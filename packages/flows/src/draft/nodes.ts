@@ -96,8 +96,8 @@ export function gateNode(id: string, position: Position): DecisionNode {
  * Changes who decides. A rule's `when` fields go, and `lockScreen` and
  * `deadline` go when a person no longer decides. Switched to a model, the
  * node starts on the decider from Settings and that decider's default
- * model; switched away, the decider and the model go, as only a model
- * reads them.
+ * model; switched away, the profile, the decider and the model go, as
+ * only a model reads them.
  */
 export function withDecidedBy(
 	node: DecisionNode,
@@ -114,6 +114,7 @@ export function withDecidedBy(
 		deadline,
 		decider: _decider,
 		model: _model,
+		profile: _profile,
 		...rest
 	} = node;
 	if (by === "model") {
@@ -181,12 +182,12 @@ export function valueNode(id: string, position: Position): ValueNode {
 /**
  * Changes who makes the value. The expression and the prompt both stay, for
  * when their mode comes back. A model starts on the first decider that can
- * make a value; a rule drops the decider and the model, as only a model
- * reads them.
+ * make a value; a rule drops the profile, the decider and the model, as
+ * only a model reads them.
  */
 export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 	if (by === node.by) return node;
-	const { decider, model: _model, ...rest } = node;
+	const { decider, model: _model, profile: _profile, ...rest } = node;
 	if (by === "rule") return { ...rest, by };
 	return {
 		...node,

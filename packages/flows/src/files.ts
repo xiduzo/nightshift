@@ -5,6 +5,11 @@ import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "./document";
 import { callersOf } from "./draft";
 import { flowNameSchema } from "./nodes";
 import {
+	type ProfilesSource,
+	type ProjectProfiles,
+	parseProfilesSource,
+} from "./profiles";
+import {
 	SCHEDULES_VERSION,
 	type Schedule,
 	type ScheduleFlowInfo,
@@ -21,7 +26,8 @@ import {
 
 /**
  * Node-only: reads and writes `.nightshift/flows/*.json` and
- * `.nightshift/schedules.json` in a repo. Not
+ * `.nightshift/schedules.json` in a repo, and reads
+ * `.nightshift/profiles.json`. Not
  * exported from the index. Reading migrates older versions in memory
  * (`migrateFlow`); the file on disk changes only when it is written.
  */
@@ -237,6 +243,37 @@ export async function writeSchedulesFile(
 		"utf8",
 	);
 	return validateSchedules(schedules, await scheduleFlowInfos(repoPath));
+}
+
+function profilesPath(repoPath: string): string {
+	return join(repoPath, ".nightshift", "profiles.json");
+}
+
+/**
+ * `.nightshift/profiles.json` as it is on disk, unparsed: what a Device
+ * hands the Walker of a run placed on it, which reads it with
+ * `parseProfilesSource`. Null when there is no file.
+ */
+export async function readProfilesSource(
+	repoPath: string,
+): Promise<ProfilesSource> {
+	return readJson(profilesPath(repoPath));
+}
+
+/** The profiles file of a repo, read. */
+export type LoadedProfiles = ProjectProfiles & {
+	/** Absolute path of `.nightshift/profiles.json`. */
+	path: string;
+};
+
+/** Reads `.nightshift/profiles.json`. A missing file is no profiles (`parseProfilesSource`). */
+export async function readProfilesFile(
+	repoPath: string,
+): Promise<LoadedProfiles> {
+	return {
+		path: profilesPath(repoPath),
+		...parseProfilesSource(await readProfilesSource(repoPath)),
+	};
 }
 
 /** The inputs and the error count of every flow file, for `validateSchedules`. */

@@ -59,11 +59,26 @@ describe("decider", () => {
 	});
 
 	test("goes with its model when a model no longer decides", () => {
-		const node = gate({ by: "model", decider: "openai", model: "m" });
+		const node = gate({
+			by: "model",
+			decider: "openai",
+			model: "m",
+			profile: "triage",
+		});
 		for (const by of ["person", "rule"] as const) {
 			const next = withDecidedBy(node, by);
 			expect("decider" in next || "model" in next).toBe(false);
+			expect("profile" in next).toBe(false);
 		}
+		expect(
+			withValueBy(
+				{
+					...withValueBy(valueNode("v", { x: 0, y: 0 }), "model"),
+					profile: "triage",
+				},
+				"rule",
+			),
+		).not.toHaveProperty("profile");
 	});
 
 	test("a Value by a rule has none; by a model, one that can make a value", () => {

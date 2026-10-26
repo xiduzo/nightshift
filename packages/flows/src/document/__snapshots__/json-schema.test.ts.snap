@@ -554,6 +554,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "object",
                 },
+                "profile": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
                 "prompt": {
                   "type": "string",
                 },
@@ -823,6 +827,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "y",
                   ],
                   "type": "object",
+                },
+                "profile": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
                 },
                 "prompt": {
                   "type": "string",
@@ -2022,6 +2030,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "object",
                 },
+                "profile": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
                 "prompt": {
                   "type": "string",
                 },
@@ -2304,6 +2316,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "y",
                   ],
                   "type": "object",
+                },
+                "profile": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
                 },
                 "prompt": {
                   "type": "string",
@@ -3448,6 +3464,265 @@ exports[`published schemas agentProfileSchema as JSON Schema 1`] = `
 }
 `;
 
+exports[`published schemas profileSchema as JSON Schema 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "anyOf": [
+      {
+        "properties": {
+          "clis": {
+            "default": [],
+            "items": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "connections": {
+            "default": [],
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string",
+          },
+          "effort": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+            ],
+            "type": "string",
+          },
+          "harness": {
+            "anyOf": [
+              {
+                "enum": [
+                  "claude-code",
+                  "opencode",
+                  "codex",
+                  "grok-build",
+                  "copilot",
+                  "gemini",
+                  "cursor",
+                  "pi",
+                ],
+                "type": "string",
+              },
+              {
+                "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+                "type": "string",
+              },
+            ],
+          },
+          "model": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "type": "string",
+          },
+          "permissionMode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "auto",
+              "bypassPermissions",
+              "plan",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "harness",
+          "model",
+          "permissionMode",
+          "name",
+        ],
+        "type": "object",
+      },
+      {
+        "properties": {
+          "decider": {
+            "enum": [
+              "typesafe",
+              "openrouter",
+              "openai",
+              "ollaya",
+              "ollama",
+            ],
+            "type": "string",
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string",
+          },
+          "model": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "type": "string",
+          },
+        },
+        "required": [
+          "decider",
+          "name",
+        ],
+        "type": "object",
+      },
+    ],
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "anyOf": [
+      {
+        "additionalProperties": false,
+        "properties": {
+          "clis": {
+            "default": [],
+            "items": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "connections": {
+            "default": [],
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string",
+          },
+          "effort": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+            ],
+            "type": "string",
+          },
+          "harness": {
+            "anyOf": [
+              {
+                "enum": [
+                  "claude-code",
+                  "opencode",
+                  "codex",
+                  "grok-build",
+                  "copilot",
+                  "gemini",
+                  "cursor",
+                  "pi",
+                ],
+                "type": "string",
+              },
+              {
+                "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+                "type": "string",
+              },
+            ],
+          },
+          "model": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "type": "string",
+          },
+          "permissionMode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "auto",
+              "bypassPermissions",
+              "plan",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "harness",
+          "model",
+          "permissionMode",
+          "clis",
+          "connections",
+          "name",
+        ],
+        "type": "object",
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "decider": {
+            "enum": [
+              "typesafe",
+              "openrouter",
+              "openai",
+              "ollaya",
+              "ollama",
+            ],
+            "type": "string",
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string",
+          },
+          "model": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "type": "string",
+          },
+        },
+        "required": [
+          "decider",
+          "name",
+        ],
+        "type": "object",
+      },
+    ],
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+}
+`;
+
 exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 {
   "input": {
@@ -3569,7 +3844,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
   "callNodeSchema": "3db8301e635a18936d1f3dd38a3d3b832e454808871572edde59bb8910fd74c3",
-  "chatRequestSchema": "e0a05a40e68d8aa0ea1d7c6046aa1715a428ab1fb2133706ec2e85e3c62275b4",
+  "chatRequestSchema": "2d0a2185ed9ad7e16e97be6f10f6c86bc54caf09916c34095a5575e8a63ee79b",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -3579,7 +3854,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "customHarnessSchema": "340fd5e4d3041404dcebc63ea2a312d8dba0e6b3c15d5b50b154df7a8f58ddb7",
   "decidedBySchema": "ba1eaed1ee91e185e0fe25e4b3ab48ebc800aac50bbe3b6f3762a1ddd7c5e6fe",
   "deciderNameSchema": "844c61e968f871120362b07648dd4375a0c6183fe79a59bfd0d521792c578247",
-  "decisionNodeSchema": "afc388913ce98b12f135314e045c2c9e323c05c02b977b0e3922257bb66a3500",
+  "decisionNodeSchema": "ed86d1f8009ce4db19d682af3b7238e88f9ba8e14227722c44b91253c4d4d367",
   "deviceNameSchema": "c385fef4336b7131063a6ba2bc416a02725ab5eedb75af59ca29bafd252dc91b",
   "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
   "endNodeSchema": "9860d3288583367ade9b096862b726129131ef682df8a10ef4623a742ebc9953",
@@ -3587,9 +3862,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "4e58a57dbdcdde303d6d10214d8ca7ccb35069ea8a49a4e5fc1171538b5effb2",
+  "flowNodeSchema": "fd55e4f8cad49200b8caaceba387123636c47e6cf514314b1edb9d878d18397e",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "917ada863765aad8db591a3ed0491e5549feffb57c53e2b1f74da55a7cf4319c",
+  "flowSchema": "4edb2858a188c8135a14afe0bcfcbefea3b457be63b56bc32022a490835f34d9",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -3602,6 +3877,8 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "listSourceSchema": "bd777218a3c3b14d1c54cb33fe527fe2e9e6055bcac39c002184e8a17fd9665e",
   "loginSchema": "23ccb4d365d96d062435a2ef12ff312587d07237ee383dfa9c7330e9db6ad64d",
   "mcpServerSchema": "a26196da9adb9b7777c1554b9c04c2be3e49961c1dc5b9a2b94ed1d9b1253727",
+  "modelProfileSchema": "3d10ac1bbeb3d3b12978834420d98fd3be50023f6fc7927855563522cb37a083",
+  "modelProfileSettingsSchema": "f135cd7b5b22046393026354bd060bf6dc08cfd5c7f107d0b4916292c2c456c4",
   "nameSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
   "nodeIdSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
   "option": "6bf55e601c5096c5094c68aa7ec3842acb0de882ce5552afb5e23334595396d9",
@@ -3609,6 +3886,8 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
   "policySchema": "c71ca6d9449c26281734e9b83bd509468adc49682849863fca0aea5ad00f48a0",
+  "profileSchema": "0165ead8699fec436d41796fb0955feffcc6b4f201b0397ca25cd993719194e5",
+  "profileSettingsSchema": "4c1961c44eec004cdae153b1e41e4bc22ef0666c00b2e29c5a4e7109b4ec00d6",
   "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
   "scheduleSchema": "c6e4ea959d51459d55f9b393d9344350cbe092773ac566d3cb1ac354a0c8c4dd",
   "scheduleSignalSchema": "72340129c840cb54c596990620242a4a89780d13706772bdabc77b1f8ebf3dad",
@@ -3617,14 +3896,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "0ff5c448e4c68f19fb0ee36478a87dc1722974630ee7c724e560913424a13d72",
+  "suggestionRequestSchema": "3f89437c37b4da3d5bbf3f56e55265966920b35f39d90490d5e0c6e365f2eac2",
   "suggestionSchema": "c016ec35c4f46cb10c11eda434d2b56ab3b389c52a8553c10df07e27697800f6",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",
   "valueBySchema": "bd03d7f4d6a9ce81bfdb8638ac71508d4761cd359a8b94bdc2fc070915a01cfd",
   "valueDeciderNameSchema": "7c7f28413777a1a59ae0c47ed82503caa6029be37a82ed9c774e89e468b946a0",
-  "valueNodeSchema": "3dc5d1af5414cd694f6660c3e1c711ba10401d283ae92e6c4cea2673dda3b08e",
+  "valueNodeSchema": "c66791946ea8d5be0326a437c1af900d8cffe44c26243072fa5ee29502f20f3f",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
   "waitNodeSchema": "7bedcef5392aa97907a474e2bad158b5563f6a59d94d44e59a566c526231c4e2",

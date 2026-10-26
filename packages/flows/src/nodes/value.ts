@@ -5,6 +5,7 @@ import {
 	isObjectSchema,
 	jsonSchemaSchema,
 	type NodeCheck,
+	nameSchema,
 	nodeBase,
 	placed,
 } from "./base";
@@ -62,9 +63,16 @@ export const valueNodeSchema = z.object({
 	/** `by: "model"` only: the brief for the model. Supports templates. */
 	prompt: z.string().optional(),
 	/**
+	 * `by: "model"` only: a Model Profile (on this computer, or in the
+	 * project's `.nightshift/profiles.json`) that names the decider and its
+	 * model. Its decider must make values. The node's own `decider` and
+	 * `model` win over it. A run resolves it when it starts.
+	 */
+	profile: nameSchema.optional(),
+	/**
 	 * `by: "model"` only: a decider that can make a value
-	 * (`valueDeciderNameSchema`). Unset: OpenRouter (`valueDecider`). A Value
-	 * by a rule has none.
+	 * (`valueDeciderNameSchema`). Unset: the profile's, else OpenRouter
+	 * (`valueDecider`). A Value by a rule has none.
 	 */
 	decider: deciderNameSchema.optional(),
 	/** `by: "model"` only. The decider's model. Unset: the decider's default chat model. */
@@ -90,7 +98,9 @@ export function checkValueNode(node: ValueNode, check: NodeCheck): void {
  * A Value node's output schema must describe an object. Made by a rule, it
  * needs an expression that parses and reads only inputs or nodes of the
  * flow. Made by a model, it needs a prompt and a decider that can make a
- * value (one with a text adapter: TypeSafe and Ollaya only decide).
+ * value (one with a text adapter: TypeSafe and Ollaya only decide). A
+ * profile's decider is checked when a run resolves it. Only a model reads
+ * a profile.
  */
 function checkMaker(node: ValueNode, check: NodeCheck): void {
 	if (!isObjectSchema(node.output)) {
@@ -103,12 +113,20 @@ function checkMaker(node: ValueNode, check: NodeCheck): void {
 			check.error(`Value node "${node.id}" needs a prompt for the model.`);
 		}
 		const decider = valueDecider(node);
-		if (!canMakeValue(decider)) {
+		// A profile gives the decider when the node names none.
+		const fromProfile =
+			node.profile !== undefined && node.decider === undefined;
+		if (!fromProfile && !canMakeValue(decider)) {
 			check.error(
 				`Value node "${node.id}" uses the decider "${decider}", which cannot make a value. Choose one of: ${valueDeciderNameSchema.options.join(", ")}.`,
 			);
 		}
 		return;
+	}
+	if (node.profile !== undefined) {
+		check.error(
+			`Value node "${node.id}" names the profile "${node.profile}", but a rule makes it. Only a model reads a profile. Remove the profile, or let a model make it.`,
+		);
 	}
 	const expression = node.expression ?? "";
 	if (expression.trim() === "") {

@@ -43,6 +43,7 @@ describe("published schemas", () => {
 		"flowSchema",
 		"schedulesFileSchema",
 		"agentProfileSchema",
+		"profileSchema",
 		"customAgentSchema",
 	]) {
 		test(`${name} as JSON Schema`, () => {

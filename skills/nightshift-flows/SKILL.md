@@ -51,7 +51,7 @@ The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`,
 
 ### agent
 
-A coding-agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`). Name a `profile` (an Agent Profile of this computer), or set `harness` (claude-code, opencode, codex, grok-build, copilot, gemini, cursor, pi, or `acp:<slug>`), `model` and `permissionMode` (default, acceptEdits, auto, bypassPermissions, plan) yourself. A profile is better. Optional: `effort`, `session` (`fresh`, or `resume` to continue its last session on a later visit), `clis` (programs it may run, for example `gh`), `connections`, `idleMinutes`, `output` (a JSON Schema for an object: the agent must report `data` that matches it), `outcomes` (its own outcomes, each `{ name, description }`; replaces the default ones), `ask: "person"`. With `ask: "person"`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step `fail`. Do not draw a `needs-input` edge then, and do not build that loop with a Gate yourself.
+A coding-agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`). Name a `profile`, or set `harness` (claude-code, opencode, codex, grok-build, copilot, gemini, cursor, pi, or `acp:<slug>`), `model` and `permissionMode` (default, acceptEdits, auto, bypassPermissions, plan) yourself. A profile is better. Optional: `effort`, `session` (`fresh`, or `resume` to continue its last session on a later visit), `clis` (programs it may run, for example `gh`), `connections`, `idleMinutes`, `output` (a JSON Schema for an object: the agent must report `data` that matches it), `outcomes` (its own outcomes, each `{ name, description }`; replaces the default ones), `ask: "person"`. With `ask: "person"`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step `fail`. Do not draw a `needs-input` edge then, and do not build that loop with a Gate yourself.
 
 Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outcome`, `output`, `summary`, `data`, `note`, `visit`, `session_id`.
 
@@ -67,7 +67,7 @@ Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_
 
 ### decision
 
-Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; `decider` (one of typesafe, openrouter, openai, ollaya, ollama) and `model` are optional and read only then.
+Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama) and `model`, all optional.
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
@@ -83,7 +83,7 @@ Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. O
 
 ### value
 
-Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and optionally a `decider` that can make a value (openrouter, openai, ollama). Use it to compute or reshape a value, often with `set`.
+Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and optionally a `profile` or a `decider` that can make a value (openrouter, openai, ollama). Use it to compute or reshape a value, often with `set`.
 
 Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 
@@ -153,6 +153,10 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 ## Schedules and webhooks
 
 A schedule in `.nightshift/schedules.json` starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls.
+
+## Profiles
+
+An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer and in `.nightshift/profiles.json`: `{ "version": 1, "profiles": [{ "name": "triage", "decider": "openrouter" }] }`. The computer's wins. Put the ones a flow needs in the project.
 
 ## Sections
 
