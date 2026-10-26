@@ -1,6 +1,7 @@
 import { appRouter, runSpaceFor } from "@nightshift/api";
 import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
 import { READS, READS_HEADER } from "@nightshift/devices";
+import { WEBHOOK_PATH } from "@nightshift/flows";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { ORPCError, onError } from "@orpc/server";
@@ -20,6 +21,7 @@ import { decodedRequest, UnreadableBody } from "./request-encoding";
 import { runExportResponse } from "./run-export";
 import type { DaemonServe } from "./serve";
 import { peerAddress } from "./this-computer";
+import { webhookResponse } from "./webhook";
 
 /** The relay's WebSocket: Yjs documents sync here (see `sync/`). */
 export const SYNC_PATH = "/sync";
@@ -34,8 +36,9 @@ const API_REFERENCE_PAGES = new Set([
 ]);
 
 /**
- * What Bun serves: the Hono app (the health check, Better Auth, the run
- * export, run artifacts, the procedures), and the sync WebSocket beside it. Bun upgrades
+ * What Bun serves: the Hono app (the health check, the webhooks of
+ * schedules, Better Auth, the run export, run artifacts, the procedures),
+ * and the sync WebSocket beside it. Bun upgrades
  * the socket itself, so the sync path never reaches Hono.
  */
 export function createHttp(
@@ -77,6 +80,15 @@ export function createHttp(
 
 	// Each poll is a request: only a developer reads a line for each.
 	if (services.logRequests) app.use(logger());
+
+	// A webhook for a schedule: the one call anyone may make without a
+	// session. The schedule's secret is its check (`webhook.ts`).
+	app.post(`${WEBHOOK_PATH}/:projectId/:scheduleId`, (c) =>
+		webhookResponse(services.engine, c.req.raw, {
+			projectId: c.req.param("projectId"),
+			scheduleId: c.req.param("scheduleId"),
+		}),
+	);
 	app.use(
 		"/*",
 		cors({

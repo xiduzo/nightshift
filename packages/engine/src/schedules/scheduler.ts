@@ -20,6 +20,7 @@ import {
 	type RunTrigger,
 } from "../log";
 import type { RunSummary } from "../read";
+import type { WebhookDelivery } from "./webhooks";
 
 /**
  * The scheduler: starts the runs of `.nightshift/schedules.json` when their
@@ -106,6 +107,9 @@ const SCHEDULE_EVENT_TYPES = [
 ] as const satisfies readonly EngineEventType[];
 
 const OPEN_STATUSES: readonly RunStatus[] = ["running", "waiting", "sleeping"];
+
+/** A schedule the cron line starts: one with a cron line and a flow, and no webhook. */
+type CronSchedule = Schedule & { cron: string; flow: string };
 
 function keyOf(projectId: string, scheduleId: string): string {
 	return `${projectId}/${scheduleId}`;
@@ -236,7 +240,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
 	async function consider(
 		projectId: string,
-		schedule: Schedule,
+		schedule: CronSchedule,
 		at: number,
 	): Promise<void> {
 		const key = keyOf(projectId, schedule.id);
@@ -344,7 +348,12 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				if (seen.has(schedule.id)) continue;
 				seen.add(schedule.id);
 				const key = keyOf(projectId, schedule.id);
+				const { cron, flow } = schedule;
+				// A webhook's schedule starts when the webhook arrives (`webhooks.ts`).
 				if (
+					cron === undefined ||
+					flow === undefined ||
+					schedule.webhook !== undefined ||
 					!schedule.enabled ||
 					(deps.firesHere && !(await deps.firesHere(projectId, schedule)))
 				) {
@@ -352,7 +361,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					continue;
 				}
 				if (!watchedSince.has(key)) watchedSince.set(key, at);
-				await consider(projectId, schedule, at);
+				await consider(projectId, { ...schedule, cron, flow }, at);
 			}
 		}
 	}
@@ -396,8 +405,11 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			return history.get(keyOf(projectId, scheduleId))?.last ?? null;
 		},
 		nextAt(projectId, schedule, at) {
-			if (!schedule.enabled) return null;
-			const due = latestCronTime(schedule.cron, at);
+			const { cron } = schedule;
+			if (!schedule.enabled || cron === undefined || schedule.webhook) {
+				return null;
+			}
+			const due = latestCronTime(cron, at);
 			const current = history.get(keyOf(projectId, schedule.id));
 			if (
 				due !== null &&
@@ -406,7 +418,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			) {
 				return due;
 			}
-			return nextCronTimes(schedule.cron, at, 1)[0] ?? null;
+			return nextCronTimes(cron, at, 1)[0] ?? null;
 		},
 	};
 }
@@ -433,9 +445,12 @@ export type ScheduleResult =
 	  };
 
 export type ScheduleSummary = Schedule & {
-	/** The next start (epoch ms). Null when paused or the cron line does not parse. */
+	/** The next start (epoch ms). Null when paused, for a webhook, or when the cron line does not parse. */
 	nextAt: number | null;
+	/** How the last cron time went. Null for a webhook. */
 	last: ScheduleResult | null;
+	/** A webhook's latest deliveries, newest first. Empty for a cron line. */
+	deliveries: WebhookDelivery[];
 	/** Problems of this schedule. One with an error fails to start. */
 	issues: ScheduleIssue[];
 };

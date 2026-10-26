@@ -50,6 +50,11 @@ const runTriggerSchema = z.discriminatedUnion("kind", [
 		scheduleId: z.string(),
 		at: z.number(),
 	}),
+	z.object({
+		kind: z.literal("webhook"),
+		scheduleId: z.string(),
+		at: z.number(),
+	}),
 ]);
 
 const costFields = {

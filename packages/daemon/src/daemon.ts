@@ -368,6 +368,8 @@ export async function createDaemon(
 		// Otherwise the Settings switch is read on every tick.
 		scheduler:
 			env.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
+		// The secret a webhook schedule names: the keychain, then the environment.
+		secret: (name) => connections.secret(name),
 		// The relay below is made once per process, before any access is removed.
 		disconnect: (deviceId) =>
 			hot.nightshiftSync?.disconnect(

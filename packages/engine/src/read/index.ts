@@ -14,6 +14,7 @@ export {
 	deriveWorktrees,
 	isOpenStatus,
 	parkedSteps,
+	type SleepFact,
 } from "./derive-run";
 export type {
 	DerivedItem,

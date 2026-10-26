@@ -147,6 +147,8 @@ export type DevicesDeps = {
 	keyStore: { prefer?: KeyStoreKind };
 	/** The engine's scheduler: off, or on until the signal aborts. */
 	scheduler: PeerEngineOptions["scheduler"];
+	/** A secret's value by name: the secret a webhook schedule names. */
+	secret?: PeerEngineOptions["secret"];
 	/** Ends the relay connections of a Device whose access was removed. */
 	disconnect(deviceId: string): void;
 	/** Kept across `bun --hot` reloads: what the runtime before this one hands over. */
@@ -213,6 +215,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			profileFor: (name) => deps.profiles.settingsFor(name),
 			spaceDocuments: deps.spaces,
 			scheduler: deps.scheduler,
+			...(deps.secret ? { secret: deps.secret } : {}),
 			// The hub for the Spaces this computer keeps; its Hosts for the others.
 			work: createWorkRelay({
 				hub: handover.hub,

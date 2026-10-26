@@ -43,6 +43,15 @@ export const scheduleListSchema = exact<ScheduleList>()(
 						}),
 					])
 					.nullable(),
+				deliveries: z.array(
+					z.object({
+						at: z.number(),
+						result: z.enum(["accepted", "filtered", "refused"]),
+						reason: z.string().nullable(),
+						runId: z.string().nullable(),
+						woke: z.number(),
+					}),
+				),
 				issues: z.array(scheduleIssueSchema),
 			}),
 		),

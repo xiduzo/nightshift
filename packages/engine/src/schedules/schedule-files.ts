@@ -8,15 +8,19 @@ import type {
 	ScheduleResult,
 	Scheduler,
 } from "./scheduler";
+import type { Webhooks } from "./webhooks";
 
 /**
  * A project's schedules file as a person reads and saves it: each
- * schedule with its next start and how its last cron time went, and on a
- * save the Person each schedule on another Person's Device runs for.
+ * schedule with its next start and how its last cron time went (a
+ * webhook's: its latest deliveries), and on a save the Person each
+ * schedule on another Person's Device runs for.
  */
 export type ScheduleFilesDeps = {
 	now(): number;
 	scheduler: Pick<Scheduler, "refresh" | "nextAt" | "last">;
+	/** The latest webhooks of each webhook schedule. */
+	webhooks: Pick<Webhooks, "deliveries">;
 	/** The run's status, or null when the log knows no such run. */
 	runStatus(runId: string): Promise<RunStatus | null>;
 	/** The schedules as a Person saves them, with the Offers of another Person's Device (`Peers.offers`). */
@@ -52,6 +56,9 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 					...schedule,
 					nextAt: scheduler.nextAt(project.id, schedule, at),
 					last: await scheduleResult(scheduler.last(project.id, schedule.id)),
+					deliveries: schedule.webhook
+						? await deps.webhooks.deliveries(project.id, schedule.id)
+						: [],
 					issues: loaded.issues.filter(
 						(issue) => issue.scheduleId === schedule.id,
 					),

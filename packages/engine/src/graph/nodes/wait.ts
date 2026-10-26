@@ -38,8 +38,11 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * - `duration` and `time`: `done` (a person who wakes it early skips the rest);
  * - `command`: the command runs again; exit 0 is `done`, else the step
  *   sleeps `everyMinutes` more and tries again;
- * - `signal`: `done` when the wake is that signal (`pending.signal`), else
- *   the step keeps waiting.
+ * - `signal`: `done` when the wake is that signal (`pending.signal`), with
+ *   the event of the webhook that sent it as `data`; else the step keeps
+ *   waiting. A `key` is rendered when the wait starts and logged with it
+ *   (`WaitStarted.signalKey`): the webhook signals match on it
+ *   (`run/signals.ts`).
  *
  * The pending wait's streak carries what the node needs across its sleeps:
  * `since` is when the wait began (the deadline and `waited_minutes` count
@@ -152,12 +155,7 @@ async function startWait(
 			});
 		}
 		case "signal":
-			return sleep(node, {
-				until: null,
-				deadline,
-				message: `Waits for the signal "${until.name}".`,
-				signal: until.name,
-			});
+			return sleep(node, signalWait(until, step, deadline));
 	}
 }
 
@@ -187,6 +185,8 @@ async function continueWait(
 	// A stop between the wake and the node's entry ends the step there.
 	if (step.signal.aborted) return { kind: "aborted", outputs };
 	if (until.kind === "signal" && pending.signal === until.name) {
+		// A webhook's signal brings its event: the step's data.
+		if (pending.signalData !== undefined) outputs.data = pending.signalData;
 		return end("done");
 	}
 	if (deadline !== null && now >= deadline) return end("timeout");
@@ -205,13 +205,33 @@ async function continueWait(
 		}
 		case "signal":
 			// A timer or a person woke it before the signal came: keep waiting.
-			return sleep(node, {
-				until: null,
-				deadline,
-				message: `Waits for the signal "${until.name}".`,
-				signal: until.name,
-			});
+			return sleep(node, signalWait(until, step, deadline));
 	}
+}
+
+/**
+ * A wait on a signal: no wake time, the deadline, and the key rendered
+ * now, so a webhook's signal is matched against the run's own values.
+ */
+function signalWait(
+	until: Extract<WaitUntil, { kind: "signal" }>,
+	step: StepHandle,
+	deadline: number | null,
+): Omit<OwnWait, "reason"> {
+	const key =
+		until.key === undefined
+			? undefined
+			: renderTemplate(until.key, step.tctx).trim();
+	return {
+		until: null,
+		deadline,
+		message:
+			key === undefined
+				? `Waits for the signal "${until.name}".`
+				: `Waits for the signal "${until.name}" with the key "${key}".`,
+		signal: until.name,
+		...(key === undefined ? {} : { signalKey: key }),
+	};
 }
 
 /**

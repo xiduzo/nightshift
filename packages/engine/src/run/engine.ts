@@ -1,5 +1,5 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import { isCustomHarness } from "@nightshift/flows";
+import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
 import type { Actor, MemberChange, StartRunInput } from "../contract";
@@ -39,13 +39,17 @@ import {
 import {
 	createScheduleFiles,
 	createScheduler,
+	createWebhooks,
 	DEFAULT_SCHEDULE_TICK_MS,
+	type WebhookAnswer,
+	type WebhookRequest,
 } from "../schedules";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
+import { createSignals } from "./signals";
 import { createSpaces } from "./space";
 import type { SpaceEngine } from "./space-engine";
 import { takeOver } from "./take-over";
@@ -138,6 +142,15 @@ export interface Engine {
 	 * offline look again now, instead of at their next try.
 	 */
 	deviceBack(deviceId: string): Promise<void>;
+	/**
+	 * A webhook for a schedule (`POST /hooks/<project>/<schedule>`): the
+	 * answer for its sender, and `done`, the run's start and the signal
+	 * that follow it (`schedules/webhooks.ts`). Never throws for a request
+	 * nobody may know about: that is `not-found`.
+	 */
+	webhook(
+		request: WebhookRequest,
+	): Promise<{ answer: WebhookAnswer; done: Promise<void> }>;
 	/**
 	 * Hands this computer's runs over to a new engine in the same process
 	 * (`bun --hot` evaluates the daemon again). Stops the scheduler, the
@@ -363,6 +376,15 @@ export function createEngine(
 		selfName: device.name,
 	});
 
+	// The Device a schedule names fires it. Without one, the Replica that
+	// keeps the Space (its Host, or the one Device of a Space without one).
+	// A webhook schedule's webhooks go to the same Device.
+	const firesHere = async (projectId: string, schedule: Schedule) => {
+		if (schedule.device !== undefined) return schedule.device === device.name;
+		const row = await projects.find(projectId);
+		return (await hostOf(row.spaceId)) === null;
+	};
+
 	const scheduler = createScheduler({
 		db,
 		now,
@@ -371,13 +393,7 @@ export function createEngine(
 		log: runLog,
 		projects: projects.list,
 		enabled: () => runSettings().scheduler,
-		// The Device a schedule names fires it. Without one, the Replica that
-		// keeps the Space (its Host, or the one Device of a Space without one).
-		firesHere: async (projectId, schedule) => {
-			if (schedule.device !== undefined) return schedule.device === device.name;
-			const row = await projects.find(projectId);
-			return (await hostOf(row.spaceId)) === null;
-		},
+		firesHere,
 		runStatus: reads.runStatus,
 	});
 	if (options.scheduler !== false) {
@@ -400,6 +416,22 @@ export function createEngine(
 		await ready;
 		return runStart.start(input, trigger);
 	}
+
+	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
+	const signals = createSignals({ db, log: runLog, runner });
+
+	const webhooks = createWebhooks({
+		db,
+		now,
+		log: runLog,
+		repoPath: async (projectId) => (await projects.find(projectId)).repoPath,
+		secret: options.secret ?? (async (name) => process.env[name]),
+		firesHere,
+		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
+		enabled: () => options.scheduler !== false && runSettings().scheduler,
+		startRun: startRunWith,
+		signal: (projectId, signal) => signals.send(projectId, signal),
+	});
 
 	const relay = createRunRelay({
 		db,
@@ -469,6 +501,7 @@ export function createEngine(
 		scheduleFiles: createScheduleFiles({
 			now,
 			scheduler,
+			webhooks,
 			runStatus: reads.runStatus,
 			schedulesWithOffers: peers.offers.schedulesWithOffers,
 		}),
@@ -496,6 +529,10 @@ export function createEngine(
 		async deviceBack(_deviceId) {
 			await ready;
 			await wakeOfflineSleeps({ db, log: runLog, runner });
+		},
+		async webhook(request) {
+			await ready;
+			return webhooks.receive(request);
 		},
 		async dispose() {
 			lifetime.abort();

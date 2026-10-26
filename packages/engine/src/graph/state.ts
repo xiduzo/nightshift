@@ -96,6 +96,8 @@ const pendingWaitSchema = z.object({
 		.nullable(),
 	/** A Wait node on a signal: the signal that ended the wait, set by the wait node on a signal resume. */
 	signal: z.string().optional(),
+	/** What came with that signal: the webhook event (`{ body, headers }`) that sent it. */
+	signalData: z.json().optional(),
 });
 const pendingParkedSchema = z.object({
 	kind: z.literal("parked"),
@@ -270,7 +272,8 @@ export type ResumeValue =
 	| { kind: "resume"; prompt?: string }
 	| { kind: "reopen" }
 	| { kind: "gate"; choice: string; note?: string }
-	| { kind: "signal"; name: string };
+	/** A signal ended the wait. `data`: the webhook event that sent it, if one did. */
+	| { kind: "signal"; name: string; data?: JsonValue };
 
 /** What a step streams while it runs (LangGraph's `custom` stream mode). */
 export type RunEvent =

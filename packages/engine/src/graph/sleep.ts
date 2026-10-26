@@ -1,5 +1,5 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
-import type { FlowNode, WaitUntil } from "@nightshift/flows";
+import type { FlowNode, JsonValue, WaitUntil } from "@nightshift/flows";
 
 import type { LoggedEvent, PolicyWaitReason, RunBus, RunLog } from "../log";
 import {
@@ -85,6 +85,8 @@ export type OwnWait = {
 	message: string;
 	/** A wait on a signal: its name. */
 	signal?: string;
+	/** A wait on a signal with a key: the key, rendered. */
+	signalKey?: string;
 };
 
 /** The step's Device (or the one its work must move from) is offline. */
@@ -239,6 +241,10 @@ export async function sleep(
 		request.kind === "own" && request.signal !== undefined
 			? { signal: request.signal }
 			: {};
+	const signalKey =
+		request.kind === "own" && request.signalKey !== undefined
+			? { signalKey: request.signalKey }
+			: {};
 	// The Device a policy wait is about (a usage limit is its harness
 	// login's), or the one that is offline. A Wait node's own wait has none.
 	const deviceId =
@@ -257,6 +263,7 @@ export async function sleep(
 			message,
 			since,
 			...signal,
+			...signalKey,
 			...deviceId,
 		},
 	});
@@ -348,7 +355,13 @@ export function waitNode(
 			}
 			if (answer?.kind === "signal") {
 				return new Command({
-					update: { pending: { ...pending, signal: answer.name } },
+					update: {
+						pending: {
+							...pending,
+							signal: answer.name,
+							...(answer.data !== undefined ? { signalData: answer.data } : {}),
+						},
+					},
 					goto: nodeId,
 				});
 			}
@@ -375,8 +388,16 @@ export function waitNode(
 /** setTimeout cannot wait longer; a longer wait checks the clock and waits again. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
-/** How a sleep ends: the timer, a person early (with a follow-up), or a signal. */
-export type Wake = { early: boolean; prompt?: string; signal?: string };
+/**
+ * How a sleep ends: the timer, a person early (with a follow-up), or a
+ * signal, with the webhook event that sent it as `data`.
+ */
+export type Wake = {
+	early: boolean;
+	prompt?: string;
+	signal?: string;
+	data?: JsonValue;
+};
 
 /** What a wake does to a run, from its log and its thread (`planWake`). */
 export type WakePlan =
@@ -421,7 +442,11 @@ export function planWake(
 	if (!step) throw new Error(`Step not found: ${sleeping.stepId}`);
 	const resume: ResumeValue =
 		how.signal !== undefined
-			? { kind: "signal", name: how.signal }
+			? {
+					kind: "signal",
+					name: how.signal,
+					...(how.data !== undefined ? { data: how.data } : {}),
+				}
 			: {
 					kind: "wake",
 					early: how.early,

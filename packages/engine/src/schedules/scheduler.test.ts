@@ -232,6 +232,7 @@ describe("the scheduler", () => {
 					runId: run.id,
 					runStatus: "finished",
 				},
+				deliveries: [],
 				issues: [],
 			},
 		]);

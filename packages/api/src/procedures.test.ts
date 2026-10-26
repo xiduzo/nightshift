@@ -101,6 +101,10 @@ const engine: Context["engine"] = {
 	onRunEvents: () => () => {},
 	runHere: async () => null,
 	deviceBack: async () => {},
+	webhook: async () => ({
+		answer: { kind: "not-found" },
+		done: Promise.resolve(),
+	}),
 	dispose: async () => {},
 };
 

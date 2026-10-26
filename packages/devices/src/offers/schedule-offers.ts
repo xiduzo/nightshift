@@ -60,9 +60,12 @@ export function createScheduleOffers(deps: {
 			}
 			let nodes: FlowNode[] = [];
 			try {
+				// A webhook that only sends a signal starts no flow: it has no nodes.
+				const flowName = schedule.flow;
+				if (flowName === undefined) throw new Error("No flow.");
 				const loaded = flowsForRun(await readFlowSources(project.repoPath), {
 					projectId: project.id,
-					flowName: schedule.flow,
+					flowName,
 				});
 				nodes = [loaded.flow, ...Object.values(loaded.calledFlows)]
 					.flatMap((f) => f.nodes)

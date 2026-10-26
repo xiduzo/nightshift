@@ -68,4 +68,10 @@ export type EngineOptions = {
 	 * of a clone. Default: the git programs on this computer.
 	 */
 	git?: Git;
+	/**
+	 * A secret's value by name: the secret a webhook schedule names as
+	 * `${NAME}`. The daemon passes its Secrets (the keychain, then the
+	 * environment). Default: the environment.
+	 */
+	secret?: (name: string) => Promise<string | undefined>;
 };

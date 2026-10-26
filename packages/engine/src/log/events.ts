@@ -407,6 +407,11 @@ export type EnginePayloads = {
 		since: number;
 		/** A Wait node on a signal: the signal's name. */
 		signal?: string;
+		/**
+		 * A Wait node on a signal with a `key`: the key, rendered. Only a
+		 * webhook signal with the same key wakes it. Absent: any does.
+		 */
+		signalKey?: string;
 		/** The Device the step waits for or on: a usage limit is its harness login's. */
 		deviceId?: string;
 	};
@@ -449,6 +454,26 @@ export type EnginePayloads = {
 		reason: string;
 		/** The earlier run that still runs, when that is the reason. */
 		runId: string | null;
+	};
+	/**
+	 * A webhook arrived for a schedule and its secret checked out: the
+	 * schedule took it (`accepted`: it started a run, sent its signal, or
+	 * tried to), or its `when` did not hold or failed (`filtered`). A
+	 * webhook that was refused (no secret, a wrong one) is never logged:
+	 * anyone may send one. Logged without a run id on the row. `at` is when
+	 * it arrived.
+	 */
+	WebhookReceived: {
+		projectId: string;
+		scheduleId: string;
+		at: number;
+		result: "accepted" | "filtered";
+		/** The run it started. */
+		runId: string | null;
+		/** How many runs its signal woke. */
+		woke: number;
+		/** Why the run did not start, or why the rule or the key failed. */
+		error: string | null;
 	};
 };
 
@@ -639,8 +664,10 @@ export type StepOutcome =
 	| "stopped" // a person stopped the run
 	| "interrupted"; // the daemon died while the step ran
 
-/** What started a run: a person, or a schedule of `.nightshift/schedules.json`. */
+/** What started a run: a person, or a schedule of `.nightshift/schedules.json` at a cron time or on a webhook. */
 export type RunTrigger =
 	| { kind: "manual" }
 	/** `at`: the cron time the run started for (epoch ms). */
-	| { kind: "schedule"; scheduleId: string; at: number };
+	| { kind: "schedule"; scheduleId: string; at: number }
+	/** `at`: when the webhook arrived (epoch ms). */
+	| { kind: "webhook"; scheduleId: string; at: number };

@@ -120,6 +120,8 @@ export type SleepFact = {
 	message: string;
 	/** The signal the step waits for, else null. */
 	signal: string | null;
+	/** The key a webhook signal must have to wake it, else null: any does. */
+	signalKey: string | null;
 };
 
 /**
@@ -152,6 +154,7 @@ export function deriveSleep(
 		until: wait.payload.until,
 		message: wait.payload.message,
 		signal: wait.payload.signal ?? null,
+		signalKey: wait.payload.signalKey ?? null,
 	};
 }
 
