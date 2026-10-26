@@ -47,7 +47,11 @@ export function engineRunSource(
 	return {
 		subscribe: (listener) =>
 			engine.onRunEvents((events) => {
-				listener([...new Set(events.map((e) => e.runId))]);
+				// A spend so far changes no run's status.
+				const runIds = new Set(
+					events.filter((e) => e.type !== "SessionUsage").map((e) => e.runId),
+				);
+				if (runIds.size > 0) listener([...runIds]);
 			}),
 		async run(runId) {
 			// One row and the facts the run log keeps, not the run page.
