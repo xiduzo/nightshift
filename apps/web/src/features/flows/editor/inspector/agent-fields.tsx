@@ -403,6 +403,7 @@ export function AgentFields({
 				{taskKind === "prompt" ? (
 					<TemplateField
 						id={`${id}-prompt`}
+						language="markdown"
 						label="Prompt"
 						hint="What the agent should do."
 						flow={flow}

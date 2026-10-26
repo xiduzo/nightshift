@@ -341,6 +341,7 @@ function SourceFields({
 			return (
 				<TemplateField
 					id={`${id}-command`}
+					language="bash"
 					label="Source command"
 					hint="A shell command that prints the list as JSON, for example cat tasks.json."
 					flow={flow}

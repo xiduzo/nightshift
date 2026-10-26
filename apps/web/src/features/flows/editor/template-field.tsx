@@ -20,6 +20,10 @@ import {
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@nightshift/ui/components/native-select";
 import { Popover, PopoverContent } from "@nightshift/ui/components/popover";
 import {
 	Tooltip,
@@ -38,7 +42,12 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { CodeTextarea } from "@/shared/code";
+import {
+	CODE_LANGUAGES,
+	type CodeLanguage,
+	CodeTextarea,
+	guessLanguage,
+} from "@/shared/code";
 
 import {
 	isSuggestKey,
@@ -67,8 +76,9 @@ import { useProjectFlowMap } from "./project-flows-context";
  * Call's `results`, a JSON input) leaves the cursor before the closing
  * braces, ready for a path: `{{planner.data.tasks}}`. A prompt (`assist`)
  * gets the prompt helper: "Suggest prompt" under the field, or Cmd/Ctrl+I.
- * A multi-line field marks its templates, highlights its `language`, stays
- * below a set height and opens in a larger window.
+ * A multi-line field marks its templates and highlights its `language`, or
+ * the language its text looks like. It stays below a set height and opens
+ * in a larger window, where the person can pick another language.
  */
 export function TemplateField({
 	id,
@@ -109,7 +119,8 @@ export function TemplateField({
 	/** Under the field, such as another helper ("Suggest command"). */
 	action?: ReactNode;
 	/** The code in a multi-line field, such as `bash`, to highlight. */
-	language?: string;
+	/** The language of the field, such as `bash`. Without it, a guess. */
+	language?: CodeLanguage;
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
 	const assistant = useFlowAssistant();
@@ -117,6 +128,9 @@ export function TemplateField({
 		assist === "prompt" && multiline && assistant !== undefined ? nodeId : null;
 	const [helping, setHelping] = useState<PromptTarget | null>(null);
 	const [large, setLarge] = useState(false);
+	const [picked, setPicked] = useState<CodeLanguage | null>(null);
+	const usual = language ?? guessLanguage(value) ?? "text";
+	const shown = picked ?? usual;
 	// The cursor moves along between the field and its larger window.
 	const caret = useRef<[number, number] | null>(null);
 	const showLarge = (next: boolean) => {
@@ -185,14 +199,14 @@ export function TemplateField({
 				id={id}
 				value={value}
 				placeholder={placeholder}
-				language={language}
+				language={shown}
 				marks={TEMPLATE}
 				className={cn(
 					"min-h-28 font-mono text-xs leading-relaxed",
 					large ? "field-sizing-fixed h-[60vh] max-h-none" : "max-h-80 pr-9",
 					className,
 				)}
-				spellCheck={language === undefined ? undefined : false}
+				spellCheck={shown === "markdown" || shown === "text"}
 				aria-invalid={invalid}
 				aria-required={required}
 				aria-describedby={describedBy}
@@ -313,13 +327,34 @@ export function TemplateField({
 							{extras}
 						</div>
 					) : null}
-					<DialogFooter>
+					<DialogFooter className="sm:justify-between">
+						<NativeSelect
+							size="sm"
+							aria-label="Highlight as"
+							value={picked ?? ""}
+							onChange={(event) =>
+								setPicked((event.target.value || null) as CodeLanguage | null)
+							}
+						>
+							<NativeSelectOption value="">
+								{`${language ? "Usual" : "Guess"}: ${labelOf(usual)}`}
+							</NativeSelectOption>
+							{CODE_LANGUAGES.map((entry) => (
+								<NativeSelectOption key={entry.value} value={entry.value}>
+									{entry.label}
+								</NativeSelectOption>
+							))}
+						</NativeSelect>
 						<DialogClose render={<Button />}>Done</DialogClose>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 		</div>
 	);
+}
+
+function labelOf(language: CodeLanguage): string {
+	return CODE_LANGUAGES.find((entry) => entry.value === language)?.label ?? "";
 }
 
 /** A `{{name.path}}` template in a field's text. */

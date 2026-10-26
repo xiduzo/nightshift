@@ -133,6 +133,7 @@ export function DecisionFields({
 				</Field>
 				<TemplateField
 					id={`${id}-prompt`}
+					language="markdown"
 					label={prompt.label}
 					hint={prompt.hint}
 					flow={flow}

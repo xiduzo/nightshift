@@ -256,6 +256,7 @@ function CheckerFields({
 			</div>
 			<TemplateField
 				id={`${id}-prompt`}
+				language="markdown"
 				label="What to check (optional)"
 				hint="The model also gets the task, the summary, the final message and the data."
 				flow={flow}

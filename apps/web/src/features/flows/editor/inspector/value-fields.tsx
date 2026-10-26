@@ -117,6 +117,7 @@ export function ValueFields({
 				) : (
 					<TemplateField
 						id={`${id}-prompt`}
+						language="markdown"
 						label="Prompt"
 						hint="What to make, with the context it needs. The model answers with data in the shape below."
 						flow={flow}

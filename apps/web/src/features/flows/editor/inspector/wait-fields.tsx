@@ -101,6 +101,7 @@ export function WaitFields({
 				<>
 					<TemplateField
 						id={`${id}-command`}
+						language="bash"
 						label="Command"
 						hint='Runs in the project until it succeeds. Put templates in quotes, for example: gh pr checks "{{pr}}".'
 						flow={flow}

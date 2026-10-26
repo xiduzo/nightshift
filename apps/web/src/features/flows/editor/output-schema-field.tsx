@@ -6,12 +6,12 @@ import {
 	FieldError,
 	FieldLabel,
 } from "@nightshift/ui/components/field";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { CodeTextarea } from "@/shared/code";
 
 import { OutputSuggest } from "../assistant/field-helpers";
 
@@ -272,9 +272,10 @@ export function OutputSchemaField({
 						)}
 						{helper}
 					</div>
-					<Textarea
+					<CodeTextarea
 						id={id}
 						value={text}
+						language="json"
 						placeholder={
 							rootObject
 								? '{\n  "type": "object",\n  "properties": { "title": { "type": "string" } }\n}'

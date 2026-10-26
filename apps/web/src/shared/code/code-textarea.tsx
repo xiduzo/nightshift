@@ -50,7 +50,8 @@ export function CodeTextarea({
 						{end}
 					</div>
 				) : null}
-				<div>
+				{/* Bold or italic text would no longer line up with the textarea. */}
+				<div className="[&_span]:[font-style:inherit]! [&_span]:[font-weight:inherit]!">
 					{lines.map((line, index) => (
 						<Fragment key={index}>
 							{index > 0 ? "\n" : null}
