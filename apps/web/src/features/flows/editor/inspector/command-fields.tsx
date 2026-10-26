@@ -2,6 +2,7 @@
 import {
 	type CommandNode,
 	commandExits,
+	type Flow,
 	type NodeOption,
 	STANDARD_EXIT_CODES,
 	uniqueOptionName,
@@ -18,7 +19,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -30,6 +30,7 @@ import { connectionQueries } from "@/features/agents";
 import { CommandSuggest } from "../../assistant/field-helpers";
 import { Field, InspectorSection, Note } from "../fields";
 import { SecretsField } from "../secrets-field";
+import { TemplateField } from "../template-field";
 import { NodeOptionsField } from "./node-options-field";
 
 /** What a Command node keeps of its output, in the order the toggle shows them. */
@@ -39,11 +40,13 @@ const COMMAND_OUTPUTS: { value: CommandNode["output"]; label: string }[] = [
 ];
 
 export function CommandFields({
+	flow,
 	node,
 	onChange,
 	onRenameOutcome,
 	onRemoveOutcome,
 }: {
+	flow: Flow;
 	node: CommandNode;
 	onChange: (change: (node: CommandNode) => CommandNode) => void;
 	onRenameOutcome: (index: number, name: string) => string | null;
@@ -78,28 +81,22 @@ export function CommandFields({
 	return (
 		<>
 			<InspectorSection title="Command">
-				<Field
+				<TemplateField
 					id={`${id}-command`}
 					label="Command"
 					hint='The exit code picks the outcome. Put templates in quotes, for example: echo "{{worker.summary}}".'
-				>
-					<Textarea
-						id={`${id}-command`}
-						value={node.command}
-						placeholder="bun run check"
-						className="min-h-20 font-mono text-xs leading-relaxed"
-						spellCheck={false}
-						aria-invalid={node.command.trim() === ""}
-						aria-describedby={`${id}-command-hint`}
-						onChange={(event) => {
-							const command = event.target.value;
-							onChange((current) => ({ ...current, command }));
-						}}
-					/>
-					<div className="self-start">
-						<CommandSuggest node={node} />
-					</div>
-				</Field>
+					flow={flow}
+					nodeId={node.id}
+					value={node.command}
+					placeholder="bun run check"
+					language="bash"
+					className="min-h-20"
+					invalid={node.command.trim() === ""}
+					onChange={(command) =>
+						onChange((current) => ({ ...current, command }))
+					}
+					action={<CommandSuggest node={node} />}
+				/>
 				<Field
 					id={`${id}-output`}
 					label="Output"

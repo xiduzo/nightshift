@@ -344,7 +344,7 @@ function LinesField<T>({
 				aria-label={label}
 				value={text}
 				placeholder={placeholder}
-				className="min-h-12 font-mono text-xs"
+				className="max-h-40 min-h-12 font-mono text-xs"
 				spellCheck={false}
 				aria-invalid={error !== null}
 				aria-describedby={error ? errorId : undefined}

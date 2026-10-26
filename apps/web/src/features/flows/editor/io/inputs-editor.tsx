@@ -232,7 +232,7 @@ function InputRow({
 					aria-invalid={defaultError !== null}
 					aria-describedby={defaultError ? `${id}-default-error` : undefined}
 					placeholder='Default, as JSON (optional): {"title": "…"}'
-					className="min-h-12 font-mono text-xs"
+					className="max-h-40 min-h-12 font-mono text-xs"
 					spellCheck={false}
 					onChange={(event) => setOptional("default", event.target.value)}
 				/>

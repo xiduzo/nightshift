@@ -79,6 +79,7 @@ export function FlowInspector({
 						id={`${id}-description`}
 						value={flow.description ?? ""}
 						placeholder="What this flow does, in one line."
+						className="max-h-60"
 						onChange={(event) => {
 							const description = event.target.value;
 							onChange((current) => ({

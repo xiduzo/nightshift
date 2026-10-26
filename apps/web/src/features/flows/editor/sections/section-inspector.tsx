@@ -200,6 +200,7 @@ export function SectionInspector({
 						id={`${id}-description`}
 						value={section.description ?? ""}
 						placeholder="What this part of the flow does"
+						className="max-h-60"
 						rows={2}
 						onChange={(event) => {
 							const description = event.target.value;

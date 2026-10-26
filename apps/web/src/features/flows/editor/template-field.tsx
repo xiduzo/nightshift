@@ -11,20 +11,34 @@ import {
 	CommandItem,
 	CommandList,
 } from "@nightshift/ui/components/command";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
 import { Input } from "@nightshift/ui/components/input";
 import { Popover, PopoverContent } from "@nightshift/ui/components/popover";
-import { Textarea } from "@nightshift/ui/components/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { BracesIcon, ChevronRightIcon } from "lucide-react";
+import { BracesIcon, ChevronRightIcon, Maximize2Icon } from "lucide-react";
 import {
 	type KeyboardEvent,
 	type ReactNode,
 	type RefObject,
+	useCallback,
 	useEffect,
 	useId,
 	useRef,
 	useState,
 } from "react";
+import { CodeTextarea } from "@/shared/code";
 
 import {
 	isSuggestKey,
@@ -53,6 +67,8 @@ import { useProjectFlowMap } from "./project-flows-context";
  * Call's `results`, a JSON input) leaves the cursor before the closing
  * braces, ready for a path: `{{planner.data.tasks}}`. A prompt (`assist`)
  * gets the prompt helper: "Suggest prompt" under the field, or Cmd/Ctrl+I.
+ * A multi-line field marks its templates, highlights its `language`, stays
+ * below a set height and opens in a larger window.
  */
 export function TemplateField({
 	id,
@@ -70,6 +86,7 @@ export function TemplateField({
 	required,
 	assist,
 	action,
+	language,
 }: {
 	id: string;
 	label: ReactNode;
@@ -91,12 +108,39 @@ export function TemplateField({
 	assist?: "prompt";
 	/** Under the field, such as another helper ("Suggest command"). */
 	action?: ReactNode;
+	/** The code in a multi-line field, such as `bash`, to highlight. */
+	language?: string;
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
 	const assistant = useFlowAssistant();
 	const helperNode =
 		assist === "prompt" && multiline && assistant !== undefined ? nodeId : null;
 	const [helping, setHelping] = useState<PromptTarget | null>(null);
+	const [large, setLarge] = useState(false);
+	// The cursor moves along between the field and its larger window.
+	const caret = useRef<[number, number] | null>(null);
+	const showLarge = (next: boolean) => {
+		const field = ref.current;
+		caret.current = field ? [field.selectionStart, field.selectionEnd] : null;
+		setLarge(next);
+	};
+	// The field and its larger window each put the cursor back when they show.
+	const attach = useCallback(
+		(field: (HTMLTextAreaElement & HTMLInputElement) | null) => {
+			ref.current = field;
+			if (field && caret.current) {
+				const [start, end] = caret.current;
+				field.setSelectionRange(start, end);
+				// Near the cursor: its share of the lines, a little above the middle.
+				const lines = field.value.split("\n").length;
+				const before = field.value.slice(0, start).split("\n").length;
+				field.scrollTop =
+					(field.scrollHeight * before) / lines - field.clientHeight / 2;
+				caret.current = null;
+			}
+		},
+		[],
+	);
 	const openHelper = () =>
 		setHelping({ base: value, selection: selectionOf(ref.current) });
 	const flows = useProjectFlowMap();
@@ -134,6 +178,100 @@ export function TemplateField({
 
 	const describedBy = hint ? `${id}-hint` : undefined;
 
+	const editor = multiline ? (
+		<div className="relative">
+			<CodeTextarea
+				ref={attach}
+				id={id}
+				value={value}
+				placeholder={placeholder}
+				language={language}
+				marks={TEMPLATE}
+				className={cn(
+					"min-h-28 font-mono text-xs leading-relaxed",
+					large ? "field-sizing-fixed h-[60vh] max-h-none" : "max-h-80 pr-9",
+					className,
+				)}
+				spellCheck={language === undefined ? undefined : false}
+				aria-invalid={invalid}
+				aria-required={required}
+				aria-describedby={describedBy}
+				aria-keyshortcuts={helperNode !== null ? "Meta+I Control+I" : undefined}
+				{...suggest.fieldProps}
+				onChange={(event) => {
+					onChange(event.target.value);
+					suggest.track(event.target);
+				}}
+				onKeyDown={(event) => {
+					if (helperNode !== null && isSuggestKey(event)) {
+						event.preventDefault();
+						openHelper();
+						return;
+					}
+					suggest.onKeyDown(event, complete);
+				}}
+			/>
+			{large ? null : (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="icon-xs"
+								className="absolute top-1.5 right-1.5 text-muted-foreground"
+								aria-label="Open in a larger window"
+								onClick={() => showLarge(true)}
+							/>
+						}
+					>
+						<Maximize2Icon />
+					</TooltipTrigger>
+					<TooltipContent>Open in a larger window</TooltipContent>
+				</Tooltip>
+			)}
+		</div>
+	) : (
+		<Input
+			ref={ref}
+			id={id}
+			value={value}
+			placeholder={placeholder}
+			className={cn("font-mono text-xs", className)}
+			spellCheck={false}
+			aria-invalid={invalid}
+			aria-required={required}
+			aria-describedby={describedBy}
+			{...suggest.fieldProps}
+			onChange={(event) => {
+				onChange(event.target.value);
+				suggest.track(event.target);
+			}}
+			onKeyDown={(event) => suggest.onKeyDown(event, complete)}
+		/>
+	);
+	// Under the field: the helpers, the variables, and the list for `{{`.
+	const helpers = (
+		<>
+			{helperNode !== null ? (
+				<PromptSuggest
+					nodeId={helperNode}
+					value={value}
+					target={helping}
+					onOpen={openHelper}
+					onClose={() => setHelping(null)}
+					field={ref}
+				/>
+			) : null}
+			{action ? <div className="self-start">{action}</div> : null}
+		</>
+	);
+	const extras = (
+		<>
+			<TemplateSuggestions anchor={ref} suggest={suggest} onPick={complete} />
+			<TemplateVariables groups={groups} onInsert={insert} />
+		</>
+	);
+
 	return (
 		<div className="flex flex-col gap-2">
 			<Field
@@ -150,72 +288,42 @@ export function TemplateField({
 				}
 				hint={hint}
 			>
-				{multiline ? (
-					<Textarea
-						ref={ref}
-						id={id}
-						value={value}
-						placeholder={placeholder}
-						className={cn(
-							"max-h-80 min-h-28 font-mono text-xs leading-relaxed",
-							className,
-						)}
-						aria-invalid={invalid}
-						aria-required={required}
-						aria-describedby={describedBy}
-						aria-keyshortcuts={
-							helperNode !== null ? "Meta+I Control+I" : undefined
-						}
-						{...suggest.fieldProps}
-						onChange={(event) => {
-							onChange(event.target.value);
-							suggest.track(event.target);
-						}}
-						onKeyDown={(event) => {
-							if (helperNode !== null && isSuggestKey(event)) {
-								event.preventDefault();
-								openHelper();
-								return;
-							}
-							suggest.onKeyDown(event, complete);
-						}}
-					/>
-				) : (
-					<Input
-						ref={ref}
-						id={id}
-						value={value}
-						placeholder={placeholder}
-						className={cn("font-mono text-xs", className)}
-						spellCheck={false}
-						aria-invalid={invalid}
-						aria-required={required}
-						aria-describedby={describedBy}
-						{...suggest.fieldProps}
-						onChange={(event) => {
-							onChange(event.target.value);
-							suggest.track(event.target);
-						}}
-						onKeyDown={(event) => suggest.onKeyDown(event, complete)}
-					/>
+				{large ? null : (
+					<>
+						{editor}
+						{helpers}
+					</>
 				)}
-				{helperNode !== null ? (
-					<PromptSuggest
-						nodeId={helperNode}
-						value={value}
-						target={helping}
-						onOpen={openHelper}
-						onClose={() => setHelping(null)}
-						field={ref}
-					/>
-				) : null}
-				{action ? <div className="self-start">{action}</div> : null}
 			</Field>
-			<TemplateSuggestions anchor={ref} suggest={suggest} onPick={complete} />
-			<TemplateVariables groups={groups} onInsert={insert} />
+			{large ? null : extras}
+			{/* The same field, larger. Only one of the two is on the page. */}
+			<Dialog open={large} onOpenChange={showLarge}>
+				<DialogContent
+					initialFocus={ref}
+					finalFocus={ref}
+					className="flex max-h-[90vh] flex-col sm:max-w-4xl"
+				>
+					<DialogHeader>
+						<DialogTitle>{label}</DialogTitle>
+					</DialogHeader>
+					{large ? (
+						<div className="flex min-h-0 flex-col gap-2 overflow-y-auto">
+							{editor}
+							{helpers}
+							{extras}
+						</div>
+					) : null}
+					<DialogFooter>
+						<DialogClose render={<Button />}>Done</DialogClose>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
+
+/** A `{{name.path}}` template in a field's text. */
+const TEMPLATE = /\{\{[^{}]*\}\}/g;
 
 /** The variables a field can use, grouped by name; a click inserts one. */
 function TemplateVariables({

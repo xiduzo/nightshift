@@ -164,6 +164,7 @@ export function NodeInspector({
 				) : null}
 				{node.type === "command" ? (
 					<CommandFields
+						flow={flow}
 						node={node}
 						onChange={(change) =>
 							onChange((current) =>

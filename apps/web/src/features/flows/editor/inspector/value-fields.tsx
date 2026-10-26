@@ -101,7 +101,7 @@ export function ValueFields({
 							id={`${id}-expression`}
 							value={expression}
 							placeholder={EXPRESSION_EXAMPLE}
-							className="min-h-24 font-mono text-xs leading-relaxed"
+							className="max-h-80 min-h-24 font-mono text-xs leading-relaxed"
 							spellCheck={false}
 							aria-invalid={expression.trim() === ""}
 							aria-describedby={`${id}-expression-hint`}
