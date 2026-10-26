@@ -8,6 +8,7 @@ import type {
 	NotificationItem,
 	NotificationWatchClient,
 } from "../notifications";
+import { createProjectQueries } from "../projects";
 import { createRunQueries, type RunWatchClient, type Wait } from "../runs";
 import { createScheduleQueries } from "../schedules";
 import { createLiveCache } from "./cache";
@@ -92,10 +93,12 @@ const KEYS = {
 	flowHealth: createDashboardQueries(orpc).flow("p1", "fix").queryKey,
 	schedules: createScheduleQueries(orpc).list("p1").queryKey,
 	cron: createScheduleQueries(orpc).preview("0 3 * * *").queryKey,
+	projects: createProjectQueries(orpc).list().queryKey,
+	branches: createProjectQueries(orpc).branches("p1").queryKey,
 } as const;
 type Name = keyof typeof KEYS;
 
-/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules. */
+/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules, the projects' counts. */
 const RUN_1: Name[] = [
 	"everyRun",
 	"ofProject",
@@ -105,6 +108,7 @@ const RUN_1: Name[] = [
 	"dashboard",
 	"flowHealth",
 	"schedules",
+	"projects",
 ];
 /** What a missed stretch of the stream reads again: the Gates, and what every run changes. */
 const EVERYTHING: Name[] = ["gates", ...RUN_1, "run2", "step2", "files2"];
@@ -287,7 +291,7 @@ describe("the live cache follows the Host", () => {
 		expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
 	});
 
-	test("a run that ends or changes reads that run, the lists, the dashboard and the schedules again", async () => {
+	test("a run that ends or changes reads that run, the lists, the dashboard, the schedules and the projects again", async () => {
 		for (const item of [
 			ended("run-finished"),
 			ended("run-failed"),
@@ -314,7 +318,7 @@ describe("the live cache follows the Host", () => {
 		await host.send(runChanged, { ...runChanged, runId: "r2" }, runChanged);
 		timers.due(300);
 		expect(stale()).toEqual(sorted([...RUN_1, "run2", "step2", "files2"]));
-		// Each run's detail, opened steps and files once, then the lists, the dashboard, the schedules.
+		// Each run's detail, opened steps and files once, then the lists, the dashboard, the schedules, the projects.
 		expect(reads).toEqual([
 			runs.getKey("r1"),
 			runs.getKey("r2"),
@@ -325,6 +329,7 @@ describe("the live cache follows the Host", () => {
 			runs.lists(),
 			orpc.dashboard.key(),
 			orpc.schedules.list.key(),
+			orpc.projects.list.key(),
 		]);
 	});
 

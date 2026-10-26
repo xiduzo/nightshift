@@ -19,6 +19,7 @@ import {
 	routeOf,
 	staleGates,
 } from "../notifications";
+import { createProjectQueries } from "../projects";
 import {
 	createRunQueries,
 	followRun,
@@ -49,7 +50,7 @@ import type { Notice, ShownNotifications } from "./shown";
 /**
  * What a screen reads again. `gates`: the open Gates. `run`: what one run
  * changes, its detail and files, the lists of runs, the dashboard's
- * numbers and a schedule's last start. `runs`: the same for every run.
+ * numbers, a schedule's last start and the run counts of the projects. `runs`: the same for every run.
  * The Devices a run can run on or move to do not change with a run.
  */
 type Read =
@@ -169,6 +170,7 @@ export function createLiveCache({
 	const runs = createRunQueries(orpc);
 	const dashboard = createDashboardQueries(orpc);
 	const schedules = createScheduleQueries(orpc);
+	const projects = createProjectQueries(orpc);
 	const openKey = gates.open().queryKey;
 	/** The notifications stream was live before: a new `live` may have missed items. */
 	let wasLive = false;
@@ -185,7 +187,7 @@ export function createLiveCache({
 		steps: new Set<string>(),
 		/** The runs whose files to read. */
 		files: new Set<string>(),
-		/** A run changed: the lists of runs, the dashboard and the schedules. */
+		/** A run changed: the lists of runs, the dashboard, the schedules and the projects. */
 		lists: false,
 	};
 	let waiting = false;
@@ -240,6 +242,8 @@ export function createLiveCache({
 				invalidate(runs.lists());
 				invalidate(dashboard.all());
 				invalidate(schedules.lists());
+				// Each project carries the counts of its runs (the sidebar, the phone's Projects).
+				invalidate(projects.lists());
 			}
 		}, READ_MS);
 	}

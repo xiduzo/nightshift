@@ -5,8 +5,10 @@ export function createProjectQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every projects query. Invalidate it after a project changes. */
 		all: () => orpc.projects.key(),
-		/** The projects of the active Space. */
+		/** The projects of the active Space, each with the counts of its runs. */
 		list: () => orpc.projects.list.queryOptions(),
+		/** Every list of projects. A run that changes changes its counts. */
+		lists: () => orpc.projects.list.key(),
 		/** Whether the folder at `path` can be a project: git, a repository, a commit. */
 		check: (path: string) =>
 			orpc.projects.check.queryOptions({ input: { path } }),
