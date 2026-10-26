@@ -18,7 +18,9 @@ import type { FlowUse } from "../flows";
 import type { Branches, Project } from "../projects";
 import type {
 	OpenGate,
+	ProjectRuns,
 	RunDetail,
+	RunPage,
 	RunStreamItem,
 	RunSummary,
 	StepDetail,
@@ -28,6 +30,8 @@ import type { ScheduleList } from "../schedules";
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {
 	listProjects(): Promise<Project[]>;
+	/** How the runs of each project stand, by project id. A project without runs is not in it. */
+	projectRuns(): Promise<Map<string, ProjectRuns>>;
 	/**
 	 * Fails when the path is not the top level of a git repository. A
 	 * repository without commits is added; `checkProjectFolder` says what it
@@ -137,7 +141,11 @@ export interface SpaceEngine {
 	 */
 	signalRun(runId: string, name: string): Promise<void>;
 
-	listRuns(input?: { projectId?: string }): Promise<RunSummary[]>;
+	/**
+	 * The Space's runs (of one project), newest first. With `limit`, a page
+	 * of them, after the run of `cursor`.
+	 */
+	listRuns(input?: { projectId?: string } & RunPage): Promise<RunSummary[]>;
 	getRun(runId: string): Promise<RunDetail>;
 	/**
 	 * One step of a run with what the run's summary of it leaves out: the

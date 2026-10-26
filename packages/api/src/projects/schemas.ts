@@ -6,6 +6,7 @@ import type {
 	GitInstall,
 	Project,
 	ProjectReadiness,
+	ProjectRuns,
 	RunCopies,
 } from "@nightshift/engine";
 import { z } from "zod";
@@ -31,6 +32,26 @@ export const projectSchema = exact<Project>()(
 			}),
 		),
 	}),
+);
+
+/** How the runs of a project stand. */
+const projectRunsSchema = exact<ProjectRuns>()(
+	z.object({
+		total: z.number(),
+		statuses: z.partialRecord(runStatusSchema, z.number()),
+		last: z
+			.object({ id: z.string(), title: z.string(), createdAt: z.number() })
+			.nullable(),
+		nextWakeAt: z.number().nullable(),
+	}),
+);
+
+/**
+ * A project in the list, with how its runs stand. Older Hosts send no
+ * `runs`: a screen then counts the runs it reads.
+ */
+export const listedProjectSchema = exact<Project & { runs?: ProjectRuns }>()(
+	projectSchema.extend({ runs: projectRunsSchema.optional() }),
 );
 
 /** The branches of a clone, newest commit first. */

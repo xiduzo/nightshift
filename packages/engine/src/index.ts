@@ -153,6 +153,7 @@ export {
 export type {
 	FeedStep,
 	OpenGate,
+	ProjectRuns,
 	RunDetail,
 	RunStreamItem,
 	RunSummary,

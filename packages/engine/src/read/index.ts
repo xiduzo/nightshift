@@ -45,7 +45,9 @@ export type { FeedStep } from "./run-transcript";
 export type {
 	OpenGate,
 	PendingCommand,
+	ProjectRuns,
 	RunDetail,
+	RunPage,
 	RunStreamItem,
 	RunSummary,
 	RunWalker,

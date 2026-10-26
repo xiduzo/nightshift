@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { project, run } from "@nightshift/db/schema";
+import { eq } from "drizzle-orm";
 
 import {
 	createRunBus,
@@ -144,5 +145,87 @@ describe("the read model", () => {
 			stepsHere: true,
 		});
 		expect(await reads.runHere("missing")).toBeNull();
+	});
+
+	test("a run list pages by limit and cursor, newest first", async () => {
+		// r1 is the oldest; r2 and r3 start at the same time, so the id orders them.
+		await sandbox.db
+			.update(run)
+			.set({ createdAt: new Date(1_000) })
+			.where(eq(run.id, "r1"));
+		for (const id of ["r2", "r3", "r4"]) {
+			await sandbox.db.insert(run).values({
+				id,
+				spaceId: sandbox.spaceId,
+				projectId: "p",
+				flow: "{}",
+				title: id,
+				worktreePath: "/w",
+				branch: "b",
+				baseRef: "main",
+				walkerId: sandbox.deviceId,
+				createdAt: new Date(id === "r4" ? 3_000 : 2_000),
+			});
+		}
+		const ids = (runs: { id: string }[]) => runs.map((r) => r.id);
+		const all = await reads.listRuns(sandbox.spaceId);
+		expect(ids(all)).toEqual(["r4", "r3", "r2", "r1"]);
+
+		const first = await reads.listRuns(sandbox.spaceId, undefined, {
+			limit: 2,
+		});
+		expect(ids(first)).toEqual(["r4", "r3"]);
+		const last = first.at(-1);
+		if (!last) throw new Error("No page.");
+		const second = await reads.listRuns(sandbox.spaceId, "p", {
+			limit: 2,
+			cursor: { createdAt: last.createdAt, id: last.id },
+		});
+		expect(ids(second)).toEqual(["r2", "r1"]);
+		expect(second[1]?.status).toBe("running");
+
+		// Only r1 has events of a running run.
+		const running = await reads.listRuns(sandbox.spaceId, undefined, {
+			limit: 1,
+			statuses: ["running"],
+		});
+		expect(ids(running)).toEqual(["r1"]);
+	});
+
+	test("each project's runs come counted by status, with the newest run", async () => {
+		await sandbox.db
+			.insert(project)
+			.values({ id: "q", spaceId: sandbox.spaceId, name: "q" });
+		await sandbox.db.insert(run).values({
+			id: "r2",
+			spaceId: sandbox.spaceId,
+			projectId: "p",
+			flow: "{}",
+			title: "Second",
+			worktreePath: "/w",
+			branch: "b",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+			createdAt: new Date(Date.now() + 60_000),
+		});
+		await log.append({
+			type: "RunStarted",
+			runId: "r2",
+			payload: { projectId: "p", flowName: "f", title: "t", start: "a" },
+		});
+		await log.append({
+			type: "RunEnded",
+			runId: "r2",
+			payload: { status: "finished", reason: null },
+		});
+		const counts = await reads.projectRuns(sandbox.spaceId);
+		expect(counts.get("p")).toMatchObject({
+			total: 2,
+			statuses: { running: 1, finished: 1 },
+			last: { id: "r2", title: "Second" },
+			nextWakeAt: null,
+		});
+		// A project without runs is not in it.
+		expect(counts.has("q")).toBe(false);
 	});
 });

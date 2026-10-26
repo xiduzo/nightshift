@@ -193,6 +193,30 @@ export type RunSummary = {
 	gates: { openedAt: number; closedAt: number | null }[];
 };
 
+/** How the runs of one project stand: what a project's row and the sidebar show. */
+export type ProjectRuns = {
+	total: number;
+	/** How many runs have each status. A status no run has is left out. */
+	statuses: Partial<Record<RunStatus, number>>;
+	/** The newest run. Null without runs. */
+	last: { id: string; title: string; createdAt: number } | null;
+	/** When the first of its sleeping runs wakes. Null when none waits for a time. */
+	nextWakeAt: number | null;
+};
+
+/** Where a page of runs starts: after this run, in the order newest first. */
+export type RunCursor = { createdAt: number; id: string };
+
+/**
+ * A page of a run list: at most `limit` runs, after `cursor`, with one of
+ * `statuses`. Without them, every run.
+ */
+export type RunPage = {
+	limit?: number;
+	cursor?: RunCursor;
+	statuses?: readonly RunStatus[];
+};
+
 /**
  * One run of a called flow inside a run: a Call step once, or one item of
  * a Call step with `each`. It has no row of its own.

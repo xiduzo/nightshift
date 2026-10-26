@@ -10,10 +10,14 @@ import {
 	ownDeviceSchema,
 	placementSchema,
 	runDetailSchema,
+	runStatusSchema,
 	runStreamItemSchema,
 	runSummarySchema,
 	stepDetailSchema,
 } from "./schemas";
+
+/** The most runs one page holds. */
+const RUNS_PAGE_MAX = 200;
 
 /**
  * Lists, starts and the Devices of a project are the session's Space's. A
@@ -33,10 +37,32 @@ export const runs = {
 		.handler(({ context, input }) =>
 			context.space.listPlacements(input.projectId),
 		),
+	/**
+	 * Newest first. With `limit`, one page: the next page starts after the
+	 * last run of this one (`cursor`). Without it, every run, as older
+	 * screens ask. Older Hosts send every run whatever the input.
+	 */
 	list: protectedProcedure
-		.route({ summary: "Lists the runs of the Space, or of one project." })
+		.route({
+			summary:
+				"Lists the runs of the Space, or of one project, newest first: all of them, or one page.",
+		})
 		.output(output(z.array(runSummarySchema)))
-		.input(z.object({ projectId: z.string().optional() }).optional())
+		.input(
+			z
+				.object({
+					projectId: z.string().optional(),
+					/** At most this many runs. */
+					limit: z.number().int().min(1).max(RUNS_PAGE_MAX).optional(),
+					/** The last run of the page before: the runs after it follow. */
+					cursor: z
+						.object({ createdAt: z.number(), id: z.string() })
+						.optional(),
+					/** Only runs with one of these statuses. */
+					statuses: z.array(runStatusSchema).min(1).optional(),
+				})
+				.optional(),
+		)
 		.handler(({ context, input }) => context.space.listRuns(input)),
 	get: runProcedure(z.object({ runId: z.string() }))
 		.route({

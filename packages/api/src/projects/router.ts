@@ -1,3 +1,4 @@
+import type { ProjectRuns } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -14,20 +15,38 @@ import {
 	gitHubCloneSchema,
 	gitHubRepoSchema,
 	gitInstallSchema,
+	listedProjectSchema,
 	projectReadinessSchema,
 	projectSchema,
 	projectSourcesSchema,
 	runCopiesSchema,
 } from "./schemas";
 
+/** How the runs of a project without runs stand. */
+const NO_RUNS: ProjectRuns = {
+	total: 0,
+	statuses: {},
+	last: null,
+	nextWakeAt: null,
+};
+
 export const projects = {
 	list: protectedProcedure
 		.route({
 			summary:
-				"Lists the projects of the Space, with the Devices that have a Clone of each.",
+				"Lists the projects of the Space, with the Devices that have a Clone of each and how their runs stand.",
 		})
-		.output(output(z.array(projectSchema)))
-		.handler(({ context }) => context.space.listProjects()),
+		.output(output(z.array(listedProjectSchema)))
+		.handler(async ({ context }) => {
+			const [projects, runs] = await Promise.all([
+				context.space.listProjects(),
+				context.space.projectRuns(),
+			]);
+			return projects.map((project) => ({
+				...project,
+				runs: runs.get(project.id) ?? NO_RUNS,
+			}));
+		}),
 	add: permitted({ project: ["add"] })
 		.route({
 			summary:

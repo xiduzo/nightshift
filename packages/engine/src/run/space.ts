@@ -125,6 +125,11 @@ export function createSpaces(deps: SpacesDeps) {
 				return withClones(spaceId, await projects.listInSpace(spaceId));
 			},
 
+			async projectRuns() {
+				await ready;
+				return reads.projectRuns(spaceId);
+			},
+
 			async addProject(input) {
 				await ready;
 				const [added] = await withClones(spaceId, [
@@ -242,7 +247,13 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listRuns(input) {
 				await ready;
-				const runs = await reads.listRuns(spaceId, input?.projectId);
+				const runs = await reads.listRuns(spaceId, input?.projectId, {
+					...(input?.limit !== undefined ? { limit: input.limit } : {}),
+					...(input?.cursor !== undefined ? { cursor: input.cursor } : {}),
+					...(input?.statuses !== undefined
+						? { statuses: input.statuses }
+						: {}),
+				});
 				const shown = await deps.pathsFor(spaceId, actor);
 				return Promise.all(runs.map(shown));
 			},

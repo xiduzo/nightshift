@@ -4,7 +4,7 @@ import type { Database } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import {
 	type Derive,
 	type LoggedEvent,
@@ -47,8 +47,10 @@ import type {
 	ItemSummary,
 	OpenGate,
 	PendingCommand,
+	ProjectRuns,
 	RunDetail,
 	RunDevice,
+	RunPage,
 	RunStreamItem,
 	RunSummary,
 	RunWalker,
@@ -560,25 +562,51 @@ export function createReadModel(deps: ReadModelDeps) {
 		return (id) => walkerOf(known, id);
 	}
 
-	/** The Space's runs (of one project), newest first, with the facts the log gives each one. */
+	/**
+	 * The Space's runs (of one project), newest first, with the facts the
+	 * log gives each one. With `page`, at most `limit` of them with one of
+	 * its `statuses`, after its `cursor`.
+	 */
 	async function listRuns(
 		spaceId: string,
 		projectId?: string,
+		page: RunPage = {},
 	): Promise<RunSummary[]> {
-		const rows = await db
+		const { cursor, statuses } = page;
+		// A status is the log's, not a column's: those pages are cut after the facts.
+		const limit = statuses ? undefined : page.limit;
+		const query = db
 			.select()
 			.from(run)
 			.where(
 				and(
 					eq(run.spaceId, spaceId),
 					projectId ? eq(run.projectId, projectId) : undefined,
+					cursor
+						? or(
+								lt(run.createdAt, new Date(cursor.createdAt)),
+								and(
+									eq(run.createdAt, new Date(cursor.createdAt)),
+									lt(run.id, cursor.id),
+								),
+							)
+						: undefined,
 				),
 			)
-			.orderBy(desc(run.createdAt));
+			.orderBy(desc(run.createdAt), desc(run.id));
+		const read = await (limit === undefined ? query : query.limit(limit));
 		const facts = await log.derive(
-			rows.map((r) => r.id),
+			read.map((r) => r.id),
 			runFacts,
 		);
+		const rows = statuses
+			? read
+					.filter((r) => {
+						const status = facts.get(r.id)?.status;
+						return status !== undefined && statuses.includes(status);
+					})
+					.slice(0, page.limit)
+			: read;
 		const deviceOf = await namer(
 			spaceId,
 			rows.flatMap((r) => [r.walkerId, runDeviceId(r)]),
@@ -599,6 +627,58 @@ export function createReadModel(deps: ReadModelDeps) {
 	}
 
 	/** The run page of `row`, the run's row (the caller has read it). */
+	/**
+	 * How the runs of each project of the Space stand, by project id. A
+	 * project without runs is not in it. The facts are the run list's.
+	 */
+	async function projectRuns(
+		spaceId: string,
+	): Promise<Map<string, ProjectRuns>> {
+		const rows = await db
+			.select({
+				id: run.id,
+				projectId: run.projectId,
+				title: run.title,
+				createdAt: run.createdAt,
+			})
+			.from(run)
+			.where(eq(run.spaceId, spaceId))
+			.orderBy(desc(run.createdAt), desc(run.id));
+		const facts = await log.derive(
+			rows.map((r) => r.id),
+			runFacts,
+		);
+		const counts = new Map<string, ProjectRuns>();
+		for (const row of rows) {
+			let counted = counts.get(row.projectId);
+			if (!counted) {
+				// Newest first: the first row of a project is its last run.
+				counted = {
+					total: 0,
+					statuses: {},
+					last: {
+						id: row.id,
+						title: row.title,
+						createdAt: row.createdAt.getTime(),
+					},
+					nextWakeAt: null,
+				};
+				counts.set(row.projectId, counted);
+			}
+			const fact = facts.get(row.id);
+			if (!fact) continue;
+			counted.total += 1;
+			counted.statuses[fact.status] = (counted.statuses[fact.status] ?? 0) + 1;
+			if (
+				fact.wakeAt !== null &&
+				(counted.nextWakeAt === null || fact.wakeAt < counted.nextWakeAt)
+			) {
+				counted.nextWakeAt = fact.wakeAt;
+			}
+		}
+		return counts;
+	}
+
 	async function getRun(row: RunRow): Promise<RunDetail> {
 		const runId = row.id;
 		const events = await log.events(runId);
@@ -842,5 +922,14 @@ export function createReadModel(deps: ReadModelDeps) {
 		}
 	}
 
-	return { listRuns, getRun, getStep, runStatus, runHere, listGates, watch };
+	return {
+		listRuns,
+		projectRuns,
+		getRun,
+		getStep,
+		runStatus,
+		runHere,
+		listGates,
+		watch,
+	};
 }

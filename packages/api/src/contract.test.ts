@@ -405,6 +405,17 @@ describe("replies of a real engine", () => {
 		);
 		await read(appRouter.runs.list);
 		await read(appRouter.runs.list, { projectId });
+		const page = (await read(appRouter.runs.list, {
+			projectId,
+			limit: 1,
+			statuses: ["finished", "failed"],
+		})) as { id: string }[];
+		expect(page.map((r) => r.id)).toEqual([started.id]);
+		const listed = (await read(appRouter.projects.list)) as {
+			id: string;
+			runs?: { total: number };
+		}[];
+		expect(listed.find((p) => p.id === projectId)?.runs?.total).toBe(1);
 		const detail = (await read(appRouter.runs.get, { runId: started.id })) as {
 			steps: { id: string }[];
 		};
