@@ -47,7 +47,7 @@ import { orpc, SERVER_URL } from "@/shared/api";
 import { dayWord, formatDateTime, formatTime } from "@/shared/format";
 import { runMutations } from "../queries";
 import { CostText } from "./cost-text";
-import { Elapsed } from "./elapsed";
+import { useWorkTime } from "./elapsed";
 import { MoveMenu } from "./move-menu";
 import { RunStatusBadge } from "./run-status-badge";
 import { RestartStepDialog } from "./step-actions";
@@ -69,10 +69,7 @@ export function RunTitle({
 	reconnecting: boolean;
 }) {
 	const stoppable = runActions(status, run.walker.thisDevice).stop;
-	// Counts up while a step runs; otherwise ends at the last step's end.
-	const lastEnd = steps.some((step) => step.endedAt === null)
-		? null
-		: Math.max(run.createdAt, ...steps.map((step) => step.endedAt ?? 0));
+	const time = useWorkTime(steps, run.createdAt);
 
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3 lg:px-5 lg:pt-4">
@@ -118,8 +115,24 @@ export function RunTitle({
 				) : null}
 			</div>
 			<p className="ml-auto shrink-0 text-muted-foreground text-sm tabular-nums">
-				<span className="sr-only">Ran for </span>
-				<Elapsed start={run.createdAt} end={lastEnd} />
+				{time.waited ? (
+					<Tooltip>
+						<TooltipTrigger render={<span />}>
+							<span className="sr-only">Worked for </span>
+							{time.active}
+							<span className="sr-only">, waited for you {time.waited}</span>
+						</TooltipTrigger>
+						<TooltipContent>
+							Worked {time.active} · waited for you {time.waited} · open{" "}
+							{time.open}
+						</TooltipContent>
+					</Tooltip>
+				) : (
+					<>
+						<span className="sr-only">Ran for </span>
+						{time.active}
+					</>
+				)}
 				<span aria-hidden="true"> · </span>
 				<span className="sr-only">, cost </span>
 				<CostText cost={run} />

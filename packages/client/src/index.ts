@@ -165,6 +165,7 @@ export {
 	retryDelay,
 	runActions,
 	runStatusLabel,
+	runTime,
 	type SessionSummary,
 	type StepOutcome,
 	type StepState,

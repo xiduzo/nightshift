@@ -17,6 +17,7 @@ import {
 } from "@/shared/format";
 import { jsonOutput } from "../lib/run-steps";
 import { CostText } from "./cost-text";
+import { useWorkTime } from "./elapsed";
 import { StepDuration } from "./step-timeline";
 
 /** The selected step on one line: its node, outcome, when, how long, and what it cost. */
@@ -95,6 +96,7 @@ export function stepGist(step: StepSummary): string | undefined {
 /** The step's facts in a grid of small label-over-value cells: when, how long, cost, visit, exit code, sessions. */
 export function StepFacts({ step }: { step: StepSummary }) {
 	const exit = step.outputs.exit_code;
+	const time = useWorkTime([step], step.startedAt);
 	const facts: { label: string; value: ReactNode }[] = [
 		{
 			label: "Started",
@@ -107,8 +109,9 @@ export function StepFacts({ step }: { step: StepSummary }) {
 				</time>
 			),
 		},
-		{ label: "Took", value: <StepDuration step={step} /> },
+		{ label: "Took", value: time.active },
 	];
+	if (time.waited) facts.push({ label: "Waited for you", value: time.waited });
 	if (hasCost(step)) {
 		facts.push({
 			label: "Cost",

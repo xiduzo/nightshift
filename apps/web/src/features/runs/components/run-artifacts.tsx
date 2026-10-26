@@ -24,6 +24,8 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
+import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { useQuery } from "@tanstack/react-query";
 import {
 	DownloadIcon,
 	FileIcon,
@@ -40,6 +42,7 @@ import {
 	type StepSummary,
 } from "@/shared/api";
 import { formatDateTime, formatTime } from "@/shared/format";
+import { Markdown } from "@/shared/markdown";
 import { SetBy } from "./run-variables";
 
 /** Where the daemon serves one artifact's file. */
@@ -48,12 +51,18 @@ function artifactUrl(runId: string, artifact: Artifact, download = false) {
 	return download ? `${url}?download` : url;
 }
 
-type Kind = "image" | "video" | "text" | "file";
+type Kind = "image" | "video" | "markdown" | "text" | "file";
 
 function kindOf(artifact: Artifact): Kind {
 	const [type] = artifact.mediaType.split("/");
 	if (type === "image") return "image";
 	if (type === "video") return "video";
+	if (
+		artifact.mediaType === "text/markdown" ||
+		/\.(md|markdown)$/i.test(artifact.name)
+	) {
+		return "markdown";
+	}
 	if (type === "text" || artifact.mediaType === "application/json") {
 		return "text";
 	}
@@ -63,6 +72,7 @@ function kindOf(artifact: Artifact): Kind {
 const KIND_ICON = {
 	image: ImagesIcon,
 	video: VideoIcon,
+	markdown: FileTextIcon,
 	text: FileTextIcon,
 	file: FileIcon,
 } as const;
@@ -251,6 +261,8 @@ function ArtifactView({
 					controls
 					className="max-h-[70svh] w-full rounded-lg border bg-muted"
 				/>
+			) : kind === "markdown" ? (
+				<MarkdownArtifact url={url} />
 			) : kind === "text" ? (
 				<iframe
 					src={url}
@@ -282,5 +294,41 @@ function ArtifactView({
 				</Button>
 			</DialogFooter>
 		</>
+	);
+}
+
+/** A Markdown file an agent kept, rendered for reading. */
+function MarkdownArtifact({ url }: { url: string }) {
+	const text = useQuery({
+		queryKey: ["artifact-text", url],
+		queryFn: async () => {
+			const response = await fetch(url, { credentials: "include" });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			return response.text();
+		},
+		staleTime: Number.POSITIVE_INFINITY,
+	});
+	if (text.isError) {
+		return (
+			<iframe
+				src={url}
+				title="Markdown file"
+				sandbox=""
+				className="h-[60svh] w-full rounded-lg border bg-muted"
+			/>
+		);
+	}
+	return (
+		<div className="h-[60svh] overflow-y-auto rounded-lg border p-4">
+			{text.data === undefined ? (
+				<div className="flex flex-col gap-2">
+					<Skeleton className="h-4 w-1/3" />
+					<Skeleton className="h-4 w-full" />
+					<Skeleton className="h-4 w-5/6" />
+				</div>
+			) : (
+				<Markdown text={text.data} className="max-w-none" />
+			)}
+		</div>
 	);
 }

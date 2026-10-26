@@ -15,7 +15,7 @@ import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { authClient } from "@/shared/api";
 import { formatDayTime } from "@/shared/format";
 import { PanelHeader } from "@/shared/panel";
-import { Elapsed } from "../elapsed";
+import { useWorkTime } from "../elapsed";
 import { RunStatusBadge } from "../run-status-badge";
 import { InputsSection, VariablesSection } from "./run-details-data";
 import { CostSection, ProgressSection } from "./run-details-progress";
@@ -92,10 +92,7 @@ function OverviewSection({
 	status: RunStatus;
 }) {
 	const ended = ENDED.includes(status);
-	// Counts up while a step runs; otherwise ends at the last step's end.
-	const lastEnd = steps.some((step) => step.endedAt === null)
-		? null
-		: Math.max(run.createdAt, ...steps.map((step) => step.endedAt ?? 0));
+	const time = useWorkTime(steps, run.createdAt);
 
 	return (
 		<InspectorSection title="Run">
@@ -121,11 +118,19 @@ function OverviewSection({
 						<Time at={run.createdAt} />
 					</Fact>
 					<Fact label={ended ? "Ran for" : "Running for"}>
-						<span className="tabular-nums">
-							<Elapsed start={run.createdAt} end={lastEnd} />
-						</span>
+						<span className="tabular-nums">{time.active}</span>
 					</Fact>
 				</div>
+				{time.waited ? (
+					<div className="grid grid-cols-2 gap-3">
+						<Fact label="Waited for you">
+							<span className="tabular-nums">{time.waited}</span>
+						</Fact>
+						<Fact label="Open for">
+							<span className="tabular-nums">{time.open}</span>
+						</Fact>
+					</div>
+				) : null}
 				{ended && run.endedAt ? (
 					<Fact label="Ended">
 						<Time at={run.endedAt} />

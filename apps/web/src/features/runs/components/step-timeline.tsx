@@ -50,21 +50,18 @@ import {
 	stepsUnder,
 } from "../lib/run-steps";
 
-import { Elapsed } from "./elapsed";
+import { WorkTime } from "./elapsed";
 
-/** How long the step took, counting up while it runs. */
+/** How long the step took, counting up while it runs and standing still while its Gate waits. */
 export function StepDuration({ step }: { step: StepSummary }) {
-	return <Elapsed start={step.startedAt} end={step.endedAt} />;
+	return <WorkTime steps={[step]} start={step.startedAt} />;
 }
 
-/** From the first step's start to the last one's end, counting up while one runs. */
+/** From the first step's start to the last one's end, without the time a Gate waited for you. */
 function spanOf(list: StepSummary[]): ReactNode {
 	if (list.length === 0) return undefined;
 	const start = Math.min(...list.map((step) => step.startedAt));
-	const end = list.some((step) => step.endedAt === null)
-		? null
-		: Math.max(...list.map((step) => step.endedAt ?? 0));
-	return <Elapsed start={start} end={end} />;
+	return <WorkTime steps={list} start={start} />;
 }
 
 /** What the steps that can cost cost together; undefined when none did. */
