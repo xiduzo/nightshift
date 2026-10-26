@@ -11,7 +11,7 @@ const command = (id: string, command = "true") => ({
 
 /** a → b → c, with b reading a and c in a Section of its own. */
 const chain: Flow = flowSchema.parse({
-	version: 5,
+	version: 6,
 	start: "a",
 	nodes: [command("a"), command("b", "echo {{ a.stdout }}"), command("c")],
 	edges: [

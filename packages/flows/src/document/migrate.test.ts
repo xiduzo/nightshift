@@ -87,7 +87,7 @@ const v1Body = {
 
 describe("migrateFlow", () => {
 	test("leaves anything that is not a version 1 object alone", () => {
-		for (const value of [null, "x", 3, [1], { version: 5 }, {}]) {
+		for (const value of [null, "x", 3, [1], { version: 6 }, {}]) {
 			expect(migrateFlow(value)).toBe(value);
 		}
 	});
@@ -106,7 +106,7 @@ describe("migrateFlow", () => {
 
 	test("input item becomes a required json input; there are no outputs", () => {
 		const flow = migrateFlow(v1Body) as Record<string, unknown>;
-		expect(flow.version).toBe(5);
+		expect(flow.version).toBe(6);
 		expect(flow.inputs).toEqual([
 			{ name: "item", type: "json", required: true },
 		]);
@@ -193,7 +193,7 @@ describe("migrateFlow", () => {
 			edges: [],
 		});
 		expect(flow).toMatchObject({
-			version: 5,
+			version: 6,
 			inputs: [
 				{ name: "epic", label: "Epic", required: true, type: "text" },
 				{ name: "base", default: "main", type: "text" },
@@ -328,7 +328,7 @@ describe("the rpgdotexe night, as version 1", () => {
 
 describe("migrateFlow: tool sets", () => {
 	const current = (nodes: unknown[]) => ({
-		version: 5,
+		version: 6,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -402,7 +402,7 @@ describe("migrateFlow: tool sets", () => {
 
 describe("migrateFlow: list sources", () => {
 	const current = (source: unknown) => ({
-		version: 5,
+		version: 6,
 		inputs: [{ name: "epic", type: "text", required: true }],
 		outputs: [],
 		start: "each",
@@ -670,7 +670,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a Gate becomes a Decision decided by you; a Decision one decided by a model, off the Claude Code decider", () => {
 		const flow = migrateFlow(v2()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(5);
+		expect(flow.version).toBe(6);
 		expect(flow.nodes[1]).toEqual({
 			id: "decide",
 			type: "decision",
@@ -715,7 +715,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a version 1 flow goes through both steps", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(5);
+		expect(flow.version).toBe(6);
 		expect(flow.nodes.find((n) => n.id === "decide")).toMatchObject({
 			type: "decision",
 			by: "model",
@@ -787,7 +787,7 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 
 	test("a Subflow node becomes a Call node; a For Each node a Call node with each", () => {
 		const flow = migrateFlow(v3()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(5);
+		expect(flow.version).toBe(6);
 		expect(flow.nodes[0]).toEqual({
 			id: "sub",
 			label: "Review",
@@ -856,7 +856,7 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 
 	test("a version 1 flow goes through every step", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(5);
+		expect(flow.version).toBe(6);
 		expect(flow.nodes.map((n) => n.type)).toEqual([
 			"command",
 			"agent",

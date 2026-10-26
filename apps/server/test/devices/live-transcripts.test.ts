@@ -66,7 +66,7 @@ async function repo(name: string): Promise<string> {
 /** One command step that prints, waits for `marker`, and prints again. */
 function slowFlow(marker: string): Flow {
 	return {
-		version: 5,
+		version: 6,
 		inputs: [],
 		outputs: [],
 		start: "build",

@@ -1,5 +1,5 @@
 {
-	"version": 5,
+	"version": 6,
 	"description": "One Trace: the worker builds it, the check runs, a failed check goes back to a fresh worker (3 tries), then the orchestrator rescues it. A Trace that passes gets a pull request on the stack and the label `implemented`.",
 	"inputs": [
 		{

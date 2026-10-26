@@ -71,7 +71,7 @@ async function repo(name: string): Promise<string> {
 
 /** A command, then a Gate: B's run waits for an answer. */
 const gateFlow: Flow = {
-	version: 5,
+	version: 6,
 	inputs: [],
 	outputs: [],
 	start: "hello",

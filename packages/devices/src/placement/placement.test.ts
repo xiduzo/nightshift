@@ -178,7 +178,7 @@ function peerEngine(
 
 const flow = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow =>
 	({
-		version: 5,
+		version: 6,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "a",

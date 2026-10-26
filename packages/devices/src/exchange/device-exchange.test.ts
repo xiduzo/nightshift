@@ -142,7 +142,7 @@ const status = (period: { link: Link }) => period.link.state().status;
 
 /** A command, then a Gate. */
 const gateFlow = {
-	version: 5,
+	version: 6,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -169,7 +169,7 @@ const gateFlow = {
 
 /** One Agent step. */
 const agentFlow = {
-	version: 5,
+	version: 6,
 	inputs: [],
 	outputs: [],
 	start: "work",
@@ -190,7 +190,7 @@ const agentFlow = {
 
 /** One command step: a run that ends on its own. */
 const quickFlow = {
-	version: 5,
+	version: 6,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -213,7 +213,7 @@ async function forEachFlow(repoPath: string): Promise<Flow> {
 	await writeFile(
 		join(flows, "say.json"),
 		JSON.stringify({
-			version: 5,
+			version: 6,
 			inputs: [{ name: "item", type: "json", required: true }],
 			outputs: [],
 			start: "say",
@@ -230,7 +230,7 @@ async function forEachFlow(repoPath: string): Promise<Flow> {
 		}),
 	);
 	return {
-		version: 5,
+		version: 6,
 		inputs: [],
 		outputs: [],
 		start: "loop",
@@ -259,7 +259,7 @@ async function forEachFlow(repoPath: string): Promise<Flow> {
 /** One command that prints, waits for a file, and prints again. */
 function slowFlow(marker: string): Flow {
 	return {
-		version: 5,
+		version: 6,
 		inputs: [],
 		outputs: [],
 		start: "build",

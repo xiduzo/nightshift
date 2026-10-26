@@ -11,7 +11,7 @@ import { serveTools } from "./mcp";
 import { type TerminalPort, terminalTools } from "./terminal";
 
 const flow: Flow = flowSchema.parse({
-	version: 5,
+	version: 6,
 	inputs: [{ name: "issue", type: "text" }],
 	outputs: [],
 	start: "build",

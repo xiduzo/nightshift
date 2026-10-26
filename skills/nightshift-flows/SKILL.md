@@ -31,11 +31,11 @@ In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. N
 
 # Writing Night Shift flows
 
-A flow is a directed graph of nodes and edges, saved as `.nightshift/flows/<name>.json` in the project. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 5. The model never changes the graph at run time.
+A flow is a directed graph of nodes and edges, saved as `.nightshift/flows/<name>.json` in the project. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 6. The model never changes the graph at run time.
 
 ## The file
 
-`{ version: 5, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
+`{ version: 6, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
 
 - `inputs`: `{ name, type: "text" | "json", label?, description?, default?, required? }`. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
@@ -134,7 +134,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 
 ## Checklist
 
-- `version` is 5, `start` names a node, every edge connects known nodes on an outcome its source can end with.
+- `version` is 6, `start` names a node, every edge connects known nodes on an outcome its source can end with.
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names.
 - Every loop has an edge with `max`.
 - Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
@@ -143,7 +143,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 
 ```json
 {
- "version": 5,
+ "version": 6,
  "description": "Builds a task, runs the tests, fixes failures, then asks.",
  "inputs": [
   {
@@ -293,7 +293,7 @@ This one calls the flow `build-task`, which takes an input `item`.
 
 ```json
 {
- "version": 5,
+ "version": 6,
  "description": "Plans a feature, then builds each task in its own branch.",
  "inputs": [
   {

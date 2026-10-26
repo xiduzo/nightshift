@@ -27,7 +27,7 @@ import {
  * editor's Sections.
  */
 
-export const FLOW_VERSION = 5;
+export const FLOW_VERSION = 6;
 
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,

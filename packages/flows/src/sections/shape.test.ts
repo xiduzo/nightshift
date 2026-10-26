@@ -34,7 +34,7 @@ const edge = (from: string, outcome: string, to: string) => ({
  * alone.
  */
 const small: Flow = flowSchema.parse({
-	version: 5,
+	version: 6,
 	start: "a",
 	nodes: ["a", "b", "c", "d", "e", "f"].map(command),
 	edges: [

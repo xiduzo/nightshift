@@ -68,7 +68,7 @@ function makeEngine(): Engine {
 
 /** A Gate only: the run waits, and nothing touches the worktree. */
 const flow: Flow = {
-	version: 5,
+	version: 6,
 	inputs: [],
 	outputs: [],
 	start: "ship",

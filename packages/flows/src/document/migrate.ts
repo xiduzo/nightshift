@@ -24,6 +24,10 @@ import { githubSubIssuesCommand } from "../recipes";
  * cannot run the file, instead of dropping its variables. A node or an
  * input named `vars` is a validation error from now on.
  *
+ * Version 5 → 6 (`migrateV5`): the node review of 2026-10 (see
+ * `docs/research/node-review-2026-10.md`). Each change that needs a file
+ * edit adds its step here.
+ *
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
@@ -42,6 +46,9 @@ export function migrateFlow(json: unknown): unknown {
 	if (isRecord(current) && current.version === 4) {
 		current = { ...current, version: 5 };
 	}
+	if (isRecord(current) && current.version === 5) {
+		current = migrateV5(current);
+	}
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
 	const nodes = current.nodes.map((node) => {
@@ -50,6 +57,15 @@ export function migrateFlow(json: unknown): unknown {
 		return migrated;
 	});
 	return changed ? { ...current, nodes } : current;
+}
+
+/**
+ * Version 5 → 6. Steps of the node review land here, one per change.
+ */
+export function migrateV5(
+	json: Record<string, unknown>,
+): Record<string, unknown> {
+	return { ...json, version: 6 };
 }
 
 /**

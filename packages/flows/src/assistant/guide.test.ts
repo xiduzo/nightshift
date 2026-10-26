@@ -20,7 +20,7 @@ const guide = flowAuthoringGuide();
 
 /** The flow `planEachExample` calls: it takes one task as `item`. */
 const buildTask: Flow = flowSchema.parse({
-	version: 5,
+	version: 6,
 	inputs: [{ name: "item", type: "json", required: true }],
 	start: "work",
 	nodes: [
@@ -57,7 +57,7 @@ describe("the examples of the guide", () => {
 	test("each sample node is a valid node of its type", () => {
 		for (const [type, node] of Object.entries(sampleNodes)) {
 			const parsed = flowSchema.safeParse({
-				version: 5,
+				version: 6,
 				start: node.id,
 				nodes: [node],
 				edges: [],

@@ -1,5 +1,5 @@
 {
-	"version": 5,
+	"version": 6,
 	"description": "An agent reviews a pull request. You read the review, and Night Shift posts it on GitHub when you agree.",
 	"inputs": [
 		{

@@ -1,5 +1,5 @@
 {
-	"version": 5,
+	"version": 6,
 	"description": "An agent builds a task and a command checks it. A failed check goes back to an agent with the log, up to 3 tries. Then Opus tries to rescue it.",
 	"inputs": [
 		{

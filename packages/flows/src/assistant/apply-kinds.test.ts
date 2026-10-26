@@ -11,7 +11,7 @@ import {
 import { isFlowSuggestion, suggestionRequestSchema } from "./assistant";
 
 const flow: Flow = flowSchema.parse({
-	version: 5,
+	version: 6,
 	start: "review",
 	description: "Reviews a change.",
 	inputs: [{ name: "pr", type: "text" }],

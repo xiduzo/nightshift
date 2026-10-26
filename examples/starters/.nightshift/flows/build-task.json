@@ -1,5 +1,5 @@
 {
-	"version": 5,
+	"version": 6,
 	"description": "Builds and checks one task of a plan. plan-and-build runs it once for each task.",
 	"inputs": [
 		{

@@ -45,7 +45,7 @@ const gate: DecisionNode = {
 
 /** build → gate (approve → ship). */
 const gateFlow: Flow = {
-	version: 5,
+	version: 6,
 	inputs: [],
 	outputs: [],
 	start: "build",

@@ -146,7 +146,7 @@ function edge(
 }
 
 function flow(nodes: FlowNode[], edges: FlowEdge[], start = "worker"): Flow {
-	return { version: 5, inputs: [], outputs: [], start, nodes, edges };
+	return { version: 6, inputs: [], outputs: [], start, nodes, edges };
 }
 
 const errors = (issues: FlowIssue[]) =>
@@ -929,7 +929,7 @@ describe("parseFlow", () => {
 
 	test("turns schema errors into one issue per zod issue, with the path", () => {
 		const result = parseFlow({
-			version: 5,
+			version: 6,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
 			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
@@ -1866,7 +1866,7 @@ describe("validateFlow: Call", () => {
 describe("parseFlow with options", () => {
 	test("passes the options to validateFlow", () => {
 		const json = {
-			version: 5,
+			version: 6,
 			start: "each",
 			nodes: [
 				{
@@ -1903,7 +1903,7 @@ describe("parseFlow with options", () => {
 		});
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow).toMatchObject({
-			version: 5,
+			version: 6,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});

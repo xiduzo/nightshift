@@ -66,7 +66,7 @@ const command = (id: string, cmd = "true", extra: object = {}) => ({
 	...extra,
 });
 const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 5, ...input });
+	flowSchema.parse({ version: 6, ...input });
 
 describe("planSubflowFromSection on the build flow", () => {
 	test("Build: three exits through a Decision, the variables written back, outputs for the nodes outside", () => {

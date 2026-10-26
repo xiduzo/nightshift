@@ -74,7 +74,7 @@ function flowIn(folder: string, name: string, nodes: unknown[]) {
 	writeFileSync(
 		join(dir, `${name}.json`),
 		JSON.stringify({
-			version: 5,
+			version: 6,
 			inputs: [],
 			outputs: [],
 			start: (nodes[0] as { id: string }).id,

@@ -156,7 +156,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 5,
+		version: 6,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

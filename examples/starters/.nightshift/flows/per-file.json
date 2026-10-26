@@ -1,5 +1,5 @@
 {
-	"version": 5,
+	"version": 6,
 	"description": "An agent applies the same instruction to each file that matches a glob. Night Shift then commits all changes at once.",
 	"inputs": [
 		{

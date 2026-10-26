@@ -23,7 +23,7 @@ import {
 } from "./tools";
 
 const draft: Flow = flowSchema.parse({
-	version: 5,
+	version: 6,
 	inputs: [{ name: "issue", type: "text" }],
 	start: "build",
 	nodes: [

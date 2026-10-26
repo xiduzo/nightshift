@@ -79,7 +79,7 @@ describe("published schemas", () => {
 	test("a flow that is not valid gives the same schema issues", () => {
 		expect(
 			flows.parseFlow({
-				version: 5,
+				version: 6,
 				start: "Bad",
 				nodes: [
 					{ id: "a", type: "agent", position: { x: 0, y: 0 }, prompt: 1 },
