@@ -686,8 +686,16 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "object",
                 },
                 "flow": {
-                  "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
-                  "type": "string",
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+                      "type": "string",
+                    },
+                    {
+                      "pattern": "^kit:[a-z0-9][a-z0-9-]{0,29}\\/[a-z0-9][a-z0-9-]{0,59}$",
+                      "type": "string",
+                    },
+                  ],
                 },
                 "id": {
                   "pattern": "^[a-z][a-z0-9_]{0,39}$",
@@ -2170,8 +2178,16 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "object",
                 },
                 "flow": {
-                  "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
-                  "type": "string",
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+                      "type": "string",
+                    },
+                    {
+                      "pattern": "^kit:[a-z0-9][a-z0-9-]{0,29}\\/[a-z0-9][a-z0-9-]{0,59}$",
+                      "type": "string",
+                    },
+                  ],
                 },
                 "id": {
                   "pattern": "^[a-z][a-z0-9_]{0,39}$",
@@ -3843,8 +3859,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
-  "callNodeSchema": "3db8301e635a18936d1f3dd38a3d3b832e454808871572edde59bb8910fd74c3",
-  "chatRequestSchema": "2d0a2185ed9ad7e16e97be6f10f6c86bc54caf09916c34095a5575e8a63ee79b",
+  "callNodeSchema": "28133376184d7c25638841e053f7f468b3eba05c40ddfc9a7fabed4d4fd8b891",
+  "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
+  "chatRequestSchema": "701a56af9a96b5090695b97f722ea9f41943bac06d6267063955ecbdee2ca40e",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -3862,9 +3879,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "fd55e4f8cad49200b8caaceba387123636c47e6cf514314b1edb9d878d18397e",
+  "flowNodeSchema": "52c299b04576e162e2a0045d3efa566b509953395b31546a589adcb37bc70749",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "4edb2858a188c8135a14afe0bcfcbefea3b457be63b56bc32022a490835f34d9",
+  "flowSchema": "a979d6ebff0a5bcd1228abfcb77ab75a485079bb5147822286af6dbe7c5d410a",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -3873,6 +3890,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "joinWaitSchema": "0351e82bc6f4c4247c9a58fe4d4a478ddb7fbd0139f8b3e14a4123b23b4d5f9a",
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
   "jsonSourceSchema": "a3a5fddca4b7a01134d1e5ae0b6af454545831c5d63dd9272c4506e020eb8b1a",
+  "kitNameSchema": "b795a5a52f3d60ab22b7095a475d8f781dc8e3f319d67d03fde0e62fb1e2b9a9",
   "labelSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "listSourceSchema": "bd777218a3c3b14d1c54cb33fe527fe2e9e6055bcac39c002184e8a17fd9665e",
   "loginSchema": "23ccb4d365d96d062435a2ef12ff312587d07237ee383dfa9c7330e9db6ad64d",
@@ -3896,7 +3914,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "3f89437c37b4da3d5bbf3f56e55265966920b35f39d90490d5e0c6e365f2eac2",
+  "suggestionRequestSchema": "f378a2e99099455fc81900685dbaed00ec0165c76951969caceb1e19bceb687e",
   "suggestionSchema": "c016ec35c4f46cb10c11eda434d2b56ab3b389c52a8553c10df07e27697800f6",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
@@ -5016,7 +5034,7 @@ exports[`published schemas a flow that is not valid gives the same schema issues
       "severity": "error",
     },
     {
-      "message": "nodes.2.flow: Use lowercase letters, digits and -, starting with a letter or digit.",
+      "message": "nodes.2.flow: Invalid input",
       "severity": "error",
     },
     {

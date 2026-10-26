@@ -6,6 +6,7 @@ import {
 	migrateFlow,
 	nodeOutcomes,
 } from "../document";
+import { isKitName } from "../kits";
 import { reservedNames } from "../nodes";
 import { checkBranches } from "./branches";
 import { checkCall, type ErrorsOf } from "./calls";
@@ -49,7 +50,9 @@ import {
  * parses, bind only inputs it declares and every required input it has no
  * default for, and a flow may not call itself through Call nodes. Issues
  * inside a called flow are not repeated: a called flow with errors gives
- * one error on the calling node.
+ * one error on the calling node. A Call node that runs a kit gets the same
+ * checks of its inputs, with or without `options.flows`: Night Shift
+ * always knows its kits.
  */
 export function validateFlow(
 	flow: Flow,
@@ -195,14 +198,15 @@ function validateIn(
 	checkUnusedVariables(scope, warning);
 	checkBranches(flow, nodes, error, warning);
 
-	// Called flows, when the project's flows are known.
-	if (flows !== undefined) {
-		const chain =
-			options.name === undefined ? ancestors : [...ancestors, options.name];
-		for (const node of nodes.values()) {
-			if (node.type === "call") {
-				checkCall(node, flows, chain, error, warning, errorsOf);
-			}
+	// Called flows: a kit always, a flow of the project when they are known.
+	const chain =
+		options.name === undefined ? ancestors : [...ancestors, options.name];
+	for (const node of nodes.values()) {
+		if (node.type !== "call") continue;
+		if (flows !== undefined) {
+			checkCall(node, flows, chain, error, warning, errorsOf);
+		} else if (isKitName(node.flow)) {
+			checkCall(node, {}, chain, error, warning, errorsOf);
 		}
 	}
 

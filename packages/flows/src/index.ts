@@ -156,6 +156,13 @@ export {
 	harnessTakesTools,
 } from "./harnesses";
 export {
+	isKitName,
+	type Kit,
+	kitCopyName,
+	kitFlow,
+	kitList,
+} from "./kits";
+export {
 	blockersFirst,
 	type ItemState,
 	type ListItem,

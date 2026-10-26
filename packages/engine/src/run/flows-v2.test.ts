@@ -1421,3 +1421,127 @@ describe("flow format 1", () => {
 		}
 	});
 });
+
+describe("kits", () => {
+	/** A bare `origin` for the sandbox repo with `main` on it, and a fake `gh` on PATH. */
+	async function withGitHub(): Promise<{
+		origin: string;
+		restore: () => void;
+	}> {
+		const origin = join(sandbox.root, "origin.git");
+		await mustGit(sandbox.root, ["init", "-q", "--bare", "-b", "main", origin]);
+		await mustGit(sandbox.repoPath, ["remote", "add", "origin", origin]);
+		await mustGit(sandbox.repoPath, ["push", "-q", "origin", "main"]);
+		const bin = join(sandbox.root, "bin");
+		await mkdir(bin, { recursive: true });
+		// No pull request is open; a new one is #7.
+		await writeFile(
+			join(bin, "gh"),
+			`#!/bin/sh
+case "$1 $2" in
+	"pr list") echo "" ;;
+	"pr create") echo "https://github.com/acme/app/pull/7" ;;
+	"pr view") echo '{"created":true,"number":7,"url":"https://github.com/acme/app/pull/7"}' ;;
+	*) exit 1 ;;
+esac
+`,
+		);
+		await chmod(join(bin, "gh"), 0o755);
+		const path = process.env.PATH;
+		process.env.PATH = `${bin}:${path}`;
+		return {
+			origin,
+			restore: () => {
+				process.env.PATH = path;
+			},
+		};
+	}
+
+	test("a Call runs a kit, and the run keeps a copy of it", async () => {
+		const { origin, restore } = await withGitHub();
+		try {
+			const engine = makeEngine(fakeHarness());
+			const run = await engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf(
+					[
+						callOnce("branch", "kit:github/create-branch", {
+							name: "feature/7-login",
+						}),
+						command(
+							"work",
+							"echo two > b.txt && git add b.txt && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -qm two",
+						),
+						callOnce("publish", "kit:github/publish-draft-pr", {
+							title: "Login",
+							base: "main",
+						}),
+						command(
+							"said",
+							`echo "{{branch.branch}} #{{publish.number}} {{publish.ended}}: {{publish.end_message}}"`,
+						),
+					],
+					[
+						edge("e1", "branch", "pass", "work"),
+						edge("e2", "work", "pass", "publish"),
+						edge("e3", "publish", "pass", "said"),
+					],
+				),
+			});
+			const detail = await waitForEnd(engine, run.id);
+			expect(detail.status).toBe("finished");
+			expect(Object.keys(detail.calledFlows).sort()).toEqual([
+				"kit:github/create-branch",
+				"kit:github/publish-draft-pr",
+			]);
+			expect(logOf(detail, "said")).toBe(
+				"feature/7-login #7 done: Pull request #7 is open: https://github.com/acme/app/pull/7",
+			);
+			expect(
+				await mustGit(origin, ["log", "-1", "--format=%s", "feature/7-login"]),
+			).toBe("two");
+		} finally {
+			restore();
+		}
+	});
+
+	test("a kit that ends with nothing to do ends its Call pass", async () => {
+		const { restore } = await withGitHub();
+		try {
+			const engine = makeEngine(fakeHarness());
+			const run = await engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf(
+					[
+						callOnce("publish", "kit:github/publish-draft-pr", {
+							title: "Nothing",
+							base: "main",
+						}),
+						command(
+							"said",
+							`echo "{{publish.ended}}: {{publish.end_message}}"`,
+						),
+					],
+					[edge("e1", "publish", "pass", "said")],
+				),
+			});
+			const detail = await waitForEnd(engine, run.id);
+			expect(detail.status).toBe("finished");
+			expect(logOf(detail, "said")).toMatch(
+				/^nothing-to-do: No new commits on \S+ to publish$/,
+			);
+		} finally {
+			restore();
+		}
+	});
+
+	test("a run does not start a kit that Night Shift does not have", async () => {
+		const engine = makeEngine(fakeHarness());
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([callOnce("x", "kit:github/nope")]),
+			}),
+		).rejects.toThrow("which Night Shift does not have");
+	});
+});

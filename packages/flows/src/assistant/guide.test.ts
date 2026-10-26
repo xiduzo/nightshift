@@ -90,9 +90,10 @@ describe("flowAuthoringGuide", () => {
 
 	test("stays short enough for every prompt", () => {
 		const words = guide.split(/\s+/).filter(Boolean).length;
-		// 2700: the node review added End, Join, kits and profiles (Model
-		// Profiles, the project's own), each with a few lines an author needs.
-		expect(words).toBeLessThan(2700);
+		// 2900: the node review added End, Join and profiles (Model Profiles,
+		// the project's own), each with a few lines an author needs, and the
+		// list of kits, one line per kit (about 200 words).
+		expect(words).toBeLessThan(2900);
 	});
 });
 

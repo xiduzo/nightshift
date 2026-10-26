@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-	flowNameSchema,
+	calledFlowNameSchema,
 	labelSchema,
 	type NodeCheck,
 	nameSchema,
@@ -68,7 +68,7 @@ export const callEachSchema = z.object({
 export type CallEach = z.infer<typeof callEachSchema>;
 
 /**
- * Runs another flow of the project: once, or once per element of a list
+ * Runs another flow of the project, or a kit (`kitFlow`): once, or once per element of a list
  * with `each`. `inputs` binds each input of the called flow to a template
  * (with `each`, the element goes to the input named by `each.as`).
  *
@@ -89,7 +89,8 @@ export type CallEach = z.infer<typeof callEachSchema>;
 export const callNodeSchema = z.object({
 	...nodeBase,
 	type: z.literal("call"),
-	flow: flowNameSchema,
+	/** A flow file of the project by name, or a kit: `kit:github/create-branch`. */
+	flow: calledFlowNameSchema,
 	inputs: bindings.default({}),
 	each: callEachSchema.optional(),
 });

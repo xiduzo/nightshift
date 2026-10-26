@@ -5,6 +5,8 @@ import {
 	nodeOutputFields,
 	runsEach,
 } from "../document";
+import { isKitName, kitFlow } from "../kits";
+import { commandHasData } from "../nodes";
 import { runFields } from "../template";
 import type { ProjectFlowMap } from "./issues";
 
@@ -141,7 +143,7 @@ function templateNode(
 	const fields = nodeOutputFields(node)
 		.filter(
 			(name) =>
-				!(node.type === "command" && name === "data" && node.output !== "json"),
+				!(node.type === "command" && name === "data" && !commandHasData(node)),
 		)
 		.map((name) => {
 			const keys =
@@ -153,11 +155,16 @@ function templateNode(
 	return { id: node.id, fields, open: false };
 }
 
-/** The flow a Call node calls, by its name: undefined while the flows load, or when it is not known or broken. */
+/**
+ * The flow a Call node calls, by its name: a kit (`kit:…`), or a flow of
+ * the project. Undefined while the project's flows load, or when it is not
+ * known or broken.
+ */
 export function calledFlow(
 	name: string,
 	flows: ProjectFlowMap | undefined,
 ): Flow | undefined {
+	if (isKitName(name)) return kitFlow(name);
 	if (flows === undefined || !Object.hasOwn(flows, name)) return undefined;
 	return flows[name] ?? undefined;
 }

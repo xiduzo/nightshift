@@ -42,6 +42,20 @@ export const flowNameSchema = z
 	);
 
 /**
+ * A kit by name: a flow that ships with Night Shift, read only, in a
+ * group (`kit:github/publish-draft-pr`). The `kits` vertical holds them.
+ */
+export const kitNameSchema = z
+	.string()
+	.regex(
+		/^kit:[a-z0-9][a-z0-9-]{0,29}\/[a-z0-9][a-z0-9-]{0,59}$/,
+		"Name a kit as kit:<group>/<name>, for example kit:github/publish-draft-pr.",
+	);
+
+/** The flow a Call node runs: a flow file of the project, or a kit. */
+export const calledFlowNameSchema = z.union([flowNameSchema, kitNameSchema]);
+
+/**
  * An outcome: `pass`, `fail`, `needs-input`, an Agent's own outcome, or a
  * Decision option. "error", "stopped", "interrupted" and "waiting" are
  * reserved for the engine.

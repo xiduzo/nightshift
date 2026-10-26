@@ -205,6 +205,16 @@ export function isChosenExit(
 }
 
 /**
+ * Whether later nodes can read the command's `data`: it prints JSON
+ * (`output: "json"`), or it names `$NS_OUTPUT`, the file for its data.
+ */
+export function commandHasData(
+	node: Pick<CommandNode, "command" | "output">,
+): boolean {
+	return node.output === "json" || node.command.includes("NS_OUTPUT");
+}
+
+/**
  * log_tail: the last lines of stdout and stderr together. data: the JSON
  * the command wrote to `$NS_OUTPUT`, else the JSON it printed with
  * `output: "json"`.

@@ -1,6 +1,8 @@
 import {
 	type Flow,
 	type FlowIssue,
+	isKitName,
+	kitFlow,
 	migrateFlow,
 	parseFlow,
 	validateFlow,
@@ -26,8 +28,10 @@ function refuseErrors(issues: readonly FlowIssue[], what = "The flow"): void {
 
 /**
  * Loads, parses and validates the flow a run starts from, and every flow
- * it can call through Call nodes (by name, from the project's flow files).
- * Version 1 files migrate first.
+ * it can call through Call nodes (by name, from the project's flow files,
+ * or a kit of this Night Shift). Version 1 files migrate first. The run
+ * keeps a copy of each, kits too, so a run on another Device walks the
+ * same flows.
  */
 export function flowsForRun(
 	sources: FlowSources,
@@ -78,7 +82,8 @@ export function flowsForRun(
 	while (queue.length > 0) {
 		const name = queue.shift() as string;
 		if (Object.hasOwn(calledFlows, name)) continue;
-		const called = name === flowName ? flow : files[name];
+		const called =
+			name === flowName ? flow : isKitName(name) ? kitFlow(name) : files[name];
 		if (!called) {
 			throw new Refusal(
 				"invalid",

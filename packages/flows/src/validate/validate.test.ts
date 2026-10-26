@@ -1493,9 +1493,22 @@ describe("validateFlow: Command output", () => {
 				(issue) => issue.message,
 			),
 		).toEqual([
-			'The prompt of "worker" uses {{check.data.tests}}, but the command node "check" prints text. Set its output to JSON to read data.',
+			'The prompt of "worker" uses {{check.data.tests}}, but the command node "check" prints text. Write JSON to $NS_OUTPUT in its command, or set its output to JSON, to read data.',
 		]);
 		expect(validateFlow(f("text", "{{check.log_tail}}"))).toEqual([]);
+	});
+
+	test("a command that writes to $NS_OUTPUT has data, whatever its output", () => {
+		const flow = f("text", "{{check.data.tests}}");
+		const writes = {
+			...flow,
+			nodes: flow.nodes.map((node) =>
+				node.type === "command"
+					? { ...node, command: `echo '{"tests": 3}' > "$NS_OUTPUT"` }
+					: node,
+			),
+		};
+		expect(errors(validateFlow(writes))).toEqual([]);
 	});
 });
 

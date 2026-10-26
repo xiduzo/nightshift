@@ -163,7 +163,7 @@ export function checkRef(
 	} else if (read === undefined) {
 		error(
 			scope.nodes.get(ref.name)?.type === "command" && field === "data"
-				? `${uses}, but the command node "${ref.name}" prints text. Set its output to JSON to read data.`
+				? `${uses}, but the command node "${ref.name}" prints text. Write JSON to $NS_OUTPUT in its command, or set its output to JSON, to read data.`
 				: `${uses}, but "${ref.name}" has no field "${field}". Use one of: ${fields.join(", ")}.`,
 			at,
 		);

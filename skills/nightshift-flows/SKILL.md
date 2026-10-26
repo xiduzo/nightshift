@@ -75,7 +75,7 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its file name) with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message.
+Shown as Subflow. Runs another flow of the project (`flow`, its file name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message.
 
 Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `end_message`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 
@@ -152,7 +152,20 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 
 ## Schedules and webhooks
 
-A schedule in `.nightshift/schedules.json` starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls.
+A schedule in `.nightshift/schedules.json` starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls: the kit `kit:github/wait-for-checks` does it.
+
+## Kits
+
+A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. A Call runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required.
+
+- `kit:github/create-branch` (name*, from) → branch, created, sha: Switches to a new branch with the name you give.
+- `kit:github/finish-pr` (pr*, action, comment) → number, url, state: Marks a pull request ready for review, or closes it.
+- `kit:github/publish-draft-pr` (title*, body, base) → number, url, created, branch, base: Pushes the current branch to GitHub and opens a draft pull request for it.
+- `kit:github/wait-for-checks` (ref) → state, sha, failed, total: Waits until the checks of a commit on GitHub are done, for at most 3 hours.
+- `kit:jira/assign` (key*, assignee): Assigns a Jira work item to a person, or to you.
+- `kit:jira/move` (key*, status*): Moves a Jira work item to another status, for example In Progress.
+
+A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`.
 
 ## Profiles
 

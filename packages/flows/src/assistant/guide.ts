@@ -19,6 +19,7 @@ import {
 	sectionColors,
 	variableTypeSchema,
 } from "../document";
+import { type Kit, kitList } from "../kits";
 import {
 	callEachOutputFields,
 	deciderNameSchema,
@@ -149,7 +150,7 @@ const nodeText: Record<FlowNodeType, string> = {
 			", ",
 		)} (\`{ kind: "duration", minutes }\`, \`{ kind: "time", at: "07:00" }\`, \`{ kind: "command", command, everyMinutes }\` until it exits 0, \`{ kind: "signal", name, key? }\`). \`timeoutMinutes\` ends it \`timeout\`. A signal comes from a person on the run page, or from a webhook schedule of the project: then \`data\` holds the webhook (\`{{wait_ci.data.body.check_suite.conclusion}}\`). With \`key\` (a template, for example \`{{pr}}\`), only a webhook whose signal key is that text wakes it.`,
 	join: `Where parallel branches meet. \`wait\`: \`all\` (default), or \`first\` (stops the other branches). \`data\` holds each branch's \`data\` by the node it came from: \`{{reviewed.data.security}}\`.`,
-	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its file name) with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message.`,
+	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its file name), or a kit (\`kit:github/publish-draft-pr\`, see Kits), with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message.`,
 	end: `Ends the run on purpose. \`status\`: ${endStatusSchema.options.map((status) => `\`${status}\``).join(", ")}. \`message\` (template) is one line for a person: the runs list and the notification show it. \`nothing-to-do\` is for a run that found no work: it is not a failure. \`failed\` fails the run on purpose. No edge leaves an End node.`,
 };
 
@@ -356,6 +357,19 @@ export const planEachExample: FlowInput = {
 
 const types = Object.keys(outputFieldsByType) as FlowNodeType[];
 
+/**
+ * One kit in the guide, on one line: its name, its inputs (* required),
+ * its outputs, and the first sentence of what it does.
+ */
+function kitLine({ name, flow }: Kit): string {
+	const inputs = flow.inputs
+		.map((input) => `${input.name}${input.required ? "*" : ""}`)
+		.join(", ");
+	const outputs = flow.outputs.map((output) => output.name).join(", ");
+	const what = (flow.description ?? "").split(". ")[0]?.replace(/\.$/, "");
+	return `- \`${name}\` (${inputs})${outputs ? ` → ${outputs}` : ""}: ${what}.`;
+}
+
 /** The guide, as Markdown. */
 export function flowAuthoringGuide(): string {
 	return `# Writing Night Shift flows
@@ -411,7 +425,15 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in \
 
 ## Schedules and webhooks
 
-A schedule in \`.nightshift/schedules.json\` starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, not with a command that polls.
+A schedule in \`.nightshift/schedules.json\` starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, not with a command that polls: the kit \`kit:github/wait-for-checks\` does it.
+
+## Kits
+
+A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\` or \`acli\`. A Call runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required.
+
+${kitList().map(kitLine).join("\n")}
+
+A webhook schedule wakes \`wait-for-checks\` when CI is done: \`signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }\`.
 
 ## Profiles
 

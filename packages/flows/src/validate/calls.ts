@@ -1,4 +1,5 @@
 import { type Flow, runsEach } from "../document";
+import { isKitName, kitFlow } from "../kits";
 import type { CallNode } from "../nodes";
 import type { ProjectFlowMap, Report, ValidateOptions } from "./issues";
 
@@ -31,12 +32,22 @@ export function checkCall(
 ): void {
 	const at = { nodeId: node.id };
 	const kind = "Subflow";
-	const runs = `${kind} node "${node.id}" runs flow "${node.flow}"`;
-	if (!Object.hasOwn(flows, node.flow)) {
-		error(`${runs}, which does not exist.`, at);
+	const kit = isKitName(node.flow);
+	const runs = `${kind} node "${node.id}" runs ${kit ? "the kit" : "flow"} "${node.flow}"`;
+	const called = kit
+		? kitFlow(node.flow)
+		: Object.hasOwn(flows, node.flow)
+			? flows[node.flow]
+			: undefined;
+	if (called === undefined) {
+		error(
+			kit
+				? `${runs}, which Night Shift does not have. Pick a kit from the list.`
+				: `${runs}, which does not exist.`,
+			at,
+		);
 		return;
 	}
-	const called = flows[node.flow];
 	if (!called) {
 		error(`${runs}, which is not valid. Open that flow and fix it first.`, at);
 		return;
@@ -86,6 +97,9 @@ export function checkCall(
 			);
 		}
 	}
+
+	// A kit calls no flow of the project, and its own checks are Night Shift's.
+	if (kit) return;
 
 	const self = chain.at(-1);
 	if (self !== undefined) {
