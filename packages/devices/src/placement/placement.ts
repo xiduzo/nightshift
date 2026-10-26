@@ -21,7 +21,7 @@ import {
 	type SpaceDocuments,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
-import type { AgentProfileSettings, FlowNode } from "@nightshift/flows";
+import type { FlowNode, ProfileSettings } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../contract";
@@ -69,7 +69,7 @@ export type PlacementDeps = {
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
 	/** An Agent Profile of this computer by name. Default: none. */
-	profileFor?: (name: string) => AgentProfileSettings | null;
+	profileFor?: (name: string) => ProfileSettings | null;
 	/** How calls reach other Devices. Without it, every step runs here. */
 	work?: WorkRelay;
 	/** The Hosts this computer links to. */

@@ -29,6 +29,9 @@ import {
 	deciderNameSchema,
 	loginSchema,
 	mcpServerSchema,
+	modelProfileSchema,
+	type ProfileIssue,
+	profileSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -276,14 +279,48 @@ export const deciderViewSchema = exact<DeciderView<SecretSource>>()(
 	}),
 );
 
-/** An Agent Profile: a harness, a model and its tools under one name. */
+/**
+ * A profile: an Agent Profile (a harness, a model and its tools) or a
+ * Model Profile (a decider and its model) under one name.
+ */
 export const profileViewSchema = exact<ProfileView>()(
-	agentProfileSchema.extend({ updatedAt: z.number() }),
+	z.union([
+		agentProfileSchema.extend({ updatedAt: z.number() }),
+		modelProfileSchema.extend({ updatedAt: z.number() }),
+	]),
 );
 
+const profileUse = {
+	updatedAt: z.number(),
+	/** The nodes that name it, by flow. */
+	usedBy: z.array(flowRefSchema.extend({ nodeIds: z.array(z.string()) })),
+};
+
 export const profileListSchema = z.array(
-	profileViewSchema.extend({
-		/** The Agent nodes that name it, by flow. */
-		usedBy: z.array(flowRefSchema.extend({ nodeIds: z.array(z.string()) })),
+	z.union([
+		agentProfileSchema.extend(profileUse),
+		modelProfileSchema.extend(profileUse),
+	]),
+);
+
+const profileIssueSchema = exact<ProfileIssue>()(
+	z.object({
+		severity: z.enum(["error", "warning"]),
+		message: z.string(),
+		profile: z.string().optional(),
 	}),
 );
+
+/** A project's own profiles (`.nightshift/profiles.json`), and the problems of its file. */
+export const projectProfilesSchema = z.object({
+	profiles: z.array(
+		z.intersection(
+			profileSchema,
+			z.object({
+				/** This computer has a profile of the same name, which wins. */
+				overridden: z.boolean(),
+			}),
+		),
+	),
+	issues: z.array(profileIssueSchema),
+});

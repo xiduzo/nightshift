@@ -13,13 +13,14 @@ import type {
 	ProfileStore,
 	SettingsStore,
 } from "@nightshift/engine";
-import type {
-	AgentHarnessName,
-	AssistantAgent,
-	AssistantScope,
-	AssistantService,
-	ChatEvent,
-	ChatRequest,
+import {
+	type AgentHarnessName,
+	type AssistantAgent,
+	type AssistantScope,
+	type AssistantService,
+	type ChatEvent,
+	type ChatRequest,
+	isAgentProfile,
 } from "@nightshift/flows";
 import { authoringPort, type ChatSpace } from "./authoring";
 import {
@@ -109,7 +110,8 @@ export function pickAgent(
 		none?: string;
 	} = {},
 ): PickedAgent | { error: string } {
-	const all = deps.profiles.list();
+	// The assistant runs on an Agent Profile only.
+	const all = deps.profiles.list().filter(isAgentProfile);
 	const named = (name: string): PickedAgent | null => {
 		const found = all.find((profile) => profile.name === name);
 		if (!found) return null;

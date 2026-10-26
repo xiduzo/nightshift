@@ -145,7 +145,9 @@ describe("connections and CLI tools", () => {
 
 		await saveConnection(stores, { name: "github", server }, "gh");
 		expect(stores.connections.list().map((c) => c.name)).toEqual(["github"]);
-		expect(stores.profiles.get("fast")?.connections).toEqual(["github"]);
+		expect(stores.profiles.get("fast")).toMatchObject({
+			connections: ["github"],
+		});
 
 		await removeConnection(stores, "github");
 		await removeCliTool(stores, "jq");

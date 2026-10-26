@@ -1,4 +1,8 @@
-import type { FlowListItem, LoadedFlow } from "@nightshift/flows";
+import {
+	type FlowListItem,
+	type LoadedFlow,
+	profileOf,
+} from "@nightshift/flows";
 
 /** A flow file of a project of the Space. */
 export type FlowRef = {
@@ -10,8 +14,8 @@ export type FlowRef = {
 /**
  * Who uses what, from every flow of the Space's projects: the flows whose
  * Agent or Tool nodes name each connection, whose Agent nodes name each CLI
- * tool, whose Command nodes name each secret, and the Agent nodes that name
- * each profile. By name.
+ * tool, whose Command nodes name each secret, and the nodes that name each
+ * profile (Agents, and Decisions and Values decided by a model). By name.
  */
 export type FlowUse = {
 	connections: Map<string, FlowRef[]>;
@@ -69,12 +73,10 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 				secrets.set(name, [...(secrets.get(name) ?? []), ref]);
 			}
 			const byProfile = new Map<string, string[]>();
-			for (const node of agents) {
-				if (node.profile === undefined) continue;
-				byProfile.set(node.profile, [
-					...(byProfile.get(node.profile) ?? []),
-					node.id,
-				]);
+			for (const node of loaded?.flow?.nodes ?? []) {
+				const profile = profileOf(node);
+				if (profile === undefined) continue;
+				byProfile.set(profile, [...(byProfile.get(profile) ?? []), node.id]);
 			}
 			for (const [name, nodeIds] of byProfile) {
 				profiles.set(name, [

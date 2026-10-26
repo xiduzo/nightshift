@@ -10,7 +10,11 @@ import {
 	type SpaceDocuments,
 	worktreeLocation,
 } from "@nightshift/engine";
-import type { AgentProfileSettings } from "@nightshift/flows";
+import {
+	type AgentProfileSettings,
+	isAgentProfile,
+	type ProfileSettings,
+} from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { WorkCall, WorkRelay, WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces, personInSpace, personOnHost } from "../links";
@@ -110,7 +114,7 @@ export function createOfferAdmission(deps: {
 	/** This computer's own Offers (its Device document). Without it, none. */
 	ownOffers?: () => readonly DeviceOffer[];
 	/** A profile of this computer, as its owner set it. */
-	profileFor?: (name: string) => AgentProfileSettings | null;
+	profileFor?: (name: string) => ProfileSettings | null;
 	/** The offered sessions of the runs this computer walks: what withdrawing an Offer stops. */
 	sessions?: Pick<OfferedSessions, "relay">;
 	/** The Offers in use, kept across a reload (`createOfferUse`). Default: its own. */
@@ -234,7 +238,9 @@ export function createOfferAdmission(deps: {
 			// Another Person's session: this computer's own profile, its caps.
 			const { profile } = call.input.offered;
 			const offer = admitted.offers.find((o) => o.profile === profile);
-			const settings = deps.profileFor?.(profile) ?? null;
+			const found = deps.profileFor?.(profile) ?? null;
+			// Only an Agent Profile runs a session.
+			const settings = found && isAgentProfile(found) ? found : null;
 			if (!offer || !settings) {
 				yield {
 					kind: "error",
@@ -324,6 +330,8 @@ export function createOfferAdmission(deps: {
 				state: async () => (await pick()).state(),
 				capabilities: async (query) => (await pick()).capabilities(query),
 				flows: async (projectId) => (await pick()).flows(projectId),
+				projectProfiles: async (projectId) =>
+					(await pick()).projectProfiles(projectId),
 				async *session(input) {
 					yield* (await pick()).session(input);
 				},
@@ -348,6 +356,7 @@ const offerKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
 /** The calls that work in the project's Clone; a model or a tool needs none. */
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
+	"projectProfiles",
 	"worktree",
 	"itemBranch",
 	"handOff",
@@ -388,6 +397,7 @@ function offeredCallRefusal(
 	const refused = `${deviceName} runs only the profiles its owner offers to this Space. ${offersNothingOr(deviceName, offers)}`;
 	switch (call.kind) {
 		case "flows":
+		case "projectProfiles":
 		case "worktree":
 		case "itemBranch":
 		case "handOff":

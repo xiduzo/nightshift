@@ -16,7 +16,7 @@ import type {
 	SpaceEngine,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import type { ChatRequest } from "@nightshift/flows";
+import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 
 /** What the port reads in the Space. */
 export type ChatSpace = Pick<SpaceEngine, "flowMap" | "getRun" | "watchRun">;
@@ -47,12 +47,15 @@ export function authoringPort(
 		draft: async () => ({ name: request.flowName, flow: request.flow }),
 		flows: () => deps.space.flowMap(request.projectId),
 		profiles: async () =>
-			deps.profiles.list().map((profile) => ({
-				name: profile.name,
-				harness: profile.harness,
-				model: profile.model,
-				description: profile.description ?? null,
-			})),
+			deps.profiles.list().map((profile) => {
+				const description = profile.description ?? null;
+				if (!isAgentProfile(profile)) {
+					const { name, decider, model } = profile;
+					return { name, decider, ...(model ? { model } : {}), description };
+				}
+				const { name, harness, model } = profile;
+				return { name, harness, model, description };
+			}),
 		tools: async () => ({
 			clis: deps.cliTools
 				.list()

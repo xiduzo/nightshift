@@ -1,6 +1,7 @@
 import { spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceDocument, Engine, ProfileStore } from "@nightshift/engine";
+import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { personInSpace } from "../links";
 import type { DeviceRegistry } from "../registry";
@@ -95,10 +96,17 @@ export function createOffers(deps: {
 		},
 
 		async make(input, by) {
-			if (!deps.profiles.get(input.profile)) {
+			const profile = deps.profiles.get(input.profile);
+			if (!profile) {
 				throw new Refusal(
 					"conflict",
 					`There is no profile named "${input.profile}". Add it under Agents first.`,
+				);
+			}
+			if (!isAgentProfile(profile)) {
+				throw new Refusal(
+					"invalid",
+					`The profile "${input.profile}" is for Decision and Value nodes. Only an agent profile can be offered.`,
 				);
 			}
 			const space = await spaceRow(input.spaceId);

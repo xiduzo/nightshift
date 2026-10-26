@@ -1,21 +1,23 @@
 import {
-	type AgentProfile,
-	type AgentProfileSettings,
-	agentProfileSchema,
-	agentProfileSettingsSchema,
 	migrateToolSets,
+	type Profile,
+	type ProfileSettings,
+	profileSchema,
+	profileSettingsSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
 import { type DeviceDocument, mapView } from "./device-document";
 
 /**
- * Agent Profiles: a harness, a model and its tools under one name, defined
- * once on this Device (the Agents page) and kept in its Device document.
- * Agent nodes name a profile; a run resolves it when it starts.
+ * Profiles: an Agent Profile (a harness, a model and its tools) or a Model
+ * Profile (a decider and its model) under one name, defined once on this
+ * Device (the Agents page) and kept in its Device document. Agent nodes,
+ * and Decisions and Values decided by a model, name a profile; a run
+ * resolves it when it starts.
  */
 
-export type ProfileView = AgentProfile & { updatedAt: number };
+export type ProfileView = Profile & { updatedAt: number };
 
 export type ProfileStore = {
 	/** Reads the profiles. Call once before the rest. */
@@ -23,9 +25,9 @@ export type ProfileStore = {
 	list(): ProfileView[];
 	get(name: string): ProfileView | null;
 	/** What a run resolves a node with, or null when there is no such profile. */
-	settingsFor(name: string): AgentProfileSettings | null;
+	settingsFor(name: string): ProfileSettings | null;
 	/** Creates or replaces a profile. */
-	save(input: AgentProfile): Promise<ProfileView>;
+	save(input: Profile): Promise<ProfileView>;
 	remove(name: string): Promise<void>;
 };
 
@@ -46,7 +48,7 @@ export function createProfileStore(options: {
 			const entry = entrySchema.safeParse(value);
 			if (!entry.success) continue;
 			// A profile saved with the GitHub tool set reads as one with `gh`.
-			const parsed = agentProfileSettingsSchema.safeParse(
+			const parsed = profileSettingsSchema.safeParse(
 				migrateToolSets(entry.data.settings),
 			);
 			// An entry this version cannot read stays in the document, unused.
@@ -81,8 +83,7 @@ export function createProfileStore(options: {
 			return settings;
 		},
 		async save(input) {
-			const { name, description, ...settings } =
-				agentProfileSchema.parse(input);
+			const { name, description, ...settings } = profileSchema.parse(input);
 			const updatedAt = Date.now();
 			await document.change(() => {
 				document.profiles.set(name, {

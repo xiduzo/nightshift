@@ -1,17 +1,28 @@
 import { saveProfile } from "@nightshift/engine";
-import { agentProfileSchema } from "@nightshift/flows";
+import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output } from "../output";
-import { ownerProcedure } from "../procedures";
-import { profileListSchema, profileViewSchema } from "./schemas";
+import { ownerProcedure, protectedProcedure } from "../procedures";
+import {
+	profileListSchema,
+	profileViewSchema,
+	projectProfilesSchema,
+} from "./schemas";
 
-/** Agent Profiles: a harness, a model and its tools under one name. Agent nodes name them. */
+/** The name a profile had, when an edit renames it. */
+const renamed = { previousName: z.string().optional() };
+
+/**
+ * Profiles: an Agent Profile (a harness, a model and its tools) for Agent
+ * nodes, or a Model Profile (a decider and its model) for Decisions and
+ * Values decided by a model, under one name.
+ */
 export const profiles = {
 	list: ownerProcedure
 		.route({
 			summary:
-				"Lists the Agent Profiles of this computer, with the Agent nodes that use each.",
+				"Lists the profiles of this computer, with the nodes that use each.",
 		})
 		.output(output(profileListSchema))
 		.handler(async ({ context }) => {
@@ -22,13 +33,13 @@ export const profiles = {
 			}));
 		}),
 	save: ownerProcedure
-		.route({ summary: "Adds an Agent Profile, or changes or renames one." })
+		.route({ summary: "Adds a profile, or changes or renames one." })
 		.output(output(profileViewSchema))
 		.input(
-			agentProfileSchema.extend({
-				/** The name it had, when the edit renames it. */
-				previousName: z.string().optional(),
-			}),
+			z.union([
+				agentProfileSchema.extend(renamed),
+				modelProfileSchema.extend(renamed),
+			]),
 		)
 		.handler(({ context, input }) => {
 			const { previousName, ...profile } = input;
@@ -38,11 +49,33 @@ export const profiles = {
 					(await context.space.flowUse()).profiles.get(name) ?? [],
 			});
 		}),
+	/**
+	 * A project's own profiles, from `.nightshift/profiles.json` in its
+	 * Clone here: each says whether this computer's profile of the same
+	 * name wins over it.
+	 */
+	project: protectedProcedure
+		.route({
+			summary:
+				"Lists the profiles of a project's own file, and whether this computer overrides each.",
+		})
+		.output(output(projectProfilesSchema))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			const read = await context.space.listProjectProfiles(input.projectId);
+			return {
+				profiles: read.profiles.map((p) => ({
+					...p,
+					overridden: context.profiles.get(p.name) !== null,
+				})),
+				issues: read.issues,
+			};
+		}),
 	/** Flows that name it refuse to start until they name another profile. */
 	remove: ownerProcedure
 		.route({
 			summary:
-				"Removes an Agent Profile. Flows that name it do not start until they name another.",
+				"Removes a profile. Flows that name it do not start until they name another.",
 		})
 		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))

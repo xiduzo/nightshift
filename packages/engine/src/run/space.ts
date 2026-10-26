@@ -1,3 +1,4 @@
+import { readProfilesFile } from "@nightshift/flows/files";
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
@@ -266,6 +267,15 @@ export function createSpaces(deps: SpacesDeps) {
 
 			flowUse() {
 				return flowUse(this);
+			},
+
+			async listProjectProfiles(projectId) {
+				await ready;
+				const row = await projects.find(projectId, spaceId);
+				// Without a Clone here, the editor reads no project profiles.
+				if (row.repoPath === null) return { profiles: [], issues: [] };
+				const { profiles, issues } = await readProfilesFile(row.repoPath);
+				return { profiles, issues };
 			},
 
 			async listRuns(input) {

@@ -13,12 +13,12 @@ import type {
 import {
 	type AgentHarnessName,
 	type AgentNode,
-	type AgentProfileSettings,
 	type CustomHarnessName,
 	deciderNameSchema,
 	isCustomHarness,
+	type ProfileSettings,
 } from "@nightshift/flows";
-import { readFlowSources } from "@nightshift/flows/files";
+import { readFlowSources, readProfilesSource } from "@nightshift/flows/files";
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
@@ -116,7 +116,7 @@ export type LocalDeviceDeps = {
 	 */
 	git?: Git;
 	/** An Agent Profile defined on this computer, by name, or null. */
-	profileFor?: (name: string) => AgentProfileSettings | null;
+	profileFor?: (name: string) => ProfileSettings | null;
 	/** Where a session keeps its artifacts. Without it, sessions keep none. */
 	artifacts?: Pick<ArtifactStore, "save">;
 };
@@ -377,6 +377,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		},
 		decide,
 		flows: async (projectId) => readFlowSources(await cloneOf(projectId)),
+		projectProfiles: async (projectId) =>
+			readProfilesSource(await cloneOf(projectId)),
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
 			const readiness = await checkProjectFolder(repoPath, { git });

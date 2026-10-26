@@ -1,8 +1,8 @@
 import type { Database } from "@nightshift/db";
 import type {
-	AgentProfileSettings,
 	Flow,
 	FlowNode,
+	ProfileSettings,
 	permissionModeSchema,
 } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
@@ -86,7 +86,7 @@ export type PeerContext = {
 	documents: SpaceDocuments;
 	now(): number;
 	/** An Agent Profile of this computer by name (`EngineOptions.profileFor`). */
-	profileFor?: (name: string) => AgentProfileSettings | null;
+	profileFor?: (name: string) => ProfileSettings | null;
 	/** Resolves when the engine is ready. */
 	ready: Promise<void>;
 	/** The Person who owns this computer, or null before the engine is ready. */

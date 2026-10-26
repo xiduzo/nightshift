@@ -9,6 +9,7 @@ import {
 import {
 	customHarnessSchema,
 	harnessNameSchema,
+	isAgentProfile,
 	isCustomHarness,
 	secretNameSchema,
 } from "@nightshift/flows";
@@ -52,7 +53,7 @@ export const connections = {
 					usedBy: use.connections.get(c.name) ?? [],
 					profiles: context.profiles
 						.list()
-						.filter((p) => p.connections.includes(c.name))
+						.filter((p) => isAgentProfile(p) && p.connections.includes(c.name))
 						.map((p) => p.name),
 				})),
 				// A secret only a Command node or a CLI tool's login names is

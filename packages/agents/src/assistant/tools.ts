@@ -26,10 +26,12 @@ import { flowJson } from "./prompts";
 /** A profile as the agent may know it: never its secrets. */
 export type AuthoringProfile = {
 	name: string;
-	harness: string;
-	model: string;
 	description?: string | null;
-};
+} & (
+	| { harness: string; model: string }
+	/** A Model Profile, for a Decision or a Value decided by a model. */
+	| { decider: string; model?: string }
+);
 
 /** A CLI tool or a connection, by name. */
 export type AuthoringToolInfo = { name: string; description: string | null };
@@ -310,13 +312,13 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.listProfiles,
 			description:
-				"The Agent Profiles of this computer: name, harness and model. An Agent node names one in `profile`.",
+				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model. The project's own profiles are in .nightshift/profiles.json.",
 			inputSchema: noInput,
 		}).server(async () => {
 			const profiles = await port.profiles();
 			return profiles.length > 0
 				? JSON.stringify(profiles, null, 2)
-				: "This computer has no Agent Profiles.";
+				: "This computer has no profiles.";
 		}),
 		toolDefinition({
 			name: AUTHORING_TOOLS.listTools,

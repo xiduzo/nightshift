@@ -6,7 +6,9 @@ import {
 	customAgentSchema,
 	customAgentSlug,
 	type HarnessName,
+	isAgentProfile,
 	isCustomHarness,
+	type Profile,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
@@ -46,12 +48,12 @@ export function customAgentOf(
 
 /**
  * Adds a profile, or changes or renames one (`previousName`). Refused when
- * the name is taken, when flows use the old name of a rename, or when it
- * names a connection or a CLI tool that does not exist.
+ * the name is taken, when flows use the old name of a rename, or when an
+ * Agent Profile names a connection or a CLI tool that does not exist.
  */
 export async function saveProfile(
 	stores: Pick<ConfigStores, "connections" | "cliTools" | "profiles">,
-	profile: AgentProfile,
+	profile: Profile,
 	options: {
 		previousName?: string;
 		/** The flows that name a profile, read only for a rename. */
@@ -78,7 +80,7 @@ export async function saveProfile(
 			);
 		}
 	}
-	const unknown = profile.connections.filter(
+	const unknown = (isAgentProfile(profile) ? profile.connections : []).filter(
 		(name) => !stores.connections.get(name),
 	);
 	if (unknown.length > 0) {
@@ -87,7 +89,9 @@ export async function saveProfile(
 			`There is no connection named ${unknown.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 		);
 	}
-	const unknownClis = profile.clis.filter((name) => !stores.cliTools.get(name));
+	const unknownClis = (isAgentProfile(profile) ? profile.clis : []).filter(
+		(name) => !stores.cliTools.get(name),
+	);
 	if (unknownClis.length > 0) {
 		throw new Refusal(
 			"conflict",
@@ -99,12 +103,13 @@ export async function saveProfile(
 	return saved;
 }
 
-/** Saves every profile that `pick` changes, in the order of the list. */
+/** Saves every Agent Profile that `pick` changes, in the order of the list. */
 async function rewriteProfiles(
 	profiles: ProfileStore,
-	pick: (profile: ProfileView) => Partial<AgentProfile> | null,
+	pick: (profile: AgentProfile) => Partial<AgentProfile> | null,
 ): Promise<void> {
 	for (const p of profiles.list()) {
+		if (!isAgentProfile(p)) continue;
 		const change = pick(p);
 		if (!change) continue;
 		const { updatedAt: _at, ...profile } = p;
@@ -195,7 +200,7 @@ export async function removeHarness(
 		: HARNESS_LABELS[harness];
 	const using = stores.profiles
 		.list()
-		.filter((p) => p.harness === harness)
+		.filter((p) => isAgentProfile(p) && p.harness === harness)
 		.map((p) => p.name);
 	if (using.length > 0) {
 		throw new Refusal(

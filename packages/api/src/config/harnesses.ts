@@ -16,6 +16,7 @@ import {
 	agentHarnessSchema,
 	customAgentSchema,
 	harnessNameSchema,
+	isAgentProfile,
 	isCustomHarness,
 } from "@nightshift/flows";
 import { z } from "zod";
@@ -60,7 +61,7 @@ export const harnesses = {
 				profilesOn: (name) =>
 					context.profiles
 						.list()
-						.filter((p) => p.harness === name)
+						.filter((p) => isAgentProfile(p) && p.harness === name)
 						.map((p) => p.name),
 			});
 		}),

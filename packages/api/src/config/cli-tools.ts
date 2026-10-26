@@ -3,6 +3,7 @@ import {
 	programOf,
 	removeCliTool,
 } from "@nightshift/engine";
+import { isAgentProfile } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -34,7 +35,7 @@ export const cliTools = {
 					usedBy: use.get(tool.name) ?? [],
 					profiles: context.profiles
 						.list()
-						.filter((p) => p.clis.includes(tool.name))
+						.filter((p) => isAgentProfile(p) && p.clis.includes(tool.name))
 						.map((p) => p.name),
 					signedInAt: tool.login?.signIn
 						? await context.toolLaunchers.signedInAt(tool.name)

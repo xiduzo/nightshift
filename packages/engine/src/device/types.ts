@@ -8,7 +8,11 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import type { AgentProfileSettings, JsonValue } from "@nightshift/flows";
+import type {
+	JsonValue,
+	ProfileSettings,
+	ProfilesSource,
+} from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 
 /**
@@ -35,6 +39,12 @@ export type Device = {
 	 * flows a run placed here starts from. Throws when it has no Clone.
 	 */
 	flows(projectId: string): Promise<FlowSources>;
+	/**
+	 * The profiles file of the project's Clone on this Device
+	 * (`.nightshift/profiles.json`), unparsed, or null without one: the
+	 * project's profiles for a run placed here. Throws when it has no Clone.
+	 */
+	projectProfiles(projectId: string): Promise<ProfilesSource>;
 	/**
 	 * One harness session. The first item says whether the session can
 	 * start: `refused` (the stream ends there) or `ready`; the harness
@@ -104,7 +114,7 @@ export type DeviceState = { online: boolean };
 export type CapabilityQuery = {
 	/** The programs to look for on the Device (CLI tools by name). */
 	programs?: readonly string[];
-	/** The Agent Profiles to look up on the Device, by name. */
+	/** The profiles (Agent and Model Profiles) to look up on the Device, by name. */
 	profiles?: readonly string[];
 };
 
@@ -122,8 +132,8 @@ export type Capabilities = {
 	clis: string[];
 	/** Where each asked program is on the Device, or null when it has none. */
 	programs: Record<string, string | null>;
-	/** The asked Agent Profiles the Device defines, by name; one it lacks is left out. */
-	profiles: Record<string, AgentProfileSettings>;
+	/** The asked profiles the Device defines, by name; one it lacks is left out. */
+	profiles: Record<string, ProfileSettings>;
 	/** The decider, when one is configured. */
 	decider: DeciderFacts | null;
 };

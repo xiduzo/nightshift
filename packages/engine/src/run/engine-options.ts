@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import type { AgentProfileSettings } from "@nightshift/flows";
+import type { ProfileSettings } from "@nightshift/flows";
 import type { DeviceDirectory } from "../contract";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
@@ -57,7 +57,7 @@ export type EngineOptions = {
 	 * name when it starts; a flow that names a profile this returns null for
 	 * refuses to start. Without it, no profile exists.
 	 */
-	profileFor?: (name: string) => AgentProfileSettings | null;
+	profileFor?: (name: string) => ProfileSettings | null;
 	/**
 	 * The Space documents, where Projects are defined. The daemon passes
 	 * the ones the relay serves. Default: new ones over `db` and `directory`.

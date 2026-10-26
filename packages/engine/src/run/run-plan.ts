@@ -1,8 +1,12 @@
 import {
-	type AgentProfileSettings,
 	type Flow,
 	type FlowNode,
-	resolveAgentNode,
+	type ProfileIssue,
+	type ProfileSettings,
+	type ProfilesSource,
+	parseProfilesSource,
+	profileOf,
+	resolveNodeProfile,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
@@ -13,11 +17,17 @@ import type { PlacedDevice, PlannedRun } from "./peers";
 /**
  * The node walk of a run's plan: where each node runs, and its profile.
  * The Placement rule is written once here: a node's `device`, else its
- * profile's Device (the run's Device when it has the profile, else this
- * computer when only it has it), else the run's Device. Who the Devices
- * are (the Person's own or offered, online, by name) is the caller's: the
- * devices' planner (`PlacementPort.plan`) passes its lookups, and so does
- * the engine's own fake of a computer alone.
+ * profile's Device (the run's Device when it has the profile or the
+ * project has it, else this computer when only it has it), else the run's
+ * Device. Who the Devices are (the Person's own or offered, online, by
+ * name) is the caller's: the devices' planner (`PlacementPort.plan`)
+ * passes its lookups, and so does the engine's own fake of a computer
+ * alone.
+ *
+ * A profile is an Agent Profile for an Agent node, or a Model Profile for
+ * a Decision or a Value decided by a model. A Device's own profile of a
+ * name wins over the project's (`.nightshift/profiles.json` in the run's
+ * Clone), so a person can change a project's profile on their computer.
  */
 
 /** What the node walk asks of the Devices a run may use. */
@@ -37,8 +47,8 @@ export type PlanDevices = {
 	 * that name, offline).
 	 */
 	byName(name: string): Promise<PlacedDevice | null>;
-	/** An Agent Profile of this computer by name, or null. */
-	profileFor(name: string): AgentProfileSettings | null;
+	/** A profile of this computer by name, or null. */
+	profileFor(name: string): ProfileSettings | null;
 };
 
 /** The refusal of a Device this computer cannot reach: the devices' planner refuses with it too. */
@@ -55,6 +65,39 @@ const planned = (at: PlacedDevice): PlannedDevice => ({
 	name: at.name,
 });
 
+/** The project's profiles, from the profiles file of the run's Clone. */
+type ProjectProfileSet = {
+	byName: Record<string, ProfileSettings>;
+	/** Why the file gives fewer profiles than it holds. */
+	issues: ProfileIssue[];
+};
+
+/**
+ * Reads the project's profiles from the run's Device. A Device that cannot
+ * answer (one from before project profiles) gives none.
+ */
+async function projectProfiles(
+	run: PlacedDevice,
+	projectId: string,
+): Promise<ProjectProfileSet> {
+	let source: ProfilesSource = null;
+	try {
+		source = await run.device.projectProfiles(projectId);
+	} catch {
+		// None: the flows came from this Clone, so it answers when it can.
+	}
+	const { profiles, issues } = parseProfilesSource(source);
+	return {
+		byName: Object.fromEntries(
+			profiles.map(({ name, description: _description, ...settings }) => [
+				name,
+				settings,
+			]),
+		),
+		issues,
+	};
+}
+
 /**
  * Where each node runs, and its profile. Returns the flows with their
  * profiles resolved, a node that runs on this computer for its profile
@@ -64,6 +107,7 @@ async function placeNodes(
 	flows: readonly Flow[],
 	runDevice: PlacedDevice,
 	devices: PlanDevices,
+	project: ProjectProfileSet,
 ): Promise<{ flows: Flow[]; named: Map<string, PlacedDevice> }> {
 	const nodes = flows.flatMap((f) => f.nodes);
 	const named = new Map<string, PlacedDevice>();
@@ -97,14 +141,15 @@ async function placeNodes(
 	const fallback =
 		walker && !walker.offered && !runDevice.offered ? walker : null;
 	for (const node of nodes) {
-		if (node.type !== "agent" || node.profile === undefined) continue;
+		const profile = profileOf(node);
+		if (profile === undefined) continue;
 		const name = namedDevice(node);
 		const at =
 			name !== undefined ? (named.get(name) as PlacedDevice) : runDevice;
-		if (!at.offered) want(at, node.profile);
-		if (name === undefined && fallback) want(fallback, node.profile);
+		if (!at.offered) want(at, profile);
+		if (name === undefined && fallback) want(fallback, profile);
 	}
-	const found = new Map<PlacedDevice, Record<string, AgentProfileSettings>>();
+	const found = new Map<PlacedDevice, Record<string, ProfileSettings>>();
 	for (const [at, names] of wanted) {
 		found.set(
 			at,
@@ -126,10 +171,23 @@ async function placeNodes(
 		if (!entry.nodeIds.includes(nodeId)) entry.nodeIds.push(nodeId);
 		missing.set(key, entry);
 	};
+	// A profile that does not fit its node: an Agent on a Model Profile, a
+	// Decision on an Agent Profile, a Value on a decider that cannot make one.
+	const misfits: string[] = [];
+	const resolve = (node: FlowNode, profile: ProfileSettings): FlowNode => {
+		const resolved = resolveNodeProfile(node, profile);
+		if ("node" in resolved) return resolved.node;
+		if (!misfits.includes(resolved.problem)) misfits.push(resolved.problem);
+		return node;
+	};
 	const placed = flows.map((flow) => ({
 		...flow,
 		nodes: flow.nodes.map((node): FlowNode => {
-			if (node.type !== "agent" || node.profile === undefined) return node;
+			const profile = profileOf(node);
+			if (profile === undefined) return node;
+			const fromProject = Object.hasOwn(project.byName, profile)
+				? project.byName[profile]
+				: undefined;
 			const name = namedDevice(node);
 			const placedAt =
 				name !== undefined ? (named.get(name) as PlacedDevice) : runDevice;
@@ -137,38 +195,46 @@ async function placeNodes(
 			if (placedAt.offered) return node;
 			if (name !== undefined) {
 				const at = named.get(name) as PlacedDevice;
-				const profile = found.get(at)?.[node.profile];
-				if (!profile) {
-					miss(node.profile, node.id, at.thisDevice ? null : at.name);
+				const settings = found.get(at)?.[profile] ?? fromProject;
+				if (!settings) {
+					miss(profile, node.id, at.thisDevice ? null : at.name);
 					return node;
 				}
-				return resolveAgentNode(node, profile);
+				return resolve(node, settings);
 			}
-			const own = found.get(runDevice)?.[node.profile];
-			if (own) return resolveAgentNode(node, own);
-			const here = fallback ? found.get(fallback)?.[node.profile] : undefined;
+			const own = found.get(runDevice)?.[profile];
+			if (own) return resolve(node, own);
+			// The project's profile runs on the run's Device: it has the project.
+			if (fromProject) return resolve(node, fromProject);
+			const here = fallback ? found.get(fallback)?.[profile] : undefined;
 			if (fallback && here) {
 				// The profile's Device: only this computer has it.
 				named.set(fallback.name, fallback);
-				return { ...resolveAgentNode(node, here), device: fallback.name };
+				return { ...resolve(node, here), device: fallback.name } as FlowNode;
 			}
-			miss(node.profile, node.id, runDevice.thisDevice ? null : runDevice.name);
+			miss(profile, node.id, runDevice.thisDevice ? null : runDevice.name);
 			return node;
 		}),
 	}));
 	if (missing.size > 0) {
+		// A broken profiles file explains a profile the project should have.
+		const fileProblem =
+			project.issues.length > 0
+				? ` The project's profiles have a problem: ${project.issues.map((i) => i.message).join(" ")}`
+				: "";
 		throw new Refusal(
 			"invalid",
 			[...missing]
 				.map(([key, { nodeIds, on }]) => {
 					const name = key.split("\u0000")[0];
 					return on === null
-						? `The flow uses the profile "${name}" (${nodeIds.join(", ")}), but no profile has that name. Add it under Agents.`
-						: `The flow uses the profile "${name}" (${nodeIds.join(", ")}) on ${on}, but that device has no profile of that name. Add it under Agents.`;
+						? `The flow uses the profile "${name}" (${nodeIds.join(", ")}), but no profile has that name. Add it under Agents, or to the project's profiles.`
+						: `The flow uses the profile "${name}" (${nodeIds.join(", ")}) on ${on}, but that device has no profile of that name. Add it under Agents, or to the project's profiles.`;
 				})
-				.join(" "),
+				.join(" ") + fileProblem,
 		);
 	}
+	if (misfits.length > 0) throw new Refusal("invalid", misfits.join(" "));
 	return { flows: placed, named };
 }
 
@@ -204,6 +270,7 @@ export async function planNodes(
 		[loaded.flow, ...Object.values(loaded.calledFlows)],
 		run,
 		devices,
+		await projectProfiles(run, start.projectId),
 	);
 	const [flow, ...called] = flows as [Flow, ...Flow[]];
 	const groups = new Map<PlacedDevice, FlowNode[]>();

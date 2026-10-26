@@ -112,12 +112,23 @@ export function apiPort(
 		flows: (projectId) => g(() => client.flows.map({ projectId })),
 		profiles: () =>
 			g(async () =>
-				(await client.profiles.list()).map((p) => ({
-					name: p.name,
-					harness: p.harness,
-					model: p.model,
-					description: p.description ?? null,
-				})),
+				(await client.profiles.list()).map((p) => {
+					const description = p.description ?? null;
+					if (!("harness" in p)) {
+						return {
+							name: p.name,
+							decider: p.decider,
+							...(p.model ? { model: p.model } : {}),
+							description,
+						};
+					}
+					return {
+						name: p.name,
+						harness: p.harness,
+						model: p.model,
+						description,
+					};
+				}),
 			),
 		tools: () =>
 			g(async () => {
@@ -138,7 +149,11 @@ export function apiPort(
 			g(async () => {
 				const profiles = await client.profiles.list();
 				const harnesses = [
-					...new Set<Harness>(profiles.map((p) => p.harness as Harness)),
+					...new Set<Harness>(
+						profiles.flatMap((p) =>
+							"harness" in p ? [p.harness as Harness] : [],
+						),
+					),
 				];
 				const lists = await Promise.all(
 					(harnesses.length > 0

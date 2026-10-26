@@ -27,6 +27,8 @@ function at(
 		thisDevice?: boolean;
 		hasClone?: boolean;
 		profiles?: string[];
+		/** The profiles of the project's file in its Clone, by name. */
+		projectProfiles?: string[];
 	} = {},
 ): PlacedDevice {
 	const profiles = options.profiles ?? [];
@@ -34,6 +36,16 @@ function at(
 		id,
 		name: id,
 		flows: async () => ({}),
+		projectProfiles: async () => ({
+			json: {
+				version: 1,
+				profiles: (options.projectProfiles ?? []).map((name) => ({
+					...PROFILE,
+					model: "from-project",
+					name,
+				})),
+			},
+		}),
 		capabilities: async (query: { profiles?: string[] }) => ({
 			profiles: Object.fromEntries(
 				(query.profiles ?? [])
@@ -143,6 +155,31 @@ describe("the node walk of a run's plan", () => {
 		expect(
 			planned.flow.nodes.map((n) => ("device" in n ? n.device : null)),
 		).toEqual([null, "this"]);
+	});
+
+	test("a project's profile runs on the run's Device; that Device's own profile wins", async () => {
+		const studio = at("studio", {
+			profiles: ["everywhere"],
+			projectProfiles: ["everywhere", "here_only"],
+		});
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "studio",
+				flow: flow([
+					profiled("own", "everywhere"),
+					profiled("project", "here_only"),
+				]),
+			},
+			{ ...devices(["here_only"]), byId: async () => studio },
+			"the-person",
+		);
+		// Not moved to this computer: the project has the profile.
+		expect(planned.plan.named).toEqual({});
+		expect(planned.flow.nodes).toMatchObject([
+			{ id: "own", model: "sonnet" },
+			{ id: "project", model: "from-project" },
+		]);
 	});
 
 	test("refuses a Device nobody can reach, a name nobody has, and a run's Device without the project", async () => {
