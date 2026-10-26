@@ -181,6 +181,10 @@ const stepOf = (detail: RunDetail, nodeId: string): StepSummary => {
 	return found;
 };
 
+/** The last step of the node with its items' elements, as a person opens it. */
+const openStep = (engine: SpaceEngine, detail: RunDetail, nodeId: string) =>
+	engine.getStep(detail.id, stepOf(detail, nodeId).id);
+
 const logOf = (detail: RunDetail, nodeId: string) =>
 	stepOf(detail, nodeId).outputs.log_tail;
 
@@ -735,7 +739,9 @@ describe("Call with each, over any list", () => {
 		});
 		expect(harness.calls[1]?.stepReport).toBe(true);
 		const each = stepOf(detail, "each");
-		expect(each.items.map((i) => [i.id, i.title, i.state, i.value])).toEqual([
+		expect(each.items[0]?.value).toBeUndefined();
+		const opened = await openStep(engine, detail, "each");
+		expect(opened.items.map((i) => [i.id, i.title, i.state, i.value])).toEqual([
 			["t1", "One", "done", { id: "t1", title: "One" }],
 			["t2", "Two", "done", { id: "t2", title: "Two", dependsOn: ["t1"] }],
 		]);
@@ -805,7 +811,7 @@ describe("Call with each, over any list", () => {
 		const run = await engine.startRun({ projectId: id, flow });
 		const detail = await waitForEnd(engine, run.id);
 		expect(detail.status).toBe("finished");
-		const files = stepOf(detail, "files");
+		const files = await openStep(engine, detail, "files");
 		expect(files.items.map((i) => [i.id, i.title, i.value])).toEqual([
 			[
 				"src/a.ts",
@@ -872,7 +878,11 @@ describe("Call with each, over any list", () => {
 		const plain = await waitForEnd(engine, strings.id);
 		expect(plain.status).toBe("finished");
 		expect(
-			stepOf(plain, "loop").items.map((i) => [i.id, i.title, i.value]),
+			(await openStep(engine, plain, "loop")).items.map((i) => [
+				i.id,
+				i.title,
+				i.value,
+			]),
 		).toEqual([
 			["0", "x", "x"],
 			["1", "y", "y"],
@@ -1257,7 +1267,7 @@ describe("flow format 1", () => {
 		const loop = stepOf(loaded, "loop");
 		// A For Each step from before flow version 4 reads as a Call step.
 		expect(loop.nodeType).toBe("call");
-		expect(loop.items[0]).toMatchObject({
+		expect((await openStep(engine, loaded, "loop")).items[0]).toMatchObject({
 			id: "12",
 			title: "first",
 			value: { number: 12, parent: { number: 7, title: "The Epic" } },

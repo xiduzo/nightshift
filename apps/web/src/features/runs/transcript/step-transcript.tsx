@@ -37,6 +37,7 @@ import { GateAnswer, GateQuestion as GateQuestionText } from "@/features/gates";
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { SectionTitle } from "../components/step-console";
+import { useOpenedStep } from "../hooks/use-opened-step";
 import { CommandExit, CommandLog } from "./items/command-items";
 import {
 	DecisionAsk,
@@ -70,7 +71,7 @@ import { markdownContext, transcriptToMarkdown } from "./transcript-markdown";
  */
 export function StepTranscript({
 	runId,
-	step,
+	step: summary,
 	transcript,
 	connecting,
 	walker,
@@ -89,6 +90,8 @@ export function StepTranscript({
 	/** The step's node: its outcomes keep their colours. */
 	node?: FlowNode;
 }) {
+	// The prompts load when the step opens.
+	const step = useOpenedStep(runId, summary);
 	const running = step.outcome === null;
 	// A gate step without an outcome waits for a person: it gets the answer form.
 	const gateOpen = step.gate !== null && running;
@@ -310,7 +313,7 @@ export function StepTranscript({
 									<SessionBoundary
 										number={sessionNumbers.get(session.id)}
 										at={session.createdAt}
-										prompt={session.prompt}
+										prompt={session.prompt ?? ""}
 									/>
 								</MessageScrollerItem>
 							))}

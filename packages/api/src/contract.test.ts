@@ -405,7 +405,12 @@ describe("replies of a real engine", () => {
 		);
 		await read(appRouter.runs.list);
 		await read(appRouter.runs.list, { projectId });
-		await read(appRouter.runs.get, { runId: started.id });
+		const detail = (await read(appRouter.runs.get, { runId: started.id })) as {
+			steps: { id: string }[];
+		};
+		for (const step of detail.steps) {
+			await read(appRouter.runs.step, { runId: started.id, stepId: step.id });
+		}
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
 		await read(appRouter.runs.moveTargets, { runId: started.id });

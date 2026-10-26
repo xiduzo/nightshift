@@ -97,6 +97,7 @@ export function StepSummary({
 			{step.nodeType === "call" && each ? (
 				<div className="overflow-hidden rounded-lg border">
 					<ItemList
+						runId={run.id}
 						step={step}
 						steps={steps}
 						selectedItem={focus}

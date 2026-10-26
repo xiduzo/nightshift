@@ -253,6 +253,11 @@ export function createSpaces(deps: SpacesDeps) {
 				return (await deps.pathsFor(spaceId, actor))(await reads.getRun(row));
 			},
 
+			async getStep(runId, stepId) {
+				await ready;
+				return reads.getStep(await getRunRow(runId, spaceId), stepId);
+			},
+
 			async listArtifacts(runId) {
 				await ready;
 				await getRunRow(runId, spaceId);

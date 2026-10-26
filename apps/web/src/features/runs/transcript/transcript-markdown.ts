@@ -129,7 +129,7 @@ export function markdownContext(
 		sessions: new Map(
 			step.sessions.map((session, position) => [
 				session.id,
-				{ prompt: session.prompt, number: position + 1 },
+				{ prompt: session.prompt ?? "", number: position + 1 },
 			]),
 		),
 		itemTitles,

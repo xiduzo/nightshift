@@ -157,6 +157,7 @@ export type {
 	RunStreamItem,
 	RunSummary,
 	RunWalker,
+	StepDetail,
 } from "./read";
 export {
 	exportRun,

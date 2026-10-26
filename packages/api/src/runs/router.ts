@@ -12,6 +12,7 @@ import {
 	runDetailSchema,
 	runStreamItemSchema,
 	runSummarySchema,
+	stepDetailSchema,
 } from "./schemas";
 
 /**
@@ -44,6 +45,20 @@ export const runs = {
 		})
 		.output(output(runDetailSchema))
 		.handler(({ context, input }) => context.space.getRun(input.runId)),
+	/**
+	 * One step of a run with what `get` leaves out: the prompt of each
+	 * session and the element of each item. A screen reads it when a
+	 * person opens the step.
+	 */
+	step: runProcedure(z.object({ runId: z.string(), stepId: z.string() }))
+		.route({
+			summary:
+				"Reads one step of a run with the prompt of each session and each item it ran.",
+		})
+		.output(output(stepDetailSchema))
+		.handler(({ context, input }) =>
+			context.space.getStep(input.runId, input.stepId),
+		),
 	/** The files the run's agents kept, oldest first. Fetch one at `GET /api/runs/:id/artifacts/:artifactId`. */
 	artifacts: runProcedure(z.object({ runId: z.string() }))
 		.route({ summary: "Lists the files the agents of a run kept." })

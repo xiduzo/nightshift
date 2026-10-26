@@ -16,7 +16,13 @@ import type {
 } from "../contract";
 import type { FlowUse } from "../flows";
 import type { Branches, Project } from "../projects";
-import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
+import type {
+	OpenGate,
+	RunDetail,
+	RunStreamItem,
+	RunSummary,
+	StepDetail,
+} from "../read";
 import type { ScheduleList } from "../schedules";
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
@@ -133,6 +139,11 @@ export interface SpaceEngine {
 
 	listRuns(input?: { projectId?: string }): Promise<RunSummary[]>;
 	getRun(runId: string): Promise<RunDetail>;
+	/**
+	 * One step of a run with what the run's summary of it leaves out: the
+	 * prompt of each session and the element of each item.
+	 */
+	getStep(runId: string, stepId: string): Promise<StepDetail>;
 	/**
 	 * The files the run's agents kept for the person, oldest first. Only
 	 * the ones kept on this computer.

@@ -19,6 +19,9 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		/** The detail of one run, or of every run without `runId`: to read it again. */
 		getKey: (runId?: string) =>
 			orpc.runs.get.key(runId === undefined ? {} : { input: { runId } }),
+		/** The opened steps of one run, or of every run without `runId`: to read them again. */
+		stepKey: (runId?: string) =>
+			orpc.runs.step.key(runId === undefined ? {} : { input: { runId } }),
 		/** The files of one run, or of every run without `runId`: to read them again. */
 		artifactsKey: (runId?: string) =>
 			orpc.runs.artifacts.key(runId === undefined ? {} : { input: { runId } }),
@@ -39,6 +42,9 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		}),
 		/** One run with its steps. */
 		get: (runId: string) => orpc.runs.get.queryOptions({ input: { runId } }),
+		/** One step with the prompt of each session and each item it ran: read when a person opens it. */
+		step: (runId: string, stepId: string) =>
+			orpc.runs.step.queryOptions({ input: { runId, stepId } }),
 		/** The files a run's agents kept. Polls while the run runs, so a new one shows. */
 		artifacts: (runId: string, live: boolean) => ({
 			...orpc.runs.artifacts.queryOptions({ input: { runId } }),

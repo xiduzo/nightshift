@@ -3,6 +3,7 @@ import type { AgentHarness, AgentHarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import {
 	type Derive,
@@ -52,6 +53,7 @@ import type {
 	RunSummary,
 	RunWalker,
 	RunWarning,
+	StepDetail,
 	StepSummary,
 	SubflowRun,
 } from "./views";
@@ -72,6 +74,9 @@ import type {
  * Over 600 lines on purpose: that locality. Every view of a run that people
  * see is made here.
  */
+
+/** What a step that is not in its run says. */
+const STEP_NOT_FOUND = "Night Shift cannot find this step of the run.";
 
 /** The take-over facts of the harness of that name, or none. */
 export type HarnessOf = (
@@ -377,6 +382,10 @@ const unnamed = (id: string): RunDevice => ({
 /** Names a Device by id, as this Replica knows it. */
 export type DeviceNamer = (id: string) => RunDevice;
 
+/**
+ * A step as the run and its stream show it: without the prompts and the
+ * elements of its items (`toStepDetail`).
+ */
 export function toStepSummary(
 	derived: DerivedStep,
 	deviceOf?: DeviceNamer,
@@ -397,7 +406,6 @@ export function toStepSummary(
 				id: item.facts.id,
 				title: item.facts.title,
 				url: item.facts.url,
-				value: item.facts.value,
 				state: item.state,
 				branch: item.branch,
 				baseBranch: item.baseBranch,
@@ -409,7 +417,6 @@ export function toStepSummary(
 		sessions: derived.sessions.map((s) => ({
 			id: s.id,
 			harnessSessionId: s.harnessSessionId,
-			prompt: s.prompt,
 			createdAt: s.startedAt,
 			outcome: s.ending?.outcome ?? null,
 			error: s.ending?.error ?? null,
@@ -432,6 +439,25 @@ export function toStepSummary(
 					openedAt: derived.gate.openedAt,
 				}
 			: null,
+	};
+}
+
+/** A step with the prompt of each session and the element of each item: what a person opens. */
+export function toStepDetail(
+	derived: DerivedStep,
+	deviceOf?: DeviceNamer,
+): StepDetail {
+	const summary = toStepSummary(derived, deviceOf);
+	return {
+		...summary,
+		sessions: summary.sessions.map((session, i) => ({
+			...session,
+			prompt: derived.sessions[i]?.prompt ?? "",
+		})),
+		items: summary.items.map((item, i) => ({
+			...item,
+			value: derived.items[i]?.facts.value ?? null,
+		})),
 	};
 }
 
@@ -599,6 +625,14 @@ export function createReadModel(deps: ReadModelDeps) {
 				: ((await deps.pendingCommands([runId])).get(runId) ?? []),
 			deviceOf,
 		);
+	}
+
+	/** One step of the run with its prompts and the elements of its items, or "not found". */
+	async function getStep(row: RunRow, stepId: string): Promise<StepDetail> {
+		const steps = await one(row.id, deriveSteps);
+		const step = steps.find((s) => s.id === stepId);
+		if (!step) throw new Refusal("not-found", STEP_NOT_FOUND);
+		return toStepDetail(step, await namer(row.spaceId, [step.deviceId]));
 	}
 
 	/** The run's status, or null for a run the log has nothing on. */
@@ -808,5 +842,5 @@ export function createReadModel(deps: ReadModelDeps) {
 		}
 	}
 
-	return { listRuns, getRun, runStatus, runHere, listGates, watch };
+	return { listRuns, getRun, getStep, runStatus, runHere, listGates, watch };
 }

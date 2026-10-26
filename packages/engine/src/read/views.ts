@@ -28,7 +28,11 @@ import type { VariableChange } from "./derive-steps";
 export type SessionSummary = {
 	id: string;
 	harnessSessionId: string | null;
-	prompt: string;
+	/**
+	 * What the session was asked. Only in the step's detail (`StepDetail`):
+	 * the prompts of a long run weigh more than the rest of it.
+	 */
+	prompt?: string;
 	createdAt: number;
 	/** Set when the session ended. */
 	outcome: SessionOutcome | null;
@@ -86,13 +90,22 @@ export type StepSummary = {
 	} | null;
 };
 
+/**
+ * One step with what its summary leaves out: the prompt of each session
+ * and the element of each item. Read when a person opens the step.
+ */
+export type StepDetail = Omit<StepSummary, "sessions" | "items"> & {
+	sessions: (Omit<SessionSummary, "prompt"> & { prompt: string })[];
+	items: (Omit<ItemSummary, "value"> & { value: JsonValue })[];
+};
+
 /** One item of a Call step's visit (`each`). */
 export type ItemSummary = {
 	id: string;
 	title: string;
 	url: string | null;
-	/** The element as the source gave it. */
-	value: JsonValue;
+	/** The element as the source gave it. Only in the step's detail (`StepDetail`). */
+	value?: JsonValue;
 	state: ItemState;
 	/** Null when the Call does not use a branch per item. */
 	branch: string | null;

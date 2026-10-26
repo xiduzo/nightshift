@@ -81,6 +81,8 @@ const KEYS = {
 	ofProject: runs.ofProject("p1").queryKey,
 	run1: runs.get("r1").queryKey,
 	run2: runs.get("r2").queryKey,
+	step1: runs.step("r1", "a").queryKey,
+	step2: runs.step("r2", "b").queryKey,
 	files1: runs.artifacts("r1", true).queryKey,
 	files2: runs.artifacts("r2", true).queryKey,
 	devices: runs.devices("p1").queryKey,
@@ -98,13 +100,14 @@ const RUN_1: Name[] = [
 	"everyRun",
 	"ofProject",
 	"run1",
+	"step1",
 	"files1",
 	"dashboard",
 	"flowHealth",
 	"schedules",
 ];
 /** What a missed stretch of the stream reads again: the Gates, and what every run changes. */
-const EVERYTHING: Name[] = ["gates", ...RUN_1, "run2", "files2"];
+const EVERYTHING: Name[] = ["gates", ...RUN_1, "run2", "step2", "files2"];
 const NOTHING: Name[] = [];
 
 /** Names in the order `stale()` gives them. */
@@ -310,11 +313,13 @@ describe("the live cache follows the Host", () => {
 		};
 		await host.send(runChanged, { ...runChanged, runId: "r2" }, runChanged);
 		timers.due(300);
-		expect(stale()).toEqual(sorted([...RUN_1, "run2", "files2"]));
-		// Each run's detail and files once, then the lists, the dashboard, the schedules.
+		expect(stale()).toEqual(sorted([...RUN_1, "run2", "step2", "files2"]));
+		// Each run's detail, opened steps and files once, then the lists, the dashboard, the schedules.
 		expect(reads).toEqual([
 			runs.getKey("r1"),
 			runs.getKey("r2"),
+			runs.stepKey("r1"),
+			runs.stepKey("r2"),
 			runs.artifactsKey("r1"),
 			runs.artifactsKey("r2"),
 			runs.lists(),

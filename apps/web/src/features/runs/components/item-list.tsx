@@ -31,6 +31,7 @@ import { ItemStateBadge } from "@/features/flows";
 import type { ItemState, ItemSummary, StepSummary } from "@/shared/api";
 import { JsonDetails } from "@/shared/code";
 import { formatTime } from "@/shared/format";
+import { useOpenedStep } from "../hooks/use-opened-step";
 import { type ItemScope, itemsOf, scopeKey } from "../lib/run-steps";
 import { Elapsed } from "./elapsed";
 
@@ -41,16 +42,20 @@ import { Elapsed } from "./elapsed";
  * as JSON. Focusing one narrows the steps and the graph to it.
  */
 export function ItemList({
-	step,
+	runId,
+	step: summary,
 	steps,
 	selectedItem,
 	onSelectItem,
 }: {
+	runId: string;
 	step: StepSummary;
 	steps: StepSummary[];
 	selectedItem: ItemScope;
 	onSelectItem: (scope: ItemScope) => void;
 }) {
+	// The elements load when the step opens.
+	const step = useOpenedStep(runId, summary);
 	const items = itemsOf(step, steps);
 	const counts = new Map<ItemState, number>();
 	for (const item of items) {

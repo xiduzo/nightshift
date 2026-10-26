@@ -5,6 +5,7 @@ import type {
 	RunDetail,
 	RunStreamItem,
 	RunSummary,
+	StepDetail,
 	TranscriptEntry,
 } from "@nightshift/engine";
 import { flowSchema, outcomeColorSchema } from "@nightshift/flows";
@@ -116,7 +117,8 @@ const itemSummarySchema = z.object({
 	id: z.string(),
 	title: z.string(),
 	url: z.string().nullable(),
-	value: z.json(),
+	/** Only in the step's detail (`runs.step`). Older Hosts send it in every summary. */
+	value: z.json().optional(),
 	state: z.enum(["done", "running", "failed", "blocked", "halted"]),
 	branch: z.string().nullable(),
 	baseBranch: z.string().nullable(),
@@ -128,7 +130,8 @@ const itemSummarySchema = z.object({
 const sessionSummarySchema = z.object({
 	id: z.string(),
 	harnessSessionId: z.string().nullable(),
-	prompt: z.string(),
+	/** Only in the step's detail (`runs.step`). Older Hosts send it in every summary. */
+	prompt: z.string().optional(),
 	createdAt: z.number(),
 	outcome: z.enum(["failed", "finished", "stopped", "interrupted"]).nullable(),
 	error: z.string().nullable(),
@@ -168,6 +171,14 @@ const stepSummarySchema = z.object({
 		})
 		.nullable(),
 });
+
+/** One step with the prompt of each session and the element of each item. */
+export const stepDetailSchema = exact<StepDetail>()(
+	stepSummarySchema.extend({
+		items: z.array(itemSummarySchema.extend({ value: z.json() })),
+		sessions: z.array(sessionSummarySchema.extend({ prompt: z.string() })),
+	}),
+);
 
 export const runDetailSchema = exact<RunDetail>()(
 	runSummarySchema.extend({

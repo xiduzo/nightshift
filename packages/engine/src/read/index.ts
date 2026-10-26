@@ -49,4 +49,5 @@ export type {
 	RunStreamItem,
 	RunSummary,
 	RunWalker,
+	StepDetail,
 } from "./views";

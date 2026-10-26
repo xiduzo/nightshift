@@ -181,6 +181,8 @@ export function createLiveCache({
 		everyRun: false,
 		/** The runs whose detail to read. */
 		details: new Set<string>(),
+		/** The runs whose opened steps to read. */
+		steps: new Set<string>(),
 		/** The runs whose files to read. */
 		files: new Set<string>(),
 		/** A run changed: the lists of runs, the dashboard and the schedules. */
@@ -206,6 +208,7 @@ export function createLiveCache({
 				pending.everyRun = true;
 			} else {
 				pending.details.add(one.runId);
+				pending.steps.add(one.runId);
 				pending.files.add(one.runId);
 			}
 		}
@@ -215,18 +218,22 @@ export function createLiveCache({
 			waiting = false;
 			const { gates: readGates, everyRun, lists } = pending;
 			const details = [...pending.details];
+			const steps = [...pending.steps];
 			const files = [...pending.files];
 			pending.gates = false;
 			pending.everyRun = false;
 			pending.lists = false;
 			pending.details.clear();
+			pending.steps.clear();
 			pending.files.clear();
 			if (readGates) invalidate(gates.all());
 			if (everyRun) {
 				invalidate(runs.getKey());
+				invalidate(runs.stepKey());
 				invalidate(runs.artifactsKey());
 			} else {
 				for (const runId of details) invalidate(runs.getKey(runId));
+				for (const runId of steps) invalidate(runs.stepKey(runId));
 				for (const runId of files) invalidate(runs.artifactsKey(runId));
 			}
 			if (lists) {

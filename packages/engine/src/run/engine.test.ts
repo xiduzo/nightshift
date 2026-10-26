@@ -437,6 +437,14 @@ describe("runs", () => {
 			outcome: "finished",
 			costUsd: 0.12,
 		});
+		// The run leaves the prompt out; the step a person opens has it.
+		expect(step?.sessions[0]?.prompt).toBeUndefined();
+		const opened = await engine.getStep(summary.id, step?.id ?? "");
+		expect(opened.sessions.map((s) => s.prompt)).toEqual([`/tdd ${prompt}`]);
+		expect(opened.outputs).toEqual(step?.outputs ?? {});
+		await expect(engine.getStep(summary.id, "no-such-step")).rejects.toThrow(
+			"cannot find this step",
+		);
 		expect(detail.takeOverCommand).toBe(
 			`cd ${summary.worktreePath} && claude --resume fake-session-1`,
 		);
