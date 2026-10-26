@@ -51,12 +51,15 @@ const POLICY_FIELDS: {
 export function FlowInspector({
 	flow,
 	name,
+	projectId,
 	policyDefaults,
 	onChange,
 }: {
 	flow: Flow;
 	/** The flow's file name, for the header. */
 	name?: string;
+	/** The flow's project: with `name`, whose kept values the Variables show. */
+	projectId?: string;
 	/** The daemon's run policy settings: what an empty number uses. Undefined while they load. */
 	policyDefaults?: Required<Policy>;
 	onChange: (change: (flow: Flow) => Flow) => void;
@@ -161,6 +164,11 @@ export function FlowInspector({
 				</Note>
 				<VariablesEditor
 					flow={flow}
+					kept={
+						projectId !== undefined && name !== undefined
+							? { projectId, flowName: name }
+							: undefined
+					}
 					describedBy={`${id}-variables-hint`}
 					onChange={onChange}
 				/>

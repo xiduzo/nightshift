@@ -234,18 +234,25 @@ export function ValuePreview({ value }: { value: unknown }) {
 	return <span title={previewValue(value, 400)}>{previewValue(value)}</span>;
 }
 
-/** The step a change came from, with a way to show it; "Start value" for the first value. */
+/**
+ * The step a change came from, with a way to show it; "Start value" for
+ * the first value, "Kept from an earlier run" for a kept one.
+ */
 export function SetBy({
 	change,
 	steps,
 	onShowStep,
 }: {
-	change: Pick<VariableChange, "stepId">;
+	change: Pick<VariableChange, "stepId" | "kept">;
 	steps: StepSummary[];
 	onShowStep: (stepId: string) => void;
 }) {
 	if (change.stepId === null) {
-		return <span className="text-muted-foreground">Start value</span>;
+		return (
+			<span className="text-muted-foreground">
+				{change.kept ? "Kept from an earlier run" : "Start value"}
+			</span>
+		);
 	}
 	const stepId = change.stepId;
 	const step = steps.find((one) => one.id === stepId);

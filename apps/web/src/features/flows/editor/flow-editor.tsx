@@ -574,6 +574,7 @@ function Editor({
 		<FlowInspector
 			flow={draft}
 			name={name}
+			projectId={projectId}
 			policyDefaults={policyDefaults}
 			onChange={(change) => setDraft(change, "settings")}
 		/>

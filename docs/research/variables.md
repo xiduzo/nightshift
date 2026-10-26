@@ -265,6 +265,34 @@ New entries, and one change:
 - **Static type checks** from Output Schemas (the last row of §5).
 - **Number and boolean Inputs**, so inputs and variables have the same types.
 
+## 9a. Kept variables (built 2026-10-26)
+
+`"keep": "project"` on a variable keeps its value between runs
+(`node-review-2026-10.md` §5.2): memory such as a skip list, without a
+file next to `.git`.
+
+- **Start.** `vars__init` reads the flow's kept values and passes them to
+  `initialVariables`. A kept variable with a value starts from it; one
+  without, or with a value that no longer fits its type or schema, starts
+  from `initial`. `VariablesSet.kept` names the ones that came from an
+  earlier run, and the run page says "Kept from an earlier run".
+- **Write.** Each write of a kept variable saves it in the `kept_variable`
+  table (`@nightshift/engine` `variables/`), in the batch of the step's
+  `StepEnded`: the write and the saved value land together. The last write
+  to end wins, also across parallel branches and runs at once.
+- **Key.** Project, flow file name and variable name. A called flow keeps
+  its own, by its own name. A quick run has no flow file and keeps nothing.
+- **Where.** The table is in the run history database of the computer that
+  walks the run (the app data dir). The exchange does not copy it, so each
+  Replica keeps its own values. A resume reads the run's events, never the
+  table.
+- **Editor.** A "Keep between runs" switch on each variable. When it is
+  on, the row shows the kept value and a Reset button (`flows.kept`,
+  `flows.resetKept`). A reset removes the row: the next run starts from
+  `initial`.
+- **Validation.** A kept variable that a template reads but no node sets is
+  a warning: it keeps nothing.
+
 ## 10. Slices
 
 1. **Engine.** Schema and migration, validator, `vars` in templates and rules,

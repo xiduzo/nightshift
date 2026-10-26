@@ -16,17 +16,25 @@ import {
 	EmptyDescription,
 	EmptyHeader,
 } from "@nightshift/ui/components/empty";
+import {
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	Field as ShadcnField,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { Item } from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
+import { Switch } from "@nightshift/ui/components/switch";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
+import { type KeptFlow, KeptValue } from "./kept-value";
 
 /** Why a variable cannot take a name, by what the name clashes with. */
 const VARIABLE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
@@ -51,10 +59,13 @@ const VARIABLE_TYPES: Record<VariableType, string> = {
  */
 export function VariablesEditor({
 	flow,
+	kept,
 	describedBy,
 	onChange,
 }: {
 	flow: Flow;
+	/** The saved flow whose kept values the rows show. Undefined: none shown. */
+	kept?: KeptFlow;
 	describedBy?: string;
 	onChange: Change;
 }) {
@@ -85,6 +96,7 @@ export function VariablesEditor({
 							key={index}
 							id={`${id}-${index}`}
 							flow={flow}
+							kept={kept}
 							variable={variable}
 							index={index}
 							count={variables.length}
@@ -149,6 +161,7 @@ export function VariablesEditor({
 function VariableRow({
 	id,
 	flow,
+	kept,
 	variable,
 	index,
 	count,
@@ -160,6 +173,7 @@ function VariableRow({
 }: {
 	id: string;
 	flow: Flow;
+	kept: KeptFlow | undefined;
 	variable: FlowVariableDef;
 	index: number;
 	count: number;
@@ -252,6 +266,31 @@ function VariableRow({
 				placeholder={variable.type === "json" ? "[]" : "Empty (optional)"}
 				multiline={false}
 			/>
+			<ShadcnField orientation="horizontal" className="items-start">
+				<Switch
+					id={`${id}-keep`}
+					checked={variable.keep !== undefined}
+					className="mt-0.5"
+					aria-describedby={`${id}-keep-hint`}
+					onCheckedChange={(on) =>
+						onUpdate(({ keep: _, ...rest }) =>
+							on ? { ...rest, keep: "project" } : rest,
+						)
+					}
+				/>
+				<FieldContent>
+					<FieldLabel htmlFor={`${id}-keep`} className="text-xs">
+						Keep between runs
+					</FieldLabel>
+					<FieldDescription id={`${id}-keep-hint`} className="text-xs">
+						Each run starts from the value the last run left, for example a list
+						of skipped issues.
+					</FieldDescription>
+				</FieldContent>
+			</ShadcnField>
+			{variable.keep !== undefined && kept ? (
+				<KeptValue id={`${id}-kept`} kept={kept} name={variable.name} />
+			) : null}
 			{variable.type === "json" ? (
 				<OutputSchemaField
 					id={`${id}-schema`}
