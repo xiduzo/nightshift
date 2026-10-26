@@ -32,7 +32,13 @@ import { Screen } from "@/shared/page";
 import { ChoiceSelect } from "./choice-select";
 import { FlowInputFields } from "./flow-input-fields";
 import { PlacementField } from "./placement-field";
-import { canRun, flowCaption, startBlocker } from "./start-words";
+import {
+	canRun,
+	chosenFlow,
+	flowCaption,
+	readsFlowFile,
+	startBlocker,
+} from "./start-words";
 
 /**
  * New run, in the Space you chose in the header: pick one of a project's
@@ -136,9 +142,11 @@ function NewRun({
 		...flowQueries.list(projectId),
 		enabled: project !== undefined,
 	});
+	const listed = flows.data?.find((item) => item.name === flowName);
 	const flow = useQuery({
 		...flowQueries.get(projectId, flowName ?? ""),
-		enabled: project !== undefined && flowName !== null,
+		enabled:
+			project !== undefined && flowName !== null && readsFlowFile(listed),
 	});
 	const placements = useQuery({
 		...runQueries.placements(projectId),
@@ -149,7 +157,8 @@ function NewRun({
 		enabled: project !== undefined,
 	});
 
-	const inputs = flow.data?.flow?.inputs ?? [];
+	const chosen = chosenFlow(listed, flow.data);
+	const inputs = chosen?.inputs ?? [];
 	const choices = placementChoices(placements.data ?? [], devices.data ?? []);
 	const place = defaultPlacement(choices, chosenDevice);
 	const badJson = inputs.filter(
@@ -176,7 +185,7 @@ function NewRun({
 	);
 
 	const ready =
-		flowName !== null && flow.data?.flow != null && blocker === null && place;
+		flowName !== null && chosen?.valid === true && blocker === null && place;
 
 	return (
 		<Screen
@@ -264,8 +273,8 @@ function NewRun({
 			) : null}
 
 			{project && flowName ? (
-				flow.data ? (
-					flow.data.flow ? (
+				chosen ? (
+					chosen.valid ? (
 						inputs.length > 0 ? (
 							<View className="gap-3">
 								<SectionHead

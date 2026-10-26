@@ -10,6 +10,32 @@ export function canRun(
 	return flow.nodeCount !== null && flow.errorCount === 0;
 }
 
+/** The chosen flow as far as New run needs it: what it asks for, and whether it can start. */
+export type ChosenFlow = { inputs: FlowInputDef[]; valid: boolean };
+
+/**
+ * The chosen flow, from its row in the flow list when the Host says the
+ * inputs there (this version), else from its file (`flows.get`, an older
+ * Host). Null while the file loads.
+ */
+export function chosenFlow(
+	listed: Pick<FlowListItem, "nodeCount" | "errorCount" | "inputs"> | undefined,
+	file: { flow: { inputs?: FlowInputDef[] } | null } | undefined,
+): ChosenFlow | null {
+	// An older Host leaves `inputs` out of the list.
+	const inputs = listed?.inputs as FlowInputDef[] | undefined;
+	if (listed && inputs !== undefined) return { inputs, valid: canRun(listed) };
+	if (!file) return null;
+	return { inputs: file.flow?.inputs ?? [], valid: file.flow !== null };
+}
+
+/** Whether New run reads the chosen flow's file: only when its row in the list does not say its inputs. */
+export function readsFlowFile(
+	listed: Pick<FlowListItem, "inputs"> | undefined,
+): boolean {
+	return (listed?.inputs as FlowInputDef[] | undefined) === undefined;
+}
+
 /** The line under a flow in the list: its description, or why it cannot start. */
 export function flowCaption(
 	flow: Pick<FlowListItem, "nodeCount" | "errorCount" | "description">,

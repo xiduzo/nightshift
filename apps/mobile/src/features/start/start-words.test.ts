@@ -3,8 +3,10 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	canRun,
+	chosenFlow,
 	flowCaption,
 	placementHint,
+	readsFlowFile,
 	startBlocker,
 } from "./start-words";
 
@@ -25,6 +27,31 @@ describe("the flow rows", () => {
 		expect(
 			flowCaption({ nodeCount: 4, errorCount: 1, description: "Ships it" }),
 		).toBe("Not valid. Fix it in Night Shift on your computer.");
+	});
+});
+
+describe("the chosen flow", () => {
+	const who = { name: "who", type: "text" as const, required: false };
+	const row = { nodeCount: 3, errorCount: 0, inputs: [who] };
+
+	test("comes from its row in the list when the Host says its inputs there", () => {
+		expect(readsFlowFile(row)).toBe(false);
+		expect(chosenFlow(row, undefined)).toEqual({ inputs: [who], valid: true });
+		expect(chosenFlow({ ...row, errorCount: 1 }, undefined)?.valid).toBe(false);
+	});
+
+	test("comes from its file when an older Host leaves the inputs out of the list", () => {
+		const old = { nodeCount: 3, errorCount: 0 } as typeof row;
+		expect(readsFlowFile(old)).toBe(true);
+		expect(chosenFlow(old, undefined)).toBeNull();
+		expect(chosenFlow(old, { flow: { inputs: [who] } })).toEqual({
+			inputs: [who],
+			valid: true,
+		});
+		expect(chosenFlow(old, { flow: null })).toEqual({
+			inputs: [],
+			valid: false,
+		});
 	});
 });
 
