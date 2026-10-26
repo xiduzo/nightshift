@@ -39,11 +39,28 @@ export function applyToDraft(
 	suggestion: Suggestion,
 	selection?: TextRange,
 ): void {
+	const after = applySuggestion(assistant.flow, nodeId, suggestion, selection);
+	replaceDraft(
+		assistant,
+		after,
+		"Suggestion applied. Save the flow to keep it.",
+	);
+}
+
+/**
+ * Makes `after` the draft, and offers to undo it while the draft is still
+ * `after`. Nothing is saved: the person saves the flow. Returns false when
+ * `after` is the draft already.
+ */
+export function replaceDraft(
+	assistant: FlowAssistant,
+	after: Flow,
+	message: string,
+): boolean {
 	const before = assistant.flow;
-	const after = applySuggestion(before, nodeId, suggestion, selection);
-	if (after === before) return;
+	if (after === before) return false;
 	assistant.changeFlow(() => after);
-	toast.success("Suggestion applied. Save the flow to keep it.", {
+	toast.success(message, {
 		action: {
 			label: "Undo",
 			onClick: () =>
@@ -52,4 +69,5 @@ export function applyToDraft(
 				),
 		},
 	});
+	return true;
 }

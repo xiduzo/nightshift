@@ -3,6 +3,7 @@ import type {
 	SuggestionEvent,
 	SuggestionRequest,
 } from "@nightshift/flows";
+import { followStream } from "./follow-stream";
 
 /** What one suggestion request gave: the suggestion, or why there is none. */
 export type SuggestionResult =
@@ -41,22 +42,17 @@ export async function followSuggestion({
 	onActivity: (text: string) => void;
 }): Promise<SuggestionResult> {
 	let suggestion: Suggestion | null = null;
-	try {
-		const events = await client.assistant.suggest(request, { signal });
-		for await (const event of events) {
+	const end = await followStream(
+		() => client.assistant.suggest(request, { signal }),
+		signal,
+		(event) => {
 			if (event.type === "activity") onActivity(event.text);
 			else if (event.type === "suggestion") suggestion = event.suggestion;
-			else if (event.type === "error")
-				return { ok: false, message: event.message };
-			else if (event.type === "done") break;
-		}
-	} catch (error) {
-		return {
-			ok: false,
-			message:
-				error instanceof Error && error.message ? error.message : NO_SUGGESTION,
-		};
-	}
+		},
+	);
+	if (end.kind === "error") return { ok: false, message: end.message };
+	if (end.kind === "broken" && end.message)
+		return { ok: false, message: end.message };
 	return suggestion
 		? { ok: true, suggestion }
 		: { ok: false, message: NO_SUGGESTION };
