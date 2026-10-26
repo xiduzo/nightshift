@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
 	index,
 	integer,
@@ -163,5 +164,10 @@ export const event = sqliteTable(
 			table.walkerId,
 			table.walkerSeq,
 		),
+		// The exchange reads a Walker's run events in a Space after a cursor,
+		// and the landed feed the latest of each at start: both from here.
+		index("event_run_spaceId_walkerId_walkerSeq_idx")
+			.on(table.spaceId, table.walkerId, table.walkerSeq)
+			.where(sql`${table.runId} is not null`),
 	],
 );

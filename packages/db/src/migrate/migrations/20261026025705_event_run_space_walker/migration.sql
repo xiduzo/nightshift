@@ -1,0 +1,1 @@
+CREATE INDEX `event_run_spaceId_walkerId_walkerSeq_idx` ON `event` (`space_id`,`walker_id`,`walker_seq`) WHERE "event"."run_id" is not null;
