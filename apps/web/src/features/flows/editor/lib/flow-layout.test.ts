@@ -69,7 +69,7 @@ const laidOut = async (
 	options: Omit<Parameters<typeof layoutFlow>[1], "layout"> = {},
 ) => (await layoutFlow(flow, { layout, ...options })).flow;
 
-function expectApart(flow: Flow, width = 256, height = 160) {
+function expectApart(flow: Flow, width = 224, height = 120) {
 	const boxes = flow.nodes.map(({ position }) => position);
 	for (const [i, one] of boxes.entries()) {
 		for (const other of boxes.slice(i + 1)) {
@@ -167,7 +167,7 @@ describe("layoutFlow", () => {
 		expect(at.a.x).toBeLessThan(at.b.x);
 		expect(at.b.x).toBeLessThan(at.c.x);
 		// A column is a node wide plus the gap between columns.
-		expect(at.b.x - at.a.x).toBeGreaterThanOrEqual(256 + 64);
+		expect(at.b.x - at.a.x).toBeGreaterThanOrEqual(224 + 64);
 	});
 
 	test("stacks the targets of one node in handle order, apart", async () => {
@@ -182,7 +182,7 @@ describe("layoutFlow", () => {
 		);
 		expect(at.onPass.x).toBe(at.onFail.x);
 		expect(at.onPass.y).toBeLessThan(at.onFail.y);
-		expect(at.onFail.y - at.onPass.y).toBeGreaterThanOrEqual(160);
+		expect(at.onFail.y - at.onPass.y).toBeGreaterThanOrEqual(120);
 	});
 
 	test("runs a loop back to the left, from the start node on", async () => {
@@ -206,7 +206,7 @@ describe("layoutFlow", () => {
 		// The loop's route runs from check's handle to fix's input.
 		const loop = routes.get("check->fix")?.points ?? [];
 		// Nodes snap to the grid after ELK routes: allow half a grid step.
-		expect(loop[0]?.x).toBeGreaterThan(at.check.x + 256 - 4);
+		expect(loop[0]?.x).toBeGreaterThan(at.check.x + 224 - 4);
 		expect(loop[loop.length - 1]?.x).toBeLessThanOrEqual(at.fix.x + 4);
 	});
 
@@ -273,7 +273,7 @@ describe("layoutFlow", () => {
 			flow.nodes.every(
 				(node, i) =>
 					i === 0 ||
-					node.position.x > (flow.nodes[i - 1]?.position.x ?? 0) + 256,
+					node.position.x > (flow.nodes[i - 1]?.position.x ?? 0) + 224,
 			);
 		const viewport = { width: 1000, height: 800 };
 
@@ -372,8 +372,8 @@ describe("Sections", () => {
 			sections,
 		}) as unknown as Flow;
 	const flow = sectioned();
-	const W = 256;
-	const H = 160;
+	const W = 224;
+	const H = 120;
 	const order = ["intake", "specify", "make", "review"];
 
 	const overlap = (a: Box, b: Box) =>

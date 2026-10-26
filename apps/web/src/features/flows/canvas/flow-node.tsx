@@ -32,15 +32,7 @@ import {
 	VariableIcon,
 } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
-import {
-	AgentBody,
-	CallBody,
-	DecisionBody,
-	EachBody,
-	ToolBody,
-	ValueBody,
-	WaitBody,
-} from "./node-bodies";
+import { CalledFlowName } from "./called-flow-name";
 import {
 	CALL_EACH_ICON,
 	DECIDED_BY_ICON,
@@ -48,7 +40,6 @@ import {
 	VALUE_BY_ICON,
 } from "./node-type";
 import {
-	OutcomeBadge,
 	outcomeLabel,
 	outcomeStyle,
 	type StepState,
@@ -229,6 +220,20 @@ export function IssueBadge({
 	);
 }
 
+/** Where the input handle sits, from the top: level with the icon tile.
+ *  `flow-layout.ts` routes edges to the same spot. */
+const INPUT_Y = 26;
+/** The id's largest size in the overview: two lines and the icon fit in a
+ *  card with one outcome. */
+const CARD_OVERVIEW_TEXT_MAX = 24;
+
+/**
+ * A node on the canvas: a compact chip with the node's icon, id and one line
+ * under it, then one row per outcome with its handle. The icon tile carries
+ * the state: a run's step state on its corner, and the tile tinted by that
+ * state or by the node's issues. In a run, the outcome the step ended on
+ * lights up on its own row. The rest of the node shows in the inspector.
+ */
 const FlowNodeCard = memo(function FlowNodeCard({
 	id,
 	data,
@@ -238,8 +243,6 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	const { node, isStart, issues, run } = data;
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
-	const errorCount = errors.length;
-	const warningCount = warnings.length;
 	const meta = NODE_TYPE[node.type];
 	const Icon =
 		node.type === "decision"
@@ -249,12 +252,20 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				: runsEach(node)
 					? CALL_EACH_ICON
 					: meta.icon;
-	const stateColor = run ? outcomeColor(node, run.state) : undefined;
-	const runColor = run
-		? stepStateStyle(run.state, stateColor).color
+	const state = run
+		? stepStateStyle(run.state, outcomeColor(node, run.state))
 		: undefined;
-	const active = run?.state === "running";
+	const StateIcon = state?.icon;
+	const running = run?.state === "running";
 	const waiting = run?.state === "waiting";
+	// The tile takes the run state's colour, else the colour of the worst issue.
+	const tileColor =
+		state?.color ??
+		(errors.length > 0
+			? "var(--destructive)"
+			: warnings.length > 0
+				? "var(--status-waiting)"
+				: undefined);
 	// The variables the node sets when its step ends, each once.
 	const writes = [...new Set((node.set ?? []).map((write) => write.variable))];
 
@@ -274,138 +285,127 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	}, [id, outcomesKey, updateNodeInternals]);
 
 	const label = node.label?.trim();
-	const overviewText = useOverviewText();
+	const overviewText = useOverviewText(CARD_OVERVIEW_TEXT_MAX);
 	const overview = overviewText > 0;
 
 	return (
 		<div
 			className={cn(
-				"relative w-64 rounded-lg border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
-				selected && "ring-2 ring-ring",
-				// A node with issues tints its card and gets a band on top, so it
-				// stands out even zoomed out. Warnings are dashed amber.
-				errorCount > 0 &&
-					"border-destructive bg-[color-mix(in_oklch,var(--destructive)_6%,var(--card))]",
-				errorCount === 0 &&
-					warningCount > 0 &&
-					"border-status-waiting border-dashed bg-[color-mix(in_oklch,var(--status-waiting)_7%,var(--card))]",
-				active &&
-					"shadow-[0_0_0_1px_var(--status-running),0_0_18px_0_color-mix(in_oklch,var(--status-running)_35%,transparent)]",
-				waiting &&
-					"shadow-[0_0_0_1px_var(--status-waiting),0_0_20px_2px_color-mix(in_oklch,var(--status-waiting)_40%,transparent)]",
-				run === null && "opacity-55",
+				"relative w-56 rounded-xl border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
+				selected && "border-ring ring-3 ring-ring/30",
+				run === null && "border-dashed bg-transparent opacity-60 shadow-none",
 			)}
-			style={
-				runColor ? { borderLeftColor: runColor, borderLeftWidth: 4 } : undefined
-			}
 		>
 			<Handle
 				type="target"
 				position={Position.Left}
 				isConnectable={isConnectable}
 				className="size-2.5! min-h-0! min-w-0! border-2! border-card! bg-muted-foreground!"
-				style={{ top: 20 }}
+				style={{ top: INPUT_Y }}
 			/>
-			{errorCount > 0 || warningCount > 0 ? (
-				<span
-					aria-hidden="true"
-					className={cn(
-						"pointer-events-none absolute -inset-x-px -top-px h-1 rounded-t-lg",
-						errorCount > 0 ? "bg-destructive" : "bg-status-waiting",
-					)}
-				/>
-			) : null}
 			{/* Kept in the overview, only hidden: the node keeps its size, so
 			    the layout and the edges stay where they are. */}
 			<div className={cn(overview && "invisible")}>
-				<div className="flex min-w-0 flex-col gap-0.5 px-3 pt-2.5 pb-2">
-					<div className="flex h-5 min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
-						<Icon className="size-3.5 shrink-0" aria-hidden="true" />
-						<span className="truncate">{meta.label}</span>
+				<div className="flex min-w-0 items-center gap-2.5 p-2.5">
+					<div
+						className="relative grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"
+						style={
+							tileColor
+								? {
+										background: `color-mix(in oklch, ${tileColor} 18%, var(--card))`,
+										color: tileColor,
+									}
+								: undefined
+						}
+						title={meta.label}
+					>
+						<Icon className="size-4" aria-hidden="true" />
+						{state && StateIcon ? (
+							<span
+								className="absolute -right-1.5 -bottom-1.5 grid size-4 place-items-center rounded-full border-2 border-card text-background"
+								style={{ background: state.color }}
+								aria-hidden="true"
+							>
+								<StateIcon
+									className={cn(
+										"size-2.5",
+										running && "animate-spin motion-reduce:animate-none",
+									)}
+								/>
+							</span>
+						) : null}
+						{waiting ? (
+							<span
+								className="absolute inset-0 rounded-lg ring-2 ring-status-waiting motion-safe:animate-ping"
+								aria-hidden="true"
+							/>
+						) : null}
+					</div>
+					<div className="flex min-w-0 flex-1 flex-col">
+						<span
+							className="truncate font-medium font-mono text-[13px] leading-5"
+							title={node.id}
+						>
+							{node.id}
+						</span>
+						<span
+							className="truncate text-[11px] text-muted-foreground"
+							style={state ? { color: state.color } : undefined}
+						>
+							{state
+								? state.label
+								: label && label !== node.id
+									? label
+									: meta.label}
+						</span>
+					</div>
+					<div className="flex shrink-0 flex-col items-end gap-1">
 						{isStart ? (
 							<Badge
 								variant="outline"
-								className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground lowercase tracking-normal"
+								className="h-4 gap-0.5 px-1 text-[10px]"
 								title="The run starts here"
 							>
 								<PlayIcon aria-hidden="true" />
-								start
+								<span className="sr-only">Start</span>
 							</Badge>
 						) : null}
-						<span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
-							{writes.length > 0 ? (
-								<Badge
-									variant="outline"
-									className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground"
-									title={`Sets ${writes.join(", ")} when the step ends`}
-								>
-									<VariableIcon aria-hidden="true" />
-									sets {writes.length}
-								</Badge>
-							) : null}
-							{errorCount > 0 || warningCount > 0 ? (
-								<IssueBadge errors={errors} warnings={warnings} />
-							) : null}
-							{run ? (
-								<OutcomeBadge
-									state={run.state}
-									color={stateColor}
-									className="h-4 px-1.5 text-[10px]"
-								/>
-							) : null}
-						</span>
+						{errors.length > 0 || warnings.length > 0 ? (
+							<IssueBadge errors={errors} warnings={warnings} />
+						) : null}
+						{writes.length > 0 ? (
+							<Badge
+								variant="outline"
+								className="h-4 gap-0.5 px-1 font-mono text-[10px]"
+								title={`Sets ${writes.join(", ")} when the step ends`}
+							>
+								<VariableIcon aria-hidden="true" />
+								{writes.length}
+							</Badge>
+						) : null}
+						{run && run.visits > 1 ? (
+							<span
+								className="text-[10px] text-muted-foreground tabular-nums"
+								title={`${run.visits} visits`}
+							>
+								×{run.visits}
+							</span>
+						) : null}
 					</div>
-					<span
-						className="truncate font-medium font-mono text-sm leading-6"
-						title={node.id}
-					>
-						{node.id}
-					</span>
-					{label && label !== node.id ? (
-						<span className="truncate text-muted-foreground" title={label}>
-							{label}
-						</span>
-					) : null}
 				</div>
 
-				<div className="flex min-w-0 flex-col gap-1.5 border-t px-3 py-2">
-					{node.type === "agent" ? <AgentBody node={node} /> : null}
-					{node.type === "decision" ? <DecisionBody node={node} /> : null}
-					{node.type === "call" ? (
-						runsEach(node) ? (
-							<EachBody node={node} />
-						) : (
-							<CallBody node={node} />
-						)
-					) : null}
-					{node.type === "value" ? <ValueBody node={node} /> : null}
-					{node.type === "wait" ? <WaitBody node={node} /> : null}
-					{node.type === "tool" ? <ToolBody node={node} /> : null}
-					{node.type === "command" ? (
-						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
-							{node.command.trim() === "" ? (
-								<span className="font-sans text-muted-foreground italic">
-									No command yet
-								</span>
-							) : (
-								<>
-									<span className="text-muted-foreground" aria-hidden="true">
-										${" "}
-									</span>
-									{node.command}
-								</>
-							)}
-						</code>
-					) : null}
-					{run && run.visits > 1 ? (
-						<span className="text-[11px] text-muted-foreground tabular-nums">
-							{run.visits} visits
-						</span>
-					) : null}
-				</div>
+				{node.type === "call" ? (
+					<div className="-mt-1 px-2.5 pb-2">
+						<CalledFlowName
+							nodeId={node.id}
+							name={node.flow}
+							prefix={runsEach(node) ? "Each runs" : "Runs"}
+						/>
+					</div>
+				) : null}
 
 				<ul
-					className="flex flex-col border-t py-1"
+					className="flex flex-col border-t border-dashed py-1"
 					aria-label={node.type === "decision" ? "Options" : "Outcomes"}
 				>
 					{outcomes.length === 0 ? (
@@ -415,20 +415,31 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					) : null}
 					{outcomes.map((outcome) => {
 						const style = outcomeStyle(outcome, outcomeColor(node, outcome));
-						const description = descriptions.get(outcome);
+						const taken = run?.state === outcome;
 						return (
 							<li
 								key={outcome}
-								className="relative flex h-5 items-center justify-end gap-2 pr-3.5 pl-3 text-[11px]"
-								title={description}
+								className={cn(
+									"relative flex h-5 items-center justify-end pr-3.5 text-[11px]",
+									run && !taken && "opacity-35",
+								)}
+								title={descriptions.get(outcome)}
 							>
-								{description ? (
-									<span className="min-w-0 flex-1 truncate text-muted-foreground">
-										{description}
-									</span>
+								{taken ? (
+									<span
+										className="absolute inset-y-0 right-0 left-2 rounded-l-full"
+										style={{
+											background: `linear-gradient(to right, transparent, color-mix(in oklch, ${style.color} 22%, transparent))`,
+										}}
+										aria-hidden="true"
+									/>
 								) : null}
 								<span
-									className={cn("shrink-0 font-medium font-mono", style.text)}
+									className={cn(
+										"relative font-mono",
+										style.text,
+										taken ? "font-semibold" : "font-medium",
+									)}
 								>
 									{outcomeLabel(outcome)}
 								</span>
@@ -455,7 +466,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						className="size-[0.9em] shrink-0 text-muted-foreground"
 						aria-hidden="true"
 					/>
-					<span className="line-clamp-3 break-all font-medium font-mono leading-tight">
+					<span className="line-clamp-2 break-all font-medium font-mono leading-tight">
 						{node.id}
 					</span>
 				</div>

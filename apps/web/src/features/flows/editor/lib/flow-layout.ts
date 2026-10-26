@@ -59,12 +59,12 @@ export type NodeHandles = {
 	outcomes: Record<string, Point>;
 };
 
-/** A node React Flow has not measured yet: `w-64` and a typical body. Only
+/** A node React Flow has not measured yet: `w-56` and three outcomes. Only
  *  affects spacing, never correctness. */
-const FALLBACK_WIDTH = 256;
-const FALLBACK_HEIGHT = 160;
+const FALLBACK_WIDTH = 224;
+const FALLBACK_HEIGHT = 120;
 /** Where `flow-node.tsx` draws the input handle, from the top. */
-const INPUT_Y = 20;
+const INPUT_Y = 26;
 /** An outcome row, and the padding under the last one. */
 const ROW_HEIGHT = 20;
 const ROWS_BOTTOM = 5;

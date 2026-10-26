@@ -4,7 +4,6 @@
  * `@nightshift/flows` (the draft vertical).
  */
 import {
-	type AgentNode,
 	checkDraft,
 	type DraftMessages,
 	type Flow,
@@ -18,14 +17,8 @@ import {
 	type TemplateField,
 	type TemplateNode,
 	templateScope,
-	type ValueNode,
 	type WaitUntil,
 } from "@nightshift/flows";
-
-/** The first line of what makes the value: the expression, or the prompt. */
-export function valueSummary(node: ValueNode): string {
-	return firstLine((node.by === "rule" ? node.expression : node.prompt) ?? "");
-}
 
 /** How each kind of wait reads in a picker. */
 export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
@@ -35,38 +28,12 @@ export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
 	signal: "A signal",
 };
 
-/** One line for a wait: what it waits for. Empty when it is not set yet. */
-export function waitSummary(until: WaitUntil): string {
-	switch (until.kind) {
-		case "duration":
-			return `${until.minutes} min`;
-		case "time":
-			return until.at.trim();
-		case "command":
-			return until.command.trim().split("\n")[0] ?? "";
-		case "signal":
-			return until.name.trim();
-	}
-}
-
 /** How each kind of list source reads in a picker. */
 export const SOURCE_KINDS: Record<ListSource["kind"], string> = {
 	json: "A JSON value",
 	command: "A command",
 	files: "Files (a glob)",
 };
-
-/** One line for a source: where the elements come from. Empty when it is not set yet. */
-export function sourceSummary(source: ListSource): string {
-	switch (source.kind) {
-		case "json":
-			return source.value.trim();
-		case "command":
-			return source.command.trim().split("\n")[0] ?? "";
-		case "files":
-			return source.glob.trim();
-	}
-}
 
 /** What an option is called on its node: an option, an outcome, or an exit. */
 export function optionNoun(node: FlowNode): "option" | "outcome" | "exit" {
@@ -439,13 +406,6 @@ function mcpMessage(
 	return flow.nodes[index]?.type === "agent"
 		? `MCP server "${String(name)}": ${rest.slice(2).map(String).join(".")} is not valid.`
 		: undefined;
-}
-
-/** The first line of a prompt, or the skill call when the prompt is empty. */
-export function agentSummary(node: AgentNode): string {
-	const firstLine = node.prompt.trim().split("\n")[0] ?? "";
-	if (node.skill) return `/${node.skill}${firstLine ? ` ${firstLine}` : ""}`;
-	return firstLine;
 }
 
 /** The first line of a decision's prompt. */
