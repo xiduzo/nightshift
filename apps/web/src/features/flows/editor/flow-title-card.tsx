@@ -51,58 +51,64 @@ export function FlowTitleCard({
 					{flow.description}
 				</p>
 			) : null}
-			<div className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
-				<span className="mr-0.5">Gets</span>
-				{flow.inputs.length === 0 ? (
-					<span>no inputs</span>
-				) : (
-					flow.inputs.map((input) => (
-						<Badge
-							key={input.name}
-							variant="outline"
-							className="font-mono font-normal"
-						>
-							{input.name}
-						</Badge>
-					))
-				)}
-				{outputs.length > 0 ? (
-					<>
-						<span className="mr-0.5 ml-2">Gives</span>
-						{outputs.map((output) => (
+			<dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 text-muted-foreground text-xs">
+				<dt>Gets</dt>
+				<dd className="flex flex-wrap gap-1">
+					{flow.inputs.length === 0 ? (
+						<span>no inputs</span>
+					) : (
+						flow.inputs.map((input) => (
 							<Badge
-								key={output.name}
+								key={input.name}
 								variant="outline"
 								className="font-mono font-normal"
 							>
-								{output.name}
+								{input.name}
 							</Badge>
-						))}
+						))
+					)}
+				</dd>
+				{outputs.length > 0 ? (
+					<>
+						<dt>Gives</dt>
+						<dd className="flex flex-wrap gap-1">
+							{outputs.map((output) => (
+								<Badge
+									key={output.name}
+									variant="outline"
+									className="font-mono font-normal"
+								>
+									{output.name}
+								</Badge>
+							))}
+						</dd>
 					</>
 				) : null}
-			</div>
-			{callers.length > 0 ? (
-				<div className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
-					<span>Called by</span>
-					{callers.map((caller) => (
-						<Button
-							key={caller}
-							variant="link"
-							size="xs"
-							className="h-auto px-0.5 font-mono text-muted-foreground hover:text-foreground"
-							nativeButton={false}
-							render={
-								<Link
-									to="/projects/$projectId/flows/$name"
-									params={{ projectId, name: caller }}
-								/>
-							}
-						>
-							{caller}
-						</Button>
-					))}
-				</div>
-			) : null}
+				{callers.length > 0 ? (
+					<>
+						<dt>Called by</dt>
+						<dd className="flex flex-wrap gap-1">
+							{callers.map((caller) => (
+								<Button
+									key={caller}
+									variant="link"
+									size="xs"
+									className="h-auto px-0.5 font-mono text-muted-foreground hover:text-foreground"
+									nativeButton={false}
+									render={
+										<Link
+											to="/projects/$projectId/flows/$name"
+											params={{ projectId, name: caller }}
+										/>
+									}
+								>
+									{caller}
+								</Button>
+							))}
+						</dd>
+					</>
+				) : null}
+			</dl>
 		</Card>
 	);
 }
