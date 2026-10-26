@@ -1,4 +1,5 @@
 import {
+	type RunResult,
 	type RunStatus,
 	runStatusLabel,
 	type StepState,
@@ -42,6 +43,7 @@ export type StatusIconName =
 	| "circle-x"
 	| "circle-alert"
 	| "circle-dot"
+	| "circle-dashed"
 	| "message-question"
 	| "hand";
 
@@ -111,8 +113,17 @@ const RUN_ICON: Record<RunStatus, StatusIconName> = {
 	interrupted: "circle-alert",
 };
 
-/** A run status, as the web shows it: "Running" in blue with a spinner icon. */
-export function runStatusLook(status: RunStatus): Look {
+/**
+ * A run status, as the web shows it: "Running" in blue with a spinner icon.
+ * A run an End node ended with nothing to do reads as such, quietly.
+ */
+export function runStatusLook(
+	status: RunStatus,
+	result: RunResult | null = null,
+): Look {
+	if (status === "finished" && result === "nothing-to-do") {
+		return { tone: "neutral", icon: "circle-dashed", label: "Nothing to do" };
+	}
 	return {
 		tone: status,
 		icon: RUN_ICON[status],
@@ -215,7 +226,8 @@ export type StepKindIconName =
 	| "function"
 	| "variable"
 	| "hourglass"
-	| "plug";
+	| "plug"
+	| "flag";
 
 /** What kind of step it is, as the web's flow editor names it: its word and icon. */
 export type StepKind = { label: string; icon: StepKindIconName };
@@ -228,6 +240,7 @@ const NODE_KIND: Record<StepSummary["nodeType"], StepKind> = {
 	value: { label: "Value", icon: "variable" },
 	wait: { label: "Wait", icon: "hourglass" },
 	tool: { label: "Tool", icon: "plug" },
+	end: { label: "End", icon: "flag" },
 };
 
 /** The kind of a step. A Decision that asks a person is a Gate. */

@@ -1,4 +1,4 @@
-import { type RunSummary, runStatusLabel } from "@nightshift/client";
+import type { RunSummary } from "@nightshift/client";
 import { type Href, router } from "expo-router";
 
 import { ListRow } from "@/shared/list";
@@ -28,16 +28,13 @@ export function RunRow({
 	projectName: string | null;
 	now: number;
 }) {
-	const look = runStatusLook(run.status);
+	const look = runStatusLook(run.status, run.result);
 	const { value, valueLabel } = rowValue(run, now);
 	return (
 		<ListRow
 			look={look}
 			title={run.title}
-			caption={[
-				{ text: runStatusLabel(run.status), tone: look.tone },
-				projectName ?? "",
-			]}
+			caption={[{ text: look.label, tone: look.tone }, projectName ?? ""]}
 			value={value}
 			valueLabel={valueLabel}
 			href={runHref(run.id)}

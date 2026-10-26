@@ -4,7 +4,7 @@
 // one draft. The edits themselves live in `node-edits.ts`,
 // `sections/section-edits.ts` and `@nightshift/flows`.
 
-import type { Flow, FlowIssue, FlowNodeType } from "@nightshift/flows";
+import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
 	callersOf,
 	isSavable,
@@ -46,7 +46,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
-import { NODE_TYPE } from "../canvas/node-type";
+import { type PaletteItem, paletteMeta } from "../canvas/node-type";
 import {
 	EnterSubflowContext,
 	OpenFlowContext,
@@ -186,7 +186,7 @@ function Editor({
 	const savable = useMemo(() => isSavable(draft), [draft]);
 	// The flow's settings show in the inspector while nothing is selected.
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [dragging, setDragging] = useState<FlowNodeType | null>(null);
+	const [dragging, setDragging] = useState<PaletteItem | null>(null);
 	const addNode = useAddNode(draft, setDraftInOpen, setSelection, nodeDefaults);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
@@ -769,7 +769,7 @@ function Editor({
 						{dragging ? (
 							<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-primary/40 border-dashed pb-20">
 								<span className="rounded-full bg-background px-3 py-1 text-muted-foreground text-xs shadow-sm">
-									Drop to add the {NODE_TYPE[dragging].label} node here
+									Drop to add the {paletteMeta(dragging).label} node here
 								</span>
 							</div>
 						) : null}

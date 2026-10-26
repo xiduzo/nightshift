@@ -4,6 +4,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import {
 	CircleAlertIcon,
 	CircleCheckIcon,
+	CircleDashedIcon,
 	CircleStopIcon,
 	CircleXIcon,
 	HourglassIcon,
@@ -12,7 +13,7 @@ import {
 	MoonIcon,
 } from "lucide-react";
 
-import type { RunStatus } from "@/shared/api";
+import type { RunStatus, RunSummary } from "@/shared/api";
 
 const STATUS: Record<RunStatus, { icon: LucideIcon; className: string }> = {
 	running: {
@@ -51,15 +52,27 @@ const STATUS: Record<RunStatus, { icon: LucideIcon; className: string }> = {
 	},
 };
 
+/** A run an End node ended with nothing to do: finished, but quiet. */
+const NOTHING_TO_DO = {
+	icon: CircleDashedIcon,
+	className: "border-border bg-muted text-muted-foreground",
+};
+
 export function RunStatusBadge({
 	status,
+	result = null,
 	className,
 }: {
 	status: RunStatus;
+	/** The result of the End node that ended the run: "Nothing to do" shows as such. */
+	result?: RunSummary["result"];
 	className?: string;
 }) {
-	const { icon: Icon, className: statusClassName } = STATUS[status];
-	const label = runStatusLabel(status);
+	const nothing = status === "finished" && result === "nothing-to-do";
+	const { icon: Icon, className: statusClassName } = nothing
+		? NOTHING_TO_DO
+		: STATUS[status];
+	const label = nothing ? "Nothing to do" : runStatusLabel(status);
 	return (
 		<Badge variant="outline" className={cn(statusClassName, className)}>
 			<Icon aria-hidden="true" />

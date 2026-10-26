@@ -14,8 +14,10 @@ import { Link } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
 	CircleAlertIcon,
+	CircleDashedIcon,
 	CircleStopIcon,
 	CircleXIcon,
+	FlagIcon,
 	HandIcon,
 	InboxIcon,
 	type LucideIcon,
@@ -72,8 +74,9 @@ type Notice = {
 /**
  * What the run needs from you, under the flow like the flow editor's issues:
  * why it failed or stopped (with the composer that resumes it), the gate it
- * waits at, or why it sleeps. A Collapsible whose header always shows what
- * happened. Nothing shows while the run walks or once it finished.
+ * waits at, or why it sleeps, or the line an End node left. A Collapsible
+ * whose header always shows what happened. Nothing shows while the run
+ * walks, or once it finished without a word from an End node.
  */
 export function RunStatusPanel({
 	run,
@@ -173,7 +176,7 @@ function noticeOf({
 }): Notice | null {
 	// A run of another device: answers, signals and stops go to it; only it resumes.
 	const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
-	const allows = runActions(status, run.walker.thisDevice);
+	const allows = runActions(status, run.walker.thisDevice, run.result);
 	const resumeHere = elsewhere
 		? `Only ${elsewhere} can resume it.`
 		: "Resume it to continue.";
@@ -283,7 +286,29 @@ function noticeOf({
 				actions: allows.resume ? <WakeButton runId={run.id} /> : undefined,
 			};
 		}
+		case "finished":
+			// Only an End node with a message leaves you something to read.
+			if (!run.result || !run.reason) return null;
+			return {
+				icon: run.result === "nothing-to-do" ? CircleDashedIcon : FlagIcon,
+				tone:
+					run.result === "nothing-to-do"
+						? "text-muted-foreground"
+						: "text-status-finished",
+				title: run.result === "nothing-to-do" ? "Nothing to do" : "Done",
+				gist: firstLine(run.reason) ?? "",
+				body: run.reason,
+			};
 		case "failed":
+			if (run.result === "failed") {
+				return {
+					icon: FlagIcon,
+					tone: "text-destructive",
+					title: "The flow ended as failed",
+					gist: firstLine(run.reason) ?? "Run it again from a step.",
+					body: `${run.reason ?? "The flow chose to end the run here as failed."}\nFix what it found, then run it again from a step.`,
+				};
+			}
 			return {
 				icon: CircleXIcon,
 				tone: "text-destructive",

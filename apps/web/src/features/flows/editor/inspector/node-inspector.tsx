@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PlayIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
 import { runQueries } from "@/features/runs/queries";
-import { NODE_TYPE } from "../../canvas/node-type";
+import { nodeMeta } from "../../canvas/node-type";
 import type { DaemonConnection } from "../connections-field";
 import { DeviceField, runsOnDevice, withDevice } from "../device-field";
 import { Field, InspectorSection, PositiveIntInput } from "../fields";
@@ -29,6 +29,7 @@ import { CallFields } from "./call-fields";
 import type { CalledFlowSupport } from "./called-flow-fields";
 import { CommandFields } from "./command-fields";
 import { DecisionFields } from "./decision-fields";
+import { EndFields } from "./end-fields";
 import { ToolFields } from "./tool-fields";
 import { ValueFields } from "./value-fields";
 import { WaitFields } from "./wait-fields";
@@ -78,7 +79,7 @@ export function NodeInspector({
 		enabled: runsOnDevice(node),
 		meta: { quietErrors: true },
 	});
-	const { label: typeLabel, icon: Icon } = NODE_TYPE[node.type];
+	const { label: typeLabel, icon: Icon } = nodeMeta(node);
 
 	return (
 		<div className="flex flex-col">
@@ -240,6 +241,18 @@ export function NodeInspector({
 					/>
 				) : null}
 
+				{node.type === "end" ? (
+					<EndFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "end" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
 				{node.type === "agent" ? (
 					<AgentAdvanced
 						node={node}
@@ -271,8 +284,9 @@ export function NodeInspector({
 					</InspectorSection>
 				) : null}
 
-				{/* A Gate (a Decision decided by you) waits as long as it must: no limits. */}
-				{node.type === "decision" && node.by === "person" ? null : (
+				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End takes no time. */}
+				{(node.type === "decision" && node.by === "person") ||
+				node.type === "end" ? null : (
 					<InspectorSection
 						title="Limits"
 						tab="setup"

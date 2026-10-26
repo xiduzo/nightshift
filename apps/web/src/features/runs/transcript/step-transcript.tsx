@@ -48,6 +48,7 @@ import {
 	ValueAsk,
 	ValueCard,
 } from "./items/decision-items";
+import { EndCard } from "./items/end-items";
 import { ItemEnd, ItemStart, ItemsRead } from "./items/list-items";
 import {
 	MessageBlock,
@@ -245,6 +246,7 @@ export function StepTranscript({
 							stepId={step.id}
 							nodeId={step.nodeId}
 							choices={openGate.choices}
+							deadline={openGate.deadline}
 							{...(elsewhere ? { walkerName: elsewhere } : {})}
 						/>
 					)}
@@ -276,6 +278,7 @@ export function StepTranscript({
 															stepId={step.id}
 															nodeId={step.nodeId}
 															choices={item.choices}
+															deadline={item.deadline ?? null}
 														/>
 													) : null
 												}
@@ -397,6 +400,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	value: "Making the value…",
 	wait: "Waiting…",
 	tool: "Calling the tool…",
+	end: "Ending the run…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -465,5 +469,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <ValueAsk item={item} />;
 		case "value":
 			return <ValueCard item={item} />;
+		case "end":
+			return <EndCard item={item} />;
 	}
 });

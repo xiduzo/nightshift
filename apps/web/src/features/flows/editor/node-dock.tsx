@@ -1,4 +1,3 @@
-import type { FlowNodeType } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Tooltip,
@@ -6,23 +5,30 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { NODE_TYPE } from "../canvas/node-type";
+import { type PaletteItem, paletteMeta } from "../canvas/node-type";
 
-/** In four groups: do, decide, shape, wait, compose (docs/research/foundational-nodes.md §5). */
-const PALETTE: FlowNodeType[] = [
+/**
+ * In groups: do, decide, shape, wait, compose, end
+ * (docs/research/foundational-nodes.md §5). A Decision shows twice, as the
+ * words people look for: a Gate (you decide) and a Branch (a rule decides).
+ * A Decision by a model is the same node, set in the inspector.
+ */
+const PALETTE: PaletteItem[] = [
 	"agent",
 	"command",
 	"tool",
-	"decision",
+	"gate",
+	"branch",
 	"value",
 	"wait",
 	"call",
+	"end",
 ];
 
-/** The drag data of a node type on its way from the dock to the canvas. */
+/** The drag data of a palette item on its way from the dock to the canvas. */
 export const NODE_DRAG_TYPE = "application/x-nightshift-node";
 
-export function isNodeType(value: string): value is FlowNodeType {
+export function isPaletteItem(value: string): value is PaletteItem {
 	return (PALETTE as string[]).includes(value);
 }
 
@@ -48,9 +54,9 @@ export function NodeDock({
 	onDragChange,
 	className,
 }: {
-	onAdd: (type: FlowNodeType) => void;
-	/** The type being dragged, and null when the drag ends. */
-	onDragChange: (type: FlowNodeType | null) => void;
+	onAdd: (type: PaletteItem) => void;
+	/** The item being dragged, and null when the drag ends. */
+	onDragChange: (type: PaletteItem | null) => void;
 	className?: string;
 }) {
 	return (
@@ -64,7 +70,7 @@ export function NodeDock({
 			)}
 		>
 			{PALETTE.map((type) => {
-				const { label, icon: Icon, blurb } = NODE_TYPE[type];
+				const { label, icon: Icon, blurb } = paletteMeta(type);
 				return (
 					<Tooltip key={type}>
 						<TooltipTrigger

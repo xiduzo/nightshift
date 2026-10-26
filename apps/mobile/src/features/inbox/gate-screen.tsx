@@ -83,6 +83,7 @@ import { type Look, NEEDS_YOU } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { CHECK_COPY } from "./answer-check";
 import { ChoiceCards } from "./choice-cards";
+import { deadlineText } from "./gate-deadline";
 import {
 	confirmText,
 	isDestructive,
@@ -416,6 +417,11 @@ function OpenGateScreen({
 								onChoose={answer.choose}
 								disabled={answer.busy}
 							/>
+							{gate.deadline ? (
+								<Text className="text-muted-foreground text-sm">
+									{deadlineText(gate.deadline, now)}
+								</Text>
+							) : null}
 							<View className="gap-2">
 								<Label nativeID="gate-note">
 									{answersAgent

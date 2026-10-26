@@ -1,6 +1,7 @@
 import {
 	commandExits,
 	DATA_EXIT_CODE,
+	type EndStatus,
 	type FlowIssue,
 	type FlowNode,
 	type FlowNodeType,
@@ -37,7 +38,8 @@ import { CalledFlowName } from "./called-flow-name";
 import {
 	CALL_EACH_ICON,
 	DECIDED_BY_ICON,
-	NODE_TYPE,
+	END_STATUS_LABEL,
+	nodeMeta,
 	VALUE_BY_ICON,
 } from "./node-type";
 import {
@@ -259,7 +261,8 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	const { node, isStart, issues, run, change } = data;
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
-	const meta = NODE_TYPE[node.type];
+	// A Decision is named a Gate or a Branch by who decides it.
+	const meta = nodeMeta(node);
 	const Icon =
 		node.type === "decision"
 			? DECIDED_BY_ICON[node.by]
@@ -433,58 +436,66 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					</div>
 				) : null}
 
-				<ul
-					className="flex flex-col border-t border-dashed py-1"
-					aria-label={node.type === "decision" ? "Options" : "Outcomes"}
-				>
-					{outcomes.length === 0 ? (
-						<li className="flex h-5 items-center justify-end pr-3.5 text-[11px] text-muted-foreground italic">
-							No options yet
-						</li>
-					) : null}
-					{outcomes.map((outcome) => {
-						const style = outcomeStyle(outcome, outcomeColor(node, outcome));
-						const taken = run?.state === outcome;
-						return (
-							<li
-								key={outcome}
-								className={cn(
-									"relative flex h-5 items-center justify-end pr-3.5 text-[11px]",
-									run && !taken && "opacity-35",
-								)}
-								title={descriptions.get(outcome)}
-							>
-								{taken ? (
-									<span
-										className="absolute inset-y-0 right-0 left-2 rounded-l-full"
-										style={{
-											background: `linear-gradient(to right, transparent, color-mix(in oklch, ${style.color} 22%, transparent))`,
-										}}
-										aria-hidden="true"
-									/>
-								) : null}
-								<span
-									className={cn(
-										"relative font-mono",
-										style.text,
-										taken ? "font-semibold" : "font-medium",
-									)}
-								>
-									{outcomeLabel(outcome)}
-								</span>
-								<Handle
-									type="source"
-									id={outcome}
-									position={Position.Right}
-									isConnectable={isConnectable}
-									className="size-2.5! min-h-0! min-w-0! border-2! border-card!"
-									style={{ background: style.color }}
-									title={`Drag to connect the ${outcomeLabel(outcome)} outcome`}
-								/>
+				{node.type === "end" ? (
+					<EndRow
+						status={node.status}
+						message={node.message}
+						reached={run ? run.state === node.status : undefined}
+					/>
+				) : (
+					<ul
+						className="flex flex-col border-t border-dashed py-1"
+						aria-label={node.type === "decision" ? "Options" : "Outcomes"}
+					>
+						{outcomes.length === 0 ? (
+							<li className="flex h-5 items-center justify-end pr-3.5 text-[11px] text-muted-foreground italic">
+								No options yet
 							</li>
-						);
-					})}
-				</ul>
+						) : null}
+						{outcomes.map((outcome) => {
+							const style = outcomeStyle(outcome, outcomeColor(node, outcome));
+							const taken = run?.state === outcome;
+							return (
+								<li
+									key={outcome}
+									className={cn(
+										"relative flex h-5 items-center justify-end pr-3.5 text-[11px]",
+										run && !taken && "opacity-35",
+									)}
+									title={descriptions.get(outcome)}
+								>
+									{taken ? (
+										<span
+											className="absolute inset-y-0 right-0 left-2 rounded-l-full"
+											style={{
+												background: `linear-gradient(to right, transparent, color-mix(in oklch, ${style.color} 22%, transparent))`,
+											}}
+											aria-hidden="true"
+										/>
+									) : null}
+									<span
+										className={cn(
+											"relative font-mono",
+											style.text,
+											taken ? "font-semibold" : "font-medium",
+										)}
+									>
+										{outcomeLabel(outcome)}
+									</span>
+									<Handle
+										type="source"
+										id={outcome}
+										position={Position.Right}
+										isConnectable={isConnectable}
+										className="size-2.5! min-h-0! min-w-0! border-2! border-card!"
+										style={{ background: style.color }}
+										title={`Drag to connect the ${outcomeLabel(outcome)} outcome`}
+									/>
+								</li>
+							);
+						})}
+					</ul>
+				)}
 			</div>
 			{overview ? (
 				<div
@@ -504,6 +515,45 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	);
 });
 
+/**
+ * How an End node ends the run, where other nodes list their outcomes:
+ * no edge leaves it, so no handle. In a run, it lights up once reached.
+ */
+function EndRow({
+	status,
+	message,
+	reached,
+}: {
+	status: EndStatus;
+	message: string | undefined;
+	/** Run view only: whether the run ended here. */
+	reached: boolean | undefined;
+}) {
+	const tone =
+		status === "failed"
+			? "text-destructive"
+			: status === "done"
+				? "text-status-finished"
+				: "text-muted-foreground";
+	return (
+		<div
+			className={cn(
+				"flex flex-col gap-0.5 border-t border-dashed px-3.5 py-1.5 text-[11px]",
+				reached === false && "opacity-35",
+			)}
+		>
+			<span className={cn("font-medium", tone)}>
+				Ends: {END_STATUS_LABEL[status].toLowerCase()}
+			</span>
+			{message?.trim() ? (
+				<span className="truncate text-muted-foreground" title={message}>
+					{message}
+				</span>
+			) : null}
+		</div>
+	);
+}
+
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
@@ -512,4 +562,5 @@ export const nodeTypes: NodeTypes = {
 	value: FlowNodeCard,
 	wait: FlowNodeCard,
 	tool: FlowNodeCard,
+	end: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

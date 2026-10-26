@@ -29,6 +29,7 @@ import { OutcomesSuggest, RulesSuggest } from "../../assistant/field-helpers";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
+import { GateDeadlineSection } from "./gate-deadline-fields";
 import { lockScreenHint } from "./lock-screen-hint";
 import { deciderModelHint, withoutField } from "./model-defaults";
 import { NodeOptionsField } from "./node-options-field";
@@ -220,6 +221,10 @@ export function DecisionFields({
 					</Note>
 				)}
 			</NodeOptionsField>
+
+			{by === "person" ? (
+				<GateDeadlineSection flow={flow} node={node} onChange={onChange} />
+			) : null}
 
 			{by === "model" ? (
 				<InspectorSection title="Model" tab="setup">

@@ -31,7 +31,9 @@ export function StepLine({
 	/** The colour the step's node gives its outcome. */
 	outcomeColor?: OutcomeColor;
 }) {
-	const { icon: typeIcon, label } = NODE_TYPE[step.nodeType];
+	const { icon: typeIcon, label: typeLabel } = NODE_TYPE[step.nodeType];
+	// A Decision step with a question was a Gate.
+	const label = step.gate !== null ? "Gate" : typeLabel;
 	const Icon = step.gate !== null ? HandIcon : typeIcon;
 	return (
 		<div className="flex min-w-0 items-center gap-2">

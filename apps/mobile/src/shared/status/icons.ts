@@ -2,9 +2,11 @@ import {
 	Bot,
 	CircleAlert,
 	CircleCheck,
+	CircleDashed,
 	CircleDot,
 	CircleStop,
 	CircleX,
+	Flag,
 	Hand,
 	Hourglass,
 	LoaderCircle,
@@ -29,6 +31,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	"circle-x": CircleX,
 	"circle-alert": CircleAlert,
 	"circle-dot": CircleDot,
+	"circle-dashed": CircleDashed,
 	"message-question": MessageCircleQuestion,
 	hand: Hand,
 	bot: Bot,
@@ -37,6 +40,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	function: SquareFunction,
 	variable: Variable,
 	plug: Plug,
+	flag: Flag,
 };
 
 /** The lucide icon of a status or a step kind. */

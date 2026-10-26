@@ -1,0 +1,45 @@
+import { cn } from "@nightshift/ui/lib/utils";
+import { AlarmClockIcon } from "lucide-react";
+import { outcomeLabel } from "@/features/flows";
+import type { OpenGate } from "@/shared/api";
+import { dayWord, formatDateTime, formatTime } from "@/shared/format";
+
+/**
+ * What happens to a Gate with a deadline when nobody answers: "Night Shift
+ * picks keep at 07:00 tomorrow". Nothing for a Gate without one.
+ */
+export function GateDeadline({
+	deadline,
+	className,
+}: {
+	deadline: OpenGate["deadline"];
+	className?: string;
+}) {
+	if (!deadline) return null;
+	const day = dayWord(deadline.at);
+	return (
+		<p
+			className={cn(
+				"flex items-start gap-1.5 text-muted-foreground text-xs leading-snug",
+				className,
+			)}
+		>
+			<AlarmClockIcon className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+			<span>
+				If nobody answers, Night Shift picks{" "}
+				<span className="font-medium font-mono text-foreground">
+					{outcomeLabel(deadline.choose)}
+				</span>{" "}
+				at{" "}
+				<time
+					dateTime={new Date(deadline.at).toISOString()}
+					title={formatDateTime(deadline.at)}
+					className="font-medium text-foreground tabular-nums"
+				>
+					{formatTime(deadline.at)}
+				</time>
+				{day === "today" ? "" : ` ${day}`}.
+			</span>
+		</p>
+	);
+}

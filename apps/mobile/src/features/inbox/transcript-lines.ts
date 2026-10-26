@@ -136,13 +136,22 @@ export function transcriptLines(
 				push({
 					key: `answer:${seq}`,
 					kind: "night-shift",
-					text: event.note.trim()
-						? `Answered ${event.choice}. Note: ${event.note.trim()}`
-						: `Answered ${event.choice}.`,
+					text: event.byDeadline
+						? `Nobody answered in time. Picked ${event.choice}.`
+						: event.note.trim()
+							? `Answered ${event.choice}. Note: ${event.note.trim()}`
+							: `Answered ${event.choice}.`,
 				});
 				break;
 			case "wait":
 				push({ key: `wait:${seq}`, kind: "night-shift", text: event.message });
+				break;
+			case "end":
+				push({
+					key: `end:${seq}`,
+					kind: "night-shift",
+					text: event.message ? `Ended. ${event.message}` : "Ended.",
+				});
 				break;
 			default:
 				break;

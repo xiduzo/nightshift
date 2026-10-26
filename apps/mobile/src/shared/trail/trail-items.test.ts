@@ -55,7 +55,12 @@ describe("trailItemOf", () => {
 				outcome: null,
 				costUsd: 0,
 				costCalls: 0,
-				gate: { question: "Ship it?", choices: [], openedAt: 0 },
+				gate: {
+					question: "Ship it?",
+					choices: [],
+					openedAt: 0,
+					deadline: null,
+				},
 			}),
 			{ labels, now: 12 * MIN },
 		);

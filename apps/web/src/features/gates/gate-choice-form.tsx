@@ -16,6 +16,7 @@ import { useId, useState } from "react";
 import { outcomeLabel, outcomeStyle } from "@/features/flows";
 import type { OpenGate } from "@/shared/api";
 import { LargerTextarea } from "@/shared/larger-window";
+import { GateDeadline } from "./gate-deadline";
 import { useResolveGate } from "./use-resolve-gate";
 
 /**
@@ -48,6 +49,7 @@ export function GateChoiceForm({
 
 	return (
 		<div className="flex flex-col gap-4">
+			<GateDeadline deadline={gate.deadline} />
 			<RadioGroup
 				value={choice}
 				onValueChange={(next) => setChoice(next as string)}

@@ -96,15 +96,26 @@ export type GateOpenItem = ItemBase & {
 	kind: "gate-open";
 	question: string;
 	choices: GateChoice[];
+	/** What Night Shift picks when nobody answers in time. */
+	deadline?: { at: number; choose: string };
 };
 
-/** A person answered the Gate. */
+/** A person answered the Gate, or its deadline chose. */
 export type GateResolvedItem = ItemBase & {
 	kind: "gate-resolved";
 	choice: string;
 	/** The colour the Gate gave this choice, if any. */
 	color?: OutcomeColor;
 	note: string;
+	/** Nobody answered: the deadline chose. */
+	byDeadline?: true;
+};
+
+/** An End step: how it ends the run, and its message. */
+export type EndItem = ItemBase & {
+	kind: "end";
+	status: "done" | "nothing-to-do" | "failed";
+	message: string | null;
 };
 
 /** A Call step with `each` read its source. */
@@ -183,4 +194,5 @@ export type TranscriptItem =
 	| ValueAskItem
 	| ValueItem
 	| LogItem
-	| ExitItem;
+	| ExitItem
+	| EndItem;

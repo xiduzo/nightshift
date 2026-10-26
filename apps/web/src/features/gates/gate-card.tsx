@@ -92,6 +92,7 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 						nodeId={gate.nodeId}
 						choices={gate.choices}
 						runTitle={gate.runTitle}
+						deadline={gate.deadline}
 						{...(gate.walker.thisDevice
 							? {}
 							: { walkerName: walkerName(gate.walker) })}

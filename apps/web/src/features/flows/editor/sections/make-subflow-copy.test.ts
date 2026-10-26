@@ -122,6 +122,7 @@ const blockers: {
 	"flow-not-valid": { code: "flow-not-valid", errors: 2 },
 	"stopped-edge": { code: "stopped-edge", nodes: ["batch"] },
 	"calls-new-flow": { code: "calls-new-flow", nodes: ["batch"] },
+	"end-node": { code: "end-node", nodes: ["none"] },
 	"mixed-exit": {
 		code: "mixed-exit",
 		from: "code",

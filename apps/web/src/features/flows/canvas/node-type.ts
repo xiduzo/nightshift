@@ -1,7 +1,15 @@
-import type { DecidedBy, FlowNodeType, ValueBy } from "@nightshift/flows";
+import type {
+	DecidedBy,
+	EndStatus,
+	FlowNode,
+	FlowNodeType,
+	NewNodeKind,
+	ValueBy,
+} from "@nightshift/flows";
 import {
 	BotIcon,
 	BracesIcon,
+	FlagIcon,
 	HandIcon,
 	HourglassIcon,
 	type LucideIcon,
@@ -53,6 +61,57 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		icon: PlugIcon,
 		blurb: "Calls one tool of a connection.",
 	},
+	end: {
+		label: "End",
+		icon: FlagIcon,
+		blurb: "Ends the run with a result and one line for you.",
+	},
+};
+
+/**
+ * How a Decision shows, by who decides it. You decide a Gate, a rule
+ * decides a Branch. A Decision by a model keeps the plain name.
+ */
+export const DECISION_KIND: Record<DecidedBy, NodeMeta> = {
+	person: {
+		label: "Gate",
+		icon: HandIcon,
+		blurb: "Waits for you to pick one of its options.",
+	},
+	rule: {
+		label: "Branch",
+		icon: SplitIcon,
+		blurb: "Takes the first option whose rule holds.",
+	},
+	model: {
+		label: "Decision",
+		icon: SparklesIcon,
+		blurb: "A model picks one of its options.",
+	},
+};
+
+/** How a node shows: its type, or for a Decision, a Gate or a Branch by who decides it. */
+export function nodeMeta(node: FlowNode): NodeMeta {
+	return node.type === "decision"
+		? DECISION_KIND[node.by]
+		: NODE_TYPE[node.type];
+}
+
+/** What the palette adds: every node type, with a Decision as a Gate or a Branch. */
+export type PaletteItem = Exclude<NewNodeKind, "decision">;
+
+/** How a palette item shows. */
+export function paletteMeta(item: PaletteItem): NodeMeta {
+	if (item === "gate") return DECISION_KIND.person;
+	if (item === "branch") return DECISION_KIND.rule;
+	return NODE_TYPE[item];
+}
+
+/** How an End node ends the run, in words. */
+export const END_STATUS_LABEL: Record<EndStatus, string> = {
+	done: "Done",
+	"nothing-to-do": "Nothing to do",
+	failed: "Failed",
 };
 
 /** The icon of a Call node that runs once per item. */

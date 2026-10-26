@@ -36,6 +36,18 @@ describe("runStatusLook", () => {
 		});
 		expect(runStatusLook("failed").icon).toBe("circle-x");
 	});
+
+	test("a run an End node ended with nothing to do reads as such; other results keep the status", () => {
+		expect(runStatusLook("finished", "nothing-to-do")).toEqual({
+			tone: "neutral",
+			icon: "circle-dashed",
+			label: "Nothing to do",
+		});
+		expect(runStatusLook("finished", "done")).toEqual(
+			runStatusLook("finished"),
+		);
+		expect(runStatusLook("failed", "failed")).toEqual(runStatusLook("failed"));
+	});
 });
 
 describe("outcomeLook", () => {
@@ -112,7 +124,12 @@ describe("stepKind", () => {
 	});
 
 	test("a Decision that asks a person is a Gate", () => {
-		const gate = { question: "Ship it?", choices: [], openedAt: 0 };
+		const gate = {
+			question: "Ship it?",
+			choices: [],
+			openedAt: 0,
+			deadline: null,
+		};
 		expect(stepKind({ nodeType: "decision", gate })).toEqual({
 			label: "Gate",
 			icon: "hand",

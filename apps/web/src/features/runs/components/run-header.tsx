@@ -68,7 +68,7 @@ export function RunTitle({
 	status: RunStatus;
 	reconnecting: boolean;
 }) {
-	const stoppable = runActions(status, run.walker.thisDevice).stop;
+	const stoppable = runActions(status, run.walker.thisDevice, run.result).stop;
 	const time = useWorkTime(steps, run.createdAt);
 
 	return (
@@ -77,7 +77,7 @@ export function RunTitle({
 				{run.title}
 			</h1>
 			<div aria-live="polite" className="flex flex-wrap items-center gap-2">
-				<RunStatusBadge status={status} />
+				<RunStatusBadge status={status} result={run.result} />
 				<WalkerBadge walker={run.device} />
 				{run.commands.length > 0 ? (
 					<Badge
@@ -153,7 +153,7 @@ export function RunActions({
 	steps: StepSummary[];
 }) {
 	const [restarting, setRestarting] = useState(false);
-	const allows = runActions(status, run.walker.thisDevice);
+	const allows = runActions(status, run.walker.thisDevice, run.result);
 	// The innermost step that runs: a step inside a called flow starts after its caller.
 	const running = allows.restart
 		? [...steps].reverse().find((step) => step.endedAt === null)

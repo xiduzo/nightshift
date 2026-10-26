@@ -118,7 +118,12 @@ function runColumns(projectNames: Map<string, string> | undefined) {
 	return column.columns([
 		column.accessor("status", {
 			header: "Status",
-			cell: ({ row }) => <RunStatusBadge status={row.original.status} />,
+			cell: ({ row }) => (
+				<RunStatusBadge
+					status={row.original.status}
+					result={row.original.result}
+				/>
+			),
 			meta: { headClassName: "w-0 pl-6", cellClassName: "w-0 py-3 pl-6" },
 		}),
 		column.accessor("title", {
@@ -227,6 +232,14 @@ function RunTitle({
 					</span>
 				) : null}
 			</div>
+			{run.result && run.reason ? (
+				<p
+					className="mt-0.5 truncate text-muted-foreground text-xs"
+					title={run.reason}
+				>
+					{run.reason}
+				</p>
+			) : null}
 			{/* What the hidden columns hold, on one line, on narrow screens. */}
 			<div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs sm:hidden">
 				{projectName ? (

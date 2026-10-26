@@ -7,6 +7,16 @@ import type { TranscriptItem } from "./transcript-items";
  * long tool results and logs are cut at the end, with a note.
  */
 
+/** How an End step ends the run, in words. */
+const END_WORDS: Record<
+	Extract<TranscriptItem, { kind: "end" }>["status"],
+	string
+> = {
+	done: "done",
+	"nothing-to-do": "nothing to do",
+	failed: "failed",
+};
+
 /** Tool results and command logs longer than this are cut, so a paste stays readable. */
 const MAX_BLOCK_CHARS = 4000;
 
@@ -94,7 +104,9 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 		case "gate-open":
 			return `**Question**\n\n${quote(item.question)}\n\nOptions: ${item.choices.map((choice) => `\`${choice.name}\``).join(", ")}`;
 		case "gate-resolved":
-			return `**Answer:** \`${item.choice}\`${item.note.trim() ? `\n\n${quote(item.note)}` : ""}`;
+			return `**${item.byDeadline ? "Picked at the deadline" : "Answer"}:** \`${item.choice}\`${item.note.trim() ? `\n\n${quote(item.note)}` : ""}`;
+		case "end":
+			return `**Ended:** ${END_WORDS[item.status]}${item.message ? `. ${item.message}` : ""}`;
 		case "items-read":
 			return `_Read ${item.count} items, ${item.open} still to do._`;
 		case "item-start":

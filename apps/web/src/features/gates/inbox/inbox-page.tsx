@@ -352,7 +352,8 @@ function SleepingGroup({
 							</ItemDescription>
 						</ItemContent>
 						{/* Only the device that runs it wakes it. */}
-						{runActions(run.status, run.walker.thisDevice).resume ? (
+						{runActions(run.status, run.walker.thisDevice, run.result)
+							.resume ? (
 							<ItemActions>
 								<Tooltip>
 									<TooltipTrigger

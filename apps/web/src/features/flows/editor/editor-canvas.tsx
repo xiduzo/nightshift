@@ -1,4 +1,4 @@
-import type { Flow, FlowIssue, FlowNodeType, Outcome } from "@nightshift/flows";
+import type { Flow, FlowIssue, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
 	type FlowCheck,
@@ -34,6 +34,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { exitHandleId, groupEdges } from "../canvas/edge-groups";
 import type { DiffMark, FlowCanvasNode } from "../canvas/flow-node";
+import type { PaletteItem } from "../canvas/node-type";
 import {
 	canvasEdges,
 	edgeTypes,
@@ -70,7 +71,7 @@ import { CanvasControls } from "./canvas-controls";
 import { fitViewOptions } from "./fit-view";
 import { loadElk } from "./lib/elk";
 import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
-import { isNodeType, NODE_DRAG_TYPE } from "./node-dock";
+import { isPaletteItem, NODE_DRAG_TYPE } from "./node-dock";
 import {
 	applyNodeSelection,
 	canvasIds,
@@ -172,7 +173,7 @@ export function EditorCanvas({
 	/** "Make section" from the selected nodes. */
 	onMakeSection: (nodeIds: string[], sectionIds: string[]) => void;
 	/** A node type dragged from the dock was dropped at this point of the screen. */
-	onDropNode: (type: FlowNodeType, at: { x: number; y: number }) => void;
+	onDropNode: (type: PaletteItem, at: { x: number; y: number }) => void;
 	/** A node was double-clicked, for example a Subflow to look inside. */
 	onNodeDoubleClick?: (nodeId: string) => void;
 	/** The Section whose nodes alone show, or null for the whole flow. */
@@ -626,7 +627,7 @@ export function EditorCanvas({
 						}}
 						onDrop={(event) => {
 							const type = event.dataTransfer.getData(NODE_DRAG_TYPE);
-							if (preview || !isNodeType(type)) return;
+							if (preview || !isPaletteItem(type)) return;
 							event.preventDefault();
 							onDropNode(type, { x: event.clientX, y: event.clientY });
 						}}

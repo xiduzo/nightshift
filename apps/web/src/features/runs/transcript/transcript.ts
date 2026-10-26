@@ -333,6 +333,7 @@ function applyStepEntries(
 					key: `gate-open:${entry.seq}`,
 					question: event.question,
 					choices: event.choices,
+					...(event.deadline ? { deadline: event.deadline } : {}),
 				});
 				break;
 			case "gate-resolved": {
@@ -347,9 +348,19 @@ function applyStepEntries(
 					choice: event.choice,
 					...(color === undefined ? {} : { color }),
 					note: event.note,
+					...(event.byDeadline ? { byDeadline: true as const } : {}),
 				});
 				break;
 			}
+			case "end":
+				push({
+					...base,
+					kind: "end",
+					key: `end:${entry.seq}`,
+					status: event.status,
+					message: event.message,
+				});
+				break;
 			case "items-read":
 				push({
 					...base,

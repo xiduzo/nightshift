@@ -1,7 +1,11 @@
 /** Flows: the list, the canvas, the editor, the flow draft, and starting a run of a flow. */
 
 export type { FlowCanvasNode, NodeRunState } from "./canvas/flow-node";
-export { hasCost, NODE_TYPE } from "./canvas/node-type";
+export {
+	END_STATUS_LABEL,
+	hasCost,
+	NODE_TYPE,
+} from "./canvas/node-type";
 export {
 	ItemStateBadge,
 	OutcomeBadge,

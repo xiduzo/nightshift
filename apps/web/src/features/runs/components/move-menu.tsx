@@ -47,7 +47,7 @@ export function MoveMenu({
 		}),
 	);
 	const walkedHere = run.walker.thisDevice;
-	const movable = runActions(status, walkedHere).move;
+	const movable = runActions(status, walkedHere, run.result).move;
 	// A run that ended for good has nothing to move.
 	if (targets.length === 0 || (!movable && hasEnded(status))) return null;
 	return (
@@ -58,7 +58,7 @@ export function MoveMenu({
 						variant="outline"
 						size="sm"
 						disabled={!movable || move.isPending}
-						title={whyNot("move", status, walkedHere) ?? undefined}
+						title={whyNot("move", status, walkedHere, run.result) ?? undefined}
 					/>
 				}
 			>

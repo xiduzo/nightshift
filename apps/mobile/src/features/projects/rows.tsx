@@ -41,7 +41,7 @@ export function ProjectRow({
 
 /** A run of a project: its status, title and when it started (or how long it has run). */
 export function ProjectRunRow({ run, now }: { run: RunSummary; now: number }) {
-	const look = runStatusLook(run.status);
+	const look = runStatusLook(run.status, run.result);
 	const time = runTime(run, now);
 	return (
 		<ListRow

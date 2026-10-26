@@ -137,14 +137,14 @@ function RunBody({
 	const labels = nodeLabels(run);
 	const current = ended ? null : currentStep(steps);
 	const message = current ? live.entries.get(current.id) : undefined;
-	const allows = runActions(status, run.walker.thisDevice);
+	const allows = runActions(status, run.walker.thisDevice, run.result);
 	const now = Date.now();
 
 	return (
 		<>
 			<View className="gap-2">
 				<View className="flex-row flex-wrap items-center gap-2">
-					<RunStatusBadge status={status} />
+					<RunStatusBadge status={status} result={run.result} />
 					{live.connection === "reconnecting" && !ended ? (
 						<Text className="text-muted-foreground text-sm">Reconnecting…</Text>
 					) : null}

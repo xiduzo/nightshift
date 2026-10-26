@@ -1,4 +1,4 @@
-import type { Flow, FlowNodeType } from "@nightshift/flows";
+import type { Flow, NewNodeKind } from "@nightshift/flows";
 import { addNode, type NodeDefaults } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
@@ -36,7 +36,7 @@ export function useAddNode(
 ) {
 	const { screenToFlowPosition } = useReactFlow();
 	const store = useStoreApi();
-	return (type: FlowNodeType, at?: { x: number; y: number }) => {
+	return (type: NewNodeKind, at?: { x: number; y: number }) => {
 		const rect = store.getState().domNode?.getBoundingClientRect();
 		const center = at
 			? screenToFlowPosition(at)

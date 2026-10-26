@@ -60,7 +60,7 @@ export function RunDetails({
 				<PanelHeader
 					icon={WorkflowIcon}
 					kicker="Run"
-					badges={<RunStatusBadge status={status} />}
+					badges={<RunStatusBadge status={status} result={run.result} />}
 					title={<SheetTitle render={<span />}>{run.title}</SheetTitle>}
 					// The close button sits in the top right corner.
 					className="pr-12"

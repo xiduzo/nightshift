@@ -188,7 +188,11 @@ export function RunPage({ runId }: { runId: string }) {
 	const variables = variableCount(runData, steps);
 	const artifactList = artifacts.data ?? [];
 	// A run that is not going runs again from a step, on the device that runs it.
-	const rerunnable = runActions(status, runData.walker.thisDevice).rerun;
+	const rerunnable = runActions(
+		status,
+		runData.walker.thisDevice,
+		runData.result,
+	).rerun;
 	const warnedStepIds = new Set(
 		runData.warnings.flatMap((warning) =>
 			warning.stepId ? [warning.stepId] : [],

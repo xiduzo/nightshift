@@ -10,8 +10,9 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useId, useState } from "react";
 import { outcomeLabel, outcomeStyle } from "@/features/flows";
-import type { GateChoice } from "@/shared/api";
+import type { GateChoice, OpenGate } from "@/shared/api";
 import { LargerTextarea } from "@/shared/larger-window";
+import { GateDeadline } from "./gate-deadline";
 import { useResolveGate } from "./use-resolve-gate";
 
 /**
@@ -26,12 +27,15 @@ export function GateAnswer({
 	choices,
 	runTitle,
 	walkerName,
+	deadline = null,
 	className,
 }: {
 	runId: string;
 	stepId: string;
 	nodeId: string;
 	choices: GateChoice[];
+	/** What Night Shift picks when nobody answers in time. */
+	deadline?: OpenGate["deadline"];
 	/** Named in the confirmation toast. */
 	runTitle?: string;
 	/** The device that runs the run, when it is not this computer: the answer goes to it. */
@@ -145,6 +149,7 @@ export function GateAnswer({
 						);
 					})}
 				</div>
+				<GateDeadline deadline={deadline} className="mt-2" />
 			</FieldSet>
 		</div>
 	);

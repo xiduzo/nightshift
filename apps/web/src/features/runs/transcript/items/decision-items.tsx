@@ -2,7 +2,7 @@
 import type { JsonValue } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
-import { BracesIcon, HandIcon, SplitIcon } from "lucide-react";
+import { AlarmClockIcon, BracesIcon, HandIcon, SplitIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { outcomeLabel, outcomeStyle, stepStateStyle } from "@/features/flows";
 import { JsonBlock } from "@/shared/code";
@@ -187,13 +187,13 @@ export function GateQuestion({
 	);
 }
 
-/** The answer a person gave, and their note. */
+/** The answer a person gave and their note, or the option the deadline chose. */
 export function GateResolved({ item }: { item: GateResolvedItem }) {
 	const { text } = outcomeStyle(item.choice, item.color);
 	return (
 		<ResultCard
-			icon={HandIcon}
-			kicker="Answered ·"
+			icon={item.byDeadline ? AlarmClockIcon : HandIcon}
+			kicker={item.byDeadline ? "Picked at the deadline ·" : "Answered ·"}
 			value={<span className="font-mono">{outcomeLabel(item.choice)}</span>}
 			tone={text}
 			extra={

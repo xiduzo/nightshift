@@ -211,6 +211,13 @@ export function subflowBlockerText(
 				title: "This flow has errors",
 				description: `Fix the ${plural(blocker.errors, "error")} of this flow first. The issues list shows them.`,
 			};
+		case "end-node": {
+			const many = blocker.nodes.length > 1;
+			return {
+				title: "An End node",
+				description: `${quotedList(blocker.nodes)} ${many ? "end" : "ends"} the run. In a Subflow, ${many ? "they end" : "it ends"} only the Subflow, and the run goes on. Move ${many ? "them" : "it"} out of the Section.`,
+			};
+		}
 		case "stopped-edge": {
 			const many = blocker.nodes.length > 1;
 			return {
