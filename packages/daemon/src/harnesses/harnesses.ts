@@ -16,11 +16,13 @@ import {
 	testMcpServer,
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
-import type {
-	ConnectionStore,
-	localDevice,
-	SettingsStore,
+import {
+	type ConnectionStore,
+	HARNESS_BIN,
+	type localDevice,
+	type SettingsStore,
 } from "@nightshift/engine";
+import { type AgentHarnessName, isCustomHarness } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
 type LocalDeviceOptions = Parameters<typeof localDevice>[0];
@@ -113,6 +115,38 @@ export function localHarnesses(deps: {
 		customHarnessNames: () =>
 			settings.current().customAgents.map((a) => `acp:${a.slug}` as const),
 		harnessNames: () => new Set(settings.current().harnesses),
+	};
+}
+
+/**
+ * The harnesses of `localHarnesses` by name, as a session outside a run
+ * (the assistant) finds them: a harness that is added, and whether its
+ * program is on this computer.
+ */
+export function harnessLookup(
+	local: ReturnType<typeof localHarnesses>,
+	settings: Pick<SettingsStore, "current">,
+	which: (program: string) => string | null = (program) => Bun.which(program),
+): {
+	harnessFor: (name: AgentHarnessName) => AgentHarness | undefined;
+	installed: (name: AgentHarnessName) => boolean;
+} {
+	return {
+		harnessFor: (name) => {
+			if (isCustomHarness(name)) return local.customHarness?.(name);
+			return local.harnessNames?.().has(name)
+				? local.harnesses[name]
+				: undefined;
+		},
+		installed: (name) => {
+			if (isCustomHarness(name)) {
+				const agent = settings
+					.current()
+					.customAgents.find((a) => `acp:${a.slug}` === name);
+				return agent !== undefined && which(agent.command) !== null;
+			}
+			return which(String(settings.current()[HARNESS_BIN[name]])) !== null;
+		},
 	};
 }
 

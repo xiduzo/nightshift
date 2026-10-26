@@ -27,6 +27,7 @@ const KINDS: Partial<Record<SettingKey, Kind>> = {
 	agentModel: { type: "text" },
 	agentPermissionMode: { type: "choice" },
 	decisionDecider: { type: "choice" },
+	assistantProfile: { type: "choice" },
 };
 
 const MAX_MINUTES = 10_080;

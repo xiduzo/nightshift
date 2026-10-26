@@ -14,6 +14,7 @@ import { NotificationSettingsCard } from "@/features/notifications";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
+import { AssistantCard } from "./components/assistant-card";
 import { CleanupCard } from "./components/cleanup-card";
 import { PhoneCard } from "./components/phone-card";
 import { RunPolicyCard } from "./components/run-policy-card";
@@ -46,6 +47,7 @@ export function SettingsPage({ thisComputer }: { thisComputer: ReactNode }) {
 							<RunPolicyCard data={settings.data} />
 							<CleanupCard data={settings.data} />
 							<AgentDefaultsCard data={settings.data} />
+							<AssistantCard data={settings.data} />
 						</>
 					) : settings.error ? (
 						<Alert variant="destructive">

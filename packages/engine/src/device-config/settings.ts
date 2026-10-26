@@ -226,6 +226,14 @@ const DEFS = {
 		schema: permissionModeSchema,
 		default: "acceptEdits",
 	} satisfies Def<z.infer<typeof permissionModeSchema>>,
+	/**
+	 * The Agent Profile the assistant runs on when a request names none.
+	 * Empty: the first profile whose harness is on this computer.
+	 */
+	assistantProfile: {
+		schema: z.string().trim().max(100),
+		default: "",
+	} satisfies Def<string>,
 	/** New Decision nodes start on this decider. */
 	decisionDecider: {
 		schema: deciderNameSchema,

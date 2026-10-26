@@ -50,7 +50,12 @@ import {
 } from "@nightshift/engine";
 
 import { createAssistant } from "./assistant";
-import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
+import {
+	harnessLookup,
+	localHarnesses,
+	programChecks,
+	reportDeviceFacts,
+} from "./harnesses";
 import {
 	authOriginsOf,
 	createHttp,
@@ -286,11 +291,19 @@ export async function createDaemon(
 	const scheduler = new AbortController();
 	hot.nightshiftScheduler = scheduler;
 
+	const harnesses = localHarnesses({
+		settings,
+		connections,
+		piAcp: options.piAcp,
+	});
+	/** The project's folder here: where its runs' worktrees branch from. */
+	const clonePath = clonePathOf(db, async () => device.id);
+
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
 		id: device.id,
 		name: device.name,
-		...localHarnesses({ settings, connections, piAcp: options.piAcp }),
+		...harnesses,
 		// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
 		decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
 		mcpServersFor: (node) => connections.mcpServersFor(node),
@@ -313,8 +326,7 @@ export async function createDaemon(
 				}),
 			),
 		toolLaunchers,
-		// The project's folder here: where its runs' worktrees branch from.
-		clonePath: clonePathOf(db, async () => device.id),
+		clonePath,
 		// Its profiles, for a run placed here from another Device.
 		profileFor: (name) => profiles.settingsFor(name),
 		// The files agents keep for the person, next to the run history.
@@ -457,7 +469,14 @@ export async function createDaemon(
 		cliTools,
 		toolLaunchers,
 		profiles,
-		assistant: createAssistant(),
+		// Suggestions in the flow editor: on this computer's profiles, read
+		// only in the project's Clone.
+		assistant: createAssistant({
+			profiles,
+			settings,
+			...harnessLookup(harnesses, settings),
+			clonePath,
+		}),
 		checks: programChecks(),
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),
