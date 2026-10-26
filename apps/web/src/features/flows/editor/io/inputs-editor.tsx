@@ -17,9 +17,9 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
+import { LargerTextarea } from "@/shared/larger-window";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 
 /** Why an input cannot take a name, by what the name clashes with. */
@@ -225,7 +225,8 @@ function InputRow({
 				onChange={(event) => setOptional("description", event.target.value)}
 			/>
 			{isJson ? (
-				<Textarea
+				<LargerTextarea
+					title={`Default of ${position}`}
 					id={`${id}-default`}
 					value={input.default ?? ""}
 					aria-label={`Default of ${position}, as JSON`}

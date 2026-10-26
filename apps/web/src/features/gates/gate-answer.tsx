@@ -7,12 +7,11 @@ import {
 	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useId, useState } from "react";
-
 import { outcomeLabel, outcomeStyle } from "@/features/flows";
 import type { GateChoice } from "@/shared/api";
+import { LargerTextarea } from "@/shared/larger-window";
 import { useResolveGate } from "./use-resolve-gate";
 
 /**
@@ -65,7 +64,8 @@ export function GateAnswer({
 					Note
 					<span className="font-normal text-muted-foreground">(optional)</span>
 				</FieldLabel>
-				<Textarea
+				<LargerTextarea
+					title="Note"
 					id={`${id}-note`}
 					value={note}
 					onChange={(event) => setNote(event.target.value)}

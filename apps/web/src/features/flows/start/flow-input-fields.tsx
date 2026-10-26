@@ -10,7 +10,7 @@ import {
 	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Textarea } from "@nightshift/ui/components/textarea";
+import { LargerTextarea } from "@/shared/larger-window";
 
 /** What the person typed per input: text, or JSON text for a `json` input. */
 export type InputTexts = Record<string, string>;
@@ -122,7 +122,8 @@ export function FlowInputFields({
 								) : null}
 							</FieldLabel>
 							{input.type === "json" ? (
-								<Textarea
+								<LargerTextarea
+									title={input.label || input.name}
 									id={fieldId}
 									value={value}
 									placeholder={input.default ?? '{"title": "…"}'}

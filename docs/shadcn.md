@@ -51,7 +51,7 @@ CLI when you need them.
 | ✓ [Input](https://ui.shadcn.com/docs/components/input) | One-line text. |
 | ✓ [Input Group](https://ui.shadcn.com/docs/components/input-group) | An input or textarea with addons inside the border: an icon, a prefix, a button, a counter. |
 | ✓ [Input OTP](https://ui.shadcn.com/docs/components/input-otp) | One-time codes, one box per digit: the two-factor code at sign-in and in its setup (`features/access/code-input.tsx`). |
-| ✓ [Textarea](https://ui.shadcn.com/docs/components/textarea) | Multi-line text: prompts, notes, JSON. `CodeTextarea` (`shared/code`) lays Shiki highlighting and `{{template}}` marks behind it, for commands and prompts. A field without a set language guesses one (`guessLanguage`); a template field opens in a larger Dialog with a picker for the language. |
+| ✓ [Textarea](https://ui.shadcn.com/docs/components/textarea) | Multi-line text: prompts, notes, JSON. `CodeTextarea` (`shared/code`) lays Shiki highlighting and `{{template}}` marks behind it, for commands and prompts. A field without a set language guesses one (`guessLanguage`). Every multi-line field opens in a larger Dialog from a button in its corner: `LargerTextarea` (`shared/larger-window`), or its parts in a template field, which adds a picker for the language. |
 | ✓ [Checkbox](https://ui.shadcn.com/docs/components/checkbox) | One on/off choice inside a form, or several from a list. |
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. As cards (`FieldLabel` around a horizontal `Field`): a profile's harness, a Gate's choices in the inbox. |
 | ✓ [Select](https://ui.shadcn.com/docs/components/select) | One choice from a list, in a styled popup. |

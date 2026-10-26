@@ -30,7 +30,6 @@ import {
 	RadioGroup,
 	RadioGroupItem,
 } from "@nightshift/ui/components/radio-group";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -52,6 +51,7 @@ import type {
 	ProfileRow,
 } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
+import { LargerTextarea } from "@/shared/larger-window";
 import { EFFORTS, PERMISSION_MODES } from "./agent-options";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { KindBadge } from "./connections/parts";
@@ -286,7 +286,8 @@ export function ProfileDetail({
 					</Field>
 					<Field>
 						<FieldLabel htmlFor={`${id}-desc`}>What it is for</FieldLabel>
-						<Textarea
+						<LargerTextarea
+							title="What it is for"
 							id={`${id}-desc`}
 							rows={2}
 							value={draft.description ?? ""}

@@ -29,15 +29,14 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
-
 import { EFFORTS, ModelCombobox, PERMISSION_MODES } from "@/features/agents";
 import type { Effort, PermissionMode } from "@/shared/api";
 import { orpc } from "@/shared/api";
+import { LargerTextarea } from "@/shared/larger-window";
 import { runMutations } from "../queries";
 
 /**
@@ -124,7 +123,8 @@ export function QuickRunDialog({
 					<FieldGroup className="gap-5">
 						<Field>
 							<FieldLabel htmlFor={`${id}-prompt`}>Prompt</FieldLabel>
-							<Textarea
+							<LargerTextarea
+								title="Prompt"
 								id={`${id}-prompt`}
 								value={prompt}
 								onChange={(event) => setPrompt(event.target.value)}

@@ -24,7 +24,6 @@ import {
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -39,6 +38,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Connection, McpServer } from "@/shared/api";
+import { LargerTextarea } from "@/shared/larger-window";
 import {
 	connectionMutations,
 	connectionQueries,
@@ -327,7 +327,8 @@ function ConnectionForm({
 						</Field>
 						<Field>
 							<FieldLabel htmlFor={`${id}-args`}>Arguments</FieldLabel>
-							<Textarea
+							<LargerTextarea
+								title="Arguments"
 								id={`${id}-args`}
 								value={draft.args}
 								onChange={(event) => set({ args: event.target.value })}

@@ -11,32 +11,18 @@ import {
 	CommandItem,
 	CommandList,
 } from "@nightshift/ui/components/command";
-import {
-	Dialog,
-	DialogClose,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@nightshift/ui/components/dialog";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Popover, PopoverContent } from "@nightshift/ui/components/popover";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { BracesIcon, ChevronRightIcon, Maximize2Icon } from "lucide-react";
+import { BracesIcon, ChevronRightIcon } from "lucide-react";
 import {
 	type KeyboardEvent,
 	type ReactNode,
 	type RefObject,
-	useCallback,
 	useEffect,
 	useId,
 	useRef,
@@ -48,6 +34,12 @@ import {
 	CodeTextarea,
 	guessLanguage,
 } from "@/shared/code";
+import {
+	LARGER_FIELD,
+	LargerWindow,
+	LargerWindowButton,
+	useLargerWindow,
+} from "@/shared/larger-window";
 
 import {
 	isSuggestKey,
@@ -122,39 +114,19 @@ export function TemplateField({
 	/** The language of the field, such as `bash`. Without it, a guess. */
 	language?: CodeLanguage;
 }) {
-	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+	const {
+		ref,
+		attach,
+		open: large,
+		show: showLarge,
+	} = useLargerWindow<HTMLTextAreaElement & HTMLInputElement>();
 	const assistant = useFlowAssistant();
 	const helperNode =
 		assist === "prompt" && multiline && assistant !== undefined ? nodeId : null;
 	const [helping, setHelping] = useState<PromptTarget | null>(null);
-	const [large, setLarge] = useState(false);
 	const [picked, setPicked] = useState<CodeLanguage | null>(null);
 	const usual = language ?? guessLanguage(value) ?? "text";
 	const shown = picked ?? usual;
-	// The cursor moves along between the field and its larger window.
-	const caret = useRef<[number, number] | null>(null);
-	const showLarge = (next: boolean) => {
-		const field = ref.current;
-		caret.current = field ? [field.selectionStart, field.selectionEnd] : null;
-		setLarge(next);
-	};
-	// The field and its larger window each put the cursor back when they show.
-	const attach = useCallback(
-		(field: (HTMLTextAreaElement & HTMLInputElement) | null) => {
-			ref.current = field;
-			if (field && caret.current) {
-				const [start, end] = caret.current;
-				field.setSelectionRange(start, end);
-				// Near the cursor: its share of the lines, a little above the middle.
-				const lines = field.value.split("\n").length;
-				const before = field.value.slice(0, start).split("\n").length;
-				field.scrollTop =
-					(field.scrollHeight * before) / lines - field.clientHeight / 2;
-				caret.current = null;
-			}
-		},
-		[],
-	);
 	const openHelper = () =>
 		setHelping({ base: value, selection: selectionOf(ref.current) });
 	const flows = useProjectFlowMap();
@@ -203,7 +175,7 @@ export function TemplateField({
 				marks={TEMPLATE}
 				className={cn(
 					"min-h-28 font-mono text-xs leading-relaxed",
-					large ? "field-sizing-fixed h-[60vh] max-h-none" : "max-h-80 pr-9",
+					large ? LARGER_FIELD : "max-h-80 pr-9",
 					className,
 				)}
 				spellCheck={shown === "markdown" || shown === "text"}
@@ -225,24 +197,7 @@ export function TemplateField({
 					suggest.onKeyDown(event, complete);
 				}}
 			/>
-			{large ? null : (
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Button
-								variant="ghost"
-								size="icon-xs"
-								className="absolute top-1.5 right-1.5 text-muted-foreground"
-								aria-label="Open in a larger window"
-								onClick={() => showLarge(true)}
-							/>
-						}
-					>
-						<Maximize2Icon />
-					</TooltipTrigger>
-					<TooltipContent>Open in a larger window</TooltipContent>
-				</Tooltip>
-			)}
+			{large ? null : <LargerWindowButton onClick={() => showLarge(true)} />}
 		</div>
 	) : (
 		<Input
@@ -311,44 +266,35 @@ export function TemplateField({
 			</Field>
 			{large ? null : extras}
 			{/* The same field, larger. Only one of the two is on the page. */}
-			<Dialog open={large} onOpenChange={showLarge}>
-				<DialogContent
-					initialFocus={ref}
-					finalFocus={ref}
-					className="flex max-h-[90vh] flex-col sm:max-w-4xl"
-				>
-					<DialogHeader>
-						<DialogTitle>{label}</DialogTitle>
-					</DialogHeader>
-					{large ? (
-						<div className="flex min-h-0 flex-col gap-2 overflow-y-auto">
-							{editor}
-							{helpers}
-							{extras}
-						</div>
-					) : null}
-					<DialogFooter className="sm:justify-between">
-						<NativeSelect
-							size="sm"
-							aria-label="Highlight as"
-							value={picked ?? ""}
-							onChange={(event) =>
-								setPicked((event.target.value || null) as CodeLanguage | null)
-							}
-						>
-							<NativeSelectOption value="">
-								{`${language ? "Usual" : "Guess"}: ${labelOf(usual)}`}
+			<LargerWindow
+				open={large}
+				onOpenChange={showLarge}
+				title={label}
+				field={ref}
+				footer={
+					<NativeSelect
+						size="sm"
+						aria-label="Highlight as"
+						value={picked ?? ""}
+						onChange={(event) =>
+							setPicked((event.target.value || null) as CodeLanguage | null)
+						}
+					>
+						<NativeSelectOption value="">
+							{`${language ? "Usual" : "Guess"}: ${labelOf(usual)}`}
+						</NativeSelectOption>
+						{CODE_LANGUAGES.map((entry) => (
+							<NativeSelectOption key={entry.value} value={entry.value}>
+								{entry.label}
 							</NativeSelectOption>
-							{CODE_LANGUAGES.map((entry) => (
-								<NativeSelectOption key={entry.value} value={entry.value}>
-									{entry.label}
-								</NativeSelectOption>
-							))}
-						</NativeSelect>
-						<DialogClose render={<Button />}>Done</DialogClose>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+						))}
+					</NativeSelect>
+				}
+			>
+				{editor}
+				{helpers}
+				{extras}
+			</LargerWindow>
 		</div>
 	);
 }

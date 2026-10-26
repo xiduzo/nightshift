@@ -28,7 +28,6 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	CopyIcon,
@@ -50,6 +49,7 @@ import {
 import { spaceQueries } from "@/features/spaces";
 import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
+import { LargerTextarea } from "@/shared/larger-window";
 import { PageSection } from "@/shared/page";
 import { deviceIcon } from "./device-icon";
 import { JoinHostDialog } from "./join-host-dialog";
@@ -249,7 +249,8 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 								https://studio.local, then https://studio.example.com.
 							</FieldDescription>
 						</FieldContent>
-						<Textarea
+						<LargerTextarea
+							title="Addresses"
 							id={`${id}-addresses`}
 							className="font-mono text-xs"
 							rows={3}

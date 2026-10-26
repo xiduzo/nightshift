@@ -29,7 +29,6 @@ import {
 } from "@nightshift/ui/components/field";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
@@ -38,9 +37,9 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-
 import type { StepSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
+import { LargerTextarea } from "@/shared/larger-window";
 import { runMutations } from "../queries";
 
 /** An Agent step whose conversation can go on: its harness named a session. */
@@ -65,7 +64,8 @@ function FollowUpField({
 	return (
 		<Field>
 			<FieldLabel htmlFor={id}>Follow-up prompt (optional)</FieldLabel>
-			<Textarea
+			<LargerTextarea
+				title="Follow-up prompt"
 				id={id}
 				value={value}
 				disabled={disabled}

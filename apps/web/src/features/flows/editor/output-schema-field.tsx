@@ -11,7 +11,7 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { CodeTextarea } from "@/shared/code";
+import { LargerTextarea } from "@/shared/larger-window";
 
 import { OutputSuggest } from "../assistant/field-helpers";
 
@@ -272,7 +272,8 @@ export function OutputSchemaField({
 						)}
 						{helper}
 					</div>
-					<CodeTextarea
+					<LargerTextarea
+						title={label}
 						id={id}
 						value={text}
 						language="json"

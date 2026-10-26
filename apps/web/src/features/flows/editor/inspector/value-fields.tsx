@@ -5,7 +5,6 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -13,6 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { deciderQueries } from "@/features/agents";
+import { LargerTextarea } from "@/shared/larger-window";
 import { ExpressionSuggest } from "../../assistant/field-helpers";
 import { VALUE_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
@@ -97,7 +97,8 @@ export function ValueFields({
 						hint="A JSONata expression over the run's values. Its result is the data."
 						error={expression.trim() === "" ? "Write the expression." : null}
 					>
-						<Textarea
+						<LargerTextarea
+							title="Expression"
 							id={`${id}-expression`}
 							value={expression}
 							placeholder={EXPRESSION_EXAMPLE}

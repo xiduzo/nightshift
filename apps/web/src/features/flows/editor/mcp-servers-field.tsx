@@ -12,9 +12,9 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Textarea } from "@nightshift/ui/components/textarea";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { LargerTextarea } from "@/shared/larger-window";
 import { NameInput } from "./io/io-rows";
 
 type Servers = Record<string, McpServer>;
@@ -339,7 +339,8 @@ function LinesField<T>({
 
 	return (
 		<div className="flex flex-col gap-1">
-			<Textarea
+			<LargerTextarea
+				title={label}
 				id={id}
 				aria-label={label}
 				value={text}
