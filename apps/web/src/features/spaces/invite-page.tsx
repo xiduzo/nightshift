@@ -170,7 +170,12 @@ function ClosedInvitation({
 			</EmptyHeader>
 			{status === "accepted" ? (
 				<EmptyContent>
-					<Button variant="outline" size="sm" render={<Link to="/login" />}>
+					<Button
+						variant="outline"
+						size="sm"
+						nativeButton={false}
+						render={<Link to="/login" />}
+					>
 						Sign in
 					</Button>
 				</EmptyContent>

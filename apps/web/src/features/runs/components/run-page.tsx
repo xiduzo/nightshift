@@ -147,7 +147,11 @@ export function RunPage({ runId }: { runId: string }) {
 									</EmptyDescription>
 								</EmptyHeader>
 								<EmptyContent>
-									<Button variant="outline" render={<Link to="/" />}>
+									<Button
+										variant="outline"
+										nativeButton={false}
+										render={<Link to="/" />}
+									>
 										Back to projects
 									</Button>
 								</EmptyContent>

@@ -210,6 +210,7 @@ function noticeOf({
 								<Button
 									size="sm"
 									variant="outline"
+									nativeButton={false}
 									render={<Link to="/inbox" />}
 								>
 									<InboxIcon data-icon="inline-start" />
