@@ -13,6 +13,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { deciderQueries } from "@/features/agents";
+import { ExpressionSuggest } from "../../assistant/field-helpers";
 import { VALUE_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { OutputSchemaField } from "../output-schema-field";
@@ -109,6 +110,9 @@ export function ValueFields({
 								onChange((current) => ({ ...current, expression: text }));
 							}}
 						/>
+						<div className="self-start">
+							<ExpressionSuggest node={node} />
+						</div>
 					</Field>
 				) : (
 					<TemplateField

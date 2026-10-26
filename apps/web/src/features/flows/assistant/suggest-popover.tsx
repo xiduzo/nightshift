@@ -54,6 +54,7 @@ export function SuggestPopover({
 	assistant,
 	kind,
 	nodeId,
+	toolSchema,
 	open,
 	onOpenChange,
 	trigger,
@@ -70,7 +71,10 @@ export function SuggestPopover({
 }: {
 	assistant: FlowAssistant;
 	kind: SuggestionKind;
-	nodeId: string;
+	/** The node whose field it fills. Unset for a field of the flow. */
+	nodeId?: string;
+	/** `arguments` only: the tool's input schema, as the editor knows it. */
+	toolSchema?: Record<string, unknown>;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	/** The button that opens it. */
@@ -121,6 +125,7 @@ export function SuggestPopover({
 						assistant={assistant}
 						kind={kind}
 						nodeId={nodeId}
+						toolSchema={toolSchema}
 						title={title}
 						description={description}
 						picks={picks}
@@ -160,6 +165,7 @@ function SuggestBody({
 	assistant,
 	kind,
 	nodeId,
+	toolSchema,
 	title,
 	description,
 	picks,
@@ -171,7 +177,8 @@ function SuggestBody({
 }: {
 	assistant: FlowAssistant;
 	kind: SuggestionKind;
-	nodeId: string;
+	nodeId?: string;
+	toolSchema?: Record<string, unknown>;
 	title: string;
 	description: string;
 	picks: readonly string[];
@@ -193,10 +200,11 @@ function SuggestBody({
 			flowName: assistant.flowName,
 			flow: assistant.flow,
 			...agentRequest(),
-			nodeId,
+			...(nodeId ? { nodeId } : {}),
 			kind,
 			instruction: text.trim(),
 			...(selection ? { selection } : {}),
+			...(toolSchema ? { toolSchema } : {}),
 		});
 	};
 

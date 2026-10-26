@@ -12,6 +12,7 @@ import { Link } from "@tanstack/react-router";
 import { SettingsIcon, WorkflowIcon } from "lucide-react";
 import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
+import { DescriptionSuggest, InputsSuggest } from "../assistant/field-helpers";
 import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
 import { InputsEditor } from "./io/inputs-editor";
 import { OutputsEditor } from "./io/outputs-editor";
@@ -86,6 +87,9 @@ export function FlowInspector({
 							}));
 						}}
 					/>
+					<div className="self-start">
+						<DescriptionSuggest before={flow.description ?? ""} />
+					</div>
 				</Field>
 				<Field
 					id={`${id}-start`}
@@ -135,6 +139,9 @@ export function FlowInspector({
 					describedBy={`${id}-inputs-hint`}
 					onChange={onChange}
 				/>
+				<div className="self-start">
+					<InputsSuggest />
+				</div>
 			</InspectorSection>
 
 			<InspectorSection

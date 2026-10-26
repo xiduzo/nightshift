@@ -19,6 +19,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { deciderQueries } from "@/features/agents";
+import { OutcomesSuggest, RulesSuggest } from "../../assistant/field-helpers";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
@@ -140,7 +141,8 @@ export function DecisionFields({
 					invalid={prompt.invalid}
 					className={by === "person" ? "font-sans text-sm" : undefined}
 					placeholder={prompt.placeholder}
-					assist="prompt"
+					// A note for the rules: nothing reads it, so no helper.
+					assist={by === "rule" ? undefined : "prompt"}
 					onChange={(text) =>
 						onChange((current) => ({ ...current, prompt: text }))
 					}
@@ -184,6 +186,10 @@ export function DecisionFields({
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}
 			>
+				<div className="flex flex-wrap items-center gap-1.5">
+					<OutcomesSuggest node={node} />
+					{by === "rule" ? <RulesSuggest node={node} /> : null}
+				</div>
 				{by === "rule" ? (
 					<Note>
 						A rule is a JSONata expression over the run's values. Write a node

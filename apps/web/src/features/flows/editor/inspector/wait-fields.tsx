@@ -6,6 +6,7 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId, useRef } from "react";
+import { CommandSuggest } from "../../assistant/field-helpers";
 import { WAIT_KINDS } from "../../flow-draft";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { TemplateField } from "../template-field";
@@ -107,6 +108,7 @@ export function WaitFields({
 						value={until.command}
 						placeholder="gh pr checks 42"
 						invalid={until.command.trim() === ""}
+						action={<CommandSuggest node={node} />}
 						onChange={(command) => setUntil({ ...until, command })}
 					/>
 					<Field

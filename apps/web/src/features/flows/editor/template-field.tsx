@@ -12,11 +12,6 @@ import {
 	CommandList,
 } from "@nightshift/ui/components/command";
 import { Input } from "@nightshift/ui/components/input";
-import {
-	InputGroup,
-	InputGroupAddon,
-	InputGroupTextarea,
-} from "@nightshift/ui/components/input-group";
 import { Popover, PopoverContent } from "@nightshift/ui/components/popover";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
@@ -57,7 +52,7 @@ import { useProjectFlowMap } from "./project-flows-context";
  * match what follows it, to pick with the arrow keys and Enter or Tab. A JSON value (an Agent's `data`, a
  * Call's `results`, a JSON input) leaves the cursor before the closing
  * braces, ready for a path: `{{planner.data.tasks}}`. A prompt (`assist`)
- * gets the prompt helper: a button in the field, or Cmd/Ctrl+I.
+ * gets the prompt helper: "Suggest prompt" under the field, or Cmd/Ctrl+I.
  */
 export function TemplateField({
 	id,
@@ -74,6 +69,7 @@ export function TemplateField({
 	initialValue,
 	required,
 	assist,
+	action,
 }: {
 	id: string;
 	label: ReactNode;
@@ -91,11 +87,12 @@ export function TemplateField({
 	/** A variable's initial value: it reads the inputs and run only. */
 	initialValue?: boolean;
 	required?: boolean;
-	/** `prompt`: the node's prompt, with the prompt helper in the field. */
+	/** `prompt`: the node's prompt, with the prompt helper under the field. */
 	assist?: "prompt";
+	/** Under the field, such as another helper ("Suggest command"). */
+	action?: ReactNode;
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
-	const groupRef = useRef<HTMLDivElement>(null);
 	const assistant = useFlowAssistant();
 	const helperNode =
 		assist === "prompt" && multiline && assistant !== undefined ? nodeId : null;
@@ -153,48 +150,7 @@ export function TemplateField({
 				}
 				hint={hint}
 			>
-				{helperNode !== null ? (
-					<InputGroup ref={groupRef}>
-						<InputGroupTextarea
-							ref={ref}
-							id={id}
-							value={value}
-							placeholder={placeholder}
-							className={cn(
-								"max-h-80 min-h-28 font-mono text-xs leading-relaxed",
-								className,
-							)}
-							aria-invalid={invalid}
-							aria-required={required}
-							aria-describedby={describedBy}
-							aria-keyshortcuts="Meta+I Control+I"
-							{...suggest.fieldProps}
-							onChange={(event) => {
-								onChange(event.target.value);
-								suggest.track(event.target);
-							}}
-							onKeyDown={(event) => {
-								if (isSuggestKey(event)) {
-									event.preventDefault();
-									openHelper();
-									return;
-								}
-								suggest.onKeyDown(event, complete);
-							}}
-						/>
-						<InputGroupAddon align="block-end" className="py-1.5">
-							<PromptSuggest
-								nodeId={helperNode}
-								value={value}
-								target={helping}
-								onOpen={openHelper}
-								onClose={() => setHelping(null)}
-								anchor={groupRef}
-								field={ref}
-							/>
-						</InputGroupAddon>
-					</InputGroup>
-				) : multiline ? (
+				{multiline ? (
 					<Textarea
 						ref={ref}
 						id={id}
@@ -207,12 +163,22 @@ export function TemplateField({
 						aria-invalid={invalid}
 						aria-required={required}
 						aria-describedby={describedBy}
+						aria-keyshortcuts={
+							helperNode !== null ? "Meta+I Control+I" : undefined
+						}
 						{...suggest.fieldProps}
 						onChange={(event) => {
 							onChange(event.target.value);
 							suggest.track(event.target);
 						}}
-						onKeyDown={(event) => suggest.onKeyDown(event, complete)}
+						onKeyDown={(event) => {
+							if (helperNode !== null && isSuggestKey(event)) {
+								event.preventDefault();
+								openHelper();
+								return;
+							}
+							suggest.onKeyDown(event, complete);
+						}}
 					/>
 				) : (
 					<Input
@@ -233,6 +199,17 @@ export function TemplateField({
 						onKeyDown={(event) => suggest.onKeyDown(event, complete)}
 					/>
 				)}
+				{helperNode !== null ? (
+					<PromptSuggest
+						nodeId={helperNode}
+						value={value}
+						target={helping}
+						onOpen={openHelper}
+						onClose={() => setHelping(null)}
+						field={ref}
+					/>
+				) : null}
+				{action ? <div className="self-start">{action}</div> : null}
 			</Field>
 			<TemplateSuggestions anchor={ref} suggest={suggest} onPick={complete} />
 			<TemplateVariables groups={groups} onInsert={insert} />

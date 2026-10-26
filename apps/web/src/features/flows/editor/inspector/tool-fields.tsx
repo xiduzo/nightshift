@@ -16,6 +16,7 @@ import { Link } from "@tanstack/react-router";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { connectionQueries } from "@/features/agents";
+import { ArgumentsSuggest } from "../../assistant/field-helpers";
 import { missingConnectionMessage } from "../../flow-draft";
 import { connectionKind, type DaemonConnection } from "../connections-field";
 import { Field, InspectorSection, Note } from "../fields";
@@ -300,6 +301,11 @@ function Arguments({
 						: "Fill in each argument. A value that is one reference keeps its JSON value."}
 				</FieldDescription>
 			</div>
+			{properties.length > 0 || !schema ? (
+				<div className="self-start">
+					<ArgumentsSuggest node={node} toolSchema={schema} />
+				</div>
+			) : null}
 			{properties.map((property) => {
 				const value = node.arguments[property.name] ?? "";
 				return (

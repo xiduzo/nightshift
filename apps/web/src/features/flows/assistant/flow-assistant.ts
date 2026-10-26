@@ -35,13 +35,14 @@ export function useFlowAssistant(): FlowAssistant | undefined {
 }
 
 /**
- * Applies `suggestion` to node `nodeId` of the draft, and offers to undo
+ * Applies `suggestion` to node `nodeId` of the draft (or to the flow, for
+ * a field of the flow), and offers to undo
  * it while the draft is still the one it made. Nothing is saved: the
  * person saves the flow.
  */
 export function applyToDraft(
 	assistant: FlowAssistant,
-	nodeId: string,
+	nodeId: string | undefined,
 	suggestion: Suggestion,
 	selection?: TextRange,
 ): void {

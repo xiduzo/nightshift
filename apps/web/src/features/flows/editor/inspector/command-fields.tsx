@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { useId } from "react";
 import { connectionQueries } from "@/features/agents";
+import { CommandSuggest } from "../../assistant/field-helpers";
 import { Field, InspectorSection, Note } from "../fields";
 import { SecretsField } from "../secrets-field";
 import { NodeOptionsField } from "./node-options-field";
@@ -95,6 +96,9 @@ export function CommandFields({
 							onChange((current) => ({ ...current, command }));
 						}}
 					/>
+					<div className="self-start">
+						<CommandSuggest node={node} />
+					</div>
 				</Field>
 				<Field
 					id={`${id}-output`}

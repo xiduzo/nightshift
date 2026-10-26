@@ -18,6 +18,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { BotIcon } from "lucide-react";
 import { deciderQueries } from "@/features/agents";
+import { CheckerSuggest, OutcomesSuggest } from "../../assistant/field-helpers";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { OutcomePill } from "../edge-inspector";
 import { Field, InspectorSection, Note } from "../fields";
@@ -141,14 +142,16 @@ export function AgentOutcomeSection({
 					The standard outcomes: pass, fail, or needs input. Use your own, such
 					as approved and changes-requested, each with its own edge.
 				</p>
-				<Button
-					variant="outline"
-					size="sm"
-					className="self-start"
-					onClick={() => onSetOutcomes(seed)}
-				>
-					Use own outcomes
-				</Button>
+				<div className="flex flex-wrap items-center gap-1.5">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => onSetOutcomes(seed)}
+					>
+						Use own outcomes
+					</Button>
+					<OutcomesSuggest node={node} />
+				</div>
 				{reads}
 			</InspectorSection>
 		);
@@ -165,14 +168,16 @@ export function AgentOutcomeSection({
 			onRenameOutcome={onRenameOutcome}
 			onRemoveOutcome={onRemoveOutcome}
 		>
-			<Button
-				variant="ghost"
-				size="sm"
-				className="self-start"
-				onClick={() => onSetOutcomes(undefined)}
-			>
-				Back to pass, fail and needs input
-			</Button>
+			<div className="flex flex-wrap items-center gap-1.5">
+				<OutcomesSuggest node={node} />
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={() => onSetOutcomes(undefined)}
+				>
+					Back to pass, fail and needs input
+				</Button>
+			</div>
 			{reads}
 		</NodeOptionsField>
 	);
@@ -257,6 +262,7 @@ function CheckerFields({
 				nodeId={node.id}
 				value={checker.prompt ?? ""}
 				placeholder="Pick pass only when the tests ran and passed."
+				action={<CheckerSuggest node={node} />}
 				onChange={(text) => {
 					const { prompt: _, ...rest } = checker;
 					onChange(text === "" ? rest : { ...rest, prompt: text });

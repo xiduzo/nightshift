@@ -6,12 +6,17 @@
 
 export {
 	applySuggestion,
+	argumentChanges,
 	type Change,
+	commandOf,
+	inputChanges,
 	type NamedChange,
 	newVariables,
 	type OutcomeChange,
 	type OutputFieldChange,
+	outcomeChanges,
 	outputChanges,
+	ruleChanges,
 	takesSuggestion,
 	type WriteChange,
 	writeChanges,
