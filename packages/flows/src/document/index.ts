@@ -16,6 +16,7 @@ export {
 	type FlowOutputDef,
 	type FlowSection,
 	type FlowVariableDef,
+	flowInputSchema,
 	flowSchema,
 	flowVariableSchema,
 	type Outcome,

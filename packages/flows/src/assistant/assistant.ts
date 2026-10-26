@@ -7,7 +7,8 @@
  *
  * Two shapes of help share these types:
  * - a suggestion for one field of one node (its prompt, its output schema,
- *   its variable writes), asked from a popover next to the field;
+ *   its outcomes, its command, ...) or of the flow itself (its description,
+ *   its inputs), asked from a popover next to the field;
  * - a chat about the whole flow, which answers in text and may propose a
  *   new version of the flow.
  *
@@ -17,20 +18,53 @@
  */
 import { z } from "zod";
 
-import { type Flow, flowSchema, flowVariableSchema } from "../document";
+import {
+	type Flow,
+	flowInputSchema,
+	flowSchema,
+	flowVariableSchema,
+} from "../document";
 import {
 	agentNodeSchema,
 	flowNameSchema,
 	jsonSchemaSchema,
+	labelSchema,
 	nodeIdSchema,
+	option,
 	variableWriteSchema,
 } from "../nodes";
 import type { FlowIssue } from "../validate";
 
-/** What a suggestion fills in: the node's prompt, its output schema, or its variable writes (`set`). */
-export const suggestionKinds = ["prompt", "output", "set"] as const;
+/**
+ * What a suggestion fills in. Of a node: its prompt, its output schema, its
+ * variable writes (`set`), an Agent's own outcomes or a Decision's options
+ * (`outcomes`), a Decision's rules, a Value's expression, a Command's or a
+ * Wait's command, an Agent checker's brief (`checker`), a Tool's
+ * arguments. Of the flow: its description and its inputs.
+ */
+export const suggestionKinds = [
+	"prompt",
+	"output",
+	"set",
+	"outcomes",
+	"rules",
+	"expression",
+	"command",
+	"checker",
+	"arguments",
+	"description",
+	"inputs",
+] as const;
 export const suggestionKindSchema = z.enum(suggestionKinds);
 export type SuggestionKind = z.infer<typeof suggestionKindSchema>;
+
+/** The kinds that fill a field of the flow itself: they take no node. */
+const flowKinds: readonly SuggestionKind[] = ["description", "inputs"];
+
+/** Whether a suggestion of `kind` fills a field of the flow, not of a node. */
+export function isFlowSuggestion(kind: SuggestionKind): boolean {
+	return flowKinds.includes(kind);
+}
 
 /** A part of a text field, by character offsets: `start` up to, not including, `end`. */
 export const textRangeSchema = z.object({
@@ -82,19 +116,32 @@ const flowInEditor = {
 	...assistantAgentSchema.shape,
 };
 
-/** A request for one suggestion for one field of one node. */
+/** A request for one suggestion for one field of one node, or of the flow. */
 export const suggestionRequestSchema = z
 	.object({
 		...flowInEditor,
-		nodeId: nodeIdSchema,
+		/** The node whose field it fills. Unset for a field of the flow (`isFlowSuggestion`). */
+		nodeId: nodeIdSchema.optional(),
 		kind: suggestionKindSchema,
 		/** What the person asks for, in their words. Empty: the assistant's best guess. */
 		instruction: z.string().max(4000).default(""),
 		/** `prompt` only: the part of the prompt to rewrite. Unset: the whole prompt. */
 		selection: textRangeSchema.optional(),
+		/**
+		 * `arguments` only: the tool's input schema, as its MCP server lists it
+		 * to the editor. Unset: the server did not answer.
+		 */
+		toolSchema: jsonSchemaSchema.optional(),
 	})
 	.refine(isCompleteAgent, INCOMPLETE_AGENT);
 export type SuggestionRequest = z.infer<typeof suggestionRequestSchema>;
+
+/** An outcome or an option of a suggestion, and the one it replaces. */
+const suggestedOutcomeSchema = option.extend({
+	/** The node's outcome this one replaces: its edges move to this one. */
+	from: labelSchema.optional(),
+});
+export type SuggestedOutcome = z.infer<typeof suggestedOutcomeSchema>;
 
 /** One suggestion. `note` says in one or two sentences what it did and why. */
 export const suggestionSchema = z.discriminatedUnion("kind", [
@@ -116,6 +163,57 @@ export const suggestionSchema = z.discriminatedUnion("kind", [
 		set: z.array(variableWriteSchema),
 		/** Variables the writes need that the flow does not declare yet. */
 		variables: z.array(flowVariableSchema),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("outcomes"),
+		/** An Agent's own outcomes or a Decision's options: they replace the node's. */
+		outcomes: z.array(suggestedOutcomeSchema).min(1),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("rules"),
+		/**
+		 * A Decision's rules, by option. An option left out keeps its rule;
+		 * an empty `when` drops it (the default option).
+		 */
+		rules: z.array(z.object({ option: labelSchema, when: z.string() })),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("expression"),
+		/** A Value node's JSONata expression. */
+		expression: z.string(),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("command"),
+		/** A Command node's command, or the command a Wait node runs until it passes. */
+		command: z.string(),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("checker"),
+		/** What the model that picks an Agent's outcome looks for. */
+		text: z.string(),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("arguments"),
+		/** A Tool node's arguments, a template each: they replace the node's. */
+		arguments: z.record(z.string(), z.string()),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("description"),
+		/** The flow's description: what it does, in one or two lines. */
+		description: z.string(),
+		note: z.string(),
+	}),
+	z.object({
+		kind: z.literal("inputs"),
+		/** The flow's inputs: they replace its inputs. */
+		inputs: z.array(flowInputSchema),
 		note: z.string(),
 	}),
 ]);

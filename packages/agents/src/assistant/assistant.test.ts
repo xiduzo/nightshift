@@ -8,7 +8,7 @@ import {
 } from "@nightshift/flows";
 import { type FakeScript, fakeHarness } from "../testing/fake";
 import { activityOf, bareToolName } from "./activity";
-import { dataReaders, scopeList, suggestionPrompt } from "./prompts";
+import { dataReaders, scopeList } from "./prompts";
 import {
 	type AssistantSessionEvent,
 	runAssistantSession,
@@ -21,6 +21,7 @@ import {
 	suggestField,
 	suggestionDataSchema,
 } from "./suggest";
+import { suggestionPrompt } from "./suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
 	version: 5,

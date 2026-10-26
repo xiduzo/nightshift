@@ -1,5 +1,5 @@
 /**
- * A suggestion for one field of one node: one read-only session that
+ * A suggestion for one field of one node, or of the flow: one read-only session that
  * answers with a step report whose `data` is the suggestion. The answer is
  * checked on the draft as the person would get it; an answer that does not
  * pass is sent back once with its problems, in the same session.
@@ -9,17 +9,22 @@ import {
 	type AssistantUsage,
 	applySuggestion,
 	type FlowNode,
+	isFlowSuggestion,
+	nodeOutcomes,
 	proposalIssues,
 	type Suggestion,
 	type SuggestionEvent,
 	type SuggestionKind,
 	type SuggestionRequest,
 	suggestionSchema,
+	takesSuggestion,
 } from "@nightshift/flows";
 import { z } from "zod";
 import type { AgentHarness } from "../port";
-import { retryPrompt, suggestionPrompt } from "./prompts";
+import { readProjectFacts } from "./project-facts";
+import { retryPrompt } from "./prompts";
 import { type AssistantReport, runAssistantSession } from "./session";
+import { suggestionPrompt } from "./suggestion-prompt";
 
 /** How many times the agent may answer: once, and once more with the problems. */
 export const SUGGESTION_ATTEMPTS = 2;
@@ -53,40 +58,112 @@ export function suggestionDataSchema(
 	return schema;
 }
 
+/** The field of a node a kind fills, in "A Command node has no … to suggest". */
 const NODE_FIELD: Record<SuggestionKind, string> = {
 	prompt: "a prompt",
 	output: "output data",
 	set: "variable writes",
+	outcomes: "outcomes",
+	rules: "rules (a rule must decide it)",
+	expression: "expression (a rule must make it)",
+	command: "command",
+	checker: "model that picks its outcome",
+	arguments: "tool to call yet",
+	description: "description",
+	inputs: "inputs",
 };
 
 /** Why a suggestion of this kind cannot be made for this node, or null. */
 export function cannotSuggest(
 	request: Pick<SuggestionRequest, "flow" | "nodeId" | "kind">,
 ): string | null {
+	if (isFlowSuggestion(request.kind)) return null;
 	const node = request.flow.nodes.find((n) => n.id === request.nodeId);
 	if (!node) {
-		return `The flow has no step "${request.nodeId}". Save or reload the flow, then try again.`;
+		return `The flow has no step "${request.nodeId ?? ""}". Save or reload the flow, then try again.`;
 	}
-	if (!suggestsFor(node, request.kind)) {
+	if (!takesSuggestion(node, request.kind)) {
 		return `A ${nodeLabel(node)} node has no ${NODE_FIELD[request.kind]} to suggest.`;
 	}
 	return null;
 }
 
-/** Whether a suggestion of `kind` fills a field `node` has: as `applySuggestion` applies it. */
-function suggestsFor(node: FlowNode, kind: SuggestionKind): boolean {
-	switch (kind) {
+/** The problems a suggestion of one kind has on its own, before the flow's checks. */
+function kindProblems(
+	request: SuggestionRequest,
+	suggestion: Suggestion,
+): string[] {
+	const node = request.flow.nodes.find((n) => n.id === request.nodeId);
+	switch (suggestion.kind) {
 		case "prompt":
-			return (
-				node.type === "agent" ||
-				node.type === "decision" ||
-				node.type === "value"
-			);
+		case "checker":
+			return suggestion.text.trim() === "" ? ["`text` is empty."] : [];
 		case "output":
-			return node.type === "agent" || node.type === "value";
-		case "set":
-			return true;
+			return suggestion.output.type !== "object"
+				? ['`output` must be a JSON Schema with `"type": "object"`.']
+				: [];
+		case "expression":
+			return suggestion.expression.trim() === ""
+				? ["`expression` is empty."]
+				: [];
+		case "command":
+			return suggestion.command.trim() === "" ? ["`command` is empty."] : [];
+		case "description":
+			return suggestion.description.trim() === ""
+				? ["`description` is empty."]
+				: [];
+		case "outcomes": {
+			const current = node ? nodeOutcomes(node) : [];
+			return suggestion.outcomes
+				.filter((o) => o.from !== undefined && !current.includes(o.from))
+				.map(
+					(o) =>
+						`\`${o.name}\`: \`from\` is "${o.from}", which is not an outcome of this node. Use one of ${current.map((n) => `\`${n}\``).join(", ")}, or leave \`from\` out.`,
+				);
+		}
+		case "rules": {
+			const options =
+				node?.type === "decision" ? node.options.map((o) => o.name) : [];
+			return suggestion.rules
+				.filter((rule) => !options.includes(rule.option))
+				.map(
+					(rule) =>
+						`"${rule.option}" is not an option of this node. Use one of ${options.map((n) => `\`${n}\``).join(", ")}.`,
+				);
+		}
+		case "arguments":
+			return argumentProblems(request.toolSchema, suggestion.arguments);
+		default:
+			return [];
 	}
+}
+
+/** The required arguments a call leaves out, and the ones the tool does not take. */
+function argumentProblems(
+	schema: Record<string, unknown> | undefined,
+	args: Record<string, string>,
+): string[] {
+	const properties =
+		schema?.properties && typeof schema.properties === "object"
+			? Object.keys(schema.properties)
+			: null;
+	if (!properties) return [];
+	const required = Array.isArray(schema?.required)
+		? schema.required.filter((n): n is string => typeof n === "string")
+		: [];
+	return [
+		...required
+			.filter((name) => (args[name] ?? "").trim() === "")
+			.map((name) => `The argument \`${name}\` is required. Give it a value.`),
+		...(schema?.additionalProperties === true
+			? []
+			: Object.keys(args)
+					.filter((name) => !properties.includes(name))
+					.map(
+						(name) =>
+							`The tool takes no argument \`${name}\`. Use one of ${properties.map((n) => `\`${n}\``).join(", ")}.`,
+					)),
+	];
 }
 
 function nodeLabel(node: FlowNode): string {
@@ -127,13 +204,7 @@ export function checkSuggestion(
 		};
 	}
 	let suggestion = parsed.data;
-	const problems: string[] = [];
-	if (suggestion.kind === "prompt" && suggestion.text.trim() === "") {
-		problems.push("`text` is empty.");
-	}
-	if (suggestion.kind === "output" && suggestion.output.type !== "object") {
-		problems.push('`output` must be a JSON Schema with `"type": "object"`.');
-	}
+	const problems: string[] = kindProblems(request, suggestion);
 	if (suggestion.kind === "set") {
 		// A variable the flow declares keeps its own definition.
 		const declared = new Set(
@@ -200,7 +271,9 @@ export async function* suggestField(
 		return;
 	}
 	const output = suggestionDataSchema(request.kind);
-	const first = suggestionPrompt(request);
+	// A command is only as good as the scripts it names: read them first.
+	const facts = request.kind === "command" ? await readProjectFacts(cwd) : null;
+	const first = suggestionPrompt(request, facts);
 	let spent: AssistantUsage | null = null;
 	let sessionId: string | null = null;
 	let problems: string[] = [];

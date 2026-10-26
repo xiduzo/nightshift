@@ -7,9 +7,12 @@
 export {
 	applySuggestion,
 	type Change,
+	type NamedChange,
 	newVariables,
+	type OutcomeChange,
 	type OutputFieldChange,
 	outputChanges,
+	takesSuggestion,
 	type WriteChange,
 	writeChanges,
 } from "./apply";
@@ -22,6 +25,8 @@ export {
 	type ChatRequest,
 	chatRequestSchema,
 	type FlowProposal,
+	isFlowSuggestion,
+	type SuggestedOutcome,
 	type Suggestion,
 	type SuggestionEvent,
 	type SuggestionKind,

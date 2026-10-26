@@ -20,7 +20,7 @@ export const assistant = {
 	suggest: ownerProcedure
 		.route({
 			summary:
-				"Streams a suggestion for one field of one node of a flow: its prompt, its output schema or its variable writes.",
+				"Streams a suggestion for one field of a flow or of one of its nodes: a prompt, output data, variables, outcomes, rules, a command, tool arguments, the description or the inputs.",
 		})
 		.input(suggestionRequestSchema)
 		.output(stream(suggestionEventSchema))

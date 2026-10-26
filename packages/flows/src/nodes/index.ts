@@ -75,6 +75,7 @@ export {
 export {
 	type Option,
 	type OutcomeColor,
+	option,
 	optionProblem,
 	outcomeColorSchema,
 	outcomeColors,
