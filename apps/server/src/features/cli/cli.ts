@@ -20,6 +20,7 @@ import {
 } from "./embedded";
 import { healthCommand } from "./health";
 import { adminCommand, joinCommand, pairCommand } from "./join";
+import { mcpCommand } from "./mcp";
 
 /**
  * `nightshift`: Night Shift without a window, for a server or any computer
@@ -36,6 +37,9 @@ Usage:
   nightshift admin --email <email>          Set how the Host admin signs in from
                                             another computer. --reset-two-factor
                                             also turns two-factor sign-in off.
+  nightshift mcp [--project <project>]     Serve the flow tools to an agent in a terminal
+                                            (MCP on stdio). Night Shift must run here.
+                                            Claude Code: claude mcp add nightshift -- nightshift mcp
   nightshift health [--restart]             Exit code 0 when Night Shift runs here, else 1.
                                             --restart stops a Night Shift that does not
                                             respond, so that its service manager starts it
@@ -205,6 +209,8 @@ export async function main(argv: string[]) {
 			return adminCommand(rest, "nightshift admin");
 		case "health":
 			return healthCommand(rest, "nightshift health");
+		case "mcp":
+			return mcpCommand(rest, "nightshift mcp");
 		// Not in the help: the pi harness of the binary starts it (embeddedPiAcp).
 		case PI_ACP_COMMAND: {
 			const { runPiAcp } = await import("@nightshift/agents");

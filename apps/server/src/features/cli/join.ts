@@ -18,10 +18,11 @@ import { RPCLink } from "@orpc/client/fetch";
  */
 
 /** Night Shift on this computer: plain http on the loopback, also when it serves https:// to others. */
-export function defaultDaemonUrl(): string {
+export function defaultDaemonUrl(
+	env: Record<string, string | undefined> = process.env,
+): string {
 	return (
-		process.env.NIGHTSHIFT_DAEMON_URL ??
-		`http://localhost:${process.env.PORT || DEFAULT_PORT}`
+		env.NIGHTSHIFT_DAEMON_URL ?? `http://localhost:${env.PORT || DEFAULT_PORT}`
 	);
 }
 

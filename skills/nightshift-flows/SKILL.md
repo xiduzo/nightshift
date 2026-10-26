@@ -13,11 +13,19 @@ Night Shift runs flows: graphs of steps (agents, shell commands, tools, decision
 2. **Look names up, do not invent them.** A node may name an Agent Profile, a connection, a CLI tool, a skill or another flow. Use only ones that exist: `list_profiles`, `list_tools` and `list_skills` of the `nightshift` MCP server, or ask the person.
 3. **Draw the whole flow.** Write the complete JSON document, not a patch. Keep the ids of nodes and edges you do not change, so the person sees a small diff.
 4. **Check it.** Send it to `check_flow` and fix every error. A warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below.
-5. **Hand it over.** `propose_flow` shows it to the person, who applies or discards it. Never save over a flow the person did not ask you to change.
+5. **Hand it over.** In the flow editor, `propose_flow` shows it to the person, who applies or discards it. In a terminal, `save_flow` saves it. Never save over a flow the person did not ask you to change.
 
 Ask the person when the goal is not clear: what starts the flow, what it must make, and where a person must approve.
 
 In the flow editor, `get_draft` gives the flow as the person has it now, saved or not: base every change on it. To fix a flow after a failed run, call `get_run` first (the run's status, its steps and the end of the failed step's transcript), explain what went wrong, then propose the change that prevents it.
+
+In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. Night Shift must run on this computer.
+
+- `list_projects`: the projects, with the one of your folder marked `current`. Every other tool works in that project, or in the one you name in `project`.
+- `list_flows`, `get_flow`, `list_profiles`, `list_tools`, `list_skills`, `check_flow`: as in the editor. Give `check_flow` the `name` you will save under.
+- `save_flow` (`name`, `flow`): checks the flow and saves it. A flow with errors is refused.
+- `start_run` (`flow`, `inputs`): starts a saved flow on this computer, and gives the link where the person follows it.
+- `list_runs`, then `get_run` (`run`): what a run did, and where it failed.
 
 <!-- Generated from flowAuthoringGuide() in packages/flows. Do not edit below this line. -->
 

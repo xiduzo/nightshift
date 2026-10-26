@@ -174,13 +174,53 @@ of the VISION goals, without a model ever changing a graph at run time.
 
 ## 5. The same tools from the terminal
 
-Serve the authoring tools also as an MCP server, `nightshift mcp`, with the
-`nightshift-flows` skill. Then Claude Code in a terminal can draw, check and
-save a flow and start a run, and the in-app helper and the terminal share one
-set of tools. It is the cheapest slice of all (no UI) and a good test of the
-tools before the panel exists. It needs a decision on how a terminal agent
-proves it may write this computer's flows (the Device's owner session, or a
-token from Settings).
+Status: built (2026-10-26).
+
+`nightshift mcp` serves the authoring tools as an MCP server on stdio, with the
+`nightshift-flows` skill. Claude Code (or any agent with MCP) in a terminal can
+draw, check and save a flow and start a run, with the tools the chat in the
+editor uses.
+
+### Use Night Shift from your terminal
+
+Night Shift must run on this computer (the desktop app, `nightshift serve` or
+`bun run dev`). Add the server once:
+
+```bash
+claude mcp add nightshift -- nightshift mcp
+# from source, with the dev daemon on port 3000 and the web UI on 3001:
+claude mcp add nightshift -- bun /path/to/nightshift/apps/server/src/cli.ts mcp --ui http://localhost:3001
+```
+
+Start Claude Code in a project's folder and ask for a flow. The tools work in
+the project whose Clone holds that folder. `--project <id, name or folder>`
+picks another one, and each tool takes a `project` argument too
+(`list_projects`). `--daemon <address>` (`NIGHTSHIFT_DAEMON_URL`) is where
+Night Shift runs, default `http://localhost:$PORT`. `--ui <address>`
+(`NIGHTSHIFT_UI_URL`) is where the links of runs and flows open, default the
+daemon's address. Use `bun …/cli.ts mcp`, not `bun run --cwd apps/server`:
+that changes the folder the server sees.
+
+### How it works
+
+- **Over the API, as this computer's owner.** The server is a client of the
+  running daemon (`/rpc`, like `nightshift join`). A request from this
+  computer gets the local session, so the terminal agent proves nothing
+  else: it can do what the person at this computer can. It starts no daemon
+  and opens no database. When no daemon answers, every tool says "Night Shift
+  is not running on this computer. Start it, then try again."
+- **One tool set.** `terminalTools` (`packages/agents/src/assistant/terminal.ts`)
+  keeps the names of the editor's tools: `list_flows`, `get_flow`,
+  `list_profiles`, `list_tools`, `list_skills`, `check_flow` and `get_run`
+  (the same run report, read with the daemon's `chatRun`). A terminal has
+  no draft and nobody who watches a proposal, so instead of `get_draft` and
+  `propose_flow` it has `save_flow` (checks with `proposalIssues` and refuses
+  on any error, then `flows.save`), `start_run` (`runs.start`, with the
+  run's link), `list_runs` and `list_projects`. No new API procedure was
+  needed.
+- **The server** (`serveTools` in `packages/agents/src/assistant/mcp.ts`)
+  lists any TanStack tool definitions over MCP and turns a thrown error into
+  an error result. The subcommand is `apps/server/src/features/cli/mcp.ts`.
 
 ## 6. Order of work
 

@@ -10,6 +10,7 @@ export type {
 	DesktopWindow,
 	DesktopWindowState,
 } from "@nightshift/notifications";
+export { type ChatSpace, chatRun } from "./assistant";
 export type {
 	Daemon,
 	DaemonInfo,
