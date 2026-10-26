@@ -30,6 +30,7 @@ import type { CalledFlowSupport } from "./called-flow-fields";
 import { CommandFields } from "./command-fields";
 import { DecisionFields } from "./decision-fields";
 import { EndFields } from "./end-fields";
+import { JoinFields } from "./join-fields";
 import { ToolFields } from "./tool-fields";
 import { ValueFields } from "./value-fields";
 import { WaitFields } from "./wait-fields";
@@ -253,6 +254,17 @@ export function NodeInspector({
 					/>
 				) : null}
 
+				{node.type === "join" ? (
+					<JoinFields
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "join" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
 				{node.type === "agent" ? (
 					<AgentAdvanced
 						node={node}
@@ -284,9 +296,10 @@ export function NodeInspector({
 					</InspectorSection>
 				) : null}
 
-				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End takes no time. */}
+				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End and a Join take no time. */}
 				{(node.type === "decision" && node.by === "person") ||
-				node.type === "end" ? null : (
+				node.type === "end" ||
+				node.type === "join" ? null : (
 					<InspectorSection
 						title="Limits"
 						tab="setup"

@@ -91,6 +91,8 @@ export type EdgeSegment = {
 	/** The colour the source node gives the outcome, if any. */
 	color?: OutcomeColor;
 	max?: number;
+	/** One edge of a fan-out: the run takes it at the same time as the others on its outcome. */
+	parallel?: boolean;
 	/** The source node shows this outcome as a row with its own handle. */
 	onNode: boolean;
 	hasError?: boolean;
@@ -103,7 +105,8 @@ export type EdgeSegment = {
 /** One segment of a label: the outcome, its max, and how often it was taken. */
 export function segmentText(segment: EdgeSegment): string {
 	const outcome = outcomeLabel(segment.outcome);
-	const label = segment.from ? `${segment.from}.${outcome}` : outcome;
+	const named = segment.from ? `${segment.from}.${outcome}` : outcome;
+	const label = segment.parallel ? `${named}, at once` : named;
 	const { max, traversals } = segment;
 	if (traversals === undefined) return max ? `${label} ×${max}` : label;
 	if (traversals > 0)
@@ -130,6 +133,7 @@ export function labelAtRest(segments: readonly EdgeSegment[]): boolean {
 		segments.some(
 			(segment) =>
 				segment.max !== undefined ||
+				segment.parallel ||
 				!segment.onNode ||
 				segment.hasError ||
 				(segment.traversals ?? 0) > 0,
@@ -143,12 +147,21 @@ export function labelAtRest(segments: readonly EdgeSegment[]): boolean {
  * a folded Section holds edges of several nodes.
  */
 export function groupSegments(
-	flow: Pick<Flow, "nodes">,
+	flow: Pick<Flow, "nodes" | "edges">,
 	group: EdgeGroup,
 ): EdgeSegment[] {
 	return group.edges.map((edge) => {
 		const source = flow.nodes.find((node) => node.id === edge.from);
 		const boxed = edge.from !== group.from;
+		// Two or more edges without a max on one outcome run at once.
+		const parallel =
+			edge.max === undefined &&
+			flow.edges.filter(
+				(other) =>
+					other.from === edge.from &&
+					other.outcome === edge.outcome &&
+					other.max === undefined,
+			).length > 1;
 		return {
 			id: edge.id,
 			outcome: edge.outcome,
@@ -158,6 +171,7 @@ export function groupSegments(
 			}),
 			color: source ? outcomeColor(source, edge.outcome) : undefined,
 			max: edge.max,
+			...(parallel && { parallel }),
 			// A folded Section's box shows a row for each node and outcome.
 			onNode:
 				boxed ||

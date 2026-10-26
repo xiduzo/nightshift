@@ -121,6 +121,16 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 			["fail", "It reported an error"],
 		]);
 	}
+	if (node.type === "join") {
+		return new Map([
+			[
+				"done",
+				node.wait === "first"
+					? "The first branch arrived"
+					: "Every branch arrived",
+			],
+		]);
+	}
 	if (node.type === "command") {
 		return new Map(
 			commandExits(node).map((exit) => [
@@ -563,4 +573,5 @@ export const nodeTypes: NodeTypes = {
 	wait: FlowNodeCard,
 	tool: FlowNodeCard,
 	end: FlowNodeCard,
+	join: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

@@ -22,6 +22,7 @@ const PALETTE: PaletteItem[] = [
 	"value",
 	"wait",
 	"call",
+	"join",
 	"end",
 ];
 

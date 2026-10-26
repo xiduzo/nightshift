@@ -62,7 +62,7 @@ export type FlowCanvasEdge = Edge<OutcomeEdgeData, "outcome">;
  * when the book has one that still holds.
  */
 export function canvasEdges(
-	flow: Pick<Flow, "nodes">,
+	flow: Pick<Flow, "nodes" | "edges">,
 	groups: readonly EdgeGroup[],
 	{
 		routes = {},

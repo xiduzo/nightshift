@@ -128,4 +128,23 @@ describe("labels", () => {
 			["gone", false],
 		]);
 	});
+
+	test("marks the edges of a fan-out: they run at once, and the label says so at rest", () => {
+		const flow = flowOf([edge("a", "success", "b"), edge("a", "success", "c")]);
+		const segments = groupEdges(flow).flatMap((group) =>
+			groupSegments(flow, group),
+		);
+		expect(segments.map((s) => s.parallel)).toEqual([true, true]);
+		expect(labelText(segments.slice(0, 1))).toBe("success, at once");
+		expect(labelAtRest(segments.slice(0, 1))).toBe(true);
+		const tried = flowOf([
+			edge("a", "success", "b", 2),
+			edge("a", "success", "c"),
+		]);
+		expect(
+			groupEdges(tried).flatMap((group) =>
+				groupSegments(tried, group).map((s) => s.parallel ?? false),
+			),
+		).toEqual([false, false]);
+	});
 });

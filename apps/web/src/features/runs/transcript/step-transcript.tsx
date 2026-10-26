@@ -401,6 +401,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	wait: "Waiting…",
 	tool: "Calling the tool…",
 	end: "Ending the run…",
+	join: "Waiting for the branches…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({

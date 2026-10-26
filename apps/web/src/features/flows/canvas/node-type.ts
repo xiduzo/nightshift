@@ -13,6 +13,7 @@ import {
 	HandIcon,
 	HourglassIcon,
 	type LucideIcon,
+	MergeIcon,
 	PlugIcon,
 	RepeatIcon,
 	SparklesIcon,
@@ -65,6 +66,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: "End",
 		icon: FlagIcon,
 		blurb: "Ends the run with a result and one line for you.",
+	},
+	join: {
+		label: "Join",
+		icon: MergeIcon,
+		blurb: "Waits for branches that run at once, then goes on.",
 	},
 };
 
