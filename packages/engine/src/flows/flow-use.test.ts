@@ -46,6 +46,8 @@ describe("flowUse", () => {
 						description: null,
 						nodeCount: 3,
 						errorCount: 0,
+						inputs: [],
+						callers: [],
 					},
 					{
 						name: "day",
@@ -53,6 +55,8 @@ describe("flowUse", () => {
 						description: null,
 						nodeCount: 1,
 						errorCount: 0,
+						inputs: [],
+						callers: [],
 					},
 					{
 						name: "broken",
@@ -60,6 +64,8 @@ describe("flowUse", () => {
 						description: null,
 						nodeCount: null,
 						errorCount: 1,
+						inputs: [],
+						callers: [],
 					},
 				];
 			},

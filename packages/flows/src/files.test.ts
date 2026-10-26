@@ -128,6 +128,8 @@ describe("listFlowFiles", () => {
 				description: "A quick fix",
 				nodeCount: 1,
 				errorCount: 1,
+				inputs: [],
+				callers: [],
 			},
 			{
 				name: "broken",
@@ -135,6 +137,8 @@ describe("listFlowFiles", () => {
 				description: null,
 				nodeCount: null,
 				errorCount: 1,
+				inputs: [],
+				callers: [],
 			},
 			{
 				name: "zeta",
@@ -142,6 +146,8 @@ describe("listFlowFiles", () => {
 				description: "A quick fix",
 				nodeCount: 1,
 				errorCount: 0,
+				inputs: [],
+				callers: [],
 			},
 		]);
 	});
@@ -282,6 +288,16 @@ describe("calls between flow files", () => {
 				}),
 			]);
 		}
+	});
+
+	test("the list says what each flow asks for and which flows run it", async () => {
+		await writeFlowFile(repo, "trace", body());
+		await writeFlowFile(repo, "night", outer("trace"));
+		const listed = await listFlowFiles(repo);
+		expect(listed.map((f) => [f.name, f.inputs, f.callers])).toEqual([
+			["night", [], []],
+			["trace", [{ name: "item", type: "json", required: true }], ["night"]],
+		]);
 	});
 
 	test("writeFlowFile checks the called flow against the repo's flows", async () => {

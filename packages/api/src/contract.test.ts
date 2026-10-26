@@ -291,6 +291,7 @@ describe("replies of a real engine", () => {
 			flow: tools,
 		});
 		await read(appRouter.flows.list, { projectId });
+		await read(appRouter.flows.map, { projectId });
 		await read(appRouter.flows.get, { projectId, name: "night" });
 
 		// Sections round-trip, and a Section issue names its Section.

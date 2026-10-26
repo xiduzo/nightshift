@@ -28,6 +28,10 @@ export const flowListItemSchema = exact<FlowListItem>()(
 		/** Null when the file is not a valid flow. */
 		nodeCount: z.number().nullable(),
 		errorCount: z.number(),
+		/** What a run of it asks for. Empty when the file is not a valid flow. */
+		inputs: flowSchema.shape.inputs,
+		/** The flows whose Subflow nodes run this one. */
+		callers: z.array(z.string()),
 	}),
 );
 

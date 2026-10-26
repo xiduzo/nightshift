@@ -1,9 +1,4 @@
-import {
-	callersOf,
-	type FlowInputDef,
-	flowNameSchema,
-	newFlow,
-} from "@nightshift/flows";
+import { type FlowInputDef, flowNameSchema, newFlow } from "@nightshift/flows";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -75,7 +70,6 @@ import { PageHeading } from "@/shared/page";
 
 import { flowMutations, flowQueries } from "./queries";
 import { StartRunDialog } from "./start/start-run-dialog";
-import { useProjectFlows } from "./use-project-flows";
 
 /**
  * The project's flow files as a grid of cards: name, description, inputs and
@@ -83,9 +77,8 @@ import { useProjectFlows } from "./use-project-flows";
  */
 export function FlowList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
+	// Each flow with its inputs, and which flows call it.
 	const flows = useQuery(flowQueries.list(projectId));
-	// Each flow's inputs, and which flows call it.
-	const loaded = useProjectFlows(projectId);
 	const [creating, setCreating] = useState(false);
 	const [toDelete, setToDelete] = useState<FlowListItem | null>(null);
 	// The flow to start. Kept after the dialog closes, so it does not empty while it fades.
@@ -156,16 +149,14 @@ export function FlowList({ projectId }: { projectId: string }) {
 							key={flow.name}
 							projectId={projectId}
 							flow={flow}
-							inputs={loaded.flows?.[flow.name]?.inputs}
-							callers={loaded.flows ? callersOf(flow.name, loaded.flows) : []}
+							inputs={flow.inputs}
+							callers={flow.callers}
 							runBlockedBy={
 								flow.nodeCount === null
 									? "This flow does not load. Open it to see why."
 									: flow.errorCount > 0
 										? "Fix the errors in the editor first."
-										: loaded.flows === undefined
-											? "Loading the flow…"
-											: null
+										: null
 							}
 							onRun={() => setStarting({ name: flow.name, open: true })}
 							onDelete={() => setToDelete(flow)}
@@ -189,7 +180,10 @@ export function FlowList({ projectId }: { projectId: string }) {
 					}
 					projectId={projectId}
 					flowName={starting.name}
-					inputs={loaded.flows?.[starting.name]?.inputs ?? []}
+					inputs={
+						flows.data?.find((flow) => flow.name === starting.name)?.inputs ??
+						[]
+					}
 				/>
 			) : null}
 

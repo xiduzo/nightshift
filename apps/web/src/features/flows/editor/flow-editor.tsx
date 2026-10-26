@@ -146,6 +146,10 @@ function Editor({
 			void queryClient.invalidateQueries({
 				queryKey: flowQueries.lists(),
 			});
+			// Another flow of the project checks its Subflow nodes against this one.
+			void queryClient.invalidateQueries({
+				queryKey: flowQueries.map(projectId).queryKey,
+			});
 		},
 		[queryClient, projectId, name],
 	);

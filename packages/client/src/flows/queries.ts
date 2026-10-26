@@ -10,6 +10,9 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 		/** The flows of one project. */
 		list: (projectId: string) =>
 			orpc.flows.list.queryOptions({ input: { projectId } }),
+		/** Every flow file of a project by name: its flow, null when it is not valid. */
+		map: (projectId: string) =>
+			orpc.flows.map.queryOptions({ input: { projectId } }),
 		/** One flow file: the flow and its issues. */
 		get: (projectId: string, name: string) =>
 			orpc.flows.get.queryOptions({ input: { projectId, name } }),

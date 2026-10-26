@@ -3,6 +3,7 @@ import type {
 	FlowIssue,
 	FlowListItem,
 	LoadedFlow,
+	ProjectFlowMap,
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
@@ -97,6 +98,8 @@ export interface SpaceEngine {
 	 */
 	listFlows(projectId: string): Promise<FlowListItem[]>;
 	getFlow(projectId: string, name: string): Promise<LoadedFlow>;
+	/** Every flow file of a project by name: its flow, null when it does not load. One read for the editor. */
+	flowMap(projectId: string): Promise<ProjectFlowMap>;
 	/** Saves drafts with errors too. Returns the issues of the saved flow. */
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	deleteFlow(projectId: string, name: string): Promise<void>;

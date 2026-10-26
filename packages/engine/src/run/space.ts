@@ -231,6 +231,11 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.flowFiles.get(spaceId, projectId, name, actor?.personId);
 			},
 
+			async flowMap(projectId) {
+				await ready;
+				return deps.flowFiles.map(spaceId, projectId, actor?.personId);
+			},
+
 			async saveFlow(projectId, name, flow) {
 				await ready;
 				return deps.flowFiles.save(spaceId, projectId, name, flow);

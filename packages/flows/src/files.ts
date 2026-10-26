@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "./document";
+import { callersOf } from "./draft";
 import { flowNameSchema } from "./nodes";
 import {
 	SCHEDULES_VERSION,
@@ -72,6 +73,8 @@ export function listFlowSources(
 			nodeCount: loaded.flow?.nodes.length ?? null,
 			errorCount: loaded.issues.filter((issue) => issue.severity === "error")
 				.length,
+			inputs: loaded.flow?.inputs ?? [],
+			callers: callersOf(name, flows),
 		});
 	}
 	return items;

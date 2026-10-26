@@ -1,4 +1,4 @@
-import type { Flow } from "../document";
+import type { Flow, FlowInputDef } from "../document";
 
 /** One problem in a flow. A flow with any `error` cannot run. */
 export type FlowIssue = {
@@ -40,6 +40,10 @@ export type FlowListItem = FlowFile & {
 	/** Null when the file does not parse against the schema. */
 	nodeCount: number | null;
 	errorCount: number;
+	/** What a run of it asks for. Empty when the file does not parse. */
+	inputs: FlowInputDef[];
+	/** The flows whose Subflow nodes run this one, by name. */
+	callers: string[];
 };
 
 export type LoadedFlow = FlowFile & {

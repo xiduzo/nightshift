@@ -3,6 +3,7 @@ import type {
 	FlowIssue,
 	FlowListItem,
 	LoadedFlow,
+	ProjectFlowMap,
 } from "@nightshift/flows";
 import {
 	deleteFlowFile,
@@ -10,7 +11,9 @@ import {
 	listFlowFiles,
 	listFlowSources,
 	loadFlowSource,
+	parsedFlows,
 	readFlowFile,
+	readFlowSources,
 	writeFlowFile,
 } from "@nightshift/flows/files";
 
@@ -49,6 +52,20 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			return listFlowSources(
 				await deps.elsewhere(spaceId, projectId, personId),
 				"",
+			);
+		},
+
+		/** Every flow file of the project by name: its flow, null when it does not load. */
+		async map(
+			spaceId: string,
+			projectId: string,
+			personId: string | undefined,
+		): Promise<ProjectFlowMap> {
+			const row = await deps.find(projectId, spaceId);
+			return parsedFlows(
+				row.repoPath !== null
+					? await readFlowSources(row.repoPath)
+					: await deps.elsewhere(spaceId, projectId, personId),
 			);
 		},
 

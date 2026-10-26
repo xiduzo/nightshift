@@ -52,7 +52,6 @@ import {
 	type InputTexts,
 	jsonProblem,
 	missingInputs,
-	useProjectFlows,
 } from "@/features/flows";
 import { formatDayTime } from "@/shared/format";
 import { scheduleQueries } from "./queries";
@@ -165,7 +164,6 @@ function ScheduleForm({
 }) {
 	const id = useId();
 	const list = useQuery(flowQueries.list(projectId));
-	const project = useProjectFlows(projectId);
 	const flowNames = (list.data ?? []).map((flow) => flow.name);
 	const [flow, setFlow] = useState(schedule?.flow ?? "");
 	// Until the person picks one: the first flow that runs.
@@ -184,8 +182,8 @@ function ScheduleForm({
 	}));
 	const [baseRef, setBaseRef] = useState(schedule?.baseRef ?? "");
 
-	const inputs = project.flows?.[chosen]?.inputs ?? [];
 	const chosenItem = list.data?.find((item) => item.name === chosen);
+	const inputs = chosenItem?.inputs ?? [];
 	const cron = cronOf(when);
 	const cronProblem = cron === null ? null : cronError(cron);
 	const preview = useQuery({
