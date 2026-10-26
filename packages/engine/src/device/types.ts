@@ -153,6 +153,9 @@ export type SessionInput = Omit<
 	| "toolsPath"
 	| "env"
 	| "scrubEnv"
+	// The assistant's, not a run step's: it runs on this computer only.
+	| "tools"
+	| "readOnly"
 > & {
 	harness: AgentHarnessName;
 	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */

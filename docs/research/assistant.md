@@ -201,3 +201,30 @@ token from Settings).
 3. Can a Member of a shared Space use the helper on a Device they do not own,
    through an Offer? First version: owner only.
 4. Cost: show the turn's tokens and cost in the panel, as a run step does?
+
+### 7.1 Answer to question 1: read only, per harness (2026-10-26)
+
+The assistant does not rely on a permission prompt. Night Shift's own
+permission prompt on the bridge exists only for a Claude Code session with a
+sandbox policy, and nothing answers it at design time. Plan mode is not the
+answer either: Claude Code runs no MCP tool in plan mode, so the step report
+and the assistant's own tools would be lost.
+
+So the session runs in `default` mode with `readOnly: true` on
+`AgentSessionInput` (`packages/agents/src/session/read-only.ts`). Each harness
+makes that hold in its own way. Night Shift's bridged tools and the step
+report work on every harness except where noted.
+
+| Harness | How it stays read only | Strength |
+| --- | --- | --- |
+| Claude Code | `--permission-mode default`, `--disallowedTools Bash,Edit,MultiEdit,NotebookEdit,Write,Task,Agent` (a deny rule wins over the person's own allow rules in `~/.claude/settings.json`, which `default` alone would still apply), and `--strict-mcp-config` (no MCP server of the person's, only Night Shift's). Read, Glob and Grep need no permission. | Verified live with Haiku: asked to write a file and run `touch`, it found no tool for either, read the file and reported over the bridge. The folder had no new file afterwards. |
+| Codex | `default` maps to Codex's `read-only` sandbox, `approval_policy = never`. MCP tools run without approval. | Strong: the OS sandbox refuses writes. Untested live (no `codex` here). The person's own MCP servers in `~/.codex/config.toml` still load. |
+| OpenCode | `default` maps to permission rules that allow only `read`, `glob`, `grep`, `list`, `lsp`, the to-do list and skills, and deny everything else (`*` too, so the person's MCP tools are denied). `tanstack_*` stays allowed. | Strong, rule-based. |
+| Grok Build | `default` maps to a sandbox policy with `fileWrite: deny`. Reports in text: no bridged tools. | Rule-based, untested live. |
+| ACP agents (Copilot, Gemini, Cursor, custom) | `default` makes the adapter refuse every permission request. | As strong as the agent's own asking: an agent configured to run edits without asking can still write. Untested live. |
+| pi | pi asks no permission at all, so refusing does nothing. A read-only session starts pi through a temp script that runs `pi --tools read,grep,find,ls` (pi's own read-only mode). pi-acp drops MCP: pi reports in text and cannot get the assistant's own tools. | Strong for pi's built-in tools. A chat on pi has no authoring tools. |
+
+Night Shift itself still puts two short-lived files in the Clone during a
+Claude Code session (the bridge's `.tanstack-mcp-bridge-*.json` and the
+sandbox's `.tanstack-projected-*` marker) and removes them when the session
+ends. Grok Build writes `.grok/` and removes it when the project had none.

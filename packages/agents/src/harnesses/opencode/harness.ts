@@ -52,6 +52,7 @@ import {
 	freePort,
 	type HarnessSpec,
 	harnessSession,
+	readOnlyInput,
 } from "../../session";
 import { harnessFacts } from "../facts";
 import { adapterPermissionMode, opencodePermission } from "./permissions";
@@ -488,14 +489,16 @@ export function opencodeHarness(
 	return {
 		name: "opencode",
 		...harnessFacts("opencode"),
-		run: (input) =>
-			harnessSession({
+		run: (raw) => {
+			const input = readOnlyInput(raw);
+			return harnessSession({
 				input,
 				spec: OPENCODE_SPEC,
 				adapter: () => opencodeAdapter(input, options),
 				...(options.abortGraceMs !== undefined
 					? { abortGraceMs: options.abortGraceMs }
 					: {}),
-			}),
+			});
+		},
 	};
 }

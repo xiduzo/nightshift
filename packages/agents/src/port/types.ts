@@ -11,7 +11,17 @@ import type {
 	HarnessName,
 } from "@nightshift/flows";
 
+import type { AnyTool } from "@tanstack/ai";
+
 export type { AgentHarnessName, CustomHarnessName, DeciderName, HarnessName };
+
+/**
+ * A tool of Night Shift's own that a session gets over the shared tool
+ * bridge, next to `report_step`: a TanStack AI server tool
+ * (`toolDefinition(...).server(...)`). A type only: the light entries never
+ * load TanStack AI.
+ */
+export type BridgedTool = AnyTool;
 
 /** An MCP server for one session, with `${NAME}` already expanded by the engine. */
 export type McpServerConfig =
@@ -83,6 +93,21 @@ export type AgentSessionInput = {
 	 * when the file cannot be kept; the agent gets the error.
 	 */
 	saveArtifact?: (file: { path: string; title?: string }) => Promise<string>;
+	/**
+	 * Night Shift's own tools for this session, over the shared tool bridge
+	 * (the assistant's authoring tools). They are allowed without a prompt
+	 * in every mode but plan mode on a harness that runs no tools there
+	 * (Claude Code). A harness without MCP (pi) cannot offer them.
+	 */
+	tools?: readonly BridgedTool[];
+	/**
+	 * The session may read `cwd` but never change it: each harness takes
+	 * away its write and shell tools, or runs in its read-only sandbox (see
+	 * `readOnlyInput` in `session/read-only.ts`). Night Shift's own bridged
+	 * tools and the step report still work. It overrides `permissionMode`,
+	 * and drops `clis`, `toolsPath` and `saveArtifact`.
+	 */
+	readOnly?: boolean;
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
 };

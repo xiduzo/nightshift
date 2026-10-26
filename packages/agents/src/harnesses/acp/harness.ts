@@ -30,11 +30,12 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
+	readOnlyInput,
 	type SdkSignals,
 } from "../../session";
 import { harnessFacts } from "../facts";
 import { ACP_DEFAULT_MODEL, ACP_FACTS, type AcpAgentName } from "./facts";
-import { piAcpCommand } from "./pi";
+import { piAcpCommand, piReadOnly } from "./pi";
 import { type SessionConfig, withSessionConfig } from "./session-config";
 
 export type AcpAgent = {
@@ -70,6 +71,15 @@ export type AcpAgent = {
 		argv: string[];
 		env: Record<string, string>;
 	};
+	/**
+	 * How a read-only session starts it, for an agent that asks no
+	 * permission before it writes (pi): the executable to run instead of the
+	 * configured one, and what removes it afterwards. Without it, a
+	 * read-only session relies on the agent asking, and the adapter refusing.
+	 */
+	readOnly?: (
+		executable: string,
+	) => Promise<{ executable: string; cleanup: () => Promise<void> }>;
 };
 
 const modelFlag = (model: string | undefined) =>
@@ -107,6 +117,7 @@ export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
 			argv: options?.piAcp ?? piAcpCommand(),
 			env: { PI_ACP_PI_COMMAND: pi },
 		}),
+		readOnly: piReadOnly,
 	},
 };
 
@@ -267,14 +278,26 @@ async function acpAdapter(
 	}
 	const model = input.model !== ACP_DEFAULT_MODEL ? input.model : undefined;
 	const bySession = agent.model === "session";
-	const launch = agent.launch?.(options.executable, options) ?? {
-		argv: [options.executable],
-		env: {},
-	};
-	const env = {
-		...launch.env,
-		...(typeof options.env === "function" ? await options.env() : options.env),
-	};
+	const ownEnv =
+		typeof options.env === "function" ? await options.env() : options.env;
+	// A read-only session of an agent that never asks starts a copy of it
+	// with its read tools only.
+	const readOnly =
+		input.readOnly && agent.readOnly
+			? await agent.readOnly(options.executable)
+			: undefined;
+	const executable = readOnly?.executable ?? options.executable;
+	let launch: { argv: string[]; env: Record<string, string> };
+	try {
+		launch = agent.launch?.(executable, options) ?? {
+			argv: [executable],
+			env: {},
+		};
+	} catch (error) {
+		await readOnly?.cleanup();
+		throw error;
+	}
+	const env = { ...launch.env, ...ownEnv };
 	const command = [
 		...launch.argv,
 		...agent.args(
@@ -326,7 +349,7 @@ async function acpAdapter(
 		refusalMessage: `${agent.label} refused the request.`,
 		...(Object.keys(env).length > 0 ? { env } : {}),
 	})(input.model);
-	return { adapter };
+	return { adapter, ...(readOnly ? { cleanup: readOnly.cleanup } : {}) };
 }
 
 /** Runs sessions of one ACP agent on this computer, in `input.cwd`, with the user's own login. */
@@ -353,15 +376,17 @@ export function acpAgentHarness(
 		name,
 		label: agent.label,
 		takeOverCommand: () => null,
-		run: (input) =>
-			harnessSession({
+		run: (raw) => {
+			const input = readOnlyInput(raw);
+			return harnessSession({
 				input,
 				spec: acpSpec(name, agent),
 				adapter: () => acpAdapter(name, agent, input, options),
 				...(options.abortGraceMs !== undefined
 					? { abortGraceMs: options.abortGraceMs }
 					: {}),
-			}),
+			});
+		},
 	};
 }
 

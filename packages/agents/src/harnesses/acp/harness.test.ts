@@ -14,6 +14,7 @@ import {
 	customAcpHarness,
 	observeAcpEvent,
 } from "./harness";
+import { piReadOnlyScript } from "./pi";
 
 let dir: string;
 let cwd: string;
@@ -166,6 +167,23 @@ describe("acpHarness", () => {
 		expect(launch?.argv[1]).toEndWith("pi-acp/dist/index.js");
 		expect(launch?.env).toEqual({ PI_ACP_PI_COMMAND: "/opt/pi/bin/pi" });
 		expect(ACP_AGENTS.pi.args({ model: "m" })).toEqual([]);
+	});
+
+	test("a read-only pi session runs pi with its read tools only", async () => {
+		const readOnly = await ACP_AGENTS.pi.readOnly?.("/opt/pi bin/pi");
+		if (!readOnly) throw new Error("pi has no read-only start");
+		try {
+			const script = await Bun.file(readOnly.executable).text();
+			expect(script).toBe(piReadOnlyScript("/opt/pi bin/pi"));
+			expect(script).toContain(
+				"exec '/opt/pi bin/pi' --tools read,grep,find,ls \"$@\"",
+			);
+			const run = Bun.spawnSync(["sh", "-n", readOnly.executable]);
+			expect(run.exitCode).toBe(0);
+		} finally {
+			await readOnly.cleanup();
+		}
+		expect(await Bun.file(readOnly.executable).exists()).toBe(false);
 	});
 
 	test("a build that carries pi-acp inside starts it its own way", () => {

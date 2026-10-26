@@ -11,6 +11,7 @@ export type {
 	AgentHarnessName,
 	AgentSessionInput,
 	AgentUsage,
+	BridgedTool,
 	CostSource,
 	CustomHarnessName,
 	Decider,

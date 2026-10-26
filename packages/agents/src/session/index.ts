@@ -11,6 +11,7 @@ export {
 	type SessionReport,
 } from "./adapter-session";
 export { ARTIFACT_TOOL_NAME } from "./artifact-tool";
+export { readOnlyInput } from "./read-only";
 export { REPORT_TOOL_NAME } from "./step-report";
 export {
 	asNumber,

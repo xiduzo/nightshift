@@ -255,4 +255,5 @@ export const CLAUDE_CODE_PROFILE: HarnessProfile = {
 	createObserver: createClaudeCodeObserver,
 	reportToolId: REPORT_TOOL_ID,
 	artifactToolId: ARTIFACT_TOOL_ID,
+	bridgedToolId: (name) => `mcp__${BRIDGED_MCP_SERVER_NAME}__${name}`,
 };

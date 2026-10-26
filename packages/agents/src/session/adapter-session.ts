@@ -127,17 +127,51 @@ export type AdapterSetup = {
 export function sessionReport(
 	input: Pick<
 		AgentSessionInput,
+		"prompt" | "stepReport" | "permissionMode" | "saveArtifact" | "tools"
+	>,
+	spec: Pick<HarnessSpec, "report" | "profile">,
+	allowedTools?: string[],
+): SessionReport {
+	const own = withArtifactTool(input, spec, allowedTools);
+	// Night Shift's own tools ride the same bridge: only where tools run.
+	const extra = input.tools ?? [];
+	if (extra.length === 0 || effectiveMode(input, spec) === "plan") return own;
+	const ids = extra.flatMap((tool) => {
+		const id = spec.profile.bridgedToolId?.(tool.name);
+		return id ? [id] : [];
+	});
+	return {
+		prompt: own.prompt,
+		tools: [...own.tools, ...extra],
+		allowedTools:
+			ids.length > 0
+				? [...new Set([...(own.allowedTools ?? []), ...ids])]
+				: own.allowedTools,
+	};
+}
+
+/** The mode the report follows: the session's own, or what the harness's report channel needs. */
+function effectiveMode(
+	input: Pick<AgentSessionInput, "permissionMode">,
+	spec: Pick<HarnessSpec, "report">,
+): AgentSessionInput["permissionMode"] {
+	return spec.report === "by-mode"
+		? input.permissionMode
+		: spec.report === "tool"
+			? "default"
+			: "plan";
+}
+
+/** The step report and the artifact tool of one session. */
+function withArtifactTool(
+	input: Pick<
+		AgentSessionInput,
 		"prompt" | "stepReport" | "permissionMode" | "saveArtifact"
 	>,
 	spec: Pick<HarnessSpec, "report" | "profile">,
 	allowedTools?: string[],
 ): SessionReport {
-	const permissionMode =
-		spec.report === "by-mode"
-			? input.permissionMode
-			: spec.report === "tool"
-				? "default"
-				: "plan";
+	const permissionMode = effectiveMode(input, spec);
 	const report = stepReportSetup(
 		{ ...input, permissionMode },
 		allowedTools,

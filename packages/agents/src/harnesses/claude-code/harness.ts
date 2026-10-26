@@ -19,6 +19,7 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
+	readOnlyInput,
 	type SessionReport,
 } from "../../session";
 import { harnessFacts } from "../facts";
@@ -82,11 +83,40 @@ const KNOWN_REASONING_MODELS = new Set([
 export function claudeCommand(
 	executable: string | undefined,
 	mcpConfigPath?: string,
+	strictMcp = false,
 ): string {
 	return [
 		executable ?? "claude",
 		...(mcpConfigPath !== undefined ? ["--mcp-config", mcpConfigPath] : []),
+		// Only the servers of `--mcp-config` load: the session's and the bridge.
+		...(strictMcp ? ["--strict-mcp-config"] : []),
 	].join(" ");
+}
+
+/**
+ * The tools a read-only session never gets (`--disallowedTools`): every
+ * built-in tool that writes a file or runs a command, and subagents, which
+ * could. A deny rule wins over the person's own allow rules, which
+ * `--permission-mode default` alone would still apply. Read, Glob, Grep and
+ * the bridged tools stay.
+ */
+export const READ_ONLY_DISALLOWED = [
+	"Bash",
+	"Edit",
+	"MultiEdit",
+	"NotebookEdit",
+	"Write",
+	"Task",
+	"Agent",
+] as const;
+
+/** `--disallowedTools` of one session: the harness's own, and the read-only list. */
+export function claudeDisallowedTools(
+	input: Pick<AgentSessionInput, "readOnly">,
+	own: string[] | undefined,
+): string[] | undefined {
+	if (!input.readOnly) return own;
+	return [...new Set([...(own ?? []), ...READ_ONLY_DISALLOWED])];
 }
 
 /** Claude Code's `--mcp-config` JSON for the session's MCP servers. */
@@ -189,6 +219,7 @@ async function claudeCodeAdapter(
 	const { claudeCodeText } = await import("@tanstack/ai-claude-code");
 	const mcp = await writeMcpConfig(input.mcpServers);
 	const allowedTools = claudeAllowedTools(input, report.allowedTools);
+	const disallowedTools = claudeDisallowedTools(input, options.disallowedTools);
 	// Typed as `opus`, the model with every Effort level, so `chat()` accepts
 	// any `reasoning` level. The adapter gets the real id and clamps the level
 	// to that model's own levels at runtime.
@@ -200,10 +231,12 @@ async function claudeCodeAdapter(
 		settingSources: options.settingSources ?? ["user", "project", "local"],
 		emitDiff: false,
 		...(allowedTools ? { allowedTools } : {}),
-		...(options.disallowedTools
-			? { disallowedTools: options.disallowedTools }
-			: {}),
-		claudeExecutable: claudeCommand(options.claudeExecutable, mcp.path),
+		...(disallowedTools ? { disallowedTools } : {}),
+		claudeExecutable: claudeCommand(
+			options.claudeExecutable,
+			mcp.path,
+			input.readOnly === true,
+		),
 		env: {
 			...effortEnv(input.model, input.effort, (model) =>
 				KNOWN_REASONING_MODELS.has(model),
@@ -221,8 +254,9 @@ export function claudeCodeHarness(
 	return {
 		name: "claude-code",
 		...harnessFacts("claude-code"),
-		run: (input) =>
-			harnessSession({
+		run: (raw) => {
+			const input = readOnlyInput(raw);
+			return harnessSession({
 				input,
 				spec: CLAUDE_CODE_SPEC,
 				adapter: (report) => claudeCodeAdapter(input, options, report),
@@ -230,6 +264,7 @@ export function claudeCodeHarness(
 				...(options.abortGraceMs !== undefined
 					? { abortGraceMs: options.abortGraceMs }
 					: {}),
-			}),
+			});
+		},
 	};
 }

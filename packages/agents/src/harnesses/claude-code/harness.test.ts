@@ -12,8 +12,10 @@ import {
 	claudeAllowedTools,
 	claudeCodeHarness,
 	claudeCommand,
+	claudeDisallowedTools,
 	claudeMcpConfig,
 	cliAllowRules,
+	READ_ONLY_DISALLOWED,
 } from "./harness";
 import { REPORT_TOOL_ID } from "./profile";
 
@@ -110,6 +112,80 @@ describe("claudeCodeHarness with MCP servers", () => {
 				() => false,
 			),
 		).toBe(false);
+	});
+});
+
+describe("claudeCodeHarness read only", () => {
+	test("no write or shell tools, no MCP server but Night Shift's, and its own tools still work", async () => {
+		const { toolDefinition } = await import("@tanstack/ai");
+		const claudeLog = join(dir, "claude.jsonl");
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_LOG: claudeLog,
+			FAKE_CLAUDE_CALLS: JSON.stringify([
+				{ name: "get_draft", arguments: {} },
+				{
+					name: "report_step",
+					arguments: { summary: "Ok.", data: { text: "x" } },
+				},
+			]),
+		});
+		const asked: unknown[] = [];
+		const getDraft = toolDefinition({
+			name: "get_draft",
+			description: "The flow draft.",
+			inputSchema: { type: "object", properties: {} },
+		}).server((args: unknown) => {
+			asked.push(args);
+			return "{}";
+		});
+		const events: AgentEvent[] = [];
+		for await (const event of claudeCodeHarness({
+			claudeExecutable: claude,
+			disallowedTools: ["WebSearch"],
+		}).run(
+			input({
+				permissionMode: "bypassPermissions",
+				readOnly: true,
+				clis: ["gh"],
+				tools: [getDraft],
+				saveArtifact: async () => "kept",
+				stepReport: {
+					outcome: false,
+					output: { type: "object", properties: { text: { type: "string" } } },
+				},
+			}),
+		)) {
+			events.push(event);
+		}
+		expect(asked).toHaveLength(1);
+		expect(events.filter((e) => e.type === "report")).toEqual([
+			{ type: "report", outcome: "", summary: "Ok.", data: { text: "x" } },
+		]);
+		const run = JSON.parse((await readFile(claudeLog, "utf8")).trim());
+		const argv: string[] = run.argv;
+		expect(argv[argv.indexOf("--permission-mode") + 1]).toBe("default");
+		expect(argv).toContain("--strict-mcp-config");
+		const list = (flag: string) => argv[argv.indexOf(flag) + 1]?.split(",");
+		expect(list("--disallowedTools")).toEqual([
+			"WebSearch",
+			...READ_ONLY_DISALLOWED,
+		]);
+		// No CLI tool, no artifact tool: only Night Shift's report and its own tool.
+		expect(list("--allowedTools")).toEqual([
+			REPORT_TOOL_ID,
+			"mcp__tanstack__get_draft",
+		]);
+		expect(run.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(
+			["get_draft", "report_step"],
+		);
+	});
+
+	test("a session that is not read only keeps its own lists", () => {
+		expect(claudeDisallowedTools({}, ["X"])).toEqual(["X"]);
+		expect(claudeDisallowedTools({}, undefined)).toBeUndefined();
+		expect(claudeCommand("claude", undefined, true)).toBe(
+			"claude --strict-mcp-config",
+		);
 	});
 });
 

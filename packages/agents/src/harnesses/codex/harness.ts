@@ -29,6 +29,7 @@ import {
 	type HarnessProfile,
 	type HarnessSpec,
 	harnessSession,
+	readOnlyInput,
 	type SdkSignals,
 } from "../../session";
 import { harnessFacts } from "../facts";
@@ -275,14 +276,16 @@ export function codexHarness(options: CodexHarnessOptions = {}): AgentHarness {
 	return {
 		name: "codex",
 		...harnessFacts("codex"),
-		run: (input) =>
-			harnessSession({
+		run: (raw) => {
+			const input = readOnlyInput(raw);
+			return harnessSession({
 				input,
 				spec: CODEX_SPEC,
 				adapter: () => codexAdapter(input, options),
 				...(options.abortGraceMs !== undefined
 					? { abortGraceMs: options.abortGraceMs }
 					: {}),
-			}),
+			});
+		},
 	};
 }

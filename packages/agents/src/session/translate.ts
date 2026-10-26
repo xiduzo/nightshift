@@ -342,6 +342,11 @@ export type HarnessProfile = {
 	reportToolId?: string;
 	/** The same for the artifact tool (`mcp__tanstack__save_artifact`). */
 	artifactToolId?: string;
+	/**
+	 * The name of any other bridged tool in the harness's allow rules, when
+	 * the harness asks before it runs one (Claude Code: `mcp__tanstack__<name>`).
+	 */
+	bridgedToolId?: (name: string) => string;
 };
 
 export type Translator = {

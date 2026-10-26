@@ -4,9 +4,44 @@
  * check and its model listing.
  */
 import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Refusal } from "@nightshift/refusal";
 import { baseCheck, type CliCheck, firstLine, probe } from "../../doctor";
+import { shellQuoteAlways } from "../../port";
+
+/** pi's tools that only read: its own read-only mode (`pi --tools read,grep,find,ls`). */
+export const PI_READ_TOOLS = ["read", "grep", "find", "ls"] as const;
+
+/** The script that runs `pi` with its read tools only, passing every argument on. */
+export function piReadOnlyScript(pi: string): string {
+	return [
+		"#!/bin/sh",
+		"# Night Shift: a read-only session. pi gets its read tools only.",
+		`exec ${shellQuoteAlways(pi)} --tools ${PI_READ_TOOLS.join(",")} "$@"`,
+		"",
+	].join("\n");
+}
+
+/**
+ * pi asks no permission before it edits or runs a command, so a read-only
+ * session cannot refuse one. pi-acp starts the pi that `PI_ACP_PI_COMMAND`
+ * names, with no arguments of ours: this writes a script that starts `pi`
+ * with its read tools only, in a private temp folder, and gives its path.
+ */
+export async function piReadOnly(
+	pi: string,
+): Promise<{ executable: string; cleanup: () => Promise<void> }> {
+	const dir = await mkdtemp(join(tmpdir(), "nightshift-pi-"));
+	const executable = join(dir, "pi");
+	await writeFile(executable, piReadOnlyScript(pi), { mode: 0o700 });
+	return {
+		executable,
+		cleanup: () => rm(dir, { recursive: true, force: true }),
+	};
+}
 
 /**
  * The command that starts pi-acp: its entry point, run with this process's

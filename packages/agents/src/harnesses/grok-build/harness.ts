@@ -30,6 +30,7 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
+	readOnlyInput,
 } from "../../session";
 import { harnessFacts } from "../facts";
 
@@ -145,14 +146,16 @@ export function grokBuildHarness(
 	return {
 		name: "grok-build",
 		...harnessFacts("grok-build"),
-		run: (input) =>
-			harnessSession({
+		run: (raw) => {
+			const input = readOnlyInput(raw);
+			return harnessSession({
 				input,
 				spec: GROK_BUILD_SPEC,
 				adapter: () => grokBuildAdapter(input, options),
 				...(options.abortGraceMs !== undefined
 					? { abortGraceMs: options.abortGraceMs }
 					: {}),
-			}),
+			});
+		},
 	};
 }
