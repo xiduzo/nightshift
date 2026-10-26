@@ -33,8 +33,8 @@
 			},
 			"each": {
 				"source": {
-					"kind": "files",
-					"glob": "{{glob}}"
+					"kind": "command",
+					"command": "git ls-files -z --cached --others --exclude-standard -- \":(glob){{glob}}\" \\\n  | tr '\\000' '\\n' | LC_ALL=C sort -u \\\n  | awk 'BEGIN { printf \"[\" } { gsub(/\\\\/, \"\\\\\\\\\"); gsub(/\"/, \"\\\\\\\"\"); printf \"%s{\\\"id\\\":\\\"%s\\\",\\\"title\\\":\\\"%s\\\",\\\"path\\\":\\\"%s\\\"}\", (NR > 1 ? \",\" : \"\"), $0, $0, $0 } END { print \"]\" }'"
 				},
 				"as": "item",
 				"branch": "shared"

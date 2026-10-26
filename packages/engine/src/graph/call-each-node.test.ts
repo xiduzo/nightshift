@@ -640,7 +640,7 @@ describe("the Call node with each", () => {
 		);
 	});
 
-	test("the sources: a command (with its log, read again before each element), files, no JSON, a cycle", async () => {
+	test("the sources: a command (with its log, read again before each element), no JSON, a cycle", async () => {
 		const itemsFile = join(sandbox.root, "items.json");
 		await writeFile(itemsFile, JSON.stringify([{ id: "1", title: "a" }]));
 		const build = body([agent("worker", "Build {{item.title}}")]);
@@ -684,38 +684,6 @@ describe("the Call node with each", () => {
 			{ count: 1, open: 1 },
 			{ count: 2, open: 1 },
 			{ count: 2, open: 0 },
-		]);
-
-		const files = await startRun(
-			sandbox,
-			flowOf([
-				callEach(
-					"loop",
-					"build",
-					{ kind: "files", glob: "*.md" },
-					{
-						branch: "shared",
-					},
-				),
-			]),
-			{ harness, flows: { build } },
-		);
-		await drive(files, { inputs: {} });
-		expect(payloads(await files.events(), "ItemStarted")).toEqual([
-			{
-				item: {
-					id: "README.md",
-					title: "README.md",
-					url: null,
-					value: { id: "README.md", title: "README.md", path: "README.md" },
-				},
-				index: 1,
-				branch: null,
-				baseBranch: null,
-				inputs: {
-					item: { id: "README.md", title: "README.md", path: "README.md" },
-				},
-			},
 		]);
 
 		const bad = await startRun(

@@ -11,6 +11,7 @@ import type {
 	ValueNode,
 	WaitNode,
 } from "../nodes";
+import { valueDecider } from "../nodes";
 import { parseFlow, validateFlow } from "./flow";
 import type { FlowIssue } from "./issues";
 
@@ -1451,18 +1452,20 @@ describe("validateFlow: Call with each", () => {
 		expect(validateFlow(f, { flows: { trace: traceBody() } })).toEqual([]);
 	});
 
-	test("the files source glob is checked too", () => {
-		const f = (glob: string) =>
+	test("the source command is checked too", () => {
+		const f = (command: string) =>
 			withInputs(
-				night(callEach("each", "trace", { source: { kind: "files", glob } })),
+				night(
+					callEach("each", "trace", { source: { kind: "command", command } }),
+				),
 				[{ name: "dir", type: "text" }],
 			);
-		expect(validateFlow(f("{{dir}}/**/*.ts"))).toEqual([]);
-		expect(errors(validateFlow(f("src/**/{{x}}.ts")))).toEqual([
+		expect(validateFlow(f('./list "{{dir}}"'))).toEqual([]);
+		expect(errors(validateFlow(f('./list "{{x}}"')))).toEqual([
 			expect.objectContaining({
 				nodeId: "each",
 				message: expect.stringContaining(
-					'The source glob of "each" uses {{x}}',
+					'The source command of "each" uses {{x}}',
 				),
 			}),
 		]);
@@ -1965,10 +1968,10 @@ describe("validateFlow: Value", () => {
 		delete json.nodes[1].decider;
 		const parsed = parseFlow(json);
 		expect(errors(parsed.issues)).toEqual([]);
-		expect(parsed.flow?.nodes[1]).toMatchObject({
-			type: "value",
-			decider: "openrouter",
-		});
+		const node = parsed.flow?.nodes[1];
+		expect(node?.type).toBe("value");
+		expect(node?.type === "value" && "decider" in node).toBe(false);
+		expect(node?.type === "value" && valueDecider(node)).toBe("openrouter");
 	});
 
 	test("a rule needs an expression that parses and reads known names", () => {

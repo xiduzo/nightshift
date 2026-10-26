@@ -1,5 +1,10 @@
 /** The fields of a Decision node: who decides, the prompt, the options, and for a Gate the lock screen. */
-import { type DecisionNode, type Flow, withDecidedBy } from "@nightshift/flows";
+import {
+	type DecisionNode,
+	decisionDecider,
+	type Flow,
+	withDecidedBy,
+} from "@nightshift/flows";
 import {
 	FieldContent,
 	FieldDescription,
@@ -19,6 +24,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { deciderQueries } from "@/features/agents";
+import { settingsQueries } from "@/features/settings";
 import { OutcomesSuggest, RulesSuggest } from "../../assistant/field-helpers";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
@@ -87,8 +93,10 @@ export function DecisionFields({
 				? "The model picks exactly one. Each option gets its own edge. A description tells the model when to pick it."
 				: "Night Shift tries the rules from top to bottom and picks the first option whose rule holds. Leave the last option without a rule: it is picked when none holds.";
 
+	// Settings → New nodes: the decider a node starts on when a model decides it.
+	const settings = useQuery(settingsQueries.get());
 	const deciders = useQuery(deciderQueries.list());
-	const decider = deciders.data?.find((d) => d.name === node.decider);
+	const decider = deciders.data?.find((d) => d.name === decisionDecider(node));
 	const keyMissing = decider?.apiKeySource === "missing";
 	return (
 		<>
@@ -113,7 +121,11 @@ export function DecisionFields({
 						value={[by]}
 						onValueChange={(value) => {
 							const next = value[0] as DecisionNode["by"] | undefined;
-							if (next) onChange((current) => withDecidedBy(current, next));
+							if (next) {
+								onChange((current) =>
+									withDecidedBy(current, next, settings.data?.values),
+								);
+							}
 						}}
 					>
 						{DECIDED_BY.map((entry) => {
@@ -223,7 +235,7 @@ export function DecisionFields({
 					>
 						<NativeSelect
 							id={`${id}-decider`}
-							value={node.decider}
+							value={decisionDecider(node)}
 							aria-invalid={keyMissing}
 							aria-describedby={`${id}-decider-hint`}
 							onChange={(event) => {

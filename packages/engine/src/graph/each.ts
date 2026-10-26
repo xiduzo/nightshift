@@ -63,36 +63,6 @@ export function parseCommandItems(stdout: string): ListItem[] {
 	return listOf(json, "The source command printed JSON that is not a list");
 }
 
-/**
- * The files that match `pattern` in the worktree, sorted by path, as
- * elements `{ id: path, title: path, path }`. The pattern stays inside the
- * worktree: an absolute pattern or a `..` segment is refused before
- * `scan` (the Device that has the worktree) lists anything.
- */
-export async function fileItems(
-	glob: string,
-	scan: (pattern: string) => Promise<string[]>,
-): Promise<ListItem[]> {
-	const trimmed = glob.trim();
-	if (trimmed === "") throw new Error("The glob of the files source is empty.");
-	if (
-		trimmed.startsWith("/") ||
-		trimmed.startsWith("~") ||
-		/^[A-Za-z]:[\\/]/.test(trimmed) ||
-		/(^|[\\/{,])\.\.([\\/},]|$)/.test(trimmed)
-	) {
-		throw new Error(
-			`The glob "${trimmed}" points outside the project. Use a path inside the project, without "..".`,
-		);
-	}
-	const pattern = trimmed;
-	const paths = await scan(pattern);
-	return listOf(
-		paths.map((path) => ({ id: path, title: path, path })),
-		`The files "${pattern}"`,
-	);
-}
-
 export function toItemFacts(item: ListItem): ItemFacts {
 	return { id: item.id, title: item.title, url: item.url, value: item.value };
 }

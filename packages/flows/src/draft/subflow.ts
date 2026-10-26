@@ -42,9 +42,9 @@ import {
 } from "../document";
 import {
 	type CallNode,
-	commandExits,
 	type DecisionNode,
 	flowNameSchema,
+	isChosenExit,
 	type Option,
 	reservedOutcomes,
 	type VariableWrite,
@@ -416,9 +416,7 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 		case "agent":
 			return outcome === "pass" || ownAgentLabel(node, outcome);
 		case "command":
-			return commandExits(node).some(
-				(exit) => exit.name === outcome && exit.code === 0,
-			);
+			return isChosenExit(node, outcome);
 		case "decision":
 			return true;
 		case "call":

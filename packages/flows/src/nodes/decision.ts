@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { deciderNameSchema, type NodeCheck, nodeBase, placed } from "./base";
+import {
+	type DeciderName,
+	deciderNameSchema,
+	type NodeCheck,
+	nodeBase,
+	placed,
+} from "./base";
 import { checkOptions, option } from "./outcomes";
 
 /**
@@ -30,8 +36,11 @@ export const decisionNodeSchema = z.object({
 	/** The options to pick from. Each one is an outcome, with its own edge. */
 	options: z.array(option).min(1),
 	by: decidedBySchema,
-	/** `by: "model"` only: the decision model that picks. */
-	decider: deciderNameSchema.default("typesafe"),
+	/**
+	 * `by: "model"` only: the decision model that picks. Unset: TypeSafe
+	 * (`decisionDecider`). A Decision by a person or a rule has none.
+	 */
+	decider: deciderNameSchema.optional(),
 	/** `by: "model"` only. The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
 	model: z.string().min(1).optional(),
 	/**
@@ -45,6 +54,13 @@ export const decisionNodeSchema = z.object({
 	lockScreen: z.boolean().optional(),
 });
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
+
+/** The decider of a Decision by model: its own, else TypeSafe. */
+export function decisionDecider(
+	node: Pick<DecisionNode, "decider">,
+): DeciderName {
+	return node.decider ?? "typesafe";
+}
 
 /** outcome: the option. note: what the person wrote, or why the model picked it. */
 export const decisionOutputFields = ["outcome", "note", "visit"] as const;

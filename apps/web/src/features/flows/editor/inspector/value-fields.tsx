@@ -1,5 +1,10 @@
 /** The fields of a Value node: who makes the value, and its schema. */
-import { type Flow, type ValueNode, withValueBy } from "@nightshift/flows";
+import {
+	type Flow,
+	type ValueNode,
+	valueDecider,
+	withValueBy,
+} from "@nightshift/flows";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
@@ -46,7 +51,7 @@ export function ValueFields({
 	const { by } = node;
 	const deciders = useQuery(deciderQueries.list());
 	const makers = (deciders.data ?? []).filter((d) => d.value !== null);
-	const decider = deciders.data?.find((d) => d.name === node.decider);
+	const decider = deciders.data?.find((d) => d.name === valueDecider(node));
 	const keyMissing = decider?.apiKeySource === "missing";
 	const cannot = decider !== undefined && decider.value === null;
 	const expression = node.expression ?? "";
@@ -180,7 +185,7 @@ export function ValueFields({
 					>
 						<NativeSelect
 							id={`${id}-decider`}
-							value={node.decider}
+							value={valueDecider(node)}
 							aria-invalid={keyMissing || cannot}
 							aria-describedby={`${id}-decider-hint`}
 							onChange={(event) => {

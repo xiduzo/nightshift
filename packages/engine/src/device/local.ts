@@ -413,17 +413,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...(run.author ? { author: run.author } : {}),
 			});
 		},
-		async files({ cwd, glob }) {
-			const paths: string[] = [];
-			for await (const path of new Bun.Glob(glob).scan({
-				cwd,
-				onlyFiles: true,
-			})) {
-				if (path === ".git" || path.startsWith(".git/")) continue;
-				paths.push(path);
-			}
-			return paths.sort();
-		},
 		handOff: ({ cwd, runBranch }) => pushRunBranch(cwd, runBranch),
 		async receiveHandOff({ run, branch, commit }) {
 			return pullRunBranch({

@@ -8,16 +8,30 @@ import {
 } from "./base";
 import { checkOptions, outcomeColorSchema } from "./outcomes";
 
-/** The Command node: a shell command whose exit code picks the outcome. */
+/**
+ * The Command node: a shell command. Its data or its exit code picks the
+ * outcome.
+ */
+
+/**
+ * The `code` of an exit that only the command's data picks: the command
+ * writes `{ "outcome": "<name>" }` to `$NS_OUTPUT`. It has no exit code
+ * and is not the catch-all.
+ */
+export const DATA_EXIT_CODE = "data";
 
 /**
  * One exit of a Command node: an exit code and the outcome it ends with.
  * The exit without a `code` is the catch-all: any other code, a command
- * that cannot start, and JSON output that is not valid. At most one, last.
+ * that cannot start, and data that is not valid JSON. At most one, last.
+ * An exit with the code `"data"` is picked by the command's data only
+ * (`dataExitFor`).
  */
 export const commandExitSchema = z.object({
 	name: labelSchema,
-	code: z.number().int().min(0).max(255).optional(),
+	code: z
+		.union([z.number().int().min(0).max(255), z.literal(DATA_EXIT_CODE)])
+		.optional(),
 	description: z.string().optional(),
 	color: outcomeColorSchema.optional(),
 });
@@ -99,18 +113,28 @@ export const commandNodeSchema = z.object({
 	 * Run with `sh -c` in the worktree. The exit code picks the outcome (`exits`). Template values
 	 * arrive as environment variables, never as shell text: write
 	 * `echo "{{worker.summary}}"` and the shell sees `echo "${NS_WORKER_SUMMARY}"`.
+	 *
+	 * `$NS_OUTPUT` names a new, empty file for the step's data, as
+	 * `$GITHUB_OUTPUT` does in GitHub Actions. JSON written there is the
+	 * step's `data`, whatever `output` says and whatever the exit code; a
+	 * file that is not valid JSON ends the step on the catch-all. stdout
+	 * stays the log. Data that is an object with an `outcome` that names
+	 * one of the node's exits ends the step on that exit (`dataExitFor`).
 	 */
 	command: z.string().min(1),
 	/**
-	 * `text`: the output is the log tail only. `json`: the command prints
-	 * JSON, kept as `data` for later nodes (`{{check.data.tests}}`); output
-	 * that is not JSON ends the step on the catch-all exit.
+	 * Where the data comes from when the command leaves `$NS_OUTPUT` empty.
+	 * `text`: there is none, the output is the log tail only. `json`: the
+	 * command prints JSON on stdout, kept as `data` for later nodes
+	 * (`{{check.data.tests}}`); output that is not JSON ends the step on
+	 * the catch-all exit. The older way: one stray `echo` breaks it.
 	 */
 	output: z.enum(["text", "json"]).default("text"),
 	/**
 	 * The outcome per exit code, each with an edge. A code without an exit
-	 * ends on the catch-all; without a catch-all the step errors. Unset:
-	 * `pass` on 0 and `fail` on any other code (`commandExits`).
+	 * ends on the catch-all; without a catch-all the step errors. An exit
+	 * with the code `"data"` only ends the step when the data names it.
+	 * Unset: `pass` on 0 and `fail` on any other code (`commandExits`).
 	 */
 	exits: z.array(commandExitSchema).min(1).optional(),
 	/**
@@ -132,7 +156,8 @@ export function commandExits(node: Pick<CommandNode, "exits">): CommandExit[] {
 /**
  * The exit a code ends on: the exit with that code, else the catch-all,
  * else undefined (the step errors). A null code (the command did not start
- * or its JSON is not valid) ends on the catch-all.
+ * or its JSON is not valid) ends on the catch-all. An exit picked by data
+ * matches no code.
  */
 export function exitFor(
 	node: Pick<CommandNode, "exits">,
@@ -145,7 +170,45 @@ export function exitFor(
 	);
 }
 
-/** log_tail: the last lines of stdout and stderr together. data: the JSON it printed, with `output: "json"`. */
+/**
+ * The exit the step's data picks: data that is an object whose `outcome`
+ * names one of the node's exits, any exit. Else undefined, and the exit
+ * code picks. A command not written for Night Shift writes no data, so its
+ * exit codes keep working.
+ */
+export function dataExitFor(
+	node: Pick<CommandNode, "exits">,
+	data: unknown,
+): CommandExit | undefined {
+	if (typeof data !== "object" || data === null || Array.isArray(data)) {
+		return undefined;
+	}
+	const outcome = (data as Record<string, unknown>).outcome;
+	if (typeof outcome !== "string") return undefined;
+	return commandExits(node).find((exit) => exit.name === outcome);
+}
+
+/**
+ * Whether the command ends on `outcome` by its own choice: its exit on
+ * code 0, or an exit only its data picks. Its other exits, the catch-all
+ * among them, are failures.
+ */
+export function isChosenExit(
+	node: Pick<CommandNode, "exits">,
+	outcome: string,
+): boolean {
+	return commandExits(node).some(
+		(exit) =>
+			exit.name === outcome &&
+			(exit.code === 0 || exit.code === DATA_EXIT_CODE),
+	);
+}
+
+/**
+ * log_tail: the last lines of stdout and stderr together. data: the JSON
+ * the command wrote to `$NS_OUTPUT`, else the JSON it printed with
+ * `output: "json"`.
+ */
 export const commandOutputFields = [
 	"outcome",
 	"exit_code",
@@ -191,7 +254,7 @@ function checkExits(node: CommandNode, check: NodeCheck): void {
 	const codes = new Set<number>();
 	const exits = commandExits(node);
 	for (const exit of exits) {
-		if (exit.code === undefined) continue;
+		if (exit.code === undefined || exit.code === DATA_EXIT_CODE) continue;
 		if (codes.has(exit.code)) {
 			check.error(
 				`Command node "${node.id}" has the exit code ${exit.code} more than once.`,

@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { githubSubIssuesCommand } from "../recipes";
+import { decisionDecider } from "../nodes";
+import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
 import { renderCommand, templateRefs } from "../template";
 import { parseFlow, validateFlow } from "../validate";
 import { type Flow, flowSchema } from "./flow";
@@ -387,7 +388,9 @@ describe("migrateFlow: tool sets", () => {
 			["ollaya", "laya:en"],
 		]);
 		const parsed = flowSchema.parse(migrated);
-		expect(parsed.nodes[0]).toMatchObject({ decider: "typesafe" });
+		expect(
+			parsed.nodes[0]?.type === "decision" && decisionDecider(parsed.nodes[0]),
+		).toBe("typesafe");
 	});
 
 	test("version 1 tool sets migrate too", () => {
@@ -817,7 +820,9 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 			type: "call",
 			position: { x: 2, y: 2 },
 			flow: "build",
-			each: { source: { kind: "files", glob: "*.md" } },
+			each: {
+				source: { kind: "command", command: gitFilesCommand("*.md") },
+			},
 		});
 		expect(flow.nodes[3]).toEqual(v3().nodes[3]);
 	});
@@ -865,5 +870,137 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 			"call",
 			"call",
 		]);
+	});
+});
+
+describe("migrateFlow: version 5 → 6, deciders and the files source", () => {
+	const v5 = (nodes: unknown[]) => ({
+		version: 5,
+		inputs: [{ name: "glob", type: "text" }],
+		outputs: [],
+		start: nodes.length > 0 ? "gate" : "",
+		nodes,
+		edges: [],
+	});
+	const decision = {
+		type: "decision",
+		position: { x: 0, y: 0 },
+		prompt: "Go on?",
+		options: [{ name: "yes" }, { name: "no" }],
+	};
+	const value = {
+		type: "value",
+		position: { x: 0, y: 0 },
+		output: { type: "object" },
+	};
+
+	test("only a Decision or a Value by a model keeps its decider and model", () => {
+		const flow = migrateFlow(
+			v5([
+				{ ...decision, id: "gate", by: "person", decider: "typesafe" },
+				{
+					...decision,
+					id: "rule",
+					by: "rule",
+					decider: "openai",
+					model: "x",
+					options: [{ name: "yes", when: "true" }, { name: "no" }],
+				},
+				{ ...decision, id: "pick", by: "model", decider: "ollaya", model: "m" },
+				{
+					...value,
+					id: "shape",
+					by: "rule",
+					expression: "{}",
+					decider: "openrouter",
+				},
+				{
+					...value,
+					id: "write",
+					by: "model",
+					prompt: "Write it.",
+					decider: "openai",
+				},
+			]),
+		) as { version: number; nodes: Record<string, unknown>[] };
+		expect(flow.version).toBe(6);
+		expect(
+			flow.nodes.map((node) => [node.id, node.decider, node.model]),
+		).toEqual([
+			["gate", undefined, undefined],
+			["rule", undefined, undefined],
+			["pick", "ollaya", "m"],
+			["shape", undefined, undefined],
+			["write", "openai", undefined],
+		]);
+		expect(
+			flow.nodes.every((node) => !("decider" in node) || node.by === "model"),
+		).toBe(true);
+		expect(flowSchema.safeParse(flow).success).toBe(true);
+	});
+
+	test("a files source becomes a command source on git ls-files", () => {
+		const flow = migrateFlow(
+			v5([
+				{
+					...decision,
+					id: "gate",
+					by: "person",
+				},
+				{
+					id: "each",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "edit",
+					each: {
+						source: { kind: "files", glob: "{{glob}}" },
+						branch: "shared",
+					},
+				},
+			]),
+		) as { nodes: Record<string, unknown>[] };
+		expect(flow.nodes[1]?.each).toEqual({
+			source: { kind: "command", command: gitFilesCommand("{{glob}}") },
+			branch: "shared",
+		});
+		const parsed = parseFlow(flow);
+		expect(parsed.issues.filter((i) => i.severity === "error")).toEqual([]);
+	});
+
+	test("the command lists the same files as the glob did", () => {
+		const repo = mkdtempSync(join(tmpdir(), "ns-files-"));
+		const git = (...args: string[]) =>
+			Bun.spawnSync(["git", ...args], { cwd: repo, stdout: "ignore" });
+		git("init", "-q");
+		for (const path of [
+			"a.md",
+			"docs/b.md",
+			"docs/deep/c.md",
+			'q"uote.md',
+			"x.ts",
+		]) {
+			Bun.spawnSync(["mkdir", "-p", join(repo, path, "..")]);
+			writeFileSync(join(repo, path), "");
+		}
+		writeFileSync(join(repo, ".gitignore"), "ignored.md\n");
+		writeFileSync(join(repo, "ignored.md"), "");
+		git("add", "a.md");
+		const list = (glob: string) => {
+			const result = Bun.spawnSync(["sh", "-c", gitFilesCommand(glob)], {
+				cwd: repo,
+			});
+			return (JSON.parse(result.stdout.toString()) as { id: string }[]).map(
+				(item) => item.id,
+			);
+		};
+		expect(list("*.md")).toEqual(["a.md", 'q"uote.md']);
+		expect(list("docs/**/*.md")).toEqual(["docs/b.md", "docs/deep/c.md"]);
+		expect(list("*.none")).toEqual([]);
+		const [first] = JSON.parse(
+			Bun.spawnSync(["sh", "-c", gitFilesCommand("a.md")], {
+				cwd: repo,
+			}).stdout.toString(),
+		);
+		expect(first).toEqual({ id: "a.md", title: "a.md", path: "a.md" });
 	});
 });

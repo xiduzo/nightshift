@@ -123,7 +123,8 @@ function isText(event: {
 
 /**
  * A command's events with the secret values in `values` taken out of its
- * output, per stream, and out of the reason it could not start.
+ * output, per stream, out of the reason it could not start, and out of
+ * what it wrote to `NS_OUTPUT`.
  */
 export async function* redactExec(
 	events: AsyncIterable<ExecEvent>,
@@ -151,6 +152,9 @@ export async function* redactExec(
 					event.spawnError === null
 						? null
 						: redactText(event.spawnError, values),
+				...(event.output === undefined
+					? {}
+					: { output: redactText(event.output, values) }),
 			};
 			return;
 		} else {

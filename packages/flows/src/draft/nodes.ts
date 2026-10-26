@@ -10,6 +10,7 @@ import {
 	DEFAULT_COMMAND_EXITS,
 	type DecidedBy,
 	type DecisionNode,
+	decisionDecider,
 	type ListSource,
 	type ToolNode,
 	type ValueBy,
@@ -68,14 +69,9 @@ export function commandNode(id: string, position: Position): CommandNode {
 /**
  * A rule decides, with the options yes and no and no rule yet; the issues
  * panel asks for one. The inspector switches who decides: you (a Gate) or
- * a model. Switched to a model, the node starts on the decider from
- * Settings and that decider's default model.
+ * a model (`withDecidedBy`).
  */
-export function decisionNode(
-	id: string,
-	position: Position,
-	defaults: NodeDefaults = {},
-): DecisionNode {
+export function decisionNode(id: string, position: Position): DecisionNode {
 	return {
 		id,
 		type: "decision",
@@ -83,22 +79,40 @@ export function decisionNode(
 		prompt: "",
 		options: [{ name: "yes" }, { name: "no" }],
 		by: "rule",
-		decider: defaults.decisionDecider ?? "typesafe",
 	};
 }
 
 /**
  * Changes who decides. A rule's `when` fields go, and `lockScreen` goes
- * when a person no longer decides; a model's name stays for when it comes back.
+ * when a person no longer decides. Switched to a model, the node starts on
+ * the decider from Settings and that decider's default model; switched
+ * away, the decider and the model go, as only a model reads them.
  */
-export function withDecidedBy(node: DecisionNode, by: DecidedBy): DecisionNode {
+export function withDecidedBy(
+	node: DecisionNode,
+	by: DecidedBy,
+	defaults: NodeDefaults = {},
+): DecisionNode {
 	if (by === node.by) return node;
 	const options =
 		by === "rule"
 			? node.options
 			: node.options.map(({ when: _, ...option }) => option);
-	const { lockScreen: _, ...rest } = node;
-	return { ...(by === "person" ? node : rest), by, options };
+	const { lockScreen, decider: _decider, model: _model, ...rest } = node;
+	if (by === "model") {
+		return {
+			...rest,
+			by,
+			options,
+			decider: defaults.decisionDecider ?? decisionDecider({}),
+		};
+	}
+	return {
+		...rest,
+		...(by === "person" && lockScreen !== undefined ? { lockScreen } : {}),
+		by,
+		options,
+	};
 }
 
 /** Runs a flow once. The called flow starts empty; the issues panel asks for one. */
@@ -128,7 +142,7 @@ const FIRST_VALUE_DECIDER = valueDeciderNameSchema
 /**
  * A rule makes the value, with an object schema and no expression yet; the
  * issues panel asks for one. Switched to a model, the node starts on the
- * first decider that can make a value.
+ * first decider that can make a value (`withValueBy`).
  */
 export function valueNode(id: string, position: Position): ValueNode {
 	return {
@@ -138,22 +152,27 @@ export function valueNode(id: string, position: Position): ValueNode {
 		by: "rule",
 		expression: "",
 		output: { type: "object" },
-		decider: FIRST_VALUE_DECIDER,
 	};
 }
 
 /**
  * Changes who makes the value. The expression and the prompt both stay, for
- * when their mode comes back. A model needs a decider that can make a value:
- * one that cannot is swapped for the first that can.
+ * when their mode comes back. A model starts on the first decider that can
+ * make a value; a rule drops the decider and the model, as only a model
+ * reads them.
  */
 export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 	if (by === node.by) return node;
-	const decider =
-		by === "model" && !canMakeValue(node.decider)
-			? FIRST_VALUE_DECIDER
-			: node.decider;
-	return { ...node, by, decider };
+	const { decider, model: _model, ...rest } = node;
+	if (by === "rule") return { ...rest, by };
+	return {
+		...node,
+		by,
+		decider:
+			decider !== undefined && canMakeValue(decider)
+				? decider
+				: FIRST_VALUE_DECIDER,
+	};
 }
 
 /** Waits 15 minutes until the inspector says otherwise. */
@@ -198,8 +217,6 @@ export function emptySource(kind: ListSource["kind"]): ListSource {
 			return { kind: "json", value: "" };
 		case "command":
 			return { kind: "command", command: "" };
-		case "files":
-			return { kind: "files", glob: "" };
 	}
 }
 

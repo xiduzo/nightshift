@@ -39,7 +39,6 @@ export type WorkCall =
 	| { kind: "capabilities"; query: CapabilityQuery }
 	| { kind: "flows" }
 	| { kind: "worktree"; run: RunRef }
-	| { kind: "files"; cwd: string; glob: string }
 	| {
 			kind: "itemBranch";
 			cwd: string;
@@ -66,7 +65,6 @@ export const WORK_KINDS = [
 	"capabilities",
 	"flows",
 	"worktree",
-	"files",
 	"itemBranch",
 	"handOff",
 	"receiveHandOff",
@@ -211,7 +209,6 @@ const workCallSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
 	z.object({ kind: z.literal("flows") }),
 	z.object({ kind: z.literal("worktree"), run: runRefSchema }),
-	z.object({ kind: z.literal("files"), cwd: z.string(), glob: z.string() }),
 	z.object({
 		kind: z.literal("itemBranch"),
 		cwd: z.string(),
@@ -242,6 +239,8 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			env: z.record(z.string(), z.string()).optional(),
 			/** Secrets by name: the Device reads their values itself. */
 			secrets: z.array(z.string()).optional(),
+			/** A Command step: a new file for its data, named in `NS_OUTPUT`. */
+			outputFile: z.boolean().optional(),
 		}),
 	}),
 	z.object({

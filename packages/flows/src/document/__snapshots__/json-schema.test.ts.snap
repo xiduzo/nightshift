@@ -395,9 +395,17 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "items": {
                     "properties": {
                       "code": {
-                        "maximum": 255,
-                        "minimum": 0,
-                        "type": "integer",
+                        "anyOf": [
+                          {
+                            "maximum": 255,
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          {
+                            "const": "data",
+                            "type": "string",
+                          },
+                        ],
                       },
                       "color": {
                         "enum": [
@@ -528,7 +536,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "string",
                 },
                 "decider": {
-                  "default": "typesafe",
                   "enum": [
                     "typesafe",
                     "openrouter",
@@ -732,23 +739,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           ],
                           "type": "object",
                         },
-                        {
-                          "properties": {
-                            "glob": {
-                              "minLength": 1,
-                              "type": "string",
-                            },
-                            "kind": {
-                              "const": "files",
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "glob",
-                          ],
-                          "type": "object",
-                        },
                       ],
                     },
                   },
@@ -850,7 +840,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "string",
                 },
                 "decider": {
-                  "default": "openrouter",
                   "enum": [
                     "typesafe",
                     "openrouter",
@@ -1774,9 +1763,17 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "additionalProperties": false,
                     "properties": {
                       "code": {
-                        "maximum": 255,
-                        "minimum": 0,
-                        "type": "integer",
+                        "anyOf": [
+                          {
+                            "maximum": 255,
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          {
+                            "const": "data",
+                            "type": "string",
+                          },
+                        ],
                       },
                       "color": {
                         "enum": [
@@ -1911,7 +1908,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "string",
                 },
                 "decider": {
-                  "default": "typesafe",
                   "enum": [
                     "typesafe",
                     "openrouter",
@@ -2047,7 +2043,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "prompt",
                 "options",
                 "by",
-                "decider",
               ],
               "type": "object",
             },
@@ -2120,24 +2115,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "required": [
                             "kind",
                             "command",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "additionalProperties": false,
-                          "properties": {
-                            "glob": {
-                              "minLength": 1,
-                              "type": "string",
-                            },
-                            "kind": {
-                              "const": "files",
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "kind",
-                            "glob",
                           ],
                           "type": "object",
                         },
@@ -2249,7 +2226,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "string",
                 },
                 "decider": {
-                  "default": "openrouter",
                   "enum": [
                     "typesafe",
                     "openrouter",
@@ -2349,7 +2325,6 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "type",
                 "by",
                 "output",
-                "decider",
               ],
               "type": "object",
             },
@@ -3327,35 +3302,34 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
-  "callEachSchema": "43a87772abe5fd60377345c38008fcd13febc0b71a965170ffcf8eb575be3c39",
-  "callNodeSchema": "121ccd0985ab06eb0ec5f6569f06bf2a323eb6c874e14cab91de4bea1db38da8",
-  "chatRequestSchema": "05a8dd41deaaddf6df68060d8c5d9e4a7326c3be214cfbf7abe7bec390a18827",
+  "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
+  "callNodeSchema": "3db8301e635a18936d1f3dd38a3d3b832e454808871572edde59bb8910fd74c3",
+  "chatRequestSchema": "d93c413ed5713caebe737e036ef4708cb0c297f2ae8e264e8b742aa6edf95dca",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
-  "commandExitSchema": "8aeb73dfd94f45d4271829acd38fd43aaf56fd36e3db9b446b0017b2f6444efa",
-  "commandNodeSchema": "e0e64124d8334fd281fe3cf839fac05e52059357725e881107d56132a9468f9e",
+  "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
+  "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
   "commandSourceSchema": "29be5c28ca62374751ca03afaf9cd232962ffa7e0220220d34e0f64a0f2f3ecb",
   "customAgentSchema": "695fcb6e79464055898109624fe9bfb29190a3dccb2c722e26f4d9bdb622d425",
   "customAgentSlugSchema": "85b706ff2ef51fed369fb25c81f938328d9771d8a396bc7f1ed876637543e94a",
   "customHarnessSchema": "340fd5e4d3041404dcebc63ea2a312d8dba0e6b3c15d5b50b154df7a8f58ddb7",
   "decidedBySchema": "ba1eaed1ee91e185e0fe25e4b3ab48ebc800aac50bbe3b6f3762a1ddd7c5e6fe",
   "deciderNameSchema": "844c61e968f871120362b07648dd4375a0c6183fe79a59bfd0d521792c578247",
-  "decisionNodeSchema": "33378bfad59b92ecba07e0f4f8bc8153d823c552e6b947eeadaf7765105f8b20",
+  "decisionNodeSchema": "b87a980503870e2b23636f4c1b37929e69bf0f90667cba3a1f883f8ae2fb91a1",
   "deviceNameSchema": "c385fef4336b7131063a6ba2bc416a02725ab5eedb75af59ca29bafd252dc91b",
   "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
-  "filesSourceSchema": "4c1c5591c21b0adb94e9d96d93d697b93de410a801ccf6b4b7a258d8c76b3219",
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "ac67351d65a4994fb6724cc3d9c19673d8b274a728e9de472b4214923f6680b2",
+  "flowNodeSchema": "6fb0a4209b8894cdedca1addbe02ffee826a1461d89fb6bf62cb58e2ccb067a5",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "aeb0f510afad56c9cb6d3f7919ccac8a705a2a11622176e777cf52b174e231ad",
+  "flowSchema": "5fd894064fcdf0e944ece285f1cb4b31994eb3a3aa00126757dd83c0006c3a1a",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
   "jsonSourceSchema": "a3a5fddca4b7a01134d1e5ae0b6af454545831c5d63dd9272c4506e020eb8b1a",
   "labelSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
-  "listSourceSchema": "08e4d5396923d469929e91f604743e2b4ba8976aa0e96f901f10a2a47d3015f1",
+  "listSourceSchema": "bd777218a3c3b14d1c54cb33fe527fe2e9e6055bcac39c002184e8a17fd9665e",
   "loginSchema": "23ccb4d365d96d062435a2ef12ff312587d07237ee383dfa9c7330e9db6ad64d",
   "mcpServerSchema": "a26196da9adb9b7777c1554b9c04c2be3e49961c1dc5b9a2b94ed1d9b1253727",
   "nameSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
@@ -3371,14 +3345,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "1a9702439df52e7984afdb2307e7a9039d6de5e6881299269eb72f5509e108b6",
-  "suggestionRequestSchema": "c623fd2dbd50399ca87bee999609730d6c7c91ebd34c5d8ee2b5c5696477f93d",
+  "suggestionRequestSchema": "10140034e6f5f94ed8f2779d9a9aa837cae0bc4668d71c13656ff973cd6b6e58",
   "suggestionSchema": "224aa6217ef03492d1a57666aa46a216efcc7e4596391dac41922d09920dfad1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",
   "valueBySchema": "bd03d7f4d6a9ce81bfdb8638ac71508d4761cd359a8b94bdc2fc070915a01cfd",
   "valueDeciderNameSchema": "7c7f28413777a1a59ae0c47ed82503caa6029be37a82ed9c774e89e468b946a0",
-  "valueNodeSchema": "054e8cb82599dd45bc1a7727b5a4888b3cbd1e6d2776d908e1e08d6bfa4abebe",
+  "valueNodeSchema": "3dc5d1af5414cd694f6660c3e1c711ba10401d283ae92e6c4cea2673dda3b08e",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
   "waitNodeSchema": "8b161da59bbae64dabd06ff81740ca7695dae7906ae794625d1a101259adcb7c",
@@ -3960,7 +3934,6 @@ exit 0"
         },
         {
           "by": "model",
-          "decider": "typesafe",
           "id": "orchestrate",
           "label": "Orchestrator: continue or halt",
           "options": [

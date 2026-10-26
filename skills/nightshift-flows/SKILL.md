@@ -59,7 +59,7 @@ Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outco
 
 ### command
 
-A shell command in the project. The exit code picks the outcome. `exits` lists `{ name, code }`; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. `output: "json"` keeps the printed JSON as `data`. `secrets` names secrets that reach the command as environment variables. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`.
+A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. `output: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `secrets` names secrets that reach the command as environment variables. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`.
 
 Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_code`, `log_tail`, `data`, `visit`.
 
@@ -67,7 +67,7 @@ Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_
 
 ### decision
 
-Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. `rule`: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; `decider` is one of typesafe, openrouter, openai, ollaya, ollama.
+Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. `rule`: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; `decider` (one of typesafe, openrouter, openai, ollaya, ollama) and `model` are optional and read only then.
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
@@ -75,7 +75,7 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its file name) with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }`, `{ kind: "command", command }` (prints a JSON array) or `{ kind: "files", glob }`; the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too.
+Shown as Subflow. Runs another flow of the project (`flow`, its file name) with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too.
 
 Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 
@@ -83,7 +83,7 @@ Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. O
 
 ### value
 
-Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and a `decider` that can make a value (openrouter, openai, ollama). Use it to compute or reshape a value, often with `set`.
+Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and optionally a `decider` that can make a value (openrouter, openai, ollama). Use it to compute or reshape a value, often with `set`.
 
 Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 

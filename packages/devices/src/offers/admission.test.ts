@@ -98,10 +98,6 @@ const device = {
 			baseRef: "main",
 		};
 	},
-	async files() {
-		ran.push({ kind: "files" });
-		return [];
-	},
 	async handOff() {
 		ran.push({ kind: "handOff" });
 		return { commit: "c", branch: "b" };
@@ -345,17 +341,7 @@ for (const [path, call] of Object.entries(paths)) {
 			expect(await outcome(request({ call: { kind: "flows" } }))).toBe(
 				"served",
 			);
-			expect(
-				await outcome(
-					request({ call: { kind: "files", cwd: worktree, glob: "**/*.md" } }),
-				),
-			).toBe("served");
-			expect(ran.map((r) => r.kind)).toEqual([
-				"session",
-				"worktree",
-				"flows",
-				"files",
-			]);
+			expect(ran.map((r) => r.kind)).toEqual(["session", "worktree", "flows"]);
 		});
 
 		test("an offered session runs the profile as its owner set it, the mode no wider than the cap", async () => {

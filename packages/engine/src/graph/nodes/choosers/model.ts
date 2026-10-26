@@ -1,6 +1,7 @@
 import type { DecisionInput, DecisionResult } from "@nightshift/agents/types";
 import {
 	type DecisionNode,
+	decisionDecider,
 	optionProblem,
 	renderTemplate,
 } from "@nightshift/flows";
@@ -62,7 +63,8 @@ async function decide(
 		};
 	}
 	// The Device says which model a node without one starts on.
-	const model = node.model ?? decider.defaultModels[node.decider].decision;
+	const picker = decisionDecider(node);
+	const model = node.model ?? decider.defaultModels[picker].decision;
 	step.record(null, {
 		type: "decision-start",
 		prompt,
@@ -71,7 +73,7 @@ async function decide(
 	});
 	const result = await decideWithin(
 		step.device,
-		{ decider: node.decider, prompt, labels: options, model, signal },
+		{ decider: picker, prompt, labels: options, model, signal },
 		signal,
 	);
 	const cost = {

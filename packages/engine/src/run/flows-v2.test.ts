@@ -17,6 +17,7 @@ import type {
 	FlowEdge,
 	FlowInput,
 } from "@nightshift/flows";
+import { parseFlow } from "@nightshift/flows";
 import { saverFor } from "../graph/checkpointer";
 import { appendEvent } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
@@ -775,7 +776,7 @@ describe("Call with each, over any list", () => {
 		});
 	});
 
-	test("files that match a glob, sorted, and a glob that leaves the worktree", async () => {
+	test("a files source of an older flow lists the files that match its glob, sorted", async () => {
 		for (const name of ["src/b.ts", "src/a.ts", "src/c.md", "top.ts"]) {
 			await mkdir(join(sandbox.repoPath, "src"), { recursive: true });
 			await writeFile(join(sandbox.repoPath, name), `${name}\n`);
@@ -801,13 +802,30 @@ describe("Call with each, over any list", () => {
 		);
 		const engine = makeEngine(fakeHarness());
 		const id = await projectId(engine);
-		const flow = flowOf(
-			[callEach("files", "lint", { kind: "files", glob: "{{pattern}}" })],
-			[],
-			{
-				inputs: [{ name: "pattern", type: "text", default: "src/*.ts" }],
-			},
-		);
+		// Version 5: the source becomes a command on `git ls-files`.
+		const parsed = parseFlow({
+			...flowOf(
+				[callEach("files", "lint", { kind: "json", value: "[]" })],
+				[],
+				{
+					inputs: [{ name: "pattern", type: "text", default: "src/*.ts" }],
+				},
+			),
+			version: 5,
+			nodes: [
+				{
+					id: "files",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "lint",
+					each: { source: { kind: "files", glob: "{{pattern}}" } },
+				},
+			],
+		});
+		const flow = parsed.flow as Flow;
+		expect(flow.nodes[0]).toMatchObject({
+			each: { source: { kind: "command" } },
+		});
 		const run = await engine.startRun({ projectId: id, flow });
 		const detail = await waitForEnd(engine, run.id);
 		expect(detail.status).toBe("finished");
@@ -829,19 +847,6 @@ describe("Call with each, over any list", () => {
 				.filter((s) => s.nodeId === "look")
 				.map((s) => s.outputs.log_tail),
 		).toEqual(["src/a.ts", "src/b.ts"]);
-
-		for (const glob of ["../*", "/etc/*", "src/../../x", "{..,src}/*"]) {
-			const escaping = await engine.startRun({
-				projectId: id,
-				flow,
-				inputs: { pattern: glob },
-			});
-			const failed = await waitForEnd(engine, escaping.id);
-			expect(failed.status).toBe("failed");
-			expect(stepOf(failed, "files").error).toContain(
-				"points outside the project",
-			);
-		}
 	});
 
 	test("a command source of plain strings, and of objects with `dependsOn` and a parent", async () => {

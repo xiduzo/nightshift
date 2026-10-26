@@ -37,20 +37,9 @@ export const commandSourceSchema = z.object({
 	command: z.string().min(1),
 });
 
-/**
- * Files in the worktree that match a glob, sorted by path. Each element is
- * `{ id: path, title: path, path }`. The glob supports templates, for
- * example `{{glob}}`, and stays inside the worktree.
- */
-export const filesSourceSchema = z.object({
-	kind: z.literal("files"),
-	glob: z.string().min(1),
-});
-
 export const listSourceSchema = z.discriminatedUnion("kind", [
 	jsonSourceSchema,
 	commandSourceSchema,
-	filesSourceSchema,
 ]);
 export type ListSource = z.infer<typeof listSourceSchema>;
 
@@ -134,9 +123,6 @@ export function checkCallNode(node: CallNode, check: NodeCheck): void {
 				break;
 			case "command":
 				check.template(each.source.command, "source command");
-				break;
-			case "files":
-				check.template(each.source.glob, "source glob");
 				break;
 		}
 		checkHaltOn(node.id, each, check);

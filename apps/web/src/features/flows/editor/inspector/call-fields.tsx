@@ -33,7 +33,7 @@ import {
 	InputBindings,
 } from "./called-flow-fields";
 
-const SOURCE_ORDER: ListSource["kind"][] = ["json", "command", "files"];
+const SOURCE_ORDER: ListSource["kind"][] = ["json", "command"];
 
 /**
  * One Call node, two ways to run: once, or once per item in a list. The
@@ -352,27 +352,6 @@ function SourceFields({
 					placeholder="cat tasks.json"
 					action={<CommandSuggest node={node} />}
 					onChange={(command) => onChange({ kind: "command", command })}
-				/>
-			);
-		case "files":
-			return (
-				<TemplateField
-					id={`${id}-glob`}
-					label="File pattern"
-					hint={
-						<>
-							Each matching file is one item, in path order. Use{" "}
-							<code className="font-mono">{`{{${each.as}.path}}`}</code> for its
-							path.
-						</>
-					}
-					flow={flow}
-					nodeId={node.id}
-					value={source.glob}
-					invalid={source.glob.trim() === ""}
-					multiline={false}
-					placeholder="src/**/*.test.ts"
-					onChange={(glob) => onChange({ kind: "files", glob })}
 				/>
 			);
 	}

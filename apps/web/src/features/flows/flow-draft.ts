@@ -32,7 +32,6 @@ export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
 export const SOURCE_KINDS: Record<ListSource["kind"], string> = {
 	json: "A JSON value",
 	command: "A command",
-	files: "Files (a glob)",
 };
 
 /** What an option is called on its node: an option, an outcome, or an exit. */
@@ -175,7 +174,6 @@ const FIELD_MESSAGES: Record<string, string> = {
 	"each.as": "Pick the input that gets the item.",
 	"each.source.value": "Set the list: a template that gives a JSON array.",
 	"each.source.command": "The source command is empty.",
-	"each.source.glob": "The glob is empty.",
 	"each.maxItems": "Max items must be a whole number above 0.",
 	expression: "Write the expression.",
 	"until.minutes": "The wait must be a whole number of minutes above 0.",

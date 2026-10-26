@@ -171,8 +171,6 @@ function rewriteSource(
 			return { ...source, value: rewrite(source.value) };
 		case "command":
 			return { ...source, command: rewrite(source.command) };
-		case "files":
-			return { ...source, glob: rewrite(source.glob) };
 	}
 }
 

@@ -61,14 +61,18 @@ export {
 	commandExits,
 	commandNodeSchema,
 	commandOutputFields,
+	DATA_EXIT_CODE,
 	DEFAULT_COMMAND_EXITS,
+	dataExitFor,
 	exitFor,
+	isChosenExit,
 	STANDARD_EXIT_CODES,
 } from "./command";
 export {
 	checkDecisionNode,
 	type DecidedBy,
 	type DecisionNode,
+	decisionDecider,
 	decisionNodeSchema,
 	decisionOutputFields,
 } from "./decision";
@@ -92,6 +96,7 @@ export {
 	type ValueBy,
 	type ValueDeciderName,
 	type ValueNode,
+	valueDecider,
 	valueDeciderNameSchema,
 	valueNodeSchema,
 	valueOutputFields,

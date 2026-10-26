@@ -61,12 +61,21 @@ export const valueNodeSchema = z.object({
 	expression: z.string().optional(),
 	/** `by: "model"` only: the brief for the model. Supports templates. */
 	prompt: z.string().optional(),
-	/** `by: "model"` only: a decider that can make a value (`valueDeciderNameSchema`). */
-	decider: deciderNameSchema.default("openrouter"),
+	/**
+	 * `by: "model"` only: a decider that can make a value
+	 * (`valueDeciderNameSchema`). Unset: OpenRouter (`valueDecider`). A Value
+	 * by a rule has none.
+	 */
+	decider: deciderNameSchema.optional(),
 	/** `by: "model"` only. The decider's model. Unset: the decider's default chat model. */
 	model: z.string().min(1).optional(),
 });
 export type ValueNode = z.infer<typeof valueNodeSchema>;
+
+/** The decider of a Value by model: its own, else OpenRouter. */
+export function valueDecider(node: Pick<ValueNode, "decider">): DeciderName {
+	return node.decider ?? "openrouter";
+}
 
 /** data: the value made (null on fail). note: why it failed, or the model's note. */
 export const valueOutputFields = ["outcome", "data", "note", "visit"] as const;
@@ -93,9 +102,10 @@ function checkMaker(node: ValueNode, check: NodeCheck): void {
 		if (node.prompt === undefined || node.prompt.trim() === "") {
 			check.error(`Value node "${node.id}" needs a prompt for the model.`);
 		}
-		if (!canMakeValue(node.decider)) {
+		const decider = valueDecider(node);
+		if (!canMakeValue(decider)) {
 			check.error(
-				`Value node "${node.id}" uses the decider "${node.decider}", which cannot make a value. Choose one of: ${valueDeciderNameSchema.options.join(", ")}.`,
+				`Value node "${node.id}" uses the decider "${decider}", which cannot make a value. Choose one of: ${valueDeciderNameSchema.options.join(", ")}.`,
 			);
 		}
 		return;

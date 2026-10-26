@@ -1,4 +1,5 @@
 import {
+	DATA_EXIT_CODE,
 	labelSchema,
 	type NodeOption,
 	type OutcomeColor,
@@ -79,8 +80,11 @@ export function OptionsEditor({
 	onDescribe?: (index: number, description: string | undefined) => void;
 	/** Decisions decided by a rule: the rule of each option. Empty removes it. */
 	onRule?: (index: number, when: string | undefined) => void;
-	/** Command nodes: the exit code of each row. Empty makes it the catch-all. */
-	onCode?: (index: number, code: number | undefined) => void;
+	/**
+	 * Command nodes: the exit code of each row. Empty makes it the
+	 * catch-all; `"data"` an exit the command picks in its data.
+	 */
+	onCode?: (index: number, code: NodeOption["code"]) => void;
 	/** The colour of each row. Undefined goes back to the one from its name. */
 	onColor?: (index: number, color: OutcomeColor | undefined) => void;
 	onAdd: (option: NodeOption) => void;
@@ -174,7 +178,7 @@ function OptionRow({
 	onRename: (name: string) => string | null;
 	onDescribe?: (description: string | undefined) => void;
 	onRule?: (when: string | undefined) => void;
-	onCode?: (code: number | undefined) => void;
+	onCode?: (code: NodeOption["code"]) => void;
 	onColor?: (color: OutcomeColor | undefined) => void;
 	onRemove: () => void;
 	onMove?: (to: number) => void;
@@ -432,8 +436,9 @@ function OutcomeColorPicker({
 }
 
 /**
- * An exit code from 0 to 255, or empty for the catch-all. Keeps what the
- * person types while it is not a valid code yet.
+ * An exit code from 0 to 255, empty for the catch-all, or `data` for an
+ * exit the command picks in its data. Keeps what the person types while it
+ * is not a valid code yet.
  */
 function ExitCodeInput({
 	id,
@@ -442,9 +447,9 @@ function ExitCodeInput({
 	onChange,
 }: {
 	id: string;
-	code: number | undefined;
+	code: NodeOption["code"];
 	label: string;
-	onChange: (code: number | undefined) => void;
+	onChange: (code: NodeOption["code"]) => void;
 }) {
 	const [text, setText] = useState(code === undefined ? "" : String(code));
 
@@ -452,21 +457,22 @@ function ExitCodeInput({
 		setText(code === undefined ? "" : String(code));
 	}, [code]);
 
-	const valid = text.trim() === "" || /^(\d{1,3})$/.test(text.trim());
-	const value = Number(text.trim());
-	const inRange = text.trim() === "" || (valid && value <= 255);
+	const trimmed = text.trim();
+	const valid =
+		trimmed === "" ||
+		trimmed === DATA_EXIT_CODE ||
+		(/^\d{1,3}$/.test(trimmed) && Number(trimmed) <= 255);
 
 	return (
 		<Input
 			id={id}
 			value={text}
-			inputMode="numeric"
 			aria-label={label}
-			aria-invalid={!inRange}
+			aria-invalid={!valid}
 			title={
-				inRange
-					? "Exit code. Leave it empty for any other code."
-					: "Use 0 to 255."
+				valid
+					? "Exit code. Leave it empty for any other code. Write data when the command picks this outcome in its data."
+					: "Use 0 to 255, or data."
 			}
 			placeholder="any"
 			className="h-8 w-14 shrink-0 text-center font-mono text-xs tabular-nums"
@@ -474,10 +480,11 @@ function ExitCodeInput({
 			onChange={(event) => {
 				const next = event.target.value;
 				setText(next);
-				const trimmed = next.trim();
-				if (trimmed === "") onChange(undefined);
-				else if (/^\d{1,3}$/.test(trimmed) && Number(trimmed) <= 255) {
-					onChange(Number(trimmed));
+				const value = next.trim();
+				if (value === "") onChange(undefined);
+				else if (value === DATA_EXIT_CODE) onChange(DATA_EXIT_CODE);
+				else if (/^\d{1,3}$/.test(value) && Number(value) <= 255) {
+					onChange(Number(value));
 				}
 			}}
 		/>

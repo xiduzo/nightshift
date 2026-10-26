@@ -2,6 +2,7 @@
 import {
 	type CommandNode,
 	commandExits,
+	DATA_EXIT_CODE,
 	type Flow,
 	type NodeOption,
 	STANDARD_EXIT_CODES,
@@ -84,7 +85,18 @@ export function CommandFields({
 				<TemplateField
 					id={`${id}-command`}
 					label="Command"
-					hint='The exit code picks the outcome. Put templates in quotes, for example: echo "{{worker.summary}}".'
+					hint={
+						<>
+							Put templates in quotes, for example:{" "}
+							<code className="font-mono">echo "{"{{worker.summary}}"}"</code>.
+							To hand on data, write JSON to{" "}
+							<code className="font-mono">"$NS_OUTPUT"</code>, for example:{" "}
+							<code className="font-mono">
+								echo '{"{"}"count": 3{"}"}' {">"} "$NS_OUTPUT"
+							</code>
+							.
+						</>
+					}
 					flow={flow}
 					nodeId={node.id}
 					value={node.command}
@@ -105,12 +117,17 @@ export function CommandFields({
 							<>
 								The command prints JSON. Later nodes read it as{" "}
 								<code className="font-mono">{`{{${node.id}.data.tests}}`}</code>
-								. Output that is not JSON ends on any other code.
+								. Output that is not JSON ends on any other code. Writing to{" "}
+								<code className="font-mono">"$NS_OUTPUT"</code> is safer: a
+								stray echo cannot break it.
 							</>
 						) : (
 							<>
 								Later nodes read the last lines as{" "}
-								<code className="font-mono">{`{{${node.id}.log_tail}}`}</code>.
+								<code className="font-mono">{`{{${node.id}.log_tail}}`}</code>,
+								and the JSON the command writes to{" "}
+								<code className="font-mono">"$NS_OUTPUT"</code> as{" "}
+								<code className="font-mono">{`{{${node.id}.data}}`}</code>.
 							</>
 						)
 					}
@@ -169,7 +186,7 @@ export function CommandFields({
 				kind="exit"
 				node={node}
 				min={1}
-				hint="Each exit code gets its own edge. Leave the code empty on the last one to catch any other code. Without it, any other code fails the run."
+				hint='Each exit code gets its own edge. Leave the code empty on the last one to catch any other code. Without it, any other code fails the run. An exit with the code data is one the command picks: it writes {"outcome": "name"} to "$NS_OUTPUT".'
 				onChange={onChange}
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}
@@ -236,6 +253,24 @@ export function CommandFields({
 								>
 									<span className="w-8 shrink-0" />
 									Another code
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className="items-start"
+									onClick={() =>
+										addExit({
+											name: uniqueOptionName(exits, "picked"),
+											code: DATA_EXIT_CODE,
+											description: "The command picks it in its data.",
+										})
+									}
+								>
+									<span className="w-8 shrink-0 font-mono">data</span>
+									<span className="flex min-w-0 flex-col">
+										<span>Picked by the command</span>
+										<span className="text-muted-foreground text-xs">
+											It writes {'{"outcome": "picked"}'} to "$NS_OUTPUT".
+										</span>
+									</span>
 								</DropdownMenuItem>
 								{catchAll === -1 ? (
 									<DropdownMenuItem

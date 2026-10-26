@@ -11,6 +11,7 @@ import {
 	type AgentNode,
 	type CallEach,
 	type CallNode,
+	type CommandExit,
 	type CommandNode,
 	commandExits,
 	type DecisionNode,
@@ -19,7 +20,9 @@ import { updateNode } from "./graph";
 
 /** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */
 /** A Decision option, an Agent outcome, or a Command exit (with its `code`). */
-export type NodeOption = DecisionNode["options"][number] & { code?: number };
+export type NodeOption = DecisionNode["options"][number] & {
+	code?: CommandExit["code"];
+};
 /** A node whose outcomes are its own options. */
 export type OptionNode = DecisionNode | AgentNode | CommandNode;
 

@@ -1,5 +1,9 @@
 import type { ValueResult } from "@nightshift/agents/types";
-import { renderTemplate, type ValueNode } from "@nightshift/flows";
+import {
+	renderTemplate,
+	type ValueNode,
+	valueDecider,
+} from "@nightshift/flows";
 import { isWaitKind, type StepContext, stepFailure } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { schemaProblem } from "../../output-schema";
@@ -55,7 +59,8 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 		return fail("No decider is configured for Value nodes.");
 	}
 	// The Device says which text model a node without one starts on.
-	const model = node.model ?? decider.defaultModels[node.decider].value;
+	const maker = valueDecider(node);
+	const model = node.model ?? decider.defaultModels[maker].value;
 	step.record(null, {
 		type: "value-start",
 		by: "model",
@@ -66,7 +71,7 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 	if (invalid !== null) return fail(invalid);
 	const ask = () =>
 		step.device.decide({
-			decider: node.decider,
+			decider: maker,
 			prompt,
 			output: node.output,
 			model,

@@ -74,11 +74,11 @@ const flow: Flow = flowSchema.parse({
 			},
 		},
 		{
-			id: "files",
+			id: "listed",
 			type: "call",
 			position: { x: 0, y: 0 },
 			flow: "trace",
-			each: { source: { kind: "files", glob: "*.md" } },
+			each: { source: { kind: "json", value: "[1, 2]" } },
 		},
 	],
 	edges: [
@@ -114,7 +114,7 @@ describe("takesSuggestion", () => {
 		expect(takes("pick")).toEqual(["expression"]);
 		expect(takes("issue")).toEqual(["arguments"]);
 		expect(takes("traces")).toEqual(["command"]);
-		expect(takes("files")).toEqual([]);
+		expect(takes("listed")).toEqual([]);
 	});
 
 	test("the description and the inputs belong to the flow, without a node", () => {

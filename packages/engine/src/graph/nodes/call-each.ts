@@ -6,7 +6,6 @@ import {
 	newlyBlocked,
 	nextItem,
 	renderCommand,
-	renderTemplate,
 	type TemplateContext,
 	unfinishedBlockers,
 } from "@nightshift/flows";
@@ -39,7 +38,6 @@ import {
 } from "../context";
 import {
 	eachOutputs,
-	fileItems,
 	itemLabel,
 	jsonSourceItems,
 	parseCommandItems,
@@ -477,8 +475,8 @@ function stopBeforeNext(
 }
 
 /**
- * Reads the source as list items: a JSON value, the JSON a command prints
- * in the worktree, or files that match a glob. Throws with a readable
+ * Reads the source as list items: a JSON value, or the JSON a command
+ * prints in the worktree. Throws with a readable
  * message. Ported from `readSource` in engine.ts.
  */
 async function readSource(
@@ -492,10 +490,6 @@ async function readSource(
 	switch (source.kind) {
 		case "json":
 			return jsonSourceItems(source.value, tctx);
-		case "files":
-			return fileItems(renderTemplate(source.glob, tctx), (glob) =>
-				step.device.files({ cwd: worktree, glob }),
-			);
 		case "command": {
 			const { command, env } = renderCommand(source.command, tctx);
 			let stdout = "";

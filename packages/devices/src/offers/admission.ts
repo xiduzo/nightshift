@@ -334,7 +334,6 @@ export function createOfferAdmission(deps: {
 				decide: (async (input: Parameters<Device["decide"]>[0]) =>
 					(await pick()).decide(input as never)) as Device["decide"],
 				worktree: async (run) => (await pick()).worktree(run),
-				files: async (input) => (await pick()).files(input),
 				handOff: async (input) => (await pick()).handOff(input),
 				receiveHandOff: async (input) => (await pick()).receiveHandOff(input),
 				itemBranch: async (input) => (await pick()).itemBranch(input),
@@ -350,7 +349,6 @@ const offerKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
 	"worktree",
-	"files",
 	"itemBranch",
 	"handOff",
 	"receiveHandOff",
@@ -364,7 +362,6 @@ function cwdOf(call: WorkCall): string | null {
 		case "session":
 		case "exec":
 			return call.input.cwd;
-		case "files":
 		case "itemBranch":
 		case "handOff":
 			return call.cwd;
@@ -376,8 +373,8 @@ function cwdOf(call: WorkCall): string | null {
 /**
  * The check of one call of another Person's run, given this computer's
  * Offers in force into the run's Space: an offered session of one of
- * them, or the run's own folder work (its flows, its worktree, its files,
- * its item branches, the Hand-off of its work to and from it). Anything
+ * them, or the run's own folder work (its flows, its worktree, its item
+ * branches, the Hand-off of its work to and from it). Anything
  * else is refused: a command, a tool, the decider, a session it did not
  * offer, and its capabilities (private to its owner). Null when it serves
  * the call.
@@ -392,7 +389,6 @@ function offeredCallRefusal(
 	switch (call.kind) {
 		case "flows":
 		case "worktree":
-		case "files":
 		case "itemBranch":
 		case "handOff":
 		case "receiveHandOff":

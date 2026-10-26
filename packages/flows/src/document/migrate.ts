@@ -1,4 +1,4 @@
-import { githubSubIssuesCommand } from "../recipes";
+import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
 
 /**
  * Brings a flow file of an older version to the current one, as raw JSON,
@@ -27,7 +27,12 @@ import { githubSubIssuesCommand } from "../recipes";
  * Version 5 → 6 (`migrateV5`): the node review of 2026-10 (see
  * `docs/research/node-review-2026-10.md`). Each change that needs a file
  * edit adds its step here.
+ * - `decider` and `model` go from a Decision by a person or a rule and a
+ *   Value by a rule: only a model reads them (`dropUnreadDeciders`).
+ * - A list source `kind: "files"` → a `command` source that asks
+ *   `git ls-files` for the same items (`migrateFilesSource`).
  *
+
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
@@ -65,7 +70,49 @@ export function migrateFlow(json: unknown): unknown {
 export function migrateV5(
 	json: Record<string, unknown>,
 ): Record<string, unknown> {
-	return { ...json, version: 6 };
+	const nodes = Array.isArray(json.nodes)
+		? json.nodes.map((node) => migrateFilesSource(dropUnreadDeciders(node)))
+		: json.nodes;
+	return {
+		...json,
+		version: 6,
+		...(nodes === undefined ? {} : { nodes }),
+	};
+}
+
+/**
+ * A Decision by a person or a rule, and a Value by a rule, lose `decider`
+ * and `model`: the schema wrote a default decider into every one of them,
+ * and only a model reads it. Returns the input unchanged otherwise.
+ */
+function dropUnreadDeciders(json: unknown): unknown {
+	if (!isRecord(json)) return json;
+	if (json.type !== "decision" && json.type !== "value") return json;
+	if (json.by === "model") return json;
+	if (!("decider" in json) && !("model" in json)) return json;
+	const { decider: _decider, model: _model, ...rest } = json;
+	return rest;
+}
+
+/**
+ * A Call node with `each` whose source was `kind: "files"` reads the same
+ * items from a `command` source: `gitFilesCommand` on the same glob.
+ * Returns the input unchanged when it is any other node or source.
+ */
+function migrateFilesSource(json: unknown): unknown {
+	if (!isRecord(json) || json.type !== "call") return json;
+	const each = json.each;
+	if (!isRecord(each)) return json;
+	const source = each.source;
+	if (!isRecord(source) || source.kind !== "files") return json;
+	if (typeof source.glob !== "string") return json;
+	return {
+		...json,
+		each: {
+			...each,
+			source: { kind: "command", command: gitFilesCommand(source.glob) },
+		},
+	};
 }
 
 /**

@@ -205,7 +205,6 @@ export function remoteDevice(
 		},
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
-		files: (input) => once<string[]>({ kind: "files", ...input }),
 		handOff: (input) =>
 			once<{ commit: string; branch: string }>({ kind: "handOff", ...input }),
 		receiveHandOff: (input) =>
@@ -238,9 +237,6 @@ export async function* serveWork(
 				return;
 			case "worktree":
 				yield result(await device.worktree(call.run));
-				return;
-			case "files":
-				yield result(await device.files({ cwd: call.cwd, glob: call.glob }));
 				return;
 			case "itemBranch":
 				yield result(

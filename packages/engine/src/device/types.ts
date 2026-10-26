@@ -69,11 +69,6 @@ export type Device = {
 	 */
 	worktree(run: RunRef): Promise<Worktree>;
 	/**
-	 * The files in the worktree at `cwd` that match a glob, relative and
-	 * sorted, without `.git`. The caller checks the glob stays inside.
-	 */
-	files(input: { cwd: string; glob: string }): Promise<string[]>;
-	/**
 	 * A Call item's branch in the worktree at `cwd`: `name`, else the first
 	 * free `name-2`, `name-3`, …, made at `base` (null: the checked-out
 	 * branch, else `fallback`) and checked out. Refuses a dirty worktree.
@@ -216,6 +211,12 @@ export type ExecInput = {
 	 * Device: the output it yields has them as `•••`.
 	 */
 	secrets?: string[];
+	/**
+	 * Gives the command a new, empty file for its data, named in the
+	 * environment variable `NS_OUTPUT` (a Command step). The `exit` event
+	 * hands back what the command wrote there, and the file goes.
+	 */
+	outputFile?: boolean;
 	/** Aborting kills the whole process group (SIGTERM, then SIGKILL). */
 	signal: AbortSignal;
 };
@@ -228,6 +229,11 @@ export type ExecEvent =
 			exitCode: number | null;
 			/** Set when the command could not start at all. */
 			spawnError: string | null;
+			/**
+			 * With `outputFile`: what the command wrote to `NS_OUTPUT`, with
+			 * secret values as `•••`. Empty when it wrote nothing.
+			 */
+			output?: string;
 	  }
 	/**
 	 * The command did not run: the Device does not have a secret it names.

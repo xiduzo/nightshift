@@ -1,5 +1,6 @@
 import {
 	commandExits,
+	DATA_EXIT_CODE,
 	type FlowIssue,
 	type FlowNode,
 	type FlowNodeType,
@@ -122,7 +123,11 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 		return new Map(
 			commandExits(node).map((exit) => [
 				exit.name,
-				exit.code === undefined ? "any other exit" : `exit ${exit.code}`,
+				exit.code === undefined
+					? "any other exit"
+					: exit.code === DATA_EXIT_CODE
+						? "picked by the command"
+						: `exit ${exit.code}`,
 			]),
 		);
 	}

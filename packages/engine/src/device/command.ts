@@ -1,6 +1,16 @@
 import { spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
-import { dirname } from "node:path";
+import {
+	closeSync,
+	mkdirSync,
+	mkdtempSync,
+	openSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+	writeSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 import type { Device, ExecEvent, ExecInput } from "./types";
 
@@ -23,6 +33,11 @@ export type CommandResult = {
 	refused: string | null;
 	/** The last lines of stdout and stderr together. */
 	logTail: string;
+	/**
+	 * With `outputFile`: what the command wrote to `NS_OUTPUT` ("" when it
+	 * wrote nothing). Null without, or when the Device did not say.
+	 */
+	output: string | null;
 };
 
 /** The last `LOG_TAIL_LINES` lines, at most `LOG_TAIL_BYTES` bytes. */
@@ -61,6 +76,7 @@ export async function runCommand(
 		exitCode: null,
 		spawnError: null,
 		refused: null,
+		output: null,
 	};
 	try {
 		for await (const event of device.exec(command)) {
@@ -73,6 +89,7 @@ export async function runCommand(
 					exitCode: event.exitCode,
 					spawnError: event.spawnError,
 					refused: null,
+					output: event.output ?? null,
 				};
 				break;
 			}
@@ -81,7 +98,12 @@ export async function runCommand(
 			onOutput(event.stream, event.text);
 		}
 	} catch (error) {
-		exit = { exitCode: null, spawnError: messageOf(error), refused: null };
+		exit = {
+			exitCode: null,
+			spawnError: messageOf(error),
+			refused: null,
+			output: null,
+		};
 	} finally {
 		closeSync(log);
 	}
@@ -93,15 +115,21 @@ export async function runCommand(
  * own process group. Yields every chunk of stdout and stderr, then one
  * `exit`. Aborting the signal kills the whole group (SIGTERM, then
  * SIGKILL). Never throws.
+ *
+ * With `outputFile`, the command gets a new, empty file in a folder of its
+ * own under the system's temp folder, named in `NS_OUTPUT`. The `exit`
+ * event holds what it wrote there, and the folder goes. Without, a
+ * `NS_OUTPUT` that Night Shift itself was started with does not reach it.
  */
 export async function* spawnCommand(
 	input: ExecInput,
 	/** Taken out of Night Shift's environment before `env` is added. */
 	scrubEnv: readonly string[] = [],
 ): AsyncGenerator<ExecEvent> {
-	const { command, cwd, env, signal } = input;
+	const { command, cwd, env, signal, outputFile = false } = input;
 	const inherited = { ...process.env };
 	for (const name of scrubEnv) delete inherited[name];
+	delete inherited[OUTPUT_ENV];
 	const queue: ExecEvent[] = [];
 	let wake: (() => void) | null = null;
 	const push = (event: ExecEvent) => {
@@ -112,12 +140,19 @@ export async function* spawnCommand(
 	};
 	const timers: ReturnType<typeof setTimeout>[] = [];
 	let settled = false;
+	let output: OutputFile | null = null;
 	const finish = (exitCode: number | null, spawnError: string | null) => {
 		if (settled) return;
 		settled = true;
 		for (const timer of timers) clearTimeout(timer);
 		signal.removeEventListener("abort", onAbort);
-		push({ type: "exit", exitCode, spawnError });
+		const written = output?.take();
+		push({
+			type: "exit",
+			exitCode,
+			spawnError,
+			...(written === undefined ? {} : { output: written }),
+		});
 	};
 
 	let child: ReturnType<typeof spawn> | undefined;
@@ -144,9 +179,14 @@ export async function* spawnCommand(
 	}
 
 	try {
+		if (outputFile) output = openOutputFile();
 		child = spawn("sh", ["-c", command], {
 			cwd,
-			env: { ...inherited, ...env },
+			env: {
+				...inherited,
+				...env,
+				...(output ? { [OUTPUT_ENV]: output.path } : {}),
+			},
 			detached: true,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
@@ -187,6 +227,34 @@ export async function* spawnCommand(
 			finish(null, null);
 		}
 	}
+}
+
+/** The environment variable that names a Command step's data file. */
+const OUTPUT_ENV = "NS_OUTPUT";
+
+/** A command's data file, and how to read it once and remove it. */
+type OutputFile = { path: string; take: () => string };
+
+/** A new, empty file in a folder of its own. Throws when it cannot make one. */
+function openOutputFile(): OutputFile {
+	const dir = mkdtempSync(join(tmpdir(), "nightshift-output-"));
+	const path = join(dir, "output.json");
+	writeFileSync(path, "");
+	let taken: string | null = null;
+	return {
+		path,
+		take() {
+			if (taken !== null) return taken;
+			try {
+				taken = readFileSync(path, "utf8");
+			} catch {
+				// The command removed it: it wrote nothing.
+				taken = "";
+			}
+			rmSync(dir, { recursive: true, force: true });
+			return taken;
+		},
+	};
 }
 
 function messageOf(error: unknown): string {

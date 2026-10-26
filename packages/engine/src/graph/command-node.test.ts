@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
@@ -439,6 +440,28 @@ describe("the Command node", () => {
 			expect(log).not.toContain("behandelaar");
 		});
 
+		test("a secret value the command writes to NS_OUTPUT is ••• in data", async () => {
+			const h = withSecrets(
+				await startRun(
+					sandbox,
+					flowOf({
+						start: "login",
+						nodes: [
+							command(
+								"login",
+								`printf '{"token": "%s"}' "$ZAC_PASSWORD" > "$NS_OUTPUT"`,
+								{ secrets: ["ZAC_PASSWORD"] },
+							),
+						],
+						edges: [],
+					}),
+				),
+			);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			expect(state.nodes.login?.data).toEqual({ token: "•••" });
+		});
+
 		test("a secret the Device does not have errors the step before the command runs", async () => {
 			const marker = join(sandbox.repoPath, "ran");
 			const h = withSecrets(
@@ -598,6 +621,193 @@ describe("the Command node", () => {
 			expect(ended).toMatchObject({
 				outcome: "other",
 				error: "The command's output is not valid JSON.",
+			});
+		});
+	});
+
+	describe("NS_OUTPUT", () => {
+		test("the JSON the command writes there is `data`; stdout stays the log", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command(
+							"check",
+							`echo "counting"; echo '{"tests": 3}' > "$NS_OUTPUT"; echo done`,
+						),
+						command("report", `echo "{{check.data.tests}}"`),
+					],
+					edges: [{ id: "e1", from: "check", outcome: "pass", to: "report" }],
+				}),
+			);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			expect(state.nodes.check?.data).toEqual({ tests: 3 });
+			expect(state.nodes.check?.log_tail).toBe("counting\ndone");
+			expect(payloads(await h.events(), "StepEnded")[1]?.outputs.log_tail).toBe(
+				"3",
+			);
+		});
+
+		test("the file wins over stdout with output json; an empty file leaves stdout", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "file",
+					nodes: [
+						command(
+							"file",
+							`echo '{"from": "stdout"}'; echo '{"from": "file"}' > "$NS_OUTPUT"`,
+							{ output: "json" },
+						),
+						command("printed", `echo '{"from": "stdout"}'`, {
+							output: "json",
+						}),
+					],
+					edges: [{ id: "e1", from: "file", outcome: "pass", to: "printed" }],
+				}),
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.nodes.file?.data).toEqual({ from: "file" });
+			expect(state.nodes.printed?.data).toEqual({ from: "stdout" });
+		});
+
+		test("each step gets a new, empty file of its own, and it goes when the step ends", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "first",
+					nodes: [
+						command(
+							"first",
+							`echo "$NS_OUTPUT"; echo '{"n": 1}' > "$NS_OUTPUT"`,
+						),
+						command("second", `test ! -s "$NS_OUTPUT" && echo "$NS_OUTPUT"`),
+					],
+					edges: [{ id: "e1", from: "first", outcome: "pass", to: "second" }],
+				}),
+			);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			const first = String(state.nodes.first?.log_tail);
+			const second = String(state.nodes.second?.log_tail);
+			expect(first).not.toBe("");
+			expect(second).not.toBe(first);
+			expect(existsSync(first)).toBe(false);
+			expect(state.nodes.second?.data).toBeUndefined();
+		});
+
+		test("a file that is not JSON ends on the catch-all, whatever output says", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", `echo 'count=3' > "$NS_OUTPUT"`),
+						command("after", "true"),
+					],
+					edges: [{ id: "e1", from: "check", outcome: "fail", to: "after" }],
+				}),
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.ended?.nodeId).toBe("after");
+			expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
+				outcome: "fail",
+				error: "The data the command wrote is not valid JSON.",
+			});
+		});
+	});
+
+	describe("data.outcome", () => {
+		const exits = [
+			{ name: "created", code: 0 },
+			{ name: "exists", code: "data" },
+			{ name: "failure", code: 1 },
+			{ name: "other" },
+		];
+		const pick = (cmd: string) =>
+			startRun(
+				sandbox,
+				flowOf({
+					start: "branch",
+					nodes: [
+						command("branch", cmd, { exits }),
+						command("reuse", "true"),
+						command("fix", "true"),
+					],
+					edges: [
+						{ id: "e1", from: "branch", outcome: "exists", to: "reuse" },
+						{ id: "e2", from: "branch", outcome: "failure", to: "fix" },
+					],
+				}),
+			);
+
+		test("data that names an exit ends on it and takes its edge", async () => {
+			const h = await pick(`echo '{"outcome": "exists"}' > "$NS_OUTPUT"`);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			expect(state.ended?.nodeId).toBe("reuse");
+			expect(state.nodes.branch).toMatchObject({
+				outcome: "exists",
+				exit_code: 0,
+				data: { outcome: "exists" },
+			});
+		});
+
+		test("the data wins over the exit code", async () => {
+			const h = await pick(
+				`echo '{"outcome": "exists"}' > "$NS_OUTPUT"; exit 1`,
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.nodes.branch?.outcome).toBe("exists");
+			expect(state.nodes.branch?.exit_code).toBe(1);
+		});
+
+		test("data that names no exit leaves the pick to the exit code", async () => {
+			const h = await pick(`echo '{"outcome": "nope"}' > "$NS_OUTPUT"; exit 1`);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.ended?.nodeId).toBe("fix");
+			expect(state.nodes.branch?.outcome).toBe("failure");
+		});
+
+		test("stdout JSON with output json picks too", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "branch",
+					nodes: [
+						command("branch", `echo '{"outcome": "exists"}'`, {
+							exits,
+							output: "json",
+						}),
+					],
+					edges: [],
+				}),
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.nodes.branch?.outcome).toBe("exists");
+		});
+
+		test("an exit only data picks ends the run as chosen when it has no edge", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "branch",
+					nodes: [
+						command("branch", `echo '{"outcome": "exists"}' > "$NS_OUTPUT"`, {
+							exits,
+						}),
+					],
+					edges: [],
+				}),
+			);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			expect(state.ended).toMatchObject({
+				status: "finished",
+				outcome: "exists",
+				reason: null,
 			});
 		});
 	});

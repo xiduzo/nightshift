@@ -53,7 +53,7 @@ export function NodeOptionsField<T extends OptionNode>({
 	onRenameOutcome: (index: number, name: string) => string | null;
 	onRemoveOutcome: (index: number) => void;
 	/** Command exits: the code of each row. */
-	onCode?: (index: number, code: number | undefined) => void;
+	onCode?: (index: number, code: NodeOption["code"]) => void;
 	/** Replaces the add button. */
 	addControl?: ReactNode;
 	/** Below the list, such as a way back to the standard outcomes. */
