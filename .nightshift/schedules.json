@@ -1,0 +1,46 @@
+{
+	"version": 1,
+	"schedules": [
+		{
+			"id": "night-chores",
+			"flow": "night-chores",
+			"inputs": {},
+			"cron": "0 2 * * *",
+			"baseRef": "main",
+			"enabled": false
+		},
+		{
+			"id": "dependency-bump",
+			"flow": "dependency-bump",
+			"inputs": {},
+			"cron": "0 3 * * 1",
+			"baseRef": "main",
+			"enabled": false
+		},
+		{
+			"id": "pr-review",
+			"flow": "pr-review",
+			"inputs": {
+				"pr": "{{event.body.pull_request.number}}"
+			},
+			"webhook": {
+				"secret": "${GITHUB_WEBHOOK_SECRET}",
+				"when": "event.headers.`x-github-event` = \"pull_request\" and event.body.action in [\"opened\", \"synchronize\"]"
+			},
+			"enabled": false
+		},
+		{
+			"id": "ci-done",
+			"inputs": {},
+			"webhook": {
+				"secret": "${GITHUB_WEBHOOK_SECRET}",
+				"when": "event.headers.`x-github-event` = \"check_suite\" and event.body.action = \"completed\""
+			},
+			"signal": {
+				"name": "ci-done",
+				"key": "event.body.check_suite.head_sha"
+			},
+			"enabled": false
+		}
+	]
+}

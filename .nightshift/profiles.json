@@ -1,0 +1,31 @@
+{
+	"version": 1,
+	"profiles": [
+		{
+			"name": "builder",
+			"description": "Builds and fixes code on its own at night: Claude Code on Sonnet, at high effort.",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"effort": "high",
+			"permissionMode": "auto",
+			"clis": [],
+			"connections": []
+		},
+		{
+			"name": "reviewer",
+			"description": "Reads code and reports findings, and changes no file: Claude Code on Sonnet in plan mode.",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"effort": "high",
+			"permissionMode": "plan",
+			"clis": [],
+			"connections": []
+		},
+		{
+			"name": "triage",
+			"description": "Decides a small question from findings: Jev on OpenRouter.",
+			"decider": "openrouter",
+			"model": "~typesafe/jev-latest"
+		}
+	]
+}
