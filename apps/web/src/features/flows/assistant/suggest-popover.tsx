@@ -37,6 +37,7 @@ import {
 	useState,
 } from "react";
 import { Markdown } from "@/shared/markdown";
+import { AgentPicker, agentRequest } from "./agent-picker";
 import {
 	applyToDraft,
 	type FlowAssistant,
@@ -191,6 +192,7 @@ function SuggestBody({
 			projectId: assistant.projectId,
 			flowName: assistant.flowName,
 			flow: assistant.flow,
+			...agentRequest(),
 			nodeId,
 			kind,
 			instruction: text.trim(),
@@ -208,6 +210,7 @@ function SuggestBody({
 				<PopoverDescription className="text-xs">
 					{description}
 				</PopoverDescription>
+				<AgentPicker purpose="suggest" className="-ml-2 self-start" />
 			</PopoverHeader>
 
 			{state.status === "idle" || state.status === "failed" ? (

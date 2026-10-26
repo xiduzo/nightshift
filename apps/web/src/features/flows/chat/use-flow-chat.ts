@@ -1,6 +1,7 @@
 import type { Flow } from "@nightshift/flows";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { client } from "@/shared/api";
+import { agentRequest } from "../assistant/agent-picker";
 import {
 	aboutRun,
 	applyChatEvent,
@@ -55,7 +56,10 @@ export function useFlowChat(projectId: string, flowName: string) {
 			running.current = controller;
 			const baseJson = JSON.stringify(flow);
 			const id = crypto.randomUUID();
-			const request = chatRequest(base, { projectId, flowName, flow, message });
+			const request = {
+				...chatRequest(base, { projectId, flowName, flow, message }),
+				...agentRequest(),
+			};
 			const started = startAnswer(base, message, {
 				person: `${id}:person`,
 				agent: `${id}:agent`,
