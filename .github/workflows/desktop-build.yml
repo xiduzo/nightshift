@@ -78,6 +78,19 @@ jobs:
           p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
           p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
 
+      # The macOS runner ran out of space while it made the disk image. The
+      # build does not use the Android SDK or the other Xcode versions.
+      - name: Free disk space
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          df -h /
+          sudo rm -rf ~/Library/Android "$ANDROID_HOME" /Users/runner/.dotnet /usr/local/share/dotnet
+          selected="$(cd "$(xcode-select -p)/../.." && pwd -P)"
+          for xcode in /Applications/Xcode_*.app; do
+            [ "$(cd "$xcode" && pwd -P)" = "$selected" ] || sudo rm -rf "$xcode"
+          done
+          df -h /
+
       - name: Build
         run: bun run --cwd apps/desktop build:stable
         env:
@@ -85,6 +98,10 @@ jobs:
           ELECTROBUN_TEAMID: ${{ secrets.ELECTROBUN_TEAMID }}
           ELECTROBUN_APPLEID: ${{ secrets.ELECTROBUN_APPLEID }}
           ELECTROBUN_APPLEIDPASS: ${{ secrets.ELECTROBUN_APPLEIDPASS }}
+
+      - name: Show disk space
+        if: always() && startsWith(matrix.os, 'macos')
+        run: df -h /
 
       - uses: actions/upload-artifact@v4
         with:
