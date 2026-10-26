@@ -1114,14 +1114,9 @@ function allWorkspaces(root: string): string[] {
  * Shape: { entry: ["name"] }
  */
 export const PENDING_NAMES: Record<string, string[]> = {
-	// The assistant's shared logic. The chat (agents, daemon) and the canvas
-	// diff (web) of the assistant build import them.
-	"@nightshift/flows": [
-		"diffFlows",
-		"flowAuthoringGuide",
-		"flowDiffSummary",
-		"proposalIssues",
-	],
+	// The assistant's shared logic. The chat (agents, daemon) of the
+	// assistant build imports them.
+	"@nightshift/flows": ["flowAuthoringGuide", "proposalIssues"],
 };
 
 type Entry = {

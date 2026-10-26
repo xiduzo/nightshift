@@ -20,10 +20,17 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import { cn } from "@nightshift/ui/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
-import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
+import {
+	CheckIcon,
+	CircleDotIcon,
+	PlayIcon,
+	SaveIcon,
+	SparklesIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/shared/page";
@@ -34,6 +41,9 @@ import {
 	OpenFlowContext,
 } from "../canvas/open-flow-context";
 import { useFoldedSections } from "../canvas/sections/use-section-canvas";
+import { FlowChatPanel } from "../chat/chat-panel";
+import { ProposalBar } from "../chat/proposal-bar";
+import { useChatPanel } from "../chat/use-chat-panel";
 import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
@@ -372,6 +382,21 @@ function Editor({
 		flow: draft,
 		changeFlow,
 	};
+	// The chat beside the canvas, and the proposal the canvas shows instead of the draft.
+	const chat = useChatPanel(assistant, { openAtStart: !initiallySaved });
+	const preview = chat.preview;
+	const previewCheck = useMemo(
+		() =>
+			preview &&
+			checkFlow(
+				preview.proposed,
+				projectFlows.flows,
+				name,
+				connectionNames,
+				profileNames,
+			),
+		[preview, projectFlows.flows, name, connectionNames, profileNames],
+	);
 
 	const inspector = selectedNode ? (
 		<NodeInspector
@@ -449,7 +474,7 @@ function Editor({
 		setSelection(null);
 		setSettingsOpen(false);
 	}, []);
-	const inspectorOpen = inspector !== null;
+	const inspectorOpen = inspector !== null && !preview;
 	// Escape closes the inspector, but not while you type in a field or a
 	// menu, a list or a dialog has the focus: Escape closes those first.
 	useEffect(() => {
@@ -523,6 +548,15 @@ function Editor({
 					{saveFlow.isPending ? "Saving…" : "Save"}
 				</Button>
 				<Button
+					variant={chat.open ? "secondary" : "outline"}
+					size="sm"
+					aria-pressed={chat.open}
+					onClick={chat.toggle}
+				>
+					<SparklesIcon data-icon="inline-start" />
+					Build with an agent
+				</Button>
+				<Button
 					size="sm"
 					onClick={() => setStarting(true)}
 					disabled={runBlockedBy !== null}
@@ -539,12 +573,16 @@ function Editor({
 						<OpenFlowContext.Provider value={openFlow}>
 							<EnterSubflowContext.Provider value={subflows.enter}>
 								<EditorCanvas
-									flow={draft}
-									routesKey={`${projectId}/${name}`}
-									check={check}
-									selection={selection}
+									// A proposal is its own canvas: it fits the view anew,
+									// and keeps no routes of the draft.
+									key={preview ? "proposal" : "draft"}
+									flow={preview?.flow ?? draft}
+									routesKey={`${projectId}/${name}${preview ? "#proposal" : ""}`}
+									check={previewCheck ?? check}
+									selection={preview ? null : selection}
 									folded={folds.folded}
-									onFlowChange={changeFlow}
+									onFlowChange={preview ? ignoreChange : changeFlow}
+									preview={preview ?? undefined}
 									onSelect={setSelection}
 									onSetFolded={sections.setSectionFolded}
 									onMakeSection={makeSection}
@@ -574,16 +612,25 @@ function Editor({
 							}}
 							className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
 						/>
-						<NodeDock
-							onAdd={(type) => addNode(type)}
-							onDragChange={setDragging}
-							className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
-						/>
-						<IssuesPopover
-							check={check}
-							onSelect={selectIssue}
-							className="pointer-events-auto absolute right-3 bottom-3 lg:top-3 lg:right-auto lg:bottom-auto lg:left-1/2 lg:-translate-x-1/2"
-						/>
+						{preview ? (
+							<ProposalBar
+								onHide={chat.hidePreview}
+								className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+							/>
+						) : (
+							<>
+								<NodeDock
+									onAdd={(type) => addNode(type)}
+									onDragChange={setDragging}
+									className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
+								/>
+								<IssuesPopover
+									check={check}
+									onSelect={selectIssue}
+									className="pointer-events-auto absolute right-3 bottom-3 lg:top-3 lg:right-auto lg:bottom-auto lg:left-1/2 lg:-translate-x-1/2"
+								/>
+							</>
+						)}
 						{dragging ? (
 							<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-primary/40 border-dashed pb-20">
 								<span className="rounded-full bg-background px-3 py-1 text-muted-foreground text-xs shadow-sm">
@@ -591,11 +638,21 @@ function Editor({
 								</span>
 							</div>
 						) : null}
-						{inspector ? (
+						{chat.open ? (
+							<FlowChatPanel
+								{...chat.panel}
+								className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(380px,calc(100%-1.5rem))]"
+							/>
+						) : null}
+						{inspector && !preview ? (
 							<FloatingInspector
 								label={selection ? "Selected" : "Flow settings"}
 								onClose={closeInspector}
-								className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]"
+								className={cn(
+									"pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]",
+									// Beside the chat on a wide screen, over it on a narrow one.
+									chat.open && "lg:right-[calc(380px+1.5rem)]",
+								)}
 							>
 								<FlowAssistantContext.Provider value={assistant}>
 									<div key={selectionKey(selection)}>{inspector}</div>
@@ -666,6 +723,9 @@ function Editor({
 		</>
 	);
 }
+
+/** The canvas of a proposal is read only. */
+function ignoreChange() {}
 
 function selectionKey(selection: Selection): string {
 	if (!selection) return "flow";
