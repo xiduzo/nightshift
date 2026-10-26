@@ -58,6 +58,16 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			...orpc.runs.list.queryOptions({ input: {} }),
 			meta: { quietRefetchErrors: true },
 		}),
+		/**
+		 * The runs of every project still on their way: at work, waiting at a
+		 * Gate, or asleep. A failed read again keeps the list.
+		 */
+		open: () => ({
+			...orpc.runs.list.queryOptions({
+				input: { statuses: ["running", "waiting", "sleeping"] },
+			}),
+			meta: { quietRefetchErrors: true },
+		}),
 		/** The sleeping runs of every project, for the inbox. A failed read does not toast. */
 		sleeping: () => ({
 			...orpc.runs.list.queryOptions({ input: { statuses: ["sleeping"] } }),

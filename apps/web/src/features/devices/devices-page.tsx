@@ -67,7 +67,8 @@ export function DevicesPage({
 	const overview = useQuery(deviceQueries.overviewLive());
 	const spaceDevices = useQuery(deviceQueries.spaceLive());
 	const spaces = useQuery(spaceQueries.list());
-	const runs = useQuery(runQueries.everyRun());
+	// Only the runs on their way: Night Shift filters them, not every run of the Space.
+	const runs = useQuery(runQueries.open());
 	const projects = useQuery(projectQueries.list());
 	const phones = useQuery(deviceQueries.phonesLive());
 	const now = useNow(30_000);
