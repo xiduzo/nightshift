@@ -13,8 +13,8 @@ import {
 	createRunLog,
 	getRunRow,
 	type LandedRunListener,
+	type LandedScope,
 	logMemberChange,
-	onLandedRunEvents,
 	planOf,
 	type RunLog,
 	type RunRow,
@@ -120,10 +120,11 @@ export interface Engine {
 	/**
 	 * Calls `listener` with the run events that land in this Replica from
 	 * now on: appended here, or brought by the exchange from another
-	 * Walker. Each carries its run's Space. The notifier reads Gates and
-	 * run endings from it. Returns the unsubscribe.
+	 * Walker. Each carries its Space and Walker, with no query (the landed
+	 * feed). `scope`: of these Spaces and Walkers only. The notifier reads
+	 * Gates and run endings from it. Returns the unsubscribe.
 	 */
-	onRunEvents(listener: LandedRunListener): () => void;
+	onRunEvents(listener: LandedRunListener, scope?: LandedScope): () => void;
 	/**
 	 * A run's status, when it wakes, and whether this computer walks it or
 	 * runs its steps, in any Space of this Replica. Null for a run it does
@@ -487,7 +488,7 @@ export function createEngine(
 			return spaceOfRun(db, runId);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
-		onRunEvents: (listener) => onLandedRunEvents(db, runLog, listener),
+		onRunEvents: (listener, scope) => history.landed.subscribe(listener, scope),
 		async runHere(runId) {
 			await ready;
 			return reads.runHere(runId);
@@ -498,6 +499,7 @@ export function createEngine(
 		},
 		async dispose() {
 			lifetime.abort();
+			history.landed.close();
 			await runner.release();
 		},
 	};

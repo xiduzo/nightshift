@@ -1,4 +1,4 @@
-/** The event log of each run: the event payloads, append and parse, the run log in memory, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, and the stamps of the copies of a step's files, and the worktrees removed on this computer. */
+/** The event log of each run: the event payloads, append and parse, the run log in memory, the landed feed, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, and the stamps of the copies of a step's files, and the worktrees removed on this computer. */
 
 export type { RunBus } from "./bus";
 export { createRunBus } from "./bus";
@@ -35,10 +35,10 @@ export {
 	type OwnStepFiles,
 	type RunHistory,
 } from "./history";
-export {
-	type LandedRunEvent,
-	type LandedRunListener,
-	onLandedRunEvents,
+export type {
+	LandedRunEvent,
+	LandedRunListener,
+	LandedScope,
 } from "./landed";
 export { logMemberChange } from "./member-events";
 export type { Derive, RunLog } from "./run-log";

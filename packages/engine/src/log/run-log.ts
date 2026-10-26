@@ -4,12 +4,14 @@ import { asc, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { stampedAppend } from "./command-stamp";
 import {
-	appendEvent,
+	appendEventRow,
 	type EngineEventType,
 	type EventInput,
 	type EventWrites,
 	groupByRun,
+	type LandedEvent,
 	type LoggedEvent,
+	landedEvent,
 	parseEventRow,
 } from "./events";
 
@@ -39,7 +41,8 @@ import {
  * - An append made while a Command is applied (`asCommand`) carries the
  *   Command's id when it is the Command's first event of its run.
  * - `onLanded` tells a listener about every event that landed, appended or
- *   ingested: the exchange pushes and streams on it.
+ *   ingested, with its Space and Walker: the landed feed (`landed.ts`)
+ *   is its one reader.
  */
 
 /** An event another Walker wrote, as the exchange carries it. */
@@ -57,7 +60,7 @@ export type ForeignEvent = {
 };
 
 /** Called with the events that just landed in this Replica. */
-export type LandedListener = (events: readonly LoggedEvent[]) => void;
+export type LandedListener = (events: readonly LandedEvent[]) => void;
 
 /** A pure function of one run's log, kept by identity. */
 export type Derive<T> = (events: readonly LoggedEvent[]) => T;
@@ -116,7 +119,7 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 	/** Counts the appends per run, so a read that raced one is not kept. */
 	const versions = new Map<string, number>();
 	const landedListeners = new Set<LandedListener>();
-	function landed(events: readonly LoggedEvent[]): void {
+	function landed(events: readonly LandedEvent[]): void {
 		if (events.length === 0) return;
 		for (const listener of [...landedListeners]) {
 			try {
@@ -312,13 +315,12 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 			writes?: EventWrites,
 		): Promise<LoggedEvent> {
 			const walker = await walkerId();
-			const logged = await stampedAppend(
-				input.runId,
-				input.payload,
-				(payload) => appendEvent(db, { ...input, payload }, walker, writes),
+			const row = await stampedAppend(input.runId, input.payload, (payload) =>
+				appendEventRow(db, { ...input, payload }, walker, writes),
 			);
+			const logged = parseEventRow(row);
 			keep(logged);
-			landed([logged]);
+			landed([landedEvent(row, logged)]);
 			return logged;
 		},
 
@@ -364,6 +366,7 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 				],
 			);
 			const added: LoggedEvent[] = [];
+			const told: LandedEvent[] = [];
 			for (const [i] of inserts.entries()) {
 				const [row] = results[
 					before.length + i
@@ -372,8 +375,9 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 				const logged = parseEventRow(row);
 				keep(logged);
 				added.push(logged);
+				told.push(landedEvent(row, logged));
 			}
-			landed(added);
+			landed(told);
 			return added;
 		},
 

@@ -104,6 +104,7 @@ export type {
 	HistoryRows,
 	LandedRunEvent,
 	LandedRunListener,
+	LandedScope,
 	LoggedEvent,
 	OwnStepFiles,
 	RunBus,

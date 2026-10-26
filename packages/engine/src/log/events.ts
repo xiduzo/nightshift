@@ -523,6 +523,16 @@ export async function appendEvent<T extends EngineEventType>(
 	walkerId: string,
 	writes: EventWrites = {},
 ): Promise<LoggedEvent> {
+	return parseEventRow(await appendEventRow(db, input, walkerId, writes));
+}
+
+/** `appendEvent`, as the row it committed: with its Space and its Walker's count. */
+export async function appendEventRow<T extends EngineEventType>(
+	db: Database,
+	input: EventInput<T>,
+	walkerId: string,
+	writes: EventWrites = {},
+): Promise<typeof event.$inferSelect> {
 	const insert = db
 		.insert(event)
 		.values({
@@ -548,7 +558,7 @@ export async function appendEvent<T extends EngineEventType>(
 					])
 				)[before.length] as (typeof event.$inferSelect)[]);
 	if (!row) throw new Error(`Could not append ${input.type}.`);
-	return parseEventRow(row);
+	return row;
 }
 
 /** The Space of an event: its run's, else its project's, else the one it names. */
@@ -564,6 +574,29 @@ function spaceOf(input: EventInput<EngineEventType>) {
 		);
 	}
 	return sql`(select ${project.spaceId} from ${project} where ${project.id} = ${projectId})`;
+}
+
+/**
+ * An event as it landed in this Replica: with its Space, and its identity,
+ * its Walker and its number among that Walker's events (`walker_seq`).
+ */
+export type LandedEvent = LoggedEvent & {
+	spaceId: string;
+	walkerId: string;
+	walkerSeq: number;
+};
+
+/** The event of a committed row, as it landed. `logged`: the row, parsed. */
+export function landedEvent(
+	row: typeof event.$inferSelect,
+	logged: LoggedEvent,
+): LandedEvent {
+	return {
+		...logged,
+		spaceId: row.spaceId,
+		walkerId: row.walkerId,
+		walkerSeq: row.walkerSeq,
+	};
 }
 
 export function parseEventRow(row: typeof event.$inferSelect): LoggedEvent {

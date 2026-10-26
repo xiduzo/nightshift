@@ -6,6 +6,7 @@ import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { RunBus } from "./bus";
 import { asCommand } from "./command-stamp";
 import type { LoggedEvent } from "./events";
+import { createLandedFeed, type LandedFeed } from "./landed";
 import type { ForeignEvent, RunLog } from "./run-log";
 import { followWalkerMoves, runsArriving } from "./run-row";
 import type { TranscriptEntry } from "./step-events";
@@ -111,6 +112,7 @@ export function createRunHistory(deps: {
 	bus: RunBus;
 }) {
 	const { db, dataDir, log, bus } = deps;
+	const landed: LandedFeed = createLandedFeed({ db, log });
 
 	/**
 	 * The run rows of `spaces` after `cursors`, in the order their events
@@ -133,24 +135,25 @@ export function createRunHistory(deps: {
 		const limit = input.limit ?? 500;
 		const found: (typeof event.$inferSelect)[] = [];
 		const cursors: HistoryCursors = {};
-		if (input.spaces.length === 0) return { rows: NO_ROWS, cursors };
-		const walkers = await db
-			.selectDistinct({ spaceId: event.spaceId, walkerId: event.walkerId })
-			.from(event)
-			.where(
-				and(
-					inArray(event.spaceId, [...input.spaces]),
-					isNotNull(event.runId),
-					input.only ? eq(event.walkerId, input.only) : undefined,
-					input.except ? sql`${event.walkerId} <> ${input.except}` : undefined,
-				),
-			);
+		const scope = {
+			...(input.only !== undefined ? { only: input.only } : {}),
+			...(input.except !== undefined ? { except: input.except } : {}),
+		};
+		// Nothing new for these cursors: no query at all.
+		if (!landed.hasAfter(input.spaces, input.cursors, scope)) {
+			return { rows: NO_ROWS, cursors };
+		}
+		// Only the Walkers with events after their cursor are read.
+		const walkers = await landed.walkersAfter(
+			input.spaces,
+			input.cursors,
+			scope,
+		);
 		// Each Walker's first `limit` in a Space hold all of its events among
 		// the first `limit` of them all: the merge by `seq` takes those.
 		/** Each event's place in its Walker's order, in this batch. */
 		const next = new Map<(typeof found)[number], number>();
-		for (const { spaceId, walkerId } of walkers) {
-			const after = input.cursors[spaceId]?.[walkerId] ?? 0;
+		for (const { spaceId, walkerId, after } of walkers) {
 			const list = await db
 				.select()
 				.from(event)
@@ -576,6 +579,8 @@ export function createRunHistory(deps: {
 	}
 
 	return {
+		/** Every run event as it lands here, with its Space; and the latest per Space and Walker. */
+		landed,
 		rowsAfter,
 		ingest,
 		runOwner,
