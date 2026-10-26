@@ -305,3 +305,84 @@ export function retryPrompt(problems: readonly string[]): string {
 		"Fix these problems and report the whole suggestion again.",
 	].join("\n");
 }
+
+/** The draft in a few lines: its steps, inputs and outputs. */
+export function draftSummary(flow: Flow): string {
+	const lines = [
+		flow.description ? `Description: ${flow.description}` : "",
+		flow.nodes.length > 0
+			? `Steps: ${flow.nodes.map((node) => `\`${node.id}\` (${node.type})`).join(", ")}. Starts at \`${flow.start}\`.`
+			: "No steps yet: the flow is empty.",
+		flow.inputs.length > 0
+			? `Inputs: ${flow.inputs.map((input) => `\`${input.name}\``).join(", ")}.`
+			: "",
+		flow.outputs.length > 0
+			? `Outputs: ${flow.outputs.map((output) => `\`${output.name}\``).join(", ")}.`
+			: "",
+	];
+	return lines.filter(Boolean).join("\n");
+}
+
+/** What the first message of a chat needs. */
+export type ChatPromptInput = {
+	flowName: string;
+	flow: Flow;
+	message: string;
+	/** The chat is about this run of the flow. */
+	runId?: string;
+};
+
+function runTask(runId: string): string[] {
+	return [
+		`# This chat is about run ${runId}`,
+		"",
+		"The person asks about this run of the flow, often one that failed. Call `get_run` first. Then explain in plain words what went wrong and why, in a few sentences. When a change to the flow would prevent it (a retry edge, a loop limit, a command that uses the wrong script, a prompt that lacks context), propose that change with `propose_flow`. When the cause is outside the flow (the code, a missing login), say what the person can do.",
+		"",
+	];
+}
+
+/** The first message of a chat: the role, the rules, the flow, then the person's message. */
+export function chatPrompt(input: ChatPromptInput): string {
+	return [
+		"You help a person build a Night Shift flow in its editor, in a chat beside the canvas. You only read and propose: never change a file. The person sees your proposal on the canvas and applies it or not, then saves.",
+		"",
+		"# How to work",
+		"",
+		"1. Read before you write. Call `get_draft` for the flow as the person has it now. Read the project in this folder when it helps (AGENTS.md, the README, the package scripts, CI config, skills). Read what you need, then answer.",
+		"2. Look names up, do not invent them: `list_profiles`, `list_tools`, `list_skills`, `list_flows` and `get_flow`. Reuse a flow with a Subflow (`call`) node instead of copying its steps.",
+		"3. To change the flow, write the whole flow, not a patch. Keep the ids and positions of the nodes and edges you do not change, so the person sees a small change.",
+		"4. Call `check_flow` and fix every error. Then call `propose_flow` with the flow and a one- or two-sentence summary.",
+		"5. After `propose_flow`, end your turn with a short message. Do not paste the flow's JSON in your answer.",
+		"",
+		"Answer in short Markdown, to the person: plain words, no internals of Night Shift. Ask when the goal is not clear: what starts the flow, what it must make, and where a person must approve. A question about the flow needs no proposal.",
+		"",
+		`# The flow "${input.flowName}"`,
+		"",
+		draftSummary(input.flow),
+		"",
+		...(input.runId ? runTask(input.runId) : []),
+		"# The person's message",
+		"",
+		input.message,
+		"",
+		"---",
+		"",
+		"For reference, how Night Shift flows work:",
+		"",
+		flowAuthoringGuide(),
+	].join("\n");
+}
+
+/** A later message in the same chat. The draft may have changed since. */
+export function chatFollowUpPrompt(input: {
+	message: string;
+	/** A run this chat was not about before. */
+	newRunId?: string;
+}): string {
+	return [
+		"The person's next message. They may have changed or applied the draft since your last answer: call `get_draft` before you change the flow.",
+		"",
+		...(input.newRunId ? runTask(input.newRunId) : []),
+		input.message,
+	].join("\n");
+}

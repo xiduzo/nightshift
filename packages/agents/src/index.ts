@@ -4,7 +4,15 @@
  * packages load on first use. The engine uses the light entries
  * (`./types`, `./harness-facts`, `./pricing`, `./tools`) instead.
  */
-export { type SuggestFieldInput, suggestField } from "./assistant";
+export {
+	type AuthoringPort,
+	type AuthoringRun,
+	type AuthoringRunStep,
+	chatCanUseTools,
+	chatTurn,
+	type SuggestFieldInput,
+	suggestField,
+} from "./assistant";
 export {
 	type DeciderAdapter,
 	type DeciderModels,

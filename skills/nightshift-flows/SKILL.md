@@ -17,6 +17,8 @@ Night Shift runs flows: graphs of steps (agents, shell commands, tools, decision
 
 Ask the person when the goal is not clear: what starts the flow, what it must make, and where a person must approve.
 
+In the flow editor, `get_draft` gives the flow as the person has it now, saved or not: base every change on it. To fix a flow after a failed run, call `get_run` first (the run's status, its steps and the end of the failed step's transcript), explain what went wrong, then propose the change that prevents it.
+
 <!-- Generated from flowAuthoringGuide() in packages/flows. Do not edit below this line. -->
 
 # Writing Night Shift flows

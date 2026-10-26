@@ -21,6 +21,11 @@ export type FakeStep =
 			text: string /** Characters per delta. Default 8. */;
 			chunkSize?: number;
 	  }
+	/**
+	 * A tool call. When the session's `tools` has one of that name (Night
+	 * Shift's own, bridged), the fake runs it with `input` and its answer is
+	 * the result, as over the real bridge. Else the result is `result`.
+	 */
 	| { type: "tool"; name: string; input?: unknown; result?: string }
 	/**
 	 * The agent's step report: one `report` event. `data` is passed on as is
@@ -172,7 +177,28 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 		const sessionId = input.resumeSessionId ?? `fake-session-${++sessions}`;
 		yield { type: "session", sessionId, model };
 
-		const events = function* (): Generator<AgentEvent | { wait: number }> {
+		const bridged = (name: string) =>
+			input.tools?.find((tool) => tool.name === name)?.execute;
+		/** The answer of a bridged tool, as the bridge hands it to the agent. */
+		const answer = async (
+			execute: (args: unknown) => unknown,
+			args: unknown,
+		): Promise<string> => {
+			try {
+				const out = await execute(args);
+				return typeof out === "string" ? out : JSON.stringify(out);
+			} catch (error) {
+				return `Error: ${error instanceof Error ? error.message : String(error)}`;
+			}
+		};
+
+		const events = function* (): Generator<
+			| AgentEvent
+			| { wait: number }
+			| {
+					call: { toolCallId: string; name: string; input: unknown };
+			  }
+		> {
 			for (const step of steps) {
 				if (step.type === "wait") {
 					yield { wait: step.ms };
@@ -199,7 +225,17 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 						name: step.name,
 						input: step.input ?? {},
 					};
-					yield { type: "tool-result", toolCallId, content: step.result ?? "" };
+					if (bridged(step.name)) {
+						yield {
+							call: { toolCallId, name: step.name, input: step.input ?? {} },
+						};
+					} else {
+						yield {
+							type: "tool-result",
+							toolCallId,
+							content: step.result ?? "",
+						};
+					}
 				}
 			}
 		};
@@ -214,7 +250,14 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 				};
 				return;
 			}
-			if (!("wait" in event)) yield event;
+			if ("call" in event) {
+				const execute = bridged(event.call.name);
+				yield {
+					type: "tool-result",
+					toolCallId: event.call.toolCallId,
+					content: execute ? await answer(execute, event.call.input) : "",
+				};
+			} else if (!("wait" in event)) yield event;
 		}
 
 		await pause(delayMs, signal);
