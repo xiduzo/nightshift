@@ -1,10 +1,10 @@
 import {
-	currentStep,
 	flowLabel,
 	hasEnded,
 	nodeLabels,
 	type RunDetail,
 	type RunStatus,
+	runningSteps,
 	runStatusLabel,
 	stepName,
 	stepPosition,
@@ -44,7 +44,9 @@ export function runProgress(
 	const ended = hasEnded(run.status) && run.status !== "interrupted";
 	const { at, of } = stepPosition(run.steps, run.flow);
 	const top = run.steps.filter((step) => step.scope === null);
-	const current = ended ? null : currentStep(top);
+	// Parallel branches run several steps at once: the glance names them all.
+	const running = ended ? [] : runningSteps(top);
+	const labels = nodeLabels(run);
 	const total = Math.max(of, 1);
 	const position = ended
 		? `Ran ${at} of ${of} ${of === 1 ? "step" : "steps"}`
@@ -58,7 +60,10 @@ export function runProgress(
 		status: run.status,
 		statusText: runStatusLabel(run.status),
 		tone: glanceTone(run.status),
-		step: current ? stepName(current, nodeLabels(run)) : null,
+		step:
+			running.length > 0
+				? running.map((step) => stepName(step, labels)).join(" and ")
+				: null,
 		position,
 		fraction,
 		ended,

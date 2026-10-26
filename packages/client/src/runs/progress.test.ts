@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	applyAgentMessages,
-	currentStep,
 	groupRuns,
 	hasEnded,
 	markdownPreview,
+	runningSteps,
 	stepState,
 } from "./progress";
 import type { RunStatus, TranscriptEntry } from "./types";
@@ -82,15 +82,15 @@ describe("where a step is", () => {
 		expect(stepState(step(5, null, "pass"))).toBe("done");
 	});
 
-	test("the current step is the last one that started and runs", () => {
+	test("the running steps are the ones that started and have not ended, first started first", () => {
 		const steps = [
 			{ id: "a", startedAt: 1, endedAt: 2 },
-			{ id: "b", startedAt: 3, endedAt: null },
 			{ id: "c", startedAt: 4, endedAt: null },
+			{ id: "b", startedAt: 3, endedAt: null },
 			{ id: "d", startedAt: 5, endedAt: 6 },
 		];
-		expect(currentStep(steps)?.id).toBe("c");
-		expect(currentStep(steps.filter((s) => s.endedAt !== null))).toBeNull();
+		expect(runningSteps(steps).map((s) => s.id)).toEqual(["b", "c"]);
+		expect(runningSteps(steps.filter((s) => s.endedAt !== null))).toEqual([]);
 	});
 });
 

@@ -73,16 +73,18 @@ export function stepState(
 		: "done";
 }
 
-/** The step that runs now: the last one that started and has not ended. */
-export function currentStep<
+/**
+ * The steps that run now, the first started first. Parallel branches run
+ * several at once; a run without branches has one at most. A step inside a
+ * called flow runs with the step that called it: pass the run's own steps
+ * to leave it out.
+ */
+export function runningSteps<
 	T extends Pick<StepSummary, "startedAt" | "endedAt">,
->(steps: readonly T[]): T | null {
-	let current: T | null = null;
-	for (const step of steps) {
-		if (step.endedAt !== null) continue;
-		if (!current || step.startedAt >= current.startedAt) current = step;
-	}
-	return current;
+>(steps: readonly T[]): T[] {
+	return steps
+		.filter((step) => step.endedAt === null)
+		.sort((a, b) => a.startedAt - b.startedAt);
 }
 
 /** The name of each node of a run, by id: its label, else its id. The run's own flow wins over the flows it calls. */

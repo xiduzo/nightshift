@@ -20,11 +20,11 @@ export {
 export {
 	type AgentMessages,
 	applyAgentMessages,
-	currentStep,
 	hasEnded,
 	markdownPreview,
 	nodeLabels,
 	type RunGroup,
+	runningSteps,
 	type StepState,
 	stepName,
 	stepPosition,

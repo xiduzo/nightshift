@@ -11,6 +11,7 @@ import {
 	Hourglass,
 	LoaderCircle,
 	type LucideIcon,
+	Merge,
 	MessageCircleQuestion,
 	Moon,
 	Plug,
@@ -41,6 +42,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	variable: Variable,
 	plug: Plug,
 	flag: Flag,
+	merge: Merge,
 };
 
 /** The lucide icon of a status or a step kind. */

@@ -227,7 +227,8 @@ export type StepKindIconName =
 	| "variable"
 	| "hourglass"
 	| "plug"
-	| "flag";
+	| "flag"
+	| "merge";
 
 /** What kind of step it is, as the web's flow editor names it: its word and icon. */
 export type StepKind = { label: string; icon: StepKindIconName };
@@ -241,6 +242,7 @@ const NODE_KIND: Record<StepSummary["nodeType"], StepKind> = {
 	wait: { label: "Wait", icon: "hourglass" },
 	tool: { label: "Tool", icon: "plug" },
 	end: { label: "End", icon: "flag" },
+	join: { label: "Join", icon: "merge" },
 };
 
 /** The kind of a step. A Decision that asks a person is a Gate. */

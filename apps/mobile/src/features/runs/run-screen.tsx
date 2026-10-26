@@ -3,7 +3,6 @@ import {
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
-	currentStep,
 	hasEnded,
 	markdownPreview,
 	mergeSteps,
@@ -12,6 +11,7 @@ import {
 	type RunDetail,
 	type RunStatus,
 	runActions,
+	runningSteps,
 	type StepSummary,
 	stepName,
 	stepState,
@@ -135,8 +135,14 @@ function RunBody({
 	const steps = mergeSteps(run.steps, live.steps);
 	const ownSteps = steps.filter((step) => step.scope === null);
 	const labels = nodeLabels(run);
-	const current = ended ? null : currentStep(steps);
-	const message = current ? live.entries.get(current.id) : undefined;
+	// Parallel branches run several steps at once: each that talks shows.
+	const talking = ended
+		? []
+		: runningSteps(steps).filter(
+				(step) =>
+					stepState(step) === "running" &&
+					(live.entries.has(step.id) || step.nodeType === "agent"),
+			);
 	const allows = runActions(status, run.walker.thisDevice, run.result);
 	const now = Date.now();
 
@@ -182,25 +188,26 @@ function RunBody({
 				</Card>
 			) : null}
 
-			{current &&
-			(message || current.nodeType === "agent") &&
-			stepState(current) === "running" ? (
-				<View className="gap-3">
-					<SectionHead title="Now" hint={stepName(current, labels)} />
-					<Card className="py-4">
-						<CardContent className="px-4">
-							<Text
-								numberOfLines={8}
-								className={message ? undefined : "text-muted-foreground"}
-							>
-								{message
-									? markdownPreview(message.text)
-									: "No message from this step yet."}
-							</Text>
-						</CardContent>
-					</Card>
-				</View>
-			) : null}
+			{talking.map((step) => {
+				const message = live.entries.get(step.id);
+				return (
+					<View key={step.id} className="gap-3">
+						<SectionHead title="Now" hint={stepName(step, labels)} />
+						<Card className="py-4">
+							<CardContent className="px-4">
+								<Text
+									numberOfLines={8}
+									className={message ? undefined : "text-muted-foreground"}
+								>
+									{message
+										? markdownPreview(message.text)
+										: "No message from this step yet."}
+								</Text>
+							</CardContent>
+						</Card>
+					</View>
+				);
+			})}
 
 			<View className="gap-3">
 				<SectionHead title="Details" />
