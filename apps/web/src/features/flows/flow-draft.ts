@@ -11,7 +11,6 @@ import {
 	type FlowNode,
 	isOptionNode,
 	type ListSource,
-	nameSchema,
 	nodeOptions,
 	type ProjectFlowMap,
 	type TemplateField,
@@ -209,7 +208,6 @@ const MESSAGES: DraftMessages = {
 			optionMessage(flow, index, rest) ??
 			bindingMessage(scope, index, rest) ??
 			haltOnMessage(flow, index, rest) ??
-			mcpMessage(flow, index, rest) ??
 			(scope === "policy" ? POLICY_MESSAGES[String(index)] : undefined) ??
 			`${field || String(scope)}: ${issue.message}`
 		);
@@ -383,27 +381,6 @@ function haltOnMessage(
 	return name === ""
 		? "A halt-on label has no name."
 		: `Halt-on label "${name}": use lowercase letters, digits and -, starting with a letter.`;
-}
-
-function mcpMessage(
-	flow: Flow,
-	index: PropertyKey | undefined,
-	rest: PropertyKey[],
-): string | undefined {
-	const [field, name, key] = rest;
-	if (field !== "mcpServers" || typeof index !== "number") return;
-	if (!nameSchema.safeParse(name).success) {
-		return `MCP server "${String(name ?? "")}": use lowercase letters, digits and _, starting with a letter.`;
-	}
-	if (key === "url") {
-		return `MCP server "${String(name)}": set a full URL, such as https://mcp.example.com/mcp.`;
-	}
-	if (key === "command") {
-		return `MCP server "${String(name)}": set the command to run.`;
-	}
-	return flow.nodes[index]?.type === "agent"
-		? `MCP server "${String(name)}": ${rest.slice(2).map(String).join(".")} is not valid.`
-		: undefined;
 }
 
 /** The first line of a decision's prompt. */

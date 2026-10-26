@@ -1,7 +1,7 @@
 /**
  * The field helpers of the inspector: an agent suggests a prompt, output
- * fields, variables, outcomes, rules, an expression, a command, what a
- * checker checks, tool arguments, or the flow's description and inputs.
+ * fields, variables, outcomes, rules, an expression, a command, tool
+ * arguments, or the flow's description and inputs.
  * Each is a "Suggest …" button beside or under its field that opens one
  * kind of popover. Each shows nothing outside the editor of one flow.
  */
@@ -442,34 +442,6 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 						label="The command becomes"
 						before={commandOf(node) ?? ""}
 						after={suggestion.command}
-					/>
-				) : null
-			}
-		/>
-	);
-}
-
-/** "Suggest what to check": the brief of the model that picks an Agent's outcome. */
-export function CheckerSuggest({ node }: { node: AgentNode }) {
-	return (
-		<FieldSuggest
-			kind="checker"
-			nodeId={node.id}
-			copy={{
-				label: "Suggest what to check",
-				title: "Suggest what to check",
-				description:
-					"The agent writes what the model looks for in the report before it picks an outcome.",
-				picks: ["Ask for proof", "One line per outcome", "Keep it short"],
-				placeholder:
-					"What makes a pass? For example: the tests ran and passed.",
-			}}
-			preview={(suggestion) =>
-				suggestion.kind === "checker" ? (
-					<TextPreview
-						label="What to check becomes"
-						before={node.checker?.prompt ?? ""}
-						after={suggestion.text}
 					/>
 				) : null
 			}

@@ -16,7 +16,8 @@ import { useResolveGate } from "./use-resolve-gate";
 
 /**
  * Answers an open Gate: an optional note, then one button per choice. A click
- * on a choice sends it, and the run walks on along that choice's edge.
+ * on a choice sends it, and the run walks on along that choice's edge. The
+ * Gate of an agent that asks has a choice that needs the note: its answer.
  */
 export function GateAnswer({
 	runId,
@@ -44,6 +45,10 @@ export function GateAnswer({
 		...(walkerName ? { walkerName } : {}),
 	});
 
+	const empty = note.trim() === "";
+	// An agent that asks goes on with the note: its answer needs one.
+	const answersAgent = choices.some((choice) => choice.needsNote);
+
 	const answer = (choice: string) => {
 		if (resolve.isPending) return;
 		const trimmed = note.trim();
@@ -62,22 +67,36 @@ export function GateAnswer({
 			<Field className="gap-2">
 				<FieldLabel htmlFor={`${id}-note`}>
 					Note
-					<span className="font-normal text-muted-foreground">(optional)</span>
+					{answersAgent ? null : (
+						<span className="font-normal text-muted-foreground">
+							(optional)
+						</span>
+					)}
 				</FieldLabel>
 				<LargerTextarea
 					title="Note"
 					id={`${id}-note`}
 					value={note}
 					onChange={(event) => setNote(event.target.value)}
-					placeholder="Context for the next steps…"
+					placeholder={
+						answersAgent
+							? "Answer the agent's questions…"
+							: "Context for the next steps…"
+					}
 					className="max-h-40 min-h-10 text-sm md:text-sm"
 					rows={2}
 					aria-describedby={`${id}-note-hint`}
 					disabled={resolve.isPending}
 				/>
 				<FieldDescription id={`${id}-note-hint`} className="text-xs">
-					The next steps of the run get your note, as{" "}
-					<code className="font-mono">{`{{${nodeId}.note}}`}</code>.
+					{answersAgent ? (
+						"The agent gets your note as its answer, and goes on."
+					) : (
+						<>
+							The next steps of the run get your note, as{" "}
+							<code className="font-mono">{`{{${nodeId}.note}}`}</code>.
+						</>
+					)}
 				</FieldDescription>
 			</Field>
 			<FieldSet className="gap-0">
@@ -95,7 +114,7 @@ export function GateAnswer({
 								key={choice.name}
 								type="button"
 								variant="outline"
-								disabled={resolve.isPending}
+								disabled={resolve.isPending || (choice.needsNote && empty)}
 								aria-busy={sending || undefined}
 								onClick={() => answer(choice.name)}
 								aria-describedby={

@@ -232,8 +232,9 @@ export function ToolsField({
 }
 
 /**
- * Programs only this node may run: names of programs on this computer that
- * are not added under Agents → Tools. One chip per name.
+ * Other programs the node may run: names of programs on this computer that
+ * are not added under Agents → Tools. One chip per name. They go in the
+ * node's one list of CLI tools, with the ones picked above.
  */
 export function NodeProgramsField({
 	id,
@@ -267,7 +268,7 @@ export function NodeProgramsField({
 	return (
 		<FieldSet className="gap-2" data-invalid={error ? true : undefined}>
 			<FieldLegend variant="label" className="text-xs">
-				Programs for this node only
+				Other programs
 			</FieldLegend>
 			{names.length > 0 ? (
 				<ul className="flex flex-wrap gap-1.5">
@@ -320,8 +321,9 @@ export function NodeProgramsField({
 			</div>
 			{error ? <FieldError className="text-xs">{error}</FieldError> : null}
 			<FieldDescription id={`${id}-hint`} className="text-xs">
-				The program name only, for example jq. The run does not start when this
-				computer cannot find it.
+				Programs on this computer that are not under Agents → Tools. The name
+				only, for example jq. The run does not start when this computer cannot
+				find it.
 			</FieldDescription>
 		</FieldSet>
 	);

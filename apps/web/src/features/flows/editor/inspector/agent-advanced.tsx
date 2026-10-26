@@ -6,10 +6,15 @@ import { useId } from "react";
 import { cliToolQueries } from "@/features/agents";
 import type { DaemonConnection } from "../connections-field";
 import { InspectorSection, Note } from "../fields";
-import { McpServersField } from "../mcp-servers-field";
 import { OutputSchemaField } from "../output-schema-field";
 import { NodeProgramsField, ToolsField } from "../tools-field";
 import { useProfile } from "./agent-fields";
+
+/** The node with these CLI tools: no `clis` field when there are none. */
+function withClis(node: AgentNode, clis: string[]): AgentNode {
+	const { clis: _, ...rest } = node;
+	return clis.length > 0 ? { ...rest, clis } : rest;
+}
 
 /** An Agent node's output data and tools. */
 export function AgentAdvanced({
@@ -30,17 +35,15 @@ export function AgentAdvanced({
 	});
 	const clis = node.clis ?? [];
 	const named = node.connections ?? [];
-	const nodeClis = node.nodeClis ?? [];
-	const serverCount = Object.keys(node.mcpServers ?? {}).length;
-	const missing = [
-		...(cliTools.data
-			? clis.filter((name) => !cliTools.data.some((t) => t.name === name))
-			: []),
-		...(connections
-			? named.filter((name) => !connections.some((c) => c.name === name))
-			: []),
-	];
-	const toolCount = clis.length + named.length + nodeClis.length + serverCount;
+	// One list in the file: the CLI tools added under Agents → Tools, and
+	// other programs on this computer.
+	const added = new Set(cliTools.data?.map((tool) => tool.name));
+	const tools = clis.filter((name) => added.has(name));
+	const programs = clis.filter((name) => !added.has(name));
+	const missing = connections
+		? named.filter((name) => !connections.some((c) => c.name === name))
+		: [];
+	const toolCount = clis.length + named.length;
 	const fromProfile = profile ? [...profile.clis, ...profile.connections] : [];
 
 	return (
@@ -97,38 +100,28 @@ export function AgentAdvanced({
 				) : null}
 				<ToolsField
 					id={`${id}-tools`}
-					clis={clis}
+					clis={tools}
 					connections={named}
 					cliTools={cliTools.data}
 					daemonConnections={connections}
 					onChange={(next) =>
-						onChange((current) => {
-							const { clis: _, ...rest } = withConnections(
-								current,
-								next.connections,
-							);
-							return next.clis.length > 0 ? { ...rest, clis: next.clis } : rest;
-						})
-					}
-				/>
-				<NodeProgramsField
-					id={`${id}-node-clis`}
-					names={nodeClis}
-					onChange={(names) =>
-						onChange(({ nodeClis: _, ...rest }) =>
-							names.length > 0 ? { ...rest, nodeClis: names } : rest,
+						onChange((current) =>
+							withClis(withConnections(current, next.connections), [
+								...next.clis,
+								...programs,
+							]),
 						)
 					}
 				/>
-				<McpServersField
-					id={`${id}-mcp`}
-					servers={node.mcpServers}
-					onChange={(mcpServers) =>
-						onChange(({ mcpServers: _, ...rest }) =>
-							mcpServers === undefined ? rest : { ...rest, mcpServers },
-						)
-					}
-				/>
+				{cliTools.data ? (
+					<NodeProgramsField
+						id={`${id}-programs`}
+						names={programs}
+						onChange={(names) =>
+							onChange((current) => withClis(current, [...tools, ...names]))
+						}
+					/>
+				) : null}
 			</InspectorSection>
 		</>
 	);

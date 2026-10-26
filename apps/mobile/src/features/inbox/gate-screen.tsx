@@ -227,6 +227,9 @@ function OpenGateScreen({
 	const [confirming, setConfirming] = useState(false);
 
 	const chosen = gate.choices.find((choice) => choice.name === answer.choice);
+	// An agent that asks goes on with the note: its answer needs one.
+	const answersAgent = gate.choices.some((choice) => choice.needsNote);
+	const noteMissing = chosen?.needsNote === true && answer.note.trim() === "";
 	const chosenRoute = chosen ? routes.get(chosen.name) : undefined;
 	const answerable = gate.canAnswer && !gate.answerPending;
 	const elsewhere =
@@ -262,7 +265,7 @@ function OpenGateScreen({
 						action={{
 							label: "Send",
 							onPress: send,
-							disabled: !chosen,
+							disabled: !chosen || noteMissing,
 							busy: answer.checking || answer.sending,
 							busyLabel: answer.checking ? "Checking…" : "Sending…",
 							variant:
@@ -414,17 +417,27 @@ function OpenGateScreen({
 								disabled={answer.busy}
 							/>
 							<View className="gap-2">
-								<Label nativeID="gate-note">Note for the run (optional)</Label>
+								<Label nativeID="gate-note">
+									{answersAgent
+										? "Your answer to the agent"
+										: "Note for the run (optional)"}
+								</Label>
 								<Textarea
 									aria-labelledby="gate-note"
 									value={answer.note}
 									onChangeText={answer.setNote}
-									placeholder="Context for the next steps"
+									placeholder={
+										answersAgent
+											? "Answer the agent's questions"
+											: "Context for the next steps"
+									}
 									editable={!answer.busy}
 									numberOfLines={4}
 								/>
 								<Text className="text-muted-foreground text-xs">
-									The next steps of the run get your note.
+									{answersAgent
+										? "The agent gets your note as its answer, and goes on."
+										: "The next steps of the run get your note."}
 								</Text>
 							</View>
 							{elsewhere ? (

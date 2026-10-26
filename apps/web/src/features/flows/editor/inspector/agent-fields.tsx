@@ -1,6 +1,12 @@
 /** The fields of an Agent node: its profile, harness, model, prompt and task. */
 import type { AgentNode, Flow, NodeOption } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
 import {
 	NativeSelect,
 	NativeSelectOption,
@@ -10,7 +16,12 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
-import { SlashSquareIcon, TextIcon, TriangleAlertIcon } from "lucide-react";
+import {
+	ChevronDownIcon,
+	SlashSquareIcon,
+	TextIcon,
+	TriangleAlertIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 import {
 	EFFORTS,
@@ -123,6 +134,181 @@ export function AgentFields({
 		node.skill === undefined ? "prompt" : "skill",
 	);
 
+	// The harness, model, effort and permission mode: the node's own, or
+	// with a profile what the node changes of it.
+	const runSettings = (
+		<>
+			<Field
+				id={`${id}-harness`}
+				label={
+					<>
+						Harness
+						{node.profile !== undefined && node.harness !== undefined ? (
+							<OverrideBadge />
+						) : null}
+					</>
+				}
+				hint={harness.note}
+			>
+				<NativeSelect
+					id={`${id}-harness`}
+					value={node.harness ?? ""}
+					aria-describedby={`${id}-harness-hint`}
+					onChange={(event) => {
+						const next = event.target.value as HarnessName | "";
+						onChange((current) =>
+							next === ""
+								? withoutField(current, "harness")
+								: switchHarness(current, next, customAgents),
+						);
+					}}
+				>
+					{node.profile !== undefined ? (
+						<NativeSelectOption value="">
+							{fromProfile(profile ? info(profile.harness).label : "unknown")}
+						</NativeSelectOption>
+					) : null}
+					{harnessOptions.map(({ value, label }) => (
+						<NativeSelectOption key={value} value={value}>
+							{label}
+						</NativeSelectOption>
+					))}
+				</NativeSelect>
+			</Field>
+
+			<div className="grid grid-cols-2 gap-3">
+				<Field
+					id={`${id}-model`}
+					label={
+						<>
+							Model
+							{node.profile !== undefined && node.model !== undefined ? (
+								<OverrideBadge />
+							) : null}
+						</>
+					}
+				>
+					<ModelCombobox
+						id={`${id}-model`}
+						harness={harnessName}
+						value={node.model ?? ""}
+						placeholder={
+							node.profile !== undefined ? profile?.model : harness.defaultModel
+						}
+						invalid={node.profile === undefined && !node.model?.trim()}
+						onChange={(model) =>
+							onChange((current) =>
+								model === "" && current.profile !== undefined
+									? withoutField(current, "model")
+									: { ...current, model },
+							)
+						}
+					/>
+				</Field>
+				<Field
+					id={`${id}-effort`}
+					label={
+						<>
+							Effort
+							{node.profile !== undefined && node.effort !== undefined ? (
+								<OverrideBadge />
+							) : null}
+						</>
+					}
+				>
+					<NativeSelect
+						id={`${id}-effort`}
+						value={node.effort ?? ""}
+						onChange={(event) => {
+							const effort = (event.target.value || undefined) as
+								| Effort
+								| undefined;
+							onChange((current) =>
+								effort === undefined
+									? withoutField(current, "effort")
+									: { ...current, effort },
+							);
+						}}
+					>
+						<NativeSelectOption value="">
+							{profile
+								? fromProfile(profile.effort ?? "model default")
+								: "Model default"}
+						</NativeSelectOption>
+						{EFFORTS.map((value) => (
+							<NativeSelectOption key={value} value={value}>
+								{value}
+							</NativeSelectOption>
+						))}
+					</NativeSelect>
+				</Field>
+			</div>
+
+			<Field
+				id={`${id}-permission`}
+				label={
+					<>
+						Permission mode
+						{node.profile !== undefined && node.permissionMode !== undefined ? (
+							<OverrideBadge />
+						) : null}
+					</>
+				}
+			>
+				<NativeSelect
+					id={`${id}-permission`}
+					value={node.permissionMode ?? ""}
+					aria-invalid={
+						node.profile === undefined && node.permissionMode === undefined
+							? true
+							: undefined
+					}
+					onChange={(event) => {
+						const permissionMode = event.target.value as PermissionMode | "";
+						onChange((current) =>
+							permissionMode === ""
+								? withoutField(current, "permissionMode")
+								: { ...current, permissionMode },
+						);
+					}}
+				>
+					{node.profile !== undefined ? (
+						<NativeSelectOption value="">
+							{fromProfile(
+								profile ? permissionLabel(profile.permissionMode) : "unknown",
+							)}
+						</NativeSelectOption>
+					) : node.permissionMode === undefined ? (
+						<NativeSelectOption value="" disabled>
+							Pick a permission mode
+						</NativeSelectOption>
+					) : null}
+					{PERMISSION_MODES.map(({ value, label }) => (
+						<NativeSelectOption key={value} value={value}>
+							{label}
+						</NativeSelectOption>
+					))}
+				</NativeSelect>
+				{(node.permissionMode ?? profile?.permissionMode) ===
+				"bypassPermissions" ? (
+					<p className="flex items-start gap-1.5 text-status-waiting text-xs">
+						<TriangleAlertIcon
+							className="mt-px size-3.5 shrink-0"
+							aria-hidden="true"
+						/>
+						The agent runs every tool, shell commands included, without asking.
+					</p>
+				) : null}
+			</Field>
+		</>
+	);
+	const overrides = [
+		node.harness,
+		node.model,
+		node.effort,
+		node.permissionMode,
+	].filter((value) => value !== undefined).length;
+
 	return (
 		<>
 			<InspectorSection title="Agent" tab="setup">
@@ -136,8 +322,8 @@ export function AgentFields({
 					}
 					hint={
 						profile
-							? "This node uses the profile. Change a field below to override it for this node only. Choose From the profile to undo."
-							: "A saved agent setup from the Agents page. Without one, set the harness and model below."
+							? "This node runs with the profile. Override a setting for this node only, or leave it to the profile."
+							: "A saved agent setup from the Agents page. Without one, set the harness, model and permission mode below."
 					}
 				>
 					<NativeSelect
@@ -167,172 +353,38 @@ export function AgentFields({
 					</NativeSelect>
 				</Field>
 
-				<Field
-					id={`${id}-harness`}
-					label={
-						<>
-							Harness
-							{node.profile !== undefined && node.harness !== undefined ? (
-								<OverrideBadge />
-							) : null}
-						</>
-					}
-					hint={harness.note}
-				>
-					<NativeSelect
-						id={`${id}-harness`}
-						value={node.harness ?? ""}
-						aria-describedby={`${id}-harness-hint`}
-						onChange={(event) => {
-							const next = event.target.value as HarnessName | "";
-							onChange((current) =>
-								next === ""
-									? withoutField(current, "harness")
-									: switchHarness(current, next, customAgents),
-							);
-						}}
+				{node.profile !== undefined ? (
+					<Collapsible
+						defaultOpen={overrides > 0}
+						className="flex flex-col gap-4"
 					>
-						{node.profile !== undefined ? (
-							<NativeSelectOption value="">
-								{fromProfile(profile ? info(profile.harness).label : "unknown")}
-							</NativeSelectOption>
-						) : null}
-						{harnessOptions.map(({ value, label }) => (
-							<NativeSelectOption key={value} value={value}>
-								{label}
-							</NativeSelectOption>
-						))}
-					</NativeSelect>
-				</Field>
-
-				<div className="grid grid-cols-2 gap-3">
-					<Field
-						id={`${id}-model`}
-						label={
-							<>
-								Model
-								{node.profile !== undefined && node.model !== undefined ? (
-									<OverrideBadge />
-								) : null}
-							</>
-						}
-					>
-						<ModelCombobox
-							id={`${id}-model`}
-							harness={harnessName}
-							value={node.model ?? ""}
-							placeholder={
-								node.profile !== undefined
-									? profile?.model
-									: harness.defaultModel
+						<CollapsibleTrigger
+							render={
+								<Button
+									variant="ghost"
+									size="sm"
+									className="group/trigger -ml-2 w-fit text-muted-foreground"
+								/>
 							}
-							invalid={node.profile === undefined && !node.model?.trim()}
-							onChange={(model) =>
-								onChange((current) =>
-									model === "" && current.profile !== undefined
-										? withoutField(current, "model")
-										: { ...current, model },
-								)
-							}
-						/>
-					</Field>
-					<Field
-						id={`${id}-effort`}
-						label={
-							<>
-								Effort
-								{node.profile !== undefined && node.effort !== undefined ? (
-									<OverrideBadge />
-								) : null}
-							</>
-						}
-					>
-						<NativeSelect
-							id={`${id}-effort`}
-							value={node.effort ?? ""}
-							onChange={(event) => {
-								const effort = (event.target.value || undefined) as
-									| Effort
-									| undefined;
-								onChange((current) =>
-									effort === undefined
-										? withoutField(current, "effort")
-										: { ...current, effort },
-								);
-							}}
 						>
-							<NativeSelectOption value="">
-								{profile
-									? fromProfile(profile.effort ?? "model default")
-									: "Model default"}
-							</NativeSelectOption>
-							{EFFORTS.map((value) => (
-								<NativeSelectOption key={value} value={value}>
-									{value}
-								</NativeSelectOption>
-							))}
-						</NativeSelect>
-					</Field>
-				</div>
-
-				<Field
-					id={`${id}-permission`}
-					label={
-						<>
-							Permission mode
-							{node.profile !== undefined &&
-							node.permissionMode !== undefined ? (
-								<OverrideBadge />
-							) : null}
-						</>
-					}
-				>
-					<NativeSelect
-						id={`${id}-permission`}
-						value={node.permissionMode ?? ""}
-						aria-invalid={
-							node.profile === undefined && node.permissionMode === undefined
-								? true
-								: undefined
-						}
-						onChange={(event) => {
-							const permissionMode = event.target.value as PermissionMode | "";
-							onChange((current) =>
-								permissionMode === ""
-									? withoutField(current, "permissionMode")
-									: { ...current, permissionMode },
-							);
-						}}
-					>
-						{node.profile !== undefined ? (
-							<NativeSelectOption value="">
-								{fromProfile(
-									profile ? permissionLabel(profile.permissionMode) : "unknown",
-								)}
-							</NativeSelectOption>
-						) : node.permissionMode === undefined ? (
-							<NativeSelectOption value="" disabled>
-								Pick a permission mode
-							</NativeSelectOption>
-						) : null}
-						{PERMISSION_MODES.map(({ value, label }) => (
-							<NativeSelectOption key={value} value={value}>
-								{label}
-							</NativeSelectOption>
-						))}
-					</NativeSelect>
-					{(node.permissionMode ?? profile?.permissionMode) ===
-					"bypassPermissions" ? (
-						<p className="flex items-start gap-1.5 text-status-waiting text-xs">
-							<TriangleAlertIcon
-								className="mt-px size-3.5 shrink-0"
-								aria-hidden="true"
+							<ChevronDownIcon
+								data-icon="inline-start"
+								className="-rotate-90 transition-transform group-data-[panel-open]/trigger:rotate-0 motion-reduce:transition-none"
 							/>
-							The agent runs every tool, shell commands included, without
-							asking.
-						</p>
-					) : null}
-				</Field>
+							Override for this node
+							{overrides > 0 ? (
+								<Badge variant="secondary" className="tabular-nums">
+									{overrides}
+								</Badge>
+							) : null}
+						</CollapsibleTrigger>
+						<CollapsibleContent className="flex flex-col gap-4">
+							{runSettings}
+						</CollapsibleContent>
+					</Collapsible>
+				) : (
+					runSettings
+				)}
 
 				<Field
 					id={`${id}-session`}
