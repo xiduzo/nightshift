@@ -343,7 +343,7 @@ describe("assistant.chat", () => {
 		expect(refused[0]?.type === "error" && refused[0].message).toContain(
 			"Choose a profile that uses Claude Code, Codex or OpenCode for the chat.",
 		);
-		// The profile for suggestions does not fit the chat: the first that does.
+		// The profile for help does not fit the chat: the first that does.
 		const events = await chat(assistant);
 		expect(events.at(-1)).toEqual({ type: "done" });
 		expect(harness.calls.at(-1)?.model).toBe("sonnet");

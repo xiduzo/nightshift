@@ -70,7 +70,7 @@ export function chatRefusal(picked: PickedProfile): string | null {
 
 /**
  * The profile the assistant runs on: the one the request names, else the
- * one in the settings ("Profile for suggestions"), else the first profile
+ * one in the settings ("Profile for help"), else the first profile
  * whose harness is added and installed here. With `fits`, the setting and
  * the first profile count only when their harness fits; the request's own
  * profile always counts, so the caller can say why it does not fit.
