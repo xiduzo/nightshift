@@ -1,4 +1,4 @@
-import type { Flow } from "@nightshift/flows";
+import { type Flow, isKitName, kitFlow } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Breadcrumb,
@@ -108,7 +108,8 @@ export function SubflowView({
 	className?: string;
 }) {
 	const current = stack.at(-1);
-	const content = subflowContent(rootFlow, stack, flows);
+	const content = subflowContent(rootFlow, stack, flows, kitFlow);
+	const kit = current ? isKitName(current.flow) : false;
 	if (!current || !content) return null;
 	const depth = stack.length;
 	const above = stack.at(-2)?.flow ?? rootFlow;
@@ -152,7 +153,7 @@ export function SubflowView({
 				<div className="flex flex-wrap items-center gap-1.5">
 					<Badge variant="outline" className="text-muted-foreground">
 						<EyeIcon aria-hidden="true" />
-						Read only
+						{kit ? "Kit, read only" : "Read only"}
 					</Badge>
 					<Tooltip>
 						<TooltipTrigger
@@ -166,7 +167,7 @@ export function SubflowView({
 							<Kbd>U</Kbd>
 						</TooltipContent>
 					</Tooltip>
-					{content.kind === "flow" || content.kind === "invalid" ? (
+					{!kit && (content.kind === "flow" || content.kind === "invalid") ? (
 						<Button
 							variant="outline"
 							size="xs"

@@ -8,6 +8,7 @@ import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
 	callersOf,
 	isSavable,
+	kitFlow,
 	newElementFlow,
 	newFlow,
 	parentSection,
@@ -258,21 +259,28 @@ function Editor({
 	);
 
 	// A new called flow: write it, point the node at it, save this flow, open it.
+	// With `copy`, the new flow is a copy of that kit.
 	const createCalled = useMutation(flowMutations.save());
-	const createCalledFlow = async (nodeId: string, calledName: string) => {
+	const createCalledFlow = async (
+		nodeId: string,
+		calledName: string,
+		copy?: { kit: string; flow: Flow },
+	) => {
 		const node = draft.nodes.find((candidate) => candidate.id === nodeId);
 		if (node?.type !== "call") return;
 		try {
 			await createCalled.mutateAsync({
 				projectId,
 				name: calledName,
-				flow: node.each
-					? newElementFlow(node.each.as, nodeDefaults)
-					: newFlow(nodeDefaults),
+				flow: copy
+					? copy.flow
+					: node.each
+						? newElementFlow(node.each.as, nodeDefaults)
+						: newFlow(nodeDefaults),
 			});
 		} catch (error) {
 			toast.error(
-				`Could not create ${calledName}: ${error instanceof Error ? error.message : String(error)}`,
+				`Could not ${copy ? `copy ${copy.kit}` : `create ${calledName}`}: ${error instanceof Error ? error.message : String(error)}`,
 			);
 			return;
 		}
@@ -297,7 +305,11 @@ function Editor({
 		} catch {
 			return;
 		}
-		toast.success(`Created ${calledName} and saved ${name}.`);
+		toast.success(
+			copy
+				? `Copied ${copy.kit} into this project as ${calledName}, and saved ${name}.`
+				: `Created ${calledName} and saved ${name}.`,
+		);
 		// The save has not rendered yet; leaving must not ask about it.
 		dirtyRef.current = false;
 		openFlow(calledName);
@@ -457,6 +469,10 @@ function Editor({
 		onOpen: openFlow,
 		onCreate: (nodeId: string, calledName: string) =>
 			void createCalledFlow(nodeId, calledName),
+		onCopyKit: (nodeId: string, kit: string, copyName: string) => {
+			const flow = kitFlow(kit);
+			if (flow) void createCalledFlow(nodeId, copyName, { kit, flow });
+		},
 		creating: createCalled.isPending || saveFlow.isPending,
 	};
 

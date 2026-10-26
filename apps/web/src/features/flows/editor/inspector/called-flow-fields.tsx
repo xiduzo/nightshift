@@ -1,5 +1,12 @@
 import type { ProjectFlowMap } from "@nightshift/flows";
-import { type CallNode, type Flow, flowNameSchema } from "@nightshift/flows";
+import {
+	type CallNode,
+	type Flow,
+	flowNameSchema,
+	isKitName,
+	kitCopyName,
+	kitList,
+} from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Field,
@@ -18,10 +25,12 @@ import {
 } from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
+	NativeSelectOptGroup,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
+	CopyIcon,
 	ExternalLinkIcon,
 	PlusIcon,
 	TriangleAlertIcon,
@@ -40,10 +49,30 @@ export type CalledFlowSupport = {
 	onOpen: (name: string) => void;
 	/** Creates a flow for the node, points the node at it, and opens it. */
 	onCreate: (nodeId: string, name: string) => void;
+	/** Saves a copy of a kit as the flow `name`, points the node at it, and opens it. */
+	onCopyKit: (nodeId: string, kit: string, name: string) => void;
 	creating: boolean;
 };
 
-/** Picks the flow a Call node calls, among all the project's flows, or creates one. */
+/** The kits Night Shift ships, the same in every project. */
+const KITS = kitList();
+
+/**
+ * The name a copy of `kit` takes: its own (`github-publish-draft-pr`), or
+ * with a number after it when the project has a flow of that name.
+ */
+function copyName(kit: string, taken: readonly string[]): string | null {
+	const base = kitCopyName(kit);
+	if (base === null) return null;
+	let name = base;
+	for (let n = 2; taken.includes(name); n++) name = `${base}-${n}`;
+	return name;
+}
+
+/**
+ * Picks the flow a Call node calls, among all the project's flows and the
+ * kits, or creates one. A kit can be copied into the project.
+ */
 export function CalledFlowField({
 	id,
 	node,
@@ -65,9 +94,15 @@ export function CalledFlowField({
 				.sort()
 		: [];
 	const current = node.flow;
-	const known = current !== "" && names.includes(current);
-	const problem =
-		current === "" || !flows
+	const kit = isKitName(current)
+		? (KITS.find((candidate) => candidate.name === current) ?? null)
+		: null;
+	const known = current !== "" && (names.includes(current) || kit !== null);
+	const problem = isKitName(current)
+		? kit
+			? null
+			: "no such kit"
+		: current === "" || !flows
 			? null
 			: current === support.flowName
 				? "this flow itself"
@@ -76,6 +111,7 @@ export function CalledFlowField({
 					: flows[current] === null
 						? "not valid"
 						: null;
+	const copy = kit && flows ? copyName(kit.name, Object.keys(flows)) : null;
 
 	return (
 		<Field className="gap-2" data-invalid={problem !== null ? true : undefined}>
@@ -93,34 +129,53 @@ export function CalledFlowField({
 					<NativeSelectOption value="">
 						{flows ? "Pick a flow" : "Loading flows…"}
 					</NativeSelectOption>
-					{names.map((name) => (
-						<NativeSelectOption key={name} value={name}>
-							{flows?.[name] === null ? `${name} (not valid)` : name}
-						</NativeSelectOption>
-					))}
+					<NativeSelectOptGroup label="This project">
+						{names.map((name) => (
+							<NativeSelectOption key={name} value={name}>
+								{flows?.[name] === null ? `${name} (not valid)` : name}
+							</NativeSelectOption>
+						))}
+					</NativeSelectOptGroup>
+					<NativeSelectOptGroup label="Kits">
+						{KITS.map(({ name }) => (
+							<NativeSelectOption key={name} value={name}>
+								{name}
+							</NativeSelectOption>
+						))}
+					</NativeSelectOptGroup>
 					{current !== "" && !known ? (
 						<NativeSelectOption value={current}>
 							{problem ? `${current} (${problem})` : current}
 						</NativeSelectOption>
 					) : null}
 				</NativeSelect>
-				<Button
-					variant="outline"
-					size="icon-sm"
-					disabled={!known}
-					aria-label={known ? `Open ${current}` : "Open the flow"}
-					title={known ? `Open ${current}` : "Pick a flow first"}
-					onClick={() => support.onOpen(current)}
-				>
-					<ExternalLinkIcon />
-				</Button>
+				{kit ? null : (
+					<Button
+						variant="outline"
+						size="icon-sm"
+						disabled={!known}
+						aria-label={known ? `Open ${current}` : "Open the flow"}
+						title={known ? `Open ${current}` : "Pick a flow first"}
+						onClick={() => support.onOpen(current)}
+					>
+						<ExternalLinkIcon />
+					</Button>
+				)}
 			</div>
 			<FieldDescription id={`${id}-hint`} className="text-xs">
 				{hint}
-				{flows && names.length === 0
-					? " This project has no other flow yet."
+				{flows && names.length === 0 && !kit
+					? " This project has no other flow yet. Pick a kit, or add a flow."
 					: ""}
 			</FieldDescription>
+			{kit ? (
+				<KitNote
+					description={kit.flow.description}
+					copy={copy}
+					pending={support.creating}
+					onCopy={(name) => support.onCopyKit(node.id, kit.name, name)}
+				/>
+			) : null}
 			{creating ? (
 				<NewFlowForm
 					taken={flows ? Object.keys(flows) : []}
@@ -144,6 +199,54 @@ export function CalledFlowField({
 				</div>
 			)}
 		</Field>
+	);
+}
+
+/**
+ * What a kit does, and the way to change it: a copy in the project, which
+ * the node then runs.
+ */
+function KitNote({
+	description,
+	copy,
+	pending,
+	onCopy,
+}: {
+	description: string | undefined;
+	/** The name the copy gets. Null while the project's flows load. */
+	copy: string | null;
+	pending: boolean;
+	onCopy: (name: string) => void;
+}) {
+	return (
+		<Item variant="muted" size="sm" className="flex-col items-start gap-2">
+			<ItemContent className="gap-1 text-xs">
+				{description ? <p>{description}</p> : null}
+				<p className="text-muted-foreground">
+					Night Shift ships this kit, and you cannot change it.
+					{copy
+						? ` To change it, copy it into this project as ${copy}. This node then runs the copy.`
+						: ""}
+				</p>
+			</ItemContent>
+			<ItemActions>
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={copy === null || pending}
+					onClick={() => {
+						if (copy) onCopy(copy);
+					}}
+				>
+					{pending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<CopyIcon data-icon="inline-start" />
+					)}
+					Copy into project
+				</Button>
+			</ItemActions>
+		</Item>
 	);
 }
 

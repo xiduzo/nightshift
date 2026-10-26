@@ -143,6 +143,27 @@ describe("subflowContent", () => {
 		).toEqual({ kind: "invalid" });
 	});
 
+	test("a kit, also before the files load, or missing", () => {
+		const kitOf = (name: string) =>
+			name === "kit:github/finish-pr" ? { id: "finish" } : undefined;
+		expect(
+			subflowContent(
+				"root",
+				[{ nodeId: "a", flow: "kit:github/finish-pr" }],
+				undefined,
+				kitOf,
+			),
+		).toEqual({ kind: "flow", flow: { id: "finish" } });
+		expect(
+			subflowContent(
+				"root",
+				[{ nodeId: "a", flow: "kit:github/nope" }],
+				flows,
+				kitOf,
+			),
+		).toEqual({ kind: "missing" });
+	});
+
 	test("a cycle wins, also before the files load", () => {
 		expect(
 			subflowContent("root", [{ nodeId: "a", flow: "root" }], undefined),

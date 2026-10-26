@@ -1,3 +1,5 @@
+import { isKitName } from "@nightshift/flows";
+
 /**
  * The Subflows you look inside, from the flow open in the editor down to
  * the one the canvas shows. Each level is one Call node and the flow it
@@ -93,17 +95,23 @@ export type SubflowContent<F> =
 
 /**
  * The deepest level's flow, from the project's flow files by name (null for
- * a file that is not valid, undefined while they load). A cycle wins: that
- * flow is open above already.
+ * a file that is not valid, undefined while they load), or a kit by
+ * `kitOf`, which needs no load. A cycle wins: that flow is open above
+ * already.
  */
 export function subflowContent<F>(
 	rootFlow: string,
 	stack: SubflowStack,
 	flows: Readonly<Record<string, F | null>> | undefined,
+	kitOf: (name: string) => F | undefined = () => undefined,
 ): SubflowContent<F> | null {
 	const current = stack.at(-1);
 	if (!current) return null;
 	if (isSubflowCycle(rootFlow, stack)) return { kind: "cycle" };
+	if (isKitName(current.flow)) {
+		const kit = kitOf(current.flow);
+		return kit ? { kind: "flow", flow: kit } : { kind: "missing" };
+	}
 	if (flows === undefined) return { kind: "loading" };
 	if (!Object.hasOwn(flows, current.flow)) return { kind: "missing" };
 	const flow = flows[current.flow];
