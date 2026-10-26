@@ -98,11 +98,12 @@ export function canvasEdges(
 		const selectedSegment = segments.find(
 			(segment) => segment.id === selected,
 		)?.id;
+		const main = leadSegments(segments, selectedSegment)[0] ?? segments[0];
 		return {
 			id: group.id,
 			type: "outcome",
 			source: group.from,
-			sourceHandle: segments[0] && handleOf(segments[0]),
+			sourceHandle: main && handleOf(main),
 			target: group.to,
 			selected: selectedSegment !== undefined,
 			data: {
@@ -118,6 +119,19 @@ export function canvasEdges(
 /** The handle an edge leaves from: its outcome's, or a folded Section's exit. */
 function handleOf(segment: EdgeSegment): string {
 	return segment.handle ?? segment.outcome;
+}
+
+/**
+ * The segments that lead a drawn edge: the ones a run took, else the selected
+ * one. The line leaves from the first one's handle and takes their colour.
+ */
+function leadSegments(
+	segments: readonly EdgeSegment[],
+	selected: string | undefined,
+): EdgeSegment[] {
+	const taken = segments.filter((segment) => (segment.traversals ?? 0) > 0);
+	if (taken.length > 0) return taken;
+	return segments.filter((segment) => segment.id === selected);
 }
 
 /** Lets an edge label select one edge of the flow. Absent in read-only canvases. */
@@ -289,7 +303,16 @@ const OutcomeEdge = memo(function OutcomeEdge({
 }: EdgeProps<FlowCanvasEdge>) {
 	const selectEdge = useContext(SelectEdgeContext);
 	const segments = data?.segments ?? [];
-	const stemStarts = useStemStarts(source, segments.map(handleOf));
+	const lead = leadSegments(segments, data?.selectedSegment);
+	// The line leaves from the lead's handle, the others join it.
+	const main = lead[0] ?? segments[0];
+	const others = segments.filter((segment) => segment !== main);
+	const stemStarts = useStemStarts(
+		source,
+		[main, ...others].flatMap((segment) =>
+			segment ? [handleOf(segment)] : [],
+		),
+	);
 	const hover = useHover();
 	const first = segments[0];
 	if (!data || !first) return null;
@@ -300,8 +323,11 @@ const OutcomeEdge = memo(function OutcomeEdge({
 		? routedPaths(data.route, from, to, stemStarts)
 		: stepPaths(from, to, sourcePosition, targetPosition, stemStarts);
 
+	// In a run, the label names only the outcomes it took.
+	const taken = segments.some((segment) => (segment.traversals ?? 0) > 0);
+	const shown = taken ? lead : segments;
 	const colors = new Set(
-		segments.map((segment) =>
+		(lead.length > 0 ? lead : segments).map((segment) =>
 			resolveOutcomeColor(segment.outcome, segment.color),
 		),
 	);
@@ -309,7 +335,8 @@ const OutcomeEdge = memo(function OutcomeEdge({
 	const color = single ? OUTCOME_COLOR_STYLE[single].color : MIXED_COLOR;
 	const untaken = (segment: EdgeSegment) => segment.traversals === 0;
 	const hasError = segments.some((segment) => segment.hasError);
-	const merged = segments.length > 1;
+	const merged = shown.length > 1;
+	const only = shown[0] ?? first;
 	const showLabel = labelAtRest(segments) || hover.hovered || Boolean(selected);
 	const stroke = (dimmed: boolean) => ({
 		stroke: color,
@@ -325,10 +352,10 @@ const OutcomeEdge = memo(function OutcomeEdge({
 					id={id}
 					path={paths.main}
 					markerEnd={`url(#${markerId(single ?? "mixed")})`}
-					style={stroke(segments.every(untaken))}
+					style={stroke(main ? untaken(main) : true)}
 				/>
 				{paths.stems.map((path, index) => {
-					const segment = segments[index + 1];
+					const segment = others[index];
 					return path && segment ? (
 						<BaseEdge
 							key={segment.id}
@@ -351,7 +378,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 									type="button"
 									tabIndex={selectEdge ? 0 : -1}
 									disabled={!selectEdge}
-									onClick={() => selectEdge?.(first.id)}
+									onClick={() => selectEdge?.(only.id)}
 								/>
 							)
 						}
@@ -359,7 +386,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 						onPointerLeave={hover.leave}
 						className={cn(
 							"nodrag nopan pointer-events-auto absolute h-5 bg-card font-mono text-[11px] shadow-xs disabled:cursor-default",
-							!merged && outcomeStyle(first.outcome, first.color).text,
+							!merged && outcomeStyle(only.outcome, only.color).text,
 							selected && "ring-2 ring-ring",
 							hasError && "border-destructive border-dashed",
 							segments.every(untaken) && "opacity-60",
@@ -373,7 +400,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 						}}
 					>
 						{merged
-							? segments.map((segment, index) => (
+							? shown.map((segment, index) => (
 									<Fragment key={segment.id}>
 										{index > 0 ? (
 											<span
@@ -401,7 +428,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 										</button>
 									</Fragment>
 								))
-							: segmentText(first)}
+							: segmentText(only)}
 					</Badge>
 				</EdgeLabelRenderer>
 			) : null}

@@ -293,7 +293,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 			className={cn(
 				"relative w-56 rounded-xl border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
 				selected && "border-ring ring-3 ring-ring/30",
-				run === null && "border-dashed bg-transparent opacity-60 shadow-none",
+				run === null && "opacity-50 shadow-none backdrop-blur-sm",
 			)}
 		>
 			<Handle
