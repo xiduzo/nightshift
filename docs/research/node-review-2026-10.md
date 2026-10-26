@@ -222,6 +222,42 @@ service sends webhooks.
 6. Webhook triggers and signals (§5.4, §6).
 7. Parallel branches and Join (§5.1).
 
+## 8. Built
+
+2026-10-27, on the branch `explore/node-review`. Flow files are version 6.
+A version 5 file migrates when Night Shift reads it.
+
+| Review | Built | Different from the review |
+| --- | --- | --- |
+| §2.1 Agent | `checker` and `mcpServers` go. `nodeClis` joins `clis`. The inspector shows the profile first, and the harness, model and permission mode as its overrides. | — |
+| §2.1, §2.2 Profiles | A project has `.nightshift/profiles.json`. An Agent Profile is for Agents, a Model Profile (a decider and a model) for a Decision or a Value by model, which can name `profile`. | The computer's profile of a name wins over the project's. The web shows a project's profiles but does not edit them. |
+| §2.3 `decider` | Optional, read only with `by: "model"`. The migration removes it from the other Decisions and Values. | — |
+| §2.4 Command data | `$NS_OUTPUT`: JSON in that file is the step's data, whatever `output` says. `output: "json"` reads stdout only when the file stays empty. Data with an `outcome` that names an exit ends the step there. An exit with `"code": "data"` is picked by data only. | — |
+| §2.5 `each` | The `files` source goes. The migration makes it a `command` source with `git ls-files`. | The rest of `each` stays as it is. |
+| §3.1 Gate deadline | `deadline: { at, choose }`, or `minutes` instead of `at`. The note says the deadline chose. | — |
+| §3.2 Agent asks | `ask: "person"`. On `needs-input`, a Gate opens with "answer" and "stop". The answer goes to the same session. | An edge on `needs-input` is an error with `ask`. |
+| §4 Palette | **Gate** and **Branch** both write a `decision` node. A Decision by model is a choice in the inspector. | — |
+| §5.1 Parallel branches | Two or more edges without `max` on one outcome are a fan-out. Each branch ends at one **Join** (`wait: "all"` or `"first"`). | The branches move in lock-step and share the run's copy of the project. Two Agents that can edit files get a warning. A fan-out inside a branch is an error: use a called flow. While one branch waits for a person or a Wait, the others pause. An answer to a Gate while another branch runs is refused. |
+| §5.2 Kept variables | `keep: "project"`: a run starts from the last saved value of this flow and variable. A person can reset it on the flow's page. | The value stays on the computer that walks the run. Another computer does not see it. |
+| §5.3 End | **End** with `done`, `nothing-to-do` or `failed`, and a one-line message. `done` and `nothing-to-do` end the run `finished`, `failed` ends it `failed`. A failed End can be rerun, not resumed. In a called flow, the Call ends `pass` or `fail`, with `ended` and `end_message`. | An End on a branch of a fan-out is an error: put it after the Join. |
+| §5.4, §6 Webhooks | A schedule has `cron` or `webhook` (a secret by name, a `when` rule). Its inputs read the event. A webhook can send a `signal` with a `key`, which wakes the Waits on that name and key. The Schedules page shows the address and the recent deliveries. | Only the computer that fires the schedule takes its webhook: the Host does not pass it on to another computer. The recent deliveries, refused ones too, stay in memory and go when Night Shift restarts. |
+| §6 Kits | Six kits, run by a Call as `kit:<group>/<name>`: `github/create-branch`, `github/publish-draft-pr`, `github/finish-pr`, `github/wait-for-checks`, `jira/assign`, `jira/move`. The Call's flow picker lists them. | A kit is read only. To change one, copy it into the project as a normal flow. |
+| §5.5 Approve one tool call | Not built, on purpose. | Watch for a flow that needs it. |
+
+Night Shift's own `.nightshift/` uses most of it: `pr-review` (a webhook, a
+fan-out of three reviews into a Join, a Decision by a Model Profile),
+`night-chores` (a kept variable, the GitHub kits, an Agent that asks, a Gate
+with a deadline) and `dependency-bump`. Their schedules are off.
+
+Left to do:
+
+- Parallel branches that edit files, each in its own copy of the project.
+- A Host that passes a webhook on to the computer that fires the schedule.
+- Recent deliveries that survive a restart.
+- Kept values that every computer of a Space can read.
+- Edit a project's profiles in the web.
+- Kits for Linear, and events from Jira and Linear.
+
 ## Sources
 
 - n8n: docs.n8n.io/integrations/builtin/core-nodes/ (Wait, Merge, Loop Over

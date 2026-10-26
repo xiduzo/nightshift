@@ -1,6 +1,8 @@
 # Starter flows
 
-Small, self-contained flows (format version 2) to copy into a project and change. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+Small, self-contained flows (format version 6) to copy into a project and change. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+
+For the newer pieces (branches that run at once and a Join, End nodes, kits, webhook schedules, kept variables, a project's profiles), read Night Shift's own flows in [`.nightshift/`](../../.nightshift/) at the root of this repo.
 
 | Flow | Inputs | Does |
 | --- | --- | --- |

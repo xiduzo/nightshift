@@ -55,15 +55,17 @@ Steps are nodes. Each node type does one job:
 
 | Node | Does |
 | --- | --- |
-| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. |
-| **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. |
+| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and go on with your answer. |
+| **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
-| **Decision** | Picks one of its options. Who picks is up to you: a person (a **gate** in your inbox), a rule (a JSONata expression), or a model. |
+| **Decision** | Picks one of its options. Who picks is up to you: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. |
 | **Value** | Makes data that matches a JSON schema, from a rule or a model. |
-| **Wait** | Waits for a duration, a time, a command that passes, or a signal from outside. |
-| **Call** | Runs another flow, once or once per item in a list. The list can come from a planner's output, a command such as `gh`, or a glob of files. |
+| **Wait** | Waits for a duration, a time, a command that passes, or a signal, for example from a webhook. |
+| **Call** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
+| **Join** | Waits for the branches that run at once, all of them or the first. |
+| **End** | Ends the run on purpose: done, nothing to do, or failed, with one line that says why. |
 
-A flow declares inputs and outputs, like a function. Steps read earlier values through templates such as `{{verify.log_tail}}` or `{{planner.data.tasks}}`.
+A flow declares inputs and outputs, like a function. Steps read earlier values through templates such as `{{verify.log_tail}}` or `{{planner.data.tasks}}`. Two or more edges on one outcome run their branches at once. A variable can keep its value from one run to the next.
 
 ### Agents on your own logins
 
@@ -79,14 +81,16 @@ An Agent node names the coding agent it runs on. One flow can mix them.
 | Any other agent that speaks the Agent Client Protocol | Add it as a custom agent with its command, for example `goose acp` |
 | GitHub Copilot, Gemini CLI, Cursor | Through the Agent Client Protocol, not yet verified |
 
-A node can add MCP servers and CLI tools such as `gh`. Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command or an MCP server in your flow.
+A node can add connections (MCP servers) and CLI tools such as `gh`. Profiles hold an agent's setup, or the model of a Decision, under one name. Put them in `.nightshift/profiles.json` so the flow runs on every computer.
+
+Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Call runs one as `kit:github/publish-draft-pr`.
 
 ### Runs that survive the night
 
-- **Schedules** start a flow at a set time and stop it at a stop time, for example 22:00 to 07:00.
+- **Schedules** start a flow at a set time and stop it at a stop time, for example 22:00 to 07:00. A schedule can also start when a webhook arrives, for example when a pull request opens, or wake a Wait when CI is done.
 - **Run policy** handles fresh retries with the failure log, a rescue by a stronger model, network grace, and usage-limit waits that resume the same session.
 - **Each run works in its own copy of your project**, so your checkout stays clean.
-- **Gates** wait in a "Needs you" inbox. An unattended run never blocks on a question in the middle of a session.
+- **Gates** wait in a "Needs you" inbox. An unattended run never blocks on a question in the middle of a session. A Gate with a deadline picks an option for you when nobody answers in time.
 
 ## Quick start
 
@@ -128,7 +132,7 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | `review-pr` | An agent reviews a pull request. A gate asks you before the review is posted. |
 | `per-file` | Applies one instruction to every file that matches a glob. |
 
-Details are in [examples/starters/](examples/starters/).
+Details are in [examples/starters/](examples/starters/). Night Shift's own flows are in [`.nightshift/`](.nightshift/): a review of each pull request, night chores on issues labelled `night`, and a weekly dependency bump.
 
 ### Run it on a server
 
