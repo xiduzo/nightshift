@@ -46,7 +46,7 @@ export function missingConnectionMessage(name: string): string {
 
 /** What the editor says about a profile the daemon does not have. */
 export function missingProfileMessage(name: string): string {
-	return `No profile named ${name}. The flow cannot run until you add it on the Agents page.`;
+	return `No profile named ${name} on this computer or in the project. The flow cannot run until you add it on the Agents page.`;
 }
 
 /** One `{{…}}` a template can use. */

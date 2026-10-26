@@ -38,7 +38,7 @@ import {
 	useCustomAgents,
 } from "@/features/agents";
 import { settingsQueries } from "@/features/settings/queries";
-import type { Effort, ProfileRow } from "@/shared/api";
+import type { AgentProfileRow, Effort } from "@/shared/api";
 import {
 	type AgentChoice,
 	currentAgentChoice,
@@ -62,7 +62,7 @@ const quiet = { staleTime: 30_000, meta: { quietErrors: true } } as const;
  * chat, only one that can chat counts.
  */
 function useAgentOptions(purpose: AgentPurpose) {
-	const profiles = useQuery({ ...profileQueries.list(), ...quiet });
+	const profiles = useQuery({ ...profileQueries.agents(), ...quiet });
 	const harnesses = useQuery({ ...harnessQueries.list(), ...quiet });
 	const settings = useQuery({ ...settingsQueries.get(), ...quiet });
 	const customAgents = useCustomAgents();
@@ -178,7 +178,7 @@ type Options = ReturnType<typeof useAgentOptions>;
 /** The harness the choice runs on, when the page can tell. */
 function harnessOf(
 	choice: AgentChoice,
-	profile: ProfileRow | undefined,
+	profile: AgentProfileRow | undefined,
 ): HarnessName | undefined {
 	return choice.harness ?? profile?.harness;
 }

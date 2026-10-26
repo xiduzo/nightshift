@@ -1,29 +1,17 @@
 /** The fields of a Value node: who makes the value, and its schema. */
-import {
-	type Flow,
-	type ValueNode,
-	valueDecider,
-	withValueBy,
-} from "@nightshift/flows";
-import { Input } from "@nightshift/ui/components/input";
-import {
-	NativeSelect,
-	NativeSelectOption,
-} from "@nightshift/ui/components/native-select";
+import { type Flow, type ValueNode, withValueBy } from "@nightshift/flows";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
-import { deciderQueries } from "@/features/agents";
 import { LargerTextarea } from "@/shared/larger-window";
 import { ExpressionSuggest } from "../../assistant/field-helpers";
 import { VALUE_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
-import { deciderModelHint, withoutField } from "./model-defaults";
+import { ModelSettings } from "./model-settings";
 
 const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
 	{ by: "rule", label: "A rule" },
@@ -39,21 +27,18 @@ const EXPRESSION_EXAMPLE =
  * decider that can make a value, with a prompt).
  */
 export function ValueFields({
+	projectId,
 	flow,
 	node,
 	onChange,
 }: {
+	projectId: string;
 	flow: Flow;
 	node: ValueNode;
 	onChange: (change: (node: ValueNode) => ValueNode) => void;
 }) {
 	const id = useId();
 	const { by } = node;
-	const deciders = useQuery(deciderQueries.list());
-	const makers = (deciders.data ?? []).filter((d) => d.value !== null);
-	const decider = deciders.data?.find((d) => d.name === valueDecider(node));
-	const keyMissing = decider?.apiKeySource === "missing";
-	const cannot = decider !== undefined && decider.value === null;
 	const expression = node.expression ?? "";
 	const prompt = node.prompt ?? "";
 	return (
@@ -170,76 +155,7 @@ export function ValueFields({
 			</InspectorSection>
 
 			{by === "model" ? (
-				<InspectorSection title="Model" tab="setup">
-					<Field
-						id={`${id}-decider`}
-						label="Decider"
-						error={
-							cannot
-								? "This decider cannot make a value. Choose one that can."
-								: keyMissing && decider?.apiKey
-									? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot make a value.`
-									: null
-						}
-						hint="The decider whose model makes the value."
-					>
-						<NativeSelect
-							id={`${id}-decider`}
-							value={valueDecider(node)}
-							aria-invalid={keyMissing || cannot}
-							aria-describedby={`${id}-decider-hint`}
-							onChange={(event) => {
-								const next = event.target.value as ValueNode["decider"];
-								// A model belongs to its decider: the new one starts on its default.
-								onChange((current) => ({
-									...withoutField(current, "model"),
-									decider: next,
-								}));
-							}}
-						>
-							{cannot && decider ? (
-								<NativeSelectOption value={decider.name} disabled>
-									{decider.label}
-								</NativeSelectOption>
-							) : null}
-							{makers.map((d) => (
-								<NativeSelectOption key={d.name} value={d.name}>
-									{d.label}
-								</NativeSelectOption>
-							))}
-						</NativeSelect>
-					</Field>
-					<Field
-						id={`${id}-model`}
-						label="Model"
-						optional
-						hint={deciderModelHint(decider)}
-					>
-						<Input
-							id={`${id}-model`}
-							list={`${id}-models`}
-							value={node.model ?? ""}
-							placeholder={decider?.value?.defaultModel}
-							className="font-mono"
-							autoComplete="off"
-							spellCheck={false}
-							aria-describedby={`${id}-model-hint`}
-							onChange={(event) => {
-								const model = event.target.value.trim();
-								onChange((current) =>
-									model === ""
-										? withoutField(current, "model")
-										: { ...current, model },
-								);
-							}}
-						/>
-						<datalist id={`${id}-models`}>
-							{(decider?.value?.models ?? []).map((value) => (
-								<option key={value} value={value} />
-							))}
-						</datalist>
-					</Field>
-				</InspectorSection>
+				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
 			) : null}
 		</>
 	);

@@ -1,5 +1,10 @@
 /** The fields of an Agent node: its profile, harness, model, prompt and task. */
-import type { AgentNode, Flow, NodeOption } from "@nightshift/flows";
+import type {
+	AgentNode,
+	AgentProfile,
+	Flow,
+	NodeOption,
+} from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -15,7 +20,6 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useQuery } from "@tanstack/react-query";
 import {
 	ChevronDownIcon,
 	SlashSquareIcon,
@@ -31,16 +35,16 @@ import {
 	ModelCombobox,
 	PERMISSION_MODES,
 	permissionLabel,
-	profileQueries,
 	switchHarness,
 	useCustomAgents,
 } from "@/features/agents";
-import type { Effort, PermissionMode, ProfileRow } from "@/shared/api";
+import type { Effort, PermissionMode } from "@/shared/api";
 import { Field, InspectorSection } from "../fields";
 import { SkillCombobox } from "../skill-combobox";
 import { TemplateField } from "../template-field";
 import { AgentOutcomeSection } from "./agent-outcomes";
 import { withoutField } from "./model-defaults";
+import { ProfileSelect, useAgentProfiles } from "./profile-select";
 
 /**
  * The node on another profile, or on none. Picking a profile hands it the
@@ -49,8 +53,8 @@ import { withoutField } from "./model-defaults";
  */
 function pickProfile(
 	node: AgentNode,
-	next: ProfileRow | undefined,
-	before: ProfileRow | undefined,
+	next: AgentProfile | undefined,
+	before: AgentProfile | undefined,
 ): AgentNode {
 	const {
 		profile: _profile,
@@ -72,19 +76,18 @@ function pickProfile(
 	return kept;
 }
 
-export function useProfile(node: AgentNode) {
-	const profiles = useQuery({
-		...profileQueries.list(),
-		staleTime: 30_000,
-		meta: { quietErrors: true },
-	});
-	const profile =
-		node.profile === undefined
-			? undefined
-			: profiles.data?.find((p) => p.name === node.profile);
-	const unknownProfile =
-		node.profile !== undefined && profiles.data !== undefined && !profile;
-	return { profiles: profiles.data, profile, unknownProfile };
+/** The profile the node names, from this computer or the project, and the profiles it can name. */
+export function useProfile(projectId: string, node: AgentNode) {
+	const { choices, chosen, unknown } = useAgentProfiles(
+		projectId,
+		node.profile,
+	);
+	return {
+		choices,
+		profile: chosen?.profile,
+		fromProject: chosen?.from === "project",
+		unknownProfile: unknown,
+	};
 }
 
 /** How an Agent node gets its task, in the order the toggle shows them. */
@@ -111,7 +114,10 @@ export function AgentFields({
 	onSetOutcomes: (outcomes: NodeOption[] | undefined) => void;
 }) {
 	const id = useId();
-	const { profiles, profile, unknownProfile } = useProfile(node);
+	const { choices, profile, fromProject, unknownProfile } = useProfile(
+		projectId,
+		node,
+	);
 	const customAgents = useCustomAgents();
 	const info = (name: HarnessName) => harnessInfo(name, customAgents);
 	// With a profile, a field the node leaves out comes from the profile.
@@ -317,40 +323,30 @@ export function AgentFields({
 					label="Profile"
 					error={
 						unknownProfile
-							? `There is no profile named ${node.profile}. The flow cannot run until you pick another or add it under Agents.`
+							? `There is no profile named ${node.profile} on this computer or in the project. The flow cannot run until you pick another or add it under Agents.`
 							: null
 					}
 					hint={
 						profile
-							? "This node runs with the profile. Override a setting for this node only, or leave it to the profile."
-							: "A saved agent setup from the Agents page. Without one, set the harness, model and permission mode below."
+							? fromProject
+								? "The project's profile, so the flow runs on any computer. Override a setting for this node only, or leave it to the profile."
+								: "This node runs with the profile. Override a setting for this node only, or leave it to the profile."
+							: "A saved agent setup from the Agents page or the project. Without one, set the harness, model and permission mode below."
 					}
 				>
-					<NativeSelect
+					<ProfileSelect
 						id={`${id}-profile`}
-						value={node.profile ?? ""}
-						aria-describedby={`${id}-profile-hint`}
-						aria-invalid={unknownProfile || undefined}
-						onChange={(event) => {
-							const name = event.target.value;
-							const next = profiles?.find((p) => p.name === name);
-							onChange((current) => pickProfile(current, next, profile));
-						}}
-					>
-						<NativeSelectOption value="">
-							None: set it on this node
-						</NativeSelectOption>
-						{(profiles ?? []).map((p) => (
-							<NativeSelectOption key={p.name} value={p.name}>
-								{p.name} · {info(p.harness).label} · {p.model}
-							</NativeSelectOption>
-						))}
-						{unknownProfile ? (
-							<NativeSelectOption value={node.profile}>
-								{node.profile} (not found)
-							</NativeSelectOption>
-						) : null}
-					</NativeSelect>
+						value={node.profile}
+						choices={choices}
+						unknown={unknownProfile}
+						none="None: set it on this node"
+						label={(p) => `${info(p.harness).label} · ${p.model}`}
+						onPick={(next) =>
+							onChange((current) =>
+								pickProfile(current, next?.profile, profile),
+							)
+						}
+					/>
 				</Field>
 
 				{node.profile !== undefined ? (
@@ -524,7 +520,8 @@ export function AgentFields({
 }
 
 /** Beside a field the node sets itself while it has a profile. */
-function OverrideBadge() {
+/** Marks a field the node sets over its profile. */
+export function OverrideBadge() {
 	return (
 		<Badge variant="outline" className="h-4 px-1 text-[0.625rem]">
 			This node

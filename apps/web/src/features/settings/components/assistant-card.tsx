@@ -19,7 +19,7 @@ const ANY = { value: "", label: "The first profile that works" };
 
 export function AssistantCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, ASSISTANT_KEYS);
-	const profiles = useQuery(profileQueries.list());
+	const profiles = useQuery(profileQueries.agents());
 	const saved = data.values.assistantProfile;
 	const names = (profiles.data ?? []).map((profile) => profile.name);
 	// A saved profile that is gone stays in the list, so the field shows it.

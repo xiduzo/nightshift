@@ -1,21 +1,11 @@
 /** The fields of a Decision node: who decides, the prompt, the options, and for a Gate the lock screen. */
-import {
-	type DecisionNode,
-	decisionDecider,
-	type Flow,
-	withDecidedBy,
-} from "@nightshift/flows";
+import { type DecisionNode, type Flow, withDecidedBy } from "@nightshift/flows";
 import {
 	FieldContent,
 	FieldDescription,
 	FieldLabel,
 	Field as ShadcnField,
 } from "@nightshift/ui/components/field";
-import { Input } from "@nightshift/ui/components/input";
-import {
-	NativeSelect,
-	NativeSelectOption,
-} from "@nightshift/ui/components/native-select";
 import { Switch } from "@nightshift/ui/components/switch";
 import {
 	ToggleGroup,
@@ -23,7 +13,6 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
-import { deciderQueries } from "@/features/agents";
 import { settingsQueries } from "@/features/settings";
 import { OutcomesSuggest, RulesSuggest } from "../../assistant/field-helpers";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
@@ -31,7 +20,7 @@ import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
 import { GateDeadlineSection } from "./gate-deadline-fields";
 import { lockScreenHint } from "./lock-screen-hint";
-import { deciderModelHint, withoutField } from "./model-defaults";
+import { ModelSettings } from "./model-settings";
 import { NodeOptionsField } from "./node-options-field";
 
 /** Who decides, in the order the toggle shows them. */
@@ -50,12 +39,14 @@ const DECIDED_BY: {
  * outcomes; with a rule, each option carries the rule that picks it.
  */
 export function DecisionFields({
+	projectId,
 	flow,
 	node,
 	onChange,
 	onRenameOutcome,
 	onRemoveOutcome,
 }: {
+	projectId: string;
 	flow: Flow;
 	node: DecisionNode;
 	onChange: (change: (node: DecisionNode) => DecisionNode) => void;
@@ -96,9 +87,6 @@ export function DecisionFields({
 
 	// Settings → New nodes: the decider a node starts on when a model decides it.
 	const settings = useQuery(settingsQueries.get());
-	const deciders = useQuery(deciderQueries.list());
-	const decider = deciders.data?.find((d) => d.name === decisionDecider(node));
-	const keyMissing = decider?.apiKeySource === "missing";
 	return (
 		<>
 			<InspectorSection title="Decision">
@@ -227,69 +215,7 @@ export function DecisionFields({
 			) : null}
 
 			{by === "model" ? (
-				<InspectorSection title="Model" tab="setup">
-					<Field
-						id={`${id}-decider`}
-						label="Decider"
-						error={
-							keyMissing && decider?.apiKey
-								? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot decide.`
-								: null
-						}
-						hint="The decision model that picks the option."
-					>
-						<NativeSelect
-							id={`${id}-decider`}
-							value={decisionDecider(node)}
-							aria-invalid={keyMissing}
-							aria-describedby={`${id}-decider-hint`}
-							onChange={(event) => {
-								const next = event.target.value as DecisionNode["decider"];
-								// A model belongs to its decider: the new one starts on its default.
-								onChange((current) => ({
-									...withoutField(current, "model"),
-									decider: next,
-								}));
-							}}
-						>
-							{(deciders.data ?? []).map((d) => (
-								<NativeSelectOption key={d.name} value={d.name}>
-									{d.label}
-								</NativeSelectOption>
-							))}
-						</NativeSelect>
-					</Field>
-					<Field
-						id={`${id}-model`}
-						label="Model"
-						optional
-						hint={deciderModelHint(decider)}
-					>
-						<Input
-							id={`${id}-model`}
-							list={`${id}-models`}
-							value={node.model ?? ""}
-							placeholder={decider?.defaultModel}
-							className="font-mono"
-							autoComplete="off"
-							spellCheck={false}
-							aria-describedby={`${id}-model-hint`}
-							onChange={(event) => {
-								const model = event.target.value.trim();
-								onChange((current) =>
-									model === ""
-										? withoutField(current, "model")
-										: { ...current, model },
-								);
-							}}
-						/>
-						<datalist id={`${id}-models`}>
-							{(decider?.models ?? []).map((value) => (
-								<option key={value} value={value} />
-							))}
-						</datalist>
-					</Field>
-				</InspectorSection>
+				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
 			) : null}
 		</>
 	);

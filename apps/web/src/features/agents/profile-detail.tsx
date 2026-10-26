@@ -40,6 +40,8 @@ import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { offerQueries } from "@/features/devices/queries";
 import type {
+	AgentProfileInput,
+	AgentProfileRow,
 	CliTool,
 	Connection,
 	Effort,
@@ -47,7 +49,6 @@ import type {
 	HarnessRowName,
 	OfferView,
 	PermissionMode,
-	ProfileInput,
 	ProfileRow,
 } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
@@ -63,10 +64,10 @@ import { harnessQueries, profileMutations, profileQueries } from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
-type Draft = Omit<ProfileInput, "previousName" | "clis" | "connections"> &
-	Required<Pick<ProfileInput, "clis" | "connections">>;
+type Draft = Omit<AgentProfileInput, "previousName" | "clis" | "connections"> &
+	Required<Pick<AgentProfileInput, "clis" | "connections">>;
 
-function draftFrom(profile: ProfileRow): Draft {
+function draftFrom(profile: AgentProfileRow): Draft {
 	const { usedBy: _usedBy, updatedAt: _at, ...rest } = profile;
 	return { ...rest, description: rest.description ?? "" };
 }
@@ -117,7 +118,7 @@ export function ProfileDetail({
 	onDirtyChange,
 }: {
 	/** The saved profile; null while adding one. */
-	profile: ProfileRow | null;
+	profile: AgentProfileRow | null;
 	/** What a new profile starts as. */
 	initial: Draft;
 	profiles: ProfileRow[];

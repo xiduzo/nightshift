@@ -6,6 +6,7 @@ import { isHarnessName } from "./harnesses";
 export type Selection =
 	| { kind: "profile"; name: string }
 	| { kind: "new-profile" }
+	| { kind: "new-model-profile" }
 	| { kind: "harness"; name: HarnessRowName }
 	| { kind: "tool"; name: string }
 	| { kind: "cli"; name: string }
@@ -26,6 +27,7 @@ export function parseItem(item: string | undefined): Selection | null {
 		case "cli":
 			return name ? { kind, name } : null;
 		case "new-profile":
+		case "new-model-profile":
 		case "secrets":
 			return { kind };
 		default:

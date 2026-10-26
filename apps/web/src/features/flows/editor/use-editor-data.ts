@@ -28,9 +28,20 @@ export function useEditorData(projectId: string, name: string) {
 		[connections],
 	);
 	const daemonProfiles = useQuery(profileQueries.list());
+	const projectProfiles = useQuery({
+		...profileQueries.project(projectId),
+		meta: { quietErrors: true },
+	});
+	// This computer's and the project's: a run finds a profile in either.
 	const profileNames = useMemo(
-		() => daemonProfiles.data?.map((profile) => profile.name),
-		[daemonProfiles.data],
+		() =>
+			daemonProfiles.data && (projectProfiles.data || projectProfiles.isError)
+				? [
+						...daemonProfiles.data.map((profile) => profile.name),
+						...(projectProfiles.data?.profiles ?? []).map((p) => p.name),
+					]
+				: undefined,
+		[daemonProfiles.data, projectProfiles.data, projectProfiles.isError],
 	);
 	return {
 		projectFlows,

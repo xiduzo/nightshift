@@ -16,12 +16,12 @@ import type { OfferView, ProfileRow } from "@/shared/api";
 import { DetailSection } from "@/shared/detail";
 import { permissionLabel } from "./agent-options";
 
-/** The Agent nodes that use the profile, by flow. */
+/** The nodes that use the profile, by flow. */
 export function ProfileUsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {
 	return (
 		<DetailSection
 			title="Used in flows"
-			description="Agent nodes that use this profile. Your changes apply from their next run."
+			description="Nodes that use this profile. Your changes apply from their next run."
 		>
 			{usedBy.length === 0 ? (
 				<p className="text-muted-foreground text-sm">No flow uses it yet.</p>

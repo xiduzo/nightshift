@@ -18,15 +18,17 @@ function withClis(node: AgentNode, clis: string[]): AgentNode {
 
 /** An Agent node's output data and tools. */
 export function AgentAdvanced({
+	projectId,
 	node,
 	connections,
 	onChange,
 }: {
+	projectId: string;
 	node: AgentNode;
 	connections: readonly DaemonConnection[] | undefined;
 	onChange: (change: (node: AgentNode) => AgentNode) => void;
 }) {
-	const { profile } = useProfile(node);
+	const { profile } = useProfile(projectId, node);
 	const id = useId();
 	const cliTools = useQuery({
 		...cliToolQueries.list(),

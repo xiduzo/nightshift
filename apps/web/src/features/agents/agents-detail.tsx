@@ -29,6 +29,10 @@ import { CliToolDetail } from "./cli-tool";
 import { SecretsCard } from "./connections/secrets-card";
 import { CustomAgentDetail } from "./custom-agent";
 import { HarnessDetail } from "./harness-detail";
+import {
+	ModelProfileDetail,
+	newModelProfileDraft,
+} from "./model-profile-detail";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
 import { ToolDetail } from "./tool-detail";
 
@@ -72,16 +76,25 @@ export function Detail({
 					<EmptyMedia variant="icon">
 						<BotIcon />
 					</EmptyMedia>
-					<EmptyTitle>No agent profiles yet</EmptyTitle>
+					<EmptyTitle>No profiles yet</EmptyTitle>
 					<EmptyDescription>
-						A profile gives a harness, a model and tools one name. Agent nodes
-						use it, so one change here reaches every flow.
+						A profile gives a harness, a model and tools one name for Agent
+						nodes. A model profile picks the model for Decision and Value nodes.
+						One change here reaches every flow.
 					</EmptyDescription>
 				</EmptyHeader>
-				<EmptyContent>
+				<EmptyContent className="flex-row justify-center">
 					<Button size="sm" onClick={() => onSelect({ kind: "new-profile" })}>
 						<PlusIcon data-icon="inline-start" />
 						Add a profile
+					</Button>
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => onSelect({ kind: "new-model-profile" })}
+					>
+						<PlusIcon data-icon="inline-start" />
+						Add a model profile
 					</Button>
 				</EmptyContent>
 			</Empty>
@@ -89,13 +102,43 @@ export function Detail({
 	}
 
 	switch (selection.kind) {
+		case "new-model-profile":
+			return (
+				<ModelProfileDetail
+					key={itemOf(selection)}
+					profile={null}
+					initial={newModelProfileDraft(
+						data.settings?.values.decisionDecider ?? "typesafe",
+					)}
+					profiles={data.profiles}
+					onSaved={(name) => onGo({ kind: "profile", name })}
+					onDeleted={() => onGo(null)}
+					onCancelNew={() => onGo(null)}
+					onDirtyChange={onDirtyChange}
+				/>
+			);
 		case "profile":
 		case "new-profile": {
-			const profile =
+			const found =
 				selection.kind === "profile"
 					? data.profiles.find((p) => p.name === selection.name)
 					: null;
-			if (profile === undefined) return <Gone what="profile" />;
+			if (found === undefined) return <Gone what="profile" />;
+			if (found && !("harness" in found)) {
+				return (
+					<ModelProfileDetail
+						key={itemOf(selection)}
+						profile={found}
+						initial={newModelProfileDraft(found.decider)}
+						profiles={data.profiles}
+						onSaved={(name) => onGo({ kind: "profile", name })}
+						onDeleted={() => onGo(null)}
+						onCancelNew={() => onGo(null)}
+						onDirtyChange={onDirtyChange}
+					/>
+				);
+			}
+			const profile = found;
 			if (added.length === 0) {
 				return (
 					<Empty className="h-full">

@@ -179,6 +179,7 @@ export function NodeInspector({
 				) : null}
 				{node.type === "decision" ? (
 					<DecisionFields
+						projectId={projectId}
 						flow={flow}
 						node={node}
 						onChange={(change) =>
@@ -207,6 +208,7 @@ export function NodeInspector({
 
 				{node.type === "value" ? (
 					<ValueFields
+						projectId={projectId}
 						flow={flow}
 						node={node}
 						onChange={(change) =>
@@ -267,6 +269,7 @@ export function NodeInspector({
 
 				{node.type === "agent" ? (
 					<AgentAdvanced
+						projectId={projectId}
 						node={node}
 						connections={connections}
 						onChange={(change) =>

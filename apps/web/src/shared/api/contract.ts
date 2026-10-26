@@ -13,7 +13,13 @@ export type { Outcome };
 
 /** The Agents page: profiles and harnesses. */
 export type ProfileRow = ApiOutputs["profiles"]["list"][number];
+/** An Agent Profile: it names a harness. */
+export type AgentProfileRow = Extract<ProfileRow, { harness: unknown }>;
+/** A Model Profile, for Decisions and Values decided by a model: it names a decider. */
+export type ModelProfileRow = Extract<ProfileRow, { decider: unknown }>;
 export type ProfileInput = ApiInputs["profiles"]["save"];
+export type AgentProfileInput = Extract<ProfileInput, { harness: unknown }>;
+
 export type HarnessRow = ApiOutputs["harnesses"]["list"][number];
 /** A harness by its name, as the Agents page lists it. */
 export type HarnessRowName = HarnessRow["name"];

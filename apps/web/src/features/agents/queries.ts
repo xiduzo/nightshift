@@ -3,7 +3,13 @@
  * Connections and their Secrets, CLI Tools and deciders.
  */
 
-import type { CheckTarget, HarnessRowName } from "@/shared/api";
+import type {
+	AgentProfileRow,
+	CheckTarget,
+	HarnessRowName,
+	ModelProfileRow,
+	ProfileRow,
+} from "@/shared/api";
 import { orpc } from "@/shared/api";
 
 export const profileQueries = {
@@ -11,8 +17,23 @@ export const profileQueries = {
 	all: () => orpc.profiles.key(),
 	/** Every list of profiles. */
 	lists: () => orpc.profiles.list.key(),
-	/** The Agent Profiles of this computer. */
+	/** The profiles of this computer: Agent Profiles and Model Profiles. */
 	list: () => orpc.profiles.list.queryOptions(),
+	/** The Agent Profiles of this computer, for Agent nodes and the assistant. */
+	agents: () => ({
+		...orpc.profiles.list.queryOptions(),
+		select: (rows: ProfileRow[]) =>
+			rows.filter((p): p is AgentProfileRow => "harness" in p),
+	}),
+	/** The Model Profiles of this computer, for Decisions and Values decided by a model. */
+	models: () => ({
+		...orpc.profiles.list.queryOptions(),
+		select: (rows: ProfileRow[]) =>
+			rows.filter((p): p is ModelProfileRow => "decider" in p),
+	}),
+	/** A project's own profiles, and whether this computer overrides each. */
+	project: (projectId: string) =>
+		orpc.profiles.project.queryOptions({ input: { projectId } }),
 };
 
 export const profileMutations = {

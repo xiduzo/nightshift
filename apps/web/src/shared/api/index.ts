@@ -56,6 +56,8 @@ export type {
 export { isSignInRequired, isTwoFactorRequired } from "@nightshift/client";
 export { authClient } from "./auth-client";
 export type {
+	AgentProfileInput,
+	AgentProfileRow,
 	CheckTarget,
 	CliCheck,
 	CliTool,
@@ -66,9 +68,9 @@ export type {
 	HarnessRowName,
 	McpServer,
 	McpTestResult,
+	ModelProfileRow,
 	Outcome,
 	PermissionMode,
-	ProfileInput,
 	ProfileRow,
 	SecretSource,
 	SecretView,

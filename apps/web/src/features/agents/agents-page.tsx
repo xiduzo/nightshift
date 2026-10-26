@@ -25,7 +25,13 @@ import { useQuery } from "@tanstack/react-query";
 import { BotIcon, CircleAlertIcon } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { settingsQueries } from "@/features/settings/queries";
-import type { CliTool, Connection } from "@/shared/api";
+import type {
+	AgentProfileRow,
+	CliTool,
+	Connection,
+	ModelProfileRow,
+	ProfileRow,
+} from "@/shared/api";
 import { SiteHeader } from "@/shared/page";
 import { PanelHeader } from "@/shared/panel";
 import { Detail } from "./agents-detail";
@@ -40,6 +46,7 @@ import { harnessInfo } from "./harnesses";
 import {
 	cliToolQueries,
 	connectionQueries,
+	deciderQueries,
 	harnessQueries,
 	profileQueries,
 } from "./queries";
@@ -95,6 +102,15 @@ export function AgentsPage({
 		else go(selection);
 	};
 	const added = (harnesses.data ?? []).filter((h) => h.added);
+	const agentProfiles = profiles.data?.filter(
+		(p): p is AgentProfileRow => "harness" in p,
+	);
+	const modelProfiles = profiles.data?.filter(
+		(p): p is ModelProfileRow => "decider" in p,
+	);
+	const deciders = useQuery(deciderQueries.list());
+	const deciderLabel = (name: string) =>
+		deciders.data?.find((d) => d.name === name)?.label ?? name;
 	const connections = tools.data?.connections ?? [];
 	const secrets = tools.data?.secrets ?? [];
 	const missingSecrets = secrets.filter(
@@ -102,7 +118,7 @@ export function AgentsPage({
 	).length;
 
 	// Nothing chosen: the first profile, else the empty state.
-	const firstProfile = profiles.data?.[0];
+	const firstProfile = agentProfiles?.[0] ?? modelProfiles?.[0];
 	const selection =
 		parseItem(item) ??
 		(firstProfile
@@ -190,37 +206,25 @@ export function AgentsPage({
 							<nav aria-label="Agents" className="flex flex-col">
 								<Group
 									title="Profiles"
-									count={profiles.data?.length}
+									count={agentProfiles?.length}
 									addLabel="Add a profile"
 									onAdd={() => select({ kind: "new-profile" })}
 								>
 									{profiles.isPending ? (
 										<ListSkeleton />
 									) : (
-										(profiles.data ?? []).map((p) => {
-											const flows = p.usedBy.length;
-											return (
-												<ListItem
-													key={p.name}
-													selected={isSel({ kind: "profile", name: p.name })}
-													onClick={() =>
-														select({ kind: "profile", name: p.name })
-													}
-													title={<span className="font-mono">{p.name}</span>}
-													description={`${harnessInfo(p.harness).label} · ${p.model}`}
-													aside={
-														<span
-															className="text-muted-foreground text-xs"
-															title={p.usedBy.map((u) => u.flowName).join(", ")}
-														>
-															{flows === 0
-																? "Not used"
-																: `In ${flows} ${flows === 1 ? "flow" : "flows"}`}
-														</span>
-													}
-												/>
-											);
-										})
+										(agentProfiles ?? []).map((p) => (
+											<ListItem
+												key={p.name}
+												selected={isSel({ kind: "profile", name: p.name })}
+												onClick={() =>
+													select({ kind: "profile", name: p.name })
+												}
+												title={<span className="font-mono">{p.name}</span>}
+												description={`${harnessInfo(p.harness).label} · ${p.model}`}
+												aside={<UsedIn usedBy={p.usedBy} />}
+											/>
+										))
 									)}
 									{isSel({ kind: "new-profile" }) ? (
 										<ListItem
@@ -229,6 +233,40 @@ export function AgentsPage({
 											title={
 												<span className="text-muted-foreground">
 													New profile
+												</span>
+											}
+										/>
+									) : null}
+								</Group>
+								<Group
+									title="Model profiles"
+									count={modelProfiles?.length}
+									addLabel="Add a model profile"
+									onAdd={() => select({ kind: "new-model-profile" })}
+								>
+									{profiles.isPending ? (
+										<ListSkeleton />
+									) : (
+										(modelProfiles ?? []).map((p) => (
+											<ListItem
+												key={p.name}
+												selected={isSel({ kind: "profile", name: p.name })}
+												onClick={() =>
+													select({ kind: "profile", name: p.name })
+												}
+												title={<span className="font-mono">{p.name}</span>}
+												description={`${deciderLabel(p.decider)} · ${p.model ?? "default model"}`}
+												aside={<UsedIn usedBy={p.usedBy} />}
+											/>
+										))
+									)}
+									{isSel({ kind: "new-model-profile" }) ? (
+										<ListItem
+											selected
+											onClick={() => {}}
+											title={
+												<span className="text-muted-foreground">
+													New model profile
 												</span>
 											}
 										/>
@@ -404,5 +442,19 @@ export function AgentsPage({
 				</AlertDialog>
 			</div>
 		</>
+	);
+}
+
+/** How many flows use a profile, with their names on hover. */
+function UsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {
+	return (
+		<span
+			className="text-muted-foreground text-xs"
+			title={usedBy.map((u) => u.flowName).join(", ")}
+		>
+			{usedBy.length === 0
+				? "Not used"
+				: `In ${usedBy.length} ${usedBy.length === 1 ? "flow" : "flows"}`}
+		</span>
 	);
 }

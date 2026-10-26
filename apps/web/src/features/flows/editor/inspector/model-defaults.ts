@@ -7,7 +7,7 @@ import type { AgentNode, DecisionNode, ValueNode } from "@nightshift/flows";
  */
 export function withoutField<N extends AgentNode | DecisionNode | ValueNode>(
 	node: N,
-	key: "harness" | "model" | "effort" | "permissionMode",
+	key: "harness" | "model" | "effort" | "permissionMode" | "decider",
 ): N {
 	const { [key as keyof N]: _dropped, ...rest } = node;
 	return rest as N;
