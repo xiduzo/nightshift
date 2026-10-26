@@ -1,4 +1,3 @@
-import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -7,8 +6,7 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from "@nightshift/ui/components/breadcrumb";
-import { Button } from "@nightshift/ui/components/button";
-import { ChevronRightIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import type { RunDetail, StepSummary } from "@/shared/api";
 
@@ -20,8 +18,8 @@ import {
 } from "../lib/run-steps";
 
 /*
- * The call in focus on the run page: the breadcrumb over the graph, the chip
- * above the step list, and the calls a step ran under.
+ * The call in focus on the run page: the breadcrumb under the page title,
+ * and the calls a step ran under.
  */
 
 /** One crumb per call, from the run's flow down to the call in focus. */
@@ -33,7 +31,7 @@ function useCrumbs(
 	const crumbs: { key: string; label: ReactNode; scope: ItemScope }[] = [
 		{
 			key: "top",
-			label: <span className="font-mono">{run.flowName ?? "Run"}</span>,
+			label: <span className="font-mono">{run.flowName ?? "Quick run"}</span>,
 			scope: null,
 		},
 	];
@@ -71,7 +69,7 @@ function useCrumbs(
 	return crumbs;
 }
 
-/** Over the graph: where the called flow sits, with a way back up. */
+/** Under the page title: the call in focus, with a way back up. */
 export function FocusBreadcrumb({
 	run,
 	steps,
@@ -118,42 +116,6 @@ export function FocusBreadcrumb({
 				))}
 			</BreadcrumbList>
 		</Breadcrumb>
-	);
-}
-
-/** Above the step list: which call it shows, and a way back to the whole run. */
-export function FocusChip({
-	steps,
-	focus,
-	onClear,
-}: {
-	steps: StepSummary[];
-	focus: NonNullable<ItemScope>;
-	onClear: () => void;
-}) {
-	const parentStep = steps.find((step) => step.id === focus.parentStepId);
-	const item =
-		parentStep && focus.itemId !== null
-			? itemsOf(parentStep, steps).find((one) => one.id === focus.itemId)
-			: undefined;
-	return (
-		<Badge variant="outline" className="h-6 min-w-0 max-w-56 gap-1 pr-0.5">
-			<span className="min-w-0 truncate">
-				{focus.itemId === null
-					? `${parentStep?.nodeId ?? "call"}`
-					: (item?.title ?? focus.itemId)}
-			</span>
-			<Button
-				variant="ghost"
-				size="icon-xs"
-				className="size-5 rounded-full"
-				onClick={onClear}
-				aria-label="Show all"
-				title="Show all"
-			>
-				<XIcon />
-			</Button>
-		</Badge>
 	);
 }
 
