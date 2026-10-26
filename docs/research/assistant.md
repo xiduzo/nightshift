@@ -1,6 +1,21 @@
 # Agents inside Night Shift
 
-**Status, 2026-10-26:** proposal. Nothing is built yet.
+**Status, 2026-10-26:** built on `feat/assistant`, except where noted.
+
+- **Built:** the field helpers in the inspector (4.2: prompt with Cmd/Ctrl+I,
+  Suggest fields, Suggest variables), the chat beside the canvas that
+  proposes a flow and shows it on the canvas (section 3), "Ask an agent why"
+  on a run that did not finish (4.1), `nightshift mcp` (section 5), and the
+  "Profile for help" setting. Each runs read only on one of this computer's
+  Agent Profiles.
+- **Verified live** in a browser with Claude Code on Haiku (2026-10-26):
+  every helper, a proposal through Show on canvas, Apply, Undo and Save, and
+  "Ask an agent why" on a failed run. The project had no change afterwards
+  except the saved flow file.
+- **Not yet:** chat threads live in the memory of Night Shift only: a
+  restart forgets them (question 2). Codex and OpenCode are not tested live
+  as the assistant. Profile suggestions (4.3) and the flow that builds flows
+  (4.4) are not built.
 
 How Night Shift can use coding agents to help a person build flows and set
 up agents, not only to run them. The main idea is a chat helper in the flow
