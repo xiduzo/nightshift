@@ -105,7 +105,7 @@ export function sectionsWithRenamedNode(
 }
 
 /** `base`, else `base-2`, `base-3`, … whichever no Section uses yet. */
-function uniqueSectionId(flow: Flow, base: string): string {
+export function uniqueSectionId(flow: Flow, base: string): string {
 	const taken = new Set((flow.sections ?? []).map((section) => section.id));
 	if (!taken.has(base)) return base;
 	for (let n = 2; ; n++) {

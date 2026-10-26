@@ -12,6 +12,7 @@ export {
 	type FlowCheck,
 	isSavable,
 } from "./check";
+export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
 export {
 	addEdge,
 	addNode,

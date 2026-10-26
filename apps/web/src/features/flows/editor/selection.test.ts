@@ -3,6 +3,7 @@ import {
 	applyNodeSelection,
 	type Selection,
 	selectedNodeIds,
+	selectionIn,
 	withoutNodes,
 } from "./selection";
 
@@ -73,5 +74,22 @@ describe("selection helpers", () => {
 		expect(withoutNodes({ kind: "node", id: "b" }, gone)).toBeNull();
 		const kept: Selection = { kind: "nodes", ids: ["a", "d"] };
 		expect(withoutNodes(kept, gone)).toBe(kept);
+	});
+
+	test("keeps only what the flow still has", () => {
+		const flow = {
+			nodes: [{ id: "a" }, { id: "b" }],
+			edges: [{ id: "e" }],
+			sections: [{ id: "s" }],
+		} as Parameters<typeof selectionIn>[0];
+		const edge: Selection = { kind: "edge", id: "e" };
+		expect(selectionIn(flow, edge)).toBe(edge);
+		expect(selectionIn(flow, { kind: "edge", id: "x" })).toBeNull();
+		expect(selectionIn(flow, { kind: "section", id: "x" })).toBeNull();
+		expect(selectionIn(flow, { kind: "nodes", ids: ["a", "c"] })).toEqual({
+			kind: "node",
+			id: "a",
+		});
+		expect(selectionIn(flow, null)).toBeNull();
 	});
 });

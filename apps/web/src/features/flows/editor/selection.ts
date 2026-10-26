@@ -2,6 +2,7 @@
 // the inspector. Several nodes (Shift-drag a box, or Cmd/Ctrl-click) can be
 // made into a Section.
 
+import type { Flow } from "@nightshift/flows";
 import { sectionIdOf, sectionNodeId } from "../canvas/sections/section-ids";
 
 export type Selection =
@@ -65,4 +66,22 @@ export function withoutNodes(
 	return ids.length === 1
 		? { kind: "node", id: ids[0] as string }
 		: { kind: "nodes", ids };
+}
+
+/** The selection without what the flow no longer has, as after an undo. */
+export function selectionIn(
+	flow: Pick<Flow, "nodes" | "edges" | "sections">,
+	current: Selection,
+): Selection {
+	if (current?.kind === "edge")
+		return flow.edges.some((edge) => edge.id === current.id) ? current : null;
+	if (current?.kind === "section")
+		return flow.sections?.some((section) => section.id === current.id)
+			? current
+			: null;
+	const known = new Set(flow.nodes.map((node) => node.id));
+	return withoutNodes(
+		current,
+		new Set(selectedNodeIds(current).filter((id) => !known.has(id))),
+	);
 }

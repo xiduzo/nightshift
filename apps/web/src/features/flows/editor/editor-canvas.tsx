@@ -160,7 +160,8 @@ export function EditorCanvas({
 	selection: Selection;
 	/** The Sections this browser keeps folded. */
 	folded: ReadonlySet<string>;
-	onFlowChange: (change: (flow: Flow) => Flow) => void;
+	/** A change, with the gesture it is part of: a drag is one step for Undo. */
+	onFlowChange: (change: (flow: Flow) => Flow, gesture?: string) => void;
 	onSelect: SelectionSetter;
 	onSetFolded: (sectionId: string, folded: boolean) => void;
 	/** "Make section" from the selected nodes. */
@@ -299,13 +300,19 @@ export function EditorCanvas({
 		[groups],
 	);
 
+	// Each drag is one gesture, from its first move to the drop.
+	const drags = useRef({ count: 0, active: false });
+
 	const onNodesChange = useCallback(
 		(changes: NodeChange<CanvasNode>[]) => {
 			applyDimensions(changes);
 			const sectionMoves = new Map<string, { x: number; y: number }>();
 			const moves: { id: string; position: { x: number; y: number } }[] = [];
+			let dragging: boolean | undefined;
 			for (const change of changes) {
-				if (change.type !== "position" || !change.position) continue;
+				if (change.type !== "position") continue;
+				dragging ||= change.dragging;
+				if (!change.position) continue;
 				const sectionId = sectionIdOf(change.id);
 				if (sectionId !== undefined)
 					sectionMoves.set(sectionId, change.position);
@@ -316,6 +323,16 @@ export function EditorCanvas({
 					? [change.id]
 					: [],
 			);
+			// A drag is one gesture, and so are moves with the arrow keys.
+			let gesture: string | undefined;
+			if (dragging !== undefined && removed.length === 0) {
+				if (dragging && !drags.current.active)
+					drags.current = { count: drags.current.count + 1, active: true };
+				gesture = drags.current.active
+					? `drag:${drags.current.count}`
+					: "nudge";
+				if (!dragging) drags.current.active = false;
+			}
 			if (moves.length > 0 || sectionMoves.size > 0 || removed.length > 0) {
 				onFlowChange((current) => {
 					let next = current;
@@ -337,7 +354,7 @@ export function EditorCanvas({
 					}
 					for (const id of removed) next = removeNode(next, id);
 					return next;
-				});
+				}, gesture);
 			}
 			const selects = changes.flatMap((change) =>
 				change.type === "select"

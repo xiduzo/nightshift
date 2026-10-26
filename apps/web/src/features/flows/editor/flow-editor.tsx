@@ -19,7 +19,14 @@ import {
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
+import { ButtonGroup } from "@nightshift/ui/components/button-group";
+import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
@@ -27,9 +34,12 @@ import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
 	CheckIcon,
 	CircleDotIcon,
+	type LucideIcon,
 	PlayIcon,
+	Redo2Icon,
 	SaveIcon,
 	SparklesIcon,
+	Undo2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -49,11 +59,14 @@ import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
 import { useAddNode } from "./canvas-controls";
+import { useFlowClipboard } from "./clipboard/use-flow-clipboard";
 import { EdgeInspector } from "./edge-inspector";
+import { type EditKeys, editKeyOf, leavesKeyToPage } from "./edit-keys";
 import { EditorCanvas } from "./editor-canvas";
 import { FloatingInspector } from "./floating-inspector";
 import { FlowInspector } from "./flow-inspector";
 import { FlowTitleCard } from "./flow-title-card";
+import { useDraftHistory } from "./history/use-draft-history";
 import { NodeInspector } from "./inspector/node-inspector";
 import { IssuesPopover } from "./issues-popover";
 import { LeaveDialog } from "./leave-dialog";
@@ -63,7 +76,7 @@ import { ProjectFlowsContext } from "./project-flows-context";
 import { MakeSubflowDialog } from "./sections/make-subflow-dialog";
 import { sectionEdits } from "./sections/section-edits";
 import { SectionInspector } from "./sections/section-inspector";
-import { type Selection, selectedNodeIds } from "./selection";
+import { type Selection, selectedNodeIds, selectionIn } from "./selection";
 import { SubflowView } from "./subflow/subflow-view";
 import { useSubflowStack } from "./subflow/use-subflow-stack";
 import { useEditorData } from "./use-editor-data";
@@ -105,7 +118,8 @@ function Editor({
 	const queryClient = useQueryClient();
 	const { fitView } = useReactFlow();
 
-	const [draft, setDraft] = useState<Flow>(initialFlow);
+	const { draft, setDraft, undo, redo, canUndo, canRedo, revision } =
+		useDraftHistory(initialFlow);
 	const [savedJson, setSavedJson] = useState(() =>
 		initiallySaved ? JSON.stringify(initialFlow) : "",
 	);
@@ -144,8 +158,9 @@ function Editor({
 	).length;
 
 	const changeFlow = useCallback(
-		(change: (flow: Flow) => Flow) => setDraft(change),
-		[],
+		(change: (flow: Flow) => Flow, gesture?: string) =>
+			setDraft(change, gesture),
+		[setDraft],
 	);
 
 	const saveFlow = useMutation(
@@ -267,6 +282,15 @@ function Editor({
 	makeSectionRef.current = makeSection;
 	const selectionRef = useRef(selection);
 	selectionRef.current = selection;
+	const clipboard = useFlowClipboard({
+		draft,
+		setDraft,
+		selection,
+		setSelection,
+	});
+	// The keys that edit the canvas: undo, redo, copy, cut and paste. Not
+	// while a proposal or a Subflow is on view.
+	const editKeysRef = useRef<EditKeys | null>(null);
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -275,6 +299,12 @@ function Editor({
 			if (key === "s" && mod) {
 				event.preventDefault();
 				save();
+			}
+			const edit = editKeyOf(event);
+			const edits = editKeysRef.current;
+			if (edit && edits && !leavesKeyToPage(event, edit)) {
+				if (edits[edit]()) event.preventDefault();
+				return;
 			}
 			// Cmd/Ctrl+G: make a Section of the selected nodes.
 			if (key === "g" && mod && !event.shiftKey && !event.altKey) {
@@ -400,6 +430,21 @@ function Editor({
 		onLinkUsed: onChatLinkUsed,
 	});
 	const preview = chat.preview;
+	editKeysRef.current =
+		preview || subflows.inside
+			? null
+			: {
+					undo: () => {
+						if (canUndo) undo();
+						return canUndo;
+					},
+					redo: () => {
+						if (canRedo) redo();
+						return canRedo;
+					},
+					...clipboard,
+				};
+
 	const previewCheck = useMemo(
 		() =>
 			preview &&
@@ -420,7 +465,10 @@ function Editor({
 			flow={draft}
 			node={selectedNode}
 			onChange={(change) =>
-				setDraft((current) => updateNode(current, selectedNode.id, change))
+				setDraft(
+					(current) => updateNode(current, selectedNode.id, change),
+					`node:${selectedNode.id}`,
+				)
 			}
 			onRename={renameSelected(selectedNode)}
 			onRenameOutcome={renameSelectedOutcome(selectedNode)}
@@ -447,7 +495,10 @@ function Editor({
 			edge={selectedEdge}
 			onSelectEdge={(id) => setSelection({ kind: "edge", id })}
 			onChange={(change) =>
-				setDraft((current) => updateEdge(current, selectedEdge.id, change))
+				setDraft(
+					(current) => updateEdge(current, selectedEdge.id, change),
+					`edge:${selectedEdge.id}`,
+				)
 			}
 			onDelete={() => {
 				setDraft((current) => removeEdge(current, selectedEdge.id));
@@ -465,8 +516,9 @@ function Editor({
 			folded={folds.folded.has(selectedSection.id)}
 			autoFocus={madeSection === selectedSection.id}
 			onChange={(change) =>
-				setDraft((current) =>
-					updateSection(current, selectedSection.id, change),
+				setDraft(
+					(current) => updateSection(current, selectedSection.id, change),
+					`section:${selectedSection.id}`,
 				)
 			}
 			onSetFolded={(folded) =>
@@ -481,9 +533,15 @@ function Editor({
 			flow={draft}
 			name={name}
 			policyDefaults={policyDefaults}
-			onChange={changeFlow}
+			onChange={(change) => setDraft(change, "settings")}
 		/>
 	) : null;
+
+	// An undo or a redo can take away what is selected.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs on each undo or redo only.
+	useEffect(() => {
+		setSelection((current) => selectionIn(draftRef.current, current));
+	}, [revision]);
 
 	const closeInspector = useCallback(() => {
 		setSelection(null);
@@ -544,6 +602,22 @@ function Editor({
 						</Badge>
 					)}
 				</div>
+				<ButtonGroup aria-label="History">
+					<HistoryButton
+						label="Undo"
+						keys={["⌘/Ctrl", "Z"]}
+						icon={Undo2Icon}
+						onClick={undo}
+						disabled={!canUndo || preview !== null}
+					/>
+					<HistoryButton
+						label="Redo"
+						keys={["⌘/Ctrl", "Shift", "Z"]}
+						icon={Redo2Icon}
+						onClick={redo}
+						disabled={!canRedo || preview !== null}
+					/>
+				</ButtonGroup>
 				<Button
 					variant="outline"
 					size="sm"
@@ -672,7 +746,10 @@ function Editor({
 								)}
 							>
 								<FlowAssistantContext.Provider value={assistant}>
-									<div key={selectionKey(selection)}>{inspector}</div>
+									{/* An undo or a redo starts the fields again from the draft. */}
+									<div key={`${selectionKey(selection)}#${revision}`}>
+										{inspector}
+									</div>
 								</FlowAssistantContext.Provider>
 							</FloatingInspector>
 						) : null}
@@ -738,6 +815,47 @@ function Editor({
 				}}
 			/>
 		</>
+	);
+}
+
+/** Undo or Redo in the header, with its keys in the tooltip. */
+function HistoryButton({
+	label,
+	keys,
+	icon: Icon,
+	onClick,
+	disabled,
+}: {
+	label: string;
+	keys: string[];
+	icon: LucideIcon;
+	onClick: () => void;
+	disabled: boolean;
+}) {
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<Button
+						variant="outline"
+						size="icon-sm"
+						aria-label={label}
+						onClick={onClick}
+						disabled={disabled}
+					/>
+				}
+			>
+				<Icon />
+			</TooltipTrigger>
+			<TooltipContent>
+				{label}
+				<KbdGroup>
+					{keys.map((key) => (
+						<Kbd key={key}>{key}</Kbd>
+					))}
+				</KbdGroup>
+			</TooltipContent>
+		</Tooltip>
 	);
 }
 
