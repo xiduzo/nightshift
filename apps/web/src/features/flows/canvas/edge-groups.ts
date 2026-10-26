@@ -96,6 +96,8 @@ export type EdgeSegment = {
 	hasError?: boolean;
 	/** Run view only: how often the run took this edge. */
 	traversals?: number;
+	/** A proposed change on view: the edge is new, or the proposal removes it. */
+	change?: "added" | "removed";
 };
 
 /** One segment of a label: the outcome, its max, and how often it was taken. */

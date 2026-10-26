@@ -29,7 +29,7 @@ import { GroupIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { exitHandleId, groupEdges } from "../canvas/edge-groups";
-import type { FlowCanvasNode } from "../canvas/flow-node";
+import type { DiffMark, FlowCanvasNode } from "../canvas/flow-node";
 import {
 	canvasEdges,
 	edgeTypes,
@@ -67,6 +67,15 @@ import {
 	selectedNodeIds,
 	withoutNodes,
 } from "./selection";
+
+/** The keys that delete what is selected. */
+const DELETE_KEYS = ["Backspace", "Delete"];
+
+/** How the nodes and edges of a proposed flow differ from the draft, by id. */
+export type CanvasPreview = {
+	nodes: ReadonlyMap<string, DiffMark>;
+	edges: ReadonlyMap<string, "added" | "removed">;
+};
 
 /** One empty list for every node without issues, so its data stays the same. */
 const NO_ISSUES: FlowIssue[] = [];
@@ -139,6 +148,7 @@ export function EditorCanvas({
 	onMakeSection,
 	onDropNode,
 	onNodeDoubleClick,
+	preview,
 }: {
 	flow: Flow;
 	/** Names the flow for the routes this browser keeps of its last layout. */
@@ -156,6 +166,11 @@ export function EditorCanvas({
 	onDropNode: (type: FlowNodeType, at: { x: number; y: number }) => void;
 	/** A node was double-clicked, for example a Subflow to look inside. */
 	onNodeDoubleClick?: (nodeId: string) => void;
+	/**
+	 * A proposed change on view: `flow` is the proposal, read only, and
+	 * these mark how its nodes and edges differ from the draft.
+	 */
+	preview?: CanvasPreview;
 }) {
 	const [measured, applyDimensions] = useMeasured();
 	const { fitView } = useReactFlow();
@@ -197,7 +212,7 @@ export function EditorCanvas({
 	const sections = useSectionCanvas(flow, {
 		folded,
 		measured,
-		editable: true,
+		editable: !preview,
 		issues: counts.bySection,
 		selectedSection: selection?.kind === "section" ? selection.id : null,
 	});
@@ -216,11 +231,12 @@ export function EditorCanvas({
 							type: node.type,
 							position: node.position,
 							measured: measured[node.id],
-							selected: selected.has(node.id),
+							selected: !preview && selected.has(node.id),
 							data: {
 								node,
 								isStart: flow.start === node.id,
 								issues: counts.byNode.get(node.id) ?? NO_ISSUES,
+								change: preview?.nodes.get(node.id),
 							},
 						},
 					],
@@ -235,6 +251,7 @@ export function EditorCanvas({
 		hidden,
 		sections.frames,
 		sections.boxes,
+		preview,
 	]);
 
 	// The routes of the last "Lay out". Each holds while its nodes stay put.
@@ -248,6 +265,7 @@ export function EditorCanvas({
 				selected: selection?.kind === "edge" ? selection.id : undefined,
 				boxes: boxPositions,
 				endOf: sections.endOf,
+				changes: preview?.edges,
 			}).map((edge) =>
 				// A line to a folded box stands for edges you cannot see:
 				// Delete does not remove them. Select one on its label.
@@ -256,7 +274,16 @@ export function EditorCanvas({
 					? { ...edge, deletable: false }
 					: edge,
 			),
-		[flow, groups, routes, counts, selection, boxPositions, sections.endOf],
+		[
+			flow,
+			groups,
+			routes,
+			counts,
+			selection,
+			boxPositions,
+			sections.endOf,
+			preview,
+		],
 	);
 	// A drawn edge carries every edge of its node pair, under its first id.
 	const groupOf = useMemo(
@@ -487,11 +514,11 @@ export function EditorCanvas({
 		() => ({ setFolded: onSetFolded }),
 		[onSetFolded],
 	);
-	const multi = selection?.kind === "nodes" ? selection.ids : null;
+	const multi = !preview && selection?.kind === "nodes" ? selection.ids : null;
 
 	return (
 		<div className="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
-			<SelectEdgeContext.Provider value={selectEdge}>
+			<SelectEdgeContext.Provider value={preview ? null : selectEdge}>
 				<SectionActionsContext.Provider value={sectionActions}>
 					<OutcomeMarkers />
 					<ReactFlow<CanvasNode, FlowCanvasEdge>
@@ -504,7 +531,11 @@ export function EditorCanvas({
 						onConnect={onConnect}
 						isValidConnection={isValidConnection}
 						onPaneClick={() => onSelect(null)}
+						nodesDraggable={!preview}
+						nodesConnectable={!preview}
+						elementsSelectable={!preview}
 						onNodeDoubleClick={(_, node) => {
+							if (preview) return;
 							const sectionId = sectionIdOf(node.id);
 							if (sectionId === undefined) onNodeDoubleClick?.(node.id);
 							else if (node.type === "sectionBox")
@@ -523,11 +554,11 @@ export function EditorCanvas({
 						}}
 						onDrop={(event) => {
 							const type = event.dataTransfer.getData(NODE_DRAG_TYPE);
-							if (!isNodeType(type)) return;
+							if (preview || !isNodeType(type)) return;
 							event.preventDefault();
 							onDropNode(type, { x: event.clientX, y: event.clientY });
 						}}
-						deleteKeyCode={["Backspace", "Delete"]}
+						deleteKeyCode={preview ? null : DELETE_KEYS}
 						selectionKeyCode="Shift"
 						multiSelectionKeyCode={["Meta", "Control"]}
 						snapToGrid

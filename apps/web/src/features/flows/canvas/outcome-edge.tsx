@@ -71,6 +71,7 @@ export function canvasEdges(
 		selected,
 		boxes,
 		endOf,
+		changes,
 	}: {
 		routes?: RouteBook;
 		/** Ids of edges with an error. */
@@ -83,6 +84,8 @@ export function canvasEdges(
 		boxes?: ReadonlyMap<string, Point>;
 		/** What each node is drawn as: itself, or its folded Section's box. */
 		endOf?: EndOf;
+		/** A proposed change on view: the new and removed edges, by edge id. */
+		changes?: ReadonlyMap<string, "added" | "removed">;
 	} = {},
 ): FlowCanvasEdge[] {
 	const at = new Map<string, Point>(
@@ -94,6 +97,7 @@ export function canvasEdges(
 			...segment,
 			hasError: errors?.has(segment.id) ?? false,
 			traversals: traversals ? (traversals[segment.id] ?? 0) : undefined,
+			change: changes?.get(segment.id),
 		}));
 		const selectedSegment = segments.find(
 			(segment) => segment.id === selected,
@@ -335,14 +339,17 @@ const OutcomeEdge = memo(function OutcomeEdge({
 	const color = single ? OUTCOME_COLOR_STYLE[single].color : MIXED_COLOR;
 	const untaken = (segment: EdgeSegment) => segment.traversals === 0;
 	const hasError = segments.some((segment) => segment.hasError);
+	// A proposed change on view: new edges in the success colour, removed ones faded.
+	const added = segments.some((segment) => segment.change === "added");
+	const removed = (segment: EdgeSegment) => segment.change === "removed";
 	const merged = shown.length > 1;
 	const only = shown[0] ?? first;
 	const showLabel = labelAtRest(segments) || hover.hovered || Boolean(selected);
-	const stroke = (dimmed: boolean) => ({
-		stroke: color,
-		strokeWidth: selected ? 2.5 : 1.5,
-		strokeDasharray: hasError ? "5 4" : undefined,
-		opacity: dimmed ? 0.35 : 1,
+	const stroke = (dimmed: boolean, gone = false) => ({
+		stroke: added && !gone ? "var(--status-finished)" : color,
+		strokeWidth: selected || (added && !gone) ? 2.5 : 1.5,
+		strokeDasharray: hasError || gone ? "5 4" : undefined,
+		opacity: dimmed || gone ? 0.35 : 1,
 	});
 
 	return (
@@ -352,7 +359,10 @@ const OutcomeEdge = memo(function OutcomeEdge({
 					id={id}
 					path={paths.main}
 					markerEnd={`url(#${markerId(single ?? "mixed")})`}
-					style={stroke(main ? untaken(main) : true)}
+					style={stroke(
+						main ? untaken(main) : true,
+						main ? removed(main) : false,
+					)}
 				/>
 				{paths.stems.map((path, index) => {
 					const segment = others[index];
@@ -361,7 +371,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 							key={segment.id}
 							path={path}
 							interactionWidth={12}
-							style={stroke(untaken(segment))}
+							style={stroke(untaken(segment), removed(segment))}
 						/>
 					) : null;
 				})}
@@ -389,14 +399,18 @@ const OutcomeEdge = memo(function OutcomeEdge({
 							!merged && outcomeStyle(only.outcome, only.color).text,
 							selected && "ring-2 ring-ring",
 							hasError && "border-destructive border-dashed",
-							segments.every(untaken) && "opacity-60",
+							(segments.every(untaken) || segments.every(removed)) &&
+								"opacity-60",
+							segments.every(removed) && "border-dashed",
 							!merged && selectEdge && "cursor-pointer hover:bg-muted",
 						)}
 						style={{
 							transform: `translate(-50%, -50%) translate(${paths.label.x}px, ${paths.label.y}px)`,
 							borderColor: hasError
 								? undefined
-								: `color-mix(in oklch, ${color} 55%, transparent)`,
+								: added
+									? "var(--status-finished)"
+									: `color-mix(in oklch, ${color} 55%, transparent)`,
 						}}
 					>
 						{merged

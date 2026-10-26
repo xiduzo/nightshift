@@ -59,6 +59,17 @@ export type FlowNodeData = {
 	issues: readonly FlowIssue[];
 	/** Run view only: the node's latest step, or null when the run never reached it. */
 	run?: NodeRunState | null;
+	/** A proposed change on view: how the node differs from the draft. */
+	change?: DiffMark;
+};
+
+/** How a node or edge of a proposed flow differs from the editor's draft. */
+export type DiffMark = "added" | "removed" | "changed";
+
+const DIFF_WORD: Record<DiffMark, string> = {
+	added: "New",
+	removed: "Removed",
+	changed: "Changed",
 };
 
 export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
@@ -240,7 +251,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	selected,
 	isConnectable,
 }: NodeProps<FlowCanvasNode>) {
-	const { node, isStart, issues, run } = data;
+	const { node, isStart, issues, run, change } = data;
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
 	const meta = NODE_TYPE[node.type];
@@ -294,8 +305,22 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				"relative w-56 rounded-xl border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
 				selected && "border-ring ring-3 ring-ring/30",
 				run === null && "opacity-50 shadow-none backdrop-blur-sm",
+				change === "added" &&
+					"border-status-finished ring-3 ring-status-finished/25",
+				change === "removed" &&
+					"border-dashed opacity-50 shadow-none backdrop-blur-sm",
 			)}
 		>
+			{change === "changed" ? (
+				<span
+					title={DIFF_WORD.changed}
+					className="absolute -top-1 -right-1 z-10 size-2.5 rounded-full bg-status-waiting ring-2 ring-card"
+				>
+					<span className="sr-only">{DIFF_WORD.changed}</span>
+				</span>
+			) : change ? (
+				<span className="sr-only">{DIFF_WORD[change]}</span>
+			) : null}
 			<Handle
 				type="target"
 				position={Position.Left}
