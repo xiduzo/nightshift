@@ -22,7 +22,8 @@ const KIND_HINT: Record<WaitUntil["kind"], string> = {
 	duration: "The step waits this long, then goes on.",
 	time: "The step waits until this time, then goes on.",
 	command: "The step runs the command until it succeeds, then goes on.",
-	signal: "The step waits until someone sends the run this signal.",
+	signal:
+		"The step waits until someone sends the run this signal, or a webhook of this project does.",
 };
 
 /** What a Wait node waits for, and the fields of that kind. */
@@ -131,25 +132,41 @@ export function WaitFields({
 			) : null}
 
 			{until.kind === "signal" ? (
-				<Field
-					id={`${id}-name`}
-					label="Signal name"
-					hint="For example deploy-finished. Send it from the run page, or with the API."
-				>
-					<Input
+				<>
+					<Field
 						id={`${id}-name`}
-						value={until.name}
-						placeholder="deploy-finished"
-						className="font-mono"
-						autoComplete="off"
-						spellCheck={false}
-						aria-invalid={until.name.trim() === ""}
-						aria-describedby={`${id}-name-hint`}
-						onChange={(event) =>
-							setUntil({ ...until, name: event.target.value })
-						}
+						label="Signal name"
+						hint="For example ci-done. Send it from the run page, or from a schedule that waits for a webhook."
+					>
+						<Input
+							id={`${id}-name`}
+							value={until.name}
+							placeholder="deploy-finished"
+							className="font-mono"
+							autoComplete="off"
+							spellCheck={false}
+							aria-invalid={until.name.trim() === ""}
+							aria-describedby={`${id}-name-hint`}
+							onChange={(event) =>
+								setUntil({ ...until, name: event.target.value })
+							}
+						/>
+					</Field>
+					<TemplateField
+						id={`${id}-key`}
+						label="Key (optional)"
+						hint="Only a webhook with the same key continues this step, for example {{pr}}. Without a key, any does."
+						flow={flow}
+						nodeId={node.id}
+						value={until.key ?? ""}
+						placeholder="{{pr}}"
+						multiline={false}
+						onChange={(key) => {
+							const { key: _, ...rest } = until;
+							setUntil(key.trim() === "" ? rest : { ...rest, key });
+						}}
 					/>
-				</Field>
+				</>
 			) : null}
 
 			<Note>
@@ -160,6 +177,13 @@ export function WaitFields({
 					<>
 						{" "}
 						and <code>{`{{${node.id}.log_tail}}`}</code>
+					</>
+				) : null}
+				{until.kind === "signal" ? (
+					<>
+						{" "}
+						and the webhook that sent the signal,{" "}
+						<code>{`{{${node.id}.data.body}}`}</code>
 					</>
 				) : null}
 				.

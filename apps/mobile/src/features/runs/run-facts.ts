@@ -39,6 +39,7 @@ function startedBy(
 	run: Pick<RunDetail, "trigger" | "startedBy">,
 ): string | undefined {
 	if (run.trigger.kind === "schedule") return "By a schedule";
+	if (run.trigger.kind === "webhook") return "By a webhook";
 	return run.startedBy?.name ? `By ${run.startedBy.name}` : undefined;
 }
 

@@ -55,7 +55,7 @@ export function UpNext({
 							key: `schedule:${schedule.id}`,
 							at: schedule.nextAt,
 							icon: CalendarClockIcon,
-							title: schedule.flow,
+							title: schedule.flow ?? schedule.id,
 							description: schedule.stopAt
 								? `Starts on schedule, stops at ${schedule.stopAt}`
 								: "Starts on schedule",

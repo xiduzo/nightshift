@@ -75,17 +75,23 @@ export function missingInputs(
 	);
 }
 
-/** One field per input of a flow: text, or JSON for a `json` input. */
+/**
+ * One field per input of a flow: text, or JSON for a `json` input. With
+ * `templates`, a value may read a webhook (`{{event.body.number}}`): its
+ * JSON is read when the webhook arrives, not here.
+ */
 export function FlowInputFields({
 	idPrefix,
 	inputs,
 	values,
 	onChange,
+	templates = false,
 }: {
 	idPrefix: string;
 	inputs: readonly FlowInputDef[];
 	values: InputTexts;
 	onChange: (values: InputTexts) => void;
+	templates?: boolean;
 }) {
 	if (inputs.length === 0) return null;
 	return (
@@ -97,7 +103,10 @@ export function FlowInputFields({
 				{inputs.map((input) => {
 					const fieldId = `${idPrefix}-input-${input.name}`;
 					const value = values[input.name] ?? "";
-					const problem = jsonProblem(input, value);
+					const problem =
+						templates && value.includes("{{")
+							? null
+							: jsonProblem(input, value);
 					const hint = problem
 						? `Not valid JSON: ${problem}`
 						: input.description;

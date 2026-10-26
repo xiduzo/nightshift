@@ -81,6 +81,15 @@ describe("runFacts", () => {
 		expect(fact.get("Flow")?.value).toBe("Quick run");
 		expect(fact.get("Computer")?.value).toBe("Your Host");
 		expect(fact.get("Started")?.sub).toBe("By a schedule");
+		const hooked = byLabel(
+			runFacts(
+				factRun({
+					trigger: { kind: "webhook", scheduleId: "s1", at: NOW - 30 * MIN },
+				}),
+				{ status: "running", steps: 1, now: NOW },
+			),
+		);
+		expect(hooked.get("Started")?.sub).toBe("By a webhook");
 		expect(fact.get("Duration")).toMatchObject({
 			value: "12 min",
 			sub: "1 step",

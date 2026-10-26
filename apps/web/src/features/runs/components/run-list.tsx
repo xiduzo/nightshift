@@ -15,7 +15,7 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { Link } from "@tanstack/react-router";
-import { CalendarClockIcon, HistoryIcon } from "lucide-react";
+import { CalendarClockIcon, HistoryIcon, WebhookIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { WalkerBadge } from "@/features/devices";
 import type { Project, RunSummary } from "@/shared/api";
@@ -211,7 +211,7 @@ function RunTitle({
 				>
 					{run.title}
 				</Link>
-				{run.trigger.kind === "schedule" ? (
+				{run.trigger.kind !== "manual" ? (
 					<ScheduledMark trigger={run.trigger} />
 				) : null}
 				<WalkerBadge walker={run.device} className="relative z-10" />
@@ -247,12 +247,13 @@ function RunTitle({
 	);
 }
 
-/** A run a schedule started; which schedule, and for when, on hover. */
+/** A run a schedule started, at its time or on a webhook; which schedule, and when, on hover. */
 function ScheduledMark({
 	trigger,
 }: {
-	trigger: Extract<RunSummary["trigger"], { kind: "schedule" }>;
+	trigger: Exclude<RunSummary["trigger"], { kind: "manual" }>;
 }) {
+	const webhook = trigger.kind === "webhook";
 	return (
 		<Tooltip>
 			<TooltipTrigger
@@ -260,11 +261,19 @@ function ScheduledMark({
 					<span className="relative z-10 flex shrink-0 items-center gap-1 text-muted-foreground text-xs" />
 				}
 			>
-				<CalendarClockIcon className="size-3.5" aria-hidden="true" />
-				<span className="max-sm:sr-only">scheduled</span>
+				{webhook ? (
+					<WebhookIcon className="size-3.5" aria-hidden="true" />
+				) : (
+					<CalendarClockIcon className="size-3.5" aria-hidden="true" />
+				)}
+				<span className="max-sm:sr-only">
+					{webhook ? "webhook" : "scheduled"}
+				</span>
 			</TooltipTrigger>
 			<TooltipContent>
-				Started by the schedule {trigger.scheduleId}, for{" "}
+				{webhook
+					? `Started by a webhook of the schedule ${trigger.scheduleId}, at `
+					: `Started by the schedule ${trigger.scheduleId}, for `}
 				{formatDateTime(trigger.at)}
 			</TooltipContent>
 		</Tooltip>

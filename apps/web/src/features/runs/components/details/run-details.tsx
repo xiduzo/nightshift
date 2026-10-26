@@ -278,6 +278,9 @@ function StartedBy({ run }: { run: RunDetail }) {
 	if (run.trigger.kind === "schedule") {
 		return <>Schedule · {run.trigger.scheduleId}</>;
 	}
+	if (run.trigger.kind === "webhook") {
+		return <>Webhook · {run.trigger.scheduleId}</>;
+	}
 	if (!run.startedBy) {
 		return <span className="text-muted-foreground">Not known</span>;
 	}
