@@ -1,7 +1,9 @@
 import {
 	type GateChoice,
+	type GateDeadline,
 	type InputValues,
 	type LoggedEvent,
+	type RunResult,
 	type RunStatus,
 	type RunTrigger,
 	type RunWarningKind,
@@ -78,7 +80,8 @@ function walkBeganSeq(events: readonly LoggedEvent[]): number {
  * `sleeping` while a step waits for a usage limit or the network. A run
  * with none of them (the daemon died while it created the run) is
  * `interrupted`. `steps`: the run's steps when the caller derived them
- * already (`deriveSteps`), else they are derived when needed.
+ * already (`deriveSteps`), else they are derived when needed. `result`:
+ * the status of the End node that ended the run, else null.
  */
 export function deriveRunState(
 	events: readonly LoggedEvent[],
@@ -86,15 +89,21 @@ export function deriveRunState(
 ): {
 	status: RunStatus;
 	reason: string | null;
+	result: RunResult | null;
 } {
 	const latest = latestRunEvent(events);
-	if (!latest) return { status: "interrupted", reason: null };
+	if (!latest) return { status: "interrupted", reason: null, result: null };
 	if (latest.type === "RunEnded") {
-		return { status: latest.payload.status, reason: latest.payload.reason };
+		return {
+			status: latest.payload.status,
+			reason: latest.payload.reason,
+			result: latest.payload.result ?? null,
+		};
 	}
-	if (deriveOpenGate(events, steps)) return { status: "waiting", reason: null };
-	if (deriveSleep(events, steps)) return { status: "sleeping", reason: null };
-	return { status: "running", reason: null };
+	const open = (status: RunStatus) => ({ status, reason: null, result: null });
+	if (deriveOpenGate(events, steps)) return open("waiting");
+	if (deriveSleep(events, steps)) return open("sleeping");
+	return open("running");
 }
 
 export function deriveRunStatus(events: readonly LoggedEvent[]): RunStatus {
@@ -300,6 +309,8 @@ export type OpenGateFact = {
 	/** The flow author let a person answer this Gate from the lock screen. */
 	lockScreen: boolean;
 	openedAt: number;
+	/** When nobody answered by then, the Gate takes an option. Null without one. */
+	deadline: GateDeadline | null;
 };
 
 /**
@@ -331,6 +342,7 @@ export function deriveOpenGate(
 		choices: open.gate.choices,
 		lockScreen: open.gate.lockScreen,
 		openedAt: open.gate.openedAt,
+		deadline: open.gate.deadline,
 	};
 }
 

@@ -33,6 +33,25 @@ describe("the actions a run allows", () => {
 		expect(allowed("finished", true)).toEqual(["resume", "rerun"]);
 	});
 
+	test("a run an End node ended is only run again, whatever its result", () => {
+		const allowedAfter = (
+			status: RunStatus,
+			result: "done" | "nothing-to-do" | "failed",
+		) =>
+			Object.entries(runActions(status, true, result))
+				.filter(([, yes]) => yes)
+				.map(([action]) => action);
+		expect(allowedAfter("finished", "done")).toEqual(["rerun"]);
+		expect(allowedAfter("finished", "nothing-to-do")).toEqual(["rerun"]);
+		expect(allowedAfter("failed", "failed")).toEqual(["rerun"]);
+		expect(whyNot("resume", "failed", true, "failed")).toBe(
+			"This run ended where its flow ends it. Run it again from a step instead.",
+		);
+		expect(whyNot("move", "failed", false, "failed")).toBe(
+			"This run ended where its flow ends it. Run it again from a step instead.",
+		);
+	});
+
 	test("on another computer: a stop, an answer, a signal and a move travel to the Walker, nothing else", () => {
 		expect(allowed("running", false)).toEqual(["stop"]);
 		expect(allowed("waiting", false)).toEqual(["stop", "answer", "move"]);

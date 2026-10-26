@@ -23,6 +23,7 @@ import {
 	callEachOutputFields,
 	deciderNameSchema,
 	decisionNodeSchema,
+	endStatusSchema,
 	harnessNameSchema,
 	outcomeColors,
 	permissionModeSchema,
@@ -119,6 +120,13 @@ export const sampleNodes = {
 			as: "item",
 		},
 	},
+	end: {
+		id: "no_work",
+		type: "end",
+		position: at,
+		status: "nothing-to-do",
+		message: "No open issues for {{label}}",
+	},
 } as const satisfies Record<FlowNodeType, NodeInput>;
 
 /** What each node type is for, and the fields it adds to the common ones. */
@@ -126,14 +134,15 @@ const nodeText: Record<FlowNodeType, string> = {
 	agent: `A coding-agent session. \`prompt\` (template) or \`skill\` (runs \`/<skill> <prompt>\`). Name a \`profile\` (an Agent Profile of this computer), or set \`harness\` (${harnessNameSchema.options.join(", ")}, or \`acp:<slug>\`), \`model\` and \`permissionMode\` (${permissionModeSchema.options.join(", ")}) yourself. A profile is better. Optional: \`effort\`, \`session\` (\`fresh\`, or \`resume\` to continue its last session on a later visit), \`clis\` (programs it may run, for example \`gh\`), \`connections\`, \`idleMinutes\`, \`output\` (a JSON Schema for an object: the agent must report \`data\` that matches it), \`outcomes\` (its own outcomes, each \`{ name, description }\`; replaces the default ones), \`ask: "person"\`. With \`ask: "person"\`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step \`fail\`. Do not draw a \`needs-input\` edge then, and do not build that loop with a Gate yourself.`,
 	command: `A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by \`$NS_OUTPUT\`, which becomes \`data\`: \`echo '{"count": 3}' > "$NS_OUTPUT"\`. Data with an \`outcome\` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. \`exits\` lists \`{ name, code }\`; an exit with \`"code": "data"\` is picked by the data only; one exit without \`code\` catches every other code and goes last. Without \`exits\`: \`pass\` on 0, \`fail\` on any other code. \`output: "json"\` reads the JSON printed on stdout instead, when \`$NS_OUTPUT\` stays empty. \`secrets\` names secrets that reach the command as environment variables. A template value reaches the shell as an environment variable, never as shell text, so quote it: \`echo "{{build.summary}}"\`.`,
 	tool: "Calls one tool of a connection (an MCP server of this computer), with no model. `connection`, `tool`, and `arguments` (a template per argument). `data` is the structured result.",
-	decision: `Picks one of its \`options\` (each \`{ name, description }\`); the option is the outcome. \`by\`: ${decisionNodeSchema.shape.by.options.map((by) => `\`${by}\``).join(", ")}. \`person\` is a Gate: \`prompt\` is the question, and the run waits for the answer. \`rule\`: each option but the last has \`when\`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. \`model\`: a small model reads \`prompt\` and picks; \`decider\` (one of ${deciderNameSchema.options.join(", ")}) and \`model\` are optional and read only then.`,
+	decision: `Picks one of its \`options\` (each \`{ name, description }\`); the option is the outcome. \`by\`: ${decisionNodeSchema.shape.by.options.map((by) => `\`${by}\``).join(", ")}. \`person\` is a Gate: \`prompt\` is the question, and the run waits for the answer. A Gate may have \`deadline: { at: "07:00", choose: "keep" }\` (or \`minutes\` instead of \`at\`, counted from when it opens): when nobody answered by then, it takes the option \`choose\`. \`rule\` is a Branch: each option but the last has \`when\`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. \`model\`: a small model reads \`prompt\` and picks; \`decider\` (one of ${deciderNameSchema.options.join(", ")}) and \`model\` are optional and read only then.`,
 	value: `Makes \`data\` that matches \`output\` (a JSON Schema for an object). \`by: "rule"\` with \`expression\` (JSONata over the run's values), or \`by: "model"\` with \`prompt\` and optionally a \`decider\` that can make a value (${valueDeciderNameSchema.options.join(", ")}). Use it to compute or reshape a value, often with \`set\`.`,
 	wait: `Waits, then ends \`done\`. \`until\` is one of: ${waitNodeSchema.shape.until.options
 		.map((option) => `\`${option.shape.kind.value}\``)
 		.join(
 			", ",
 		)} (\`{ kind: "duration", minutes }\`, \`{ kind: "time", at: "07:00" }\`, \`{ kind: "command", command, everyMinutes }\` until it exits 0, \`{ kind: "signal", name, key? }\`). \`timeoutMinutes\` ends it \`timeout\`. A signal comes from a person on the run page, or from a webhook schedule of the project: then \`data\` holds the webhook (\`{{wait_ci.data.body.check_suite.conclusion}}\`). With \`key\` (a template, for example \`{{pr}}\`), only a webhook whose signal key is that text wakes it.`,
-	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its file name) with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too.`,
+	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its file name) with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message.`,
+	end: `Ends the run on purpose. \`status\`: ${endStatusSchema.options.map((status) => `\`${status}\``).join(", ")}. \`message\` (template) is one line for a person: the runs list and the notification show it. \`nothing-to-do\` is for a run that found no work: it is not a failure. \`failed\` fails the run on purpose. No edge leaves an End node.`,
 };
 
 const code = (names: readonly string[]) =>
@@ -150,7 +159,9 @@ function nodeSection(type: FlowNodeType): string {
 					? "its options"
 					: type === "call"
 						? `${code(nodeOutcomes(parsed({ ...sampleNodes.call, each: undefined })))}; with \`each\`: ${code(nodeOutcomes(sample))}`
-						: code(nodeOutcomes(sample));
+						: type === "end"
+							? "none, the run ends here"
+							: code(nodeOutcomes(sample));
 	const fields =
 		type === "call"
 			? `${code(outputFieldsByType.call)}; with \`each\`: ${code(callEachOutputFields)}`
@@ -363,7 +374,7 @@ ${types.map(nodeSection).join("\n\n")}
 
 ## Edges, outcomes and loops
 
-An edge is \`{ id, from, outcome, to, max? }\`. It leaves \`from\` when its step ends with \`outcome\`. Use ids such as \`check-fail-fix\`. Each outcome a node can end with needs an edge, else the run ends there: on \`fail\` or \`needs-input\` that ends it as failed. Leave an outcome without an edge only to end the run on purpose.
+An edge is \`{ id, from, outcome, to, max? }\`. It leaves \`from\` when its step ends with \`outcome\`. Use ids such as \`check-fail-fix\`. Each outcome a node can end with needs an edge, else the run ends there: on \`fail\` or \`needs-input\` that ends it as failed. To end the run on purpose, lead the edge to an End node: it says why the run ended (\`nothing-to-do\`, \`failed\`) in one line.
 
 Every loop needs at least one edge with \`max\`: how often a run may take that edge. A Gate in a loop needs one too. Put \`max\` on the edge that goes back (\`check-fail-fix\`, max 3). When every edge for an outcome reached its max, the run fails there. Several edges may leave on one outcome: the run takes the first, in file order, that has not reached its max (fix three times, then ask a person). Every node must be reachable from \`start\`.
 

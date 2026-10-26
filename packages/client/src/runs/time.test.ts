@@ -16,7 +16,12 @@ function step(
 		gate:
 			options.gateAt === undefined
 				? null
-				: { question: "?", choices: [], openedAt: options.gateAt },
+				: {
+						question: "?",
+						choices: [],
+						openedAt: options.gateAt,
+						deadline: null,
+					},
 		scope: options.parent
 			? { parentStepId: options.parent, itemId: null }
 			: null,

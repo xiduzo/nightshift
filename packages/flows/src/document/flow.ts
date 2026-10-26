@@ -4,6 +4,7 @@ import {
 	callNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
+	endNodeSchema,
 	jsonSchemaSchema,
 	labelSchema,
 	nameSchema,
@@ -37,6 +38,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	valueNodeSchema,
 	waitNodeSchema,
 	toolNodeSchema,
+	endNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;

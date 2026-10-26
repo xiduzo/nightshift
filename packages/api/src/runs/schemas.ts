@@ -29,11 +29,20 @@ export const runStatusSchema = z.enum([
 	"interrupted",
 ]);
 
+/** How the End node that ended a run says it came out. */
+export const runResultSchema = z.enum(["done", "nothing-to-do", "failed"]);
+
 /** The Device that walks a run, or one a run or a step runs on. */
 export const runWalkerSchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
 	thisDevice: z.boolean(),
+});
+
+/** When nobody answered a Gate by `at` (epoch ms), it takes `choose`. */
+export const gateDeadlineSchema = z.object({
+	at: z.number(),
+	choose: z.string(),
 });
 
 /** One choice of a Gate. */
@@ -83,6 +92,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		baseRef: z.string(),
 		status: runStatusSchema,
 		reason: z.string().nullable(),
+		result: runResultSchema.nullable(),
 		wakeAt: z.number().nullable(),
 		signal: z.string().nullable(),
 		inputs: z.record(z.string(), z.json()),
@@ -158,6 +168,7 @@ const stepSummarySchema = z.object({
 		"call",
 		"wait",
 		"tool",
+		"end",
 	]),
 	visit: z.number(),
 	startedAt: z.number(),
@@ -175,6 +186,7 @@ const stepSummarySchema = z.object({
 			question: z.string(),
 			choices: z.array(gateChoiceSchema),
 			openedAt: z.number(),
+			deadline: gateDeadlineSchema.nullable(),
 		})
 		.nullable(),
 });
@@ -321,11 +333,13 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		type: z.literal("gate-open"),
 		question: z.string(),
 		choices: z.array(gateChoiceSchema),
+		deadline: gateDeadlineSchema.optional(),
 	}),
 	z.object({
 		type: z.literal("gate-resolved"),
 		choice: z.string(),
 		note: z.string(),
+		byDeadline: z.literal(true).optional(),
 	}),
 	z.object({
 		type: z.literal("items-read"),
@@ -383,6 +397,11 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		isError: z.boolean(),
 		text: z.string(),
 		data: z.json(),
+	}),
+	z.object({
+		type: z.literal("end"),
+		status: runResultSchema,
+		message: z.string().nullable(),
 	}),
 ]);
 

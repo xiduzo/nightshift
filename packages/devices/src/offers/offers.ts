@@ -195,7 +195,7 @@ const OWN_SETTINGS = [
 /**
  * Whether a node's step touches its Device beyond the run's worktree: a
  * process, a tool, a harness or the decider. Gates, rules, waits for a
- * time or a signal, and calls of other flows touch nothing.
+ * time or a signal, calls of other flows and End nodes touch nothing.
  *
  * A switch on the node type, on purpose: it is the Offer's rule (what an
  * Offer lets another Person run), not a fact of each kind.
@@ -213,6 +213,8 @@ function touchesDevice(node: FlowNode): boolean {
 			return node.until.kind === "command";
 		case "call":
 			return node.each?.source.kind === "command";
+		case "end":
+			return false;
 	}
 }
 

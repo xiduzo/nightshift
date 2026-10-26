@@ -1,6 +1,7 @@
 import type { AgentEvent } from "@nightshift/agents/types";
 import type { ItemState, JsonValue } from "@nightshift/flows";
-import type { GateChoice } from "./events";
+import type { RunResult } from "../run-status";
+import type { GateChoice, GateDeadline } from "./events";
 
 /**
  * What a step writes to its transcript, one entry per line, by step type.
@@ -29,8 +30,22 @@ export type GateEvent =
 			type: "gate-open";
 			question: string;
 			choices: GateChoice[];
+			deadline?: GateDeadline;
 	  }
-	| { type: "gate-resolved"; choice: string; note: string };
+	| {
+			type: "gate-resolved";
+			choice: string;
+			note: string;
+			/** Nobody answered: the deadline took the choice. */
+			byDeadline?: true;
+	  };
+
+/** What an End step writes to its transcript: how it ends the run, and its message. */
+export type EndEvent = {
+	type: "end";
+	status: RunResult;
+	message: string | null;
+};
 
 /** What a Call step with `each` writes to its transcript. */
 export type ForEachEvent =
@@ -120,7 +135,8 @@ export type StepEvent =
 	| ForEachEvent
 	| WaitEvent
 	| ValueEvent
-	| ToolEvent;
+	| ToolEvent
+	| EndEvent;
 
 /**
  * One line of a step's transcript file. `seq` increases by one per run,

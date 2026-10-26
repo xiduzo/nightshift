@@ -114,8 +114,9 @@ export function parkStopped(
  * - `error` and `interrupted` park as failed: `Node "x" failed: <error>`.
  * - no edge: a chosen end of the kind (`pass`, a Decision option, an
  *   Agent's own outcome, a Command's exit on code 0, a Wait's `done`, the
- *   outcome of a Call with `each`) ends the flow (`ended` set, goto END);
- *   `fail`, `needs-input` and the rest park as failed.
+ *   outcome of a Call with `each`, every End) ends the flow (`ended` set,
+ *   with the End's result, goto END); `fail`, `needs-input` and the rest
+ *   park as failed.
  * - every edge on the outcome at its max parks as failed.
  */
 export function route(
@@ -208,6 +209,7 @@ async function routeOn(
 	if (choice.kind === "end") {
 		const kind = ctx.kindOf(node);
 		if (kind.isChosenEnd(node, outcome)) {
+			const result = kind.endResult(node, outcome);
 			return new Command({
 				update: {
 					...update,
@@ -215,7 +217,8 @@ async function routeOn(
 						status: "finished",
 						nodeId: node.id,
 						outcome,
-						reason: kind.endReason(node, outcome),
+						reason: kind.endReason(node, outcome, end.outputs),
+						...(result !== null ? { result } : {}),
 					},
 				},
 				goto: END,

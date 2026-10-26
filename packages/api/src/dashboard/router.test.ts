@@ -37,6 +37,7 @@ function aRun(fields: Partial<RunSummary>): RunSummary {
 		baseRef: "main",
 		status: "finished",
 		reason: null,
+		result: null,
 		wakeAt: null,
 		signal: null,
 		inputs: {},

@@ -203,6 +203,8 @@ export type SubflowChange =
  * - `stopped-edge`: these Call nodes inside go on along a `stopped` edge
  *   after the stop time. Inside a Subflow, the caller stops instead.
  * - `calls-new-flow`: these Call nodes inside call a flow of the new name.
+ * - `end-node`: these End nodes inside end the run. Inside a Subflow they
+ *   end the Subflow only, and the caller goes on.
  * - `mixed-exit`: edges on one outcome lead inside and outside, and an edge
  *   inside comes after an edge outside that has a `max`. Its count stays
  *   with the caller, so the new flow cannot pick between them.
@@ -226,6 +228,7 @@ export type SubflowBlocker =
 	| { code: "flow-not-valid"; errors: number }
 	| { code: "stopped-edge"; nodes: string[] }
 	| { code: "calls-new-flow"; nodes: string[] }
+	| { code: "end-node"; nodes: string[] }
 	| { code: "mixed-exit"; from: string; outcome: string; edges: string[] }
 	| { code: "rule-reads-outside"; node: string; names: string[] }
 	| { code: "rule-reads-inside"; node: string; names: string[] }
@@ -255,7 +258,7 @@ export type SubflowPlan =
 const CALL_RUN_FIELDS = ["flow", "base_branch", "index"] as const;
 type CallRunField = (typeof CALL_RUN_FIELDS)[number];
 /** The fields a Call node has besides its flow's outputs. */
-const CALL_FIELDS = ["outcome", "ended", "visit"];
+const CALL_FIELDS = ["outcome", "ended", "end_message", "visit"];
 /** The space between nodes the plan places. */
 const STEP_X = 384;
 const STEP_Y = 144;
@@ -426,6 +429,9 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 		case "value":
 		case "tool":
 			return outcome === "pass";
+		case "end":
+			// A Section with an End node does not become a Subflow (`end-node`).
+			return false;
 	}
 }
 
@@ -539,6 +545,13 @@ class Planner {
 			blockers.push({
 				code: "calls-new-flow",
 				nodes: calling.map((node) => node.id),
+			});
+
+		const ends = this.inner.filter((node) => node.type === "end");
+		if (ends.length > 0)
+			blockers.push({
+				code: "end-node",
+				nodes: ends.map((node) => node.id),
 			});
 
 		for (const exit of this.exits) {

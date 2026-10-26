@@ -17,6 +17,8 @@ import {
 	callNode,
 	commandNode,
 	decisionNode,
+	endNode,
+	gateNode,
 	type NodeDefaults,
 	type Position,
 	toolNode,
@@ -58,8 +60,16 @@ export function setVariables(flow: Flow, variables: FlowVariableDef[]): Flow {
 	return variables.length > 0 ? { ...rest, variables } : rest;
 }
 
+/**
+ * What the palette adds: a node of a type, or a Decision by who decides it.
+ * A Gate is a Decision you decide, a Branch one a rule decides. Both write a
+ * `decision` node; a Decision by a model is the same node with another
+ * `by`, set in the inspector.
+ */
+export type NewNodeKind = FlowNodeType | "gate" | "branch";
+
 const NEW_NODE: Record<
-	FlowNodeType,
+	NewNodeKind,
 	{
 		id: string;
 		create: (
@@ -72,16 +82,19 @@ const NEW_NODE: Record<
 	agent: { id: "agent", create: agentNode },
 	command: { id: "check", create: commandNode },
 	decision: { id: "decide", create: decisionNode },
+	gate: { id: "gate", create: gateNode },
+	branch: { id: "branch", create: decisionNode },
 	call: { id: "call", create: callNode },
 	value: { id: "value", create: valueNode },
 	wait: { id: "wait", create: waitNode },
 	tool: { id: "tool", create: toolNode },
+	end: { id: "end", create: endNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
 export function addNode(
 	flow: Flow,
-	type: FlowNodeType,
+	type: NewNodeKind,
 	position: Position,
 	defaults: NodeDefaults = {},
 ) {

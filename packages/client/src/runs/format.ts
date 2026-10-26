@@ -1,4 +1,4 @@
-import type { RunSummary } from "./types";
+import type { RunResult, RunSummary } from "./types";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -106,4 +106,24 @@ const STATUS_LABELS: Record<RunSummary["status"], string> = {
 /** A run's status in words, as every screen shows it: "Running", "Waiting for you". */
 export function runStatusLabel(status: RunSummary["status"]): string {
 	return STATUS_LABELS[status];
+}
+
+const RESULT_LABELS: Record<RunResult, string> = {
+	done: "Done",
+	"nothing-to-do": "Nothing to do",
+	failed: "Failed",
+};
+
+/**
+ * How a run that an End node ended came out, in words, with the End's
+ * message: "Nothing to do: No open issues". Null for a run no End node
+ * ended.
+ */
+export function runEndLine(
+	run: Pick<RunSummary, "result" | "reason">,
+): string | null {
+	// An older Host sends no result at all.
+	if (!run.result) return null;
+	const label = RESULT_LABELS[run.result];
+	return run.reason ? `${label}: ${run.reason}` : label;
 }

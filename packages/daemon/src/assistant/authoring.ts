@@ -233,6 +233,8 @@ function lineOf(event: TranscriptEntry["event"]): string {
 			return `Waits: ${event.message}`;
 		case "item-end":
 			return event.reason ? `Item ${event.state}: ${event.reason}` : "";
+		case "end":
+			return `End: ${event.status}${event.message ? `. ${event.message}` : ""}`;
 		default:
 			return "";
 	}

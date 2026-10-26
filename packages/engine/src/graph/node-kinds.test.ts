@@ -4,6 +4,7 @@ import type {
 	CallNode,
 	CommandNode,
 	DecisionNode,
+	EndNode,
 	FlowNode,
 	FlowNodeType,
 	Outcome,
@@ -59,6 +60,8 @@ const call = (fields: Record<string, unknown> = {}) =>
 	node<CallNode>({ type: "call", flow: "other", ...fields });
 const callEach = (source: Record<string, unknown> = { kind: "json" }) =>
 	call({ each: { source } });
+const end = (status: EndNode["status"] = "done") =>
+	node<EndNode>({ type: "end", status });
 
 const ALL_TYPES: FlowNodeType[] = [
 	"agent",
@@ -68,6 +71,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"value",
 	"wait",
 	"call",
+	"end",
 ];
 
 describe("NODE_KINDS", () => {
@@ -87,6 +91,7 @@ describe("NODE_KINDS", () => {
 			value("rule"),
 			wait({ kind: "duration", minutes: 1 }),
 			call(),
+			end(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -110,6 +115,7 @@ describe("make and resumeRules", () => {
 			[wait({ kind: "duration", minutes: 1 }), RESUME_RULES.wait],
 			[call(), RESUME_RULES.call],
 			[callEach(), RESUME_RULES.callEach],
+			[end(), RESUME_RULES.fresh],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -149,7 +155,8 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 		expect(auxKinds(tool())).toEqual(["wait"]);
 	});
 
-	test("a Call and a rule Decision or Value have the park node only", () => {
+	test("a Call, an End and a rule Decision or Value have the park node only", () => {
+		expect(auxKinds(end())).toEqual([]);
 		expect(auxKinds(call())).toEqual([]);
 		expect(auxKinds(callEach())).toEqual([]);
 		expect(auxKinds(decision("rule"))).toEqual([]);
@@ -161,7 +168,9 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 	const chosen = (n: FlowNode, outcome: Outcome) =>
 		kindOf(n).isChosenEnd(n, outcome);
 	const reason = (n: FlowNode, outcome: Outcome) =>
-		kindOf(n).endReason(n, outcome);
+		kindOf(n).endReason(n, outcome, {});
+	const result = (n: FlowNode, outcome: Outcome) =>
+		kindOf(n).endResult(n, outcome);
 	const endedAt = (outcome: string) => `Ended at node "n" with "${outcome}".`;
 
 	test("pass is a chosen end and the plain end for an Agent, a Tool and a Value; fail and needs-input are not", () => {
@@ -225,6 +234,34 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 		expect(reason(callEach(), "halted")).toBe(endedAt("halted"));
 		expect(reason(callEach(), "pass")).toBe(endedAt("pass"));
 	});
+
+	test("an End is a chosen end whatever its status: its result is the status, its reason the message", () => {
+		for (const status of ["done", "nothing-to-do", "failed"] as const) {
+			expect(chosen(end(status), status)).toBe(true);
+			expect(result(end(status), status)).toBe(status);
+			expect(reason(end(status), status)).toBeNull();
+			expect(
+				kindOf(end(status)).endReason(end(status), status, {
+					message: "No open issues",
+				}),
+			).toBe("No open issues");
+		}
+	});
+
+	test("no other kind gives the run a result", () => {
+		for (const n of [
+			agent(),
+			command(),
+			tool(),
+			decision("person"),
+			value("rule"),
+			wait({ kind: "duration", minutes: 1 }),
+			call(),
+			callEach(),
+		]) {
+			expect(result(n, "pass")).toBeNull();
+		}
+	});
 });
 
 describe("endedLabel: a Call's `ended` for the node its flow ended at", () => {
@@ -234,6 +271,12 @@ describe("endedLabel: a Call's `ended` for the node its flow ended at", () => {
 			"yes",
 		);
 		expect(kindOf(own).endedLabel(own, "shipped")).toBe("shipped");
+		expect(
+			kindOf(end("nothing-to-do")).endedLabel(
+				end("nothing-to-do"),
+				"nothing-to-do",
+			),
+		).toBe("nothing-to-do");
 		expect(kindOf(own).endedLabel(own, "fail")).toBe("");
 		expect(kindOf(agent()).endedLabel(agent(), "pass")).toBe("");
 		for (const n of [
@@ -259,7 +302,7 @@ describe("logsCommandOutput: which steps get a command log path", () => {
 		expect(logs(callEach({ kind: "json", path: "items" }))).toBe(false);
 		expect(logs(call())).toBe(false);
 		expect(logs(wait({ kind: "duration", minutes: 1 }))).toBe(false);
-		for (const n of [agent(), tool(), decision("rule"), value("rule")]) {
+		for (const n of [agent(), tool(), decision("rule"), value("rule"), end()]) {
 			expect(logs(n)).toBe(false);
 		}
 	});
@@ -370,7 +413,14 @@ describe("cutShortOutputs: what a cut ends an open step with", () => {
 	});
 
 	test("every other kind keeps the outputs it had, marked with the outcome", () => {
-		for (const type of ["agent", "command", "tool", "value", "wait"] as const) {
+		for (const type of [
+			"agent",
+			"command",
+			"tool",
+			"value",
+			"wait",
+			"end",
+		] as const) {
 			for (const outcome of OUTCOMES) {
 				expect(
 					kindOfType(type).cutShortOutputs(
@@ -405,6 +455,7 @@ describe("connections and requirements: what run start asks", () => {
 			value("model"),
 			wait({ kind: "duration", minutes: 1 }),
 			call(),
+			end(),
 		]) {
 			expect(kindOf(n).connections(n)).toEqual([]);
 		}
@@ -441,8 +492,8 @@ describe("connections and requirements: what run start asks", () => {
 		).toEqual([null]);
 	});
 
-	test("a Command, a Tool, a Wait and a Call require nothing of their own", async () => {
-		for (const type of ["command", "tool", "wait", "call"] as const) {
+	test("a Command, a Tool, a Wait, a Call and an End require nothing of their own", async () => {
+		for (const type of ["command", "tool", "wait", "call", "end"] as const) {
 			expect(NODE_KINDS[type].requirements).toEqual([]);
 		}
 	});
@@ -461,5 +512,6 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(wait({ kind: "duration", minutes: 1 }))).toBeNull();
 		expect(works(callEach())).toBe("worktree");
 		expect(works(call())).toBeNull();
+		expect(works(end())).toBeNull();
 	});
 });

@@ -203,7 +203,17 @@ export function rewriteOwnTemplates(
 		case "agent":
 			return { ...node, prompt: rewrite(node.prompt) };
 		case "decision":
-			return { ...node, prompt: rewrite(node.prompt) };
+			return {
+				...node,
+				prompt: rewrite(node.prompt),
+				...(node.deadline?.at !== undefined
+					? { deadline: { ...node.deadline, at: rewrite(node.deadline.at) } }
+					: {}),
+			};
+		case "end":
+			return node.message === undefined
+				? node
+				: { ...node, message: rewrite(node.message) };
 		case "command":
 			return { ...node, command: rewrite(node.command) };
 		case "call":

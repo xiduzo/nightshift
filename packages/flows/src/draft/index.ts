@@ -19,6 +19,7 @@ export {
 	callersOf,
 	edgeInLoop,
 	moveNode,
+	type NewNodeKind,
 	removeEdge,
 	removeNode,
 	renameNode,

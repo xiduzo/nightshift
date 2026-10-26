@@ -218,6 +218,7 @@ describe("the template scope", () => {
 			fields: [
 				{ name: "outcome", ref: "sub.outcome", json: false },
 				{ name: "ended", ref: "sub.ended", json: false },
+				{ name: "end_message", ref: "sub.end_message", json: false },
 				{ name: "visit", ref: "sub.visit", json: false },
 				{
 					name: "verdict",

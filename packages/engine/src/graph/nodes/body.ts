@@ -17,6 +17,7 @@ import {
 	scopeKey,
 } from "../../log";
 import { deriveNodeOutputs, deriveVariables } from "../../read";
+import type { RunResult } from "../../run-status";
 import { compileFlow } from "../compile";
 import type { StepContext } from "../context";
 import { flowOutputs } from "../inputs";
@@ -33,7 +34,9 @@ import type { Parked, RunStateValues } from "../state";
  *
  * How a body ends, in the walk's terms (`ScopeEnd` in engine.ts):
  *
- * - `finished`: the body reached a chosen end (`state.ended`).
+ * - `finished`: the body reached a chosen end (`state.ended`). An End node
+ *   gives its `result` and its message as `reason`: a `failed` End fails
+ *   the Call step (`fail`) or the element (`ItemEnded failed`).
  * - `failed`: a body step ended `fail`/`needs-input` with no edge, errored,
  *   or exhausted its edge: the body parked at that step (rule 2). The park
  *   is swallowed here, because today a failed body fails the Call step
@@ -56,6 +59,10 @@ export type BodyEnd =
 			kind: "finished";
 			node: FlowNode;
 			outcome: Outcome;
+			/** The result of the End node the body ended at, else undefined. */
+			result?: RunResult;
+			/** The reason of the chosen end: an End node's message. */
+			reason: string | null;
 			/** The body's node outputs, from its final state. */
 			nodes: NodeOutputs;
 			/** The body's variables, from its final state. */
@@ -148,6 +155,8 @@ export async function runBody(input: {
 		kind: "finished",
 		node,
 		outcome: ended.outcome as Outcome,
+		...(ended.result ? { result: ended.result } : {}),
+		reason: ended.reason,
 		nodes: result.nodes,
 		vars: result.vars ?? {},
 	};
@@ -182,6 +191,16 @@ export async function bodyOutputs(
 			flow: input.flowName,
 		},
 	});
+}
+
+/**
+ * Why a body that ended at a `failed` End node failed: its message, else
+ * which End node chose it.
+ */
+export function failedEndReason(
+	ended: Extract<BodyEnd, { kind: "finished" }>,
+): string {
+	return ended.reason ?? `The flow ended as failed at node "${ended.node.id}".`;
 }
 
 /** Whether the Call node has an edge on `stopped`: it wraps the run up after the stop time. */

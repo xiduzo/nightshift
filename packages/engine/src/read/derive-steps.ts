@@ -9,6 +9,7 @@ import {
 	type EngineEventType,
 	type EnginePayloads,
 	type GateChoice,
+	type GateDeadline,
 	type InputValues,
 	type ItemFacts,
 	type LoggedEvent,
@@ -154,6 +155,8 @@ export type DerivedStep = {
 		lockScreen: boolean;
 		openedAt: number;
 		openedSeq: number;
+		/** When nobody answered by then, the Gate takes an option. Null without one. */
+		deadline: GateDeadline | null;
 	} | null;
 	/** Call steps with `each` only: its items in the order they started or were blocked. */
 	items: DerivedItem[];
@@ -219,6 +222,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				lockScreen: e.payload.lockScreen === true,
 				openedAt: e.at,
 				openedSeq: e.seq,
+				deadline: e.payload.deadline ?? null,
 			};
 		} else if (e.type === "StepReopened") {
 			step.openedSeq = e.seq;

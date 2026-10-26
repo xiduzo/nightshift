@@ -13,8 +13,13 @@ const gate = (runId: string, stepId: string) =>
 		question: "Ship it?",
 	}) as unknown as OpenGate;
 
-const run = (id: string, status: RunStatus, reason?: string) =>
-	({ id, status, title: `Run ${id}`, reason }) as unknown as RunSummary;
+const run = (
+	id: string,
+	status: RunStatus,
+	reason?: string,
+	result: RunSummary["result"] = null,
+) =>
+	({ id, status, title: `Run ${id}`, reason, result }) as unknown as RunSummary;
 
 describe("the words of a notice", () => {
 	test("a Gate names its project, its run and its question", () => {
@@ -53,5 +58,29 @@ describe("the words of a notice", () => {
 		expect(
 			describeNotice({ kind: "run-failed", run: run("r2", "failed") }),
 		).toEqual({ title: "A run failed", body: "Run r2" });
+	});
+
+	test("a run an End node ended says its result and its message", () => {
+		expect(
+			describeNotice({
+				kind: "run-finished",
+				run: run("r3", "finished", "No open issues", "nothing-to-do"),
+			}),
+		).toEqual({
+			title: "A run had nothing to do",
+			body: "Run r3\nNothing to do: No open issues",
+		});
+		expect(
+			describeNotice({
+				kind: "run-failed",
+				run: run("r4", "failed", null as unknown as string, "failed"),
+			}),
+		).toEqual({ title: "A run failed", body: "Run r4\nFailed" });
+		expect(
+			describeNotice({
+				kind: "run-finished",
+				run: run("r5", "finished", "Opened #12", "done"),
+			}),
+		).toEqual({ title: "A run finished", body: "Run r5\nDone: Opened #12" });
 	});
 });

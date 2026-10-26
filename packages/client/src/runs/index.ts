@@ -8,6 +8,7 @@ export {
 	formatCost,
 	formatKnownCost,
 	type KnownCost,
+	runEndLine,
 	runStatusLabel,
 	whenLabel,
 } from "./format";
@@ -47,6 +48,7 @@ export type {
 	ItemState,
 	ItemSummary,
 	RunDetail,
+	RunResult,
 	RunStatus,
 	RunSummary,
 	SessionSummary,

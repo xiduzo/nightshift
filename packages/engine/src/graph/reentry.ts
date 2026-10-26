@@ -3,6 +3,7 @@ import type {
 	EnginePayloads,
 	LoggedEvent,
 	ResumedBy,
+	RunResult,
 	RunStatus,
 	Scope,
 } from "../log";
@@ -211,7 +212,8 @@ export function planReentry(input: {
 		const refusal = rerunNodeRefusal(flow, request.nodeId);
 		if (refusal) throw new RunRefusal("unknown-node", refusal);
 	}
-	refuseLive(request.kind, deriveRunState(events).status);
+	const { status, result } = deriveRunState(events);
+	refuseLive(request.kind, status, result);
 	if (request.kind === "rerun") {
 		return planRerun(flow, events, thread, request, clearStopAt, cleared);
 	}
@@ -339,8 +341,12 @@ function planRerun(
  * is the run's own rule (`run-status/`). A resume of a sleeping run is a
  * wake, which the runner takes before it gets here.
  */
-function refuseLive(kind: ReentryRequest["kind"], status: RunStatus): void {
-	refuseUnless(kind, status, true);
+function refuseLive(
+	kind: ReentryRequest["kind"],
+	status: RunStatus,
+	result: RunResult | null,
+): void {
+	refuseUnless(kind, status, true, result);
 	if (status === "sleeping") {
 		throw new Error("A sleeping run wakes. It does not re-enter.");
 	}

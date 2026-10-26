@@ -29,6 +29,7 @@ import {
 	transcriptToRead,
 } from "../log";
 import type { DerivedStep } from "../read";
+import type { RunResult } from "../run-status";
 import type { KeptFlow } from "../variables";
 import type { ResumeRules } from "./resume-point";
 import type { RunEvent, RunStateValues } from "./state";
@@ -201,8 +202,17 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	 * is a failure with no edge.
 	 */
 	isChosenEnd(node: N, outcome: Outcome): boolean;
-	/** The `RunEnded` reason of a chosen end: null for the flow's plain end, else which node and outcome. */
-	endReason(node: N, outcome: Outcome): string | null;
+	/**
+	 * The `RunEnded` reason of a chosen end: null for the flow's plain end,
+	 * else which node and outcome, or what the node says (`outputs`, the
+	 * step's outputs: an End node's message).
+	 */
+	endReason(node: N, outcome: Outcome, outputs: StepOutputs): string | null;
+	/**
+	 * The result a chosen end gives the run (`RunEnded.result`): an End
+	 * node's status. Null for every other end.
+	 */
+	endResult(node: N, outcome: Outcome): RunResult | null;
 	/** A Call's `ended` output when its flow ended at this node: the label, or "". */
 	endedLabel(node: N, outcome: Outcome): string;
 	/** Whether a step of this node writes a command log (`StepStarted.logPath`). */
@@ -255,6 +265,7 @@ export const PLAIN_KIND = {
 	isChosenEnd: (_node, outcome) => outcome === "pass",
 	endReason: (node, outcome) =>
 		outcome === "pass" ? null : endedAtReason(node, outcome),
+	endResult: () => null,
 	endedLabel: () => "",
 	logsCommandOutput: () => false,
 	timeBudget: (node) => ({

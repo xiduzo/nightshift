@@ -73,7 +73,10 @@ export type CallEach = z.infer<typeof callEachSchema>;
  * (with `each`, the element goes to the input named by `each.as`).
  *
  * Once: ends `pass` or `fail`; its outputs are the called flow's outputs,
- * plus `ended` (the label or choice it ended on, or "") and `visit`.
+ * plus `ended` (the label or choice it ended on, or "") and `visit`. A
+ * called flow that ends at an End node ends the Call `pass` (`done`,
+ * `nothing-to-do`) or `fail` (`failed`); `ended` is then the End's status
+ * and `end_message` its message.
  * With `each`: ends `done` or `halted`; its outputs count the elements and
  * hold each one's result in `results` (`callEachOutputFields`).
  *
@@ -94,8 +97,17 @@ export type CallNode = z.infer<typeof callNodeSchema>;
 /** A Call node with `each`: it runs its flow once per element. */
 export type CallEachNode = CallNode & { each: CallEach };
 
-/** Without `each`. ended: the label or choice the called flow ended on, or "". */
-export const callOutputFields = ["outcome", "ended", "visit"] as const;
+/**
+ * Without `each`. ended: the label or choice the called flow ended on, or
+ * the status of its End node, or "". end_message: the message of that End
+ * node, or "".
+ */
+export const callOutputFields = [
+	"outcome",
+	"ended",
+	"end_message",
+	"visit",
+] as const;
 
 /**
  * The fields of a Call node with `each`: counts per element state; summary:

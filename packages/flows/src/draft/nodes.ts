@@ -11,6 +11,7 @@ import {
 	type DecidedBy,
 	type DecisionNode,
 	decisionDecider,
+	type EndNode,
 	type ListSource,
 	type ToolNode,
 	type ValueBy,
@@ -83,10 +84,19 @@ export function decisionNode(id: string, position: Position): DecisionNode {
 }
 
 /**
- * Changes who decides. A rule's `when` fields go, and `lockScreen` goes
- * when a person no longer decides. Switched to a model, the node starts on
- * the decider from Settings and that decider's default model; switched
- * away, the decider and the model go, as only a model reads them.
+ * A Gate, from the palette: a Decision you decide, with the options yes
+ * and no and no question yet; the issues panel asks for one.
+ */
+export function gateNode(id: string, position: Position): DecisionNode {
+	return withDecidedBy(decisionNode(id, position), "person");
+}
+
+/**
+ * Changes who decides. A rule's `when` fields go, and `lockScreen` and
+ * `deadline` go when a person no longer decides. Switched to a model, the
+ * node starts on the decider from Settings and that decider's default
+ * model; switched away, the decider and the model go, as only a model
+ * reads them.
  */
 export function withDecidedBy(
 	node: DecisionNode,
@@ -98,7 +108,13 @@ export function withDecidedBy(
 		by === "rule"
 			? node.options
 			: node.options.map(({ when: _, ...option }) => option);
-	const { lockScreen, decider: _decider, model: _model, ...rest } = node;
+	const {
+		lockScreen,
+		deadline,
+		decider: _decider,
+		model: _model,
+		...rest
+	} = node;
 	if (by === "model") {
 		return {
 			...rest,
@@ -110,9 +126,15 @@ export function withDecidedBy(
 	return {
 		...rest,
 		...(by === "person" && lockScreen !== undefined ? { lockScreen } : {}),
+		...(by === "person" && deadline !== undefined ? { deadline } : {}),
 		by,
 		options,
 	};
+}
+
+/** Ends the run as done, with no message yet. */
+export function endNode(id: string, position: Position): EndNode {
+	return { id, type: "end", position, status: "done", message: "" };
 }
 
 /** Runs a flow once. The called flow starts empty; the issues panel asks for one. */

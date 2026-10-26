@@ -7,8 +7,10 @@ import type {
 import type { RunCommandKind } from "../contract";
 import type {
 	GateChoice,
+	GateDeadline,
 	ResumeAction,
 	ResumedBy,
+	RunResult,
 	RunStatus,
 	RunTrigger,
 	RunWarningKind,
@@ -87,6 +89,8 @@ export type StepSummary = {
 		question: string;
 		choices: GateChoice[];
 		openedAt: number;
+		/** When nobody answered by `at`, the Gate takes `choose`. Null without a deadline. */
+		deadline: GateDeadline | null;
 	} | null;
 };
 
@@ -159,8 +163,16 @@ export type RunSummary = {
 	branch: string;
 	baseRef: string;
 	status: RunStatus;
-	/** Why the run failed, or which Decision label or Gate choice ended it. */
+	/**
+	 * Why the run failed, or which Decision label or Gate choice ended it,
+	 * or the message of the End node that ended it.
+	 */
 	reason: string | null;
+	/**
+	 * How the End node that ended the run says it came out: `done`,
+	 * `nothing-to-do` or `failed`. Null when no End node ended it.
+	 */
+	result: RunResult | null;
 	/** When a sleeping run continues. Null while it waits for a signal with no timeout. */
 	wakeAt: number | null;
 	/** The signal a sleeping run waits for (a Wait node), else null. */
@@ -329,6 +341,8 @@ export type OpenGate = {
 	 */
 	lockScreen: boolean;
 	openedAt: number;
+	/** When nobody answered by `at`, Night Shift takes `choose`. Null without a deadline. */
+	deadline: GateDeadline | null;
 	walker: RunWalker;
 	/** An answer is on its way to the Walker. */
 	answerPending: boolean;

@@ -1,19 +1,37 @@
 import { gateParts, type OpenGate, plainText } from "../gates";
-import type { RunSummary } from "../runs";
+import { type RunSummary, runEndLine } from "../runs";
 
 /** What a notice tells about: the Gate that opened, or the run that ended. */
 type NoticeFacts =
 	| { kind: "gate-opened"; gate: OpenGate }
 	| {
 			kind: "run-finished" | "run-failed";
-			run: Pick<RunSummary, "title" | "reason">;
+			run: Pick<RunSummary, "title" | "reason" | "result">;
 	  };
 
-/** The words of a notice: the project, the run and the question as plain text, or the run and how it ended. */
+/**
+ * The words of a notice: the project, the run and the question as plain
+ * text, or the run and how it ended. A run an End node ended says its
+ * result and message ("Nothing to do: No open issues").
+ */
 export function describeNotice(notice: NoticeFacts): {
 	title: string;
 	body: string;
 } {
+	if (notice.kind !== "gate-opened") {
+		const end = runEndLine(notice.run);
+		if (end !== null) {
+			return {
+				title:
+					notice.run.result === "nothing-to-do"
+						? "A run had nothing to do"
+						: notice.kind === "run-failed"
+							? "A run failed"
+							: "A run finished",
+				body: `${notice.run.title}\n${end}`,
+			};
+		}
+	}
 	switch (notice.kind) {
 		case "gate-opened":
 			return {

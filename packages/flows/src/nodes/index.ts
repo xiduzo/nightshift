@@ -75,7 +75,17 @@ export {
 	decisionDecider,
 	decisionNodeSchema,
 	decisionOutputFields,
+	type GateDeadline,
 } from "./decision";
+export {
+	checkEndNode,
+	type EndNode,
+	type EndStatus,
+	endMessage,
+	endNodeSchema,
+	endOutputFields,
+	endStatusSchema,
+} from "./end";
 export {
 	type Option,
 	type OutcomeColor,

@@ -53,6 +53,7 @@ import {
 	type BodyGraph,
 	bodyGraph,
 	bodyOutputs,
+	failedEndReason,
 	hasStoppedEdge,
 	runBody,
 } from "./body";
@@ -438,6 +439,16 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			}
 			case "finished": {
 				const outputs = await bodyOutputs(ctx, body, ended);
+				// A failed End node fails the element, as a failed body does.
+				if (ended.result === "failed") {
+					await endItem(
+						element.facts.id,
+						"failed",
+						failedEndReason(ended),
+						outputs,
+					);
+					return next(element.index);
+				}
 				if (haltOn.includes(ended.outcome)) {
 					await endItem(
 						element.facts.id,

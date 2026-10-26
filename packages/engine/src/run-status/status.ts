@@ -1,3 +1,10 @@
+/**
+ * How a run that an End node ended came out, as its flow chose. `done`
+ * and `nothing-to-do` end the run `finished`, `failed` ends it `failed`.
+ * A run that ended any other way has no result.
+ */
+export type RunResult = "done" | "nothing-to-do" | "failed";
+
 /** Derived from the event log, never stored. */
 export type RunStatus =
 	| "running" // a step is in progress, or the walk is between steps

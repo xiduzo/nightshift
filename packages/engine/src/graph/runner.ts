@@ -20,10 +20,11 @@ import {
 	type RunStatus,
 	runsArriving,
 } from "../log";
-import { deriveRunState, deriveSteps } from "../read";
+import { deriveOpenGate, deriveRunState, deriveSteps } from "../read";
 import {
 	ARRIVING,
 	RunRefusal,
+	type RunResult,
 	STILL_RUNNING,
 	WALKED_ELSEWHERE,
 } from "../run-status";
@@ -165,7 +166,14 @@ export type Intent =
 	 * Answers the run's open Gate. The Turn ends once the Gate's step has
 	 * ended. The caller checks the answer against the Gate (`check`).
 	 */
-	| { kind: "answer"; stepId: string; choice: string; note: string }
+	| {
+			kind: "answer";
+			stepId: string;
+			choice: string;
+			note: string;
+			/** Nobody answered: the Gate's deadline chose (`deadlineTurn`). */
+			byDeadline?: true;
+	  }
 	/** Ends the sleep of a sleeping run (`planWake`): its timer, a person early, or a signal. */
 	| ({ kind: "wake" } & Wake)
 	/** Continues a run that is not going (`planReentry`), or wakes a sleeping one early with `prompt`. */
@@ -513,12 +521,13 @@ export function createRunner(deps: RunnerDeps) {
 		runId: string,
 		status: RunEnding,
 		reason: string | null,
+		result?: RunResult,
 	): Promise<void> {
 		try {
 			await writer.append({
 				type: "RunEnded",
 				runId,
-				payload: { status, reason },
+				payload: { status, reason, ...(result ? { result } : {}) },
 			});
 		} catch (error) {
 			// A stop took the run from the drive and wrote its end.
@@ -584,7 +593,13 @@ export function createRunner(deps: RunnerDeps) {
 			// The prune comes first: once the log says the run ended, a
 			// person may resume it, and the slot frees right after the end.
 			await pruneThread(thread, runId);
-			await endRun(thread.ctx.log, runId, ending.status, ending.reason);
+			await endRun(
+				thread.ctx.log,
+				runId,
+				ending.status,
+				ending.reason,
+				ending.result,
+			);
 		} catch (error) {
 			// A stop took the run from this drive: it writes nothing more.
 			if (thread?.fence.closed) return;
@@ -645,6 +660,10 @@ export function createRunner(deps: RunnerDeps) {
 		// A wait with no time (a signal with no timeout) has no timer.
 		if (parked.kind === "wait" && parked.until !== null) {
 			sleeps.schedule(runId, parked.until);
+		}
+		// A Gate with a deadline: the timer answers it then (`deadlineTurn`).
+		if (parked.kind === "gate" && parked.deadline) {
+			sleeps.schedule(runId, parked.deadline.at);
 		}
 	}
 
@@ -777,19 +796,60 @@ export function createRunner(deps: RunnerDeps) {
 		options: TakeOptions,
 	): Promise<Taken> {
 		if (!reserve(row.id, intent, options)) return QUEUED;
-		const { choice, note } = intent;
+		// The Gate's deadline, if it has one, no longer applies.
+		sleeps.forget(row.id);
+		const { choice, note, byDeadline } = intent;
 		const asked =
 			deriveSteps(await log.events(row.id)).find((s) => s.id === intent.stepId)
 				?.gate?.openedSeq ?? 0;
 		drive(
 			row,
-			inputOf({ kind: "resume", value: { kind: "gate", choice, note } }),
+			inputOf({
+				kind: "resume",
+				value: {
+					kind: "gate",
+					choice,
+					note,
+					...(byDeadline ? { byDeadline } : {}),
+				},
+			}),
 		);
 		// The ask node ends the step on the answer, or an Agent's step opens
 		// again with it. The Turn ends once the Gate closed, so the run no
 		// longer waits when the caller looks again (I8).
 		await untilGateClosed(row.id, intent.stepId, asked);
 		return DRIVING;
+	}
+
+	/**
+	 * A timer fired on a run that waits at a Gate with a deadline: the Gate
+	 * takes the deadline's option, as an answer would, with a note that says
+	 * the deadline chose it. A timer before the deadline is set again. A
+	 * Gate a person answered first, or one without a deadline, is left as it
+	 * is.
+	 */
+	async function deadlineTurn(
+		row: RunRow,
+		events: readonly LoggedEvent[],
+		options: TakeOptions,
+	): Promise<Taken> {
+		const gate = deriveOpenGate(events);
+		if (!gate?.deadline) return UNCHANGED;
+		if (deps.now() < gate.deadline.at) {
+			sleeps.schedule(row.id, gate.deadline.at);
+			return UNCHANGED;
+		}
+		return answerTurn(
+			row,
+			{
+				kind: "answer",
+				stepId: gate.stepId,
+				choice: gate.deadline.choose,
+				note: "",
+				byDeadline: true,
+			},
+			options,
+		);
 	}
 
 	/**
@@ -967,6 +1027,10 @@ export function createRunner(deps: RunnerDeps) {
 			case "answer":
 				return answerTurn(row, intent, options);
 			case "wake":
+				// The timer of a Gate's deadline: the run waits, it does not sleep.
+				if (!intent.early && deriveRunState(events).status === "waiting") {
+					return deadlineTurn(row, events, options);
+				}
 				return wakeTurn(row, events, intent, intent, options);
 			case "resume": {
 				const { kind: _, ...request } = intent;

@@ -4,6 +4,7 @@ import {
 	checkCallNode,
 	checkCommandNode,
 	checkDecisionNode,
+	checkEndNode,
 	checkToolNode,
 	checkValueNode,
 	checkWaitNode,
@@ -56,6 +57,9 @@ export function checkNode(
 			break;
 		case "tool":
 			checkToolNode(node, check);
+			break;
+		case "end":
+			checkEndNode(node, check);
 			break;
 	}
 }

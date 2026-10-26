@@ -970,6 +970,7 @@ function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
 		walker: { id: "device", name: "test", thisDevice: true },
 		answerPending: false,
 		lockScreen: false,
+		deadline: null,
 	};
 }
 

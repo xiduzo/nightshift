@@ -3,6 +3,7 @@ import { type JsonValue, outcomeColorSchema } from "@nightshift/flows";
 import { z } from "zod";
 import type {
 	GateChoice,
+	GateDeadline,
 	StepOutcome,
 	StepOutputs,
 	TranscriptEntry,
@@ -142,6 +143,8 @@ const pendingGateSchema = z.object({
 	 * Set by the ask node, read by the resume point, which reopens the step.
 	 */
 	answer: z.string().optional(),
+	/** When nobody answered by `at` (epoch ms), the Gate takes `choose`. */
+	deadline: z.object({ at: z.number(), choose: z.string() }).optional(),
 });
 const pendingSchema = z.discriminatedUnion("kind", [
 	pendingWaitSchema,
@@ -163,6 +166,11 @@ const endedSchema = z.object({
 	nodeId: z.string(),
 	outcome: z.string(),
 	reason: z.string().nullable(),
+	/**
+	 * The result an End node gave (`NodeKind.endResult`): `failed` ends the
+	 * run `failed`, the others `finished`. Absent for every other end.
+	 */
+	result: z.enum(["done", "nothing-to-do", "failed"]).optional(),
 });
 export type Ended = z.infer<typeof endedSchema>;
 
@@ -254,6 +262,8 @@ export type Parked =
 			nodeId: string;
 			question: string;
 			choices: GateChoice[];
+			/** The runner answers the Gate at the deadline (`GateDeadline`). */
+			deadline?: GateDeadline;
 	  }
 	| {
 			kind: "parked";
@@ -275,14 +285,15 @@ export type Parked =
  *   while it slept). The engine appends `RunResumed` first.
  * - `reopen`: a person resumed a run that was stopped at a Gate: the gate
  *   node asks again.
- * - `gate`: the answer to a Gate.
+ * - `gate`: the answer to a Gate. `byDeadline`: nobody answered, and the
+ *   deadline took its option.
  * - `signal`: someone sent the run a signal; a Wait node on it ends `done`.
  */
 export type ResumeValue =
 	| { kind: "wake"; early: boolean; prompt?: string }
 	| { kind: "resume"; prompt?: string }
 	| { kind: "reopen" }
-	| { kind: "gate"; choice: string; note?: string }
+	| { kind: "gate"; choice: string; note?: string; byDeadline?: true }
 	/** A signal ended the wait. `data`: the webhook event that sent it, if one did. */
 	| { kind: "signal"; name: string; data?: JsonValue };
 

@@ -2,7 +2,7 @@ import type { OpenGate } from "@nightshift/engine";
 import { z } from "zod";
 
 import { exact } from "../output";
-import { gateChoiceSchema, runWalkerSchema } from "../runs";
+import { gateChoiceSchema, gateDeadlineSchema, runWalkerSchema } from "../runs";
 
 /** A Gate that waits for a person: what it asks, and its choices. */
 export const openGateSchema = exact<OpenGate>()(
@@ -27,6 +27,8 @@ export const openGateSchema = exact<OpenGate>()(
 		 */
 		lockScreen: z.boolean(),
 		openedAt: z.number(),
+		/** When nobody answered by `at`, Night Shift takes `choose`. */
+		deadline: gateDeadlineSchema.nullable(),
 		walker: runWalkerSchema,
 		/** An answer is on its way to the Walker. */
 		answerPending: z.boolean(),

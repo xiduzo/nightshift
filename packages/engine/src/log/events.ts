@@ -17,7 +17,7 @@ import type {
 import { sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
-import type { RunStatus } from "../run-status";
+import type { RunResult, RunStatus } from "../run-status";
 import { upgradePayload } from "./upgrade-payload";
 
 /**
@@ -48,6 +48,12 @@ export type StepOutputs = Record<string, JsonValue>;
 
 /** Input values of a flow, by input name. */
 export type InputValues = Record<string, JsonValue>;
+
+/**
+ * A Gate's deadline as the Gate opened with it: `at` (epoch ms) is when
+ * the Gate takes the option `choose` if nobody answered.
+ */
+export type GateDeadline = { at: number; choose: string };
 
 /**
  * One choice of a Gate: an option of its Decision node, with the colour the
@@ -335,6 +341,12 @@ export type EnginePayloads = {
 		 * does not change it.
 		 */
 		lockScreen?: true;
+		/**
+		 * When nobody answered by then, the Gate takes an option (`deadline`
+		 * on its Decision). Written only when the Gate has one, with the time
+		 * rendered when it opened, so a restart keeps the same deadline.
+		 */
+		deadline?: GateDeadline;
 	};
 	SessionStarted: {
 		prompt: string;
@@ -433,7 +445,12 @@ export type EnginePayloads = {
 	StopAfterStepRequested: Record<string, never>;
 	/** A person withdrew the stop after the step: the run goes on. */
 	StopAfterStepCancelled: Record<string, never>;
-	RunEnded: { status: RunEnding; reason: string | null };
+	/**
+	 * `result`: the status of the End node that ended the run, as its flow
+	 * chose (the reason is then the End's message). Absent for every other
+	 * end, and in older logs.
+	 */
+	RunEnded: { status: RunEnding; reason: string | null; result?: RunResult };
 	/**
 	 * Something went wrong that did not fail the step, and that a person
 	 * should know: for example, what a step cost is not known. Logged with
@@ -663,7 +680,7 @@ export function groupByRun(
 }
 
 /** Derived from the event log, never stored (`run-status/`). */
-export type { RunStatus };
+export type { RunResult, RunStatus };
 
 /**
  * How one visit of a node ended: one of the node's outcomes (`pass`, a

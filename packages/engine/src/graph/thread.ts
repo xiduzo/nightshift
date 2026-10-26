@@ -9,6 +9,7 @@ import type {
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import type { RunBus, RunEnding, RunLog, RunRow } from "../log";
+import type { RunResult } from "../run-status";
 import { compileFlow } from "./compile";
 import type { createRecorders, StepContext } from "./context";
 import { createFence, type Fence, FencedSaver, fencedLog } from "./fence";
@@ -298,12 +299,22 @@ export async function driveGraph(
  * reason. Null when the run goes on: it waits, or a Gate is open, or a
  * stop took it.
  */
-export function endingOf(
-	outcome: DriveOutcome,
-): { status: RunEnding; reason: string | null } | null {
+export function endingOf(outcome: DriveOutcome): {
+	status: RunEnding;
+	reason: string | null;
+	result?: RunResult;
+} | null {
 	switch (outcome.kind) {
-		case "ended":
-			return { status: "finished", reason: outcome.ended.reason };
+		case "ended": {
+			// An End node's result: `failed` is a failure the flow chose.
+			const { reason, result } = outcome.ended;
+			if (result === undefined) return { status: "finished", reason };
+			return {
+				status: result === "failed" ? "failed" : "finished",
+				reason,
+				result,
+			};
+		}
 		case "parked":
 			return outcome.parked.kind === "parked"
 				? { status: outcome.parked.status, reason: outcome.parked.reason }

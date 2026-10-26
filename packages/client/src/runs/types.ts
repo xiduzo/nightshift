@@ -13,6 +13,8 @@ export type ItemSummary = StepSummary["items"][number];
 export type ItemState = ItemSummary["state"];
 export type StepScope = NonNullable<StepSummary["scope"]>;
 export type RunStatus = RunSummary["status"];
+/** How the End node that ended a run says it came out. */
+export type RunResult = NonNullable<RunSummary["result"]>;
 export type StepOutcome = NonNullable<StepSummary["outcome"]>;
 export type StartRunInput = ApiInputs["runs"]["start"];
 export type RunTrigger = RunSummary["trigger"];
@@ -47,6 +49,8 @@ export type ItemEvent = Extract<
 >;
 export type WaitEvent = Extract<StepEvent, { type: "wait" | "wake" }>;
 export type ValueEvent = Extract<StepEvent, { type: "value-start" | "value" }>;
+/** An End node's step: how it ends the run, and its message. */
+export type EndEvent = Extract<StepEvent, { type: "end" }>;
 /** A Tool node's call and the tool's answer. */
 export type ToolNodeEvent = Extract<
 	StepEvent,
@@ -61,6 +65,7 @@ export type AgentEvent = Exclude<
 	| WaitEvent
 	| ValueEvent
 	| ToolNodeEvent
+	| EndEvent
 >;
 export type AgentUsage = NonNullable<
 	Extract<AgentEvent, { type: "finished" }>["usage"]

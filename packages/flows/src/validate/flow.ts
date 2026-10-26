@@ -142,6 +142,11 @@ function validateIn(
 				`Edge "${edge.id}" leaves "${edge.from}" on "needs-input", but that agent asks a person when it needs input and takes no edge. Remove the edge, or let the agent end on needs-input.`,
 				{ edgeId: edge.id },
 			);
+		} else if (source.type === "end") {
+			error(
+				`Edge "${edge.id}" leaves the End node "${edge.from}". An End node ends the run, so no edge can leave it.`,
+				{ edgeId: edge.id },
+			);
 		} else if (!nodeOutcomes(source).includes(edge.outcome)) {
 			error(
 				`Edge "${edge.id}" leaves "${edge.from}" on "${edge.outcome}", but ${describeNode(source)} ends with ${nodeOutcomes(source).join(", ")}.`,

@@ -3,9 +3,10 @@ import {
 	type DecisionNode,
 	optionProblem,
 	renderTemplate,
+	type TemplateContext,
 } from "@nightshift/flows";
 
-import type { GateChoice } from "../../../log";
+import type { GateChoice, GateDeadline } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { openGate } from "../../gate";
 import { interruptNode } from "../../interrupt";
@@ -20,6 +21,7 @@ import {
 import type { DoneStep } from "../../run-position";
 import type { PendingGate, ResumeValue, RunStateValues } from "../../state";
 import { beginStep, type OpenStep } from "../../step-runner";
+import { parseTime } from "../wait";
 import { type Chooser, decisionOutputs, gateChoices } from "./chooser";
 
 /**
@@ -49,6 +51,13 @@ import { type Chooser, decisionOutputs, gateChoices } from "./chooser";
  * resumes the thread (`optionProblem`); the ask node checks again, and
  * ends the step `error` should a bad one slip through.
  *
+ * A Gate with a `deadline` works out when it is due as it opens (the time
+ * rendered and read as a Wait by time reads it, or the minutes from now)
+ * and logs it with `GateOpened`, so a restart keeps the same time. The
+ * runner sets a timer from the interrupt (and from the log after a
+ * restart); when it fires, the runner answers the Gate with the deadline's
+ * option (`byDeadline`), and the note says the deadline chose it.
+ *
  * The Gate opens and ends its step through the step runner's lower seam
  * (`beginStep`, `OpenStep`), not `runStep`: the step stays open across the
  * ask node's interrupt and ends in another graph node.
@@ -69,6 +78,7 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 			visit: asked.visit,
 			question: asked.question,
 			choices: asked.choices,
+			...(asked.deadline ? { deadline: asked.deadline } : {}),
 		};
 		return new Command({ update: { pending }, goto: askNodeId(node.id) });
 	};
@@ -86,6 +96,7 @@ export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
 			nodeId: node.id,
 			question: pending.question,
 			choices: pending.choices,
+			...(pending.deadline ? { deadline: pending.deadline } : {}),
 		}),
 		async answer(pending, answer, state, config) {
 			if (answer?.kind !== "gate") {
@@ -111,6 +122,7 @@ type OpenGate = {
 	visit: number;
 	question: string;
 	choices: GateChoice[];
+	deadline: GateDeadline | null;
 };
 type Ensured =
 	| OpenGate
@@ -158,6 +170,7 @@ async function ensureOpen(
 			visit: own.visit,
 			question: gate.question,
 			choices: gate.choices,
+			deadline: gate.deadline,
 		};
 	}
 	const begun = await beginStep(
@@ -198,15 +211,49 @@ async function open(
 	try {
 		const question = renderTemplate(node.prompt, step.tctx);
 		const choices = gateChoices(node);
+		const deadline = deadlineOf(node, step.tctx, ctx.now(), ctx.minuteMs);
 		await openGate(ctx, step, {
 			question,
 			choices,
 			lockScreen: node.lockScreen === true,
+			deadline,
 		});
-		return { stepId, visit, question, choices };
+		return { stepId, visit, question, choices, deadline };
 	} finally {
 		step.leaveOpen();
 	}
+}
+
+/**
+ * When the Gate takes its deadline's option, from when it opens (`now`):
+ * `minutes` from now, or `at` rendered and read as a Wait by time reads
+ * it. Null without a deadline. Throws when `at` is not a valid time: the
+ * Gate does not open.
+ */
+export function deadlineOf(
+	node: DecisionNode,
+	tctx: TemplateContext,
+	now: number,
+	minuteMs: number,
+): GateDeadline | null {
+	const deadline = node.deadline;
+	if (deadline === undefined) return null;
+	if (deadline.minutes !== undefined) {
+		return { at: now + deadline.minutes * minuteMs, choose: deadline.choose };
+	}
+	const text = renderTemplate(deadline.at ?? "", tctx).trim();
+	const at = parseTime(text, now);
+	if (at === null) {
+		throw new Error(
+			`The deadline "${text}" is not valid. Write a date and time like 2026-10-18T07:00, or a time like 07:00.`,
+		);
+	}
+	return { at, choose: deadline.choose };
+}
+
+/** The note of a Gate the deadline answered: why nobody's answer chose it. */
+function deadlineNote(choice: string): string {
+	return `Nobody answered by the deadline, so Night Shift chose "${choice}".`;
 }
 
 /**
@@ -237,7 +284,8 @@ async function resolve(
 	if (begun.kind === "parked") return begun;
 	const step = begun.step;
 	const { choice } = answer;
-	const note = answer.note ?? "";
+	// The deadline chose: the note says so.
+	const note = answer.byDeadline ? deadlineNote(choice) : (answer.note ?? "");
 	const problem = optionProblem(gate.choices, choice);
 	if (problem !== null) {
 		return {
@@ -249,7 +297,12 @@ async function resolve(
 			),
 		};
 	}
-	step.record(null, { type: "gate-resolved", choice, note });
+	step.record(null, {
+		type: "gate-resolved",
+		choice,
+		note,
+		...(answer.byDeadline ? { byDeadline: true as const } : {}),
+	});
 	return {
 		kind: "ended",
 		end: await step.end(

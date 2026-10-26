@@ -143,6 +143,7 @@ export function runFacts(events: readonly LoggedEvent[]) {
 	return {
 		status: state.status,
 		reason: state.reason,
+		result: state.result,
 		wakeAt: sleep?.until ?? null,
 		signal: sleep?.signal ?? null,
 		inputs: deriveInputs(events),
@@ -442,6 +443,7 @@ export function toStepSummary(
 					question: derived.gate.question,
 					choices: derived.gate.choices,
 					openedAt: derived.gate.openedAt,
+					deadline: derived.gate.deadline,
 				}
 			: null,
 	};
@@ -796,6 +798,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				choices: gate.choices,
 				lockScreen: gate.lockScreen,
 				openedAt: gate.openedAt,
+				deadline: gate.deadline,
 				walker,
 				answerPending,
 			});

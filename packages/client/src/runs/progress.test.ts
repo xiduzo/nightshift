@@ -58,7 +58,12 @@ describe("the runs by group", () => {
 });
 
 describe("where a step is", () => {
-	const gate = { question: "Ship it?", choices: [], openedAt: 1 };
+	const gate = {
+		question: "Ship it?",
+		choices: [],
+		openedAt: 1,
+		deadline: null,
+	};
 
 	const step = (
 		endedAt: number | null,

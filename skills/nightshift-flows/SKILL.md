@@ -47,7 +47,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -67,7 +67,7 @@ Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_
 
 ### decision
 
-Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. `rule`: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; `decider` (one of typesafe, openrouter, openai, ollaya, ollama) and `model` are optional and read only then.
+Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; `decider` (one of typesafe, openrouter, openai, ollaya, ollama) and `model` are optional and read only then.
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
@@ -75,9 +75,9 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its file name) with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too.
+Shown as Subflow. Runs another flow of the project (`flow`, its file name) with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message.
 
-Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
+Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `end_message`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 
 `{"id":"each_task","type":"call","position":{"x":0,"y":0},"flow":"build-task","inputs":{"check":"bun test"},"each":{"source":{"kind":"json","value":"{{plan.data.tasks}}"},"as":"item"}}`
 
@@ -105,9 +105,17 @@ Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `text`, `visit`.
 
 `{"id":"ticket","type":"tool","position":{"x":0,"y":0},"connection":"jira","tool":"getIssue","arguments":{"key":"{{issue}}"}}`
 
+### end
+
+Ends the run on purpose. `status`: `done`, `nothing-to-do`, `failed`. `message` (template) is one line for a person: the runs list and the notification show it. `nothing-to-do` is for a run that found no work: it is not a failure. `failed` fails the run on purpose. No edge leaves an End node.
+
+Outcomes: none, the run ends here. Outputs: `outcome`, `message`, `visit`.
+
+`{"id":"no_work","type":"end","position":{"x":0,"y":0},"status":"nothing-to-do","message":"No open issues for {{label}}"}`
+
 ## Edges, outcomes and loops
 
-An edge is `{ id, from, outcome, to, max? }`. It leaves `from` when its step ends with `outcome`. Use ids such as `check-fail-fix`. Each outcome a node can end with needs an edge, else the run ends there: on `fail` or `needs-input` that ends it as failed. Leave an outcome without an edge only to end the run on purpose.
+An edge is `{ id, from, outcome, to, max? }`. It leaves `from` when its step ends with `outcome`. Use ids such as `check-fail-fix`. Each outcome a node can end with needs an edge, else the run ends there: on `fail` or `needs-input` that ends it as failed. To end the run on purpose, lead the edge to an End node: it says why the run ended (`nothing-to-do`, `failed`) in one line.
 
 Every loop needs at least one edge with `max`: how often a run may take that edge. A Gate in a loop needs one too. Put `max` on the edge that goes back (`check-fail-fix`, max 3). When every edge for an outcome reached its max, the run fails there. Several edges may leave on one outcome: the run takes the first, in file order, that has not reached its max (fix three times, then ask a person). Every node must be reachable from `start`.
 

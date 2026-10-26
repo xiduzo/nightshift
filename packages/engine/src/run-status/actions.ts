@@ -1,6 +1,6 @@
 import { Refusal, type RefusalKind } from "@nightshift/refusal";
 
-import type { RunStatus } from "./status";
+import type { RunResult, RunStatus } from "./status";
 
 /**
  * Which actions a run allows now, and why not: one rule. The engine
@@ -75,6 +75,19 @@ const AT_GATE =
 	"This run waits at a Gate. Answer the Gate, or stop the run first.";
 const ENDED_RESUME_OR_RERUN =
 	"This run has ended. Resume it, or run it again from a step.";
+/** Why a run an End node ended does not continue: its flow chose to end it there. */
+const CHOSEN_END =
+	"This run ended where its flow ends it. Run it again from a step instead.";
+
+/**
+ * The actions a run an End node ended does not allow, whatever its status:
+ * nothing is left to continue, here or on another Device.
+ */
+const NOT_AFTER_END: ReadonlySet<RunAction> = new Set([
+	"resume",
+	"restart",
+	"move",
+]);
 
 /**
  * For each action, the statuses that do not allow it, with why and what
@@ -131,23 +144,33 @@ const NOT_NOW: Record<RunAction, Partial<Record<RunStatus, string>>> = {
 /**
  * Why the run does not allow `action` now, in words for people, or null
  * when it does. `walkedHere`: the computer that takes the action walks the
- * run (a run's `walker.thisDevice`).
+ * run (a run's `walker.thisDevice`). `result`: the run's result when an
+ * End node ended it (a run's `result`): such a run is only run again. It
+ * counts only while the status says the run ended.
  */
 export function whyNot(
 	action: RunAction,
 	status: RunStatus,
 	walkedHere: boolean,
+	result: RunResult | null = null,
 ): string | null {
 	if (!walkedHere && !RELAYED.has(action)) return WALKED_ELSEWHERE;
+	// A result holds while the run stays ended; a live status that moved on wins.
+	const ended = status === "finished" || status === "failed";
+	if (result !== null && ended && NOT_AFTER_END.has(action)) return CHOSEN_END;
 	return NOT_NOW[action][status] ?? null;
 }
 
 /** Every action, and whether the run allows it now (`whyNot` says why not). */
-export function runActions(status: RunStatus, walkedHere: boolean): RunActions {
+export function runActions(
+	status: RunStatus,
+	walkedHere: boolean,
+	result: RunResult | null = null,
+): RunActions {
 	return Object.fromEntries(
 		ACTIONS.map((action) => [
 			action,
-			whyNot(action, status, walkedHere) === null,
+			whyNot(action, status, walkedHere, result) === null,
 		]),
 	) as Record<RunAction, boolean>;
 }
@@ -223,8 +246,9 @@ export function refuseUnless(
 	action: RunAction,
 	status: RunStatus,
 	walkedHere: boolean,
+	result: RunResult | null = null,
 ): void {
-	const why = whyNot(action, status, walkedHere);
+	const why = whyNot(action, status, walkedHere, result);
 	if (why === null) return;
 	throw new RunRefusal(
 		walkedHere || RELAYED.has(action) ? "not-now" : "walked-elsewhere",

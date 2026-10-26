@@ -18,4 +18,4 @@ export {
 	WALKED_ELSEWHERE,
 	whyNot,
 } from "./actions";
-export type { RunStatus } from "./status";
+export type { RunResult, RunStatus } from "./status";

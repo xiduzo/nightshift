@@ -159,6 +159,7 @@ export {
 	type RunActions,
 	type RunDetail,
 	type RunGroup,
+	type RunResult,
 	type RunStatus,
 	type RunStreamConnection,
 	type RunSummary,

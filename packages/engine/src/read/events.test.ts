@@ -146,14 +146,19 @@ function log() {
 		ended: (
 			status: EnginePayloads["RunEnded"]["status"],
 			reason: string | null = null,
-		) => push("RunEnded", { status, reason }),
+			result?: EnginePayloads["RunEnded"]["result"],
+		) => push("RunEnded", { status, reason, ...(result ? { result } : {}) }),
 	};
 	return builder;
 }
 
 describe("deriveRunState", () => {
 	test("a run without a start is interrupted", () => {
-		expect(deriveRunState([])).toEqual({ status: "interrupted", reason: null });
+		expect(deriveRunState([])).toEqual({
+			status: "interrupted",
+			reason: null,
+			result: null,
+		});
 	});
 
 	test("a started run without an end is running", () => {
@@ -165,6 +170,24 @@ describe("deriveRunState", () => {
 		expect(deriveRunState(events)).toEqual({
 			status: "failed",
 			reason: "edge e1 at max",
+			result: null,
+		});
+	});
+
+	test("an End node's end gives its result, and its message as the reason", () => {
+		const nothing = log()
+			.runStarted()
+			.ended("finished", "No open issues", "nothing-to-do");
+		expect(deriveRunState(nothing.events)).toEqual({
+			status: "finished",
+			reason: "No open issues",
+			result: "nothing-to-do",
+		});
+		const chosen = log().runStarted().ended("failed", null, "failed");
+		expect(deriveRunState(chosen.events)).toEqual({
+			status: "failed",
+			reason: null,
+			result: "failed",
 		});
 	});
 
@@ -175,6 +198,7 @@ describe("deriveRunState", () => {
 		expect(deriveRunState(b.events)).toEqual({
 			status: "finished",
 			reason: null,
+			result: null,
 		});
 	});
 });
@@ -528,6 +552,7 @@ describe("gates", () => {
 		expect(deriveRunState(b.events)).toEqual({
 			status: "waiting",
 			reason: null,
+			result: null,
 		});
 		expect(deriveOpenGate(b.events)).toEqual({
 			stepId: "s1",
@@ -537,6 +562,7 @@ describe("gates", () => {
 			choices: [{ name: "approve" }, { name: "reject" }],
 			lockScreen: false,
 			openedAt: b.events.at(-1)?.at ?? 0,
+			deadline: null,
 		});
 		expect(deriveSteps(b.events)[0]?.gate?.question).toBe("Ship PR 12?");
 

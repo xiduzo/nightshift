@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
 	type DeciderName,
 	deciderNameSchema,
+	labelSchema,
 	type NodeCheck,
 	nodeBase,
 	placed,
@@ -16,6 +17,20 @@ import { checkOptions, option } from "./outcomes";
 /** Who decides a Decision node: you (a Gate), a rule, or a model. */
 export const decidedBySchema = z.enum(["person", "rule", "model"]);
 export type DecidedBy = z.infer<typeof decidedBySchema>;
+
+/**
+ * When a Gate stops waiting, in the same forms as a Wait node: `at`, a
+ * template that renders a date and time (`2026-10-18T07:00`) or a time of
+ * day (`07:00`: the next one after the Gate opens), or `minutes` after the
+ * Gate opens. Exactly one of the two (the validator checks it). `choose`
+ * names the option the Gate takes then.
+ */
+export const gateDeadlineSchema = z.object({
+	at: z.string().optional(),
+	minutes: z.number().int().positive().optional(),
+	choose: labelSchema,
+});
+export type GateDeadline = z.infer<typeof gateDeadlineSchema>;
 
 /**
  * Picks one of its options, which is the step's outcome. `by` says who:
@@ -52,6 +67,12 @@ export const decisionNodeSchema = z.object({
 	 * so the flow version stays the same.
 	 */
 	lockScreen: z.boolean().optional(),
+	/**
+	 * `by: "person"` only: when nobody answered by then, the Gate takes
+	 * `choose`, and its note says the deadline chose it. Unset: the Gate
+	 * waits as long as it must.
+	 */
+	deadline: gateDeadlineSchema.optional(),
 });
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
 
@@ -85,7 +106,35 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 		check,
 	);
 	checkDecidedBy(node, check);
+	checkDeadline(node, check);
 	check.template(node.prompt, "prompt");
+}
+
+/**
+ * A deadline belongs to a Gate (a Decision decided by a person), has one
+ * time (`at` or `minutes`), and chooses one of the Gate's options.
+ */
+function checkDeadline(node: DecisionNode, check: NodeCheck): void {
+	const deadline = node.deadline;
+	if (deadline === undefined) return;
+	if (node.by !== "person") {
+		check.error(
+			`Decision node "${node.id}" has a deadline, but ${node.by === "rule" ? "a rule" : "a model"} decides it. Only a Gate waits for an answer. Remove the deadline, or let a person decide.`,
+		);
+		return;
+	}
+	const at = deadline.at?.trim() ?? "";
+	if ((at === "") === (deadline.minutes === undefined)) {
+		check.error(
+			`The deadline of Gate "${node.id}" needs a time or a number of minutes. Give it one of the two.`,
+		);
+	}
+	if (at !== "") check.template(at, "deadline");
+	if (!node.options.some((option) => option.name === deadline.choose)) {
+		check.error(
+			`The deadline of Gate "${node.id}" chooses "${deadline.choose}", which is not one of its options. Choose one of: ${node.options.map((option) => option.name).join(", ")}.`,
+		);
+	}
 }
 
 /**

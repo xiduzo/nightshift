@@ -141,7 +141,8 @@ function refuseRestart(
 	events: readonly LoggedEvent[],
 	stepId: string | undefined,
 ): void {
-	refuseUnless("restart", deriveRunState(events).status, true);
+	const { status, result } = deriveRunState(events);
+	refuseUnless("restart", status, true, result);
 	const open = deriveSteps(events).filter((s) => s.endedAt === null);
 	if (open.length === 0) {
 		throw new RunRefusal(
@@ -180,7 +181,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		request: RunActionRequest,
 	): Promise<void> {
 		const events = await log.events(row.id);
-		const status = deriveRunState(events).status;
+		const { status, result } = deriveRunState(events);
 		switch (request.kind) {
 			case "stop":
 				// A run that has ended has nothing to stop.
@@ -212,13 +213,13 @@ export function createRunActions(deps: RunActionsDeps) {
 				});
 			case "move":
 				if (!actor) throw signedOut();
-				refuseUnless("move", status, false);
+				refuseUnless("move", status, false, result);
 				return relay.send(row, actor, {
 					kind: "run.move",
 					payload: { to: request.to },
 				});
 			default:
-				refuseUnless(request.kind, status, false);
+				refuseUnless(request.kind, status, false, result);
 		}
 	}
 
@@ -264,11 +265,8 @@ export function createRunActions(deps: RunActionsDeps) {
 		}
 		await runner.hold(runId, async ({ events, active }) => {
 			// A Turn that holds a slot is in the middle of a step too.
-			refuseUnless(
-				"move",
-				active ? "running" : deriveRunState(events).status,
-				true,
-			);
+			const { status, result } = deriveRunState(events);
+			refuseUnless("move", active ? "running" : status, true, result);
 			// The plan stays: only the Walker changes. A Device that is
 			// offline is the planner's refusal.
 			if (!(await deps.placement.moveTo(row, actor, to))) {
@@ -334,8 +332,10 @@ export function createRunActions(deps: RunActionsDeps) {
 						...(request.prompt !== undefined ? { prompt: request.prompt } : {}),
 					},
 					{
-						check: (events) =>
-							refuseUnless("resume", deriveRunState(events).status, true),
+						check: (events) => {
+							const { status, result } = deriveRunState(events);
+							refuseUnless("resume", status, true, result);
+						},
 					},
 				);
 				return;

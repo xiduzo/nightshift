@@ -6,6 +6,7 @@ import {
 	commandExits,
 	commandOutputFields,
 	decisionOutputFields,
+	endOutputFields,
 	type OutcomeColor,
 	toolOutputFields,
 	valueOutputFields,
@@ -49,6 +50,9 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return ["done", "timeout"];
 		case "tool":
 			return ["pass", "fail"];
+		case "end":
+			// No edge leaves an End node: the run ends there.
+			return [];
 	}
 }
 
@@ -85,6 +89,7 @@ export const outputFieldsByType = {
 	value: valueOutputFields,
 	wait: waitOutputFields,
 	tool: toolOutputFields,
+	end: endOutputFields,
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /** Output fields that hold JSON, so a template may take a path below them. */

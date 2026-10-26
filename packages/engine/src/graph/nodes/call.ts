@@ -18,6 +18,7 @@ import {
 	type BodyGraph,
 	bodyGraph,
 	bodyOutputs,
+	failedEndReason,
 	hasStoppedEdge,
 	runBody,
 } from "./body";
@@ -31,7 +32,10 @@ import { callEachNode } from "./call-each";
  * Once: binds the called flow's inputs (`FlowCalled`), runs the flow in the
  * scope `{ parentStepId: stepId, itemId: null }` and ends `pass` with the
  * flow's declared outputs, `ended` and `visit` when it finished on a chosen
- * end, `fail` with the reason when it failed.
+ * end, `fail` with the reason when it failed. An End node is a chosen end
+ * with a result: `done` and `nothing-to-do` end the Call `pass`, `failed`
+ * ends it `fail`, and `ended` and `end_message` hold its status and
+ * message.
  *
  * Everything before the body runs again on a resume and after a daemon
  * death (rule 4), so it is idempotent: the resume point (`resumePoint`,
@@ -157,13 +161,19 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			}
 			case "finished": {
 				const outputs = await bodyOutputs(ctx, body, ended);
+				const label = ctx
+					.kindOf(ended.node)
+					.endedLabel(ended.node, ended.outcome);
+				// An End node: its status is the label, its message the end_message.
+				const own: StepOutputs =
+					ended.result !== undefined
+						? { ended: label, end_message: ended.reason ?? "" }
+						: { ended: label };
+				const failed = ended.result === "failed";
 				const result = await end(
-					"pass",
-					{
-						...outputs,
-						ended: ctx.kindOf(ended.node).endedLabel(ended.node, ended.outcome),
-					},
-					null,
+					failed ? "fail" : "pass",
+					{ ...outputs, ...own },
+					failed ? failedEndReason(ended) : null,
 				);
 				return route(ctx, state, node, result, config);
 			}

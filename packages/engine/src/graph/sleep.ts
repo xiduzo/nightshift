@@ -4,6 +4,7 @@ import type { FlowNode, JsonValue, WaitUntil } from "@nightshift/flows";
 import type { LoggedEvent, PolicyWaitReason, RunBus, RunLog } from "../log";
 import {
 	type DerivedStep,
+	deriveOpenGate,
 	deriveRunState,
 	deriveSleep,
 	deriveSteps,
@@ -502,9 +503,10 @@ export type SleepDeps = {
 export type Sleeps = ReturnType<typeof createSleeps>;
 
 /**
- * The wake timers of sleeping runs. One per runner. A timer that fires
- * hands the run to `deps.wake`; the runner then wakes it in a Turn
- * (`planWake`, `recordWake`), or queues it on a full run cap.
+ * The wake timers of sleeping runs, and of runs that wait at a Gate with a
+ * deadline. One per runner, one timer per run. A timer that fires hands
+ * the run to `deps.wake`; the runner then wakes it in a Turn (`planWake`,
+ * `recordWake`) or answers its Gate, or queues it on a full run cap.
  */
 export function createSleeps(deps: SleepDeps) {
 	/** Timers that end the waits of sleeping runs, by run id. */
@@ -542,11 +544,15 @@ export function createSleeps(deps: SleepDeps) {
 	 * A new daemon's timer for a run that slept when the last one died, from
 	 * the log (`deriveSleep`: the latest `WaitStarted` with no `WaitEnded`,
 	 * on an open step of a run that has not ended). A wait with no time (a
-	 * signal with no timeout) gets no timer.
+	 * signal with no timeout) gets no timer. A run that waits at a Gate with
+	 * a deadline gets the deadline's timer: the runner answers the Gate when
+	 * it fires.
 	 */
 	function restore(runId: string, events: readonly LoggedEvent[]): void {
 		const sleeping = deriveSleep(events);
 		if (sleeping?.until != null) schedule(runId, sleeping.until);
+		const deadline = deriveOpenGate(events)?.deadline;
+		if (deadline) schedule(runId, deadline.at);
 	}
 
 	return { schedule, restore, forget, dispose };
