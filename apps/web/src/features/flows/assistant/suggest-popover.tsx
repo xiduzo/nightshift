@@ -36,6 +36,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Markdown } from "@/shared/markdown";
 import {
 	applyToDraft,
 	type FlowAssistant,
@@ -307,9 +308,10 @@ function SuggestBody({
 			{state.status === "ready" ? (
 				<div className="flex flex-col gap-3">
 					{state.suggestion.note ? (
-						<p className="text-muted-foreground text-xs leading-relaxed">
-							{state.suggestion.note}
-						</p>
+						<Markdown
+							text={state.suggestion.note}
+							className="text-muted-foreground text-xs"
+						/>
 					) : null}
 					{renderPreview(state.suggestion)}
 					{reason ? (

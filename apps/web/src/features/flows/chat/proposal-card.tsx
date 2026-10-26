@@ -30,6 +30,7 @@ import {
 	TriangleAlertIcon,
 } from "lucide-react";
 import { useState } from "react";
+import { Markdown } from "@/shared/markdown";
 import type { ChatProposal } from "./chat-thread";
 import type { ProposalCanvas } from "./proposal-canvas";
 import { summaryLabels } from "./proposal-canvas";
@@ -70,7 +71,9 @@ export function ProposalCard({
 		<Card size="sm" className="gap-3">
 			<CardHeader>
 				<CardTitle>Proposed change</CardTitle>
-				<CardDescription>{summary}</CardDescription>
+				<CardDescription>
+					<Markdown text={summary} className="text-sm" />
+				</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				<div className="flex flex-wrap gap-1.5">
