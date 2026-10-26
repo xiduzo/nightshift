@@ -55,6 +55,16 @@ const flow: Flow = flowSchema.parse({
 			arguments: {},
 		},
 		{
+			id: "traces",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "trace",
+			each: {
+				source: { kind: "command", command: "cat tasks.json" },
+				as: "task",
+			},
+		},
+		{
 			id: "notify",
 			type: "agent",
 			position: { x: 0, y: 0 },
@@ -107,6 +117,20 @@ describe("each kind gets its own task and context", () => {
 		expect(text).toContain("- `test`: `bun test`");
 		expect(text).toContain("0 → `pass`");
 		expect(text).toContain("`Makefile`");
+	});
+
+	test("command of a list: the item shape, the called flow, and a tracker example", () => {
+		const text = suggestionPrompt(
+			request({ nodeId: "traces", kind: "command" }),
+			{ packageManager: null, scripts: {}, taskFiles: [] },
+		);
+		expect(text).toContain("Print one JSON array on stdout");
+		expect(text).toContain("`dependsOn`");
+		expect(text).toContain("`.nightshift/flows/trace.json`");
+		expect(text).toContain("`{{task.<field>}}`");
+		expect(text).toContain("subIssues(first: 100)");
+		expect(text).toContain("cat tasks.json");
+		expect(text).not.toContain("The node's exits");
 	});
 
 	test("checker: the outcomes to pick from and the agent's prompt", () => {

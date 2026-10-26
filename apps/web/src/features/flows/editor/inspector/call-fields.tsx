@@ -7,12 +7,6 @@ import {
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@nightshift/ui/components/dropdown-menu";
-import {
 	FieldContent,
 	FieldDescription,
 	FieldLabel,
@@ -26,11 +20,11 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Switch } from "@nightshift/ui/components/switch";
-import { ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useRef } from "react";
+import { CommandSuggest } from "../../assistant/field-helpers";
 import { SOURCE_KINDS } from "../../flow-draft";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
-import { LIST_RECIPES } from "../lib/list-recipes";
 import { OptionsEditor } from "../options-editor";
 import { TemplateField } from "../template-field";
 import {
@@ -345,23 +339,19 @@ function SourceFields({
 			);
 		case "command":
 			return (
-				<div className="flex flex-col gap-2">
-					<TemplateField
-						id={`${id}-command`}
-						label="Source command"
-						hint="A shell command that prints the list as JSON, for example cat tasks.json. A recipe replaces what is here."
-						flow={flow}
-						nodeId={node.id}
-						value={source.command}
-						invalid={source.command.trim() === ""}
-						className="min-h-16"
-						placeholder="cat tasks.json"
-						onChange={(command) => onChange({ kind: "command", command })}
-					/>
-					<RecipePicker
-						onPick={(command) => onChange({ kind: "command", command })}
-					/>
-				</div>
+				<TemplateField
+					id={`${id}-command`}
+					label="Source command"
+					hint="A shell command that prints the list as JSON, for example cat tasks.json."
+					flow={flow}
+					nodeId={node.id}
+					value={source.command}
+					invalid={source.command.trim() === ""}
+					className="min-h-16"
+					placeholder="cat tasks.json"
+					action={<CommandSuggest node={node} />}
+					onChange={(command) => onChange({ kind: "command", command })}
+				/>
 			);
 		case "files":
 			return (
@@ -385,43 +375,6 @@ function SourceFields({
 				/>
 			);
 	}
-}
-
-/**
- * Fills the source command with a recipe: a command on a tracker's CLI or
- * a file that prints the list as JSON. The person edits it from there.
- */
-function RecipePicker({ onPick }: { onPick: (command: string) => void }) {
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<Button
-						variant="outline"
-						size="sm"
-						className="self-start font-normal"
-					/>
-				}
-			>
-				Start from a recipe
-				<ChevronDownIcon data-icon="inline-end" aria-hidden="true" />
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-80">
-				{LIST_RECIPES.map((recipe) => (
-					<DropdownMenuItem
-						key={recipe.name}
-						className="flex-col items-start gap-0.5"
-						onClick={() => onPick(recipe.command)}
-					>
-						<span>{recipe.name}</span>
-						<span className="text-muted-foreground text-xs">
-							{recipe.description}
-						</span>
-					</DropdownMenuItem>
-				))}
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
 }
 
 /**

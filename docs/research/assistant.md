@@ -228,13 +228,14 @@ shapes, `nodeId` became optional (the flow's own fields take none), and
 | Value (rule): expression | `expression` | The output schema, the rule syntax, the scope | Added |
 | Command: command | `command` | The package manager (lock file), the `package.json` scripts, task files (`project-facts.ts`), the exits | Added |
 | Wait (command): command | `command` | Same, and "exit 0 ends the wait" | Added |
+| Subflow (each, from a command): source command | `command` | The item shape (`id`, `title`, `url`, `dependsOn`, `done`), the called flow's file to see which item fields it reads, the trackers to check (`gh`, `glab`, `acli`), two GitHub examples (a label, and the sub-issues of an issue from `githubSubIssuesCommand`) | Added 2026-10-26. It replaces the "Start from a recipe" menu: the recipes fit the first flows only, and the Jira one was never run. |
 | Agent checker: What to check | `checker` | The outcomes, the prompt, the output schema | Added |
 | Tool: arguments | `arguments` | The tool's input schema, which the editor sends (`toolSchema`) | Added. A required argument left out, or one the tool does not take, goes back to the agent. |
 | Flow: description | `description` | The draft in short, each step in one line | Added |
 | Flow: inputs | `inputs` | The current inputs and who reads each, the names templates read that the flow does not declare | Added |
 | Decision (rule): note | — | Nothing reads it | Skipped |
 | Flow: variables | — | The Set variables helper declares the ones a write needs | Skipped |
-| Flow: outputs; Subflow: input bindings, list source | — | Short templates the variable list already offers | Later, if people ask |
+| Flow: outputs; Subflow: input bindings, list (JSON or files) | — | Short templates the variable list already offers | Later, if people ask |
 | Agent: skill, profile, harness, model, tools, connections, MCP servers | — | Pickers over this computer's lists | Skipped: a choice, not writing |
 | Command exits, secrets; Wait time, minutes, signal; timeouts, limits, device, run policy; edges (outcome, max) | — | Numbers, names and toggles | Skipped |
 

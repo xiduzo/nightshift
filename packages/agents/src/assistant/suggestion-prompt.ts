@@ -6,9 +6,11 @@
  * project's scripts for a command.
  */
 import {
+	type CallEachNode,
 	type Flow,
 	type FlowNode,
 	flowAuthoringGuide,
+	githubSubIssuesCommand,
 	isFlowSuggestion,
 	nodeOutcomes,
 	type SuggestionKind,
@@ -366,9 +368,54 @@ function factsLines(facts: ProjectFacts | null): string[] {
 	].filter(Boolean);
 }
 
+/**
+ * The task of a Call node's source command: a JSON array of items, the
+ * item fields the engine reads, and the fields the called flow reads.
+ * Two examples on GitHub show the item shape on a real tracker.
+ */
+function listCommandTask(
+	node: CallEachNode,
+	facts: ProjectFacts | null,
+): string[] {
+	const current =
+		node.each.source.kind === "command" ? node.each.source.command : "";
+	const as = node.each.as;
+	return [
+		`Write the command that prints the list of items. The node runs the flow \`${node.flow}\` once per item, and the item goes to its input \`${as}\`. The command runs with \`sh -c\` in the project's folder before each item, so items added during the run run too.`,
+		"",
+		"Rules:",
+		"- Print one JSON array on stdout, nothing else. Each item is an object.",
+		"- Give each item `id` (text, unique in the list) and `title`. Add `url` when the source has one.",
+		"- Add `dependsOn` (a list of ids, or of `{ id, done }`) when the source knows what blocks an item: an item waits until those are done. Add `done: true` for an item that is finished: the node skips it.",
+		`- Keep the fields the called flow reads. Read \`.nightshift/flows/${node.flow}.json\` and look for \`{{${as}.<field>}}\`.`,
+		"- Use the tracker this project uses. Check `git remote -v` and which CLI is installed: `gh`, `glab`, `acli`. A file of tasks in the project works too.",
+		'- A `{{reference}}` reaches the shell as an environment variable, never as shell text: put it in double quotes, `--label "{{label}}"`.',
+		"- Only read. Never change an issue, a file or git. Never ask for input or open a pager. You may run the command once to check what it prints.",
+		"",
+		"Two examples. The open GitHub issues with a label:",
+		"```sh",
+		`gh issue list --label ready --state open --limit 200 --json number,title,body,url,state --jq '[ .[] | { id: (.number | tostring), number, title, body, url, state } ]'`,
+		"```",
+		"The sub-issues of one GitHub issue, with their blocked-by links and the labels that count as done:",
+		"```sh",
+		githubSubIssuesCommand({ parent: "{{epic}}", doneLabels: ["implemented"] }),
+		"```",
+		"",
+		"# The project",
+		"",
+		...factsLines(facts),
+		"",
+		current.trim() === ""
+			? "The node has no command yet."
+			: `The current command:\n\`\`\`sh\n${current}\n\`\`\``,
+	];
+}
+
 const commandKind: KindPrompt = {
 	what: "a command",
 	task: ({ node, facts }) => {
+		if (node.type === "call" && node.each)
+			return listCommandTask({ ...node, each: node.each }, facts);
 		const wait = node.type === "wait";
 		const current =
 			node.type === "command"

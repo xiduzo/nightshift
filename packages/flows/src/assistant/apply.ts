@@ -86,11 +86,17 @@ export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
 	}
 }
 
-/** The command a `command` suggestion rewrites: a Command's, or the one a Wait runs until it passes. */
+/**
+ * The command a `command` suggestion rewrites: a Command's, the one a Wait
+ * runs until it passes, or the one that prints a Call node's list.
+ */
 export function commandOf(node: FlowNode): string | undefined {
 	if (node.type === "command") return node.command;
 	if (node.type === "wait" && node.until.kind === "command") {
 		return node.until.command;
+	}
+	if (node.type === "call" && node.each?.source.kind === "command") {
+		return node.each.source.command;
 	}
 	return undefined;
 }
@@ -182,6 +188,14 @@ export function applySuggestion(
 					return {
 						...current,
 						until: { ...current.until, command: suggestion.command },
+					};
+				if (current.type === "call" && current.each?.source.kind === "command")
+					return {
+						...current,
+						each: {
+							...current.each,
+							source: { kind: "command", command: suggestion.command },
+						},
 					};
 				return current;
 			});

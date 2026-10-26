@@ -388,37 +388,53 @@ export function ExpressionSuggest({ node }: { node: ValueNode }) {
 	);
 }
 
-/** "Suggest command": a Command node's command, or the one a Wait runs, from the project's scripts. */
+/**
+ * "Suggest command": a Command node's command, the one a Wait runs, or the
+ * one that lists a Call node's items, from the project's scripts and tools.
+ */
 export function CommandSuggest({ node }: { node: FlowNode }) {
-	const wait = node.type === "wait";
 	return (
 		<FieldSuggest
 			kind="command"
 			nodeId={node.id}
 			copy={
-				wait
+				node.type === "call"
 					? {
 							label: "Suggest command",
-							title: "Suggest a command",
+							title: "Suggest a list command",
 							description:
-								"The agent reads the project and proposes a command that succeeds once the wait is over.",
+								"The agent reads the project and proposes a command that lists the items, one run of the flow per item.",
 							picks: [
-								"Wait for the checks to pass",
-								"Wait for a deploy",
-								"Wait for a file",
+								"Sub-issues of an issue",
+								"Open issues with a label",
+								"Tasks in a checklist file",
 							],
 							placeholder:
-								"What do you wait for? For example: the checks of the pull request.",
+								"Which items should run? For example: the open issues with the label ready.",
 						}
-					: {
-							label: "Suggest command",
-							title: "Suggest a command",
-							description:
-								"The agent reads the project's scripts and proposes a command for this step.",
-							picks: ["Run the tests", "Run the linter", "Build the project"],
-							placeholder:
-								"What should it run? For example: the type check of the web app.",
-						}
+					: node.type === "wait"
+						? {
+								label: "Suggest command",
+								title: "Suggest a command",
+								description:
+									"The agent reads the project and proposes a command that succeeds once the wait is over.",
+								picks: [
+									"Wait for the checks to pass",
+									"Wait for a deploy",
+									"Wait for a file",
+								],
+								placeholder:
+									"What do you wait for? For example: the checks of the pull request.",
+							}
+						: {
+								label: "Suggest command",
+								title: "Suggest a command",
+								description:
+									"The agent reads the project's scripts and proposes a command for this step.",
+								picks: ["Run the tests", "Run the linter", "Build the project"],
+								placeholder:
+									"What should it run? For example: the type check of the web app.",
+							}
 			}
 			preview={(suggestion) =>
 				suggestion.kind === "command" ? (

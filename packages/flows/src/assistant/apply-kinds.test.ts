@@ -63,6 +63,23 @@ const flow: Flow = flowSchema.parse({
 			tool: "create_issue",
 			arguments: { title: "x", gone: "y" },
 		},
+		{
+			id: "traces",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "trace",
+			each: {
+				source: { kind: "command", command: "cat tasks.json" },
+				maxItems: 5,
+			},
+		},
+		{
+			id: "files",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "trace",
+			each: { source: { kind: "files", glob: "*.md" } },
+		},
 	],
 	edges: [
 		{ id: "e1", from: "review", outcome: "pass", to: "gate" },
@@ -96,6 +113,8 @@ describe("takesSuggestion", () => {
 		expect(takes("ci")).toEqual(["command"]);
 		expect(takes("pick")).toEqual(["expression"]);
 		expect(takes("issue")).toEqual(["arguments"]);
+		expect(takes("traces")).toEqual(["command"]);
+		expect(takes("files")).toEqual([]);
 	});
 
 	test("the description and the inputs belong to the flow, without a node", () => {
@@ -214,6 +233,23 @@ describe("applySuggestion, the newer kinds", () => {
 		);
 		expect(wait).toMatchObject({
 			until: { kind: "command", command: "gh pr checks", everyMinutes: 5 },
+		});
+		const list = nodeOf(
+			applySuggestion(flow, "traces", {
+				kind: "command",
+				command: "gh issue list --json number,title",
+				note: "",
+			}),
+			"traces",
+		);
+		expect(list).toMatchObject({
+			each: {
+				source: {
+					kind: "command",
+					command: "gh issue list --json number,title",
+				},
+				maxItems: 5,
+			},
 		});
 		const checker = nodeOf(
 			applySuggestion(flow, "review", { kind: "checker", text: "", note: "" }),

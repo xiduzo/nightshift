@@ -1,6 +1,7 @@
 /**
- * Recipes: ready-made list sources for a Call node with `each`. The editor
- * offers them, and `migrateFlow` turns an old `github` source into one.
+ * Recipes: ready-made list sources for a Call node with `each`. The
+ * assistant shows one as an example of a source command, and
+ * `migrateFlow` turns an old `github` source into one.
  */
 
 /**
