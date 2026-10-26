@@ -62,7 +62,6 @@ import { ThisDeviceLabel } from "@/features/devices";
 import { flowQueries } from "@/features/flows";
 import { useOpenGates } from "@/features/gates";
 import { AddProjectDialog, projectQueries } from "@/features/projects";
-import { useProjectRuns } from "@/features/runs";
 import { scheduleQueries } from "@/features/schedules";
 import { SpaceSwitcher } from "@/features/spaces";
 import type { Project } from "@/shared/api";
@@ -237,19 +236,9 @@ function ProjectFolder({ project }: { project: Project }) {
 	}, [inProject]);
 	const Icon = open ? FolderOpenIcon : FolderIcon;
 
-	const flows = useQuery({
-		...flowQueries.list(params.projectId),
-		staleTime: 30_000,
-		meta: { quietErrors: true },
-	});
-	const schedules = useQuery({
-		...scheduleQueries.list(params.projectId),
-		staleTime: 30_000,
-		meta: { quietErrors: true },
-	});
-	const runs = useProjectRuns(project.id);
-	const schedulesOn = schedules.data?.schedules.filter((s) => s.enabled);
-	const running = runs.data?.some((run) => run.status === "running") ?? false;
+	// Counted by Night Shift with the project list: no read per project.
+	const runs = project.runs;
+	const running = (runs?.statuses.running ?? 0) > 0;
 
 	return (
 		<Collapsible
@@ -292,74 +281,95 @@ function ProjectFolder({ project }: { project: Project }) {
 				</span>
 			</CollapsibleTrigger>
 			<CollapsibleContent>
-				{/* Full-width rows, indented to the project name, so a count fits on the right. */}
-				<SidebarMenu className="mt-1 group-data-[collapsible=icon]:hidden">
-					<ProjectPageItem
-						to="/projects/$projectId/flows"
-						projectId={project.id}
-						label="Flows"
-						icon={WorkflowIcon}
-						badge={
-							flows.data ? (
-								<SidebarMenuBadge
-									aria-label={`${flows.data.length} ${flows.data.length === 1 ? "flow" : "flows"}`}
-								>
-									{flows.data.length}
-								</SidebarMenuBadge>
-							) : null
-						}
-					/>
-					<ProjectPageItem
-						to="/projects/$projectId/runs"
-						projectId={project.id}
-						label="Runs"
-						icon={HistoryIcon}
-						// The menu button hides its tooltip while the sidebar is open; this one is the breakdown.
-						tooltip={
-							runs.data && runs.data.length > 0
-								? { children: describeRunStatuses(runs.data), hidden: false }
-								: undefined
-						}
-						badge={
-							runs.data ? (
-								<SidebarMenuBadge
-									className="gap-1.5"
-									aria-label={describeRunStatuses(runs.data)}
-								>
-									{runs.data.length > 0 ? <RunsDonut runs={runs.data} /> : null}
-									{runs.data.length}
-								</SidebarMenuBadge>
-							) : null
-						}
-					/>
-					<ProjectPageItem
-						to="/projects/$projectId/schedules"
-						projectId={project.id}
-						label="Schedules"
-						icon={CalendarClockIcon}
-						badge={
-							schedules.data && schedulesOn ? (
-								<SidebarMenuBadge
-									aria-label={`${schedulesOn.length} of ${schedules.data.schedules.length} schedules on`}
-								>
-									{schedulesOn.length}
-								</SidebarMenuBadge>
-							) : null
-						}
-					/>
-					{/* What runs left in the project's folder: only where it has one. */}
-					{project.repoPath !== null ? (
-						<ProjectPageItem
-							to="/projects/$projectId/branches"
-							projectId={project.id}
-							label="Branches"
-							icon={GitBranchIcon}
-							badge={null}
-						/>
-					) : null}
-				</SidebarMenu>
+				{/* Its flows and schedules are read only while the folder is open. */}
+				<ProjectPages project={project} />
 			</CollapsibleContent>
 		</Collapsible>
+	);
+}
+
+/** The pages of an open project folder, each with its count. */
+function ProjectPages({ project }: { project: Project }) {
+	const flows = useQuery({
+		...flowQueries.list(project.id),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const schedules = useQuery({
+		...scheduleQueries.list(project.id),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const schedulesOn = schedules.data?.schedules.filter((s) => s.enabled);
+	const runs = project.runs;
+
+	return (
+		/* Full-width rows, indented to the project name, so a count fits on the right. */
+		<SidebarMenu className="mt-1 group-data-[collapsible=icon]:hidden">
+			<ProjectPageItem
+				to="/projects/$projectId/flows"
+				projectId={project.id}
+				label="Flows"
+				icon={WorkflowIcon}
+				badge={
+					flows.data ? (
+						<SidebarMenuBadge
+							aria-label={`${flows.data.length} ${flows.data.length === 1 ? "flow" : "flows"}`}
+						>
+							{flows.data.length}
+						</SidebarMenuBadge>
+					) : null
+				}
+			/>
+			<ProjectPageItem
+				to="/projects/$projectId/runs"
+				projectId={project.id}
+				label="Runs"
+				icon={HistoryIcon}
+				// The menu button hides its tooltip while the sidebar is open; this one is the breakdown.
+				tooltip={
+					runs && runs.total > 0
+						? { children: describeRunStatuses(runs), hidden: false }
+						: undefined
+				}
+				badge={
+					runs ? (
+						<SidebarMenuBadge
+							className="gap-1.5"
+							aria-label={describeRunStatuses(runs)}
+						>
+							{runs.total > 0 ? <RunsDonut runs={runs} /> : null}
+							{runs.total}
+						</SidebarMenuBadge>
+					) : null
+				}
+			/>
+			<ProjectPageItem
+				to="/projects/$projectId/schedules"
+				projectId={project.id}
+				label="Schedules"
+				icon={CalendarClockIcon}
+				badge={
+					schedules.data && schedulesOn ? (
+						<SidebarMenuBadge
+							aria-label={`${schedulesOn.length} of ${schedules.data.schedules.length} schedules on`}
+						>
+							{schedulesOn.length}
+						</SidebarMenuBadge>
+					) : null
+				}
+			/>
+			{/* What runs left in the project's folder: only where it has one. */}
+			{project.repoPath !== null ? (
+				<ProjectPageItem
+					to="/projects/$projectId/branches"
+					projectId={project.id}
+					label="Branches"
+					icon={GitBranchIcon}
+					badge={null}
+				/>
+			) : null}
+		</SidebarMenu>
 	);
 }
 

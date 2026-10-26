@@ -77,7 +77,7 @@ export function InboxPage({
 }) {
 	const gates = useOpenGates();
 	const now = useNow(30_000);
-	const runs = useQuery(runQueries.everyRunForInbox());
+	const runs = useQuery(runQueries.sleeping());
 	const projects = useQuery(projectQueries.list());
 	const projectNames = new Map(projects.data?.map((p) => [p.id, p.name]));
 	const sleeping = (runs.data ?? [])

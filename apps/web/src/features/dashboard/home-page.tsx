@@ -14,8 +14,8 @@ import { SectionCards } from "./section-cards";
  */
 export function HomePage() {
 	const projects = useQuery(projectQueries.list());
-	// Recent runs and the project list, which shows how each project's runs stand.
-	const runs = useQuery(runQueries.everyRun());
+	// The project list says how each project's runs stand: only the newest runs load.
+	const runs = useQuery(runQueries.latest(OVERVIEW_ROWS));
 	const summary = useQuery(dashboardQueries.summary());
 
 	return (
@@ -49,7 +49,6 @@ export function HomePage() {
 				>
 					<ProjectList
 						projects={projects.data}
-						runs={runs.data}
 						isLoading={projects.isLoading}
 					/>
 				</PageSection>

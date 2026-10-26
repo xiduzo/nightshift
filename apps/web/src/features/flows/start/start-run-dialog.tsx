@@ -145,6 +145,9 @@ function typedInputs(inputs: FlowInputDef[], values: InputValues): InputValues {
  * Starts a flow file in a new worktree: its inputs, the ref to start from,
  * and an optional stop time.
  */
+/** The runs whose branches "Start from" offers. */
+const RECENT_RUNS = 12;
+
 export function StartRunDialog({
 	open,
 	onOpenChange,
@@ -207,7 +210,7 @@ function StartRunForm({
 	const noDevice = placements.isSuccess && devices.length === 0;
 	const now = useNow(15_000);
 	// Recent branches of this project's runs: a night can go on from an open stack.
-	const runs = useQuery(runQueries.ofProject(projectId));
+	const runs = useQuery(runQueries.ofProject(projectId, RECENT_RUNS));
 	const recentRefs = [
 		...new Set((runs.data ?? []).flatMap((run) => [run.branch, run.baseRef])),
 	].slice(0, 12);

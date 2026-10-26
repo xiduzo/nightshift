@@ -1,10 +1,38 @@
 import type { ApiQueryUtils } from "../api";
+import type { RunStatus, RunSummary } from "./types";
 
 /**
  * How often a run's files are read again while it runs: an agent keeps a
  * file in the middle of a step, and no stream item says so.
  */
 const ARTIFACTS_POLL_MS = 15_000;
+
+/** Where the next page of a run list starts: after this run. */
+export type RunCursor = Pick<RunSummary, "createdAt" | "id">;
+
+/**
+ * The cursor of the page after `page`, or none when it was the last. An
+ * older Host sends every run whatever the input: a page longer than asked,
+ * or one that does not start after its cursor, is the last.
+ */
+export function nextRunCursor(
+	page: readonly RunCursor[],
+	pageSize: number,
+	cursor: RunCursor | undefined,
+): RunCursor | undefined {
+	if (page.length !== pageSize) return undefined;
+	const first = page[0];
+	if (
+		cursor &&
+		first &&
+		(first.createdAt > cursor.createdAt ||
+			(first.createdAt === cursor.createdAt && first.id >= cursor.id))
+	) {
+		return undefined;
+	}
+	const last = page.at(-1);
+	return last ? { createdAt: last.createdAt, id: last.id } : undefined;
+}
 
 /**
  * The query options of runs. No list polls: the live cache follows the
@@ -30,16 +58,43 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			...orpc.runs.list.queryOptions({ input: {} }),
 			meta: { quietRefetchErrors: true },
 		}),
-		/** The runs of every project for the inbox: its sleeping runs. A failed read does not toast. */
-		everyRunForInbox: () => ({
-			...orpc.runs.list.queryOptions({ input: {} }),
+		/** The sleeping runs of every project, for the inbox. A failed read does not toast. */
+		sleeping: () => ({
+			...orpc.runs.list.queryOptions({ input: { statuses: ["sleeping"] } }),
 			meta: { quietErrors: true },
 		}),
-		/** The runs of one project. A failed read again keeps the list. */
-		ofProject: (projectId: string) => ({
-			...orpc.runs.list.queryOptions({ input: { projectId } }),
+		/** The runs of one project, or its newest `limit`. A failed read again keeps the list. */
+		ofProject: (projectId: string, limit?: number) => ({
+			...orpc.runs.list.queryOptions({
+				input: { projectId, ...(limit !== undefined ? { limit } : {}) },
+			}),
 			meta: { quietRefetchErrors: true },
 		}),
+		/** The newest runs of the Space, at most `limit`. A failed read again keeps them. */
+		latest: (limit: number) => ({
+			...orpc.runs.list.queryOptions({ input: { limit } }),
+			meta: { quietRefetchErrors: true },
+		}),
+		/**
+		 * The runs of the Space (of one project, with one of `statuses`),
+		 * newest first, `pageSize` at a time: the next page loads when the
+		 * screen asks for more.
+		 */
+		pages: (
+			filter: { projectId?: string; statuses?: RunStatus[] },
+			pageSize: number,
+		) =>
+			orpc.runs.list.infiniteOptions({
+				input: (cursor: RunCursor | undefined) => ({
+					...filter,
+					limit: pageSize,
+					...(cursor ? { cursor } : {}),
+				}),
+				initialPageParam: undefined as RunCursor | undefined,
+				getNextPageParam: (page, _pages, cursor) =>
+					nextRunCursor(page, pageSize, cursor),
+				meta: { quietRefetchErrors: true },
+			}),
 		/** One run with its steps. */
 		get: (runId: string) => orpc.runs.get.queryOptions({ input: { runId } }),
 		/** One step with the prompt of each session and each item it ran: read when a person opens it. */

@@ -7,6 +7,5 @@ export { RunList } from "./components/run-list";
 export { RunPage } from "./components/run-page";
 export { RunStatusBadge } from "./components/run-status-badge";
 export { ProjectRunCopiesPage } from "./copies/run-copies-page";
-export { useProjectRuns } from "./hooks/use-project-runs";
 export { preloadRunCopiesPage, preloadRunPage } from "./preload";
 export { runQueries } from "./queries";

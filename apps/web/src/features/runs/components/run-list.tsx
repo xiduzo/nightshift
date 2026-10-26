@@ -1,3 +1,4 @@
+import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
 	EmptyContent,
@@ -7,6 +8,7 @@ import {
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
 	TooltipContent,
@@ -25,7 +27,8 @@ import { RunStatusBadge } from "./run-status-badge";
 /**
  * Runs as a table, newest first: status, title (a link to the run), project,
  * flow, branch, cost and start. Cost and start sort. Narrow screens keep
- * status, title and cost. With `pageSize`, the runs show in pages.
+ * status, title and cost. With `pageSize`, the runs show in pages. With
+ * `more`, a button under the list loads the next runs.
  */
 export function RunList({
 	runs,
@@ -34,6 +37,7 @@ export function RunList({
 	emptyDescription,
 	emptyAction,
 	pageSize,
+	more,
 }: {
 	runs: RunSummary[] | undefined;
 	/** Pass to show the project of each run. */
@@ -44,6 +48,8 @@ export function RunList({
 	emptyAction?: ReactNode;
 	/** Runs per page. Without it, every run shows. */
 	pageSize?: number;
+	/** There are more runs than the list holds: load them. */
+	more?: { load: () => void; loading: boolean };
 }) {
 	if (isLoading) {
 		return (
@@ -75,14 +81,29 @@ export function RunList({
 		: undefined;
 
 	return (
-		<DataTable
-			columns={runColumns(projectNames)}
-			data={runs}
-			getRowId={(run) => run.id}
-			initialSorting={[{ id: "started", desc: true }]}
-			rowClassName={() => "relative"}
-			pageSize={pageSize}
-		/>
+		<>
+			<DataTable
+				columns={runColumns(projectNames)}
+				data={runs}
+				getRowId={(run) => run.id}
+				initialSorting={[{ id: "started", desc: true }]}
+				rowClassName={() => "relative"}
+				pageSize={pageSize}
+			/>
+			{more ? (
+				<div className="flex justify-center border-t px-6 py-3">
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={more.loading}
+						onClick={more.load}
+					>
+						{more.loading ? <Spinner data-icon="inline-start" /> : null}
+						Show older runs
+					</Button>
+				</div>
+			) : null}
+		</>
 	);
 }
 

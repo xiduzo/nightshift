@@ -2,16 +2,18 @@ import { ChartContainer } from "@nightshift/ui/components/chart";
 import { cn } from "@nightshift/ui/lib/utils";
 import { Pie, PieChart } from "recharts";
 
-import type { RunSummary } from "@/shared/api";
-
-import { countRunStatuses, RUN_STATUS_CHART } from "./run-statuses";
+import {
+	countRunStatuses,
+	RUN_STATUS_CHART,
+	type RunStatusCounts,
+} from "./run-statuses";
 
 /** A donut of run statuses, after the shadcn `chart-pie-donut` block. Small enough for a sidebar badge. */
 export function RunsDonutChart({
 	runs,
 	className,
 }: {
-	runs: RunSummary[];
+	runs: RunStatusCounts;
 	className?: string;
 }) {
 	return (

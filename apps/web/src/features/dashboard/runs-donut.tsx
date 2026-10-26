@@ -1,7 +1,7 @@
 import { cn } from "@nightshift/ui/lib/utils";
 import { lazy, Suspense } from "react";
 
-import type { RunSummary } from "@/shared/api";
+import type { RunStatusCounts } from "./run-statuses";
 
 // The chart library is large and every page shows the sidebar: it loads after the page.
 const RunsDonutChart = lazy(() =>
@@ -13,7 +13,7 @@ export function RunsDonut({
 	runs,
 	className,
 }: {
-	runs: RunSummary[];
+	runs: RunStatusCounts;
 	className?: string;
 }) {
 	return (

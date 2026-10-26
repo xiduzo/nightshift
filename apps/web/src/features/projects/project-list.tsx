@@ -19,7 +19,7 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Link } from "@tanstack/react-router";
 import { FolderGitIcon, FolderOpenIcon } from "lucide-react";
-import type { Project, RunSummary } from "@/shared/api";
+import type { Project } from "@/shared/api";
 import { formatDateTime, formatRelative } from "@/shared/format";
 import { ProjectMenu } from "./project-menu";
 import { projectFolder } from "./projects";
@@ -27,11 +27,9 @@ import { projectFolder } from "./projects";
 /** The projects as cards: open, rename, move or remove one. */
 export function ProjectList({
 	projects,
-	runs,
 	isLoading,
 }: {
 	projects: Project[] | undefined;
-	runs: RunSummary[] | undefined;
 	isLoading: boolean;
 }) {
 	if (isLoading) {
@@ -67,36 +65,19 @@ export function ProjectList({
 	return (
 		<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 			{projects.map((project) => (
-				<ProjectCard
-					key={project.id}
-					project={project}
-					runs={runs?.filter((run) => run.projectId === project.id)}
-				/>
+				<ProjectCard key={project.id} project={project} />
 			))}
 		</div>
 	);
 }
 
-function ProjectCard({
-	project,
-	runs,
-}: {
-	project: Project;
-	/** This project's runs, when loaded. */
-	runs: RunSummary[] | undefined;
-}) {
-	const last = runs?.reduce<RunSummary | undefined>(
-		(latest, run) =>
-			latest === undefined || run.createdAt > latest.createdAt ? run : latest,
-		undefined,
-	);
+function ProjectCard({ project }: { project: Project }) {
+	const { runs } = project;
+	const last = runs?.last;
 	const active =
-		runs?.filter(
-			(run) =>
-				run.status === "running" ||
-				run.status === "waiting" ||
-				run.status === "sleeping",
-		).length ?? 0;
+		(runs?.statuses.running ?? 0) +
+		(runs?.statuses.waiting ?? 0) +
+		(runs?.statuses.sleeping ?? 0);
 
 	return (
 		<Card
@@ -146,7 +127,7 @@ function ProjectCard({
 				) : last ? (
 					<>
 						<span className="tabular-nums">
-							{runs.length} {runs.length === 1 ? "run" : "runs"}
+							{runs.total} {runs.total === 1 ? "run" : "runs"}
 						</span>
 						<span aria-hidden="true">·</span>
 						<span className="truncate">
