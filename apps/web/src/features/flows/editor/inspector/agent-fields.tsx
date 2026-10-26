@@ -407,6 +407,7 @@ export function AgentFields({
 						value={node.prompt}
 						invalid={node.prompt.trim() === ""}
 						placeholder="Implement the change, then report pass or fail."
+						assist="prompt"
 						onChange={(prompt) =>
 							onChange((current) => ({ ...current, prompt }))
 						}

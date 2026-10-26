@@ -13,6 +13,8 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { OutputSuggest } from "../assistant/field-helpers";
+
 import { Note } from "./fields";
 import {
 	fromJsonSchema,
@@ -101,6 +103,7 @@ export function OutputSchemaField({
 	label = "Output data",
 	reference,
 	children,
+	assist = false,
 }: {
 	id: string;
 	nodeId: string;
@@ -118,6 +121,8 @@ export function OutputSchemaField({
 	description?: string;
 	/** Shown above the fields, such as a field the node always has. */
 	children?: ReactNode;
+	/** The node's own output: "Suggest fields" asks an agent for them. */
+	assist?: boolean;
 }) {
 	const [mode, setMode] = useState<Mode>(() =>
 		shapeOf(output, rootObject) ? "fields" : "json",
@@ -160,6 +165,9 @@ export function OutputSchemaField({
 	};
 
 	const base = reference ?? `${nodeId}.data`;
+	const helper = assist ? (
+		<OutputSuggest nodeId={nodeId} output={output} />
+	) : null;
 	const fields = schemaFields(output, base);
 
 	return (
@@ -227,9 +235,13 @@ export function OutputSchemaField({
 							fields={shape.fields}
 							path=""
 							onChange={(next) => editShape({ ...shape, fields: next })}
+							aside={helper}
 						/>
 					) : (
-						<ShapeDetails shape={shape} path="data" onChange={editShape} />
+						<>
+							<ShapeDetails shape={shape} path="data" onChange={editShape} />
+							{helper ? <div className="self-start">{helper}</div> : null}
+						</>
 					)}
 				</fieldset>
 			) : (
@@ -258,6 +270,7 @@ export function OutputSchemaField({
 								</Button>
 							),
 						)}
+						{helper}
 					</div>
 					<Textarea
 						id={id}

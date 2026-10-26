@@ -140,6 +140,7 @@ export function DecisionFields({
 					invalid={prompt.invalid}
 					className={by === "person" ? "font-sans text-sm" : undefined}
 					placeholder={prompt.placeholder}
+					assist="prompt"
 					onChange={(text) =>
 						onChange((current) => ({ ...current, prompt: text }))
 					}

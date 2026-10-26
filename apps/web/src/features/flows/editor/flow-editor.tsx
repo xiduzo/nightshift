@@ -27,6 +27,7 @@ import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/shared/page";
+import { FlowAssistantContext } from "../assistant/flow-assistant";
 import { NODE_TYPE } from "../canvas/node-type";
 import {
 	EnterSubflowContext,
@@ -364,6 +365,14 @@ function Editor({
 		creating: createCalled.isPending || saveFlow.isPending,
 	};
 
+	// The field helpers of the inspector: they read the draft and change it.
+	const assistant = {
+		projectId,
+		flowName: name,
+		flow: draft,
+		changeFlow,
+	};
+
 	const inspector = selectedNode ? (
 		<NodeInspector
 			key={selectedNode.id}
@@ -588,7 +597,9 @@ function Editor({
 								onClose={closeInspector}
 								className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]"
 							>
-								<div key={selectionKey(selection)}>{inspector}</div>
+								<FlowAssistantContext.Provider value={assistant}>
+									<div key={selectionKey(selection)}>{inspector}</div>
+								</FlowAssistantContext.Provider>
 							</FloatingInspector>
 						) : null}
 					</div>

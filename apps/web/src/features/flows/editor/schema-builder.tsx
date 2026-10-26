@@ -8,7 +8,7 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { PlusIcon, XIcon } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 
 import {
 	emptyShape,
@@ -190,12 +190,15 @@ export function FieldsEditor({
 	path,
 	nested = false,
 	onChange,
+	aside,
 }: {
 	fields: SchemaField[];
 	/** The object's place, for labels. Empty at the root. */
 	path: string;
 	nested?: boolean;
 	onChange: (fields: SchemaField[]) => void;
+	/** Shown next to the add button, such as a helper that suggests fields. */
+	aside?: ReactNode;
 }) {
 	const update = (index: number, field: SchemaField) =>
 		onChange(fields.map((current, at) => (at === index ? field : current)));
@@ -224,24 +227,26 @@ export function FieldsEditor({
 					))}
 				</ul>
 			) : null}
-			<Button
-				variant="outline"
-				size="xs"
-				className="self-start"
-				onClick={() =>
-					onChange([
-						...fields,
-						{
-							name: freshName(fields),
-							required: true,
-							shape: { kind: "text" },
-						},
-					])
-				}
-			>
-				<PlusIcon data-icon="inline-start" />
-				{nested ? `Add field to ${path}` : "Add field"}
-			</Button>
+			<div className="flex flex-wrap items-center gap-1.5">
+				<Button
+					variant="outline"
+					size="xs"
+					onClick={() =>
+						onChange([
+							...fields,
+							{
+								name: freshName(fields),
+								required: true,
+								shape: { kind: "text" },
+							},
+						])
+					}
+				>
+					<PlusIcon data-icon="inline-start" />
+					{nested ? `Add field to ${path}` : "Add field"}
+				</Button>
+				{aside}
+			</div>
 		</div>
 	);
 }

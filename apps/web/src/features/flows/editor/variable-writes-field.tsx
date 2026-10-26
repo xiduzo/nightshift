@@ -20,6 +20,7 @@ import {
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId } from "react";
 
+import { SetSuggest } from "../assistant/field-helpers";
 import { Field, InspectorSection, Note } from "./fields";
 import { TemplateField } from "./template-field";
 
@@ -76,10 +77,15 @@ export function VariableWritesSection({
 				step's own results as <code>{`{{${node.id}.outcome}}`}</code>.
 			</Note>
 			{variables.length === 0 && writes.length === 0 ? (
-				<Note>
-					This flow has no variables yet. Click an empty spot on the canvas,
-					then add one under Variables.
-				</Note>
+				<>
+					<Note>
+						This flow has no variables yet. Click an empty spot on the canvas,
+						then add one under Variables. Or let an agent suggest them.
+					</Note>
+					<div className="self-start">
+						<SetSuggest node={node} />
+					</div>
+				</>
 			) : (
 				<>
 					{writes.length > 0 ? (
@@ -106,21 +112,23 @@ export function VariableWritesSection({
 							))}
 						</ol>
 					) : null}
-					<Button
-						variant="outline"
-						size="sm"
-						className="self-start"
-						disabled={variables.length === 0}
-						onClick={() =>
-							setWrites((current) => [
-								...current,
-								{ variable: variables[0]?.name ?? "", value: "" },
-							])
-						}
-					>
-						<PlusIcon data-icon="inline-start" />
-						Set a variable
-					</Button>
+					<div className="flex flex-wrap items-center gap-1.5">
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={variables.length === 0}
+							onClick={() =>
+								setWrites((current) => [
+									...current,
+									{ variable: variables[0]?.name ?? "", value: "" },
+								])
+							}
+						>
+							<PlusIcon data-icon="inline-start" />
+							Set a variable
+						</Button>
+						<SetSuggest node={node} />
+					</div>
 				</>
 			)}
 		</InspectorSection>

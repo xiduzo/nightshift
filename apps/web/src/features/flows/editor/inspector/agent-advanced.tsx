@@ -59,6 +59,7 @@ export function AgentAdvanced({
 					nodeId={node.id}
 					output={node.output}
 					rootObject
+					assist
 					description="The data the agent reports, besides its outcome and a summary. The step fails when the data does not fit."
 					onChange={(output) =>
 						onChange(({ output: _, ...rest }) =>

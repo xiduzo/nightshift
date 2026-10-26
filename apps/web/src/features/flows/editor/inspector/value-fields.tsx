@@ -120,6 +120,7 @@ export function ValueFields({
 						value={prompt}
 						invalid={prompt.trim() === ""}
 						placeholder="List the failing tests in {{check.log_tail}}."
+						assist="prompt"
 						onChange={(text) =>
 							onChange((current) => ({ ...current, prompt: text }))
 						}
@@ -147,6 +148,7 @@ export function ValueFields({
 					nodeId={node.id}
 					output={node.output}
 					required
+					assist
 					description="The shape of the data this node makes. The step fails when the result does not fit."
 					onChange={(output) =>
 						onChange((current) =>

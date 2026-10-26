@@ -12,6 +12,11 @@ import {
 	CommandList,
 } from "@nightshift/ui/components/command";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupTextarea,
+} from "@nightshift/ui/components/input-group";
 import { Popover, PopoverContent } from "@nightshift/ui/components/popover";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
@@ -26,6 +31,13 @@ import {
 	useState,
 } from "react";
 
+import {
+	isSuggestKey,
+	PromptSuggest,
+	type PromptTarget,
+	selectionOf,
+} from "../assistant/field-helpers";
+import { useFlowAssistant } from "../assistant/flow-assistant";
 import {
 	completeTemplate,
 	matchVariables,
@@ -44,7 +56,8 @@ import { useProjectFlowMap } from "./project-flows-context";
  * Clicking one inserts it at the cursor. Typing `{{` lists the variables that
  * match what follows it, to pick with the arrow keys and Enter or Tab. A JSON value (an Agent's `data`, a
  * Call's `results`, a JSON input) leaves the cursor before the closing
- * braces, ready for a path: `{{planner.data.tasks}}`.
+ * braces, ready for a path: `{{planner.data.tasks}}`. A prompt (`assist`)
+ * gets the prompt helper: a button in the field, or Cmd/Ctrl+I.
  */
 export function TemplateField({
 	id,
@@ -60,6 +73,7 @@ export function TemplateField({
 	multiline = true,
 	initialValue,
 	required,
+	assist,
 }: {
 	id: string;
 	label: ReactNode;
@@ -77,8 +91,17 @@ export function TemplateField({
 	/** A variable's initial value: it reads the inputs and run only. */
 	initialValue?: boolean;
 	required?: boolean;
+	/** `prompt`: the node's prompt, with the prompt helper in the field. */
+	assist?: "prompt";
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+	const groupRef = useRef<HTMLDivElement>(null);
+	const assistant = useFlowAssistant();
+	const helperNode =
+		assist === "prompt" && multiline && assistant !== undefined ? nodeId : null;
+	const [helping, setHelping] = useState<PromptTarget | null>(null);
+	const openHelper = () =>
+		setHelping({ base: value, selection: selectionOf(ref.current) });
 	const flows = useProjectFlowMap();
 	const groups = templateVariables(flow, nodeId, { flows, initialValue });
 
@@ -130,7 +153,48 @@ export function TemplateField({
 				}
 				hint={hint}
 			>
-				{multiline ? (
+				{helperNode !== null ? (
+					<InputGroup ref={groupRef}>
+						<InputGroupTextarea
+							ref={ref}
+							id={id}
+							value={value}
+							placeholder={placeholder}
+							className={cn(
+								"max-h-80 min-h-28 font-mono text-xs leading-relaxed",
+								className,
+							)}
+							aria-invalid={invalid}
+							aria-required={required}
+							aria-describedby={describedBy}
+							aria-keyshortcuts="Meta+I Control+I"
+							{...suggest.fieldProps}
+							onChange={(event) => {
+								onChange(event.target.value);
+								suggest.track(event.target);
+							}}
+							onKeyDown={(event) => {
+								if (isSuggestKey(event)) {
+									event.preventDefault();
+									openHelper();
+									return;
+								}
+								suggest.onKeyDown(event, complete);
+							}}
+						/>
+						<InputGroupAddon align="block-end" className="py-1.5">
+							<PromptSuggest
+								nodeId={helperNode}
+								value={value}
+								target={helping}
+								onOpen={openHelper}
+								onClose={() => setHelping(null)}
+								anchor={groupRef}
+								field={ref}
+							/>
+						</InputGroupAddon>
+					</InputGroup>
+				) : multiline ? (
 					<Textarea
 						ref={ref}
 						id={id}
