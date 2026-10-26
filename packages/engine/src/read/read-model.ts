@@ -131,27 +131,28 @@ export function parseCalledFlows(row: RunRow): Record<string, Flow> {
 	return flows;
 }
 
-/** What a run summary reads from the log. The run log keeps it per run until the next append. */
+/**
+ * What a run summary reads from the log. The run log keeps it per run until
+ * the next append. The steps are derived once, for every part that reads them.
+ */
 export function runFacts(events: readonly LoggedEvent[]) {
-	const state = deriveRunState(events);
+	const steps = deriveSteps(events);
+	const state = deriveRunState(events, steps);
 	const open = isOpenStatus(state.status);
+	const sleep = state.status === "sleeping" ? deriveSleep(events, steps) : null;
 	return {
 		status: state.status,
 		reason: state.reason,
-		wakeAt:
-			state.status === "sleeping" ? (deriveSleep(events)?.until ?? null) : null,
-		signal:
-			state.status === "sleeping"
-				? (deriveSleep(events)?.signal ?? null)
-				: null,
+		wakeAt: sleep?.until ?? null,
+		signal: sleep?.signal ?? null,
 		inputs: deriveInputs(events),
 		stopAt: deriveStopAt(events),
 		stopAfterStep: open && deriveStopAfterStep(events),
-		...costFields(sumCost(events)),
-		warnings: runWarnings(events),
+		...costFields(sumCost(events, steps)),
+		warnings: runWarnings(events, steps),
 		endedAt: deriveEndedAt(events),
 		trigger: deriveTrigger(events),
-		calls: deriveCalls(events),
+		calls: deriveCalls(steps),
 		gates: deriveGateWaits(events),
 	};
 }
@@ -185,10 +186,13 @@ function costFields(cost: CostTally) {
 }
 
 /** The run's warnings, each with the node of its step. */
-function runWarnings(events: readonly LoggedEvent[]): RunWarning[] {
+function runWarnings(
+	events: readonly LoggedEvent[],
+	steps: readonly DerivedStep[],
+): RunWarning[] {
 	const warnings = deriveWarnings(events);
 	if (warnings.length === 0) return [];
-	const nodes = new Map(deriveSteps(events).map((s) => [s.id, s.nodeId]));
+	const nodes = new Map(steps.map((s) => [s.id, s.nodeId]));
 	return warnings.map((w) => ({
 		kind: w.kind,
 		message: w.message,
@@ -266,8 +270,7 @@ const callStatus: Partial<Record<StepOutcome, RunStatus>> = {
 };
 
 /** The Call steps of a run, with what each run of a called flow spent and how it ended. */
-function deriveCalls(events: readonly LoggedEvent[]): CallFact[] {
-	const steps = deriveSteps(events);
+function deriveCalls(steps: readonly DerivedStep[]): CallFact[] {
 	const byId = new Map(steps.map((step) => [step.id, step]));
 	// The cost of each run of a called flow, with the flows it called, by scope key.
 	const cost = new Map<string, CostTally>();

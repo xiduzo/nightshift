@@ -437,10 +437,13 @@ export function lastHarnessSession(
 
 /**
  * The run's cost: what each ended session reported, plus what steps spent
- * outside sessions (a decider).
+ * outside sessions (a decider). `steps`: the run's steps, when the caller
+ * derived them already.
  */
-export function sumCost(events: readonly LoggedEvent[]): CostTally {
-	const steps = deriveSteps(events);
+export function sumCost(
+	events: readonly LoggedEvent[],
+	steps: readonly DerivedStep[] = deriveSteps(events),
+): CostTally {
 	const stepIds = new Set(steps.map((s) => s.id));
 	let total = NO_COST;
 	for (const step of steps) total = addCost(total, step.cost);

@@ -77,9 +77,13 @@ function walkBeganSeq(events: readonly LoggedEvent[]): number {
  * resume means the run is `running`, `waiting` while a Gate is open, or
  * `sleeping` while a step waits for a usage limit or the network. A run
  * with none of them (the daemon died while it created the run) is
- * `interrupted`.
+ * `interrupted`. `steps`: the run's steps when the caller derived them
+ * already (`deriveSteps`), else they are derived when needed.
  */
-export function deriveRunState(events: readonly LoggedEvent[]): {
+export function deriveRunState(
+	events: readonly LoggedEvent[],
+	steps?: readonly DerivedStep[],
+): {
 	status: RunStatus;
 	reason: string | null;
 } {
@@ -88,8 +92,8 @@ export function deriveRunState(events: readonly LoggedEvent[]): {
 	if (latest.type === "RunEnded") {
 		return { status: latest.payload.status, reason: latest.payload.reason };
 	}
-	if (deriveOpenGate(events)) return { status: "waiting", reason: null };
-	if (deriveSleep(events)) return { status: "sleeping", reason: null };
+	if (deriveOpenGate(events, steps)) return { status: "waiting", reason: null };
+	if (deriveSleep(events, steps)) return { status: "sleeping", reason: null };
 	return { status: "running", reason: null };
 }
 
@@ -121,9 +125,12 @@ export type SleepFact = {
 /**
  * The wait the run sleeps in: the latest `WaitStarted` of the current walk
  * with no `WaitEnded` after it, on a step that is still open, while the run
- * has not ended.
+ * has not ended. `steps` as for `deriveRunState`.
  */
-export function deriveSleep(events: readonly LoggedEvent[]): SleepFact | null {
+export function deriveSleep(
+	events: readonly LoggedEvent[],
+	steps?: readonly DerivedStep[],
+): SleepFact | null {
 	const latest = latestRunEvent(events);
 	if (!latest || latest.type === "RunEnded") return null;
 	const began = latest.seq;
@@ -137,7 +144,7 @@ export function deriveSleep(events: readonly LoggedEvent[]): SleepFact | null {
 	}
 	if (!wait?.stepId) return null;
 	const stepId = wait.stepId;
-	const step = deriveSteps(events).find((s) => s.id === stepId);
+	const step = (steps ?? deriveSteps(events)).find((s) => s.id === stepId);
 	if (!step || step.endedAt !== null) return null;
 	return {
 		stepId,
@@ -296,15 +303,16 @@ export type OpenGateFact = {
  * The Gate the run waits at: a Gate step that opened and has not ended,
  * while the run has not ended. A Gate step that started but never wrote
  * `GateOpened` (the daemon died in between) is not open: recovery
- * interrupts it like any other step.
+ * interrupts it like any other step. `steps` as for `deriveRunState`.
  */
 export function deriveOpenGate(
 	events: readonly LoggedEvent[],
+	steps?: readonly DerivedStep[],
 ): OpenGateFact | null {
 	const latest = latestRunEvent(events);
 	if (!latest || latest.type === "RunEnded") return null;
 	const walkBegan = latest.seq;
-	const open = deriveSteps(events).findLast(
+	const open = (steps ?? deriveSteps(events)).findLast(
 		(s) =>
 			s.endedAt === null &&
 			s.gate !== null &&
