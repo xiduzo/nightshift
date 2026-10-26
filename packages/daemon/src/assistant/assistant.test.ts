@@ -10,6 +10,7 @@ import type {
 	ChatRequest,
 	FlowInput,
 	SuggestionEvent,
+	SuggestionRequest,
 } from "@nightshift/flows";
 import { call } from "@orpc/server";
 
@@ -19,7 +20,7 @@ import {
 	createAssistant,
 	NO_CLONE,
 	NO_PROFILE,
-	pickProfile,
+	pickAgent,
 } from "./assistant";
 import { type ChatSpace, chatRun } from "./authoring";
 
@@ -76,28 +77,52 @@ function deps(over: Partial<AssistantDeps> = {}): AssistantDeps {
 	};
 }
 
-describe("pickProfile", () => {
+describe("pickAgent", () => {
 	test("the request's profile first", () => {
-		expect(pickProfile("a_codex", deps())).toMatchObject({ name: "a_codex" });
-		expect(pickProfile("gone", deps())).toEqual({
+		expect(pickAgent({ profile: "a_codex" }, deps())).toMatchObject({
+			profile: "a_codex",
+		});
+		expect(pickAgent({ profile: "gone" }, deps())).toEqual({
 			error:
 				'There is no profile "gone" on this computer. Pick another one, or add it on the Agents page.',
 		});
 	});
 
+	test("the request's own fields override its profile, as on an Agent node", () => {
+		expect(
+			pickAgent({ profile: "b_claude", model: "haiku", effort: "low" }, deps()),
+		).toEqual({
+			profile: "b_claude",
+			settings: { harness: "claude-code", model: "haiku", effort: "low" },
+		});
+	});
+
+	test("no profile: the request's own harness and model", () => {
+		expect(
+			pickAgent({ harness: "claude-code", model: "haiku" }, deps()),
+		).toEqual({
+			profile: null,
+			settings: { harness: "claude-code", model: "haiku" },
+		});
+		expect(pickAgent({ model: "haiku" }, deps())).toEqual({
+			error: "Choose a profile, or a harness and a model.",
+		});
+	});
+
 	test("then the setting, then the first profile whose harness is here", () => {
 		expect(
-			pickProfile(undefined, deps({ settings: settings("a_codex") })),
-		).toMatchObject({ name: "a_codex" });
+			pickAgent({}, deps({ settings: settings("a_codex") })),
+		).toMatchObject({ profile: "a_codex" });
 		// A profile in the settings that is gone falls back.
-		expect(
-			pickProfile(undefined, deps({ settings: settings("gone") })),
-		).toMatchObject({ name: "b_claude", settings: { model: "sonnet" } });
-		expect(pickProfile(undefined, deps())).toMatchObject({ name: "b_claude" });
+		expect(pickAgent({}, deps({ settings: settings("gone") }))).toMatchObject({
+			profile: "b_claude",
+			settings: { model: "sonnet" },
+		});
+		expect(pickAgent({}, deps())).toMatchObject({ profile: "b_claude" });
 	});
 
 	test("none: tells the person to add one", () => {
-		expect(pickProfile(undefined, deps({ installed: () => false }))).toEqual({
+		expect(pickAgent({}, deps({ installed: () => false }))).toEqual({
 			error: NO_PROFILE,
 		});
 	});
@@ -133,6 +158,7 @@ function context(assistant: Context["assistant"]): Context {
 
 async function suggest(
 	assistant: Context["assistant"],
+	over: Partial<SuggestionRequest> = {},
 ): Promise<SuggestionEvent[]> {
 	const stream = await call(
 		appRouter.assistant.suggest,
@@ -143,6 +169,7 @@ async function suggest(
 			nodeId: "plan",
 			kind: "prompt",
 			instruction: "Ask for steps.",
+			...over,
 		},
 		{ context: context(assistant), path: ["assistant", "suggest"] },
 	);
@@ -188,6 +215,28 @@ describe("assistant.suggest", () => {
 		expect(input?.readOnly).toBe(true);
 	});
 
+	test("runs on the harness, model and effort the person picks", async () => {
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "report",
+					outcome: "",
+					summary: "Shorter.",
+					data: { text: "Plan {{issue}}." },
+				},
+			],
+		});
+		const events = await suggest(
+			createAssistant(deps({ harnessFor: () => harness })),
+			{ harness: "claude-code", model: "haiku", effort: "low" },
+		);
+		expect(events.at(-1)).toEqual({ type: "done" });
+		expect(harness.calls[0]?.model).toBe("haiku");
+		expect(harness.calls[0]?.effort).toBe("low");
+		expect(harness.calls[0]?.readOnly).toBe(true);
+		expect(harness.calls[0]?.permissionMode).toBe("default");
+	});
+
 	test("ends with an error the person can act on", async () => {
 		expect(
 			await suggest(createAssistant(deps({ clonePath: async () => null }))),
@@ -195,6 +244,33 @@ describe("assistant.suggest", () => {
 		expect(
 			await suggest(createAssistant(deps({ installed: () => false }))),
 		).toEqual([{ type: "error", message: NO_PROFILE }]);
+		expect(
+			await suggest(createAssistant(deps()), { harness: "codex", model: "m" }),
+		).toEqual([
+			{
+				type: "error",
+				message:
+					"The Codex harness is not added on this computer. Add it on the Agents page, or choose another harness.",
+			},
+		]);
+		expect(
+			await suggest(createAssistant(deps({ installed: () => false })), {
+				harness: "claude-code",
+				model: "haiku",
+			}),
+		).toEqual([
+			{
+				type: "error",
+				message:
+					"Night Shift cannot find Claude Code on this computer. Install it, or choose another harness.",
+			},
+		]);
+	});
+
+	test("a harness without a model is not a valid request", async () => {
+		await expect(
+			suggest(createAssistant(deps()), { harness: "claude-code" }),
+		).rejects.toThrow();
 	});
 });
 
@@ -323,6 +399,91 @@ describe("assistant.chat", () => {
 		]);
 		expect(a.at(-1)).toEqual({ type: "done" });
 		expect(b).toEqual([{ type: "error", message: BUSY }]);
+	});
+
+	test("another model on a harness that resumes with it: the same session", async () => {
+		const harness = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
+		const assistant = createAssistant(deps({ harnessFor: () => harness }));
+		const first = await chat(assistant, { profile: "b_claude" });
+		const threadId = first[0]?.type === "thread" ? first[0].threadId : "";
+		await chat(assistant, {
+			threadId,
+			message: "And lint?",
+			harness: "claude-code",
+			model: "haiku",
+			effort: "low",
+		});
+		expect(harness.calls[1]?.resumeSessionId).toBe("fake-session-1");
+		expect(harness.calls[1]?.model).toBe("haiku");
+		expect(harness.calls[1]?.effort).toBe("low");
+	});
+
+	test("another harness: a new session with the chat so far, on the same thread", async () => {
+		const claude = fakeHarness({
+			steps: [{ type: "text", text: "Add a lint step." }],
+		});
+		const goose = fakeHarness({ steps: [{ type: "text", text: "Done." }] });
+		const assistant = createAssistant(
+			deps({
+				harnessFor: (name) => (name === "acp:goose" ? goose : claude),
+				installed: () => true,
+			}),
+		);
+		const first = await chat(assistant, { message: "What is missing?" });
+		const threadId = first[0]?.type === "thread" ? first[0].threadId : "";
+		const second = await chat(assistant, {
+			threadId,
+			message: "Then add it.",
+			harness: "acp:goose",
+			model: "default",
+		});
+		expect(second[0]).toEqual({ type: "thread", threadId });
+		expect(second.at(-1)).toEqual({ type: "done" });
+		const input = goose.calls[0];
+		expect(input?.resumeSessionId).toBeUndefined();
+		expect(input?.readOnly).toBe(true);
+		expect(input?.prompt).toContain("# The chat so far");
+		expect(input?.prompt).toContain("What is missing?");
+		expect(input?.prompt).toContain("Add a lint step.");
+		expect(input?.prompt).toContain("Then add it.");
+		// The next message on goose resumes goose's session.
+		await chat(assistant, {
+			threadId,
+			message: "Thanks.",
+			harness: "acp:goose",
+			model: "default",
+		});
+		expect(goose.calls[1]?.resumeSessionId).toBe("fake-session-1");
+	});
+
+	test("another model on a harness that cannot resume with it: a new session with the chat so far", async () => {
+		const goose = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
+		const assistant = createAssistant(
+			deps({ harnessFor: () => goose, installed: () => true }),
+		);
+		const agent = { harness: "acp:goose", model: "a" } as const;
+		const first = await chat(assistant, { ...agent, message: "Hello." });
+		const threadId = first[0]?.type === "thread" ? first[0].threadId : "";
+		await chat(assistant, { ...agent, threadId, message: "Again." });
+		expect(goose.calls[1]?.resumeSessionId).toBe("fake-session-1");
+		await chat(assistant, { ...agent, model: "b", threadId, message: "Now." });
+		expect(goose.calls[2]?.resumeSessionId).toBeUndefined();
+		expect(goose.calls[2]?.model).toBe("b");
+		expect(goose.calls[2]?.prompt).toContain("Hello.");
+		expect(goose.calls[2]?.prompt).toContain("Again.");
+	});
+
+	test("a harness the person picks that cannot use the chat's tools: says which to choose", async () => {
+		const assistant = createAssistant(
+			deps({ harnessFor: () => fakeHarness(), installed: () => true }),
+		);
+		expect(await chat(assistant, { harness: "pi", model: "m" })).toEqual([
+			{
+				type: "error",
+				message:
+					"The chat cannot use pi: it cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode for the chat.",
+			},
+		]);
 	});
 
 	test("a profile whose agent cannot use the chat's tools: says which to choose", async () => {

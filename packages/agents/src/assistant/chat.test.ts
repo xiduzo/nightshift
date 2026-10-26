@@ -7,7 +7,12 @@ import {
 } from "@nightshift/flows";
 import type { BridgedTool } from "../port";
 import { fakeHarness } from "../testing/fake";
-import { type ChatTurnEvent, chatCanUseTools, chatTurn } from "./chat";
+import {
+	type ChatTurnEvent,
+	chatCanUseTools,
+	chatTurn,
+	resumesOnAnotherModel,
+} from "./chat";
 import {
 	AUTHORING_TOOLS,
 	type AuthoringPort,
@@ -332,6 +337,32 @@ describe("chatTurn", () => {
 		expect(input?.prompt).toContain("This chat is about run r1");
 		expect(input?.prompt).not.toContain("# Writing Night Shift flows");
 		expect(input?.tools?.map((t) => t.name)).toContain("get_run");
+	});
+
+	test("a new session of a chat on another agent gets the chat so far", async () => {
+		const harness = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
+		const { propose: _p, ...rest } = port();
+		await turn({
+			request: request({ message: "Then add it." }),
+			harness,
+			profile: { model: "haiku" },
+			cwd: "/repo",
+			port: rest,
+			history: [{ message: "What is missing?", answer: "A lint step." }],
+			signal: new AbortController().signal,
+		});
+		const prompt = harness.calls[0]?.prompt ?? "";
+		expect(prompt).toContain("# The chat so far");
+		expect(prompt.indexOf("What is missing?")).toBeLessThan(
+			prompt.indexOf("Then add it."),
+		);
+		expect(prompt).toContain("A lint step.");
+	});
+
+	test("which harnesses resume on another model", () => {
+		expect(resumesOnAnotherModel("claude-code")).toBe(true);
+		expect(resumesOnAnotherModel("acp:goose")).toBe(false);
+		expect(resumesOnAnotherModel("gemini")).toBe(false);
 	});
 
 	test("which harnesses a chat can run on", () => {

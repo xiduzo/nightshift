@@ -178,7 +178,7 @@ const sum = (a: AssistantUsage, b: AssistantUsage): AssistantUsage => {
 
 export type SuggestFieldInput = {
 	request: SuggestionRequest;
-	/** The harness of the profile, as this computer runs it. */
+	/** The harness that answers, as this computer runs it. */
 	harness: AgentHarness;
 	profile: Pick<AgentProfileSettings, "model" | "effort">;
 	/** The project's Clone on this computer. */

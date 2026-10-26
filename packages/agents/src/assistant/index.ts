@@ -6,8 +6,13 @@
  * The same tools for an agent in a terminal (`terminalTools`), served over
  * MCP by `nightshift mcp` (`serveTools`).
  */
-export { chatCanUseTools, chatTurn } from "./chat";
+export {
+	chatCanUseTools,
+	chatTurn,
+	resumesOnAnotherModel,
+} from "./chat";
 export { serveTools } from "./mcp";
+export type { ChatExchange } from "./prompts";
 export { type SuggestFieldInput, suggestField } from "./suggest";
 export {
 	type TerminalPort,

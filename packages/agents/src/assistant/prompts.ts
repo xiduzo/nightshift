@@ -330,7 +330,32 @@ export type ChatPromptInput = {
 	message: string;
 	/** The chat is about this run of the flow. */
 	runId?: string;
+	/** The chat so far, with another agent: its messages and answers, oldest first. */
+	history?: readonly ChatExchange[];
 };
+
+/** One message of the person in a chat, and the answer to it. */
+export type ChatExchange = { message: string; answer: string };
+
+/** The chat so far, for a new session that takes it over. */
+function chatHistory(history: readonly ChatExchange[]): string[] {
+	return [
+		"# The chat so far",
+		"",
+		"The person chatted with another agent about this flow before. Continue that chat: this is what they said and what the agent answered, oldest first. The draft may have changed since: call `get_draft`.",
+		"",
+		...history.flatMap((exchange) => [
+			"## The person",
+			"",
+			exchange.message,
+			"",
+			"## The agent",
+			"",
+			exchange.answer.trim() || "(No answer.)",
+			"",
+		]),
+	];
+}
 
 function runTask(runId: string): string[] {
 	return [
@@ -361,6 +386,7 @@ export function chatPrompt(input: ChatPromptInput): string {
 		draftSummary(input.flow),
 		"",
 		...(input.runId ? runTask(input.runId) : []),
+		...(input.history ? chatHistory(input.history) : []),
 		"# The person's message",
 		"",
 		input.message,

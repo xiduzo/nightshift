@@ -1,6 +1,7 @@
 /**
- * The assistant's design-time session: one harness session on an Agent
- * Profile, in a project's Clone, read only. Generic: it knows nothing of
+ * The assistant's design-time session: one harness session on the agent
+ * the person picked (an Agent Profile, or a harness and model), in a
+ * project's Clone, read only. Generic: it knows nothing of
  * suggestions or chats. A suggestion asks for a step report with an output
  * schema; a chat resumes the session per message and adds its own tools.
  *
@@ -19,12 +20,13 @@ import { settleCost } from "../pricing";
 import { activityOf } from "./activity";
 
 export type AssistantSessionInput = {
-	/** The harness of the profile (`profile.harness`), as this computer runs it. */
+	/** The harness that answers, as this computer runs it. */
 	harness: AgentHarness;
 	/**
-	 * The profile's model and effort. Its permission mode, CLI tools and
-	 * connections are not used: the session reads the project and changes
-	 * nothing.
+	 * The model and effort: a profile's, with the person's overrides, or
+	 * the ones the person picked. Nothing else of a profile is used (its
+	 * permission mode, CLI tools, connections): the session reads the
+	 * project and changes nothing.
 	 */
 	profile: Pick<AgentProfileSettings, "model" | "effort">;
 	/** The project's Clone on this computer. */
@@ -77,8 +79,8 @@ export function sessionErrorMessage(
 			return "Stopped.";
 		case "usage-limit":
 			return resetAt
-				? `This profile reached its usage limit until ${new Date(resetAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}. Try again then, or pick another profile.`
-				: "This profile reached its usage limit. Try again later, or pick another profile.";
+				? `This agent reached its usage limit until ${new Date(resetAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}. Try again then, or choose another agent.`
+				: "This agent reached its usage limit. Try again later, or choose another agent.";
 		case "network":
 			return "Night Shift could not reach the model. Check the internet connection, then try again.";
 		default:
