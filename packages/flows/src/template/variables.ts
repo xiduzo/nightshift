@@ -133,17 +133,35 @@ export type VariableResult =
 	| { ok: true; values: Record<string, JsonValue> }
 	| { ok: false; error: string };
 
+/** The values a flow starts with, and which of them an earlier run kept. */
+export type InitialResult =
+	| { ok: true; values: Record<string, JsonValue>; kept: string[] }
+	| { ok: false; error: string };
+
 /**
  * The flow's variables when it starts: each `initial` rendered over the
- * inputs and `run` (no node ran yet), read as its type. Unset: null.
+ * inputs and `run` (no node ran yet), read as its type. Unset: null. A
+ * kept variable (`keep`) with a value in `kept` starts from that value
+ * instead, when it still fits the type and schema: a flow edited since
+ * the value was kept falls back to `initial`.
  */
 export function initialVariables(
 	flow: Pick<Flow, "variables">,
 	context: TemplateContext,
 	checkSchema?: SchemaCheck,
-): VariableResult {
+	kept: Readonly<Record<string, JsonValue>> = {},
+): InitialResult {
 	const values: Record<string, JsonValue> = {};
+	const fromKept: string[] = [];
 	for (const def of flow.variables ?? []) {
+		if (def.keep !== undefined && Object.hasOwn(kept, def.name)) {
+			const fitted = fit(def, kept[def.name] ?? null, false, checkSchema);
+			if (fitted.ok) {
+				values[def.name] = fitted.value;
+				fromKept.push(def.name);
+				continue;
+			}
+		}
 		if (def.initial === undefined || def.initial.trim() === "") {
 			values[def.name] = null;
 			continue;
@@ -155,7 +173,7 @@ export function initialVariables(
 		}
 		values[def.name] = fitted.value;
 	}
-	return { ok: true, values };
+	return { ok: true, values, kept: fromKept };
 }
 
 /** Whether the write applies when the step ends with `outcome`. */

@@ -86,6 +86,56 @@ describe("initialVariables", () => {
 				branch: "on nightshift/fix",
 				summary: null,
 			},
+			kept: [],
+		});
+	});
+
+	test("a kept variable starts from its kept value, the rest from initial", () => {
+		const result = initialVariables(
+			{
+				variables: [
+					{ name: "skipped", type: "json", initial: "[]", keep: "project" },
+					{ name: "tries", type: "number", initial: "0" },
+					{ name: "last", type: "text", keep: "project" },
+				],
+			},
+			{ nodes: {}, inputs: {}, run },
+			undefined,
+			// `tries` is not kept, so its old value does not count.
+			{ skipped: [12, 14], tries: 5 },
+		);
+		expect(result).toEqual({
+			ok: true,
+			values: { skipped: [12, 14], tries: 0, last: null },
+			kept: ["skipped"],
+		});
+	});
+
+	test("a kept value that no longer fits starts from initial", () => {
+		const result = initialVariables(
+			{
+				variables: [
+					{ name: "count", type: "number", initial: "1", keep: "project" },
+					{
+						name: "seen",
+						type: "json",
+						initial: "[]",
+						keep: "project",
+						schema: { type: "array" },
+					},
+				],
+			},
+			{ nodes: {}, inputs: {}, run },
+			(schema, value) =>
+				schema.type === "array" && !Array.isArray(value)
+					? "must be array"
+					: null,
+			{ count: "many", seen: { a: 1 } },
+		);
+		expect(result).toEqual({
+			ok: true,
+			values: { count: 1, seen: [] },
+			kept: [],
 		});
 	});
 

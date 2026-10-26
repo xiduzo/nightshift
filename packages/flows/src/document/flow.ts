@@ -110,10 +110,17 @@ export const flowOutputSchema = z.object({
 export const variableTypeSchema = z.enum(["text", "number", "boolean", "json"]);
 
 /**
+ * Where a kept variable lives between runs. `project`: one value per flow
+ * and variable in the project, on the computer that runs the flow.
+ */
+const variableKeepSchema = z.enum(["project"]);
+
+/**
  * A named, typed value the flow keeps while it runs, like a local variable
  * of a function. Each invocation of the flow (a run's top-level flow, a
  * Call, each element of a Call with `each`) has its own. Nodes read it as
- * `{{vars.<name>}}` and change it with `set`.
+ * `{{vars.<name>}}` and change it with `set`. A kept variable (`keep`)
+ * also lives on between runs.
  */
 export const flowVariableSchema = z.object({
 	name: nameSchema,
@@ -126,6 +133,13 @@ export const flowVariableSchema = z.object({
 	 */
 	initial: z.string().optional(),
 	description: z.string().optional(),
+	/**
+	 * Keep the value between runs. A run starts from the value the last
+	 * write of this flow in this project left, else from `initial`; each
+	 * write saves it. A called flow keeps its own. Unset: every run starts
+	 * from `initial`.
+	 */
+	keep: variableKeepSchema.optional(),
 });
 
 /**

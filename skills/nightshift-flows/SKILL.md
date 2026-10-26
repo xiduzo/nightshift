@@ -39,7 +39,7 @@ A flow is a directed graph of nodes and edges, saved as `.nightshift/flows/<name
 
 - `inputs`: `{ name, type: "text" | "json", label?, description?, default?, required? }`. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
-- `variables`: `{ name, type, initial?, schema?, description? }`, `type` one of `text`, `number`, `boolean`, `json`.
+- `variables`: `{ name, type, initial?, schema?, description?, keep? }`, `type` one of `text`, `number`, `boolean`, `json`.
 - `policy`: optional. `maxSteps` caps the steps of a run.
 - `sections`: frames in the editor only, see below.
 
@@ -127,6 +127,8 @@ Rules (a Decision's `when`, a Value's `expression`, a write's `expression`) are 
 ## Variables
 
 A variable is a named, typed value the flow keeps while it runs. Declare it in `variables`. `initial` is a template over the inputs and `run` only. Read it as `{{vars.name}}`. A node changes it with `set`, a list of `{ variable, value | expression, on? }`: exactly one of `value` (a template) or `expression` (JSONata), and `on` lists the outcomes that write (unset: every outcome). Writes apply in order when the step ends. The node's own id reads the step that just ended. Each flow, each Subflow and each element of a Subflow with `each` has its own variables. A value that does not fit the type ends the step with an error.
+
+`"keep": "project"` keeps a variable between runs: memory for the next run, such as the issues a flow skipped. A run starts from the value the last write of this flow left in this project, else from `initial`. Each write saves it. A Subflow keeps its own, by its flow name. A kept value that no longer fits the type starts from `initial`. A person can reset a kept value on the flow's page. Check for duplicates with JSONata over the list: `item.number in vars.skipped`.
 
 ## Schedules and webhooks
 

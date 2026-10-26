@@ -2498,4 +2498,34 @@ describe("validateFlow: variables", () => {
 			'The variable "idle" is never set or read. Set it on a node, or remove it.',
 		]);
 	});
+
+	test("a kept variable that no node sets is a warning", () => {
+		const kept = (keep: boolean) =>
+			warnings(
+				validateFlow(
+					withVariables({ check: { set: [] } }, [
+						{
+							name: "failures",
+							type: "json",
+							initial: "[]",
+							...(keep ? { keep: "project" as const } : {}),
+						},
+					]),
+				),
+			).map((issue) => issue.message);
+		expect(kept(false)).toEqual([]);
+		expect(kept(true)).toEqual([
+			'The variable "failures" is kept between runs, but no node sets it. Set it on a node, or stop keeping it.',
+		]);
+		// Set on a node: no warning.
+		expect(
+			warnings(
+				validateFlow(
+					withVariables({}, [
+						{ name: "failures", type: "json", initial: "[]", keep: "project" },
+					]),
+				),
+			),
+		).toEqual([]);
+	});
 });

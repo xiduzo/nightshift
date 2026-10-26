@@ -157,14 +157,25 @@ export function checkWrites(node: FlowNode, scope: Scope, error: Report): void {
 	}
 }
 
-/** A variable that no node writes and nothing reads does nothing. */
+/**
+ * A variable that no node writes and nothing reads does nothing. A kept
+ * variable that no node writes keeps nothing: every run starts from its
+ * initial value.
+ */
 export function checkUnusedVariables(scope: Scope, warning: Report): void {
 	const written = new Set<string>();
 	for (const node of scope.nodes.values()) {
 		for (const write of node.set ?? []) written.add(write.variable);
 	}
 	for (const variable of scope.flow.variables ?? []) {
-		if (written.has(variable.name) || scope.readVars.has(variable.name)) {
+		if (written.has(variable.name)) continue;
+		if (scope.readVars.has(variable.name)) {
+			if (variable.keep !== undefined) {
+				warning(
+					`The variable "${variable.name}" is kept between runs, but no node sets it. Set it on a node, or stop keeping it.`,
+					{},
+				);
+			}
 			continue;
 		}
 		warning(
