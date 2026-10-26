@@ -133,6 +133,15 @@ function validateIn(
 			error(`Edge "${edge.id}" leaves unknown node "${edge.from}".`, {
 				edgeId: edge.id,
 			});
+		} else if (
+			source.type === "agent" &&
+			source.ask === "person" &&
+			edge.outcome === "needs-input"
+		) {
+			error(
+				`Edge "${edge.id}" leaves "${edge.from}" on "needs-input", but that agent asks a person when it needs input and takes no edge. Remove the edge, or let the agent end on needs-input.`,
+				{ edgeId: edge.id },
+			);
 		} else if (!nodeOutcomes(source).includes(edge.outcome)) {
 			error(
 				`Edge "${edge.id}" leaves "${edge.from}" on "${edge.outcome}", but ${describeNode(source)} ends with ${nodeOutcomes(source).join(", ")}.`,

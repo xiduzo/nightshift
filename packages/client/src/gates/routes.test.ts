@@ -52,6 +52,28 @@ describe("choiceRoutes", () => {
 		expect(routes.get("retry")).toEqual({ kind: "limit" });
 	});
 
+	test("an Agent that asks: the answer goes back to it, stop takes its fail edge", () => {
+		const asks = run({
+			flow: {
+				nodes: [{ id: "build", type: "agent" }, { id: "plan" }],
+				edges: [{ id: "e1", from: "build", outcome: "fail", to: "plan" }],
+			},
+			steps: [{ id: "s1", nodeId: "build", scope: null }],
+		} as unknown as Partial<RunDetail>);
+		const routes = choiceRoutes(
+			asks,
+			{ stepId: "s1", nodeId: "build" },
+			[{ name: "answer", needsNote: true }, { name: "stop" }],
+			labels,
+		);
+		expect(routes.has("answer")).toBe(false);
+		expect(routes.get("stop")).toEqual({
+			kind: "node",
+			nodeId: "plan",
+			label: "Plan",
+		});
+	});
+
 	test("a node without a label goes by its id", () => {
 		const routes = choiceRoutes(run(), gate, [{ name: "approve" }], new Map());
 		expect(routes.get("approve")).toMatchObject({ label: "build" });

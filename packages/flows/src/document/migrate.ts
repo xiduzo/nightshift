@@ -31,6 +31,8 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
  *   Value by a rule: only a model reads them (`dropUnreadDeciders`).
  * - A list source `kind: "files"` → a `command` source that asks
  *   `git ls-files` for the same items (`migrateFilesSource`).
+ * - Agent nodes (`migrateAgentNode`): `checker` and `mcpServers` go, and
+ *   `nodeClis` joins `clis`.
  *
 
  * Any version:
@@ -71,7 +73,9 @@ export function migrateV5(
 	json: Record<string, unknown>,
 ): Record<string, unknown> {
 	const nodes = Array.isArray(json.nodes)
-		? json.nodes.map((node) => migrateFilesSource(dropUnreadDeciders(node)))
+		? json.nodes.map((node) =>
+				migrateAgentNode(migrateFilesSource(dropUnreadDeciders(node))),
+			)
 		: json.nodes;
 	return {
 		...json,
@@ -113,6 +117,31 @@ function migrateFilesSource(json: unknown): unknown {
 			source: { kind: "command", command: gitFilesCommand(source.glob) },
 		},
 	};
+}
+
+/**
+ * An Agent node loses `checker`: a Decision by a model after the Agent does
+ * its job. It loses `mcpServers`: Connections give an Agent its MCP
+ * servers, and keep their secrets off the flow file. `nodeClis` joins
+ * `clis`: one list of the programs the agent may run, the node's CLI tools
+ * first. Returns the input unchanged when it is any other node.
+ */
+function migrateAgentNode(json: unknown): unknown {
+	if (!isRecord(json) || json.type !== "agent") return json;
+	const {
+		checker: _checker,
+		mcpServers: _mcpServers,
+		nodeClis,
+		...rest
+	} = json;
+	const names = (value: unknown) =>
+		Array.isArray(value)
+			? value.filter((name): name is string => typeof name === "string")
+			: [];
+	const clis = [...new Set([...names(rest.clis), ...names(nodeClis)])];
+	if (clis.length > 0) return { ...rest, clis };
+	const { clis: _clis, ...without } = rest;
+	return without;
 }
 
 /**

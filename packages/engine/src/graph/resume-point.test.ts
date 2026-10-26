@@ -661,6 +661,55 @@ describe("resumePoint", () => {
 		});
 	});
 
+	describe("after an answer at an Agent's Gate (pending gate with an answer)", () => {
+		const answered = (stepId: string): Pending => ({
+			kind: "gate",
+			stepId,
+			nodeId: NODE.id,
+			visit: 1,
+			question: "Which one?",
+			choices: [{ name: "answer", needsNote: true }, { name: "stop" }],
+			answer: "Use Postgres.",
+		});
+
+		test("the Gate is still asked: the step is reopened and its session goes on with the answer", () => {
+			const events = logOf(
+				started("s1"),
+				...session("s1", "h1"),
+				gateOpened("s1"),
+			);
+			expectTable(
+				{ state: stateOf({ pending: answered("s1") }), events },
+				all({
+					kind: "reopen",
+					stepId: "s1",
+					harnessSessionId: "h1",
+					prompt: "Use Postgres.",
+				}),
+			);
+		});
+
+		test("the answer went once already (the daemon died after): the latest resume's prompt", () => {
+			const events = logOf(
+				started("s1"),
+				...session("s1", "h1"),
+				gateOpened("s1"),
+				{ type: "StepReopened", stepId: "s1", payload: { prompt: "x" } },
+				ended("s1", "interrupted"),
+				resumed("s1", "Night Shift restarted."),
+			);
+			expectTable(
+				{ state: stateOf({ pending: answered("s1") }), events },
+				all({
+					kind: "reopen",
+					stepId: "s1",
+					harnessSessionId: "h1",
+					prompt: "Night Shift restarted.",
+				}),
+			);
+		});
+	});
+
 	test("entryOf maps the point onto beginStep's StepStart, prompt and all", () => {
 		const point = (...args: Parameters<typeof resumePoint>): StepEntry => {
 			const found = resumePoint(...args);

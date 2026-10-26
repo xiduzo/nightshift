@@ -39,8 +39,7 @@ import type { FlowIssue } from "../validate";
  * What a suggestion fills in. Of a node: its prompt, its output schema, its
  * variable writes (`set`), an Agent's own outcomes or a Decision's options
  * (`outcomes`), a Decision's rules, a Value's expression, a Command's or a
- * Wait's command, an Agent checker's brief (`checker`), a Tool's
- * arguments. Of the flow: its description and its inputs.
+ * Wait's command, a Tool's arguments. Of the flow: its description and its inputs.
  */
 export const suggestionKinds = [
 	"prompt",
@@ -50,7 +49,6 @@ export const suggestionKinds = [
 	"rules",
 	"expression",
 	"command",
-	"checker",
 	"arguments",
 	"description",
 	"inputs",
@@ -190,12 +188,6 @@ export const suggestionSchema = z.discriminatedUnion("kind", [
 		kind: z.literal("command"),
 		/** A Command node's command, or the command a Wait node runs until it passes. */
 		command: z.string(),
-		note: z.string(),
-	}),
-	z.object({
-		kind: z.literal("checker"),
-		/** What the model that picks an Agent's outcome looks for. */
-		text: z.string(),
 		note: z.string(),
 	}),
 	z.object({

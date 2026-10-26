@@ -50,6 +50,12 @@ import type { StepStart } from "./step-runner";
  *    is reopened when recovery ended it meanwhile (the daemon died after the
  *    wake). The prompt is the latest `RunResumed` for the step, else the
  *    wait's own follow-up.
+ * 1b. `pending` is this node's Gate that a person answered (an Agent that
+ *    asks, `PendingGate.answer`): the step it names is reopened, so the
+ *    Gate closes in the log, and its harness session goes on with the
+ *    answer. The answer goes once: when the step was reopened since or
+ *    ended (the daemon died after the answer), the prompt is the latest
+ *    `RunResumed` for the step, else "Continue where you left off.".
  * 2. `pending` is this node's parked step and a person resumed: the step is
  *    taken up (reopened) when the rules say so (`parked`), else a new visit.
  *    The prompt is the resume's, else "Continue where you left off.".
@@ -155,6 +161,18 @@ export function resumePoint(
 			continued: prompt,
 			reopened: resumePromptOf(events, own) ?? prompt,
 		});
+	}
+
+	if (held?.pending.kind === "gate" && held.pending.answer !== undefined) {
+		const own = held.step;
+		if (!own) return { kind: "new" };
+		return reopen(
+			own,
+			sessionOf(own),
+			gateAsked(own)
+				? held.pending.answer
+				: (resumePromptOf(events, own) ?? DEFAULT_RESUME_PROMPT),
+		);
 	}
 
 	if (held?.pending.kind === "parked") {

@@ -44,7 +44,6 @@ export {
 export type { KeyStoreKind } from "./keychain";
 export { valueStore } from "./keychain";
 export type { McpExpansion } from "./mcp";
-export { expandMcpServers } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { createProfileStore } from "./profiles";
 export type {

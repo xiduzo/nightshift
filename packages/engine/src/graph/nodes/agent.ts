@@ -13,7 +13,6 @@ import {
 	type FlowNode,
 	type JsonValue,
 	type Outcome,
-	optionProblem,
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
@@ -38,17 +37,14 @@ import {
 	type StepContext,
 	stepFailure,
 } from "../context";
-import {
-	deciderCostSource,
-	sessionCostUnknown,
-	warnDeciderCost,
-} from "../cost";
+import { sessionCostUnknown } from "../cost";
 import { checkOutputData, normalizeOutputData } from "../output-schema";
 import { RESUME_RULES, rerunEntryOf, type StepEntry } from "../resume-point";
 import { scopeOf } from "../route";
+import { heldStep } from "../run-position";
 import type { RunStateValues } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
-import { decideWithin } from "./choosers/model";
+import { ASK_CHOICES, agentAskNode } from "./agent-ask";
 
 /**
  * The Agent node: one harness session per visit, ported from `runAgentStep`
@@ -69,7 +65,10 @@ import { decideWithin } from "./choosers/model";
  * through the step's session record, and the step's end from the report. A
  * usage limit or a network failure is a wait request; the runner plans the
  * wait and parks at the wait node (`wait__<id>`, the shared `waitNode`), or
- * ends the step `error` on a give-up.
+ * ends the step `error` on a give-up. With `ask: "person"` a report of
+ * `needs-input` asks a person instead (`agent-ask.ts`): the runner opens a
+ * Gate on the open step, and the answer reopens it with the note as the
+ * prompt.
  *
  * Over 600 lines on purpose: one file per node type (STRUCTURE.md, section
  * 4), and `runSession` is one harness session from its start to its end.
@@ -85,7 +84,14 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 					entry.kind === "new"
 						? rerunEntryOf(node, step.events, scopeOf(config))
 						: undefined;
+				// The person's answer at the agent's Gate, when this entry goes on from it.
+				const asked = heldStep(state, node.id);
+				const answer =
+					asked?.kind === "gate" && asked.answer !== undefined
+						? asked.answer
+						: null;
 				return runSession(ctx, node, step, {
+					note: answer,
 					prompt:
 						rerun !== undefined
 							? (rerun?.prompt ?? null)
@@ -110,30 +116,11 @@ export function isOwnAgentLabel(node: AgentNode, outcome: Outcome): boolean {
 	);
 }
 
-/** Agent nodes name CLI tools the Device defines. */
-export const cliToolsDefined: Requirement<AgentNode> = (nodes, has) => {
-	const unknown = missingNames(
-		nodes,
-		(node) => node.clis ?? [],
-		new Set(has.clis),
-	);
-	if (unknown.length === 0) return null;
-	return unknown
-		.map(
-			({ name, nodeIds }) =>
-				`The flow uses the CLI tool "${name}" (${nodeIds.join(", ")}), but no CLI tool has that name${onDevice(has)}. Add it under Agents → Tools.`,
-		)
-		.join(" ");
-};
-
 /** Every CLI tool an Agent node uses is on the Device. */
 export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
-	const notFound = [
-		...new Set(
-			// A node's own CLI tools need no definition, but the Device must have them.
-			nodes.flatMap(programsOf),
-		),
-	].filter((name) => (has.programs[name] ?? null) === null);
+	const notFound = [...new Set(nodes.flatMap(programsOf))].filter(
+		(name) => (has.programs[name] ?? null) === null,
+	);
 	if (notFound.length === 0) return null;
 	return notFound
 		.map((name) =>
@@ -144,9 +131,12 @@ export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
 		.join(" ");
 };
 
-/** The programs an Agent node's agent may run: its CLI tools and its own. */
+/**
+ * The programs an Agent node's agent may run: its CLI tools. One the
+ * Device defines brings its login; any other only needs to be there.
+ */
 function programsOf(node: AgentNode): string[] {
-	return [...(node.clis ?? []), ...(node.nodeClis ?? [])];
+	return node.clis ?? [];
 }
 
 /** Agent nodes run on harnesses the Device has added. */
@@ -160,12 +150,6 @@ export const harnessesAdded: Requirement<AgentNode> = (nodes, has) => {
 		)
 		.join(" ");
 };
-
-/** An Agent node's checker needs the decider. */
-export const checkersHaveDecider: Requirement<AgentNode> = (nodes, has) =>
-	!has.decider && nodes.some((n) => n.checker !== undefined)
-		? `The flow has an Agent node with a checker, but no decider is configured${onDevice(has)}.`
-		: null;
 
 /** The harnesses the Agent nodes name that the Device has not added, with their nodes. */
 function missingHarnesses(
@@ -204,9 +188,9 @@ export function missingNames<N extends FlowNode>(
 /**
  * The Agent kind. A wait node for the policy's waits; `pass` and the
  * node's own outcomes are chosen ends, and an own outcome is the label a
- * Call reports; the idle timer is this kind's alone; the Device must have
- * its connections, CLI tools (defined and installed), harness and, for a
- * checker, the decider.
+ * Call reports; the idle timer is this kind's alone; an Agent that asks a
+ * person has an ask node for its Gate; the Device must have its
+ * connections, CLI tools and harness.
  */
 export const AGENT: NodeKind<AgentNode> = {
 	...PLAIN_KIND,
@@ -214,7 +198,10 @@ export const AGENT: NodeKind<AgentNode> = {
 	make: agentNode,
 	works: () => "worktree",
 	resumeRules: () => RESUME_RULES.agent,
-	aux: () => [{ kind: "wait" }],
+	aux: (node) =>
+		node.ask === "person"
+			? [{ kind: "wait" }, { kind: "ask", make: agentAskNode }]
+			: [{ kind: "wait" }],
 	isChosenEnd: (node, outcome) =>
 		outcome === "pass" || isOwnAgentLabel(node, outcome),
 	endedLabel: (node, outcome) =>
@@ -225,12 +212,7 @@ export const AGENT: NodeKind<AgentNode> = {
 	}),
 	connections: (node) => node.connections ?? [],
 	programs: programsOf,
-	requirements: [
-		cliToolsDefined,
-		cliToolsInstalled,
-		harnessesAdded,
-		checkersHaveDecider,
-	],
+	requirements: [cliToolsInstalled, harnessesAdded],
 };
 
 /**
@@ -270,57 +252,52 @@ function lastSessionOf(
 
 const BUILT_IN_AGENT_OUTCOMES = ["pass", "fail", "needs-input"];
 
-/** The outcomes an Agent node may report. */
+/** The outcomes an Agent node may report: with `ask`, `needs-input` too. */
 function agentOutcomes(node: AgentNode): string[] {
-	return node.outcomes?.map((o) => o.name) ?? BUILT_IN_AGENT_OUTCOMES;
-}
-
-/** The built-in outcomes as a checker sees them. */
-const BUILT_IN_CHECK_OUTCOMES = [
-	{ name: "pass", description: "The task is done." },
-	{ name: "fail", description: "The task is not done." },
-	{
-		name: "needs-input",
-		description: "A person must decide or provide something first.",
-	},
-];
-
-/** The outcomes a checker picks from: name and description only. */
-function checkOutcomes(
-	node: AgentNode,
-): { name: string; description?: string }[] {
-	return (
-		node.outcomes?.map((o) =>
-			o.description === undefined
-				? { name: o.name }
-				: { name: o.name, description: o.description },
-		) ?? BUILT_IN_CHECK_OUTCOMES
-	);
+	const own = node.outcomes?.map((o) => o.name) ?? BUILT_IN_AGENT_OUTCOMES;
+	return node.ask === "person" && !own.includes("needs-input")
+		? [...own, "needs-input"]
+		: own;
 }
 
 /**
+ * The outcome an agent that asks a person reports for its questions, next
+ * to its own outcomes.
+ */
+const ASK_OUTCOME = {
+	name: "needs-input",
+	description:
+		"You need a person to answer before you can go on. Put your questions in your final message.",
+};
+
+/**
  * What the harness asks the agent to report: a spec for own outcomes or an
- * output schema. With a checker the agent reports no outcome: the checker
- * picks it.
+ * output schema. An agent that asks a person may report `needs-input` too,
+ * with the description that tells it where its questions go.
  */
 function stepReportOf(node: AgentNode): AgentSessionInput["stepReport"] {
-	if (node.checker) {
-		return node.output
-			? { outcome: false, output: node.output }
-			: { outcome: false };
-	}
-	if (!node.outcomes && !node.output) return true;
+	if (!node.outcomes && !node.output && node.ask === undefined) return true;
 	const spec: StepReportSpec = {};
-	if (node.outcomes) {
-		spec.outcomes = node.outcomes.map((o) =>
+	if (node.outcomes || node.ask === "person") {
+		const own = (node.outcomes ?? BUILT_IN_OUTCOMES).map((o) =>
 			o.description === undefined
 				? { name: o.name }
 				: { name: o.name, description: o.description },
 		);
+		spec.outcomes =
+			node.ask === "person"
+				? [...own.filter((o) => o.name !== ASK_OUTCOME.name), ASK_OUTCOME]
+				: own;
 	}
 	if (node.output) spec.output = node.output;
 	return spec;
 }
+
+/** The built-in outcomes, as an agent that asks a person reads them. */
+const BUILT_IN_OUTCOMES = [
+	{ name: "pass", description: "The task is done." },
+	{ name: "fail", description: "The task is not done." },
+];
 
 type AgentReport = {
 	outcome: StepReportOutcome;
@@ -344,7 +321,12 @@ async function runSession(
 	ctx: StepContext,
 	node: AgentNode,
 	step: StepHandle,
-	input: { prompt: string | null; resumeSessionId: string | null },
+	input: {
+		prompt: string | null;
+		resumeSessionId: string | null;
+		/** The person's answer this session goes on with, when it does (`ask`). */
+		note: string | null;
+	},
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const { resumeSessionId } = input;
@@ -374,9 +356,9 @@ async function runSession(
 			null,
 		);
 	}
-	// The node's connections and its own servers go to the Device by name,
-	// with `${NAME}` as written: the Device fills them in, and the values go
-	// to the harness only, never into the log. The log keeps the node's
+	// The node's connections go to the Device by name, with `${NAME}` as
+	// written: the Device fills them in, and the values go to the harness
+	// only, never into the log. The log keeps the node's
 	// prompt only, like the report instruction the harness adds; a new
 	// session learns its CLI tools from the Device after the prompt.
 	const clis = [...new Set(programsOf(node))];
@@ -399,7 +381,6 @@ async function runSession(
 						effort: agent.effort,
 						...(clis.length > 0 ? { clis } : {}),
 						...(node.connections ? { connections: node.connections } : {}),
-						...(node.mcpServers ? { mcpServers: node.mcpServers } : {}),
 					}
 				: {
 						...common,
@@ -595,6 +576,7 @@ async function runSession(
 		output,
 		summary: finalReport?.summary || output,
 		session_id: harnessSessionId ?? "",
+		...(input.note !== null ? { note: input.note } : {}),
 	};
 	if (finalReport?.data !== undefined) {
 		outputs.data = finalReport.data as JsonValue;
@@ -611,24 +593,21 @@ async function runSession(
 	}
 	const stepError = (error: string) =>
 		end("error", { ...outputs, outcome: "error" }, error, harnessSessionId);
-	if (node.checker && (finalReport || final.outcome === "finished")) {
-		if (node.output) {
-			if (!finalReport) {
-				return stepError(
-					"The agent finished with no step report, so it gave no data for the output schema.",
-				);
-			}
-			const problem = checkOutputData(node.output, finalReport.data);
-			if (problem) return stepError(problem);
-		}
-		return checkOutcome(node, step, outputs, harnessSessionId);
-	}
 	if (finalReport) {
 		const outcomes = agentOutcomes(node);
 		if (!outcomes.includes(finalReport.outcome)) {
 			return stepError(
 				`The agent reported "${finalReport.outcome}", which is not an outcome of this node. Its outcomes are: ${outcomes.join(", ")}.`,
 			);
+		}
+		// It asks a person: no edge, a Gate. Its data may wait for the answer.
+		if (node.ask === "person" && finalReport.outcome === ASK_OUTCOME.name) {
+			return {
+				kind: "ask",
+				question: askQuestion(finalReport.summary, output),
+				choices: [...ASK_CHOICES],
+				outputs: { ...outputs, outcome: ASK_OUTCOME.name },
+			};
 		}
 		if (node.output) {
 			const problem = checkOutputData(node.output, finalReport.data);
@@ -662,105 +641,14 @@ async function runSession(
 	);
 }
 
-/** What the checker reads when its prompt is empty. */
-const DEFAULT_CHECK_BRIEF =
-	"Read what the agent did, then pick the outcome that fits its result.";
-
 /**
- * The checker of an Agent node: after the session, its decider reads the
- * agent's task, summary, final message and data, and picks one of the
- * node's outcomes. The transcript gets `decision-start` and `decision` as
- * for a Decision decided by a model; the checker's reasons are the `note`
- * output and its cost goes on `StepEnded`. A usage limit or a network
- * failure of the checker fails the step: waiting would run the agent again.
+ * What the Gate of an agent that asks shows: its summary, then its final
+ * message, where its questions are, when that says more.
  */
-async function checkOutcome(
-	node: AgentNode,
-	step: StepHandle,
-	outputs: StepOutputs,
-	harnessSessionId: string | null,
-): Promise<BodyResult> {
-	const checker = node.checker as NonNullable<AgentNode["checker"]>;
-	const { signal } = step;
-	const options = checkOutcomes(node);
-	const task = renderTemplate(node.prompt, step.tctx);
-	const brief = checker.prompt
-		? renderTemplate(checker.prompt, step.tctx).trim()
-		: "";
-	const sections = [
-		brief || DEFAULT_CHECK_BRIEF,
-		"## The agent's task",
-		node.skill ? `/${node.skill} ${task}`.trim() : task,
-		"## The agent's summary",
-		String(outputs.summary ?? ""),
-		"## The agent's final message",
-		String(outputs.output ?? ""),
-		...(outputs.data !== undefined
-			? ["## The agent's data", JSON.stringify(outputs.data, null, 2)]
-			: []),
-	];
-	const prompt = sections.join("\n\n");
-	const finish = (
-		outcome: string,
-		note: string,
-		error: string | null,
-		cost: Pick<BodyResult & { kind: "end" }, "costUsd" | "costSource">,
-	): BodyResult => ({
-		kind: "end",
-		outcome,
-		outputs: { ...outputs, outcome, note },
-		error,
-		harnessSessionId,
-		...cost,
-	});
-	const decider = (await step.device.capabilities()).decider;
-	if (!decider) {
-		return finish(
-			"error",
-			"",
-			"No decider is configured for the checker of this Agent node.",
-			{ costUsd: null },
-		);
-	}
-	// The Device says which model a checker without one starts on.
-	const model =
-		checker.model ?? decider.defaultModels[checker.decider].decision;
-	step.record(null, {
-		type: "decision-start",
-		prompt,
-		labels: options.map((option) => option.name),
-		model,
-	});
-	const result = await decideWithin(
-		step.device,
-		{ decider: checker.decider, prompt, labels: options, model, signal },
-		signal,
-	);
-	const cost = {
-		costUsd: result.costUsd,
-		costSource: deciderCostSource(result),
-	};
-	await warnDeciderCost(step, cost.costSource, "check", model);
-	if (result.kind === "decided") {
-		step.record(null, {
-			type: "decision",
-			label: result.label,
-			notes: result.notes,
-		});
-	}
-	const note = result.kind === "decided" ? result.notes : "";
-	if (signal.aborted) {
-		return {
-			kind: "aborted",
-			outputs: { ...outputs, note },
-			harnessSessionId,
-			...cost,
-		};
-	}
-	if (result.kind === "error") {
-		return finish("error", note, `The checker failed: ${result.message}`, cost);
-	}
-	const problem = optionProblem(options, result.label);
-	if (problem !== null) return finish("error", note, problem, cost);
-	return finish(result.label, note, null, cost);
+function askQuestion(summary: string, output: string): string {
+	const short = summary.trim();
+	const long = output.trim();
+	if (long === "" || long === short) return short;
+	if (short === "") return long;
+	return `${short}\n\n${long}`;
 }

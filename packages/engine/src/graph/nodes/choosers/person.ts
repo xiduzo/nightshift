@@ -7,6 +7,7 @@ import {
 
 import type { GateChoice } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
+import { openGate } from "../../gate";
 import { interruptNode } from "../../interrupt";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
 import {
@@ -185,8 +186,7 @@ async function ensureOpen(
 }
 
 /**
- * Asks the Gate's question. The fact goes in the log first, so the Gate is
- * open even when the daemon dies before the transcript line is written.
+ * Asks the Gate's question (`openGate`).
  * The step stays open in the log; its recorder and timers close.
  */
 async function open(
@@ -198,18 +198,11 @@ async function open(
 	try {
 		const question = renderTemplate(node.prompt, step.tctx);
 		const choices = gateChoices(node);
-		await ctx.log.append({
-			type: "GateOpened",
-			runId: ctx.run.id,
-			stepId,
-			payload: {
-				question,
-				choices,
-				...(node.lockScreen === true ? { lockScreen: true as const } : {}),
-			},
+		await openGate(ctx, step, {
+			question,
+			choices,
+			lockScreen: node.lockScreen === true,
 		});
-		step.record(null, { type: "gate-open", question, choices });
-		ctx.bus.publish(ctx.run.id, { kind: "step-changed", stepId });
 		return { stepId, visit, question, choices };
 	} finally {
 		step.leaveOpen();

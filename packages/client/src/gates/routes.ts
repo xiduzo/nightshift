@@ -20,24 +20,28 @@ type FlowOfRun = Pick<RunDetail, "flow" | "traversals" | "steps">;
  * Where each choice of a Gate leads, by choice name, by the engine's own
  * edge rule (`nextEdge`). Empty when the run is not loaded, or when the
  * Gate is in a flow that a Call step started: its end goes back to that
- * step, not out of the run.
+ * step, not out of the run. The Gate of an Agent that asks a person: the
+ * answer goes back to the agent (no route), and stop ends the step `fail`.
  */
 export function choiceRoutes(
 	run: FlowOfRun | undefined,
 	gate: { stepId: string; nodeId: string },
-	choices: readonly Pick<GateChoice, "name">[],
+	choices: readonly Pick<GateChoice, "name" | "needsNote">[],
 	labels: ReadonlyMap<string, string>,
 ): Map<string, ChoiceRoute> {
 	const routes = new Map<string, ChoiceRoute>();
 	if (!run) return routes;
 	const step = run.steps.find((one) => one.id === gate.stepId);
 	if (step?.scope) return routes;
-	if (!run.flow.nodes.some((node) => node.id === gate.nodeId)) return routes;
+	const node = run.flow.nodes.find((one) => one.id === gate.nodeId);
+	if (!node) return routes;
+	const asks = node.type === "agent";
 	for (const choice of choices) {
+		if (asks && choice.needsNote) continue;
 		const next = nextEdge({
 			flow: run.flow,
 			from: gate.nodeId,
-			outcome: choice.name,
+			outcome: asks ? "fail" : choice.name,
 			traversals: run.traversals,
 		});
 		routes.set(

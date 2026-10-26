@@ -1,23 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { Command } from "@langchain/langgraph";
-import { defaultDeciderModel } from "@nightshift/agents";
 import {
 	failingScript,
-	fakeDecider,
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/testing";
-import type {
-	AgentHarness,
-	AgentSessionInput,
-	Decider,
-} from "@nightshift/agents/types";
+import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { readTranscriptFile } from "../log/transcripts";
+import { deriveOpenGate } from "../read/derive-run";
 import { deriveSteps } from "../read/derive-steps";
 import {
 	agent as agentNode,
@@ -29,11 +24,12 @@ import {
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT } from "./context";
+import { ASK_CHOICES } from "./nodes/agent-ask";
 
 /**
  * The Agent node on the compiled graph, driven by the fake harness with a
  * real run log and checkpoint saver: what the Agent's body makes of a session
- * (the prompt, the step report, the checker, the CLI tools, the sessions it
+ * (the prompt, the step report, a question to a person, the CLI tools, the sessions it
  * continues), plus one wait and one crash re-entry through the whole graph.
  * The shared rules (the entry checks, the stop time, the sleep, the resume
  * point) are tested once in step-runner.test.ts, sleep.test.ts and
@@ -1048,152 +1044,194 @@ describe("the Agent node", () => {
 	});
 });
 
-describe("the checker", () => {
-	const review = {
-		outcomes: [
-			{ name: "approved", description: "The change can merge." },
-			{ name: "changes-requested" },
-		],
-		output: {
-			type: "object",
-			properties: { issues: { type: "array", items: { type: "string" } } },
-			required: ["issues"],
-		},
-		checker: {
-			decider: "typesafe",
-			prompt: "Approve only when {{task}} is done.",
-		},
-	};
-
-	test("the agent reports no outcome; the checker picks it, with its note and cost", async () => {
-		const harness = fakeHarness(
-			reportingScript("", "Reviewed it", { issues: [] }),
+describe("an Agent that asks a person", () => {
+	/** Asks first, then passes with the answer. */
+	const asking = () =>
+		fakeHarness((_input, call) =>
+			call === 0
+				? reportingScript("needs-input", "Which database should I use?")
+				: reportingScript("pass", "Built it on Postgres."),
 		);
-		const decider = fakeDecider([
-			{ label: "approved", notes: "No issues left.", costUsd: 0.01 },
-		]);
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				inputs: [{ name: "task" }],
-				start: "worker",
-				nodes: [
-					agent("worker", review),
-					{
-						id: "merge",
-						type: "command" as const,
-						position: { x: 0, y: 0 },
-						command: "true",
-					},
-				],
-				edges: [{ id: "e1", from: "worker", outcome: "approved", to: "merge" }],
-			}),
-			{ harness, decider },
-		);
-		const { parked, state } = await drive(h, { inputs: { task: "the thing" } });
-		expect(parked).toEqual([]);
-		expect(harness.calls[0]?.stepReport).toEqual({
-			outcome: false,
-			output: review.output,
-		});
-		expect(decider.calls).toHaveLength(1);
-		const asked = decider.calls[0];
-		expect(asked?.labels).toEqual(review.outcomes);
-		expect(asked?.prompt).toBe(
-			[
-				"Approve only when the thing is done.",
-				"## The agent's task",
-				"Work on worker: the thing",
-				"## The agent's summary",
-				"Reviewed it",
-				"## The agent's final message",
-				"Working on it.",
-				"## The agent's data",
-				JSON.stringify({ issues: [] }, null, 2),
-			].join("\n\n"),
-		);
-		expect(payloads(await h.events(), "StepEnded")[0]).toEqual({
-			outcome: "approved",
-			outputs: {
-				outcome: "approved",
-				note: "No issues left.",
-				output: "Working on it.",
-				summary: "Reviewed it",
-				data: { issues: [] },
-				visit: 1,
-				session_id: "fake-session-1",
-			},
-			error: null,
-			costUsd: 0.01,
-			costSource: "reported",
-		});
-		expect(state.nodes.worker?.note).toBe("No issues left.");
-		expect(h.types()).resolves.toContain("EdgeTaken");
-	});
-
-	test("without own outcomes the checker picks pass, fail or needs-input", async () => {
-		const harness = fakeHarness(reportingScript("", "Done"));
-		const decider = fakeDecider([{ label: "fail", notes: "Tests fail." }]);
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "worker",
-				nodes: [agent("worker", { checker: { decider: "typesafe" } })],
-				edges: [],
-			}),
-			{ harness, decider },
-		);
-		const { parked } = await drive(h, { inputs: { task: "x" } });
-		expect(decider.calls[0]?.labels.map((l) => l.name)).toEqual([
-			"pass",
-			"fail",
-			"needs-input",
-		]);
-		expect(
-			decider.calls[0]?.prompt.startsWith(
-				"Read what the agent did, then pick the outcome that fits its result.",
-			),
-		).toBe(true);
-		expect(parked[0]).toMatchObject({
-			status: "failed",
-			reason:
-				'Node "worker" ended with "fail" and no edge leaves it on that outcome.',
-		});
-	});
-
-	test("a checker without a decider, or one that picks an unknown outcome, errors the step", async () => {
-		const flow = flowOf({
+	const askFlow = (extra: Record<string, unknown> = {}) =>
+		flowOf({
 			start: "worker",
-			nodes: [agent("worker", { checker: { decider: "typesafe" } })],
+			nodes: [agent("worker", { ask: "person", ...extra })],
 			edges: [],
 		});
-		const none = await startRun(sandbox, flow, {
-			harness: fakeHarness(reportingScript("", "Done")),
-		});
-		const first = await drive(none, { inputs: { task: "x" } });
-		expect(first.parked[0]).toMatchObject({
-			status: "failed",
-			reason:
-				'Node "worker" failed: No decider is configured for the checker of this Agent node.',
-		});
 
-		const wrong = await startRun(sandbox, flow, {
-			harness: fakeHarness(reportingScript("", "Done")), // A decider that answers off the list (against its contract).
-			decider: {
-				defaultModel: defaultDeciderModel,
-				decide: async () => ({
-					kind: "decided",
-					label: "maybe",
-					notes: "",
-					costUsd: null,
+	test("needs-input opens a Gate on the open step; the answer reopens it and the session goes on with the note", async () => {
+		const harness = asking();
+		const h = await startRun(sandbox, askFlow(), { harness });
+		const first = await drive(h, { inputs: { task: "x" } });
+		const [own] = deriveSteps(await h.events());
+		const stepId = own?.id as string;
+		const question = "Which database should I use?\n\nWorking on it.";
+		expect(first.next).toEqual(["ask__worker"]);
+		expect(first.parked).toEqual([
+			{
+				kind: "gate",
+				stepId,
+				nodeId: "worker",
+				question,
+				choices: [...ASK_CHOICES],
+			},
+		]);
+		// The agent may report needs-input, and learns where its questions go.
+		expect(harness.calls[0]?.stepReport).toEqual({
+			outcomes: [
+				{ name: "pass", description: "The task is done." },
+				{ name: "fail", description: "The task is not done." },
+				{
+					name: "needs-input",
+					description:
+						"You need a person to answer before you can go on. Put your questions in your final message.",
+				},
+			],
+		});
+		const asked = await h.events();
+		expect(own).toMatchObject({ endedAt: null, outcome: null });
+		expect(payloads(asked, "GateOpened")).toEqual([
+			{ question, choices: [...ASK_CHOICES] },
+		]);
+		expect(deriveOpenGate(asked)).toMatchObject({ stepId, nodeId: "worker" });
+		expect(payloads(asked, "StepEnded")).toEqual([]);
+
+		const second = await drive(
+			h,
+			new Command({
+				resume: { kind: "gate", choice: "answer", note: "Use Postgres." },
+			}),
+			h.graph(),
+		);
+		expect(second.parked).toEqual([]);
+		expect(second.state.ended?.nodeId).toBe("worker");
+		expect(harness.calls[1]).toMatchObject({
+			prompt: "Use Postgres.",
+			resumeSessionId: "fake-session-1",
+		});
+		const after = await h.events();
+		expect(deriveSteps(after)).toHaveLength(1);
+		expect(payloads(after, "StepReopened")).toEqual([
+			{ prompt: "Use Postgres." },
+		]);
+		expect(deriveOpenGate(after)).toBeNull();
+		expect(payloads(after, "StepEnded")).toEqual([
+			{
+				outcome: "pass",
+				outputs: expect.objectContaining({
+					outcome: "pass",
+					summary: "Built it on Postgres.",
+					note: "Use Postgres.",
 				}),
-			} as unknown as Decider,
-		});
-		const second = await drive(wrong, { inputs: { task: "x" } });
+				error: null,
+			},
+		]);
+		const transcript = await readTranscriptFile(own?.transcriptPath as string);
+		expect(
+			transcript
+				.map((e) => e.event)
+				.filter((e) => e.type === "gate-open" || e.type === "gate-resolved"),
+		).toEqual([
+			{ type: "gate-open", question, choices: [...ASK_CHOICES] },
+			{ type: "gate-resolved", choice: "answer", note: "Use Postgres." },
+		]);
+	});
+
+	test("stop ends the step fail with what the agent said and the note", async () => {
+		const harness = asking();
+		const h = await startRun(sandbox, askFlow(), { harness });
+		await drive(h, { inputs: { task: "x" } });
+		const second = await drive(
+			h,
+			new Command({
+				resume: { kind: "gate", choice: "stop", note: "Not now." },
+			}),
+			h.graph(),
+		);
+		expect(harness.calls).toHaveLength(1);
 		expect(second.parked[0]).toMatchObject({
+			kind: "parked",
 			status: "failed",
-			reason:
-				'Node "worker" failed: "maybe" is not an option of this node. Choose one of: pass, fail, needs-input.',
 		});
+		expect(payloads(await h.events(), "StepEnded")).toEqual([
+			{
+				outcome: "fail",
+				outputs: expect.objectContaining({
+					outcome: "fail",
+					summary: "Which database should I use?",
+					note: "Not now.",
+				}),
+				error: null,
+			},
+		]);
+	});
+
+	test("with own outcomes the agent may report needs-input too", async () => {
+		const harness = asking();
+		const h = await startRun(
+			sandbox,
+			askFlow({ outcomes: [{ name: "built" }, { name: "needs-input" }] }),
+			{ harness },
+		);
+		const first = await drive(h, { inputs: { task: "x" } });
+		expect(first.next).toEqual(["ask__worker"]);
+		expect(harness.calls[0]?.stepReport).toEqual({
+			outcomes: [
+				{ name: "built" },
+				{
+					name: "needs-input",
+					description:
+						"You need a person to answer before you can go on. Put your questions in your final message.",
+				},
+			],
+		});
+	});
+
+	test("a person resumes a run stopped at the Gate: the session goes on with the resume's prompt", async () => {
+		const harness = asking();
+		const h = await startRun(sandbox, askFlow(), { harness });
+		await drive(h, { inputs: { task: "x" } });
+		const [own] = deriveSteps(await h.events());
+		const stepId = own?.id as string;
+		// What the runner and the engine append for a stop and a resume.
+		await h.log.append({ type: "StopRequested", runId: h.runId, payload: {} });
+		await h.log.append({
+			type: "StepEnded",
+			runId: h.runId,
+			stepId,
+			payload: {
+				outcome: "stopped",
+				outputs: { outcome: "stopped", visit: 1 },
+				error: null,
+			},
+		});
+		await h.log.append({
+			type: "RunEnded",
+			runId: h.runId,
+			payload: { status: "stopped", reason: null },
+		});
+		await h.log.append({
+			type: "RunResumed",
+			runId: h.runId,
+			payload: {
+				nodeId: "worker",
+				stepId,
+				prompt: "Pick one yourself.",
+				by: "person",
+			},
+		});
+		const second = await drive(
+			h,
+			new Command({ resume: { kind: "reopen" } }),
+			h.graph(),
+		);
+		expect(second.state.ended?.nodeId).toBe("worker");
+		expect(harness.calls[1]).toMatchObject({
+			prompt: "Pick one yourself.",
+			resumeSessionId: "fake-session-1",
+		});
+		expect(payloads(await h.events(), "StepReopened")).toEqual([
+			{ prompt: "Pick one yourself." },
+		]);
 	});
 });

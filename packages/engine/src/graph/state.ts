@@ -129,8 +129,19 @@ const pendingGateSchema = z.object({
 			name: z.string(),
 			description: z.string().optional(),
 			color: outcomeColorSchema.optional(),
+			needsNote: z.literal(true).optional(),
 		}),
 	),
+	/**
+	 * An Agent that asks a person (`ask`): the step's outputs so far, which
+	 * a Stop ends the step with.
+	 */
+	outputs: z.record(z.string(), z.any()).optional(),
+	/**
+	 * An Agent's Gate a person answered: the note its session goes on with.
+	 * Set by the ask node, read by the resume point, which reopens the step.
+	 */
+	answer: z.string().optional(),
 });
 const pendingSchema = z.discriminatedUnion("kind", [
 	pendingWaitSchema,

@@ -22,7 +22,6 @@ const flow: Flow = flowSchema.parse({
 			position: { x: 0, y: 0 },
 			profile: "worker",
 			prompt: "Review {{pr}}.",
-			checker: { decider: "typesafe", prompt: "Old brief." },
 		},
 		{
 			id: "gate",
@@ -95,19 +94,12 @@ describe("takesSuggestion", () => {
 	test("each kind fits the nodes that have its field", () => {
 		const takes = (id: string) =>
 			(
-				[
-					"outcomes",
-					"rules",
-					"expression",
-					"command",
-					"checker",
-					"arguments",
-				] as const
+				["outcomes", "rules", "expression", "command", "arguments"] as const
 			).filter((kind) => {
 				const node = nodeOf(flow, id);
 				return node ? takesSuggestion(node, kind) : false;
 			});
-		expect(takes("review")).toEqual(["outcomes", "checker"]);
+		expect(takes("review")).toEqual(["outcomes"]);
 		expect(takes("gate")).toEqual(["outcomes", "rules"]);
 		expect(takes("check")).toEqual(["command"]);
 		expect(takes("ci")).toEqual(["command"]);
@@ -204,7 +196,7 @@ describe("applySuggestion, the newer kinds", () => {
 		]);
 	});
 
-	test("expression, command and checker set their field", () => {
+	test("expression and command set their field", () => {
 		const expression = nodeOf(
 			applySuggestion(flow, "pick", {
 				kind: "expression",
@@ -251,14 +243,6 @@ describe("applySuggestion, the newer kinds", () => {
 				maxItems: 5,
 			},
 		});
-		const checker = nodeOf(
-			applySuggestion(flow, "review", { kind: "checker", text: "", note: "" }),
-			"review",
-		);
-		expect(checker).toMatchObject({ checker: { decider: "typesafe" } });
-		expect(checker?.type === "agent" && checker.checker).not.toHaveProperty(
-			"prompt",
-		);
 	});
 
 	test("a kind on a node without its field leaves the flow as it is", () => {

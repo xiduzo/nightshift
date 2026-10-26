@@ -76,8 +76,6 @@ export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
 			return node.type === "value" && node.by === "rule";
 		case "command":
 			return commandOf(node) !== undefined;
-		case "checker":
-			return node.type === "agent" && node.checker !== undefined;
 		case "arguments":
 			return node.type === "tool" && node.tool.trim() !== "";
 		case "description":
@@ -111,7 +109,7 @@ export function commandOf(node: FlowNode): string | undefined {
  * - `outcomes`: an Agent's own outcomes or a Decision's options, with the
  *   edges moved as `applyOutcomes` says;
  * - `rules`: the rule of each option it names;
- * - `expression`, `command`, `checker`, `arguments`: that field;
+ * - `expression`, `command`, `arguments`: that field;
  * - `description`, `inputs`: the flow's.
  * A node that does not take the suggestion's kind, or no node by that id,
  * leaves the flow as it is.
@@ -198,16 +196,6 @@ export function applySuggestion(
 						},
 					};
 				return current;
-			});
-		case "checker":
-			return updateNode(flow, nodeId, (current) => {
-				if (current.type !== "agent" || !current.checker) return current;
-				const { prompt: _, ...checker } = current.checker;
-				const text = suggestion.text.trim();
-				return {
-					...current,
-					checker: text === "" ? checker : { ...checker, prompt: text },
-				};
 			});
 		case "arguments":
 			return updateNode(flow, nodeId, (current) =>

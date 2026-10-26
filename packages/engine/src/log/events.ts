@@ -49,11 +49,16 @@ export type StepOutputs = Record<string, JsonValue>;
 /** Input values of a flow, by input name. */
 export type InputValues = Record<string, JsonValue>;
 
-/** One choice of a Gate: an option of its Decision node, with the colour the node gives it. */
+/**
+ * One choice of a Gate: an option of its Decision node, with the colour the
+ * node gives it, or a choice of an Agent that asks a person (`ask`).
+ */
 export type GateChoice = {
 	name: string;
 	description?: string;
 	color?: OutcomeColor;
+	/** The choice needs a note: the answer an Agent goes on with. */
+	needsNote?: true;
 };
 
 /**

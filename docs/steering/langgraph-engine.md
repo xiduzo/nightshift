@@ -138,8 +138,13 @@ packages/engine/src/
                            copy of pending the interrupt carries and what
                            the answer does.
   graph/nodes/agent.ts     agent node: the body runSession; AGENT, with
-                           the Agent's requirements (CLI tools, harness,
-                           checker) and isOwnAgentLabel.
+                           the Agent's requirements (CLI tools, harness)
+                           and isOwnAgentLabel.
+  graph/nodes/agent-ask.ts the ask node of an Agent that asks a person
+                           (`ask`): answer reopens the step with the note,
+                           stop ends it `fail`.
+  graph/gate.ts            openGate: GateOpened, the transcript and the
+                           bus, for a Gate and an Agent that asks.
   graph/nodes/command.ts   command node: the body runShell; COMMAND.
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
                            per `by` gets the option. DECISION, whose

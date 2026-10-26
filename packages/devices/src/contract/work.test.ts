@@ -70,15 +70,6 @@ const calls: WorkRequest[] = [
 				},
 				clis: ["gh"],
 				connections: ["linear"],
-				mcpServers: {
-					docs: {
-						command: "docs-mcp",
-						args: [],
-						// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, not a template literal
-						env: { TOKEN: "${TOKEN}" },
-					},
-					web: { url: "https://example.com/mcp", headers: {} },
-				},
 			},
 		},
 	},

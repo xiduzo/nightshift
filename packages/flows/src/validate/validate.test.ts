@@ -1200,6 +1200,34 @@ describe("validateFlow: agent outcomes and output", () => {
 		expect(validateFlow(flow([agent("worker")], []))).toEqual([]);
 	});
 
+	test("an agent that asks a person never ends on needs-input", () => {
+		const asks = agent("worker", { ask: "person" });
+		expect(nodeOutcomes(asks)).toEqual(["pass", "fail"]);
+		expect(
+			nodeOutcomes(
+				review({
+					ask: "person",
+					outcomes: [{ name: "approved" }, { name: "needs-input" }],
+				}),
+			),
+		).toEqual(["approved"]);
+		const f = flow(
+			[asks, agent("helper")],
+			[
+				edge("a", "worker", "pass", "helper"),
+				edge("b", "worker", "needs-input", "helper"),
+			],
+		);
+		expect(errors(validateFlow(f))).toEqual([
+			{
+				severity: "error",
+				message:
+					'Edge "b" leaves "worker" on "needs-input", but that agent asks a person when it needs input and takes no edge. Remove the edge, or let the agent end on needs-input.',
+				edgeId: "b",
+			},
+		]);
+	});
+
 	test("outcomes are unique, valid and not reserved", () => {
 		const f = flow(
 			[

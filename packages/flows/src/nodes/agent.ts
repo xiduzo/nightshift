@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-	deciderNameSchema,
 	isObjectSchema,
 	jsonSchemaSchema,
 	type NodeCheck,
@@ -159,10 +158,10 @@ export const permissionModeSchema = z.enum([
 ]);
 
 /**
- * An MCP server an Agent node adds to its session: a local command (stdio)
- * or a URL (streamable HTTP). Flow files live in repos: never put secrets
- * here. `${NAME}` in `env` values and `headers` reads the daemon's
- * environment when the session starts.
+ * An MCP server: a local command (stdio) or a URL (streamable HTTP). A
+ * Connection holds one, saved on the daemon, never in a flow file.
+ * `${NAME}` in `env` values and `headers` reads a secret when the session
+ * starts.
  */
 export const mcpServerSchema = z.union([
 	z.object({
@@ -209,10 +208,11 @@ export const agentNodeSchema = z.object({
 	 */
 	session: z.enum(["fresh", "resume"]).default("fresh"),
 	/**
-	 * CLI tools by name (programs defined on this daemon, under Agents →
-	 * Tools): the agent may run them without a prompt. A flow that names one
-	 * the daemon does not have, or that this computer cannot find, refuses
-	 * to start.
+	 * CLI tools by name: programs on this computer the agent may run without
+	 * a prompt, for example `gh` or `aws`. One defined under Agents → Tools
+	 * brings its login and its notes for the agent; any other only needs to
+	 * be on this computer. A flow that names one this computer cannot find
+	 * refuses to start.
 	 */
 	clis: z.array(cliNameSchema).optional(),
 	/** The step fails when the agent shows no activity for this long. */
@@ -223,34 +223,19 @@ export const agentNodeSchema = z.object({
 	 * that names a connection the daemon does not have refuses to start.
 	 */
 	connections: z.array(nameSchema).optional(),
-	/** MCP servers by name, added to the harness's own configuration. */
-	mcpServers: z.record(nameSchema, mcpServerSchema).optional(),
-	/**
-	 * CLI tools for this node only: programs this computer has that are not
-	 * defined on the daemon. The agent may run them without a prompt. A flow
-	 * that names one this computer cannot find refuses to start.
-	 */
-	nodeClis: z.array(cliNameSchema).optional(),
 	/**
 	 * The agent's own outcomes, each with an edge. Replaces `pass`, `fail`
-	 * and `needs-input` when set. The agent reports one of them, or with a
-	 * `checker` the checker picks one.
+	 * and `needs-input` when set. The agent reports one of them.
 	 */
 	outcomes: z.array(option).min(1).optional(),
 	/**
-	 * Who picks the outcome. Unset: the agent itself, in its step report,
-	 * from the outcomes only. Set: the agent reports its summary and data,
-	 * then this decision model reads them and picks the outcome.
+	 * `person`: when the agent needs input, Night Shift asks a person in a
+	 * Gate with its summary and questions, and takes no edge. "Answer" sends
+	 * the person's note to the same session, which goes on; "Stop" ends the
+	 * step `fail`. The agent may report `needs-input` even with its own
+	 * outcomes. Unset: `needs-input` is an outcome like any other.
 	 */
-	checker: z
-		.object({
-			decider: deciderNameSchema.default("typesafe"),
-			/** Unset: the decider's default model. */
-			model: z.string().min(1).optional(),
-			/** What the checker looks for. Supports templates. */
-			prompt: z.string().optional(),
-		})
-		.optional(),
+	ask: z.enum(["person"]).optional(),
 	/**
 	 * A JSON Schema for the `data` of the step report. The agent must report
 	 * data that matches it, else the step ends as `error`. Later nodes read
@@ -262,7 +247,8 @@ export type AgentNode = z.infer<typeof agentNodeSchema>;
 
 /**
  * output: the final message. summary: the report's summary, else the
- * output. data: the report's JSON. note: why the checker picked the outcome.
+ * output. data: the report's JSON. note: the person's latest answer when
+ * the agent asked (`ask`), or why they stopped it.
  */
 export const agentOutputFields = [
 	"outcome",
@@ -300,8 +286,6 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 		}
 	}
 	check.template(node.prompt, "prompt");
-	if (node.checker?.prompt)
-		check.template(node.checker.prompt, "checker prompt");
 	if (node.outcomes !== undefined) {
 		checkOptions(
 			node.id,

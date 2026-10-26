@@ -36,11 +36,11 @@ export function sessionCostUnknown(
 		: `The cost of this step is not known. ${harness} reported no cost and no model. ${LEFT_OUT}`;
 }
 
-/** Warns when a decider answered without a cost: a Decision, a Value, or a checker. */
+/** Warns when a decider answered without a cost: a Decision or a Value. */
 export async function warnDeciderCost(
 	step: Pick<StepHandle, "warn">,
 	source: CostSource | null | undefined,
-	what: "decision" | "value" | "check",
+	what: "decision" | "value",
 	model: string,
 ): Promise<void> {
 	if (source !== null) return;

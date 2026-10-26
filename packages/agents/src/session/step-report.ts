@@ -86,7 +86,7 @@ export type ReportRules = {
 	output?: Record<string, unknown>;
 	/** The default outcomes: the prompt and tool keep today's texts. */
 	defaultOutcomes: boolean;
-	/** False: the agent reports no outcome (a checker picks it). */
+	/** False: the agent reports no outcome (something else picks it). */
 	withOutcome: boolean;
 };
 

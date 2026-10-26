@@ -175,8 +175,7 @@ function rewriteSource(
 }
 
 /**
- * Applies `rewrite` to every template of the node: a prompt (an Agent's
- * checker prompt too), a command, a question, a list source, the bindings
+ * Applies `rewrite` to every template of the node: a prompt, a command, a question, a list source, the bindings
  * of a called flow's inputs, and the values of its variable writes.
  */
 export function rewriteTemplates(
@@ -202,18 +201,7 @@ export function rewriteOwnTemplates(
 ): FlowNode {
 	switch (node.type) {
 		case "agent":
-			return {
-				...node,
-				prompt: rewrite(node.prompt),
-				...(node.checker?.prompt !== undefined
-					? {
-							checker: {
-								...node.checker,
-								prompt: rewrite(node.checker.prompt),
-							},
-						}
-					: {}),
-			};
+			return { ...node, prompt: rewrite(node.prompt) };
 		case "decision":
 			return { ...node, prompt: rewrite(node.prompt) };
 		case "command":

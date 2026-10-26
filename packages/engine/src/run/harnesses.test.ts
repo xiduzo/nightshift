@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type { HarnessName } from "@nightshift/agents/types";
-import { event } from "@nightshift/db/schema";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 import { expandMcpServers } from "../device-config/mcp";
 import type { RunStatus } from "../log/events";
@@ -87,16 +84,6 @@ async function waitForEnd(
 	);
 }
 
-/** Every file under `dir`, as one string. */
-async function readTree(dir: string): Promise<string> {
-	const entries = await readdir(dir, { recursive: true, withFileTypes: true });
-	const files = entries.filter((e) => e.isFile());
-	const texts = await Promise.all(
-		files.map((e) => readFile(join(e.parentPath, e.name), "utf8")),
-	);
-	return texts.join("\n");
-}
-
 describe("harnesses", () => {
 	test("each Agent step runs on the harness its node names", async () => {
 		const claude = named("claude-code");
@@ -128,7 +115,7 @@ describe("harnesses", () => {
 		expect(codex.calls.map((c) => [c.prompt, c.model])).toEqual([
 			["Work as reviewer.", "gpt-5-codex"],
 		]);
-		// No MCP servers on the node: the harness gets none.
+		// No connections on the node: the harness gets no MCP servers.
 		expect(codex.calls[0]?.mcpServers).toBeUndefined();
 	});
 
@@ -239,94 +226,6 @@ describe("custom agents", () => {
 		).rejects.toThrow(
 			"The flow has an Agent node on goose (worker), but no custom agent goose is added. Add it under Agents.",
 		);
-	});
-});
-
-describe("MCP servers", () => {
-	const TOKEN = "NIGHTSHIFT_TEST_MCP_TOKEN";
-	const SECRET = "s3cret-value-for-the-test";
-	beforeEach(() => {
-		process.env[TOKEN] = SECRET;
-	});
-	afterEach(() => {
-		delete process.env[TOKEN];
-	});
-
-	test("the harness gets the node's MCP servers with the references expanded", async () => {
-		const harness = named("opencode");
-		const engine = makeEngine({ opencode: harness });
-		const run = await engine.startRun({
-			projectId: await projectId(engine),
-			flow: flowOf([
-				agent("worker", {
-					harness: "opencode",
-					mcpServers: {
-						local: {
-							command: "my-mcp",
-							args: ["--token", ref(TOKEN)],
-							env: { API_TOKEN: ref(TOKEN), MODE: "night" },
-						},
-						remote: {
-							url: "https://mcp.example.com/mcp",
-							headers: { Authorization: `Bearer ${ref(TOKEN)}` },
-						},
-					},
-				}),
-			]),
-		});
-		expect(await waitForEnd(engine, run.id)).toBe("finished");
-		expect(harness.calls[0]?.mcpServers).toEqual({
-			local: {
-				command: "my-mcp",
-				// Arguments stay as written: only env values and headers expand.
-				args: ["--token", ref(TOKEN)],
-				env: { API_TOKEN: SECRET, MODE: "night" },
-			},
-			remote: {
-				url: "https://mcp.example.com/mcp",
-				headers: { Authorization: `Bearer ${SECRET}` },
-			},
-		});
-
-		// The run's snapshot keeps the reference; the value is never logged.
-		const detail = await engine.getRun(run.id);
-		const node = detail.flow.nodes[0] as AgentNode;
-		expect(node.mcpServers?.local).toMatchObject({
-			env: { API_TOKEN: ref(TOKEN) },
-		});
-		const rows = await sandbox.db.select().from(event);
-		expect(JSON.stringify(rows)).not.toContain(SECRET);
-		expect(await readTree(sandbox.dataDir)).not.toContain(SECRET);
-	});
-
-	test("a variable the daemon does not have refuses the step and names it", async () => {
-		const harness = named("claude-code");
-		const engine = makeEngine({ "claude-code": harness });
-		const run = await engine.startRun({
-			projectId: await projectId(engine),
-			flow: flowOf([
-				agent("worker", {
-					mcpServers: {
-						tracker: {
-							url: "https://mcp.example.com/mcp",
-							headers: {
-								Authorization: `Bearer ${ref("NIGHTSHIFT_TEST_NOT_SET")}`,
-								"X-Other": ref(TOKEN),
-							},
-						},
-					},
-				}),
-			]),
-		});
-		expect(await waitForEnd(engine, run.id)).toBe("failed");
-		expect(harness.calls).toHaveLength(0);
-		const step = (await engine.getRun(run.id)).steps[0];
-		expect(step?.outcome).toBe("error");
-		expect(step?.error).toBe(
-			'The MCP server "tracker" needs the secret NIGHTSHIFT_TEST_NOT_SET, but it is not saved. Save it under Agents → Secrets, or remove the reference.',
-		);
-		expect(step?.error).not.toContain(SECRET);
-		expect(step?.sessions).toEqual([]);
 	});
 });
 

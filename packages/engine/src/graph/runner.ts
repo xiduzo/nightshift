@@ -103,7 +103,8 @@ import {
  *   (`release` waits for it, up to `RELEASE_WAIT_MS`), but it begins no
  *   drive.
  * - I8 A Turn waits on no harness and no timer. The one wait is an
- *   answer's: until the Gate's step ended, or no drive holds the run.
+ *   answer's: until the Gate closed (its step ended, or opened again), or
+ *   no drive holds the run.
  * - I9 A Turn reads the run's row and refuses a run another Device walks
  *   now (a move is a Turn too), with the one refusal for that rule
  *   (`walked-elsewhere`). The person's actions ask the same rule before
@@ -687,11 +688,17 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * Resolves once the run's log says step `stepId` ended, or no drive
-	 * holds the run. Subscribes before the first look, so an append between
-	 * the two is not missed.
+	 * Resolves once the run's log says the Gate of step `stepId` that was
+	 * asked at `askedSeq` closed, or no drive holds the run. A Gate closes
+	 * when its step ends, or when its step opens again (an Agent goes on
+	 * with the answer, and may ask again later). Subscribes before the first
+	 * look, so an append between the two is not missed.
 	 */
-	function untilStepEnded(runId: string, stepId: string): Promise<void> {
+	function untilGateClosed(
+		runId: string,
+		stepId: string,
+		askedSeq: number,
+	): Promise<void> {
 		return new Promise<void>((resolve) => {
 			let settled = false;
 			const unsubscribe = bus.subscribe(runId, () => void look());
@@ -699,9 +706,10 @@ export function createRunner(deps: RunnerDeps) {
 				if (settled) return;
 				const events = await log.events(runId);
 				if (settled) return;
-				const ended =
-					deriveSteps(events).find((s) => s.id === stepId)?.endedAt !== null;
-				if (ended || !slots.has(runId)) {
+				const step = deriveSteps(events).find((s) => s.id === stepId);
+				const closed =
+					!step || step.endedAt !== null || step.openedSeq > askedSeq;
+				if (closed || !slots.has(runId)) {
 					settled = true;
 					unsubscribe();
 					resolve();
@@ -770,13 +778,17 @@ export function createRunner(deps: RunnerDeps) {
 	): Promise<Taken> {
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		const { choice, note } = intent;
+		const asked =
+			deriveSteps(await log.events(row.id)).find((s) => s.id === intent.stepId)
+				?.gate?.openedSeq ?? 0;
 		drive(
 			row,
 			inputOf({ kind: "resume", value: { kind: "gate", choice, note } }),
 		);
-		// The Gate node ends the step on the answer. The Turn ends once it
-		// has, so the run no longer waits when the caller looks again (I8).
-		await untilStepEnded(row.id, intent.stepId);
+		// The ask node ends the step on the answer, or an Agent's step opens
+		// again with it. The Turn ends once the Gate closed, so the run no
+		// longer waits when the caller looks again (I8).
+		await untilGateClosed(row.id, intent.stepId, asked);
 		return DRIVING;
 	}
 

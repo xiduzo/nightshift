@@ -125,9 +125,9 @@ async function decide(
  * Asks the Device's decider, but never waits on it longer than
  * `STOP_GRACE_MS` past an abort: a decider that ignores its signal cannot
  * hold the run. A decider that throws (against its contract) counts as an
- * error. Shared with an Agent node's checker.
+ * error.
  */
-export function decideWithin(
+function decideWithin(
 	device: Pick<Device, "decide">,
 	input: DecisionInput,
 	signal: AbortSignal,

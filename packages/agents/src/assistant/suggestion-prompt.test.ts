@@ -27,7 +27,6 @@ const flow: Flow = flowSchema.parse({
 			position: { x: 0, y: 0 },
 			profile: "worker",
 			prompt: "Review {{pr}} and say if it can merge.",
-			checker: { decider: "typesafe" },
 		},
 		{
 			id: "gate",
@@ -133,14 +132,6 @@ describe("each kind gets its own task and context", () => {
 		expect(text).not.toContain("The node's exits");
 	});
 
-	test("checker: the outcomes to pick from and the agent's prompt", () => {
-		const text = suggestionPrompt(
-			request({ nodeId: "review", kind: "checker" }),
-		);
-		expect(text).toContain("Write the brief of the checker");
-		expect(text).toContain('"name": "needs-input"');
-	});
-
 	test("arguments: the tool's input schema from the editor", () => {
 		const text = suggestionPrompt(
 			request({
@@ -183,7 +174,7 @@ describe("the checks of the newer kinds", () => {
 		).toContain("A Command node has no rules");
 		expect(cannotSuggest(request({ kind: "inputs" }))).toBeNull();
 		expect(
-			cannotSuggest(request({ nodeId: "review", kind: "checker" })),
+			cannotSuggest(request({ nodeId: "review", kind: "outcomes" })),
 		).toBeNull();
 	});
 

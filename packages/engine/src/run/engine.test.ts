@@ -2545,20 +2545,6 @@ describe("decisions", () => {
 		expect(existsSync(join(sandbox.root, "repo.nightshift"))).toBe(false);
 	});
 
-	test("startRun refuses a flow with an Agent checker when no decider is configured", async () => {
-		const engine = makeEngine(fakeHarness());
-		await expect(
-			engine.startRun({
-				projectId: await projectId(engine),
-				flow: flowOf([
-					agent("worker", "Work", { checker: { decider: "typesafe" } }),
-				]),
-			}),
-		).rejects.toThrow(
-			"The flow has an Agent node with a checker, but no decider is configured.",
-		);
-	});
-
 	test("a decision that runs past its timeout errors", async () => {
 		const { decider } = scriptedDecider(waitForAbort);
 		const engine = makeEngine(fakeHarness(), { decider }, { minuteMs: 50 });
@@ -2843,6 +2829,61 @@ describe("gates", () => {
 				choice: "reject",
 			}),
 		).rejects.toThrow("does not wait at a Gate");
+	});
+
+	test("an Agent that asks: its answer needs a note, and returns while the session goes on", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", "Build it", { ask: "person" })]),
+		});
+		const worker = await waitFor(() => sessions[0]);
+		worker.text("Which database: Postgres or SQLite?");
+		worker.emit({
+			type: "report",
+			outcome: "needs-input",
+			summary: "I need a choice.",
+		});
+		worker.finish();
+
+		const open = await openGateOf(engine, run.id);
+		expect(open).toMatchObject({
+			nodeId: "worker",
+			question: "I need a choice.\n\nWhich database: Postgres or SQLite?",
+			choices: [{ name: "answer", needsNote: true }, { name: "stop" }],
+		});
+		expect(await statusOf(engine, run.id)).toBe("waiting");
+		await expect(
+			engine.resolveGate({
+				runId: run.id,
+				stepId: open.stepId,
+				choice: "answer",
+				note: " ",
+			}),
+		).rejects.toThrow('Write a note to choose "answer"');
+
+		// The answer returns once the Gate closed, not when the session ends.
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "answer",
+			note: "Postgres.",
+		});
+		const again = await waitFor(() => sessions[1]);
+		expect(again.input).toMatchObject({
+			prompt: "Postgres.",
+			resumeSessionId: "harness-0",
+		});
+		expect(await engine.listGates()).toEqual([]);
+		expect(await statusOf(engine, run.id)).toBe("running");
+		again.emit({ type: "report", outcome: "pass", summary: "Built it." });
+		again.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "pass"],
+		]);
 	});
 
 	test("an answer while the run cap is full fails and keeps the gate open", async () => {

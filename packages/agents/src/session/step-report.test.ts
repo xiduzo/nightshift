@@ -388,7 +388,7 @@ describe("a spec with its own outcomes and an output schema", () => {
 	});
 });
 
-describe("a spec without an outcome (a checker picks it)", () => {
+describe("a spec without an outcome (something else picks it)", () => {
 	const spec: StepReportSpec = {
 		outcome: false,
 		output: { type: "object", properties: { pr: { type: "string" } } },

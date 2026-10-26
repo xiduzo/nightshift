@@ -205,21 +205,18 @@ describe("connections at the start", () => {
 });
 
 describe("CLI tools at the start", () => {
-	test("a flow that names a CLI tool the daemon does not have refuses to start", async () => {
+	test("a CLI tool the daemon does not define starts: this computer has it", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
 			cliNames: () => new Set(["gh"]),
 			findCli: (name) => `/bin/${name}`,
 		});
-		await expect(
-			engine.startRun({
-				projectId: await projectId(engine),
-				flow: flowOf([agent("worker", { clis: ["gh", "aws"] })]),
-			}),
-		).rejects.toThrow(
-			'The flow uses the CLI tool "aws" (worker), but no CLI tool has that name. Add it under Agents → Tools.',
-		);
-		expect(harness.calls).toHaveLength(0);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", { clis: ["gh", "aws"] })]),
+		});
+		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
+		expect(harness.calls[0]?.clis).toEqual(["gh", "aws"]);
 	});
 
 	test("a flow that names a CLI tool this computer does not have refuses to start", async () => {
@@ -254,7 +251,7 @@ describe("CLI tools at the start", () => {
 		expect(harness.calls.map((c) => c.clis)).toEqual([["gh"], undefined]);
 	});
 
-	test("the node's own CLI tools need no definition, but this computer must have them", async () => {
+	test("a CLI tool needs no definition, but this computer must have it", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
 			cliNames: () => new Set(["gh"]),
@@ -263,7 +260,7 @@ describe("CLI tools at the start", () => {
 		const id = await projectId(engine);
 		const run = await engine.startRun({
 			projectId: id,
-			flow: flowOf([agent("worker", { clis: ["gh"], nodeClis: ["rg", "gh"] })]),
+			flow: flowOf([agent("worker", { clis: ["gh", "rg", "gh"] })]),
 		});
 		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
 		expect(harness.calls[0]?.clis).toEqual(["gh", "rg"]);
@@ -271,7 +268,7 @@ describe("CLI tools at the start", () => {
 		await expect(
 			engine.startRun({
 				projectId: id,
-				flow: flowOf([agent("worker", { nodeClis: ["jq"] })]),
+				flow: flowOf([agent("worker", { clis: ["jq"] })]),
 			}),
 		).rejects.toThrow(
 			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or take it off the flow.',
@@ -282,7 +279,7 @@ describe("CLI tools at the start", () => {
 describe("mcpServersFor", () => {
 	test("the harness gets what mcpServersFor returns for the node", async () => {
 		const harness: FakeHarness = fakeHarness();
-		const asked: Pick<AgentNode, "connections" | "mcpServers">[] = [];
+		const asked: Pick<AgentNode, "connections">[] = [];
 		const servers = {
 			tracker: {
 				command: "tracker-mcp",
@@ -297,19 +294,12 @@ describe("mcpServersFor", () => {
 				return { ok: true, servers };
 			},
 		});
-		const own = { local: { command: "own-mcp", args: [], env: {} } };
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
-			flow: flowOf([
-				agent("worker", { connections: ["tracker"], mcpServers: own }),
-			]),
+			flow: flowOf([agent("worker", { connections: ["tracker"] })]),
 		});
 		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
-		expect(asked).toHaveLength(1);
-		expect(asked[0]).toMatchObject({
-			connections: ["tracker"],
-			mcpServers: own,
-		});
+		expect(asked).toEqual([{ connections: ["tracker"] }]);
 		expect(harness.calls[0]?.mcpServers).toEqual(servers);
 	});
 

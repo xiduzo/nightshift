@@ -26,10 +26,15 @@ export function runsEach(node: FlowNode): node is CallEachNode {
 /** The outcomes a node can end with, in the order its handles show. */
 export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 	switch (node.type) {
-		case "agent":
-			return node.outcomes
+		case "agent": {
+			const outcomes = node.outcomes
 				? node.outcomes.map((o) => o.name)
 				: ["pass", "fail", "needs-input"];
+			// An agent that asks a person never ends on needs-input.
+			return node.ask === "person"
+				? outcomes.filter((name) => name !== "needs-input")
+				: outcomes;
+		}
 		case "command":
 			return commandExits(node).map((exit) => exit.name);
 		case "decision":

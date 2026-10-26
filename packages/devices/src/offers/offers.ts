@@ -189,10 +189,7 @@ const OWN_SETTINGS = [
 	"model",
 	"effort",
 	"clis",
-	"nodeClis",
 	"connections",
-	"mcpServers",
-	"checker",
 ] as const satisfies readonly (keyof AgentNode)[];
 
 /**

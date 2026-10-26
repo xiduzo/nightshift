@@ -8,11 +8,7 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import type {
-	AgentNode,
-	AgentProfileSettings,
-	JsonValue,
-} from "@nightshift/flows";
+import type { AgentProfileSettings, JsonValue } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 
 /**
@@ -162,8 +158,6 @@ export type SessionInput = Omit<
 	clis?: string[];
 	/** Connections by name: the Device expands them with its own secrets. */
 	connections?: string[];
-	/** The node's own MCP servers, with `${NAME}` references as written. */
-	mcpServers?: AgentNode["mcpServers"];
 	/**
 	 * The step the session runs for: the agent keeps artifacts of it with
 	 * `save_artifact`. The Device that runs the session keeps them.
@@ -179,13 +173,7 @@ export type SessionInput = Omit<
  */
 export type OfferedSessionInput = Omit<
 	SessionInput,
-	| "harness"
-	| "model"
-	| "permissionMode"
-	| "effort"
-	| "clis"
-	| "connections"
-	| "mcpServers"
+	"harness" | "model" | "permissionMode" | "effort" | "clis" | "connections"
 > & {
 	offered: {
 		profile: string;

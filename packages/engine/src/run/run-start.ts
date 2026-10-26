@@ -54,7 +54,7 @@ import type { PlacementPort, PlannedRun } from "./peers";
  * The requirements are one function each (`Requirement`) and listed once,
  * in `REQUIREMENTS`, in the order the person sees them. The ones about one
  * kind live on that kind's descriptor (`NodeKind.requirements`: an Agent's
- * CLI tools, harness and checker, a model Decision's and a model Value's
+ * CLI tools and harness, a model Decision's and a model Value's
  * decider); the connections check is the one shared requirement, and it
  * asks each kind which connections its node names (`NodeKind.connections`).
  * This module switches on no node type to ask them.

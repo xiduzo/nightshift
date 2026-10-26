@@ -25,7 +25,6 @@ import type { ArtifactStore } from "../artifacts";
 import {
 	type CliToolGuide,
 	cliToolsInstruction,
-	expandMcpServers,
 	type McpExpansion,
 	type SecretEnv,
 } from "../device-config";
@@ -79,11 +78,11 @@ export type LocalDeviceDeps = {
 	/** Decides Decision nodes and makes values for Value nodes. */
 	decider?: Decider;
 	/**
-	 * An Agent node's MCP servers: its connections and its own servers, with
-	 * `${NAME}` expanded. Default: its own servers, from `process.env`.
+	 * An Agent node's MCP servers: its connections, with `${NAME}`
+	 * expanded. Default: none, and a node with connections is refused.
 	 */
 	mcpServersFor?: (
-		node: Pick<AgentNode, "connections" | "mcpServers">,
+		node: Pick<AgentNode, "connections">,
 	) => Promise<McpExpansion>;
 	/**
 	 * A Command node's secrets, by name: the keychain, then the daemon's
@@ -170,15 +169,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	const findCli = deps.findCli ?? ((name: string) => Bun.which(name));
 	const mcpServersFor =
 		deps.mcpServersFor ??
-		(async (
-			node: Pick<AgentNode, "connections" | "mcpServers">,
-		): Promise<McpExpansion> =>
+		(async (node: Pick<AgentNode, "connections">): Promise<McpExpansion> =>
 			(node.connections ?? []).length > 0
 				? {
 						ok: false,
 						message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
 					}
-				: expandMcpServers(node.mcpServers, process.env));
+				: { ok: true, servers: {} });
 	const secretEnv =
 		deps.secretEnv ??
 		(async (names: readonly string[]): Promise<SecretEnv> => {
@@ -226,14 +223,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			};
 			return;
 		}
-		const {
-			harness: name,
-			connections,
-			mcpServers,
-			clis,
-			artifacts,
-			...rest
-		} = input;
+		const { harness: name, connections, clis, artifacts, ...rest } = input;
 		const harness = harnessFor(name);
 		if (!harness) {
 			yield {
@@ -244,10 +234,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		}
 		// `${NAME}` in env values and headers reads the keychain, then the
 		// environment. The values go to the harness only, never into the log.
-		const mcp = await mcpServersFor({
-			...(connections ? { connections } : {}),
-			...(mcpServers ? { mcpServers } : {}),
-		});
+		const mcp = await mcpServersFor(connections ? { connections } : {});
 		if (!mcp.ok) {
 			yield { type: "refused", message: mcp.message };
 			return;

@@ -67,7 +67,6 @@ const NODE_FIELD: Record<SuggestionKind, string> = {
 	rules: "rules (a rule must decide it)",
 	expression: "expression (a rule must make it)",
 	command: "command",
-	checker: "model that picks its outcome",
 	arguments: "tool to call yet",
 	description: "description",
 	inputs: "inputs",
@@ -96,7 +95,6 @@ function kindProblems(
 	const node = request.flow.nodes.find((n) => n.id === request.nodeId);
 	switch (suggestion.kind) {
 		case "prompt":
-		case "checker":
 			return suggestion.text.trim() === "" ? ["`text` is empty."] : [];
 		case "output":
 			return suggestion.output.type !== "object"

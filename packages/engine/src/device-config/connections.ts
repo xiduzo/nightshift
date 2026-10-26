@@ -111,10 +111,8 @@ export type ConnectionStore = {
 	secretSource(name: string): SecretSource;
 	setSecret(name: string, value: string): Promise<void>;
 	removeSecret(name: string): Promise<void>;
-	/** An Agent node's MCP servers: its connections, then its own, with `${NAME}` expanded. */
-	mcpServersFor(
-		node: Pick<AgentNode, "connections" | "mcpServers">,
-	): Promise<McpExpansion>;
+	/** An Agent node's MCP servers: its connections, with `${NAME}` expanded. */
+	mcpServersFor(node: Pick<AgentNode, "connections">): Promise<McpExpansion>;
 	/**
 	 * One server, expanded, for a test: a saved connection by name, or a draft.
 	 * `values` are the secret values it read, to take out of error text.
@@ -387,8 +385,7 @@ export function createConnectionStore(options: {
 				}
 				servers[name] = found.server;
 			}
-			// A server the node defines itself wins over a connection of the same name.
-			return expandServers({ ...servers, ...(node.mcpServers ?? {}) });
+			return expandServers(servers);
 		},
 		async expandForTest(target) {
 			const server =

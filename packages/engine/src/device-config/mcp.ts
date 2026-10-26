@@ -1,5 +1,5 @@
 import type { McpServerConfig } from "@nightshift/agents/types";
-import type { AgentNode } from "@nightshift/flows";
+import type { McpServer } from "@nightshift/flows";
 
 /** `${NAME}`: an environment variable name, as a shell would read it. */
 const REFERENCE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
@@ -10,13 +10,13 @@ export type McpExpansion =
 	| { ok: false; message: string };
 
 /**
- * Expands `${NAME}` in the `env` values and `headers` of an Agent node's MCP
- * servers from `env` (the daemon's environment). Commands, arguments and
+ * Expands `${NAME}` in the `env` values and `headers` of MCP servers (an
+ * Agent node's connections) from `env`. Commands, arguments and
  * URLs stay as written. A variable that is not set refuses the whole set:
  * a server that starts without its token fails later and less clearly.
  */
 export function expandMcpServers(
-	servers: AgentNode["mcpServers"],
+	servers: Record<string, McpServer> | undefined,
 	env: Readonly<Record<string, string | undefined>>,
 ): McpExpansion {
 	const expanded: Record<string, McpServerConfig> = {};

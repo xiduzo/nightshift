@@ -41,6 +41,8 @@ export const gateChoiceSchema = z.object({
 	name: z.string(),
 	description: z.string().optional(),
 	color: outcomeColorSchema.optional(),
+	/** The choice needs a note: the answer an Agent goes on with. */
+	needsNote: z.literal(true).optional(),
 });
 
 const runTriggerSchema = z.discriminatedUnion("kind", [

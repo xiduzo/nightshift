@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
+import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { CostSource } from "@nightshift/agents/pricing";
 import { agentSession, step as stepTable } from "@nightshift/db/schema";
 import {
@@ -13,6 +13,7 @@ import type { Device } from "../device";
 import {
 	commandLogPath,
 	type EnginePayloads,
+	type GateChoice,
 	type LoggedEvent,
 	type RunWarningKind,
 	type StepBudget,
@@ -39,6 +40,7 @@ import {
 	stopAtOf,
 	templateContext,
 } from "./context";
+import { openGate } from "./gate";
 import { dataProblem } from "./output-schema";
 import {
 	entryOf,
@@ -47,6 +49,7 @@ import {
 	type StepEntry,
 } from "./resume-point";
 import {
+	askNodeId,
 	parkCommand,
 	parkStopped,
 	route,
@@ -62,7 +65,7 @@ import {
 	sleep,
 	type WaitRequest,
 } from "./sleep";
-import type { RunStateValues } from "./state";
+import type { PendingGate, RunStateValues } from "./state";
 
 /**
  * The step runner: one deep module that owns the lifecycle every step node
@@ -213,6 +216,9 @@ export type BodyEnd = {
  *   ends when the wait would pass the stop time or the grace is spent.
  * - `sleep`: a Wait node worked out its own wake time (`OwnWait`); the
  *   sleep module persists it and parks at the wait node, the step open.
+ * - `ask`: the body asks a person (an Agent with `ask`): the runner opens a
+ *   Gate on the step (`openGate`) and goes to the node's ask node, the
+ *   step open. `outputs` are what a Stop ends the step with.
  */
 export type BodyResult =
 	| BodyEnd
@@ -229,7 +235,13 @@ export type BodyResult =
 			costSource?: CostSource | null;
 	  } & WaitRequest)
 	| ({ kind: "sleep" } & OwnWait)
-	| ({ kind: "offline" } & DeviceWait);
+	| ({ kind: "offline" } & DeviceWait)
+	| {
+			kind: "ask";
+			question: string;
+			choices: GateChoice[];
+			outputs: StepOutputs;
+	  };
 
 /** What a node tells the runner: how it re-enters, what its body does, what an empty end looks like. */
 export type StepSpec = {
@@ -332,6 +344,8 @@ export async function runStep(
 			);
 			return route(ctx, state, node, end, config);
 		}
+		case "ask":
+			return askPerson(ctx, node, state, config, step, result);
 		case "wait":
 		case "sleep":
 		case "offline": {
@@ -364,6 +378,44 @@ export async function runStep(
 			return route(ctx, state, node, end, config);
 		}
 	}
+}
+
+/**
+ * Opens the Gate a body asks for and commits it as `pending`, then jumps to
+ * the node's ask node, which interrupts until a person answers. The step
+ * stays open in the log; its recorder and timers close. A Gate that cannot
+ * open ends the step `error`.
+ */
+async function askPerson(
+	ctx: StepContext,
+	node: FlowNode,
+	state: RunStateValues,
+	config: LangGraphRunnableConfig,
+	step: OpenStep,
+	ask: Extract<BodyResult, { kind: "ask" }>,
+): Promise<Command> {
+	const { stepId, visit } = step;
+	try {
+		await openGate(ctx, step, ask);
+	} catch (error) {
+		const end = await step.end(
+			"error",
+			{ ...ask.outputs, outcome: "error" },
+			`The question to a person could not open: ${stepFailure(error, `the Gate of node "${node.id}" of run ${ctx.run.id}`)}`,
+		);
+		return route(ctx, state, node, end, config);
+	}
+	step.leaveOpen();
+	const pending: PendingGate = {
+		kind: "gate",
+		stepId,
+		nodeId: node.id,
+		visit,
+		question: ask.question,
+		choices: ask.choices,
+		outputs: ask.outputs,
+	};
+	return new Command({ update: { pending }, goto: askNodeId(node.id) });
 }
 
 /** Why a step ran out of time: its end's error. `minutes` is the limit it ran past. */

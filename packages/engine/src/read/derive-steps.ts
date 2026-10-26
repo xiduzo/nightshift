@@ -143,7 +143,10 @@ export type DerivedStep = {
 	sessions: DerivedSession[];
 	/** Harness sessions plus what the step spent itself (a decider). */
 	cost: CostTally;
-	/** Gate steps only: the latest `GateOpened` of this step. */
+	/**
+	 * Gate steps, and an Agent step while it asks a person: the latest
+	 * `GateOpened` of this step. Null again once the step reopens.
+	 */
 	gate: {
 		question: string;
 		choices: GateChoice[];
@@ -222,6 +225,8 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			step.endedAt = null;
 			step.outcome = null;
 			step.error = null;
+			// A Gate the step asked is closed: an Agent goes on with the answer.
+			step.gate = null;
 		} else if (e.type === "StepEnded" && step.endedAt === null) {
 			step.endedAt = e.at;
 			step.outcome = e.payload.outcome;

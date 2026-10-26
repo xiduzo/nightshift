@@ -11,7 +11,6 @@ import {
 	agentHarnessSchema,
 	deciderNameSchema,
 	effortSchema,
-	mcpServerSchema,
 	permissionModeSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
@@ -165,7 +164,7 @@ const sessionFields = {
 	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
 };
 
-/** A session the Walker resolved: its harness, model, tools and MCP servers. */
+/** A session the Walker resolved: its harness, model, tools and connections. */
 const sessionInputSchema = z.object({
 	...sessionFields,
 	harness: agentHarnessSchema,
@@ -174,7 +173,6 @@ const sessionInputSchema = z.object({
 	effort: effortSchema.optional(),
 	clis: z.array(z.string()).optional(),
 	connections: z.array(z.string()).optional(),
-	mcpServers: z.record(z.string(), mcpServerSchema).optional(),
 });
 
 /** A session of a profile the Device offers: the Device resolves the profile. */

@@ -10,13 +10,7 @@ import type {
 	ValueNode,
 } from "@nightshift/flows";
 import type { Capabilities } from "../device/types";
-import {
-	AGENT,
-	checkersHaveDecider,
-	cliToolsDefined,
-	cliToolsInstalled,
-	harnessesAdded,
-} from "../graph/nodes/agent";
+import { AGENT, cliToolsInstalled, harnessesAdded } from "../graph/nodes/agent";
 import { DECISION, modelDecisionsHaveDecider } from "../graph/nodes/decision";
 import { modelValuesHaveDecider, VALUE } from "../graph/nodes/value";
 import { type TestDeviceDeps, testDevice } from "../testing/test-support";
@@ -69,13 +63,8 @@ function has(overrides: Partial<TestDeviceDeps> = {}): Promise<Capabilities> {
 describe("REQUIREMENTS", () => {
 	test("lists the shared connections check, then every kind's own, once each", async () => {
 		expect(REQUIREMENTS[0]).toBe(connectionsExist);
-		expect(REQUIREMENTS).toHaveLength(7);
-		expect(AGENT.requirements).toEqual([
-			cliToolsDefined,
-			cliToolsInstalled,
-			harnessesAdded,
-			checkersHaveDecider,
-		]);
+		expect(REQUIREMENTS).toHaveLength(5);
+		expect(AGENT.requirements).toEqual([cliToolsInstalled, harnessesAdded]);
 		expect(DECISION.requirements).toEqual([modelDecisionsHaveDecider]);
 		expect(VALUE.requirements).toEqual([modelValuesHaveDecider]);
 	});
@@ -94,9 +83,7 @@ describe("REQUIREMENTS", () => {
 			agent("a", {
 				harness: "claude-code",
 				connections: ["github"],
-				clis: ["gh"],
-				nodeClis: ["jq"],
-				checker: { prompt: "ok?" },
+				clis: ["gh", "jq"],
 			}),
 			node({ id: "t", type: "tool", connection: "github" }),
 			decision("d", "model"),
@@ -128,20 +115,11 @@ describe("connectionsExist", () => {
 	});
 });
 
-describe("cliToolsDefined", () => {
-	test("refuses a CLI tool no definition has; a node's own CLI tools need none", async () => {
-		const nodes = [agent("a", { clis: ["acli"], nodeClis: ["jq"] })];
-		expect(cliToolsDefined(nodes, await has())).toBe(
-			'The flow uses the CLI tool "acli" (a), but no CLI tool has that name. Add it under Agents → Tools.',
-		);
-	});
-});
-
 describe("cliToolsInstalled", () => {
-	test("refuses once per tool this computer does not have, defined or the node's own", async () => {
+	test("refuses once per tool this computer does not have, defined or not", async () => {
 		const nodes = [
-			agent("a", { clis: ["gh"], nodeClis: ["jq"] }),
-			agent("b", { nodeClis: ["jq"] }),
+			agent("a", { clis: ["gh", "jq"] }),
+			agent("b", { clis: ["jq"] }),
 		];
 		const daemon = await has({
 			findCli: (name) => (name === "gh" ? "/gh" : null),
@@ -188,14 +166,6 @@ describe("the decider requirements", () => {
 		expect(
 			modelDecisionsHaveDecider([decision("d", "person")], await noDecider()),
 		).toBeNull();
-	});
-
-	test("an Agent node with a checker needs a decider", async () => {
-		const nodes = [agent("a", { checker: { prompt: "done?" } })];
-		expect(checkersHaveDecider(nodes, await noDecider())).toBe(
-			"The flow has an Agent node with a checker, but no decider is configured.",
-		);
-		expect(checkersHaveDecider([agent("a")], await noDecider())).toBeNull();
 	});
 
 	test("a Value made by a model needs a decider that makes values", async () => {

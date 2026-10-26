@@ -1004,3 +1004,56 @@ describe("migrateFlow: version 5 → 6, deciders and the files source", () => {
 		expect(first).toEqual({ id: "a.md", title: "a.md", path: "a.md" });
 	});
 });
+
+describe("migrateFlow: version 5 → 6, Agent nodes", () => {
+	const v5 = (nodes: Record<string, unknown>[]) => ({
+		version: 5,
+		start: nodes[0]?.id,
+		nodes,
+		edges: [],
+	});
+
+	test("checker and mcpServers go; nodeClis joins clis", () => {
+		const flow = migrateFlow(
+			v5([
+				{
+					...agent,
+					id: "build",
+					prompt: "Build it.",
+					clis: ["gh", "acli"],
+					nodeClis: ["jq", "gh"],
+					checker: { decider: "typesafe", prompt: "Done?" },
+					mcpServers: { docs: { url: "https://example.com/mcp" } },
+				},
+				{ ...agent, id: "own", prompt: "Go.", nodeClis: ["rg"] },
+				{ ...agent, id: "none", prompt: "Go.", nodeClis: [] },
+			]),
+		) as { version: number; nodes: Record<string, unknown>[] };
+		expect(flow.version).toBe(6);
+		expect(flow.nodes[0]).toEqual({
+			...agent,
+			id: "build",
+			prompt: "Build it.",
+			clis: ["gh", "acli", "jq"],
+		});
+		expect(flow.nodes[1]).toEqual({
+			...agent,
+			id: "own",
+			prompt: "Go.",
+			clis: ["rg"],
+		});
+		expect(flow.nodes[2]).toEqual({ ...agent, id: "none", prompt: "Go." });
+		expect(() => flowSchema.parse(flow)).not.toThrow();
+	});
+
+	test("other nodes stay as they are", () => {
+		const command = {
+			id: "check",
+			type: "command",
+			position: { x: 0, y: 0 },
+			command: "true",
+		};
+		const flow = migrateFlow(v5([command])) as { nodes: unknown[] };
+		expect(flow.nodes[0]).toEqual(command);
+	});
+});

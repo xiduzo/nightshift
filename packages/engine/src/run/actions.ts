@@ -96,11 +96,12 @@ const signedOut = () =>
 
 /**
  * Throws when `answer` cannot answer the run's open Gate, as the log says:
- * no Gate is open, another step is, or the choice is not one of its options.
+ * no Gate is open, another step is, the choice is not one of its options,
+ * or the choice needs a note and has none (the answer to an Agent).
  */
 function refuseAnswer(
 	events: readonly LoggedEvent[],
-	{ stepId, choice }: { stepId: string; choice: string },
+	{ stepId, choice, note }: { stepId: string; choice: string; note?: string },
 ): void {
 	const why = whyNot("answer", deriveRunState(events).status, true);
 	const gate = deriveOpenGate(events);
@@ -112,6 +113,13 @@ function refuseAnswer(
 	}
 	const problem = optionProblem(gate.choices, choice);
 	if (problem !== null) throw new RunRefusal("invalid-answer", problem);
+	const picked = gate.choices.find((c) => c.name === choice);
+	if (picked?.needsNote && (note ?? "").trim() === "") {
+		throw new RunRefusal(
+			"invalid-answer",
+			`Write a note to choose "${choice}": the agent goes on with it.`,
+		);
+	}
 }
 
 /** Throws unless the run sleeps in a Wait node that waits for the Signal `name`. */

@@ -84,28 +84,11 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
           "oneOf": [
             {
               "properties": {
-                "checker": {
-                  "properties": {
-                    "decider": {
-                      "default": "typesafe",
-                      "enum": [
-                        "typesafe",
-                        "openrouter",
-                        "openai",
-                        "ollaya",
-                        "ollama",
-                      ],
-                      "type": "string",
-                    },
-                    "model": {
-                      "minLength": 1,
-                      "type": "string",
-                    },
-                    "prompt": {
-                      "type": "string",
-                    },
-                  },
-                  "type": "object",
+                "ask": {
+                  "enum": [
+                    "person",
+                  ],
+                  "type": "string",
                 },
                 "clis": {
                   "items": {
@@ -169,78 +152,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "label": {
                   "type": "string",
                 },
-                "mcpServers": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "properties": {
-                          "args": {
-                            "default": [],
-                            "items": {
-                              "type": "string",
-                            },
-                            "type": "array",
-                          },
-                          "command": {
-                            "minLength": 1,
-                            "type": "string",
-                          },
-                          "env": {
-                            "additionalProperties": {
-                              "type": "string",
-                            },
-                            "default": {},
-                            "propertyNames": {
-                              "type": "string",
-                            },
-                            "type": "object",
-                          },
-                        },
-                        "required": [
-                          "command",
-                        ],
-                        "type": "object",
-                      },
-                      {
-                        "properties": {
-                          "headers": {
-                            "additionalProperties": {
-                              "type": "string",
-                            },
-                            "default": {},
-                            "propertyNames": {
-                              "type": "string",
-                            },
-                            "type": "object",
-                          },
-                          "url": {
-                            "format": "uri",
-                            "type": "string",
-                          },
-                        },
-                        "required": [
-                          "url",
-                        ],
-                        "type": "object",
-                      },
-                    ],
-                  },
-                  "propertyNames": {
-                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
-                    "type": "string",
-                  },
-                  "type": "object",
-                },
                 "model": {
                   "minLength": 1,
                   "type": "string",
-                },
-                "nodeClis": {
-                  "items": {
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
-                    "type": "string",
-                  },
-                  "type": "array",
                 },
                 "outcomes": {
                   "items": {
@@ -1441,32 +1355,11 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
             {
               "additionalProperties": false,
               "properties": {
-                "checker": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "decider": {
-                      "default": "typesafe",
-                      "enum": [
-                        "typesafe",
-                        "openrouter",
-                        "openai",
-                        "ollaya",
-                        "ollama",
-                      ],
-                      "type": "string",
-                    },
-                    "model": {
-                      "minLength": 1,
-                      "type": "string",
-                    },
-                    "prompt": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "decider",
+                "ask": {
+                  "enum": [
+                    "person",
                   ],
-                  "type": "object",
+                  "type": "string",
                 },
                 "clis": {
                   "items": {
@@ -1530,83 +1423,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "label": {
                   "type": "string",
                 },
-                "mcpServers": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "additionalProperties": false,
-                        "properties": {
-                          "args": {
-                            "default": [],
-                            "items": {
-                              "type": "string",
-                            },
-                            "type": "array",
-                          },
-                          "command": {
-                            "minLength": 1,
-                            "type": "string",
-                          },
-                          "env": {
-                            "additionalProperties": {
-                              "type": "string",
-                            },
-                            "default": {},
-                            "propertyNames": {
-                              "type": "string",
-                            },
-                            "type": "object",
-                          },
-                        },
-                        "required": [
-                          "command",
-                          "args",
-                          "env",
-                        ],
-                        "type": "object",
-                      },
-                      {
-                        "additionalProperties": false,
-                        "properties": {
-                          "headers": {
-                            "additionalProperties": {
-                              "type": "string",
-                            },
-                            "default": {},
-                            "propertyNames": {
-                              "type": "string",
-                            },
-                            "type": "object",
-                          },
-                          "url": {
-                            "format": "uri",
-                            "type": "string",
-                          },
-                        },
-                        "required": [
-                          "url",
-                          "headers",
-                        ],
-                        "type": "object",
-                      },
-                    ],
-                  },
-                  "propertyNames": {
-                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
-                    "type": "string",
-                  },
-                  "type": "object",
-                },
                 "model": {
                   "minLength": 1,
                   "type": "string",
-                },
-                "nodeClis": {
-                  "items": {
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
-                    "type": "string",
-                  },
-                  "type": "array",
                 },
                 "outcomes": {
                   "items": {
@@ -3368,13 +3187,13 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
-  "agentNodeSchema": "13e378286abcfddbbdf95ec737fc349e9ebf2f2223360efbaf69c10ab4d2b13e",
+  "agentNodeSchema": "af0999f5ca7bbf65319f53c02156037e14b015d4d5077dc9c0ddc56fc5c5da42",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
   "callNodeSchema": "3db8301e635a18936d1f3dd38a3d3b832e454808871572edde59bb8910fd74c3",
-  "chatRequestSchema": "aa062554707d50ad5b199158411ca2c73a635c073c39c61e38db9ddf21bd298c",
+  "chatRequestSchema": "08f2e8b66ffd66a59b0d1d35918579313c1bbe06a11499a0b3cbe5f329e86cbe",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -3390,9 +3209,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "028d9752731ca5a40d4433ad1c49998b2767da59e27b4c9b6f1ac57122308291",
+  "flowNodeSchema": "c44ad34602211345bdb62e90d0b67eeb6ad65aa763e41b98f59305a4c6322b6f",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "d167e363776a675ca9ec693019be1e5b60564d6759fdd41efefde0216d5af896",
+  "flowSchema": "20ff4f0d931da95e89474fea9bf920dba257c931943bc68eaaf1fbe357cb309d",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
@@ -3416,9 +3235,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "schedulesFileSchema": "3eab457fc7e32059aab407e8d51c3b190aa8b358f1719a8142ce517b996b58de",
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
-  "suggestionKindSchema": "1a9702439df52e7984afdb2307e7a9039d6de5e6881299269eb72f5509e108b6",
-  "suggestionRequestSchema": "3652d1a8704469d6a35a805d1ad733f4ac8f3c9939c564b48b3b940948f1a937",
-  "suggestionSchema": "224aa6217ef03492d1a57666aa46a216efcc7e4596391dac41922d09920dfad1",
+  "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
+  "suggestionRequestSchema": "2b702a0bfdd4d86005c8c17edc34aa84516c31807aca98318d61d355ea83679c",
+  "suggestionSchema": "8e9b93aec369332c2ce49f4281518a7c2587b40690b562f6efd17c9733963668",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",

@@ -553,7 +553,7 @@ describe("when a secret was set and used", () => {
 });
 
 describe("mcpServersFor", () => {
-	test("the node's connections, then its own servers, expanded", async () => {
+	test("the node's connections, expanded", async () => {
 		const { store } = await makeStore({
 			TRACKER_TOKEN: "env-tracker",
 			DOCS_TOKEN: "env-docs",
@@ -565,9 +565,6 @@ describe("mcpServersFor", () => {
 
 		const result = await store.mcpServersFor({
 			connections: ["tracker", "docs"],
-			mcpServers: {
-				local: { command: "local-mcp", args: [], env: { T: ref("TEAM") } },
-			},
 		});
 		expect(result).toEqual({
 			ok: true,
@@ -585,24 +582,6 @@ describe("mcpServersFor", () => {
 						"X-Team": "night-keychain-docs",
 					},
 				},
-				local: { command: "local-mcp", args: [], env: { T: "night" } },
-			},
-		});
-	});
-
-	test("a server the node defines itself wins over a connection of the same name", async () => {
-		const { store } = await makeStore({ TRACKER_TOKEN: "t" });
-		await store.save(tracker);
-		const result = await store.mcpServersFor({
-			connections: ["tracker"],
-			mcpServers: {
-				tracker: { url: "https://own.example.com/mcp", headers: {} },
-			},
-		});
-		expect(result).toEqual({
-			ok: true,
-			servers: {
-				tracker: { url: "https://own.example.com/mcp", headers: {} },
 			},
 		});
 	});
@@ -642,7 +621,7 @@ describe("mcpServersFor", () => {
 		expect(secrets.reads).toEqual(["TRACKER_TOKEN"]);
 	});
 
-	test("no connections and no servers is an empty set", async () => {
+	test("no connections is an empty set", async () => {
 		const { store } = await makeStore();
 		expect(await store.mcpServersFor({})).toEqual({ ok: true, servers: {} });
 	});

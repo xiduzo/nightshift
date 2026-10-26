@@ -461,39 +461,6 @@ const commandKind: KindPrompt = {
 	},
 };
 
-const checkerKind: KindPrompt = {
-	what: "what the checker looks for",
-	task: ({ node }) => {
-		const agent = node.type === "agent" ? node : null;
-		const outcomes =
-			agent?.outcomes ?? nodeOutcomes(node).map((name) => ({ name }));
-		return [
-			"Write the brief of the checker: a small model that reads the agent's report (its summary, its final message and its data) after the step and picks the outcome. `text` is that brief.",
-			"",
-			"Rules:",
-			"- Say for each outcome what in the report makes it the right pick. Name the data fields to look at.",
-			"- Be strict where it matters: a pass needs evidence, such as tests that ran and passed.",
-			"- A few short sentences. Templates work, but the model already gets the task and the report.",
-			"",
-			"The outcomes to pick from:",
-			json(outcomes),
-			"",
-			"The agent's prompt:",
-			"```",
-			agent?.prompt.trim() || "(empty)",
-			"```",
-			"",
-			agent?.output
-				? `The agent's output schema:\n${json(agent.output)}`
-				: "The agent reports no structured data.",
-			"",
-			agent?.checker?.prompt?.trim()
-				? `The current brief:\n\`\`\`\n${agent.checker.prompt}\n\`\`\``
-				: "The checker has no brief yet.",
-		];
-	},
-};
-
 const argumentsKind: KindPrompt = {
 	what: "the arguments of a tool call",
 	task: ({ request, node }) => {
@@ -589,7 +556,6 @@ const NODE_KINDS: Record<Exclude<SuggestionKind, FlowKind>, KindPrompt> = {
 	rules: rulesKind,
 	expression: expressionKind,
 	command: commandKind,
-	checker: checkerKind,
 	arguments: argumentsKind,
 };
 

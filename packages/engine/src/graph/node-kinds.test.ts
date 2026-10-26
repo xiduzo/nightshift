@@ -137,6 +137,13 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 		expect(aux[0]?.kind === "ask" && typeof aux[0].make).toBe("function");
 	});
 
+	test("an Agent that asks a person has an ask node too", () => {
+		const asks = agent({ ask: "person" });
+		const aux = kindOf(asks).aux(asks);
+		expect(aux.map((a) => a.kind)).toEqual(["wait", "ask"]);
+		expect(aux[1]?.kind === "ask" && typeof aux[1].make).toBe("function");
+	});
+
 	test("a Command and a Tool wait while their Device is offline", () => {
 		expect(auxKinds(command())).toEqual(["wait"]);
 		expect(auxKinds(tool())).toEqual(["wait"]);
@@ -403,16 +410,12 @@ describe("connections and requirements: what run start asks", () => {
 		}
 	});
 
-	test("the Agent kind requires its CLI tools, its harness and, for a checker, the decider", async () => {
+	test("the Agent kind requires its CLI tools and its harness", async () => {
 		const caps = await has();
-		const nodes = [
-			agent({ harness: "codex", clis: ["gh"], checker: { prompt: "ok?" } }),
-		];
+		const nodes = [agent({ harness: "codex", clis: ["gh"] })];
 		expect(NODE_KINDS.agent.requirements.map((r) => r(nodes, caps))).toEqual([
-			'The flow uses the CLI tool "gh" (n), but no CLI tool has that name. Add it under Agents → Tools.',
 			'The flow uses the CLI tool "gh", but this computer does not have it. Install gh, or take it off the flow.',
 			"The flow has an Agent node on Codex (n), but no Codex harness is added. Add it under Agents.",
-			"The flow has an Agent node with a checker, but no decider is configured.",
 		]);
 	});
 
