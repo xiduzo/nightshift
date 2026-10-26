@@ -21,6 +21,7 @@ import {
 	edge,
 	flowOf,
 	type Harness,
+	held,
 	payloads,
 	startRun,
 } from "../testing/graph";
@@ -798,7 +799,7 @@ describe("the Call node with each", () => {
 		// the state (the list and the results are in the log).
 		expect(first.state.loops.loop).toEqual({ index: 1 });
 		expect(first.state.visits).toEqual({ loop: 1 });
-		expect(first.state.pending).toBeNull();
+		expect(held(first.state)).toBeNull();
 		// The For Each step and element 2 are open.
 		expect(loop.endedAt).toBeNull();
 		expect(loop.items.map((i) => [i.facts.id, i.state, i.open])).toEqual([
@@ -1118,7 +1119,7 @@ describe("the Call node with each", () => {
 		]);
 		expect(first.next).toEqual(["park__loop"]);
 		expect(first.state.loops).toEqual({ loop: null });
-		expect(first.state.pending).toMatchObject({
+		expect(held(first.state)).toMatchObject({
 			kind: "parked",
 			stepId: loop.id,
 			nodeId: "loop",

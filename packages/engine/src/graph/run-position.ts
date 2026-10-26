@@ -6,7 +6,13 @@ import {
 	scopeKey,
 } from "../log";
 import { countVisits, type DerivedStep, deriveSteps } from "../read";
-import type { Pending, RunStateUpdate, RunStateValues } from "./state";
+import {
+	heldOf,
+	type Pending,
+	type PositionState,
+	type RunStateUpdate,
+	type RunStateValues,
+} from "./state";
 
 /**
  * The run position: where a run is, as its checkpoint and its log agree.
@@ -47,10 +53,12 @@ import type { Pending, RunStateUpdate, RunStateValues } from "./state";
  * reads the checkpoint; the event log is the read model"). This module
  * changes neither: it is the one place where the two are compared.
  *
- * One branch today. The shapes are keyed by node in one scope, `pending`
- * is one slot per graph, and the front is one last step per scope. A walk
- * with parallel branches keys them per branch here (docs/steering/
- * langgraph-engine.md, "Fan-out and join").
+ * Parallel branches (`branches.ts`): the shapes are keyed by node in one
+ * scope, and so is `pending` (`heldOf`), so each branch's node finds its
+ * own hold. The front stays one last step per scope: a re-entry of a run
+ * parked on a branch names that branch's step (`reentry.ts`), and a run
+ * that crashed with two steps running goes on from its pending tasks
+ * (docs/steering/langgraph-engine.md, "Fan-out and join").
  */
 
 type NodeRef = Pick<FlowNode, "id">;
@@ -79,6 +87,8 @@ export type DoneStep = {
 	ended: EnginePayloads["StepEnded"];
 	/** The edge the walk took after it, when the log has one. */
 	edge: EnginePayloads["EdgeTaken"] | null;
+	/** Every edge the walk took after it: one, or the edges of a fan-out. */
+	edges: EnginePayloads["EdgeTaken"][];
 };
 
 /**
@@ -141,7 +151,7 @@ export type Position = {
  * on the first question that needs it.
  */
 export function positionOf(
-	state: Partial<Pick<RunStateValues, "pending" | "loops" | "visits">>,
+	state: PositionState,
 	events: readonly LoggedEvent[],
 	scope: Scope | null,
 ): Position {
@@ -217,14 +227,28 @@ function doneAfter(
 			e.seq > ended.seq,
 	);
 	if (finished) return null;
-	const edge = events.find(
+	// The edges after this end, up to the node's next step in the scope.
+	const next = events.find(
+		(e) =>
+			e.type === "StepStarted" &&
+			e.seq > ended.seq &&
+			e.payload.nodeId === step.nodeId &&
+			scopeKey(e.payload.scope ?? null) === key,
+	);
+	const edges = events.filter(
 		(e): e is EdgeTakenEvent =>
 			e.type === "EdgeTaken" &&
 			e.seq > ended.seq &&
+			(next === undefined || e.seq < next.seq) &&
 			e.payload.from === step.nodeId &&
 			scopeKey(e.payload.scope ?? null) === key,
 	);
-	return { step, ended: ended.payload, edge: edge?.payload ?? null };
+	return {
+		step,
+		ended: ended.payload,
+		edge: edges[0]?.payload ?? null,
+		edges: edges.map((e) => e.payload),
+	};
 }
 
 /**
@@ -241,11 +265,10 @@ export function isDone(
 
 /** The step the checkpoint holds for `nodeId`, or null when it holds another node's, or none. */
 export function heldStep(
-	state: Partial<Pick<RunStateValues, "pending">>,
+	state: Pick<PositionState, "pending">,
 	nodeId: string,
 ): Pending | null {
-	const pending = state.pending ?? null;
-	return pending?.nodeId === nodeId ? pending : null;
+	return heldOf(state.pending)[nodeId] ?? null;
 }
 
 /**

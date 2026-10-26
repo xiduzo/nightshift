@@ -17,6 +17,7 @@ import {
 	deriveVariables,
 } from "../read";
 import { RunRefusal, refuseUnless } from "../run-status";
+import { placeOf } from "./branches";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { sessionOf } from "./resume-point";
 import {
@@ -27,8 +28,13 @@ import {
 	reenteredNode,
 	takeBackVisit,
 } from "./run-position";
-import type { RunStateUpdate } from "./state";
-import type { ThreadEntry, ThreadSnapshot } from "./thread";
+import type { Parked, ResumeValue, RunStateUpdate } from "./state";
+import {
+	resumeEach,
+	type ThreadEntry,
+	type ThreadSnapshot,
+	type ThreadState,
+} from "./thread";
 
 /**
  * Re-entry: the daemon side of a resume. A person or the daemon asks a run
@@ -129,6 +135,34 @@ export function resumeTarget(
 	return { nodeId, stepId, scope, topNodeId };
 }
 
+/**
+ * What `RunResumed` records when a step on a branch parked the run: that
+ * step, not the last step of the log, which may be another branch's. Null
+ * when the thread is not parked on a branch of the run's own flow.
+ */
+function branchTarget(
+	flow: Flow,
+	events: readonly LoggedEvent[],
+	state: ThreadState,
+): ResumeTarget | null {
+	if (state.kind !== "interrupted") return null;
+	const parked = state.interrupts.find(
+		({ value }) => value.kind === "parked" && placeOf(flow, value.nodeId),
+	)?.value;
+	if (parked?.kind !== "parked") return null;
+	const step = parked.stepId
+		? deriveSteps(events).find((s) => s.id === parked.stepId && !s.scope)
+		: undefined;
+	const continued =
+		step?.nodeType === "agent" && sessionOf(step) !== null ? step : null;
+	return {
+		nodeId: parked.nodeId,
+		stepId: continued?.id ?? null,
+		scope: null,
+		topNodeId: parked.nodeId,
+	};
+}
+
 /** The follow-up prompt of an Agent session that the daemon continues after a restart. */
 export const DAEMON_RESUME_PROMPT =
 	"Night Shift stopped while you worked on this, so your last actions may or may not have happened. Before you repeat any of them, check the worktree (git status, git log) and the remote (pushed branches, pull requests, comments). Then continue where you left off.";
@@ -217,12 +251,13 @@ export function planReentry(input: {
 	if (request.kind === "rerun") {
 		return planRerun(flow, events, thread, request, clearStopAt, cleared);
 	}
-	const target = resumeTarget(events) ?? {
-		nodeId: flow.start,
-		stepId: null,
-		scope: null,
-		topNodeId: flow.start,
-	};
+	const target = branchTarget(flow, events, thread.state) ??
+		resumeTarget(events) ?? {
+			nodeId: flow.start,
+			stepId: null,
+			scope: null,
+			topNodeId: flow.start,
+		};
 	const prompt =
 		request.prompt ??
 		(request.by === "daemon" ? DAEMON_RESUME_PROMPT : DEFAULT_RESUME_PROMPT);
@@ -237,20 +272,23 @@ export function planReentry(input: {
 		...(request.action ? { action: request.action } : {}),
 	};
 	const update = cleared ? { update: cleared } : {};
+	const answer = (parked: Parked): ResumeValue =>
+		parked.kind === "gate" ? { kind: "reopen" } : { kind: "resume", prompt };
 	switch (thread.state.kind) {
-		case "interrupted":
+		case "interrupted": {
+			// Parallel branches may sit at several: each takes its own answer.
+			const each = resumeEach(thread.state, answer);
 			return {
 				resumed,
 				entry: {
 					kind: "resume",
-					value:
-						thread.state.value.kind === "gate"
-							? { kind: "reopen" }
-							: { kind: "resume", prompt },
+					value: answer(thread.state.value),
 					...update,
+					...(each ? { each } : {}),
 				},
 				clearTasks: false,
 			};
+		}
 		case "pending":
 			return {
 				resumed,

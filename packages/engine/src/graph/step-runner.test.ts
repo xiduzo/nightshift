@@ -54,6 +54,7 @@ const stateOf = (extra: Partial<RunStateValues> = {}): RunStateValues => ({
 	loops: {},
 	pending: null,
 	ended: null,
+	joins: {},
 	...extra,
 });
 
@@ -423,7 +424,7 @@ describe("the step runner", () => {
 				expect(update.pending).toMatchObject(row.pending);
 			} else {
 				// Routed on: the step's visit and outputs are in the state, nothing pends.
-				expect(update.pending).toBeNull();
+				expect(update.pending).toEqual({ n: null });
 				expect(update.visits).toEqual({ n: 1 });
 			}
 			// One step at most, and the log is consistent with the state.

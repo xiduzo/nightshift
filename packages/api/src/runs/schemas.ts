@@ -169,6 +169,7 @@ const stepSummarySchema = z.object({
 		"wait",
 		"tool",
 		"end",
+		"join",
 	]),
 	visit: z.number(),
 	startedAt: z.number(),

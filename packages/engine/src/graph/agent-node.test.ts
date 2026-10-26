@@ -18,6 +18,7 @@ import {
 	agent as agentNode,
 	drive,
 	flowOf,
+	held,
 	MINUTE,
 	payloads,
 	startRun,
@@ -257,7 +258,7 @@ describe("the Agent node", () => {
 		// The log has the step list; the state does not keep it twice.
 		expect(derived?.outcome).toBe("pass");
 		expect("steps" in state).toBe(false);
-		expect(state.pending).toBeNull();
+		expect(held(state)).toBeNull();
 		expect(state.ended).toEqual({
 			status: "finished",
 			nodeId: "worker",
@@ -376,7 +377,7 @@ describe("the Agent node", () => {
 					'Node "worker" ended with "fail", but edge "retry" (worker → worker on fail, max 2) reached its max.',
 			},
 		]);
-		expect(state.pending).toMatchObject({
+		expect(held(state)).toMatchObject({
 			kind: "parked",
 			stepId: steps[2]?.id,
 			nodeId: "worker",
@@ -507,7 +508,7 @@ describe("the Agent node", () => {
 					"Usage limit: You've hit your limit. The step continues a minute after the reset.",
 			},
 		]);
-		expect(first.state.pending).toEqual({
+		expect(held(first.state)).toEqual({
 			kind: "wait",
 			stepId,
 			nodeId: "worker",
@@ -569,7 +570,7 @@ describe("the Agent node", () => {
 		);
 		expect(second.parked).toEqual([]);
 		expect(second.state.ended?.status).toBe("finished");
-		expect(second.state.pending).toBeNull();
+		expect(held(second.state)).toBeNull();
 		expect(second.state.visits).toEqual({ worker: 1 });
 		expect(harness.calls).toHaveLength(2);
 		expect(harness.calls[1]?.resumeSessionId).toBe("fake-session-1");
@@ -707,7 +708,7 @@ describe("the Agent node", () => {
 				reason: null,
 			},
 		]);
-		expect(second.state.pending).toMatchObject({
+		expect(held(second.state)).toMatchObject({
 			kind: "parked",
 			stepId,
 			visit: 1,
@@ -916,7 +917,7 @@ describe("the Agent node", () => {
 		expect(parked).toEqual([
 			{
 				kind: "parked",
-				stepId: state.pending?.stepId as string,
+				stepId: held(state)?.stepId as string,
 				nodeId: "worker",
 				status: "stopped",
 				reason: null,

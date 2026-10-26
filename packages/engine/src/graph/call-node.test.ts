@@ -12,6 +12,7 @@ import {
 	drive,
 	edge,
 	flowOf,
+	held,
 	payloads,
 	startRun,
 } from "../testing/graph";
@@ -211,7 +212,7 @@ describe("the Call node", () => {
 			"approved",
 		);
 		// The body's park (its step failed with no edge) never reached the root.
-		expect(state.pending).toBeNull();
+		expect(held(state)).toBeNull();
 		expect(await h.types()).toEqual([
 			"RunStarted",
 			"StepStarted",
@@ -355,7 +356,7 @@ describe("the Call node", () => {
 		]);
 		// The Subflow task never committed: the root stays at the node.
 		expect(first.next).toEqual(["call"]);
-		expect(first.state.pending).toBeNull();
+		expect(held(first.state)).toBeNull();
 		expect(first.state.visits).toEqual({});
 		expect(await h.types()).toEqual([
 			"RunStarted",

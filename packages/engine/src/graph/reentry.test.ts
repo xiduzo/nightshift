@@ -268,20 +268,21 @@ function threadAt(
 		...over,
 	};
 }
-const parkedAt = (stepId: string | null, nodeId = "b"): ThreadState => ({
+const at = (value: Parked): ThreadState => ({
 	kind: "interrupted",
-	value: { kind: "parked", stepId, nodeId, status: "stopped", reason: null },
+	value,
+	interrupts: [{ id: "i1", value }],
 });
-const gateAt = (stepId: string): ThreadState => ({
-	kind: "interrupted",
-	value: {
+const parkedAt = (stepId: string | null, nodeId = "b"): ThreadState =>
+	at({ kind: "parked", stepId, nodeId, status: "stopped", reason: null });
+const gateAt = (stepId: string): ThreadState =>
+	at({
 		kind: "gate",
 		stepId,
 		nodeId: "b",
 		question: "Ship it?",
 		choices: [],
-	} satisfies Parked,
-});
+	});
 const PENDING: ThreadState = { kind: "pending", next: ["b"] };
 const ENDED: ThreadState = {
 	kind: "ended",

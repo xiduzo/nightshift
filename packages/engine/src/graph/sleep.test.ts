@@ -18,6 +18,7 @@ import {
 	edge,
 	flowOf,
 	type Harness,
+	held,
 	MINUTE,
 	payloads,
 	startRun,
@@ -177,7 +178,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 			reason: "usage-limit",
 			until: resetAt + MINUTE,
 		});
-		expect(first.state.pending).toEqual({
+		expect(held(first.state)).toEqual({
 			kind: "wait",
 			stepId,
 			nodeId: "worker",
@@ -206,7 +207,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(d.resumed).toEqual([{ kind: "wake", early: false }]);
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: false }]);
 		const woken = await d.driven();
-		expect(woken.state.pending).toBeNull();
+		expect(held(woken.state)).toBeNull();
 		expect(woken.state.ended).toMatchObject({ status: "finished" });
 		expect(await h.types()).toEqual([
 			"RunStarted",
@@ -314,7 +315,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		// The body did not run again, and the park keeps the harness session
 		// for a resume.
 		expect(harness.calls).toHaveLength(1);
-		expect(woken.state.pending).toMatchObject({
+		expect(held(woken.state)).toMatchObject({
 			kind: "parked",
 			stepId: deriveSteps(await h.events())[0]?.id as string,
 			harnessSessionId: "fake-session-1",
@@ -475,7 +476,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 				since: time.now(),
 			},
 		]);
-		expect(first.state.pending).toEqual({
+		expect(held(first.state)).toEqual({
 			kind: "wait",
 			stepId,
 			nodeId: "pause",
@@ -572,11 +573,11 @@ describe("the sleep module: a Wait node's own wait", () => {
 			reason: "signal",
 			until: time.now() + 55 * MINUTE,
 		});
-		expect(again.state.pending).toMatchObject({
+		expect(held(again.state)).toMatchObject({
 			streak: { count: 2, since: time.now() - 5 * MINUTE },
 			session: null,
 		});
-		expect(again.state.pending).not.toHaveProperty("signal");
+		expect(held(again.state)).not.toHaveProperty("signal");
 
 		time.advance(5);
 		await d.wake({ early: true, signal: "deployed" });

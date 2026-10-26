@@ -224,7 +224,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				update: {
 					loops: { [node.id]: cursor },
 					...commitVisit(node, visit),
-					pending: null,
+					pending: { [node.id]: null },
 				},
 				goto: node.id,
 			});

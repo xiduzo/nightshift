@@ -14,7 +14,14 @@ import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
 import { createRecorders, type StepContext } from "../graph/context";
 import { createRunner, type Runner, type RunnerDeps } from "../graph/runner";
-import type { Parked, RunEvent, RunStateValues } from "../graph/state";
+import {
+	heldOf,
+	type Parked,
+	type Pending,
+	type PendingValue,
+	type RunEvent,
+	type RunStateValues,
+} from "../graph/state";
 import {
 	type DriveOutcome,
 	driveGraph,
@@ -286,6 +293,17 @@ export async function drive(
 		next: [...snapshot.next],
 		outcome,
 	};
+}
+
+/**
+ * The one step the state holds (a wait, a park or a Gate), or null when it
+ * holds none. Throws when it holds several: a test of parallel branches
+ * reads them by node (`heldOf`).
+ */
+export function held(state: { pending?: PendingValue }): Pending | null {
+	const holds = Object.values(heldOf(state.pending));
+	if (holds.length > 1) throw new Error("The state holds several steps.");
+	return holds[0] ?? null;
 }
 
 export const payloads = <T extends EngineEventType>(

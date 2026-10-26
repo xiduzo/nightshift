@@ -228,17 +228,135 @@ export const RunState = z.object({
 	traversals: mergedRecord<number>(),
 	/** The cursors of Call nodes with `each`, by node id; null once the loop ended. */
 	loops: mergedRecord<Loop | null>(),
-	/** One slot per graph: a walk with parallel branches keys it per branch (see `run-position.ts`). */
-	pending: withLangGraph(pendingSchema.nullable(), {
-		default: () => null as Pending | null,
+	/**
+	 * The steps a wait, a park or a Gate holds, by node id: one per branch
+	 * that holds one, so parallel branches each keep their own (`holds`).
+	 * Read it through `heldOf`: a checkpoint from before parallel branches
+	 * holds one `Pending` or null here.
+	 */
+	pending: withLangGraph(z.record(z.string(), pendingSchema), {
+		reducer: { schema: z.any(), fn: holds },
+		default: () => ({}) as Held,
 	}),
 	ended: withLangGraph(endedSchema.nullable(), {
 		default: () => null as Ended | null,
 	}),
+	/** The round of each Join whose branches run or ran (`JoinRound`), by Join id. */
+	joins: withLangGraph(z.record(z.string(), z.any()), {
+		reducer: { schema: z.any(), fn: joinRounds },
+		default: () => ({}) as Record<string, JoinRound>,
+	}),
 });
-export type RunStateValues = z.infer<typeof RunState>;
+export type RunStateValues = Omit<
+	z.infer<typeof RunState>,
+	"pending" | "joins"
+> & {
+	pending: PendingValue;
+	joins: Record<string, JoinRound>;
+};
 /** A node's state update: the channels it writes. */
-export type RunStateUpdate = Partial<RunStateValues>;
+export type RunStateUpdate = Partial<
+	Omit<RunStateValues, "pending" | "joins">
+> & {
+	pending?: PendingWrite;
+	joins?: Record<string, JoinRound>;
+};
+
+/** The steps the checkpoint holds, by node id. */
+export type Held = Record<string, Pending>;
+
+/** `pending` as a checkpoint may hold it: by node id, or one hold or none from before parallel branches. */
+export type PendingValue = Held | Pending | null;
+
+/** The part of the state that says where the run is: what the run position reads (`positionOf`). */
+export type PositionState = {
+	pending?: PendingValue;
+	loops?: RunStateValues["loops"];
+	visits?: RunStateValues["visits"];
+};
+
+/**
+ * A write to `pending`: a node's own hold (a `Pending`, kept under its
+ * node), the release of one or more nodes (`{ [nodeId]: null }`), or
+ * null: every hold goes (a re-entry starts clean).
+ */
+export type PendingWrite = Pending | Record<string, Pending | null> | null;
+
+/** Whether a stored or written value is one `Pending`, not a record of them. */
+function isPending(value: unknown): value is Pending {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as { kind?: unknown }).kind === "string"
+	);
+}
+
+/** The holds of a `pending` value, by node id. A checkpoint from before parallel branches holds one or none. */
+export function heldOf(value: unknown): Held {
+	if (value === null || value === undefined) return {};
+	if (isPending(value)) return { [value.nodeId]: value };
+	return value as Held;
+}
+
+/** The reducer of `pending`: a write sets or releases holds by node, null releases all. */
+function holds(current: unknown, write: PendingWrite): Held {
+	if (write === null) return {};
+	const next = { ...heldOf(current) };
+	if (isPending(write)) {
+		next[write.nodeId] = write;
+		return next;
+	}
+	for (const [nodeId, pending] of Object.entries(write)) {
+		if (pending === null) delete next[nodeId];
+		else next[nodeId] = pending;
+	}
+	return next;
+}
+
+/**
+ * One round of a Join: a fan-out opened it, its branches arrive in it, and
+ * the Join closes it when it goes on. A later fan-out of the same Join
+ * opens the next round.
+ */
+export type JoinRound = {
+	/** Counts the fan-outs into this Join. */
+	round: number;
+	/** The branches that arrived, by the node each entered the Join from, in order. */
+	arrived: { from: string; at: number }[];
+	/** The Join went on: a step of this round's branches that still runs goes no further. */
+	closed: boolean;
+};
+
+/**
+ * The reducer of `joins`, per Join: a later round replaces an earlier one,
+ * an earlier round's write is late and goes, and writes to the same round
+ * merge (branches that arrive in one super-step all count, and a close
+ * stays closed).
+ */
+function joinRounds(
+	current: Record<string, JoinRound>,
+	write: Record<string, JoinRound>,
+): Record<string, JoinRound> {
+	const next = { ...current };
+	for (const [joinId, round] of Object.entries(write)) {
+		const now = next[joinId];
+		if (!now || round.round > now.round) {
+			next[joinId] = round;
+			continue;
+		}
+		if (round.round < now.round) continue;
+		const known = new Set(now.arrived.map((a) => a.from));
+		next[joinId] = {
+			round: now.round,
+			arrived: [
+				...now.arrived,
+				...round.arrived.filter((a) => !known.has(a.from)),
+			],
+			closed: now.closed || round.closed,
+		};
+	}
+	return next;
+}
 
 /**
  * What an interrupt carries. The runner reads it from the stream's

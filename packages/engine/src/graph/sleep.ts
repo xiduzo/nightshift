@@ -4,10 +4,10 @@ import type { FlowNode, JsonValue, WaitUntil } from "@nightshift/flows";
 import type { LoggedEvent, PolicyWaitReason, RunBus, RunLog } from "../log";
 import {
 	type DerivedStep,
-	deriveOpenGate,
 	deriveRunState,
 	deriveSleep,
 	deriveSteps,
+	firstDeadline,
 } from "../read";
 import {
 	DEFAULT_RESUME_PROMPT,
@@ -21,6 +21,7 @@ import { planWait, type WaitStreak } from "./policy";
 import { waitNodeId } from "./route";
 import { commitVisit, heldStep } from "./run-position";
 import type {
+	Parked,
 	Pending,
 	PendingParked,
 	PendingWait,
@@ -432,14 +433,14 @@ export function planWake(
 	if (deriveRunState(events).status !== "sleeping") {
 		return { kind: "not-sleeping" };
 	}
-	if (at.kind !== "interrupted" || at.value.kind !== "wait") {
-		return { kind: "not-sleeping" };
-	}
-	const sleeping = at.value;
+	if (at.kind !== "interrupted") return { kind: "not-sleeping" };
+	const steps = deriveSteps(events);
+	const sleeping = sleepingBranch(events, steps, at, how);
+	if (!sleeping) return { kind: "not-sleeping" };
 	if (!how.early && sleeping.until !== null && now < sleeping.until) {
 		return { kind: "too-soon", until: sleeping.until };
 	}
-	const step = deriveSteps(events).find((s) => s.id === sleeping.stepId);
+	const step = steps.find((s) => s.id === sleeping.stepId);
 	if (!step) throw new Error(`Step not found: ${sleeping.stepId}`);
 	const resume: ResumeValue =
 		how.signal !== undefined
@@ -454,6 +455,43 @@ export function planWake(
 					...(how.prompt !== undefined ? { prompt: how.prompt } : {}),
 				};
 	return { kind: "wake", step, resume };
+}
+
+/**
+ * The wait a wake ends. One wait: the one the thread sits at. Parallel
+ * branches may sleep at once: a signal ends the wait for that signal, and
+ * a timer or a person the one that wakes first. A wait whose step a stop
+ * ended does not count.
+ */
+function sleepingBranch(
+	events: readonly LoggedEvent[],
+	steps: readonly DerivedStep[],
+	at: Extract<ThreadState, { kind: "interrupted" }>,
+	how: Wake,
+): Extract<Parked, { kind: "wait" }> | null {
+	const waits = at.interrupts.flatMap(({ value }) =>
+		value.kind === "wait" &&
+		steps.find((s) => s.id === value.stepId)?.endedAt === null
+			? [value]
+			: [],
+	);
+	if (waits.length < 2) {
+		return at.value.kind === "wait" ? at.value : (waits[0] ?? null);
+	}
+	if (how.signal !== undefined) {
+		const forSignal = waits.find((wait) =>
+			events.some(
+				(e) =>
+					e.type === "WaitStarted" &&
+					e.stepId === wait.stepId &&
+					e.payload.signal === how.signal,
+			),
+		);
+		if (forSignal) return forSignal;
+	}
+	const first = (wait: { until: number | null }) =>
+		wait.until ?? Number.POSITIVE_INFINITY;
+	return [...waits].sort((a, b) => first(a) - first(b))[0] ?? null;
 }
 
 /** What `recordWake` writes to. */
@@ -551,7 +589,7 @@ export function createSleeps(deps: SleepDeps) {
 	function restore(runId: string, events: readonly LoggedEvent[]): void {
 		const sleeping = deriveSleep(events);
 		if (sleeping?.until != null) schedule(runId, sleeping.until);
-		const deadline = deriveOpenGate(events)?.deadline;
+		const deadline = firstDeadline(events)?.deadline;
 		if (deadline) schedule(runId, deadline.at);
 	}
 

@@ -12,6 +12,7 @@ import {
 	drive,
 	edge,
 	flowOf,
+	held,
 	startRun,
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -180,7 +181,7 @@ describe("a waiting step's streak", () => {
 		let driven = await drive(h, { inputs: {} });
 		for (let i = 0; i < 3; i++) {
 			expect(driven.parked[0]).toMatchObject({ kind: "wait" });
-			const pending = driven.state.pending as PendingWait;
+			const pending = held(driven.state) as PendingWait;
 			waits.push(pending);
 			await h.log.append({
 				type: "WaitEnded",

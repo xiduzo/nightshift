@@ -7,6 +7,7 @@ import type {
 	EndNode,
 	FlowNode,
 	FlowNodeType,
+	JoinNode,
 	Outcome,
 	ToolNode,
 	ValueNode,
@@ -62,6 +63,8 @@ const callEach = (source: Record<string, unknown> = { kind: "json" }) =>
 	call({ each: { source } });
 const end = (status: EndNode["status"] = "done") =>
 	node<EndNode>({ type: "end", status });
+const join = (fields: Record<string, unknown> = {}) =>
+	node<JoinNode>({ type: "join", wait: "all", ...fields });
 
 const ALL_TYPES: FlowNodeType[] = [
 	"agent",
@@ -72,6 +75,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"wait",
 	"call",
 	"end",
+	"join",
 ];
 
 describe("NODE_KINDS", () => {
@@ -92,6 +96,7 @@ describe("NODE_KINDS", () => {
 			wait({ kind: "duration", minutes: 1 }),
 			call(),
 			end(),
+			join(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -116,6 +121,7 @@ describe("make and resumeRules", () => {
 			[call(), RESUME_RULES.call],
 			[callEach(), RESUME_RULES.callEach],
 			[end(), RESUME_RULES.fresh],
+			[join(), RESUME_RULES.fresh],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -222,6 +228,11 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 		expect(chosen(w, "done")).toBe(true);
 		expect(reason(w, "done")).toBeNull();
 		expect(chosen(w, "timeout")).toBe(false);
+	});
+
+	test("a Join that is done ends the flow plainly", () => {
+		expect(chosen(join(), "done")).toBe(true);
+		expect(reason(join(), "done")).toBeNull();
 	});
 
 	test("a Call once ends on pass; a Call with each ends on any outcome, done plainly", () => {

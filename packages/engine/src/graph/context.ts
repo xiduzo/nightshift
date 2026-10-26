@@ -31,6 +31,7 @@ import {
 import type { DerivedStep } from "../read";
 import type { RunResult } from "../run-status";
 import type { KeptFlow } from "../variables";
+import type { Races } from "./branches";
 import type { ResumeRules } from "./resume-point";
 import type { RunEvent, RunStateValues } from "./state";
 
@@ -132,6 +133,11 @@ export type StepContext = {
 	 * node modules: they import it.
 	 */
 	kindOf(node: FlowNode): NodeKind;
+	/**
+	 * The race of the `first` Joins of this thread and the running steps of
+	 * branches it may stop (`branches.ts`). A body shares its caller's.
+	 */
+	races: Races;
 };
 
 /** A node of the compiled graph: runs one visit and returns where to go next. */

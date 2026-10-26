@@ -1,10 +1,11 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Database } from "@nightshift/db";
-import type {
-	Flow,
-	FlowNode,
-	JsonValue,
-	ResolvedPolicy,
+import {
+	branchPlaces,
+	type Flow,
+	type FlowNode,
+	type JsonValue,
+	type ResolvedPolicy,
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { Device } from "../device";
@@ -20,7 +21,7 @@ import {
 	type RunStatus,
 	runsArriving,
 } from "../log";
-import { deriveOpenGate, deriveRunState, deriveSteps } from "../read";
+import { deriveRunState, deriveSteps, firstDeadline } from "../read";
 import {
 	ARRIVING,
 	RunRefusal,
@@ -34,11 +35,12 @@ import { FencedError } from "./fence";
 import { type CloseDeps, type CutShort, closeOpenWork } from "./open-work";
 import { planReentry, type ReentryRequest } from "./reentry";
 import { createSleeps, planWake, recordWake, type Wake } from "./sleep";
-import type { Parked, RunEvent } from "./state";
+import type { Parked, ResumeValue, RunEvent } from "./state";
 import {
 	endingOf,
 	inputOf,
 	openThread,
+	resumeEach,
 	type StreamInput,
 	type Thread,
 	type ThreadDeps,
@@ -266,6 +268,10 @@ type TurnState = { freed: boolean };
 export type Runner = ReturnType<typeof createRunner>;
 
 const DRIVING: Taken = { kind: "driving" };
+/** An answer to a Gate on one branch while another branch's step still runs. */
+const BRANCHES_WORK =
+	"Another branch of this run is still working. Answer the Gate when its step ends.";
+
 const HALTED: Taken = { kind: "halted" };
 const QUEUED: Taken = { kind: "queued" };
 const UNCHANGED: Taken = { kind: "unchanged" };
@@ -580,7 +586,7 @@ export function createRunner(deps: RunnerDeps) {
 				controller: walk.controller,
 				onEvent: (event) => onCustom(runId, event),
 			});
-			if (outcome.kind === "parked") onInterrupt(runId, outcome.parked);
+			if (outcome.kind === "parked") onInterrupt(runId, outcome.interrupts);
 			const ending = endingOf(outcome);
 			if (!ending) {
 				// A run that waits or holds a Gate keeps only what its resume
@@ -651,20 +657,24 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * The root's interrupt ended the drive. A stop that came in while the
+	 * The root's interrupts ended the drive. A stop that came in while the
 	 * wait began or the Gate opened closed the drive's fence, so the drive
 	 * never gets here: the stop closed the parked step itself. A `parked`
-	 * step ends the run (`endingOf`); a Gate needs nothing.
+	 * step ends the run (`endingOf`); a Gate needs nothing. Parallel
+	 * branches may sleep at once: the timer is for the earliest wake.
 	 */
-	function onInterrupt(runId: string, parked: Parked): void {
+	function onInterrupt(runId: string, interrupts: readonly Parked[]): void {
 		// A wait with no time (a signal with no timeout) has no timer.
-		if (parked.kind === "wait" && parked.until !== null) {
-			sleeps.schedule(runId, parked.until);
-		}
 		// A Gate with a deadline: the timer answers it then (`deadlineTurn`).
-		if (parked.kind === "gate" && parked.deadline) {
-			sleeps.schedule(runId, parked.deadline.at);
-		}
+		// Parallel branches may wait at once: the timer is for the earliest.
+		const wakes = interrupts.flatMap((parked) =>
+			parked.kind === "wait" && parked.until !== null
+				? [parked.until]
+				: parked.kind === "gate" && parked.deadline
+					? [parked.deadline.at]
+					: [],
+		);
+		if (wakes.length > 0) sleeps.schedule(runId, Math.min(...wakes));
 	}
 
 	/**
@@ -789,12 +799,20 @@ export function createRunner(deps: RunnerDeps) {
 		return DRIVING;
 	}
 
-	/** An answer: the thread continues at once, so it needs a slot. A full cap leaves the Gate open. */
+	/**
+	 * An answer: the thread continues at once, so it needs a slot. A full
+	 * cap leaves the Gate open. A Gate on one of parallel branches opens
+	 * while the other branches still work: the answer waits until they end.
+	 */
 	async function answerTurn(
 		row: RunRow,
 		intent: Extract<Intent, { kind: "answer" }>,
 		options: TakeOptions,
 	): Promise<Taken> {
+		const flow = walkOf(row.id)?.thread?.ctx.flow;
+		if (flow && branchPlaces(flow).size > 0) {
+			throw new RunRefusal("not-now", BRANCHES_WORK);
+		}
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		// The Gate's deadline, if it has one, no longer applies.
 		sleeps.forget(row.id);
@@ -802,18 +820,17 @@ export function createRunner(deps: RunnerDeps) {
 		const asked =
 			deriveSteps(await log.events(row.id)).find((s) => s.id === intent.stepId)
 				?.gate?.openedSeq ?? 0;
-		drive(
-			row,
-			inputOf({
-				kind: "resume",
-				value: {
-					kind: "gate",
-					choice,
-					note,
-					...(byDeadline ? { byDeadline } : {}),
-				},
-			}),
+		const value: ResumeValue = {
+			kind: "gate",
+			choice,
+			note,
+			...(byDeadline ? { byDeadline } : {}),
+		};
+		// Parallel branches may hold several Gates: the answer goes to its own.
+		const each = resumeEach(await threadOf(row).state(), (parked) =>
+			parked.kind === "gate" && parked.stepId === intent.stepId ? value : null,
 		);
+		drive(row, inputOf({ kind: "resume", value, ...(each ? { each } : {}) }));
 		// The ask node ends the step on the answer, or an Agent's step opens
 		// again with it. The Turn ends once the Gate closed, so the run no
 		// longer waits when the caller looks again (I8).
@@ -833,8 +850,9 @@ export function createRunner(deps: RunnerDeps) {
 		events: readonly LoggedEvent[],
 		options: TakeOptions,
 	): Promise<Taken> {
-		const gate = deriveOpenGate(events);
-		if (!gate?.deadline) return UNCHANGED;
+		// Parallel branches may wait at several Gates: the first deadline is due.
+		const gate = firstDeadline(events);
+		if (!gate) return UNCHANGED;
 		if (deps.now() < gate.deadline.at) {
 			sleeps.schedule(row.id, gate.deadline.at);
 			return UNCHANGED;
@@ -865,7 +883,8 @@ export function createRunner(deps: RunnerDeps) {
 		options: TakeOptions,
 	): Promise<Taken> {
 		const runId = row.id;
-		const plan = planWake(events, await threadOf(row).state(), how, deps.now());
+		const at = await threadOf(row).state();
+		const plan = planWake(events, at, how, deps.now());
 		if (plan.kind === "not-sleeping") return UNCHANGED;
 		if (plan.kind === "too-soon") {
 			sleeps.schedule(runId, plan.until);
@@ -875,7 +894,19 @@ export function createRunner(deps: RunnerDeps) {
 		sleeps.forget(runId);
 		if (!reserve(runId, intent, options)) return QUEUED;
 		await recordWake({ log, bus, recorders }, runId, plan, how);
-		drive(row, inputOf({ kind: "resume", value: plan.resume }));
+		const each = resumeEach(at, (parked) =>
+			parked.kind === "wait" && parked.stepId === plan.step.id
+				? plan.resume
+				: null,
+		);
+		drive(
+			row,
+			inputOf({
+				kind: "resume",
+				value: plan.resume,
+				...(each ? { each } : {}),
+			}),
+		);
 		return DRIVING;
 	}
 

@@ -3,8 +3,14 @@ import {
 	END,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import { type FlowNode, type JsonValue, nextEdge } from "@nightshift/flows";
+import {
+	type FlowEdge,
+	type FlowNode,
+	type JsonValue,
+	nextEdge,
+} from "@nightshift/flows";
 import type { Scope, StepOutcome, StepOutputs } from "../log";
+import { arrive, openRound, outrun, placeOf } from "./branches";
 import type { NodeAction, StepContext } from "./context";
 import { interruptNode } from "./interrupt";
 import { commitVisit, type DoneStep } from "./run-position";
@@ -118,6 +124,12 @@ export function parkStopped(
  *   with the End's result, goto END); `fail`, `needs-input` and the rest
  *   park as failed.
  * - every edge on the outcome at its max parks as failed.
+ *
+ * Parallel branches (`branches.ts`): a fan-out takes every edge at once and
+ * opens a round of its Join; a branch that reaches its Join arrives in
+ * that round; a step of a branch its Join left behind goes no further; and
+ * an outcome with no edge on a branch parks as failed, since a branch ends
+ * at its Join, never at the end of the flow.
  */
 export function route(
 	ctx: StepContext,
@@ -154,7 +166,7 @@ export function routeDone(
 		error: ended.error,
 		...(ended.variables ? { variables: ended.variables } : {}),
 	};
-	return routeOn(ctx, state, node, end, config, extra, done.edge);
+	return routeOn(ctx, state, node, end, config, extra, done.edges);
 }
 
 async function routeOn(
@@ -164,7 +176,7 @@ async function routeOn(
 	end: StepEnd,
 	config: LangGraphRunnableConfig,
 	extra: RunStateUpdate | undefined,
-	taken: DoneStep["edge"],
+	taken: DoneStep["edges"] | null,
 ): Promise<Command> {
 	const { outcome, visit } = end;
 	const update: RunStateUpdate = {
@@ -172,8 +184,11 @@ async function routeOn(
 		nodes: { [node.id]: end.outputs },
 		...(end.variables ? { vars: end.variables } : {}),
 		...commitVisit(node, visit),
-		pending: null,
+		pending: { [node.id]: null },
 	};
+	// A branch another branch outran goes no further, whatever its end:
+	// its Join went on without it (`branches.ts`).
+	if (outrun(ctx, state, node, config)) return new Command({ update });
 	const park = (status: "failed" | "stopped", reason: string | null) =>
 		parkCommand({ node, status, reason, step: end, update });
 	// A stop parks. The one exception: a Call node the stop time ended
@@ -188,26 +203,34 @@ async function routeOn(
 			`Node "${node.id}" failed: ${end.error ?? "unknown error"}`,
 		);
 	}
-	if (taken) {
-		// The walk took this edge before the commit was lost.
-		return new Command({
-			update: {
-				...update,
-				traversals: {
-					[taken.edgeId]: (state.traversals[taken.edgeId] ?? 0) + 1,
-				},
-			},
-			goto: taken.to,
-		});
-	}
 	const choice = nextEdge({
 		flow: ctx.flow,
 		from: node.id,
 		outcome,
 		traversals: state.traversals,
 	});
+	const [first] = taken ?? [];
+	if (first && choice.kind !== "fan-out") {
+		// The walk took this edge before the commit was lost.
+		return new Command({
+			update: {
+				...update,
+				...arrivalAt(ctx, state, node, first.to, config),
+				traversals: {
+					[first.edgeId]: (state.traversals[first.edgeId] ?? 0) + 1,
+				},
+			},
+			goto: first.to,
+		});
+	}
 	if (choice.kind === "end") {
 		const kind = ctx.kindOf(node);
+		if (placeOf(ctx.flow, node.id)) {
+			return park(
+				"failed",
+				`Node "${node.id}" ended with "${outcome}" on a branch, and no edge leads on to its Join.`,
+			);
+		}
 		if (kind.isChosenEnd(node, outcome)) {
 			const result = kind.endResult(node, outcome);
 			return new Command({
@@ -241,7 +264,44 @@ async function routeOn(
 			`Node "${node.id}" ended with "${outcome}", but edge ${edges} reached its max.`,
 		);
 	}
+	if (choice.kind === "fan-out") {
+		// Every branch at once. An edge the log has already (the commit
+		// after it was lost) is not appended again.
+		const logged = new Set((taken ?? []).map((e) => e.edgeId));
+		const traversals: Record<string, number> = {};
+		for (const edge of choice.edges) {
+			traversals[edge.id] = (state.traversals[edge.id] ?? 0) + 1;
+			if (logged.has(edge.id)) continue;
+			await takeEdge(ctx, edge, outcome, config);
+		}
+		return new Command({
+			update: {
+				...update,
+				...openRound(ctx, state, node.id, outcome),
+				traversals,
+			},
+			goto: choice.edges.map((edge) => edge.to),
+		});
+	}
 	const { edge } = choice;
+	await takeEdge(ctx, edge, outcome, config);
+	return new Command({
+		update: {
+			...update,
+			...arrivalAt(ctx, state, node, edge.to, config),
+			traversals: { [edge.id]: (state.traversals[edge.id] ?? 0) + 1 },
+		},
+		goto: edge.to,
+	});
+}
+
+/** `EdgeTaken` in the log, in the flow's scope. */
+async function takeEdge(
+	ctx: StepContext,
+	edge: FlowEdge,
+	outcome: string,
+	config: LangGraphRunnableConfig,
+): Promise<void> {
 	await ctx.log.append({
 		type: "EdgeTaken",
 		runId: ctx.run.id,
@@ -253,13 +313,19 @@ async function routeOn(
 			scope: scopeOf(config),
 		},
 	});
-	return new Command({
-		update: {
-			...update,
-			traversals: { [edge.id]: (state.traversals[edge.id] ?? 0) + 1 },
-		},
-		goto: edge.to,
-	});
+}
+
+/** A branch's arrival when the edge leads to a Join, else nothing (`arrive`). */
+function arrivalAt(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	to: string,
+	config: LangGraphRunnableConfig,
+): RunStateUpdate {
+	const target = ctx.flow.nodes.find((n) => n.id === to);
+	if (target?.type !== "join") return {};
+	return arrive(ctx, state, node.id, target, ctx.now(), config);
 }
 
 /**

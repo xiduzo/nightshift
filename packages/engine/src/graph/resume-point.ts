@@ -4,7 +4,7 @@ import { type DerivedStep, deriveSteps } from "../read";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { type DoneStep, isCutShort, positionOf } from "./run-position";
 import { pendingWaitOf } from "./sleep";
-import type { RunStateValues } from "./state";
+import type { PositionState } from "./state";
 import type { StepStart } from "./step-runner";
 
 /**
@@ -141,7 +141,7 @@ export const RESUME_RULES = {
 /** Decides how `node` re-enters. Appends nothing. */
 export function resumePoint(
 	node: Pick<FlowNode, "id">,
-	state: Pick<RunStateValues, "pending" | "loops" | "visits">,
+	state: PositionState,
 	events: readonly LoggedEvent[],
 	scope: Scope | null,
 	rules: ResumeRules,

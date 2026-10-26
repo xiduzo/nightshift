@@ -20,6 +20,7 @@ import {
 	type StepEvent,
 	type StepOutcome,
 	type StepOutputs,
+	scopeKey,
 	transcriptPath,
 } from "../log";
 import {
@@ -31,6 +32,7 @@ import {
 	gitAuthorOf,
 } from "../read";
 import { keptNames, saveKeptValues } from "../variables";
+import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import {
 	emit,
 	keptFlowOf,
@@ -67,7 +69,7 @@ import {
 	sleep,
 	type WaitRequest,
 } from "./sleep";
-import type { PendingGate, RunStateValues } from "./state";
+import type { PendingGate, RunStateUpdate, RunStateValues } from "./state";
 
 /**
  * The step runner: one deep module that owns the lifecycle every step node
@@ -99,8 +101,8 @@ import type { PendingGate, RunStateValues } from "./state";
  * A cut would spread that lifecycle over the nodes again.
  */
 
-/** Why a step's signal aborted. */
-export type AbortReason = "stopped" | "timeout" | "idle";
+/** Why a step's signal aborted. `outrun`: another branch reached a `first` Join (`branches.ts`). */
+export type AbortReason = "stopped" | "timeout" | "idle" | "outrun";
 
 /**
  * How a node enters: a new visit (the default), or an existing step of the
@@ -185,7 +187,11 @@ export type OpenStep = StepHandle & {
 	leaveOpen(): void;
 };
 
-/** What `beginStep` gives: a step to run, or the run parked before it. */
+/**
+ * What `beginStep` gives: a step to run, or the `command` the node returns
+ * instead: the run parked before the step, or the node is on a branch
+ * another branch outran, and goes no further (a command with no goto).
+ */
 export type BeginStep =
 	| { kind: "step"; step: OpenStep }
 	| { kind: "parked"; command: Command };
@@ -261,6 +267,8 @@ export type StepSpec = {
 	 * kind's empty fields. Default `{ visit }`.
 	 */
 	outputs?(step: StepHandle): StepOutputs | Promise<StepOutputs>;
+	/** What the step's route writes besides its end: a Join closes its round. */
+	update?: RunStateUpdate;
 };
 
 /**
@@ -276,7 +284,10 @@ export async function runStep(
 ): Promise<Command> {
 	const events = await ctx.log.events(ctx.run.id);
 	const entry = resumePoint(node, state, events, scopeOf(config), spec.rules);
-	if (entry.kind === "done") return routeDone(ctx, state, node, entry, config);
+	const extra = spec.update;
+	if (entry.kind === "done") {
+		return routeDone(ctx, state, node, entry, config, extra);
+	}
 	const begun = await beginStep(
 		ctx,
 		node,
@@ -334,7 +345,7 @@ export async function runStep(
 				result.error,
 				extraOf(result),
 			);
-			return route(ctx, state, node, end, config);
+			return route(ctx, state, node, end, config, extra);
 		}
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
@@ -344,7 +355,7 @@ export async function runStep(
 				aborted.error,
 				extraOf(result),
 			);
-			return route(ctx, state, node, end, config);
+			return route(ctx, state, node, end, config, extra);
 		}
 		case "ask":
 			return askPerson(ctx, node, state, config, step, result);
@@ -361,13 +372,13 @@ export async function runStep(
 			if (slept.kind === "asleep") return slept.command;
 			// The step ends before its wait: with the session it has, and
 			// what the decider cost before it hit the limit.
-			const extra = result.kind === "wait" ? extraOf(result) : {};
+			const costs = result.kind === "wait" ? extraOf(result) : {};
 			if (slept.kind === "stop-time") {
 				const end = await step.end(
 					"stopped",
 					await blank("stopped"),
 					null,
-					extra,
+					costs,
 				);
 				return parkStopped(node, end, slept.reason);
 			}
@@ -375,9 +386,9 @@ export async function runStep(
 				"error",
 				await blank("error"),
 				slept.error,
-				extra,
+				costs,
 			);
-			return route(ctx, state, node, end, config);
+			return route(ctx, state, node, end, config, extra);
 		}
 	}
 }
@@ -433,7 +444,8 @@ export function budgetError(
 /**
  * The end an aborted step has, from its signal's reason: `error` with why
  * for the node's time budget or no activity, else `stopped` (a person
- * stopped the run). The outputs the body had so far are kept.
+ * stopped the run, or another branch outran this one, which the error
+ * says). The outputs the body had so far are kept.
  */
 export function abortEnd(
 	ctx: StepContext,
@@ -456,7 +468,7 @@ export function abortEnd(
 	return {
 		outcome: "stopped",
 		outputs: { ...outputs, outcome: "stopped" },
-		error: null,
+		error: reason === "outrun" ? OUTRUN_ERROR : null,
 	};
 }
 
@@ -516,6 +528,13 @@ export async function beginStep(
 	let visit: number;
 	let existing: DerivedStep | null = null;
 	if (start.kind === "new") {
+		// A branch another branch outran starts nothing more.
+		if (outrun(ctx, state, node, config)) {
+			return {
+				kind: "parked",
+				command: new Command({ update: { pending: { [node.id]: null } } }),
+			};
+		}
 		// Only a new visit parks before its step: a continued or reopened step
 		// enters the node body with the aborted signal, so it ends `stopped`
 		// with its session and a later resume can reopen it.
@@ -625,6 +644,12 @@ export async function beginStep(
 		);
 	};
 	touch();
+	// A step of a branch stops when another branch wins a `first` Join.
+	const unrace = placeOf(ctx.flow, node.id)
+		? ctx.races.running(scopeKey(scope), node.id, () =>
+				stepController.abort("outrun" satisfies AbortReason),
+			)
+		: () => {};
 
 	let closed = false;
 	const leaveOpen = () => {
@@ -634,6 +659,7 @@ export async function beginStep(
 		clearTimeout(timer);
 		clearTimeout(idleTimer);
 		runSignal.removeEventListener("abort", onStop);
+		unrace();
 	};
 
 	const handle: OpenStep = {

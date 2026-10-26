@@ -9,6 +9,7 @@ import {
 	command,
 	drive,
 	flowOf,
+	held,
 	MINUTE,
 	payloads,
 	startRun,
@@ -198,7 +199,7 @@ describe("the Wait node", () => {
 			stepId,
 			until: time.now() + 5 * MINUTE,
 		});
-		expect(second.state.pending).toMatchObject({
+		expect(held(second.state)).toMatchObject({
 			streak: { count: 2, since: time.now() - 5 * MINUTE },
 		});
 
@@ -312,8 +313,8 @@ describe("the Wait node", () => {
 			reason: "signal",
 			until: null,
 		});
-		expect(woken.state.pending).toMatchObject({ streak: { count: 2 } });
-		expect(woken.state.pending).not.toHaveProperty("signal");
+		expect(held(woken.state)).toMatchObject({ streak: { count: 2 } });
+		expect(held(woken.state)).not.toHaveProperty("signal");
 
 		// The signal arrives.
 		time.advance(4);

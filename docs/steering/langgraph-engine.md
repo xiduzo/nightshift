@@ -580,58 +580,70 @@ The checkpoint is still the walk's and the log still the read model (ADR
 position is the one place where the two are compared.
 `graph/run-position.test.ts` holds the rule as tables.
 
-## Fan-out and join (a plan, not built)
+## Fan-out and join (`graph/branches.ts`, `graph/nodes/join.ts`)
 
-Night Shift has no parallel branches yet: the four reviews of the ZAC
-feature factory run one after another. This is the plan to add them,
-against the run position.
+Built 2026-10-26 (node review, `docs/research/node-review-2026-10.md`
+§5.1). The earlier plan here made each branch a body, as a Call's is. The
+flow file chose plain edges instead: two or more edges without a `max` on
+one outcome are a fan-out, and every branch ends at the same Join node
+(`wait: "all" | "first"`). `@nightshift/flows` reads the shape
+(`fanOutsOf`, `branchPlaces`) and checks it (`validate/branches.ts`): one
+Join per fan-out, branches that share no node, do not fan out again and
+do not lead back, no edge into a branch or its Join from outside.
 
-**The shape.** A Fan-out is one node kind. Its branches run at the same
-time; its end is the join. Each branch is a body, as a Call's is: a called
-flow (or a Section) in its own scope `{ parentStepId, itemId: <branch> }`.
-The join waits for every branch and ends on a join rule (every branch
-passed, any passed, the first that ended), with each branch's outputs in
-the node's outputs. The branch ends are facts in the log, as items are for
-a Call with `each`.
+**In LangGraph.** The fan-out's `route()` returns one `Command` with every
+branch's node in `goto`, so the branches run as tasks of one super-step.
+Each branch moves on in the super-steps after, in step with the others:
+a super-step ends when all its tasks did, so a branch's next step starts
+when the steps of the other branches end. A Join runs whenever a branch
+reaches it; it does nothing until its rule holds, then runs one step that
+ends `done` with each branch's `data` keyed by the node it came from.
 
-**In LangGraph.** The fan-out node sends one task per branch (`Send` to a
-branch node), and a join node runs in the super-step after them. Each
-branch task has its own task id, so its body has its own checkpoint
-namespace (`<node>:<task id>`). Two bodies called from one task would share
-one namespace, so the branches cannot be concurrent calls inside one node.
-A branch that parks or waits interrupts its own task. LangGraph keeps the
-writes of the branch tasks that ended, and a resume runs only the
-interrupted ones.
+**What the state learned.**
 
-**What the run position learns: the branch is a key.**
+1. `pending` is keyed by node (`Held`, reducer `holds`): each branch
+   keeps its own wait, park or Gate, and `route()` releases only its own
+   node. `heldOf` reads a checkpoint from before, which holds one
+   `Pending` or null.
+2. `joins` keeps one round per Join (`JoinRound`): the fan-out opens it,
+   each branch that reaches the Join arrives in it, the Join's route
+   closes it. A later round replaces an earlier one; writes to one round
+   merge, so branches that arrive in one super-step all count.
+3. A branch whose round is closed goes no further (`outrun`): its new
+   steps do not start, and a step that ends routes nowhere.
 
-1. Inside a branch, the body has its own state, so `visits`, `pending`,
-   `loops` and the front work per scope as today.
-2. At the root, the branch tasks write in one super-step. `pending` is one
-   slot (a last-value channel), and two writes to it in one step throw.
-   Branch tasks write no root `pending`; the fan-out keeps its work per
-   branch in a channel keyed by branch, with a merging reducer. The
-   fan-out commits its own visit once, at the join.
-3. `latestFront` (one last step over every scope) becomes one front per
-   branch, and `reenteredNode` and `resumeTarget` with it. `RunResumed`
-   names one step today; a run with two parked branches needs one target
-   per branch.
-4. `ThreadState.interrupted` holds one interrupt; the root can have one per
-   branch. `driveGraph` collects every root interrupt already. A resume
-   answers one interrupt by its id (`Command({ resume: { [id]: value } })`).
-5. The Turn. A branch's Gate can open while another branch runs, and the
-   super-step ends only when every branch task ended or interrupted. One
-   drive per run (runner invariant I4) means an answer waits until then.
-   Open question for the product: say "Your answer is saved. The run goes
-   on when the other branches finish", or let a branch drive alone.
-6. Status, stop and recovery. A run with a Gate open in one branch and a
-   step running in another is running, with the Gate in the inbox.
-   `closeOpenWork` ends every open step from the inside out already; a
-   parked Gate stays open on recovery, per branch.
+**`first`.** A super-step waits for all its tasks, so the Join alone would
+wait for the slowest branch. The branch that reaches a `first` Join first
+claims the round in memory (`Races`, one per Thread) and aborts the steps
+that run on the other branches (`AbortReason` `outrun`: they end
+`stopped` with "Another branch reached the Join first."). After a
+restart the claim is gone and the Join picks the earliest arrival from
+the state.
 
-**The order to build it.** The run position keyed per branch; the thread
-state with one interrupt per branch; the Turn for an answer during a
-super-step; then the node kind, with a fan-out in the crash test's flow.
+**Interrupts.** A branch that parks, sleeps or opens a Gate interrupts
+its own task. The other tasks of the super-step finish, and the walk
+halts until a person or a wake answers: the other branches pause after
+their running step. The thread can sit at several interrupts
+(`ThreadState.interrupted.interrupts`). A resume answers each by its id
+(`ThreadEntry.each`, `resumeEach`): every parked branch is resumed, a
+Gate asks again, an answer or a wake goes to its own step only. A drive
+that ends with a parked branch ends the run, even when another waits.
+An answer to a Gate while another branch's step still runs is refused
+with words for that. `RunResumed` names the parked branch's node
+(`branchTarget`).
+
+**Crash.** `crash.test.ts` walks a fan-out too, with a crash and a stop
+before every write. A fan-out whose commit was lost goes on from the log
+(`DoneStep.edges`: the `EdgeTaken` of each branch it took, appended once).
+
+**Not built.** A branch that fans out again (a called flow can). One
+copy of the project per branch: branches share the run's worktree, and
+the checks warn about two Agents that can edit files. A Gate answered
+while the other branches run (the "Turn" question): the answer is
+refused until their steps end. Two branches may each hold a Gate or an
+Agent's ask at once, and each answer goes to its own step. An Agent's ask
+closes in the log when its step reopens, in the super-step after the
+answer: while another branch still waits, the answered ask looks open.
 
 ## The resume point (`graph/resume-point.ts`)
 

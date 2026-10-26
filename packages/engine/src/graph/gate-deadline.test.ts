@@ -204,3 +204,62 @@ describe("a Gate with a deadline", () => {
 		expect(payloads(await h.events(), "GateOpened")).toEqual([]);
 	});
 });
+
+describe("Gates with deadlines on parallel branches", () => {
+	test("the timer holds the first deadline; each Gate takes its option at its own, then the Join goes on", async () => {
+		const branchGate = (id: string, minutes: number): DecisionNode => ({
+			...gate({ minutes, choose: "keep" }),
+			id,
+		});
+		const flow = flowOf(
+			[
+				command("start", "true"),
+				branchGate("soon", 30),
+				branchGate("late", 60),
+				{ id: "joined", type: "join", position: { x: 0, y: 0 }, wait: "all" },
+			],
+			[
+				edge("s1", "start", "pass", "soon"),
+				edge("s2", "start", "pass", "late"),
+				edge("j1", "soon", "keep", "joined"),
+				edge("j2", "late", "keep", "joined"),
+			],
+		);
+		const { h, runner, clock } = await setup(flow);
+		await waitFor(
+			async () =>
+				!runner.isActive(h.runId) &&
+				deriveSteps(await h.events()).filter(
+					(s) => s.gate !== null && s.endedAt === null,
+				).length === 2,
+		);
+		const outcomeOf = async (nodeId: string) =>
+			deriveSteps(await h.events()).find((s) => s.nodeId === nodeId)?.outcome;
+
+		// The first deadline is due: only its Gate takes its option.
+		clock.now = T0 + 30 * MINUTE;
+		expect(await runner.take(h.runId, { kind: "wake", early: false })).toEqual({
+			kind: "driving",
+		});
+		await waitFor(
+			async () =>
+				!runner.isActive(h.runId) && (await outcomeOf("soon")) === "keep",
+		);
+		expect(await outcomeOf("late")).toBeNull();
+		expect(await statusOf(h)).toBe("waiting");
+
+		// Before the second deadline the timer changes nothing.
+		clock.now = T0 + 45 * MINUTE;
+		expect(await runner.take(h.runId, { kind: "wake", early: false })).toEqual({
+			kind: "unchanged",
+		});
+
+		clock.now = T0 + 60 * MINUTE;
+		expect(await runner.take(h.runId, { kind: "wake", early: false })).toEqual({
+			kind: "driving",
+		});
+		await waitFor(async () => (await statusOf(h)) === "finished");
+		expect(await outcomeOf("late")).toBe("keep");
+		expect(await outcomeOf("joined")).toBe("done");
+	});
+});

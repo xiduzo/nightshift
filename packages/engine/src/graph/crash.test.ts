@@ -101,6 +101,30 @@ const FLOW: Flow = flowOf(
 	],
 );
 
+/**
+ * The same walk with parallel branches: the agent fans out to a second
+ * Agent and a Command, which run side by side and meet at a Join, then a
+ * rule decides. Two steps run at once, so a crash comes while both run,
+ * between their ends, between the arrivals and the Join, and between the
+ * edges of the fan-out.
+ */
+const FANOUT: Flow = flowOf(
+	[
+		agent("build", "Build it"),
+		agent("review", "Review it"),
+		{ id: "lint", type: "command", position: { x: 0, y: 0 }, command: "true" },
+		{ id: "joined", type: "join", position: { x: 0, y: 0 }, wait: "all" },
+		ruled("decide", "go"),
+	],
+	[
+		edge("f1", "build", "pass", "review"),
+		edge("f2", "build", "pass", "lint"),
+		edge("f3", "review", "pass", "joined"),
+		edge("f4", "lint", "pass", "joined"),
+		edge("f5", "joined", "done", "decide"),
+	],
+);
+
 /** What a run did, as a person reads it from the log. */
 type Story = {
 	/** Each step that ended on its own: node, item, outcome. A cut-short step is left out. */
@@ -270,13 +294,16 @@ async function recover(runner: Runner, h: Harness): Promise<void> {
 }
 
 /** Walks the flow to its end, with `fault` on the way. Returns the story and the writes the walk made. */
-async function walk(fault: Fault | null): Promise<{
+async function walk(
+	fault: Fault | null,
+	flow: Flow = FLOW,
+): Promise<{
 	story: Story;
 	writes: number;
 	trace: string[];
 	uncommitted: string[];
 }> {
-	const h = await startRun(sandbox, FLOW, {
+	const h = await startRun(sandbox, flow, {
 		harness: harness(),
 		flows: { item: ITEM },
 	});
@@ -340,7 +367,7 @@ async function walk(fault: Fault | null): Promise<{
 		story: storyOf(events),
 		writes: faulty.state.writes,
 		trace: faulty.state.trace,
-		uncommitted: FLOW.nodes
+		uncommitted: flow.nodes
 			.filter((node) => at.uncommitted(node) !== null)
 			.map((node) => node.id),
 	};
@@ -397,6 +424,72 @@ describe("a crash at every write of a walk", () => {
 						}
 					} catch (error) {
 						wrong.push({ at, before, error: String(error) });
+					}
+				}
+				expect(wrong).toEqual([]);
+			},
+			{ timeout: 600_000 },
+		);
+	}
+});
+
+describe("a crash at every write of a walk with parallel branches", () => {
+	let baseline: Story;
+	let writes = 0;
+
+	beforeAll(async () => {
+		const clean = await walk(null, FANOUT);
+		baseline = clean.story;
+		writes = clean.writes;
+	}, 60_000);
+
+	/** The branches end in any order: compare the steps as a set. */
+	const unordered = (story: Story) => ({
+		...story,
+		steps: [...story.steps].sort((a, b) =>
+			a.join("|").localeCompare(b.join("|")),
+		),
+	});
+
+	test("the walk without a crash: both branches, the Join, the rule", () => {
+		expect(unordered(baseline)).toEqual({
+			steps: [
+				["build", null, "pass"],
+				["decide", null, "go"],
+				["joined", null, "done"],
+				["lint", null, "pass"],
+				["review", null, "pass"],
+			],
+			items: [],
+			ended: {
+				status: "finished",
+				reason: 'Ended at node "decide" with "go".',
+			},
+		});
+		expect(writes).toBeGreaterThan(20);
+	});
+
+	for (const kind of ["crash", "stop"] as const) {
+		test(
+			`a ${kind} before each write: the run ends as the walk without one`,
+			async () => {
+				const wrong: {
+					at: number;
+					story?: Story;
+					uncommitted?: string[];
+					error?: string;
+				}[] = [];
+				for (let at = 1; at <= writes; at++) {
+					try {
+						const { story, uncommitted } = await walk({ at, kind }, FANOUT);
+						if (
+							!Bun.deepEquals(unordered(story), unordered(baseline)) ||
+							uncommitted.length > 0
+						) {
+							wrong.push({ at, story, uncommitted });
+						}
+					} catch (error) {
+						wrong.push({ at, error: String(error) });
 					}
 				}
 				expect(wrong).toEqual([]);

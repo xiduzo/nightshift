@@ -101,7 +101,10 @@ export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
 		async answer(pending, answer, state, config) {
 			if (answer?.kind !== "gate") {
 				// A reopen, or anything else: the node asks again in a new visit.
-				return new Command({ update: { pending: null }, goto: node.id });
+				return new Command({
+					update: { pending: { [node.id]: null } },
+					goto: node.id,
+				});
 			}
 			const done = await resolve(ctx, node, state, config, pending, answer);
 			if (done.kind === "parked") return done.command;
@@ -111,7 +114,11 @@ export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
 		// node asks again in a new visit, as a reopen does.
 		stale: {
 			ctx,
-			letGo: () => new Command({ update: { pending: null }, goto: node.id }),
+			letGo: () =>
+				new Command({
+					update: { pending: { [node.id]: null } },
+					goto: node.id,
+				}),
 		},
 	});
 }

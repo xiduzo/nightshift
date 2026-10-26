@@ -318,32 +318,57 @@ export type OpenGateFact = {
  * while the run has not ended. A Gate step that started but never wrote
  * `GateOpened` (the daemon died in between) is not open: recovery
  * interrupts it like any other step. `steps` as for `deriveRunState`.
+ * Parallel branches may wait at several: this is the latest
+ * (`deriveOpenGates` has them all).
  */
 export function deriveOpenGate(
 	events: readonly LoggedEvent[],
 	steps?: readonly DerivedStep[],
 ): OpenGateFact | null {
+	return deriveOpenGates(events, steps).at(-1) ?? null;
+}
+
+/** Every Gate the run waits at, in the order the steps started: one per branch that waits. */
+export function deriveOpenGates(
+	events: readonly LoggedEvent[],
+	steps?: readonly DerivedStep[],
+): OpenGateFact[] {
 	const latest = latestRunEvent(events);
-	if (!latest || latest.type === "RunEnded") return null;
+	if (!latest || latest.type === "RunEnded") return [];
 	const walkBegan = latest.seq;
-	const open = (steps ?? deriveSteps(events)).findLast(
-		(s) =>
-			s.endedAt === null &&
-			s.gate !== null &&
-			s.gate.openedSeq > s.openedSeq &&
-			s.gate.openedSeq > walkBegan,
+	return (steps ?? deriveSteps(events)).flatMap((open) =>
+		open.endedAt === null &&
+		open.gate !== null &&
+		open.gate.openedSeq > open.openedSeq &&
+		open.gate.openedSeq > walkBegan
+			? [
+					{
+						stepId: open.id,
+						nodeId: open.nodeId,
+						visit: open.visit,
+						question: open.gate.question,
+						choices: open.gate.choices,
+						lockScreen: open.gate.lockScreen,
+						openedAt: open.gate.openedAt,
+						deadline: open.gate.deadline,
+					},
+				]
+			: [],
 	);
-	if (!open?.gate) return null;
-	return {
-		stepId: open.id,
-		nodeId: open.nodeId,
-		visit: open.visit,
-		question: open.gate.question,
-		choices: open.gate.choices,
-		lockScreen: open.gate.lockScreen,
-		openedAt: open.gate.openedAt,
-		deadline: open.gate.deadline,
-	};
+}
+
+/** The open Gate whose deadline comes first, or null when no open Gate has one. */
+export function firstDeadline(
+	events: readonly LoggedEvent[],
+): (OpenGateFact & { deadline: GateDeadline }) | null {
+	let first: (OpenGateFact & { deadline: GateDeadline }) | null = null;
+	for (const gate of deriveOpenGates(events)) {
+		const { deadline } = gate;
+		if (deadline && (!first || deadline.at < first.deadline.at)) {
+			first = { ...gate, deadline };
+		}
+	}
+	return first;
 }
 
 /**

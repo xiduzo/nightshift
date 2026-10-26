@@ -44,17 +44,21 @@ export function choiceRoutes(
 			outcome: asks ? "fail" : choice.name,
 			traversals: run.traversals,
 		});
+		const label = (id: string) => labels.get(id) ?? id;
 		routes.set(
 			choice.name,
 			next.kind === "edge"
-				? {
-						kind: "node",
-						nodeId: next.edge.to,
-						label: labels.get(next.edge.to) ?? next.edge.to,
-					}
-				: next.kind === "end"
-					? { kind: "end" }
-					: { kind: "limit" },
+				? { kind: "node", nodeId: next.edge.to, label: label(next.edge.to) }
+				: next.kind === "fan-out"
+					? {
+							// Several branches at once: the first names the route, the label all.
+							kind: "node",
+							nodeId: next.edges[0]?.to ?? "",
+							label: next.edges.map((edge) => label(edge.to)).join(" and "),
+						}
+					: next.kind === "end"
+						? { kind: "end" }
+						: { kind: "limit" },
 		);
 	}
 	return routes;

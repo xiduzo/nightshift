@@ -12,6 +12,7 @@ export {
 	deriveStopAt,
 	deriveTraversals,
 	deriveWorktrees,
+	firstDeadline,
 	isOpenStatus,
 	parkedSteps,
 	type SleepFact,

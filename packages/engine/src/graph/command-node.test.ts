@@ -8,7 +8,7 @@ import { templateEnvName } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read/derive-steps";
-import { drive, flowOf, payloads, startRun } from "../testing/graph";
+import { drive, flowOf, held, payloads, startRun } from "../testing/graph";
 import {
 	createSandbox,
 	type Sandbox,
@@ -123,7 +123,7 @@ describe("the Command node", () => {
 			visit: 1,
 		});
 		expect(state.visits).toEqual({ ship: 1 });
-		expect(state.pending).toBeNull();
+		expect(held(state)).toBeNull();
 		expect(state.ended).toEqual({
 			status: "finished",
 			nodeId: "ship",
@@ -251,7 +251,7 @@ describe("the Command node", () => {
 				error: null,
 			},
 		]);
-		expect(state.pending).toMatchObject({
+		expect(held(state)).toMatchObject({
 			kind: "parked",
 			stepId: slow?.id,
 			nodeId: "slow",

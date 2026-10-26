@@ -10,6 +10,7 @@ import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import type { RunBus, RunEnding, RunLog, RunRow } from "../log";
 import type { RunResult } from "../run-status";
+import { createRaces } from "./branches";
 import { compileFlow } from "./compile";
 import type { createRecorders, StepContext } from "./context";
 import { createFence, type Fence, FencedSaver, fencedLog } from "./fence";
@@ -72,10 +73,18 @@ export type ThreadDeps = {
 	policyFor(flow: Flow): ResolvedPolicy;
 };
 
+/** One interrupt the thread sits at, with the id a resume answers it by. */
+export type Interrupt = { id: string; value: Parked };
+
 /** Where a run's thread is, for the engine's resume mapping (design rule 9). */
 export type ThreadState =
-	/** The thread sits at an interrupt: a wait, a Gate, or a parked step. */
-	| { kind: "interrupted"; value: Parked }
+	/**
+	 * The thread sits at an interrupt: a wait, a Gate, or a parked step.
+	 * Parallel branches can sit at several (`interrupts`, `value` is the
+	 * first). A branch already answered may still be listed until the
+	 * super-step ends: a resume aims at an interrupt by its step.
+	 */
+	| { kind: "interrupted"; value: Parked; interrupts: Interrupt[] }
 	/**
 	 * A node is pending without an interrupt: the daemon died, a stop came,
 	 * or the engine failed, while it ran or before its super-step was
@@ -101,7 +110,8 @@ export type ThreadSnapshot = {
 export type DriveOutcome =
 	/**
 	 * The root's interrupt ended the drive. `parked` is the one the runner
-	 * reacts to (the last); `interrupts` lists every root interrupt, in order.
+	 * reacts to: the first parked step, else the last; `interrupts` lists
+	 * every root interrupt, in order.
 	 */
 	| { kind: "parked"; parked: Parked; interrupts: Parked[] }
 	/** The graph reached END with `ended` set. */
@@ -173,6 +183,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		dataDir: deps.dataDir,
 		settings: deps.settings,
 		kindOf,
+		races: createRaces(),
 	};
 	const saver = new FencedSaver(deps.db, fence);
 	const graph = compileFlow(flow, ctx).compile({ checkpointer: saver });
@@ -219,11 +230,13 @@ function stateOf(
 	values: Partial<RunStateValues>,
 	hasCheckpoint: boolean,
 ): ThreadState {
-	const interrupt = snapshot.tasks
+	const interrupts = snapshot.tasks
 		.flatMap((task) => task.interrupts)
-		.find((i) => i.value !== undefined);
+		.filter((i) => i.value !== undefined && i.id !== undefined)
+		.map((i) => ({ id: i.id as string, value: i.value as Parked }));
+	const [interrupt] = interrupts;
 	if (interrupt) {
-		return { kind: "interrupted", value: interrupt.value as Parked };
+		return { kind: "interrupted", value: interrupt.value, interrupts };
 	}
 	// `next` leaves out a task whose writes are saved but whose super-step
 	// has no checkpoint yet (the daemon died, or a stop came, in between).
@@ -275,11 +288,13 @@ export async function driveGraph(
 			const root = (data as Record<string, unknown>).__interrupt__ as
 				| { value: Parked }[]
 				| undefined;
-			const first = root?.[0];
-			if (first) interrupts.push(first.value);
+			for (const each of root ?? []) interrupts.push(each.value);
 		}
 		if (fence.closed) return { kind: "fenced" };
-		const parked = interrupts[interrupts.length - 1];
+		// A parked branch ends the run, even when another branch waits.
+		const parked =
+			interrupts.find((i) => i.kind === "parked") ??
+			interrupts[interrupts.length - 1];
 		if (parked) return { kind: "parked", parked, interrupts };
 		const latest = await graph.getState(configOf(runId));
 		const ended = (latest.values as Partial<RunStateValues>).ended;
@@ -330,10 +345,37 @@ export type ThreadEntry =
 	| { kind: "start"; inputs: Record<string, JsonValue>; stopAt: number | null }
 	/** The node the thread is pending at runs again. `update` writes state first. */
 	| { kind: "continue"; update?: RunStateUpdate }
-	/** Answers the interrupt the thread sits at. `update` writes state before the node goes on. */
-	| { kind: "resume"; value: ResumeValue; update?: RunStateUpdate }
+	/**
+	 * Answers the interrupt the thread sits at. `update` writes state before
+	 * the node goes on. `each`: when parallel branches sit at several, the
+	 * answer per interrupt id; one left out keeps waiting.
+	 */
+	| {
+			kind: "resume";
+			value: ResumeValue;
+			update?: RunStateUpdate;
+			each?: Record<string, ResumeValue>;
+	  }
 	/** Jumps to a top-level node with `update` written first. */
 	| { kind: "goto"; nodeId: string; update: RunStateUpdate };
+
+/**
+ * The answer to one interrupt among several (`ThreadEntry.each`): the
+ * resume for every interrupt `pick` gives a value, by id. Null when the
+ * thread sits at one interrupt or none: the plain resume answers it.
+ */
+export function resumeEach(
+	state: ThreadState,
+	pick: (value: Parked) => ResumeValue | null,
+): Record<string, ResumeValue> | null {
+	if (state.kind !== "interrupted" || state.interrupts.length < 2) return null;
+	const each: Record<string, ResumeValue> = {};
+	for (const { id, value } of state.interrupts) {
+		const answer = pick(value);
+		if (answer) each[id] = answer;
+	}
+	return Object.keys(each).length > 0 ? each : null;
+}
 
 /** The LangGraph input of an entry: the one place that builds a `Command`. */
 export function inputOf(entry: ThreadEntry): StreamInput {
@@ -344,7 +386,7 @@ export function inputOf(entry: ThreadEntry): StreamInput {
 			return entry.update ? new Command({ update: entry.update }) : null;
 		case "resume":
 			return new Command({
-				resume: entry.value,
+				resume: entry.each ?? entry.value,
 				...(entry.update ? { update: entry.update } : {}),
 			});
 		case "goto":

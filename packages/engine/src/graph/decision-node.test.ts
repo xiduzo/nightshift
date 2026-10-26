@@ -9,7 +9,14 @@ import type {
 } from "@nightshift/agents/types";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read/derive-steps";
-import { command, drive, flowOf, payloads, startRun } from "../testing/graph";
+import {
+	command,
+	drive,
+	flowOf,
+	held,
+	payloads,
+	startRun,
+} from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 
@@ -332,7 +339,7 @@ describe("the Decision node", () => {
 				message: expect.stringContaining("continues in 5 min"),
 			},
 		]);
-		expect(first.state.pending).toMatchObject({
+		expect(held(first.state)).toMatchObject({
 			kind: "wait",
 			stepId,
 			nodeId: "decide",

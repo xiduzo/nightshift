@@ -9,6 +9,7 @@ import {
 	drive,
 	flowOf,
 	type Harness,
+	held,
 	payloads,
 	startRun,
 } from "../testing/graph";
@@ -108,7 +109,7 @@ describe("the Gate node", () => {
 		]);
 		// The visit commits on the answer; the open Gate is in the checkpoint.
 		expect(first.state.visits).toEqual({});
-		expect(first.state.pending).toEqual({
+		expect(held(first.state)).toEqual({
 			kind: "gate",
 			stepId,
 			nodeId: "gate",
@@ -265,7 +266,7 @@ describe("the Gate node", () => {
 		expect(payloads(await h.events(), "GateOpened")).toEqual([
 			{ question: "Ready?", choices },
 		]);
-		expect(first.state.pending).toMatchObject({ choices });
+		expect(held(first.state)).toMatchObject({ choices });
 		expect(
 			(await readTranscriptFile(gateStep?.transcriptPath as string)).map(
 				(e) => e.event,
@@ -378,7 +379,7 @@ describe("the Gate node", () => {
 		h.saver.putWrites = putWrites;
 		const dead = await h.graph().getState(h.config);
 		expect(dead.next).toEqual(["gate"]);
-		expect(dead.values.pending).toBeNull();
+		expect(held(dead.values)).toBeNull();
 		const before = await h.events();
 		expect(before.map((e) => e.type)).toEqual([
 			"RunStarted",
@@ -399,7 +400,7 @@ describe("the Gate node", () => {
 				choices: CHOICES,
 			},
 		]);
-		expect(again.state.pending).toMatchObject({ kind: "gate", stepId });
+		expect(held(again.state)).toMatchObject({ kind: "gate", stepId });
 		expect(await h.events()).toEqual(before);
 
 		const answered = await drive(
