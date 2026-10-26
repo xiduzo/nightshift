@@ -14,6 +14,7 @@ export {
 	writeChanges,
 } from "./apply";
 export {
+	type AssistantScope,
 	type AssistantService,
 	type AssistantUsage,
 	type ChatEvent,

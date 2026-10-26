@@ -135,11 +135,21 @@ export type ChatEvent =
 	| { type: "text"; delta: string }
 	| { type: "proposal"; proposal: FlowProposal };
 
+/**
+ * Who asks, and in which Space: the chat reads the project's other flows
+ * and its runs as this Person sees them in that Space.
+ */
+export type AssistantScope = { spaceId: string; personId: string };
+
 /** The daemon's assistant. Stopping: abort `signal`; the stream then ends. */
 export interface AssistantService {
 	suggest(
 		request: SuggestionRequest,
 		signal: AbortSignal,
 	): AsyncIterable<SuggestionEvent>;
-	chat(request: ChatRequest, signal: AbortSignal): AsyncIterable<ChatEvent>;
+	chat(
+		request: ChatRequest,
+		signal: AbortSignal,
+		scope: AssistantScope,
+	): AsyncIterable<ChatEvent>;
 }

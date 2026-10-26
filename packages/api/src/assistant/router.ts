@@ -42,7 +42,10 @@ export const assistant = {
 		.handler(async function* ({ context, input, signal, path }) {
 			const controller = follow(signal);
 			try {
-				yield* context.assistant.chat(input, controller.signal);
+				yield* context.assistant.chat(input, controller.signal, {
+					spaceId: context.spaceId,
+					personId: context.session.user.id,
+				});
 			} catch (error) {
 				throw readable(error, path);
 			}

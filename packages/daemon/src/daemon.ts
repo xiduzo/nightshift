@@ -469,13 +469,17 @@ export async function createDaemon(
 		cliTools,
 		toolLaunchers,
 		profiles,
-		// Suggestions in the flow editor: on this computer's profiles, read
-		// only in the project's Clone.
+		// Suggestions and chats in the flow editor: on this computer's
+		// profiles, read only in the project's Clone. A chat reads the
+		// project's flows and runs as the Person sees them in the Space.
 		assistant: createAssistant({
 			profiles,
 			settings,
 			...harnessLookup(harnesses, settings),
 			clonePath,
+			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+			cliTools,
+			connections,
 		}),
 		checks: programChecks(),
 		projectSetup: {

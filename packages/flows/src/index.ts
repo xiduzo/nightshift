@@ -1,6 +1,7 @@
 // Browser-safe. File access lives in "@nightshift/flows/files".
 
 export {
+	type AssistantScope,
 	type AssistantService,
 	type AssistantUsage,
 	applySuggestion,
