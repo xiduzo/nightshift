@@ -1,6 +1,7 @@
 import {
 	gateParts,
 	markdownPreview,
+	plainText,
 	type TranscriptEntry,
 } from "@nightshift/client";
 
@@ -128,7 +129,7 @@ export function transcriptLines(
 				push({
 					key: `gate:${seq}`,
 					kind: "night-shift",
-					text: `Asks: ${gateParts(event.question).headline}`,
+					text: `Asks: ${plainText(gateParts(event.question).headline)}`,
 				});
 				break;
 			case "gate-resolved":

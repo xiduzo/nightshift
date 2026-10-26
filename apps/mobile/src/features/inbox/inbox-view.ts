@@ -3,6 +3,7 @@ import {
 	gateRun,
 	inboxOrder,
 	type OpenGate,
+	plainText,
 	waitedText,
 	waitingForYou,
 } from "@nightshift/client";
@@ -243,7 +244,7 @@ export function gateRowText(
 	const { flow } = gateRun(gate);
 	return {
 		overline: `${gate.projectName} · ${flow}`,
-		title: headline,
+		title: plainText(headline),
 		choices: choicesText(gate.choices.length),
 		nodeId: gate.nodeId,
 		waited: waitedText(now - gate.openedAt),

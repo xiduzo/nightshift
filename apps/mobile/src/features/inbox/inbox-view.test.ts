@@ -197,6 +197,14 @@ describe("gateRowText", () => {
 		});
 	});
 
+	test("the headline shows without Markdown marks", () => {
+		const row = gateRowText(
+			gate({ question: "**Ship** the [fix](https://x)?" }),
+			0,
+		);
+		expect(row.title).toBe("Ship the fix?");
+	});
+
 	test("a Gate that links a pull request shows its icon", () => {
 		const row = gateRowText(
 			gate({

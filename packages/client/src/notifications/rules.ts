@@ -1,4 +1,4 @@
-import type { OpenGate } from "../gates";
+import { gateParts, type OpenGate, plainText } from "../gates";
 import type { RunSummary } from "../runs";
 
 /** What a notice tells about: the Gate that opened, or the run that ended. */
@@ -9,7 +9,7 @@ type NoticeFacts =
 			run: Pick<RunSummary, "title" | "reason">;
 	  };
 
-/** The words of a notice: the project, the run and the question, or the run and how it ended. */
+/** The words of a notice: the project, the run and the question as plain text, or the run and how it ended. */
 export function describeNotice(notice: NoticeFacts): {
 	title: string;
 	body: string;
@@ -18,7 +18,7 @@ export function describeNotice(notice: NoticeFacts): {
 		case "gate-opened":
 			return {
 				title: `${notice.gate.projectName}: a Gate waits for you`,
-				body: `${notice.gate.runTitle}\n${notice.gate.question}`,
+				body: `${notice.gate.runTitle}\n${plainText(gateParts(notice.gate.question).headline)}`,
 			};
 		case "run-finished":
 			return {

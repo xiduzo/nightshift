@@ -21,6 +21,10 @@ const ALLOWED: Record<string, "types" | "values"> = {
 	"@orpc/client/plugins": "values",
 	"@orpc/tanstack-query": "values",
 	"@tanstack/react-query": "values",
+	mdast: "types",
+	"mdast-util-from-markdown": "values",
+	"mdast-util-gfm": "values",
+	"micromark-extension-gfm": "values",
 	react: "values",
 };
 

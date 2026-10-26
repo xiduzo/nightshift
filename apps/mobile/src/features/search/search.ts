@@ -2,6 +2,7 @@ import {
 	gateParts,
 	gateRun,
 	type OpenGate,
+	plainText,
 	type RunSummary,
 	runStatusLabel,
 } from "@nightshift/client";
@@ -38,7 +39,7 @@ export function searchGates<G extends OpenGate>(
 	if (words.length === 0) return [...gates];
 	return gates.filter((gate) =>
 		matches(words, [
-			gateParts(gate.question).headline,
+			plainText(gateParts(gate.question).headline),
 			gate.projectName,
 			gateRun(gate).flow,
 			gate.runTitle,

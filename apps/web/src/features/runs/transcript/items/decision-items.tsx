@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { outcomeLabel, outcomeStyle, stepStateStyle } from "@/features/flows";
 import { JsonBlock } from "@/shared/code";
 import { formatDateTime, formatRelative, formatTime } from "@/shared/format";
+import { Markdown } from "@/shared/markdown";
 import type {
 	DecisionAskItem,
 	DecisionItem,
@@ -180,9 +181,7 @@ export function GateQuestion({
 				</span>
 			}
 		>
-			<p className="whitespace-pre-wrap break-words leading-relaxed">
-				{item.question}
-			</p>
+			<Markdown text={item.question} />
 			{answer}
 		</ResultCard>
 	);

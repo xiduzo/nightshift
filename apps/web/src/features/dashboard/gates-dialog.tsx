@@ -1,4 +1,4 @@
-import { waitedText } from "@nightshift/client";
+import { gateParts, waitedText } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -30,6 +30,7 @@ import type {
 } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { InlineMarkdown } from "@/shared/markdown";
 import {
 	ChartSection,
 	DetailsDialog,
@@ -188,7 +189,10 @@ function GatesDetails({
 										>
 											<ItemContent className="min-w-0">
 												<ItemTitle className="w-full truncate">
-													{gate.question}
+													<InlineMarkdown
+														text={gateParts(gate.question).headline}
+														links={false}
+													/>
 												</ItemTitle>
 												<ItemDescription className="truncate">
 													{project ? null : `${gate.projectName}, `}

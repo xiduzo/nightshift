@@ -29,6 +29,17 @@ describe("the words of a notice", () => {
 		});
 	});
 
+	test("a Gate's question shows as plain text: its first paragraph, no Markdown marks", () => {
+		const markdown = {
+			...gate("r1", "review"),
+			question:
+				"**Ship** the [fix](https://x)?\n\nSummary:\nIt checks `the token`.",
+		} as OpenGate;
+		expect(describeNotice({ kind: "gate-opened", gate: markdown }).body).toBe(
+			"Fix the login\nShip the fix?",
+		);
+	});
+
 	test("a run names its title, and why it ended when it knows", () => {
 		expect(
 			describeNotice({

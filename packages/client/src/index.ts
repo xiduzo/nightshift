@@ -73,6 +73,7 @@ export {
 	inboxOrder,
 	type OpenGate,
 	parseGateQuestion,
+	plainText,
 	unreachableAnswerText,
 	waitedText,
 	waitingForYou,

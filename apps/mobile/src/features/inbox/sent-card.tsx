@@ -1,4 +1,4 @@
-import { gateParts, type OpenGate } from "@nightshift/client";
+import { gateParts, type OpenGate, plainText } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
@@ -25,6 +25,9 @@ export function SentCard({
 	/** The next Gate in inbox order, or null when nothing else waits. */
 	next: OpenGate | null;
 }) {
+	const nextHeadline = next
+		? plainText(gateParts(next.question).headline)
+		: null;
 	return (
 		<Card className="gap-3 px-4 py-5">
 			<Icon as={CircleCheck} className={`size-8 ${TONE_CLASS.finished.text}`} />
@@ -58,14 +61,14 @@ export function SentCard({
 									params: { runId: next.runId, stepId: next.stepId },
 								})
 							}
-							accessibilityHint={`Opens ${gateParts(next.question).headline}`}
+							accessibilityHint={`Opens ${nextHeadline}`}
 							className="h-auto min-h-11 py-2"
 						>
 							<Text>Next Gate</Text>
 							<Icon as={ArrowRight} className="text-primary-foreground" />
 						</Button>
 						<Text className="text-muted-foreground text-xs" numberOfLines={1}>
-							Next: {gateParts(next.question).headline}
+							Next: {nextHeadline}
 						</Text>
 					</>
 				) : (
