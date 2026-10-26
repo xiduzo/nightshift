@@ -16,7 +16,10 @@ export function ProjectRow({
 	overview: { project, needsYou, lastRun },
 	now,
 }: {
-	overview: ProjectOverview<{ id: string; name: string }, RunSummary>;
+	overview: ProjectOverview<
+		{ id: string; name: string },
+		Pick<RunSummary, "id" | "projectId" | "title" | "createdAt">
+	>;
 	now: number;
 }) {
 	return (

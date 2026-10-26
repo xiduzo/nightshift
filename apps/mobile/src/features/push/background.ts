@@ -1,5 +1,6 @@
 import {
 	answerGate,
+	GLANCE_RUNS,
 	gateRefusalText,
 	glanceSnapshot,
 	PUSH_ANDROID_CHANNEL,
@@ -122,7 +123,8 @@ async function refreshGlance(): Promise<void> {
 	}
 	const [gates, runs] = await Promise.all([
 		host.client.gates.list(),
-		host.client.runs.list({}),
+		// An older Host sends every run: the glance takes the newest.
+		host.client.runs.list({ limit: GLANCE_RUNS }),
 	]);
 	updateGlance(glanceSnapshot({ gates, runs }));
 }

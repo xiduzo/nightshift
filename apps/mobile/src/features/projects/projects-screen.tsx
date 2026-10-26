@@ -30,17 +30,31 @@ export function ProjectsScreen() {
 	const runQueries = useHostQueries(createRunQueries);
 	const projects = useQuery(projectQueries.list());
 	const gates = useQuery(gateQueries.open());
-	const runs = useQuery(runQueries.everyRun());
-	const refresh = useScreenRefresh([
-		projects.refetch,
-		gates.refetch,
-		runs.refetch,
-	]);
-
 	const list = projects.data;
+	// The Host says the last run of each project. An older Host does not:
+	// then every run tells it.
+	const counted = list?.every((project) => project.runs !== undefined) ?? true;
+	const runs = useQuery({ ...runQueries.everyRun(), enabled: !counted });
+	const refresh = useScreenRefresh(
+		counted
+			? [projects.refetch, gates.refetch]
+			: [projects.refetch, gates.refetch, runs.refetch],
+	);
+
+	const lastRuns = useMemo(
+		() =>
+			counted
+				? (list ?? []).flatMap((project) =>
+						project.runs?.last
+							? [{ ...project.runs.last, projectId: project.id }]
+							: [],
+					)
+				: (runs.data ?? []),
+		[counted, list, runs.data],
+	);
 	const overviews = useMemo(
-		() => projectOverviews(list ?? [], gates.data ?? [], runs.data ?? []),
-		[list, gates.data, runs.data],
+		() => projectOverviews(list ?? [], gates.data ?? [], lastRuns),
+		[list, gates.data, lastRuns],
 	);
 	const needsYou = overviews.reduce((sum, row) => sum + row.needsYou, 0);
 	// Again every 30 s: often enough for "3 h ago".

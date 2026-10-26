@@ -78,6 +78,7 @@ export {
 	waitingForYou,
 } from "./gates";
 export {
+	GLANCE_RUNS,
 	type GlanceSnapshot,
 	type GlanceTone,
 	glanceSnapshot,

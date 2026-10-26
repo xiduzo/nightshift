@@ -3,9 +3,11 @@ import { describe, expect, test } from "bun:test";
 import type { RunStatus, RunSummary } from "@nightshift/client";
 
 import {
+	countedFilters,
 	emptyFilterTitle,
 	filterCounts,
 	filterRuns,
+	filterStatuses,
 	inFilter,
 	ofProject,
 	rowValue,
@@ -174,5 +176,36 @@ describe("runsSummary and runRowLabel", () => {
 	test("an empty filter says what it looked for", () => {
 		expect(emptyFilterTitle("needs-you")).toBe("No run needs you");
 		expect(emptyFilterTitle("failed")).toBe("No failed runs");
+	});
+});
+
+describe("the chips on a Host that counts runs", () => {
+	const projects = [
+		{
+			id: "website",
+			runs: { statuses: { running: 1, sleeping: 2, failed: 1 } },
+		},
+		{ id: "api", runs: { statuses: { finished: 3, interrupted: 1 } } },
+	];
+
+	test("count the runs of every project, or of one", () => {
+		expect(countedFilters(projects, null)).toEqual({
+			all: 8,
+			running: 3,
+			"needs-you": 0,
+			failed: 2,
+			finished: 3,
+		});
+		expect(countedFilters(projects, "api")?.failed).toBe(1);
+	});
+
+	test("are null on an older Host, which sends no counts", () => {
+		expect(countedFilters([{ id: "website" }], null)).toBeNull();
+		expect(countedFilters(undefined, null)).toBeNull();
+	});
+
+	test("ask the Host for their statuses", () => {
+		expect(filterStatuses("all")).toBeUndefined();
+		expect(filterStatuses("failed")).toEqual(["failed", "interrupted"]);
 	});
 });

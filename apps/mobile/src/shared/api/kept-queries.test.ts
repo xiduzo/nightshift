@@ -13,6 +13,10 @@ describe("the reads the phone keeps between starts", () => {
 			keptQuery(query([["runs", "list"], { type: "query", input: {} }])),
 		).toBe(true);
 		expect(keptQuery(query([["gates", "list"], { type: "query" }]))).toBe(true);
+		// The Runs tab reads its runs a page at a time.
+		expect(
+			keptQuery(query([["runs", "list"], { type: "infinite", input: {} }])),
+		).toBe(true);
 		expect(
 			keptQuery(query([["dashboard", "summary"], { type: "query" }])),
 		).toBe(true);

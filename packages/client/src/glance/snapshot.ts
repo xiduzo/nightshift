@@ -7,8 +7,8 @@ import {
 } from "../runs";
 import { type GlanceTone, glanceTone } from "./tone";
 
-/** How many runs a glance shows. */
-const RUNS_SHOWN = 3;
+/** How many runs a glance shows: the newest. A screen reads only these. */
+export const GLANCE_RUNS = 3;
 
 /** One run on a glance: its flow and status, nothing more. */
 export type GlanceRun = {
@@ -56,7 +56,7 @@ export function glanceSnapshot({
 	const waiting = waitingForYou(gates);
 	const latest = [...runs]
 		.sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-		.slice(0, RUNS_SHOWN)
+		.slice(0, GLANCE_RUNS)
 		.map((run) => ({
 			id: run.id,
 			flow: flowLabel(run),

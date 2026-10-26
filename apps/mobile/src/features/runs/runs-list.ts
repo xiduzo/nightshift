@@ -64,6 +64,48 @@ export function filterCounts(
 	return counts;
 }
 
+/** The statuses the Host reads for a chip. None for "All": every run. */
+export function filterStatuses(filter: RunFilter): RunStatus[] | undefined {
+	return filter === "all" ? undefined : [...STATUSES[filter]];
+}
+
+/**
+ * How many runs each chip shows, from the run counts of the projects (of
+ * one project, or of all when `projectId` is null). Null when the Host
+ * sends no counts (an older Host): then the screen counts what it read.
+ */
+export function countedFilters(
+	projects:
+		| readonly {
+				id: string;
+				runs?: { statuses: Partial<Record<RunStatus, number>> };
+		  }[]
+		| undefined,
+	projectId: string | null,
+): Record<RunFilter, number> | null {
+	if (!projects || projects.some((project) => project.runs === undefined)) {
+		return null;
+	}
+	const counts: Record<RunFilter, number> = {
+		all: 0,
+		running: 0,
+		"needs-you": 0,
+		failed: 0,
+		finished: 0,
+	};
+	for (const project of projects) {
+		if (projectId !== null && project.id !== projectId) continue;
+		for (const [status, count] of Object.entries(
+			project.runs?.statuses ?? {},
+		)) {
+			for (const { key } of RUN_FILTERS) {
+				if (inFilter(status as RunStatus, key)) counts[key] += count ?? 0;
+			}
+		}
+	}
+	return counts;
+}
+
 /** The runs of one project, or of every project when `projectId` is null. */
 export function ofProject<T extends Pick<RunSummary, "projectId">>(
 	runs: readonly T[],
@@ -84,7 +126,7 @@ export function filterRuns<T extends Pick<RunSummary, "status" | "createdAt">>(
 		.sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** How many rows the list shows at first, and how many more each "Show more" adds. */
+/** How many runs the list reads at first, and how many more each "Show more" reads. */
 export const RUNS_PAGE = 30;
 
 const MINUTE = 60_000;

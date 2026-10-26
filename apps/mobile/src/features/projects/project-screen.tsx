@@ -57,8 +57,9 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 		[projectId],
 	);
 	const gates = useQuery({ ...gateQueries.open(), select: ofProject });
+	// Only the newest: the project list counts them all.
 	const runs = useQuery({
-		...runQueries.ofProject(projectId),
+		...runQueries.ofProject(projectId, SHOWN),
 		select: newestFirst,
 	});
 	const flows = useQuery(flowQueries.list(projectId));
@@ -69,6 +70,8 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 		flows.refetch,
 	]);
 	const project = projects.data?.find((p) => p.id === projectId);
+	// An older Host sends no counts, and every run whatever the limit.
+	const runCount = project?.runs?.total ?? runs.data?.length;
 	// Again every 30 s: often enough for "waited 12 min".
 	const now = useNow();
 
@@ -91,7 +94,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 						<ListRow
 							icon={History}
 							title="Runs"
-							value={runs.data ? String(runs.data.length) : undefined}
+							value={runCount !== undefined ? String(runCount) : undefined}
 							href={projectLinks.runs(projectId)}
 							dismissTo
 							accessibilityHint="Opens Runs with the runs of this project"
@@ -152,7 +155,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 								runs.data && runs.data.length > 0 ? "Newest first" : undefined
 							}
 							seeAll={
-								runs.data && runs.data.length > SHOWN
+								runCount !== undefined && runCount > SHOWN
 									? { href: projectLinks.runs(projectId), dismissTo: true }
 									: undefined
 							}

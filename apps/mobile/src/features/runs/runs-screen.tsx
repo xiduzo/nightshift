@@ -2,10 +2,10 @@ import { createProjectQueries, createRunQueries } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { History, Search, X } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { useHostQueries } from "@/features/host";
 import { SpacePicker } from "@/features/spaces";
@@ -19,9 +19,11 @@ import { Screen } from "@/shared/page";
 import { useScreenRefresh } from "@/shared/refresh";
 import { RunRow } from "./run-row";
 import {
+	countedFilters,
 	emptyFilterTitle,
 	filterCounts,
 	filterRuns,
+	filterStatuses,
 	ofProject,
 	RUN_FILTERS,
 	RUNS_PAGE,
@@ -83,20 +85,32 @@ export function RunsScreen() {
 	const { filter, projectId, setFilter, clearProject } = useRunsParams();
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
-	const runs = useQuery(runQueries.everyRun());
 	const projects = useQuery(projectQueries.list());
-	const [limit, setLimit] = useState(RUNS_PAGE);
+	const runs = useInfiniteQuery(
+		runQueries.pages(
+			{
+				...(projectId !== null ? { projectId } : {}),
+				...(filter !== "all" ? { statuses: filterStatuses(filter) } : {}),
+			},
+			RUNS_PAGE,
+		),
+	);
 	const refresh = useScreenRefresh([runs.refetch, projects.refetch]);
 
 	const projectNames = useMemo(
 		() => new Map((projects.data ?? []).map((p) => [p.id, p.name])),
 		[projects.data],
 	);
+	const loaded = useMemo(() => runs.data?.pages.flat(), [runs.data]);
+	// An older Host sends every run whatever the filter: the screen filters too.
 	const inProject = useMemo(
-		() => ofProject(runs.data ?? [], projectId),
-		[runs.data, projectId],
+		() => ofProject(loaded ?? [], projectId),
+		[loaded, projectId],
 	);
-	const counts = useMemo(() => filterCounts(inProject), [inProject]);
+	const counts = useMemo(
+		() => countedFilters(projects.data, projectId) ?? filterCounts(inProject),
+		[projects.data, projectId, inProject],
+	);
 	const shown = useMemo(
 		() => filterRuns(inProject, filter),
 		[inProject, filter],
@@ -106,11 +120,6 @@ export function RunsScreen() {
 		: null;
 	// Again every 30 s: often enough for "12 min".
 	const now = useNow();
-
-	const choose = (next: RunFilter) => {
-		setLimit(RUNS_PAGE);
-		setFilter(next);
-	};
 
 	if (runs.isPending) {
 		return (
@@ -137,7 +146,10 @@ export function RunsScreen() {
 		);
 	}
 
-	if (runs.data.length === 0) {
+	// An older Host sends no counts but every run.
+	const spaceRuns =
+		countedFilters(projects.data, null)?.all ?? loaded?.length ?? 0;
+	if (projects.data !== undefined && spaceRuns === 0) {
 		return (
 			<Screen onRefresh={refresh}>
 				<RunsHeader />
@@ -160,17 +172,14 @@ export function RunsScreen() {
 
 	return (
 		<Screen onRefresh={refresh}>
-			<RunsHeader summary={runsSummary(shown.length, projectName)} />
+			<RunsHeader summary={runsSummary(counts[filter], projectName)} />
 			<ChipRail>
 				{projectName ? (
 					<Chip
 						label={projectName}
 						icon={X}
 						selected
-						onPress={() => {
-							setLimit(RUNS_PAGE);
-							clearProject();
-						}}
+						onPress={clearProject}
 						role="button"
 						accessibilityHint="Shows the runs of every project"
 					/>
@@ -181,14 +190,14 @@ export function RunsScreen() {
 						label={label}
 						count={counts[key]}
 						selected={filter === key}
-						onPress={() => choose(key)}
+						onPress={() => setFilter(key)}
 					/>
 				))}
 			</ChipRail>
 			{shown.length > 0 ? (
 				<>
 					<ListGroup>
-						{shown.slice(0, limit).map((run) => (
+						{shown.map((run) => (
 							<RunRow
 								key={run.id}
 								run={run}
@@ -197,12 +206,13 @@ export function RunsScreen() {
 							/>
 						))}
 					</ListGroup>
-					{shown.length > limit ? (
+					{runs.hasNextPage ? (
 						<Button
 							size="lg"
 							variant="outline"
 							className="h-auto min-h-11 self-center py-2"
-							onPress={() => setLimit((current) => current + RUNS_PAGE)}
+							disabled={runs.isFetchingNextPage}
+							onPress={() => void runs.fetchNextPage()}
 						>
 							<Text>Show more runs</Text>
 						</Button>
@@ -232,7 +242,7 @@ export function RunsScreen() {
 					<Button
 						size="lg"
 						variant="outline"
-						onPress={() => choose("all")}
+						onPress={() => setFilter("all")}
 						className="h-auto min-h-11 py-2"
 					>
 						<Text>Show all runs</Text>

@@ -14,7 +14,7 @@ const KEPT = new Set([
 	"spaces.list",
 ]);
 
-/** Whether the phone keeps this query between starts: a plain read of `KEPT` that has its data. */
+/** Whether the phone keeps this query between starts: a read of `KEPT` (plain or in pages) that has its data. */
 export function keptQuery(query: {
 	queryKey: readonly unknown[];
 	state: { status: string };
@@ -23,5 +23,5 @@ export function keptQuery(query: {
 	const [path, options] = query.queryKey;
 	if (!Array.isArray(path)) return false;
 	const type = (options as { type?: unknown } | undefined)?.type;
-	return type === "query" && KEPT.has(path.join("."));
+	return (type === "query" || type === "infinite") && KEPT.has(path.join("."));
 }
