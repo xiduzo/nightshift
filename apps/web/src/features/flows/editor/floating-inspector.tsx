@@ -24,6 +24,8 @@ export function FloatingInspector({
 	return (
 		<aside
 			aria-label="Inspector"
+			// The field helpers' popovers open beside it (INSPECTOR_SELECTOR).
+			data-inspector
 			className={cn("flex max-h-full min-h-0 flex-col", className)}
 		>
 			<Card className="flex max-h-full min-h-0 flex-col gap-0 py-0 shadow-lg">

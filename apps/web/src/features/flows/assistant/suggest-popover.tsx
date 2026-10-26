@@ -36,7 +36,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { applyToDraft, type FlowAssistant } from "./flow-assistant";
+import {
+	applyToDraft,
+	type FlowAssistant,
+	INSPECTOR_SELECTOR,
+} from "./flow-assistant";
 import { useSuggestion } from "./use-suggestion";
 
 /**
@@ -71,7 +75,10 @@ export function SuggestPopover({
 	trigger: ReactElement;
 	/** A label for an icon-only trigger. */
 	tooltip?: ReactNode;
-	/** What the popover opens beside. Default: the trigger. */
+	/**
+	 * What the popover opens beside. Default: the inspector's left edge, at
+	 * the height of the trigger, so the popover covers no field.
+	 */
 	anchor?: RefObject<HTMLElement | null>;
 	/** Where the focus goes when it closes. Default: back where it was. */
 	finalFocus?: RefObject<HTMLElement | null>;
@@ -86,18 +93,21 @@ export function SuggestPopover({
 	blocked?: (suggestion: Suggestion) => string | null;
 	renderPreview: (suggestion: Suggestion) => ReactNode;
 }) {
+	const triggerRef = useRef<HTMLButtonElement>(null);
 	return (
 		<Popover open={open} onOpenChange={(next) => onOpenChange(next)}>
 			{tooltip ? (
 				<Tooltip>
-					<TooltipTrigger render={<PopoverTrigger render={trigger} />} />
+					<TooltipTrigger
+						render={<PopoverTrigger ref={triggerRef} render={trigger} />}
+					/>
 					<TooltipContent>{tooltip}</TooltipContent>
 				</Tooltip>
 			) : (
-				<PopoverTrigger render={trigger} />
+				<PopoverTrigger ref={triggerRef} render={trigger} />
 			)}
 			<PopoverContent
-				anchor={anchor}
+				anchor={anchor ?? (() => besideInspector(triggerRef.current))}
 				side="left"
 				align="start"
 				sideOffset={12}
@@ -122,6 +132,25 @@ export function SuggestPopover({
 			</PopoverContent>
 		</Popover>
 	);
+}
+
+/**
+ * A point on the inspector's left edge, at the height of `trigger`: the
+ * popover opens to the left of the inspector, not over it. The trigger
+ * itself outside an inspector.
+ */
+function besideInspector(trigger: HTMLElement | null) {
+	if (!trigger) return null;
+	const panel = trigger.closest(INSPECTOR_SELECTOR);
+	if (!panel) return trigger;
+	return {
+		contextElement: trigger,
+		getBoundingClientRect: () => {
+			const at = trigger.getBoundingClientRect();
+			const edge = panel.getBoundingClientRect();
+			return new DOMRect(edge.left, at.top, 0, at.height);
+		},
+	};
 }
 
 /** The popover's content. It mounts on open, so closing forgets the instruction and stops the agent. */

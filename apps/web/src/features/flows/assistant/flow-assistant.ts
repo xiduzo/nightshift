@@ -23,6 +23,9 @@ export type FlowAssistant = {
 	changeFlow: (change: (flow: Flow) => Flow) => void;
 };
 
+/** Marks the panel the helpers sit in: their popovers open beside it. */
+export const INSPECTOR_SELECTOR = "[data-inspector]";
+
 export const FlowAssistantContext = createContext<FlowAssistant | undefined>(
 	undefined,
 );
