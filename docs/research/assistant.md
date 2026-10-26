@@ -6,8 +6,9 @@
   Suggest fields, Suggest variables), the chat beside the canvas that
   proposes a flow and shows it on the canvas (section 3), "Ask an agent why"
   on a run that did not finish (4.1), `nightshift mcp` (section 5), and the
-  "Profile for help" setting. Each runs read only on one of this computer's
-  Agent Profiles.
+  "Profile for help" setting. Each runs read only on the agent the person
+  picks (section 3.5): the profile for help, another Agent Profile with
+  overrides, or a harness, model and effort.
 - **Verified live** in a browser with Claude Code on Haiku (2026-10-26):
   every helper, a proposal through Show on canvas, Apply, Undo and Save, and
   "Ask an agent why" on a failed run. The project had no change afterwards
@@ -129,8 +130,43 @@ web panel ──assistant.send({projectId, flow, draft, message, thread})──�
 2. **Propose and apply.** `propose_flow`, `check_flow`, the canvas diff,
    Apply and Discard.
 3. **Start from nothing.** The empty-flow panel and the starting prompts.
-4. **Pick the profile.** A profile picker in the panel; default is the
-   profile with the newest model on this computer.
+4. **Pick the agent.** Built as section 3.5.
+
+### 3.5 Choosing the agent (built 2026-10-26)
+
+Every suggest popover and the chat panel ("Ask an agent why" opens it)
+show one compact picker: "Profile for help", a profile name, or
+"Claude Code · haiku · low". It opens the fields of an Agent node:
+
+- **Profile.** "Profile for help (<name>)" first: the setting, else the
+  first profile that works. Then "None: choose the agent here", then the
+  profiles of this computer.
+- **Harness, Model, Effort.** With a profile, each field reads "From the
+  profile (…)" until the person overrides it. A change on the profile for
+  help pins that profile, with the change on top. Without a profile, the
+  harness and model are required.
+
+The browser keeps the choice (`localStorage`), and the helpers and the chat
+share it. Each request sends `profile`, `harness`, `model` and `effort`
+(`assistantAgentSchema` in `packages/flows`, the Agent node's own schemas).
+No fields: the profile for help, as before. The daemon resolves them in
+`pickAgent` (`packages/daemon/src/assistant`): a profile's harness, model and
+effort with the overrides on top, or the request's own harness and model,
+which must be added and installed here. The session stays read only
+whatever the choice: a profile's permission mode, CLI tools and connections
+never apply.
+
+The chat needs a harness that takes Night Shift's tools
+(`harnessTakesTools`, from `HARNESS_CATALOG`): pi and Grok Build cannot
+chat. The chat picker disables them with "(cannot chat)", and the daemon
+refuses them in plain words.
+
+A chat keeps its thread when the agent changes. On the same agent, the
+next message resumes the session. On another model or effort of a harness
+that takes a model on resume (Claude Code, OpenCode, Codex), it resumes
+too. On another harness, or another model of any other harness, a new
+session starts with the chat so far (the last 20 messages and answers) in
+its first prompt.
 
 ## 4. Other places where an agent helps
 
