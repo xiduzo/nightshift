@@ -137,7 +137,7 @@ const flowInput: Record<string, unknown> = {
 	required: ["flow"],
 };
 
-function cut(text: string, max: number): string {
+export function cut(text: string, max: number): string {
 	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
@@ -146,20 +146,37 @@ function tail(text: string, max: number): string {
 	return text.length > max ? `…${text.slice(text.length - max + 1)}` : text;
 }
 
-function issueLines(issues: readonly FlowIssue[]): string {
+export function issueLines(issues: readonly FlowIssue[]): string {
 	if (issues.length === 0) return "No issues.";
 	return issues
 		.map((issue) => `- ${issue.severity}: ${issue.message}`)
 		.join("\n");
 }
 
-const errorsOf = (issues: readonly FlowIssue[]) =>
+export const errorsOf = (issues: readonly FlowIssue[]) =>
 	issues.filter((issue) => issue.severity === "error");
 
-function field(args: unknown, key: string): unknown {
+export function field(args: unknown, key: string): unknown {
 	return typeof args === "object" && args !== null
 		? (args as Record<string, unknown>)[key]
 		: undefined;
+}
+
+/** The project's flows in short, for `list_flows`: all but `skip`. */
+export function flowRows(flows: ProjectFlowMap, skip?: string) {
+	return Object.entries(flows)
+		.filter(([name]) => name !== skip)
+		.map(([name, flow]) =>
+			flow
+				? {
+						name,
+						description: flow.description ?? null,
+						inputs: flow.inputs.map((input) => input.name),
+						outputs: flow.outputs.map((output) => output.name),
+						steps: flow.nodes.length,
+					}
+				: { name, valid: false },
+		);
 }
 
 /** The issues of a flow the agent wrote, checked as the editor checks it. */
@@ -179,8 +196,15 @@ async function check(port: AuthoringPort, flow: unknown) {
 	return { draft, issues };
 }
 
-/** One run as Markdown for the agent, at most `RUN_REPORT_LIMIT` characters. */
-export function runReport(run: AuthoringRun, draft: Flow): string {
+/**
+ * One run as Markdown for the agent, at most `RUN_REPORT_LIMIT` characters.
+ * `draft` is the flow as it is now, which `what` names.
+ */
+export function runReport(
+	run: AuthoringRun,
+	draft: Flow,
+	what = "The draft",
+): string {
 	const lines: string[] = [
 		`# Run ${run.id}`,
 		"",
@@ -191,8 +215,8 @@ export function runReport(run: AuthoringRun, draft: Flow): string {
 	const diff = flowDiffSummary(diffFlows(run.flow, draft));
 	lines.push(
 		diff.empty
-			? "The draft is the flow this run used."
-			: `The draft changed since this run: ${diff.added} steps added, ${diff.removed} removed, ${diff.changed} changed, ${diff.edges} edges changed.`,
+			? `${what} is the flow this run used.`
+			: `${what} changed since this run: ${diff.added} steps added, ${diff.removed} removed, ${diff.changed} changed, ${diff.edges} edges changed.`,
 	);
 	lines.push("", "## Steps, in the order they ran");
 	const steps = run.steps.slice(-STEP_LIMIT);
@@ -254,19 +278,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 			inputSchema: noInput,
 		}).server(async () => {
 			const [draft, flows] = await Promise.all([port.draft(), port.flows()]);
-			const rows = Object.entries(flows)
-				.filter(([name]) => name !== draft.name)
-				.map(([name, flow]) =>
-					flow
-						? {
-								name,
-								description: flow.description ?? null,
-								inputs: flow.inputs.map((input) => input.name),
-								outputs: flow.outputs.map((output) => output.name),
-								steps: flow.nodes.length,
-							}
-						: { name, valid: false },
-				);
+			const rows = flowRows(flows, draft.name);
 			return rows.length > 0
 				? JSON.stringify(rows, null, 2)
 				: "The project has no other flows.";

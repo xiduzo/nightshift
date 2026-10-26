@@ -11,7 +11,12 @@ export {
 	chatCanUseTools,
 	chatTurn,
 	type SuggestFieldInput,
+	serveTools,
 	suggestField,
+	type TerminalPort,
+	type TerminalProject,
+	type TerminalRunSummary,
+	terminalTools,
 } from "./assistant";
 export {
 	type DeciderAdapter,
