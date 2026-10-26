@@ -82,7 +82,9 @@ export function createHttp(
 		cors({
 			origin: [services.corsOrigin, ...desktopOrigins],
 			allowMethods: ["GET", "POST", "OPTIONS"],
-			allowHeaders: ["Content-Type", "Authorization"],
+			// x-orpc-batch: the web app on another address (the desktop
+			// app, `bun run dev`) sends its calls together in one batch.
+			allowHeaders: ["Content-Type", "Authorization", "x-orpc-batch"],
 			credentials: true,
 		}),
 	);

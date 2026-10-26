@@ -79,6 +79,22 @@ describe("the procedures over HTTP", () => {
 		expect(response.headers.get("vary")).toContain("Accept-Encoding");
 	});
 
+	test("the web app on another address may send a batch", async () => {
+		const response = await fetch(`${daemon.url}/rpc/__batch__`, {
+			method: "OPTIONS",
+			headers: {
+				origin: "http://localhost:3001",
+				"access-control-request-method": "POST",
+				"access-control-request-headers": "content-type,x-orpc-batch",
+			},
+		});
+		const allowed = (response.headers.get("access-control-allow-headers") ?? "")
+			.toLowerCase()
+			.split(",")
+			.map((header) => header.trim());
+		expect(allowed).toContain("x-orpc-batch");
+	});
+
 	test("a request body sent compressed is read", async () => {
 		const response = await fetch(`${daemon.url}/rpc/runs/list`, {
 			method: "POST",
