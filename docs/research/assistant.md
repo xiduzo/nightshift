@@ -2,8 +2,10 @@
 
 **Status, 2026-10-26:** built on `feat/assistant`, except where noted.
 
-- **Built:** the field helpers in the inspector (4.2: prompt with Cmd/Ctrl+I,
-  Suggest fields, Suggest variables), the chat beside the canvas that
+- **Built:** the field helpers in the inspector and the flow settings (4.2:
+  a "Suggest …" button for the prompt, output fields, variables, outcomes,
+  options, rules, an expression, a command, what a checker checks, tool
+  arguments, the description and the inputs; inventory in 4.2.1), the chat beside the canvas that
   proposes a flow and shows it on the canvas (section 3), "Ask an agent why"
   on a run that did not finish (4.1), `nightshift mcp` (section 5), and the
   "Profile for help" setting. Each runs read only on the agent the person
@@ -196,6 +198,57 @@ an output schema (no chat):
   exists.
 - **Command:** "Find the command" for "run the linter", from the project's
   scripts.
+
+#### 4.2.1 Every helper, one look (built 2026-10-26)
+
+Each helper is an outline "Suggest …" button with a sparkle, under its field
+or beside the field's own action button. Each opens the same popover: title,
+short description, three quick picks, an instruction box, then a preview with
+Apply, Try again and Discard, and an Undo toast after Apply. The prompt keeps
+Cmd/Ctrl+I and the rewrite of a selected part; the icon inside the field is
+gone, "Suggest prompt" under the field replaces it.
+
+Each kind has its own result shape in `suggestionSchema`, its own
+`applySuggestion` branch (`packages/flows/src/assistant/apply.ts`, tests in
+`apply-kinds.test.ts`), its own instruction and context in
+`packages/agents/src/assistant/suggestion-prompt.ts`, its own checks in
+`suggest.ts`, and its own preview in `apps/web/.../assistant/previews.tsx`.
+The contract stays backward compatible: the three first kinds keep their
+shapes, `nodeId` became optional (the flow's own fields take none), and
+`toolSchema` is a new optional field.
+
+| Field | Kind | Context the agent gets | Decision |
+| --- | --- | --- | --- |
+| Agent, Decision (model or person), Value (model): prompt | `prompt` | Template scope, outcomes, output schema, the selection | Kept, now a button |
+| Agent, Value: output data | `output` | Who reads which data field | Kept |
+| Any node: Set variables | `set` | The node's outcomes, the flow's variables | Kept |
+| Agent: own outcomes | `outcomes` | The prompt, the edges that leave the node and where they go, the nodes that read `{{id.outcome}}` | Added. An outcome may name the one it replaces (`from`): its edges move along. The preview counts the edges that go. |
+| Decision: options | `outcomes` | Same, plus who decides | Added. An option keeps the rule of the one it replaces. |
+| Decision (rule): rules | `rules` | The options, the rule syntax, the template scope; the output schemas are in the flow | Added: JSONata is the hardest field. An unknown option or a rule that does not parse goes back to the agent. |
+| Value (rule): expression | `expression` | The output schema, the rule syntax, the scope | Added |
+| Command: command | `command` | The package manager (lock file), the `package.json` scripts, task files (`project-facts.ts`), the exits | Added |
+| Wait (command): command | `command` | Same, and "exit 0 ends the wait" | Added |
+| Agent checker: What to check | `checker` | The outcomes, the prompt, the output schema | Added |
+| Tool: arguments | `arguments` | The tool's input schema, which the editor sends (`toolSchema`) | Added. A required argument left out, or one the tool does not take, goes back to the agent. |
+| Flow: description | `description` | The draft in short, each step in one line | Added |
+| Flow: inputs | `inputs` | The current inputs and who reads each, the names templates read that the flow does not declare | Added |
+| Decision (rule): note | — | Nothing reads it | Skipped |
+| Flow: variables | — | The Set variables helper declares the ones a write needs | Skipped |
+| Flow: outputs; Subflow: input bindings, list source | — | Short templates the variable list already offers | Later, if people ask |
+| Agent: skill, profile, harness, model, tools, connections, MCP servers | — | Pickers over this computer's lists | Skipped: a choice, not writing |
+| Command exits, secrets; Wait time, minutes, signal; timeouts, limits, device, run policy; edges (outcome, max) | — | Numbers, names and toggles | Skipped |
+
+**Verified live** (2026-10-26) in a browser on a dev daemon and web app from
+a worktree, Claude Code on Haiku at low effort, in a small project with a
+`bun.lock` and three scripts: Suggest description and Suggest inputs
+(applied; the flow's `{{pr}}` error went away), Suggest rules on a rule
+Decision (applied, the rule error went away), Suggest command (proposed
+`bun run test` from the lock file and the scripts; applied, then undone),
+Suggest outcomes on an Agent (kept `pass` and its edge, added
+`changes-requested`, removed `needs-input`; applied) and Suggest prompt
+(the button). Not tried live: expression, checker, arguments, a Wait's
+command and a Decision's options; their tests cover the prompt and the
+checks.
 
 ### 4.3 Set up agents
 
