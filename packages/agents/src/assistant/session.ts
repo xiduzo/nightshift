@@ -96,6 +96,35 @@ function usageOf(usage: AgentUsage, model: string | null): AssistantUsage {
 }
 
 /**
+ * The session's total at its end: the harness's own (`end`), unless it
+ * counts less than the running total before it (`live`). A running total
+ * never goes down: an end usage with fewer tokens covers only part of the
+ * session (its last model call, say), so the larger counts and cost win.
+ * An end usage that covers the running total wins whole: its reported
+ * cost is truer than an estimate from tokens.
+ */
+export function settleUsage(
+	live: AssistantUsage | null,
+	end: AssistantUsage,
+): AssistantUsage {
+	if (
+		!live ||
+		(end.inputTokens >= live.inputTokens &&
+			end.outputTokens >= live.outputTokens)
+	) {
+		return end;
+	}
+	const costs = [live.costUsd, end.costUsd].filter(
+		(cost): cost is number => cost !== undefined,
+	);
+	return {
+		inputTokens: Math.max(live.inputTokens, end.inputTokens),
+		outputTokens: Math.max(live.outputTokens, end.outputTokens),
+		...(costs.length > 0 ? { costUsd: Math.max(...costs) } : {}),
+	};
+}
+
+/**
  * Run one assistant session. Never throws: a failure ends the stream with
  * an `error` event. Aborting `signal` stops the harness.
  */
@@ -109,6 +138,8 @@ export async function* runAssistantSession(
 	let text = "";
 	let lastMessage: string | null = null;
 	let lastActivity: string | null = null;
+	/** The running total the harness reported last. */
+	let live: AssistantUsage | null = null;
 	try {
 		const events = harness.run({
 			cwd,
@@ -169,11 +200,15 @@ export async function* runAssistantSession(
 					};
 					break;
 				case "usage":
-					yield { type: "usage", usage: usageOf(event.usage, model) };
+					live = usageOf(event.usage, model);
+					yield { type: "usage", usage: live };
 					break;
 				case "finished":
 					if (event.usage) {
-						yield { type: "usage", usage: usageOf(event.usage, model) };
+						yield {
+							type: "usage",
+							usage: settleUsage(live, usageOf(event.usage, model)),
+						};
 					}
 					yield {
 						type: "end",

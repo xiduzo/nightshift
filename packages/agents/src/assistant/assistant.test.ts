@@ -13,6 +13,7 @@ import {
 	type AssistantSessionEvent,
 	runAssistantSession,
 	sessionErrorMessage,
+	settleUsage,
 } from "./session";
 import {
 	cannotSuggest,
@@ -168,6 +169,47 @@ describe("runAssistantSession", () => {
 		expect(events).toContainEqual({
 			type: "usage",
 			usage: { inputTokens: 10, outputTokens: 2, costUsd: 0.5 },
+		});
+	});
+
+	test("the end usage never counts less than the running total before it", async () => {
+		// The harness's end usage covers only the last model call.
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "usage",
+					usage: { inputTokens: 900, outputTokens: 90, costUsd: 0.035 },
+				},
+			],
+			outcome: {
+				type: "finished",
+				usage: { inputTokens: 200, outputTokens: 20, costUsd: 0.007 },
+			},
+		});
+		const events = await collect(
+			runAssistantSession({
+				harness,
+				profile,
+				cwd: "/",
+				prompt: "Hi",
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(events.filter((e) => e.type === "usage").at(-1)).toEqual({
+			type: "usage",
+			usage: { inputTokens: 900, outputTokens: 90, costUsd: 0.035 },
+		});
+	});
+
+	test("an end usage that covers the running total wins with its reported cost", () => {
+		const live = { inputTokens: 900, outputTokens: 90, costUsd: 0.035 };
+		const end = { inputTokens: 900, outputTokens: 95, costUsd: 0.007 };
+		expect(settleUsage(live, end)).toEqual(end);
+		expect(settleUsage(null, end)).toEqual(end);
+		expect(settleUsage(live, { inputTokens: 100, outputTokens: 99 })).toEqual({
+			inputTokens: 900,
+			outputTokens: 99,
+			costUsd: 0.035,
 		});
 	});
 
