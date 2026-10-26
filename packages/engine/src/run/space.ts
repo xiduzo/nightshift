@@ -26,6 +26,7 @@ import {
 	type RunSummary,
 } from "../read";
 import type { ScheduleFiles } from "../schedules";
+import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
 import type { PlacementPort, WithPaths } from "./peers";
 import type { RunRelay } from "./relay";
@@ -61,6 +62,11 @@ export type SpacesDeps = {
 	>;
 	placement: Pick<PlacementPort, "devicesFor" | "placements">;
 	flowFiles: FlowFiles;
+	/** The kept variables of a project's flows on this computer. */
+	kept: {
+		list(flow: KeptFlow): Promise<KeptValue[]>;
+		reset(flow: KeptFlow, name: string): Promise<void>;
+	};
 	scheduleFiles: ScheduleFiles;
 	reads: ReadModel;
 	/** The artifacts kept on this computer. */
@@ -244,6 +250,18 @@ export function createSpaces(deps: SpacesDeps) {
 			async deleteFlow(projectId, name) {
 				await ready;
 				await deps.flowFiles.remove(spaceId, projectId, name);
+			},
+
+			async listKeptValues(projectId, flowName) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				return deps.kept.list({ spaceId, projectId, flowName });
+			},
+
+			async resetKeptValue(projectId, flowName, name) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				await deps.kept.reset({ spaceId, projectId, flowName }, name);
 			},
 
 			flowUse() {

@@ -27,6 +27,7 @@ import type {
 	StepDetail,
 } from "../read";
 import type { ScheduleList } from "../schedules";
+import type { KeptValue } from "../variables";
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {
@@ -103,6 +104,17 @@ export interface SpaceEngine {
 	/** Saves drafts with errors too. Returns the issues of the saved flow. */
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	deleteFlow(projectId: string, name: string): Promise<void>;
+	/**
+	 * The values the flow's kept variables (`keep`) have between runs on
+	 * this computer, by name. A variable without one starts from `initial`.
+	 */
+	listKeptValues(projectId: string, flowName: string): Promise<KeptValue[]>;
+	/** Forgets one kept value: the next run starts the variable from `initial`. */
+	resetKeptValue(
+		projectId: string,
+		flowName: string,
+		name: string,
+	): Promise<void>;
 	/**
 	 * Who uses what, from every flow of the Space's projects: the flows that
 	 * name each connection and CLI tool, and the Agent nodes that name each

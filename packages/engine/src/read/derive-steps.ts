@@ -365,6 +365,8 @@ export type VariableChange = {
 	value: JsonValue;
 	/** The step whose write set it; null for the value the flow started with. */
 	stepId: string | null;
+	/** A start value an earlier run kept (`keep`), not the variable's `initial`. */
+	kept?: true;
 	at: number;
 };
 
@@ -379,12 +381,14 @@ export function deriveVariableChanges(
 	const scopeOfStep = new Map<string, Scope | null>();
 	for (const e of bySeq(events)) {
 		if (e.type === "VariablesSet") {
+			const kept = new Set(e.payload.kept ?? []);
 			for (const [name, value] of Object.entries(e.payload.values)) {
 				changes.push({
 					scope: e.payload.scope ?? null,
 					name,
 					value,
 					stepId: null,
+					...(kept.has(name) ? { kept: true as const } : {}),
 					at: e.at,
 				});
 			}

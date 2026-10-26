@@ -2,12 +2,13 @@ import { sql } from "drizzle-orm";
 import {
 	index,
 	integer,
+	primaryKey,
 	sqliteTable,
 	text,
 	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
-import { createdAt, spaceId } from "./columns";
+import { createdAt, spaceId, updatedAt } from "./columns";
 import { project } from "./projects";
 
 // Owner: `@nightshift/engine`: `log/` appends the event log and writes the
@@ -169,5 +170,39 @@ export const event = sqliteTable(
 		index("event_run_spaceId_walkerId_walkerSeq_idx")
 			.on(table.spaceId, table.walkerId, table.walkerSeq)
 			.where(sql`${table.runId} is not null`),
+	],
+);
+
+// Owner: `@nightshift/engine` `variables/`: `graph/` saves a kept value with
+// the step that writes it, and `run/` reads and resets them for a person.
+
+/**
+ * The value a kept variable (`keep: "project"`) has between runs: one per
+ * project, flow and variable. A run of the flow starts from it, and each
+ * write of the variable saves it in the batch of its `StepEnded`, so the
+ * last write wins. A run's own history stays in its events: this row is
+ * only the value the next run starts from. Kept on the Replica that walks
+ * the runs; the exchange does not copy it. A reset removes the row.
+ */
+export const keptVariable = sqliteTable(
+	"kept_variable",
+	{
+		spaceId: spaceId(),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => project.id),
+		/** The flow file's name; a called flow keeps its own. */
+		flowName: text("flow_name").notNull(),
+		name: text("name").notNull(),
+		/** JSON-encoded value. */
+		value: text("value").notNull(),
+		/** The run and step that wrote it last. No foreign keys, like the event log. */
+		runId: text("run_id").notNull(),
+		stepId: text("step_id").notNull(),
+		updatedAt: updatedAt(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.projectId, table.flowName, table.name] }),
+		index("kept_variable_spaceId_idx").on(table.spaceId),
 	],
 );

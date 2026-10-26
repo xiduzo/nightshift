@@ -44,6 +44,7 @@ import {
 	type WebhookAnswer,
 	type WebhookRequest,
 } from "../schedules";
+import { listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
 import { createRecovery } from "./recovery";
@@ -498,6 +499,10 @@ export function createEngine(
 			get: projects.get,
 			elsewhere: placement.flowsElsewhere,
 		}),
+		kept: {
+			list: (flow) => listKeptValues(db, flow),
+			reset: (flow, name) => resetKeptValue(db, flow, name),
+		},
 		scheduleFiles: createScheduleFiles({
 			now,
 			scheduler,

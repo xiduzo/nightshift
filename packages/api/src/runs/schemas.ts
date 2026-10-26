@@ -231,6 +231,8 @@ export const runDetailSchema = exact<RunDetail>()(
 				name: z.string(),
 				value: z.json(),
 				stepId: z.string().nullable(),
+				/** A start value an earlier run kept (`keep`), not `initial`. */
+				kept: z.literal(true).optional(),
 				at: z.number(),
 			}),
 		),

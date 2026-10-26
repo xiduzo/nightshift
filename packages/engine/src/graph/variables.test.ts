@@ -15,6 +15,7 @@ import {
 	startRun,
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
+import { listKeptValues, resetKeptValue } from "../variables";
 import { reentryUpdate } from "./reentry";
 
 /**
@@ -265,5 +266,124 @@ describe("variables", () => {
 			},
 		]);
 		expect(deriveVariables(logged, `${first.id}/`)).toEqual({ count: 6 });
+	});
+
+	describe("kept between runs", () => {
+		/**
+		 * `skip` adds the input's number to `skipped`, a kept list, unless
+		 * it is in it already; `count` is not kept.
+		 */
+		const skipper = flowOf(
+			[
+				command("skip", `echo "seen {{vars.skipped}}"`, {
+					set: [
+						{
+							variable: "skipped",
+							expression:
+								"$number(issue) in vars.skipped ? vars.skipped : $append(vars.skipped, $number(issue))",
+						},
+						{ variable: "count", expression: "vars.count + 1" },
+					],
+				}),
+			],
+			[],
+			{
+				variables: [
+					{ name: "skipped", type: "json", initial: "[]", keep: "project" },
+					{ name: "count", type: "number", initial: "0" },
+				],
+				inputs: [{ name: "issue", type: "text" }],
+			},
+		);
+		const kept = (flowName: string) => ({
+			spaceId: sandbox.spaceId,
+			projectId: "project-1",
+			flowName,
+		});
+		const runOf = async (issue: string, flowName = "skipper") => {
+			const h = await startRun(sandbox, skipper, {
+				flowName,
+				inputs: { issue },
+			});
+			const driven = await drive(h, { inputs: { issue } });
+			expect(driven.parked).toEqual([]);
+			return { h, state: driven.state, logged: await h.events() };
+		};
+
+		test("a run starts from the value the last run kept, and each write saves it", async () => {
+			const first = await runOf("12");
+			expect(first.state.vars).toEqual({ skipped: [12], count: 1 });
+			expect(payloads(first.logged, "VariablesSet")).toEqual([
+				{ values: { skipped: [], count: 0 }, scope: null },
+			]);
+
+			const second = await runOf("14");
+			expect(second.state.vars).toEqual({ skipped: [12, 14], count: 1 });
+			// The log says which start value came from an earlier run.
+			expect(payloads(second.logged, "VariablesSet")).toEqual([
+				{ values: { skipped: [12], count: 0 }, scope: null, kept: ["skipped"] },
+			]);
+			expect(
+				deriveVariableChanges(second.logged)
+					.filter((c) => c.stepId === null)
+					.map((c) => [c.name, c.kept ?? false]),
+			).toEqual([
+				["skipped", true],
+				["count", false],
+			]);
+
+			const third = await runOf("12");
+			expect(third.state.vars).toEqual({ skipped: [12, 14], count: 1 });
+			// Only the kept variable is saved.
+			const values = await listKeptValues(sandbox.db, kept("skipper"));
+			expect(values.map((v) => [v.name, v.value, v.runId])).toEqual([
+				["skipped", [12, 14], third.h.runId],
+			]);
+		});
+
+		test("each flow keeps its own, and a reset starts from initial again", async () => {
+			await runOf("12");
+			const other = await runOf("30", "other");
+			expect(other.state.vars).toEqual({ skipped: [30], count: 1 });
+
+			await resetKeptValue(sandbox.db, kept("skipper"), "skipped");
+			expect(await listKeptValues(sandbox.db, kept("skipper"))).toEqual([]);
+			const fresh = await runOf("14");
+			expect(fresh.state.vars).toEqual({ skipped: [14], count: 1 });
+			expect(
+				(await listKeptValues(sandbox.db, kept("other"))).map((v) => v.value),
+			).toEqual([[30]]);
+		});
+
+		test("a quick run keeps nothing", async () => {
+			const h = await startRun(sandbox, skipper, { inputs: { issue: "12" } });
+			await drive(h, { inputs: { issue: "12" } });
+			expect(await listKeptValues(sandbox.db, kept("test"))).toEqual([]);
+		});
+
+		test("a called flow keeps its own, by its flow name", async () => {
+			const call = {
+				id: "call",
+				type: "call",
+				position: { x: 0, y: 0 },
+				flow: "skipper",
+				inputs: { issue: "{{issue}}" },
+			} as const;
+			const caller = flowOf([call], [], {
+				inputs: [{ name: "issue", type: "text" }],
+			});
+			for (const issue of ["7", "8"]) {
+				const h = await startRun(sandbox, caller, {
+					flowName: "caller",
+					flows: { skipper },
+					inputs: { issue },
+				});
+				expect((await drive(h, { inputs: { issue } })).parked).toEqual([]);
+			}
+			expect(
+				(await listKeptValues(sandbox.db, kept("skipper"))).map((v) => v.value),
+			).toEqual([[7, 8]]);
+			expect(await listKeptValues(sandbox.db, kept("caller"))).toEqual([]);
+		});
 	});
 });

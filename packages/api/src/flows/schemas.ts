@@ -1,3 +1,4 @@
+import type { KeptValue } from "@nightshift/engine";
 import {
 	type FlowIssue,
 	type FlowListItem,
@@ -42,5 +43,15 @@ export const loadedFlowSchema = exact<LoadedFlow>()(
 		path: z.string(),
 		flow: flowSchema.nullable(),
 		issues: z.array(flowIssueSchema),
+	}),
+);
+
+/** The value a kept variable has between runs on this computer. */
+export const keptValueSchema = exact<KeptValue>()(
+	z.object({
+		name: z.string(),
+		value: z.json(),
+		runId: z.string(),
+		updatedAt: z.number(),
 	}),
 );

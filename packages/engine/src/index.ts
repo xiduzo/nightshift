@@ -186,3 +186,4 @@ export {
 	UNREACHABLE_DEVICE,
 } from "./run";
 export type { ScheduleList, WebhookAnswer } from "./schedules";
+export type { KeptValue } from "./variables";

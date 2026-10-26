@@ -30,8 +30,10 @@ import {
 	deriveWorktrees,
 	gitAuthorOf,
 } from "../read";
+import { keptNames, saveKeptValues } from "../variables";
 import {
 	emit,
+	keptFlowOf,
 	pastStopTime,
 	STOP_AFTER_STEP_REASON,
 	STOP_TIME_REASON,
@@ -749,21 +751,34 @@ export async function beginStep(
 				written.ok && Object.keys(written.values).length > 0
 					? written.values
 					: undefined;
-			await ctx.log.append({
-				type: "StepEnded",
-				runId,
-				stepId,
-				payload: {
-					outcome,
-					outputs,
-					error,
-					...(variables ? { variables } : {}),
-					...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
-					...(extra?.costSource !== undefined
-						? { costSource: extra.costSource }
-						: {}),
+			// A write of a kept variable saves it for the next run, in the
+			// same batch as the step's end.
+			const keptFlow = variables ? keptFlowOf(ctx, scope) : null;
+			const saveKept =
+				variables && keptFlow
+					? saveKeptValues(ctx.db, keptFlow, keptNames(ctx.flow), variables, {
+							runId,
+							stepId,
+						})
+					: [];
+			await ctx.log.append(
+				{
+					type: "StepEnded",
+					runId,
+					stepId,
+					payload: {
+						outcome,
+						outputs,
+						error,
+						...(variables ? { variables } : {}),
+						...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
+						...(extra?.costSource !== undefined
+							? { costSource: extra.costSource }
+							: {}),
+					},
 				},
-			});
+				saveKept.length > 0 ? { before: saveKept } : undefined,
+			);
 			changed();
 			emit(config, {
 				type: "step-ended",

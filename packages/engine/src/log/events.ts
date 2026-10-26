@@ -304,12 +304,18 @@ export type EnginePayloads = {
 		variables?: Record<string, JsonValue>;
 	};
 	/**
-	 * The variables of a flow when it starts (each `initial`), in the scope
-	 * the flow runs in: null at the top level of the run.
+	 * The variables of a flow when it starts (each `initial`, or a kept
+	 * value), in the scope the flow runs in: null at the top level of the
+	 * run.
 	 */
 	VariablesSet: {
 		values: Record<string, JsonValue>;
 		scope: Scope | null;
+		/**
+		 * The kept variables (`keep`) that start from the value an earlier
+		 * run left, not from `initial`. Absent when none does.
+		 */
+		kept?: string[];
 	};
 	/**
 	 * A Gate step asks a person and waits. The step stays open until a person

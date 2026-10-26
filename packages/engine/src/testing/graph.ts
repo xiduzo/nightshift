@@ -156,6 +156,8 @@ export type StartOptions = {
 	/** What `RunStarted` records as the run's inputs. */
 	inputs?: InputValues;
 	branch?: string;
+	/** The flow file the run starts from; default none, as a quick run. */
+	flowName?: string;
 };
 
 let runs = 0;
@@ -178,7 +180,7 @@ export async function startRun(
 		id: runId,
 		spaceId: sandbox.spaceId,
 		projectId,
-		flowName: null,
+		flowName: options.flowName ?? null,
 		flow: JSON.stringify(flow),
 		bodyFlows: JSON.stringify(flows),
 		title: "test",
@@ -193,7 +195,7 @@ export async function startRun(
 		runId,
 		payload: {
 			projectId,
-			flowName: null,
+			flowName: options.flowName ?? null,
 			title: "test",
 			start: flow.start,
 			inputs: options.inputs ?? {},

@@ -6,7 +6,8 @@ import {
 	StateGraph,
 } from "@langchain/langgraph";
 import { type Flow, initialVariables } from "@nightshift/flows";
-import { type StepContext, templateContext } from "./context";
+import { keptNames, keptValues } from "../variables";
+import { keptFlowOf, type StepContext, templateContext } from "./context";
 import { dataProblem } from "./output-schema";
 import {
 	askNodeId,
@@ -88,8 +89,9 @@ export const VARIABLES_NODE = "vars__init";
 
 /**
  * Sets the flow's variables to their initial values (each `initial`
- * rendered over the inputs and `run`), logs them (`VariablesSet`, in the
- * flow's scope) and goes on to the start node. An initial value that does
+ * rendered over the inputs and `run`, or for a kept variable the value an
+ * earlier run left), logs them (`VariablesSet`, in the flow's scope) and
+ * goes on to the start node. An initial value that does
  * not fit parks the run as failed at the start node, before its step.
  */
 function variablesNode(flow: Flow, ctx: StepContext) {
@@ -97,10 +99,14 @@ function variablesNode(flow: Flow, ctx: StepContext) {
 		state: Parameters<typeof templateContext>[1],
 		config: LangGraphRunnableConfig,
 	): Promise<Command> => {
+		const scope = scopeOf(config);
+		// A kept variable starts from the value an earlier run left.
+		const kept = keptFlowOf(ctx, scope);
 		const result = initialVariables(
 			flow,
 			templateContext(ctx, state, config),
 			dataProblem,
+			kept && keptNames(flow).size > 0 ? await keptValues(ctx.db, kept) : {},
 		);
 		const start = flow.nodes.find((node) => node.id === flow.start);
 		if (!result.ok) {
@@ -115,7 +121,11 @@ function variablesNode(flow: Flow, ctx: StepContext) {
 		await ctx.log.append({
 			type: "VariablesSet",
 			runId: ctx.run.id,
-			payload: { values: result.values, scope: scopeOf(config) },
+			payload: {
+				values: result.values,
+				scope,
+				...(result.kept.length > 0 ? { kept: result.kept } : {}),
+			},
 		});
 		return new Command({
 			update: { vars: result.values },

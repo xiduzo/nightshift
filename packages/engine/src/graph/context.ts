@@ -21,6 +21,7 @@ import {
 	type RunLog,
 	type RunRow,
 	readRunTranscript,
+	type Scope,
 	type StepEvent,
 	type StepOutputs,
 	type TranscriptEntry,
@@ -28,6 +29,7 @@ import {
 	transcriptToRead,
 } from "../log";
 import type { DerivedStep } from "../read";
+import type { KeptFlow } from "../variables";
 import type { ResumeRules } from "./resume-point";
 import type { RunEvent, RunStateValues } from "./state";
 
@@ -356,6 +358,20 @@ export function createRecorders(input: {
 			};
 		},
 	};
+}
+
+/**
+ * Whose kept variables this graph reads and writes: the run's project and
+ * the flow's file name. A called flow (`scope` set) keeps its own, by its
+ * name. A quick run has no flow file, so it keeps nothing (null).
+ */
+export function keptFlowOf(
+	ctx: Pick<StepContext, "run" | "flowName">,
+	scope: Scope | null,
+): KeptFlow | null {
+	const flowName = scope === null ? ctx.run.flowName : ctx.flowName;
+	if (flowName === null) return null;
+	return { spaceId: ctx.run.spaceId, projectId: ctx.run.projectId, flowName };
 }
 
 /** Templates of a node read the state's node outputs, the inputs, the variables and the run. */

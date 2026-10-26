@@ -6,6 +6,7 @@ import {
 	agentSession,
 	clone,
 	event,
+	keptVariable,
 	project,
 	run,
 	step,
@@ -444,7 +445,7 @@ export function createProjects(deps: ProjectsDeps) {
 
 		/**
 		 * Moves the project to another Space: its row, Clones, runs, steps,
-		 * sessions and events take the new Space in one batch. Then the
+		 * sessions, events and kept variables take the new Space in one batch. Then the
 		 * new Space's document gets its entry and Clones, and the old
 		 * one loses them. `ProjectMoved` is logged in the new Space.
 		 */
@@ -494,6 +495,10 @@ export function createProjects(deps: ProjectsDeps) {
 						),
 					),
 				db.update(run).set({ spaceId: to }).where(eq(run.projectId, projectId)),
+				db
+					.update(keptVariable)
+					.set({ spaceId: to })
+					.where(eq(keptVariable.projectId, projectId)),
 			]);
 
 			const source = await documents.open(from);

@@ -1,4 +1,4 @@
-import { flowNameSchema, flowSchema } from "@nightshift/flows";
+import { flowNameSchema, flowSchema, nameSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -6,6 +6,7 @@ import { ownerProcedure, protectedProcedure } from "../procedures";
 import {
 	flowIssueSchema,
 	flowListItemSchema,
+	keptValueSchema,
 	loadedFlowSchema,
 } from "./schemas";
 
@@ -48,6 +49,27 @@ export const flows = {
 		.input(flowRef.extend({ flow: flowSchema }))
 		.handler(({ context, input }) =>
 			context.space.saveFlow(input.projectId, input.name, input.flow),
+		),
+	/** The values the flow's kept variables carry from one run to the next. */
+	kept: protectedProcedure
+		.route({
+			summary:
+				"Lists the values a flow's kept variables carry from one run to the next on this computer.",
+		})
+		.output(output(z.array(keptValueSchema)))
+		.input(flowRef)
+		.handler(({ context, input }) =>
+			context.space.listKeptValues(input.projectId, input.name),
+		),
+	resetKept: ownerProcedure
+		.route({
+			summary:
+				"Forgets the kept value of one variable of a flow: its next run starts from the initial value.",
+		})
+		.output(output(z.void()))
+		.input(flowRef.extend({ variable: nameSchema }))
+		.handler(({ context, input }) =>
+			context.space.resetKeptValue(input.projectId, input.name, input.variable),
 		),
 	remove: ownerProcedure
 		.route({ summary: "Removes a flow file from the project." })
