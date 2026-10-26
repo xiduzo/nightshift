@@ -2,6 +2,8 @@
 
 export {
 	type AssistantService,
+	applySuggestion,
+	type Change as SuggestionChange,
 	type ChatEvent,
 	type ChatRequest,
 	chatRequestSchema,
@@ -15,6 +17,9 @@ export {
 	type ListDiff,
 	type NodeChange,
 	type NodeMove,
+	newVariables,
+	type OutputFieldChange,
+	outputChanges,
 	type ProposalCheckOptions,
 	proposalIssues,
 	type Suggestion,
@@ -23,6 +28,9 @@ export {
 	type SuggestionRequest,
 	suggestionRequestSchema,
 	suggestionSchema,
+	type TextRange,
+	type WriteChange,
+	writeChanges,
 } from "./assistant";
 export {
 	DEFAULT_POLICY,

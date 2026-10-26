@@ -5,6 +5,15 @@
  */
 
 export {
+	applySuggestion,
+	type Change,
+	newVariables,
+	type OutputFieldChange,
+	outputChanges,
+	type WriteChange,
+	writeChanges,
+} from "./apply";
+export {
 	type AssistantService,
 	type ChatEvent,
 	type ChatRequest,
@@ -16,6 +25,7 @@ export {
 	type SuggestionRequest,
 	suggestionRequestSchema,
 	suggestionSchema,
+	type TextRange,
 } from "./assistant";
 export {
 	diffFlows,
