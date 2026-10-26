@@ -41,6 +41,7 @@ import {
 	OpenFlowContext,
 } from "../canvas/open-flow-context";
 import { useFoldedSections } from "../canvas/sections/use-section-canvas";
+import type { ChatLink } from "../chat/chat-link";
 import { FlowChatPanel } from "../chat/chat-panel";
 import { ProposalBar } from "../chat/proposal-bar";
 import { useChatPanel } from "../chat/use-chat-panel";
@@ -74,7 +75,14 @@ type Props = {
 	initialFlow: Flow;
 	/** False when the editor starts from a draft that is not on disk yet. */
 	initiallySaved: boolean;
+	/** Opens the chat panel at the start: as it is, or a chat about a run. */
+	chatLink?: ChatLink;
+	/** The chat link did its work: drop it from the address. */
+	onChatLinkUsed?: () => void;
 };
+
+/** What the chat panel covers of the canvas on a wide screen: its width (`w-[min(380px,…)]`) and its gap. */
+const CHAT_PANEL_COVERS_PX = 380 + 12;
 
 export function FlowEditor(props: Props) {
 	return (
@@ -90,6 +98,8 @@ function Editor({
 	name,
 	initialFlow,
 	initiallySaved,
+	chatLink,
+	onChatLinkUsed,
 }: Props) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -380,10 +390,15 @@ function Editor({
 		projectId,
 		flowName: name,
 		flow: draft,
+		readFlow: () => draftRef.current,
 		changeFlow,
 	};
 	// The chat beside the canvas, and the proposal the canvas shows instead of the draft.
-	const chat = useChatPanel(assistant, { openAtStart: !initiallySaved });
+	const chat = useChatPanel(assistant, {
+		openAtStart: !initiallySaved,
+		link: chatLink,
+		onLinkUsed: onChatLinkUsed,
+	});
 	const preview = chat.preview;
 	const previewCheck = useMemo(
 		() =>
@@ -583,6 +598,8 @@ function Editor({
 									folded={folds.folded}
 									onFlowChange={preview ? ignoreChange : changeFlow}
 									preview={preview ?? undefined}
+									// A fit keeps the flow beside the chat, not under it.
+									coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
 									onSelect={setSelection}
 									onSetFolded={sections.setSectionFolded}
 									onMakeSection={makeSection}

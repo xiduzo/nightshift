@@ -82,6 +82,7 @@ export function RunStatusPanel({
 	onShowGate,
 	wait,
 	lastStep,
+	askWhy,
 	className,
 }: {
 	run: RunDetail;
@@ -91,6 +92,8 @@ export function RunStatusPanel({
 	wait: CurrentWait | null;
 	/** Where resuming continues. */
 	lastStep: StepSummary | undefined;
+	/** "Ask an agent why", beside the reason the run ended. */
+	askWhy?: ReactNode;
 	className?: string;
 }) {
 	const id = useId();
@@ -140,8 +143,11 @@ export function RunStatusPanel({
 							{notice.body}
 						</div>
 					</ScrollArea>
-					{notice.actions ? (
-						<div className="flex flex-wrap gap-2">{notice.actions}</div>
+					{notice.actions || askWhy ? (
+						<div className="flex flex-wrap gap-2">
+							{notice.actions}
+							{askWhy}
+						</div>
 					) : null}
 					{notice.resumable ? (
 						<ResumeComposer runId={run.id} lastStep={lastStep} />

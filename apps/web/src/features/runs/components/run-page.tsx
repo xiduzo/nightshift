@@ -28,10 +28,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowDownToLineIcon, SearchXIcon, WorkflowIcon } from "lucide-react";
 import { type ComponentProps, useMemo, useRef, useState } from "react";
+import { deviceQueries } from "@/features/devices";
 import { projectQueries } from "@/features/projects";
 import { useMediaQuery } from "@/shared/media-query";
 import { type Crumb, SiteHeader } from "@/shared/page";
 import { useRunStream } from "../hooks/use-run-stream";
+import { askWhy } from "../lib/ask-why";
 import {
 	calledFlowName,
 	calledFlowOf,
@@ -47,6 +49,7 @@ import {
 import { runQueries } from "../queries";
 import { StepTranscript } from "../transcript/step-transcript";
 import { emptyTranscript } from "../transcript/transcript";
+import { AskWhyButton } from "./ask-why-button";
 import { RunDetails } from "./details/run-details";
 import { RunArtifacts } from "./run-artifacts";
 import { FocusBreadcrumb, StepContext } from "./run-focus";
@@ -85,6 +88,8 @@ type PanelHandle = NonNullable<
 export function RunPage({ runId }: { runId: string }) {
 	const run = useQuery(runQueries.get(runId));
 	const projects = useQuery(projectQueries.list());
+	// This computer, for its owner only: the assistant is the owner's.
+	const devices = useQuery(deviceQueries.overview());
 	const stream = useRunStream(runId);
 	const desktop = useMediaQuery(DESKTOP);
 	/** Null follows the latest step as the run walks. */
@@ -168,6 +173,12 @@ export function RunPage({ runId }: { runId: string }) {
 	const status = stream.status ?? run.data.status;
 	const runData = run.data;
 	const project = projects.data?.find((p) => p.id === runData.projectId);
+	const ask = askWhy({
+		status,
+		flowName: runData.flowName,
+		project,
+		owner: devices.data ? devices.data.thisComputer !== null : undefined,
+	});
 	// In focus: only the item's steps, nested ones included.
 	const visible = stepsUnder(steps, focus);
 	const selectedStep =
@@ -404,6 +415,11 @@ export function RunPage({ runId }: { runId: string }) {
 				onShowGate={showGate}
 				wait={stream.transcript.lastWait}
 				lastStep={lastStep}
+				askWhy={
+					ask.kind === "hidden" ? undefined : (
+						<AskWhyButton runId={runData.id} ask={ask} />
+					)
+				}
 			/>
 			<RunWarnings warnings={runData.warnings} onShowStep={setPickedStepId} />
 		</>

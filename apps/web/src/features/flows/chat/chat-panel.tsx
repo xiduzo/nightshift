@@ -1,9 +1,11 @@
+import { runStatusLabel } from "@nightshift/client";
 import type { Flow } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
+import { Badge } from "@nightshift/ui/components/badge";
 import { Bubble, BubbleContent } from "@nightshift/ui/components/bubble";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
@@ -37,19 +39,27 @@ import {
 } from "@nightshift/ui/components/message-scroller";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
+import { Link } from "@tanstack/react-router";
 import {
 	ArrowUpIcon,
 	CircleAlertIcon,
+	HistoryIcon,
 	SparklesIcon,
 	SquareIcon,
 	SquarePenIcon,
 	XIcon,
 } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
+import type { RunStatus } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
-import type { AgentMessage, ChatProposal, ChatThread } from "./chat-thread";
+import {
+	type AgentMessage,
+	ASK_WHY_MESSAGE,
+	type ChatProposal,
+	type ChatThread,
+} from "./chat-thread";
 import { proposalCanvas } from "./proposal-canvas";
 import { ProposalCard } from "./proposal-card";
 import { STARTERS } from "./starters";
@@ -65,6 +75,8 @@ type Props = {
 	sendBlockedBy: string | null;
 	/** The flow has nothing in it yet: the chat offers ideas to start with. */
 	blank: boolean;
+	/** The run the chat is about, with its status once it loads. Null: the chat is about the flow. */
+	run: { id: string; status?: RunStatus; title?: string } | null;
 	/** The message whose proposal the canvas shows. */
 	shownId: string | null;
 	onSend: (text: string) => void;
@@ -122,6 +134,7 @@ export function FlowChatPanel(props: Props) {
 						</>
 					}
 				/>
+				{props.run ? <RunChip run={props.run} /> : null}
 				{empty ? <ChatEmpty {...props} /> : <ChatMessages {...props} />}
 				<Composer {...props} />
 			</Card>
@@ -129,7 +142,60 @@ export function FlowChatPanel(props: Props) {
 	);
 }
 
-function ChatEmpty({ blank, sendBlockedBy, onSend }: Props) {
+/** The run the chat is about, as a link back to it. */
+function RunChip({ run }: { run: NonNullable<Props["run"]> }) {
+	const status = run.status ? runStatusLabel(run.status).toLowerCase() : null;
+	return (
+		<div className="shrink-0 border-b px-3 py-2">
+			<Badge
+				variant="outline"
+				className="max-w-full"
+				title={run.title ? `Open the run: ${run.title}` : "Open the run"}
+				render={<Link to="/runs/$runId" params={{ runId: run.id }} />}
+			>
+				<HistoryIcon aria-hidden="true" />
+				<span className="truncate">
+					About run <span className="font-mono">{shortRunId(run.id)}</span>
+					{status ? ` · ${status}` : null}
+				</span>
+			</Badge>
+		</div>
+	);
+}
+
+/** The first characters of a run id: enough to tell runs apart in a chip. */
+function shortRunId(id: string): string {
+	return id.length > 8 ? id.slice(0, 8) : id;
+}
+
+function ChatEmpty({ blank, run, sendBlockedBy, onSend }: Props) {
+	if (run) {
+		return (
+			<Empty className="min-h-0 flex-1 overflow-y-auto border-0">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<SparklesIcon />
+					</EmptyMedia>
+					<EmptyTitle>Ask an agent about this run</EmptyTitle>
+					<EmptyDescription>
+						The agent reads the run, says what went wrong and proposes a change
+						to the flow.
+					</EmptyDescription>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-auto w-full justify-start whitespace-normal py-1.5 text-left"
+						disabled={sendBlockedBy !== null}
+						onClick={() => onSend(ASK_WHY_MESSAGE)}
+					>
+						{ASK_WHY_MESSAGE}
+					</Button>
+				</EmptyContent>
+			</Empty>
+		);
+	}
 	return (
 		<Empty className="min-h-0 flex-1 overflow-y-auto border-0">
 			<EmptyHeader>

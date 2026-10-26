@@ -21,6 +21,7 @@ import { ArrowLeftIcon, CircleAlertIcon, FileWarningIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { projectQueries } from "@/features/projects";
 import { type Crumb, SiteHeader } from "@/shared/page";
+import { parseChatLink } from "./chat/chat-link";
 import { FlowEditor } from "./editor/flow-editor";
 
 import { flowQueries } from "./queries";
@@ -28,9 +29,15 @@ import { flowQueries } from "./queries";
 export function FlowPage({
 	projectId,
 	name,
+	chat,
+	onChatLinkUsed,
 }: {
 	projectId: string;
 	name: string;
+	/** The `chat` search value: opens the chat panel, or a chat about a run. */
+	chat?: string;
+	/** Drops `chat` from the address once the editor used it. */
+	onChatLinkUsed?: () => void;
 }) {
 	const validName = flowNameSchema.safeParse(name).success;
 	const projects = useQuery(projectQueries.list());
@@ -156,6 +163,8 @@ export function FlowPage({
 			name={name}
 			initialFlow={loaded.data.flow ?? newFlow()}
 			initiallySaved={loaded.data.flow !== null}
+			chatLink={parseChatLink(chat)}
+			onChatLinkUsed={onChatLinkUsed}
 		/>
 	);
 }

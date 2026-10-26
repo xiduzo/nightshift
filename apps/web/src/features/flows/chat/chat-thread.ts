@@ -1,4 +1,9 @@
-import type { ChatEvent, FlowProposal } from "@nightshift/flows";
+import type {
+	ChatEvent,
+	ChatRequest,
+	Flow,
+	FlowProposal,
+} from "@nightshift/flows";
 
 /** What the agent spent on one answer. */
 type AssistantUsage = Extract<ChatEvent, { type: "usage" }>["usage"];
@@ -30,13 +35,39 @@ export type ChatMessage =
 
 export type AgentMessage = Extract<ChatMessage, { role: "agent" }>;
 
-/** A chat about one flow: the thread to continue, and its messages. */
+/**
+ * A chat about one flow: the thread to continue, and its messages. With
+ * `runId` the chat is about that run of the flow, for example one that
+ * failed: every message of the chat carries it.
+ */
 export type ChatThread = {
 	threadId?: string;
+	runId?: string;
 	messages: ChatMessage[];
 };
 
 export const EMPTY_THREAD: ChatThread = { messages: [] };
+
+/** A new chat about run `runId`. */
+export function aboutRun(runId: string): ChatThread {
+	return { runId, messages: [] };
+}
+
+/** The first message of a chat about a run that did not finish. */
+export const ASK_WHY_MESSAGE =
+	"Why did this run not finish? Propose a change to the flow that fixes it.";
+
+/** The request for one message of `thread`: it continues the thread, and keeps its run. */
+export function chatRequest(
+	thread: ChatThread,
+	input: { projectId: string; flowName: string; flow: Flow; message: string },
+): ChatRequest {
+	return {
+		...input,
+		...(thread.threadId ? { threadId: thread.threadId } : {}),
+		...(thread.runId ? { runId: thread.runId } : {}),
+	};
+}
 
 /** Changes the last message, when it is the agent's. */
 function withLastAgent(
@@ -174,7 +205,7 @@ export function writeThread(
 	thread: ChatThread,
 ): void {
 	try {
-		if (thread.messages.length === 0 && !thread.threadId)
+		if (thread.messages.length === 0 && !thread.threadId && !thread.runId)
 			store?.removeItem(key);
 		else store?.setItem(key, JSON.stringify(thread));
 	} catch {
@@ -184,8 +215,9 @@ export function writeThread(
 
 function isThread(value: unknown): value is ChatThread {
 	if (typeof value !== "object" || value === null) return false;
-	const { threadId, messages } = value as Record<string, unknown>;
+	const { threadId, runId, messages } = value as Record<string, unknown>;
 	if (threadId !== undefined && typeof threadId !== "string") return false;
+	if (runId !== undefined && typeof runId !== "string") return false;
 	return (
 		Array.isArray(messages) &&
 		messages.every(

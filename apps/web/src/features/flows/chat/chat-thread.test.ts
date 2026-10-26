@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type FlowProposal, flowSchema } from "@nightshift/flows";
 import {
+	aboutRun,
 	applyChatEvent,
+	chatRequest,
 	EMPTY_THREAD,
 	endAnswer,
 	openProposal,
@@ -122,5 +124,49 @@ describe("the kept chat", () => {
 		};
 		expect(readThread(throwing, "any")).toEqual(EMPTY_THREAD);
 		expect(() => writeThread(throwing, "any", asked)).not.toThrow();
+	});
+});
+
+describe("a chat about a run", () => {
+	const flow = proposal.flow;
+	const input = { projectId: "p1", flowName: "build", flow, message: "Why?" };
+
+	test("every message carries the run, and the thread once it has one", () => {
+		const about = aboutRun("run-1");
+		expect(chatRequest(about, input)).toEqual({ ...input, runId: "run-1" });
+		const continued = applyChatEvent(
+			startAnswer(about, "Why?", { person: "1:person", agent: "1:agent" }),
+			{ type: "thread", threadId: "t1" },
+			"{}",
+		);
+		expect(continued.runId).toBe("run-1");
+		expect(chatRequest(continued, input)).toEqual({
+			...input,
+			threadId: "t1",
+			runId: "run-1",
+		});
+	});
+
+	test("a chat about the flow sends no run", () => {
+		expect(chatRequest(EMPTY_THREAD, input)).toEqual(input);
+	});
+
+	test("is kept over a reload, before its first message too", () => {
+		const store = memoryStore();
+		const key = threadKey("p1", "build");
+		writeThread(store, key, aboutRun("run-1"));
+		expect(readThread(store, key)).toEqual(aboutRun("run-1"));
+		store.setItem(key, JSON.stringify({ runId: 7, messages: [] }));
+		expect(readThread(store, key)).toEqual(EMPTY_THREAD);
+	});
+});
+
+describe("Undo after Apply", () => {
+	test("opens the proposal again", () => {
+		const shown = applyChatEvent(asked, { type: "proposal", proposal }, "B");
+		const applied = setProposalStatus(shown, "1:agent", "applied");
+		expect(openProposal(applied)).toBeUndefined();
+		const undone = setProposalStatus(applied, "1:agent", "open");
+		expect(openProposal(undone)?.id).toBe("1:agent");
 	});
 });

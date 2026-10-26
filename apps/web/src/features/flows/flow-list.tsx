@@ -68,6 +68,7 @@ import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 
+import { chatSearch } from "./chat/chat-link";
 import { flowMutations, flowQueries } from "./queries";
 import { StartRunDialog } from "./start/start-run-dialog";
 
@@ -441,9 +442,11 @@ function NewFlowForm({
 		flowMutations.save({
 			onSuccess: (_, input) => {
 				void queryClient.invalidateQueries({ queryKey: flowQueries.all() });
+				// The new flow opens with the chat, to build it with an agent.
 				void navigate({
 					to: "/projects/$projectId/flows/$name",
 					params: { projectId, name: input.name },
+					search: { chat: chatSearch({ kind: "open" }) },
 				});
 			},
 		}),
