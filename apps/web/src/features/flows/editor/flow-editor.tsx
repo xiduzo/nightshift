@@ -740,7 +740,7 @@ function Editor({
 								label={selection ? "Selected" : "Flow settings"}
 								onClose={closeInspector}
 								className={cn(
-									"pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]",
+									"absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]",
 									// Beside the chat on a wide screen, over it on a narrow one.
 									chat.open && "lg:right-[calc(380px+1.5rem)]",
 								)}
