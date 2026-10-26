@@ -1,8 +1,9 @@
 /**
- * The assistant: an agent on one of this computer's Agent Profiles that
- * helps a person build a flow while they edit it. It works at design time
- * only and never writes a flow file: it suggests, the person applies, and
- * the person saves. At run time a model still never changes the graph.
+ * The assistant: an agent on this computer (an Agent Profile, or a harness
+ * and model the person picks) that helps a person build a flow while they
+ * edit it. It works at design time only and never writes a flow file: it
+ * suggests, the person applies, and the person saves. At run time a model
+ * still never changes the graph.
  *
  * Two shapes of help share these types:
  * - a suggestion for one field of one node (its prompt, its output schema,
@@ -11,13 +12,14 @@
  *   new version of the flow.
  *
  * The daemon runs both as harness sessions in the project's Clone, read
- * only. The types here are the contract between the web app, the API and
+ * only, on the agent the request picks (`assistantAgentSchema`). The types here are the contract between the web app, the API and
  * the daemon; `AssistantService` is the daemon's side.
  */
 import { z } from "zod";
 
 import { type Flow, flowSchema, flowVariableSchema } from "../document";
 import {
+	agentNodeSchema,
 	flowNameSchema,
 	jsonSchemaSchema,
 	nodeIdSchema,
@@ -37,6 +39,39 @@ export const textRangeSchema = z.object({
 });
 export type TextRange = z.infer<typeof textRangeSchema>;
 
+const agentFields = agentNodeSchema.shape;
+
+/**
+ * Which agent answers, picked as an Agent node picks its agent: an Agent
+ * Profile, with `harness`, `model` and `effort` as overrides on top, or no
+ * profile and its own harness and model. Nothing set: the profile for help
+ * in the settings, else the first profile that works. The session is read
+ * only whatever the choice: a profile's permission mode, CLI tools and
+ * connections never apply.
+ */
+export const assistantAgentSchema = z.object({
+	profile: agentFields.profile,
+	harness: agentFields.harness,
+	model: agentFields.model,
+	effort: agentFields.effort,
+});
+export type AssistantAgent = z.infer<typeof assistantAgentSchema>;
+
+/** Without a profile, a harness, model or effort needs both the harness and the model. */
+function isCompleteAgent(agent: AssistantAgent): boolean {
+	if (agent.profile !== undefined) return true;
+	const chosen =
+		agent.harness !== undefined ||
+		agent.model !== undefined ||
+		agent.effort !== undefined;
+	return !chosen || (agent.harness !== undefined && agent.model !== undefined);
+}
+
+const INCOMPLETE_AGENT = {
+	message: "Choose a profile, or a harness and a model.",
+	path: ["harness"],
+};
+
 /** Where the assistant works: a project's flow, as the editor holds it now. */
 const flowInEditor = {
 	projectId: z.string().min(1),
@@ -44,20 +79,21 @@ const flowInEditor = {
 	flowName: flowNameSchema,
 	/** The editor's draft, saved or not: the assistant's base, not the file. */
 	flow: flowSchema,
-	/** The Agent Profile to run on. Unset: the assistant's profile in the settings. */
-	profile: z.string().min(1).optional(),
+	...assistantAgentSchema.shape,
 };
 
 /** A request for one suggestion for one field of one node. */
-export const suggestionRequestSchema = z.object({
-	...flowInEditor,
-	nodeId: nodeIdSchema,
-	kind: suggestionKindSchema,
-	/** What the person asks for, in their words. Empty: the assistant's best guess. */
-	instruction: z.string().max(4000).default(""),
-	/** `prompt` only: the part of the prompt to rewrite. Unset: the whole prompt. */
-	selection: textRangeSchema.optional(),
-});
+export const suggestionRequestSchema = z
+	.object({
+		...flowInEditor,
+		nodeId: nodeIdSchema,
+		kind: suggestionKindSchema,
+		/** What the person asks for, in their words. Empty: the assistant's best guess. */
+		instruction: z.string().max(4000).default(""),
+		/** `prompt` only: the part of the prompt to rewrite. Unset: the whole prompt. */
+		selection: textRangeSchema.optional(),
+	})
+	.refine(isCompleteAgent, INCOMPLETE_AGENT);
 export type SuggestionRequest = z.infer<typeof suggestionRequestSchema>;
 
 /** One suggestion. `note` says in one or two sentences what it did and why. */
@@ -86,14 +122,19 @@ export const suggestionSchema = z.discriminatedUnion("kind", [
 export type Suggestion = z.infer<typeof suggestionSchema>;
 
 /** One message of a person in a chat about a flow. */
-export const chatRequestSchema = z.object({
-	...flowInEditor,
-	message: z.string().min(1).max(20_000),
-	/** Continue this chat. Unset: start a new one. */
-	threadId: z.string().min(1).optional(),
-	/** A run of this flow the chat is about, for example one that failed. */
-	runId: z.string().min(1).optional(),
-});
+export const chatRequestSchema = z
+	.object({
+		...flowInEditor,
+		message: z.string().min(1).max(20_000),
+		/**
+		 * Continue this chat. Unset: start a new one. A chat continues on
+		 * another agent too: the new agent gets the conversation so far.
+		 */
+		threadId: z.string().min(1).optional(),
+		/** A run of this flow the chat is about, for example one that failed. */
+		runId: z.string().min(1).optional(),
+	})
+	.refine(isCompleteAgent, INCOMPLETE_AGENT);
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 
 /** What the assistant spent on one answer. */

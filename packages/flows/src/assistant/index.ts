@@ -14,6 +14,7 @@ export {
 	writeChanges,
 } from "./apply";
 export {
+	type AssistantAgent,
 	type AssistantScope,
 	type AssistantService,
 	type AssistantUsage,

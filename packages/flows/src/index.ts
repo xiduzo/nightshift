@@ -1,6 +1,7 @@
 // Browser-safe. File access lives in "@nightshift/flows/files".
 
 export {
+	type AssistantAgent,
 	type AssistantScope,
 	type AssistantService,
 	type AssistantUsage,
@@ -135,7 +136,11 @@ export {
 	withValueBy,
 	withWrites,
 } from "./draft";
-export { HARNESS_CATALOG, type HarnessCatalogEntry } from "./harnesses";
+export {
+	HARNESS_CATALOG,
+	type HarnessCatalogEntry,
+	harnessTakesTools,
+} from "./harnesses";
 export {
 	blockersFirst,
 	type ItemState,

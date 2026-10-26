@@ -1,4 +1,8 @@
-import type { HarnessName } from "../nodes";
+import {
+	type AgentHarnessName,
+	type HarnessName,
+	isCustomHarness,
+} from "../nodes";
 
 /**
  * What a person sees of each built-in harness, as pure data: the web app's
@@ -25,6 +29,8 @@ export type HarnessCatalogEntry = {
 	offMachine: string;
 	/** The setting of this computer that holds the path of its CLI. */
 	binSetting: `${string}Bin`;
+	/** Takes Night Shift's own tools in a session (`harnessTakesTools`). */
+	tools: boolean;
 };
 
 /** The model name that leaves the choice to the agent's own setting. */
@@ -42,6 +48,7 @@ export const HARNESS_CATALOG = {
 		offMachine:
 			"Prompts and your project's code go to Anthropic under your Claude login.",
 		binSetting: "claudeBin",
+		tools: true,
 	},
 	opencode: {
 		name: "opencode",
@@ -59,6 +66,7 @@ export const HARNESS_CATALOG = {
 		offMachine:
 			"Prompts and code go to the model provider OpenCode is set up with.",
 		binSetting: "opencodeBin",
+		tools: true,
 	},
 	codex: {
 		name: "codex",
@@ -75,6 +83,7 @@ export const HARNESS_CATALOG = {
 		],
 		offMachine: "Prompts and code go to OpenAI under your Codex login.",
 		binSetting: "codexBin",
+		tools: true,
 	},
 	"grok-build": {
 		name: "grok-build",
@@ -85,6 +94,7 @@ export const HARNESS_CATALOG = {
 		suggestedModels: ["grok-build", "grok-build-0.1", "composer-2.5"],
 		offMachine: "Prompts and code go to xAI under your Grok login.",
 		binSetting: "grokBin",
+		tools: false,
 	},
 	copilot: {
 		name: "copilot",
@@ -96,6 +106,7 @@ export const HARNESS_CATALOG = {
 		offMachine:
 			"Prompts and code go to GitHub Copilot under your GitHub login.",
 		binSetting: "copilotBin",
+		tools: true,
 	},
 	gemini: {
 		name: "gemini",
@@ -106,6 +117,7 @@ export const HARNESS_CATALOG = {
 		suggestedModels: [AGENT_DEFAULT],
 		offMachine: "Prompts and code go to Google under your Gemini CLI login.",
 		binSetting: "geminiBin",
+		tools: true,
 	},
 	cursor: {
 		name: "cursor",
@@ -116,6 +128,7 @@ export const HARNESS_CATALOG = {
 		suggestedModels: [AGENT_DEFAULT],
 		offMachine: "Prompts and code go to Cursor under your Cursor login.",
 		binSetting: "cursorBin",
+		tools: true,
 	},
 	pi: {
 		name: "pi",
@@ -127,5 +140,16 @@ export const HARNESS_CATALOG = {
 		offMachine:
 			"Prompts and code go to the model provider pi is set up with. With a local model, such as one in Ollama, they stay on this computer.",
 		binSetting: "piBin",
+		tools: false,
 	},
 } as const satisfies { [K in HarnessName]: HarnessCatalogEntry & { name: K } };
+
+/**
+ * Whether a harness takes Night Shift's own tools in a session. The chat
+ * of the assistant needs them to read the draft and propose a flow: pi
+ * drops MCP, and Grok Build reports in text. A custom agent speaks ACP
+ * with MCP, so it takes them.
+ */
+export function harnessTakesTools(name: AgentHarnessName): boolean {
+	return isCustomHarness(name) || HARNESS_CATALOG[name].tools;
+}
