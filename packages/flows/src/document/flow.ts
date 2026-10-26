@@ -5,6 +5,7 @@ import {
 	commandNodeSchema,
 	decisionNodeSchema,
 	endNodeSchema,
+	joinNodeSchema,
 	jsonSchemaSchema,
 	labelSchema,
 	nameSchema,
@@ -39,6 +40,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	waitNodeSchema,
 	toolNodeSchema,
 	endNodeSchema,
+	joinNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -51,7 +53,10 @@ export const flowEdgeSchema = z.object({
 	/**
 	 * How often a run may take this edge. Every cycle needs at least one edge
 	 * with a max. When several edges leave a node on the same outcome, the
-	 * engine takes the first one (in file order) that has not hit its max.
+	 * engine takes the first one (in file order) that has not hit its max,
+	 * and one edge without a max after them is the way on when all did.
+	 * Several edges without a max on one outcome run all at once: a fan-out,
+	 * whose branches meet at a Join (`document/branches.ts`).
 	 */
 	max: z.number().int().positive().optional(),
 });

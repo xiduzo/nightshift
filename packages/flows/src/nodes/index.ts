@@ -87,6 +87,12 @@ export {
 	endStatusSchema,
 } from "./end";
 export {
+	type JoinNode,
+	type JoinWait,
+	joinNodeSchema,
+	joinOutputFields,
+} from "./join";
+export {
 	type Option,
 	type OutcomeColor,
 	option,

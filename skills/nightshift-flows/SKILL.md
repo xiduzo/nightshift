@@ -47,7 +47,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -113,11 +113,23 @@ Outcomes: none, the run ends here. Outputs: `outcome`, `message`, `visit`.
 
 `{"id":"no_work","type":"end","position":{"x":0,"y":0},"status":"nothing-to-do","message":"No open issues for {{label}}"}`
 
+### join
+
+Where parallel branches meet. `wait`: `all` (default), or `first` (stops the other branches). `data` holds each branch's `data` by the node it came from: `{{reviewed.data.security}}`.
+
+Outcomes: `done`. Outputs: `outcome`, `data`, `visit`.
+
+`{"id":"reviewed","type":"join","position":{"x":0,"y":0},"wait":"all"}`
+
 ## Edges, outcomes and loops
 
 An edge is `{ id, from, outcome, to, max? }`. It leaves `from` when its step ends with `outcome`. Use ids such as `check-fail-fix`. Each outcome a node can end with needs an edge, else the run ends there: on `fail` or `needs-input` that ends it as failed. To end the run on purpose, lead the edge to an End node: it says why the run ended (`nothing-to-do`, `failed`) in one line.
 
-Every loop needs at least one edge with `max`: how often a run may take that edge. A Gate in a loop needs one too. Put `max` on the edge that goes back (`check-fail-fix`, max 3). When every edge for an outcome reached its max, the run fails there. Several edges may leave on one outcome: the run takes the first, in file order, that has not reached its max (fix three times, then ask a person). Every node must be reachable from `start`.
+Every loop needs at least one edge with `max`: how often a run may take that edge. A Gate in a loop needs one too. Put `max` on the edge that goes back (`check-fail-fix`, max 3). When every edge for an outcome reached its max, the run fails there. Several edges with `max` may leave on one outcome: the run takes the first, in file order, that has not reached its max, and one last edge without `max` is the way on after them (fix three times, then ask a person). Every node must be reachable from `start`.
+
+## Parallel branches
+
+Two or more edges without `max` on one outcome are a fan-out: each starts a branch, and all run at once. The branches share no node and all end at one `join` node, never at an `end`. No fan-out inside a branch: use a called flow. Branches share one copy of the project: give all but one `permissionMode: "plan"`. While one branch waits for a person or a Wait, the others pause.
 
 ## Templates
 

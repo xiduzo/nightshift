@@ -1057,3 +1057,47 @@ describe("migrateFlow: version 5 → 6, Agent nodes", () => {
 		expect(flow.nodes[0]).toEqual(command);
 	});
 });
+
+describe("migrateFlow: version 5 → 6, edges a fan-out would take", () => {
+	const v5 = () => ({
+		version: 5,
+		start: "check",
+		nodes: [
+			{
+				id: "check",
+				type: "command",
+				position: { x: 0, y: 0 },
+				command: "true",
+			},
+			{ ...agent, id: "fix", prompt: "Fix it" },
+			{ ...agent, id: "ask", prompt: "Ask" },
+			{ ...agent, id: "never", prompt: "Never" },
+		],
+		edges: [
+			{ id: "a", from: "check", outcome: "fail", to: "fix", max: 2 },
+			{ id: "b", from: "check", outcome: "fail", to: "ask" },
+			{ id: "c", from: "check", outcome: "fail", to: "never" },
+			{ id: "d", from: "fix", outcome: "pass", to: "check" },
+		],
+	});
+
+	test("an edge without a max after another one on the same outcome goes: version 5 never took it", () => {
+		const flow = migrateFlow(v5()) as { version: number; edges: unknown[] };
+		expect(flow.version).toBe(6);
+		expect(flow.edges.map((edge) => (edge as { id: string }).id)).toEqual([
+			"a",
+			"b",
+			"d",
+		]);
+		const parsed = parseFlow(flow);
+		expect(parsed.issues.filter((issue) => issue.severity === "error")).toEqual(
+			[],
+		);
+	});
+
+	test("a flow without such edges keeps its edges as they are", () => {
+		const input = { ...v5(), edges: v5().edges.slice(0, 2) };
+		const flow = migrateFlow(input) as { edges: unknown };
+		expect(flow.edges).toBe(input.edges);
+	});
+});

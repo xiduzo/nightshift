@@ -251,6 +251,8 @@ export function rewriteOwnTemplates(
 			}
 		case "tool":
 			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
+		case "join":
+			return node;
 	}
 }
 

@@ -5,6 +5,12 @@
  */
 
 export {
+	type BranchPlace,
+	branchPlaces,
+	type FanOut,
+	fanOutsOf,
+} from "./branches";
+export {
 	DEFAULT_POLICY,
 	FLOW_VERSION,
 	type Flow,

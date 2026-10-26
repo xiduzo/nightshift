@@ -432,6 +432,8 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 		case "end":
 			// A Section with an End node does not become a Subflow (`end-node`).
 			return false;
+		case "join":
+			return outcome === "done";
 	}
 }
 

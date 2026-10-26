@@ -12,6 +12,7 @@ import {
 	type DecisionNode,
 	decisionDecider,
 	type EndNode,
+	type JoinNode,
 	type ListSource,
 	type ToolNode,
 	type ValueBy,
@@ -231,6 +232,11 @@ export function toolNode(id: string, position: Position): ToolNode {
 		tool: "",
 		arguments: {},
 	};
+}
+
+/** A Join waits for every branch until the person picks `first`. */
+export function joinNode(id: string, position: Position): JoinNode {
+	return { id, type: "join", position, wait: "all" };
 }
 
 export function emptySource(kind: ListSource["kind"]): ListSource {

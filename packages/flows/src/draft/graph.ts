@@ -19,6 +19,7 @@ import {
 	decisionNode,
 	endNode,
 	gateNode,
+	joinNode,
 	type NodeDefaults,
 	type Position,
 	toolNode,
@@ -89,6 +90,7 @@ const NEW_NODE: Record<
 	wait: { id: "wait", create: waitNode },
 	tool: { id: "tool", create: toolNode },
 	end: { id: "end", create: endNode },
+	join: { id: "join", create: joinNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */

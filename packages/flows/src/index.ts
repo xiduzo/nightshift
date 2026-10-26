@@ -46,7 +46,10 @@ export {
 	writeChanges,
 } from "./assistant";
 export {
+	type BranchPlace,
+	branchPlaces,
 	DEFAULT_POLICY,
+	type FanOut,
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
@@ -198,6 +201,8 @@ export {
 	harnessNameSchema,
 	isChosenExit,
 	isCustomHarness,
+	type JoinNode,
+	type JoinWait,
 	type JsonValue,
 	type ListSource,
 	type Login,

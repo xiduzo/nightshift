@@ -7,6 +7,7 @@ import {
 	commandOutputFields,
 	decisionOutputFields,
 	endOutputFields,
+	joinOutputFields,
 	type OutcomeColor,
 	toolOutputFields,
 	valueOutputFields,
@@ -53,6 +54,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 		case "end":
 			// No edge leaves an End node: the run ends there.
 			return [];
+		case "join":
+			return ["done"];
 	}
 }
 
@@ -90,9 +93,10 @@ export const outputFieldsByType = {
 	wait: waitOutputFields,
 	tool: toolOutputFields,
 	end: endOutputFields,
+	join: joinOutputFields,
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
-/** Output fields that hold JSON, so a template may take a path below them. */
+/** Output fields that hold JSON, so a template may take a path below them. A Join's `data` holds one entry per branch. */
 export const jsonOutputFields = ["data", "results"] as const;
 
 /**

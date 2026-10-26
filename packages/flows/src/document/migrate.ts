@@ -33,6 +33,9 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
  *   `git ls-files` for the same items (`migrateFilesSource`).
  * - Agent nodes (`migrateAgentNode`): `checker` and `mcpServers` go, and
  *   `nodeClis` joins `clis`.
+ * - Two or more edges without a max on one outcome run all at once from
+ *   now on (a fan-out). Before, the first one won and the others were never
+ *   taken: those others go (`dropShadowedEdges`).
  *
 
  * Any version:
@@ -78,7 +81,7 @@ export function migrateV5(
 			)
 		: json.nodes;
 	return {
-		...json,
+		...dropShadowedEdges(json),
 		version: 6,
 		...(nodes === undefined ? {} : { nodes }),
 	};
@@ -142,6 +145,27 @@ function migrateAgentNode(json: unknown): unknown {
 	if (clis.length > 0) return { ...rest, clis };
 	const { clis: _clis, ...without } = rest;
 	return without;
+}
+
+/**
+ * Drops each edge without a max that follows another edge without a max on
+ * the same node and outcome. Version 5 took the first of them and never
+ * the others; version 6 would take them all at once. The edges a version 5
+ * run could take stay, in their order.
+ */
+export function dropShadowedEdges(
+	json: Record<string, unknown>,
+): Record<string, unknown> {
+	if (!Array.isArray(json.edges)) return json;
+	const open = new Set<string>();
+	const edges = json.edges.filter((edge) => {
+		if (!isRecord(edge) || edge.max !== undefined) return true;
+		const key = `${String(edge.from)}\u0000${String(edge.outcome)}`;
+		if (open.has(key)) return false;
+		open.add(key);
+		return true;
+	});
+	return edges.length === json.edges.length ? json : { ...json, edges };
 }
 
 /**

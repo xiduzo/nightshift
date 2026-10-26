@@ -61,5 +61,8 @@ export function checkNode(
 		case "end":
 			checkEndNode(node, check);
 			break;
+		case "join":
+			// A Join's checks are the branches' (`checkBranches`).
+			break;
 	}
 }

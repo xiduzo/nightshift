@@ -409,7 +409,7 @@ describe("validateFlow", () => {
 				[agent("worker"), command("check"), agent("other")],
 				[
 					edge("first", "worker", "pass", "check"),
-					edge("never", "worker", "pass", "other"),
+					edge("never", "worker", "pass", "other", 2),
 					edge("other-outcome", "worker", "fail", "other"),
 				],
 			),
@@ -430,6 +430,207 @@ describe("validateFlow", () => {
 			),
 		);
 		expect(issues).toEqual([]);
+	});
+});
+
+describe("validateFlow: parallel branches", () => {
+	const join = (id: string, wait: "all" | "first" = "all"): FlowNode => ({
+		id,
+		type: "join",
+		position: { x: 0, y: 0 },
+		wait,
+	});
+	const review = (id: string) => agent(id, { permissionMode: "plan" });
+
+	/** worker fans out to two reviews that meet at `joined`, then `ship`. */
+	function fanOut(): Flow {
+		return flow(
+			[
+				agent("worker"),
+				review("security"),
+				review("style"),
+				join("joined"),
+				command("ship"),
+			],
+			[
+				edge("a", "worker", "pass", "security"),
+				edge("b", "worker", "pass", "style"),
+				edge("c", "security", "pass", "joined"),
+				edge("d", "style", "pass", "joined"),
+				edge("e", "joined", "done", "ship"),
+			],
+		);
+	}
+
+	test("two edges without a max on one outcome, each branch to one Join: no issue", () => {
+		const issues = validateFlow(fanOut());
+		expect(errors(issues)).toEqual([]);
+		// The reviews' other outcomes have no edge, as ever.
+		expect(issues.every((issue) => issue.edgeId === undefined)).toBe(true);
+	});
+
+	test("a fan-out edge with a max is an error", () => {
+		const base = fanOut();
+		const issues = validateFlow({
+			...base,
+			edges: [...base.edges, edge("x", "worker", "pass", "ship", 2)],
+		});
+		expect(errors(issues)).toEqual([
+			expect.objectContaining({
+				edgeId: "x",
+				message: expect.stringContaining("at once"),
+			}),
+		]);
+	});
+
+	test("a branch that never reaches the Join is an error", () => {
+		const base = fanOut();
+		const issues = validateFlow({
+			...base,
+			edges: base.edges.filter((e) => e.id !== "d"),
+		});
+		expect(errors(issues).map((issue) => issue.message)).toEqual([
+			expect.stringContaining('to "style" never reaches a Join'),
+		]);
+	});
+
+	test("branches that reach different Joins, or share a node, are errors", () => {
+		const shared = flow(
+			[
+				agent("worker"),
+				review("security"),
+				review("style"),
+				review("both"),
+				join("joined"),
+			],
+			[
+				edge("a", "worker", "pass", "security"),
+				edge("b", "worker", "pass", "style"),
+				edge("c", "security", "pass", "both"),
+				edge("d", "style", "pass", "both"),
+				edge("e", "both", "pass", "joined"),
+			],
+		);
+		expect(errors(validateFlow(shared)).map((i) => i.message)).toEqual([
+			expect.stringContaining('share node "both"'),
+		]);
+		const two = flow(
+			[
+				agent("worker"),
+				review("security"),
+				review("style"),
+				join("one"),
+				join("two"),
+			],
+			[
+				edge("a", "worker", "pass", "security"),
+				edge("b", "worker", "pass", "style"),
+				edge("c", "security", "pass", "one"),
+				edge("d", "style", "pass", "two"),
+			],
+		);
+		expect(errors(validateFlow(two)).map((i) => i.message)).toEqual([
+			expect.stringContaining("reach different Joins: one, two"),
+		]);
+	});
+
+	test("a Join without a fan-out, and an edge into a Join from outside the branches, are errors", () => {
+		const alone = flow(
+			[agent("worker"), join("joined")],
+			[edge("a", "worker", "pass", "joined")],
+		);
+		expect(errors(validateFlow(alone)).map((i) => i.message)).toEqual([
+			expect.stringContaining('Join "joined" has no branches to wait for'),
+		]);
+		const base = fanOut();
+		const outside = validateFlow({
+			...base,
+			nodes: [...base.nodes, command("late")],
+			edges: [
+				...base.edges,
+				edge("f", "worker", "fail", "late"),
+				edge("g", "late", "pass", "joined"),
+			],
+		});
+		expect(errors(outside)).toEqual([
+			expect.objectContaining({
+				edgeId: "g",
+				message: expect.stringContaining("not on a branch"),
+			}),
+		]);
+	});
+
+	test("an End node on a branch is an error: a branch ends at its Join", () => {
+		const base = fanOut();
+		const issues = validateFlow({
+			...base,
+			nodes: [
+				...base.nodes,
+				{
+					id: "stop",
+					type: "end",
+					position: { x: 0, y: 0 },
+					status: "nothing-to-do",
+				},
+			],
+			edges: [...base.edges, edge("f", "style", "fail", "stop")],
+		});
+		expect(errors(issues)).toEqual([
+			expect.objectContaining({
+				nodeId: "stop",
+				message: expect.stringContaining("put the End after the Join"),
+			}),
+		]);
+	});
+
+	test("a branch that fans out again, or leads back, is an error", () => {
+		const nested = flow(
+			[
+				agent("worker"),
+				review("security"),
+				review("style"),
+				review("inner"),
+				join("joined"),
+			],
+			[
+				edge("a", "worker", "pass", "security"),
+				edge("b", "worker", "pass", "style"),
+				edge("c", "security", "pass", "joined"),
+				edge("d", "style", "pass", "inner"),
+				edge("e", "style", "pass", "joined"),
+				edge("f", "inner", "pass", "joined"),
+			],
+		);
+		expect(errors(validateFlow(nested)).map((i) => i.message)).toContainEqual(
+			expect.stringContaining('Node "style" fans out inside a branch'),
+		);
+		const base = fanOut();
+		const back = validateFlow({
+			...base,
+			edges: [...base.edges, edge("f", "style", "fail", "worker", 2)],
+		});
+		expect(errors(back).map((i) => i.message)).toEqual([
+			expect.stringContaining('leads back to "worker"'),
+		]);
+	});
+
+	test("warns when two branches can edit files at the same time", () => {
+		const base = fanOut();
+		const issues = validateFlow({
+			...base,
+			nodes: base.nodes.map((node) =>
+				node.type === "agent" && node.id !== "worker"
+					? { ...node, permissionMode: "acceptEdits" as const }
+					: node,
+			),
+		});
+		expect(errors(issues)).toEqual([]);
+		expect(warnings(issues)).toContainEqual(
+			expect.objectContaining({
+				nodeId: "worker",
+				message: expect.stringContaining('"security", "style"'),
+			}),
+		);
 	});
 });
 

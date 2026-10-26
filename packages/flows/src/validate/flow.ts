@@ -1,11 +1,13 @@
 import {
 	type Flow,
 	type FlowNode,
+	fanOutsOf,
 	flowSchema,
 	migrateFlow,
 	nodeOutcomes,
 } from "../document";
 import { reservedNames } from "../nodes";
+import { checkBranches } from "./branches";
 import { checkCall, type ErrorsOf } from "./calls";
 import { findCycles } from "./cycles";
 import type {
@@ -37,6 +39,8 @@ import {
  * output schema that describes an object, template references to known
  * names and fields, outputs, and no cycle without an edge that has a `max`
  * (a Gate in a cycle too: a person could loop forever).
+ * Parallel branches (a fan-out: several edges without a max on one
+ * outcome) each reach the same Join (`checkBranches`).
  * Warns about unreachable nodes and about outcomes without an edge, since
  * ending on one ends the run as failed. Warns about Sections that are not
  * one connected part with one entry, share a node, or name unknown nodes.
@@ -161,10 +165,15 @@ function validateIn(
 	}
 
 	// Edges that can never be taken: an earlier edge on the same node and
-	// outcome has no max, so the engine always picks that one.
+	// outcome has no max, so the engine always picks that one. Two or more
+	// without a max are a fan-out instead (`checkBranches`).
 	const unbounded = new Map<string, string>();
+	const fannedOut = new Set(
+		fanOutsOf(flow).map((fanOut) => `${fanOut.from}\u0000${fanOut.outcome}`),
+	);
 	for (const edge of flow.edges) {
 		const key = `${edge.from}\u0000${edge.outcome}`;
+		if (fannedOut.has(key)) continue;
 		const earlier = unbounded.get(key);
 		if (earlier !== undefined) {
 			warning(
@@ -184,6 +193,7 @@ function validateIn(
 
 	checkOutputs(scope, error);
 	checkUnusedVariables(scope, warning);
+	checkBranches(flow, nodes, error, warning);
 
 	// Called flows, when the project's flows are known.
 	if (flows !== undefined) {
