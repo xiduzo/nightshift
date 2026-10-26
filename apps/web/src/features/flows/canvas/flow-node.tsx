@@ -304,11 +304,11 @@ const FlowNodeCard = memo(function FlowNodeCard({
 			className={cn(
 				"relative w-56 rounded-xl border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
 				selected && "border-ring ring-3 ring-ring/30",
-				run === null && "opacity-50 shadow-none backdrop-blur-sm",
+				// Not reached, or removed: the card stays opaque, so edges and
+				// nodes behind it do not show through. Only its content fades.
+				(run === null || change === "removed") && "border-dashed shadow-none",
 				change === "added" &&
 					"border-status-finished ring-3 ring-status-finished/25",
-				change === "removed" &&
-					"border-dashed opacity-50 shadow-none backdrop-blur-sm",
 			)}
 		>
 			{change === "changed" ? (
@@ -330,7 +330,12 @@ const FlowNodeCard = memo(function FlowNodeCard({
 			/>
 			{/* Kept in the overview, only hidden: the node keeps its size, so
 			    the layout and the edges stay where they are. */}
-			<div className={cn(overview && "invisible")}>
+			<div
+				className={cn(
+					overview && "invisible",
+					(run === null || change === "removed") && "opacity-60",
+				)}
+			>
 				<div className="flex min-w-0 items-center gap-2.5 p-2.5">
 					<div
 						className="relative grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"

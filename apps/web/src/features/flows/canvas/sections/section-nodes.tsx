@@ -22,6 +22,7 @@ import {
 import {
 	ChevronsDownUpIcon,
 	ChevronsUpDownIcon,
+	CircleDashedIcon,
 	GroupIcon,
 	PlayIcon,
 } from "lucide-react";
@@ -49,6 +50,8 @@ export type SectionFrameData = {
 	issues: readonly FlowIssue[];
 	/** The height of the header above the nodes. */
 	header: number;
+	/** Run view only: the state of its nodes. */
+	run?: SectionRunSummary;
 };
 
 /** One handle of a folded box: the edges of one node and outcome that leave. */
@@ -58,6 +61,8 @@ export type SectionBoxExit = {
 	/** `SectionExit.label`, "verdict · pass": how "Lay out" names the handle. */
 	label: string;
 	color?: OutcomeColor;
+	/** Run view only: the run left the Section this way. */
+	taken?: boolean;
 };
 
 export type SectionBoxData = {
@@ -117,6 +122,37 @@ function SectionIssues({ issues }: { issues: readonly FlowIssue[] }) {
 	);
 }
 
+/**
+ * The state of a Section in the run, as a node shows its own: the state of
+ * its latest step, else that the run has not come here.
+ */
+function SectionRunBadge({
+	run,
+	className,
+}: {
+	run: SectionRunSummary;
+	className?: string;
+}) {
+	if (!run.latest) {
+		return (
+			<Badge
+				variant="outline"
+				className={cn("text-muted-foreground", className)}
+			>
+				<CircleDashedIcon aria-hidden="true" />
+				Not reached
+			</Badge>
+		);
+	}
+	return (
+		<OutcomeBadge
+			state={run.latest.state}
+			color={run.latest.color}
+			className={className}
+		/>
+	);
+}
+
 function FoldButton({
 	section,
 	folded,
@@ -157,7 +193,7 @@ const SectionFrame = memo(function SectionFrame({
 	data,
 	selected,
 }: NodeProps<SectionFrameNode>) {
-	const { section, count, issues, header } = data;
+	const { section, count, issues, header, run } = data;
 	const color = sectionColor(section.color);
 	const name = nameOf(section);
 	const description = section.description?.trim();
@@ -194,6 +230,12 @@ const SectionFrame = memo(function SectionFrame({
 						>
 							{nodesText(count)}
 						</Badge>
+						{run ? (
+							<SectionRunBadge
+								run={run}
+								className="h-4 shrink-0 bg-background px-1.5 text-[10px]"
+							/>
+						) : null}
 						<SectionIssues issues={issues} />
 					</div>
 					{description ? (
@@ -224,28 +266,31 @@ const SectionFrame = memo(function SectionFrame({
 	);
 });
 
-/** What the nodes inside a folded box do in the run: who runs now, what failed. */
+/**
+ * What the nodes inside a folded box do in the run: the state of the
+ * latest step and its node, what failed, how far the run came.
+ */
 function BoxRun({ run, count }: { run: SectionRunSummary; count: number }) {
 	const actions = useContext(SectionActionsContext);
-	const now = run.now;
+	const latest = run.latest;
 	return (
 		<div className="flex min-w-0 flex-col gap-1 border-t px-3 py-2 text-[11px]">
-			{now ? (
+			{latest ? (
 				<button
 					type="button"
 					disabled={!actions?.selectNode}
 					onClick={(event) => {
 						event.stopPropagation();
-						actions?.selectNode?.(now.nodeId);
+						actions?.selectNode?.(latest.nodeId);
 					}}
 					className="nodrag nopan flex min-w-0 items-center gap-1.5 rounded-sm text-left hover:underline disabled:hover:no-underline"
-					title={`Show ${now.nodeId}`}
+					title={`Show ${latest.nodeId}`}
 				>
-					<OutcomeBadge
-						state={now.state}
+					<SectionRunBadge
+						run={run}
 						className="h-4 shrink-0 px-1.5 text-[10px]"
 					/>
-					<span className="truncate font-mono">{now.nodeId}</span>
+					<span className="truncate font-mono">{latest.nodeId}</span>
 				</button>
 			) : null}
 			{run.failed.length > 0 ? (
@@ -289,7 +334,9 @@ const SectionBox = memo(function SectionBox({
 					"shadow-[0_0_0_1px_var(--status-running),0_0_18px_0_color-mix(in_oklch,var(--status-running)_35%,transparent)]",
 				waiting &&
 					"shadow-[0_0_0_1px_var(--status-waiting),0_0_20px_2px_color-mix(in_oklch,var(--status-waiting)_40%,transparent)]",
-				run?.reached === 0 && "opacity-55",
+				// Not reached: the box stays opaque, so nothing behind it shows
+				// through. Only its content fades.
+				run?.reached === 0 && "border-dashed shadow-none",
 			)}
 			style={{ borderColor: mix(color, 60) }}
 		>
@@ -301,7 +348,12 @@ const SectionBox = memo(function SectionBox({
 				style={{ top: 20 }}
 				title="Drag an edge here to lead into the Section"
 			/>
-			<div className={cn(overview && "invisible")}>
+			<div
+				className={cn(
+					overview && "invisible",
+					run?.reached === 0 && "opacity-60",
+				)}
+			>
 				<div
 					className="flex min-w-0 flex-col gap-0.5 rounded-t-md px-3 pt-2.5 pb-2"
 					style={{ background: mix(color, 8) }}
@@ -345,16 +397,35 @@ const SectionBox = memo(function SectionBox({
 							return (
 								<li
 									key={exitHandleId(exit.from, exit.outcome)}
-									className="relative flex h-5 min-w-0 items-center justify-end gap-1 pr-3.5 pl-3 text-[11px]"
+									className={cn(
+										"relative flex h-5 min-w-0 items-center justify-end gap-1 pr-3.5 pl-3 text-[11px]",
+										exit.taken === false && "opacity-50",
+									)}
 								>
-									<span className="truncate font-mono text-muted-foreground">
+									{exit.taken ? (
+										<span
+											className="absolute inset-y-0 right-0 left-2 rounded-l-full"
+											style={{
+												background: `linear-gradient(to right, transparent, color-mix(in oklch, ${style.color} 22%, transparent))`,
+											}}
+											aria-hidden="true"
+										/>
+									) : null}
+									<span className="relative truncate font-mono text-muted-foreground">
 										{exit.from}
 									</span>
-									<span aria-hidden="true" className="text-muted-foreground">
+									<span
+										aria-hidden="true"
+										className="relative text-muted-foreground"
+									>
 										·
 									</span>
 									<span
-										className={cn("shrink-0 font-medium font-mono", style.text)}
+										className={cn(
+											"relative shrink-0 font-mono",
+											style.text,
+											exit.taken ? "font-semibold" : "font-medium",
+										)}
 									>
 										{outcomeLabel(exit.outcome)}
 									</span>

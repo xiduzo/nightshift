@@ -20,7 +20,7 @@ import { foldEdgeGroups, foldedMembers, sectionEnds } from "./folded-edges";
 import { boxPosition, FRAME_PADDING, frameRect } from "./section-geometry";
 import { sectionNodeId } from "./section-ids";
 import type { SectionBoxNode, SectionFrameNode } from "./section-nodes";
-import { sectionRunSummary } from "./section-run";
+import { type SectionRunSummary, sectionRunSummary } from "./section-run";
 
 /**
  * Behind the edges, also when selected: React Flow lifts a selected node
@@ -130,6 +130,21 @@ export function useSectionCanvas(
 		const frames: SectionFrameNode[] = [];
 		const boxes: SectionBoxNode[] = [];
 		const boxPositions = new Map<string, Point>();
+		// The run state of a Section's nodes, its latest step in its node's colour.
+		const runOf = (
+			members: readonly string[],
+		): SectionRunSummary | undefined => {
+			if (!run) return undefined;
+			const summary = sectionRunSummary(members, run.states, run.order);
+			const latest = summary.latest;
+			const node =
+				latest && flow.nodes.find((each) => each.id === latest.nodeId);
+			if (!latest || !node) return summary;
+			return {
+				...summary,
+				latest: { ...latest, color: outcomeColor(node, latest.state) },
+			};
+		};
 		for (const section of sections) {
 			const id = sectionNodeId(section.id);
 			const count = section.nodes.filter((node) => known.has(node)).length;
@@ -159,6 +174,7 @@ export function useSectionCanvas(
 						count,
 						issues: sectionIssues,
 						header: FRAME_PADDING.top,
+						run: run ? runOf(section.nodes) : undefined,
 					},
 				});
 				continue;
@@ -192,13 +208,12 @@ export function useSectionCanvas(
 							outcome,
 							label,
 							color: node ? outcomeColor(node, outcome) : undefined,
+							taken: run ? run.states.get(from)?.state === outcome : undefined,
 						};
 					}),
 					isStart: boundary.start,
 					issues: sectionIssues,
-					run: run
-						? sectionRunSummary(section.nodes, run.states, run.order)
-						: undefined,
+					run: run ? runOf(section.nodes) : undefined,
 				},
 			});
 		}

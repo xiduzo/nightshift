@@ -18,6 +18,7 @@ describe("sectionRunSummary", () => {
 		);
 		expect(summary).toEqual({
 			now: { nodeId: "scope", state: "running" },
+			latest: { nodeId: "scope", state: "running" },
 			running: ["scope"],
 			waiting: [],
 			failed: ["stack"],
@@ -34,9 +35,20 @@ describe("sectionRunSummary", () => {
 		expect(summary.waiting).toEqual(["human"]);
 	});
 
+	test("a Section the run left takes the state of its last step", () => {
+		const summary = sectionRunSummary(["build", "stack"], states, [
+			"stack",
+			"build",
+			"scope",
+		]);
+		expect(summary.now).toBeNull();
+		expect(summary.latest).toEqual({ nodeId: "build", state: "pass" });
+	});
+
 	test("a Section the run never reached", () => {
 		expect(sectionRunSummary(["a", "b"], states, ["build"])).toEqual({
 			now: null,
+			latest: null,
 			running: [],
 			waiting: [],
 			failed: [],
