@@ -7,8 +7,14 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { Panel, useReactFlow, useStoreApi } from "@xyflow/react";
+import {
+	type FitViewOptions,
+	Panel,
+	useReactFlow,
+	useStoreApi,
+} from "@xyflow/react";
 import { MaximizeIcon, MinusIcon, PlusIcon, WorkflowIcon } from "lucide-react";
+import { FIT_VIEW } from "./fit-view";
 import type { SelectionSetter } from "./selection";
 
 // Adding a node, and the zoom, fit and layout buttons: the parts of a flow
@@ -63,8 +69,11 @@ export function useAddNode(
  */
 export function CanvasControls({
 	onAutoLayout,
+	fit = FIT_VIEW,
 }: {
 	onAutoLayout?: () => void;
+	/** How Fit view fits the flow: beside a panel that covers the canvas, for example. */
+	fit?: FitViewOptions;
 }) {
 	const { zoomIn, zoomOut, fitView } = useReactFlow();
 	const controls = [
@@ -81,7 +90,7 @@ export function CanvasControls({
 		{
 			label: "Fit view",
 			icon: MaximizeIcon,
-			onClick: () => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
+			onClick: () => void fitView({ ...fit, duration: 200 }),
 		},
 		...(onAutoLayout
 			? [{ label: "Auto layout", icon: WorkflowIcon, onClick: onAutoLayout }]

@@ -6,6 +6,7 @@ import {
 } from "@nightshift/flows";
 import { createContext, useContext } from "react";
 import { toast } from "sonner";
+import { undoDraft } from "./draft-undo";
 
 /**
  * What the field helpers need from the editor: where the flow is, its
@@ -17,6 +18,8 @@ export type FlowAssistant = {
 	flowName: string;
 	/** The editor's draft, saved or not. */
 	flow: Flow;
+	/** The draft as it is now, also after the render that made `flow`. */
+	readFlow: () => Flow;
 	changeFlow: (change: (flow: Flow) => Flow) => void;
 };
 
@@ -48,14 +51,16 @@ export function applyToDraft(
 }
 
 /**
- * Makes `after` the draft, and offers to undo it while the draft is still
- * `after`. Nothing is saved: the person saves the flow. Returns false when
+ * Makes `after` the draft, and offers to undo it while the draft still
+ * holds `after` (`undoDraft`). `onUndo` runs when Undo brought the draft
+ * back. Nothing is saved: the person saves the flow. Returns false when
  * `after` is the draft already.
  */
 export function replaceDraft(
 	assistant: FlowAssistant,
 	after: Flow,
 	message: string,
+	onUndo?: () => void,
 ): boolean {
 	const before = assistant.flow;
 	if (after === before) return false;
@@ -63,10 +68,13 @@ export function replaceDraft(
 	toast.success(message, {
 		action: {
 			label: "Undo",
-			onClick: () =>
-				assistant.changeFlow((current) =>
-					current === after ? before : current,
-				),
+			onClick: () => {
+				if (undoDraft(assistant, { before, after })) onUndo?.();
+				else
+					toast.info(
+						"You changed the flow after that. Undo cannot bring it back now.",
+					);
+			},
 		},
 	});
 	return true;

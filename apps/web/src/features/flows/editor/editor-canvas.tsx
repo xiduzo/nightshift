@@ -23,6 +23,7 @@ import {
 	ReactFlow,
 	useNodesInitialized,
 	useReactFlow,
+	useStore,
 	useStoreApi,
 } from "@xyflow/react";
 import { GroupIcon } from "lucide-react";
@@ -57,6 +58,7 @@ import {
 import { useSectionCanvas } from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
 import { CanvasControls } from "./canvas-controls";
+import { fitViewOptions } from "./fit-view";
 import { loadElk } from "./lib/elk";
 import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
 import { isNodeType, NODE_DRAG_TYPE } from "./node-dock";
@@ -149,6 +151,7 @@ export function EditorCanvas({
 	onDropNode,
 	onNodeDoubleClick,
 	preview,
+	coveredRight = 0,
 }: {
 	flow: Flow;
 	/** Names the flow for the routes this browser keeps of its last layout. */
@@ -171,9 +174,16 @@ export function EditorCanvas({
 	 * these mark how its nodes and edges differ from the draft.
 	 */
 	preview?: CanvasPreview;
+	/** Pixels of the canvas's right side a panel covers: a fit keeps the flow beside it. */
+	coveredRight?: number;
 }) {
 	const [measured, applyDimensions] = useMeasured();
 	const { fitView } = useReactFlow();
+	const canvasWidth = useStore((state) => state.width);
+	const fit = useMemo(
+		() => fitViewOptions(canvasWidth, coveredRight),
+		[canvasWidth, coveredRight],
+	);
 
 	// Fit once more when every node has its size: the first fit runs before
 	// the nodes are measured and the panels have their final size.
@@ -182,11 +192,9 @@ export function EditorCanvas({
 	useEffect(() => {
 		if (!initialized || fitted.current) return;
 		fitted.current = true;
-		const frame = requestAnimationFrame(
-			() => void fitView({ maxZoom: 1, padding: 0.15 }),
-		);
+		const frame = requestAnimationFrame(() => void fitView(fit));
 		return () => cancelAnimationFrame(frame);
-	}, [initialized, fitView]);
+	}, [initialized, fitView, fit]);
 
 	const counts = useMemo(() => {
 		const byNode = new Map<string, FlowIssue[]>();
@@ -476,9 +484,7 @@ export function EditorCanvas({
 		} finally {
 			laying.current = false;
 		}
-		requestAnimationFrame(
-			() => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
-		);
+		requestAnimationFrame(() => void fitView({ ...fit, duration: 200 }));
 		toast.info("Laid out the flow.", {
 			action: {
 				label: "Undo",
@@ -503,6 +509,7 @@ export function EditorCanvas({
 		sections.endOf,
 		onFlowChange,
 		fitView,
+		fit,
 		store,
 	]);
 
@@ -564,7 +571,7 @@ export function EditorCanvas({
 						snapToGrid
 						snapGrid={[8, 8]}
 						fitView
-						fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
+						fitViewOptions={fit}
 						minZoom={0.2}
 						className="[--xy-background-color:transparent]"
 						aria-label="Flow canvas"
@@ -575,7 +582,7 @@ export function EditorCanvas({
 							size={1.25}
 							color="color-mix(in oklch, var(--foreground) 16%, transparent)"
 						/>
-						<CanvasControls onAutoLayout={() => void autoLayout()} />
+						<CanvasControls onAutoLayout={() => void autoLayout()} fit={fit} />
 						{multi ? (
 							<NodeToolbar nodeId={multi} isVisible position={Position.Top}>
 								<Button
