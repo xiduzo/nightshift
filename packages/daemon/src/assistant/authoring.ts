@@ -23,13 +23,14 @@ import {
 } from "@nightshift/flows";
 
 /** What the port reads in the Space. */
-export type ChatSpace = Pick<
-	SpaceEngine,
-	"flowMap" | "getRun" | "watchRun" | "listProjectProfiles"
->;
+export type ChatSpace = Pick<SpaceEngine, "flowMap" | "getRun" | "watchRun">;
+
+/** The chat's Space, and the project's own profiles that the authoring tools list. */
+export type AuthoringSpace = ChatSpace &
+	Pick<SpaceEngine, "listProjectProfiles">;
 
 export type AuthoringPortDeps = {
-	space: ChatSpace;
+	space: AuthoringSpace;
 	profiles: Pick<ProfileStore, "list">;
 	cliTools: Pick<CliToolStore, "list">;
 	connections: Pick<ConnectionStore, "list">;

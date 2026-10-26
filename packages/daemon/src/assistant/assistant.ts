@@ -22,7 +22,7 @@ import {
 	type ChatRequest,
 	isAgentProfile,
 } from "@nightshift/flows";
-import { authoringPort, type ChatSpace } from "./authoring";
+import { type AuthoringSpace, authoringPort } from "./authoring";
 import {
 	type ChatThread,
 	createThreadStore,
@@ -42,7 +42,7 @@ export type AssistantDeps = {
 	/** The folder of the project's Clone on this computer (in that Space), or null. */
 	clonePath: (projectId: string, spaceId?: string) => Promise<string | null>;
 	/** The engine as the Person sees the Space: the project's flows and runs. */
-	space: (scope: AssistantScope) => ChatSpace;
+	space: (scope: AssistantScope) => AuthoringSpace;
 	cliTools: Pick<CliToolStore, "list">;
 	connections: Pick<ConnectionStore, "list">;
 	/** The skills a harness can run in the project. Default: the installed ones. */
