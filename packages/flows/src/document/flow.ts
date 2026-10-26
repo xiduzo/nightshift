@@ -147,11 +147,10 @@ export const sectionColors = [
 export const sectionColorSchema = z.enum(sectionColors);
 
 /**
- * A named, coloured frame around nodes of this flow, in the editor only:
- * the engine and the run do not read it. Its nodes should form one
- * connected part that the flow enters at one node (`validateFlow` warns
- * when they do not). Whether it is folded is not in the file: each person
- * folds it in their own browser.
+ * A named, coloured group of nodes of this flow, in the editor only: the
+ * engine and the run do not read it. Its nodes should form one connected
+ * part that the flow enters at one node (`validateFlow` warns when they do
+ * not). The canvas shows it as one box. You open the box to see its nodes.
  */
 export const flowSectionSchema = z.object({
 	id: z.string().min(1),

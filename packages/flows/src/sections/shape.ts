@@ -1,8 +1,8 @@
 /**
  * The shape of a Section in its flow: which nodes it holds, where the flow
- * enters it, and the edges that cross its frame. A Section is one connected
+ * enters it, and the edges that cross its edge. A Section is one connected
  * part of the flow with one entry (decision 2 of the canvas research), so
- * it folds into one box with one way in.
+ * it shows as one box with one way in.
  */
 import type { Flow, FlowEdge, FlowSection } from "../document";
 import { nodeOutcomes } from "../document";
@@ -86,8 +86,8 @@ export function canMakeSection(
 }
 
 /**
- * The edges that leave a Section on one outcome of one node. A folded
- * Section shows one handle for each, labelled "verdict · pass".
+ * The edges that leave a Section on one outcome of one node. A Section's
+ * box shows one handle for each, labelled "verdict · pass".
  */
 export type SectionExit = {
 	from: string;

@@ -1,7 +1,6 @@
-// A Section on the canvas: a frame drawn behind its nodes, or, folded, one
-// box that stands for them. Both are React Flow nodes. The frame is not a
-// React Flow parent (`parentId`): its nodes keep their own positions, and
-// the frame is sized to them (`section-geometry.ts`).
+// A Section on the canvas: one box that stands for its nodes, a React Flow
+// node at the top-left corner of its members (`section-geometry.ts`). Open
+// it to see its nodes (`section-focus.ts`).
 
 import type {
 	FlowIssue,
@@ -20,11 +19,10 @@ import {
 	Position,
 } from "@xyflow/react";
 import {
-	ChevronsDownUpIcon,
-	ChevronsUpDownIcon,
 	CircleDashedIcon,
 	GroupIcon,
 	PlayIcon,
+	ZoomInIcon,
 } from "lucide-react";
 import { createContext, memo, useContext } from "react";
 import { exitHandleId } from "../edge-groups";
@@ -42,19 +40,7 @@ import {
 } from "../outcome-badge";
 import type { SectionRunSummary } from "./section-run";
 
-export type SectionFrameData = {
-	section: FlowSection;
-	/** How many of its nodes are on the canvas. */
-	count: number;
-	/** The Section's validation warnings. */
-	issues: readonly FlowIssue[];
-	/** The height of the header above the nodes. */
-	header: number;
-	/** Run view only: the state of its nodes. */
-	run?: SectionRunSummary;
-};
-
-/** One handle of a folded box: the edges of one node and outcome that leave. */
+/** One handle of a box: the edges of one node and outcome that leave. */
 export type SectionBoxExit = {
 	from: string;
 	outcome: string;
@@ -76,18 +62,18 @@ export type SectionBoxData = {
 	run?: SectionRunSummary;
 };
 
-export type SectionFrameNode = Node<SectionFrameData, "sectionFrame">;
 export type SectionBoxNode = Node<SectionBoxData, "sectionBox">;
 /** Every node a flow canvas draws. */
-export type CanvasNode = FlowCanvasNode | SectionFrameNode | SectionBoxNode;
+export type CanvasNode = FlowCanvasNode | SectionBoxNode;
 
 export type SectionActions = {
-	setFolded: (sectionId: string, folded: boolean) => void;
-	/** Selects a node that a folded box hides. Run view only. */
+	/** Shows only the Section's nodes on the canvas. */
+	open: (sectionId: string) => void;
+	/** Selects a node that a box hides. Run view only. */
 	selectNode?: (nodeId: string) => void;
 };
 
-/** What the frames and boxes can do. Without it they only show. */
+/** What the boxes can do. Without it they only show. */
 export const SectionActionsContext = createContext<SectionActions | null>(null);
 
 /** The Section's colour, from the theme. No colour: a neutral grey. */
@@ -153,121 +139,35 @@ function SectionRunBadge({
 	);
 }
 
-function FoldButton({
+/** Shows only the Section's nodes. Zooming far into its box does the same. */
+function OpenButton({
 	section,
-	folded,
 	className,
 }: {
 	section: FlowSection;
-	folded: boolean;
 	className?: string;
 }) {
-	const actions = useContext(SectionActionsContext);
-	if (!actions) return null;
-	const label = folded ? "Unfold section" : "Fold section";
-	const Icon = folded ? ChevronsUpDownIcon : ChevronsDownUpIcon;
+	const open = useContext(SectionActionsContext)?.open;
+	if (!open) return null;
 	return (
 		<Button
 			variant="ghost"
 			size="icon-xs"
 			className={cn("nodrag nopan", className)}
-			aria-label={label}
-			title={label}
+			aria-label="Open section"
+			title="Open section: show only its nodes"
 			onClick={(event) => {
-				// Folding is not a click on the frame: it keeps the selection.
 				event.stopPropagation();
-				actions.setFolded(section.id, !folded);
+				open(section.id);
 			}}
 		>
-			<Icon />
+			<ZoomInIcon />
 		</Button>
 	);
 }
 
 /**
- * The frame behind a Section's nodes: its name, node count, warnings and a
- * fold button. Only the header takes the pointer. The rest lets clicks
- * and drags through to the edges and the canvas.
- */
-const SectionFrame = memo(function SectionFrame({
-	data,
-	selected,
-}: NodeProps<SectionFrameNode>) {
-	const { section, count, issues, header, run } = data;
-	const color = sectionColor(section.color);
-	const name = nameOf(section);
-	const description = section.description?.trim();
-	const overviewText = useOverviewText(64);
-	const overview = overviewText > 0;
-	return (
-		<div
-			className={cn(
-				"relative size-full rounded-xl border-2 transition-shadow motion-reduce:transition-none",
-				selected && "ring-2 ring-ring ring-offset-2 ring-offset-background",
-			)}
-			style={{ borderColor: mix(color, 45), background: mix(color, 6) }}
-		>
-			<div
-				className={cn(
-					"pointer-events-auto flex cursor-grab items-start gap-2 rounded-t-[10px] px-3 pt-1.5 active:cursor-grabbing",
-					// Zoomed out, the header stays where it is to grab, unseen.
-					overview && "opacity-0",
-				)}
-				style={{ height: header }}
-			>
-				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<div className="flex h-6 min-w-0 items-center gap-1.5">
-						<span
-							className="truncate font-medium text-sm"
-							style={{ color: section.color ? color : undefined }}
-							title={name}
-						>
-							{name}
-						</span>
-						<Badge
-							variant="outline"
-							className="h-4 shrink-0 bg-background/60 px-1.5 text-[10px] text-muted-foreground tabular-nums"
-						>
-							{nodesText(count)}
-						</Badge>
-						{run ? (
-							<SectionRunBadge
-								run={run}
-								className="h-4 shrink-0 bg-background px-1.5 text-[10px]"
-							/>
-						) : null}
-						<SectionIssues issues={issues} />
-					</div>
-					{description ? (
-						<p
-							className="-mt-0.5 truncate text-muted-foreground text-xs"
-							title={description}
-						>
-							{description}
-						</p>
-					) : null}
-				</div>
-				<FoldButton section={section} folded={false} className="-mr-1.5" />
-			</div>
-			{overview ? (
-				// Zoomed out, the name stands above the frame in large type, and
-				// takes the frame along when dragged.
-				<span
-					className="pointer-events-auto absolute bottom-full left-1 mb-[0.2em] cursor-grab whitespace-nowrap font-medium leading-none active:cursor-grabbing"
-					style={{
-						fontSize: overviewText,
-						color: section.color ? color : undefined,
-					}}
-				>
-					{name}
-				</span>
-			) : null}
-		</div>
-	);
-});
-
-/**
- * What the nodes inside a folded box do in the run: the state of the
+ * What the nodes inside a box do in the run: the state of the
  * latest step and its node, what failed, how far the run came.
  */
 function BoxRun({ run, count }: { run: SectionRunSummary; count: number }) {
@@ -308,7 +208,7 @@ function BoxRun({ run, count }: { run: SectionRunSummary; count: number }) {
 }
 
 /**
- * A folded Section: one box in place of its nodes. One input handle, and
+ * A Section: one box in place of its nodes. One input handle, and
  * one output handle for each node and outcome whose edges leave it,
  * labelled "verdict · pass".
  */
@@ -373,7 +273,7 @@ const SectionBox = memo(function SectionBox({
 						) : null}
 						<span className="ml-auto flex shrink-0 items-center gap-1 normal-case tracking-normal">
 							<SectionIssues issues={issues} />
-							<FoldButton section={section} folded className="-my-1 -mr-1.5" />
+							<OpenButton section={section} className="-my-1 -mr-1.5" />
 						</span>
 					</div>
 					<span
@@ -464,9 +364,8 @@ const SectionBox = memo(function SectionBox({
 	);
 });
 
-/** The node types of every flow canvas: the flow's nodes, and Sections. */
+/** The node types of every flow canvas: the flow's nodes, and Section boxes. */
 export const canvasNodeTypes: NodeTypes = {
 	...nodeTypes,
-	sectionFrame: SectionFrame,
 	sectionBox: SectionBox,
 };

@@ -740,7 +740,11 @@ to need no wrapping. These are the boundary edges counted from the file:
 The developer answered the open questions:
 
 1. **Fold state:** per browser, as in n8n. The flow file holds the Sections,
-   not whether they are folded.
+   not whether they are folded. *Replaced 2026-10-26:* a Section is always
+   one box. You open it as in TouchDesigner: zoom far into the box (or use
+   its Open button) and the canvas shows only its nodes, zoom far out and
+   the box takes their place again. Nothing is folded or kept per browser.
+   "Lay out" lays out the nodes inside each box too.
 2. **Section membership:** a Section is one connected part with one entry.
    The editor refuses a selection that is not.
 3. **Edge labels:** the canvas may hide labels that the node rows already

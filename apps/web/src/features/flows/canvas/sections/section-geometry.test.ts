@@ -7,8 +7,6 @@ import {
 } from "@nightshift/flows";
 import {
 	boxPosition,
-	FRAME_PADDING,
-	frameRect,
 	membersBounds,
 	moveSection,
 	sectionDragDelta,
@@ -32,20 +30,13 @@ const sizes = {
 	b: { width: 256, height: 140 },
 };
 
-describe("frames", () => {
-	test("a frame is its members' box, padded, with a header on top", () => {
+describe("the box", () => {
+	test("its members' bounds, by their positions and sizes", () => {
 		expect(membersBounds(flow, ["a", "b"], sizes)).toEqual({
 			x: 0,
 			y: 0,
 			width: 656,
 			height: 220,
-		});
-		const { top, right, bottom, left } = FRAME_PADDING;
-		expect(frameRect(flow, section, sizes)).toEqual({
-			x: -left,
-			y: -top,
-			width: 656 + left + right,
-			height: 220 + top + bottom,
 		});
 	});
 
@@ -57,37 +48,17 @@ describe("frames", () => {
 			height: 160,
 		});
 		expect(membersBounds(flow, ["zz"])).toBeNull();
-		expect(frameRect(flow, { ...section, nodes: [] })).toBeNull();
+		expect(boxPosition(flow, { ...section, nodes: [] })).toBeNull();
 	});
 
-	test("the frame follows a member that moves", () => {
-		const moved = {
-			...flow,
-			nodes: flow.nodes.map((node) =>
-				node.id === "b" ? { ...node, position: { x: 400, y: 400 } } : node,
-			),
-		};
-		const before = frameRect(flow, section, sizes);
-		const after = frameRect(moved, section, sizes);
-		expect(after?.x).toBe(before?.x);
-		expect(after?.height).toBe((before?.height ?? 0) + 320);
-	});
-
-	test("a folded box sits at the top-left corner of its members", () => {
+	test("a box sits at the top-left corner of its members", () => {
 		expect(boxPosition(flow, section)).toEqual({ x: 0, y: 0 });
 	});
 });
 
 describe("dragging a Section", () => {
-	test("dragging the frame moves its members by as much, and no other node", () => {
-		const frame = frameRect(flow, section, sizes);
-		if (!frame) throw new Error("no frame");
-		const delta = sectionDragDelta(
-			flow,
-			section,
-			{ x: frame.x + 40, y: frame.y - 16 },
-			{ sizes, folded: false },
-		);
+	test("dragging the box moves its members by as much, and no other node", () => {
+		const delta = sectionDragDelta(flow, section, { x: 40, y: -16 });
 		expect(delta).toEqual({ x: 40, y: -16 });
 		const moved = moveSection(flow, section, delta ?? { x: 0, y: 0 });
 		expect(moved.nodes.map((node) => node.position)).toEqual([
@@ -95,16 +66,8 @@ describe("dragging a Section", () => {
 			{ x: 440, y: 64 },
 			{ x: 1000, y: 1000 },
 		]);
-		// The frame lands where it was dropped.
-		expect(frameRect(moved, section, sizes)).toEqual(
-			expect.objectContaining({ x: frame.x + 40, y: frame.y - 16 }),
-		);
-	});
-
-	test("dragging a folded box moves its members from their top-left corner", () => {
-		expect(
-			sectionDragDelta(flow, section, { x: 8, y: 24 }, { folded: true }),
-		).toEqual({ x: 8, y: 24 });
+		// The box lands where it was dropped.
+		expect(boxPosition(moved, section)).toEqual({ x: 40, y: -16 });
 	});
 
 	test("no move keeps the flow", () => {

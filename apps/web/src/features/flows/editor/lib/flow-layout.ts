@@ -745,6 +745,9 @@ export type LaidFlow = {
 	flow: Flow;
 	/** By pair key. An edge between two nodes of one folded Section has none. */
 	routes: Map<string, EdgeRoute>;
+	/** By pair key: the edges inside folded Sections, routed for when the
+	 *  Section opens. Their ends are nodes, never a box. */
+	inside: Map<string, EdgeRoute>;
 	direction?: Direction;
 	/** By Section id, on the canvas grid. Sections the layout left out (see
 	 *  `layoutSections`) have none. */
@@ -766,7 +769,7 @@ export async function layoutFlow(
 	{ layout, viewport, ...options }: LayoutFlowOptions,
 ): Promise<LaidFlow> {
 	if (flow.nodes.length === 0) {
-		return { flow, routes: new Map(), sections: new Map() };
+		return { flow, routes: new Map(), inside: new Map(), sections: new Map() };
 	}
 	const { boxes, routes, direction } = await layoutBest(
 		layout,
@@ -775,25 +778,25 @@ export async function layoutFlow(
 	);
 
 	const at = new Map<string, Point>();
+	const inside = new Map<string, EdgeRoute>();
 	const sections = new Map<string, SectionBox>();
 	for (const section of layoutSections(flow)) {
 		const box = boxes.get(sectionNodeId(section.id));
 		if (!box) continue;
 		const folded = options.folded?.has(section.id) ?? false;
 		if (folded) {
-			const members = flow.nodes.filter((node) =>
-				section.nodes.includes(node.id),
-			);
-			const corner = {
-				x: Math.min(...members.map((node) => node.position.x)),
-				y: Math.min(...members.map((node) => node.position.y)),
-			};
-			const shift = { x: snap(box.x) - corner.x, y: snap(box.y) - corner.y };
-			for (const node of members) {
-				at.set(node.id, {
-					x: node.position.x + shift.x,
-					y: node.position.y + shift.y,
+			// Its members get a layout of their own, left to right as in an
+			// open frame, with its top-left corner on the box.
+			const laid = await layoutInside(layout, flow, section, options);
+			const shift = { x: snap(box.x), y: snap(box.y) };
+			for (const [id, member] of laid.boxes) {
+				at.set(id, {
+					x: shift.x + snap(member.x),
+					y: shift.y + snap(member.y),
 				});
+			}
+			for (const [key, route] of laid.routes) {
+				inside.set(key, moveRoute(route, shift));
 			}
 			sections.set(section.id, {
 				x: snap(box.x),
@@ -825,5 +828,37 @@ export async function layoutFlow(
 		const position = at.get(node.id);
 		return position ? moveNode(next, node.id, position) : next;
 	}, flow);
-	return { flow: laid, routes, direction, sections };
+	return { flow: laid, routes, inside, direction, sections };
+}
+
+/**
+ * The members of one Section, and the edges between them, laid out left to
+ * right on their own, from 0, 0. The member the Section starts at comes
+ * first.
+ */
+async function layoutInside(
+	layout: ElkLayout,
+	flow: Flow,
+	section: FlowSection,
+	{ sizes, handles }: FlowGraphOptions,
+): Promise<Laid> {
+	const members = new Set(section.nodes);
+	const part: Flow = {
+		...flow,
+		start: sectionBoundary(flow, section.nodes).entry ?? section.nodes[0] ?? "",
+		nodes: flow.nodes.filter((node) => members.has(node.id)),
+		edges: flow.edges.filter(
+			(edge) => members.has(edge.from) && members.has(edge.to),
+		),
+		sections: undefined,
+	};
+	return layoutBest(layout, flowGraph(part, { sizes, handles }));
+}
+
+function moveRoute(route: EdgeRoute, by: Point): EdgeRoute {
+	const move = (point: Point) => ({ x: point.x + by.x, y: point.y + by.y });
+	return {
+		points: route.points.map(move),
+		label: route.label ? move(route.label) : undefined,
+	};
 }

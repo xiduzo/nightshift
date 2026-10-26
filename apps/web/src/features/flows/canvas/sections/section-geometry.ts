@@ -1,23 +1,13 @@
-// Where a Section shows on the canvas. Its frame is not stored: it is the
-// box around its members, plus padding and a header for its name. Folded,
-// the Section is one box at the top-left corner of its members. So a frame
-// follows its members, and moving the frame or the box moves the members.
-// Positions in the flow file stay per node.
+// Where a Section shows on the canvas: one box at the top-left corner of
+// its members. Its place is not stored, so the box follows its members, and
+// moving the box moves the members. Positions in the flow file stay per node.
 
 import { type Flow, type FlowSection, moveNode } from "@nightshift/flows";
-import { SECTION_PADDING } from "../../editor/lib/flow-layout";
 import type { Point } from "../edge-route";
 import type { Measured } from "../use-measured";
 
 /** A node React Flow has not measured yet: `w-64` and a typical body. */
 const FALLBACK_SIZE = { width: 256, height: 160 };
-
-/**
- * Between the members and the frame: the room "Lay out" leaves, so a frame
- * drawn around laid-out members matches the layout. The top holds the
- * frame's header: its name, and one line of description.
- */
-export const FRAME_PADDING = SECTION_PADDING;
 
 export type Rect = Point & { width: number; height: number };
 
@@ -44,24 +34,7 @@ export function membersBounds(
 	return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** The frame of an unfolded Section: its members, padded, with room for a header on top. */
-export function frameRect(
-	flow: Pick<Flow, "nodes">,
-	section: FlowSection,
-	sizes?: Measured,
-): Rect | null {
-	const bounds = membersBounds(flow, section.nodes, sizes);
-	if (!bounds) return null;
-	const { top, right, bottom, left } = FRAME_PADDING;
-	return {
-		x: bounds.x - left,
-		y: bounds.y - top,
-		width: bounds.width + left + right,
-		height: bounds.height + top + bottom,
-	};
-}
-
-/** Where a folded Section's box is: the top-left corner of its members. */
+/** Where a Section's box is: the top-left corner of its members. */
 export function boxPosition(
 	flow: Pick<Flow, "nodes">,
 	section: FlowSection,
@@ -71,19 +44,15 @@ export function boxPosition(
 }
 
 /**
- * How far the members move when the Section's frame (or its box, when
- * `folded`) is dragged to `to`, from where the flow has it now. Null when
- * the Section has no node on the canvas.
+ * How far the members move when the Section's box is dragged to `to`, from
+ * where the flow has it now. Null when the Section has no node on the canvas.
  */
 export function sectionDragDelta(
 	flow: Pick<Flow, "nodes">,
 	section: FlowSection,
 	to: Point,
-	{ sizes, folded }: { sizes?: Measured; folded: boolean },
 ): Point | null {
-	const from = folded
-		? boxPosition(flow, section)
-		: frameRect(flow, section, sizes);
+	const from = boxPosition(flow, section);
 	return from ? { x: to.x - from.x, y: to.y - from.y } : null;
 }
 

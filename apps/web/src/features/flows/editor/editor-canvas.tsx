@@ -44,6 +44,8 @@ import {
 	recordRoutes,
 	writeRoutes,
 } from "../canvas/route-cache";
+import { sectionEnds } from "../canvas/sections/folded-edges";
+import { useOpenSection } from "../canvas/sections/section-focus";
 import {
 	moveSection,
 	sectionDragDelta,
@@ -55,7 +57,11 @@ import {
 	SectionActionsContext,
 	type SectionBoxData,
 } from "../canvas/sections/section-nodes";
-import { useSectionCanvas } from "../canvas/sections/use-section-canvas";
+import { OpenSectionBar, SectionZoom } from "../canvas/sections/section-zoom";
+import {
+	sectionIds,
+	useSectionCanvas,
+} from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
 import { CanvasControls } from "./canvas-controls";
 import { fitViewOptions } from "./fit-view";
@@ -84,7 +90,7 @@ const NO_ISSUES: FlowIssue[] = [];
 
 /**
  * Where React Flow measured each node's handles, from the node's top-left
- * corner, and each folded box's size and handles, by Section id. Only the
+ * corner, and each box's size and handles, by Section id. Only the
  * height counts: inputs sit on the left side of a node and outcomes on its
  * right. A box names its exits as the layout does ("verdict · pass").
  */
@@ -95,7 +101,6 @@ function measuredHandles(
 	const sectionHandles: Record<string, NodeHandles> = {};
 	const sectionSizes: Record<string, Size> = {};
 	for (const [id, node] of nodeLookup) {
-		if (node.type === "sectionFrame") continue;
 		const bounds = node.internals.handleBounds;
 		const { width, height } = node.measured;
 		if (!bounds || width === undefined) continue;
@@ -132,24 +137,22 @@ function measuredHandles(
 	return { handles, sectionHandles, sectionSizes };
 }
 
-/** A Section's frame or box has no fill on the mini map, only its outline. */
-function miniMapColor(node: CanvasNode): string {
-	if (node.type === "sectionFrame") return "transparent";
-	return "color-mix(in oklch, var(--muted-foreground) 45%, transparent)";
-}
+const MINI_MAP_COLOR =
+	"color-mix(in oklch, var(--muted-foreground) 45%, transparent)";
 
 export function EditorCanvas({
 	flow,
 	routesKey,
 	check,
 	selection,
-	folded,
 	onFlowChange,
 	onSelect,
-	onSetFolded,
 	onMakeSection,
 	onDropNode,
 	onNodeDoubleClick,
+	openSection,
+	onOpenSection,
+	flowLabel,
 	preview,
 	coveredRight = 0,
 }: {
@@ -158,18 +161,20 @@ export function EditorCanvas({
 	routesKey: string;
 	check: FlowCheck;
 	selection: Selection;
-	/** The Sections this browser keeps folded. */
-	folded: ReadonlySet<string>;
 	/** A change, with the gesture it is part of: a drag is one step for Undo. */
 	onFlowChange: (change: (flow: Flow) => Flow, gesture?: string) => void;
 	onSelect: SelectionSetter;
-	onSetFolded: (sectionId: string, folded: boolean) => void;
 	/** "Make section" from the selected nodes. */
 	onMakeSection: (nodeIds: string[]) => void;
 	/** A node type dragged from the dock was dropped at this point of the screen. */
 	onDropNode: (type: FlowNodeType, at: { x: number; y: number }) => void;
 	/** A node was double-clicked, for example a Subflow to look inside. */
 	onNodeDoubleClick?: (nodeId: string) => void;
+	/** The Section whose nodes alone show, or null for the whole flow. */
+	openSection: string | null;
+	onOpenSection: (sectionId: string | null) => void;
+	/** What the whole flow is called while a Section is open. */
+	flowLabel: string;
 	/**
 	 * A proposed change on view: `flow` is the proposal, read only, and
 	 * these mark how its nodes and edges differ from the draft.
@@ -218,8 +223,21 @@ export function EditorCanvas({
 		return { byNode, bySection, edgeErrors };
 	}, [check]);
 
-	const sections = useSectionCanvas(flow, {
-		folded,
+	// An open Section shows its nodes alone. Edits still go to the whole flow.
+	const open = useOpenSection(flow, openSection);
+	const view = open.view;
+	// Something picked outside the open Section shows the whole flow again.
+	useEffect(() => {
+		if (!open.section) return;
+		const members = new Set(open.section.nodes);
+		const outside =
+			selection?.kind === "section"
+				? selection.id !== open.section.id
+				: selectedNodeIds(selection).some((id) => !members.has(id));
+		if (outside) onOpenSection(null);
+	}, [selection, open.section, onOpenSection]);
+
+	const sections = useSectionCanvas(view, {
 		measured,
 		editable: !preview,
 		issues: counts.bySection,
@@ -229,8 +247,8 @@ export function EditorCanvas({
 
 	const nodes = useMemo<CanvasNode[]>(() => {
 		const selected = new Set(selectedNodeIds(selection));
-		const flowNodes = flow.nodes.flatMap((node): FlowCanvasNode[] =>
-			// A folded Section's nodes are not on the canvas at all, so no
+		const flowNodes = view.nodes.flatMap((node): FlowCanvasNode[] =>
+			// A Section's nodes are not on the canvas at all, so no
 			// click, box or key can select or delete them.
 			hidden.has(node.id)
 				? []
@@ -243,22 +261,21 @@ export function EditorCanvas({
 							selected: !preview && selected.has(node.id),
 							data: {
 								node,
-								isStart: flow.start === node.id,
+								isStart: view.start === node.id,
 								issues: counts.byNode.get(node.id) ?? NO_ISSUES,
 								change: preview?.nodes.get(node.id),
 							},
 						},
 					],
 		);
-		return [...sections.frames, ...flowNodes, ...sections.boxes];
+		return [...flowNodes, ...sections.boxes];
 	}, [
-		flow.nodes,
-		flow.start,
+		view.nodes,
+		view.start,
 		counts,
 		measured,
 		selection,
 		hidden,
-		sections.frames,
 		sections.boxes,
 		preview,
 	]);
@@ -268,7 +285,7 @@ export function EditorCanvas({
 	const { groups, boxPositions } = sections;
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			canvasEdges(flow, groups, {
+			canvasEdges(view, groups, {
 				routes,
 				errors: counts.edgeErrors,
 				selected: selection?.kind === "edge" ? selection.id : undefined,
@@ -276,7 +293,7 @@ export function EditorCanvas({
 				endOf: sections.endOf,
 				changes: preview?.edges,
 			}).map((edge) =>
-				// A line to a folded box stands for edges you cannot see:
+				// A line to a box stands for edges you cannot see:
 				// Delete does not remove them. Select one on its label.
 				sectionIdOf(edge.source) !== undefined ||
 				sectionIdOf(edge.target) !== undefined
@@ -284,7 +301,7 @@ export function EditorCanvas({
 					: edge,
 			),
 		[
-			flow,
+			view,
 			groups,
 			routes,
 			counts,
@@ -336,16 +353,13 @@ export function EditorCanvas({
 			if (moves.length > 0 || sectionMoves.size > 0 || removed.length > 0) {
 				onFlowChange((current) => {
 					let next = current;
-					// Dragging a frame or a box moves its nodes as one block,
-					// from where they are now.
+					// Dragging a box moves its nodes as one block, from where
+					// they are now.
 					const carried = new Set<string>();
 					for (const [sectionId, to] of sectionMoves) {
 						const section = next.sections?.find((s) => s.id === sectionId);
 						if (!section) continue;
-						const delta = sectionDragDelta(next, section, to, {
-							sizes: measured,
-							folded: folded.has(sectionId),
-						});
+						const delta = sectionDragDelta(next, section, to);
 						if (delta) next = moveSection(next, section, delta);
 						for (const id of section.nodes) carried.add(id);
 					}
@@ -369,7 +383,7 @@ export function EditorCanvas({
 				onSelect((current) => withoutNodes(current, gone));
 			}
 		},
-		[applyDimensions, onFlowChange, onSelect, measured, folded],
+		[applyDimensions, onFlowChange, onSelect],
 	);
 
 	// A box drawn with Shift selects the nodes in it. React Flow selects
@@ -413,7 +427,7 @@ export function EditorCanvas({
 		[groupOf, selection, onFlowChange, onSelect],
 	);
 
-	/** An edge dropped on a folded box leads to the node the Section starts at. */
+	/** An edge dropped on a box leads to the node the Section starts at. */
 	const targetOf = useCallback(
 		(target: string): string | null => {
 			const sectionId = sectionIdOf(target);
@@ -469,8 +483,9 @@ export function EditorCanvas({
 		const { width, height, nodeLookup } = store.getState();
 		const viewport = { width: width / 1.15, height: height / 1.15 };
 		try {
-			// A folded Section is one box: the layout moves its nodes as a
-			// block, so the box (their top-left corner) lands where it laid it.
+			// A Section is one box: the layout lays its nodes out inside, and
+			// their top-left corner lands where it put the box.
+			const folded = sectionIds(flow);
 			const laid = await layoutFlow(flow, {
 				layout: await loadElk(),
 				sizes: measured,
@@ -481,12 +496,18 @@ export function EditorCanvas({
 			const at = new Map(
 				laid.flow.nodes.map((node) => [node.id, node.position]),
 			);
-			const book = recordRoutes(
-				laid.flow.nodes,
-				groupEdges(laid.flow),
-				laid.routes,
-				sections.endOf,
-			);
+			const laidGroups = groupEdges(laid.flow);
+			const book = {
+				// Inside a Section, the routes hold once it opens.
+				...recordRoutes(laid.flow.nodes, laidGroups, laid.inside),
+				...recordRoutes(
+					laid.flow.nodes,
+					laidGroups,
+					laid.routes,
+					// The whole flow's ends, also while a Section is open.
+					sectionEnds(flow, folded),
+				),
+			};
 			setRoutes(book);
 			writeRoutes(routesKey, book);
 			onFlowChange((current) =>
@@ -517,26 +538,15 @@ export function EditorCanvas({
 				},
 			},
 		});
-	}, [
-		flow,
-		routes,
-		routesKey,
-		measured,
-		folded,
-		sections.endOf,
-		onFlowChange,
-		fitView,
-		fit,
-		store,
-	]);
+	}, [flow, routes, routesKey, measured, onFlowChange, fitView, fit, store]);
 
 	const selectEdge = useCallback(
 		(id: string) => onSelect({ kind: "edge", id }),
 		[onSelect],
 	);
 	const sectionActions = useMemo(
-		() => ({ setFolded: onSetFolded }),
-		[onSetFolded],
+		() => ({ open: onOpenSection }),
+		[onOpenSection],
 	);
 	const multi = !preview && selection?.kind === "nodes" ? selection.ids : null;
 
@@ -562,8 +572,7 @@ export function EditorCanvas({
 							if (preview) return;
 							const sectionId = sectionIdOf(node.id);
 							if (sectionId === undefined) onNodeDoubleClick?.(node.id);
-							else if (node.type === "sectionBox")
-								onSetFolded(sectionId, false);
+							else onOpenSection(sectionId);
 						}}
 						onSelectionStart={() => {
 							boxSelecting.current = true;
@@ -600,6 +609,21 @@ export function EditorCanvas({
 							color="color-mix(in oklch, var(--foreground) 16%, transparent)"
 						/>
 						<CanvasControls onAutoLayout={() => void autoLayout()} fit={fit} />
+						<SectionZoom
+							flow={flow}
+							measured={measured}
+							open={open.section?.id ?? null}
+							onOpen={onOpenSection}
+							onClose={() => onOpenSection(null)}
+							fit={fit}
+						/>
+						{open.section && !preview ? (
+							<OpenSectionBar
+								section={open.section}
+								flowLabel={flowLabel}
+								onClose={() => onOpenSection(null)}
+							/>
+						) : null}
 						{multi ? (
 							<NodeToolbar nodeId={multi} isVisible position={Position.Top}>
 								<Button
@@ -617,7 +641,7 @@ export function EditorCanvas({
 								</Button>
 							</NodeToolbar>
 						) : null}
-						{flow.nodes.length > 4 ? (
+						{view.nodes.length > 4 ? (
 							<MiniMap<CanvasNode>
 								pannable
 								zoomable
@@ -625,12 +649,7 @@ export function EditorCanvas({
 								className="m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block"
 								style={{ width: 168, height: 112 }}
 								nodeBorderRadius={6}
-								nodeColor={miniMapColor}
-								nodeStrokeColor={(node) =>
-									node.type === "sectionFrame"
-										? "color-mix(in oklch, var(--muted-foreground) 45%, transparent)"
-										: "transparent"
-								}
+								nodeColor={MINI_MAP_COLOR}
 							/>
 						) : null}
 					</ReactFlow>

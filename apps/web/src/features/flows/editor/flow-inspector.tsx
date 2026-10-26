@@ -279,7 +279,7 @@ export function FlowInspector({
 							<Kbd>⌘/Ctrl</Kbd>
 							<Kbd>G</Kbd>
 						</KbdGroup>{" "}
-						makes them a Section: a named frame you can fold.
+						makes them a Section: one named box. Zoom into it to see its nodes.
 					</li>
 					<li>
 						A Decision node has one outcome per option, a Command node one per

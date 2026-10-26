@@ -50,7 +50,6 @@ import {
 	EnterSubflowContext,
 	OpenFlowContext,
 } from "../canvas/open-flow-context";
-import { useFoldedSections } from "../canvas/sections/use-section-canvas";
 import type { ChatLink } from "../chat/chat-link";
 import { FlowChatPanel } from "../chat/chat-panel";
 import { ProposalBar } from "../chat/proposal-bar";
@@ -128,7 +127,28 @@ function Editor({
 	const [madeSection, setMadeSection] = useState<string | null>(null);
 	// The Section "Make subflow" works on, while its dialog is open.
 	const [subflowOf, setSubflowOf] = useState<string | null>(null);
-	const folds = useFoldedSections(`${projectId}/${name}`);
+	// The Section whose nodes alone show on the canvas.
+	const [openSection, setOpenSection] = useState<string | null>(null);
+	// A node added or pasted while a Section is open joins it.
+	const setDraftInOpen = useCallback<typeof setDraft>(
+		(change, gesture) =>
+			setDraft((current) => {
+				const next = typeof change === "function" ? change(current) : change;
+				const section = openSection;
+				if (!section || !next.sections?.some((s) => s.id === section))
+					return next;
+				const before = new Set(current.nodes.map((node) => node.id));
+				const added = next.nodes
+					.map((node) => node.id)
+					.filter((id) => !before.has(id));
+				if (added.length === 0) return next;
+				return updateSection(next, section, (s) => ({
+					...s,
+					nodes: [...s.nodes, ...added],
+				}));
+			}, gesture),
+		[setDraft, openSection],
+	);
 
 	const dirty = useMemo(
 		() => JSON.stringify(draft) !== savedJson,
@@ -152,7 +172,7 @@ function Editor({
 	// The flow's settings show in the inspector while nothing is selected.
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [dragging, setDragging] = useState<FlowNodeType | null>(null);
-	const addNode = useAddNode(draft, setDraft, setSelection, nodeDefaults);
+	const addNode = useAddNode(draft, setDraftInOpen, setSelection, nodeDefaults);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -268,7 +288,7 @@ function Editor({
 		openFlow(calledName);
 	};
 
-	const sections = sectionEdits(draft, setDraft, setSelection, folds.setFolded);
+	const sections = sectionEdits(draft, setDraft, setSelection);
 	const draftRef = useRef(draft);
 	draftRef.current = draft;
 	const subflowSection = draft.sections?.find(
@@ -284,7 +304,7 @@ function Editor({
 	selectionRef.current = selection;
 	const clipboard = useFlowClipboard({
 		draft,
-		setDraft,
+		setDraft: setDraftInOpen,
 		selection,
 		setSelection,
 	});
@@ -338,11 +358,17 @@ function Editor({
 	const callers = projectFlows.flows ? callersOf(name, projectFlows.flows) : [];
 
 	const selectNode = (nodeId: string) => {
-		// A node inside a folded Section shows again.
+		// A node inside a Section shows in its open Section.
 		const holder = sectionOf(draft, nodeId);
-		if (holder && folds.folded.has(holder.id))
-			folds.setFolded(holder.id, false);
 		setSelection({ kind: "node", id: nodeId });
+		if (holder && holder.id !== openSection) {
+			setOpenSection(holder.id);
+			return;
+		}
+		if (!holder && openSection !== null) {
+			setOpenSection(null);
+			return;
+		}
 		void fitView({ nodes: [{ id: nodeId }], duration: 300, maxZoom: 1 });
 	};
 
@@ -513,7 +539,6 @@ function Editor({
 			issues={check.issues.filter(
 				(issue) => issue.sectionId === selectedSection.id,
 			)}
-			folded={folds.folded.has(selectedSection.id)}
 			autoFocus={madeSection === selectedSection.id}
 			onChange={(change) =>
 				setDraft(
@@ -521,9 +546,7 @@ function Editor({
 					`section:${selectedSection.id}`,
 				)
 			}
-			onSetFolded={(folded) =>
-				sections.setSectionFolded(selectedSection.id, folded)
-			}
+			onOpen={() => setOpenSection(selectedSection.id)}
 			onRemove={() => sections.removeWithUndo(selectedSection.id)}
 			onSelectNode={selectNode}
 			onMakeSubflow={() => setSubflowOf(selectedSection.id)}
@@ -669,16 +692,17 @@ function Editor({
 									routesKey={`${projectId}/${name}${preview ? "#proposal" : ""}`}
 									check={previewCheck ?? check}
 									selection={preview ? null : selection}
-									folded={folds.folded}
 									onFlowChange={preview ? ignoreChange : changeFlow}
 									preview={preview ?? undefined}
 									// A fit keeps the flow beside the chat, not under it.
 									coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
 									onSelect={setSelection}
-									onSetFolded={sections.setSectionFolded}
 									onMakeSection={makeSection}
 									onDropNode={addNode}
 									onNodeDoubleClick={subflows.enterNode}
+									openSection={preview ? null : openSection}
+									onOpenSection={setOpenSection}
+									flowLabel={name}
 								/>
 							</EnterSubflowContext.Provider>
 						</OpenFlowContext.Provider>
@@ -758,7 +782,6 @@ function Editor({
 					{subflows.inside ? (
 						<OpenFlowContext.Provider value={openFlow}>
 							<SubflowView
-								projectId={projectId}
 								rootFlow={name}
 								stack={subflows.stack}
 								flows={projectFlows.flows}

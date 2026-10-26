@@ -17,15 +17,17 @@ export {
 	OutcomeMarkers,
 } from "./canvas/outcome-edge";
 export { readRoutes } from "./canvas/route-cache";
+export { useOpenSection } from "./canvas/sections/section-focus";
 export type { CanvasNode } from "./canvas/sections/section-nodes";
 export {
 	canvasNodeTypes,
 	SectionActionsContext,
 } from "./canvas/sections/section-nodes";
 export {
-	useFoldedSections,
-	useSectionCanvas,
-} from "./canvas/sections/use-section-canvas";
+	OpenSectionBar,
+	SectionZoom,
+} from "./canvas/sections/section-zoom";
+export { useSectionCanvas } from "./canvas/sections/use-section-canvas";
 export { useMeasured } from "./canvas/use-measured";
 export { chatAboutRun } from "./chat/chat-link";
 export { InspectorSection } from "./editor/fields";

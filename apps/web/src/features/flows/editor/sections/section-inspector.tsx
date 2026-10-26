@@ -1,6 +1,6 @@
 /**
  * The inspector of the selected Section: its name, colour and description,
- * its warnings, its nodes, and fold and remove. Removing a Section keeps its
+ * its warnings, its nodes, and open and remove. Removing a Section keeps its
  * nodes. "Make subflow" moves them to a flow of their own (the dialog).
  */
 import {
@@ -24,29 +24,27 @@ import { cn } from "@nightshift/ui/lib/utils";
 import {
 	BanIcon,
 	CheckIcon,
-	ChevronsDownUpIcon,
-	ChevronsUpDownIcon,
 	GroupIcon,
 	SquareFunctionIcon,
 	Trash2Icon,
 	TriangleAlertIcon,
+	ZoomInIcon,
 } from "lucide-react";
 import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
 import { OUTCOME_COLOR_STYLE } from "../../canvas/outcome-badge";
 import { Field, InspectorSection, Note } from "../fields";
 
-/** No colour: the frame takes a neutral grey. */
+/** No colour: the box takes a neutral grey. */
 const NO_COLOR = "none";
 
 export function SectionInspector({
 	flow,
 	section,
 	issues,
-	folded,
 	autoFocus = false,
 	onChange,
-	onSetFolded,
+	onOpen,
 	onRemove,
 	onSelectNode,
 	onMakeSubflow,
@@ -55,11 +53,11 @@ export function SectionInspector({
 	section: FlowSection;
 	/** The Section's validation warnings. */
 	issues: readonly FlowIssue[];
-	folded: boolean;
 	/** Puts the cursor in the name: the Section was just made. */
 	autoFocus?: boolean;
 	onChange: (change: (section: FlowSection) => FlowSection) => void;
-	onSetFolded: (folded: boolean) => void;
+	/** Shows only the Section's nodes on the canvas. */
+	onOpen: () => void;
 	onRemove: () => void;
 	/** Selects one of its nodes on the canvas. */
 	onSelectNode: (nodeId: string) => void;
@@ -71,7 +69,6 @@ export function SectionInspector({
 	const members = section.nodes.filter((node) => known.has(node));
 	const { entry } = sectionBoundary(flow, members);
 	const name = section.label.trim() || section.id;
-	const FoldIcon = folded ? ChevronsUpDownIcon : ChevronsDownUpIcon;
 
 	return (
 		<div className="flex flex-col">
@@ -85,10 +82,11 @@ export function SectionInspector({
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => onSetFolded(!folded)}
+							onClick={onOpen}
+							title="Show only its nodes"
 						>
-							<FoldIcon data-icon="inline-start" />
-							{folded ? "Unfold" : "Fold"}
+							<ZoomInIcon data-icon="inline-start" />
+							Open
 						</Button>
 						<Button
 							variant="ghost"
@@ -238,7 +236,7 @@ export function SectionInspector({
 					{entry
 						? `The flow comes into this Section at ${entry}.`
 						: "The flow has no single way into this Section."}{" "}
-					Remove the Section to keep its nodes without a frame.
+					Remove the Section to keep its nodes on their own.
 				</Note>
 			</InspectorSection>
 

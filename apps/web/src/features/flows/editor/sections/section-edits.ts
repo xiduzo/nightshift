@@ -6,20 +6,19 @@ import {
 } from "@nightshift/flows";
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
-import { type Selection, selectedNodeIds, withoutNodes } from "../selection";
+import type { Selection } from "../selection";
 import type { SubflowMade } from "./make-subflow";
 import { sectionName, sectionProblemText } from "./section-problems";
 
 /**
  * The edits of Sections that reach past one field: make one from the
- * selected nodes, remove one (with an undo), fold one without leaving
- * hidden nodes selected, and put a Subflow in its place (with an undo).
+ * selected nodes, remove one (with an undo), and put a Subflow in its
+ * place (with an undo).
  */
 export function sectionEdits(
 	draft: Flow,
 	setDraft: Dispatch<SetStateAction<Flow>>,
 	setSelection: Dispatch<SetStateAction<Selection>>,
-	setFolded: (sectionId: string, folded: boolean) => void,
 ) {
 	/** Returns the new Section's id, or null when the nodes cannot form one. */
 	const makeSection = (nodeIds: readonly string[]): string | null => {
@@ -43,7 +42,6 @@ export function sectionEdits(
 		const section = sections[index];
 		if (!section) return;
 		setDraft((current) => removeSection(current, sectionId));
-		setFolded(sectionId, false);
 		setSelection(null);
 		toast.info(`Removed the Section ${sectionName(section)}. Its nodes stay.`, {
 			action: {
@@ -51,22 +49,6 @@ export function sectionEdits(
 				onClick: () =>
 					setDraft((current) => restoreSection(current, section, index)),
 			},
-		});
-	};
-
-	/** Folding hides its nodes: a selection of them moves to the Section. */
-	const setSectionFolded = (sectionId: string, folded: boolean) => {
-		setFolded(sectionId, folded);
-		if (!folded) return;
-		const section = draft.sections?.find((s) => s.id === sectionId);
-		if (!section) return;
-		const members = new Set(section.nodes);
-		setSelection((current) => {
-			if (!selectedNodeIds(current).some((id) => members.has(id)))
-				return current;
-			return (
-				withoutNodes(current, members) ?? { kind: "section", id: sectionId }
-			);
 		});
 	};
 
@@ -82,7 +64,6 @@ export function sectionEdits(
 	) => {
 		const before = draft;
 		setDraft(made.caller);
-		setFolded(sectionId, false);
 		setSelection({ kind: "node", id: made.callNode });
 		toast.success(
 			`Made the Subflow "${made.name}". Save this flow to keep the change.`,
@@ -109,7 +90,7 @@ export function sectionEdits(
 		);
 	};
 
-	return { makeSection, removeWithUndo, setSectionFolded, applySubflow };
+	return { makeSection, removeWithUndo, applySubflow };
 }
 
 /**

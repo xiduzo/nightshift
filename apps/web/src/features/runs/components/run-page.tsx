@@ -214,14 +214,10 @@ export function RunPage({ runId }: { runId: string }) {
 	const graphScope: ItemScope = focus && focusFlow ? focus : null;
 	const graphSteps = stepsIn(steps, graphScope);
 	const graphTraversals = traversalsIn(runData, graphScope);
-	// The flow on the graph, for the Sections this browser keeps folded.
+	// The name of the flow on the graph.
 	const graphFlowName = focusStep
 		? calledFlowName(runData, steps, focusStep)
 		: runData.flowName;
-	const graphFoldKey =
-		graphFlowName && (!focus || focusFlow)
-			? `${runData.projectId}/${graphFlowName}`
-			: undefined;
 	const graphSelected = selectedStep
 		? stepAtScope(steps, selectedStep, graphScope)
 		: undefined;
@@ -375,10 +371,10 @@ export function RunPage({ runId }: { runId: string }) {
 							? `${runData.projectId}/${runData.flowName}`
 							: undefined
 					}
-					foldKey={graphFoldKey}
 					selectedNodeId={graphSelected?.nodeId ?? null}
 					onSelectNode={selectNode}
 					label={graphScope ? "The flow of the call in focus" : undefined}
+					flowLabel={graphFlowName ?? undefined}
 				/>
 			</TabsContent>
 			<TabsContent value="variables" className="flex min-h-0 flex-1 flex-col">

@@ -584,8 +584,8 @@ describe("Sections", () => {
 		expect(loop[0]?.x).toBeGreaterThan(loop[loop.length - 1]?.x ?? 0);
 	});
 
-	test("moves the members of a folded Section as one block, onto its box", async () => {
-		// Members somewhere, apart: the block keeps their places.
+	test("lays out the members of a folded Section left to right, onto its box", async () => {
+		// Members somewhere, piled up: the layout puts them in a row.
 		const spread = {
 			...flow,
 			nodes: flow.nodes.map((node, i) => ({
@@ -607,20 +607,21 @@ describe("Sections", () => {
 					};
 					expect(box.folded).toBe(folded.has(section.id));
 					if (!box.folded) continue;
-					const before = spread.nodes.filter((n) =>
-						section.nodes.includes(n.id),
-					);
 					const after = laid.flow.nodes.filter((n) =>
 						section.nodes.includes(n.id),
 					);
-					const dx = (after[0]?.position.x ?? 0) - (before[0]?.position.x ?? 0);
-					const dy = (after[0]?.position.y ?? 0) - (before[0]?.position.y ?? 0);
-					for (const [i, node] of after.entries()) {
-						expect(node.position.x - (before[i]?.position.x ?? 0)).toBe(dx);
-						expect(node.position.y - (before[i]?.position.y ?? 0)).toBe(dy);
-					}
 					expect(Math.min(...after.map((n) => n.position.x))).toBe(box.x);
 					expect(Math.min(...after.map((n) => n.position.y))).toBe(box.y);
+					expectApart({ ...laid.flow, nodes: after });
+					// Left to right: each edge inside goes right, but the loops.
+					const { back } = walk(spread);
+					for (const e of spread.edges) {
+						if (back.has(e.id) || !section.nodes.includes(e.from)) continue;
+						const to = after.find((n) => n.id === e.to);
+						const from = after.find((n) => n.id === e.from);
+						if (!to || !from) continue;
+						expect(to.position.x).toBeGreaterThan(from.position.x);
+					}
 					for (const id of section.nodes) boxOf.set(id, box);
 				}
 				// No route inside a folded Section; the others end on its box.
@@ -628,6 +629,7 @@ describe("Sections", () => {
 					const from = boxOf.get(group.from);
 					if (from && from === boxOf.get(group.to)) {
 						expect(laid.routes.has(group.key)).toBe(false);
+						expect(laid.inside.has(group.key)).toBe(true);
 						continue;
 					}
 					if (laid.direction !== "wrapped") {
