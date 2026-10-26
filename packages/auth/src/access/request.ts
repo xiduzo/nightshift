@@ -44,6 +44,11 @@ export type RequestAccess = {
 	 */
 	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
 	/**
+	 * The Person's role in a Space, from the memberships the request read.
+	 * Null without a session, or in a Space the Person is not a member of.
+	 */
+	roleIn(spaceId: string): Promise<Role | null>;
+	/**
 	 * Makes a Space the session's active one (the organization plugin's
 	 * `setActiveOrganization`). Refused when the Person is not a member.
 	 */
@@ -121,6 +126,10 @@ export async function requestAccess(
 			if (!space || !session) return false;
 			const role = (await spaces()).find((s) => s.id === space)?.role;
 			return role !== undefined && roleAllows(role, permissions);
+		},
+		async roleIn(space) {
+			if (!session) return null;
+			return (await spaces()).find((s) => s.id === space)?.role ?? null;
 		},
 		async setActiveSpace(id) {
 			await auth.api

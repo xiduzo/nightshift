@@ -173,6 +173,7 @@ describe("replies of a real engine", () => {
 			},
 			spaceId: sandbox.spaceId,
 			can: async () => true,
+			roleIn: async () => "owner",
 			setActiveSpace: async () => {},
 			headers: new Headers(),
 			fromThisComputer: true,

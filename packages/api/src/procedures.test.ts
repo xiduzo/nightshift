@@ -115,6 +115,7 @@ async function contextFor(
 				session: null,
 				spaceId: null,
 				can: async () => false,
+				roleIn: async () => null,
 				setActiveSpace: async () => {},
 				createSpace: async () => ({ id: "none" }),
 				members: {} as Context["members"],
@@ -127,6 +128,7 @@ async function contextFor(
 		requireTwoFactor: policy.requireTwoFactor,
 		fromThisComputer: false,
 		can: access.can,
+		roleIn: access.roleIn,
 		setActiveSpace: access.setActiveSpace,
 		createSpace: access.createSpace,
 		members: access.members,
@@ -860,6 +862,15 @@ describe("a run opened by its id", () => {
 		expect((await contextFor(bob.headers)).spaceId).toBe(own);
 		await call(appRouter.runs.list, undefined, { context });
 		expect(calls.at(-1)).toEqual({ space: own, method: "listRuns" });
+	});
+
+	test("finds the Person's role in the run's Space in the memberships the request read", async () => {
+		const { bob } = await aRunOfPlatform();
+		const context = await contextFor(bob.headers);
+		const statements = sandbox.countStatements();
+		await readFollowStop(context, "platform-run");
+		// The fake engine reads nothing: no statement for the role either.
+		expect(statements()).toBe(0);
 	});
 
 	test("is not found outside the Person's Spaces, the same as a run that does not exist", async () => {

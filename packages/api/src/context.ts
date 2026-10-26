@@ -39,6 +39,8 @@ export type Context = {
 	 * server.
 	 */
 	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
+	/** The session's Person's role in a Space, null when they are not a member. */
+	roleIn: RequestAccess["roleIn"];
 	/** Makes a Space of the Person the session's active one. */
 	setActiveSpace(spaceId: string): Promise<void>;
 	/** The request's headers, with the local session when it got one: for Better Auth's own checks. */

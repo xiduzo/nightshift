@@ -119,7 +119,7 @@ export function createHttp(
 	// A file download, not an oRPC call: a run of any of the Person's
 	// Spaces, for a role that may export runs there (`runSpaceFor`).
 	app.get("/api/runs/:id/export", async (c) => {
-		const { session, spaceId, hostAccess } = await access(c);
+		const { session, spaceId, hostAccess, roleIn } = await access(c);
 		if (!session || !spaceId) {
 			return c.json({ message: "Sign in to use Night Shift." }, 401);
 		}
@@ -130,9 +130,13 @@ export function createHttp(
 			);
 		}
 		const runId = c.req.param("id");
-		const found = await runSpaceFor(services, session.user.id, runId, {
-			run: ["export"],
-		});
+		const found = await runSpaceFor(
+			{ engine: services.engine, roleIn },
+			runId,
+			{
+				run: ["export"],
+			},
+		);
 		if ("refused" in found) {
 			return found.refused === "forbidden"
 				? c.json(
@@ -151,7 +155,7 @@ export function createHttp(
 	// A file, not an oRPC call: one artifact of a run of any of the Person's
 	// Spaces (`runSpaceFor`), for an <img>, a <video> or a download.
 	app.get("/api/runs/:id/artifacts/:artifactId", async (c) => {
-		const { session, spaceId, hostAccess } = await access(c);
+		const { session, spaceId, hostAccess, roleIn } = await access(c);
 		if (!session || !spaceId) {
 			return c.json({ message: "Sign in to use Night Shift." }, 401);
 		}
@@ -162,7 +166,7 @@ export function createHttp(
 			);
 		}
 		const runId = c.req.param("id");
-		const found = await runSpaceFor(services, session.user.id, runId);
+		const found = await runSpaceFor({ engine: services.engine, roleIn }, runId);
 		if ("refused" in found) {
 			return c.json({ message: "Artifact not found." }, 404);
 		}

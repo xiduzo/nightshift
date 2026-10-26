@@ -1,5 +1,4 @@
-import { type Permissions, roleAllows, roleIn } from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
+import { type Permissions, type Role, roleAllows } from "@nightshift/auth";
 import type { Engine } from "@nightshift/engine";
 import type { z } from "zod";
 
@@ -13,10 +12,13 @@ import { protectedProcedure } from "../procedures";
  * session's active Space stays as it is. Lists stay in the active Space.
  */
 
-/** What finds the run's Space and the Person's role in it. */
+/**
+ * What finds the run's Space and the Person's role in it: the role from
+ * the memberships the request read already (`RequestAccess.roleIn`).
+ */
 export type RunSpaceDeps = {
-	db: Database;
 	engine: Pick<Engine, "spaceOfRun">;
+	roleIn(spaceId: string): Promise<Role | null>;
 };
 
 /**
@@ -32,12 +34,11 @@ export type RunSpace =
 /** The Space of the run for the Person, with their role there checked against `permissions`. */
 export async function runSpaceFor(
 	deps: RunSpaceDeps,
-	personId: string,
 	runId: string,
 	permissions?: Permissions,
 ): Promise<RunSpace> {
 	const spaceId = await deps.engine.spaceOfRun(runId);
-	const role = spaceId ? await roleIn(deps.db, personId, spaceId) : null;
+	const role = spaceId ? await deps.roleIn(spaceId) : null;
 	if (!spaceId || !role) return { refused: "not-found" };
 	if (permissions && !roleAllows(role, permissions)) {
 		return { refused: "forbidden" };
@@ -70,8 +71,7 @@ export function runProcedure<TInput extends z.ZodType<{ runId: string }>>(
 		.errors(runRefusals)
 		.input(input)
 		.use(async ({ context, next, errors }, { runId }) => {
-			const personId = context.session.user.id;
-			const found = await runSpaceFor(context, personId, runId, permissions);
+			const found = await runSpaceFor(context, runId, permissions);
 			if ("refused" in found) {
 				throw found.refused === "forbidden"
 					? errors.FORBIDDEN()
@@ -80,7 +80,9 @@ export function runProcedure<TInput extends z.ZodType<{ runId: string }>>(
 			return next({
 				context: {
 					spaceId: found.spaceId,
-					space: context.engine.space(found.spaceId, { personId }),
+					space: context.engine.space(found.spaceId, {
+						personId: context.session.user.id,
+					}),
 				},
 			});
 		});
