@@ -1109,11 +1109,20 @@ function allWorkspaces(root: string): string[] {
  * Value names on an entry that no workspace of this branch imports yet,
  * because the code that imports them is on its way. A name fails once a
  * workspace imports it, so the list empties itself as that code lands. Each
- * name is listed in section 8 of STRUCTURE.md. Empty today.
+ * name is listed in section 8 of STRUCTURE.md.
  *
  * Shape: { entry: ["name"] }
  */
-export const PENDING_NAMES: Record<string, string[]> = {};
+export const PENDING_NAMES: Record<string, string[]> = {
+	// The assistant's shared logic. The chat (agents, daemon) and the canvas
+	// diff (web) of the assistant build import them.
+	"@nightshift/flows": [
+		"diffFlows",
+		"flowAuthoringGuide",
+		"flowDiffSummary",
+		"proposalIssues",
+	],
+};
 
 type Entry = {
 	/** How another workspace imports it: `@nightshift/db/migrate`. */
