@@ -45,7 +45,11 @@ export type { KeyStoreKind } from "./keychain";
 export { valueStore } from "./keychain";
 export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
-export { createProfileStore } from "./profiles";
+export {
+	createProfileStore,
+	profileChoice,
+	storedDeviceProfiles,
+} from "./profiles";
 export type {
 	RunSettings,
 	SettingField,

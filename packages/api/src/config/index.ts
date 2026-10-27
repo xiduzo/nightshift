@@ -6,4 +6,5 @@ export { cliTools } from "./cli-tools";
 export { connections } from "./connections";
 export { deciders, harnesses } from "./harnesses";
 export { profiles } from "./profiles";
+export { deviceProfileSchema } from "./schemas";
 export { settings } from "./settings";

@@ -22,10 +22,27 @@ export type Placement = {
  */
 export type NodeToPlace = { profile?: string };
 
+/**
+ * A profile of a Device, as a Person picks it for a node: its id, its
+ * name, and its kind (an Agent Profile for Agent nodes, a Model Profile
+ * for Decisions and Values decided by a model).
+ */
+export type DeviceProfile = {
+	id: string;
+	name: string;
+	kind: "agent" | "model";
+};
+
 /** One of a Person's Devices, as placement sees it. */
 export type OwnDevice = Placement & {
 	/** It takes work now. */
 	online: boolean;
 	/** It has a Clone of the project. */
 	hasClone: boolean;
+	/**
+	 * The profiles a run of the Person may use on it: every profile of
+	 * their own Device, the offered ones of another Person's. Absent when
+	 * this computer cannot tell: it has no copy of that Device's document.
+	 */
+	profiles?: DeviceProfile[];
 };

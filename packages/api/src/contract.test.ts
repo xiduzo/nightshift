@@ -426,6 +426,22 @@ describe("replies of a real engine", () => {
 		}
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
+		expect(
+			await read(appRouter.profiles.catalog, {
+				spaceId: sandbox.spaceId,
+				projectId,
+			}),
+		).toEqual([
+			{
+				deviceId: sandbox.deviceId,
+				name: expect.any(String),
+				thisDevice: true,
+				mine: true,
+				online: true,
+				// This engine knows no profiles of this computer.
+				profiles: null,
+			},
+		]);
 		await read(appRouter.runs.moveTargets, { runId: started.id });
 		const copies = (await read(appRouter.projects.runCopies, {
 			projectId,

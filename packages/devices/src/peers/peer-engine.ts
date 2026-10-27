@@ -62,6 +62,7 @@ export function createPeerEngine(
 	const {
 		work,
 		ownOffers,
+		ownProfiles,
 		mayUseOffers,
 		offerUse,
 		presence,
@@ -78,6 +79,7 @@ export function createPeerEngine(
 					...(relay ? { relay } : {}),
 					...(work ? { work } : {}),
 					...(ownOffers ? { ownOffers } : {}),
+					...(ownProfiles ? { ownProfiles } : {}),
 					...(mayUseOffers ? { mayUseOffers } : {}),
 					...(offerUse ? { offerUse } : {}),
 					...(presence ? { presence } : {}),

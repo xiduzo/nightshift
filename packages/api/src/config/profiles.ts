@@ -1,10 +1,12 @@
 import { saveProfile } from "@nightshift/engine";
 import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output } from "../output";
 import { ownerProcedure, protectedProcedure } from "../procedures";
 import {
+	profileCatalogSchema,
 	profileListSchema,
 	profileViewSchema,
 	projectProfilesSchema,
@@ -54,6 +56,36 @@ export const profiles = {
 				await context.offers.renamed(saved.id, context.session.user.id);
 			}
 			return saved;
+		}),
+	/**
+	 * The profiles a flow of a project can use, by Device, for the
+	 * session's Person: this computer's, their other Devices' that this
+	 * computer has a copy of, and what other Persons offer to the Space.
+	 */
+	catalog: protectedProcedure
+		.route({
+			summary:
+				"Lists the profiles a flow of a project can use, by Device: the Person's own, and those others offer to the Space.",
+		})
+		.output(output(profileCatalogSchema))
+		.input(z.object({ spaceId: z.string().min(1), projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			if ((await context.roleIn(input.spaceId)) === null) {
+				throw new ORPCError("NOT_FOUND", {
+					message: "That Space does not exist.",
+				});
+			}
+			const devices = await context.engine
+				.space(input.spaceId, { personId: context.session.user.id })
+				.listDevices(input.projectId);
+			return devices.map((d) => ({
+				deviceId: d.deviceId,
+				name: d.name,
+				thisDevice: d.thisDevice,
+				mine: d.offers === undefined,
+				online: d.online,
+				profiles: d.profiles ?? null,
+			}));
 		}),
 	/**
 	 * A project's own profiles, from `.nightshift/profiles.json` in its

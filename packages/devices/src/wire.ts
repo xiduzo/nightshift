@@ -6,6 +6,7 @@ import {
 	type KeyStoreKind,
 	memberRole,
 	type ProfileStore,
+	profileChoice,
 	type SettingsStore,
 	type SpaceDocuments,
 } from "@nightshift/engine";
@@ -240,6 +241,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					deps.document,
 					(profile) => offeredProfile(deps.profiles, profile)?.name ?? null,
 				),
+			ownProfiles: () => deps.profiles.list().map(profileChoice),
 			offerUse: handover.offerUse,
 			presence: handover.presence,
 			mayUseOffers: async (spaceId, personId) => {
