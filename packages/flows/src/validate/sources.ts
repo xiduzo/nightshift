@@ -116,6 +116,27 @@ export function canonicalFlowJson(flow: Flow): string {
 	return `${JSON.stringify(current, null, "\t")}\n`;
 }
 
+/** The longest flow name (`flowNameSchema`). */
+const MAX_FLOW_NAME = 60;
+
+/**
+ * `name` when no flow has it, else the first free `name-2`, `name-3`, …
+ * A long name is cut to make room, so the result stays a flow name
+ * (`flowNameSchema`). What two flows with one name become: the second
+ * gets the suffix.
+ */
+export function suffixedName(name: string, taken: ReadonlySet<string>): string {
+	if (!taken.has(name)) return name;
+	for (let n = 2; ; n++) {
+		const suffix = `-${n}`;
+		const base = name
+			.slice(0, MAX_FLOW_NAME - suffix.length)
+			.replace(/-+$/, "");
+		const candidate = `${base}${suffix}`;
+		if (!taken.has(candidate)) return candidate;
+	}
+}
+
 function sorted(sources: FlowSources): ReadonlyMap<string, FlowSource> {
 	return new Map(
 		Object.entries(sources).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),

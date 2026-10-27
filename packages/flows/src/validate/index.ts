@@ -27,6 +27,7 @@ export {
 	loadFlowSource,
 	parsedFlows,
 	scheduleFlowInfos,
+	suffixedName,
 } from "./sources";
 export {
 	calledFlow,
