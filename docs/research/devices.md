@@ -1,6 +1,11 @@
 # Devices: running Night Shift on more than one computer
 
-Status: proposal, 2026-10-19, revised twice the same day. Nothing here is
+Status: 2026-10-27: [ADR 1](../adr/0001-one-personal-space-per-home-host.md),
+[ADR 2](../adr/0002-flows-are-night-shift-data.md) and
+[ADR 3](../adr/0003-a-profile-belongs-to-one-device.md) change parts of
+this design. The sections below that state the new rule say "(ADR N)".
+The slice logs stay as they were built. Before that: proposal, 2026-10-19,
+revised twice the same day. Nothing here is
 built. The shape is decided: **peers with a local Replica, synced through a
 Host**. Three other shapes (a hub with thin runners, peers on one shared
 remote database, independent daemons with git as the bus) were compared
@@ -170,15 +175,23 @@ flowchart LR
 - Everything a Person makes starts in their **personal Space**: projects,
   runs, gates. Nobody can be invited to it. Sharing is a new Space plus an
   invitation, never a switch on something private.
+- A Person has **one personal Space per Home Host**. When a Device joins
+  its Home Host, its own personal Space and the Person's personal Space on
+  that Host become one Space, which the Host keeps. All the Person's
+  Devices, with their profiles, CLI Tools and Connections, are usable there
+  without Offers. A Guest Host never merges: it gets only shared Spaces
+  (ADR 1).
 - A Device's configuration (profiles, tools, connections, secret names,
   binary paths) lives in its **Device document**, which syncs only through
   its **home Host** and only to Devices of the same owner. A guest Host
   never receives it. A Member of a shared Space sees of your Device only:
   its name, that it is online, that it has a Clone of the shared Project,
   and the names of the profiles you offered.
-- **Secrets never leave their Device.** Values are in that Device's
+- **Secret values never leave their Device.** Values are in that Device's
   keychain or environment; `${NAME}` resolves where the MCP server starts.
-  Even secret names are owner-private.
+  Secret names are owner-private: every Device of the Person sees the
+  secret names of each of their Devices, nobody else does. A step that
+  needs a Secret runs on a Device that has it (ADR 1).
 - **Every row carries a Space id** (the TECH constraint). The Host filters
   every sync, relay and stream by membership. The Replica holds many
   Spaces; every query is scoped to one.
@@ -195,7 +208,8 @@ flowchart LR
    it receives "Platform" and nothing else. Their private work stays on
    their own home Host.
 4. Their Device adds its Clone of the Project. Now both of you see where
-   the Project exists. They draw flows in their Clone and push; you pull.
+   the Project exists. They draw flows in the editor. The Space keeps
+   them, so you see each save at once, with no push or pull (ADR 2).
 5. If you want their flows to use your hetzner-1, you **offer** profile
    `codex-server` of hetzner-1 into "Platform", with a permission cap
    (`acceptEdits` at most) and two sessions at most. They place a node on
@@ -336,10 +350,14 @@ bodies stop touching `harness`, `spawn`, MCP or `Bun.which` directly.
 ### Agents and tools per Device
 
 Agent Profiles, CLI Tools and Connections are a Device's own. The Agents
-page groups them by Device. A flow names a profile; the profile's Device is
-where it runs. Two Devices may define a profile with the same name; a
-node's `device` picks, else the Walker's own. Across Persons, a profile is
-visible only as an Offer.
+page groups them by Device. A profile's identity is its Device and its id;
+its name is a label. A node names that pair ("builder on LE2316"), and the
+profile's Device is where the step runs. Two Devices may each have a
+profile labelled "builder"; Night Shift never uses one for the other. When
+the profile's Device is offline, the step waits for it. A Project has no
+profiles of its own (ADR 3). In a personal Space, every profile of the
+Person's Devices is usable without an Offer (ADR 1). Across Persons, a
+profile is visible only as an Offer.
 
 ### Placement
 
@@ -378,10 +396,12 @@ resumes it there from the archived checkpoint.
 A Project is its normalised remote, in exactly one Space. A Clone is
 (project, device, path). Adding a folder whose `origin` matches an existing
 Project makes a Clone of it. A repository without a remote is bound to one
-Device for good. Flows and schedules stay in the repository; each Device
-reads them from its own Clone. A Schedule names the Device that fires it
-(`device` in `schedules.json`, default the Space's Host), so it never
-fires twice.
+Device for good. Flows and schedules are Night Shift data, not files in
+the repository: the Space that keeps the Project keeps them as Yjs
+documents, and every Device of the Space holds a copy (ADR 2). A Schedule
+may name the Device that fires it. Without one, the Host of its Space
+fires it, once (ADR 1). When a Device joins its Home Host, a remote that
+both sides have becomes one Project with a Clone per Device (ADR 1).
 
 ### Worktrees and the Hand-off
 

@@ -1,19 +1,21 @@
 ---
 name: nightshift-flows
-description: Write, change and check Night Shift flows (the `.nightshift/flows/<name>.json` files of a project). Use when the person asks to build, draw, fix or explain a Night Shift flow, a node, an edge, a loop, a Gate or a Subflow, or when you edit a file in `.nightshift/flows/`.
+description: Write, change and check Night Shift flows through the `nightshift` MCP server or the chat in the flow editor. Use when the person asks to build, draw, fix or explain a Night Shift flow, a node, an edge, a loop, a Gate or a Subflow, or when you find a `.nightshift/` folder in a project.
 ---
 
 # Night Shift flows
 
 Night Shift runs flows: graphs of steps (agents, shell commands, tools, decisions) that work through the night on a project. This skill tells you how to write a flow that Night Shift accepts.
 
+Night Shift keeps flows, schedules and profiles as its own data, not as files in the repository (ADR 2). You read and save a flow only through Night Shift's tools: `get_flow` gives the flow as Night Shift keeps it, and only `save_flow` checks and saves one. Never write or commit a file in a `.nightshift/` folder, and do not take such a file as the flow the person has. You may read a JSON file that the person gives you, such as a starter flow, and save it with `save_flow`. The guide below still names `.nightshift/flows/<name>.json`, `.nightshift/schedules.json` and `.nightshift/profiles.json`: do not write those files. Write the same JSON and save it with `save_flow`.
+
 ## How to work
 
-1. **Read before you write.** Read the flows the project has (`.nightshift/flows/*.json`, or `list_flows` and `get_flow` of the `nightshift` MCP server). Reuse a flow with a Subflow (`call`) node instead of copying its steps.
+1. **Read before you write.** Read the flows the project has with `list_flows` and `get_flow` of the `nightshift` MCP server. Reuse a flow with a Subflow (`call`) node instead of copying its steps.
 2. **Look names up, do not invent them.** A node may name an Agent Profile, a connection, a CLI tool, a skill or another flow. Use only ones that exist: `list_profiles`, `list_tools` and `list_skills` of the `nightshift` MCP server, or ask the person.
 3. **Draw the whole flow.** Write the complete JSON document, not a patch. Keep the ids of nodes and edges you do not change, so the person sees a small diff.
-4. **Check it.** Send it to `check_flow` and fix every error. A warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below.
-5. **Hand it over.** In the flow editor, `propose_flow` shows it to the person, who applies or discards it. In a terminal, `save_flow` saves it. Never save over a flow the person did not ask you to change.
+4. **Check it.** Send it to `check_flow` and fix every error. A warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below, then give the JSON to the person. Do not save it as a file. The editor gets a JSON import (planned, ADR 2).
+5. **Hand it over.** In the flow editor, `propose_flow` shows it to the person, who applies or discards it. In a terminal, `save_flow` saves it. A save is an edit of the flow, like a save in the editor. Never save over a flow the person did not ask you to change.
 
 Ask the person when the goal is not clear: what starts the flow, what it must make, and where a person must approve.
 
@@ -26,6 +28,15 @@ In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. N
 - `save_flow` (`name`, `flow`): checks the flow and saves it. A flow with errors is refused.
 - `start_run` (`flow`, `inputs`): starts a saved flow on this computer, and gives the link where the person follows it.
 - `list_runs`, then `get_run` (`run`): what a run did, and where it failed.
+
+Add the server to Claude Code with `claude mcp add nightshift -- nightshift mcp`. Add `--project <id, name or folder>` to work in another project than the one of your folder.
+
+The `nightshift` command line gets the same flow actions (planned, ADR 2). Until then, use the MCP server.
+
+The MCP server cannot save a schedule or a profile:
+
+- **Schedules**: the person adds, pauses and removes a schedule under the project's Schedules in Night Shift ("Add schedule"). Tell them the flow, the inputs, the cron line or the webhook, and the stop time to use.
+- **Profiles**: `list_profiles` gives the profiles of this computer. The person makes a profile on the Agents page. A project has no profiles of its own (ADR 3). Name a profile in `profile` as `list_profiles` gives it. Later a node names a profile by its Device and its id, not by its name (planned, ADR 3).
 
 <!-- Generated from flowAuthoringGuide() in packages/flows. Do not edit below this line. -->
 
