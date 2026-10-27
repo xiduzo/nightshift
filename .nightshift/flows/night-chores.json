@@ -217,6 +217,7 @@
 		{
 			"id": "done",
 			"type": "end",
+			"label": "Done",
 			"position": {
 				"x": 2880,
 				"y": 0
@@ -227,6 +228,7 @@
 		{
 			"id": "kept",
 			"type": "end",
+			"label": "Stays a draft",
 			"position": {
 				"x": 2560,
 				"y": 200
@@ -237,6 +239,7 @@
 		{
 			"id": "nothing_to_do",
 			"type": "end",
+			"label": "No issue to take",
 			"position": {
 				"x": 320,
 				"y": -200
@@ -247,6 +250,7 @@
 		{
 			"id": "no_changes",
 			"type": "end",
+			"label": "No changes",
 			"position": {
 				"x": 1920,
 				"y": 200
@@ -257,6 +261,7 @@
 		{
 			"id": "no_issues",
 			"type": "end",
+			"label": "Issues not read",
 			"position": {
 				"x": 0,
 				"y": 260
@@ -267,6 +272,7 @@
 		{
 			"id": "no_branch",
 			"type": "end",
+			"label": "No branch",
 			"position": {
 				"x": 320,
 				"y": 260
@@ -277,6 +283,7 @@
 		{
 			"id": "stuck",
 			"type": "end",
+			"label": "Agent stuck",
 			"position": {
 				"x": 640,
 				"y": 260
@@ -287,6 +294,7 @@
 		{
 			"id": "still_failing",
 			"type": "end",
+			"label": "Checks still fail",
 			"position": {
 				"x": 960,
 				"y": 260
@@ -297,6 +305,7 @@
 		{
 			"id": "checks_broken",
 			"type": "end",
+			"label": "Checks did not run",
 			"position": {
 				"x": 960,
 				"y": 400
@@ -307,6 +316,7 @@
 		{
 			"id": "not_published",
 			"type": "end",
+			"label": "Not published",
 			"position": {
 				"x": 1280,
 				"y": 260
@@ -317,6 +327,7 @@
 		{
 			"id": "not_finished",
 			"type": "end",
+			"label": "Not finished",
 			"position": {
 				"x": 2880,
 				"y": 200
@@ -466,14 +477,33 @@
 			"label": "Work on the issue",
 			"color": "blue",
 			"description": "A branch, the agent, and the checks. A failed check goes back to the agent three times.",
-			"nodes": ["branch", "build", "checks"]
+			"nodes": [
+				"branch",
+				"build",
+				"checks",
+				"no_branch",
+				"stuck",
+				"still_failing",
+				"checks_broken"
+			]
 		},
 		{
 			"id": "deliver",
 			"label": "Deliver",
 			"color": "green",
 			"description": "A draft pull request, CI, and your answer in the morning.",
-			"nodes": ["publish", "opened", "ci", "decide", "finish"]
+			"nodes": [
+				"publish",
+				"opened",
+				"ci",
+				"decide",
+				"finish",
+				"done",
+				"kept",
+				"no_changes",
+				"not_published",
+				"not_finished"
+			]
 		}
 	]
 }

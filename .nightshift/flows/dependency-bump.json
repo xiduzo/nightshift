@@ -120,6 +120,7 @@
 		{
 			"id": "done",
 			"type": "end",
+			"label": "Published",
 			"position": {
 				"x": 1600,
 				"y": 0
@@ -130,6 +131,7 @@
 		{
 			"id": "nothing_to_do",
 			"type": "end",
+			"label": "All up to date",
 			"position": {
 				"x": 320,
 				"y": -200
@@ -140,6 +142,7 @@
 		{
 			"id": "no_list",
 			"type": "end",
+			"label": "List not read",
 			"position": {
 				"x": 0,
 				"y": 260
@@ -150,6 +153,7 @@
 		{
 			"id": "no_branch",
 			"type": "end",
+			"label": "No branch",
 			"position": {
 				"x": 320,
 				"y": 260
@@ -160,6 +164,7 @@
 		{
 			"id": "stuck",
 			"type": "end",
+			"label": "Agent stuck",
 			"position": {
 				"x": 640,
 				"y": 260
@@ -170,6 +175,7 @@
 		{
 			"id": "still_failing",
 			"type": "end",
+			"label": "Checks still fail",
 			"position": {
 				"x": 960,
 				"y": 260
@@ -180,6 +186,7 @@
 		{
 			"id": "checks_broken",
 			"type": "end",
+			"label": "Checks did not run",
 			"position": {
 				"x": 960,
 				"y": 400
@@ -190,6 +197,7 @@
 		{
 			"id": "not_published",
 			"type": "end",
+			"label": "Not published",
 			"position": {
 				"x": 1600,
 				"y": 200
@@ -285,7 +293,22 @@
 			"label": "Bump",
 			"color": "orange",
 			"description": "A branch, the agent, and the checks. A failed check goes back to the agent twice.",
-			"nodes": ["branch", "bump", "checks"]
+			"nodes": [
+				"branch",
+				"bump",
+				"checks",
+				"no_branch",
+				"stuck",
+				"still_failing",
+				"checks_broken"
+			]
+		},
+		{
+			"id": "publish_all",
+			"label": "Publish",
+			"color": "green",
+			"description": "A draft pull request with the bumps.",
+			"nodes": ["publish", "done", "not_published"]
 		}
 	]
 }

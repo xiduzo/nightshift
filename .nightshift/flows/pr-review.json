@@ -268,6 +268,7 @@
 		{
 			"id": "blocked",
 			"type": "end",
+			"label": "Blocks the merge",
 			"position": {
 				"x": 1960,
 				"y": -140
@@ -278,6 +279,7 @@
 		{
 			"id": "fine",
 			"type": "end",
+			"label": "Nothing blocks",
 			"position": {
 				"x": 1960,
 				"y": 0
@@ -288,6 +290,7 @@
 		{
 			"id": "not_posted",
 			"type": "end",
+			"label": "Not posted",
 			"position": {
 				"x": 1960,
 				"y": 140
@@ -298,6 +301,7 @@
 		{
 			"id": "no_checkout",
 			"type": "end",
+			"label": "No checkout",
 			"position": {
 				"x": 340,
 				"y": 420
@@ -409,7 +413,8 @@
 				"structure",
 				"copy_review",
 				"correctness",
-				"reviewed"
+				"reviewed",
+				"no_checkout"
 			]
 		},
 		{
@@ -417,7 +422,7 @@
 			"label": "Report",
 			"color": "violet",
 			"description": "One comment on the pull request, and a label when a problem blocks the merge.",
-			"nodes": ["merge", "triage", "comment"]
+			"nodes": ["merge", "triage", "comment", "blocked", "fine", "not_posted"]
 		}
 	]
 }
