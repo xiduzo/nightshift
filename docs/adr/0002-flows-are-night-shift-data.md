@@ -28,9 +28,10 @@ it. Each Device reads them from its own Clone. This causes problems:
 4. **Offline edits merge.** A person can edit a flow on a Device that
    cannot reach the Host. The edits merge when the Link is back. A Run
    started offline uses the Device's copy.
-5. **Every save is a version.** A version records who saved it, when, on
-   which Device, and the change. A person can see the difference and
-   restore a version. A Run records the version that it runs.
+5. **Every save is a revision.** A revision records who saved it, when,
+   on which Device, and the change. A person can see the difference and
+   restore a revision. A Run records the revision that it runs. The word
+   is "revision", because a flow's `version` field is its format version.
 6. **A flow belongs to one Project.** "Copy into project" and JSON export
    and import move a flow between Projects. Kits stay the read-only flows
    that ship with Night Shift.
@@ -55,7 +56,7 @@ it. Each Device reads them from its own Clone. This causes problems:
   comes from the Space, not from a Clone.
 - The `nightshift-flows` skill, the starters and the examples stop telling
   agents and people to edit `.nightshift/` files.
-- A flow is no longer reviewed in a pull request. Versions (decision 5)
+- A flow is no longer reviewed in a pull request. Revisions (decision 5)
   take that place.
 - Night Shift's own repository removes its committed `.nightshift/` after
   the import.
