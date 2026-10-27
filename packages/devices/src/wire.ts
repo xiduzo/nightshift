@@ -1,6 +1,7 @@
 import { type Auth, roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
+	createDeviceCopies,
 	type Device,
 	type DeviceDocument,
 	type FlowDocuments,
@@ -293,6 +294,12 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			engine.admission.withdrawn(spaceId, profile),
 	});
 
+	/**
+	 * Read-only copies of the documents of this computer's owner's other
+	 * Devices, from the home Host: their names, profiles and secret names.
+	 */
+	const copies = createDeviceCopies({ db, selfId: self.id });
+
 	/** This computer's links to the Hosts it paired with. */
 	const links = createDeviceLinks({
 		links: hostLinks,
@@ -314,6 +321,12 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				deps,
 				hello.spaces.filter((space) => kept.has(space.id)).map((s) => s.id),
 			);
+		},
+		// The Devices the home Host lists: only this Person's own.
+		deviceDocuments: (_link, hello) => copies.keep(hello.devices ?? []),
+		// Without its home Host this computer learns nothing of the others.
+		revoked: async (link) => {
+			if (link.role === "home") await copies.keep([]);
 		},
 		// Run history both ways, the commands for the runs this computer walks,
 		// and the steps of the Host's runs placed on this computer.
@@ -357,6 +370,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	handover.release = async () => {
 		clearInterval(presence);
 		await links.close();
+		await copies.close();
 		// A command this engine is applying ends here: the next runtime
 		// reports its result, and does not apply it again.
 		await Promise.allSettled(

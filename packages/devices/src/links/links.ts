@@ -44,6 +44,16 @@ export function createDeviceLinks(deps: {
 		hello: HostHello,
 	): Promise<{ name: string; doc: Y.Doc }[]>;
 	/**
+	 * The copies of the owner's other Devices' documents to sync from the
+	 * home Host, read-only (the Devices it lists).
+	 */
+	deviceDocuments?(
+		link: HostLink,
+		hello: HostHello,
+	): Promise<{ name: string; doc: Y.Doc }[]>;
+	/** The Host refused the key: this computer's access there was removed. */
+	revoked?(link: HostLink): Promise<void>;
+	/**
 	 * Called once for each link it starts: what runs over it (the exchange
 	 * of run history, the work of placed steps), as the link's streams.
 	 * The function it returns is called when the link stops.
@@ -84,6 +94,12 @@ export function createDeviceLinks(deps: {
 							deps.spaceDocuments?.(link, hello) ?? Promise.resolve([]),
 					}
 				: {}),
+			...(deps.deviceDocuments
+				? {
+						deviceDocuments: (hello: HostHello) =>
+							deps.deviceDocuments?.(link, hello) ?? Promise.resolve([]),
+					}
+				: {}),
 			onAddresses: (addresses) => {
 				deps.links.setAddresses(link.hostId, addresses).catch(() => {});
 			},
@@ -91,6 +107,7 @@ export function createDeviceLinks(deps: {
 				void deps.links
 					.revoked(link.hostId)
 					.then(() => deps.keys.delete(link.hostId))
+					.then(() => deps.revoked?.(link))
 					.catch(() => {});
 			},
 		});

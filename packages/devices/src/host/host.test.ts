@@ -12,7 +12,7 @@ import {
 	createRunLog,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
-import { createDeviceRegistry } from "../registry";
+import { createDeviceRegistry, setSelfOwner } from "../registry";
 import { createHost, type Host } from "./host";
 
 /**
@@ -103,6 +103,43 @@ describe("a Device whose link answers", () => {
 		expect(guest.spaces.map((s) => [s.name, s.personal])).toEqual([
 			["Platform", false],
 		]);
+	});
+
+	test("on its Home Host learns its owner's other Devices, and the Host when its owner owns it; never another Person's, never on a Guest Host", async () => {
+		const { ada, bob } = await adaAndBob();
+		await setSelfOwner(people.db, ada.userId);
+		const join = (id: string, ownerId: string, home: boolean) =>
+			host.registry.join({
+				id,
+				name: id,
+				platform: "test",
+				ownerId,
+				homeHost: home ? "https://studio.invalid" : null,
+			});
+		await join("laptop", ada.userId, true);
+		await join("desktop", ada.userId, true);
+		await join("old", ada.userId, true);
+		await host.registry.revoke("old");
+		await join("travel", ada.userId, false);
+		await join("bobs", bob.userId, true);
+		const key = (deviceId: string, personId: string): DeviceKeyAccess => ({
+			keyId: `key-${deviceId}`,
+			deviceId,
+			personId,
+			permissions: { sync: ["pull", "push"] },
+		});
+
+		const laptop = await host.hello(key("laptop", ada.userId));
+		expect(laptop.devices).toEqual([
+			{ id: "host-a", name: "Studio" },
+			{ id: "desktop", name: "desktop" },
+		]);
+		// Bob does not own the Host, and Ada's Devices are not his.
+		expect((await host.hello(key("bobs", bob.userId))).devices).toEqual([]);
+		// A Guest Host keeps no Device document, so it lists none.
+		expect(
+			(await host.hello(key("travel", ada.userId))).devices,
+		).toBeUndefined();
 	});
 
 	test("learns whether its owner is the Host admin", async () => {

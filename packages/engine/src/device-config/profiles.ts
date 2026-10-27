@@ -63,7 +63,9 @@ function newProfileId(): string {
 }
 
 /** The profiles of a Device document's `profiles` map, by id. */
-function readProfiles(entries: Y.Map<unknown>): Map<string, ProfileView> {
+export function readProfiles(
+	entries: Y.Map<unknown>,
+): Map<string, ProfileView> {
 	const out = new Map<string, ProfileView>();
 	for (const [id, value] of entries.entries()) {
 		const entry = entrySchema.safeParse(value);

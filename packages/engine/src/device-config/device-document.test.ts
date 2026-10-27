@@ -280,7 +280,7 @@ describe("facts", () => {
 		});
 	});
 
-	test("a refresh reports this computer: platform, harnesses, programs, Clones", async () => {
+	test("a refresh reports this computer: name, platform, harnesses, programs, Clones", async () => {
 		await sandbox.db
 			.insert(project)
 			.values({ id: "p1", name: "app", spaceId: sandbox.spaceId });
@@ -296,10 +296,12 @@ describe("facts", () => {
 			db: sandbox.db,
 			document,
 			deviceId: sandbox.deviceId,
+			name: "LE2316",
 			harnesses: () => ({ "claude-code": "/bin/claude", codex: null }),
 			programs: async () => ["gh", "git"],
 		});
 		expect(deviceFacts(document)).toMatchObject({
+			name: "LE2316",
 			platform: process.platform,
 			harnesses: { "claude-code": "/bin/claude", codex: null },
 			programs: ["gh", "git"],

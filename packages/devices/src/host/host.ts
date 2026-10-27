@@ -22,7 +22,7 @@ import {
 	type PairingRedeemed,
 	type PairingStart,
 } from "../contract";
-import type { DeviceRegistry } from "../registry";
+import { type DeviceRegistry, selfOwnerId } from "../registry";
 import type { PairingReviewView } from "./types";
 
 /**
@@ -90,6 +90,24 @@ export function createHost(deps: {
 			name: deps.self.name,
 			addresses: settings.current().hostAddresses,
 		};
+	}
+	/**
+	 * The other Devices of a home Device's owner whose documents this Host
+	 * keeps, and this Host when the owner owns it: the documents the Device
+	 * reads (`documentAccess`). Never another Person's.
+	 */
+	async function ownDevices(
+		key: DeviceKeyAccess,
+	): Promise<NonNullable<HostHello["devices"]>> {
+		const others = (await registry.list(key.personId)).filter(
+			(d) =>
+				d.id !== key.deviceId && d.revokedAt === null && d.homeHost !== null,
+		);
+		const host =
+			(await selfOwnerId(deps.db)) === key.personId
+				? [{ id: deps.self.id, name: deps.self.name }]
+				: [];
+		return [...host, ...others.map((d) => ({ id: d.id, name: d.name }))];
 	}
 	function prune() {
 		const now = Date.now();
@@ -251,6 +269,7 @@ export function createHost(deps: {
 				// personal Space stays with the owner's Home Host (ADR 1).
 				spaces: home ? spaces : spaces.filter((space) => !space.personal),
 				hostAdmin: await isHostAdmin(deps.db, key.personId),
+				...(home ? { devices: await ownDevices(key) } : {}),
 			};
 		},
 	};

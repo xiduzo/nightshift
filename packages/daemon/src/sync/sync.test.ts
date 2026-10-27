@@ -441,11 +441,84 @@ describe("Device keys on the relay", () => {
 		await waitFor(() => page.failed.length > 0);
 	}, 20_000);
 
-	test("a Device key opens no other Device's document, not even the Host's own", async () => {
-		pairB();
-		const client = connect(document.name, { token: KEY });
-		await waitFor(() => client.failed.length > 0);
-		expect(client.provider.isSynced).toBe(false);
+	describe("the documents of the owner's other Devices (ADR 1, decision 2)", () => {
+		const C = "device:device-c";
+		const D = "device:device-d";
+
+		/** C is another home Device of the owner. D is a home Device of Dee. */
+		async function others() {
+			pairB();
+			keptOwners.set(C, ownerId);
+			keptOwners.set(D, (await people.signUp("Dee3")).userId);
+			const writer = connect(C, { origin: ORIGIN });
+			await waitFor(() => writer.provider.isSynced);
+			writer.doc
+				.getMap("facts")
+				.set("secrets", [{ name: "GH_TOKEN", setAt: 1 }]);
+			return writer;
+		}
+
+		test("a home Device reads another Device of its owner, and writes nothing to it", async () => {
+			const writer = await others();
+			const reader = connect(C, { token: KEY });
+			await waitFor(
+				() => reader.doc.getMap("facts").get("secrets") !== undefined,
+			);
+			expect(reader.doc.getMap("facts").get("secrets")).toEqual([
+				{ name: "GH_TOKEN", setAt: 1 },
+			]);
+
+			reader.doc.getMap("facts").set("platform", "from-b");
+			await Bun.sleep(100);
+			expect(writer.doc.getMap("facts").get("platform")).toBeUndefined();
+		});
+
+		test("a home Device reads the Host's own document when its owner owns the Host, and writes nothing to it", async () => {
+			pairB();
+			document.doc.getMap("facts").set("platform", "linux");
+			const reader = connect(document.name, { token: KEY });
+			await waitFor(
+				() => reader.doc.getMap("facts").get("platform") === "linux",
+			);
+			reader.doc.getMap("facts").set("platform", "from-b");
+			await Bun.sleep(100);
+			expect(document.facts.get("platform")).toBe("linux");
+		});
+
+		test("another Person's Device document is refused", async () => {
+			await others();
+			const client = connect(D, { token: KEY });
+			await waitFor(() => client.failed.length > 0);
+			expect(client.provider.isSynced).toBe(false);
+		});
+
+		test("a Device of another Person reads neither the owner's Devices nor the Host's own", async () => {
+			await others();
+			deviceKeys.set("nsd_dee", {
+				deviceId: "device-d",
+				personId: keptOwners.get(D) as string,
+				home: true,
+			});
+			for (const name of [C, document.name]) {
+				const client = connect(name, { token: "nsd_dee" });
+				await waitFor(() => client.failed.length > 0);
+				expect(client.provider.isSynced).toBe(false);
+			}
+		});
+
+		test("over a Guest Host a Device reads no other Device's document", async () => {
+			await others();
+			deviceKeys.set(KEY, {
+				deviceId: "device-b",
+				personId: ownerId,
+				home: false,
+			});
+			for (const name of [C, document.name]) {
+				const client = connect(name, { token: KEY });
+				await waitFor(() => client.failed.length > 0);
+				expect(client.provider.isSynced).toBe(false);
+			}
+		});
 	});
 
 	test("a guest Host never opens a Device document to a key", async () => {

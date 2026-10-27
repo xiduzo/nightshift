@@ -294,7 +294,14 @@ export async function createDaemon(
 		profiles.load(),
 	]);
 
-	reportDeviceFacts({ db, document, deviceId: device.id, settings, kept: hot });
+	reportDeviceFacts({
+		db,
+		document,
+		deviceId: device.id,
+		name: device.name,
+		settings,
+		kept: hot,
+	});
 
 	// Only the newest engine may start scheduled runs: the one before stops
 	// its scheduler.

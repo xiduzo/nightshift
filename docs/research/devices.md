@@ -1157,6 +1157,32 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      deliberately not promised" says). The Members page should treat a
      Host's Space as read-only on a Device.
 
+   *Landed (ADR 1, the documents of the owner's other Devices):*
+   - **The Host lists them.** Over a home link, `link.hello` (and every
+     heartbeat) has `devices`: the other Devices of the key's Person
+     whose documents the Host keeps (home, access on), and the Host
+     itself when that Person owns it. A Guest Host, and a Host of an
+     older version, leaves it out. Never another Person's Device.
+   - **Read-only on the relay.** `documentAccess` gives a Device key
+     `"read"` on `device:<id>` of another Device of its Person, only on
+     its home Host: a document the Host keeps for that Person, or the
+     Host's own. Its own document stays `"write"`. A Device of another
+     Person, and any Device over a Guest Host, is refused.
+   - **A copy on each Device** (`createDeviceCopies`,
+     `packages/engine/src/device-config/device-copies.ts`): a row of
+     `ydoc` named `device-copy:<id>`, apart from the `device:<id>` rows a
+     Host keeps, synced as `device:<id>` over the home link
+     (`HttpsLinkOptions.deviceDocuments`). A Device the Host no longer
+     lists loses its copy and stops syncing it; a home link that is
+     revoked drops every copy. Nothing on the Device writes a copy, and
+     its relay serves none.
+   - **What a copy tells**: the Device's name (a new fact, `facts.name`,
+     else the name the Host gave), platform, profiles, and the names of
+     its saved secrets with when each was set. Secret values never enter
+     a Device document (ADR 1, decision 3), so no copy has one. A copy
+     also has the Device's Clone paths and settings: its owner's, like
+     the rest of the document.
+
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
 

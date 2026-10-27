@@ -70,7 +70,10 @@ export type SyncDeviceKey = {
  * A token that is a Device key (`deviceKey`) is a Device, never a session:
  * it opens its own Device document, only on its home Host (to change it),
  * the Space documents of the Spaces its owner is a Member of (to read),
- * and the flow documents of their Projects.
+ * and the flow documents of their Projects. On its home Host it also reads
+ * the Device documents of its owner's other Devices: the ones the Host
+ * keeps for them, and the Host's own when its owner owns the Host (ADR 1,
+ * decision 2). A Device document holds secret names, never their values.
  */
 /** What a role needs to change a flow document over sync. */
 const FLOW_WRITE: Permissions = {
@@ -129,11 +132,13 @@ export function documentAccess(options: {
 			if (!key) return false;
 			const context = { deviceId: key.deviceId };
 			if (documentName.startsWith("device:")) {
-				const own =
-					documentName === `device:${key.deviceId}` &&
-					key.home &&
-					(await ownerOf(documentName)) === key.personId;
-				return own ? { access: "write", context } : false;
+				const owners =
+					key.home && (await ownerOf(documentName)) === key.personId;
+				if (!owners) return false;
+				return {
+					access: documentName === `device:${key.deviceId}` ? "write" : "read",
+					context,
+				};
 			}
 			const access = await spaceAccess(key.personId, documentName, true);
 			return access ? { access, context } : false;
