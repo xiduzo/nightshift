@@ -6,6 +6,7 @@ import {
 	flowSchema,
 	singleAgentFlow,
 } from "../document";
+import { flowNameSchema } from "../nodes";
 import {
 	callersOf,
 	canonicalFlowJson,
@@ -14,6 +15,7 @@ import {
 	loadFlowSource,
 	parsedFlows,
 	scheduleFlowInfos,
+	suffixedName,
 } from "./sources";
 
 const quick = (): Flow =>
@@ -195,5 +197,25 @@ describe("canonicalFlowJson", () => {
 		expect(canonicalFlowJson(flow)).toBe(
 			`${JSON.stringify({ ...flow, version: FLOW_VERSION }, null, "\t")}\n`,
 		);
+	});
+});
+
+describe("suffixedName", () => {
+	test("keeps a name that no flow has", () => {
+		expect(suffixedName("quick", new Set(["other"]))).toBe("quick");
+	});
+
+	test("gives a taken name the first free number from 2", () => {
+		expect(suffixedName("quick", new Set(["quick"]))).toBe("quick-2");
+		expect(suffixedName("quick", new Set(["quick", "quick-2"]))).toBe(
+			"quick-3",
+		);
+	});
+
+	test("cuts a long name, so the result is still a flow name", () => {
+		const long = `${"a".repeat(57)}-bc`;
+		const name = suffixedName(long, new Set([long]));
+		expect(name).toBe(`${"a".repeat(57)}-2`);
+		expect(flowNameSchema.safeParse(name).success).toBe(true);
 	});
 });
