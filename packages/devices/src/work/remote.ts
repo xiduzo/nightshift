@@ -15,8 +15,7 @@ import type {
 	ToolResult,
 	Worktree,
 } from "@nightshift/engine";
-import type { ProfilesSource } from "@nightshift/flows";
-import type { FlowSources } from "@nightshift/flows/files";
+import type { FlowSources, ProfilesSource } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type {
 	WorkCall,

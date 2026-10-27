@@ -18,6 +18,17 @@ export type {
 	ValidateOptions,
 } from "./issues";
 export {
+	callersOf,
+	canonicalFlowJson,
+	type FlowPathOf,
+	type FlowSource,
+	type FlowSources,
+	listFlowSources,
+	loadFlowSource,
+	parsedFlows,
+	scheduleFlowInfos,
+} from "./sources";
+export {
 	calledFlow,
 	schemaFields,
 	type TemplateField,

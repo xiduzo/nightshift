@@ -10,7 +10,6 @@ import type {
 	Outcome,
 	Policy,
 } from "../document";
-import type { ProjectFlowMap } from "../validate";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import {
 	agentNode,
@@ -206,20 +205,6 @@ export function updateEdge(
 
 export function removeEdge(flow: Flow, id: string): Flow {
 	return { ...flow, edges: flow.edges.filter((edge) => edge.id !== id) };
-}
-
-/** The flows of the project that call `name` through a Call node. */
-export function callersOf(name: string, flows: ProjectFlowMap): string[] {
-	return Object.entries(flows)
-		.filter(
-			([caller, flow]) =>
-				caller !== name &&
-				(flow?.nodes ?? []).some(
-					(node) => node.type === "call" && node.flow === name,
-				),
-		)
-		.map(([caller]) => caller)
-		.sort();
 }
 
 /** Whether the edge closes a loop: its source is reachable again from its target. */

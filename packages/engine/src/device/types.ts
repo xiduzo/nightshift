@@ -9,11 +9,11 @@ import type {
 	ValueResult,
 } from "@nightshift/agents/types";
 import type {
+	FlowSources,
 	JsonValue,
 	ProfileSettings,
 	ProfilesSource,
 } from "@nightshift/flows";
-import type { FlowSources } from "@nightshift/flows/files";
 
 /**
  * The Device port: what a step body needs from a computer, as one

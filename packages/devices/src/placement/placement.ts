@@ -21,8 +21,7 @@ import {
 	type SpaceDocuments,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
-import type { FlowNode, ProfileSettings } from "@nightshift/flows";
-import type { FlowSources } from "@nightshift/flows/files";
+import type { FlowNode, FlowSources, ProfileSettings } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, personInSpace } from "../links";
