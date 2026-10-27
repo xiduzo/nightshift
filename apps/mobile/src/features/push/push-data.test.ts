@@ -130,6 +130,18 @@ describe("a push while the app is in front", () => {
 		expect(showInFront(waiting, { pathname: "/inbox" })).toBe(false);
 	});
 
+	test("a step that waits for a device shows, except on its run", () => {
+		const wait = pushDataOf({
+			kind: "device-wait",
+			key: "run-1:wait:build",
+			runId: "run-1",
+			stepId: "build",
+		});
+		expect(showInFront(wait, { pathname: "/" })).toBe(true);
+		expect(showInFront(wait, { pathname: "/runs/run-2" })).toBe(true);
+		expect(showInFront(wait, { pathname: "/runs/run-1" })).toBe(false);
+	});
+
 	test("a run's end shows no banner", () => {
 		const run = pushDataOf({
 			kind: "run-failed",

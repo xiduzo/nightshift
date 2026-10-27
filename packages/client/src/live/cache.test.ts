@@ -406,6 +406,40 @@ describe("the live cache follows the Host", () => {
 		});
 	});
 
+	test("a step that waits for a device shows its own words and opens its run; its end takes the notice away", async () => {
+		const { live, stale, timers } = setUp();
+		const { host, shown, closed } = follow(live);
+		await host.send({
+			kind: "device-wait",
+			key: "r1:wait:a",
+			spaceId: "s1",
+			runId: "r1",
+			stepId: "a",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+			alert: true,
+			at: 1,
+		});
+		expect(shown[0]?.route).toEqual({ to: "run", runId: "r1" });
+		called.length = 0;
+		expect(await shown[0]?.describe()).toEqual({
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+		});
+		expect(called).toEqual([]);
+
+		await host.send({
+			kind: "wait-ended",
+			key: "r1:wait:a",
+			runId: "r1",
+			stepId: "a",
+			at: 2,
+		});
+		expect(closed).toEqual(["r1:wait:a"]);
+		timers.due(300);
+		expect(stale()).toEqual(sorted(RUN_1));
+	});
+
 	test("the words of a notice are the read of its item: the burst does not read them again", async () => {
 		const { live, stale, timers } = setUp();
 		const { host, shown } = follow(live);

@@ -4,12 +4,14 @@
  *
  * A push carries no content: what happened, its ids and one short sentence
  * (`WebPushPayload` in `@nightshift/notifications`, `channels/web-push.ts`):
- *   { type: "show", kind, key, spaceId, runId, stepId, title, count }
+ *   { type: "show", kind, key, spaceId, runId, stepId, title, body?, count }
+ * Only a step that waits for a device has a `body`: when the run stops waiting.
  * Every push shows a notification: the subscription is `userVisibleOnly`,
  * and a push that shows nothing costs the site its subscription (Safari)
  * or a notice of the browser's own (Chrome). So no push takes one back: the
  * next open Night Shift page closes the notifications of the Gates that no
- * longer wait (`features/notifications`, `closeAnsweredGates`).
+ * longer wait (`features/notifications`, `closeAnsweredGates`), and an
+ * open page closes the notification of a wait that ended (`wait-ended`).
  * The notification's tag is the key, so a second push of one key replaces
  * the first. Its data has the kind and when it showed, for that page. A
  * click opens the Gate or the run in an open Night Shift tab, or in a new one.
@@ -37,7 +39,9 @@ function pathOf(push) {
 		return `/inbox?gate=${encodeURIComponent(push.stepId)}`;
 	}
 	if (
-		(push.kind === "run-finished" || push.kind === "run-failed") &&
+		(push.kind === "run-finished" ||
+			push.kind === "run-failed" ||
+			push.kind === "device-wait") &&
 		push.runId
 	) {
 		return `/runs/${encodeURIComponent(push.runId)}`;
@@ -57,6 +61,9 @@ self.addEventListener("push", (event) => {
 	event.waitUntil(
 		self.registration.showNotification(push.title || "Night Shift", {
 			tag: push.key,
+			...(typeof push.body === "string" && push.body
+				? { body: push.body }
+				: {}),
 			icon: "/favicon.svg",
 			badge: "/favicon.svg",
 			data: { path: pathOf(push), kind: push.kind, shownAt: Date.now() },

@@ -41,7 +41,7 @@ import type { Notice, ShownNotifications } from "./shown";
  * the one follower of the Host's streams for both apps. It follows the
  * notifications stream (and reconnects), reads again what each item
  * changes, shows a notice for an item that alerts, takes away the
- * notifications of Gates that no longer wait, drops an answered Gate from
+ * notifications of Gates that no longer wait and of device waits that ended, drops an answered Gate from
  * the inbox at once, and follows one run's stream in batches. Each app
  * passes in only what differs: its client, and how it shows a
  * notification (`ShownNotifications`).
@@ -76,6 +76,8 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 		case "run-finished":
 		case "run-failed":
 		case "run-changed":
+		case "device-wait":
+		case "wait-ended":
 			return [ofRun(item.runId)];
 		case "gate-opened":
 		case "gate-closed":
@@ -275,6 +277,10 @@ export function createLiveCache({
 	async function describe(
 		item: Extract<NotificationItem, { alert: boolean }>,
 	): Promise<{ title: string; body?: string }> {
+		// A device wait says it all: the Host words it in the person's time zone.
+		if (item.kind === "device-wait") {
+			return { title: item.title, ...(item.body ? { body: item.body } : {}) };
+		}
 		try {
 			// Read now: what the cache has may be from before the item. This
 			// read is the item's read of the open Gates or of the run, so the
@@ -329,11 +335,13 @@ export function createLiveCache({
 		read(readsAfter(item));
 		switch (item.kind) {
 			case "gate-closed":
+			case "wait-ended":
 				void close(item.key);
 				return;
 			case "gate-opened":
 			case "run-finished":
 			case "run-failed":
+			case "device-wait":
 				if (item.alert) void tell(item);
 				return;
 		}

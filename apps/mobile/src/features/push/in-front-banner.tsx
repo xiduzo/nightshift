@@ -17,12 +17,19 @@ import { showInFront } from "./push-data";
 /** How long the banner stays when the person does not tap it. */
 const SHOWN_MS = 6000;
 
+/** What the banner says a tap does, by where it goes. */
+const TAP = {
+	gate: { hint: "Opens the Gate", text: "Tap to answer it." },
+	run: { hint: "Opens the run", text: "Tap to open the run." },
+	inbox: { hint: "Opens the inbox", text: "Tap to open your inbox." },
+} as const;
+
 /**
- * A Gate that opened while the app is in front, as a banner at the top of
- * the app: the live cache shows it from the stream at once, and a push
- * that comes in front shows it too. The phone shows no banner of its own
- * then. A tap opens the Gate. It also tells the push handling which
- * screen is in front.
+ * A Gate that opened, or a step that waits for a device, while the app is
+ * in front, as a banner at the top of the app: the live cache shows it
+ * from the stream at once, and a push that comes in front shows it too.
+ * The phone shows no banner of its own then. A tap opens the Gate or the
+ * run. It also tells the push handling which screen is in front.
  */
 export function InFrontBanner() {
 	const pathname = usePathname();
@@ -43,12 +50,12 @@ export function InFrontBanner() {
 
 	if (!banner) return null;
 	const route = routeOf(banner.data);
-	const opensGate = route.to === "gate";
+	const tap = TAP[route.to];
 
 	return (
 		<Pressable
 			accessibilityRole="button"
-			accessibilityHint={opensGate ? "Opens the Gate" : "Opens the inbox"}
+			accessibilityHint={tap.hint}
 			onPress={() => {
 				hideBanner(banner);
 				openPhoneRoute(route);
@@ -58,9 +65,7 @@ export function InFrontBanner() {
 		>
 			<Alert icon={BellRing}>
 				<AlertTitle>{banner.title}</AlertTitle>
-				<AlertDescription>
-					{opensGate ? "Tap to answer it." : "Tap to open your inbox."}
-				</AlertDescription>
+				<AlertDescription>{tap.text}</AlertDescription>
 			</Alert>
 		</Pressable>
 	);

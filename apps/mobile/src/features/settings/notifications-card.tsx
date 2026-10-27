@@ -110,6 +110,11 @@ function NotificationFields({
 					checked={value.events.runFailed}
 					onChange={(on) => onChange({ events: { runFailed: on } })}
 				/>
+				<SwitchRow
+					title="A step waits for a device"
+					checked={value.events.deviceWait}
+					onChange={(on) => onChange({ events: { deviceWait: on } })}
+				/>
 			</ListGroup>
 			<ListGroup>
 				<SwitchRow
