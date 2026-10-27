@@ -30,7 +30,7 @@ Night Shift turns the pipeline into a flow that you draw. The engine owns the or
 
 - **Local first.** Every session, branch, and token stays on your own computers. Agents run with your own CLI logins.
 - **The engine decides, the model advises.** A model never adds a node or changes the graph. Every loop has a maximum count.
-- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a version: you see who changed what, and you can restore an earlier one (planned, [ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
+- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a revision: you see who changed what, and you can restore an earlier one (planned, [ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
 - **No built-in method.** Spec-driven, issue-driven, or one file at a time: each method is just another flow.
 
 ## How it works
