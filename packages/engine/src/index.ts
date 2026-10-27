@@ -107,7 +107,11 @@ export type {
 	FlowDocuments,
 	FlowNotice,
 	FlowRef,
+	FlowRevisionItem,
+	FlowRevisionView,
 	FlowUse,
+	RevisionKind,
+	RevisionName,
 } from "./flows";
 export {
 	createFlowDocuments,
@@ -115,6 +119,7 @@ export {
 	documentSpace,
 	flowSources,
 	flowsForRun,
+	revisionKinds,
 } from "./flows";
 export type { WalkFile, WalkFiles, WalkRef } from "./graph";
 export type {

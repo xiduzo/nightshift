@@ -496,6 +496,7 @@ export function toRunDetail(
 		...toSummary(row, derived.facts, names, walker, device),
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
+		flowRevision: row.flowRevision,
 		steps: derived.steps.map((step) => toStepSummary(step, deviceOf)),
 		// Edges of the top-level flow; a called flow's edges count per scope.
 		traversals: deriveTraversals(events),

@@ -7,4 +7,8 @@ export {
 	missingInputs,
 } from "./inputs";
 export { createFlowMutations, createFlowQueries } from "./queries";
-export type { FlowListItem } from "./types";
+export type {
+	FlowListItem,
+	FlowRevisionItem,
+	FlowRevisionView,
+} from "./types";

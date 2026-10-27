@@ -8,8 +8,15 @@ export {
 	type FlowDocument,
 	type FlowDocuments,
 	flowSources,
+	type RevisionKind,
+	revisionKinds,
 } from "./flow-document";
-export type { FlowFiles } from "./flow-files";
+export type {
+	FlowFiles,
+	FlowRevisionItem,
+	FlowRevisionView,
+	RevisionName,
+} from "./flow-files";
 export { createFlowFiles } from "./flow-files";
 export type { FlowRef, FlowUse } from "./flow-use";
 export { flowUse } from "./flow-use";

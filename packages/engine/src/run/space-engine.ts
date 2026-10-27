@@ -16,7 +16,12 @@ import type {
 	Placement,
 	StartRunInput,
 } from "../contract";
-import type { FlowNotice, FlowUse } from "../flows";
+import type {
+	FlowNotice,
+	FlowRevisionItem,
+	FlowRevisionView,
+	FlowUse,
+} from "../flows";
 import type { Branches, Project } from "../projects";
 import type {
 	OpenGate,
@@ -98,13 +103,38 @@ export interface SpaceEngine {
 	getFlow(projectId: string, name: string): Promise<LoadedFlow>;
 	/** Every flow file of a project by name: its flow, null when it does not load. One read for the editor. */
 	flowMap(projectId: string): Promise<ProjectFlowMap>;
-	/** Saves drafts with errors too. Returns the issues of the saved flow. */
+	/** Saves drafts with errors too, as a new revision. Returns the issues of the saved flow. */
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
+	/** Removes the flow. Its revisions stay. */
 	deleteFlow(projectId: string, name: string): Promise<void>;
 	/** What a person must know about the project's flows (the import on upgrade), oldest first. */
 	listFlowNotices(projectId: string): Promise<FlowNotice[]>;
 	/** Removes a notice, on every Device of the Space. */
 	dismissFlowNotice(projectId: string, noticeId: string): Promise<void>;
+	/**
+	 * The revisions of a flow, newest first: who saved each, when, on which
+	 * Device, and what it changed from the one before.
+	 */
+	listFlowRevisions(
+		projectId: string,
+		name: string,
+	): Promise<FlowRevisionItem[]>;
+	/**
+	 * One revision of a flow with its flow, and the diff to it from
+	 * `against`: another revision, or the flow as it is now.
+	 */
+	getFlowRevision(
+		projectId: string,
+		name: string,
+		revisionId: string,
+		against?: string,
+	): Promise<FlowRevisionView>;
+	/** Saves a revision's flow as the flow now, as a new revision. Returns its issues. */
+	restoreFlowRevision(
+		projectId: string,
+		name: string,
+		revisionId: string,
+	): Promise<FlowIssue[]>;
 	/**
 	 * The values the flow's kept variables (`keep`) have between runs on
 	 * this computer, by name. A variable without one starts from `initial`.

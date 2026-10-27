@@ -694,7 +694,7 @@ export type DocumentProjectFlowsDeps = {
 /**
  * The flows and schedules of a project in its flow document. Every
  * Device reads and saves them, with or without a Clone of the project.
- * A save by a Person records a revision of kind `save`.
+ * A save records a revision of kind `save`, or the kind it names.
  */
 export function documentProjectFlows(
 	deps: DocumentProjectFlowsDeps,
@@ -711,7 +711,7 @@ export function documentProjectFlows(
 			return { sources: flowSources(document), pathOf: (name) => name };
 		},
 
-		async save({ projectId, spaceId, personId }, name, flow) {
+		async save({ projectId, spaceId, personId }, name, flow, options = {}) {
 			const valid = flowNameSchema.safeParse(name);
 			if (!valid.success) {
 				throw new Refusal(
@@ -723,7 +723,7 @@ export function documentProjectFlows(
 			await saveFlow(document, {
 				name,
 				flow,
-				kind: "save",
+				kind: options.kind ?? "save",
 				personId: personId ?? null,
 				deviceId:
 					typeof deps.deviceId === "string"
@@ -740,6 +740,12 @@ export function documentProjectFlows(
 
 		async remove({ projectId, spaceId }, name) {
 			await removeFlow(await documentOf(projectId, spaceId), name);
+		},
+
+		async revisions({ projectId, spaceId }, name) {
+			const document = await documentOf(projectId, spaceId);
+			const flowId = flowIdOf(document, name);
+			return flowId === null ? [] : flowRevisions(document, flowId);
 		},
 
 		async schedules({ projectId, spaceId }, options = {}) {

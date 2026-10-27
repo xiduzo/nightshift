@@ -253,7 +253,13 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async saveFlow(projectId, name, flow) {
 				await ready;
-				return deps.flowFiles.save(spaceId, projectId, name, flow);
+				return deps.flowFiles.save(
+					spaceId,
+					projectId,
+					name,
+					flow,
+					actor?.personId,
+				);
 			},
 
 			async deleteFlow(projectId, name) {
@@ -271,6 +277,39 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				await projects.find(projectId, spaceId);
 				await deps.flowNotices.dismiss(projectId, noticeId);
+			},
+
+			async listFlowRevisions(projectId, name) {
+				await ready;
+				return deps.flowFiles.revisions(
+					spaceId,
+					projectId,
+					name,
+					actor?.personId,
+				);
+			},
+
+			async getFlowRevision(projectId, name, revisionId, against) {
+				await ready;
+				return deps.flowFiles.revision(
+					spaceId,
+					projectId,
+					name,
+					revisionId,
+					against,
+					actor?.personId,
+				);
+			},
+
+			async restoreFlowRevision(projectId, name, revisionId) {
+				await ready;
+				return deps.flowFiles.restore(
+					spaceId,
+					projectId,
+					name,
+					revisionId,
+					actor?.personId,
+				);
 			},
 
 			async listKeptValues(projectId, flowName) {

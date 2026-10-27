@@ -28,6 +28,7 @@ import {
 	type OpenGate,
 	type SpaceEngine,
 } from "@nightshift/engine";
+import { singleAgentFlow } from "@nightshift/flows";
 import {
 	FAILURE_MESSAGE,
 	Refusal,
@@ -254,6 +255,37 @@ describe("procedures", () => {
 				),
 			),
 		).toBe("FORBIDDEN");
+	});
+
+	test("a viewer cannot save, remove or restore a flow; a member can", async () => {
+		const { bob, cy, spaceId } = await platform();
+		const ref = { projectId: "p1", name: "night" };
+		const flow = singleAgentFlow({
+			prompt: "Fix it",
+			model: "sonnet",
+			permissionMode: "acceptEdits",
+		});
+		let context = await contextFor(cy.headers);
+		const writes = [
+			() => call(appRouter.flows.save, { ...ref, flow }, { context }),
+			() => call(appRouter.flows.remove, ref, { context }),
+			() =>
+				call(appRouter.flows.restore, { ...ref, revisionId: "r" }, { context }),
+		];
+		for (const write of writes)
+			expect(await errorOf(write())).toBe("FORBIDDEN");
+		// Reading the revisions is fine.
+		await call(appRouter.flows.revisions, ref, { context });
+		expect(calls).toEqual([{ space: spaceId, method: "listFlowRevisions" }]);
+
+		// A member is not this computer's owner, and still saves.
+		context = await contextFor(bob.headers);
+		for (const write of writes) await write();
+		expect(calls.slice(1).map((c) => c.method)).toEqual([
+			"saveFlow",
+			"deleteFlow",
+			"restoreFlowRevision",
+		]);
 	});
 
 	test("a permitted call reads the session and the memberships once, and decides in memory", async () => {

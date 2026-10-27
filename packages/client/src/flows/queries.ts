@@ -19,6 +19,30 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 		/** What the import of the project's flow folder did that a person must know. */
 		notices: (projectId: string) =>
 			orpc.flows.notices.queryOptions({ input: { projectId } }),
+		/** The revisions of a flow, newest first. */
+		revisions: (projectId: string, name: string) =>
+			orpc.flows.revisions.queryOptions({ input: { projectId, name } }),
+		/** Every revisions query of one flow. Invalidate it after the flow is saved. */
+		revisionsKey: (projectId: string, name: string) =>
+			orpc.flows.revisions.key({ input: { projectId, name } }),
+		/**
+		 * One revision with its flow, and the diff to it from `against`:
+		 * another revision, or the flow as it is now when left out.
+		 */
+		revision: (
+			projectId: string,
+			name: string,
+			revisionId: string,
+			against?: string,
+		) =>
+			orpc.flows.revision.queryOptions({
+				input: {
+					projectId,
+					name,
+					revisionId,
+					...(against !== undefined ? { against } : {}),
+				},
+			}),
 		/** The values a flow's kept variables carry from one run to the next. */
 		kept: (projectId: string, name: string) =>
 			orpc.flows.kept.queryOptions({ input: { projectId, name } }),
@@ -31,6 +55,7 @@ export function createFlowMutations(orpc: ApiQueryUtils) {
 		save: orpc.flows.save.mutationOptions,
 		remove: orpc.flows.remove.mutationOptions,
 		dismissNotice: orpc.flows.dismissNotice.mutationOptions,
+		restore: orpc.flows.restore.mutationOptions,
 		resetKept: orpc.flows.resetKept.mutationOptions,
 	};
 }
