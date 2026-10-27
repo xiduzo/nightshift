@@ -166,7 +166,8 @@ const entrySchema = z.object({
 });
 
 /** A saved secret as the Device facts hold it. An older document holds the bare name. */
-const savedSecretSchema = z.union([
+/** A saved secret as the document's facts hold it: an older document holds bare names. */
+export const savedSecretSchema = z.union([
 	z.string().transform((name) => ({ name, setAt: null })),
 	z.object({ name: z.string(), setAt: z.number().nullable() }),
 ]);

@@ -115,13 +115,25 @@ describe("two Devices", () => {
 			provider.destroy();
 		}
 
-		// A's Person removes B's access: B's link ends.
+		// A is a Device of the same Person: B keeps a read-only copy of A's
+		// document.
+		const aId = (await a.client.devices.list()).thisComputer?.id as string;
+		await waitFor(
+			() => copyOn(b, aId),
+			(copied) => copied,
+		);
+
+		// A's Person removes B's access: B's link ends, and B's copy goes.
 		await a.client.devices.revoke({ deviceId: bId });
 		const after = await waitFor(
 			async () => (await b.client.devices.list()).thisComputer?.hosts ?? [],
 			(hosts) => hosts[0]?.status === "revoked",
 		);
 		expect(after).toHaveLength(1);
+		await waitFor(
+			() => copyOn(b, aId),
+			(copied) => !copied,
+		);
 		expect((await a.client.devices.list()).devices[0]).toMatchObject({
 			online: false,
 			revokedAt: expect.any(Number),
@@ -146,3 +158,21 @@ describe("two Devices", () => {
 		]);
 	}, 60_000);
 });
+
+/** Whether a daemon keeps a copy of another Device's document. */
+function copyOn(daemon: Daemon, deviceId: string): boolean {
+	const db = new Database(join(daemon.dataDir, "nightshift.db"), {
+		readonly: true,
+	});
+	try {
+		return (
+			db
+				.query<{ name: string }, [string]>(
+					"select name from ydoc where name = ?",
+				)
+				.get(`device-copy:${deviceId}`) !== null
+		);
+	} finally {
+		db.close();
+	}
+}

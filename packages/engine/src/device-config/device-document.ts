@@ -47,6 +47,8 @@ export type DeviceDocument = PersistedDocument & {
  * else does (an Offer exposes a profile's name, not these).
  */
 export type DeviceFacts = {
+	/** What its owner calls it: its Device name. */
+	name: string;
 	platform: string;
 	/** Each added harness, and where its CLI is (null: not found). */
 	harnesses: Record<string, string | null>;
@@ -195,14 +197,17 @@ export function setDeviceFacts(
 }
 
 /**
- * Looks at this computer again and writes the facts that changed: the
- * platform, the added harnesses' CLIs, the programs, and its Clones. The
- * secret names are written by the connection store when they change.
+ * Looks at this computer again and writes the facts that changed: its
+ * name, the platform, the added harnesses' CLIs, the programs, and its
+ * Clones. The secret names are written by the connection store when they
+ * change.
  */
 export async function refreshDeviceFacts(options: {
 	db: Database;
 	document: DeviceDocument;
 	deviceId: string;
+	/** This computer's Device name. */
+	name: string;
 	/** Each added harness, and where its CLI is. */
 	harnesses: () => Record<string, string | null>;
 	programs: () => Promise<string[]>;
@@ -214,6 +219,7 @@ export async function refreshDeviceFacts(options: {
 		.where(eq(clone.deviceId, deviceId))
 		.orderBy(clone.path);
 	await setDeviceFacts(document, {
+		name: options.name,
 		platform: process.platform,
 		harnesses: options.harnesses(),
 		programs: await options.programs(),

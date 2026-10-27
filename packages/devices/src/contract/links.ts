@@ -31,6 +31,13 @@ export const hostHelloSchema = z.object({
 	spaces: z.array(listedSpaceSchema),
 	/** The Device's owner is the Host admin. A Host of an older version leaves it out. */
 	hostAdmin: z.boolean().optional(),
+	/**
+	 * Over a link to the home Host: the owner's other Devices whose Device
+	 * documents the Host keeps, the Host itself when the owner owns it. The
+	 * Device syncs a read-only copy of each. A guest Host, and a Host of an
+	 * older version, leaves it out.
+	 */
+	devices: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
 });
 export type HostHello = z.infer<typeof hostHelloSchema>;
 

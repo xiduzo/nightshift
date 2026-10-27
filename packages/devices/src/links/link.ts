@@ -27,7 +27,9 @@ import type { LinkStatus } from "./types";
  *   that doubles up to `maxBackoffMs`.
  * - A Host that refuses the key (its owner removed this computer's
  *   access) ends the link for good: `revoked`.
- * - Over a link to its home Host, this Device's own document syncs.
+ * - Over a link to its home Host, this Device's own document syncs, and a
+ *   read-only copy of each of its owner's other Devices' documents that
+ *   the Host lists. A copy the Host stops listing stops syncing.
  * - Over any link, the Space documents the Host lists (the Spaces this
  *   Device's owner is a Member of there) sync read-only.
  * - Every document goes over one WebSocket per link.
@@ -87,6 +89,12 @@ export type HttpsLinkOptions = {
 	 * every answer of the Host, so a Space it lists later syncs too.
 	 */
 	spaceDocuments?(hello: HostHello): Promise<{ name: string; doc: Y.Doc }[]>;
+	/**
+	 * The copies of the owner's other Devices' documents, over a link to
+	 * the home Host: called with every answer of the Host, so a Device it
+	 * lists later syncs too, and one it no longer lists stops.
+	 */
+	deviceDocuments?(hello: HostHello): Promise<{ name: string; doc: Y.Doc }[]>;
 	heartbeatMs?: number;
 	firstBackoffMs?: number;
 	maxBackoffMs?: number;
@@ -170,6 +178,8 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	let current: HostClient | null = null;
 	let socket: HocuspocusProviderWebsocket | null = null;
 	const providers = new Map<string, HocuspocusProvider>();
+	/** The names of the copies of other Devices' documents that sync now. */
+	const copies = new Set<string>();
 	/** Aborts when the link drops: every stream stops. */
 	let online: AbortController | null = null;
 	const stop = new AbortController();
@@ -252,11 +262,26 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		for (const document of (await options.spaceDocuments?.(hello)) ?? []) {
 			attach(address, document.name, document.doc);
 		}
+		if (link.role === "home" && options.deviceDocuments) {
+			const listed = await options.deviceDocuments(hello);
+			const names = new Set(listed.map((document) => document.name));
+			for (const name of copies) {
+				if (names.has(name)) continue;
+				providers.get(name)?.destroy();
+				providers.delete(name);
+				copies.delete(name);
+			}
+			for (const document of listed) {
+				attach(address, document.name, document.doc);
+				copies.add(document.name);
+			}
+		}
 	}
 
 	function stopDocuments() {
 		for (const provider of providers.values()) provider.destroy();
 		providers.clear();
+		copies.clear();
 		socket?.destroy();
 		socket = null;
 	}

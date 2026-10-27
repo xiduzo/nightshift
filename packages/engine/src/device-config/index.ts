@@ -24,6 +24,11 @@ export {
 	createConnectionStore,
 	secretStore,
 } from "./connections";
+export {
+	createDeviceCopies,
+	type DeviceCopies,
+	type DeviceCopy,
+} from "./device-copies";
 export type { DeviceDocument } from "./device-document";
 export {
 	deviceDocumentName,
