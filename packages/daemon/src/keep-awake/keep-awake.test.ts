@@ -38,11 +38,17 @@ function fakeRuns(open: RunFacts[] = []) {
 const run = (
 	id: string,
 	status: RunFacts["status"],
-	where: { walker?: boolean; device?: boolean; wakeAt?: number | null } = {},
+	where: {
+		walker?: boolean;
+		device?: boolean;
+		wakeAt?: number | null;
+		waitReason?: RunFacts["waitReason"];
+	} = {},
 ): RunFacts => ({
 	id,
 	status,
 	wakeAt: where.wakeAt ?? null,
+	waitReason: where.waitReason ?? (where.wakeAt ? "duration" : null),
 	walker: { thisDevice: where.walker ?? true },
 	device: { thisDevice: where.device ?? where.walker ?? true },
 });
@@ -172,6 +178,40 @@ describe("keep this computer awake", () => {
 		expect(lock.live()).toBe(1);
 		awake.stop();
 		expect(lock.live()).toBe(0);
+	});
+
+	test("a step that waits for another Device that is offline does not keep this computer awake", async () => {
+		const runs = fakeRuns([
+			run("waits", "sleeping", {
+				wakeAt: 60_000,
+				waitReason: "device-offline",
+			}),
+		]);
+		const lock = fakeLock();
+		const awake = createKeepAwake({
+			enabled: () => true,
+			runs: runs.source,
+			lock: lock.lock,
+			checkMs: 1_000_000,
+		});
+		await awake.start();
+		expect(awake.holding()).toBe(false);
+
+		// The Device is back: the step runs here.
+		runs.set(run("waits", "running"));
+		await awake.idle();
+		expect(awake.holding()).toBe(true);
+
+		// It went away again.
+		runs.set(
+			run("waits", "sleeping", {
+				wakeAt: 60_000,
+				waitReason: "device-offline",
+			}),
+		);
+		await awake.idle();
+		expect(lock.live()).toBe(0);
+		awake.stop();
 	});
 
 	test("a lock that ended on its own is held again after a pause, not in a loop", async () => {
