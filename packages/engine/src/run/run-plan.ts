@@ -43,8 +43,8 @@ export type PlanDevices = {
 	/**
 	 * A Device by the name a node gives it: this computer, one of the
 	 * Person's other Devices, or another Person's through its Offers. Null
-	 * when there is none of that name. Throws a refusal of its own (two of
-	 * that name, offline).
+	 * when there is none of that name. An offline one is `offline`: its
+	 * steps wait for it. Throws a refusal of its own (two of that name).
 	 */
 	byName(name: string): Promise<PlacedDevice | null>;
 	/** A profile of this computer by name, or null. */
@@ -151,6 +151,8 @@ async function placeNodes(
 	}
 	const found = new Map<PlacedDevice, Record<string, ProfileSettings>>();
 	for (const [at, names] of wanted) {
+		// An offline Device cannot say which profiles it has.
+		if (at.offline) continue;
 		found.set(
 			at,
 			at.thisDevice
@@ -174,6 +176,7 @@ async function placeNodes(
 	// A profile that does not fit its node: an Agent on a Model Profile, a
 	// Decision on an Agent Profile, a Value on a decider that cannot make one.
 	const misfits: string[] = [];
+	const offlineProfiles: string[] = [];
 	const resolve = (node: FlowNode, profile: ProfileSettings): FlowNode => {
 		const resolved = resolveNodeProfile(node, profile);
 		if ("node" in resolved) return resolved.node;
@@ -196,6 +199,12 @@ async function placeNodes(
 			if (name !== undefined) {
 				const at = named.get(name) as PlacedDevice;
 				const settings = found.get(at)?.[profile] ?? fromProject;
+				if (!settings && at.offline) {
+					offlineProfiles.push(
+						`${at.name} is offline, so Night Shift cannot find its profile "${profile}" (${node.id}). Start the run when it is online.`,
+					);
+					return node;
+				}
 				if (!settings) {
 					miss(profile, node.id, at.thisDevice ? null : at.name);
 					return node;
@@ -235,6 +244,9 @@ async function placeNodes(
 		);
 	}
 	if (misfits.length > 0) throw new Refusal("invalid", misfits.join(" "));
+	if (offlineProfiles.length > 0) {
+		throw new Refusal("unavailable", offlineProfiles.join(" "));
+	}
 	return { flows: placed, named };
 }
 

@@ -152,7 +152,8 @@ export type PreparedRun = {
  * sees the refusals (after the plan's own: its Devices, the flow and its
  * called flows, each node's Device and profile): every `REQUIREMENTS` entry
  * passes on each Device for the nodes placed on it (an offered Device's
- * Offers stand in for them), and a Device whose nodes work in the worktree
+ * Offers stand in for them, and an offline Device is not asked), and a
+ * Device whose nodes work in the worktree
  * has a Clone; the stop time is ahead; the inputs resolve. Throws the
  * refusal, returns the prepared run. A Device checks its Clone is ready
  * when it adds the worktree, before the run is written.
@@ -164,9 +165,11 @@ export async function prepareRun(
 ): Promise<PreparedRun> {
 	const { flow, flowName, calledFlows } = planned;
 	for (const { at, nodes } of planned.groups) {
-		const refusal = at.offered
-			? null
-			: refusalOf(nodes, await capabilitiesFor(nodes, at.device));
+		// An offline Device checks each call itself when it is back.
+		const refusal =
+			at.offered || at.offline
+				? null
+				: refusalOf(nodes, await capabilitiesFor(nodes, at.device));
 		if (refusal !== null) throw new Refusal("conflict", refusal);
 		const worker = nodes.find((n) => kindOf(n).works(n) === "worktree");
 		if (worker && !at.hasClone) {

@@ -15,6 +15,7 @@ export {
 	expectRunLogsInSync,
 	mustGit,
 	type Sandbox,
+	sleepClock,
 	type TestEngineOptions,
 	testDevice,
 	waitFor,
