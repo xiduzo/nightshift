@@ -389,6 +389,15 @@ node's Device field in the editor lists what the planner allows
 (`runs.devices` with `forNode`). A run from before the plan kept names
 walks with the names its nodes give.
 
+The Person's other Devices come from the Replica that keeps the Space: on
+a Device in a Host's Space, the Host answers. When the home Host cannot be
+reached, the Device lists its owner's other Devices from their document
+copies (ADR 1): offline, with their names and last known profiles, and a
+Clone where the Space document says so. A node that names one of them
+waits for it. A Host that cannot tell a Device's profiles (it keeps no
+copy) gets them from the Device's own copy. Never for another Person, and
+never in a Space of a Guest Host.
+
 ### Who walks
 
 A Run's Walker is chosen at start; the default is the Space's Host, because

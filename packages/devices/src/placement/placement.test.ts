@@ -6,13 +6,18 @@ import {
 	clone,
 	device as deviceTable,
 	event,
+	hostLink,
 	organization,
 	run as runTable,
+	user,
 } from "@nightshift/db/schema";
 import {
 	createSpaceDocuments,
 	deviceDocumentName,
 	documentRows,
+	HostUnreachableError,
+	type ListedProject,
+	type OwnDevice,
 	planOf,
 	type RunStatus,
 	recordClone,
@@ -31,6 +36,7 @@ import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
 import {
+	type HostRelay,
 	type WorkRelay,
 	type WorkRequest,
 	workRequestSchema,
@@ -847,6 +853,143 @@ describe("the Space's profiles", () => {
 			["studio-b", undefined, [{ id: "p-1", name: "builder", kind: "agent" }]],
 			["laptop-c", ["coder"], [{ id: "p-2", name: "coder", kind: "agent" }]],
 		]);
+	});
+});
+
+describe("the owner's other Devices in a Space of the home Host", () => {
+	const SPACE = "space-on-h";
+	const HOST = "host-h";
+	/** This computer's Person, as the home Host knows them. */
+	const ON_HOST = "person-on-h";
+	const LAPTOP_PROFILES = [
+		{ id: "p-l", name: "builder", kind: "agent" as const },
+	];
+
+	/** B in a Space its Host keeps, with a copy of its owner's laptop's document. */
+	async function deviceInHostSpace(options: {
+		role?: "home" | "guest";
+		devices?: () => Promise<OwnDevice[]>;
+	}) {
+		await b.db.insert(hostLink).values({
+			hostId: HOST,
+			name: "H",
+			addresses: "[]",
+			role: options.role ?? "home",
+			personId: ON_HOST,
+			keyStore: "file",
+		});
+		const [local] = await b.db.select().from(user);
+		await createHostSpaces(b.db).update(
+			{ id: HOST, name: "H" },
+			[{ id: SPACE, name: "Personal", personal: true, role: "owner" }],
+			local?.id as string,
+		);
+		const spaceDocuments = createSpaceDocuments({
+			db: b.db,
+			directory: deviceDirectory(b.db),
+		});
+		const document = await spaceDocuments.open(SPACE);
+		await document.change(() => {
+			recordClone(document, {
+				projectId: "p-shared",
+				deviceId: "laptop",
+				deviceName: "laptop.local",
+			});
+		});
+		const placement = createPlacement({
+			db: b.db,
+			device: testDevice({ harnesses: {} }, b.deviceId),
+			log: { walkerId: async () => b.deviceId } as never,
+			registry: {} as never,
+			documents: spaceDocuments,
+			hostSpaces: createHostSpaces(b.db),
+			project: async () => ({ repoPath: null }) as ListedProject,
+			relay: {
+				devices: async () => {
+					if (!options.devices) throw new HostUnreachableError();
+					return options.devices();
+				},
+			} as unknown as HostRelay,
+			copies: {
+				list: async () => [
+					{
+						deviceId: "laptop",
+						name: "Laptop",
+						platform: "darwin",
+						profiles: LAPTOP_PROFILES,
+						secrets: [{ name: "GH_TOKEN", setAt: 1 }],
+						checkedAt: 1,
+					},
+				],
+			},
+		});
+		return { placement, spaceDocuments };
+	}
+
+	test("while the Host cannot be reached, they are listed offline with the name and profiles of their copy", async () => {
+		const { placement, spaceDocuments } = await deviceInHostSpace({});
+		const devices = await placement.devicesFor(SPACE, ON_HOST, "p-shared");
+		expect(devices.slice(1)).toEqual([
+			{
+				deviceId: "laptop",
+				name: "Laptop",
+				thisDevice: false,
+				online: false,
+				hasClone: true,
+				profiles: LAPTOP_PROFILES,
+			},
+		]);
+		// A node that names it waits for it, instead of a refusal.
+		const named = (await placement.namesFor(SPACE, ON_HOST, "p-shared"))(
+			"Laptop",
+		);
+		expect(named).toMatchObject({ deviceId: "laptop", online: false });
+		await spaceDocuments.close();
+	});
+
+	test("a Host that cannot tell a Device's profiles gets them from the copy; another Person's offered ones stay", async () => {
+		const { placement, spaceDocuments } = await deviceInHostSpace({
+			devices: async () => [
+				{
+					deviceId: "laptop",
+					name: "Laptop",
+					thisDevice: false,
+					online: true,
+					hasClone: true,
+				},
+				{
+					deviceId: "theirs",
+					name: "Theirs",
+					thisDevice: false,
+					online: true,
+					hasClone: true,
+					offers: ["coder"],
+				},
+			],
+		});
+		const devices = await placement.devicesFor(SPACE, ON_HOST, "p-shared");
+		expect(devices.slice(1).map((d) => [d.deviceId, d.profiles])).toEqual([
+			["laptop", LAPTOP_PROFILES],
+			["theirs", undefined],
+		]);
+		await spaceDocuments.close();
+	});
+
+	test("never for another Person, and never in a Space of a Guest Host", async () => {
+		const own = await deviceInHostSpace({});
+		expect(
+			(await own.placement.devicesFor(SPACE, "someone-else", "p-shared")).slice(
+				1,
+			),
+		).toEqual([]);
+		await own.spaceDocuments.close();
+
+		await b.db.delete(hostLink);
+		const guest = await deviceInHostSpace({ role: "guest" });
+		expect(
+			(await guest.placement.devicesFor(SPACE, ON_HOST, "p-shared")).slice(1),
+		).toEqual([]);
+		await guest.spaceDocuments.close();
 	});
 });
 

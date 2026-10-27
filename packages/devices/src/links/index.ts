@@ -13,6 +13,7 @@ export {
 	createHostSpaces,
 	type HostSpaceRef,
 	type HostSpaces,
+	keptByHomeHost,
 	personInSpace,
 	personOnHost,
 } from "./host-spaces";

@@ -2,7 +2,9 @@ import type { Database } from "@nightshift/db";
 import {
 	type Actor,
 	type Device,
+	type DeviceCopies,
 	type DeviceProfile,
+	deviceNameIn,
 	HostUnreachableError,
 	type ListedProject,
 	NOT_ON_THIS_COMPUTER,
@@ -26,7 +28,7 @@ import {
 import type { FlowNode, FlowSources, ProfileSettings } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../contract";
-import { type HostSpaces, personInSpace } from "../links";
+import { type HostSpaces, keptByHomeHost, personInSpace } from "../links";
 import {
 	type DeviceOffer,
 	NO_STARTER,
@@ -86,6 +88,11 @@ export type PlacementDeps = {
 	offersHere?(spaceId: string): Promise<DeviceOffer[]>;
 	/** This computer's profiles, for its owner. Default: unknown. */
 	ownProfiles?(): readonly DeviceProfile[];
+	/**
+	 * The copies of the documents of this computer's owner's other Devices,
+	 * from the home Host (`createDeviceCopies`). Default: none.
+	 */
+	copies?: Pick<DeviceCopies, "list">;
 	/** Whether a Person's role in a Space uses Offers. Default: nobody's. */
 	mayUseOffers?(spaceId: string, personId: string): Promise<boolean>;
 };
@@ -187,6 +194,17 @@ export function createPlacement(deps: PlacementDeps) {
 		);
 	}
 
+	/**
+	 * The copies of the owner's other Devices' documents that count for a
+	 * Person in a Space: only in a Space of the home Host, and only for this
+	 * computer's own Person there.
+	 */
+	async function copiesFor(spaceId: string, personId: string) {
+		if (!deps.copies || !(await keptByHomeHost(db, spaceId))) return [];
+		if ((await ownerHere(spaceId)) !== personId) return [];
+		return deps.copies.list();
+	}
+
 	/** The Person who owns this computer, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
 		return personInSpace(db, spaceId, await selfOwnerId(db));
@@ -214,20 +232,53 @@ export function createPlacement(deps: PlacementDeps) {
 			...(deps.ownProfiles ? { profiles: [...deps.ownProfiles()] } : {}),
 		};
 		if ((await hostSpaces.hostOf(spaceId)) !== null) {
-			// The Host cannot be reached: the list shows this computer only.
+			const copies = await copiesFor(spaceId, personId);
 			const listed = deps.relay
 				? await deps.relay
 						.devices({ spaceId, projectId })
 						.catch((error: unknown) => {
-							if (error instanceof HostUnreachableError) return [];
+							if (error instanceof HostUnreachableError) return null;
 							throw error;
 						})
 				: [];
+			if (listed === null) {
+				// The Host cannot be reached: this computer, and the owner's
+				// other Devices as their copies last told, offline.
+				const document = await documents.open(spaceId);
+				const withClone = new Set(
+					projectClones(document, projectId).map((c) => c.deviceId),
+				);
+				return [
+					here,
+					...copies.map((copy) => ({
+						deviceId: copy.deviceId,
+						name:
+							copy.name ?? deviceNameIn(document, copy.deviceId) ?? "Device",
+						thisDevice: false,
+						online: false,
+						hasClone: withClone.has(copy.deviceId),
+						profiles: copy.profiles,
+					})),
+				];
+			}
+			const copyOf = new Map(copies.map((c) => [c.deviceId, c]));
 			return [
 				here,
 				...listed
 					.filter((d) => d.deviceId !== self)
-					.map((d) => ({ ...d, thisDevice: false })),
+					.map((d) => {
+						// A Host that cannot tell a Device's profiles: its copy here can.
+						const profiles =
+							d.profiles ??
+							(d.offers === undefined
+								? copyOf.get(d.deviceId)?.profiles
+								: undefined);
+						return {
+							...d,
+							thisDevice: false,
+							...(profiles ? { profiles } : {}),
+						};
+					}),
 			];
 		}
 		const withClone = new Set(
