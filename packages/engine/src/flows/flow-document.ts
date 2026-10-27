@@ -50,7 +50,9 @@ import type { ProjectFlows } from "./project-flows";
  * A flow is keyed by its id, and its name is a field. Two flows with one
  * name (two Devices that created it offline) both stay: the older keeps
  * the name, the newer reads with a suffix (`suffixedName`) until a save
- * writes that name.
+ * writes that name. A newer one with the same content too (two Devices
+ * that imported one Clone folder) does not read at all, and a save of
+ * the older removes it.
  */
 export type FlowDocument = {
 	readonly projectId: string;
@@ -153,7 +155,20 @@ type FlowEntry = {
 
 /** Every flow of the document that has a valid name, each with a name of its own. */
 function flowEntries(document: FlowDocument): FlowEntry[] {
-	const entries: Omit<FlowEntry, "name">[] = [];
+	return scanFlows(document).entries;
+}
+
+/**
+ * The flows of the document, and the copies it leaves out: a flow with
+ * the name and the content of an older one, as two Devices that import
+ * the same Clone folder before they sync leave it. The older reads, the
+ * copy does not (`copies`: by the flow id of the one that reads).
+ */
+function scanFlows(document: FlowDocument): {
+	entries: FlowEntry[];
+	copies: Map<string, string[]>;
+} {
+	const all: Omit<FlowEntry, "name">[] = [];
 	for (const [flowId, value] of document.flows.entries()) {
 		if (!(value instanceof Y.Map)) continue;
 		const map = value as Y.Map<unknown>;
@@ -165,26 +180,49 @@ function flowEntries(document: FlowDocument): FlowEntry[] {
 		if (typeof version !== "number" || typeof createdAt !== "number") continue;
 		const newer = version > FLOW_VERSION;
 		if (!newer && !readable(map)) continue;
-		entries.push({ flowId, stored, createdAt, newer, map });
+		all.push({ flowId, stored, createdAt, newer, map });
 	}
-	entries.sort((a, b) =>
+	all.sort((a, b) =>
 		a.createdAt !== b.createdAt
 			? a.createdAt - b.createdAt
 			: a.flowId < b.flowId
 				? -1
 				: 1,
 	);
+	const copies = new Map<string, string[]>();
+	const counts = new Map<string, number>();
+	for (const entry of all) {
+		counts.set(entry.stored, (counts.get(entry.stored) ?? 0) + 1);
+	}
+	const seen: { entry: Omit<FlowEntry, "name">; json: string }[] = [];
+	const entries = all.filter((entry) => {
+		if (entry.newer || (counts.get(entry.stored) ?? 0) < 2) return true;
+		const json = stableJson(flowJson(entry.map));
+		const original = seen.find(
+			(other) => other.entry.stored === entry.stored && other.json === json,
+		);
+		if (!original) {
+			seen.push({ entry, json });
+			return true;
+		}
+		const flowId = original.entry.flowId;
+		copies.set(flowId, [...(copies.get(flowId) ?? []), entry.flowId]);
+		return false;
+	});
 	const taken = new Set(entries.map((entry) => entry.stored));
 	const owners = new Set<string>();
-	return entries.map((entry) => {
-		if (!owners.has(entry.stored)) {
-			owners.add(entry.stored);
-			return { ...entry, name: entry.stored };
-		}
-		const name = suffixedName(entry.stored, taken);
-		taken.add(name);
-		return { ...entry, name };
-	});
+	return {
+		copies,
+		entries: entries.map((entry) => {
+			if (!owners.has(entry.stored)) {
+				owners.add(entry.stored);
+				return { ...entry, name: entry.stored };
+			}
+			const name = suffixedName(entry.stored, taken);
+			taken.add(name);
+			return { ...entry, name };
+		}),
+	};
 }
 
 function readable(map: Y.Map<unknown>): boolean {
@@ -275,9 +313,8 @@ export async function saveFlow(
 		at: number;
 	},
 ): Promise<{ flowId: string; revisionId: string | null }> {
-	const found = flowEntries(document).find(
-		(entry) => entry.name === input.name,
-	);
+	const scan = scanFlows(document);
+	const found = scan.entries.find((entry) => entry.name === input.name);
 	if (found?.newer) {
 		throw new Refusal(
 			"conflict",
@@ -297,6 +334,10 @@ export async function saveFlow(
 		const map = found?.map ?? newFlowMap(document.flows, flowId, input.at);
 		if (map.get("name") !== input.name) map.set("name", input.name);
 		applyFlow(map, input.flow);
+		// A copy reads again once its original changes: it goes, its revisions stay.
+		for (const copy of scan.copies.get(flowId) ?? []) {
+			document.flows.delete(copy);
+		}
 	});
 	if (revisionId !== null) {
 		await document.history.change(() => {
@@ -320,13 +361,21 @@ export async function removeFlow(
 	document: FlowDocument,
 	name: string,
 ): Promise<void> {
-	const found = flowEntries(document).find(
+	const scan = scanFlows(document);
+	const found = scan.entries.find(
 		(entry) => entry.name === name && !entry.newer,
 	);
 	if (!found) {
 		throw new Refusal("not-found", `The flow "${name}" does not exist.`);
 	}
-	await document.current.change(() => document.flows.delete(found.flowId));
+	await document.current.change(() => {
+		for (const flowId of [
+			found.flowId,
+			...(scan.copies.get(found.flowId) ?? []),
+		]) {
+			document.flows.delete(flowId);
+		}
+	});
 }
 
 /** The revisions of a flow that this Night Shift reads, oldest first. One from a newer Night Shift is left out. */
@@ -464,7 +513,7 @@ function applyOrder(order: Y.Array<string>, wanted: readonly string[]): void {
 }
 
 /** The schedules of the document that this Night Shift reads, in their order, and whether it holds others. */
-function readSchedules(document: FlowDocument): {
+export function readSchedules(document: FlowDocument): {
 	schedules: Schedule[];
 	unreadable: number;
 } {
@@ -493,7 +542,7 @@ function orderedKeys(store: Y.Map<unknown>, order: Y.Array<string>): string[] {
 }
 
 /** Saves the schedules: only those that differ. One that this Night Shift does not read stays. */
-async function saveSchedules(
+export async function saveSchedules(
 	document: FlowDocument,
 	schedules: readonly Schedule[],
 ): Promise<void> {
@@ -519,7 +568,7 @@ async function saveSchedules(
 }
 
 /** The same JSON, whatever the order of the keys. */
-function same(a: unknown, b: unknown): boolean {
+export function same(a: unknown, b: unknown): boolean {
 	return stableJson(a) === stableJson(b);
 }
 
