@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import {
@@ -16,6 +15,7 @@ import {
 	createRunLog,
 	createSandbox,
 	type Sandbox,
+	seedFlows,
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
@@ -208,11 +208,8 @@ const quickFlow = {
 
 /** A For Each over three items; its body (`say`, in the folder at `repoPath`) prints the item. */
 async function forEachFlow(repoPath: string): Promise<Flow> {
-	const flows = join(repoPath, ".nightshift", "flows");
-	await mkdir(flows, { recursive: true });
-	await writeFile(
-		join(flows, "say.json"),
-		JSON.stringify({
+	await seedFlows(repoPath, {
+		say: {
 			version: 6,
 			inputs: [{ name: "item", type: "json", required: true }],
 			outputs: [],
@@ -227,8 +224,8 @@ async function forEachFlow(repoPath: string): Promise<Flow> {
 				},
 			],
 			edges: [],
-		}),
-	);
+		},
+	});
 	return {
 		version: 6,
 		inputs: [],

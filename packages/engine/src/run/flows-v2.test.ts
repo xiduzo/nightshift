@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	fakeDecider,
@@ -22,6 +22,7 @@ import { saverFor } from "../graph/checkpointer";
 import { appendEvent } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { RunDetail, StepSummary } from "../read/views";
+import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -153,9 +154,7 @@ function flowOf(
 }
 
 async function saveFlow(name: string, flow: FlowInput | unknown) {
-	const dir = join(sandbox.repoPath, ".nightshift", "flows");
-	await mkdir(dir, { recursive: true });
-	await writeFile(join(dir, `${name}.json`), JSON.stringify(flow));
+	await seedFlows(sandbox.repoPath, { [name]: flow });
 }
 
 async function projectId(engine: SpaceEngine): Promise<string> {
@@ -1298,14 +1297,13 @@ describe("flow format 1", () => {
 			"fixtures",
 			"rpgdotexe-v1",
 		);
-		const flowsDir = join(sandbox.repoPath, ".nightshift", "flows");
-		await mkdir(flowsDir, { recursive: true });
+		const flows: Record<string, unknown> = {};
 		for (const name of ["night", "feature", "trace"]) {
-			await copyFile(
-				join(fixtures, `${name}.json`),
-				join(flowsDir, `${name}.json`),
+			flows[name] = JSON.parse(
+				await readFile(join(fixtures, `${name}.json`), "utf8"),
 			);
 		}
+		await seedFlows(sandbox.repoPath, flows);
 		// What the night's commands need: an ignored `.build/`, the script, and `gh`.
 		await writeFile(join(sandbox.repoPath, ".gitignore"), ".build/\n");
 		await mkdir(join(sandbox.repoPath, "tools", "night-shift"), {

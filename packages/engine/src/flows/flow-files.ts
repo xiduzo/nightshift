@@ -2,41 +2,20 @@ import {
 	type Flow,
 	type FlowIssue,
 	type FlowListItem,
-	type FlowSources,
 	type LoadedFlow,
 	listFlowSources,
 	loadFlowSource,
 	type ProjectFlowMap,
 	parsedFlows,
 } from "@nightshift/flows";
-import {
-	deleteFlowFile,
-	flowFilePath,
-	listFlowFiles,
-	readFlowFile,
-	readFlowSources,
-	writeFlowFile,
-} from "@nightshift/flows/files";
+import type { ProjectFlows } from "./project-flows";
 
 /**
- * The flow files of a project in a Space: read from its Clone on this
- * computer, else from the Clone of another of the Person's Devices. A save
- * and a delete need the Clone here.
+ * The flows of a project in a Space as a Person lists, reads, saves and
+ * deletes them, through the `ProjectFlows` port.
  */
 export type FlowFilesDeps = {
-	/** The project in the Space, with its Clone here (`repoPath`) or null. Throws when it is not in the Space. */
-	find(
-		projectId: string,
-		spaceId: string,
-	): Promise<{ repoPath: string | null }>;
-	/** The project in the Space with its Clone here. Throws without one. */
-	get(projectId: string, spaceId: string): Promise<{ repoPath: string }>;
-	/** The flow files of a project without a Clone here, from another of the Person's Devices. */
-	elsewhere(
-		spaceId: string,
-		projectId: string,
-		personId: string | undefined,
-	): Promise<FlowSources>;
+	flows: ProjectFlows;
 };
 
 export type FlowFiles = ReturnType<typeof createFlowFiles>;
@@ -48,26 +27,18 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			projectId: string,
 			personId: string | undefined,
 		): Promise<FlowListItem[]> {
-			const row = await deps.find(projectId, spaceId);
-			if (row.repoPath !== null) return listFlowFiles(row.repoPath);
-			return listFlowSources(
-				await deps.elsewhere(spaceId, projectId, personId),
-				(name) => flowFilePath("", name),
-			);
+			const set = await deps.flows.flows({ projectId, spaceId, personId });
+			return listFlowSources(set.sources, set.pathOf);
 		},
 
-		/** Every flow file of the project by name: its flow, null when it does not load. */
+		/** Every flow of the project by name: its flow, null when it does not load. */
 		async map(
 			spaceId: string,
 			projectId: string,
 			personId: string | undefined,
 		): Promise<ProjectFlowMap> {
-			const row = await deps.find(projectId, spaceId);
-			return parsedFlows(
-				row.repoPath !== null
-					? await readFlowSources(row.repoPath)
-					: await deps.elsewhere(spaceId, projectId, personId),
-			);
+			const set = await deps.flows.flows({ projectId, spaceId, personId });
+			return parsedFlows(set.sources);
 		},
 
 		async get(
@@ -76,13 +47,8 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			name: string,
 			personId: string | undefined,
 		): Promise<LoadedFlow> {
-			const row = await deps.find(projectId, spaceId);
-			if (row.repoPath !== null) return readFlowFile(row.repoPath, name);
-			return loadFlowSource(
-				await deps.elsewhere(spaceId, projectId, personId),
-				name,
-				(found) => flowFilePath("", found),
-			);
+			const set = await deps.flows.flows({ projectId, spaceId, personId });
+			return loadFlowSource(set.sources, name, set.pathOf);
 		},
 
 		async save(
@@ -91,8 +57,7 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			name: string,
 			flow: Flow,
 		): Promise<FlowIssue[]> {
-			const row = await deps.get(projectId, spaceId);
-			return writeFlowFile(row.repoPath, name, flow);
+			return deps.flows.save({ projectId, spaceId }, name, flow);
 		},
 
 		async remove(
@@ -100,8 +65,7 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			projectId: string,
 			name: string,
 		): Promise<void> {
-			const row = await deps.get(projectId, spaceId);
-			await deleteFlowFile(row.repoPath, name);
+			await deps.flows.remove({ projectId, spaceId }, name);
 		},
 	};
 }

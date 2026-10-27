@@ -1,6 +1,6 @@
 import type { Schedule } from "@nightshift/flows";
-import { readSchedulesFile, writeSchedulesFile } from "@nightshift/flows/files";
 import type { Actor, OffersPort } from "../contract";
+import type { ProjectFlows } from "../flows";
 import type { RunStatus } from "../log";
 import type {
 	ScheduleList,
@@ -18,6 +18,8 @@ import type { Webhooks } from "./webhooks";
  */
 export type ScheduleFilesDeps = {
 	now(): number;
+	/** The project's schedules and flows. */
+	flows: Pick<ProjectFlows, "flows" | "schedules" | "saveSchedules">;
 	scheduler: Pick<Scheduler, "refresh" | "nextAt" | "last">;
 	/** The latest webhooks of each webhook schedule. */
 	webhooks: Pick<Webhooks, "deliveries">;
@@ -43,21 +45,18 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 
 	return {
 		/** The project's schedules, each with its next start, its last result and its issues. */
-		async list(project: {
-			id: string;
-			repoPath: string;
-		}): Promise<ScheduleList> {
-			const loaded = await readSchedulesFile(project.repoPath);
+		async list(spaceId: string, projectId: string): Promise<ScheduleList> {
+			const loaded = await deps.flows.schedules({ projectId, spaceId });
 			await scheduler.refresh();
 			const at = deps.now();
 			const schedules = [];
 			for (const schedule of loaded.schedules) {
 				schedules.push({
 					...schedule,
-					nextAt: scheduler.nextAt(project.id, schedule, at),
-					last: await scheduleResult(scheduler.last(project.id, schedule.id)),
+					nextAt: scheduler.nextAt(projectId, schedule, at),
+					last: await scheduleResult(scheduler.last(projectId, schedule.id)),
 					deliveries: schedule.webhook
-						? await deps.webhooks.deliveries(project.id, schedule.id)
+						? await deps.webhooks.deliveries(projectId, schedule.id)
 						: [],
 					issues: loaded.issues.filter(
 						(issue) => issue.scheduleId === schedule.id,
@@ -71,15 +70,20 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 			};
 		},
 
-		/** Writes the project's schedules file, with the Person of each schedule on another Person's Device. */
+		/** Saves the project's schedules, with the Person of each schedule on another Person's Device. */
 		async save(
-			project: { id: string; repoPath: string },
 			spaceId: string,
+			projectId: string,
 			actor: Actor | undefined,
 			schedules: readonly Schedule[],
 		) {
-			return writeSchedulesFile(
-				project.repoPath,
+			const of = { projectId, spaceId };
+			const project = {
+				id: projectId,
+				flows: async () => (await deps.flows.flows(of)).sources,
+			};
+			return deps.flows.saveSchedules(
+				of,
 				await deps.schedulesWithOffers(project, spaceId, actor, schedules),
 			);
 		},

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import {
@@ -21,11 +20,11 @@ import {
 	createSandbox,
 	mustGit,
 	type Sandbox,
+	seedFlows,
 	testDevice,
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
-import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { and, eq } from "drizzle-orm";
 import {
 	type WorkRelay,
@@ -299,11 +298,7 @@ describe("a run placed on another Device", () => {
 	});
 
 	test("the flows come from that Device's Clone, and the project is renamed without one here", async () => {
-		await mkdir(join(b.repoPath, ".nightshift", "flows"), { recursive: true });
-		await writeFile(
-			join(b.repoPath, ".nightshift", "flows", "hello.json"),
-			JSON.stringify(flow([command("hi", "echo hi")])),
-		);
+		await seedFlows(b.repoPath, { hello: flow([command("hi", "echo hi")]) });
 		expect(await space().listPlacements(projectId)).toEqual([
 			{ deviceId: B, name: "studio-b", thisDevice: false },
 		]);
@@ -892,23 +887,24 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		await mustGit(a.root, ["init", "-q", "--bare", remote]);
 		await mustGit(a.repoPath, ["remote", "add", "origin", remote]);
 		await mustGit(b.repoPath, ["remote", "add", "origin", remote]);
-		await writeFlowFile(
-			a.repoPath,
-			"night",
-			flow([
-				{ ...command("there", "echo from B"), device: "studio-b" },
-			] as Flow["nodes"]),
-		);
 		// The schedule names no Person: it fires here, for A's owner.
-		await writeSchedulesFile(a.repoPath, [
+		await seedFlows(
+			a.repoPath,
 			{
-				id: "nightly",
-				flow: "night",
-				inputs: {},
-				cron: "0 22 * * *",
-				enabled: true,
+				night: flow([
+					{ ...command("there", "echo from B"), device: "studio-b" },
+				] as Flow["nodes"]),
 			},
-		]);
+			[
+				{
+					id: "nightly",
+					flow: "night",
+					inputs: {},
+					cron: "0 22 * * *",
+					enabled: true,
+				},
+			],
+		);
 		await Bun.sleep(TICK_MS * 4);
 		clock = at(16, 22, 0, 20);
 		const scheduled = await waitFor(

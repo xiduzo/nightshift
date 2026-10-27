@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
 import type { AppRouterClient } from "@nightshift/api";
+import { seedFlows } from "@nightshift/engine/testing";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
@@ -86,12 +87,9 @@ function repo(name: string): string {
 }
 
 /** A flow in B's Clone with one Agent node. */
-function flowOnB(name: string, agent: Record<string, unknown>) {
-	const dir = join(folderOnB, ".nightshift", "flows");
-	mkdirSync(dir, { recursive: true });
-	writeFileSync(
-		join(dir, `${name}.json`),
-		JSON.stringify({
+async function flowOnB(name: string, agent: Record<string, unknown>) {
+	await seedFlows(folderOnB, {
+		[name]: {
 			version: 6,
 			inputs: [],
 			outputs: [],
@@ -106,8 +104,8 @@ function flowOnB(name: string, agent: Record<string, unknown>) {
 				},
 			],
 			edges: [],
-		}),
-	);
+		},
+	});
 }
 
 function lines(path: string): string[] {
@@ -222,7 +220,7 @@ beforeAll(async () => {
 		clis: [],
 		connections: [],
 	});
-	flowOnB("offered", { profile: "coder" });
+	await flowOnB("offered", { profile: "coder" });
 }, 180_000);
 
 afterAll(async () => {
@@ -299,11 +297,14 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 60_000);
 
 	test("naming another profile, or a wider permission mode, is refused at start", async () => {
-		flowOnB("other", { profile: "claude" });
+		await flowOnB("other", { profile: "claude" });
 		await expect(
 			colleague.runs.start({ projectId, flowName: "other", deviceId: bId }),
 		).rejects.toThrow(`${bName} offers "coder" to this Space, not "claude".`);
-		flowOnB("wide", { profile: "coder", permissionMode: "bypassPermissions" });
+		await flowOnB("wide", {
+			profile: "coder",
+			permissionMode: "bypassPermissions",
+		});
 		await expect(
 			colleague.runs.start({ projectId, flowName: "wide", deviceId: bId }),
 		).rejects.toThrow("with acceptEdits at most");

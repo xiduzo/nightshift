@@ -5,8 +5,7 @@ import {
 	type OwnDevice,
 	type SpaceDocuments,
 } from "@nightshift/engine";
-import type { FlowNode, Schedule } from "@nightshift/flows";
-import { readFlowSources } from "@nightshift/flows/files";
+import type { FlowNode, FlowSources, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { personInSpace } from "../links";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
@@ -38,7 +37,7 @@ export function createScheduleOffers(deps: {
 }) {
 	const { db } = deps;
 	return async function schedulesWithOffers(
-		project: { id: string; repoPath: string },
+		project: { id: string; flows(): Promise<FlowSources> },
 		spaceId: string,
 		actor: Actor | undefined,
 		schedules: readonly Schedule[],
@@ -63,7 +62,7 @@ export function createScheduleOffers(deps: {
 				// A webhook that only sends a signal starts no flow: it has no nodes.
 				const flowName = schedule.flow;
 				if (flowName === undefined) throw new Error("No flow.");
-				const loaded = flowsForRun(await readFlowSources(project.repoPath), {
+				const loaded = flowsForRun(await project.flows(), {
 					projectId: project.id,
 					flowName,
 				});

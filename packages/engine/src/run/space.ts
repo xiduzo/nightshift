@@ -385,14 +385,14 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listSchedules(projectId) {
 				await ready;
-				const row = await projects.get(projectId, spaceId);
-				return deps.scheduleFiles.list(row);
+				return deps.scheduleFiles.list(spaceId, projectId);
 			},
 
 			async saveSchedules(projectId, schedules) {
 				await ready;
-				const row = await projects.get(projectId, spaceId);
-				return deps.scheduleFiles.save(row, spaceId, actor, schedules);
+				// A project without a Clone here is refused before the Offers check.
+				await projects.get(projectId, spaceId);
+				return deps.scheduleFiles.save(spaceId, projectId, actor, schedules);
 			},
 
 			async resolveGate({ runId, stepId, choice, note }) {

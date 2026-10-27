@@ -18,12 +18,8 @@ import {
 import {
 	canonicalFlowJson,
 	type FlowIssue,
-	type FlowListItem,
 	type FlowSource,
 	type FlowSources,
-	type LoadedFlow,
-	listFlowSources,
-	loadFlowSource,
 	parsedFlows,
 	parseFlow,
 	scheduleFlowInfos,
@@ -39,13 +35,6 @@ import {
 
 function flowsDir(repoPath: string): string {
 	return join(repoPath, ".nightshift", "flows");
-}
-
-/** All flow files, sorted by name. A missing directory is an empty list. */
-export async function listFlowFiles(repoPath: string): Promise<FlowListItem[]> {
-	return listFlowSources(await readFlowSources(repoPath), (name) =>
-		flowFilePath(repoPath, name),
-	);
 }
 
 /**
@@ -74,24 +63,6 @@ export async function readFlowSources(repoPath: string): Promise<FlowSources> {
 		if (file !== null) files[name] = file;
 	}
 	return files;
-}
-
-/**
- * Fails when the file does not exist. A file that is not valid JSON loads with
- * flow null. Called flows are checked against the repo's other flow files.
- */
-export async function readFlowFile(
-	repoPath: string,
-	name: string,
-): Promise<LoadedFlow> {
-	const path = flowFilePath(repoPath, name);
-	const file = await readJson(path);
-	if (file === null) throw notFound(name);
-	return loadFlowSource(
-		{ ...(await readFlowSources(repoPath)), [name]: file },
-		name,
-		() => path,
-	);
 }
 
 /**
