@@ -191,6 +191,8 @@ export const hostContract = {
 					deviceId,
 					name: deviceName,
 					platform: z.string().trim().min(1).max(32),
+					/** The Device asks this Host to be its home Host. An older Device leaves it out. */
+					home: z.boolean().optional(),
 				}),
 			)
 			.output(described(pairingStartSchema)),

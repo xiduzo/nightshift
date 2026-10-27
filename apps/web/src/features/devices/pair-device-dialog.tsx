@@ -36,7 +36,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LaptopIcon, ShieldCheckIcon } from "lucide-react";
+import { EyeIcon, LaptopIcon, ShieldCheckIcon } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -157,6 +157,16 @@ function PairDeviceSteps({
 							<span className="mt-1 block break-all font-mono text-xs">
 								{review.fingerprint}
 							</span>
+						</AlertDescription>
+					</Alert>
+				) : null}
+				{!review.hostAdmin && review.home !== false ? (
+					<Alert>
+						<EyeIcon />
+						<AlertTitle>The Host admin can read your personal runs</AlertTitle>
+						<AlertDescription>
+							You are not the Host admin here. The Host admin can read your
+							personal runs and their transcripts on this Host.
 						</AlertDescription>
 					</Alert>
 				) : null}

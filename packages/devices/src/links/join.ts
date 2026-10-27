@@ -57,6 +57,7 @@ export async function* joinHost(
 				deviceId: deps.self.id,
 				name: deps.self.name,
 				platform: deps.self.platform,
+				home: input.role === "home",
 			},
 			{ signal },
 		)
@@ -119,6 +120,7 @@ export async function* joinHost(
 					hostId: link.hostId,
 					hostName: link.name,
 					role: link.role,
+					hostAdmin: answer.hostAdmin ?? null,
 				};
 				return;
 			}

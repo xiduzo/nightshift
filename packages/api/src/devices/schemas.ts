@@ -99,6 +99,8 @@ export const spaceDeviceViewSchema = exact<SpaceDeviceView>()(
 export const pairingReviewViewSchema = exact<PairingReviewView>()(
 	z.object({
 		userCode: z.string(),
+		hostAdmin: z.boolean(),
+		home: z.boolean().nullable(),
 		status: z.enum(["pending", "approved", "denied"]),
 		device: z.object({
 			id: z.string(),
@@ -125,6 +127,7 @@ export const joinProgressSchema = exact<JoinProgress>()(
 			hostId: z.string(),
 			hostName: z.string(),
 			role: hostRoleSchema,
+			hostAdmin: z.boolean().nullable(),
 		}),
 	]),
 );

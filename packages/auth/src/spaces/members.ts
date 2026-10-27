@@ -54,6 +54,19 @@ export async function hasHostAdmin(db: Database): Promise<boolean> {
 	return row !== undefined;
 }
 
+/** Whether the Person is the Host admin. */
+export async function isHostAdmin(
+	db: Database,
+	personId: string,
+): Promise<boolean> {
+	const [row] = await db
+		.select({ role: user.role })
+		.from(user)
+		.where(eq(user.id, personId))
+		.limit(1);
+	return row?.role === HOST_ADMIN;
+}
+
 /**
  * Why an email and password sign-up is refused, or null when it may go
  * ahead: the Host's first Person always may; anyone else needs a pending,

@@ -8,7 +8,7 @@ import {
 	cookiesOf,
 	createAuthSandbox,
 } from "../testing/sandbox";
-import { invitationView, membersOf } from "./members";
+import { invitationView, isHostAdmin, membersOf } from "./members";
 import { LOCAL_EMAIL, localPerson, personalSpaceId } from "./spaces";
 
 let sandbox: AuthSandbox;
@@ -82,6 +82,9 @@ describe("invitation-only signup", () => {
 		// Everyone after is a user of the Host.
 		const ada = await sandbox.signUp("Ada");
 		expect(await roleOf(ada.userId)).toBe("user");
+		expect(await isHostAdmin(sandbox.db, local.userId)).toBe(true);
+		expect(await isHostAdmin(sandbox.db, ada.userId)).toBe(false);
+		expect(await isHostAdmin(sandbox.db, "nobody")).toBe(false);
 	});
 
 	test("on a Host without anyone, the first sign-up needs no invitation and is the admin", async () => {

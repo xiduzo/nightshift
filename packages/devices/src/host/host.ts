@@ -5,6 +5,7 @@ import {
 	createDeviceKeys,
 	type DeviceKeyAccess,
 	denyPairing,
+	isHostAdmin,
 	normalizeUserCode,
 	redeemPairing,
 	reviewPairing,
@@ -37,6 +38,8 @@ type Pending = {
 	deviceId: string;
 	name: string;
 	platform: string;
+	/** It asks this Host to be its home Host. Undefined: an older Device did not say. */
+	home?: boolean;
 	userCode: string;
 	expiresAt: number;
 };
@@ -122,6 +125,7 @@ export function createHost(deps: {
 			deviceId: string;
 			name: string;
 			platform: string;
+			home?: boolean;
 		}): Promise<PairingStart> {
 			requireHost();
 			if (input.deviceId === deps.self.id) {
@@ -178,17 +182,21 @@ export function createHost(deps: {
 				key,
 				personId: answer.personId,
 				host: who(),
+				hostAdmin: await isHostAdmin(deps.db, answer.personId),
 			};
 		},
 
 		async review(
 			headers: Headers,
 			userCode: string,
+			personId: string,
 		): Promise<PairingReviewView> {
 			requireHost();
 			const review = await reviewPairing(auth, headers, userCode);
 			const asked = pendingByUserCode(review.userCode);
 			return {
+				hostAdmin: await isHostAdmin(deps.db, personId),
+				home: asked?.home ?? null,
 				userCode: review.userCode,
 				status: review.status,
 				device: {
@@ -233,12 +241,16 @@ export function createHost(deps: {
 				);
 			}
 			await registry.seen(key.deviceId);
+			const spaces = await spacesOf(deps.db, key.personId);
+			const home = paired.homeHost !== null;
 			return {
 				host: who(),
 				deviceId: key.deviceId,
 				personId: key.personId,
-				// What the Device takes part in here: its owner's Spaces.
-				spaces: await spacesOf(deps.db, key.personId),
+				// What the Device takes part in here: its owner's Spaces. A
+				// personal Space stays with the owner's Home Host (ADR 1).
+				spaces: home ? spaces : spaces.filter((space) => !space.personal),
+				hostAdmin: await isHostAdmin(deps.db, key.personId),
 			};
 		},
 	};

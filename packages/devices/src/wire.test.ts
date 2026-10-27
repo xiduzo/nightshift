@@ -410,8 +410,12 @@ describe("the devices runtime across a reload", () => {
 			});
 
 			const second = await startB({ host: true, auth: people.auth });
-			const { headers } = await people.signUp("Ada");
-			const review = await second.devices.review(headers, code.userCode);
+			const ada = await people.signUp("Ada");
+			const review = await second.devices.review(
+				ada.headers,
+				code.userCode,
+				ada.userId,
+			);
 			expect(review.device).toEqual({
 				id: "device-c",
 				name: "C",

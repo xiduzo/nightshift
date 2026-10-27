@@ -24,8 +24,13 @@ export const hostHelloSchema = z.object({
 	host: hostSchema,
 	deviceId: z.string(),
 	personId: z.string(),
-	/** The Spaces the Device's owner is a Member of on the Host, with their role there. */
+	/**
+	 * The Spaces the Device's owner is a Member of on the Host, with their
+	 * role there. A Guest Host lists no personal Space.
+	 */
 	spaces: z.array(listedSpaceSchema),
+	/** The Device's owner is the Host admin. A Host of an older version leaves it out. */
+	hostAdmin: z.boolean().optional(),
 });
 export type HostHello = z.infer<typeof hostHelloSchema>;
 
@@ -51,6 +56,12 @@ export const pairingRedeemedSchema = z.union([
 		key: z.string(),
 		personId: z.string(),
 		host: hostSchema,
+		/**
+		 * The Person who allowed it is the Host admin. When not, the Host
+		 * admin can read their personal runs there. A Host of an older
+		 * version leaves it out.
+		 */
+		hostAdmin: z.boolean().optional(),
 	}),
 ]);
 export type PairingRedeemed = z.infer<typeof pairingRedeemedSchema>;
