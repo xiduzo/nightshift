@@ -193,6 +193,7 @@ async function offer(sessionCap = 1) {
 		{
 			spaceId: SPACE,
 			profile: "coder",
+			profileName: "coder",
 			permissionCap: "acceptEdits",
 			sessionCap,
 			offeredAt: 1,
@@ -312,6 +313,27 @@ for (const [path, call] of Object.entries(paths)) {
 	}
 
 	describe(`Offer admission, a run ${path}`, () => {
+		test("a renamed profile stays offered: a node names its new name, and the Offer keeps its id", async () => {
+			// "builder", offered before profiles had ids, is now named "coder".
+			own = [
+				{
+					spaceId: SPACE,
+					profile: "builder",
+					profileName: "coder",
+					permissionCap: "acceptEdits",
+					sessionCap: 1,
+					offeredAt: 1,
+				},
+			];
+			await listed("builder");
+			expect(await outcome(request({ call: offered() }))).toBe("served");
+			expect(
+				await outcome(
+					request({ call: offered("Do the work.", { profile: "builder" }) }),
+				),
+			).toBe('hetzner-1 offers "coder" to this Space, not "builder".');
+		});
+
 		test("another Person's run takes an Offer in force: its offered sessions and the run's own folder work", async () => {
 			expect(await outcome(request({ call: offered() }))).toBe(
 				"hetzner-1 offers nothing to this Space. Its owner can offer a profile on the Agents page.",

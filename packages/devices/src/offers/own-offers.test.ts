@@ -1,8 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { HostUnreachableError } from "@nightshift/engine";
+import {
+	createProfileStore,
+	HostUnreachableError,
+	type SpaceDocument,
+} from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import type { AgentProfile } from "@nightshift/flows";
 import { createEngineOffers } from "./engine-offers";
-import { deviceOffers, setDeviceOffer } from "./offers";
+import {
+	deviceOffers,
+	offeredProfile,
+	type SpaceOffer,
+	setDeviceOffer,
+	spaceOffers,
+} from "./offers";
 import { createOffers } from "./own-offers";
 
 /**
@@ -41,7 +52,8 @@ function offersWith(paired: Record<string, object>) {
 					...caps,
 					deviceId: "laptop",
 					deviceName: "laptop",
-					profile: "review",
+					profile: "p-review",
+					profileName: "review",
 					offeredAt: 1,
 					by: "marieke",
 				},
@@ -76,7 +88,9 @@ describe("withdraw", () => {
 		const order: string[] = [];
 		const engineOffers = createEngineOffers({
 			ready: Promise.resolve(),
-			documents: {} as never,
+			documents: {
+				open: async () => ({ offers: new Map() }),
+			} as never,
 			log: {
 				append: async () => {
 					throw new Error("A Space a Host keeps logs its Offers there.");
@@ -93,7 +107,7 @@ describe("withdraw", () => {
 				},
 			},
 			stopUnder: async (offer) => {
-				order.push(`stop the runs under ${offer.profile}`);
+				order.push(`stop the runs under ${offer.profileName}`);
 			},
 		});
 		const offers = createOffers({
@@ -112,11 +126,145 @@ describe("withdraw", () => {
 			offers.withdraw({ spaceId: "space-team", profile: "coder" }, "me"),
 		).rejects.toThrow(HostUnreachableError);
 		// No more work under it, at once.
-		expect(deviceOffers(document)).toEqual([]);
+		expect(deviceOffers(document, (id) => id)).toEqual([]);
 		expect(order).toEqual([
 			"the Host",
 			"stop the runs under coder",
 			"abort the calls under coder",
+		]);
+		await document.close();
+	});
+});
+
+const coder: AgentProfile = {
+	name: "coder",
+	harness: "claude-code",
+	model: "sonnet",
+	permissionMode: "acceptEdits",
+	clis: [],
+	connections: [],
+};
+const { name: _name, ...coderSettings } = coder;
+
+describe("Offers by profile id", () => {
+	test("an Offer made before profiles had ids reads unchanged: it names the profile by its name, which is its id", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.profiles.set("coder", {
+				description: null,
+				settings: coderSettings,
+				updatedAt: 1,
+			});
+			document.offers.set("space-team/coder", {
+				spaceId: "space-team",
+				profile: "coder",
+				...caps,
+				offeredAt: 1,
+			});
+		});
+		const profiles = createProfileStore({ document });
+		const nameOf = (profile: string) =>
+			offeredProfile(profiles, profile)?.name ?? null;
+		expect(deviceOffers(document, nameOf)).toEqual([
+			{
+				spaceId: "space-team",
+				profile: "coder",
+				profileName: "coder",
+				...caps,
+				offeredAt: 1,
+			},
+		]);
+		const published = new Map([
+			[
+				"laptop/coder",
+				{
+					deviceId: "laptop",
+					deviceName: "laptop",
+					profile: "coder",
+					...caps,
+					offeredAt: 1,
+					by: "marieke",
+				},
+			],
+		]);
+		expect(
+			spaceOffers({
+				offers: published,
+			} as unknown as Pick<SpaceDocument, "offers">),
+		).toMatchObject([{ profile: "coder", profileName: "coder" }]);
+		await document.close();
+	});
+
+	test("a renamed profile keeps its Offer, and the Offer of a removed profile is not in force", async () => {
+		const document = await sandbox.openDocument();
+		const profiles = createProfileStore({ document });
+		const saved = await profiles.save(coder);
+		await setDeviceOffer(document, {
+			spaceId: "space-team",
+			profile: saved.id,
+			...caps,
+			offeredAt: 1,
+		});
+		const nameOf = (profile: string) =>
+			offeredProfile(profiles, profile)?.name ?? null;
+		await profiles.save({ ...coder, name: "maker" }, saved.id);
+		expect(deviceOffers(document, nameOf)).toMatchObject([
+			{ profile: saved.id, profileName: "maker" },
+		]);
+		await profiles.remove(saved.id);
+		// Another profile may take the name of the removed one: it is not offered.
+		await profiles.save({ ...coder, name: "maker" });
+		expect(deviceOffers(document, nameOf)).toEqual([]);
+		await document.close();
+	});
+
+	test("a rename shows the new name in each Space that lists the Offer, and not in a Space that withdrew it", async () => {
+		const document = await sandbox.openDocument();
+		const profiles = createProfileStore({ document });
+		const saved = await profiles.save(coder);
+		for (const spaceId of ["space-team", "space-gone"]) {
+			await setDeviceOffer(document, {
+				spaceId,
+				profile: saved.id,
+				...caps,
+				offeredAt: 1,
+			});
+		}
+		const listed: SpaceOffer = {
+			...caps,
+			deviceId: "self",
+			deviceName: "LE2316",
+			profile: saved.id,
+			profileName: "coder",
+			offeredAt: 1,
+			by: "me",
+		};
+		const published: { spaceId: string; profileName: string }[] = [];
+		const offers = createOffers({
+			db: sandbox.db,
+			engine: {
+				offers: {
+					list: async (spaceId: string) =>
+						spaceId === "space-team" ? [listed] : [],
+					publish: async (input: { spaceId: string; profileName: string }) => {
+						published.push({
+							spaceId: input.spaceId,
+							profileName: input.profileName,
+						});
+					},
+				},
+			} as never,
+			document,
+			profiles,
+			self: { id: "self", name: "LE2316" },
+			ownerId: "me",
+			withdrawn: () => {},
+		});
+
+		await profiles.save({ ...coder, name: "maker" }, saved.id);
+		await offers.renamed(saved.id, "me");
+		expect(published).toEqual([
+			{ spaceId: "space-team", profileName: "maker" },
 		]);
 		await document.close();
 	});
@@ -157,7 +305,7 @@ describe("spaceDevices", () => {
 			platform: null,
 			lastSeenAt: null,
 			online: null,
-			offers: [{ ...caps, profile: "review" }],
+			offers: [{ ...caps, profile: "p-review", profileName: "review" }],
 		});
 	});
 

@@ -63,7 +63,7 @@ export function OfferDialog({
 	open,
 	onOpenChange,
 }: {
-	profile: string;
+	profile: { id: string; name: string };
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
@@ -82,7 +82,7 @@ function OfferForm({
 	profile,
 	onDone,
 }: {
-	profile: string;
+	profile: { id: string; name: string };
 	onDone: () => void;
 }) {
 	const id = useId();
@@ -100,7 +100,7 @@ function OfferForm({
 		offerMutations.make({
 			onSuccess: () => {
 				toast.success(
-					`Offered ${profile} to ${spaces.find((s) => s.id === space)?.name ?? "the Space"}`,
+					`Offered ${profile.name} to ${spaces.find((s) => s.id === space)?.name ?? "the Space"}`,
 				);
 				void queryClient.invalidateQueries({ queryKey: offerQueries.all() });
 				onDone();
@@ -116,7 +116,7 @@ function OfferForm({
 				if (space && sessionsValid) {
 					make.mutate({
 						spaceId: space,
-						profile,
+						profile: profile.id,
 						permissionCap: cap,
 						sessionCap,
 					});
@@ -124,7 +124,7 @@ function OfferForm({
 			}}
 		>
 			<DialogHeader>
-				<DialogTitle>Offer {profile} to a Space</DialogTitle>
+				<DialogTitle>Offer {profile.name} to a Space</DialogTitle>
 				<DialogDescription>
 					People in the Space can run this profile on this computer, within the
 					limits you set. You can withdraw it at any time.
@@ -228,14 +228,21 @@ export function WithdrawOfferDialog({
 	onOpenChange,
 }: {
 	/** The Offer to withdraw; null: closed. */
-	offer: { spaceId: string; spaceName: string; profile: string } | null;
+	offer: {
+		spaceId: string;
+		spaceName: string;
+		profile: string;
+		profileName: string;
+	} | null;
 	onOpenChange: (open: boolean) => void;
 }) {
 	const queryClient = useQueryClient();
 	const withdraw = useMutation(
 		offerMutations.withdraw({
 			onSuccess: () => {
-				toast.success(`Withdrew ${offer?.profile} from ${offer?.spaceName}`);
+				toast.success(
+					`Withdrew ${offer?.profileName} from ${offer?.spaceName}`,
+				);
 				onOpenChange(false);
 			},
 			onError: (error) => toast.error(`Not withdrawn: ${error.message}`),
@@ -248,7 +255,7 @@ export function WithdrawOfferDialog({
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>
-						Withdraw {offer?.profile} from {offer?.spaceName}?
+						Withdraw {offer?.profileName} from {offer?.spaceName}?
 					</AlertDialogTitle>
 					<AlertDialogDescription>
 						People in the Space can no longer run it on this computer. Steps

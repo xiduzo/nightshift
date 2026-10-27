@@ -4,7 +4,7 @@ import {
 	startRunInputSchema,
 	type TranscriptEntry,
 } from "@nightshift/engine";
-import { labelSchema } from "@nightshift/flows";
+import { labelSchema, nameSchema } from "@nightshift/flows";
 import type { RefusalKind } from "@nightshift/refusal";
 import { type ContractRouterClient, oc } from "@orpc/contract";
 import { z } from "zod";
@@ -300,7 +300,14 @@ export const hostContract = {
 				summary:
 					"Publishes a paired Device's Offer of a profile to a Space here, or its new caps.",
 			})
-			.input(offerRefSchema.extend({ ...offerCapsSchema.shape, deviceName }))
+			.input(
+				offerRefSchema.extend({
+					...offerCapsSchema.shape,
+					deviceName,
+					// Optional: a Device from before profile ids sends none.
+					profileName: nameSchema.optional(),
+				}),
+			)
 			.output(described(z.void())),
 		/** The Device withdraws its Offer from a Space here. */
 		withdrawOffer: sync

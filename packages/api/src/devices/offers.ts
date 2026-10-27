@@ -9,7 +9,7 @@ import { ownerProcedure } from "../procedures";
 import { offerListSchema } from "./schemas";
 
 /**
- * This computer's Offers: one of its profiles made available to a Space,
+ * This computer's Offers: one of its profiles (by its id) made available to a Space,
  * with a permission-mode cap and a session cap. Made and withdrawn by the
  * computer's owner, in a Space where their role allows `offer.make`.
  */

@@ -15,7 +15,9 @@ export type OfferRun = {
 export type OfferView = OfferCaps & {
 	spaceId: string;
 	spaceName: string;
+	/** The profile's id. */
 	profile: string;
+	profileName: string;
 	offeredAt: number;
 	/** The Space still lists it. False: it was withdrawn there, and runs no longer use it. */
 	listed: boolean;
@@ -43,18 +45,25 @@ export type SpaceDeviceView = {
 	/** Epoch ms of its last connection. Null when this computer cannot tell. */
 	lastSeenAt: number | null;
 	clones: { projectId: string; projectName: string }[];
-	offers: (OfferCaps & { profile: string })[];
+	/** `profile`: the profile's id. */
+	offers: (OfferCaps & { profile: string; profileName: string })[];
 };
 
 /** This computer's Offers into Spaces, made by its owner. */
 export type Offers = {
 	/** Its Offers, every Space, oldest first. */
 	list(): Promise<OfferView[]>;
-	/** Offers one of its profiles to a Space, or changes the caps. */
+	/** Offers one of its profiles (`profile`: its id) to a Space, or changes the caps. */
 	make(
 		input: OfferCaps & { spaceId: string; profile: string },
 		by: string,
 	): Promise<void>;
+	/**
+	 * Shows a profile's new name in the Spaces that list its Offers. Each
+	 * Offer keeps its caps. A Space that cannot be reached keeps the old
+	 * name until the next change of the Offer.
+	 */
+	renamed(profileId: string, by: string): Promise<void>;
 	/**
 	 * Withdraws it: the Space no longer lists it, its running steps end as
 	 * stopped, and this computer takes no more work under it.

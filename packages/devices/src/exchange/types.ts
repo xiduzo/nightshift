@@ -73,7 +73,14 @@ export type HostExchange = {
 	 */
 	offer(
 		key: DeviceKeyAccess,
-		input: OfferCaps & { spaceId: string; profile: string; deviceName: string },
+		input: OfferCaps & {
+			spaceId: string;
+			/** The profile's id. */
+			profile: string;
+			/** The profile's name. A Device from before ids sends none: its id is its name. */
+			profileName?: string;
+			deviceName: string;
+		},
 	): Promise<void>;
 	/** Withdraws an Offer of the key's Device from a Space of this Host. */
 	withdrawOffer(

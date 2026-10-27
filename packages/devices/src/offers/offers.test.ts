@@ -40,7 +40,13 @@ const agent = (extra: Record<string, unknown> = {}) =>
 
 const placed = {
 	deviceName: "hetzner-1",
-	offers: [{ profile: "coder", permissionCap: "acceptEdits" as const }],
+	offers: [
+		{
+			profile: "p-coder",
+			profileName: "coder",
+			permissionCap: "acceptEdits" as const,
+		},
+	],
 	mayUse: true,
 };
 
@@ -186,6 +192,7 @@ describe("another Person's run on the computer that walks it", () => {
 			{
 				spaceId: sandbox.spaceId,
 				profile: "coder",
+				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
 				offeredAt: Date.now(),
@@ -196,6 +203,7 @@ describe("another Person's run on the computer that walks it", () => {
 			deviceId: sandbox.deviceId,
 			deviceName: "studio",
 			profile: "coder",
+			profileName: "coder",
 			permissionCap: "acceptEdits",
 			sessionCap: 1,
 			by: "the-owner",
@@ -297,6 +305,7 @@ describe("another Person's run on the computer that walks it", () => {
 				deviceId: sandbox.deviceId,
 				deviceName: "studio",
 				profile: "coder",
+				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
 				by: "the-owner",
@@ -396,6 +405,7 @@ describe("another Person's run on the computer that walks it", () => {
 			"offeredAt",
 			"permissionCap",
 			"profile",
+			"profileName",
 			"sessionCap",
 		]);
 		expect(JSON.stringify(document.doc.toJSON())).not.toContain("sonnet");
@@ -488,6 +498,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			{
 				spaceId: sandbox.spaceId,
 				profile: "coder",
+				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
 				offeredAt: 1,
@@ -498,6 +509,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			deviceId: sandbox.deviceId,
 			deviceName: here?.name as string,
 			profile: "coder",
+			profileName: "coder",
 			permissionCap: "acceptEdits",
 			sessionCap: 1,
 			by: null,

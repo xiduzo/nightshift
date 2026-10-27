@@ -34,6 +34,7 @@ import {
 	deviceOffers,
 	type Offers,
 	type OfferUse,
+	offeredProfile,
 } from "./offers";
 import {
 	createPeerEngine,
@@ -234,7 +235,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			}),
 			// This computer's own Offers, the sessions and calls under them,
 			// and who may use Offers in a Space.
-			ownOffers: () => deviceOffers(deps.document),
+			ownOffers: () =>
+				deviceOffers(
+					deps.document,
+					(profile) => offeredProfile(deps.profiles, profile)?.name ?? null,
+				),
 			offerUse: handover.offerUse,
 			presence: handover.presence,
 			mayUseOffers: async (spaceId, personId) => {

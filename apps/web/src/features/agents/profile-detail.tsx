@@ -145,7 +145,7 @@ export function ProfileDetail({
 		enabled: profile !== null,
 	});
 	const offered = (offers.data?.offers ?? []).filter(
-		(o) => o.profile === profile?.name,
+		(o) => o.profile === profile?.id,
 	);
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
@@ -496,7 +496,7 @@ export function ProfileDetail({
 
 			{profile ? (
 				<OfferDialog
-					profile={profile.name}
+					profile={{ id: profile.id, name: profile.name }}
 					open={offering}
 					onOpenChange={setOffering}
 				/>

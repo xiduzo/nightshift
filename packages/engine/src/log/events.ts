@@ -170,7 +170,10 @@ export type EnginePayloads = {
 	OfferMade: {
 		deviceId: string;
 		deviceName: string;
+		/** The profile's id; before profiles had ids, its name. */
 		profile: string;
+		/** The profile's name. Absent in an event logged before ids. */
+		profileName?: string;
 		permissionCap: string;
 		sessionCap: number;
 		by: string | null;

@@ -9,8 +9,9 @@ export type Placement = {
 	/** This computer. */
 	thisDevice: boolean;
 	/**
-	 * Another Person's Device: the profiles it offers to the Space, the
-	 * only ones a run there may use. Absent for the Person's own Devices.
+	 * Another Person's Device: the names of the profiles it offers to the
+	 * Space, the only ones a run there may use. Absent for the Person's
+	 * own Devices.
 	 */
 	offers?: string[];
 };

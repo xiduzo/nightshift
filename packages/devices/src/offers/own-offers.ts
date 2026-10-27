@@ -6,7 +6,12 @@ import { Refusal } from "@nightshift/refusal";
 import { personInSpace } from "../links";
 import type { DeviceRegistry } from "../registry";
 import type { EngineOffers } from "./engine-offers";
-import { deviceOffers, removeDeviceOffer, setDeviceOffer } from "./offers";
+import {
+	deviceOffers,
+	offeredProfile,
+	removeDeviceOffer,
+	setDeviceOffer,
+} from "./offers";
 import type { Offers, SpaceDeviceView } from "./types";
 
 /**
@@ -56,7 +61,10 @@ export function createOffers(deps: {
 	return {
 		async list() {
 			const views = [];
-			for (const offer of deviceOffers(document)) {
+			// An Offer of a removed profile stays listed, so its owner can withdraw it.
+			const nameOf = (profile: string) =>
+				offeredProfile(deps.profiles, profile)?.name ?? profile;
+			for (const offer of deviceOffers(document, nameOf)) {
 				const space = await spaceRow(offer.spaceId);
 				const listed = (await engine.offers.list(offer.spaceId)).some(
 					(o) => o.deviceId === self.id && o.profile === offer.profile,
@@ -96,18 +104,17 @@ export function createOffers(deps: {
 		},
 
 		async make(input, by) {
-			// An Offer names a profile by its name.
-			const profile = deps.profiles.byName(input.profile);
+			const profile = deps.profiles.get(input.profile);
 			if (!profile) {
 				throw new Refusal(
 					"conflict",
-					`There is no profile named "${input.profile}". Add it under Agents first.`,
+					"This profile was removed. Add it under Agents first.",
 				);
 			}
 			if (!isAgentProfile(profile)) {
 				throw new Refusal(
 					"invalid",
-					`The profile "${input.profile}" is for Decision and Value nodes. Only an agent profile can be offered.`,
+					`The profile "${profile.name}" is for Decision and Value nodes. Only an agent profile can be offered.`,
 				);
 			}
 			const space = await spaceRow(input.spaceId);
@@ -120,11 +127,44 @@ export function createOffers(deps: {
 			}
 			await engine.offers.publish({
 				...input,
+				profileName: profile.name,
 				deviceId: self.id,
 				deviceName: self.name,
 				by: await personInSpace(db, input.spaceId, by),
 			});
 			await setDeviceOffer(document, { ...input, offeredAt: Date.now() });
+		},
+
+		async renamed(profileId, by) {
+			const profile = deps.profiles.get(profileId);
+			if (!profile) return;
+			for (const offer of deviceOffers(document, () => profile.name)) {
+				if (offer.profile !== profileId) continue;
+				const listed = (await engine.offers.list(offer.spaceId)).find(
+					(o) => o.deviceId === self.id && o.profile === profileId,
+				);
+				// A Space that stopped listing it keeps it withdrawn.
+				if (!listed || listed.profileName === profile.name) continue;
+				try {
+					await engine.offers.publish({
+						spaceId: offer.spaceId,
+						profile: profileId,
+						profileName: profile.name,
+						permissionCap: offer.permissionCap,
+						sessionCap: offer.sessionCap,
+						deviceId: self.id,
+						deviceName: self.name,
+						by: await personInSpace(db, offer.spaceId, by),
+					});
+				} catch (error) {
+					// The rename stands. The Space shows the old name until the
+					// next change of this Offer.
+					console.error(
+						`[offers] the new name of ${profileId} did not reach ${offer.spaceId}:`,
+						error,
+					);
+				}
+			}
 		},
 
 		async withdraw(input, by) {
@@ -188,6 +228,7 @@ export function createOffers(deps: {
 					offer.deviceId === self.id,
 				).offers.push({
 					profile: offer.profile,
+					profileName: offer.profileName,
 					permissionCap: offer.permissionCap,
 					sessionCap: offer.sessionCap,
 				});

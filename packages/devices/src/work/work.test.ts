@@ -190,6 +190,7 @@ describe("the work server", () => {
 			{
 				spaceId: SPACE,
 				profile: "coder",
+				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
 				offeredAt: 1,

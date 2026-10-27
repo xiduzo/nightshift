@@ -265,9 +265,10 @@ export type PlacedDevice = {
 /** What a run start knows of the Offers of the Device it places a run of another Person on. */
 export type OfferedPlacement = {
 	deviceName: string;
-	/** Its Offers into the run's Space. */
+	/** Its Offers into the run's Space: the profile's id and its name. */
 	offers: readonly {
 		profile: string;
+		profileName: string;
 		permissionCap: z.infer<typeof permissionModeSchema>;
 	}[];
 	/** The starter's role in the Space uses Offers (`offer.use`). */

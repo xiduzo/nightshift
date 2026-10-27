@@ -56,6 +56,8 @@ let ownerOnA: string;
 let spaceId: string;
 let projectId: string;
 let folderOnB: string;
+/** The id of B's profile `coder`. */
+let coderId: string;
 
 function git(cwd: string, ...args: string[]) {
 	const child = Bun.spawnSync(
@@ -212,14 +214,16 @@ beforeAll(async () => {
 		(project) => project?.id === projectId,
 	);
 	// B's profile: its owner set it wide open; the Offer caps it.
-	await b.client.profiles.save({
-		name: "coder",
-		harness: "claude-code",
-		model: "sonnet",
-		permissionMode: "bypassPermissions",
-		clis: [],
-		connections: [],
-	});
+	coderId = (
+		await b.client.profiles.save({
+			name: "coder",
+			harness: "claude-code",
+			model: "sonnet",
+			permissionMode: "bypassPermissions",
+			clis: [],
+			connections: [],
+		})
+	).id;
 	await flowOnB("offered", { profile: "coder" });
 }, 180_000);
 
@@ -242,7 +246,7 @@ describe("a colleague's run on another Person's Device", () => {
 		expect(spaces.map((s) => s.id)).toContain(spaceId);
 		await b.client.offers.make({
 			spaceId,
-			profile: "coder",
+			profile: coderId,
 			permissionCap: "acceptEdits",
 			sessionCap: 1,
 		});
@@ -270,7 +274,12 @@ describe("a colleague's run on another Person's Device", () => {
 			lastSeenAt: expect.any(Number),
 			clones: [{ projectId, projectName: "on-a" }],
 			offers: [
-				{ profile: "coder", permissionCap: "acceptEdits", sessionCap: 1 },
+				{
+					profile: coderId,
+					profileName: "coder",
+					permissionCap: "acceptEdits",
+					sessionCap: 1,
+				},
 			],
 		});
 		// B's owner sees B as one of their own.
@@ -283,12 +292,17 @@ describe("a colleague's run on another Person's Device", () => {
 			async () => (await b.client.offers.list()).offers,
 			(offers) => offers[0]?.listed === true,
 		);
-		expect(mine).toMatchObject({ spaceName: "Platform", profile: "coder" });
+		expect(mine).toMatchObject({
+			spaceName: "Platform",
+			profile: coderId,
+			profileName: "coder",
+		});
 		expect(eventsOnA("OfferMade")).toEqual([
 			{
 				deviceId: bId,
 				deviceName: bName,
-				profile: "coder",
+				profile: coderId,
+				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
 				by: ownerOnA,
@@ -397,7 +411,7 @@ describe("a colleague's run on another Person's Device", () => {
 		const pid = Number(lines(PIDS).at(-1));
 		expect(alive(pid)).toBe(true);
 
-		await b.client.offers.withdraw({ spaceId, profile: "coder" });
+		await b.client.offers.withdraw({ spaceId, profile: coderId });
 		await waitFor(
 			() => runOf(started.id),
 			(r) => r?.status === "stopped",
@@ -411,7 +425,7 @@ describe("a colleague's run on another Person's Device", () => {
 		const detail = await colleague.runs.get({ runId: started.id });
 		expect(detail.steps.at(-1)?.outcome).toBe("stopped");
 		expect(eventsOnA("OfferWithdrawn")).toEqual([
-			{ deviceId: bId, profile: "coder", by: ownerOnA },
+			{ deviceId: bId, profile: coderId, by: ownerOnA },
 		]);
 		expect((await b.client.offers.list()).offers).toEqual([]);
 		writeFileSync(SLEEP_MS, "0");

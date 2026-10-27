@@ -263,7 +263,8 @@ export function createPlacement(deps: PlacementDeps) {
 				name: offer.deviceName,
 				offers: [],
 			};
-			entry.offers.push(offer.profile);
+			// A flow names a profile by its name.
+			entry.offers.push(offer.profileName);
 			byDevice.set(offer.deviceId, entry);
 		}
 		const others: OwnDevice[] = [];
@@ -311,7 +312,7 @@ export function createPlacement(deps: PlacementDeps) {
 				: {
 						...here,
 						offers: ((await deps.offersHere?.(spaceId)) ?? []).map(
-							(o) => o.profile,
+							(o) => o.profileName,
 						),
 					};
 		const all = [
