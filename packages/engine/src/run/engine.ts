@@ -4,7 +4,7 @@ import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
 import type { Actor, MemberChange, StartRunInput } from "../contract";
 import { defaultRunSettings, type RunSettings } from "../device-config";
-import { createFlowFiles } from "../flows";
+import { createFlowFiles, fileProjectFlows } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
 	copyStamps,
@@ -281,6 +281,11 @@ export function createEngine(
 		git,
 		...(hosts ? { relay: hosts } : {}),
 	});
+	const projectFlows = fileProjectFlows({
+		find: projects.find,
+		get: projects.get,
+		elsewhere: placement.flowsElsewhere,
+	});
 	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`
 	// handover) ends it.
 	const lifetime = new AbortController();
@@ -393,6 +398,7 @@ export function createEngine(
 		startRun: startRunWith,
 		log: runLog,
 		projects: projects.list,
+		flows: projectFlows,
 		enabled: () => runSettings().scheduler,
 		firesHere,
 		runStatus: reads.runStatus,
@@ -425,7 +431,7 @@ export function createEngine(
 		db,
 		now,
 		log: runLog,
-		repoPath: async (projectId) => (await projects.find(projectId)).repoPath,
+		flows: projectFlows,
 		secret: options.secret ?? (async (name) => process.env[name]),
 		firesHere,
 		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
@@ -494,17 +500,14 @@ export function createEngine(
 		listBranches,
 		runCopies,
 		placement,
-		flowFiles: createFlowFiles({
-			find: projects.find,
-			get: projects.get,
-			elsewhere: placement.flowsElsewhere,
-		}),
+		flowFiles: createFlowFiles({ flows: projectFlows }),
 		kept: {
 			list: (flow) => listKeptValues(db, flow),
 			reset: (flow, name) => resetKeptValue(db, flow, name),
 		},
 		scheduleFiles: createScheduleFiles({
 			now,
+			flows: projectFlows,
 			scheduler,
 			webhooks,
 			runStatus: reads.runStatus,

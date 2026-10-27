@@ -9,6 +9,7 @@ import { event } from "@nightshift/db/schema";
 import {
 	type FlowInputDef,
 	type JsonValue,
+	loadFlowSource,
 	nextTimeOfDay,
 	type Schedule,
 	type WebhookEvent,
@@ -18,10 +19,10 @@ import {
 	webhookSecretName,
 	webhookSignalKey,
 } from "@nightshift/flows";
-import { readFlowFile, readSchedulesFile } from "@nightshift/flows/files";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
+import type { ProjectFlows } from "../flows";
 import { parseEventRow, type RunLog, type RunTrigger } from "../log";
 import type { RunSummary } from "../read";
 
@@ -98,8 +99,8 @@ export type WebhooksDeps = {
 	now(): number;
 	/** Appends `WebhookReceived`. */
 	log: RunLog;
-	/** The project's folder on this computer, or null: it has no Clone here. Throws for an unknown project. */
-	repoPath(projectId: string): Promise<string | null>;
+	/** The project's schedules and flows. Throws for a project it cannot read. */
+	flows: Pick<ProjectFlows, "flows" | "schedules">;
 	/** A secret's value by name: the keychain, then the environment. */
 	secret(name: string): Promise<string | undefined>;
 	/** Whether this Device takes the schedule's webhooks: the rule of its cron times. */
@@ -166,25 +167,19 @@ export function createWebhooks(deps: WebhooksDeps) {
 		refusals.set(key, list.slice(0, DELIVERIES_SHOWN));
 	}
 
-	/** The schedule and its project's folder, or null for any reason the sender may not learn. */
+	/** The schedule, or null for any reason the sender may not learn. */
 	async function find(
 		projectId: string,
 		scheduleId: string,
-	): Promise<{ repoPath: string; schedule: Schedule } | null> {
-		let repoPath: string | null;
+	): Promise<{ schedule: Schedule } | null> {
 		try {
-			repoPath = await deps.repoPath(projectId);
-		} catch {
-			return null;
-		}
-		if (repoPath === null) return null;
-		try {
-			const { schedules } = await readSchedulesFile(repoPath, {
-				validate: false,
-			});
+			const { schedules } = await deps.flows.schedules(
+				{ projectId },
+				{ validate: false },
+			);
 			// A duplicate id is an issue in the UI; the first one counts.
 			const schedule = schedules.find((s) => s.id === scheduleId);
-			return schedule?.webhook ? { repoPath, schedule } : null;
+			return schedule?.webhook ? { schedule } : null;
 		} catch {
 			return null;
 		}
@@ -192,11 +187,12 @@ export function createWebhooks(deps: WebhooksDeps) {
 
 	/** The inputs of the schedule's flow, to render its values with the right types. */
 	async function flowInputs(
-		repoPath: string,
+		projectId: string,
 		flow: string,
 	): Promise<readonly FlowInputDef[]> {
 		try {
-			return (await readFlowFile(repoPath, flow)).flow?.inputs ?? [];
+			const set = await deps.flows.flows({ projectId });
+			return loadFlowSource(set.sources, flow, set.pathOf).flow?.inputs ?? [];
 		} catch {
 			return [];
 		}
@@ -205,7 +201,6 @@ export function createWebhooks(deps: WebhooksDeps) {
 	/** What an accepted webhook does, after the sender has its answer. */
 	async function act(
 		projectId: string,
-		repoPath: string,
 		schedule: Schedule,
 		at: number,
 		webhook: WebhookEvent,
@@ -240,7 +235,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 			try {
 				const inputs = webhookInputs(
 					schedule,
-					await flowInputs(repoPath, schedule.flow),
+					await flowInputs(projectId, schedule.flow),
 					webhook,
 				);
 				const run = await deps.startRun(
@@ -317,7 +312,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 				return { answer: { kind: "not-found" }, done };
 			}
 
-			const { repoPath, schedule } = found;
+			const { schedule } = found;
 			const refusal = !schedule.enabled
 				? "The schedule is paused."
 				: !deps.enabled()
@@ -355,7 +350,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 			}
 			return {
 				answer: { kind: "accepted" },
-				done: act(projectId, repoPath, schedule, at, webhook),
+				done: act(projectId, schedule, at, webhook),
 			};
 		},
 

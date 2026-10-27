@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
-import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { asc, eq, inArray } from "drizzle-orm";
 import {
 	defaultRunSettings,
@@ -12,6 +11,7 @@ import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
 import type { RunSummary } from "../read/views";
 import { createEngine, type EngineInternals } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
+import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
@@ -161,8 +161,11 @@ const settle = () => Bun.sleep(TICK_MS * 12);
 
 async function setup(engine: SpaceEngine, schedules: Schedule[], flow?: Flow) {
 	const project = await engine.addProject({ repoPath: sandbox.repoPath });
-	await writeFlowFile(sandbox.repoPath, "night", flow ?? commandFlow());
-	await writeSchedulesFile(sandbox.repoPath, schedules);
+	await seedFlows(
+		sandbox.repoPath,
+		{ night: flow ?? commandFlow() },
+		schedules,
+	);
 	return project;
 }
 

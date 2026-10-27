@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { seedFlows } from "@nightshift/engine/testing";
 
 import {
 	type Daemon,
@@ -68,12 +69,9 @@ function repo(name: string): string {
 }
 
 /** A flow file in a Clone. */
-function flowIn(folder: string, name: string, nodes: unknown[]) {
-	const dir = join(folder, ".nightshift", "flows");
-	mkdirSync(dir, { recursive: true });
-	writeFileSync(
-		join(dir, `${name}.json`),
-		JSON.stringify({
+async function flowIn(folder: string, name: string, nodes: unknown[]) {
+	await seedFlows(folder, {
+		[name]: {
 			version: 6,
 			inputs: [],
 			outputs: [],
@@ -85,8 +83,8 @@ function flowIn(folder: string, name: string, nodes: unknown[]) {
 				outcome: "pass",
 				to: (node as { id: string }).id,
 			})),
-		}),
-	);
+		},
+	});
 }
 
 const IDENTITY =
@@ -186,7 +184,7 @@ afterAll(async () => {
 describe("nodes on two Devices", () => {
 	test("A walks a run whose middle node runs on B: the work goes there and back", async () => {
 		expect(aName).not.toBe(bName);
-		flowIn(folderOnA, "relay", [
+		await flowIn(folderOnA, "relay", [
 			commits("one", "one.txt"),
 			commits("two", "two.txt", bName),
 			shell("three", "ls"),
@@ -219,7 +217,7 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("a dirty worktree fails the step that needs the work on the other Device", async () => {
-		flowIn(folderOnA, "dirty", [
+		await flowIn(folderOnA, "dirty", [
 			shell("scribble", "echo draft > draft.txt"),
 			shell("there", "ls", bName),
 		]);
@@ -238,7 +236,7 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("B walks a run with a node on A: the call goes through A, and the work moves both ways", async () => {
-		flowIn(folderOnB, "visit", [
+		await flowIn(folderOnB, "visit", [
 			commits("here", "here.txt"),
 			commits("there", "there.txt", aName),
 			shell("back", "ls"),
@@ -265,7 +263,7 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("a node whose Device is offline sleeps, and continues when it is back", async () => {
-		flowIn(folderOnA, "later", [
+		await flowIn(folderOnA, "later", [
 			shell("first", "sleep 2"),
 			shell("there", "echo from B", bName),
 		]);
@@ -291,7 +289,7 @@ describe("nodes on two Devices", () => {
 	}, 120_000);
 
 	test("Move to: B walks a run A started, from A's archived checkpoint", async () => {
-		flowIn(folderOnA, "moving", [
+		await flowIn(folderOnA, "moving", [
 			shell("before", "echo before"),
 			{
 				id: "ask",

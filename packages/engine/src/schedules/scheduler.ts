@@ -7,10 +7,10 @@ import {
 	type Schedule,
 	type ScheduleIssue,
 } from "@nightshift/flows";
-import { readSchedulesFile } from "@nightshift/flows/files";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { and, asc, gt, inArray } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
+import type { ProjectFlows } from "../flows";
 import {
 	type EngineEventType,
 	type LoggedEvent,
@@ -72,7 +72,9 @@ export type SchedulerDeps = {
 	/** Appends `ScheduleFired` and `ScheduleSkipped`. */
 	log: RunLog;
 	/** The projects a person has not removed, with their folder on this computer. */
-	projects(): Promise<{ id: string; repoPath: string }[]>;
+	projects(): Promise<{ id: string }[]>;
+	/** The schedules of each project. */
+	flows: Pick<ProjectFlows, "schedules">;
 	/** Starts a run of a flow file, with the trigger stored in `RunStarted`. */
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
 	/** The run's status, or null when the log knows no such run. */
@@ -331,13 +333,14 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			off = false;
 			onSince = at;
 		}
-		for (const { id: projectId, repoPath } of await deps.projects()) {
+		for (const { id: projectId } of await deps.projects()) {
 			if (stopped) return;
 			let schedules: Schedule[];
 			try {
-				({ schedules } = await readSchedulesFile(repoPath, {
-					validate: false,
-				}));
+				({ schedules } = await deps.flows.schedules(
+					{ projectId },
+					{ validate: false },
+				));
 			} catch {
 				continue;
 			}

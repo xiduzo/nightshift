@@ -3,11 +3,11 @@ import { createHmac } from "node:crypto";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
-import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { eq } from "drizzle-orm";
 import { parseEventRow } from "../log/events";
 import { createEngine, type Engine } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
+import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
@@ -100,9 +100,11 @@ function hook(extra: Partial<Schedule> = {}): Schedule {
 }
 
 async function setup(schedules: Schedule[]) {
-	await writeFlowFile(sandbox.repoPath, "echo", echoFlow);
-	await writeFlowFile(sandbox.repoPath, "wait", waitFlow);
-	await writeSchedulesFile(sandbox.repoPath, schedules);
+	await seedFlows(
+		sandbox.repoPath,
+		{ echo: echoFlow, wait: waitFlow },
+		schedules,
+	);
 }
 
 const body = (value: unknown) =>
@@ -281,7 +283,7 @@ describe("a webhook schedule", () => {
 		});
 		expect((await space.listRuns())[0]?.inputs).toMatchObject({ pr: "8" });
 
-		await writeSchedulesFile(sandbox.repoPath, [hook({ enabled: false })]);
+		await seedFlows(sandbox.repoPath, {}, [hook({ enabled: false })]);
 		expect(await send(payload, bearer("pull_request"))).toEqual({
 			kind: "refused",
 			reason: "The schedule is paused.",

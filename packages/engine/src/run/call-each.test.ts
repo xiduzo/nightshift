@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	fakeDecider,
@@ -25,6 +25,7 @@ import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
 import type { RunDetail, RunStreamItem, StepSummary } from "../read/views";
+import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -172,13 +173,11 @@ async function saveBody(
 	nodes: Flow["nodes"],
 	edges: FlowEdge[] = [],
 ): Promise<void> {
-	const dir = join(sandbox.repoPath, ".nightshift", "flows");
-	await mkdir(dir, { recursive: true });
 	const flow: FlowInput = {
 		...flowOf(nodes, edges),
 		inputs: [{ name: "item", type: "json", required: true }],
 	};
-	await writeFile(join(dir, `${name}.json`), JSON.stringify(flow));
+	await seedFlows(sandbox.repoPath, { [name]: flow });
 }
 
 /** A command source that prints these items. */
@@ -1436,8 +1435,6 @@ describe("stop modes", () => {
 describe("run inputs", () => {
 	test("inputs reach top-level templates, bindings reach the called flow, defaults apply", async () => {
 		const engine = makeEngine(fakeHarness());
-		const dir = join(sandbox.repoPath, ".nightshift", "flows");
-		await mkdir(dir, { recursive: true });
 		const body: FlowInput = {
 			...flowOf([
 				command("note", `echo "body sees epic {{epic}} for {{item.id}}"`),
@@ -1447,7 +1444,7 @@ describe("run inputs", () => {
 				{ name: "epic", required: true },
 			],
 		};
-		await writeFile(join(dir, "body.json"), JSON.stringify(body));
+		await seedFlows(sandbox.repoPath, { body });
 		const flow = flowOf(
 			[
 				command("hello", `echo "epic {{epic}} model {{model}}"`),

@@ -7,12 +7,28 @@ import type { Flow } from "./document";
 import { singleAgentFlow } from "./document";
 import {
 	deleteFlowFile,
-	listFlowFiles,
-	readFlowFile,
+	flowFilePath,
+	readFlowSources,
 	readProfilesFile,
 	readProfilesSource,
 	writeFlowFile,
 } from "./files";
+import { listFlowSources, loadFlowSource } from "./validate";
+
+/** The flow files of a repo, listed as the engine lists them. */
+async function listFlowFiles(repoPath: string) {
+	return listFlowSources(await readFlowSources(repoPath), (name) =>
+		flowFilePath(repoPath, name),
+	);
+}
+
+/** One flow file, read as the engine reads it. Refuses a name that is not valid. */
+async function readFlowFile(repoPath: string, name: string) {
+	flowFilePath(repoPath, name);
+	return loadFlowSource(await readFlowSources(repoPath), name, (found) =>
+		flowFilePath(repoPath, found),
+	);
+}
 
 /** Where the flow files of a repo live: `.nightshift/flows`. */
 const flowsDir = (repoPath: string) => join(repoPath, ".nightshift", "flows");

@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
+import { seedFlows } from "@nightshift/engine/testing";
 
 import {
 	type Daemon,
@@ -72,20 +73,17 @@ function repo(name: string): string {
 }
 
 /** A flow file in B's Clone: the only copy of the project's flows. */
-function flowOnB(name: string, nodes: unknown[], edges: unknown[] = []) {
-	const dir = join(folderOnB, ".nightshift", "flows");
-	mkdirSync(dir, { recursive: true });
-	writeFileSync(
-		join(dir, `${name}.json`),
-		JSON.stringify({
+async function flowOnB(name: string, nodes: unknown[], edges: unknown[] = []) {
+	await seedFlows(folderOnB, {
+		[name]: {
 			version: 6,
 			inputs: [],
 			outputs: [],
 			start: (nodes[0] as { id: string }).id,
 			nodes,
 			edges,
-		}),
-	);
+		},
+	});
 }
 
 const agentNode = {
@@ -177,7 +175,7 @@ describe("a run placed on another Device", () => {
 			{ deviceId: bId, name: expect.any(String), thisDevice: true },
 		]);
 
-		flowOnB(
+		await flowOnB(
 			"placed",
 			[
 				{
@@ -242,7 +240,7 @@ describe("a run placed on another Device", () => {
 
 	test("a stop on A ends B's session", async () => {
 		writeFileSync(SLEEP_MS, "60000");
-		flowOnB("slow", [agentNode]);
+		await flowOnB("slow", [agentNode]);
 		const before = pids().length;
 		const started = await a.client.runs.start({
 			projectId,
@@ -283,7 +281,7 @@ describe("a run placed on another Device", () => {
 			[now],
 		);
 		db.close();
-		flowOnB("hello", [
+		await flowOnB("hello", [
 			{
 				id: "hi",
 				type: "command",
