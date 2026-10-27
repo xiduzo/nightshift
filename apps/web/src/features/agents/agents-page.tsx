@@ -121,9 +121,7 @@ export function AgentsPage({
 	const firstProfile = agentProfiles?.[0] ?? modelProfiles?.[0];
 	const selection =
 		parseItem(item) ??
-		(firstProfile
-			? { kind: "profile" as const, name: firstProfile.name }
-			: null);
+		(firstProfile ? { kind: "profile" as const, id: firstProfile.id } : null);
 	const isSel = (s: Selection) =>
 		selection !== null && itemOf(selection) === itemOf(s);
 
@@ -215,11 +213,9 @@ export function AgentsPage({
 									) : (
 										(agentProfiles ?? []).map((p) => (
 											<ListItem
-												key={p.name}
-												selected={isSel({ kind: "profile", name: p.name })}
-												onClick={() =>
-													select({ kind: "profile", name: p.name })
-												}
+												key={p.id}
+												selected={isSel({ kind: "profile", id: p.id })}
+												onClick={() => select({ kind: "profile", id: p.id })}
 												title={<span className="font-mono">{p.name}</span>}
 												description={`${harnessInfo(p.harness).label} · ${p.model}`}
 												aside={<UsedIn usedBy={p.usedBy} />}
@@ -249,11 +245,9 @@ export function AgentsPage({
 									) : (
 										(modelProfiles ?? []).map((p) => (
 											<ListItem
-												key={p.name}
-												selected={isSel({ kind: "profile", name: p.name })}
-												onClick={() =>
-													select({ kind: "profile", name: p.name })
-												}
+												key={p.id}
+												selected={isSel({ kind: "profile", id: p.id })}
+												onClick={() => select({ kind: "profile", id: p.id })}
 												title={<span className="font-mono">{p.name}</span>}
 												description={`${deciderLabel(p.decider)} · ${p.model ?? "default model"}`}
 												aside={<UsedIn usedBy={p.usedBy} />}

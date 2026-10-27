@@ -96,7 +96,8 @@ export function createOffers(deps: {
 		},
 
 		async make(input, by) {
-			const profile = deps.profiles.get(input.profile);
+			// An Offer names a profile by its name.
+			const profile = deps.profiles.byName(input.profile);
 			if (!profile) {
 				throw new Refusal(
 					"conflict",

@@ -64,11 +64,11 @@ import { harnessQueries, profileMutations, profileQueries } from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
-type Draft = Omit<AgentProfileInput, "previousName" | "clis" | "connections"> &
+type Draft = Omit<AgentProfileInput, "id" | "clis" | "connections"> &
 	Required<Pick<AgentProfileInput, "clis" | "connections">>;
 
 function draftFrom(profile: AgentProfileRow): Draft {
-	const { usedBy: _usedBy, updatedAt: _at, ...rest } = profile;
+	const { id: _id, usedBy: _usedBy, updatedAt: _at, ...rest } = profile;
 	return { ...rest, description: rest.description ?? "" };
 }
 
@@ -126,7 +126,8 @@ export function ProfileDetail({
 	harnesses: HarnessRow[];
 	cliTools: CliTool[];
 	connections: Connection[];
-	onSaved: (name: string) => void;
+	/** Gets the saved profile's id. */
+	onSaved: (id: string) => void;
 	onDeleted: () => void;
 	onCancelNew: () => void;
 	/** Unsaved changes, so the page can ask before it shows something else. */
@@ -159,7 +160,7 @@ export function ProfileDetail({
 				void queryClient.invalidateQueries({
 					queryKey: harnessQueries.lists(),
 				});
-				onSaved(next.name);
+				onSaved(next.id);
 			},
 		}),
 	);
@@ -178,8 +179,9 @@ export function ProfileDetail({
 	const usedBy = profile?.usedBy ?? [];
 	const nodeCount = usedBy.reduce((n, use) => n + use.nodeIds.length, 0);
 	const nameInvalid = name !== "" && !NAME.test(name);
-	const nameTaken =
-		name !== profile?.name && profiles.some((p) => p.name === name);
+	const nameTaken = profiles.some(
+		(p) => p.name === name && p.id !== profile?.id,
+	);
 	const dirty = !same(draft, saved);
 	useEffect(() => {
 		onDirtyChange(dirty);
@@ -236,7 +238,7 @@ export function ProfileDetail({
 						name,
 						description: draft.description?.trim() || undefined,
 						model: draft.model.trim(),
-						previousName: profile?.name,
+						id: profile?.id,
 					}),
 				onDiscard: () => (profile ? setDraft(saved) : onCancelNew()),
 			}}
@@ -521,7 +523,7 @@ export function ProfileDetail({
 						<AlertDialogAction
 							variant="destructive"
 							disabled={remove.isPending}
-							onClick={() => profile && remove.mutate({ name: profile.name })}
+							onClick={() => profile && remove.mutate({ id: profile.id })}
 						>
 							Delete
 						</AlertDialogAction>

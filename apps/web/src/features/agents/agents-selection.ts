@@ -2,9 +2,9 @@
 import type { HarnessRowName } from "@/shared/api";
 import { isHarnessName } from "./harnesses";
 
-/** What the detail pane shows, as it sits in the URL (`?item=profile:builder`). */
+/** What the detail pane shows, as it sits in the URL (`?item=profile:<id>`). */
 export type Selection =
-	| { kind: "profile"; name: string }
+	| { kind: "profile"; id: string }
 	| { kind: "new-profile" }
 	| { kind: "new-model-profile" }
 	| { kind: "harness"; name: HarnessRowName }
@@ -20,7 +20,7 @@ export function parseItem(item: string | undefined): Selection | null {
 	const name = colon === -1 ? "" : item.slice(colon + 1);
 	switch (kind) {
 		case "profile":
-			return name ? { kind, name } : null;
+			return name ? { kind, id: name } : null;
 		case "harness":
 			return isHarnessName(name) ? { kind, name } : null;
 		case "tool":
@@ -36,6 +36,7 @@ export function parseItem(item: string | undefined): Selection | null {
 }
 
 export function itemOf(selection: Selection): string {
+	if ("id" in selection) return `${selection.kind}:${selection.id}`;
 	return "name" in selection
 		? `${selection.kind}:${selection.name}`
 		: selection.kind;

@@ -157,7 +157,8 @@ describe("the Device document", () => {
 		expect(again.settings.current().agentModel).toBe("opus");
 		expect([...again.cliTools.names()]).toEqual(["gh"]);
 		expect([...again.connections.names()]).toEqual(["docs"]);
-		expect(again.profiles.settingsFor("reviewer")).toMatchObject({
+		const reviewer = again.profiles.byName("reviewer");
+		expect(reviewer && again.profiles.settingsFor(reviewer.id)).toMatchObject({
 			harness: "codex",
 			connections: ["docs"],
 		});

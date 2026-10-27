@@ -47,36 +47,40 @@ export function customAgentOf(
 }
 
 /**
- * Adds a profile, or changes or renames one (`previousName`). Refused when
- * the name is taken, when flows use the old name of a rename, or when an
- * Agent Profile names a connection or a CLI tool that does not exist.
+ * Adds a profile, or changes or renames the one of `id`. A rename changes
+ * the name only: the id stays. Refused when the name is taken, when the
+ * profile of `id` is gone, when flows use the old name of a rename, or
+ * when an Agent Profile names a connection or a CLI tool that does not
+ * exist.
  */
 export async function saveProfile(
 	stores: Pick<ConfigStores, "connections" | "cliTools" | "profiles">,
 	profile: Profile,
 	options: {
-		previousName?: string;
+		id?: string;
 		/** The flows that name a profile, read only for a rename. */
 		flowsUsing(name: string): Promise<readonly { flowName: string }[]>;
 	},
 ): Promise<ProfileView> {
-	const { previousName } = options;
-	const renamed = previousName !== undefined && previousName !== profile.name;
-	if (
-		(previousName === undefined || renamed) &&
-		stores.profiles.get(profile.name)
-	) {
+	const { id } = options;
+	const current = id === undefined ? null : stores.profiles.get(id);
+	if (id !== undefined && !current) {
+		throw new Refusal("not-found", "This profile was removed. Add it again.");
+	}
+	const taken = stores.profiles.byName(profile.name);
+	if (taken && taken.id !== id) {
 		throw new Refusal(
 			"conflict",
 			`A profile named "${profile.name}" already exists. Pick another name.`,
 		);
 	}
-	if (renamed) {
-		const use = await options.flowsUsing(previousName);
+	// Flows name a profile by its name, so a rename would cut them off.
+	if (current && current.name !== profile.name) {
+		const use = await options.flowsUsing(current.name);
 		if (use.length > 0) {
 			throw new Refusal(
 				"conflict",
-				`The flows ${use.map((u) => u.flowName).join(", ")} use "${previousName}". Change it there first, or keep the name.`,
+				`The flows ${use.map((u) => u.flowName).join(", ")} use "${current.name}". Change it there first, or keep the name.`,
 			);
 		}
 	}
@@ -98,9 +102,7 @@ export async function saveProfile(
 			`There is no CLI tool named ${unknownClis.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 		);
 	}
-	const saved = await stores.profiles.save(profile);
-	if (renamed) await stores.profiles.remove(previousName);
-	return saved;
+	return stores.profiles.save(profile, id);
 }
 
 /** Saves every Agent Profile that `pick` changes, in the order of the list. */
@@ -112,8 +114,8 @@ async function rewriteProfiles(
 		if (!isAgentProfile(p)) continue;
 		const change = pick(p);
 		if (!change) continue;
-		const { updatedAt: _at, ...profile } = p;
-		await profiles.save({ ...profile, ...change });
+		const { id, updatedAt: _at, ...profile } = p;
+		await profiles.save({ ...profile, ...change }, id);
 	}
 }
 

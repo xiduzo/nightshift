@@ -10,13 +10,14 @@ import {
 	projectProfilesSchema,
 } from "./schemas";
 
-/** The name a profile had, when an edit renames it. */
-const renamed = { previousName: z.string().optional() };
+/** The profile an edit changes; a new profile has none. */
+const edited = { id: z.string().min(1).optional() };
 
 /**
  * Profiles: an Agent Profile (a harness, a model and its tools) for Agent
  * nodes, or a Model Profile (a decider and its model) for Decisions and
- * Values decided by a model, under one name.
+ * Values decided by a model. Each has an id that never changes, and a name
+ * that flows use.
  */
 export const profiles = {
 	list: ownerProcedure
@@ -37,14 +38,14 @@ export const profiles = {
 		.output(output(profileViewSchema))
 		.input(
 			z.union([
-				agentProfileSchema.extend(renamed),
-				modelProfileSchema.extend(renamed),
+				agentProfileSchema.extend(edited),
+				modelProfileSchema.extend(edited),
 			]),
 		)
 		.handler(({ context, input }) => {
-			const { previousName, ...profile } = input;
+			const { id, ...profile } = input;
 			return saveProfile(context, profile, {
-				previousName,
+				...(id !== undefined ? { id } : {}),
 				flowsUsing: async (name) =>
 					(await context.space.flowUse()).profiles.get(name) ?? [],
 			});
@@ -66,7 +67,7 @@ export const profiles = {
 			return {
 				profiles: read.profiles.map((p) => ({
 					...p,
-					overridden: context.profiles.get(p.name) !== null,
+					overridden: context.profiles.byName(p.name) !== null,
 				})),
 				issues: read.issues,
 			};
@@ -78,6 +79,6 @@ export const profiles = {
 				"Removes a profile. Flows that name it do not start until they name another.",
 		})
 		.output(output(z.void()))
-		.input(z.object({ name: z.string() }))
-		.handler(({ context, input }) => context.profiles.remove(input.name)),
+		.input(z.object({ id: z.string() }))
+		.handler(({ context, input }) => context.profiles.remove(input.id)),
 };

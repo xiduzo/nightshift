@@ -212,7 +212,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			device: local,
 			dataDir: deps.dataDir,
 			settings: () => deps.settings.run(),
-			profileFor: (name) => deps.profiles.settingsFor(name),
+			// A flow names a profile by its name.
+			profileFor: (name) => {
+				const profile = deps.profiles.byName(name);
+				return profile ? deps.profiles.settingsFor(profile.id) : null;
+			},
 			spaceDocuments: deps.spaces,
 			scheduler: deps.scheduler,
 			...(deps.secret ? { secret: deps.secret } : {}),
