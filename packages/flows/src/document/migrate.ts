@@ -37,7 +37,6 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
  *   now on (a fan-out). Before, the first one won and the others were never
  *   taken: those others go (`dropShadowedEdges`).
  *
-
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
