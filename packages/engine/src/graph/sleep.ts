@@ -232,8 +232,12 @@ export async function sleep(
 		until = plan.until;
 		message = plan.message;
 	} else if (request.kind === "device") {
-		// It looks again in a while; the Device coming back wakes it sooner.
-		until = now + DEVICE_RETRY_MINUTES * ctx.minuteMs;
+		// It looks again in a while, and at the stop time at the latest:
+		// that wake ends the step stopped. The Device coming back wakes it
+		// sooner.
+		const stopAt = stopAtOf(state, config);
+		const retry = now + DEVICE_RETRY_MINUTES * ctx.minuteMs;
+		until = stopAt === null ? retry : Math.min(retry, stopAt);
 		message = `${request.name} is offline. The step starts when it is back.`;
 	} else {
 		until = cutToDeadline(request.until, request.deadline);

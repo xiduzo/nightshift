@@ -254,6 +254,12 @@ export type PlacedDevice = {
 	 * capabilities are its owner's.
 	 */
 	offered?: OfferedPlacement;
+	/**
+	 * It is offline now (a node's Device, never the run's): its steps wait
+	 * for it, up to the stop time. The start asks it nothing: it checks
+	 * each call itself when it is back.
+	 */
+	offline?: boolean;
 };
 
 /** What a run start knows of the Offers of the Device it places a run of another Person on. */

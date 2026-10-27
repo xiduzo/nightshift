@@ -21,6 +21,7 @@ import {
 	mustGit,
 	type Sandbox,
 	seedFlows,
+	sleepClock,
 	testDevice,
 	waitFor,
 } from "@nightshift/engine/testing";
@@ -531,6 +532,78 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		const run = await until(started.id, "finished");
 		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
 	}, 20_000);
+
+	test("a node whose Device is offline at the start: the run starts, the step waits, and continues when it is back", async () => {
+		await shareRemote();
+		online.delete(B);
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					command("first", "true"),
+					{ ...command("ask", "echo from B"), device: "studio-b" },
+				] as Flow["nodes"],
+				[{ id: "e1", from: "first", outcome: "pass", to: "ask" }],
+			),
+			startedBy: personId,
+		});
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps[1]?.nodeId).toBe("ask");
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+	}, 20_000);
+
+	test("a node whose Device stays offline waits up to the stop time, then the step stops", async () => {
+		await shareRemote();
+		const clock = sleepClock();
+		lifetime.abort();
+		await engine.dispose();
+		engine = peerEngine({ minuteMs: 50, now: clock.now });
+		online.delete(B);
+		// Two retries a minute apart, then the stop time half a minute later.
+		const stopAt = clock.now() + 125;
+		const started = await space().startRun({
+			projectId,
+			flow: flow([
+				{ ...command("ask", "echo from B"), device: "studio-b" },
+			] as Flow["nodes"]),
+			startedBy: personId,
+			stopAt,
+		});
+		const run = await clock.follow(space(), started.id);
+		expect(run.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["ask", "stopped"],
+		]);
+		const wakes = (await a.db.select().from(event))
+			.filter((e) => e.type === "WaitStarted")
+			.map((e) => JSON.parse(e.payload).until);
+		expect(wakes).toEqual([stopAt - 75, stopAt - 25, stopAt]);
+	}, 20_000);
+
+	test("a profile on a node's Device that is offline cannot be found: the run does not start", async () => {
+		await shareRemote();
+		online.delete(B);
+		await expect(
+			space().startRun({
+				projectId,
+				flow: flow([
+					{
+						id: "work",
+						type: "agent",
+						position: { x: 0, y: 0 },
+						prompt: "Do the work.",
+						profile: "everywhere_but_here",
+						device: "studio-b",
+					},
+				] as Flow["nodes"]),
+				startedBy: personId,
+			}),
+		).rejects.toThrow(
+			'studio-b is offline, so Night Shift cannot find its profile "everywhere_but_here" (work). Start the run when it is online.',
+		);
+	});
 
 	test("a node may not name a device its starter does not have", async () => {
 		await shareRemote();

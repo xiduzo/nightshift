@@ -29,6 +29,7 @@ function at(
 		profiles?: string[];
 		/** The profiles of the project's file in its Clone, by name. */
 		projectProfiles?: string[];
+		offline?: boolean;
 	} = {},
 ): PlacedDevice {
 	const profiles = options.profiles ?? [];
@@ -46,13 +47,16 @@ function at(
 				})),
 			},
 		}),
-		capabilities: async (query: { profiles?: string[] }) => ({
-			profiles: Object.fromEntries(
-				(query.profiles ?? [])
-					.filter((name) => profiles.includes(name))
-					.map((name) => [name, PROFILE]),
-			),
-		}),
+		capabilities: async (query: { profiles?: string[] }) => {
+			if (options.offline) throw new Error(`${id} is offline.`);
+			return {
+				profiles: Object.fromEntries(
+					(query.profiles ?? [])
+						.filter((name) => profiles.includes(name))
+						.map((name) => [name, PROFILE]),
+				),
+			};
+		},
 	} as unknown as Device;
 	return {
 		device,
@@ -60,6 +64,7 @@ function at(
 		name: id,
 		thisDevice: options.thisDevice ?? false,
 		hasClone: options.hasClone ?? true,
+		...(options.offline ? { offline: true } : {}),
 	};
 }
 
@@ -180,6 +185,43 @@ describe("the node walk of a run's plan", () => {
 			{ id: "own", model: "sonnet" },
 			{ id: "project", model: "from-project" },
 		]);
+	});
+
+	test("a node's Device that is offline is not asked: a profile of the project runs there, any other is refused", async () => {
+		const away = at("away", { offline: true });
+		const offline: PlanDevices = {
+			...devices(),
+			byId: async () => at("studio", { projectProfiles: ["shared"] }),
+			byName: async (name) => (name === "away" ? away : null),
+		};
+		const onAway = (id: string, profile: string) =>
+			({ ...profiled(id, profile), device: "away" }) as FlowNode;
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "studio",
+				flow: flow([command("plain", "away"), onAway("work", "shared")]),
+			},
+			offline,
+			"the-person",
+		);
+		expect(planned.groups.map((g) => [g.at.id, g.at.offline])).toEqual([
+			["away", true],
+		]);
+		expect(planned.flow.nodes[1]).toMatchObject({ model: "from-project" });
+		await expect(
+			planNodes(
+				{
+					projectId: "p",
+					deviceId: "studio",
+					flow: flow([onAway("work", "own")]),
+				},
+				offline,
+				"the-person",
+			),
+		).rejects.toThrow(
+			'away is offline, so Night Shift cannot find its profile "own" (work). Start the run when it is online.',
+		);
 	});
 
 	test("refuses a Device nobody can reach, a name nobody has, and a run's Device without the project", async () => {
