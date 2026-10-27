@@ -16,6 +16,7 @@ import {
 	type StepOutcome,
 	scopeKey,
 	type TranscriptEntry,
+	type WaitReason,
 } from "../log";
 import { addCost, type CostTally, NO_COST, sessionCost } from "./cost";
 import {
@@ -146,6 +147,8 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		result: state.result,
 		wakeAt: sleep?.until ?? null,
 		signal: sleep?.signal ?? null,
+		/** What the run sleeps for. Only `RunHere` carries it, not the summary. */
+		waitReason: sleep?.reason ?? null,
 		inputs: deriveInputs(events),
 		stopAt: deriveStopAt(events),
 		stopAfterStep: open && deriveStopAfterStep(events),
@@ -170,6 +173,8 @@ export type RunHere = {
 	id: string;
 	status: RunStatus;
 	wakeAt: number | null;
+	/** What a sleeping run waits for: a time, the network, an offline Device. Null while it does not sleep. */
+	waitReason: WaitReason | null;
 	/** This computer walks it. */
 	walkedHere: boolean;
 	/** Its steps run on this computer (its Device, as its row says). */
@@ -220,7 +225,7 @@ export function toSummary(
 	walker: RunWalker,
 	device: RunDevice = walker,
 ): RunSummary {
-	const { calls, ...rest } = facts;
+	const { calls, waitReason: _, ...rest } = facts;
 	return {
 		id: row.id,
 		projectId: row.projectId,
@@ -743,6 +748,7 @@ export function createReadModel(deps: ReadModelDeps) {
 			id: runId,
 			status: facts.status,
 			wakeAt: facts.wakeAt,
+			waitReason: facts.waitReason,
 			walkedHere: here(row.walkerId),
 			stepsHere: here(runDeviceId(row)),
 		};

@@ -141,10 +141,35 @@ describe("the read model", () => {
 			id: "r1",
 			status: "running",
 			wakeAt: null,
+			waitReason: null,
 			walkedHere: true,
 			stepsHere: true,
 		});
 		expect(await reads.runHere("missing")).toBeNull();
+	});
+
+	test("a run that sleeps for an offline Device says so, and its summary does not", async () => {
+		await log.append(stepStarted("s1"));
+		await log.append({
+			type: "WaitStarted",
+			runId: "r1",
+			stepId: "s1",
+			payload: {
+				reason: "device-offline",
+				until: 60_000,
+				message: "studio-mac is offline. The step starts when it is back.",
+				since: 0,
+				deviceId: "device-2",
+				deviceName: "studio-mac",
+			},
+		});
+		expect(await reads.runHere("r1")).toMatchObject({
+			status: "sleeping",
+			wakeAt: 60_000,
+			waitReason: "device-offline",
+		});
+		const detail = await reads.getRun(await getRunRow(sandbox.db, "r1"));
+		expect(detail).not.toHaveProperty("waitReason");
 	});
 
 	test("a run list pages by limit and cursor, newest first", async () => {

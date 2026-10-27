@@ -1,4 +1,4 @@
-import type { Engine, RunSummary } from "@nightshift/engine";
+import type { Engine, RunHere } from "@nightshift/engine";
 
 import type { SleepHold, SleepLock } from "./sleep-lock";
 
@@ -10,14 +10,19 @@ import type { SleepHold, SleepLock } from "./sleep-lock";
  * A run needs this computer while it runs, or sleeps until a timer (a
  * usage limit, a network failure, a Wait with a timeout), and this
  * computer walks it or runs its steps. A run that waits for a person at a
- * Gate, or for a signal with no timeout, does not keep it awake.
+ * Gate, for a signal with no timeout, or for another Device that is
+ * offline, does not keep it awake: the Device that comes back wakes the
+ * step, and a computer that sleeps meanwhile wakes for nothing.
  *
  * It follows the runs only while the setting is on (and the OS has a
  * sleep lock): with it off, a landed event costs nothing here.
  */
 
 /** What decides whether a run needs this computer. */
-export type RunFacts = Pick<RunSummary, "id" | "status" | "wakeAt"> & {
+export type RunFacts = Pick<
+	RunHere,
+	"id" | "status" | "wakeAt" | "waitReason"
+> & {
 	walker: { thisDevice: boolean };
 	device: { thisDevice: boolean };
 };
@@ -36,7 +41,28 @@ export function needsThisComputer(run: RunFacts): boolean {
 	const here = run.walker.thisDevice || run.device.thisDevice;
 	if (!here) return false;
 	if (run.status === "running") return true;
-	return run.status === "sleeping" && run.wakeAt !== null;
+	return (
+		run.status === "sleeping" &&
+		run.wakeAt !== null &&
+		run.waitReason !== "device-offline"
+	);
+}
+
+/** One run, from one row and the facts the run log keeps, not the run page. */
+async function runFactsOf(
+	engine: Pick<Engine, "runHere">,
+	runId: string,
+): Promise<RunFacts | null> {
+	const here = await engine.runHere(runId).catch(() => null);
+	if (!here) return null;
+	return {
+		id: here.id,
+		status: here.status,
+		wakeAt: here.wakeAt,
+		waitReason: here.waitReason,
+		walker: { thisDevice: here.walkedHere },
+		device: { thisDevice: here.stepsHere },
+	};
 }
 
 /** The engine's runs, in every Space of this Replica. */
@@ -53,23 +79,17 @@ export function engineRunSource(
 				);
 				if (runIds.size > 0) listener([...runIds]);
 			}),
-		async run(runId) {
-			// One row and the facts the run log keeps, not the run page.
-			const here = await engine.runHere(runId).catch(() => null);
-			if (!here) return null;
-			return {
-				id: here.id,
-				status: here.status,
-				wakeAt: here.wakeAt,
-				walker: { thisDevice: here.walkedHere },
-				device: { thisDevice: here.stepsHere },
-			};
-		},
+		run: (runId) => runFactsOf(engine, runId),
 		async openRuns() {
 			const out: RunFacts[] = [];
 			for (const spaceId of await spaces()) {
 				const runs = await engine.space(spaceId).listRuns();
-				out.push(...runs.filter((run) => run.endedAt === null));
+				for (const run of runs) {
+					if (run.endedAt !== null) continue;
+					// The summary does not say what a sleeping run waits for.
+					const facts = await runFactsOf(engine, run.id);
+					if (facts) out.push(facts);
+				}
 			}
 			return out;
 		},
