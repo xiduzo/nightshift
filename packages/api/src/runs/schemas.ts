@@ -11,6 +11,7 @@ import type {
 import { flowSchema, outcomeColorSchema } from "@nightshift/flows";
 import { z } from "zod";
 
+import { deviceProfileSchema } from "../config";
 import { exact } from "../output";
 
 /**
@@ -440,7 +441,11 @@ export const placementSchema = exact<Placement>()(
 
 /** One of the Person's Devices, with whether it is online and has a Clone. */
 export const ownDeviceSchema = exact<OwnDevice>()(
-	placementSchema.extend({ online: z.boolean(), hasClone: z.boolean() }),
+	placementSchema.extend({
+		online: z.boolean(),
+		hasClone: z.boolean(),
+		profiles: z.array(deviceProfileSchema).optional(),
+	}),
 );
 
 /** A file a run's agent kept for the person. */

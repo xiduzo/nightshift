@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import {
 	type Actor,
 	type Device,
+	type DeviceProfile,
 	HostUnreachableError,
 	type ListedProject,
 	NOT_ON_THIS_COMPUTER,
@@ -19,6 +20,7 @@ import {
 	type RunLog,
 	type RunRow,
 	type SpaceDocuments,
+	storedDeviceProfiles,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
 import type { FlowNode, FlowSources, ProfileSettings } from "@nightshift/flows";
@@ -82,11 +84,21 @@ export type PlacementDeps = {
 	localFor?(row: RunRow): Device;
 	/** This computer's own Offers into a Space that are in force. Default: none. */
 	offersHere?(spaceId: string): Promise<DeviceOffer[]>;
+	/** This computer's profiles, for its owner. Default: unknown. */
+	ownProfiles?(): readonly DeviceProfile[];
 	/** Whether a Person's role in a Space uses Offers. Default: nobody's. */
 	mayUseOffers?(spaceId: string, personId: string): Promise<boolean>;
 };
 
 export type PlacementModule = ReturnType<typeof createPlacement>;
+
+/** An offered profile as a Person picks it: only an Agent Profile is offered. */
+function offeredChoice(offer: {
+	profile: string;
+	profileName: string;
+}): DeviceProfile {
+	return { id: offer.profile, name: offer.profileName, kind: "agent" };
+}
 
 /** A work relay that reaches nobody. */
 const UNREACHABLE: WorkRelay = {
@@ -199,6 +211,7 @@ export function createPlacement(deps: PlacementDeps) {
 			thisDevice: true,
 			online: true,
 			hasClone: project.repoPath !== null,
+			...(deps.ownProfiles ? { profiles: [...deps.ownProfiles()] } : {}),
 		};
 		if ((await hostSpaces.hostOf(spaceId)) !== null) {
 			// The Host cannot be reached: the list shows this computer only.
@@ -225,12 +238,15 @@ export function createPlacement(deps: PlacementDeps) {
 		const own: OwnDevice[] = [];
 		for (const d of await registry.list(personId)) {
 			if (d.revokedAt !== null || d.id === self) continue;
+			// Known only when this Replica keeps a copy of its Device document.
+			const profiles = await storedDeviceProfiles(db, d.id);
 			own.push({
 				deviceId: d.id,
 				name: d.name,
 				thisDevice: false,
 				online: await work.online(d.id, spaceId),
 				hasClone: withClone.has(d.id),
+				...(profiles ? { profiles } : {}),
 			});
 		}
 		return [here, ...own];
@@ -255,20 +271,25 @@ export function createPlacement(deps: PlacementDeps) {
 		);
 		const mine = new Set(own.map((d) => d.deviceId));
 		const self = await deps.log.walkerId();
-		const byDevice = new Map<string, { name: string; offers: string[] }>();
+		const byDevice = new Map<
+			string,
+			{ name: string; offers: string[]; profiles: DeviceProfile[] }
+		>();
 		for (const offer of spaceOffers(document)) {
 			if (offer.deviceId === self || offer.deviceId === device.id) continue;
 			if (mine.has(offer.deviceId)) continue;
 			const entry = byDevice.get(offer.deviceId) ?? {
 				name: offer.deviceName,
 				offers: [],
+				profiles: [],
 			};
 			// A flow names a profile by its name.
 			entry.offers.push(offer.profileName);
+			entry.profiles.push(offeredChoice(offer));
 			byDevice.set(offer.deviceId, entry);
 		}
 		const others: OwnDevice[] = [];
-		for (const [id, { name, offers }] of byDevice) {
+		for (const [id, { name, offers, profiles }] of byDevice) {
 			const paired = await registry.get(id);
 			if (
 				paired &&
@@ -281,6 +302,7 @@ export function createPlacement(deps: PlacementDeps) {
 				name: paired?.name ?? name,
 				thisDevice: false,
 				offers,
+				profiles,
 				online: await work.online(id, spaceId),
 				hasClone: withClone.has(id),
 			});
@@ -306,14 +328,15 @@ export function createPlacement(deps: PlacementDeps) {
 		// In a Host's Space, this computer's Person is the one who asks here.
 		const owner = await ownerHere(spaceId);
 		const asking = await personInSpace(db, spaceId, personId);
+		const offeredHere =
+			owner === asking ? [] : ((await deps.offersHere?.(spaceId)) ?? []);
 		const thisOne: OwnDevice =
 			owner === asking
 				? here
 				: {
 						...here,
-						offers: ((await deps.offersHere?.(spaceId)) ?? []).map(
-							(o) => o.profileName,
-						),
+						offers: offeredHere.map((o) => o.profileName),
+						profiles: offeredHere.map(offeredChoice),
 					};
 		const all = [
 			thisOne,

@@ -12,6 +12,7 @@ import {
 	type CliTool,
 	type Connection,
 	cliToolGitSchema,
+	type DeviceProfile,
 	type FlowRef,
 	type ProfileView,
 	type SecretSource,
@@ -288,6 +289,32 @@ export const profileViewSchema = exact<ProfileView>()(
 		agentProfileSchema.extend({ id: z.string(), updatedAt: z.number() }),
 		modelProfileSchema.extend({ id: z.string(), updatedAt: z.number() }),
 	]),
+);
+
+/** A profile of a Device, as a Person picks it for a node. */
+export const deviceProfileSchema = exact<DeviceProfile>()(
+	z.object({
+		id: z.string(),
+		name: z.string(),
+		kind: z.enum(["agent", "model"]),
+	}),
+);
+
+/**
+ * The profiles a flow of a project can use, by Device: every profile of
+ * the Person's own Devices, the offered ones of other Persons' Devices.
+ * `profiles` is null when this computer cannot tell yet.
+ */
+export const profileCatalogSchema = z.array(
+	z.object({
+		deviceId: z.string(),
+		name: z.string(),
+		thisDevice: z.boolean(),
+		/** One of the Person's own Devices; else another Person's, through its Offers. */
+		mine: z.boolean(),
+		online: z.boolean(),
+		profiles: z.array(deviceProfileSchema).nullable(),
+	}),
 );
 
 const profileUse = {

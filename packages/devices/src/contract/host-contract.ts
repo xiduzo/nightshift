@@ -142,6 +142,15 @@ const ownDeviceSchema = exact<OwnDevice>()(
 		offers: z.array(z.string()).optional(),
 		online: z.boolean(),
 		hasClone: z.boolean(),
+		profiles: z
+			.array(
+				z.object({
+					id: z.string(),
+					name: z.string(),
+					kind: z.enum(["agent", "model"]),
+				}),
+			)
+			.optional(),
 	}),
 );
 

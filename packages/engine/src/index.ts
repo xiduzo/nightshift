@@ -14,6 +14,7 @@ export type { RunCopies, RunCopy } from "./cleanup";
 export type {
 	Actor,
 	DeviceDirectory,
+	DeviceProfile,
 	NodeToPlace,
 	OwnDevice,
 	Placement,
@@ -76,6 +77,7 @@ export {
 	openDeviceDocument,
 	type ProfileStore,
 	type ProfileView,
+	profileChoice,
 	programOf,
 	refreshDeviceFacts,
 	removeCliTool,
@@ -93,6 +95,7 @@ export {
 	secretStore,
 	settingsPatchSchema,
 	settingsSchema,
+	storedDeviceProfiles,
 	valueStore,
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";

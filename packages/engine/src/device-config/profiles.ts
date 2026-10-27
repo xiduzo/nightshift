@@ -1,14 +1,22 @@
 import { randomUUID } from "node:crypto";
+import type { Database } from "@nightshift/db";
 import {
+	isAgentProfile,
 	migrateToolSets,
 	type Profile,
 	type ProfileSettings,
 	profileSchema,
 	profileSettingsSchema,
 } from "@nightshift/flows";
+import * as Y from "yjs";
 import { z } from "zod";
-
-import { type DeviceDocument, mapView } from "./device-document";
+import type { DeviceProfile } from "../contract";
+import {
+	type DeviceDocument,
+	deviceDocumentName,
+	mapView,
+} from "./device-document";
+import { documentRows } from "./ydoc";
 
 /**
  * Profiles: an Agent Profile (a harness, a model and its tools) or a Model
@@ -54,33 +62,69 @@ function newProfileId(): string {
 	return `p-${randomUUID()}`;
 }
 
+/** The profiles of a Device document's `profiles` map, by id. */
+function readProfiles(entries: Y.Map<unknown>): Map<string, ProfileView> {
+	const out = new Map<string, ProfileView>();
+	for (const [id, value] of entries.entries()) {
+		const entry = entrySchema.safeParse(value);
+		if (!entry.success) continue;
+		// A profile saved with the GitHub tool set reads as one with `gh`.
+		const parsed = profileSettingsSchema.safeParse(
+			migrateToolSets(entry.data.settings),
+		);
+		// An entry this version cannot read stays in the document, unused.
+		if (!parsed.success) continue;
+		out.set(id, {
+			...parsed.data,
+			id,
+			name: entry.data.name ?? id,
+			...(entry.data.description
+				? { description: entry.data.description }
+				: {}),
+			updatedAt: entry.data.updatedAt,
+		});
+	}
+	return out;
+}
+
+/**
+ * The profiles in this Replica's copy of another Device's document, as
+ * a Person picks them: a Host keeps the copies of the Devices whose home
+ * Host it is. Null when this Replica has no copy.
+ */
+export async function storedDeviceProfiles(
+	db: Database,
+	deviceId: string,
+): Promise<DeviceProfile[] | null> {
+	const state = await documentRows(db).fetch(deviceDocumentName(deviceId));
+	if (!state) return null;
+	const doc = new Y.Doc();
+	try {
+		Y.applyUpdate(doc, state);
+		return [...readProfiles(doc.getMap("profiles")).values()]
+			.map(profileChoice)
+			.sort((a, b) => a.name.localeCompare(b.name));
+	} finally {
+		doc.destroy();
+	}
+}
+
+/** A profile as a Person picks it for a node. */
+export function profileChoice(profile: ProfileView): DeviceProfile {
+	return {
+		id: profile.id,
+		name: profile.name,
+		kind: isAgentProfile(profile) ? "agent" : "model",
+	};
+}
+
 export function createProfileStore(options: {
 	document: DeviceDocument;
 }): ProfileStore {
 	const { document } = options;
-	const profiles = mapView(document, document.profiles, () => {
-		const out = new Map<string, ProfileView>();
-		for (const [id, value] of document.profiles.entries()) {
-			const entry = entrySchema.safeParse(value);
-			if (!entry.success) continue;
-			// A profile saved with the GitHub tool set reads as one with `gh`.
-			const parsed = profileSettingsSchema.safeParse(
-				migrateToolSets(entry.data.settings),
-			);
-			// An entry this version cannot read stays in the document, unused.
-			if (!parsed.success) continue;
-			out.set(id, {
-				...parsed.data,
-				id,
-				name: entry.data.name ?? id,
-				...(entry.data.description
-					? { description: entry.data.description }
-					: {}),
-				updatedAt: entry.data.updatedAt,
-			});
-		}
-		return out;
-	});
+	const profiles = mapView(document, document.profiles, () =>
+		readProfiles(document.profiles),
+	);
 	const list = () =>
 		[...profiles().values()].sort(
 			(a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),

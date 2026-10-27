@@ -11,6 +11,8 @@ import {
 } from "@nightshift/db/schema";
 import {
 	createSpaceDocuments,
+	deviceDocumentName,
+	documentRows,
 	planOf,
 	type RunStatus,
 	recordClone,
@@ -27,6 +29,7 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
+import * as Y from "yjs";
 import {
 	type WorkRelay,
 	type WorkRequest,
@@ -156,6 +159,12 @@ afterEach(async () => {
 	await Promise.all([a.cleanup(), b.cleanup()]);
 });
 
+/** A's own profiles. */
+const A_PROFILES = [
+	{ id: "everywhere", name: "everywhere", kind: "agent" as const },
+	{ id: "p-model", name: "judge", kind: "model" as const },
+];
+
 /** A's engine. Without `internals`, it fires no schedules. */
 function peerEngine(
 	internals?: Parameters<typeof createPeerEngine>[1],
@@ -169,6 +178,7 @@ function peerEngine(
 			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
 			profileFor: (name) =>
 				name === "everywhere" || name === "here_only" ? PROFILE : null,
+			ownProfiles: () => A_PROFILES,
 			spaceDocuments: documents,
 			work,
 		}),
@@ -792,6 +802,49 @@ describe("a run's plan", () => {
 			"studio-b is offline. Move the run when it is online.",
 		);
 		await space().stopRun(started.id);
+	});
+});
+
+describe("the Space's profiles", () => {
+	test("this computer lists its own profiles, another of the Person's Devices those of its document copy, and another Person's its offered ones", async () => {
+		const devices = () => space().listDevices(projectId);
+		// No copy of B's Device document here: its profiles are unknown.
+		expect((await devices()).map((d) => [d.name, d.profiles])).toEqual([
+			[expect.any(String), A_PROFILES],
+			["studio-b", undefined],
+		]);
+
+		const copy = new Y.Doc();
+		copy.getMap("profiles").set("p-1", {
+			name: "builder",
+			description: null,
+			settings: PROFILE,
+			updatedAt: 1,
+		});
+		await documentRows(a.db).store(
+			deviceDocumentName(B),
+			Y.encodeStateAsUpdate(copy),
+		);
+		const document = await documents.open(a.spaceId);
+		await document.change(() => {
+			document.offers.set("device-c/p-2", {
+				deviceId: "device-c",
+				deviceName: "laptop-c",
+				profile: "p-2",
+				profileName: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+				by: "someone-else",
+			});
+		});
+		expect(
+			(await devices()).map((d) => [d.name, d.offers, d.profiles]),
+		).toEqual([
+			[expect.any(String), undefined, A_PROFILES],
+			["studio-b", undefined, [{ id: "p-1", name: "builder", kind: "agent" }]],
+			["laptop-c", ["coder"], [{ id: "p-2", name: "coder", kind: "agent" }]],
+		]);
 	});
 });
 

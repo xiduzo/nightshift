@@ -11,6 +11,11 @@
 export type { Actor, MemberChange } from "./actor";
 export type { DeviceDirectory } from "./directory";
 export type { OffersPort } from "./offers";
-export type { NodeToPlace, OwnDevice, Placement } from "./placement";
+export type {
+	DeviceProfile,
+	NodeToPlace,
+	OwnDevice,
+	Placement,
+} from "./placement";
 export type { Relay, RunCommandInput, RunCommandKind } from "./relay";
 export { type StartRunInput, startRunInputSchema } from "./start-run";
