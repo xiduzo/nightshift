@@ -2,7 +2,8 @@ import type { PushData, PushRoute, ShownNotification } from "../notifications";
 
 /**
  * Something the person should see now: an item of the notifications
- * stream with `alert`. A Gate opened, a run finished, a run failed.
+ * stream with `alert`. A Gate opened, a run finished, a run failed, a
+ * step waits for a device.
  */
 export type Notice = {
 	/** What a push of the same key carries: what happened, its key, its Space, run and step. */
@@ -33,7 +34,7 @@ export type ListedNotification = ShownNotification & {
 export type ShownNotifications = {
 	/** Shows a notice now. */
 	show(notice: Notice): void | Promise<void>;
-	/** Takes away every notification of the key: its Gate does not wait anymore. */
+	/** Takes away every notification of the key: its Gate or its device wait is over. */
 	close(key: string): void | Promise<void>;
 	/** The notifications this screen shows now. */
 	list(): Promise<readonly ListedNotification[]>;

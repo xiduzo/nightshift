@@ -62,6 +62,11 @@ const EVENTS: {
 		label: "A run failed",
 		description: "A run stopped on an error.",
 	},
+	{
+		key: "deviceWait",
+		label: "A step waits for a device",
+		description: "A run for you waits until an offline device is back.",
+	},
 ];
 
 const SCREENS: {

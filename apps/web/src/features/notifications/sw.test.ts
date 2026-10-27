@@ -26,6 +26,7 @@ const ORIGIN = "https://nightshift.example";
 type Shown = {
 	title: string;
 	tag: string;
+	body?: string;
 	data: { path: string; kind: string; shownAt: number };
 };
 type Tab = {
@@ -119,6 +120,13 @@ const pushes: PushData[] = [
 		stepId: null,
 	},
 	{
+		kind: "device-wait",
+		key: "run-3:wait:build",
+		spaceId: "space-1",
+		runId: "run-3",
+		stepId: "build",
+	},
+	{
 		kind: "gates-waiting",
 		key: "waiting:5",
 		spaceId: null,
@@ -140,6 +148,25 @@ describe("the service worker", () => {
 			expect(one?.data.path).toBe(webPathOf(routeOf(push)));
 			expect(typeof one?.data.shownAt).toBe("number");
 		}
+	});
+
+	test("a step that waits for a device shows its second line, and opens its run", async () => {
+		const sw = worker();
+		await sw.push({
+			type: "show",
+			kind: "device-wait",
+			key: "run-3:wait:build",
+			spaceId: "space-1",
+			runId: "run-3",
+			stepId: "build",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+		});
+		expect(sw.shown[0]).toMatchObject({
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+			data: { path: "/runs/run-3", kind: "device-wait" },
+		});
 	});
 
 	test("an open page finds the notification of a Gate that no longer waits", async () => {
