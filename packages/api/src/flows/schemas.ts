@@ -1,9 +1,11 @@
 import {
+	type FlowExport,
 	type FlowNotice,
 	type FlowRevisionItem,
 	type FlowRevisionView,
 	type KeptValue,
 	revisionKinds,
+	type SavedFlow,
 } from "@nightshift/engine";
 import {
 	type FlowDiff,
@@ -170,4 +172,14 @@ export const flowRevisionViewSchema = exact<FlowRevisionView>()(
 		}),
 		diff: flowDiffSchema.nullable(),
 	}),
+);
+
+/** A flow as a JSON file: the name to save it under, and its contents. */
+export const flowExportSchema = exact<FlowExport>()(
+	z.object({ fileName: z.string(), json: z.string() }),
+);
+
+/** A flow an import or a copy saved: its name there, and its problems. */
+export const savedFlowSchema = exact<SavedFlow>()(
+	z.object({ name: z.string(), issues: z.array(flowIssueSchema) }),
 );

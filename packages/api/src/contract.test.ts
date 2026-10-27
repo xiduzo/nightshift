@@ -322,6 +322,22 @@ describe("replies of a real engine", () => {
 			name: "night",
 			revisionId: oldest,
 		});
+		const exported = (await read(appRouter.flows.export, {
+			projectId,
+			name: "night",
+		})) as { json: string };
+		const imported = (await reply(appRouter.flows.import, {
+			projectId,
+			name: "night",
+			json: exported.json,
+		})) as { name: string };
+		expect(imported.name).toBe("night-2");
+		await reply(appRouter.flows.copy, {
+			projectId,
+			name: "night",
+			toProjectId: projectId,
+			as: "night-copy",
+		});
 
 		// Sections round-trip, and a Section issue names its Section.
 		const sections: Flow["sections"] = [

@@ -319,6 +319,7 @@ export {
 export {
 	calledFlow,
 	callersOf,
+	canonicalFlowJson,
 	type FlowFile,
 	type FlowIssue,
 	type FlowListItem,

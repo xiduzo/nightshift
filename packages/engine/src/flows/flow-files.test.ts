@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { type Flow, flowSchema, singleAgentFlow } from "@nightshift/flows";
+import {
+	FLOW_VERSION,
+	type Flow,
+	flowSchema,
+	singleAgentFlow,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
@@ -173,5 +178,139 @@ describe("the revisions of a flow", () => {
 		expect(
 			(await refusal(files.revisions(SPACE, PROJECT, "other", "ada"))).kind,
 		).toBe("not-found");
+	});
+});
+
+describe("moving a flow between projects", () => {
+	let sandbox: Sandbox;
+	let documents: FlowDocuments;
+	let files: FlowFiles;
+	const OTHER = "other";
+
+	beforeEach(async () => {
+		sandbox = await createSandbox();
+		documents = createFlowDocuments({ db: sandbox.db });
+		files = createFlowFiles({
+			flows: documentProjectFlows({
+				documents,
+				find: async () => ({}),
+				deviceId: "laptop",
+			}),
+		});
+	});
+
+	afterEach(async () => {
+		await documents.close();
+		await sandbox.cleanup();
+	});
+
+	/** A flow whose second node calls the flow `helper`. */
+	function caller(): Flow {
+		const flow = withSecondNode(quick("Fix it"));
+		return {
+			...flow,
+			nodes: [
+				...flow.nodes.filter((node) => node.id !== "check"),
+				{
+					id: "check",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "helper",
+					inputs: {},
+				},
+			],
+		};
+	}
+
+	test("an export is the flow as JSON, which an import in another project saves as a revision of kind import", async () => {
+		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
+		const exported = await files.export(SPACE, PROJECT, "build", "ada");
+		expect(exported.fileName).toBe("build.json");
+		expect(JSON.parse(exported.json)).toMatchObject({ version: FLOW_VERSION });
+
+		const saved = await files.import(
+			SPACE,
+			OTHER,
+			"build",
+			exported.json,
+			"ada",
+		);
+		expect(saved).toEqual({ name: "build", issues: [] });
+		const [revision] = await files.revisions(SPACE, OTHER, "build", "ada");
+		expect(revision).toMatchObject({ kind: "import", person: { id: "ada" } });
+	});
+
+	test("an import of a name the project has gets a suffix", async () => {
+		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
+		const { json } = await files.export(SPACE, PROJECT, "build", "ada");
+		const saved = await files.import(SPACE, PROJECT, "build", json, "ada");
+		expect(saved.name).toBe("build-2");
+		expect(
+			(await files.list(SPACE, PROJECT, "ada")).map((f) => f.name),
+		).toEqual(["build", "build-2"]);
+	});
+
+	test("an import brings a flow of an older format up to date", async () => {
+		const flow = quick("Fix it");
+		const old = JSON.stringify({ ...flow, version: 5 });
+		await files.import(SPACE, PROJECT, "old", old, "ada");
+		const loaded = await files.get(SPACE, PROJECT, "old", "ada");
+		expect(loaded.flow?.version).toBe(FLOW_VERSION);
+	});
+
+	test("refuses a file that is not JSON, not a flow, or from a newer Night Shift", async () => {
+		const newer = JSON.stringify({
+			...quick("Fix it"),
+			version: FLOW_VERSION + 1,
+		});
+		for (const json of ["{", JSON.stringify({ nodes: "none" }), newer]) {
+			const refused = await refusal(
+				files.import(SPACE, PROJECT, "bad", json, "ada"),
+			);
+			expect(refused.kind).toBe("invalid");
+		}
+		expect(
+			(await refusal(files.import(SPACE, PROJECT, "bad", newer, "ada")))
+				.message,
+		).toContain("newer version of Night Shift");
+		expect(await files.list(SPACE, PROJECT, "ada")).toEqual([]);
+	});
+
+	test("a copy into another project leaves the flows it calls behind, and says so", async () => {
+		await files.save(SPACE, PROJECT, "helper", quick("Help"), "ada");
+		await files.save(SPACE, PROJECT, "build", caller(), "ada");
+
+		const copied = await files.copy(
+			SPACE,
+			PROJECT,
+			"build",
+			{ projectId: OTHER, name: "build" },
+			"ada",
+		);
+		expect(copied.name).toBe("build");
+		expect(copied.issues).toContainEqual(
+			expect.objectContaining({ severity: "error", nodeId: "check" }),
+		);
+		expect((await files.list(SPACE, OTHER, "ada")).map((f) => f.name)).toEqual([
+			"build",
+		]);
+		const [revision] = await files.revisions(SPACE, OTHER, "build", "ada");
+		expect(revision?.kind).toBe("copy");
+	});
+
+	test("a copy refuses a name the other project has, and suggests a free one", async () => {
+		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
+		await files.save(SPACE, OTHER, "build", quick("Theirs"), "ada");
+		const refused = await refusal(
+			files.copy(
+				SPACE,
+				PROJECT,
+				"build",
+				{ projectId: OTHER, name: "build" },
+				"ada",
+			),
+		);
+		expect(refused.kind).toBe("conflict");
+		expect(refused.message).toContain('"build-2"');
 	});
 });

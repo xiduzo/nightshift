@@ -105,6 +105,7 @@ export {
 export type {
 	FlowDocument,
 	FlowDocuments,
+	FlowExport,
 	FlowNotice,
 	FlowRef,
 	FlowRevisionItem,
@@ -112,6 +113,7 @@ export type {
 	FlowUse,
 	RevisionKind,
 	RevisionName,
+	SavedFlow,
 } from "./flows";
 export {
 	createFlowDocuments,
