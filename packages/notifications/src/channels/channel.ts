@@ -10,7 +10,9 @@ import type { PushKind, PushTarget } from "../targets";
  *
  * A message carries no content: ids, what happened, and one short sentence
  * for the person ("A Gate waits for you"). A screen asks Night Shift for
- * the rest.
+ * the rest. A device wait names its flow and Device, and when the run
+ * stops waiting: the phone and the browser cannot read that from a
+ * notification.
  */
 
 /**
@@ -34,10 +36,12 @@ export type NotificationMessage = {
 	/** Null for `gates-waiting`, which spans Spaces. */
 	spaceId: string | null;
 	runId: string | null;
-	/** The Gate's step. Null for a run. */
+	/** The Gate's step, or the step that waits for a Device. Null for a run. */
 	stepId: string | null;
 	/** One short sentence for the person. */
 	title: string;
+	/** A second line, for a device wait. Absent: the screen says what fits the kind. */
+	body?: string;
 	/**
 	 * Show it as a notification. False: a screen only updates what it
 	 * shows (another computer notifies for the Space, or the person turned
@@ -92,10 +96,63 @@ export function titleOf(kind: NoticeKind): string {
 			return "A run finished";
 		case "run-failed":
 			return "A run failed";
+		case "device-wait":
+			return "A step waits for a device";
 	}
 }
 
 /** The sentence of the notification at the end of quiet hours. */
 export function gatesWaitingTitle(count: number): string {
 	return count === 1 ? "1 Gate waits for you" : `${count} Gates wait for you`;
+}
+
+/** What one notification says: its sentence, and a second line. */
+export type NoticeWords = { title: string; body?: string };
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * When the run stops, in the Person's time zone: the time of day within a
+ * day ("06:00"), else the day too ("Tue 28 Oct at 06:00").
+ */
+function stopTimeOf(stopAt: number, now: number, timeZone: string): string {
+	// Built from parts: ICU versions put different separators between them.
+	const parts = new Intl.DateTimeFormat("en-GB", {
+		timeZone,
+		weekday: "short",
+		day: "numeric",
+		month: "short",
+		hour: "2-digit",
+		minute: "2-digit",
+		hourCycle: "h23",
+	}).formatToParts(new Date(stopAt));
+	const part = (type: Intl.DateTimeFormatPartTypes) =>
+		parts.find((p) => p.type === type)?.value ?? "";
+	const time = `${part("hour")}:${part("minute")}`;
+	if (stopAt - now < DAY_MS) return time;
+	return `${part("weekday")} ${part("day")} ${part("month")} at ${time}`;
+}
+
+/**
+ * The words of a device wait: "<flow> waits for <device>", and what
+ * happens next. A Device of an older version does not say its name: "a
+ * device".
+ */
+export function deviceWaitWords(wait: {
+	flow: string;
+	device: string | null;
+	stopAt: number | null;
+	timeZone: string;
+	now: number;
+}): NoticeWords {
+	const title = `${wait.flow} waits for ${wait.device ?? "a device"}`;
+	const next = "The step starts when the device is back.";
+	if (wait.stopAt === null || wait.stopAt <= wait.now) {
+		return { title, body: next };
+	}
+	const at = stopTimeOf(wait.stopAt, wait.now, wait.timeZone);
+	return {
+		title,
+		body: `${next} If it is not back by ${at}, the run stops.`,
+	};
 }

@@ -128,3 +128,52 @@ test("a stream from this computer makes the Person active here; one from elsewhe
 	phone.abort();
 	await phoneDone;
 });
+
+test("a device wait that is over reaches the open streams as wait-ended", async () => {
+	const inApp = createInAppChannel({ now: () => 5 });
+	const stop = new AbortController();
+	const got: InAppItem[] = [];
+	const done = (async () => {
+		for await (const item of inApp.watch("ada", stop.signal)) got.push(item);
+	})();
+
+	await inApp.send(
+		{ kind: "in-app", personId: "ada" },
+		{
+			...message,
+			kind: "device-wait",
+			key: "run-1:wait:step-1",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+		},
+	);
+	await inApp.withdraw(
+		{ kind: "in-app", personId: "ada" },
+		"run-1:wait:step-1",
+	);
+	await inApp.withdraw({ kind: "in-app", personId: "ada" }, "run-1:end:3");
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	expect(got).toEqual([
+		{
+			kind: "device-wait",
+			key: "run-1:wait:step-1",
+			spaceId: "space-1",
+			runId: "run-1",
+			stepId: "step-1",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+			alert: true,
+			at: 1,
+		},
+		{
+			kind: "wait-ended",
+			key: "run-1:wait:step-1",
+			runId: "run-1",
+			stepId: "step-1",
+			at: 5,
+		},
+	]);
+	stop.abort();
+	await done;
+});

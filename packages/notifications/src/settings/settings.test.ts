@@ -57,7 +57,12 @@ describe("the settings store", () => {
 		const store = createSettingsStore(db, { timeZone: "Europe/Amsterdam" });
 		expect(await store.get("ada")).toEqual(defaultSettings("Europe/Amsterdam"));
 		expect(defaultSettings("UTC")).toMatchObject({
-			events: { gateOpened: true, runFinished: true, runFailed: true },
+			events: {
+				gateOpened: true,
+				runFinished: true,
+				runFailed: true,
+				deviceWait: true,
+			},
 			quietHours: null,
 			screens: { web: true, expo: true, desktop: true },
 			holdMinutes: 3,
@@ -104,17 +109,18 @@ describe("the settings store", () => {
 			gateOpened: true,
 			runFinished: true,
 			runFailed: true,
+			deviceWait: true,
 		});
 	});
 
-	test("a save of the computer's switches also changes the Person's events", async () => {
+	test("a save of the computer's switches also changes the Person's events, and leaves the device wait alone", async () => {
 		const store = createSettingsStore(db, { timeZone: "UTC" });
 		const switches = {
 			notifyGateOpened: true,
 			notifyRunFinished: false,
 			notifyRunFailed: true,
 		};
-		await store.save("ada", { holdMinutes: 10 });
+		await store.save("ada", { holdMinutes: 10, events: { deviceWait: false } });
 
 		await store.adoptComputerSwitches("ada", {}, switches);
 		expect((await store.get("ada")).events.runFinished).toBe(true);
@@ -129,6 +135,7 @@ describe("the settings store", () => {
 			gateOpened: true,
 			runFinished: false,
 			runFailed: true,
+			deviceWait: false,
 		});
 		expect(after.holdMinutes).toBe(10);
 	});

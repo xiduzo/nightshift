@@ -12,7 +12,7 @@ export const PUSH_CATEGORY = {
 	decide: "gate-decide",
 	/** Any other Gate, and the end of quiet hours: a tap opens the app. */
 	open: "gate-open",
-	/** A run that finished or failed: a tap opens the run. */
+	/** A run that finished or failed, or a step that waits for a Device: a tap opens the run. */
 	run: "run",
 } as const;
 
@@ -31,6 +31,7 @@ export const PUSH_MESSAGE_KINDS = [
 	"gate-opened",
 	"run-finished",
 	"run-failed",
+	"device-wait",
 	"gates-waiting",
 ] as const;
 export type PushMessageKind = (typeof PUSH_MESSAGE_KINDS)[number];
@@ -51,7 +52,7 @@ export type PushData = {
 	/** Null for `gates-waiting`, which spans Spaces. */
 	spaceId: string | null;
 	runId: string | null;
-	/** The Gate's step. Null for a run. */
+	/** The Gate's step, or the step that waits for a Device. Null for a run. */
 	stepId: string | null;
 	/** `gates-waiting` only: how many Gates wait. */
 	count?: number | null;

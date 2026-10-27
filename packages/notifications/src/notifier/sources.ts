@@ -32,11 +32,25 @@ export type OpenGateRef = {
 	choices?: string[];
 };
 
+/** What a notification about a run names, and whether the run still sleeps. */
+export type RunRef = {
+	/** The flow name, or the prompt of a quick run. */
+	title: string;
+	/** The Person the run runs for. Null: a run from before every run had one. */
+	personId: string | null;
+	/** The stop time, epoch ms. Null: the run has none. */
+	stopAt: number | null;
+	/** The run sleeps now: one of its steps waits. */
+	sleeping: boolean;
+};
+
 export type RunEventSource = {
 	/** Calls `listener` with the run events that land from now on. Returns the unsubscribe. */
 	subscribe(listener: (events: readonly RunEvent[]) => void): () => void;
 	/** The open Gates of the Space's runs. */
 	openGates(spaceId: string): Promise<OpenGateRef[]>;
+	/** One run of the Space. Null: this Replica has no such run. */
+	run(spaceId: string, runId: string): Promise<RunRef | null>;
 };
 
 /** The engine's run events and open Gates. */
@@ -53,6 +67,19 @@ export function engineRunEvents(
 				lockScreen: g.lockScreen,
 				choices: g.choices.map((choice) => choice.name),
 			}));
+		},
+		async run(spaceId, runId) {
+			const run = await engine
+				.space(spaceId)
+				.getRun(runId)
+				.catch(() => null);
+			if (!run) return null;
+			return {
+				title: run.title,
+				personId: run.startedBy?.id ?? null,
+				stopAt: run.stopAt,
+				sleeping: run.status === "sleeping",
+			};
 		},
 	};
 }

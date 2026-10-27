@@ -32,10 +32,12 @@ import type { VapidKeyStore, VapidKeys } from "./vapid-keys";
  * What the service worker gets: the data of the push (`PushData`, without
  * the lock-screen options), with what to show.
  */
-export type WebPushPayload = { type: "show"; title: string } & Omit<
-	PushData,
-	"options"
->;
+export type WebPushPayload = {
+	type: "show";
+	title: string;
+	/** The second line. Absent: the title alone. */
+	body?: string;
+} & Omit<PushData, "options">;
 
 /** A browser's push subscription, as `PushSubscription.toJSON()` gives it. */
 export type WebPushSubscription = {
@@ -111,7 +113,7 @@ function urgencyOf(
 	kind: NotificationMessage["kind"],
 ): WebPushRequest["urgency"] {
 	if (kind === "gate-opened" || kind === "gates-waiting") return "high";
-	if (kind === "run-failed") return "normal";
+	if (kind === "run-failed" || kind === "device-wait") return "normal";
 	return "low";
 }
 
@@ -167,6 +169,7 @@ export function createWebPushChannel(
 					runId: message.runId,
 					stepId: message.stepId,
 					title: message.title,
+					...(message.body ? { body: message.body } : {}),
 					count: message.count,
 				},
 				urgencyOf(message.kind),

@@ -4,7 +4,12 @@ import { applySettingsPatch } from "./queries";
 import type { NotificationSettings } from "./types";
 
 const saved: NotificationSettings = {
-	events: { gateOpened: true, runFinished: true, runFailed: true },
+	events: {
+		gateOpened: true,
+		runFinished: true,
+		runFailed: true,
+		deviceWait: true,
+	},
 	quietHours: { start: "22:00", end: "07:00" },
 	timeZone: "Europe/Amsterdam",
 	screens: { web: true, expo: true, desktop: true },
@@ -18,6 +23,7 @@ describe("applySettingsPatch", () => {
 			gateOpened: true,
 			runFinished: false,
 			runFailed: true,
+			deviceWait: true,
 		});
 		expect(next.quietHours).toEqual(saved.quietHours);
 	});

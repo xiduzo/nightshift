@@ -1,4 +1,4 @@
-import { parseGateKey } from "../contract";
+import { parseDeviceWaitKey, parseGateKey } from "../contract";
 import type { NoticeKind } from "../deliveries";
 import type {
 	InAppTarget,
@@ -23,6 +23,8 @@ export type InAppItem =
 			runId: string;
 			stepId: string | null;
 			title: string;
+			/** The second line of a device wait. Absent: the screen words it. */
+			body?: string;
 			/** Show it as a notification. False: only update what the screen shows. */
 			alert: boolean;
 			at: number;
@@ -30,6 +32,14 @@ export type InAppItem =
 	/** A Gate closed: it was answered (on any screen), or its run stopped. */
 	| {
 			kind: "gate-closed";
+			key: string;
+			runId: string;
+			stepId: string;
+			at: number;
+	  }
+	/** A step no longer waits for its Device: it went on, or its run ended. */
+	| {
+			kind: "wait-ended";
 			key: string;
 			runId: string;
 			stepId: string;
@@ -124,6 +134,7 @@ export function createInAppChannel(
 				runId: message.runId,
 				stepId: message.stepId,
 				title: message.title,
+				...(message.body ? { body: message.body } : {}),
 				alert: message.alert,
 				at: message.at,
 			});
@@ -132,13 +143,24 @@ export function createInAppChannel(
 
 		async withdraw(target, key) {
 			const gate = parseGateKey(key);
-			if (!gate) return;
-			publish(target.personId, {
-				kind: "gate-closed",
-				key,
-				...gate,
-				at: now(),
-			});
+			if (gate) {
+				publish(target.personId, {
+					kind: "gate-closed",
+					key,
+					...gate,
+					at: now(),
+				});
+				return;
+			}
+			const wait = parseDeviceWaitKey(key);
+			if (wait) {
+				publish(target.personId, {
+					kind: "wait-ended",
+					key,
+					...wait,
+					at: now(),
+				});
+			}
 		},
 
 		runChanged(target, run) {

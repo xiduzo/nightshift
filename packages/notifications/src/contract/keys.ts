@@ -15,6 +15,15 @@ export function runEndKey(runId: string, seq: number): string {
 	return `${runId}:end:${seq}`;
 }
 
+/**
+ * One step's wait for an offline Device (`runId:wait:<stepId>`). The
+ * step looks again every minute and sleeps again: those sleeps keep the
+ * one notification.
+ */
+export function deviceWaitKey(wait: { runId: string; stepId: string }): string {
+	return `${wait.runId}:wait:${wait.stepId}`;
+}
+
 /** The notification at the end of quiet hours (`waiting:<ms>`). */
 export function waitingKey(at: number): string {
 	return `waiting:${at}`;
@@ -24,6 +33,7 @@ export function waitingKey(at: number): string {
 export type NotificationKey =
 	| { kind: "gate"; runId: string; stepId: string }
 	| { kind: "run-end"; runId: string; seq: number }
+	| { kind: "device-wait"; runId: string; stepId: string }
 	| { kind: "waiting"; at: number };
 
 const WAITING = "waiting";
@@ -48,6 +58,9 @@ export function parseKey(key: string): NotificationKey | null {
 		const seq = third === undefined ? null : integer(third);
 		return seq === null ? null : { kind: "run-end", runId: first, seq };
 	}
+	if (parts.length === 3 && first !== WAITING && second === "wait" && third) {
+		return { kind: "device-wait", runId: first, stepId: third };
+	}
 	return null;
 }
 
@@ -61,7 +74,17 @@ export function parseGateKey(
 		: null;
 }
 
-/** Whether a key names a Gate. A run's end and the end of quiet hours do not. */
+/** The run and step of a device wait's key. Null for any other key. */
+export function parseDeviceWaitKey(
+	key: string,
+): { runId: string; stepId: string } | null {
+	const parsed = parseKey(key);
+	return parsed?.kind === "device-wait"
+		? { runId: parsed.runId, stepId: parsed.stepId }
+		: null;
+}
+
+/** Whether a key names a Gate. A run's end, a device wait and the end of quiet hours do not. */
 export function isGateKey(key: string): boolean {
 	return parseGateKey(key) !== null;
 }

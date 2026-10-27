@@ -81,6 +81,24 @@ describe("the desktop channel", () => {
 		});
 	});
 
+	test("a step that waits for a device opens the run and says what happens next", async () => {
+		const { notifier, desktop } = channel();
+		await desktop.send(target(), {
+			...failed,
+			kind: "device-wait",
+			key: "run-1:wait:step-1",
+			stepId: "step-1",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+		});
+		expect(notifier.shown[0]).toEqual({
+			id: "run-1:wait:step-1",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+			open: "/runs/run-1",
+		});
+	});
+
 	test("a run without its id opens the inbox", async () => {
 		const { notifier, desktop } = channel();
 		await desktop.send(target(), { ...failed, runId: null });

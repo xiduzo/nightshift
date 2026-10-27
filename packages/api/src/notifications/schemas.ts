@@ -26,26 +26,44 @@ export const pushTargetSchema = exact<PushTargetView>()(
 	}),
 );
 
-const noticeKindSchema = z.enum(["gate-opened", "run-finished", "run-failed"]);
+const noticeKindSchema = z.enum([
+	"gate-opened",
+	"run-finished",
+	"run-failed",
+	"device-wait",
+]);
 
 /** One item of the in-app stream: what happened in a Space, with ids and one short sentence. */
 export const notificationItemSchema = exact<InAppItem>()(
 	z.discriminatedUnion("kind", [
 		z.object({
 			kind: noticeKindSchema,
-			/** `runId:stepId` for a Gate, `runId:end:<seq>` for a run that ended. */
+			/**
+			 * `runId:stepId` for a Gate, `runId:end:<seq>` for a run that
+			 * ended, `runId:wait:<stepId>` for a step that waits for a Device.
+			 */
 			key: z.string(),
 			spaceId: z.string(),
 			runId: z.string(),
-			/** The Gate's step. Null for a run. */
+			/** The Gate's step, or the step that waits. Null for a run. */
 			stepId: z.string().nullable(),
 			title: z.string(),
+			/** The second line of a device wait: when the run stops waiting. */
+			body: z.string().optional(),
 			/** Show it as a notification. False: only update what the screen shows. */
 			alert: z.boolean(),
 			at: z.number(),
 		}),
 		z.object({
 			kind: z.literal("gate-closed"),
+			key: z.string(),
+			runId: z.string(),
+			stepId: z.string(),
+			at: z.number(),
+		}),
+		/** A step no longer waits for its Device. An older screen reads everything again. */
+		z.object({
+			kind: z.literal("wait-ended"),
 			key: z.string(),
 			runId: z.string(),
 			stepId: z.string(),

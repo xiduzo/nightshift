@@ -136,6 +136,26 @@ describe("messages", () => {
 		}
 	});
 
+	test("a step that waits for a device goes in the run category, with its second line", async () => {
+		await channel.send(phone(), {
+			...runEnd("run-finished"),
+			kind: "device-wait",
+			key: "run-1:wait:step-1",
+			stepId: "step-1",
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+		});
+		expect(expo.sent[0]).toMatchObject({
+			title: "Triage waits for studio-mac",
+			body: "The step starts when the device is back.",
+			categoryId: "run",
+			channelId: "runs",
+			priority: "normal",
+			collapseId: "run-1:wait:step-1",
+			data: { kind: "device-wait", runId: "run-1", stepId: "step-1" },
+		});
+	});
+
 	test("the end of quiet hours says how many Gates wait", async () => {
 		await channel.send(phone(), {
 			...gate(),

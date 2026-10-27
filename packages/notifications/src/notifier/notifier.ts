@@ -1,7 +1,9 @@
 import {
+	deviceWaitWords,
 	type GateFacts,
 	gatesWaitingTitle,
 	type InAppChannel,
+	type NoticeWords,
 	type NotificationMessage,
 	type PushChannels,
 	titleOf,
@@ -16,14 +18,18 @@ import {
 import type { PushTarget, TargetStore } from "../targets";
 import { createGateTracker } from "./gate-tracker";
 import type { RunEvent, RunEventSource } from "./sources";
+import { createWaitTracker, type StartedWait } from "./wait-tracker";
 
 /**
  * The notifier: it reads the run events of this Replica and decides whom
- * to tell, about what, and on which screen. Three events: a new Gate
- * (keyed `runId:stepId`), a run that finished, a run that failed.
+ * to tell, about what, and on which screen. Four events: a new Gate
+ * (keyed `runId:stepId`), a run that finished, a run that failed, and a
+ * step that waits for an offline Device (keyed `runId:wait:<stepId>`).
  *
  * The rules:
- * - Who: the Members of the run's Space.
+ * - Who: the Members of the run's Space. A device wait goes only to the
+ *   Person the run runs for: "<flow> waits for <device>", with the stop
+ *   time. It is withdrawn when the wait is over (`wait-tracker.ts`).
  * - Every open page and app (the in-app stream) hears of every event at
  *   once, also in quiet hours. It shows a notification only when this
  *   daemon sends for the Space, the person wants that event, and it is
@@ -48,14 +54,16 @@ import type { RunEvent, RunEventSource } from "./sources";
  *   sleeps or wakes, moves, stops or ends, or a step starts or ends. That
  *   is quiet: no push, and the item shows nothing. A screen reads the run
  *   again instead of polling.
- * - Answer once, clear everywhere: when a Gate closes, every screen that
- *   got it gets a withdraw, and what still waits is dropped.
+ * - Answer once, clear everywhere: when a Gate closes, or a device wait
+ *   is over, every screen that got it gets a withdraw, and what still
+ *   waits is dropped.
  * - Lock-screen answers: a push about a Gate its author marked carries its
  *   options, only to a person whose role allows an answer (`mayAnswer`).
  *
  * At start, the open Gates are read: one the log has not told yet (it
  * opened while no notifier listened) is pushed then, the others tell
- * nobody again. A push is claimed before it goes out (`sending`): one a
+ * nobody again. A device wait the log told is withdrawn when its run no
+ * longer sleeps. A push is claimed before it goes out (`sending`): one a
  * crash cut short goes out at the first check a minute after its claim
  * (`LOST_AFTER_MS`), so a reload never sends one twice that the last
  * notifier still sends. Every piece of work runs one after the other, so
@@ -143,6 +151,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			console.error(`[notifications] ${message}`, error));
 	/** The open Gates this notifier knows, and what the engine said of each. */
 	const gates = createGateTracker((spaceId) => deps.events.openGates(spaceId));
+	/** The steps that wait for an offline Device. */
+	const waits = createWaitTracker();
 	const mayAnswer = deps.mayAnswer ?? (async () => false);
 	let queue: Promise<void> = Promise.resolve();
 	let stopped = false;
@@ -159,12 +169,14 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		key: string,
 		ids: { spaceId: string; runId: string; stepId: string | null },
 		alert: boolean,
+		words?: NoticeWords,
 	): NotificationMessage {
 		return {
 			key,
 			kind,
 			...ids,
-			title: titleOf(kind),
+			title: words?.title ?? titleOf(kind),
+			...(words?.body ? { body: words.body } : {}),
 			alert,
 			count: null,
 			at: now(),
@@ -193,8 +205,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		key: string,
 		ids: { spaceId: string; runId: string; stepId: string | null },
 		personId: string,
+		words?: NoticeWords,
 	): Promise<NotificationMessage> {
-		const msg = message(kind, key, ids, true);
+		const msg = message(kind, key, ids, true, words);
 		if (kind !== "gate-opened") return msg;
 		return { ...msg, gate: await gateFacts(key, ids.spaceId, personId) };
 	}
@@ -202,6 +215,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	function wants(settings: NotificationSettings, kind: NoticeKind): boolean {
 		if (kind === "gate-opened") return settings.events.gateOpened;
 		if (kind === "run-finished") return settings.events.runFinished;
+		if (kind === "device-wait") return settings.events.deviceWait;
 		return settings.events.runFailed;
 	}
 
@@ -236,40 +250,83 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	}
 
 	/**
-	 * Tells every screen of the Space's audience about one event. `inApp`
-	 * false: pushes only, for a Gate found open at start (the open pages
-	 * read everything again when they connect).
+	 * Tells every screen of the people about one event: the Space's
+	 * audience, unless `people` names some of them. `inApp` false: pushes
+	 * only, for a Gate found open at start (the open pages read everything
+	 * again when they connect). `words`: what it says to each Person, when
+	 * it says more than the sentence of its kind.
 	 */
 	async function tell(
 		kind: NoticeKind,
 		key: string,
 		ids: { spaceId: string; runId: string; stepId: string | null },
-		inApp = true,
+		options: {
+			inApp?: boolean;
+			people?: readonly string[];
+			words?: (settings: NotificationSettings) => NoticeWords;
+		} = {},
 	): Promise<void> {
+		const inApp = options.inApp ?? true;
 		const sends = await deps.sendsFor(ids.spaceId);
-		for (const personId of await deps.audience(ids.spaceId)) {
+		for (const personId of options.people ??
+			(await deps.audience(ids.spaceId))) {
 			const settings = await deps.settings.get(personId);
 			const wanted = wants(settings, kind);
+			const words = options.words?.(settings);
 			// Quiet hours hold the alert of an open page too: it only updates.
 			const alert = inApp && sends && wanted && !inQuietHours(settings, now());
 			if (inApp) {
 				await deps.inApp.send(
 					{ kind: "in-app", personId },
-					message(kind, key, ids, alert),
+					message(kind, key, ids, alert, words),
 				);
 			}
 			if (wanted) {
 				await push(
-					{ personId, key, kind, ...ids },
+					{
+						personId,
+						key,
+						kind,
+						...ids,
+						title: words?.title ?? null,
+						body: words?.body ?? null,
+					},
 					settings,
 					{
-						...(await pushMessage(kind, key, ids, personId)),
+						...(await pushMessage(kind, key, ids, personId, words)),
 						toldInApp: alert,
 					},
 					sends,
 				);
 			}
 		}
+	}
+
+	/**
+	 * A step waits for an offline Device: the Person the run runs for hears
+	 * of it, if they are still a Member of the Space. Nobody else does.
+	 */
+	async function tellWait(spaceId: string, wait: StartedWait): Promise<void> {
+		const run = await deps.events.run(spaceId, wait.runId);
+		const personId = run?.personId;
+		if (!run || !personId) return;
+		if (!(await deps.audience(spaceId)).includes(personId)) return;
+		await tell(
+			"device-wait",
+			wait.key,
+			{ spaceId, runId: wait.runId, stepId: wait.stepId },
+			{
+				people: [personId],
+				words: (settings) =>
+					deviceWaitWords({
+						flow: run.title,
+						device: wait.deviceName,
+						stopAt: run.stopAt,
+						timeZone: settings.timeZone,
+						now: now(),
+					}),
+			},
+		);
 	}
 
 	/**
@@ -326,7 +383,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		});
 	}
 
-	/** A Gate closed: withdraw it everywhere, and drop what still waits. */
+	/** A Gate closed, or a device wait is over: withdraw it everywhere, and drop what still waits. */
 	async function close(spaceId: string, key: string): Promise<void> {
 		for (const personId of await deps.audience(spaceId)) {
 			await deps.inApp.withdraw({ kind: "in-app", personId }, key);
@@ -367,6 +424,10 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				await tell("gate-opened", key, { spaceId, runId, stepId });
 				told.add(runId);
 			}
+			// The other Members' screens hear of the wait as a run that changed.
+			const { started, ended } = waits.apply(spaceId, list, now());
+			for (const key of ended) await close(spaceId, key);
+			for (const wait of started) await tellWait(spaceId, wait);
 			for (const event of list) {
 				if (event.type !== "RunEnded") continue;
 				const status = (event.payload as { status?: string }).status;
@@ -409,6 +470,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			row.key,
 			{ spaceId: row.spaceId, runId: row.runId, stepId: row.stepId },
 			row.personId,
+			row.title === null
+				? undefined
+				: { title: row.title, ...(row.body ? { body: row.body } : {}) },
 		);
 	}
 
@@ -468,9 +532,11 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			const settings = await deps.settings.get(personId);
 			if (inQuietHours(settings, at)) continue;
 			const gates = rows.filter((row) => row.kind === "gate-opened");
+			// A wait that is over was withdrawn: what is left still waits.
+			const stillWait = rows.filter((row) => row.kind === "device-wait");
 			// Runs that ended meanwhile go without a push.
 			for (const row of rows) {
-				if (row.kind === "gate-opened") continue;
+				if (row.kind === "gate-opened" || row.kind === "device-wait") continue;
 				await deps.deliveries.update(personId, row.key, {
 					status: "dropped",
 					heldFor: [],
@@ -504,7 +570,13 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					});
 				}
 			}
-			for (const row of gates) {
+			for (const row of stillWait) {
+				const reach = (await deps.targets.byIds(row.heldFor)).filter(
+					(target) => settings.screens[target.kind],
+				);
+				sentTo.set(row.key, await sendTo(reach, await messageOf(row)));
+			}
+			for (const row of [...gates, ...stillWait]) {
 				const sent = sentTo.get(row.key) ?? [];
 				await deps.deliveries.update(personId, row.key, {
 					status: sent.length > 0 ? "sent" : "dropped",
@@ -520,15 +592,35 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		await gates.baseline(await deps.spaces());
 		// Gates that closed while this daemon was away: withdraw them now.
 		const closed = new Map<string, string>();
-		for (const row of await deps.deliveries.liveGates()) {
+		for (const row of await deps.deliveries.liveOfKind("gate-opened")) {
 			if (!gates.isOpen(row.spaceId, row.key)) closed.set(row.key, row.spaceId);
 		}
 		for (const [key, spaceId] of closed) await close(spaceId, key);
 		// Gates that opened while no notifier listened (a reload, a start, a
 		// run that woke): pushed now. The log drops the ones already told.
 		for (const { spaceId, key, runId, stepId } of gates.open()) {
-			await tell("gate-opened", key, { spaceId, runId, stepId }, false);
+			await tell(
+				"gate-opened",
+				key,
+				{ spaceId, runId, stepId },
+				{ inApp: false },
+			);
 		}
+		// Device waits the log told: over when their run no longer sleeps.
+		const told = new Map<string, Delivery>();
+		for (const row of await deps.deliveries.liveOfKind("device-wait")) {
+			told.set(row.key, row);
+		}
+		for (const [key, row] of told) {
+			const run = await deps.events.run(row.spaceId, row.runId);
+			if (run?.sleeping) waits.track(row.spaceId, key);
+			else await close(row.spaceId, key);
+		}
+	}
+
+	/** The device waits whose step did not sleep again: withdraw them. */
+	async function endWaits(at: number): Promise<void> {
+		for (const { spaceId, key } of waits.due(at)) await close(spaceId, key);
 	}
 
 	return {
@@ -557,6 +649,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 
 	async function tick(): Promise<void> {
 		const at = now();
+		await endWaits(at);
 		await sendDue(at);
 		await endQuietHours(at);
 	}

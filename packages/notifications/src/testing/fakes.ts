@@ -11,6 +11,7 @@ import type {
 	OpenGateRef,
 	RunEvent,
 	RunEventSource,
+	RunRef,
 } from "../notifier/sources";
 import type { PushTarget } from "../targets";
 
@@ -54,6 +55,8 @@ export type FakeRunEvents = {
 	source: RunEventSource;
 	/** Sets the open Gates of a Space, as the engine would read them now. */
 	setOpen(spaceId: string, gates: OpenGateRef[]): void;
+	/** Sets a run, as the engine would read it now. */
+	setRun(runId: string, run: RunRef): void;
 	/** Lands run events, as the engine's log would. */
 	land(events: readonly RunEvent[]): void;
 };
@@ -61,6 +64,7 @@ export type FakeRunEvents = {
 /** Run events and open Gates that a test sets. */
 export function fakeRunEvents(): FakeRunEvents {
 	const open = new Map<string, OpenGateRef[]>();
+	const runs = new Map<string, RunRef>();
 	const listeners = new Set<(events: readonly RunEvent[]) => void>();
 	return {
 		source: {
@@ -69,8 +73,10 @@ export function fakeRunEvents(): FakeRunEvents {
 				return () => listeners.delete(listener);
 			},
 			openGates: async (spaceId) => [...(open.get(spaceId) ?? [])],
+			run: async (_spaceId, runId) => runs.get(runId) ?? null,
 		},
 		setOpen: (spaceId, gates) => open.set(spaceId, gates),
+		setRun: (runId, run) => runs.set(runId, run),
 		land(events) {
 			for (const listener of [...listeners]) listener(events);
 		},

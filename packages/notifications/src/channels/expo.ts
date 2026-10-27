@@ -29,7 +29,8 @@ import type {
  * - The category says which buttons the phone shows: `gate-decide`
  *   (Approve and Reject, a Gate its author marked for the lock screen with
  *   exactly two options), `gate-open` (any other Gate: it opens the app),
- *   `run` (a run that finished or failed).
+ *   `run` (a run that finished or failed, or a step that waits for a
+ *   Device: it opens the run).
  * - Android: a Gate goes to the `gates` channel (high importance), a
  *   run to `runs` (default importance). The phone app defines both.
  * - One notification per key: the key is the thread id, the collapse id
@@ -99,12 +100,17 @@ export function expoMessage(
 	const once = {
 		to: token,
 		title: message.title,
+		...(message.body ? { body: message.body } : {}),
 		sound: "default",
 		threadId: message.key,
 		collapseId: message.key,
 		tag: message.key,
 	};
-	if (message.kind === "run-finished" || message.kind === "run-failed") {
+	if (
+		message.kind === "run-finished" ||
+		message.kind === "run-failed" ||
+		message.kind === "device-wait"
+	) {
 		return {
 			...once,
 			data,
