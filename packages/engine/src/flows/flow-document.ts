@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { DocumentSpace } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { project } from "@nightshift/db/schema";
 import {
@@ -16,12 +17,14 @@ import {
 	validateSchedules,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import { z } from "zod";
 import {
 	openPersistedDocument,
 	type PersistedDocument,
 } from "../device-config";
+import { spaceIdOf } from "../projects";
 import type { ProjectFlows } from "./project-flows";
 
 /**
@@ -70,6 +73,35 @@ export function flowDocumentName(projectId: string): string {
 /** The name of a Project's flow history document. */
 export function flowHistoryName(projectId: string): string {
 	return `flows-history:${projectId}`;
+}
+
+/** The Project of a flow document or a flow history name, or null for another kind. */
+export function flowDocumentProject(name: string): string | null {
+	for (const prefix of ["flows:", "flows-history:"]) {
+		if (name.startsWith(prefix)) return name.slice(prefix.length) || null;
+	}
+	return null;
+}
+
+/**
+ * The Space of a synced document, for the relay's access check: a Space
+ * document, or a flow document of a Project this Replica has. Null for
+ * another kind, and for a Project it does not have.
+ */
+export function documentSpace(
+	db: Database,
+): (name: string) => Promise<DocumentSpace | null> {
+	return async (name) => {
+		const spaceId = spaceIdOf(name);
+		if (spaceId !== null) return { spaceId, kind: "space" };
+		const projectId = flowDocumentProject(name);
+		if (projectId === null) return null;
+		const [row] = await db
+			.select({ spaceId: project.spaceId })
+			.from(project)
+			.where(eq(project.id, projectId));
+		return row ? { spaceId: row.spaceId, kind: "flows" } : null;
+	};
 }
 
 /** The transaction origin of this Replica's own changes. */
@@ -501,8 +533,13 @@ export type FlowDocuments = {
 	open(projectId: string): Promise<FlowDocument>;
 	/** Opens the documents of every Project this Replica knows. */
 	openAll(): Promise<FlowDocument[]>;
-	/** An open document by its name (`flows:<id>`, `flows-history:<id>`), for the relay. */
+	/** An open document by its name (`flows:<id>`, `flows-history:<id>`). */
 	byName(name: string): PersistedDocument | null;
+	/**
+	 * A document by its name, for the relay: opened when its Project is
+	 * one this Replica has. Null for another name.
+	 */
+	find(name: string): Promise<PersistedDocument | null>;
 	/** Flushes every document. */
 	flush(): Promise<void>;
 	close(): Promise<void>;
@@ -560,6 +597,19 @@ export function createFlowDocuments(options: { db: Database }): FlowDocuments {
 			return Promise.all(rows.map((row) => open(row.id)));
 		},
 		byName: (name) => opened.get(name) ?? null,
+		async find(name) {
+			const known = opened.get(name);
+			if (known) return known;
+			const projectId = flowDocumentProject(name);
+			if (projectId === null) return null;
+			const [row] = await db
+				.select({ id: project.id })
+				.from(project)
+				.where(eq(project.id, projectId));
+			if (!row) return null;
+			await open(projectId);
+			return opened.get(name) ?? null;
+		},
 		async flush() {
 			await Promise.all([...opened.values()].map((d) => d.flush()));
 		},

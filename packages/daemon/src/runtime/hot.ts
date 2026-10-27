@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
 import type {
 	DeviceDocument,
+	FlowDocuments,
 	GitHubClones,
 	SpaceDocuments,
 } from "@nightshift/engine";
@@ -18,7 +19,7 @@ import type { Lease } from "./lease";
  * that must have one owner per process keeps it:
  *
  * - kept as it is: the database client (one per database, so a reload
- *   leaks none), the lease, the Device and Space documents (one writer
+ *   leaks none), the lease, the Device, Space and flow documents (one writer
  *   each), the in-app channel (an open notification stream outlives a
  *   reload), the listeners (Bun reloads a server of the same `id` in
  *   place);
@@ -43,6 +44,7 @@ export type HotRegistry = KeptDevices &
 		nightshiftLease?: Lease;
 		nightshiftDocument?: DeviceDocument;
 		nightshiftSpaces?: SpaceDocuments;
+		nightshiftFlows?: FlowDocuments;
 		nightshiftInApp?: InAppChannel;
 		nightshiftNotifications?: Notifications;
 		nightshiftKeepAwake?: KeepAwake;

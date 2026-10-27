@@ -34,18 +34,19 @@ import {
 	createArtifactStore,
 	createCliToolStore,
 	createConnectionStore,
+	createFlowDocuments,
 	createGitHubClones,
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
 	createToolLaunchers,
 	documentRows,
+	documentSpace,
 	localDevice,
 	openDeviceDocument,
 	programOf,
 	secretStore,
 	setUpGit,
-	spaceIdOf,
 	systemGitInstaller,
 } from "@nightshift/engine";
 
@@ -173,6 +174,7 @@ export async function createDaemon(
 			Promise.all([
 				hot.nightshiftDocument?.flush(),
 				hot.nightshiftSpaces?.flush(),
+				hot.nightshiftFlows?.flush(),
 				hot.nightshiftNotifications?.stop(),
 				hot.nightshiftKeepAwake?.stop(),
 				lease.release(),
@@ -190,6 +192,14 @@ export async function createDaemon(
 		directory: deviceDirectory(db),
 	});
 	const spaces = hot.nightshiftSpaces;
+
+	/**
+	 * The flow documents: each Project's flows and schedules, and their
+	 * revisions (ADR 2). Every Device keeps a copy, and the relay serves
+	 * them to the Devices of the Space.
+	 */
+	hot.nightshiftFlows ??= createFlowDocuments({ db });
+	const flows = hot.nightshiftFlows;
 
 	const trustedOrigins = trustedOriginsOf(env, port);
 	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
@@ -235,6 +245,7 @@ export async function createDaemon(
 	// Every Space's document, before the relay serves them: the Projects of a
 	// Replica from before them are imported here, once.
 	await spaces.openAll();
+	await flows.openAll();
 
 	/**
 	 * One person on one computer signs in to nothing: a request from this
@@ -363,6 +374,7 @@ export async function createDaemon(
 		profiles,
 		document,
 		spaces,
+		flows,
 		self: device,
 		ownerId: person.userId,
 		local,
@@ -389,10 +401,10 @@ export async function createDaemon(
 	 * like the document, and bound to this daemon's closures.
 	 */
 	const sync = keepSync(hot, {
-		document: (name) =>
+		document: async (name) =>
 			name === document.name
 				? document.doc
-				: (spaces.byName(name)?.doc ?? null),
+				: (spaces.byName(name)?.doc ?? (await flows.find(name))?.doc ?? null),
 		// On a Host: the documents of the Devices whose home Host this is.
 		kept: {
 			has: async (name) =>
@@ -406,7 +418,7 @@ export async function createDaemon(
 			ownerId: person.userId,
 			isThisComputer: (peer, request) =>
 				isThisComputer(peer, request, trustedOrigins),
-			spaceIdOf,
+			spaceOfDocument: documentSpace(db),
 			policy: hostPolicy,
 			keptOwner: (name) => engine.devices.keptDocumentOwner(name),
 			deviceKey: (token) => devices.host.syncKey(token),

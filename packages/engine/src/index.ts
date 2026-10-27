@@ -98,8 +98,13 @@ export {
 	storedDeviceProfiles,
 	valueStore,
 } from "./device-config";
-export type { FlowRef, FlowUse } from "./flows";
-export { flowsForRun } from "./flows";
+export type { FlowDocument, FlowDocuments, FlowRef, FlowUse } from "./flows";
+export {
+	createFlowDocuments,
+	documentProjectFlows,
+	documentSpace,
+	flowsForRun,
+} from "./flows";
 export type { WalkFile, WalkFiles, WalkRef } from "./graph";
 export type {
 	CopyStamp,
@@ -149,7 +154,6 @@ export {
 	type SpaceDocuments,
 	setUpGit,
 	spaceDocumentName,
-	spaceIdOf,
 	systemGitInstaller,
 	worktreeLocation,
 } from "./projects";

@@ -14,6 +14,7 @@ import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	createFlowDocuments,
 	documentProjectFlows,
+	documentSpace,
 	type FlowDocument,
 	type FlowDocuments,
 	flowIdOf,
@@ -431,5 +432,50 @@ describe("the flow document", () => {
 			expect.objectContaining({ severity: "warning" }),
 		]);
 		expect(document.schedules.has("future")).toBe(true);
+	});
+});
+
+describe("the documents of a Replica, for the relay", () => {
+	let sandbox: Sandbox;
+	let documents: FlowDocuments;
+
+	beforeEach(async () => {
+		sandbox = await createSandbox();
+		documents = createFlowDocuments({ db: sandbox.db });
+		await sandbox.db.insert(project).values({
+			id: "shop",
+			spaceId: sandbox.spaceId,
+			name: "Shop",
+			createdAt: new Date(),
+		});
+	});
+
+	afterEach(async () => {
+		await documents.close();
+		await sandbox.cleanup();
+	});
+
+	test("find opens the flow documents of a Project the Replica has, and no others", async () => {
+		const found = await documents.find("flows-history:shop");
+		expect(found?.name).toBe("flows-history:shop");
+		expect(documents.byName("flows:shop")).not.toBeNull();
+		expect(await documents.find("flows:elsewhere")).toBeNull();
+		expect(await documents.find(`space:${sandbox.spaceId}`)).toBeNull();
+	});
+
+	test("documentSpace names the Space of a Space document and of a flow document", async () => {
+		const spaceOf = documentSpace(sandbox.db);
+		expect(await spaceOf(`space:${sandbox.spaceId}`)).toEqual({
+			spaceId: sandbox.spaceId,
+			kind: "space",
+		});
+		for (const name of ["flows:shop", "flows-history:shop"]) {
+			expect(await spaceOf(name)).toEqual({
+				spaceId: sandbox.spaceId,
+				kind: "flows",
+			});
+		}
+		expect(await spaceOf("flows:elsewhere")).toBeNull();
+		expect(await spaceOf("device:someone")).toBeNull();
 	});
 });
