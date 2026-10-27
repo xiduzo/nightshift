@@ -361,7 +361,13 @@ profile is visible only as an Offer.
 
 ### Placement
 
-1. The node's `device`. 2. The profile's Device. 3. The Walker.
+1. The node's `device`. 2. The profile's Device. 3. The Run's Device: the
+Device that started the Run, or the Host for a Run started from a Phone or
+a browser on the Host (ADR 1). 4. The Walker.
+
+A profile is a Device's own: a node names it by Device and profile id
+(ADR 3). A placed Device that is offline makes the step wait, up to the
+Run's stop time (ADR 1).
 
 Explicit names, not a matcher. The run-start requirements read the placed
 Device's capabilities, or the Offer: "The flow uses `gh` on `hetzner-1`,
@@ -387,7 +393,9 @@ walks with the names its nodes give.
 
 A Run's Walker is chosen at start; the default is the Space's Host, because
 it stays on and a browser-only client has no daemon. A Device that starts
-a Run for itself is its own Walker. The Run's worktree lives on the Device
+a Run in a Space a Host keeps gives the walk to the Host, and its unplaced
+steps still run on that Device (ADR 1). A Device that cannot reach its Host
+walks the Run itself, and the Exchange sends it to the Host later. The Run's worktree lives on the Device
 of its first placed step. "Move this Run to studio" ends the walk here and
 resumes it there from the archived checkpoint.
 
