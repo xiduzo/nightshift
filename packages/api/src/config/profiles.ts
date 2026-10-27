@@ -42,13 +42,18 @@ export const profiles = {
 				modelProfileSchema.extend(edited),
 			]),
 		)
-		.handler(({ context, input }) => {
+		.handler(async ({ context, input }) => {
 			const { id, ...profile } = input;
-			return saveProfile(context, profile, {
+			const saved = await saveProfile(context, profile, {
 				...(id !== undefined ? { id } : {}),
 				flowsUsing: async (name) =>
 					(await context.space.flowUse()).profiles.get(name) ?? [],
 			});
+			// The Spaces it is offered to show its new name.
+			if (id !== undefined) {
+				await context.offers.renamed(saved.id, context.session.user.id);
+			}
+			return saved;
 		}),
 	/**
 	 * A project's own profiles, from `.nightshift/profiles.json` in its

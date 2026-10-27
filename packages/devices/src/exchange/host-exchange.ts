@@ -337,6 +337,7 @@ export function createHostExchange(deps: {
 			}
 			await engine.offers.publish({
 				...input,
+				profileName: input.profileName ?? input.profile,
 				deviceId: key.deviceId,
 				by: key.personId,
 			});

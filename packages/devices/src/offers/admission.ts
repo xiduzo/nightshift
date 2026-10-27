@@ -102,7 +102,7 @@ export type OfferAdmission = {
 	): Device;
 	/** This computer's Offers into a Space that are in force. */
 	inForce(spaceId: string): Promise<DeviceOffer[]>;
-	/** Aborts the calls running here under a withdrawn Offer. */
+	/** Aborts the calls running here under a withdrawn Offer (`profile`: its id). */
 	withdrawn(spaceId: string, profile: string): void;
 };
 
@@ -111,9 +111,12 @@ export function createOfferAdmission(deps: {
 	/** This computer as a Device: it serves every admitted call. */
 	device: Device;
 	documents: SpaceDocuments;
-	/** This computer's own Offers (its Device document). Without it, none. */
+	/**
+	 * This computer's own Offers (its Device document), with the names
+	 * their profiles have now. Without it, none.
+	 */
 	ownOffers?: () => readonly DeviceOffer[];
-	/** A profile of this computer, as its owner set it. */
+	/** A profile of this computer by name, as its owner set it. */
 	profileFor?: (name: string) => ProfileSettings | null;
 	/** The offered sessions of the runs this computer walks: what withdrawing an Offer stops. */
 	sessions?: Pick<OfferedSessions, "relay">;
@@ -236,9 +239,14 @@ export function createOfferAdmission(deps: {
 				return;
 			}
 			// Another Person's session: this computer's own profile, its caps.
+			// The node names the profile by its name, and `ownOffers` gives
+			// each Offer the name its profile has now: so the name finds the
+			// offered profile, also after a rename.
 			const { profile } = call.input.offered;
-			const offer = admitted.offers.find((o) => o.profile === profile);
-			const found = deps.profileFor?.(profile) ?? null;
+			const offer = admitted.offers.find((o) => o.profileName === profile);
+			const found = offer
+				? (deps.profileFor?.(offer.profileName) ?? null)
+				: null;
 			// Only an Agent Profile runs a session.
 			const settings = found && isAgentProfile(found) ? found : null;
 			if (!offer || !settings) {
@@ -248,10 +256,13 @@ export function createOfferAdmission(deps: {
 				};
 				return;
 			}
-			const key = offerKey(request.spaceId, profile);
+			// Keyed by the profile's id: a rename keeps the count and the calls.
+			const key = offerKey(request.spaceId, offer.profile);
 			const stop = new AbortController();
 			const both = AbortSignal.any([signal, stop.signal]);
-			const forget = calls.add(request.spaceId, profile, () => stop.abort());
+			const forget = calls.add(request.spaceId, offer.profile, () =>
+				stop.abort(),
+			);
 			/** Its owner withdrew the Offer: the run's step fails and says why. */
 			const withdrawn = () => stop.signal.aborted && !signal.aborted;
 			let release: (() => void) | null = null;
@@ -406,7 +417,7 @@ function offeredCallRefusal(
 		case "session": {
 			if (!("offered" in call.input)) return refused;
 			const { profile } = call.input.offered;
-			return offers.some((o) => o.profile === profile)
+			return offers.some((o) => o.profileName === profile)
 				? null
 				: offersNothingOr(deviceName, offers, profile);
 		}
@@ -449,7 +460,7 @@ function offeredSession(
  * (`calls`, to abort when it is withdrawn). They outlive an admission: a
  * `bun --hot` reload hands them to the next engine's, so a session that
  * runs on through the reload still counts against its Offer. Keyed by the
- * Space and the profile.
+ * Space and the profile's id.
  */
 export type OfferUse = {
 	slots: {

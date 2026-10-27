@@ -16,8 +16,12 @@ type OfferedSession = {
 	runId: string;
 	deviceId: string;
 	spaceId: string;
-	profile: string;
+	/** The profile's name, as the node names it. */
+	profileName: string;
 };
+
+/** An Offer whose sessions withdrawing it stops. */
+type OfferRef = { spaceId: string; deviceId: string; profileName: string };
 
 /**
  * The offered sessions running now, of the runs this computer walks: what
@@ -52,7 +56,7 @@ export function createOfferedSessions() {
 									runId: request.runId,
 									deviceId,
 									spaceId: request.spaceId,
-									profile: call.input.offered.profile,
+									profileName: call.input.offered.profile,
 								})
 							: null;
 					try {
@@ -65,11 +69,7 @@ export function createOfferedSessions() {
 		},
 
 		/** The runs whose running step is a session under the Offer. */
-		runsUnder(offer: {
-			spaceId: string;
-			deviceId: string;
-			profile: string;
-		}): string[] {
+		runsUnder(offer: OfferRef): string[] {
 			return [
 				...new Set(
 					[...running.values()]
@@ -77,7 +77,7 @@ export function createOfferedSessions() {
 							(e) =>
 								e.spaceId === offer.spaceId &&
 								e.deviceId === offer.deviceId &&
-								e.profile === offer.profile,
+								e.profileName === offer.profileName,
 						)
 						.map((e) => e.runId),
 				),
@@ -107,7 +107,9 @@ export type EngineOffers = {
 			spaceId: string;
 			deviceId: string;
 			deviceName: string;
+			/** The profile's id. */
 			profile: string;
+			profileName: string;
 			by: string | null;
 		},
 	): Promise<void>;
@@ -123,6 +125,7 @@ export type EngineOffers = {
 	withdraw(input: {
 		spaceId: string;
 		deviceId: string;
+		/** The profile's id. */
 		profile: string;
 		by: string | null;
 	}): Promise<void>;
@@ -144,11 +147,7 @@ export function createEngineOffers(deps: {
 	hostOf(spaceId: string): Promise<string | null>;
 	relay?: Pick<HostRelay, "offer" | "withdrawOffer">;
 	/** Stops the runs walked here whose running step is a session under the Offer. */
-	stopUnder(offer: {
-		spaceId: string;
-		deviceId: string;
-		profile: string;
-	}): Promise<void>;
+	stopUnder(offer: OfferRef): Promise<void>;
 }): EngineOffers {
 	const { documents, log, relay } = deps;
 	return {
@@ -167,6 +166,7 @@ export function createEngineOffers(deps: {
 				await relay.offer({
 					spaceId,
 					profile: offer.profile,
+					profileName: offer.profileName,
 					deviceName: offer.deviceName,
 					permissionCap: offer.permissionCap,
 					sessionCap: offer.sessionCap,
@@ -184,6 +184,7 @@ export function createEngineOffers(deps: {
 					deviceId: offer.deviceId,
 					deviceName: offer.deviceName,
 					profile: offer.profile,
+					profileName: offer.profileName,
 					permissionCap: offer.permissionCap,
 					sessionCap: offer.sessionCap,
 					by,
@@ -194,6 +195,16 @@ export function createEngineOffers(deps: {
 		async withdraw(input) {
 			await deps.ready;
 			const { spaceId, deviceId, profile, by } = input;
+			const document = await documents.open(spaceId);
+			// The sessions name the profile by its name, as the Space lists it.
+			const listed = spaceOffers(document, deviceId).find(
+				(o) => o.profile === profile,
+			);
+			const stop = {
+				spaceId,
+				deviceId,
+				profileName: listed?.profileName ?? profile,
+			};
 			if ((await deps.hostOf(spaceId)) !== null) {
 				if (!relay || deviceId !== deps.deviceId) {
 					throw new HostUnreachableError();
@@ -203,11 +214,10 @@ export function createEngineOffers(deps: {
 				} finally {
 					// The runs this computer walks stop their steps under it too,
 					// also when the Host cannot be reached.
-					await deps.stopUnder({ spaceId, deviceId, profile });
+					await deps.stopUnder(stop);
 				}
 				return;
 			}
-			const document = await documents.open(spaceId);
 			let removed = false;
 			await document.change(() => {
 				removed = unpublishOffer(document, deviceId, profile);
@@ -219,7 +229,7 @@ export function createEngineOffers(deps: {
 					payload: { deviceId, profile, by },
 				});
 			}
-			await deps.stopUnder({ spaceId, deviceId, profile });
+			await deps.stopUnder(stop);
 		},
 	};
 }

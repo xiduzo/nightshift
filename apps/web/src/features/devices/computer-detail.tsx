@@ -192,7 +192,9 @@ export function ComputerDetail({
 							{computer.offers.map((offer) => (
 								<Item key={offer.profile} variant="outline" size="sm">
 									<ItemContent>
-										<ItemTitle className="font-mono">{offer.profile}</ItemTitle>
+										<ItemTitle className="font-mono">
+											{offer.profileName}
+										</ItemTitle>
 										<ItemDescription>{caps(offer)}</ItemDescription>
 									</ItemContent>
 								</Item>
@@ -293,7 +295,7 @@ function ThisComputerOffers({ spaceId }: { spaceId: string }) {
 							>
 								<ItemContent className="min-w-0">
 									<ItemTitle>
-										<span className="font-mono">{offer.profile}</span>
+										<span className="font-mono">{offer.profileName}</span>
 										{offer.listed ? null : (
 											<Badge variant="outline">Withdrawn in the Space</Badge>
 										)}

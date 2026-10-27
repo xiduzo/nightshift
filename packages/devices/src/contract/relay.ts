@@ -29,7 +29,13 @@ export type HostRelay = Relay & {
 	): AsyncIterable<TranscriptEntry>;
 	/** Publishes this Device's Offer in a Space a Host keeps, through that Host. */
 	offer(
-		input: OfferCaps & { spaceId: string; profile: string; deviceName: string },
+		input: OfferCaps & {
+			spaceId: string;
+			/** The profile's id. */
+			profile: string;
+			profileName: string;
+			deviceName: string;
+		},
 	): Promise<void>;
 	/** Withdraws this Device's Offer from a Space a Host keeps, through that Host. */
 	withdrawOffer(input: { spaceId: string; profile: string }): Promise<void>;

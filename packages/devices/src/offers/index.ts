@@ -15,6 +15,7 @@ export {
 export {
 	type DeviceOffer,
 	deviceOffers,
+	offeredProfile,
 	offerRefusal,
 	offersNothing,
 	offerTakes,

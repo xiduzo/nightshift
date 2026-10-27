@@ -91,7 +91,9 @@ export const spaceDeviceViewSchema = exact<SpaceDeviceView>()(
 		clones: z.array(
 			z.object({ projectId: z.string(), projectName: z.string() }),
 		),
-		offers: z.array(offerCapsSchema.extend({ profile: z.string() })),
+		offers: z.array(
+			offerCapsSchema.extend({ profile: z.string(), profileName: z.string() }),
+		),
 	}),
 );
 
@@ -164,7 +166,9 @@ const offerViewSchema = exact<OfferView>()(
 	offerCapsSchema.extend({
 		spaceId: z.string(),
 		spaceName: z.string(),
+		/** The profile's id. */
 		profile: z.string(),
+		profileName: z.string(),
 		offeredAt: z.number(),
 		/** False: it was withdrawn in the Space. */
 		listed: z.boolean(),
