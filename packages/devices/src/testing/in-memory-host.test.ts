@@ -49,6 +49,8 @@ function rowsOf(walkerId: string, projectId = "project-none"): RunRows {
 				flowName: null,
 				flow: "{}",
 				bodyFlows: "{}",
+				flowRevision: null,
+				bodyFlowRevisions: "{}",
 				title: "Pushed",
 				worktreePath: "",
 				branch: "nightshift/pushed",

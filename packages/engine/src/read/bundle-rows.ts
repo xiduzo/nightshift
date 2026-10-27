@@ -31,22 +31,28 @@ export type BundleRows = {
 	events: (typeof event.$inferSelect)[];
 };
 
-/** The run's columns of a bundle from before its Person and its Devices: read with none. */
+/** The run's columns of a bundle from before its Person, its Devices and its Flow revisions: read with none. */
 function withoutStartedBy() {
 	const {
 		startedBy: _person,
 		deviceId: _device,
 		placements: _placements,
 		deviceNames: _names,
+		flowRevision: _revision,
+		bodyFlowRevisions: _revisions,
 		...columns
 	} = getColumns(run);
 	return columns;
 }
 
+/** What a run of a bundle from before Flow revisions has of them. */
+const NO_REVISIONS = { flowRevision: null, bodyFlowRevisions: "{}" };
+
 /**
- * A format 3 to 7 bundle: the live schema's tables. Format 3 has no
+ * A format 3 to 8 bundle: the live schema's tables. Format 3 has no
  * `started_by`, formats 3 and 4 no `device_id`, formats 3 to 5 no
- * `placements`, and formats 3 to 6 no `device_names`: read as null.
+ * `placements`, formats 3 to 6 no `device_names`, and formats 3 to 7 no
+ * Flow revisions: read as none.
  */
 export async function readRows(
 	db: Database,
@@ -55,7 +61,7 @@ export async function readRows(
 ): Promise<BundleRows> {
 	const columns = getColumns(run);
 	const [runRow] =
-		formatVersion >= 7
+		formatVersion >= 8
 			? await db.select().from(run).where(eq(run.id, runId))
 			: (
 					await db
@@ -64,6 +70,9 @@ export async function readRows(
 							...(formatVersion >= 4 ? { startedBy: columns.startedBy } : {}),
 							...(formatVersion >= 5 ? { deviceId: columns.deviceId } : {}),
 							...(formatVersion >= 6 ? { placements: columns.placements } : {}),
+							...(formatVersion >= 7
+								? { deviceNames: columns.deviceNames }
+								: {}),
 						})
 						.from(run)
 						.where(eq(run.id, runId))
@@ -71,8 +80,9 @@ export async function readRows(
 					startedBy: null,
 					deviceId: null,
 					placements: null,
-					...row,
 					deviceNames: null,
+					...row,
+					...NO_REVISIONS,
 				}));
 	const projectId = runRow?.projectId ?? "";
 	const [projectRow] = await db
@@ -149,6 +159,7 @@ export async function readFormat2(
 			deviceId: null,
 			placements: null,
 			deviceNames: null,
+			...NO_REVISIONS,
 		},
 		steps: steps.map((s) => ({ ...s, ...space })),
 		sessions: sessions.map((s) => ({ ...s, ...space })),
@@ -225,6 +236,7 @@ export async function readFormat1(
 					deviceId: null,
 					placements: null,
 					deviceNames: null,
+					...NO_REVISIONS,
 				}
 			: undefined,
 		steps: steps.map((s) => ({ ...s, ...space, deviceId: null })),

@@ -198,13 +198,24 @@ function readable(map: Y.Map<unknown>): boolean {
 	);
 }
 
-/** Every flow of the document that this Night Shift reads, by name: what a Clone's flow files were. */
+/**
+ * Every flow of the document that this Night Shift reads, by name: what a
+ * Clone's flow files were. Each with its Flow revision, when the flow is
+ * the last one saved.
+ */
 export function flowSources(document: FlowDocument): FlowSources {
 	const sources: FlowSources = {};
 	for (const entry of flowEntries(document).sort((a, b) =>
 		a.name < b.name ? -1 : 1,
 	)) {
-		if (!entry.newer) sources[entry.name] = { json: flowJson(entry.map) };
+		if (entry.newer) continue;
+		const json = flowJson(entry.map);
+		const last = flowRevisions(document, entry.flowId).at(-1);
+		// A merge that no revision records yet is no revision.
+		sources[entry.name] =
+			last !== undefined && same(last.flow, json)
+				? { json, revision: last.id }
+				: { json };
 	}
 	return sources;
 }

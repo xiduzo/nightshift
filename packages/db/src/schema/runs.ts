@@ -36,6 +36,14 @@ export const run = sqliteTable(
 		flow: text("flow").notNull(),
 		/** JSON copies of every flow the run can call (through Call nodes) at start, by flow name. */
 		bodyFlows: text("body_flows").notNull().default("{}"),
+		/**
+		 * The Flow revision the run started from (ADR 2). Null for a quick
+		 * run, a flow without revisions (a flow file), and a run from before
+		 * revisions.
+		 */
+		flowRevision: text("flow_revision"),
+		/** JSON: the Flow revision of each flow in `body_flows` that has one, by flow name. */
+		bodyFlowRevisions: text("body_flow_revisions").notNull().default("{}"),
 		title: text("title").notNull(),
 		/** Absolute path of the worktree the run works in. */
 		worktreePath: text("worktree_path").notNull(),

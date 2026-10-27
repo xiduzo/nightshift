@@ -295,6 +295,28 @@ describe("the flow document", () => {
 		]);
 	});
 
+	test("a read gives a flow its revision, and none for a merge that no revision records", async () => {
+		await laptop.flows.save(of, "build", twoNodes());
+		const document = await laptop.document();
+		const [saved] = flowRevisions(document, flowIdOf(document, "build") ?? "");
+		expect((await laptop.flows.flows(of)).sources.build).toEqual({
+			json: twoNodes(),
+			revision: saved?.id as string,
+		});
+
+		await sync(laptop, desktop);
+		await laptop.flows.save(of, "build", withPrompt(twoNodes(), "a", "Laptop"));
+		await desktop.flows.save(
+			of,
+			"build",
+			withPrompt(twoNodes(), "b", "Desktop"),
+		);
+		await sync(laptop, desktop);
+		expect((await laptop.flows.flows(of)).sources.build).not.toHaveProperty(
+			"revision",
+		);
+	});
+
 	test("a save records a revision: who, when, on which Device, and the flow", async () => {
 		clock.at = 5_000;
 		await laptop.flows.save(of, "build", twoNodes());

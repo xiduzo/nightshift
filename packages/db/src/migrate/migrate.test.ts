@@ -316,3 +316,19 @@ describe("migration run_device_names", () => {
 		]);
 	});
 });
+
+describe("migration run_flow_revisions", () => {
+	test("a run from before Flow revisions has none", async () => {
+		const db = await databaseBefore("run_flow_revisions");
+		for (const statement of [
+			"INSERT INTO project (id, space_id, name) VALUES ('p1', 's', 'repo')",
+			"INSERT INTO run (id, space_id, project_id, flow, title, worktree_path, branch, base_ref, walker_id) VALUES ('r1', 's', 'p1', '{}', 'Run', '/w/r1', 'b-r1', 'main', 'd1')",
+		]) {
+			await db.run(sql.raw(statement));
+		}
+		await migrateDb(db);
+		expect(
+			await rows(db, "SELECT flow_revision, body_flow_revisions FROM run"),
+		).toEqual([{ flow_revision: null, body_flow_revisions: "{}" }]);
+	});
+});

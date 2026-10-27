@@ -32,7 +32,7 @@ function refuseErrors(issues: readonly FlowIssue[], what = "The flow"): void {
  * it can call through Call nodes (by name, from the project's flow files,
  * or a kit of this Night Shift). Version 1 files migrate first. The run
  * keeps a copy of each, kits too, so a run on another Device walks the
- * same flows.
+ * same flows, and the Flow revision of each that has one.
  */
 export function flowsForRun(
 	sources: FlowSources,
@@ -40,7 +40,11 @@ export function flowsForRun(
 ): {
 	flow: Flow;
 	flowName: string | null;
+	/** The Flow revision of the flow by name. Null for a flow without one, and for a flow of the input. */
+	flowRevision: string | null;
 	calledFlows: Record<string, Flow>;
+	/** The Flow revision of each called flow that has one, by name. */
+	calledFlowRevisions: Record<string, string>;
 } {
 	const files = parsedFlows(sources);
 	let flow: Flow;
@@ -78,7 +82,12 @@ export function flowsForRun(
 		flow = parsed.flow;
 		flowName = null;
 	}
+	const revisionOf = (name: string): string | null => {
+		const source = Object.hasOwn(sources, name) ? sources[name] : undefined;
+		return source && "json" in source ? (source.revision ?? null) : null;
+	};
 	const calledFlows: Record<string, Flow> = {};
+	const calledFlowRevisions: Record<string, string> = {};
 	const queue = calledFlowNames(flow);
 	while (queue.length > 0) {
 		const name = queue.shift() as string;
@@ -96,7 +105,15 @@ export function flowsForRun(
 			`The called flow "${name}"`,
 		);
 		calledFlows[name] = called;
+		const revision = isKitName(name) ? null : revisionOf(name);
+		if (revision !== null) calledFlowRevisions[name] = revision;
 		queue.push(...calledFlowNames(called));
 	}
-	return { flow, flowName, calledFlows };
+	return {
+		flow,
+		flowName,
+		flowRevision: flowName === null ? null : revisionOf(flowName),
+		calledFlows,
+		calledFlowRevisions,
+	};
 }
