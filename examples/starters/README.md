@@ -1,8 +1,8 @@
 # Starter flows
 
-Small, self-contained flows (format version 6) to copy into a project and change. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+Small, self-contained flows (format version 6) to save into a project and change. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
 
-For the newer pieces (branches that run at once and a Join, End nodes, kits, webhook schedules, kept variables, a project's profiles), read Night Shift's own flows in [`.nightshift/`](../../.nightshift/) at the root of this repo.
+For the newer pieces (branches that run at once and a Join, End nodes, kits, webhook schedules, kept variables), read Night Shift's own flows in [`.nightshift/`](../../.nightshift/) at the root of this repo. The folder goes after the import on upgrade ([ADR 2](../../docs/adr/0002-flows-are-night-shift-data.md)).
 
 | Flow | Inputs | Does |
 | --- | --- | --- |
@@ -15,14 +15,9 @@ For the newer pieces (branches that run at once and a Join, End nodes, kits, web
 
 ## Use them
 
-1. Copy the flows into your project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`.
-
-   ```bash
-   mkdir -p <your-project>/.nightshift/flows
-   cp examples/starters/.nightshift/flows/*.json <your-project>/.nightshift/flows/
-   ```
-
-2. Add the project in Night Shift, open a flow in the editor, and change the prompts, models, and `check` to fit the project.
-3. Start a run: the start dialog asks for the flow's inputs.
+1. Add the project in Night Shift.
+2. Save the flows into the project. Night Shift keeps flows itself, so do not copy the files into the project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`. Ask an agent that has the `nightshift` MCP server (`claude mcp add nightshift -- nightshift mcp`) to save each file in `examples/starters/.nightshift/flows/` with `save_flow`. The editor gets a JSON import for this (planned, [ADR 2](../../docs/adr/0002-flows-are-night-shift-data.md)).
+3. Open a flow in the editor, and change the prompts, models, and `check` to fit the project.
+4. Start a run: the start dialog asks for the flow's inputs.
 
 Commands get every template value as an environment variable, never as shell text, so `sh -c "{{check}}"` runs the input `check` as a command, and the review text in `review-pr` cannot inject shell code.

@@ -1,5 +1,9 @@
 # Mobile: the phone app, a notifier for every screen, one inbox
 
+Note, 2026-10-27: "Personal on <Host>" goes. A Device that joins its Home
+Host merges its personal Space into the Host's, so the Phone sees all
+personal work ([ADR 1](../adr/0001-one-personal-space-per-home-host.md)).
+
 Status: decided, 2026-10-21. Nothing here is built. The shape is decided:
 **the phone is a Person's client of a Host**, not a Device. A notifier on
 the server tells the person about Gates and runs on every screen they use.

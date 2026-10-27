@@ -30,7 +30,7 @@ Night Shift turns the pipeline into a flow that you draw. The engine owns the or
 
 - **Local first.** Every session, branch, and token stays on your own computers. Agents run with your own CLI logins.
 - **The engine decides, the model advises.** A model never adds a node or changes the graph. Every loop has a maximum count.
-- **Flows are files.** A flow is a JSON file in your repo (`.nightshift/flows/`). You can review it, diff it, and share it like code.
+- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a version: you see who changed what, and you can restore an earlier one (planned, [ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
 - **No built-in method.** Spec-driven, issue-driven, or one file at a time: each method is just another flow.
 
 ## How it works
@@ -81,7 +81,7 @@ An Agent node names the coding agent it runs on. One flow can mix them.
 | Any other agent that speaks the Agent Client Protocol | Add it as a custom agent with its command, for example `goose acp` |
 | GitHub Copilot, Gemini CLI, Cursor | Through the Agent Client Protocol, not yet verified |
 
-A node can add connections (MCP servers) and CLI tools such as `gh`. Profiles hold an agent's setup, or the model of a Decision, under one name. Put them in `.nightshift/profiles.json` so the flow runs on every computer.
+A node can add connections (MCP servers) and CLI tools such as `gh`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" (planned, [ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
 
 Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Call runs one as `kit:github/publish-draft-pr`.
 
@@ -104,12 +104,16 @@ bun run db:push
 bun run dev            # web UI and API with hot reload
 ```
 
-Then open the web UI, add a project, and copy a [starter flow](examples/starters/) into it:
+Then open the web UI, add a project, and give it a [starter flow](examples/starters/). Night Shift keeps flows itself, so do not copy the files into your project. Ask an agent that has the `nightshift` MCP server to save them:
 
 ```bash
-mkdir -p <your-project>/.nightshift/flows
-cp examples/starters/.nightshift/flows/*.json <your-project>/.nightshift/flows/
+# from this checkout, with the dev daemon on port 3000 and the web UI on 3001:
+claude mcp add nightshift -- bun "$PWD/apps/server/src/cli.ts" mcp --ui http://localhost:3001
 ```
+
+Start Claude Code in your project's folder and ask: "Save each flow in `<this checkout>/examples/starters/.nightshift/flows/` with `save_flow`."
+
+The editor gets a JSON import for this (planned, [ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
 
 Open a flow in the editor, change the prompts and the check to fit your project, and start a run.
 
@@ -132,7 +136,7 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | `review-pr` | An agent reviews a pull request. A gate asks you before the review is posted. |
 | `per-file` | Applies one instruction to every file that matches a glob. |
 
-Details are in [examples/starters/](examples/starters/). Night Shift's own flows are in [`.nightshift/`](.nightshift/): a review of each pull request, night chores on issues labelled `night`, and a weekly dependency bump.
+Details are in [examples/starters/](examples/starters/). Night Shift's own flows are in [`.nightshift/`](.nightshift/) until the import on upgrade moves them into Night Shift ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)): a review of each pull request, night chores on issues labelled `night`, and a weekly dependency bump.
 
 ### Run it on a server
 

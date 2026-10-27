@@ -20,7 +20,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | --- | --- |
 | Users | One developer: the author. Better Auth stays, and local mode auto-creates one user and one session. |
 | The method | The flow is the method. No method packages and no `method.json`. A WTF night is one flow among others. |
-| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Stored as a versioned JSON file in the repo: `.nightshift/flows/<name>.json`, with a published zod schema. Night Shift knows no method and no tracker: GitHub, WTF, and the rpgdotexe night are flows, CLI tools and commands, never engine concepts. |
+| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Night Shift data, not a file in the repo: a Yjs document in the Space that keeps its Project, with a published zod schema. Every save is a Flow version. People edit flows in the editor, and agents through `nightshift mcp` and the `nightshift` CLI ([ADR 2](adr/0002-flows-are-night-shift-data.md)). Night Shift knows no method and no tracker: GitHub, WTF, and the rpgdotexe night are flows, CLI tools and commands, never engine concepts. |
 | Flow I/O | A flow declares **inputs** and **outputs**, like a function. The inputs of the top-level flow are asked when a run starts. A Call node calls a flow once with bound inputs, or with `each` once per list element, bound to an input. The outputs come back to the caller. Version 1 files (with `params` and `input: "item"`) migrate on load. |
 | Templates | `{{name.path}}` reads a value: `name` is a node id, an input, or `run`. Node ids and inputs share one namespace. A path reaches into JSON: `{{planner.data.tasks}}`, `{{item.parent.number}}`. A command gets every value as an environment variable, never as shell text. |
 | Node types | Agent, Command, Tool, Decision, Value, Wait, Call. A Gate is a Decision decided by you; a Call with `each` runs once per list element. See section 3. |
@@ -29,7 +29,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Daemon | Nights run on a stable daemon (`bun run night`): a built server without hot reload. Development uses `bun run dev` in a separate git worktree, so code changes never reload a daemon that runs a night. |
 | Skills | An Agent node names a skill that the harness already has (user, project, or plugin skills). No skill pack materialization. |
 | Lists | A Call with `each` reads a list from a source: a JSON value (often another node's output), a command that prints JSON, or files that match a glob. An issue tracker is a command on its CLI (`gh`, `glab`, `acli`): Suggest command writes one for the project. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
-| Triggers | A run starts by hand, or from a schedule stored in the project (`.nightshift/schedules.json`), for example every night at 22:00 with a stop time of 07:00. |
+| Triggers | A run starts by hand, or from a schedule of the project, for example every night at 22:00 with a stop time of 07:00. The Space keeps its schedules with its flows ([ADR 2](adr/0002-flows-are-night-shift-data.md)). A schedule that names no Device fires once, on the Host of its Space ([ADR 1](adr/0001-one-personal-space-per-home-host.md)). |
 | GitHub | GitHub is a CLI tool (`gh`) and a list command (the sub-issues of an issue, the issues with a label) that Suggest command writes. An Agent node that lists `gh` runs it with the user's login, or with the tool's own login (`gh-work` runs `gh` with its own token: several accounts of one program); a Command node or a list source runs it in the worktree. Nothing in the engine knows GitHub. |
 | Tools | A flow reaches the outside world through the CLI and MCP, as equals. A Command node runs a CLI; a Tool node calls one tool of a Connection (an MCP server defined once on the daemon, secrets as `${NAME}`) with arguments from templates and gets a typed result, with no model in the loop. The same Connections an Agent node hands to its session. Nothing in the engine knows any service. |
 | Decisions | A Decision node picks one of its options, and who picks is a field of the node: you (a Gate, in the Needs-you inbox), a rule (a JSONata expression per option over the run's values, deterministic and free), or a model (the decider). The three sit behind one seam in the engine. The decider is a TanStack AI decision model through `decide()`: TypeSafe Jev by default, or Jev on OpenRouter, OpenAI Decisions, Ollaya on this computer, or Ollama on this computer (any pulled chat model, no key), each with its API key as a secret. Other deciders plug in behind the same interface. |
@@ -70,7 +70,7 @@ flowchart LR
     agents["packages/agents — harness sessions + tools"]
     db[("libsql — facts + event log + checkpoints")]
   end
-  flows[".nightshift/flows/*.json"]
+  flows["flows + schedules (Yjs documents of the Space)"]
   harness["claude, opencode, codex"]
   gh["gh CLI → GitHub"]
 
@@ -89,7 +89,7 @@ flowchart LR
 | --- | --- |
 | `packages/config` | The shared TypeScript configuration. No code. |
 | `packages/db` | Drizzle schema on libsql. Durable facts and the event log. Full transcripts live on disk, indexed here. |
-| `packages/flows` | The flow schema (zod), the loader (`./files`), and the validator (unbounded loops, unknown names, missing outcomes). Each node type has one file in `src/nodes/` with its schema, its checks and its output fields. |
+| `packages/flows` | The flow schema (zod), the `.nightshift/` reader (`./files`: after [ADR 2](adr/0002-flows-are-night-shift-data.md), only the one import on upgrade reads these files), and the validator (unbounded loops, unknown names, missing outcomes). Each node type has one file in `src/nodes/` with its schema, its checks and its output fields. |
 | `packages/ui` | Shared components and tokens. |
 | `packages/auth` | Identity and access on Better Auth: login, two-factor, pairing, device keys, Spaces, members and roles. |
 | `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, CLI tool permissions, the decider providers. |
@@ -117,7 +117,7 @@ Proves: the TanStack AI harness adapter inside the Bun daemon, worktrees, the ev
 
 ### Slice 2 — The flow editor
 
-Draw a flow in React Flow with Agent and Command nodes and `pass`/`fail` edges. Save it to `.nightshift/flows/`. Run it: worker → check → back to worker on `fail`, at most three times.
+Draw a flow in React Flow with Agent and Command nodes and `pass`/`fail` edges. Save it. Run it: worker → check → back to worker on `fail`, at most three times.
 
 Proves: the flow schema, the validator, the graph walk, retry loops, template variables.
 
@@ -162,7 +162,7 @@ Status: built. Tested with fakes. The starters validate; none has run against a 
 
 ### Slice 7 — Triggers
 
-- Schedules in `.nightshift/schedules.json`: a flow, its inputs, a time of day or a cron line, and a stop time. The daemon starts the runs. The UI lists, adds, pauses, and removes schedules, and shows the next start.
+- Schedules of a project: a flow, its inputs, a time of day or a cron line, and a stop time. The daemon starts the runs. The UI lists, adds, pauses, and removes schedules, and shows the next start.
 
 Proves: a night starts without a person.
 
@@ -214,7 +214,7 @@ Projects: Add project checks the chosen folder before it adds it, in this order:
 
 Lease: one daemon per database. A daemon takes the lease (the `daemon_lease` row) before it recovers interrupted work or starts the scheduler, and writes a heartbeat every 10 seconds. A second daemon on the same database refuses to start: it prints the holder's host, pid and start time, and exits with code 1. The lease is free when its holder released it (a clean stop with Ctrl+C or SIGTERM), when the holder's pid no longer runs on this machine, or when its last heartbeat is older than 90 seconds. Every acquisition adds one to the epoch. A daemon whose machine slept keeps the lease on waking, unless another daemon took it in the meantime; then its next heartbeat fails, it logs `SELF-FENCE:` and exits with code 3 without writing anything more. Nothing restarts it: stop the other daemon first, then start this one again. The Settings page shows the lease under This daemon.
 
-Schedules: `.nightshift/schedules.json` in a project's clone, next to the flows. The UI lists, adds, pauses and removes them; the file can also be edited by hand. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and base ref. The daemon reads the file again on every tick (30 s), so an edit needs no restart. A cron time that is more than 15 minutes late is skipped, and a schedule does not start while its previous run still runs, waits or sleeps. Every daemon starts the schedules of the projects in its own database: keep the night's projects out of the dev database.
+Schedules: the schedules of a project live in the Space that keeps it, next to its flows, not in a Clone ([ADR 2](adr/0002-flows-are-night-shift-data.md)). The UI lists, adds, pauses and removes them. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and base ref. A schedule that names no Device fires on the Host of its Space, once ([ADR 1](adr/0001-one-personal-space-per-home-host.md)). A cron time that is more than 15 minutes late is skipped, and a schedule does not start while its previous run still runs, waits or sleeps. A Space without a Host fires its schedules on its one Device: keep the night's projects out of the dev database.
 
 Settings: the Settings page saves daemon-wide values in the database: the scheduler switch, the run cap, the step cap, the run policy defaults (a flow's own `policy` numbers win), the defaults for new Agent and Decision nodes, and desktop notifications. A setting that is not saved reads the environment (`NIGHTSHIFT_*` in `apps/server/.env`), then its default. The engine reads them when they apply, so a change needs no restart. One exception: `NIGHTSHIFT_SCHEDULER=off` turns the scheduler off whatever the page says, so a dev daemon on a copy of the database never starts the night's schedules.
 
@@ -228,7 +228,7 @@ NIGHTSHIFT_OPENCODE_BIN=/path/to/opencode   # must be a 1.x build (see section 7
 NIGHTSHIFT_CODEX_BIN=/path/to/codex
 ```
 
-Agent Profiles: a harness, a model, an effort, a permission mode, tool sets and connections under one name, saved in the database (`agent_profile`) and edited on the Agents page. An Agent node names one in `"profile": "builder"` and may set any of those fields itself; its own value wins, and tool sets and connections add up. A node without a profile needs its own harness, model and permission mode. The run resolves its profiles into its copy of the flows when it starts, so a later edit reaches the next run and a resumed run keeps what it started with. A flow that names a profile the daemon does not have refuses to start, and the flow editor lists it as an issue. A profile that flows name keeps its name; deleting one leaves those flows refusing to start until they name another.
+Agent Profiles: a harness, a model, an effort, a permission mode, tool sets and connections under one name, saved in the database (`agent_profile`) and edited on the Agents page. A profile belongs to one Device: its identity is the Device and the profile's id, and its name is a label. An Agent node names that pair in `profile` (the editor shows "builder on LE2316") and may set any of those fields itself; its own value wins, and tool sets and connections add up. A node without a profile needs its own harness, model and permission mode. The run resolves its profiles into its copy of the flows when it starts, so a later edit reaches the next run and a resumed run keeps what it started with. A flow that names a profile on a Device that the Space no longer has does not start: the editor marks the node and asks for another profile. Night Shift never takes another Device's profile with the same label. Flows reference the id, so a rename changes no flow. A Project has no profiles of its own ([ADR 3](adr/0003-a-profile-belongs-to-one-device.md)).
 
 Connections: an MCP server is defined once on the Agents page (under Tools) and named by Agent nodes (`"connections": ["linear"]`). A node may still define its own `mcpServers`; one of the same name wins over the connection. A flow that names a connection the daemon does not have refuses to start. `${NAME}` in env values and headers reads the macOS keychain first (service `nightshift`, saved under Agents → Secrets through `Bun.secrets`), then the daemon's environment. The database keeps only the names of saved secrets. A missing variable fails the step with its name; values never go into the flow file, the database or the logs. "Test" connects to a server, lists its tools and disconnects.
 
