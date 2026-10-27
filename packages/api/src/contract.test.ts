@@ -294,6 +294,34 @@ describe("replies of a real engine", () => {
 		await read(appRouter.flows.list, { projectId });
 		await read(appRouter.flows.map, { projectId });
 		await read(appRouter.flows.get, { projectId, name: "night" });
+		// A second save of night, so its revisions have a diff between them.
+		await reply(appRouter.flows.save, {
+			projectId,
+			name: "night",
+			flow: { ...night, description: "Fix the bug at night." },
+		});
+		const revisions = (await read(appRouter.flows.revisions, {
+			projectId,
+			name: "night",
+		})) as { id: string }[];
+		expect(revisions).toHaveLength(2);
+		const [newest, oldest] = revisions.map((revision) => revision.id);
+		await read(appRouter.flows.revision, {
+			projectId,
+			name: "night",
+			revisionId: oldest,
+		});
+		await read(appRouter.flows.revision, {
+			projectId,
+			name: "night",
+			revisionId: newest,
+			against: oldest,
+		});
+		await reply(appRouter.flows.restore, {
+			projectId,
+			name: "night",
+			revisionId: oldest,
+		});
 
 		// Sections round-trip, and a Section issue names its Section.
 		const sections: Flow["sections"] = [

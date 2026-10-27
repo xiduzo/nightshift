@@ -100,4 +100,17 @@ describe("fileProjectFlows", () => {
 			await expect(attempt()).rejects.toThrow(NOT_HERE);
 		}
 	});
+
+	test("keeps no revisions: a flow file has none", async () => {
+		const { repoPath, dispose } = await clone();
+		try {
+			await seedFlowFolder(repoPath, { quick: { version: 1 } });
+			const flows = fileProjectFlows(inClone(repoPath));
+			expect(await flows.revisions({ projectId: "project" }, "quick")).toEqual(
+				[],
+			);
+		} finally {
+			await dispose();
+		}
+	});
 });

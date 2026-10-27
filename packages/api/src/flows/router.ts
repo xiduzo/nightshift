@@ -2,11 +2,13 @@ import { flowNameSchema, flowSchema, nameSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output } from "../output";
-import { ownerProcedure, protectedProcedure } from "../procedures";
+import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
 import {
 	flowIssueSchema,
 	flowListItemSchema,
 	flowNoticeSchema,
+	flowRevisionItemSchema,
+	flowRevisionViewSchema,
 	keptValueSchema,
 	loadedFlowSchema,
 } from "./schemas";
@@ -41,10 +43,11 @@ export const flows = {
 		.output(output(z.record(z.string(), flowSchema.nullable())))
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) => context.space.flowMap(input.projectId)),
-	/** Saves drafts with errors too. Returns the issues. Writes this computer's Clone: its owner's. */
-	save: ownerProcedure
+	/** Saves drafts with errors too, as a new revision. Returns the issues. */
+	save: permitted({ flow: ["save"] })
 		.route({
-			summary: "Saves a flow file, also with errors, and returns its problems.",
+			summary:
+				"Saves a flow, also with errors, as a new revision, and returns its problems.",
 		})
 		.output(output(z.array(flowIssueSchema)))
 		.input(flowRef.extend({ flow: flowSchema }))
@@ -90,11 +93,58 @@ export const flows = {
 		.handler(({ context, input }) =>
 			context.space.dismissFlowNotice(input.projectId, input.id),
 		),
-	remove: ownerProcedure
-		.route({ summary: "Removes a flow file from the project." })
+	remove: permitted({ flow: ["remove"] })
+		.route({
+			summary: "Removes a flow from the project. Its revisions stay.",
+		})
 		.output(output(z.void()))
 		.input(flowRef)
 		.handler(({ context, input }) =>
 			context.space.deleteFlow(input.projectId, input.name),
+		),
+	revisions: protectedProcedure
+		.route({
+			summary:
+				"Lists the revisions of a flow, newest first: who saved each, when, on which device, and what it changed.",
+		})
+		.output(output(z.array(flowRevisionItemSchema)))
+		.input(flowRef)
+		.handler(({ context, input }) =>
+			context.space.listFlowRevisions(input.projectId, input.name),
+		),
+	revision: protectedProcedure
+		.route({
+			summary:
+				"Reads one revision of a flow and what changes from another revision, or from the flow as it is now, to it.",
+		})
+		.output(output(flowRevisionViewSchema))
+		.input(
+			flowRef.extend({
+				revisionId: z.string(),
+				/** The revision to compare with. Left out: the flow as it is now. */
+				against: z.string().optional(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.getFlowRevision(
+				input.projectId,
+				input.name,
+				input.revisionId,
+				input.against,
+			),
+		),
+	restore: permitted({ flow: ["save"] })
+		.route({
+			summary:
+				"Saves a revision of a flow as the flow now, as a new revision, and returns its problems.",
+		})
+		.output(output(z.array(flowIssueSchema)))
+		.input(flowRef.extend({ revisionId: z.string() }))
+		.handler(({ context, input }) =>
+			context.space.restoreFlowRevision(
+				input.projectId,
+				input.name,
+				input.revisionId,
+			),
 		),
 };

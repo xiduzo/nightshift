@@ -14,6 +14,7 @@ import {
 	writeFlowFile,
 	writeSchedulesFile,
 } from "@nightshift/flows/files";
+import type { FlowRevision, RevisionKind } from "./flow-document";
 
 /**
  * Where the engine reads and saves the flows and the schedules of a
@@ -46,11 +47,28 @@ export type ProjectSchedules = {
 	issues: ScheduleIssue[];
 };
 
+/** How a save records its revision. */
+export type SaveFlowOptions = {
+	/** Why the revision exists. Default `save`. */
+	kind?: RevisionKind;
+};
+
 export type ProjectFlows = {
 	/** Every flow of the project. Throws for a project it cannot read. */
 	flows(of: FlowsOf): Promise<ProjectFlowSet>;
-	/** Saves a flow, a draft with errors too. Returns its issues. */
-	save(of: FlowsOf, name: string, flow: Flow): Promise<FlowIssue[]>;
+	/** Saves a flow, a draft with errors too, as a new revision. Returns its issues. */
+	save(
+		of: FlowsOf,
+		name: string,
+		flow: Flow,
+		options?: SaveFlowOptions,
+	): Promise<FlowIssue[]>;
+	/**
+	 * The revisions of the flow of that name, oldest first. Empty for a
+	 * flow without any: one that does not exist, and every flow of the
+	 * file adapter, which keeps no revisions.
+	 */
+	revisions(of: FlowsOf, name: string): Promise<FlowRevision[]>;
 	/** Removes a flow. Refuses (`not-found`) a flow that does not exist. */
 	remove(of: FlowsOf, name: string): Promise<void>;
 	/** The project's schedules. `validate` (default true) checks each against the project's flows. */
@@ -116,6 +134,10 @@ export function fileProjectFlows(deps: FileProjectFlowsDeps): ProjectFlows {
 
 		async remove(of, name) {
 			await deleteFlowFile(await repoPath(of), name);
+		},
+
+		async revisions() {
+			return [];
 		},
 
 		async schedules(of, options = {}) {

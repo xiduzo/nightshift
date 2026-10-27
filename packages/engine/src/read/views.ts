@@ -281,6 +281,8 @@ export type RunDetail = RunSummary & {
 	flow: Flow;
 	/** Copies of every flow the run can call (through Call nodes), by name, taken at start. */
 	calledFlows: Record<string, Flow>;
+	/** The Flow revision the run started from. Null for a quick run, and a flow without revisions. */
+	flowRevision: string | null;
 	/** In the order they started. */
 	steps: StepSummary[];
 	/** How often the run took each edge of its flow, by edge id. */

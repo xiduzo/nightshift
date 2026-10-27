@@ -205,6 +205,7 @@ export const runDetailSchema = exact<RunDetail>()(
 	runSummarySchema.extend({
 		flow: flowSchema,
 		calledFlows: z.record(z.string(), flowSchema),
+		flowRevision: z.string().nullable(),
 		steps: z.array(stepSummarySchema),
 		traversals: z.record(z.string(), z.number()),
 		calledTraversals: z.array(

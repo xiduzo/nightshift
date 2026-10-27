@@ -38,6 +38,7 @@ import {
 } from "../projects";
 import {
 	createReadModel,
+	namesOf,
 	parseCalledFlows,
 	parseRunFlow,
 	type RunHere,
@@ -524,7 +525,11 @@ export function createEngine(
 		listBranches,
 		runCopies,
 		placement,
-		flowFiles: createFlowFiles({ flows: projectFlows }),
+		flowFiles: createFlowFiles({
+			flows: projectFlows,
+			personNames: (ids) => namesOf(db, ids),
+			deviceNames: (ids) => directory.names(ids),
+		}),
 		flowNotices: {
 			list: async (projectId) =>
 				flowNotices(await flowDocuments.open(projectId)),

@@ -53,6 +53,8 @@ export {
 	createFlowMutations,
 	createFlowQueries,
 	type FlowListItem,
+	type FlowRevisionItem,
+	type FlowRevisionView,
 	filledInputs,
 	type InputTexts,
 	jsonProblem,

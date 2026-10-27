@@ -120,6 +120,10 @@ describe("a Run and its Flow revision", () => {
 		expect((await startedPayload(started.id)).flowRevision).toBe(
 			lastRevision(document, "build"),
 		);
+		// The run details show the revision the run ran.
+		expect((await engine.getRun(started.id)).flowRevision).toBe(
+			lastRevision(document, "build"),
+		);
 	});
 
 	test("a flow that a merge changed since its last revision, and a flow the start sends, record none", async () => {
