@@ -192,7 +192,7 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 7,
+			formatVersion: 8,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
@@ -307,6 +307,40 @@ describe("exportRun", () => {
 		expect(opened.meta.formatVersion).toBe(3);
 		expect(opened.run.startedBy).toBeNull();
 		expect(opened.run.spaceId).toBe(sandbox.spaceId);
+		opened.close();
+	});
+
+	test("a format 7 bundle still opens: its run without Flow revisions", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
+		// What a Night Shift before Flow revisions wrote.
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
+		for (const statement of [
+			"ALTER TABLE run DROP COLUMN flow_revision",
+			"ALTER TABLE run DROP COLUMN body_flow_revisions",
+			"UPDATE bundle SET value = '7' WHERE key = 'format_version'",
+		]) {
+			await file.run(sql.raw(statement));
+		}
+		file.$client.close();
+
+		const opened = await openRunBundle(path);
+		expect(opened.meta.formatVersion).toBe(7);
+		expect(opened.run).toMatchObject({
+			flowRevision: null,
+			bodyFlowRevisions: "{}",
+		});
+		expect(opened.run.deviceNames).toEqual(expect.any(String));
 		opened.close();
 	});
 

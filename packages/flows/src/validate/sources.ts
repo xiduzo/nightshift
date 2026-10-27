@@ -12,9 +12,12 @@ import type { FlowListItem, LoadedFlow, ProjectFlowMap } from "./issues";
 
 /**
  * What one flow holds, as plain data that can cross a wire: its parsed
- * JSON, or why it is not JSON.
+ * JSON, or why it is not JSON. `revision`: the Flow revision this JSON
+ * is, when Night Shift keeps the flow and it is a saved revision.
  */
-export type FlowSource = { json: unknown } | { jsonError: string };
+export type FlowSource =
+	| { json: unknown; revision?: string }
+	| { jsonError: string };
 
 /** Every flow of a project by name (valid names only, sorted). */
 export type FlowSources = Record<string, FlowSource>;

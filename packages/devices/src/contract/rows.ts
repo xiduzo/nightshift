@@ -14,6 +14,10 @@ const runRowSchema = z.object({
 	flowName: z.string().nullable(),
 	flow: z.string(),
 	bodyFlows: z.string(),
+	/** Its Flow revision (null: none). A Device of a version before revisions sends none. */
+	flowRevision: z.string().nullable().default(null),
+	/** The Flow revisions of its called flows, by name (JSON). A Device of a version before revisions sends none. */
+	bodyFlowRevisions: z.string().default("{}"),
 	title: z.string(),
 	worktreePath: z.string(),
 	branch: z.string(),

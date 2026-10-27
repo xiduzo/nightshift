@@ -141,7 +141,9 @@ export function quickRunTitle(flow: Flow): string {
 export type PreparedRun = {
 	flow: Flow;
 	flowName: string | null;
+	flowRevision: string | null;
 	calledFlows: Record<string, Flow>;
+	calledFlowRevisions: Record<string, string>;
 	inputs: InputValues;
 	title: string;
 	stopAt: number | null;
@@ -163,7 +165,8 @@ export async function prepareRun(
 	planned: PlannedRun,
 	deps: { now(): number },
 ): Promise<PreparedRun> {
-	const { flow, flowName, calledFlows } = planned;
+	const { flow, flowName, flowRevision, calledFlows, calledFlowRevisions } =
+		planned;
 	for (const { at, nodes } of planned.groups) {
 		// An offline Device checks each call itself when it is back.
 		const refusal =
@@ -200,7 +203,9 @@ export async function prepareRun(
 	return {
 		flow,
 		flowName,
+		flowRevision,
 		calledFlows,
+		calledFlowRevisions,
 		inputs,
 		title,
 		stopAt: input.stopAt ?? null,
@@ -263,7 +268,15 @@ export function createRunStart(deps: RunStartDeps) {
 				const startedBy = planned.plan.personId;
 				const { device } = planned.run;
 				const prepared = await prepareRun(input, planned, deps);
-				const { flow, flowName, calledFlows, inputs, title } = prepared;
+				const {
+					flow,
+					flowName,
+					flowRevision,
+					calledFlows,
+					calledFlowRevisions,
+					inputs,
+					title,
+				} = prepared;
 				const authorId = input.startedBy ?? startedBy;
 				const author = authorId ? await gitAuthorOf(db, authorId) : null;
 				// The worktree lives on the run's Device.
@@ -282,6 +295,7 @@ export function createRunStart(deps: RunStartDeps) {
 						payload: {
 							projectId: projectRow.id,
 							flowName,
+							...(flowRevision !== null ? { flowRevision } : {}),
 							title,
 							start: flow.start,
 							stopAt: prepared.stopAt,
@@ -300,6 +314,8 @@ export function createRunStart(deps: RunStartDeps) {
 								flowName,
 								flow: JSON.stringify(flow),
 								bodyFlows: JSON.stringify(calledFlows),
+								flowRevision,
+								bodyFlowRevisions: JSON.stringify(calledFlowRevisions),
 								title,
 								worktreePath: worktree.worktreePath,
 								branch: worktree.branch,

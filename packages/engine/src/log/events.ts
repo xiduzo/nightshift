@@ -187,6 +187,8 @@ export type EnginePayloads = {
 	RunStarted: {
 		projectId: string;
 		flowName: string | null;
+		/** The Flow revision the run starts from (ADR 2). Absent: none (a quick run, a flow file), or before revisions. */
+		flowRevision?: string;
 		title: string;
 		/** The node the walk starts at. */
 		start: string;

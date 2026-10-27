@@ -183,7 +183,11 @@ export type PlannedRun = {
 	run: PlacedDevice;
 	flow: Flow;
 	flowName: string | null;
+	/** The Flow revision the run starts from, or null (`flowsForRun`). */
+	flowRevision: string | null;
 	calledFlows: Record<string, Flow>;
+	/** The Flow revision of each called flow that has one, by name. */
+	calledFlowRevisions: Record<string, string>;
 	/**
 	 * Each Device with the nodes placed on it, every node once: run start
 	 * asks each Device whether it has what its nodes need. The plan checked

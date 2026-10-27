@@ -302,6 +302,8 @@ export async function planNodes(
 		run,
 		flow,
 		flowName: loaded.flowName,
+		flowRevision: loaded.flowRevision,
+		calledFlowRevisions: loaded.calledFlowRevisions,
 		calledFlows: Object.fromEntries(
 			calledNames.map((name, i) => [name, called[i] as Flow]),
 		),
