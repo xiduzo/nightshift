@@ -1,13 +1,14 @@
 import {
 	type Flow,
 	type FlowIssue,
+	type FlowSources,
 	isKitName,
 	kitFlow,
 	migrateFlow,
+	parsedFlows,
 	parseFlow,
 	validateFlow,
 } from "@nightshift/flows";
-import { type FlowSources, parsedFlows } from "@nightshift/flows/files";
 import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
 

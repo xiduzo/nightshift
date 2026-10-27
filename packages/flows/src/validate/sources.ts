@@ -1,0 +1,154 @@
+import { Refusal } from "@nightshift/refusal";
+import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../document";
+import type { ScheduleFlowInfo } from "../schedules";
+import { parseFlow } from "./flow";
+import type { FlowListItem, LoadedFlow, ProjectFlowMap } from "./issues";
+
+/**
+ * The flows of a project as plain data: what a Clone's flow files hold,
+ * read anywhere, and what the list, the editor, a run and the schedules
+ * make of them. Pure: reading them is the caller's.
+ */
+
+/**
+ * What one flow holds, as plain data that can cross a wire: its parsed
+ * JSON, or why it is not JSON.
+ */
+export type FlowSource = { json: unknown } | { jsonError: string };
+
+/** Every flow of a project by name (valid names only, sorted). */
+export type FlowSources = Record<string, FlowSource>;
+
+/** Where a flow of the sources is (`FlowFile.path`). */
+export type FlowPathOf = (name: string) => string;
+
+/** Every flow of the sources, with its errors and the flows that call it, sorted by name. */
+export function listFlowSources(
+	sources: FlowSources,
+	pathOf: FlowPathOf,
+): FlowListItem[] {
+	const files = sorted(sources);
+	const flows = flowsOf(files);
+	const items: FlowListItem[] = [];
+	for (const [name, file] of files) {
+		const loaded = loadedFlow(pathOf(name), name, file, flows);
+		items.push({
+			name: loaded.name,
+			path: loaded.path,
+			description: loaded.flow?.description ?? null,
+			nodeCount: loaded.flow?.nodes.length ?? null,
+			errorCount: loaded.issues.filter((issue) => issue.severity === "error")
+				.length,
+			inputs: loaded.flow?.inputs ?? [],
+			callers: callersOf(name, flows),
+		});
+	}
+	return items;
+}
+
+/**
+ * One flow of the sources. A flow that is not valid JSON loads with flow
+ * null. Called flows are checked against the other sources. Fails when
+ * there is no such flow.
+ */
+export function loadFlowSource(
+	sources: FlowSources,
+	name: string,
+	pathOf: FlowPathOf,
+): LoadedFlow {
+	const files = sorted(sources);
+	const file = files.get(name);
+	if (file === undefined) {
+		throw new Refusal("not-found", `The flow "${name}" does not exist.`);
+	}
+	return loadedFlow(pathOf(name), name, file, flowsOf(files));
+}
+
+/** Every source as a flow, null when it does not parse (`ValidateOptions.flows`). */
+export function parsedFlows(sources: FlowSources): Record<string, Flow | null> {
+	return flowsOf(sorted(sources));
+}
+
+/** The inputs and the error count of every flow of the sources, for `validateSchedules`. */
+export function scheduleFlowInfos(
+	sources: FlowSources,
+): Record<string, ScheduleFlowInfo | null> {
+	const files = sorted(sources);
+	const flows = flowsOf(files);
+	const infos: Record<string, ScheduleFlowInfo | null> = {};
+	for (const [name, file] of files) {
+		if (!("json" in file)) {
+			infos[name] = null;
+			continue;
+		}
+		const loaded = parseFlow(file.json, { flows, name });
+		infos[name] = loaded.flow
+			? {
+					inputs: loaded.flow.inputs,
+					errorCount: loaded.issues.filter((i) => i.severity === "error")
+						.length,
+				}
+			: null;
+	}
+	return infos;
+}
+
+/** The flows of the project that call `name` through a Call node. */
+export function callersOf(name: string, flows: ProjectFlowMap): string[] {
+	return Object.entries(flows)
+		.filter(
+			([caller, flow]) =>
+				caller !== name &&
+				(flow?.nodes ?? []).some(
+					(node) => node.type === "call" && node.flow === name,
+				),
+		)
+		.map(([caller]) => caller)
+		.sort();
+}
+
+/**
+ * A flow as Night Shift saves it: the current version, as pretty JSON
+ * with a trailing newline.
+ */
+export function canonicalFlowJson(flow: Flow): string {
+	const current: Flow = { ...flow, version: FLOW_VERSION };
+	return `${JSON.stringify(current, null, "\t")}\n`;
+}
+
+function sorted(sources: FlowSources): ReadonlyMap<string, FlowSource> {
+	return new Map(
+		Object.entries(sources).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+	);
+}
+
+function flowsOf(
+	files: ReadonlyMap<string, FlowSource>,
+): Record<string, Flow | null> {
+	const flows: Record<string, Flow | null> = {};
+	for (const [name, file] of files) {
+		const result =
+			"json" in file ? flowSchema.safeParse(migrateFlow(file.json)) : null;
+		flows[name] = result?.success ? result.data : null;
+	}
+	return flows;
+}
+
+function loadedFlow(
+	path: string,
+	name: string,
+	file: FlowSource,
+	flows: Readonly<Record<string, Flow | null>>,
+): LoadedFlow {
+	if (!("json" in file)) {
+		return {
+			name,
+			path,
+			flow: null,
+			issues: [
+				{ severity: "error", message: `Not valid JSON: ${file.jsonError}` },
+			],
+		};
+	}
+	return { name, path, ...parseFlow(file.json, { flows, name }) };
+}

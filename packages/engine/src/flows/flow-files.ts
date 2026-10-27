@@ -1,17 +1,18 @@
-import type {
-	Flow,
-	FlowIssue,
-	FlowListItem,
-	LoadedFlow,
-	ProjectFlowMap,
+import {
+	type Flow,
+	type FlowIssue,
+	type FlowListItem,
+	type FlowSources,
+	type LoadedFlow,
+	listFlowSources,
+	loadFlowSource,
+	type ProjectFlowMap,
+	parsedFlows,
 } from "@nightshift/flows";
 import {
 	deleteFlowFile,
-	type FlowSources,
+	flowFilePath,
 	listFlowFiles,
-	listFlowSources,
-	loadFlowSource,
-	parsedFlows,
 	readFlowFile,
 	readFlowSources,
 	writeFlowFile,
@@ -51,7 +52,7 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			if (row.repoPath !== null) return listFlowFiles(row.repoPath);
 			return listFlowSources(
 				await deps.elsewhere(spaceId, projectId, personId),
-				"",
+				(name) => flowFilePath("", name),
 			);
 		},
 
@@ -80,7 +81,7 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			return loadFlowSource(
 				await deps.elsewhere(spaceId, projectId, personId),
 				name,
-				"",
+				(found) => flowFilePath("", found),
 			);
 		},
 

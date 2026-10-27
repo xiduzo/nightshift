@@ -2,10 +2,10 @@ import type { Database } from "@nightshift/db";
 import type {
 	Flow,
 	FlowNode,
+	FlowSources,
 	ProfileSettings,
 	permissionModeSchema,
 } from "@nightshift/flows";
-import type { FlowSources } from "@nightshift/flows/files";
 import type { z } from "zod";
 import type {
 	Actor,
