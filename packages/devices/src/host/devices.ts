@@ -85,7 +85,7 @@ export function createDevices(deps: {
 		},
 		startPairing: (input) => host.startPairing(input),
 		redeemPairing: (input) => host.redeemPairing(input),
-		review: (headers, code) => host.review(headers, code),
+		review: (headers, code, personId) => host.review(headers, code, personId),
 		approve: (headers, code) => host.approve(headers, code),
 		deny: (headers, code) => host.deny(headers, code),
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),

@@ -104,6 +104,11 @@ export async function joinCommand(argv: string[], program: string) {
 				console.log(
 					`\nPaired with ${step.hostName} as ${step.role === "home" ? "its home Host" : "a guest Host"}. This computer stays connected to it.`,
 				);
+				if (step.role === "home" && step.hostAdmin === false) {
+					console.log(
+						`You are not the Host admin of ${step.hostName}. Its Host admin can read your personal runs and their transcripts there.`,
+					);
+				}
 			}
 		}
 	} catch (error) {

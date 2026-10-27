@@ -6,6 +6,7 @@ export {
 	hasHostAdmin,
 	type InvitationView,
 	invitationView,
+	isHostAdmin,
 	type MemberChange,
 	membershipOf,
 	membersOf,

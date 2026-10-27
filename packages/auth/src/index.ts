@@ -50,6 +50,7 @@ export {
 	addMembership,
 	type InvitationView,
 	invitationView,
+	isHostAdmin,
 	localPerson,
 	type MemberChange,
 	membershipOf,

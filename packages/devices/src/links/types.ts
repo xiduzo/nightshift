@@ -34,4 +34,14 @@ export type JoinProgress =
 			fingerprint: string | null;
 			expiresAt: number;
 	  }
-	| { kind: "joined"; hostId: string; hostName: string; role: HostRole };
+	| {
+			kind: "joined";
+			hostId: string;
+			hostName: string;
+			role: HostRole;
+			/**
+			 * This computer's owner is the Host admin there. When not, the Host
+			 * admin can read their personal runs. Null: the Host did not say.
+			 */
+			hostAdmin: boolean | null;
+	  };

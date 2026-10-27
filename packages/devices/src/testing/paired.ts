@@ -140,7 +140,8 @@ export async function pairedReplicas(
 			name,
 			platform: "test",
 			ownerId: personId,
-			homeHost: null,
+			// A is its home Host, as its link says below.
+			homeHost: "https://a.invalid",
 		});
 		const key: DeviceKeyAccess = {
 			keyId: `key-${sandbox.deviceId}`,

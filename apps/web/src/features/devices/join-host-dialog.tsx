@@ -31,7 +31,12 @@ import {
 } from "@nightshift/ui/components/radio-group";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQueryClient } from "@tanstack/react-query";
-import { CopyIcon, ExternalLinkIcon, ShieldCheckIcon } from "lucide-react";
+import {
+	CopyIcon,
+	ExternalLinkIcon,
+	EyeIcon,
+	ShieldCheckIcon,
+} from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -42,7 +47,7 @@ import { deviceQueries } from "./queries";
 
 type Role = "home" | "guest";
 
-/** Where the pairing is: the form, the code to enter on the Host, or an error. */
+/** Where the pairing is: the form, the code to enter on the Host, an error, or done. */
 type Step =
 	| { kind: "form"; error: string | null }
 	| { kind: "starting" }
@@ -53,7 +58,9 @@ type Step =
 			page: string | null;
 			fingerprint: string | null;
 			expiresAt: number;
-	  };
+	  }
+	/** Paired with a home Host whose Host admin is someone else. */
+	| { kind: "joined"; hostName: string };
 
 /**
  * "Join a Host": pairs this computer with a Host. This computer asks the
@@ -118,10 +125,14 @@ function JoinHostSteps({
 						expiresAt: next.expiresAt,
 					});
 				} else {
-					toast.success(`Paired with ${next.hostName}`);
 					void queryClient.invalidateQueries({
 						queryKey: deviceQueries.overviewKey(),
 					});
+					if (next.role === "home" && next.hostAdmin === false) {
+						setStep({ kind: "joined", hostName: next.hostName });
+						return;
+					}
+					toast.success(`Paired with ${next.hostName}`);
 					onDone();
 					return;
 				}
@@ -137,6 +148,9 @@ function JoinHostSteps({
 
 	if (step.kind === "code") {
 		return <CodeStep step={step} />;
+	}
+	if (step.kind === "joined") {
+		return <JoinedStep hostName={step.hostName} />;
 	}
 
 	const starting = step.kind === "starting";
@@ -225,6 +239,35 @@ function JoinHostSteps({
 				</Button>
 			</DialogFooter>
 		</form>
+	);
+}
+
+/**
+ * Paired with a home Host that someone else runs: its Host admin can read
+ * this Person's personal runs there, so the Person reads that before the
+ * dialog closes.
+ */
+function JoinedStep({ hostName }: { hostName: string }) {
+	return (
+		<>
+			<DialogHeader>
+				<DialogTitle>Paired with {hostName}</DialogTitle>
+				<DialogDescription>
+					This computer stays connected to it.
+				</DialogDescription>
+			</DialogHeader>
+			<Alert>
+				<EyeIcon />
+				<AlertTitle>The Host admin can read your personal runs</AlertTitle>
+				<AlertDescription>
+					You are not the Host admin of {hostName}. Its Host admin can read your
+					personal runs and their transcripts there.
+				</AlertDescription>
+			</Alert>
+			<DialogFooter>
+				<DialogClose render={<Button />}>Done</DialogClose>
+			</DialogFooter>
+		</>
 	);
 }
 

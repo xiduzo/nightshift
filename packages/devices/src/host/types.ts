@@ -47,6 +47,10 @@ export type DevicesOverview = {
 /** A pairing code, as the Person approving it sees it. */
 export type PairingReviewView = {
 	userCode: string;
+	/** The Person who reviews it is the Host admin. */
+	hostAdmin: boolean;
+	/** The Device asks this Host to be its home Host. Null: an older Device did not say. */
+	home: boolean | null;
 	status: "pending" | "approved" | "denied";
 	device: { id: string; name: string | null; platform: string | null };
 	/** This Host's certificate fingerprint, to compare with the one the device shows. */
@@ -63,6 +67,8 @@ export type Devices = {
 		deviceId: string;
 		name: string;
 		platform: string;
+		/** This Host is to be the Device's home Host. */
+		home?: boolean;
 	}): Promise<PairingStart>;
 	/** A joining Device polls for the answer; on approval it gets its key. */
 	redeemPairing(input: {
@@ -73,8 +79,12 @@ export type Devices = {
 		/** The address the Device joined by. */
 		address: string;
 	}): Promise<PairingRedeemed>;
-	/** Binds the code to the Person whose session `headers` carry, and shows it. */
-	review(headers: Headers, userCode: string): Promise<PairingReviewView>;
+	/** Binds the code to the Person whose session `headers` carry (`personId`), and shows it. */
+	review(
+		headers: Headers,
+		userCode: string,
+		personId: string,
+	): Promise<PairingReviewView>;
 	approve(headers: Headers, userCode: string): Promise<void>;
 	deny(headers: Headers, userCode: string): Promise<void>;
 	/** Removes a Device's access: its key, its connections. The Person's own Devices only. */

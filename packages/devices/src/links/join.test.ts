@@ -2,7 +2,10 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HostLinks } from "./host-links";
+import { implement } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
+import { hostContract, type PairingRedeemed } from "../contract";
+import type { HostLink, HostLinks } from "./host-links";
 import { hostPage, joinHost } from "./join";
 
 /**
@@ -108,6 +111,108 @@ describe("joining a Host", () => {
 			}
 		},
 	);
+});
+
+/**
+ * A Host that serves pairing only, on the loopback: it gives a code, and
+ * its first answer to the poll is `joined`. It keeps what the joining
+ * Device asked for.
+ */
+function pairingHost(joined: Joined) {
+	const asked: { home?: boolean }[] = [];
+	const host = implement(hostContract);
+	const handler = new RPCHandler({
+		pairing: {
+			start: host.pairing.start.handler(({ input }) => {
+				asked.push({ home: input.home });
+				return {
+					deviceCode: "device-code",
+					userCode: "ABCD1234",
+					verificationUri: "http://127.0.0.1/devices",
+					verificationUriComplete: "http://127.0.0.1/devices?pair=ABCD1234",
+					expiresIn: 600,
+					interval: 0,
+					fingerprint: null,
+				};
+			}),
+			redeem: host.pairing.redeem.handler(() => joined),
+		},
+	});
+	const server = Bun.serve({
+		hostname: "127.0.0.1",
+		port: 0,
+		async fetch(request) {
+			const { response } = await handler.handle(request, { prefix: "/rpc" });
+			return response ?? new Response("Not found", { status: 404 });
+		},
+	});
+	return { url: `http://127.0.0.1:${server.port}`, asked, server };
+}
+
+/** Joins the Host at `url` as `role`, and returns every step it yields. */
+async function joinSteps(url: string, role: "home" | "guest") {
+	const links = {
+		list: async () => [],
+		save: async (link) => ({ ...link, createdAt: 0, revokedAt: null }),
+	} as Pick<HostLinks, "list" | "save"> as HostLinks;
+	const steps = [];
+	for await (const step of joinHost(
+		{
+			self: { id: "device-b", name: "laptop", platform: "darwin" },
+			links,
+			keys: {
+				kind: "file",
+				get: async () => null,
+				set: async () => {},
+				delete: async () => {},
+			},
+			started: (_link: HostLink) => {},
+			sleep: async () => {},
+		},
+		{ url, role },
+	)) {
+		steps.push(step);
+	}
+	return steps;
+}
+
+type Joined = Extract<PairingRedeemed, { status: "joined" }>;
+
+const joinedAnswer: Joined = {
+	status: "joined",
+	key: "device-key",
+	personId: "person-bob",
+	host: { id: "host-a", name: "Studio", addresses: [] },
+};
+
+describe("joining a Host as its home Host", () => {
+	test("asks to be its home Device, and says when the Person is not the Host admin", async () => {
+		const host = pairingHost({ ...joinedAnswer, hostAdmin: false });
+		try {
+			const steps = await joinSteps(host.url, "home");
+			expect(host.asked).toEqual([{ home: true }]);
+			expect(steps.at(-1)).toEqual({
+				kind: "joined",
+				hostId: "host-a",
+				hostName: "Studio",
+				role: "home",
+				hostAdmin: false,
+			});
+		} finally {
+			host.server.stop(true);
+		}
+	});
+
+	test("with a Host of an older version, which does not say who its Host admin is", async () => {
+		const host = pairingHost(joinedAnswer);
+		try {
+			const steps = await joinSteps(host.url, "guest");
+			expect(host.asked).toEqual([{ home: false }]);
+			expect(steps.at(-1)).toMatchObject({ role: "guest", hostAdmin: null });
+		} finally {
+			host.server.stop(true);
+		}
+	});
 });
 
 describe("the Host's page for the code", () => {

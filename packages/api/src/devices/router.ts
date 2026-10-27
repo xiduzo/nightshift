@@ -54,7 +54,11 @@ export const devices = {
 		.output(output(pairingReviewViewSchema))
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
-			context.devices.review(context.headers, input.userCode),
+			context.devices.review(
+				context.headers,
+				input.userCode,
+				context.session.user.id,
+			),
 		),
 	approve: protectedProcedure
 		.route({
