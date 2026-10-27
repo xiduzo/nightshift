@@ -31,6 +31,10 @@ export const notificationSettings = sqliteTable("notification_settings", {
 		.notNull()
 		.default(true),
 	runFailed: integer("run_failed", { mode: "boolean" }).notNull().default(true),
+	/** A step of a run for the Person waits for a Device that is offline. */
+	deviceWait: integer("device_wait", { mode: "boolean" })
+		.notNull()
+		.default(true),
 	/** Quiet hours start, `HH:MM` in `time_zone`. Null: no quiet hours. */
 	quietStart: text("quiet_start"),
 	/** Quiet hours end, `HH:MM` in `time_zone`. */
@@ -81,20 +85,29 @@ export const pushTarget = sqliteTable(
 /**
  * What the notifier did with one event for one Person: sent, held or
  * withdrawn. Keyed by the event (`runId:stepId` for a Gate,
- * `runId:end:<seq>` for a run that ended), so a notification goes out once
- * and can be withdrawn on every screen that got it.
+ * `runId:end:<seq>` for a run that ended, `runId:wait:<stepId>` for a
+ * step that waits for a Device), so a notification goes out once and can
+ * be withdrawn on every screen that got it.
  */
 export const notificationDelivery = sqliteTable(
 	"notification_delivery",
 	{
 		personId: text("person_id").notNull(),
 		key: text("key").notNull(),
-		/** `gate-opened`, `run-finished` or `run-failed`. */
+		/** `gate-opened`, `run-finished`, `run-failed` or `device-wait`. */
 		kind: text("kind").notNull(),
 		spaceId: text("space_id").notNull(),
 		runId: text("run_id").notNull(),
-		/** The Gate's step. Null for a run. */
+		/** The Gate's step, or the step that waits. Null for a run. */
 		stepId: text("step_id"),
+		/**
+		 * What the notification says, when it names more than its kind
+		 * ("Triage waits for studio-mac"): a held push goes out with the
+		 * same words. Null: the sentence of its kind.
+		 */
+		title: text("title"),
+		/** The notification's second line. Null: none. */
+		body: text("body"),
 		/**
 		 * `held`: waits until `due_at` while a screen is open. `quiet`: waits
 		 * for the end of quiet hours. `sent`, `dropped` or `withdrawn`.

@@ -1,9 +1,11 @@
 /** The channels: the port every way to reach a screen implements, the in-app stream, the push slots, and Web Push with its VAPID keys. */
 
 export {
+	deviceWaitWords,
 	type GateFacts,
 	gatesWaitingTitle,
 	type InAppTarget,
+	type NoticeWords,
 	type NotificationChannel,
 	type NotificationMessage,
 	type PushChannels,

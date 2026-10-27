@@ -36,6 +36,8 @@ const eventsSchema = z.object({
 	runFinished: z.boolean(),
 	/** A run failed. */
 	runFailed: z.boolean(),
+	/** A step of a run for you waits for a device that is offline. */
+	deviceWait: z.boolean(),
 });
 
 const quietHoursSchema = z.object({
@@ -98,10 +100,10 @@ const SWITCH_KEYS = [
 	"notifyRunFailed",
 ] as const;
 
-/** The Person's events that the computer's switches stand for. */
+/** The Person's events that the computer's switches stand for. The computer had no switch for a device wait. */
 export function eventsOfSwitches(
 	switches: ComputerSwitches,
-): NotificationSettings["events"] {
+): Omit<NotificationSettings["events"], "deviceWait"> {
 	return {
 		gateOpened: switches.notifyGateOpened,
 		runFinished: switches.notifyRunFinished,
@@ -123,7 +125,12 @@ export function defaultSettings(
 	timeZone: string = localTimeZone(),
 ): NotificationSettings {
 	return {
-		events: { gateOpened: true, runFinished: true, runFailed: true },
+		events: {
+			gateOpened: true,
+			runFinished: true,
+			runFailed: true,
+			deviceWait: true,
+		},
 		quietHours: null,
 		timeZone,
 		screens: { web: true, expo: true, desktop: true },
@@ -203,6 +210,7 @@ export function createSettingsStore(
 				gateOpened: row.gateOpened,
 				runFinished: row.runFinished,
 				runFailed: row.runFailed,
+				deviceWait: row.deviceWait,
 			},
 			quietHours:
 				row.quietStart && row.quietEnd
@@ -220,6 +228,7 @@ export function createSettingsStore(
 			gateOpened: settings.events.gateOpened,
 			runFinished: settings.events.runFinished,
 			runFailed: settings.events.runFailed,
+			deviceWait: settings.events.deviceWait,
 			quietStart: settings.quietHours?.start ?? null,
 			quietEnd: settings.quietHours?.end ?? null,
 			timeZone: settings.timeZone,

@@ -535,6 +535,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(JSON.parse(waited?.payload ?? "{}")).toMatchObject({
 			reason: "device-offline",
 			deviceId: B,
+			deviceName: "studio-b",
 			message: "studio-b is offline. The step starts when it is back.",
 		});
 		online.add(B);
@@ -757,6 +758,7 @@ describe("a run's plan", () => {
 		expect(JSON.parse(waited?.payload ?? "{}")).toMatchObject({
 			reason: "device-offline",
 			deviceId: B,
+			deviceName: "studio-b",
 			message: "studio-b is offline. The step starts when it is back.",
 		});
 		online.add(B);

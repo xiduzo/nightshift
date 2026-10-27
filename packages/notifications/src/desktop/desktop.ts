@@ -143,5 +143,10 @@ export function noticeOf(message: NotificationMessage): DesktopNotice {
 			return { ...base, body: "Open the run to see its outcome." };
 		case "run-failed":
 			return { ...base, body: "Open the run to see why it failed." };
+		case "device-wait":
+			return {
+				...base,
+				body: message.body ?? "Open the run to see what waits.",
+			};
 	}
 }

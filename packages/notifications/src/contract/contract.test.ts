@@ -3,9 +3,11 @@ import { describe, expect, test } from "bun:test";
 import type { NotificationMessage } from "../channels";
 import { expoMessage, expoWithdrawMessage } from "../channels/expo";
 import {
+	deviceWaitKey,
 	gateKey,
 	isGateKey,
 	type PushData,
+	parseDeviceWaitKey,
 	parseGateKey,
 	pushDataOf,
 	routeOf,
@@ -45,6 +47,23 @@ describe("a notification key", () => {
 			expect(parseGateKey(key)).toBeNull();
 			expect(isGateKey(key)).toBe(false);
 		}
+	});
+
+	test("a device wait's key is its run and step, and is no Gate", () => {
+		const key = deviceWaitKey({ runId: "run-1", stepId: "build" });
+		expect(key).toBe("run-1:wait:build");
+		expect(parseKey(key)).toEqual({
+			kind: "device-wait",
+			runId: "run-1",
+			stepId: "build",
+		});
+		expect(parseDeviceWaitKey(key)).toEqual({
+			runId: "run-1",
+			stepId: "build",
+		});
+		expect(parseDeviceWaitKey("run-1:build")).toBeNull();
+		expect(parseGateKey(key)).toBeNull();
+		expect(isGateKey(key)).toBe(false);
 	});
 
 	test("a key Night Shift does not make names nothing", () => {
@@ -147,6 +166,14 @@ describe("where a tap goes", () => {
 		expect(at("run-failed", "run-1")).toBe("/runs/run-1");
 	});
 
+	test("a step that waits for a device opens its run", () => {
+		expect(
+			routeOf({ kind: "device-wait", runId: "run-1", stepId: "build" }),
+		).toEqual({ to: "run", runId: "run-1" });
+		expect(at("device-wait", "run-1", "build")).toBe("/runs/run-1");
+		expect(at("device-wait", null, "build")).toBe("/inbox");
+	});
+
 	test("anything else, or a push without its ids, opens the inbox", () => {
 		expect(at("gates-waiting", null)).toBe("/inbox");
 		expect(at("run-finished", null)).toBe("/inbox");
@@ -178,6 +205,12 @@ describe("from the Host to the phone", () => {
 				gate: { lockScreen: true, options: lockScreenGate.options },
 			}),
 			message({ kind: "run-finished", key: "run-1:end:3", stepId: null }),
+			message({
+				kind: "device-wait",
+				key: "run-1:wait:review",
+				title: "Triage waits for studio-mac",
+				body: "The step starts when the device is back.",
+			}),
 			message({
 				kind: "gates-waiting",
 				key: "waiting:5",

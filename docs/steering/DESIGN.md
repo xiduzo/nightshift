@@ -8,7 +8,7 @@ Last updated: 2026-10-21
 
 1. **Show the facts, not a mood** — Every status on screen is derived from a fact the user can open: an event, a pull request, a check. No spinner without a session behind it.
 2. **The gate is the product** — The "Needs you" inbox is the most important screen. It lists the open gates of every Space you are in on the left, grouped by project, like the Agents page. The open gate shows what happened on the left, and its links, choices and note on the right. The right side stays in place while you read. Resolving one takes two actions: pick a choice, then send. Nothing goes out by accident.
-3. **Calm by default** — An unattended run is quiet. The UI surfaces only changes that need a person. Noise goes to the transcript. A notification goes out only for a gate, a finished run or a failed run, on the screens the person chose, outside their quiet hours.
+3. **Calm by default** — An unattended run is quiet. The UI surfaces only changes that need a person. Noise goes to the transcript. A notification goes out only for a gate, a finished run, a failed run or a step that waits for an offline device, on the screens the person chose, outside their quiet hours.
 4. **Same words as the method** — The spec tree uses the method's own terms (Epic, Feature, Trace for WTF). The pipeline uses Night Shift terms (Flow, Step, Gate). Never mix the two on one card.
 5. **Readable for a Product Owner** — No terminal metaphors. A session is a transcript. A takeover is a button that copies a command.
 

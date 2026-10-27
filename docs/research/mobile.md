@@ -272,15 +272,16 @@ registers it again. Expo gives a push token only with the EAS project id
 `eas init`). Without it the app works, but the phone does not register.
 
 **Every push** has a `title` (one sentence, for example "A Gate waits for
-you") and no `body`. `threadId`, `collapseId` and the Android `tag` are the
+you") and no `body`, but for `device-wait`: "Triage waits for studio-mac",
+with a `body` that says when the run stops waiting. `threadId`, `collapseId` and the Android `tag` are the
 key, so a second push of one key replaces the first. The `data`:
 
 | Field | Value |
 | --- | --- |
-| `kind` | `gate-opened`, `run-finished`, `run-failed` or `gates-waiting` |
-| `key` | `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `waiting:<ms>` for `gates-waiting` |
+| `kind` | `gate-opened`, `run-finished`, `run-failed`, `device-wait` or `gates-waiting` |
+| `key` | `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `runId:wait:<stepId>` for a step that waits for a Device, `waiting:<ms>` for `gates-waiting` |
 | `spaceId`, `runId` | The run and its Space. Null for `gates-waiting`, which spans Spaces |
-| `stepId` | The Gate's step. Null for a run and for `gates-waiting` |
+| `stepId` | The Gate's step, or the step that waits. Null for a run and for `gates-waiting` |
 | `count` | `gates-waiting` only: how many Gates wait |
 | `options` | `gate-decide` only: `[{ id, label }, { id, label }]`, the two options in the author's order |
 
@@ -291,7 +292,7 @@ key, so a second push of one key replaces the first. The `data`:
 | --- | --- | --- | --- |
 | `gate-decide` | A Gate the author marked (`lockScreen: true`) with exactly two options, sent to a person whose role allows an answer | `approve` and `reject`, both `isAuthenticationRequired: false` and `opensAppToForeground: false`: the author marked the Gate, so the answer needs no unlock | Opens the Gate |
 | `gate-open` | Every other Gate, and `gates-waiting` | none | Opens the Gate, or the inbox when `runId` is null. A biometric check comes before the answer |
-| `run` | A run that finished or failed | none | Opens the run |
+| `run` | A run that finished or failed, or a step that waits for a Device (to the Person the run runs for only) | none | Opens the run |
 
 The action `approve` answers `options[0].id`, `reject` answers
 `options[1].id`: `gates.resolve({ runId, stepId, choice })`. The buttons

@@ -10,8 +10,12 @@ import { and, eq, inArray } from "drizzle-orm";
  * reaches each of them.
  */
 
-/** What a notification tells. */
-export type NoticeKind = "gate-opened" | "run-finished" | "run-failed";
+/** What a notification tells. `device-wait`: a step waits for a Device that is offline. */
+export type NoticeKind =
+	| "gate-opened"
+	| "run-finished"
+	| "run-failed"
+	| "device-wait";
 
 /**
  * `sending`: claimed, and going out to `heldFor` now. A crash before it
@@ -35,6 +39,14 @@ export type Delivery = {
 	spaceId: string;
 	runId: string;
 	stepId: string | null;
+	/**
+	 * What the notification says, when it names more than its kind ("Triage
+	 * waits for studio-mac"). A held push goes out with the same words.
+	 * Null: the sentence of its kind (`titleOf`).
+	 */
+	title: string | null;
+	/** The second line. Null: none. */
+	body: string | null;
 	status: DeliveryStatus;
 	dueAt: number | null;
 	/** The push targets that got it, by id. */
@@ -46,11 +58,12 @@ export type Delivery = {
 	withdrawnAt: number | null;
 };
 
-/** A new entry of the log. */
+/** A new entry of the log. Without `title` and `body`: the sentence of its kind. */
 export type Claim = Pick<
 	Delivery,
 	"personId" | "key" | "kind" | "spaceId" | "runId" | "stepId"
->;
+> &
+	Partial<Pick<Delivery, "title" | "body">>;
 
 /** What can change on an entry. */
 export type DeliveryChange = Partial<
@@ -74,6 +87,8 @@ export function createDeliveryLog(db: Database) {
 			spaceId: row.spaceId,
 			runId: row.runId,
 			stepId: row.stepId,
+			title: row.title,
+			body: row.body,
 			status: row.status as DeliveryStatus,
 			dueAt: row.dueAt?.getTime() ?? null,
 			sentTo: ids(row.sentTo),
@@ -113,6 +128,8 @@ export function createDeliveryLog(db: Database) {
 		): Promise<boolean> {
 			const values = {
 				...claim,
+				title: claim.title ?? null,
+				body: claim.body ?? null,
 				...columns(change),
 				status: change.status,
 				createdAt: new Date(now),
@@ -203,14 +220,17 @@ export function createDeliveryLog(db: Database) {
 			return rows.map(toDelivery);
 		},
 
-		/** The Gates of the log that may still be open: sending, held, quiet or sent. */
-		async liveGates(): Promise<Delivery[]> {
+		/**
+		 * The entries of one kind that can still reach a screen, or did:
+		 * the Gates that may still be open, the waits that may still last.
+		 */
+		async liveOfKind(kind: NoticeKind): Promise<Delivery[]> {
 			const rows = await db
 				.select()
 				.from(notificationDelivery)
 				.where(
 					and(
-						eq(notificationDelivery.kind, "gate-opened"),
+						eq(notificationDelivery.kind, kind),
 						inArray(notificationDelivery.status, LIVE),
 					),
 				);

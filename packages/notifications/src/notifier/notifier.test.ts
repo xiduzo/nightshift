@@ -970,3 +970,219 @@ describe("lock-screen Gates", () => {
 		expect(expo.sent()[0]).not.toHaveProperty("gate");
 	});
 });
+
+describe("a step that waits for a device", () => {
+	/** 06:00 UTC the next morning: the run's stop time. */
+	const STOP = Date.UTC(2026, 9, 22, 6, 0);
+
+	beforeEach(() => {
+		events.setRun("run-1", {
+			title: "Nightly triage",
+			personId: "ada",
+			stopAt: STOP,
+			sleeping: true,
+		});
+	});
+
+	/** The step sleeps because its Device is offline: the first sleep, or a look again a minute later. */
+	async function sleepFor(stepId = "step-1", deviceName = "studio-mac") {
+		events.land([
+			event("WaitStarted", "run-1", stepId, {
+				reason: "device-offline",
+				deviceId: "device-2",
+				deviceName,
+			}),
+		]);
+		await notifier.idle();
+	}
+
+	async function wake(stepId = "step-1") {
+		events.land([event("WaitEnded", "run-1", stepId, { early: false })]);
+		await notifier.idle();
+	}
+
+	test("tells only the person the run runs for, with the flow, the device and the stop time", async () => {
+		await notifier.start();
+		const ada = await register("ada", "expo");
+		await register("bob", "expo");
+		const adaScreen = openScreen("ada");
+		const bobScreen = openScreen("bob");
+		await settings.save("ada", { holdMinutes: 0 });
+
+		await sleepFor();
+
+		expect(sentTo(expo)).toEqual([`${ada.id}:run-1:wait:step-1`]);
+		expect(expo.sent()[0]).toMatchObject({
+			kind: "device-wait",
+			runId: "run-1",
+			stepId: "step-1",
+			title: "Nightly triage waits for studio-mac",
+			body: "The step starts when the device is back. If it is not back by 06:00, the run stops.",
+		});
+		expect(adaScreen[0]).toMatchObject({
+			kind: "device-wait",
+			key: "run-1:wait:step-1",
+			title: "Nightly triage waits for studio-mac",
+			alert: true,
+		});
+		// Bob's screens only read the run again.
+		expect(bobScreen.map((item) => item.kind)).toEqual(["run-changed"]);
+	});
+
+	test("the step that looks again every minute keeps its one notification", async () => {
+		await notifier.start();
+		await register("ada", "web");
+
+		await sleepFor();
+		for (let minute = 1; minute <= 3; minute++) {
+			clock += MINUTE;
+			await wake();
+			await sleepFor();
+			await notifier.tick();
+		}
+
+		expect(web.sent()).toHaveLength(1);
+		expect(web.withdrawn()).toEqual([]);
+	});
+
+	test("is withdrawn once the step does not sleep again", async () => {
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		await sleepFor();
+		const screen = openScreen("ada");
+
+		await wake();
+		await notifier.tick();
+		expect(expo.withdrawn()).toEqual([]);
+
+		clock += 15_000;
+		await notifier.tick();
+		expect(expo.calls.at(-1)).toEqual({
+			call: "withdraw",
+			targetId: phone.id,
+			key: "run-1:wait:step-1",
+		});
+		expect(screen.map((item) => item.kind)).toEqual([
+			"run-changed",
+			"wait-ended",
+		]);
+		expect((await deliveries.live("run-1:wait:step-1")).length).toBe(0);
+	});
+
+	test("is withdrawn at once when the step or the run ends", async () => {
+		await notifier.start();
+		await register("ada", "web");
+		await sleepFor("step-1");
+		await sleepFor("step-2");
+
+		events.land([event("StepEnded", "run-1", "step-1")]);
+		await notifier.idle();
+		expect(web.withdrawn()).toEqual(["run-1:wait:step-1"]);
+
+		await endRun("run-1", "stopped");
+		expect(web.withdrawn()).toEqual(["run-1:wait:step-1", "run-1:wait:step-2"]);
+	});
+
+	test("says no stop time when the run has none, and names a device of an older Night Shift as a device", async () => {
+		events.setRun("run-1", {
+			title: "Nightly triage",
+			personId: "ada",
+			stopAt: null,
+			sleeping: true,
+		});
+		await notifier.start();
+		await register("ada", "web");
+
+		await sleepFor("step-1", "");
+
+		expect(web.sent()[0]).toMatchObject({
+			title: "Nightly triage waits for a device",
+			body: "The step starts when the device is back.",
+		});
+	});
+
+	test("goes to nobody when the person turned it off, left the Space, or the run names nobody", async () => {
+		await notifier.start();
+		await register("ada", "web");
+		await register("cy", "web");
+		await settings.save("ada", { events: { deviceWait: false } });
+
+		await sleepFor("step-1");
+		events.setRun("run-1", {
+			title: "Nightly triage",
+			personId: "cy",
+			stopAt: null,
+			sleeping: true,
+		});
+		await sleepFor("step-2");
+		events.setRun("run-1", {
+			title: "Nightly triage",
+			personId: null,
+			stopAt: null,
+			sleeping: true,
+		});
+		await sleepFor("step-3");
+
+		expect(web.calls).toEqual([]);
+	});
+
+	test("a wait held over quiet hours goes out with its words when they end", async () => {
+		await settings.save("ada", {
+			quietHours: { start: "22:00", end: "07:00" },
+		});
+		clock = Date.UTC(2026, 9, 21, 23, 0);
+		events.setRun("run-1", {
+			title: "Nightly triage",
+			personId: "ada",
+			stopAt: Date.UTC(2026, 9, 22, 9, 30),
+			sleeping: true,
+		});
+		await notifier.start();
+		const ada = await register("ada", "web");
+
+		await sleepFor();
+		expect(web.calls).toEqual([]);
+
+		clock = Date.UTC(2026, 9, 22, 7, 0);
+		await notifier.tick();
+
+		expect(sentTo(web)).toEqual([`${ada.id}:run-1:wait:step-1`]);
+		expect(web.sent()[0]).toMatchObject({
+			title: "Nightly triage waits for studio-mac",
+			body: "The step starts when the device is back. If it is not back by 09:30, the run stops.",
+		});
+	});
+
+	test("a wait that ended while no notifier listened is withdrawn at start", async () => {
+		await notifier.start();
+		await register("ada", "web");
+		await sleepFor();
+		notifier.stop();
+
+		events.setRun("run-1", {
+			title: "Nightly triage",
+			personId: "ada",
+			stopAt: STOP,
+			sleeping: false,
+		});
+		notifier = makeNotifier();
+		await notifier.start();
+
+		expect(web.withdrawn()).toEqual(["run-1:wait:step-1"]);
+	});
+
+	test("a wait that still lasts at start is withdrawn when it ends later", async () => {
+		await notifier.start();
+		await register("ada", "web");
+		await sleepFor();
+		notifier.stop();
+
+		notifier = makeNotifier();
+		await notifier.start();
+		expect(web.withdrawn()).toEqual([]);
+
+		events.land([event("StepEnded", "run-1", "step-1")]);
+		await notifier.idle();
+		expect(web.withdrawn()).toEqual(["run-1:wait:step-1"]);
+	});
+});

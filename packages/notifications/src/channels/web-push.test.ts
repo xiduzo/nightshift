@@ -140,3 +140,27 @@ test("a run that ended is not urgent, and a run that failed is normal", async ()
 
 	expect(sender.requests.map((r) => r.urgency)).toEqual(["low", "normal"]);
 });
+
+test("a step that waits for a device is normal, and carries its second line", async () => {
+	const sender = fakeWebPushSender();
+	const channel = createWebPushChannel({
+		keys,
+		subject: "mailto:host@example.com",
+		sender: sender.send,
+	});
+
+	await channel.send(browser, {
+		...gate,
+		kind: "device-wait",
+		key: "run-1:wait:step-1",
+		title: "Triage waits for studio-mac",
+		body: "The step starts when the device is back.",
+	});
+
+	expect(sender.requests[0]?.urgency).toBe("normal");
+	expect(sender.payloads()[0]).toMatchObject({
+		kind: "device-wait",
+		title: "Triage waits for studio-mac",
+		body: "The step starts when the device is back.",
+	});
+});

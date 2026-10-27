@@ -255,7 +255,7 @@ export async function sleep(
 	// login's), or the one that is offline. A Wait node's own wait has none.
 	const deviceId =
 		request.kind === "device"
-			? { deviceId: request.deviceId }
+			? { deviceId: request.deviceId, deviceName: request.name }
 			: request.kind === "policy"
 				? { deviceId: step.device.id }
 				: {};

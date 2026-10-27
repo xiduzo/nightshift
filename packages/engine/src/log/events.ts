@@ -440,6 +440,8 @@ export type EnginePayloads = {
 		signalKey?: string;
 		/** The Device the step waits for or on: a usage limit is its harness login's. */
 		deviceId?: string;
+		/** `device-offline`: the name of the Device it waits for, for a notification. */
+		deviceName?: string;
 	};
 	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
 	WaitEnded: { early: boolean; signal?: string };
