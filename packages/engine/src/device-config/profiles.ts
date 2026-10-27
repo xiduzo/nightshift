@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
 	migrateToolSets,
 	type Profile,
@@ -11,32 +12,47 @@ import { type DeviceDocument, mapView } from "./device-document";
 
 /**
  * Profiles: an Agent Profile (a harness, a model and its tools) or a Model
- * Profile (a decider and its model) under one name, defined once on this
- * Device (the Agents page) and kept in its Device document. Agent nodes,
- * and Decisions and Values decided by a model, name a profile; a run
- * resolves it when it starts.
+ * Profile (a decider and its model), defined once on this Device (the
+ * Agents page) and kept in its Device document. A profile's id never
+ * changes. Its name is a label that a rename changes. Agent nodes, and
+ * Decisions and Values decided by a model, name a profile by that label
+ * for now; a run resolves it when it starts.
  */
 
-export type ProfileView = Profile & { updatedAt: number };
+export type ProfileView = Profile & { id: string; updatedAt: number };
 
 export type ProfileStore = {
 	/** Reads the profiles. Call once before the rest. */
 	load(): Promise<void>;
 	list(): ProfileView[];
-	get(name: string): ProfileView | null;
+	get(id: string): ProfileView | null;
+	/** The profile with that name, as a flow names it. */
+	byName(name: string): ProfileView | null;
 	/** What a run resolves a node with, or null when there is no such profile. */
-	settingsFor(name: string): ProfileSettings | null;
-	/** Creates or replaces a profile. */
-	save(input: Profile): Promise<ProfileView>;
-	remove(name: string): Promise<void>;
+	settingsFor(id: string): ProfileSettings | null;
+	/** Adds a profile, or replaces the one of `id`. A rename keeps the id. */
+	save(input: Profile, id?: string): Promise<ProfileView>;
+	remove(id: string): Promise<void>;
 };
 
-/** A profile as the Device document holds it. */
+/**
+ * A profile as the Device document holds it, under its id. An entry saved
+ * before profiles had ids has no `name`: its key is its name and its id.
+ */
 const entrySchema = z.object({
+	name: z.string().optional(),
 	description: z.string().nullable(),
 	settings: z.unknown(),
 	updatedAt: z.number(),
 });
+
+/**
+ * A new profile's id. The hyphen keeps it apart from every name
+ * (`nameSchema`), so it never equals the id of an entry saved before ids.
+ */
+function newProfileId(): string {
+	return `p-${randomUUID()}`;
+}
 
 export function createProfileStore(options: {
 	document: DeviceDocument;
@@ -44,7 +60,7 @@ export function createProfileStore(options: {
 	const { document } = options;
 	const profiles = mapView(document, document.profiles, () => {
 		const out = new Map<string, ProfileView>();
-		for (const [name, value] of document.profiles.entries()) {
+		for (const [id, value] of document.profiles.entries()) {
 			const entry = entrySchema.safeParse(value);
 			if (!entry.success) continue;
 			// A profile saved with the GitHub tool set reads as one with `gh`.
@@ -53,9 +69,10 @@ export function createProfileStore(options: {
 			);
 			// An entry this version cannot read stays in the document, unused.
 			if (!parsed.success) continue;
-			out.set(name, {
+			out.set(id, {
 				...parsed.data,
-				name,
+				id,
+				name: entry.data.name ?? id,
 				...(entry.data.description
 					? { description: entry.data.description }
 					: {}),
@@ -64,17 +81,22 @@ export function createProfileStore(options: {
 		}
 		return out;
 	});
+	const list = () =>
+		[...profiles().values()].sort(
+			(a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+		);
 
 	return {
 		// The document is read when it opens; a remote edit applies at once.
 		async load() {},
-		list: () =>
-			[...profiles().values()].sort((a, b) => a.name.localeCompare(b.name)),
-		get: (name) => profiles().get(name) ?? null,
-		settingsFor(name) {
-			const found = profiles().get(name);
+		list,
+		get: (id) => profiles().get(id) ?? null,
+		byName: (name) => list().find((p) => p.name === name) ?? null,
+		settingsFor(id) {
+			const found = profiles().get(id);
 			if (!found) return null;
 			const {
+				id: _id,
 				name: _name,
 				description: _description,
 				updatedAt: _at,
@@ -82,11 +104,12 @@ export function createProfileStore(options: {
 			} = found;
 			return settings;
 		},
-		async save(input) {
+		async save(input, id = newProfileId()) {
 			const { name, description, ...settings } = profileSchema.parse(input);
 			const updatedAt = Date.now();
 			await document.change(() => {
-				document.profiles.set(name, {
+				document.profiles.set(id, {
+					name,
 					description: description || null,
 					settings,
 					updatedAt,
@@ -94,14 +117,15 @@ export function createProfileStore(options: {
 			});
 			return {
 				...settings,
+				id,
 				name,
 				...(description ? { description } : {}),
 				updatedAt,
 			};
 		},
-		async remove(name) {
+		async remove(id) {
 			await document.change(() => {
-				document.profiles.delete(name);
+				document.profiles.delete(id);
 			});
 		},
 	};

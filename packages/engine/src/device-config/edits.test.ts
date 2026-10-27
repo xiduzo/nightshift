@@ -89,9 +89,9 @@ describe("saveProfile", () => {
 		expect(stores.profiles.list()).toEqual([]);
 	});
 
-	test("refuses a taken name, and a rename of a profile that flows use", async () => {
+	test("refuses a taken name, a removed profile, and a rename of a profile that flows use", async () => {
 		const stores = await makeStores();
-		await saveProfile(stores, profile(), unused);
+		const fast = await saveProfile(stores, profile(), unused);
 		await saveProfile(stores, profile({ name: "slow" }), unused);
 		expect(await errorOf(saveProfile(stores, profile(), unused))).toBe(
 			'A profile named "fast" already exists. Pick another name.',
@@ -100,14 +100,14 @@ describe("saveProfile", () => {
 			await errorOf(
 				saveProfile(stores, profile({ name: "slow" }), {
 					...unused,
-					previousName: "fast",
+					id: fast.id,
 				}),
 			),
 		).toBe('A profile named "slow" already exists. Pick another name.');
 		expect(
 			await errorOf(
 				saveProfile(stores, profile({ name: "quick" }), {
-					previousName: "fast",
+					id: fast.id,
 					flowsUsing: async (name) =>
 						name === "fast" ? [{ flowName: "night" }] : [],
 				}),
@@ -115,16 +115,45 @@ describe("saveProfile", () => {
 		).toBe(
 			'The flows night use "fast". Change it there first, or keep the name.',
 		);
+		expect(
+			await errorOf(
+				saveProfile(stores, profile(), { ...unused, id: "p-gone" }),
+			),
+		).toBe("This profile was removed. Add it again.");
 	});
 
-	test("a rename saves the new name and removes the old one", async () => {
+	test("a new profile gets an id that no name can be", async () => {
 		const stores = await makeStores();
-		await saveProfile(stores, profile(), unused);
-		await saveProfile(stores, profile({ name: "quick" }), {
+		const saved = await saveProfile(stores, profile(), unused);
+		expect(saved.id).toStartWith("p-");
+		expect(stores.profiles.get(saved.id)?.name).toBe("fast");
+	});
+
+	test("a rename changes the name and keeps the id", async () => {
+		const stores = await makeStores();
+		const fast = await saveProfile(stores, profile(), unused);
+		const quick = await saveProfile(stores, profile({ name: "quick" }), {
 			...unused,
-			previousName: "fast",
+			id: fast.id,
 		});
-		expect(stores.profiles.list().map((p) => p.name)).toEqual(["quick"]);
+		expect(quick.id).toBe(fast.id);
+		expect(stores.profiles.list().map((p) => [p.id, p.name])).toEqual([
+			[fast.id, "quick"],
+		]);
+		expect(stores.profiles.byName("quick")?.id).toBe(fast.id);
+		expect(stores.profiles.byName("fast")).toBeNull();
+	});
+
+	test("an edit that keeps the name keeps the id", async () => {
+		const stores = await makeStores();
+		const fast = await saveProfile(stores, profile(), unused);
+		await saveProfile(stores, profile({ model: "opus" }), {
+			...unused,
+			id: fast.id,
+		});
+		expect(stores.profiles.list()).toMatchObject([
+			{ id: fast.id, name: "fast", model: "opus" },
+		]);
 	});
 });
 
@@ -133,7 +162,7 @@ describe("connections and CLI tools", () => {
 		const stores = await makeStores();
 		await saveConnection(stores, { name: "gh", server });
 		await stores.cliTools.save({ name: "jq" });
-		await saveProfile(
+		const fast = await saveProfile(
 			stores,
 			profile({ connections: ["gh"], clis: ["jq"] }),
 			unused,
@@ -145,7 +174,7 @@ describe("connections and CLI tools", () => {
 
 		await saveConnection(stores, { name: "github", server }, "gh");
 		expect(stores.connections.list().map((c) => c.name)).toEqual(["github"]);
-		expect(stores.profiles.get("fast")).toMatchObject({
+		expect(stores.profiles.get(fast.id)).toMatchObject({
 			connections: ["github"],
 		});
 
@@ -153,7 +182,7 @@ describe("connections and CLI tools", () => {
 		await removeCliTool(stores, "jq");
 		expect(stores.connections.list()).toEqual([]);
 		expect(stores.cliTools.list()).toEqual([]);
-		expect(stores.profiles.get("fast")).toMatchObject({
+		expect(stores.profiles.get(fast.id)).toMatchObject({
 			connections: [],
 			clis: [],
 		});
@@ -168,11 +197,15 @@ describe("harnesses", () => {
 		await addHarness(stores, "gemini");
 		expect(stores.settings.current().harnesses).toEqual([...before, "gemini"]);
 
-		await saveProfile(stores, profile({ harness: "gemini" }), unused);
+		const fast = await saveProfile(
+			stores,
+			profile({ harness: "gemini" }),
+			unused,
+		);
 		expect(await errorOf(removeHarness(stores, "gemini"))).toBe(
 			"The profile fast run on Gemini CLI. Move it to another harness first.",
 		);
-		await stores.profiles.remove("fast");
+		await stores.profiles.remove(fast.id);
 		await removeHarness(stores, "gemini");
 		expect(stores.settings.current().harnesses).toEqual(before);
 	});

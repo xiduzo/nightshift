@@ -327,8 +327,12 @@ export async function createDaemon(
 			),
 		toolLaunchers,
 		clonePath,
-		// Its profiles, for a run placed here from another Device.
-		profileFor: (name) => profiles.settingsFor(name),
+		// Its profiles, for a run placed here from another Device. A flow names
+		// a profile by its name.
+		profileFor: (name) => {
+			const profile = profiles.byName(name);
+			return profile ? profiles.settingsFor(profile.id) : null;
+		},
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
 	});

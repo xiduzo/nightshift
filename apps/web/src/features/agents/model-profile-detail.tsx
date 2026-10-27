@@ -80,7 +80,8 @@ export function ModelProfileDetail({
 	/** What a new profile starts as. */
 	initial: Draft;
 	profiles: ProfileRow[];
-	onSaved: (name: string) => void;
+	/** Gets the saved profile's id. */
+	onSaved: (id: string) => void;
 	onDeleted: () => void;
 	onCancelNew: () => void;
 	/** Unsaved changes, so the page can ask before it shows something else. */
@@ -103,7 +104,7 @@ export function ModelProfileDetail({
 			onSuccess: (next) => {
 				toast.success(profile ? `Saved ${next.name}` : `Added ${next.name}`);
 				void invalidate();
-				onSaved(next.name);
+				onSaved(next.id);
 			},
 		}),
 	);
@@ -122,8 +123,9 @@ export function ModelProfileDetail({
 	const usedBy = profile?.usedBy ?? [];
 	const nodeCount = usedBy.reduce((n, use) => n + use.nodeIds.length, 0);
 	const nameInvalid = name !== "" && !NAME.test(name);
-	const nameTaken =
-		name !== profile?.name && profiles.some((p) => p.name === name);
+	const nameTaken = profiles.some(
+		(p) => p.name === name && p.id !== profile?.id,
+	);
 	const dirty = !same(draft, saved);
 	useEffect(() => {
 		onDirtyChange(dirty);
@@ -174,7 +176,7 @@ export function ModelProfileDetail({
 						decider: draft.decider,
 						...(draft.model.trim() ? { model: draft.model.trim() } : {}),
 						description: draft.description.trim() || undefined,
-						previousName: profile?.name,
+						id: profile?.id,
 					}),
 				onDiscard: () => (profile ? setDraft(saved) : onCancelNew()),
 			}}
@@ -332,7 +334,7 @@ export function ModelProfileDetail({
 						<AlertDialogAction
 							variant="destructive"
 							disabled={remove.isPending}
-							onClick={() => profile && remove.mutate({ name: profile.name })}
+							onClick={() => profile && remove.mutate({ id: profile.id })}
 						>
 							Delete
 						</AlertDialogAction>

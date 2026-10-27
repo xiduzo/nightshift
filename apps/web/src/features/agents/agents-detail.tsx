@@ -67,7 +67,11 @@ export function Detail({
 	data: PageData;
 }) {
 	const added = data.harnesses.filter((h) => h.added);
-	const openProfile = (name: string) => onSelect({ kind: "profile", name });
+	// The tools and harnesses list the profiles that use them by name.
+	const openProfile = (name: string) => {
+		const found = data.profiles.find((p) => p.name === name);
+		if (found) onSelect({ kind: "profile", id: found.id });
+	};
 
 	if (!selection) {
 		return (
@@ -111,7 +115,7 @@ export function Detail({
 						data.settings?.values.decisionDecider ?? "typesafe",
 					)}
 					profiles={data.profiles}
-					onSaved={(name) => onGo({ kind: "profile", name })}
+					onSaved={(id) => onGo({ kind: "profile", id })}
 					onDeleted={() => onGo(null)}
 					onCancelNew={() => onGo(null)}
 					onDirtyChange={onDirtyChange}
@@ -121,7 +125,7 @@ export function Detail({
 		case "new-profile": {
 			const found =
 				selection.kind === "profile"
-					? data.profiles.find((p) => p.name === selection.name)
+					? data.profiles.find((p) => p.id === selection.id)
 					: null;
 			if (found === undefined) return <Gone what="profile" />;
 			if (found && !("harness" in found)) {
@@ -131,7 +135,7 @@ export function Detail({
 						profile={found}
 						initial={newModelProfileDraft(found.decider)}
 						profiles={data.profiles}
-						onSaved={(name) => onGo({ kind: "profile", name })}
+						onSaved={(id) => onGo({ kind: "profile", id })}
 						onDeleted={() => onGo(null)}
 						onCancelNew={() => onGo(null)}
 						onDirtyChange={onDirtyChange}
@@ -167,7 +171,7 @@ export function Detail({
 					harnesses={added}
 					cliTools={data.cliTools}
 					connections={data.connections}
-					onSaved={(name) => onGo({ kind: "profile", name })}
+					onSaved={(id) => onGo({ kind: "profile", id })}
 					onDeleted={() => onGo(null)}
 					onCancelNew={() => onGo(null)}
 					onDirtyChange={onDirtyChange}

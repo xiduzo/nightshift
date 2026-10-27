@@ -42,6 +42,7 @@ function profiles(
 		list: () =>
 			Object.entries(list).map(([name, settings]) => ({
 				...settings,
+				id: name,
 				name,
 				updatedAt: 0,
 			})),

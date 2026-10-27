@@ -327,21 +327,49 @@ describe("createProfileStore", () => {
 		const document = await sandbox.openDocument();
 		const store = createProfileStore({ document });
 		await store.load();
-		await store.save({ ...builder, name: "builder", description: "Builds." });
+		const { id } = await store.save({
+			...builder,
+			name: "builder",
+			description: "Builds.",
+		});
 		// After a restart.
 		const again = createProfileStore({
 			document: await sandbox.openDocument(),
 		});
 		await again.load();
-		expect(again.list().map((p) => p.name)).toEqual(["builder"]);
-		expect(again.get("builder")?.description).toBe("Builds.");
-		expect(again.settingsFor("builder")).toEqual(builder);
-		await again.remove("builder");
-		expect(again.settingsFor("builder")).toBeNull();
+		expect(again.list().map((p) => [p.id, p.name])).toEqual([[id, "builder"]]);
+		expect(again.get(id)?.description).toBe("Builds.");
+		expect(again.byName("builder")?.id).toBe(id);
+		expect(again.settingsFor(id)).toEqual(builder);
+		await again.remove(id);
+		expect(again.settingsFor(id)).toBeNull();
 		const third = createProfileStore({
 			document: await sandbox.openDocument(),
 		});
 		expect(third.list()).toEqual([]);
+	});
+
+	test("a profile saved before ids reads with its name as its id, and keeps that id on a rename", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.profiles.set("builder", {
+				description: "Builds.",
+				settings: builder,
+				updatedAt: 1,
+			});
+		});
+		const store = createProfileStore({ document });
+		await store.load();
+		expect(store.list()).toMatchObject([
+			{ id: "builder", name: "builder", description: "Builds." },
+		]);
+		expect(store.settingsFor("builder")).toEqual(builder);
+
+		const renamed = await store.save({ ...builder, name: "maker" }, "builder");
+		expect(renamed.id).toBe("builder");
+		expect(store.byName("maker")?.id).toBe("builder");
+		expect(store.byName("builder")).toBeNull();
+		expect([...document.profiles.keys()]).toEqual(["builder"]);
 	});
 
 	test("refuses a profile with a name a node cannot use", async () => {

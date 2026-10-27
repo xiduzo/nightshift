@@ -281,16 +281,17 @@ export const deciderViewSchema = exact<DeciderView<SecretSource>>()(
 
 /**
  * A profile: an Agent Profile (a harness, a model and its tools) or a
- * Model Profile (a decider and its model) under one name.
+ * Model Profile (a decider and its model), with the id that never changes.
  */
 export const profileViewSchema = exact<ProfileView>()(
 	z.union([
-		agentProfileSchema.extend({ updatedAt: z.number() }),
-		modelProfileSchema.extend({ updatedAt: z.number() }),
+		agentProfileSchema.extend({ id: z.string(), updatedAt: z.number() }),
+		modelProfileSchema.extend({ id: z.string(), updatedAt: z.number() }),
 	]),
 );
 
 const profileUse = {
+	id: z.string(),
 	updatedAt: z.number(),
 	/** The nodes that name it, by flow. */
 	usedBy: z.array(flowRefSchema.extend({ nodeIds: z.array(z.string()) })),
