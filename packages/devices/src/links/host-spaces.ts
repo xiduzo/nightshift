@@ -181,3 +181,19 @@ export async function personOnHost(
 		.where(eq(hostSpace.spaceId, spaceId));
 	return row?.personId ?? null;
 }
+
+/**
+ * Whether this computer's home Host keeps the Space: there, this
+ * computer's Person may place steps on their other Devices.
+ */
+export async function keptByHomeHost(
+	db: Database,
+	spaceId: string,
+): Promise<boolean> {
+	const [row] = await db
+		.select({ role: hostLink.role })
+		.from(hostSpace)
+		.innerJoin(hostLink, eq(hostLink.hostId, hostSpace.hostId))
+		.where(eq(hostSpace.spaceId, spaceId));
+	return row?.role === "home";
+}

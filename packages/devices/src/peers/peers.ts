@@ -1,4 +1,5 @@
 import {
+	type DeviceCopies,
 	type DeviceProfile,
 	memberName,
 	memberRole,
@@ -46,6 +47,12 @@ export type PeerOptions = {
 	ownOffers?: () => readonly DeviceOffer[];
 	/** This computer's profiles, which its owner may use. Without it, unknown. */
 	ownProfiles?: () => readonly DeviceProfile[];
+	/**
+	 * The copies of the documents of this computer's owner's other Devices
+	 * (`createDeviceCopies`): their names and profiles while the home Host
+	 * cannot be reached. Without it, none.
+	 */
+	copies?: Pick<DeviceCopies, "list">;
 	/**
 	 * Whether a Person's role in a Space lets them use Offers (`offer.use`),
 	 * the Host's check before it places another Person's run through one.
@@ -143,6 +150,7 @@ export function createPeers(
 		localFor: admission.deviceFor,
 		offersHere: admission.inForce,
 		...(options.ownProfiles ? { ownProfiles: options.ownProfiles } : {}),
+		...(options.copies ? { copies: options.copies } : {}),
 		mayUseOffers: (spaceId, personId) =>
 			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
 	});

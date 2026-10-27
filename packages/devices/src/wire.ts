@@ -210,6 +210,12 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		return kept;
 	}
 
+	/**
+	 * Read-only copies of the documents of this computer's owner's other
+	 * Devices, from the home Host: their names, profiles and secret names.
+	 */
+	const copies = createDeviceCopies({ db, selfId: self.id });
+
 	// The engine takes the relays, and the relays reach the engine and the
 	// Links: they read both when they are called, after this function.
 	const engine = createPeerEngine(
@@ -247,6 +253,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					(profile) => offeredProfile(deps.profiles, profile)?.name ?? null,
 				),
 			ownProfiles: () => deps.profiles.list().map(profileChoice),
+			copies,
 			offerUse: handover.offerUse,
 			presence: handover.presence,
 			mayUseOffers: async (spaceId, personId) => {
@@ -293,12 +300,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		withdrawn: (spaceId, profile) =>
 			engine.admission.withdrawn(spaceId, profile),
 	});
-
-	/**
-	 * Read-only copies of the documents of this computer's owner's other
-	 * Devices, from the home Host: their names, profiles and secret names.
-	 */
-	const copies = createDeviceCopies({ db, selfId: self.id });
 
 	/** This computer's links to the Hosts it paired with. */
 	const links = createDeviceLinks({
