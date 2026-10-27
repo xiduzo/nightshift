@@ -18,18 +18,27 @@ import { project } from "@nightshift/db/schema";
 import { deviceDirectory } from "@nightshift/devices";
 import {
 	createCliToolStore,
+	createFlowDocuments,
 	createSettingsStore,
 	createSpaceDocuments,
 	type DeviceDocument,
+	documentProjectFlows,
+	documentSpace,
+	type FlowDocuments,
 	type SpaceDocuments,
 	spaceDocumentName,
-	spaceIdOf,
 } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
+import {
+	type Flow,
+	flowSchema,
+	parsedFlows,
+	singleAgentFlow,
+} from "@nightshift/flows";
 import type { Server } from "bun";
 import * as Y from "yjs";
 import { isThisComputer } from "../http";
@@ -53,6 +62,8 @@ let people: AuthSandbox;
 let stranger: Headers;
 let document: DeviceDocument;
 let spaces: SpaceDocuments;
+/** The flow documents of this Host's Projects. */
+let flows: FlowDocuments;
 let sync: Sync;
 let server: Server<SocketData>;
 const providers: HocuspocusProvider[] = [];
@@ -81,11 +92,12 @@ beforeEach(async () => {
 		db: people.db,
 		directory: deviceDirectory(people.db),
 	});
+	flows = createFlowDocuments({ db: people.db });
 	sync = createSync({
-		document: (name) =>
+		document: async (name) =>
 			name === document.name
 				? document.doc
-				: (spaces.byName(name)?.doc ?? null),
+				: (spaces.byName(name)?.doc ?? (await flows.find(name))?.doc ?? null),
 		kept: {
 			has: (name) => keptOwners.has(name),
 			fetch: async (name) => keptRows.get(name) ?? null,
@@ -100,7 +112,7 @@ beforeEach(async () => {
 			ownerId: owner.userId,
 			isThisComputer: (peer, request) =>
 				isThisComputer(peer, request, new Set([ORIGIN])),
-			spaceIdOf,
+			spaceOfDocument: documentSpace(people.db),
 			keptOwner: async (name) => keptOwners.get(name) ?? null,
 			deviceKey: async (token) => deviceKeys.get(token) ?? null,
 		}),
@@ -122,6 +134,7 @@ afterEach(async () => {
 	server.stop(true);
 	await document.close();
 	await spaces.close();
+	await flows.close();
 	await sandbox.cleanup();
 	people.cleanup();
 });
@@ -129,9 +142,15 @@ afterEach(async () => {
 /** A client of the relay, as a UI or another Device opens one. */
 function connect(
 	name = document.name,
-	options: { origin?: string; cookie?: string; token?: string } = {},
+	options: {
+		origin?: string;
+		cookie?: string;
+		token?: string;
+		/** The client's own copy: a Device's document. Default: a new one. */
+		doc?: Y.Doc;
+	} = {},
 ) {
-	const doc = new Y.Doc();
+	const doc = options.doc ?? new Y.Doc();
 	const failed: string[] = [];
 	// A browser sends its page's origin and cookies; Bun's WebSocket takes headers.
 	const headers: Record<string, string> = {};
@@ -346,7 +365,7 @@ describe("documentAccess on a Host that requires two-factor", () => {
 			ownerId,
 			isThisComputer: (peer, request) =>
 				isThisComputer(peer, request, new Set([ORIGIN])),
-			spaceIdOf,
+			spaceOfDocument: documentSpace(people.db),
 			policy: { requireTwoFactor: true },
 		});
 
@@ -556,5 +575,218 @@ describe("the relay across a bun --hot reload", () => {
 			authorize: async () => false as const,
 		});
 		expect(next).toBe(older as Sync);
+	});
+});
+
+describe("documentAccess: a flow document", () => {
+	const PROJECT = "project-shop";
+	const name = `flows:${PROJECT}`;
+	const historyName = `flows-history:${PROJECT}`;
+	const of = { projectId: PROJECT };
+
+	/** A flow with two Agent nodes, `a` and `b`. */
+	const twoNodes = (prompts: { a?: string; b?: string } = {}): Flow => {
+		const quick = flowSchema.parse(
+			singleAgentFlow({
+				prompt: "First",
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+			}),
+		);
+		const [agent] = quick.nodes;
+		if (agent?.type !== "agent") throw new Error("Expected an Agent node.");
+		return {
+			...quick,
+			start: "a",
+			nodes: [
+				{ ...agent, id: "a", prompt: prompts.a ?? "First" },
+				{ ...agent, id: "b", prompt: prompts.b ?? "Second" },
+			],
+		};
+	};
+
+	const promptsOf = (flows: Record<string, Flow | null>) =>
+		Object.fromEntries(
+			(flows.build?.nodes ?? []).map((node) => [
+				node.id,
+				node.type === "agent" ? node.prompt : null,
+			]),
+		);
+
+	/**
+	 * Platform with one Project: Ada owns it, Bob is a member, Cy a viewer.
+	 * Bob and Cy each have a Device with a key of this Host.
+	 */
+	async function platform() {
+		const ada = await people.signUp("Ada");
+		const bob = await people.signUp("Bob");
+		const cy = await people.signUp("Cy");
+		const space = await people.auth.api.createOrganization({
+			headers: ada.headers,
+			body: { name: "Platform", slug: "platform" },
+		});
+		if (!space) throw new Error("no space");
+		for (const [person, role] of [
+			[bob, "member"],
+			[cy, "viewer"],
+		] as const) {
+			await people.auth.api.addMember({
+				body: { userId: person.userId, role, organizationId: space.id },
+			});
+		}
+		await people.db.insert(project).values({
+			id: PROJECT,
+			spaceId: space.id,
+			name: "Shop",
+			createdAt: new Date(),
+		});
+		deviceKeys.set("nsd_bob", {
+			deviceId: "device-bob",
+			personId: bob.userId,
+			home: false,
+		});
+		deviceKeys.set("nsd_cy", {
+			deviceId: "device-cy",
+			personId: cy.userId,
+			home: false,
+		});
+		const cookie = (headers: Headers) => headers.get("cookie") ?? "";
+		return { bob: cookie(bob.headers), cy: cookie(cy.headers) };
+	}
+
+	/** The flows on this Host, as its engine saves them. */
+	const onHost = () =>
+		documentProjectFlows({
+			documents: flows,
+			find: async () => ({}),
+			deviceId: "host",
+		});
+
+	/** A Device's own copy of the Project's flows, on its own Replica. */
+	async function deviceCopy() {
+		await sandbox.db.insert(project).values({
+			id: PROJECT,
+			spaceId: sandbox.spaceId,
+			name: "Shop",
+			createdAt: new Date(),
+		});
+		const documents = createFlowDocuments({ db: sandbox.db });
+		const opened = await documents.open(PROJECT);
+		return {
+			documents,
+			opened,
+			flows: documentProjectFlows({
+				documents,
+				find: async () => ({}),
+				deviceId: "device-bob",
+			}),
+			/** Its Link to this Host: both documents. */
+			link(token: string) {
+				return [
+					connect(name, { token, doc: opened.current.doc }),
+					connect(historyName, { token, doc: opened.history.doc }),
+				];
+			},
+		};
+	}
+
+	test("a member and a viewer read it in a browser; neither writes through the relay", async () => {
+		const { bob, cy } = await platform();
+		const member = connect(name, { origin: ORIGIN, cookie: bob });
+		const viewer = connect(name, { origin: ORIGIN, cookie: cy });
+		await waitFor(() => member.provider.isSynced && viewer.provider.isSynced);
+
+		member.doc.getMap("meta").set("from", "Bob");
+		viewer.doc.getMap("meta").set("from", "Cy");
+		await onHost().save(of, "build", twoNodes());
+		await waitFor(
+			() =>
+				member.doc.getMap("flows").size === 1 &&
+				viewer.doc.getMap("flows").size === 1,
+		);
+		expect((await flows.open(PROJECT)).meta.has("from")).toBe(false);
+	});
+
+	test("a Device of a member saves into it; a Device of a viewer only reads", async () => {
+		await platform();
+		const device = await deviceCopy();
+		try {
+			const [current, history] = device.link("nsd_bob");
+			await waitFor(
+				() => !!current?.provider.isSynced && !!history?.provider.isSynced,
+			);
+			await device.flows.save(
+				{ ...of, personId: "bob" },
+				"build",
+				twoNodes({ a: "From Bob" }),
+			);
+			await waitFor(
+				async () =>
+					promptsOf(parsedFlows((await onHost().flows(of)).sources)).a ===
+					"From Bob",
+			);
+
+			const viewer = connect(name, { token: "nsd_cy" });
+			await waitFor(() => viewer.provider.isSynced);
+			viewer.doc.getMap("meta").set("from", "Cy");
+			await Bun.sleep(100);
+			expect((await flows.open(PROJECT)).meta.has("from")).toBe(false);
+		} finally {
+			await device.documents.close();
+		}
+	});
+
+	test("a Person outside the Space, and a Project this Host does not have, are refused", async () => {
+		await platform();
+		const dee = (await people.signUp("Dee2")).userId;
+		deviceKeys.set("nsd_dee", {
+			deviceId: "device-dee",
+			personId: dee,
+			home: true,
+		});
+		const outsider = connect(name, { token: "nsd_dee" });
+		const unknown = connect("flows:no-such-project", { token: "nsd_bob" });
+		await waitFor(
+			() => outsider.failed.length > 0 && unknown.failed.length > 0,
+		);
+		expect(outsider.provider.isSynced).toBe(false);
+		expect(unknown.provider.isSynced).toBe(false);
+	});
+
+	test("edits on a Device without its Link and on the Host merge when the Link is back", async () => {
+		await platform();
+		const host = onHost();
+		await host.save(of, "build", twoNodes());
+		const device = await deviceCopy();
+		try {
+			const first = device.link("nsd_bob");
+			await waitFor(async () => {
+				const sources = (await device.flows.flows(of)).sources;
+				return "build" in sources;
+			});
+			for (const client of first) client.provider.destroy();
+
+			await host.save(of, "build", twoNodes({ a: "On the Host" }));
+			await device.flows.save(
+				{ ...of, personId: "bob" },
+				"build",
+				twoNodes({ b: "On the Device" }),
+			);
+
+			device.link("nsd_bob");
+			const merged = { a: "On the Host", b: "On the Device" };
+			await waitFor(
+				async () =>
+					JSON.stringify(
+						promptsOf(parsedFlows((await host.flows(of)).sources)),
+					) === JSON.stringify(merged) &&
+					JSON.stringify(
+						promptsOf(parsedFlows((await device.flows.flows(of)).sources)),
+					) === JSON.stringify(merged),
+				{ label: "both edits on both sides" },
+			);
+		} finally {
+			await device.documents.close();
+		}
 	});
 });

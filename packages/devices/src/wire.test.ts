@@ -3,10 +3,12 @@ import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
 import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, hostLink, runCommand, user } from "@nightshift/db/schema";
 import {
+	createFlowDocuments,
 	createProfileStore,
 	createSettingsStore,
 	type Device,
 	type DeviceDocument,
+	type FlowDocuments,
 	type RunStatus,
 	type SessionInput,
 	worktreeLocation,
@@ -24,7 +26,12 @@ import { setDeviceOffer } from "./offers/offers";
 import type { PeerEngine } from "./peers";
 import { OFFLINE_AFTER_MS } from "./registry";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
-import { type DevicesRuntime, type KeptDevices, startDevices } from "./wire";
+import {
+	type DevicesRuntime,
+	hostSpaceDocuments,
+	type KeptDevices,
+	startDevices,
+} from "./wire";
 import { createWorkHub } from "./work";
 
 /**
@@ -38,6 +45,8 @@ let b: Sandbox;
 let paired: PairedReplicas;
 /** B's Device document: the daemon keeps it across reloads. */
 let document: DeviceDocument;
+/** B's flow documents: the daemon keeps them across reloads. */
+let flows: FlowDocuments;
 /** What `bun --hot` keeps between the starts. */
 let kept: KeptDevices;
 /** B's sessions as a placed Device: each runs until the test ends it. */
@@ -52,6 +61,7 @@ beforeEach(async () => {
 	// B's engine is the runtime's.
 	await paired.device.dispose();
 	document = await b.openDocument();
+	flows = createFlowDocuments({ db: b.db });
 	kept = {};
 	sessions = [];
 	open = new Map();
@@ -66,6 +76,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
 	await kept.nightshiftDevices?.release();
+	await flows.close();
 	await paired.host.dispose();
 	await Promise.all([a, b].map((s) => s.cleanup()));
 });
@@ -93,6 +104,7 @@ async function startB(
 		profiles,
 		document,
 		spaces: paired.documents,
+		flows,
 		self: { id: b.deviceId, name: "B" },
 		ownerId: owner?.id as string,
 		local: placedDevice(),
@@ -619,5 +631,36 @@ describe("the devices runtime across a reload", () => {
 				item: { type: "text", delta: "done" },
 			});
 		}
+	});
+});
+
+describe("the documents a Device syncs of a Host's Spaces", () => {
+	test("each Space document, and the flow documents of every Project in it", async () => {
+		const space = await paired.documents.open(a.spaceId);
+		space.doc.transact(() => {
+			for (const id of ["project-b", "project-a"]) {
+				space.projects.set(id, {
+					name: id,
+					remote: null,
+					createdAt: 1,
+					removedAt: null,
+					updatedAt: 1,
+				});
+			}
+		});
+		const synced = await hostSpaceDocuments(
+			{ spaces: paired.documents, flows },
+			[a.spaceId],
+		);
+		expect(synced.map((document) => document.name)).toEqual([
+			space.name,
+			"flows:project-a",
+			"flows-history:project-a",
+			"flows:project-b",
+			"flows-history:project-b",
+		]);
+		const opened = await flows.open("project-a");
+		expect(synced[1]?.doc).toBe(opened.current.doc);
+		expect(synced[2]?.doc).toBe(opened.history.doc);
 	});
 });

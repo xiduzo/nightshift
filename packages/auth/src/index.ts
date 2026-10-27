@@ -3,6 +3,7 @@
 
 export {
 	authEndpointAccess,
+	type DocumentSpace,
 	documentAccess,
 	type RequestAccess,
 	requestAccess,

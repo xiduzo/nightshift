@@ -9,7 +9,8 @@ import * as Y from "yjs";
  * opens a document by name and Yjs keeps both sides in step. It serves
  * two kinds of document:
  *
- * - Owned documents: this Device's document and every Space document.
+ * - Owned documents: this Device's document, every Space document and
+ *   the flow documents of the Projects this Replica has.
  *   The engine holds each one (a `PersistedDocument`) and writes it to
  *   the Replica on every update. Hocuspocus only carries their updates:
  *   when it loads one it takes the engine's state, and from then on every
@@ -41,7 +42,7 @@ export type KeptDocuments = {
 /** What the relay reads, from the daemon that made it or kept it last. */
 export type SyncOptions = {
 	/** The live document the daemon owns under that name, or null. */
-	document: (name: string) => Y.Doc | null;
+	document: (name: string) => Y.Doc | null | Promise<Y.Doc | null>;
 	/** The documents it keeps for others. None by default. */
 	kept?: KeptDocuments;
 	authorize: SyncAuthorize;
@@ -99,7 +100,7 @@ export function createSync(first: SyncOptions): Sync {
 	const isKept = async (name: string) => {
 		const { kept } = options;
 		return (
-			options.document(name) === null &&
+			(await options.document(name)) === null &&
 			kept !== undefined &&
 			(await kept.has(name))
 		);
@@ -116,7 +117,8 @@ export function createSync(first: SyncOptions): Sync {
 		}) {
 			const peer = (context as { peer?: string | null }).peer ?? null;
 			const known =
-				options.document(documentName) !== null || (await isKept(documentName));
+				(await options.document(documentName)) !== null ||
+				(await isKept(documentName));
 			const granted =
 				known &&
 				(await options.authorize({ documentName, token, peer, request }));
@@ -127,7 +129,7 @@ export function createSync(first: SyncOptions): Sync {
 		},
 		async onLoadDocument({ documentName, document }) {
 			const { kept } = options;
-			const owned = options.document(documentName);
+			const owned = await options.document(documentName);
 			if (!owned && kept && (await isKept(documentName))) {
 				const state = await kept.fetch(documentName);
 				if (state) Y.applyUpdate(document, state);

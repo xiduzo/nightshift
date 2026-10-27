@@ -237,6 +237,13 @@ describe("creating a Space", () => {
 		expect(roleAllows("member", { project: ["move"] })).toBe(false);
 		expect(roleAllows("admin", { project: ["move"] })).toBe(true);
 		expect(roleAllows("viewer", { project: ["add"] })).toBe(false);
+		for (const role of ["owner", "admin", "member"]) {
+			expect(
+				roleAllows(role, { flow: ["save", "remove"], schedule: ["save"] }),
+			).toBe(true);
+		}
+		expect(roleAllows("viewer", { flow: ["save"] })).toBe(false);
+		expect(roleAllows("viewer", { schedule: ["save"] })).toBe(false);
 		expect(roleAllows("nobody", { project: ["add"] })).toBe(false);
 	});
 });

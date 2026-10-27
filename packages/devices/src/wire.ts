@@ -3,6 +3,7 @@ import type { Database } from "@nightshift/db";
 import {
 	type Device,
 	type DeviceDocument,
+	type FlowDocuments,
 	type KeyStoreKind,
 	memberRole,
 	type ProfileStore,
@@ -10,6 +11,7 @@ import {
 	type SettingsStore,
 	type SpaceDocuments,
 } from "@nightshift/engine";
+import type * as Y from "yjs";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
@@ -138,6 +140,8 @@ export type DevicesDeps = {
 	profiles: ProfileStore;
 	document: DeviceDocument;
 	spaces: SpaceDocuments;
+	/** The flow documents of the Projects: this Device keeps a copy of each. */
+	flows: FlowDocuments;
 	/** This computer's Device. */
 	self: { id: string; name: string };
 	/** The Person who owns this computer. */
@@ -296,6 +300,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		document: deps.document,
 		// The Spaces the Host lists: kept here as the Host's, their documents
 		// synced read-only, before run rows that name their projects arrive.
+		// The flow documents of their Projects sync both ways. A Project the
+		// Host adds later syncs from its next answer.
 		spaceDocuments: async (link, hello) => {
 			const { hostSpaces } = engine;
 			await hostSpaces.update(
@@ -304,13 +310,9 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				ownerId,
 			);
 			const kept = new Set(await hostSpaces.ofHost(link.hostId));
-			return Promise.all(
-				hello.spaces
-					.filter((space) => kept.has(space.id))
-					.map(async (space) => {
-						const opened = await deps.spaces.open(space.id);
-						return { name: opened.name, doc: opened.doc };
-					}),
+			return hostSpaceDocuments(
+				deps,
+				hello.spaces.filter((space) => kept.has(space.id)).map((s) => s.id),
 			);
 		},
 		// Run history both ways, the commands for the runs this computer walks,
@@ -446,4 +448,31 @@ async function letGo(engine: { dispose(): Promise<void> }): Promise<void> {
 			error,
 		);
 	});
+}
+
+/**
+ * What a Device syncs of the Spaces a Host keeps: each Space document,
+ * which it only receives, and the flow documents of each Project in it,
+ * which it keeps a copy of and changes too (ADR 2).
+ */
+export async function hostSpaceDocuments(
+	documents: {
+		spaces: Pick<SpaceDocuments, "open">;
+		flows: Pick<FlowDocuments, "open">;
+	},
+	spaceIds: readonly string[],
+): Promise<{ name: string; doc: Y.Doc }[]> {
+	const synced: { name: string; doc: Y.Doc }[] = [];
+	for (const spaceId of spaceIds) {
+		const space = await documents.spaces.open(spaceId);
+		synced.push({ name: space.name, doc: space.doc });
+		for (const projectId of [...space.projects.keys()].sort()) {
+			const { current, history } = await documents.flows.open(projectId);
+			synced.push(
+				{ name: current.name, doc: current.doc },
+				{ name: history.name, doc: history.doc },
+			);
+		}
+	}
+	return synced;
 }

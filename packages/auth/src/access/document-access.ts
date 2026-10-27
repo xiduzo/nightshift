@@ -4,7 +4,7 @@ import type { Auth } from "../auth";
 import { isDeviceKey } from "../device-keys";
 import type { HostPolicy } from "../host-access";
 import type { LocalSession } from "../local-session";
-import { roleIn } from "../spaces";
+import { type Permissions, roleAllows, roleIn } from "../spaces";
 import { requestAccess } from "./request";
 
 /**
@@ -33,6 +33,13 @@ export type SyncAuthorize = (request: {
 	request: Request;
 }) => SyncAccess | SyncGrant | Promise<SyncAccess | SyncGrant>;
 
+/**
+ * The Space a synced document belongs to, and its kind: the Space
+ * document, or a flow document of one of the Space's Projects (its flows
+ * and schedules, or their revisions).
+ */
+export type DocumentSpace = { spaceId: string; kind: "space" | "flows" };
+
 /** A Device key as the relay needs it. */
 export type SyncDeviceKey = {
 	deviceId: string;
@@ -54,11 +61,23 @@ export type SyncDeviceKey = {
  *   be checked per action (a rename, a removal), so every write to a
  *   Space document goes through the procedures, which check the role
  *   and log an event.
+ * - `flows:<project id>` and `flows-history:<project id>`: a Member of the
+ *   Project's Space, read-only. A browser saves a flow through the
+ *   procedures. A Device of a Member whose role may save and remove flows
+ *   and save schedules changes them: it keeps a copy, and its edits
+ *   merge (ADR 2). The daemon that saves checks the flow.
  *
  * A token that is a Device key (`deviceKey`) is a Device, never a session:
  * it opens its own Device document, only on its home Host (to change it),
- * and the Space documents of the Spaces its owner is a Member of (to read).
+ * the Space documents of the Spaces its owner is a Member of (to read),
+ * and the flow documents of their Projects.
  */
+/** What a role needs to change a flow document over sync. */
+const FLOW_WRITE: Permissions = {
+	flow: ["save", "remove"],
+	schedule: ["save"],
+};
+
 export function documentAccess(options: {
 	auth: Auth;
 	db: Database;
@@ -67,8 +86,8 @@ export function documentAccess(options: {
 	ownerId: string;
 	/** Whether the upgrade request came from this computer (the daemon's own rule). */
 	isThisComputer: (peer: string | null, request: Request) => boolean;
-	/** The Space of a document name, or null for another kind of document. */
-	spaceIdOf: (documentName: string) => string | null;
+	/** The Space of a document, or null for another kind of document. */
+	spaceOfDocument: (documentName: string) => Promise<DocumentSpace | null>;
 	/**
 	 * The Host's rules for sessions from other computers. A session the
 	 * Host refuses (two-factor required, not on) opens no document.
@@ -85,15 +104,22 @@ export function documentAccess(options: {
 	const ownerOf = async (documentName: string) =>
 		(await options.keptOwner?.(documentName)) ?? options.ownerId;
 
-	/** A Space document: read-only for a Member of that Space. */
+	/**
+	 * A document of a Space: read-only for a Member of that Space. A
+	 * Device (`device`) of a Member who may change flows writes a flow
+	 * document.
+	 */
 	const spaceAccess = async (
 		personId: string,
 		documentName: string,
+		device = false,
 	): Promise<SyncAccess> => {
-		const spaceId = options.spaceIdOf(documentName);
-		if (!spaceId) return false;
-		return (await roleIn(options.db, personId, spaceId)) === null
-			? false
+		const space = await options.spaceOfDocument(documentName);
+		if (!space) return false;
+		const role = await roleIn(options.db, personId, space.spaceId);
+		if (role === null) return false;
+		return device && space.kind === "flows" && roleAllows(role, FLOW_WRITE)
+			? "write"
 			: "read";
 	};
 
@@ -109,7 +135,7 @@ export function documentAccess(options: {
 					(await ownerOf(documentName)) === key.personId;
 				return own ? { access: "write", context } : false;
 			}
-			const access = await spaceAccess(key.personId, documentName);
+			const access = await spaceAccess(key.personId, documentName, true);
 			return access ? { access, context } : false;
 		}
 		const local = options.isThisComputer(peer, request);

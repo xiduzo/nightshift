@@ -18,6 +18,8 @@ export const statements = {
 	gate: ["resolve"],
 	signal: ["send"],
 	offer: ["use", "make"],
+	flow: ["save", "remove"],
+	schedule: ["save"],
 	member: [...defaultStatements.member, "invite", "remove", "role"],
 	space: ["settings", "delete"],
 } as const;
@@ -35,13 +37,16 @@ const everything = {
 	gate: ["resolve"],
 	signal: ["send"],
 	offer: ["use", "make"],
+	flow: ["save", "remove"],
+	schedule: ["save"],
 } satisfies Permissions;
 
 /**
  * The default roles. Owner: all. Admin: all but deleting the Space.
- * Member: adds projects, runs, answers Gates, sends signals, uses Offers
- * (but makes none: offering a Device's profile to a Space is for its
- * owners and admins). Viewer: nothing that writes.
+ * Member: adds projects, runs, answers Gates, sends signals, saves and
+ * removes flows and schedules, uses Offers (but makes none: offering a
+ * Device's profile to a Space is for its owners and admins). Viewer:
+ * nothing that writes.
  */
 export const roles = {
 	owner: ac.newRole({
