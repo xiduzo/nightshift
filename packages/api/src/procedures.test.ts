@@ -257,7 +257,7 @@ describe("procedures", () => {
 		).toBe("FORBIDDEN");
 	});
 
-	test("a viewer cannot save, remove or restore a flow; a member can", async () => {
+	test("a viewer cannot save, remove, restore, import or copy a flow; a member can", async () => {
 		const { bob, cy, spaceId } = await platform();
 		const ref = { projectId: "p1", name: "night" };
 		const flow = singleAgentFlow({
@@ -271,6 +271,13 @@ describe("procedures", () => {
 			() => call(appRouter.flows.remove, ref, { context }),
 			() =>
 				call(appRouter.flows.restore, { ...ref, revisionId: "r" }, { context }),
+			() => call(appRouter.flows.import, { ...ref, json: "{}" }, { context }),
+			() =>
+				call(
+					appRouter.flows.copy,
+					{ ...ref, toProjectId: "p2", as: "night" },
+					{ context },
+				),
 		];
 		for (const write of writes)
 			expect(await errorOf(write())).toBe("FORBIDDEN");
@@ -285,6 +292,8 @@ describe("procedures", () => {
 			"saveFlow",
 			"deleteFlow",
 			"restoreFlowRevision",
+			"importFlow",
+			"copyFlow",
 		]);
 	});
 

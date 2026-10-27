@@ -312,6 +312,33 @@ export function createSpaces(deps: SpacesDeps) {
 				);
 			},
 
+			async exportFlow(projectId, name) {
+				await ready;
+				return deps.flowFiles.export(spaceId, projectId, name, actor?.personId);
+			},
+
+			async importFlow(projectId, name, json) {
+				await ready;
+				return deps.flowFiles.import(
+					spaceId,
+					projectId,
+					name,
+					json,
+					actor?.personId,
+				);
+			},
+
+			async copyFlow(projectId, name, to) {
+				await ready;
+				return deps.flowFiles.copy(
+					spaceId,
+					projectId,
+					name,
+					to,
+					actor?.personId,
+				);
+			},
+
 			async listKeptValues(projectId, flowName) {
 				await ready;
 				await projects.find(projectId, spaceId);

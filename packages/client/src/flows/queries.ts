@@ -43,6 +43,12 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 					...(against !== undefined ? { against } : {}),
 				},
 			}),
+		/** The flow as a JSON file. Fetch it when the person exports: it is never cached. */
+		export: (projectId: string, name: string) => ({
+			...orpc.flows.export.queryOptions({ input: { projectId, name } }),
+			staleTime: 0,
+			gcTime: 0,
+		}),
 		/** The values a flow's kept variables carry from one run to the next. */
 		kept: (projectId: string, name: string) =>
 			orpc.flows.kept.queryOptions({ input: { projectId, name } }),
@@ -56,6 +62,8 @@ export function createFlowMutations(orpc: ApiQueryUtils) {
 		remove: orpc.flows.remove.mutationOptions,
 		dismissNotice: orpc.flows.dismissNotice.mutationOptions,
 		restore: orpc.flows.restore.mutationOptions,
+		import: orpc.flows.import.mutationOptions,
+		copy: orpc.flows.copy.mutationOptions,
 		resetKept: orpc.flows.resetKept.mutationOptions,
 	};
 }

@@ -17,10 +17,12 @@ import type {
 	StartRunInput,
 } from "../contract";
 import type {
+	FlowExport,
 	FlowNotice,
 	FlowRevisionItem,
 	FlowRevisionView,
 	FlowUse,
+	SavedFlow,
 } from "../flows";
 import type { Branches, Project } from "../projects";
 import type {
@@ -135,6 +137,23 @@ export interface SpaceEngine {
 		name: string,
 		revisionId: string,
 	): Promise<FlowIssue[]>;
+	/** The flow as a JSON file, to import into another project. Refuses a flow that is not valid. */
+	exportFlow(projectId: string, name: string): Promise<FlowExport>;
+	/**
+	 * Saves the flow of a JSON file as a new flow of the project. A name
+	 * the project has already gets a suffix. Returns the name and the issues.
+	 */
+	importFlow(projectId: string, name: string, json: string): Promise<SavedFlow>;
+	/**
+	 * Copies the flow into a project of this Space as `to.name`, without
+	 * the flows it calls. Refuses a name that project has, with a free one
+	 * to use. Returns the name and the issues there.
+	 */
+	copyFlow(
+		projectId: string,
+		name: string,
+		to: { projectId: string; name: string },
+	): Promise<SavedFlow>;
 	/**
 	 * The values the flow's kept variables (`keep`) have between runs on
 	 * this computer, by name. A variable without one starts from `initial`.

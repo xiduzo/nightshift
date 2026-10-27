@@ -4,6 +4,7 @@ import { z } from "zod";
 import { output } from "../output";
 import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
 import {
+	flowExportSchema,
 	flowIssueSchema,
 	flowListItemSchema,
 	flowNoticeSchema,
@@ -11,9 +12,13 @@ import {
 	flowRevisionViewSchema,
 	keptValueSchema,
 	loadedFlowSchema,
+	savedFlowSchema,
 } from "./schemas";
 
 const flowRef = z.object({ projectId: z.string(), name: flowNameSchema });
+
+/** The largest flow file an import takes: 5 MB. */
+const MAX_FLOW_JSON = 5_000_000;
 
 export const flows = {
 	list: protectedProcedure
@@ -146,5 +151,48 @@ export const flows = {
 				input.name,
 				input.revisionId,
 			),
+		),
+	export: protectedProcedure
+		.route({
+			summary: "Gives a flow as a JSON file, to import into another project.",
+		})
+		.output(output(flowExportSchema))
+		.input(flowRef)
+		.handler(({ context, input }) =>
+			context.space.exportFlow(input.projectId, input.name),
+		),
+	import: permitted({ flow: ["save"] })
+		.route({
+			summary:
+				"Saves the flow of a JSON file as a new flow of the project, with a suffix when the name is taken, and returns its name and problems.",
+		})
+		.output(output(savedFlowSchema))
+		.input(
+			flowRef.extend({
+				/** The contents of the file. */
+				json: z.string().max(MAX_FLOW_JSON),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.importFlow(input.projectId, input.name, input.json),
+		),
+	copy: permitted({ flow: ["save"] })
+		.route({
+			summary:
+				"Copies a flow into a project of this space, without the flows it calls, and returns its name and problems there.",
+		})
+		.output(output(savedFlowSchema))
+		.input(
+			flowRef.extend({
+				toProjectId: z.string(),
+				/** The name of the copy. A name that project has is refused. */
+				as: flowNameSchema,
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.copyFlow(input.projectId, input.name, {
+				projectId: input.toProjectId,
+				name: input.as,
+			}),
 		),
 };

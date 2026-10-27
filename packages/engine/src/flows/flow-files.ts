@@ -1,5 +1,7 @@
 import {
+	canonicalFlowJson,
 	diffFlows,
+	FLOW_VERSION,
 	type Flow,
 	type FlowDiff,
 	type FlowDiffSummary,
@@ -13,6 +15,7 @@ import {
 	migrateFlow,
 	type ProjectFlowMap,
 	parsedFlows,
+	suffixedName,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { FlowRevision, RevisionKind } from "./flow-document";
@@ -20,7 +23,8 @@ import type { ProjectFlows } from "./project-flows";
 
 /**
  * The flows of a project in a Space as a Person lists, reads, saves and
- * deletes them, through the `ProjectFlows` port, and the revisions of each.
+ * deletes them, through the `ProjectFlows` port. Also their revisions,
+ * a restore, and the moves between projects: export, import and copy.
  */
 export type FlowFilesDeps = {
 	flows: ProjectFlows;
@@ -63,6 +67,12 @@ export type FlowRevisionView = {
 	/** From `against` to the revision. Null when either does not read as a flow. */
 	diff: FlowDiff | null;
 };
+
+/** A flow as a file to save and import elsewhere. */
+export type FlowExport = { fileName: string; json: string };
+
+/** A flow that an import or a copy saved: its name there, and its problems. */
+export type SavedFlow = { name: string; issues: FlowIssue[] };
 
 export type FlowFiles = ReturnType<typeof createFlowFiles>;
 
@@ -128,6 +138,24 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 		});
 		const currentFlow = loadFlowSource(set.sources, name, set.pathOf).flow;
 		return { items, flows, currentFlow };
+	}
+
+	/** The flow of that name, or a refusal when it does not read as a flow. */
+	async function validFlow(
+		spaceId: string,
+		projectId: string,
+		name: string,
+		personId: string | undefined,
+	): Promise<Flow> {
+		const set = await deps.flows.flows({ projectId, spaceId, personId });
+		const loaded = loadFlowSource(set.sources, name, set.pathOf);
+		if (loaded.flow === null) {
+			throw new Refusal(
+				"invalid",
+				`The flow "${name}" is not valid. Fix it in the editor first.`,
+			);
+		}
+		return loaded.flow;
 	}
 
 	return {
@@ -247,7 +275,103 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			}
 			return deps.flows.save(of, name, flow, { kind: "restore" });
 		},
+
+		/** The flow as a JSON file, in the form Night Shift saves it. */
+		async export(
+			spaceId: string,
+			projectId: string,
+			name: string,
+			personId: string | undefined,
+		): Promise<FlowExport> {
+			const flow = await validFlow(spaceId, projectId, name, personId);
+			return { fileName: `${name}.json`, json: canonicalFlowJson(flow) };
+		},
+
+		/**
+		 * Saves the flow of a JSON file as a new flow of the project, a
+		 * revision of kind `import`. An older format is brought up to date
+		 * first. A name the project has already gets a suffix (`-2`).
+		 */
+		async import(
+			spaceId: string,
+			projectId: string,
+			name: string,
+			json: string,
+			personId: string | undefined,
+		): Promise<SavedFlow> {
+			const flow = importedFlow(json);
+			const of = { projectId, spaceId, personId };
+			const set = await deps.flows.flows(of);
+			const free = suffixedName(name, new Set(Object.keys(set.sources)));
+			const issues = await deps.flows.save(of, free, flow, { kind: "import" });
+			return { name: free, issues };
+		},
+
+		/**
+		 * Copies the flow into a project of the Space, a revision of kind
+		 * `copy` there. The flows it calls stay behind: the issues say which
+		 * ones the copy misses. Refuses a name that project has already,
+		 * and suggests a free one.
+		 */
+		async copy(
+			spaceId: string,
+			projectId: string,
+			name: string,
+			to: { projectId: string; name: string },
+			personId: string | undefined,
+		): Promise<SavedFlow> {
+			const flow = await validFlow(spaceId, projectId, name, personId);
+			const target = { projectId: to.projectId, spaceId, personId };
+			const taken = new Set(
+				Object.keys((await deps.flows.flows(target)).sources),
+			);
+			if (taken.has(to.name)) {
+				throw new Refusal(
+					"conflict",
+					`That project has a flow named "${to.name}" already. Copy it as "${suffixedName(to.name, taken)}" instead.`,
+				);
+			}
+			const issues = await deps.flows.save(target, to.name, flow, {
+				kind: "copy",
+			});
+			return { name: to.name, issues };
+		},
 	};
+}
+
+/** The flow a JSON file holds, brought to the current format, or a refusal that says what is wrong. */
+function importedFlow(json: string): Flow {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(json);
+	} catch {
+		throw new Refusal(
+			"invalid",
+			"This file is not a flow. Choose a flow file that Night Shift exported.",
+		);
+	}
+	const migrated = migrateFlow(parsed);
+	const version =
+		migrated !== null && typeof migrated === "object" && "version" in migrated
+			? migrated.version
+			: undefined;
+	if (typeof version === "number" && version > FLOW_VERSION) {
+		throw new Refusal(
+			"invalid",
+			"A newer version of Night Shift made this flow. Update Night Shift to import it.",
+		);
+	}
+	const flow = flowSchema.safeParse(migrated);
+	if (!flow.success) {
+		const issue = flow.error.issues[0];
+		const where =
+			issue && issue.path.length > 0 ? ` at ${issue.path.join(".")}` : "";
+		throw new Refusal(
+			"invalid",
+			`This file is not a valid flow${where}: ${issue?.message ?? "check its format"}. Choose a flow file that Night Shift exported.`,
+		);
+	}
+	return flow.data;
 }
 
 function revisionNotFound(): Refusal {

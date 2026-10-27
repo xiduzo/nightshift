@@ -12,10 +12,12 @@ export {
 	revisionKinds,
 } from "./flow-document";
 export type {
+	FlowExport,
 	FlowFiles,
 	FlowRevisionItem,
 	FlowRevisionView,
 	RevisionName,
+	SavedFlow,
 } from "./flow-files";
 export { createFlowFiles } from "./flow-files";
 export type { FlowRef, FlowUse } from "./flow-use";
