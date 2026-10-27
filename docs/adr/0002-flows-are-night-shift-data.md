@@ -31,7 +31,7 @@ it. Each Device reads them from its own Clone. This causes problems:
 5. **Every save is a version.** A version records who saved it, when, on
    which Device, and the change. A person can see the difference and
    restore a version. A Run records the version that it runs.
-6. **A flow belongs to one Project.** "Copy to project" and JSON export
+6. **A flow belongs to one Project.** "Copy into project" and JSON export
    and import move a flow between Projects. Kits stay the read-only flows
    that ship with Night Shift.
 7. **Agents use Night Shift's tools.** An agent reads and saves flows only
