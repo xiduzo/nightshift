@@ -384,6 +384,9 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					serve: (request, signal) =>
 						engine.admission.serve(request, { hostId }, signal),
 					served,
+					// A session for a Walker that this computer cannot reach stops.
+					replyDeadlineMs: () =>
+						deps.settings.current().offlineWorkMinutes * 60_000,
 				}).attach(link),
 			];
 			return () => {

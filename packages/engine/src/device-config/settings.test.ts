@@ -208,6 +208,18 @@ describe("save", () => {
 		]);
 	});
 
+	test("the offline limit of the work for other Devices is 10 min, and a saved value wins", async () => {
+		const s = await store();
+		expect(s.current().offlineWorkMinutes).toBe(10);
+		expect(s.view().fields.offlineWorkMinutes).toEqual({
+			source: "default",
+			default: 10,
+		});
+		await s.save({ offlineWorkMinutes: 30 });
+		expect((await store()).current().offlineWorkMinutes).toBe(30);
+		await expect(s.save({ offlineWorkMinutes: 0 })).rejects.toThrow();
+	});
+
 	test("saving again replaces the value", async () => {
 		const s = await store();
 		await s.save({ networkGraceMinutes: 30 });

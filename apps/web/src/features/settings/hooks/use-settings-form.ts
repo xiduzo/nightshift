@@ -23,6 +23,7 @@ const KINDS: Partial<Record<SettingKey, Kind>> = {
 	usageLimitFirstWaitMinutes: { type: "minutes" },
 	usageLimitMaxWaitMinutes: { type: "minutes" },
 	networkGraceMinutes: { type: "minutes" },
+	offlineWorkMinutes: { type: "minutes" },
 	agentHarness: { type: "choice" },
 	agentModel: { type: "text" },
 	agentPermissionMode: { type: "choice" },

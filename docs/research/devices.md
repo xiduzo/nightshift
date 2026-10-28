@@ -592,8 +592,12 @@ Between two steps on different Devices: push, fetch and checkout,
   away, and the runs moved to it. A run that the Host walks waits for
   the Host. A step placed on another Device waits until the link is
   back. The exchange then sends the Device's runs to the Host.
-- A Device that cannot reach anyone for long aborts its sessions. The
-  limit is a Device setting.
+- A placed Device that cannot reach the Host for long stops the
+  sessions and commands it runs for a run another Device walks: nothing
+  runs for a Walker that is gone. "Long" is the Device setting
+  `offlineWorkMinutes` (Settings → Runs → Offline limit, 10 min by
+  default), read each time the replies fail. The runs the Device walks
+  itself go on offline: the exchange sends them to the Host later.
 
 ### The relay
 
@@ -1404,7 +1408,8 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      made in that window wait for it. A Device that takes its work again
      names the calls it still serves; any other it took ended there (it
      restarted, or the call never reached it) and ends with an error.
-     Replies that cannot reach the Host for a minute abort the call on the
+     Replies that cannot reach the Host for the Device setting
+     `offlineWorkMinutes` (10 min by default) abort the call on the
      Device: nothing runs for a Walker that is gone.
    - **Two checks, two code paths.** The Host, before it places a run
      (`PlacementPort.plan`, then `place`, in `packages/devices/src/placement/`): the Device is paired here and not revoked,
@@ -1531,8 +1536,9 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      its Host has the minute only. Online now means a work
      stream is open; a call already made waits out a short drop (45 s).
    - **Offline during a step.** The placed Device keeps the session and
-     its replies while they cannot reach the Host, up to ten minutes
-     (`REPLY_DEADLINE_MS`), and sends them when the link is back: the
+     its replies while they cannot reach the Host, up to the Device
+     setting `offlineWorkMinutes` (10 min by default), and sends them
+     when the link is back: the
      Walker gets the events it missed (a short drop is a reattach). A call
      the hub ends because the Device stayed away (45 s) is an `offline`
      error: a session cut off that way ends with an error of kind
