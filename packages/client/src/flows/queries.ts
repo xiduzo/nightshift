@@ -22,9 +22,12 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 		/** The revisions of a flow, newest first. */
 		revisions: (projectId: string, name: string) =>
 			orpc.flows.revisions.queryOptions({ input: { projectId, name } }),
-		/** Every revisions query of one flow. Invalidate it after the flow is saved. */
+		/** The list of a flow's revisions. Invalidate it, and `revisionKey`, after the flow is saved. */
 		revisionsKey: (projectId: string, name: string) =>
 			orpc.flows.revisions.key({ input: { projectId, name } }),
+		/** Every revision read of one flow: each compares with the flow as it is now. */
+		revisionKey: (projectId: string, name: string) =>
+			orpc.flows.revision.key({ input: { projectId, name } }),
 		/**
 		 * One revision with its flow, and the diff to it from `against`:
 		 * another revision, or the flow as it is now when left out.

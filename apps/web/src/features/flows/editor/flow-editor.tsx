@@ -22,6 +22,12 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
@@ -36,7 +42,11 @@ import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
 	CheckIcon,
 	CircleDotIcon,
+	CopyIcon,
+	DownloadIcon,
+	HistoryIcon,
 	type LucideIcon,
+	MoreHorizontalIcon,
 	PlayIcon,
 	Redo2Icon,
 	SaveIcon,
@@ -45,6 +55,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { formatDateTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
 import { type PaletteItem, paletteMeta } from "../canvas/node-type";
@@ -55,8 +66,11 @@ import {
 import type { ChatLink } from "../chat/chat-link";
 import { FlowChatPanel } from "../chat/chat-panel";
 import { ProposalBar } from "../chat/proposal-bar";
+import { proposalCanvas } from "../chat/proposal-canvas";
 import { useChatPanel } from "../chat/use-chat-panel";
 import { checkFlow } from "../flow-draft";
+import { CopyFlowDialog } from "../move/copy-flow-dialog";
+import { saveFile } from "../move/flow-file";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
 import { useAddNode } from "./canvas-controls";
@@ -74,6 +88,10 @@ import { LeaveDialog } from "./leave-dialog";
 import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
+import {
+	type RevisionOnCanvas,
+	RevisionsSheet,
+} from "./revisions/revisions-sheet";
 import { MakeSubflowDialog } from "./sections/make-subflow-dialog";
 import { sectionEdits } from "./sections/section-edits";
 import { SectionInspector } from "./sections/section-inspector";
@@ -98,6 +116,10 @@ type Props = {
 	chatLink?: ChatLink;
 	/** The chat link did its work: drop it from the address. */
 	onChatLinkUsed?: () => void;
+	/** Opens the revisions at the start, with this revision open. */
+	revisionLink?: string;
+	/** The revision link did its work: drop it from the address. */
+	onRevisionLinkUsed?: () => void;
 };
 
 /** What the chat panel covers of the canvas on a wide screen: its width (`w-[min(380px,…)]`) and its gap. */
@@ -119,6 +141,8 @@ function Editor({
 	initiallySaved,
 	chatLink,
 	onChatLinkUsed,
+	revisionLink,
+	onRevisionLinkUsed,
 }: Props) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -130,6 +154,22 @@ function Editor({
 		initiallySaved ? JSON.stringify(initialFlow) : "",
 	);
 	const [selection, setSelection] = useState<Selection>(null);
+	const [revisionsOpen, setRevisionsOpen] = useState(
+		revisionLink !== undefined,
+	);
+	const [openRevision, setOpenRevision] = useState<string | null>(
+		revisionLink ?? null,
+	);
+	// The revision the canvas shows instead of the draft.
+	const [shownRevision, setShownRevision] = useState<RevisionOnCanvas | null>(
+		null,
+	);
+	const [copying, setCopying] = useState(false);
+	// The sheet opened with the revision link: drop it from the address.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs once, at the start.
+	useEffect(() => {
+		if (revisionLink !== undefined) onRevisionLinkUsed?.();
+	}, []);
 	// The Section just made: its inspector asks for a name first.
 	const [madeSection, setMadeSection] = useState<string | null>(null);
 	// The Section "Make subflow" works on, while its dialog is open.
@@ -206,6 +246,26 @@ function Editor({
 	);
 
 	const canSave = dirty && savable && !saveFlow.isPending;
+	// Export and copy read the saved flow: there is none before the first save.
+	const everSaved = savedJson !== "";
+
+	const exportFlow = async () => {
+		try {
+			const file = await queryClient.fetchQuery(
+				flowQueries.export(projectId, name),
+			);
+			saveFile(file.fileName, file.json);
+			if (dirty) {
+				toast.info(
+					"Exported the saved flow. Save first to export your changes too.",
+				);
+			}
+		} catch (error) {
+			toast.error(
+				`Could not export: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	};
 
 	/** After a save: the draft is the file now, and the cached flow follows. */
 	const onSaved = useCallback(
@@ -222,6 +282,12 @@ function Editor({
 			void queryClient.invalidateQueries({
 				queryKey: flowQueries.map(projectId).queryKey,
 			});
+			for (const queryKey of [
+				flowQueries.revisionsKey(projectId, name),
+				flowQueries.revisionKey(projectId, name),
+			]) {
+				void queryClient.invalidateQueries({ queryKey });
+			}
 		},
 		[queryClient, projectId, name],
 	);
@@ -490,7 +556,14 @@ function Editor({
 		link: chatLink,
 		onLinkUsed: onChatLinkUsed,
 	});
-	const preview = chat.preview;
+	const revisionPreview = useMemo(
+		() =>
+			shownRevision
+				? proposalCanvas(shownRevision.before, shownRevision.after)
+				: null,
+		[shownRevision],
+	);
+	const preview = revisionPreview ?? chat.preview;
 	editKeysRef.current =
 		preview || subflows.inside
 			? null
@@ -696,6 +769,47 @@ function Editor({
 					{saveFlow.isPending ? "Saving…" : "Save"}
 				</Button>
 				<Button
+					variant={revisionsOpen || shownRevision ? "secondary" : "outline"}
+					size="sm"
+					aria-label="Revisions"
+					onClick={() => {
+						setShownRevision(null);
+						setRevisionsOpen(true);
+					}}
+				>
+					<HistoryIcon data-icon="inline-start" />
+					<span className="hidden md:inline">Revisions</span>
+				</Button>
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						render={
+							<Button
+								variant="outline"
+								size="icon-sm"
+								aria-label={`More actions for ${name}`}
+							/>
+						}
+					>
+						<MoreHorizontalIcon />
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-48">
+						<DropdownMenuItem
+							disabled={!everSaved}
+							onClick={() => void exportFlow()}
+						>
+							<DownloadIcon aria-hidden="true" />
+							Export as file
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							disabled={!everSaved}
+							onClick={() => setCopying(true)}
+						>
+							<CopyIcon aria-hidden="true" />
+							Copy into project…
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+				<Button
 					variant={chat.open ? "secondary" : "outline"}
 					size="sm"
 					aria-pressed={chat.open}
@@ -723,9 +837,15 @@ function Editor({
 								<EditorCanvas
 									// A proposal is its own canvas: it fits the view anew,
 									// and keeps no routes of the draft.
-									key={preview ? "proposal" : "draft"}
+									key={
+										revisionPreview
+											? `revision:${shownRevision?.revisionId}`
+											: preview
+												? "proposal"
+												: "draft"
+									}
 									flow={preview?.flow ?? draft}
-									routesKey={`${projectId}/${name}${preview ? "#proposal" : ""}`}
+									routesKey={`${projectId}/${name}${revisionPreview ? `#revision:${shownRevision?.revisionId}` : preview ? "#proposal" : ""}`}
 									check={previewCheck ?? check}
 									selection={preview ? null : selection}
 									onFlowChange={preview ? ignoreChange : changeFlow}
@@ -763,7 +883,25 @@ function Editor({
 							}}
 							className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
 						/>
-						{preview ? (
+						{shownRevision ? (
+							<ProposalBar
+								title={`You see the revision of ${formatDateTime(shownRevision.at)}: what it changed`}
+								onHide={() => setShownRevision(null)}
+								className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+							>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setShownRevision(null);
+										setRevisionsOpen(true);
+									}}
+								>
+									<HistoryIcon data-icon="inline-start" />
+									Back to revisions
+								</Button>
+							</ProposalBar>
+						) : preview ? (
 							<ProposalBar
 								onHide={chat.hidePreview}
 								className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
@@ -862,6 +1000,35 @@ function Editor({
 					}}
 				/>
 			) : null}
+
+			<RevisionsSheet
+				projectId={projectId}
+				name={name}
+				open={revisionsOpen}
+				onOpenChange={setRevisionsOpen}
+				selectedId={openRevision}
+				onSelect={setOpenRevision}
+				dirty={dirty}
+				onShow={(revision) => {
+					chat.hidePreview();
+					setSelection(null);
+					setRevisionsOpen(false);
+					setShownRevision(revision);
+				}}
+				onRestored={(flow, issues) => {
+					setDraft(flow);
+					onSaved(flow, issues);
+					setShownRevision(null);
+				}}
+			/>
+
+			<CopyFlowDialog
+				open={copying}
+				onOpenChange={setCopying}
+				projectId={projectId}
+				name={name}
+				dirty={dirty}
+			/>
 
 			<LeaveDialog
 				blocked={blocker.status === "blocked"}

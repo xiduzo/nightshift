@@ -7,16 +7,23 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { cn } from "@nightshift/ui/lib/utils";
+import type { ReactNode } from "react";
 
 /**
- * Over the canvas while it shows a proposal: what the marks mean, and the
- * way back to the draft. Apply and Discard stay on the proposal in the chat.
+ * Over the canvas while it shows a proposal or a Flow revision: what the
+ * marks mean, and the way back to the draft. Apply and Discard stay on the
+ * proposal in the chat.
  */
 export function ProposalBar({
+	title = "You see the proposed change",
 	onHide,
+	children,
 	className,
 }: {
+	title?: string;
 	onHide: () => void;
+	/** More actions, before the way back to the draft. */
+	children?: ReactNode;
 	className?: string;
 }) {
 	return (
@@ -27,7 +34,7 @@ export function ProposalBar({
 			className={cn("flex-nowrap bg-background shadow-lg", className)}
 		>
 			<ItemContent className="min-w-0">
-				<ItemTitle>You see the proposed change</ItemTitle>
+				<ItemTitle>{title}</ItemTitle>
 				<ItemDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
 					<span className="flex items-center gap-1.5">
 						<span
@@ -53,6 +60,7 @@ export function ProposalBar({
 				</ItemDescription>
 			</ItemContent>
 			<ItemActions>
+				{children}
 				<Button variant="outline" size="sm" onClick={onHide}>
 					Show my flow
 				</Button>
