@@ -48,7 +48,7 @@ export function flowCaption(
 
 /** What one place is, for the person who picks it. */
 export function placementHint(
-	choice: Pick<PlacementChoice, "online" | "offers" | "thisDevice">,
+	choice: Pick<PlacementChoice, "online" | "offers" | "thisDevice" | "lastRun">,
 ): string {
 	if (!choice.online) {
 		return "Offline. Open Night Shift on that computer to run flows on it.";
@@ -58,7 +58,10 @@ export function placementHint(
 			? "Another person offers this computer to the Space, with no profiles."
 			: `Another person offers this computer to the Space, with ${choice.offers.join(", ")}.`;
 	}
-	return choice.thisDevice ? "Your Host." : "One of your computers.";
+	if (choice.thisDevice) return "Your Host.";
+	return choice.lastRun
+		? "One of your computers. The last run of this project ran here."
+		: "One of your computers.";
 }
 
 function names(inputs: readonly Pick<FlowInputDef, "label" | "name">[]) {

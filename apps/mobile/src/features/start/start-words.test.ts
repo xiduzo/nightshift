@@ -64,6 +64,9 @@ test("placementHint says what each place is", () => {
 		"One of your computers.",
 	);
 	expect(
+		placementHint({ online: true, thisDevice: false, lastRun: true }),
+	).toBe("One of your computers. The last run of this project ran here.");
+	expect(
 		placementHint({ online: true, thisDevice: false, offers: ["claude"] }),
 	).toBe("Another person offers this computer to the Space, with claude.");
 	expect(placementHint({ online: true, thisDevice: false, offers: [] })).toBe(

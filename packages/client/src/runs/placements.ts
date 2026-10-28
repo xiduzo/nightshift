@@ -12,6 +12,8 @@ export type PlacementChoice = {
 	/** Another person's Device: the profiles it offers to this Space. */
 	offers?: string[];
 	online: boolean;
+	/** The project's latest run ran on it. */
+	lastRun?: boolean;
 };
 
 /**
@@ -28,6 +30,7 @@ export function placementChoices(
 		name: placement.name,
 		thisDevice: placement.thisDevice,
 		...(placement.offers !== undefined ? { offers: placement.offers } : {}),
+		...(placement.lastRun ? { lastRun: true } : {}),
 		online: true,
 	}));
 	const known = new Set(online.map((choice) => choice.deviceId));
@@ -47,7 +50,8 @@ export function placementChoices(
 
 /**
  * The place a run goes when the person does not choose: the one they
- * chose while it is still online, else this computer, else the first.
+ * chose while it is still online, else this computer, else the one the
+ * project's latest run ran on, else the first.
  */
 export function defaultPlacement(
 	choices: readonly PlacementChoice[],
@@ -57,6 +61,7 @@ export function defaultPlacement(
 	return (
 		online.find((choice) => choice.deviceId === chosen) ??
 		online.find((choice) => choice.thisDevice) ??
+		online.find((choice) => choice.lastRun) ??
 		online[0] ??
 		null
 	);

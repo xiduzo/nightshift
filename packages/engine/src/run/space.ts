@@ -2,7 +2,7 @@ import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService } from "../cleanup";
-import type { Actor, StartRunInput } from "../contract";
+import type { Actor, Placement, StartRunInput } from "../contract";
 import { type FlowFiles, type FlowNotice, flowUse } from "../flows";
 import type { Runner } from "../graph";
 import {
@@ -50,6 +50,8 @@ export type SpacesDeps = {
 	documents: SpaceDocuments;
 	/** The ids of the project's runs. */
 	runIdsOfProject(projectId: string): Promise<string[]>;
+	/** The Device the project's latest run ran on, or null (`lastRunDevice`). */
+	lastRunDevice(projectId: string): Promise<string | null>;
 	/** The run's row, or "not found". */
 	runRow(runId: string): Promise<RunRow>;
 	listBranches(repoPath: string): Promise<Branches>;
@@ -104,6 +106,38 @@ export function createSpaces(deps: SpacesDeps) {
 		const document = await documents.open(spaceId);
 		const deviceId = await log.walkerId();
 		return rows.map((row) => toProject(row, document, deviceId));
+	}
+
+	/** The Devices a run of the project can run on, the one of its latest run marked. */
+	async function placementsOf(
+		spaceId: string,
+		personId: string,
+		projectId: string,
+	): Promise<Placement[]> {
+		const list = await deps.placement.placements(spaceId, personId, projectId);
+		const last = await deps.lastRunDevice(projectId);
+		return list.map((p) => (p.deviceId === last ? { ...p, lastRun: true } : p));
+	}
+
+	/**
+	 * Where a run goes when the person names no Device: this computer, or,
+	 * when it has no Clone of the project (a Host without one), the Device
+	 * of the project's latest run, else the first of the person's own.
+	 */
+	async function runDevice(
+		spaceId: string,
+		input: StartRunInput,
+		actor: Actor | undefined,
+	): Promise<string | undefined> {
+		if (input.deviceId !== undefined || !actor) return input.deviceId;
+		const project = await projects.find(input.projectId, spaceId);
+		if (project.repoPath !== null) return undefined;
+		const list = await placementsOf(spaceId, actor.personId, input.projectId);
+		const pick =
+			list.find((p) => p.lastRun) ??
+			list.find((p) => p.offers === undefined) ??
+			list[0];
+		return pick && !pick.thisDevice ? pick.deviceId : undefined;
 	}
 
 	/** Refuses while a run of the project runs a step. */
@@ -230,7 +264,7 @@ export function createSpaces(deps: SpacesDeps) {
 			async listPlacements(projectId) {
 				await ready;
 				if (!actor) throw new Refusal("signed-out", "Sign in to start a run.");
-				return deps.placement.placements(spaceId, actor.personId, projectId);
+				return placementsOf(spaceId, actor.personId, projectId);
 			},
 
 			async listFlows(projectId) {
@@ -406,8 +440,14 @@ export function createSpaces(deps: SpacesDeps) {
 						if (!(error instanceof HostUnreachableError)) throw error;
 					}
 				}
+				// A run started here, from a browser or a phone: its steps run
+				// here, or where the project's runs ran when it has no Clone here.
+				const deviceId = await runDevice(spaceId, input, actor);
 				return (await deps.pathsFor(spaceId, actor))(
-					await deps.startRun(input, { kind: "manual" }),
+					await deps.startRun(
+						deviceId === undefined ? input : { ...input, deviceId },
+						{ kind: "manual" },
+					),
 				);
 			},
 
