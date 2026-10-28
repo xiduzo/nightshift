@@ -1,6 +1,6 @@
 import { spaceIds, spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { clone, project } from "@nightshift/db/schema";
+import { clone, project, ydoc } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
@@ -190,6 +190,12 @@ export type SpaceDocuments = {
 	byName(name: string): SpaceDocument | null;
 	/** Writes the Space's Members into its document, from the auth tables. */
 	mirrorMembers(spaceId: string): Promise<void>;
+	/**
+	 * Removes the document of a Space this Replica no longer has: closes
+	 * it, and deletes it from the Replica. Throws while the Space or a
+	 * Project of it is still here.
+	 */
+	remove(spaceId: string): Promise<void>;
 	/** Flushes every document. */
 	flush(): Promise<void>;
 	close(): Promise<void>;
@@ -266,6 +272,23 @@ export function createSpaceDocuments(options: {
 		async mirrorMembers(spaceId) {
 			const document = await open(spaceId);
 			if (!document.hostedElsewhere) await mirror(db, document);
+		},
+		async remove(spaceId) {
+			const [kept] = await db
+				.select({ id: project.id })
+				.from(project)
+				.where(eq(project.spaceId, spaceId))
+				.limit(1);
+			if (kept || (await spaceIds(db)).includes(spaceId)) {
+				throw new Error(`The Space ${spaceId} is still here.`);
+			}
+			const name = spaceDocumentName(spaceId);
+			const pending = opening.get(spaceId);
+			opening.delete(spaceId);
+			opened.delete(name);
+			const document = await pending?.catch(() => null);
+			await document?.close();
+			await db.delete(ydoc).where(eq(ydoc.name, name));
 		},
 		async flush() {
 			await Promise.all([...opened.values()].map((d) => d.flush()));

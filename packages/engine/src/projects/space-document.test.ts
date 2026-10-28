@@ -7,6 +7,7 @@ import {
 	organization,
 	project,
 	user,
+	ydoc,
 } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
@@ -196,6 +197,42 @@ describe("projection", () => {
 		expect(await projectRows()).toEqual([
 			{ id: "p1", spaceId: elsewhere, name: "theirs", removedAt: null },
 		]);
+	});
+});
+
+describe("remove", () => {
+	const stored = async (spaceId: string) =>
+		(
+			await sandbox.db
+				.select({ name: ydoc.name })
+				.from(ydoc)
+				.where(eq(ydoc.name, spaceDocumentName(spaceId)))
+		).length;
+
+	test("the document of a Space this Replica no longer has goes, open or not", async () => {
+		const gone = await otherSpace(sandbox.db, "Gone");
+		const document = await documents.open(gone);
+		await document.flush();
+		expect(await stored(gone)).toBe(1);
+		await sandbox.db.delete(organization).where(eq(organization.id, gone));
+
+		await documents.remove(gone);
+
+		expect(await stored(gone)).toBe(0);
+		expect(documents.byName(spaceDocumentName(gone))).toBeNull();
+	});
+
+	test("the document of a Space that is still here, or that has a project here, stays", async () => {
+		const kept = await otherSpace(sandbox.db, "Kept");
+		await (await documents.open(kept)).flush();
+		await expect(documents.remove(kept)).rejects.toThrow("still here");
+
+		await sandbox.db
+			.insert(project)
+			.values({ id: "p1", spaceId: kept, name: "left behind" });
+		await sandbox.db.delete(organization).where(eq(organization.id, kept));
+		await expect(documents.remove(kept)).rejects.toThrow("still here");
+		expect(await stored(kept)).toBe(1);
 	});
 });
 

@@ -198,6 +198,7 @@ export const leaveResultSchema = exact<LeaveResult>()(
 				spaceId: z.string(),
 				projects: z.number(),
 				runs: z.number(),
+				unpinned: z.number(),
 				backup: z.string(),
 			})
 			.nullable(),

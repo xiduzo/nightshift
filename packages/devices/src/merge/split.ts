@@ -4,6 +4,8 @@ import type { Database } from "@nightshift/db";
 import { hostSpace, run } from "@nightshift/db/schema";
 import {
 	type Engine,
+	type FlowDocument,
+	type FlowDocuments,
 	type SpaceDocuments,
 	spaceMoveBatch,
 	spaceProjectRows,
@@ -30,7 +32,10 @@ import { type SplitRow, splitRows } from "./split-rows";
  * everything: it loses nothing.
  *
  * The Projects keep their ids, so their flow documents stay as they are
- * here, with their history; they no longer sync with the Host. The rows
+ * here, with their history; they no longer sync with the Host. A schedule
+ * of theirs that names another Device would never fire again: it names
+ * no Device after the split, so it fires here, the one Replica of the
+ * new Space. The result counts them (`unpinned`). The rows
  * that come along name the Person by their id here again. The Host's
  * Space stays on this computer with the rest of its rows, named
  * "Personal on <Host>", but the Person is no longer a Member of it here:
@@ -51,9 +56,11 @@ import { type SplitRow, splitRows } from "./split-rows";
  *    with this computer's runs only), names the Host's Space "Personal
  *    on <Host>", adds what the composition root moves of the same runs
  *    (`moveStatements`), ends a merge that is not done, and sets this
- *    state. Then the engine reads the moved runs again.
- * 4. `done`: the new Space's document takes its Projects and Clones from
- *    the rows, as a new document does on its first open.
+ *    state with the count of the schedules to unpin. Then the engine
+ *    reads the moved runs again.
+ * 4. `done`: the schedules that name another Device name none, and the
+ *    new Space's document takes its Projects and Clones from the rows, as
+ *    a new document does on its first open.
  *
  * A split that stopped goes on from its state, by itself
  * (`keepFinishing`).
@@ -74,8 +81,9 @@ export type PersonalSplitDeps = {
 	};
 	hostLinks: Pick<HostLinks, "get">;
 	spaces: Pick<SpaceDocuments, "open">;
+	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
-	self: { id: string };
+	self: { id: string; name: string };
 	/** The Person who owns this computer. */
 	ownerId: string;
 	dataDir: string;
@@ -168,18 +176,62 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 			.map((p) => p.id);
 	}
 
+	/** The schedules of a flow document that name a Device other than this computer. */
+	function pinnedElsewhere(document: FlowDocument): string[] {
+		return [...document.schedules.entries()].flatMap(([key, value]) => {
+			const device = (value as { device?: unknown } | null)?.device;
+			return typeof device === "string" && device !== self.name ? [key] : [];
+		});
+	}
+
+	/** How many schedules of the Projects name a Device other than this computer. */
+	async function countPinnedElsewhere(
+		projects: readonly string[],
+	): Promise<number> {
+		let count = 0;
+		for (const id of projects) {
+			count += pinnedElsewhere(await deps.flows.open(id)).length;
+		}
+		return count;
+	}
+
+	/**
+	 * The schedules of the Projects that name another Device name none:
+	 * without it they never fire. A schedule's Person goes with it: it
+	 * names who the runs on that Device ran for. Runs again safely.
+	 */
+	async function unpin(projects: readonly string[]): Promise<void> {
+		for (const id of projects) {
+			const document = await deps.flows.open(id);
+			const keys = pinnedElsewhere(document);
+			if (keys.length === 0) continue;
+			await document.current.change(() => {
+				for (const key of keys) {
+					const {
+						device: _device,
+						person: _person,
+						...rest
+					} = document.schedules.get(key) as Record<string, unknown>;
+					document.schedules.set(key, rest);
+				}
+			});
+		}
+	}
+
 	/** Goes on from the split's state, to its end. */
 	async function resume(row: SplitRow): Promise<SplitResult> {
 		const { fromSpace: from, toSpace: to } = row;
 		let state: SplitState = row.state;
 		let projects = row.projects;
 		let runs = row.runs;
+		let unpinned = row.unpinned;
 
 		if (state === "planned") {
 			await noRunsNotDone(from);
 			projects = await projectsHere(from);
 			const runIds = await spaceRunIds(db, from, projects, self.id);
 			runs = runIds.length;
+			unpinned = await countPinnedElsewhere(projects);
 			const fromName = `Personal on ${row.hostName}`;
 			const statements: BatchItem<"sqlite">[] = [
 				...(await splitPersonalSpaceBatch(db, {
@@ -207,7 +259,7 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 					.where(eq(hostSpace.spaceId, from)),
 				...(deps.moveStatements?.([{ from, to, runIds }]) ?? []),
 				merges.abandon(),
-				rows.moved(to, { projects, runs }),
+				rows.moved(to, { projects, runs, unpinned }),
 			);
 			await db.batch(
 				statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
@@ -217,6 +269,7 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		}
 
 		if (state === "moved") {
+			await unpin(projects);
 			// Its first open takes the Projects and Clones from the rows.
 			await deps.spaces.open(to);
 			await rows.done(to);
@@ -227,6 +280,7 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 			spaceId: to,
 			projects: projects.length,
 			runs,
+			unpinned,
 			backup: row.backup,
 		};
 	}
@@ -302,6 +356,7 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 						spaceId: row.toSpace,
 						projects: row.projects.length,
 						runs: row.runs,
+						unpinned: row.unpinned,
 						backup: row.backup,
 					}
 				: null;

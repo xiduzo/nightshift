@@ -179,7 +179,8 @@ function splitter(extra: Partial<PersonalSplitDeps> = {}) {
 		engine: paired.device,
 		hostLinks: createHostLinks(b.db),
 		spaces: paired.documents,
-		self: { id: b.deviceId },
+		flows: paired.flows,
+		self: { id: b.deviceId, name: "B" },
 		ownerId: localPerson,
 		dataDir: b.dataDir,
 		...extra,
@@ -303,7 +304,12 @@ describe("leaving the home Host keeps a copy", () => {
 
 		const result = await splitter().run();
 
-		expect(result).toMatchObject({ state: "done", projects: 1, runs: 1 });
+		expect(result).toMatchObject({
+			state: "done",
+			projects: 1,
+			runs: 1,
+			unpinned: 0,
+		});
 		const own = result?.spaceId as string;
 		expect(own).not.toBe(a.spaceId);
 		// One personal Space, B's own, named Personal: A's is gone from the switcher.
@@ -367,6 +373,37 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(
 			backups.filter((f) => f.startsWith("before-leaving-host-")),
 		).toHaveLength(1);
+	});
+
+	test("a schedule that names another device fires on B after the split; one that names B stays", async () => {
+		const { projectId } = await mergedIntoA();
+		const flows = await paired.flows.open(projectId);
+		await flows.current.change(() => {
+			flows.schedules.set("on-c", {
+				id: "on-c",
+				flow: "hello",
+				inputs: {},
+				cron: "0 6 * * *",
+				enabled: true,
+				device: "C",
+				person: paired.personId,
+			});
+		});
+		await revoke();
+
+		const result = await splitter().run();
+
+		expect(result).toMatchObject({ state: "done", unpinned: 1 });
+		const own = result?.spaceId as string;
+		const { schedules } = await paired.device
+			.space(own)
+			.listSchedules(projectId);
+		const byId = new Map(schedules.map((s) => [s.id, s]));
+		expect(byId.get("nightly")?.device).toBe("B");
+		expect(byId.get("on-c")?.device).toBeUndefined();
+		expect(byId.get("on-c")?.person).toBeUndefined();
+		expect(byId.get("on-c")?.cron).toBe("0 6 * * *");
+		expect(await splitter().of(a.spaceId)).toMatchObject({ unpinned: 1 });
 	});
 
 	test("a split that is done does not run again", async () => {

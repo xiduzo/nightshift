@@ -136,6 +136,11 @@ export type SplitResult = {
 	/** How many projects and runs came along. */
 	projects: number;
 	runs: number;
+	/**
+	 * How many schedules of those projects named another Device: they
+	 * fire on this computer now, since it keeps the new Space alone.
+	 */
+	unpinned: number;
 	/** The copy of the database made before the split changed anything. */
 	backup: string;
 };

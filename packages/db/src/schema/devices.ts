@@ -234,6 +234,8 @@ export const spaceSplit = sqliteTable("space_split", {
 	projects: text("projects"),
 	/** How many runs came along. */
 	runs: integer("runs").notNull().default(0),
+	/** How many schedules that named another Device fire on this computer now. */
+	unpinned: integer("unpinned").notNull().default(0),
 	/** The copy of the database made before the split changed anything. */
 	backup: text("backup").notNull(),
 	createdAt: createdAt(),

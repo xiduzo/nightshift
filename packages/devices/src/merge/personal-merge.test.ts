@@ -12,8 +12,9 @@ import {
 	run as runTable,
 	spaceMerge,
 	user,
+	ydoc,
 } from "@nightshift/db/schema";
-import { createFlowDocuments } from "@nightshift/engine";
+import { createFlowDocuments, spaceDocumentName } from "@nightshift/engine";
 import {
 	createSandbox,
 	mustGit,
@@ -488,6 +489,68 @@ describe("the merge of Personal", () => {
 		await expect(merger(link).run()).rejects.toThrow(MERGE_WORDS.merged);
 		await expect(merger(link).preview()).rejects.toThrow(MERGE_WORDS.merged);
 		expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+	});
+
+	test("the old Personal leaves no document and no events behind", async () => {
+		await projectWithRun();
+		await b.db.insert(event).values({
+			spaceId: b.spaceId,
+			type: "MemberJoined",
+			payload: JSON.stringify({ personId: localPerson, role: "owner" }),
+			walkerId: b.deviceId,
+			walkerSeq: 1_000,
+		});
+		const { link } = online();
+		await ready(link);
+		await (await paired.documents.open(b.spaceId)).flush();
+
+		await merger(link).run();
+
+		expect(
+			await b.db.select().from(event).where(eq(event.spaceId, b.spaceId)),
+		).toEqual([]);
+		expect(
+			await b.db
+				.select({ name: ydoc.name })
+				.from(ydoc)
+				.where(eq(ydoc.name, spaceDocumentName(b.spaceId))),
+		).toEqual([]);
+	});
+
+	test("at start, what a merge that is done left of the old Personal goes", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).run();
+		// What a merge of an older version left.
+		await b.db.insert(event).values({
+			spaceId: b.spaceId,
+			type: "MemberJoined",
+			payload: JSON.stringify({ personId: localPerson, role: "owner" }),
+			walkerId: b.deviceId,
+			walkerSeq: 1_000,
+		});
+		await b.db
+			.insert(ydoc)
+			.values({ name: spaceDocumentName(b.spaceId), state: Buffer.from([]) })
+			.onConflictDoNothing();
+		const finishing = new AbortController();
+
+		merger(link).keepFinishing(finishing.signal);
+
+		await waitFor(
+			async () =>
+				(await b.db.select().from(event).where(eq(event.spaceId, b.spaceId)))
+					.length === 0,
+			{ label: "the old events gone", timeoutMs: 5_000 },
+		);
+		finishing.abort();
+		expect(
+			await b.db
+				.select({ name: ydoc.name })
+				.from(ydoc)
+				.where(eq(ydoc.name, spaceDocumentName(b.spaceId))),
+		).toEqual([]);
 	});
 
 	test("a computer that is a Host with paired devices keeps its Personal", async () => {

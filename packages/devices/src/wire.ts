@@ -327,6 +327,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		engine,
 		hostLinks,
 		spaces: deps.spaces,
+		flows: deps.flows,
 		self,
 		ownerId,
 		dataDir: deps.dataDir,

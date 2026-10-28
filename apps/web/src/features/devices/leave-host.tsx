@@ -48,6 +48,14 @@ export function LeaveHostButton({ hostName }: { hostName: string }) {
 					"Your Personal on this computer is ready when its runs are done.",
 				);
 			}
+			const unpinned = result.split?.unpinned ?? 0;
+			if (unpinned > 0) {
+				toast.info(
+					unpinned === 1
+						? "1 schedule named another device. It runs on this computer now."
+						: `${unpinned} schedules named another device. They run on this computer now.`,
+				);
+			}
 		},
 	});
 	return (
