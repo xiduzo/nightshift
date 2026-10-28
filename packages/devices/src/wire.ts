@@ -13,6 +13,7 @@ import {
 	type SpaceDocuments,
 	storedDeviceCopy,
 } from "@nightshift/engine";
+import type { BatchItem } from "drizzle-orm/batch";
 import type * as Y from "yjs";
 import {
 	type AppliedCommands,
@@ -33,6 +34,7 @@ import {
 	deviceKeyStore,
 	type LinkOptions,
 } from "./links";
+import { createPersonalMerge, type MergeMove } from "./merge";
 import {
 	createOffers,
 	createOfferUse,
@@ -159,6 +161,12 @@ export type DevicesDeps = {
 	secret?: PeerEngineOptions["secret"];
 	/** Ends the relay connections of a Device whose access was removed. */
 	disconnect(deviceId: string): void;
+	/**
+	 * What a merge of Personal into the home Host's moves beside the rows
+	 * of `devices` and the engine, in the same batch: the notifier's
+	 * deliveries of the moved runs, which this package does not import.
+	 */
+	moveStatements?(moves: readonly MergeMove[]): BatchItem<"sqlite">[];
 	/** Kept across `bun --hot` reloads: what the runtime before this one hands over. */
 	kept: KeptDevices;
 	/** Knobs for tests only. */
@@ -359,6 +367,23 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		...(deps.internals?.links ? { linkOptions: deps.internals.links } : {}),
 	});
 
+	/** The merge of this computer's Personal into its home Host's (ADR 1). */
+	const merge = createPersonalMerge({
+		db,
+		engine,
+		links,
+		hostLinks,
+		spaces: deps.spaces,
+		flows: deps.flows,
+		self,
+		ownerId,
+		dataDir: deps.dataDir,
+		...(deps.moveStatements ? { moveStatements: deps.moveStatements } : {}),
+	});
+	// A merge that moved its rows finishes when its Host answers.
+	const finishing = new AbortController();
+	merge.keepFinishing(finishing.signal);
+
 	const presence = setInterval(() => {
 		engine.devices.sweep(OFFLINE_AFTER_MS).catch((error) => {
 			console.error("Device presence was not updated:", error);
@@ -373,6 +398,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		});
 	};
 	handover.release = async () => {
+		finishing.abort();
 		clearInterval(presence);
 		await links.close();
 		await copies.close();
@@ -401,6 +427,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		fingerprint,
 		copies,
 		keptDocument: (deviceId) => storedDeviceCopy(db, deviceId),
+		merge,
 	});
 
 	return {

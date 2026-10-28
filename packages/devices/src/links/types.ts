@@ -1,3 +1,4 @@
+import type { MergePreview, MergeResult } from "../contract";
 import type { HostRole } from "./host-links";
 
 /** The Links of this computer to its Hosts, and how `nightshift join` goes. */
@@ -44,4 +45,10 @@ export type JoinProgress =
 			 * admin can read their personal runs. Null: the Host did not say.
 			 */
 			hostAdmin: boolean | null;
-	  };
+	  }
+	/** After a join of a home Host: what the merge of Personal does, before it does it. */
+	| { kind: "merge-preview"; preview: MergePreview }
+	/** The merge of Personal went this far. */
+	| { kind: "merged"; result: MergeResult }
+	/** Personal did not merge now, and why. It waits for the person. */
+	| { kind: "merge-skipped"; reason: string };

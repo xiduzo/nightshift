@@ -142,6 +142,13 @@ export interface Engine {
 	 */
 	onRunEvents(listener: LandedRunListener, scope?: LandedScope): () => void;
 	/**
+	 * The rows of these runs changed in the database under the engine, in
+	 * one batch that logged no `ProjectMoved` (a merge of Spaces): their
+	 * logs are read from the database again, and so are the latest counts
+	 * of the landed feed, so the exchange sees the moved events.
+	 */
+	reindex(runIds: readonly string[]): void;
+	/**
 	 * A run's status, when it wakes, and whether this computer walks it or
 	 * runs its steps, in any Space of this Replica. Null for a run it does
 	 * not have. Cheap: one row and the facts the run log keeps, for a
@@ -604,6 +611,10 @@ export function createEngine(
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		onRunEvents: (listener, scope) => history.landed.subscribe(listener, scope),
+		reindex(runIds) {
+			runLog.forget(runIds);
+			history.landed.reread();
+		},
 		async runHere(runId) {
 			await ready;
 			return reads.runHere(runId);

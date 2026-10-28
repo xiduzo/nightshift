@@ -49,6 +49,7 @@ export {
 // router type: its declaration must be able to name them.
 export {
 	addMembership,
+	adoptPersonalSpaceBatch,
 	type InvitationView,
 	invitationView,
 	isHostAdmin,

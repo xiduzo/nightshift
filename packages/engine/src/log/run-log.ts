@@ -381,6 +381,21 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 			return added;
 		},
 
+		/**
+		 * Drops what is kept in memory of these runs, their logs and what
+		 * was derived from them: their rows changed in the database under
+		 * this log (a merge of Spaces moves them). The next read takes them
+		 * from the database.
+		 */
+		forget(runIds: readonly string[]): void {
+			for (const runId of runIds) {
+				logs.delete(runId);
+				memos.delete(runId);
+				loading.delete(runId);
+				versions.set(runId, (versions.get(runId) ?? 0) + 1);
+			}
+		},
+
 		/** Calls `listener` with every event that lands from now on. Returns the unsubscribe. */
 		onLanded(listener: LandedListener): () => void {
 			landedListeners.add(listener);

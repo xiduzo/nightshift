@@ -16,7 +16,7 @@ export {
 	type PushChannels,
 	type SendResult,
 } from "./channels";
-export type { NoticeKind } from "./deliveries";
+export { moveDeliveriesBatch, type NoticeKind } from "./deliveries";
 export {
 	createDesktopChannel,
 	type DesktopNotice,

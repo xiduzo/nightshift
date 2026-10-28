@@ -47,6 +47,11 @@ export type LandedFeed = {
 		cursors: Cursors,
 		walkers?: WalkerScope,
 	): Promise<WalkerAfter[]>;
+	/**
+	 * Reads the latest counts from the log again: rows of runs moved to
+	 * another Space without a `ProjectMoved` (a merge of Spaces).
+	 */
+	reread(): void;
 	/** Stops following the run log. */
 	close(): void;
 };
@@ -221,6 +226,11 @@ export function createLandedFeed(deps: {
 		async walkersAfter(spaces, cursors, walkers) {
 			while (!known()) await read();
 			return after(spaces, cursors, walkers);
+		},
+
+		reread() {
+			moves++;
+			refresh();
 		},
 
 		close() {

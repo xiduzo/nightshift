@@ -126,14 +126,18 @@ describe("the event log exchange", () => {
 		spaceId = (await a.client.spaces.list()).active as string;
 
 		// The Space reaches B: B's Person works in it as A's Person does on A.
+		// B joined A as its home Host, so B's own Personal merged into it
+		// (ADR 1): B has one personal Space, named "Personal", which A keeps.
 		const listed = await waitFor(
 			async () => (await b.client.spaces.list()).spaces,
 			(spaces) => spaces.some((s) => s.id === spaceId),
 		);
 		expect(listed.find((s) => s.id === spaceId)).toMatchObject({
-			personal: false,
+			name: "Personal",
+			personal: true,
 			role: "owner",
 		});
+		expect(listed.filter((s) => s.personal)).toHaveLength(1);
 		await b.client.spaces.switch({ spaceId });
 
 		// The project is listed on B before B has a folder of it.

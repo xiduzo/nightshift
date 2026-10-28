@@ -196,6 +196,52 @@ flowchart LR
   every sync, relay and stream by membership. The Replica holds many
   Spaces; every query is scoped to one.
 
+### One Personal: the merge on join
+
+When a Device joins its Home Host, its own Personal merges into the
+Person's Personal on that Host (ADR 1, `devices/src/merge/`). The merge
+rewrites the Device's database, so it is careful:
+
+1. **Checks.** The Home Host answers now and lists the Person's personal
+   Space. No run in Personal is running, waiting, sleeping or
+   interrupted. The Device is not a Host with paired Devices of its own:
+   such a Device keeps its Personal. One merge runs at a time, inside the
+   daemon that holds the database.
+2. **Preview.** The Host answers a dry run of `sync.mergePersonal`. The
+   person sees each project, its runs, where it goes, the flows that take
+   a new name and the schedules that keep firing here. Nothing changes.
+3. **Copy.** `VACUUM INTO` writes a copy of the whole database to
+   `backups/` in the data directory before any change.
+4. **States** (`space_merge`): `planned` (the copy is made), `mapped`
+   (the Host took the projects, `sync.mergePersonal`), `moved` (one
+   `db.batch`: every row with `spaceMoveBatch`, the Host's Space becomes
+   this Device's "Personal" with `adoptPersonalSpaceBatch`, the
+   notifier's deliveries, and the state), `pushed` (the exchange gave
+   the Host every moved run). A merge cut short goes on from its state.
+   After `moved` it finishes by itself when the Host answers.
+5. **The Host.** It takes each project by its remote into the personal
+   Space: a remote it has takes that project's id, so the runs of both
+   sides are one history. Every other project keeps its id. A remote of
+   a shared Space stays apart from it, in Personal without that remote
+   there, unless the person chooses to join it: then the Members of that
+   Space see its runs. The Host's Space id stays.
+6. **After the batch.** The old Space document loses the moved
+   projects. The flow documents of a project that joins another merge
+   into it (`mergeFlowDocuments`), once the Host's copy is here. Each
+   schedule that names no Device is pinned to this Device, so it keeps
+   firing where it fired. The engine reads the moved runs again
+   (`Engine.reindex`). The moved events of this Device take the numbers
+   after its latest, so they reach the Host after every cursor.
+7. **The name.** The merged Space is "Personal" on the Device: the
+   Host's answer no longer renames it "Personal on <Host>".
+
+On a new join, the merge runs at once and the join shows its preview and
+its result. When it cannot run, the join says why, and the merge waits
+for the person.
+
+An older Host has no `sync.mergePersonal`: the Device keeps its
+Personal and says to update the Host.
+
 ### Sharing a project with a colleague
 
 1. You create a Space "Platform" and invite the colleague by email. Your

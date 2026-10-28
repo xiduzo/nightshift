@@ -125,6 +125,7 @@ function fakeLinks(
 					return client;
 				},
 				check: () => {},
+				synced: () => true,
 				close: async () => {},
 			};
 		},

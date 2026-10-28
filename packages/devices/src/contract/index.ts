@@ -25,6 +25,10 @@ export {
 export { type OfferCaps, offerCapsSchema, offerRefSchema } from "./offers";
 export type {
 	ElsewhereProject,
+	MergePreview,
+	MergeProjectView,
+	MergeResult,
+	MergeState,
 	PersonalMerge,
 	PersonalMergeInput,
 } from "./personal";

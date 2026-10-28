@@ -1,6 +1,8 @@
 import {
 	type DevicesOverview,
 	type JoinProgress,
+	type MergePreview,
+	type MergeResult,
 	type OfferView,
 	type OtherDeviceView,
 	offerCapsSchema,
@@ -140,6 +142,39 @@ export const pairingReviewViewSchema = exact<PairingReviewView>()(
 	}),
 );
 
+/** What a merge of this computer's Personal into its home Host's would do. */
+export const mergePreviewSchema = exact<MergePreview>()(
+	z.object({
+		host: z.object({ id: z.string(), name: z.string() }),
+		projects: z.array(
+			z.object({
+				id: z.string(),
+				name: z.string(),
+				remote: z.string().nullable(),
+				removed: z.boolean(),
+				runs: z.number(),
+				into: z.enum(["new", "same-remote", "shared", "apart"]),
+				sharedSpace: z.object({ id: z.string(), name: z.string() }).nullable(),
+				renamedFlows: z.array(z.object({ from: z.string(), to: z.string() })),
+				schedules: z.number(),
+			}),
+		),
+		runs: z.number(),
+	}),
+);
+
+const mergeStateSchema = z.enum(["planned", "mapped", "moved", "pushed"]);
+
+/** How a merge of Personal went. */
+export const mergeResultSchema = exact<MergeResult>()(
+	z.object({
+		state: mergeStateSchema,
+		projects: z.number(),
+		runs: z.number(),
+		backup: z.string(),
+	}),
+);
+
 /** How `nightshift join` goes, step by step. */
 export const joinProgressSchema = exact<JoinProgress>()(
 	z.discriminatedUnion("kind", [
@@ -158,6 +193,9 @@ export const joinProgressSchema = exact<JoinProgress>()(
 			role: hostRoleSchema,
 			hostAdmin: z.boolean().nullable(),
 		}),
+		z.object({ kind: z.literal("merge-preview"), preview: mergePreviewSchema }),
+		z.object({ kind: z.literal("merged"), result: mergeResultSchema }),
+		z.object({ kind: z.literal("merge-skipped"), reason: z.string() }),
 	]),
 );
 

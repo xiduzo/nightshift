@@ -7,3 +7,4 @@ export {
 	type DeliveryLog,
 	type NoticeKind,
 } from "./deliveries";
+export { moveDeliveriesBatch } from "./moved";

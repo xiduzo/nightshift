@@ -69,3 +69,46 @@ export const personalMergeSchema = z.object({
 	elsewhere: z.array(elsewhereProjectSchema),
 });
 export type PersonalMerge = z.infer<typeof personalMergeSchema>;
+
+/** How far a merge of the personal Spaces came. */
+export type MergeState = "planned" | "mapped" | "moved" | "pushed";
+
+/** Where a Project of this computer's Personal goes, as the person sees it before the merge. */
+export type MergeProjectView = {
+	id: string;
+	name: string;
+	remote: string | null;
+	/** A person removed it: it moves, and stays removed. */
+	removed: boolean;
+	runs: number;
+	/**
+	 * `new`: a project of its own in Personal. `same-remote`: it joins the
+	 * project with its remote in Personal. `shared`: it joins the project
+	 * with its remote in a shared Space (only when chosen). `apart`: its
+	 * remote is a project of a shared Space, and it stays apart from it.
+	 */
+	into: "new" | "same-remote" | "shared" | "apart";
+	/** The shared Space with its remote, for `shared` and `apart`. */
+	sharedSpace: { id: string; name: string } | null;
+	/** The flows that take another name, because the project they join has one by that name. */
+	renamedFlows: { from: string; to: string }[];
+	/** Schedules that name no device: they keep firing on this computer. */
+	schedules: number;
+};
+
+/** What a merge of this computer's Personal into its home Host's would do. Changes nothing. */
+export type MergePreview = {
+	host: { id: string; name: string };
+	projects: MergeProjectView[];
+	/** How many runs move. */
+	runs: number;
+};
+
+/** How a merge went. */
+export type MergeResult = {
+	state: MergeState;
+	projects: number;
+	runs: number;
+	/** The copy of the database made before the merge changed anything. */
+	backup: string;
+};

@@ -100,6 +100,7 @@ const engine: Context["engine"] = {
 	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
 	logMemberChange: async () => {},
 	onRunEvents: () => () => {},
+	reindex: () => {},
 	runHere: async () => null,
 	deviceBack: async () => {},
 	webhook: async () => ({

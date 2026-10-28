@@ -435,3 +435,44 @@ export async function projectRowsOf(
 		);
 	return rows.map(moving);
 }
+
+/**
+ * The Projects of a Space, removed ones too, oldest first, and whether
+ * `deviceId` has a Clone of each: what a Device asks its home Host to
+ * take when its own personal Space merges into the Host's.
+ */
+export async function spaceProjectRows(
+	db: Database,
+	spaceId: string,
+	deviceId: string,
+): Promise<(MovingProject & { clone: boolean })[]> {
+	const rows = await db
+		.select({ ...movingColumns, cloneId: clone.id })
+		.from(project)
+		.leftJoin(
+			clone,
+			and(eq(clone.projectId, project.id), eq(clone.deviceId, deviceId)),
+		)
+		.where(eq(project.spaceId, spaceId))
+		.orderBy(project.createdAt, project.id);
+	return rows.map(({ cloneId, ...row }) => ({
+		...moving(row),
+		clone: cloneId !== null,
+	}));
+}
+
+/** The runs of these Projects in the Space: the runs a move of them takes along. */
+export async function spaceRunIds(
+	db: Database,
+	spaceId: string,
+	projectIds: readonly string[],
+): Promise<string[]> {
+	if (projectIds.length === 0) return [];
+	const rows = await db
+		.select({ id: run.id })
+		.from(run)
+		.where(
+			and(eq(run.spaceId, spaceId), inArray(run.projectId, [...projectIds])),
+		);
+	return rows.map((row) => row.id);
+}

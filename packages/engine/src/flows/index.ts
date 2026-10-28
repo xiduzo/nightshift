@@ -21,6 +21,11 @@ export type {
 	SavedFlow,
 } from "./flow-files";
 export { createFlowFiles } from "./flow-files";
+export {
+	type FlowMergePlan,
+	mergeFlowDocuments,
+	planFlowMerge,
+} from "./flow-merge";
 export { createFlowMigrations } from "./flow-migration";
 export type { FlowRef, FlowUse } from "./flow-use";
 export { flowUse, profileUseKey } from "./flow-use";
