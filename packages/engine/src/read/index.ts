@@ -1,6 +1,7 @@
 /** The read model: the pure projections of the event log, the run views, cost, the Persons a run names, and the run bundle. */
 
 export {
+	awaitsWorktree,
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
 	deriveInputs,
@@ -15,6 +16,8 @@ export {
 	firstDeadline,
 	isOpenStatus,
 	parkedSteps,
+	type RunWorktree,
+	runWorktree,
 	type SleepFact,
 } from "./derive-run";
 export type {

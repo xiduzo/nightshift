@@ -255,9 +255,9 @@ export type PlacedDevice = {
 	 */
 	offered?: OfferedPlacement;
 	/**
-	 * It is offline now (a node's Device, never the run's): its steps wait
-	 * for it, up to the stop time. The start asks it nothing: it checks
-	 * each call itself when it is back.
+	 * It is offline now: its steps wait for it, up to the stop time. The
+	 * start asks it nothing: it checks each call itself when it is back.
+	 * As the run's Device, it makes the run's worktree then.
 	 */
 	offline?: boolean;
 };

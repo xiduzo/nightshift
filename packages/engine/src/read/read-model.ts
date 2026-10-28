@@ -33,6 +33,7 @@ import {
 	deriveTraversals,
 	deriveTrigger,
 	deriveWarnings,
+	deriveWorktree,
 	isOpenStatus,
 } from "./derive-run";
 import {
@@ -158,6 +159,8 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		trigger: deriveTrigger(events),
 		calls: deriveCalls(steps),
 		gates: deriveGateWaits(events),
+		/** The worktree the log names: a run row has none when its Device was offline at the start. */
+		worktree: deriveWorktree(events),
 	};
 }
 
@@ -225,7 +228,8 @@ export function toSummary(
 	walker: RunWalker,
 	device: RunDevice = walker,
 ): RunSummary {
-	const { calls, waitReason: _, ...rest } = facts;
+	const { calls, waitReason: _, worktree, ...rest } = facts;
+	const where = worktree ?? row;
 	return {
 		id: row.id,
 		projectId: row.projectId,
@@ -234,9 +238,9 @@ export function toSummary(
 		startedBy: runPerson(row.startedBy, names),
 		flowName: row.flowName,
 		title: row.title,
-		worktreePath: row.worktreePath,
-		branch: row.branch,
-		baseRef: row.baseRef,
+		worktreePath: where.worktreePath,
+		branch: where.branch,
+		baseRef: where.baseRef,
 		...rest,
 		subflows: subflowRuns(row, calls, facts.status),
 		createdAt: row.createdAt.getTime(),
@@ -492,8 +496,9 @@ export function toRunDetail(
 	// A run walked or placed elsewhere: its worktree is not on this computer.
 	const last =
 		walker.thisDevice && device.thisDevice ? lastHarnessSession(events) : null;
+	const summary = toSummary(row, derived.facts, names, walker, device);
 	return {
-		...toSummary(row, derived.facts, names, walker, device),
+		...summary,
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
 		flowRevision: row.flowRevision,
@@ -501,7 +506,7 @@ export function toRunDetail(
 		// Edges of the top-level flow; a called flow's edges count per scope.
 		traversals: deriveTraversals(events),
 		calledTraversals: deriveCalledTraversals(events),
-		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
+		takeOverCommand: takeOverCommand(summary.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
 		commands,
 		variables: deriveVariableChanges(events),

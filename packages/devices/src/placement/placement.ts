@@ -59,8 +59,8 @@ import { remoteDevice } from "../work";
  *   module's Devices. Each Device is checked: one of the Person's own, or
  *   another Person's through its Offers into the Space (the nodes placed
  *   there stay within them, `offerRefusal`), with a Clone where it needs
- *   one. The run's Device must be online. A node's Device may be offline:
- *   its steps wait for it, up to the stop time. On the Replica that keeps the Space the registry
+ *   one. A Device may be offline: its steps wait for it, up to the stop
+ *   time. The run's Device makes the run's worktree when it is back. On the Replica that keeps the Space the registry
  *   answers; on a Device in a Host's Space the Host does
  *   (`HostRelay.devices`). Run start keeps the plan on the run's row.
  * - While the run walks (`deviceFor`): the plan, read from the row
@@ -485,13 +485,10 @@ export function createPlacement(deps: PlacementDeps) {
 
 		/**
 		 * One of the starter's other Devices, or another Person's through its
-		 * Offers, checked. An offline one is refused as the run's Device (its
-		 * worktree is made at the start), and waited for as a node's.
+		 * Offers, checked. An offline one is waited for: as the run's Device
+		 * it makes the run's worktree when it is back.
 		 */
-		async function other(
-			id: string,
-			as: "run" | "node",
-		): Promise<PlacedDevice> {
+		async function other(id: string): Promise<PlacedDevice> {
 			const hostedHere = (await hostSpaces.hostOf(spaceId)) === null;
 			const found = (await list()).find((d) => d.deviceId === id);
 			let offered: OfferedPlacement | undefined;
@@ -519,7 +516,7 @@ export function createPlacement(deps: PlacementDeps) {
 			}
 			const name =
 				found?.name ?? (await registry.get(id))?.name ?? "That device";
-			if (!found || (!found.online && as === "run")) {
+			if (!found) {
 				throw new Refusal(
 					"unavailable",
 					`${name} is offline. Start the run when it is online, or choose another device.`,
@@ -561,18 +558,18 @@ export function createPlacement(deps: PlacementDeps) {
 		return {
 			walker,
 			async byId(id) {
-				return (await isHere(id)) ? walker : other(id, "run");
+				return (await isHere(id)) ? walker : other(id);
 			},
 			async byName(name) {
 				const match = deviceNamed(await list(), name);
 				if (!match) return name === device.name ? walker : null;
-				return match.thisDevice ? walker : other(match.deviceId, "node");
+				return match.thisDevice ? walker : other(match.deviceId);
 			},
 			async profileDevice(id) {
 				if (await isHere(id)) return walker;
 				const match = (await list()).find((d) => d.deviceId === id);
 				if (!match) return null;
-				return match.thisDevice ? walker : other(match.deviceId, "node");
+				return match.thisDevice ? walker : other(match.deviceId);
 			},
 		};
 	}

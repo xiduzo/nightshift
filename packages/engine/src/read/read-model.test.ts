@@ -172,6 +172,63 @@ describe("the read model", () => {
 		expect(detail).not.toHaveProperty("waitReason");
 	});
 
+	test("a run whose worktree a step made later shows it from the log; an old run from its row", async () => {
+		await sandbox.db.insert(run).values({
+			id: "r2",
+			spaceId: sandbox.spaceId,
+			projectId: "p",
+			flow: "{}",
+			title: "r2",
+			worktreePath: "",
+			branch: "",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+		});
+		await log.append({
+			type: "RunStarted",
+			runId: "r2",
+			payload: { projectId: "p", flowName: null, title: "r2", start: "a" },
+		});
+		const where = (r: {
+			branch: string;
+			worktreePath: string;
+			baseRef: string;
+		}) => ({
+			branch: r.branch,
+			worktreePath: r.worktreePath,
+			baseRef: r.baseRef,
+		});
+		const listed = async (id: string) => {
+			const found = (await reads.listRuns(sandbox.spaceId)).find(
+				(r) => r.id === id,
+			);
+			if (!found) throw new Error(`No run ${id}.`);
+			return where(found);
+		};
+		expect(await listed("r2")).toEqual({
+			branch: "",
+			worktreePath: "",
+			baseRef: "main",
+		});
+
+		const made = {
+			worktreePath: "/w2",
+			branch: "nightshift/r2",
+			baseRef: "c0ffee",
+		};
+		await log.append({ type: "WorktreeCreated", runId: "r2", payload: made });
+		expect(await listed("r2")).toEqual(made);
+		expect(
+			where(await reads.getRun(await getRunRow(sandbox.db, "r2"))),
+		).toEqual(made);
+
+		expect(await listed("r1")).toEqual({
+			worktreePath: "/w",
+			branch: "b",
+			baseRef: "main",
+		});
+	});
+
 	test("a run list pages by limit and cursor, newest first", async () => {
 		// r1 is the oldest; r2 and r3 start at the same time, so the id orders them.
 		await sandbox.db

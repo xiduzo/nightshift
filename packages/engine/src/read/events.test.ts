@@ -11,6 +11,7 @@ import type {
 } from "../log/events";
 import { NO_COST, sessionCost } from "./cost";
 import {
+	awaitsWorktree,
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
 	deriveCalledTraversals,
@@ -22,8 +23,11 @@ import {
 	deriveStopAt,
 	deriveTraversals,
 	deriveWarnings,
+	deriveWorktree,
+	deriveWorktrees,
 	isOpenStatus,
 	parkedSteps,
+	runWorktree,
 } from "./derive-run";
 import {
 	countVisits,
@@ -870,5 +874,66 @@ describe("automatic resume", () => {
 		expect(countDaemonResumes(l.events)).toBe(0);
 		daemon();
 		expect(countDaemonResumes(l.events)).toBe(1);
+	});
+});
+
+describe("the run's worktree", () => {
+	const made = {
+		worktreePath: "/b/worktrees/abcd1234",
+		branch: "nightshift/abcd1234",
+		baseRef: "c0ffee",
+	};
+	/** A row written while the run's Device was offline: no worktree, the base the person asked for. */
+	const waiting = { worktreePath: "", branch: "", baseRef: "main" };
+	const run = { deviceId: "device-b", walkerId: "host" };
+
+	test("a run whose Device was offline at the start has none until the event names it", () => {
+		const events = log().runStarted().events;
+		expect(deriveWorktree(events)).toBeNull();
+		expect(awaitsWorktree(waiting, events)).toBe(true);
+		expect(runWorktree(waiting, events)).toEqual(waiting);
+		expect(deriveWorktrees(events, { ...run, ...waiting }).paths).toEqual(
+			new Map(),
+		);
+	});
+
+	test("the worktree a later step made comes from the event, on every Replica", () => {
+		const events = log().runStarted().push("WorktreeCreated", made).events;
+		expect(awaitsWorktree(waiting, events)).toBe(false);
+		expect(runWorktree(waiting, events)).toEqual(made);
+		expect(deriveWorktrees(events, { ...run, ...waiting })).toEqual({
+			holder: "device-b",
+			paths: new Map([["device-b", made.worktreePath]]),
+		});
+	});
+
+	test("an old run without the event reads its worktree from its row", () => {
+		const events = log().runStarted().events;
+		expect(awaitsWorktree(made, events)).toBe(false);
+		expect(runWorktree(made, events)).toEqual(made);
+		expect(deriveWorktrees(events, { ...run, ...made }).paths).toEqual(
+			new Map([["device-b", made.worktreePath]]),
+		);
+	});
+
+	test("a Hand-off moves the work on from the worktree the event named", () => {
+		const events = log().runStarted().push("WorktreeCreated", made).push(
+			"HandedOff",
+			{
+				from: "device-b",
+				to: "device-c",
+				commit: "beef",
+				branch: made.branch,
+				worktreePath: "/c/worktrees/abcd1234",
+			},
+			{ stepId: "s1" },
+		).events;
+		expect(deriveWorktrees(events, { ...run, ...waiting })).toEqual({
+			holder: "device-c",
+			paths: new Map([
+				["device-b", made.worktreePath],
+				["device-c", "/c/worktrees/abcd1234"],
+			]),
+		});
 	});
 });

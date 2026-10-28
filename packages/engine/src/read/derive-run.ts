@@ -4,6 +4,7 @@ import {
 	type InputValues,
 	type LoggedEvent,
 	type RunResult,
+	type RunRow,
 	type RunStatus,
 	type RunTrigger,
 	type RunWarningKind,
@@ -167,21 +168,71 @@ export function deriveSleep(
 	};
 }
 
+/** Where a run works: its worktree on the run's Device, its branch and the commit it started from. */
+export type RunWorktree = Pick<RunRow, "worktreePath" | "branch" | "baseRef">;
+
+/**
+ * The run's worktree as `WorktreeCreated` logged it, or null before it is
+ * made. A run whose Device was offline at the start gets its worktree
+ * when the Device is back: its row has none, and every Replica reads it
+ * from this event, because a run row is never updated.
+ */
+export function deriveWorktree(
+	events: readonly LoggedEvent[],
+): RunWorktree | null {
+	const created = ofType(events, "WorktreeCreated").at(-1);
+	return created ? { ...created.payload } : null;
+}
+
+/**
+ * The run's worktree: the logged one (`deriveWorktree`), else the row's.
+ * A run from before the event has it on its row only.
+ */
+export function runWorktree(
+	row: RunWorktree,
+	events: readonly LoggedEvent[],
+): RunWorktree {
+	const created = deriveWorktree(events);
+	return (
+		created ?? {
+			worktreePath: row.worktreePath,
+			branch: row.branch,
+			baseRef: row.baseRef,
+		}
+	);
+}
+
+/**
+ * The run has no worktree yet: its Device was offline when it started, and
+ * no step made it since. Every worktree has a branch, and the exchange
+ * never empties one, so an empty branch says it on every Replica.
+ */
+export function awaitsWorktree(
+	row: RunWorktree,
+	events: readonly LoggedEvent[],
+): boolean {
+	return runWorktree(row, events).branch === "";
+}
+
 /**
  * Where a run's work is: the Device that has it now (the run's Device,
  * then the `to` of each `HandedOff`), and the run's worktree on each
- * Device it reached.
+ * Device it reached. The run's Device has none until its worktree is made.
  */
 export function deriveWorktrees(
 	events: readonly LoggedEvent[],
 	run: { deviceId: string | null; walkerId: string; worktreePath: string },
 ): { holder: string; paths: Map<string, string> } {
 	let holder = run.deviceId ?? run.walkerId;
-	const paths = new Map([[holder, run.worktreePath]]);
+	const paths = new Map<string, string>();
+	if (run.worktreePath !== "") paths.set(holder, run.worktreePath);
 	for (const e of bySeq(events)) {
-		if (e.type !== "HandedOff") continue;
-		holder = e.payload.to;
-		paths.set(holder, e.payload.worktreePath);
+		if (e.type === "WorktreeCreated") {
+			paths.set(holder, e.payload.worktreePath);
+		} else if (e.type === "HandedOff") {
+			holder = e.payload.to;
+			paths.set(holder, e.payload.worktreePath);
+		}
 	}
 	return { holder, paths };
 }

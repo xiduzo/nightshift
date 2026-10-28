@@ -391,7 +391,7 @@ describe("a run placed on another Device", () => {
 		expect(await space().listProjects()).toEqual([]);
 	});
 
-	test("refusals name the Device: what it lacks, offline, not the starter's, no Clone", async () => {
+	test("refusals name the Device: what it lacks, not the starter's, no Clone", async () => {
 		await expect(
 			space().startRun({
 				projectId,
@@ -402,18 +402,6 @@ describe("a run placed on another Device", () => {
 		).rejects.toThrow(
 			"The flow has an Agent node on Codex (work), but no Codex harness is added on studio-b.",
 		);
-
-		online.delete(B);
-		await expect(
-			space().startRun({
-				projectId,
-				flow: flow([command("hi", "echo hi")]),
-				startedBy: personId,
-				deviceId: B,
-			}),
-		).rejects.toThrow("studio-b is offline.");
-		expect(await space().listPlacements(projectId)).toEqual([]);
-		online.add(B);
 
 		await a.db.insert(organization).values({
 			id: "personal-someone-else",
@@ -456,6 +444,142 @@ describe("a run placed on another Device", () => {
 		).rejects.toThrow("spare does not have this project.");
 		expect(await engine.space(a.spaceId).listRuns()).toEqual([]);
 	});
+});
+
+describe("a run whose Device is offline at the start", () => {
+	/** The events of the run, by type, in the order they were logged. */
+	async function typesOf(runId: string): Promise<string[]> {
+		return (await a.db.select().from(event).where(eq(event.runId, runId)))
+			.sort((x, y) => x.seq - y.seq)
+			.map((e) => e.type);
+	}
+
+	test("starts without its worktree, waits for the Device, and makes the worktree there when it is back", async () => {
+		online.delete(B);
+		const started = await space().startRun({
+			projectId,
+			flow: flow([command("where", "pwd")]),
+			startedBy: personId,
+			deviceId: B,
+		});
+		expect(started.device).toEqual({
+			id: B,
+			name: "studio-b",
+			thisDevice: false,
+		});
+		expect(started.branch).toBe("");
+		expect(started.worktreePath).toBe("");
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps[0]?.nodeId).toBe("where");
+		const waited = (await a.db.select().from(event)).find(
+			(e) => e.type === "WaitStarted",
+		);
+		expect(JSON.parse(waited?.payload ?? "{}")).toMatchObject({
+			reason: "device-offline",
+			deviceId: B,
+			message: "studio-b is offline. The step starts when it is back.",
+		});
+		expect(await typesOf(started.id)).not.toContain("WorktreeCreated");
+
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		// The worktree is B's, beside B's Clone, and the step ran in it.
+		expect(run.branch).toStartWith("nightshift/");
+		expect(run.worktreePath.startsWith(b.root)).toBe(true);
+		expect(existsSync(run.worktreePath)).toBe(true);
+		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe(
+			run.worktreePath,
+		);
+		// The row keeps no worktree: the event is the fact.
+		const [row] = await a.db
+			.select()
+			.from(runTable)
+			.where(eq(runTable.id, started.id));
+		expect(row?.branch).toBe("");
+		expect(await typesOf(started.id)).toContain("WorktreeCreated");
+	}, 20_000);
+
+	test("starts from the base the person asked for, when the Device is back", async () => {
+		const base = (await mustGit(b.repoPath, ["rev-parse", "HEAD"])).trim();
+		await mustGit(b.repoPath, [
+			"-c",
+			"user.name=Test",
+			"-c",
+			"user.email=test@nightshift.invalid",
+			"commit",
+			"-q",
+			"--allow-empty",
+			"-m",
+			"later",
+		]);
+		online.delete(B);
+		const started = await space().startRun({
+			projectId,
+			flow: flow([command("where", "git rev-parse HEAD")]),
+			startedBy: personId,
+			deviceId: B,
+			baseRef: base,
+		});
+		expect(started.baseRef).toBe(base);
+		await until(started.id, "sleeping");
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		expect(run.baseRef).toBe(base);
+		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe(base);
+	}, 20_000);
+
+	test("a step that needs no computer runs while the Device is offline", async () => {
+		online.delete(B);
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					{
+						id: "rule",
+						type: "decision",
+						position: { x: 0, y: 0 },
+						prompt: "Go on?",
+						options: [{ name: "pass" }],
+						by: "rule",
+						rule: '"pass"',
+					},
+					command("where", "pwd"),
+				] as Flow["nodes"],
+				[{ id: "e1", from: "rule", outcome: "pass", to: "where" }],
+			),
+			startedBy: personId,
+			deviceId: B,
+		});
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["rule", "pass"],
+			["where", null],
+		]);
+	}, 20_000);
+
+	test("the Device stays offline: the run waits up to the stop time, then the step stops", async () => {
+		const clock = sleepClock();
+		lifetime.abort();
+		await engine.dispose();
+		engine = peerEngine({ minuteMs: 50, now: clock.now });
+		online.delete(B);
+		const stopAt = clock.now() + 125;
+		const started = await space().startRun({
+			projectId,
+			flow: flow([command("where", "pwd")]),
+			startedBy: personId,
+			deviceId: B,
+			stopAt,
+		});
+		const run = await clock.follow(space(), started.id);
+		expect(run.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["where", "stopped"],
+		]);
+		expect(run.branch).toBe("");
+		expect(await typesOf(started.id)).not.toContain("WorktreeCreated");
+	}, 20_000);
 });
 
 describe("nodes placed on Devices, with the Hand-off", () => {

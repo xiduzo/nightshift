@@ -50,6 +50,9 @@ import type { PlacementPort, PlannedRun } from "./peers";
  *   has the run's Device create the worktree, writes the run row with its
  *   plan, appends `RunStarted` and `WorktreeCreated` and hands the thread
  *   to the runner. This computer walks the run wherever its steps run.
+ *   When the run's Device is offline, the row has no worktree and the run
+ *   waits: its first step that works in the worktree makes it there when
+ *   the Device is back (ADR 1, decision 11).
  *
  * The requirements are one function each (`Requirement`) and listed once,
  * in `REQUIREMENTS`, in the order the person sees them. The ones about one
@@ -279,13 +282,19 @@ export function createRunStart(deps: RunStartDeps) {
 				} = prepared;
 				const authorId = input.startedBy ?? startedBy;
 				const author = authorId ? await gitAuthorOf(db, authorId) : null;
-				// The worktree lives on the run's Device.
-				const worktree = await device.worktree({
-					id: runId,
-					projectId: projectRow.id,
-					...(input.baseRef !== undefined ? { baseRef: input.baseRef } : {}),
-					...(author ? { author } : {}),
-				});
+				// The worktree lives on the run's Device. An offline one makes it
+				// when it is back: until then the row keeps the base the person
+				// asked for, and no branch.
+				const worktree = planned.run.offline
+					? null
+					: await device.worktree({
+							id: runId,
+							projectId: projectRow.id,
+							...(input.baseRef !== undefined
+								? { baseRef: input.baseRef }
+								: {}),
+							...(author ? { author } : {}),
+						});
 				const walkerId = await log.walkerId();
 				// The row and the event that names it are one batch.
 				await log.append(
@@ -317,9 +326,9 @@ export function createRunStart(deps: RunStartDeps) {
 								flowRevision,
 								bodyFlowRevisions: JSON.stringify(calledFlowRevisions),
 								title,
-								worktreePath: worktree.worktreePath,
-								branch: worktree.branch,
-								baseRef: worktree.baseRef,
+								worktreePath: worktree?.worktreePath ?? "",
+								branch: worktree?.branch ?? "",
+								baseRef: worktree?.baseRef ?? input.baseRef ?? "",
 								walkerId,
 								// The walk reads the plan, and decides nothing again.
 								...planColumns(planned.plan),
@@ -329,11 +338,13 @@ export function createRunStart(deps: RunStartDeps) {
 				);
 				const [row] = await db.select().from(run).where(eq(run.id, runId));
 				if (!row) throw new Error("Could not create the run.");
-				await log.append({
-					type: "WorktreeCreated",
-					runId,
-					payload: worktree,
-				});
+				if (worktree) {
+					await log.append({
+						type: "WorktreeCreated",
+						runId,
+						payload: worktree,
+					});
+				}
 				started = { row, walkerId, device };
 				return { row, inputs, stopAt: prepared.stopAt };
 			},

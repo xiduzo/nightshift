@@ -490,7 +490,9 @@ default: one of the starter's own Devices with a Clone is. 4. The Walker.
 
 A profile is a Device's own: a node names it by Device and profile id
 (ADR 3). A placed Device that is offline makes the step wait, up to the
-Run's stop time (ADR 1).
+Run's stop time (ADR 1). This holds for the Run's Device too: the Run
+starts without its Worktree, and its first step that works in the
+Worktree makes it there when the Device is back (`WorktreeCreated`).
 
 Explicit names, not a matcher. The run-start requirements read the placed
 Device's capabilities, or the Offer: "The flow uses `gh` on `hetzner-1`,
@@ -552,7 +554,9 @@ Between two steps on different Devices: push, fetch and checkout,
 ### Recovery
 
 - Placed Device offline when a step must start: the step sleeps with reason
-  `device-offline`, woken when it reconnects.
+  `device-offline`, woken when it reconnects. A Run whose own Device is
+  offline at the start has no Worktree yet: the first step that works in
+  it sleeps for the Run's Device, then makes the Worktree there.
 - Placed Device offline during a step: its daemon keeps the session and
   buffers events; the Walker reattaches, or resumes with the harness
   session id (`continue, with-session`).
