@@ -1,6 +1,6 @@
 ---
 name: nightshift-flows
-description: Write, change and check Night Shift flows through the `nightshift` MCP server, the `nightshift flows` command or the chat in the flow editor. Use when the person asks to build, draw, fix or explain a Night Shift flow, a node, an edge, a loop, a Gate or a Subflow, or when you find a `.nightshift/` folder in a project.
+description: Write, change and check Night Shift flows through the `nightshift` MCP server, the `nightshift flows` command or the chat in the flow editor. Use when the person asks to build, draw, fix or explain a Night Shift flow, a node, an edge, a loop, a Gate or a Subflow, or when the person gives you a flow as a JSON file to save.
 ---
 
 # Night Shift flows

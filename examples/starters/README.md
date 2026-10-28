@@ -2,8 +2,6 @@
 
 Small, self-contained flows (format version 6) to save into a project and change. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
 
-For the newer pieces (branches that run at once and a Join, End nodes, kits, webhook schedules, kept variables), read Night Shift's own flows in [`.nightshift/`](../../.nightshift/) at the root of this repo. The folder goes after the import on upgrade ([ADR 2](../../docs/adr/0002-flows-are-night-shift-data.md)).
-
 | Flow | Inputs | Does |
 | --- | --- | --- |
 | `implement-and-check` | `task`, `check` (default `bun test`) | An agent implements the task, a command runs `check`; a failed check goes back to a fresh agent with the log (3 tries in all), then a rescue on Opus. |
@@ -16,7 +14,7 @@ For the newer pieces (branches that run at once and a Join, End nodes, kits, web
 ## Use them
 
 1. Add the project in Night Shift.
-2. Save the flows into the project. Night Shift keeps flows itself, so do not copy the files into the project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`. Choose Import in the project's flow list for each file in `examples/starters/.nightshift/flows/`, or run `nightshift flows import <file>` for each one in the project's folder.
+2. Save the flows into the project. Night Shift keeps flows itself, so do not copy the files into the project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`. Choose Import in the project's flow list for each file in `examples/starters/flows/`, or run `nightshift flows import <file>` for each one in the project's folder.
 3. Open a flow in the editor, and change the prompts, models, and `check` to fit the project.
 4. Start a run: the start dialog asks for the flow's inputs.
 

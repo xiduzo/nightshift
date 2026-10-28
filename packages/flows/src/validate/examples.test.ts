@@ -5,29 +5,27 @@ import { FLOW_VERSION, type Flow, type FlowMigration } from "../document";
 import { parseFlow, validateFlow } from "./flow";
 
 /**
- * The import of a project folder on this computer: it gives the project's
- * profiles to this computer under their names, so every name a node of
- * format 6 gives finds its profile here.
+ * An import on this computer that finds every profile a node of format 6
+ * names here, under its name.
  */
 const importedHere: FlowMigration = {
 	deviceId: "this-computer",
 	deviceIdByName: () => null,
 	profileIdByName: (_device, name) => name,
 };
-/** The example projects of the repo: `examples/<project>/.nightshift/flows/*.json`. */
+/** The example projects of the repo: `examples/<project>/flows/*.json`, files to import. */
 const examplesDir = join(import.meta.dir, "..", "..", "..", "..", "examples");
 
 const projects = readdirSync(examplesDir, { withFileTypes: true })
 	.filter(
 		(entry) =>
-			entry.isDirectory() &&
-			existsSync(join(examplesDir, entry.name, ".nightshift", "flows")),
+			entry.isDirectory() && existsSync(join(examplesDir, entry.name, "flows")),
 	)
 	.map((entry) => entry.name)
 	.sort();
 
 function flowFiles(project: string): string[] {
-	const dir = join(examplesDir, project, ".nightshift", "flows");
+	const dir = join(examplesDir, project, "flows");
 	return readdirSync(dir)
 		.filter((name) => name.endsWith(".json"))
 		.sort()
@@ -57,7 +55,7 @@ describe("example flows", () => {
 					expect(flow === null ? issues : []).toEqual([]);
 				});
 
-				test(`${name}.json is written in format 6, which the import of a project folder brings to ${FLOW_VERSION}`, () => {
+				test(`${name}.json is written in format 6, which an import brings to ${FLOW_VERSION}`, () => {
 					// parseFlow migrates older files, so read the file's own version.
 					expect((raw as { version?: unknown }).version).toBe(6);
 				});

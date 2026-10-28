@@ -74,10 +74,10 @@ the phone. A push says what waits and nothing more: "A Gate waits for you".
 Use the `ux-copy` and `ste-writing` skills.
 
 - **No implementation details.** Do not show: the daemon, worktrees, file
-  paths (`.nightshift/...`), PATH, environment variables, `sh -c`, stdout,
+  paths (`logs/<run>/...`), PATH, environment variables, `sh -c`, stdout,
   stdio, exit codes, adapters, leases, event names, "parse".
   Bad: "The daemon starts the flow at these times, each run in a new
-  worktree. Saved in .nightshift/schedules.json."
+  worktree. Saved in the flow document."
   Good: "Choose a flow and when it runs. Night Shift starts it for you at
   those times."
 - **Say instead:** "Night Shift" or "this computer" for the daemon. Leave
