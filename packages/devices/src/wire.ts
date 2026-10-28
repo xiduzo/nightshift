@@ -34,7 +34,11 @@ import {
 	deviceKeyStore,
 	type LinkOptions,
 } from "./links";
-import { createPersonalMerge, type MergeMove } from "./merge";
+import {
+	createPersonalMerge,
+	createPersonalSplit,
+	type MergeMove,
+} from "./merge";
 import {
 	createOffers,
 	createOfferUse,
@@ -313,6 +317,21 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			engine.admission.withdrawn(spaceId, profile),
 	});
 
+	/**
+	 * The split of a personal Space of this computer's own off its home
+	 * Host's, when this computer leaves it (ADR 1).
+	 */
+	const split = createPersonalSplit({
+		db,
+		engine,
+		hostLinks,
+		spaces: deps.spaces,
+		self,
+		ownerId,
+		dataDir: deps.dataDir,
+		...(deps.moveStatements ? { moveStatements: deps.moveStatements } : {}),
+	});
+
 	/** This computer's links to the Hosts it paired with. */
 	const links = createDeviceLinks({
 		links: hostLinks,
@@ -337,9 +356,14 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		},
 		// The Devices the home Host lists: only this Person's own.
 		deviceDocuments: (_link, hello) => copies.keep(hello.devices ?? []),
-		// Without its home Host this computer learns nothing of the others.
+		// Without its home Host this computer learns nothing of the others,
+		// and its Personal splits off the Host's: it keeps a copy.
 		revoked: async (link) => {
-			if (link.role === "home") await copies.keep([]);
+			if (link.role !== "home") return;
+			await copies.keep([]);
+			await split.run().catch(() => {
+				// It waits for the runs this computer walks: `keepFinishing` tries again.
+			});
 		},
 		// Run history both ways, the commands for the runs this computer walks,
 		// and the steps of the Host's runs placed on this computer.
@@ -380,9 +404,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		dataDir: deps.dataDir,
 		...(deps.moveStatements ? { moveStatements: deps.moveStatements } : {}),
 	});
-	// A merge that moved its rows finishes when its Host answers.
+	// A merge that moved its rows finishes when its Host answers. A split
+	// starts once this computer left its Host, and finishes by itself.
 	const finishing = new AbortController();
 	merge.keepFinishing(finishing.signal);
+	split.keepFinishing(finishing.signal);
 
 	const presence = setInterval(() => {
 		engine.devices.sweep(OFFLINE_AFTER_MS).catch((error) => {

@@ -32,6 +32,8 @@ export type {
 	MergeState,
 	PersonalMerge,
 	PersonalMergeInput,
+	SplitResult,
+	SplitState,
 } from "./personal";
 export { READS, READS_HEADER, reads } from "./reads";
 export type { HostRelay } from "./relay";

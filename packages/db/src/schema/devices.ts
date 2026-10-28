@@ -203,3 +203,39 @@ export const spaceMerge = sqliteTable("space_merge", {
 	createdAt: createdAt(),
 	updatedAt: updatedAt(),
 });
+
+/**
+ * The split of a personal Space off the one this computer's home Host
+ * keeps, when this computer leaves that Host (ADR 1: leaving keeps a
+ * copy): the Person's own personal Space again, with the Projects this
+ * computer has a Clone of and the runs it walked. One row per split, so a
+ * split cut short goes on where it stopped. Its states, in order:
+ *
+ * - `planned`: the copy of the database is made (`backup`). Nothing
+ *   else changed.
+ * - `moved`: the rows are in the new Space, in one batch with this state.
+ * - `done`: the new Space's document has its Projects. The split is done.
+ */
+export const spaceSplit = sqliteTable("space_split", {
+	/** The new personal Space of this computer's own. */
+	toSpace: text("to_space").primaryKey(),
+	/** The personal Space the home Host keeps, which this computer leaves. */
+	fromSpace: text("from_space").notNull(),
+	/** The Host this computer leaves. */
+	hostId: text("host_id").notNull(),
+	/** Its name, for the Space it keeps: "Personal on <Host>". */
+	hostName: text("host_name").notNull(),
+	/** The Person who owns this computer. */
+	personId: text("person_id").notNull(),
+	/** The same Person as the Host knows them: the rows that come along name them so. */
+	hostPersonId: text("host_person_id").notNull(),
+	state: text("state", { enum: ["planned", "moved", "done"] }).notNull(),
+	/** JSON: the ids of the Projects that came along. Null until `moved`. */
+	projects: text("projects"),
+	/** How many runs came along. */
+	runs: integer("runs").notNull().default(0),
+	/** The copy of the database made before the split changed anything. */
+	backup: text("backup").notNull(),
+	createdAt: createdAt(),
+	updatedAt: updatedAt(),
+});

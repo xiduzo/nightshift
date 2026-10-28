@@ -555,6 +555,79 @@ describe("spaceMoveBatch", () => {
 		expect(JSON.parse(joined?.payload ?? "{}").personId).toBe(LOCAL);
 	});
 
+	test("with one Walker's runs, the runs another Walker walks stay, with their steps, sessions and events", async () => {
+		await seed({ hostedRow: false });
+		await sandbox.db.insert(run).values({
+			id: "r-theirs",
+			spaceId: from,
+			projectId: "mine",
+			flow: "{}",
+			title: "theirs",
+			worktreePath: "/w/theirs",
+			branch: "theirs",
+			baseRef: "main",
+			walkerId: STUDIO,
+			startedBy: LOCAL,
+		});
+		await sandbox.db.insert(step).values({
+			id: "r-theirs-step",
+			spaceId: from,
+			runId: "r-theirs",
+			nodeId: "n1",
+			nodeType: "agent",
+			visit: 1,
+			transcriptPath: "/t/theirs",
+		});
+		await sandbox.db.insert(event).values({
+			spaceId: from,
+			runId: "r-theirs",
+			type: "StepEnded",
+			payload: "{}",
+			walkerId: STUDIO,
+			walkerSeq: 1,
+		});
+
+		await runMove({
+			from,
+			to,
+			projectMap: { mine: "mine" },
+			personMap: { [LOCAL]: HOSTED },
+			runsOf: walker,
+		});
+
+		const rowOf = async (id: string) =>
+			(await sandbox.db.select().from(run).where(eq(run.id, id)))[0];
+		expect(await rowOf("r-mine")).toMatchObject({
+			spaceId: to,
+			startedBy: HOSTED,
+		});
+		expect(await rowOf("r-theirs")).toMatchObject({
+			spaceId: from,
+			projectId: "mine",
+			startedBy: LOCAL,
+		});
+		const [theirStep] = await sandbox.db
+			.select()
+			.from(step)
+			.where(eq(step.runId, "r-theirs"));
+		expect(theirStep?.spaceId).toBe(from);
+		expect(
+			(await eventsOf(["r-theirs"])).map((e) => [e.spaceId, e.walkerSeq]),
+		).toEqual([[from, 1]]);
+		expect(new Set((await eventsOf(["r-mine"])).map((e) => e.spaceId))).toEqual(
+			new Set([to]),
+		);
+		expect(await spacesOf(clone, ["mine"])).toEqual(new Set([to]));
+		expect(await spacesOf(keptVariable, ["mine"])).toEqual(new Set([to]));
+	});
+
+	test("a move of one Walker's runs keeps every project's id", async () => {
+		await seed({ hostedRow: true });
+		await expect(
+			spaceMoveBatch(sandbox.db, move({ runsOf: walker })),
+		).rejects.toThrow("keeps every Project's id");
+	});
+
 	test("the batch is one unit: when a statement fails, nothing moved", async () => {
 		await seed({ hostedRow: true });
 		const snapshot = async () => ({

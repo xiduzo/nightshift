@@ -19,6 +19,7 @@ import {
 	mirrorHostSpace,
 	personalSpaceId,
 	spacesOf,
+	splitPersonalSpaceBatch,
 } from "./spaces";
 
 let sandbox: AuthSandbox;
@@ -335,5 +336,79 @@ describe("adopting the personal Space of the Home Host", () => {
 				to: "nowhere",
 			}),
 		).rejects.toThrow("is not on this Replica");
+	});
+});
+
+describe("splitting a personal Space off the Home Host's", () => {
+	/** Ada's personal Space is the one her Home Host keeps, as after a merge. */
+	async function merged() {
+		const ada = await sandbox.signUp("Ada");
+		const own = await personalSpaceId(sandbox.db, ada.userId);
+		if (!own) throw new Error("no personal Space");
+		const hosted = "space-on-host";
+		await mirrorHostSpace(sandbox.db, { id: hosted, name: "Personal" });
+		await sandbox.db.batch(
+			await adoptPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: own,
+				to: hosted,
+			}),
+		);
+		return { ada, hosted };
+	}
+
+	test("a new Space becomes the one personal Space, and the Host's is no longer hers here", async () => {
+		const { ada, hosted } = await merged();
+
+		await sandbox.db.batch(
+			await splitPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: hosted,
+				to: "space-of-her-own",
+				fromName: "Personal on studio",
+			}),
+		);
+
+		expect(await spacesOf(sandbox.db, ada.userId)).toEqual([
+			{
+				id: "space-of-her-own",
+				name: "Personal",
+				personal: true,
+				role: "owner",
+			},
+		]);
+		expect(await ensurePersonalSpace(sandbox.db, ada.userId)).toBe(
+			"space-of-her-own",
+		);
+		const [kept] = await sandbox.db
+			.select()
+			.from(organization)
+			.where(eq(organization.id, hosted));
+		expect(kept).toMatchObject({ name: "Personal on studio", personal: false });
+		const sessions = await sandbox.db
+			.select({ active: session.activeOrganizationId })
+			.from(session)
+			.where(eq(session.userId, ada.userId));
+		expect(sessions.map((s) => s.active)).toEqual(["space-of-her-own"]);
+	});
+
+	test("only the Person's personal Space splits, into a Space that is not here yet", async () => {
+		const { ada, hosted } = await merged();
+		await expect(
+			splitPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: "elsewhere",
+				to: "new",
+				fromName: "x",
+			}),
+		).rejects.toThrow("is not the personal Space");
+		await expect(
+			splitPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: hosted,
+				to: hosted,
+				fromName: "x",
+			}),
+		).rejects.toThrow("is on this Replica already");
 	});
 });

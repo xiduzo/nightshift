@@ -285,3 +285,64 @@ export async function adoptPersonalSpaceBatch(
 		db.delete(organization).where(eq(organization.id, from)),
 	];
 }
+
+/**
+ * The statements that give the Person a new personal Space `to` of this
+ * Replica's own in place of `from`, the personal Space their Home Host
+ * keeps, for the `db.batch` that moves the rows this Device takes along
+ * (ADR 1: leaving keeps a copy). The reverse of `adoptPersonalSpaceBatch`.
+ *
+ * `to` is made, named "Personal", with the Person as its owner. A session
+ * that worked in `from` works in `to`. `from` stays, with the rows that
+ * do not come along, as the Host's Space: it is no longer personal here,
+ * it takes `fromName`, and the Person is no longer a Member of it here.
+ * Throws when `from` is not the Person's personal Space, or `to` exists.
+ */
+export async function splitPersonalSpaceBatch(
+	db: Database,
+	input: { personId: string; from: string; to: string; fromName: string },
+): Promise<[BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]> {
+	const { personId, from, to, fromName } = input;
+	if ((await personalSpaceId(db, personId)) !== from) {
+		throw new Error(
+			`The Space ${from} is not the personal Space of ${personId}.`,
+		);
+	}
+	if (await spaceExists(db, to)) {
+		throw new Error(`The Space ${to} is on this Replica already.`);
+	}
+	// The slug of a personal Space, unless an older Space still has it.
+	const slug = `personal-${personId}`;
+	const [taken] = await db
+		.select({ id: organization.id })
+		.from(organization)
+		.where(eq(organization.slug, slug));
+	const createdAt = new Date();
+	return [
+		db.insert(organization).values({
+			id: to,
+			name: "Personal",
+			slug: taken ? `${slug}-${to}` : slug,
+			personal: true,
+			createdAt,
+		}),
+		db.insert(member).values({
+			id: randomUUID(),
+			organizationId: to,
+			userId: personId,
+			role: "owner",
+			createdAt,
+		}),
+		db
+			.update(organization)
+			.set({ personal: false, name: fromName })
+			.where(eq(organization.id, from)),
+		db
+			.delete(member)
+			.where(and(eq(member.organizationId, from), eq(member.userId, personId))),
+		db
+			.update(session)
+			.set({ activeOrganizationId: to })
+			.where(eq(session.activeOrganizationId, from)),
+	];
+}
