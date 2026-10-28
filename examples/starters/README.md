@@ -16,7 +16,7 @@ For the newer pieces (branches that run at once and a Join, End nodes, kits, web
 ## Use them
 
 1. Add the project in Night Shift.
-2. Save the flows into the project. Night Shift keeps flows itself, so do not copy the files into the project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`. Ask an agent that has the `nightshift` MCP server (`claude mcp add nightshift -- nightshift mcp`) to save each file in `examples/starters/.nightshift/flows/` with `save_flow`. The editor gets a JSON import for this (planned, [ADR 2](../../docs/adr/0002-flows-are-night-shift-data.md)).
+2. Save the flows into the project. Night Shift keeps flows itself, so do not copy the files into the project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`. Choose Import in the project's flow list for each file in `examples/starters/.nightshift/flows/`, or run `nightshift flows import <file>` for each one in the project's folder.
 3. Open a flow in the editor, and change the prompts, models, and `check` to fit the project.
 4. Start a run: the start dialog asks for the flow's inputs.
 

@@ -141,7 +141,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Environment Reference | `${NAME}` in a Connection's env values or headers. The daemon puts in its environment variable `NAME` when the Step starts, so secrets stay out of Flows. A Command Node's command reads a Secret it names in `secrets` the same way, as `"$NAME"`. | Slice 8 |
 | Step Report | The Outcome, summary, and optional data an agent reports at the end of its Session. | PLAN §3 |
 | Output Schema | A JSON Schema for the data of an Agent Node's Step Report or a Value Node's value. The editor builds it from fields (text, number, yes or no, choice, list, object). The engine checks the data against it. | Slice 6 |
-| Starter | A small Flow in `examples/starters/`, as JSON, to save into a Project with `nightshift mcp` (a JSON import in the editor is planned, ADR 2). | Slice 6; ADR 2 |
+| Starter | A small Flow in `examples/starters/`, as JSON, to import into a Project: Import in the flow list, or `nightshift flows import`. | Slice 6; ADR 2 |
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. Each entry has a `seq` that grows by one per entry in the Run, across its Steps. A Run's Transcript is its Steps' entries in that order: the run page shows it so, wherever the Run is walked. | Slice 1 |
 | Artifact | A file a Run keeps for the person: a screenshot, a recording, a report. An agent keeps one with the `save_artifact` tool; Night Shift copies it into its data folder on the Device that ran the Step. Shown on the Run page under Artifacts. | Artifacts |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |

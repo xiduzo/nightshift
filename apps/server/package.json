@@ -20,6 +20,7 @@
 		"@nightshift/auth": "workspace:*",
 		"@nightshift/daemon": "workspace:*",
 		"@nightshift/db": "workspace:*",
+		"@nightshift/flows": "workspace:*",
 		"@orpc/client": "catalog:",
 		"better-auth": "catalog:",
 		"libsql": "catalog:",

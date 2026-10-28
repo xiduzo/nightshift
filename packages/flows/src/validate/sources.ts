@@ -1,5 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../document";
+import { flowNameSchema } from "../nodes";
 import type { ScheduleFlowInfo } from "../schedules";
 import { parseFlow } from "./flow";
 import type { FlowListItem, LoadedFlow, ProjectFlowMap } from "./issues";
@@ -138,6 +139,24 @@ export function suffixedName(name: string, taken: ReadonlySet<string>): string {
 		const candidate = `${base}${suffix}`;
 		if (!taken.has(candidate)) return candidate;
 	}
+}
+
+/** The name an imported flow gets when its file name is no flow name. */
+const FALLBACK_NAME = "imported-flow";
+
+/**
+ * The flow name a file suggests: `Build Check.json` → `build-check`. A
+ * name the project has already gets a suffix when Night Shift saves it.
+ */
+export function flowNameOfFile(fileName: string): string {
+	const name = fileName
+		.replace(/\.json$/i, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+/, "")
+		.slice(0, MAX_FLOW_NAME)
+		.replace(/-+$/, "");
+	return flowNameSchema.safeParse(name).success ? name : FALLBACK_NAME;
 }
 
 function sorted(sources: FlowSources): ReadonlyMap<string, FlowSource> {

@@ -1,3 +1,4 @@
+import { flowNameOfFile } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -6,7 +7,6 @@ import { UploadIcon } from "lucide-react";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { flowMutations, flowQueries } from "../queries";
-import { flowNameOfFile } from "./flow-file";
 
 /**
  * Imports a flow file, one that Night Shift exported, as a new flow of the

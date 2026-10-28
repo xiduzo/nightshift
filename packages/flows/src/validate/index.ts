@@ -23,6 +23,7 @@ export {
 	type FlowPathOf,
 	type FlowSource,
 	type FlowSources,
+	flowNameOfFile,
 	listFlowSources,
 	loadFlowSource,
 	parsedFlows,

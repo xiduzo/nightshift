@@ -326,6 +326,7 @@ export {
 	type FlowPathOf,
 	type FlowSource,
 	type FlowSources,
+	flowNameOfFile,
 	type LoadedFlow,
 	listFlowSources,
 	loadFlowSource,
