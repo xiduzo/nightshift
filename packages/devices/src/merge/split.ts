@@ -55,7 +55,9 @@ import { type SplitRow, splitRows } from "./split-rows";
  *    One split at a time in this process.
  * 2. `planned`: a copy of the whole database in the data directory
  *    (`VACUUM INTO`), before any change.
- * 3. `moved`: one `db.batch` makes the new Space the Person's personal
+ * 3. `moved`: no run starts in the Space from the last check for runs
+ *    this computer walks through the batch (`Engine.holdStarts`). One
+ *    `db.batch` makes the new Space the Person's personal
  *    Space (`splitPersonalSpaceBatch`), moves the rows (`spaceMoveBatch`
  *    with this computer's runs only), names the Host's Space "Personal
  *    on <Host>", moves the commands of the moved runs (`run_command`),
@@ -82,7 +84,7 @@ export const SPLIT_WORDS = {
 
 export type PersonalSplitDeps = {
 	db: Database;
-	engine: Pick<Engine, "space" | "reindex"> & {
+	engine: Pick<Engine, "space" | "reindex" | "holdStarts"> & {
 		hostSpaces: Pick<HostSpaces, "hostOf">;
 	};
 	hostLinks: Pick<HostLinks, "get">;
@@ -234,47 +236,53 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		let unpinned = row.unpinned;
 
 		if (state === "planned") {
-			await noRunsNotDone(from);
-			projects = await projectsHere(from);
-			const runIds = await spaceRunIds(db, from, projects, self.id);
-			runs = runIds.length;
-			unpinned = await countPinnedElsewhere(projects);
-			const fromName = `Personal on ${row.hostName}`;
-			const statements: BatchItem<"sqlite">[] = [
-				...(await splitPersonalSpaceBatch(db, {
-					personId: row.personId,
-					from,
-					to,
-					fromName,
-				})),
-			];
-			if (projects.length > 0) {
-				statements.push(
-					...(await spaceMoveBatch(db, {
+			// No run starts in the Space from its last check through the batch.
+			const release = await engine.holdStarts(from);
+			try {
+				await noRunsNotDone(from);
+				projects = await projectsHere(from);
+				const runIds = await spaceRunIds(db, from, projects, self.id);
+				runs = runIds.length;
+				unpinned = await countPinnedElsewhere(projects);
+				const fromName = `Personal on ${row.hostName}`;
+				const statements: BatchItem<"sqlite">[] = [
+					...(await splitPersonalSpaceBatch(db, {
+						personId: row.personId,
 						from,
 						to,
-						projectMap: Object.fromEntries(projects.map((id) => [id, id])),
-						personMap: { [row.hostPersonId]: row.personId },
-						runsOf: self.id,
+						fromName,
 					})),
+				];
+				if (projects.length > 0) {
+					statements.push(
+						...(await spaceMoveBatch(db, {
+							from,
+							to,
+							projectMap: Object.fromEntries(projects.map((id) => [id, id])),
+							personMap: { [row.hostPersonId]: row.personId },
+							runsOf: self.id,
+						})),
+					);
+				}
+				statements.push(
+					db
+						.update(hostSpace)
+						.set({ name: fromName, updatedAt: new Date() })
+						.where(eq(hostSpace.spaceId, from)),
+					...runCommandMoves(db, [{ from, to, runIds }], {
+						[row.hostPersonId]: row.personId,
+					}),
+					...(deps.moveStatements?.([{ from, to, runIds }]) ?? []),
+					merges.abandon(),
+					rows.moved(to, { projects, runs, unpinned }),
 				);
+				await db.batch(
+					statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
+				);
+				engine.reindex(runIds);
+			} finally {
+				release();
 			}
-			statements.push(
-				db
-					.update(hostSpace)
-					.set({ name: fromName, updatedAt: new Date() })
-					.where(eq(hostSpace.spaceId, from)),
-				...runCommandMoves(db, [{ from, to, runIds }], {
-					[row.hostPersonId]: row.personId,
-				}),
-				...(deps.moveStatements?.([{ from, to, runIds }]) ?? []),
-				merges.abandon(),
-				rows.moved(to, { projects, runs, unpinned }),
-			);
-			await db.batch(
-				statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
-			);
-			engine.reindex(runIds);
 			state = "moved";
 		}
 

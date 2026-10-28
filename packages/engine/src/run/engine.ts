@@ -65,6 +65,7 @@ import { createRunStart } from "./run-start";
 import { createSignals } from "./signals";
 import { createSpaces } from "./space";
 import type { SpaceEngine } from "./space-engine";
+import { createStartHolds } from "./start-holds";
 import { takeOver } from "./take-over";
 import { wakeOfflineSleeps } from "./wake";
 
@@ -150,6 +151,15 @@ export interface Engine {
 	 * of the landed feed, so the exchange sees the moved events.
 	 */
 	reindex(runIds: readonly string[]): void;
+	/**
+	 * Holds the start of new runs while a merge of Spaces moves the rows
+	 * of `spaceId`: from its last check for runs that are not done
+	 * through its batch. No schedule fires anywhere, a webhook's run or a
+	 * person's run in that Space is refused, and the starts under way
+	 * end first. A schedule that came due meanwhile fires after the
+	 * release, within its grace. Always release it, on success or failure.
+	 */
+	holdStarts(spaceId: string): Promise<() => void>;
 	/**
 	 * A run's status, when it wakes, and whether this computer walks it or
 	 * runs its steps, in any Space of this Replica. Null for a run it does
@@ -492,12 +502,16 @@ export function createEngine(
 		);
 	}
 
+	/** The Spaces whose new runs wait for a merge of Spaces. */
+	const startHolds = createStartHolds();
+
 	async function startRunWith(
 		input: StartRunInput,
 		trigger: RunTrigger,
 	): Promise<RunSummary> {
 		await ready;
-		return runStart.start(input, trigger);
+		const { spaceId } = await projects.find(input.projectId);
+		return startHolds.start(spaceId, () => runStart.start(input, trigger));
 	}
 
 	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
@@ -621,6 +635,14 @@ export function createEngine(
 		reindex(runIds) {
 			runLog.forget(runIds);
 			history.landed.reread();
+		},
+		async holdStarts(spaceId) {
+			const releaseScheduler = await scheduler.hold();
+			const releaseStarts = await startHolds.hold(spaceId);
+			return () => {
+				releaseStarts();
+				releaseScheduler();
+			};
 		},
 		async runHere(runId) {
 			await ready;

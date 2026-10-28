@@ -220,6 +220,7 @@ export {
 	HostUnreachableError,
 	type PlanDevices,
 	planNodes,
+	START_HOLD_WORDS,
 	UNREACHABLE_DEVICE,
 } from "./run";
 export type { ScheduleList, WebhookAnswer } from "./schedules";

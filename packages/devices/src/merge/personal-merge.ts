@@ -63,7 +63,9 @@ import { runCommandMoves } from "./run-commands";
  *    says where each one goes. It answers the same when it is asked
  *    again. The schedules that name no device are pinned to this
  *    computer, so they keep firing where they fired.
- * 4. `moved`: one `db.batch` moves every row (`spaceMoveBatch`, with this
+ * 4. `moved`: no run starts in Personal from the last check for runs
+ *    that are not done through the batch (`Engine.holdStarts`). One
+ *    `db.batch` moves every row (`spaceMoveBatch`, with this
  *    computer's events numbered after its latest), makes the Host's
  *    Space this computer's personal Space named "Personal"
  *    (`adoptPersonalSpaceBatch`), moves the commands of the moved runs
@@ -109,7 +111,7 @@ export const NOT_DONE = [
 
 export type PersonalMergeDeps = {
 	db: Database;
-	engine: Pick<Engine, "space" | "reindex"> & {
+	engine: Pick<Engine, "space" | "reindex" | "holdStarts"> & {
 		exchange: Pick<RunHistoryExchange, "rowsAfter" | "cursorsWith">;
 		hostSpaces: Pick<HostSpaces, "listed">;
 	};
@@ -373,59 +375,65 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		if (to === null) throw new Error("A mapped merge has no Space to go to.");
 
 		if (state === "mapped") {
-			await noRunsNotDone(from);
-			// The schedules keep firing where they fired: on this computer.
-			for (const source of Object.keys(projectMap)) {
-				const document = await deps.flows.open(source);
-				const keys = unpinned(document);
-				if (keys.length === 0) continue;
-				await document.current.change(() => {
-					for (const key of keys) {
-						const value = document.schedules.get(key) as Record<
-							string,
-							unknown
-						>;
-						document.schedules.set(key, { ...value, device: self.name });
-					}
-				});
-			}
-			const bySpace = new Map<string, Record<string, string>>();
-			for (const [source, target] of Object.entries(projectMap)) {
-				bySpace.set(target.spaceId, {
-					...bySpace.get(target.spaceId),
-					[source]: target.projectId,
-				});
-			}
-			const statements: BatchItem<"sqlite">[] = [];
-			const moves: MergeMove[] = [];
-			for (const [space, map] of bySpace) {
-				const ids = await spaceRunIds(db, from, Object.keys(map));
-				runIds.push(...ids);
-				moves.push({ from, to: space, runIds: ids });
+			// No run starts in Personal from its last check through the batch.
+			const release = await engine.holdStarts(from);
+			try {
+				await noRunsNotDone(from);
+				// The schedules keep firing where they fired: on this computer.
+				for (const source of Object.keys(projectMap)) {
+					const document = await deps.flows.open(source);
+					const keys = unpinned(document);
+					if (keys.length === 0) continue;
+					await document.current.change(() => {
+						for (const key of keys) {
+							const value = document.schedules.get(key) as Record<
+								string,
+								unknown
+							>;
+							document.schedules.set(key, { ...value, device: self.name });
+						}
+					});
+				}
+				const bySpace = new Map<string, Record<string, string>>();
+				for (const [source, target] of Object.entries(projectMap)) {
+					bySpace.set(target.spaceId, {
+						...bySpace.get(target.spaceId),
+						[source]: target.projectId,
+					});
+				}
+				const statements: BatchItem<"sqlite">[] = [];
+				const moves: MergeMove[] = [];
+				for (const [space, map] of bySpace) {
+					const ids = await spaceRunIds(db, from, Object.keys(map));
+					runIds.push(...ids);
+					moves.push({ from, to: space, runIds: ids });
+					statements.push(
+						...(await spaceMoveBatch(db, {
+							from,
+							to: space,
+							projectMap: map,
+							personMap,
+							walkerId: self.id,
+						})),
+					);
+				}
 				statements.push(
-					...(await spaceMoveBatch(db, {
+					...(await adoptPersonalSpaceBatch(db, {
+						personId: row.personId,
 						from,
-						to: space,
-						projectMap: map,
-						personMap,
-						walkerId: self.id,
+						to,
 					})),
+					...runCommandMoves(db, moves, personMap),
+					...(deps.moveStatements?.(moves) ?? []),
+					rows.moved(from),
 				);
+				await db.batch(
+					statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
+				);
+				engine.reindex(runIds);
+			} finally {
+				release();
 			}
-			statements.push(
-				...(await adoptPersonalSpaceBatch(db, {
-					personId: row.personId,
-					from,
-					to,
-				})),
-				...runCommandMoves(db, moves, personMap),
-				...(deps.moveStatements?.(moves) ?? []),
-				rows.moved(from),
-			);
-			await db.batch(
-				statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
-			);
-			engine.reindex(runIds);
 			state = "moved";
 		}
 

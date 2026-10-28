@@ -43,6 +43,9 @@ import type { WebhookDelivery } from "./webhooks";
  *   waiting or sleeping: that cron time is skipped.
  * - A start that fails (flow errors, the run cap) is recorded with its error
  *   and not retried.
+ * - A hold (`hold`, while a merge of Spaces moves rows) skips the ticks
+ *   and changes nothing else: a cron time that came due meanwhile fires
+ *   on the first tick after it, under the rules above.
  */
 
 /** How late a cron time may still start. */
@@ -97,6 +100,12 @@ export type Scheduler = {
 	tick(): Promise<void>;
 	/** Reads the schedule facts the log gained since the last read. */
 	refresh(): Promise<void>;
+	/**
+	 * Holds the ticks: none starts a run until the release. Resolves once
+	 * the tick under way ended, so its runs are in the log. The release
+	 * ticks at once when the scheduler runs, and is safe to call twice.
+	 */
+	hold(): Promise<() => void>;
 	last(projectId: string, scheduleId: string): ScheduleRecord | null;
 	/** The next start: a due time that still starts on the next tick, else the next cron time. Null when paused. */
 	nextAt(projectId: string, schedule: Schedule, now: number): number | null;
@@ -143,6 +152,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 	let running: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let stopped = false;
+	/** How many holds are not released. */
+	let holds = 0;
 
 	function record(
 		projectId: string,
@@ -322,6 +333,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
 	async function pass(): Promise<void> {
 		await refresh();
+		if (holds > 0) return;
 		if (deps.enabled && !deps.enabled()) {
 			// Off counts as paused: turning it on again starts from now.
 			watchedSince.clear();
@@ -334,7 +346,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			onSince = at;
 		}
 		for (const { id: projectId } of await deps.projects()) {
-			if (stopped) return;
+			if (stopped || holds > 0) return;
 			let schedules: Schedule[];
 			try {
 				({ schedules } = await deps.flows.schedules(
@@ -346,7 +358,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			}
 			const seen = new Set<string>();
 			for (const schedule of schedules) {
-				if (stopped) return;
+				if (stopped || holds > 0) return;
 				// A duplicate id is an issue in the UI; the first one counts.
 				if (seen.has(schedule.id)) continue;
 				seen.add(schedule.id);
@@ -404,6 +416,18 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		stop,
 		tick,
 		refresh,
+		async hold() {
+			holds++;
+			let released = false;
+			const release = () => {
+				if (released) return;
+				released = true;
+				holds--;
+				if (holds === 0 && timer !== undefined) void tick();
+			};
+			await running;
+			return release;
+		},
 		last(projectId, scheduleId) {
 			return history.get(keyOf(projectId, scheduleId))?.last ?? null;
 		},

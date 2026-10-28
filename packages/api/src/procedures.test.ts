@@ -101,6 +101,7 @@ const engine: Context["engine"] = {
 	logMemberChange: async () => {},
 	onRunEvents: () => () => {},
 	reindex: () => {},
+	holdStarts: async () => () => {},
 	runHere: async () => null,
 	deviceBack: async () => {},
 	webhook: async () => ({

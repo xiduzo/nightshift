@@ -2,15 +2,18 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { asc, eq, inArray } from "drizzle-orm";
 import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
+import type { RunLog } from "../log";
 import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
 import type { RunSummary } from "../read/views";
-import { createEngine, type EngineInternals } from "../run/engine";
+import { createEngine, type Engine, type EngineInternals } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
+import { START_HOLD_WORDS } from "../run/start-holds";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
@@ -19,7 +22,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { SCHEDULE_GRACE_MS } from "./scheduler";
+import { createScheduler, SCHEDULE_GRACE_MS } from "./scheduler";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 
@@ -52,10 +55,10 @@ function startDaemon(
 		"maxConcurrentRuns" | "scheduler" | "settings"
 	> = {},
 	internals: EngineInternals = {},
-): { engine: SpaceEngine; die: () => void } {
+): { engine: SpaceEngine; root: Engine; die: () => void } {
 	const controller = new AbortController();
 	engines.push(controller);
-	const engine = createEngine(
+	const root = createEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness() },
@@ -68,8 +71,12 @@ function startDaemon(
 			signal: controller.signal,
 			...internals,
 		},
-	).space(sandbox.spaceId);
-	return { engine, die: () => controller.abort() };
+	);
+	return {
+		engine: root.space(sandbox.spaceId),
+		root,
+		die: () => controller.abort(),
+	};
 }
 
 function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
@@ -451,6 +458,82 @@ describe("the scheduler", () => {
 		});
 		const next = firedRunId(later[2]);
 		await engine.stopRun(next);
+	});
+
+	test("a schedule due while a merge holds the starts fires after the release, within its grace", async () => {
+		const { engine, root } = startDaemon();
+		const project = await setup(engine, [nightly()]);
+		await settle();
+		const release = await root.holdStarts(sandbox.spaceId);
+
+		clock = at(16, 22, 0, 20);
+		await settle();
+		expect(await scheduleFacts()).toEqual([]);
+		expect(await engine.listRuns()).toEqual([]);
+		// A person's run in the held Space waits too.
+		const refused = engine.startRun({
+			projectId: project.id,
+			flowName: "night",
+		});
+		await expect(refused).rejects.toBeInstanceOf(Refusal);
+		await expect(refused).rejects.toThrow(START_HOLD_WORDS.held);
+
+		clock = at(16, 22, 2);
+		release();
+		const [fired] = await waitForFacts(1);
+		expect(fired?.payload).toMatchObject({
+			scheduleId: "nightly",
+			at: at(16, 22),
+			error: null,
+		});
+		await waitForEnd(engine, firedRunId(fired));
+		await settle();
+		expect(await scheduleFacts()).toHaveLength(1);
+	});
+
+	test("a hold waits for the tick under way, and the ticks during it start nothing", async () => {
+		let listed = 0;
+		let answer: () => void = () => {};
+		const scheduler = createScheduler({
+			db: sandbox.db,
+			now: () => clock,
+			tickMs: TICK_MS,
+			log: {} as RunLog,
+			projects: () => {
+				listed++;
+				return new Promise((resolve) => {
+					answer = () => resolve([]);
+				});
+			},
+			flows: { schedules: async () => ({ schedules: [] }) } as never,
+			startRun: () => Promise.reject(new Error("No run starts here.")),
+			runStatus: async () => null,
+		});
+		const ticking = scheduler.tick();
+		await waitFor(async () => listed === 1 || null, {
+			label: "the tick lists",
+		});
+		let held = false;
+		const holding = scheduler.hold().then((release) => {
+			held = true;
+			return release;
+		});
+		await Bun.sleep(TICK_MS * 2);
+		expect(held).toBe(false);
+
+		answer();
+		await ticking;
+		const release = await holding;
+		expect(held).toBe(true);
+		await scheduler.tick();
+		expect(listed).toBe(1);
+		release();
+		const next = scheduler.tick();
+		await waitFor(async () => listed === 2 || null, {
+			label: "the tick after the release lists",
+		});
+		answer();
+		await next;
 	});
 
 	test("a paused schedule does not fire", async () => {
