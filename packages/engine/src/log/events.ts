@@ -313,6 +313,13 @@ export type EnginePayloads = {
 		 * its writes, or the reverse.
 		 */
 		variables?: Record<string, JsonValue>;
+		/**
+		 * The kept variables (`keep`) among `variables`, and the flow that
+		 * keeps them: another Replica saves them from this event too
+		 * (`ingestKeptValues`). Absent when the step wrote none, and in
+		 * older logs.
+		 */
+		kept?: { flowName: string; names: string[] };
 	};
 	/**
 	 * The variables of a flow when it starts (each `initial`, or a kept

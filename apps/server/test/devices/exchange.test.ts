@@ -16,11 +16,13 @@ import {
 
 /**
  * The event log exchange between two daemons: A is the Host, B pairs with
- * it. B walks a run in A's Space; A's Replica gets it as it goes, answers
- * its Gate (B applies the answer), and opens the transcript from the
- * archive. This is the transport's smoke test: the exchange itself (by
- * cursor, Commands, refusals, a Host that was away) is tested in memory
- * in packages/devices (`device-exchange.test.ts`).
+ * it. B starts a run in A's Space, and A walks it (ADR 1): its steps run
+ * on B. B's Replica gets the run as it goes, answers its Gate (A applies
+ * the answer), and opens the transcript from the archive. This is the
+ * transport's smoke test: the exchange itself (by cursor, Commands,
+ * refusals, a Host that was away) is tested in memory in packages/devices
+ * (`device-exchange.test.ts`). `host-walks.test.ts` has B walk a run while
+ * A is away, and send it to A later.
  */
 
 const root = mkdtempSync(join(tmpdir(), "nightshift-exchange-"));
@@ -119,7 +121,7 @@ afterAll(async () => {
 });
 
 describe("the event log exchange", () => {
-	test("B walks a run in A's Space; A sees it live, answers its Gate, and opens its transcript", async () => {
+	test("B starts a run in A's Space; A walks it, B sees it live, answers its Gate, and opens its transcript", async () => {
 		// A's project, in A's personal Space.
 		const added = await a.client.projects.add({ repoPath: await repo("on-a") });
 		projectId = added.id;
@@ -166,63 +168,66 @@ describe("the event log exchange", () => {
 			[bId, false],
 		]);
 
-		// B walks a run; it waits at its Gate.
+		// B starts a run; A walks it, and it waits at its Gate.
 		const started = await b.client.runs.start({ projectId, flow: gateFlow });
+		expect(started.walker).toMatchObject({ id: aId, thisDevice: false });
+		expect(started.device).toMatchObject({ id: bId, thisDevice: true });
 		await waitFor(
-			() => runOn(b, started.id),
+			() => runOn(a, started.id),
 			(r) => r?.status === "waiting",
 		);
 
-		// A's Replica has it, with the same status, walked by B.
+		// B's Replica has it, with the same status, walked by A.
 		const seen = (await waitFor(
-			() => runOn(a, started.id),
+			() => runOn(b, started.id),
 			(r) => r?.status === "waiting",
 		)) as RunSummary;
-		expect(seen.walker).toMatchObject({ id: bId, thisDevice: false });
+		expect(seen.walker).toMatchObject({ id: aId, thisDevice: false });
 		// Started by the Person A knows, with B's paths: B is A's owner's own Device.
 		const personOfA = (await a.client.settings.get()).daemon.device.ownerId;
 		expect(seen.startedBy?.id).toBe(personOfA);
-		expect(seen.startedBy?.name).toBeTruthy();
+		expect((await runOn(a, started.id))?.startedBy?.name).toBeTruthy();
 		expect(seen.worktreePath).not.toBe("");
 		expect(seen.walker.name).toBeTruthy();
 		const gate = await waitFor(
 			async () =>
-				(await a.client.gates.list()).find((g) => g.runId === started.id),
+				(await b.client.gates.list()).find((g) => g.runId === started.id),
 			(g) => g !== undefined,
 		);
-		expect(gate?.walker.id).toBe(bId);
+		expect(gate?.walker.id).toBe(aId);
 		expect(gate?.answerPending).toBe(false);
 
-		// A's Person answers it on A; B applies it and the run finishes on both.
-		await a.client.gates.resolve({
+		// B's Person answers it on B; A applies it and the run finishes on both.
+		await b.client.gates.resolve({
 			runId: started.id,
 			stepId: gate?.stepId as string,
 			choice: "approve",
-			note: "Ship it from A.",
+			note: "Ship it from B.",
 		});
 		await waitFor(
-			() => runOn(b, started.id),
-			(r) => r?.status === "finished",
-		);
-		const finished = await waitFor(
 			() => runOn(a, started.id),
 			(r) => r?.status === "finished",
 		);
-		expect(finished?.reason).toBe((await runOn(b, started.id))?.reason);
+		const finished = await waitFor(
+			() => runOn(b, started.id),
+			(r) => r?.status === "finished",
+		);
+		expect(finished?.reason).toBe((await runOn(a, started.id))?.reason);
 		const detail = await waitFor(
-			() => a.client.runs.get({ runId: started.id }),
+			() => b.client.runs.get({ runId: started.id }),
 			(d) => d.commands.length === 0,
 		);
-		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
-			["hello", "pass"],
-			["ship", "approve"],
+		expect(
+			detail.steps.map((s) => [s.nodeId, s.outcome, s.device?.id]),
+		).toEqual([
+			["hello", "pass", bId],
+			["ship", "approve", bId],
 		]);
-		expect(detail.steps[1]?.outputs.note).toBe("Ship it from A.");
-		expect(detail.takeOverCommand).toBeNull();
+		expect(detail.steps[1]?.outputs.note).toBe("Ship it from B.");
 
-		// A opens the command step's transcript: it comes from the archive.
+		// B opens the command step's transcript: it comes from the archive.
 		const controller = new AbortController();
-		const stream = await a.client.runs.watch(
+		const stream = await b.client.runs.watch(
 			{ runId: started.id },
 			{ signal: controller.signal },
 		);

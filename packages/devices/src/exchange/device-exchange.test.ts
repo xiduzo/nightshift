@@ -920,6 +920,35 @@ describe("the Device's exchange with its Host", () => {
 		}
 	});
 
+	test("a kept value B's walk saved is A's too: the next run A walks starts from it", async () => {
+		const counting = {
+			...quickFlow,
+			variables: [
+				{ name: "runs", type: "number", initial: "0", keep: "project" },
+			],
+			nodes: [
+				{
+					...quickFlow.nodes[0],
+					set: [{ variable: "runs", expression: "vars.runs + 1" }],
+				},
+			],
+		} as Flow;
+		await paired.projectOnDevice(projectId, { clone: true });
+		await seedFlows(paired.device.space(a.spaceId), projectId, {
+			count: counting,
+		});
+		online();
+		const run = await paired.device
+			.space(a.spaceId)
+			.startRun({ projectId, flowName: "count" });
+		await untilStatus(paired.host, run.id, "finished");
+		expect(
+			await paired.host.space(a.spaceId).listKeptValues(projectId, "count"),
+		).toEqual([
+			{ name: "runs", value: 1, runId: run.id, updatedAt: expect.any(Number) },
+		]);
+	});
+
 	test("a key A no longer knows ends the link: revoked, and nothing more goes to A", async () => {
 		let removed = false;
 		const period = online(

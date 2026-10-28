@@ -189,8 +189,10 @@ export const event = sqliteTable(
  * project, flow and variable. A run of the flow starts from it, and each
  * write of the variable saves it in the batch of its `StepEnded`, so the
  * last write wins. A run's own history stays in its events: this row is
- * only the value the next run starts from. Kept on the Replica that walks
- * the runs; the exchange does not copy it. A reset removes the row.
+ * only the value the next run starts from. The Replica that walks the
+ * run saves it, and every other Replica saves it again from the
+ * `StepEnded` the exchange brings: a later write there stays. A reset
+ * removes the row.
  */
 export const keptVariable = sqliteTable(
 	"kept_variable",

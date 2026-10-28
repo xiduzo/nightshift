@@ -15,8 +15,9 @@ import {
 
 /**
  * Live transcripts between two daemons: A is the Host, B pairs with it.
- * A watches a running step of a run B walks, and sees its output as it
- * is written, before the step ends. The transport's smoke test: both
+ * B starts a run, A walks it, and its step runs on B (ADR 1). A, the
+ * Walker, and B, through A, watch the running step and see its output as
+ * it is written, before the step ends. The transport's smoke test: both
  * ways and the resume from a cursor are tested in memory in
  * packages/devices (`device-exchange.test.ts`).
  */
@@ -137,7 +138,7 @@ afterAll(async () => {
 });
 
 describe("live transcripts across Devices", () => {
-	test("the Host shows a running step that a Device walks, as it is written", async () => {
+	test("the Host and the Device show a running step the Host walks, as it is written", async () => {
 		const marker = join(root, "go-b");
 		const started = await b.client.runs.start({
 			projectId,
@@ -149,9 +150,15 @@ describe("live transcripts across Devices", () => {
 			(step) => step !== undefined && step.endedAt === null,
 		);
 
+		expect(started.walker.thisDevice).toBe(false);
 		const watching = watch(a, started.id);
+		const onB = watch(b, started.id);
 		await waitFor(
 			() => watching.lines,
+			(lines) => lines.includes("first line"),
+		);
+		await waitFor(
+			() => onB.lines,
 			(lines) => lines.includes("first line"),
 		);
 		// The step still runs: the line came live, not from the archive.
@@ -163,8 +170,14 @@ describe("live transcripts across Devices", () => {
 			() => watching.lines,
 			(lines) => lines.includes("second line"),
 		);
+		await waitFor(
+			() => onB.lines,
+			(lines) => lines.includes("second line"),
+		);
 		expect(watching.lines).toEqual(["first line", "second line"]);
+		expect(onB.lines).toEqual(["first line", "second line"]);
 		watching.stop();
-		await watching.done;
+		onB.stop();
+		await Promise.all([watching.done, onB.done]);
 	}, 60_000);
 });

@@ -2,7 +2,19 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Database } from "@nightshift/db";
 import { agentSession, event, project, run, step } from "@nightshift/db/schema";
-import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import type { JsonValue } from "@nightshift/flows";
+import {
+	and,
+	asc,
+	eq,
+	gt,
+	inArray,
+	isNotNull,
+	isNull,
+	or,
+	sql,
+} from "drizzle-orm";
+import { type KeptWrite, saveKeptWrites } from "../variables";
 import type { RunBus } from "./bus";
 import { asCommand } from "./command-stamp";
 import type { LoggedEvent } from "./events";
@@ -313,9 +325,80 @@ export function createRunHistory(deps: {
 		if (runIds.length > 0) after.push(followWalkerMoves(db, runIds));
 		// The Walker's own copy of this fact, filled here from the fact.
 		if (sessionIds.length > 0) after.push(fillHarnessSessions(sessionIds));
+		// The next run here starts from the kept values the Walker saved.
+		after.push(...saveKeptWrites(db, await keptWritesOf(rows)));
 		const added = await log.ingest(rows.events, { before, after });
 		publish(added);
 		return added;
+	}
+
+	/**
+	 * The writes of kept variables in the batch's new `StepEnded` events,
+	 * each with its run's project. An event this Replica has already is
+	 * left out, so a kept value a person reset here stays reset.
+	 */
+	async function keptWritesOf(rows: HistoryRows): Promise<KeptWrite[]> {
+		const ended = rows.events.flatMap((e) => {
+			if (e.type !== "StepEnded" || e.stepId === null) return [];
+			const payload = JSON.parse(e.payload) as {
+				variables?: Record<string, JsonValue>;
+				kept?: { flowName: string; names: string[] };
+			};
+			if (!payload.kept || !payload.variables) return [];
+			const values: Record<string, JsonValue> = {};
+			for (const name of payload.kept.names) {
+				const value = payload.variables[name];
+				if (value !== undefined) values[name] = value;
+			}
+			if (Object.keys(values).length === 0) return [];
+			return [{ e, flowName: payload.kept.flowName, values }];
+		});
+		if (ended.length === 0) return [];
+		const known = new Set(
+			(
+				await db
+					.select({ walkerId: event.walkerId, walkerSeq: event.walkerSeq })
+					.from(event)
+					.where(
+						or(
+							...ended.map(({ e }) =>
+								and(
+									eq(event.walkerId, e.walkerId),
+									eq(event.walkerSeq, e.walkerSeq),
+								),
+							),
+						),
+					)
+			).map((k) => `${k.walkerId}\n${k.walkerSeq}`),
+		);
+		const fresh = ended.filter(
+			({ e }) => !known.has(`${e.walkerId}\n${e.walkerSeq}`),
+		);
+		if (fresh.length === 0) return [];
+		const runIds = [...new Set(fresh.map(({ e }) => e.runId))];
+		const projectOf = new Map(rows.runs.map((r) => [r.id, r.projectId]));
+		const unknown = runIds.filter((id) => !projectOf.has(id));
+		if (unknown.length > 0) {
+			for (const r of await db
+				.select({ id: run.id, projectId: run.projectId })
+				.from(run)
+				.where(inArray(run.id, unknown))) {
+				projectOf.set(r.id, r.projectId);
+			}
+		}
+		return fresh.flatMap(({ e, flowName, values }) => {
+			const projectId = projectOf.get(e.runId);
+			if (projectId === undefined) return [];
+			return [
+				{
+					flow: { spaceId: e.spaceId, projectId, flowName },
+					values,
+					runId: e.runId,
+					stepId: e.stepId as string,
+					at: e.at,
+				},
+			];
+		});
 	}
 
 	/**
