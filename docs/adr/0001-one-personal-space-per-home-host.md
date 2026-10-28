@@ -1,6 +1,6 @@
 # 1. One personal Space per Home Host
 
-Status: accepted, 2026-10-27
+Status: accepted, 2026-10-27. Built, 2026-10-28.
 
 ## Context
 
@@ -74,6 +74,13 @@ personal or shared.
 - "Personal on <Host>" disappears from the UI. A person has one Space
   named "Personal".
 - The Phone sees all personal work, because the Host keeps it.
+- On a Home Host that another Person runs, the Host is usable in your
+  Personal only through the Host admin's Offer. The start default skips
+  it otherwise.
+- A Device that leaves also takes the Projects that it walked a run of
+  without a Clone, so each Run that it walked keeps its Project. A
+  schedule of those Projects that names another Device fires on the
+  leaving Device.
 - A Device without a Home Host keeps its own personal Space, as today.
 - The merge is a migration of rows between Spaces. Every row carries its
   Space id (TECH constraint), so the migration rewrites Space ids and the
