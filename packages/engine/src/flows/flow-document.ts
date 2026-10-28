@@ -142,7 +142,7 @@ const SCALAR_ORDER = [
 ];
 
 /** A flow of the document as a read sees it. */
-type FlowEntry = {
+export type FlowEntry = {
 	flowId: string;
 	/** Its name for this read: the stored one, or with a suffix on a clash. */
 	name: string;
@@ -154,7 +154,7 @@ type FlowEntry = {
 };
 
 /** Every flow of the document that has a valid name, each with a name of its own. */
-function flowEntries(document: FlowDocument): FlowEntry[] {
+export function flowEntries(document: FlowDocument): FlowEntry[] {
 	return scanFlows(document).entries;
 }
 
@@ -527,7 +527,11 @@ export function readSchedules(document: FlowDocument): {
 	return { schedules, unreadable };
 }
 
-function orderedKeys(store: Y.Map<unknown>, order: Y.Array<string>): string[] {
+/** The keys of `store` in `order`, then the others by key. */
+export function orderedKeys(
+	store: Y.Map<unknown>,
+	order: Y.Array<string>,
+): string[] {
 	const seen = new Set<string>();
 	const keys: string[] = [];
 	for (const key of order.toArray()) {
