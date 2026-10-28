@@ -229,7 +229,14 @@ rewrites the Device's database, so it is careful:
    as the Host knows them), the notifier's deliveries, and the state),
    `pushed` (the exchange gave
    the Host every moved run). A merge cut short goes on from its state.
-   After `moved` it finishes by itself when the Host answers.
+   After `moved` it finishes by itself when the Host answers. From its
+   last check for runs that are not done through its batch, no run
+   starts (`Engine.holdStarts`): the scheduler skips its ticks, and a
+   person's run or a webhook's run in Personal is refused with "Night
+   Shift moves the projects of this Space now. Start the run again in a
+   minute." The hold waits for the starts under way first. A schedule
+   that came due meanwhile fires after it, within its 15 minutes of
+   grace. The hold ends on success and on failure.
 5. **The Host.** It takes each project by its remote into the personal
    Space: a remote it has takes that project's id, so the runs of both
    sides are one history. Every other project keeps its id. A remote of
@@ -279,7 +286,8 @@ reverse of the merge, and as careful:
    the Device has no link with access to that Host. It waits while a run
    that this Device walks there is running, waiting, sleeping or
    interrupted. The daemon tries at start and every 30 s, so a split
-   cut short or held back goes on by itself.
+   cut short or held back goes on by itself. As in the merge, no run
+   starts from its last check through its batch.
 2. **Copy.** `VACUUM INTO` writes `backups/before-leaving-host-*.db`
    first.
 3. **States** (`space_split`, a sibling of `space_merge` with a new Space
