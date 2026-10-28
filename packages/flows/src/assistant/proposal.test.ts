@@ -109,7 +109,7 @@ describe("proposalIssues", () => {
 			],
 			[
 				"build",
-				'The device "mac" has no profile "worker". Use a device and a profile from the list of profiles.',
+				'There is no profile "worker" on the device "mac". Use a device and a profile from list_profiles.',
 			],
 		]);
 	});

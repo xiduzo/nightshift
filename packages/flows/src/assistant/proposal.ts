@@ -91,7 +91,7 @@ const messages: DraftMessages = {
 	missingConnection: (name) =>
 		`This computer has no connection "${name}". Use one it has, or leave it out.`,
 	missingProfile: (profile) =>
-		`The device "${profile.device}" has no profile "${profile.profile}". Use a device and a profile from the list of profiles.`,
+		`There is no profile "${profile.profile}" on the device "${profile.device}". Use a device and a profile from list_profiles.`,
 };
 
 /** A schema issue, on its node or edge when it has one: `Node "build": prompt: …`. */

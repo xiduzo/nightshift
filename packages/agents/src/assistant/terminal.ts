@@ -37,6 +37,7 @@ import {
 	field,
 	flowRows,
 	issueLines,
+	profileRefs,
 	runReport,
 } from "./tools";
 
@@ -55,7 +56,8 @@ export type TerminalRunSummary = {
 export type TerminalPort = {
 	projects(): Promise<TerminalProject[]>;
 	flows(projectId: string): Promise<ProjectFlowMap>;
-	profiles(): Promise<AuthoringProfile[]>;
+	/** The profiles a node of the project may name, each on its Device. */
+	profiles(projectId: string): Promise<AuthoringProfile[]>;
 	tools(): Promise<{
 		clis: AuthoringToolInfo[];
 		connections: AuthoringToolInfo[];
@@ -122,8 +124,9 @@ async function checkIn(
 	flow: unknown,
 	name: string | undefined,
 ): Promise<FlowIssue[]> {
-	const [flows, tools] = await Promise.all([
+	const [flows, profiles, tools] = await Promise.all([
 		port.flows(projectId),
+		port.profiles(projectId),
 		port.tools(),
 	]);
 	// The saved flow of that name is the base: a profile or a connection it
@@ -136,6 +139,7 @@ async function checkIn(
 	return proposalIssues(base ?? (flow as Flow), flow, {
 		flows,
 		name,
+		profiles: profileRefs(profiles),
 		connections: tools.connections.map((c) => c.name),
 	});
 }
@@ -245,13 +249,14 @@ export function terminalTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.listProfiles,
 			description:
-				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model.",
-			inputSchema: { type: "object", properties: {} },
-		}).server(async () => {
-			const profiles = await port.profiles();
+				'The profiles a node may name, each on its computer (a Device). Name one in a node as `"profile": { "device": <device>, "profile": <profile> }`, with both ids from this list; the step runs on that computer. An Agent Profile (`kind` agent) is for an Agent node. A Model Profile (`kind` model) is for a Decision or a Value decided by a model. The settings (harness, model, decider) show for this computer\'s profiles only.',
+			inputSchema: projectOnly,
+		}).server(async (args: unknown) => {
+			const project = await projectOf(args);
+			const profiles = await port.profiles(project.id);
 			return profiles.length > 0
 				? JSON.stringify(profiles, null, 2)
-				: "This computer has no profiles.";
+				: "None of your computers has a profile yet. Set the harness, model and permission mode on the node.";
 		}),
 		toolDefinition({
 			name: AUTHORING_TOOLS.listTools,

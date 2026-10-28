@@ -177,7 +177,7 @@ export function chatPrompt(input: ChatPromptInput): string {
 		"# How to work",
 		"",
 		"1. Read before you write. Call `get_draft` for the flow as the person has it now. Read the project in this folder when it helps (AGENTS.md, the README, the package scripts, CI config, skills). Read what you need, then answer.",
-		"2. Look names up, do not invent them: `list_profiles`, `list_tools`, `list_skills`, `list_flows` and `get_flow`. Reuse a flow with a Subflow (`call`) node instead of copying its steps.",
+		"2. Look names up, do not invent them: `list_profiles`, `list_tools`, `list_skills`, `list_flows` and `get_flow`. A node names a profile with the `device` and `profile` ids that `list_profiles` gives. Reuse a flow with a Subflow (`call`) node instead of copying its steps.",
 		"3. To change the flow, write the whole flow, not a patch. Keep the ids and positions of the nodes and edges you do not change, so the person sees a small change.",
 		"4. Call `check_flow` and fix every error. Then call `propose_flow` with the flow and a one- or two-sentence summary.",
 		"5. After `propose_flow`, end your turn with a short message. Do not paste the flow's JSON in your answer.",
