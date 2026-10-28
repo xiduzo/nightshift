@@ -8,6 +8,7 @@ import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
 	joinProgressSchema,
+	mergePendingSchema,
 	mergePreviewSchema,
 	mergeResultSchema,
 	otherDeviceViewSchema,
@@ -153,6 +154,17 @@ export const devices = {
 	 * remote. Without it, they stay apart in Personal.
 	 */
 	merge: {
+		/**
+		 * A Device that joined before the merge existed, or a merge that
+		 * stopped: Personal waits for the person to merge it.
+		 */
+		pending: ownerProcedure
+			.route({
+				summary:
+					"Says whether this computer's Personal waits to merge into its home Host's.",
+			})
+			.output(output(mergePendingSchema))
+			.handler(({ context }) => context.devices.mergePending()),
 		preview: ownerProcedure
 			.route({
 				summary:

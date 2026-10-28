@@ -2,7 +2,8 @@ import type { AppRouterClient } from "@nightshift/api";
 
 /**
  * The words of a merge of this computer's Personal into its home Host's
- * (ADR 1), as the CLI prints them: after `nightshift join`.
+ * (ADR 1), as the CLI prints them: after `nightshift join`, and in
+ * `nightshift merge`.
  */
 
 type MergePreview = Awaited<

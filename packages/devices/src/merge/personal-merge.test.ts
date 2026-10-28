@@ -565,6 +565,39 @@ describe("the merge of Personal", () => {
 		expect(existsSync(join(b.dataDir, "backups"))).toBe(false);
 	});
 
+	test("a device that joined before waits for the person, and never merges by itself", async () => {
+		const { runId } = await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		const merge = merger(link);
+
+		expect(await merge.pending()).toEqual({
+			pending: true,
+			state: null,
+			hostName: "A",
+			blocked: null,
+		});
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
+
+		await merge.run();
+		expect((await merge.pending()).pending).toBe(false);
+	});
+
+	test("a waiting merge says why it cannot run now", async () => {
+		const offline: Link = {
+			...online({ push: false }).link,
+			state: () => ({ status: "offline", address: null, since: 0 }),
+		};
+
+		expect(await merger(offline).pending()).toEqual({
+			pending: true,
+			state: null,
+			hostName: "A",
+			blocked: MERGE_WORDS.offline,
+		});
+	});
+
 	test("the Host's personal Space keeps the name the Host gives it before a merge", async () => {
 		const rows = await b.db.select().from(hostSpace);
 		expect(rows.map((r) => r.name)).toEqual(["Personal on A"]);

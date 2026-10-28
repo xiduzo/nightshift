@@ -40,7 +40,7 @@ export function createDevices(deps: {
 	/** On a Host: the Device document it keeps for a paired Device, read. */
 	keptDocument(deviceId: string): Promise<DeviceCopy | null>;
 	/** The merge of this computer's Personal into its home Host's. */
-	merge: Pick<PersonalSpaceMerge, "preview" | "run">;
+	merge: Pick<PersonalSpaceMerge, "preview" | "run" | "pending">;
 	/** The clock, in milliseconds. Default: `Date.now`. */
 	now?: () => number;
 }): Devices {
@@ -177,6 +177,7 @@ export function createDevices(deps: {
 				}
 			}
 		},
+		mergePending: () => deps.merge.pending(),
 		mergePreview: (input) => deps.merge.preview(input),
 		merge: (input) => deps.merge.run(input),
 	};

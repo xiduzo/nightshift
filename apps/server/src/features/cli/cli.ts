@@ -22,6 +22,7 @@ import { flowsCommand } from "./flows";
 import { healthCommand } from "./health";
 import { adminCommand, joinCommand, pairCommand } from "./join";
 import { mcpCommand } from "./mcp";
+import { mergeCommand } from "./merge";
 
 /**
  * `nightshift`: Night Shift without a window, for a server or any computer
@@ -35,6 +36,9 @@ Usage:
   nightshift serve [options]                Run Night Shift on this computer.
   nightshift join <host-address> [--guest]  Pair this computer with a Host.
   nightshift pair <code> [--yes]            Allow a computer to pair with this Host.
+  nightshift merge [--dry-run] [--yes]      Merge the Personal of this computer into
+                                            the Personal of its home Host. It shows
+                                            what moves and asks first.
   nightshift admin --email <email>          Set how the Host admin signs in from
                                             another computer. --reset-two-factor
                                             also turns two-factor sign-in off.
@@ -210,6 +214,8 @@ export async function main(argv: string[]) {
 			return joinCommand(rest, "nightshift join");
 		case "pair":
 			return pairCommand(rest, "nightshift pair");
+		case "merge":
+			return mergeCommand(rest, "nightshift merge");
 		case "admin":
 			return adminCommand(rest, "nightshift admin");
 		case "health":

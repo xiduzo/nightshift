@@ -112,3 +112,15 @@ export type MergeResult = {
 	/** The copy of the database made before the merge changed anything. */
 	backup: string;
 };
+
+/** Whether this computer's Personal waits to merge into its home Host's. */
+export type MergePending = {
+	/** Personal can merge, or a merge that started waits to go on. */
+	pending: boolean;
+	/** How far a merge that started came. Null: none started. */
+	state: MergeState | null;
+	/** The home Host. Null without one. */
+	hostName: string | null;
+	/** Why it cannot run now. Null: it can. */
+	blocked: string | null;
+};
