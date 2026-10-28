@@ -51,6 +51,25 @@ export function placementChoices(
 	return [...online, ...offline];
 }
 
+/**
+ * What the Host is when another person runs it: whose it is, and what
+ * they offer to this Space. Null for any other place.
+ */
+export function hostOwnerHint(
+	choice: Pick<PlacementChoice, "thisDevice" | "offers" | "ownerName">,
+): string | null {
+	if (!choice.thisDevice || choice.offers === undefined) return null;
+	const owner = choice.ownerName;
+	if (!owner) {
+		return choice.offers.length === 0
+			? "This Host belongs to another person. It offers no profiles to this Space."
+			: `This Host belongs to another person. It offers ${choice.offers.join(", ")} to this Space.`;
+	}
+	return choice.offers.length === 0
+		? `This Host belongs to ${owner}. ${owner} has not offered it to this Space.`
+		: `This Host belongs to ${owner}. ${owner} offers ${choice.offers.join(", ")} to this Space.`;
+}
+
 /** One of your Devices, or another person's that offers you something. */
 function usable(choice: Pick<PlacementChoice, "offers">): boolean {
 	return choice.offers === undefined || choice.offers.length > 0;
