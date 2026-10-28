@@ -1,4 +1,9 @@
-import { useRunActed, waitedText } from "@nightshift/client";
+import {
+	defaultPlacement,
+	placementChoices,
+	useRunActed,
+	waitedText,
+} from "@nightshift/client";
 import type { FlowInputDef } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -198,15 +203,13 @@ function StartRunForm({
 	);
 	const [baseRef, setBaseRef] = useState("");
 	// Where the steps run: this computer when it has the project, else the
-	// device of the project's latest run, else the first.
+	// device of the project's latest run, else one of the person's own. A
+	// Host another person owns that offers them nothing is no default.
 	const placements = useQuery(runQueries.placements(projectId));
 	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
 	const devices = placements.data ?? [];
 	const device =
-		devices.find((d) => d.deviceId === chosenDevice) ??
-		devices.find((d) => d.thisDevice) ??
-		devices.find((d) => d.lastRun) ??
-		devices[0];
+		defaultPlacement(placementChoices(devices), chosenDevice) ?? undefined;
 	// One choice that is this computer: nothing to ask.
 	const askDevice = devices.length > 1 || (device && !device.thisDevice);
 	const noDevice = placements.isSuccess && devices.length === 0;

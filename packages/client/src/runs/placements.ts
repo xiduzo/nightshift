@@ -48,10 +48,18 @@ export function placementChoices(
 	return [...online, ...offline];
 }
 
+/** One of your Devices, or another person's that offers you something. */
+function usable(choice: Pick<PlacementChoice, "offers">): boolean {
+	return choice.offers === undefined || choice.offers.length > 0;
+}
+
 /**
  * The place a run goes when the person does not choose: the one they
  * chose while it is still online, else this computer, else the one the
- * project's latest run ran on, else the first.
+ * project's latest run ran on, else one of their own, else the first.
+ * This computer and the latest run's Device count only when they are the
+ * person's own or offer them something: a Host another person owns that
+ * offers nothing is no default.
  */
 export function defaultPlacement(
 	choices: readonly PlacementChoice[],
@@ -60,8 +68,9 @@ export function defaultPlacement(
 	const online = choices.filter((choice) => choice.online);
 	return (
 		online.find((choice) => choice.deviceId === chosen) ??
-		online.find((choice) => choice.thisDevice) ??
-		online.find((choice) => choice.lastRun) ??
+		online.find((choice) => choice.thisDevice && usable(choice)) ??
+		online.find((choice) => choice.lastRun && usable(choice)) ??
+		online.find((choice) => choice.offers === undefined) ??
 		online[0] ??
 		null
 	);

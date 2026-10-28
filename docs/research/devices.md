@@ -484,7 +484,9 @@ on their own Device.
 Device that started the Run, or the Host for a Run started from a Phone or
 a browser on the Host (ADR 1). A Host without a Clone of the Project
 takes the Device of the Project's latest Run (`lastRunDevice`); Start
-run marks it and lets the person choose another. 4. The Walker.
+run marks it and lets the person choose another. A Host that another
+Person owns and that offers the starter nothing in the Space is no
+default: one of the starter's own Devices with a Clone is. 4. The Walker.
 
 A profile is a Device's own: a node names it by Device and profile id
 (ADR 3). A placed Device that is offline makes the step wait, up to the
