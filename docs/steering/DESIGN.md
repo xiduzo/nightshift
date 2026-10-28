@@ -60,6 +60,7 @@ The palette is neutral. Status colors (running, blocked, needs you, verified) ar
 | Forms | `input.tsx`, `input-group.tsx`, `textarea.tsx`, `label.tsx`, `checkbox.tsx` | Settings, project config |
 | Menus | `dropdown-menu.tsx` | Per-row actions |
 | Feedback | `sonner.tsx`, `tooltip.tsx`, `skeleton.tsx`, `empty.tsx` | Toasts for events, skeletons while facts load, empty states with a next step |
+| A change to the person's data they did not start (the merge of Personal) | `alert.tsx` banner, `dialog.tsx` | The banner offers it, or says why it cannot run now. The dialog shows what changes, then one confirm button. It never runs by itself |
 
 Pipeline board and spec tree components do not exist yet. Build them in `packages/ui` from the primitives above.
 

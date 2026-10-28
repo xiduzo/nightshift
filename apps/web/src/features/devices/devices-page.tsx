@@ -31,6 +31,7 @@ import {
 	PhoneListItem,
 } from "./devices-list";
 import { HostDetail } from "./host-detail";
+import { MergePersonalAlert } from "./merge-personal";
 import { HostSpacesAlert, hostKeptSpaces } from "./open-space";
 import { PairDeviceDialog } from "./pair-device-dialog";
 import { PhoneDetail } from "./phone-detail";
@@ -159,6 +160,7 @@ export function DevicesPage({
 			<SiteHeader crumbs={[{ label: "Devices" }]} />
 			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
 				<div className="min-w-0 flex-1 overflow-y-auto">
+					<MergePersonalAlert />
 					{elsewhere.length > 0 ? (
 						<div className="mx-auto w-full max-w-6xl px-4 pt-8 md:px-8">
 							<HostSpacesAlert spaces={elsewhere} />

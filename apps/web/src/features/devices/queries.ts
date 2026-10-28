@@ -30,3 +30,14 @@ export const offerMutations = createOfferMutations(orpc);
 
 /** The Space's runs, to show what runs on each computer now. */
 export const runQueries = createRunQueries(orpc);
+
+/**
+ * The merge of this computer's Personal into its home Host's: whether it
+ * waits for the person, and what it would do. Web only.
+ */
+export const mergeQueries = {
+	pending: () => orpc.devices.merge.pending.queryOptions(),
+	preview: (join: readonly string[]) =>
+		orpc.devices.merge.preview.queryOptions({ input: { join: [...join] } }),
+	run: () => orpc.devices.merge.run.mutationOptions(),
+};

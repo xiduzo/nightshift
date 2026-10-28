@@ -19,6 +19,7 @@ export {
 	type HostProcedureMeta,
 	hostContract,
 	type ListedSpace,
+	type MergePending,
 	type MergePreview,
 	type MergeResult,
 	type OfferCaps,

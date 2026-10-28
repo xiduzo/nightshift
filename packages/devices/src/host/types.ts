@@ -2,6 +2,7 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { DeviceCopy, KeyStoreKind } from "@nightshift/engine";
 import type {
 	HostHello,
+	MergePending,
 	MergePreview,
 	MergeResult,
 	PairingRedeemed,
@@ -114,6 +115,12 @@ export type Devices = {
 	phonesAt(hostId: string): Promise<PhoneView[]>;
 	/** Signs out one of those phones. */
 	removePhoneAt(hostId: string, phoneId: string): Promise<void>;
+	/**
+	 * Whether this computer's Personal waits to merge into its home
+	 * Host's: a Device that joined before, or a merge that stopped. It
+	 * merges only when the person confirms it.
+	 */
+	mergePending(): Promise<MergePending>;
 	/**
 	 * What a merge of this computer's Personal into its home Host's would
 	 * do. Refuses when it cannot run now. Changes nothing. `join`: the

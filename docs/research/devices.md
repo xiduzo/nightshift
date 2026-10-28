@@ -239,6 +239,16 @@ On a new join, the merge runs at once and the join shows its preview and
 its result. When it cannot run, the join says why, and the merge waits
 for the person.
 
+A Device that joined before the merge existed keeps its Personal beside
+the Host's until its person merges them. It never merges by itself. The
+Devices page shows a banner while a merge waits (`devices.merge.pending`):
+it says why the merge cannot run now, or opens the preview with a
+confirm button. In the preview the person chooses which projects join a
+shared Space's project. A merge that stopped offers to finish. The CLI
+does the same: `nightshift merge` shows the preview and asks,
+`--dry-run` only shows it, `--join <project>` chooses a shared project,
+`--yes` skips the question.
+
 An older Host has no `sync.mergePersonal`: the Device keeps its
 Personal and says to update the Host.
 

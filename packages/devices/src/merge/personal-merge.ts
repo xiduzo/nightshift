@@ -19,6 +19,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type {
 	PersonalMerge as HostAnswer,
+	MergePending,
 	MergePreview,
 	MergeProjectView,
 	MergeResult,
@@ -491,9 +492,50 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		}, deps.pushWaitMs ?? 20_000);
 	}
 
+	/**
+	 * Whether this computer's Personal waits to merge, for a Device that
+	 * joined its home Host before the merge existed, or a merge that
+	 * stopped. Never merges by itself: the person confirms it. `blocked`:
+	 * why it cannot run now. Cheap: no call to the Host.
+	 */
+	async function pending(): Promise<MergePending> {
+		const started = await rows.unfinished();
+		const host = await home().catch(() => null);
+		if (started) {
+			const link = deps.links.get(started.hostId);
+			return {
+				pending: true,
+				state: started.state,
+				hostName: host?.name ?? null,
+				blocked: link?.state().status === "online" ? null : MERGE_WORDS.offline,
+			};
+		}
+		const none = { pending: false, state: null, hostName: null, blocked: null };
+		if (!host || (await hostsDevices())) return none;
+		const from = await personalSpaceId(db, deps.ownerId);
+		const listed = await engine.hostSpaces.listed(host.id);
+		if (from === null || listed.some((space) => space.id === from)) {
+			return none;
+		}
+		let blocked: string | null = null;
+		try {
+			online(host.id);
+			if (!listed.some((space) => space.personal)) {
+				throw new Refusal("unavailable", MERGE_WORDS.notListed);
+			}
+			await noRunsNotDone(from);
+		} catch (error) {
+			if (!(error instanceof Refusal)) throw error;
+			blocked = error.message;
+		}
+		return { pending: true, state: null, hostName: host.name, blocked };
+	}
+
 	return {
 		/** What a merge would do now. Refuses when it cannot run now. Changes nothing. */
 		preview,
+
+		pending,
 
 		/**
 		 * Merges Personal into the home Host's, or goes on with a merge that

@@ -1,6 +1,7 @@
 import {
 	type DevicesOverview,
 	type JoinProgress,
+	type MergePending,
 	type MergePreview,
 	type MergeResult,
 	type OfferView,
@@ -164,6 +165,16 @@ export const mergePreviewSchema = exact<MergePreview>()(
 );
 
 const mergeStateSchema = z.enum(["planned", "mapped", "moved", "pushed"]);
+
+/** Whether this computer's Personal waits to merge into its home Host's. */
+export const mergePendingSchema = exact<MergePending>()(
+	z.object({
+		pending: z.boolean(),
+		state: mergeStateSchema.nullable(),
+		hostName: z.string().nullable(),
+		blocked: z.string().nullable(),
+	}),
+);
 
 /** How a merge of Personal went. */
 export const mergeResultSchema = exact<MergeResult>()(
