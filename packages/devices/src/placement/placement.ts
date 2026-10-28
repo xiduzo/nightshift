@@ -25,7 +25,13 @@ import {
 	storedDeviceProfiles,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
-import type { FlowNode, FlowSources, ProfileSettings } from "@nightshift/flows";
+import {
+	type FlowNode,
+	type FlowSources,
+	isProfileRef,
+	type ProfileSettings,
+	profileOf,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, keptByHomeHost, personInSpace } from "../links";
@@ -47,7 +53,7 @@ import { remoteDevice } from "../work";
  * - At run start (`plan`): the Person the run runs for, as the Host of its
  *   Space knows them; the run's Device (`deviceId`, else this computer);
  *   and each node's Device, by the engine's node walk (`planNodes`: its
- *   `device`, else its profile's Device, else the run's) over this
+ *   profile's Device, else its `device`, else the run's) over this
  *   module's Devices. Each Device is checked: one of the Person's own, or
  *   another Person's through its Offers into the Space (the nodes placed
  *   there stay within them, `offerRefusal`), with a Clone where it needs
@@ -57,7 +63,8 @@ import { remoteDevice } from "../work";
  *   (`HostRelay.devices`). Run start keeps the plan on the run's row.
  * - While the run walks (`deviceFor`): the plan, read from the row
  *   (`planOf`), and nothing decided again. Another Device is a
- *   `remoteDevice` over the work relay, named as the plan names it.
+ *   `remoteDevice` over the work relay, named as the plan names it. A
+ *   node with a profile runs on the Device of the id its profile names.
  *
  * The placed Device checks every call again itself.
  */
@@ -166,8 +173,13 @@ export function createPlacement(deps: PlacementDeps) {
 		return id === device.id || id === (await deps.log.walkerId());
 	}
 
-	/** The Device a step of `node` runs on, as the run's plan says. */
+	/**
+	 * The Device a step of `node` runs on, as the run's plan says: its
+	 * profile's Device by id, else the Device it names, else the run's.
+	 */
 	function deviceFor(node: FlowNode, row: RunRow): Device {
+		const ref = profileOf(node);
+		if (isProfileRef(ref)) return deviceById(ref.device, row);
 		const plan = planOf(row);
 		const name = nodeDevice(node);
 		const at =
@@ -181,9 +193,7 @@ export function createPlacement(deps: PlacementDeps) {
 			return deps.localFor?.(row) ?? device;
 		}
 		const plan = planOf(row);
-		const name =
-			[plan.device, ...Object.values(plan.named)].find((d) => d.id === id)
-				?.name ?? named;
+		const name = plan.devices[id]?.name ?? named;
 		return remoteDevice(
 			plan.personId === null ? NO_STARTER_RELAY : work,
 			{ id, name: name ?? "The device of this step" },
