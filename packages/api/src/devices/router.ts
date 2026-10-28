@@ -8,6 +8,8 @@ import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
 	joinProgressSchema,
+	mergePreviewSchema,
+	mergeResultSchema,
 	otherDeviceViewSchema,
 	pairingReviewViewSchema,
 	spaceDeviceViewSchema,
@@ -20,6 +22,10 @@ import {
  * relay that a paired Device calls under `devices` is the Host's router
  * (`hostPeer`).
  */
+const mergeInput = z
+	.object({ join: z.array(z.string().min(1).max(64)).max(1_000).optional() })
+	.default({});
+
 export const devices = {
 	list: protectedProcedure
 		.route({
@@ -141,8 +147,33 @@ export const devices = {
 			await context.devices.removePhoneAt(hostId, input.id);
 		}),
 	/**
+	 * The merge of this computer's Personal into its home Host's (ADR 1):
+	 * one Space named "Personal", which the Host keeps. `join`: the
+	 * projects to move into the project of a shared Space with their
+	 * remote. Without it, they stay apart in Personal.
+	 */
+	merge: {
+		preview: ownerProcedure
+			.route({
+				summary:
+					"Shows what merging this computer's Personal into its home Host's does. Changes nothing.",
+			})
+			.input(mergeInput)
+			.output(output(mergePreviewSchema))
+			.handler(({ context, input }) => context.devices.mergePreview(input)),
+		run: ownerProcedure
+			.route({
+				summary:
+					"Merges this computer's Personal into its home Host's, after a copy of its data.",
+			})
+			.input(mergeInput)
+			.output(output(mergeResultSchema))
+			.handler(({ context, input }) => context.devices.merge(input)),
+	},
+	/**
 	 * Pairs this computer with a Host (`nightshift join`): yields the code to
-	 * approve there, then the Host once it is approved.
+	 * approve there, then the Host once it is approved. After a home Host,
+	 * this computer's Personal merges into the Host's, and it yields how.
 	 */
 	join: ownerProcedure
 		.route({

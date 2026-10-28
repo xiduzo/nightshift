@@ -35,13 +35,15 @@ import {
 	CopyIcon,
 	ExternalLinkIcon,
 	EyeIcon,
+	MergeIcon,
 	ShieldCheckIcon,
 } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { client } from "@/shared/api";
+import { client, type MergePreview, type MergeResult } from "@/shared/api";
 
+import { MergePreviewList } from "./merge-preview";
 import { formatUserCode } from "./platform";
 import { deviceQueries } from "./queries";
 
@@ -59,8 +61,21 @@ type Step =
 			fingerprint: string | null;
 			expiresAt: number;
 	  }
-	/** Paired with a home Host whose Host admin is someone else. */
-	| { kind: "joined"; hostName: string };
+	/** Paired with a home Host: Personal merges into the Host's, with what it does. */
+	| {
+			kind: "merging";
+			hostName: string;
+			hostAdmin: boolean | null;
+			preview: MergePreview | null;
+	  }
+	/** Paired, with what the Person must read: the merge, or a Host admin who is someone else. */
+	| {
+			kind: "joined";
+			hostName: string;
+			hostAdmin: boolean | null;
+			merged: MergeResult | null;
+			notMerged: string | null;
+	  };
 
 /**
  * "Join a Host": pairs this computer with a Host. This computer asks the
@@ -115,6 +130,8 @@ function JoinHostSteps({
 				{ url: address.trim(), role },
 				{ signal: stop.signal },
 			);
+			let joined: Extract<Step, { kind: "merging" }> | null = null;
+			let hostName = "the Host";
 			for await (const next of progress) {
 				if (next.kind === "code") {
 					setStep({
@@ -124,19 +141,48 @@ function JoinHostSteps({
 						fingerprint: next.fingerprint,
 						expiresAt: next.expiresAt,
 					});
-				} else {
+				} else if (next.kind === "joined") {
 					void queryClient.invalidateQueries({
 						queryKey: deviceQueries.overviewKey(),
 					});
-					if (next.role === "home" && next.hostAdmin === false) {
-						setStep({ kind: "joined", hostName: next.hostName });
-						return;
-					}
-					toast.success(`Paired with ${next.hostName}`);
-					onDone();
+					hostName = next.hostName;
+					if (next.role !== "home") break;
+					joined = {
+						kind: "merging",
+						hostName: next.hostName,
+						hostAdmin: next.hostAdmin,
+						preview: null,
+					};
+					setStep(joined);
+				} else if (next.kind === "merge-preview" && joined !== null) {
+					const merging: Extract<Step, { kind: "merging" }> = joined;
+					joined = { ...merging, preview: next.preview };
+					setStep(joined);
+				} else if (joined) {
+					// Personal is one Space now: every list reads again.
+					void queryClient.invalidateQueries();
+					setStep({
+						kind: "joined",
+						hostName: joined.hostName,
+						hostAdmin: joined.hostAdmin,
+						merged: next.kind === "merged" ? next.result : null,
+						notMerged: next.kind === "merge-skipped" ? next.reason : null,
+					});
 					return;
 				}
 			}
+			if (joined?.hostAdmin === false) {
+				setStep({
+					kind: "joined",
+					hostName: joined.hostName,
+					hostAdmin: false,
+					merged: null,
+					notMerged: null,
+				});
+				return;
+			}
+			toast.success(`Paired with ${hostName}`);
+			onDone();
 		} catch (error) {
 			if (stop.signal.aborted) return;
 			setStep({
@@ -149,8 +195,11 @@ function JoinHostSteps({
 	if (step.kind === "code") {
 		return <CodeStep step={step} />;
 	}
+	if (step.kind === "merging") {
+		return <MergingStep step={step} />;
+	}
 	if (step.kind === "joined") {
-		return <JoinedStep hostName={step.hostName} />;
+		return <JoinedStep step={step} />;
 	}
 
 	const starting = step.kind === "starting";
@@ -242,12 +291,33 @@ function JoinHostSteps({
 	);
 }
 
+/** Paired with the home Host: Personal merges into the Host's now. */
+function MergingStep({ step }: { step: Extract<Step, { kind: "merging" }> }) {
+	return (
+		<>
+			<DialogHeader>
+				<DialogTitle>Paired with {step.hostName}</DialogTitle>
+				<DialogDescription>
+					Your Personal on this computer becomes one with your Personal on{" "}
+					{step.hostName}. Keep this window open.
+				</DialogDescription>
+			</DialogHeader>
+			{step.preview ? <MergePreviewList preview={step.preview} /> : null}
+			<p className="flex items-center gap-2 text-muted-foreground text-sm">
+				<Spinner />
+				{step.preview ? "Merging your Personal…" : "Reading your Personal…"}
+			</p>
+		</>
+	);
+}
+
 /**
- * Paired with a home Host that someone else runs: its Host admin can read
- * this Person's personal runs there, so the Person reads that before the
- * dialog closes.
+ * Paired with a Host, with what the Person reads before the dialog
+ * closes: how the merge of Personal went, and, for a home Host that
+ * someone else runs, that its Host admin can read their personal runs.
  */
-function JoinedStep({ hostName }: { hostName: string }) {
+function JoinedStep({ step }: { step: Extract<Step, { kind: "joined" }> }) {
+	const { hostName } = step;
 	return (
 		<>
 			<DialogHeader>
@@ -256,14 +326,38 @@ function JoinedStep({ hostName }: { hostName: string }) {
 					This computer stays connected to it.
 				</DialogDescription>
 			</DialogHeader>
-			<Alert>
-				<EyeIcon />
-				<AlertTitle>The Host admin can read your personal runs</AlertTitle>
-				<AlertDescription>
-					You are not the Host admin of {hostName}. Its Host admin can read your
-					personal runs and their transcripts there.
-				</AlertDescription>
-			</Alert>
+			{step.merged ? (
+				<Alert>
+					<MergeIcon />
+					<AlertTitle>Your Personal is merged</AlertTitle>
+					<AlertDescription>
+						Your projects and runs from this computer are in Personal now. Night
+						Shift kept a copy of your data from before the merge.
+						{step.merged.state === "pushed"
+							? null
+							: ` Your runs reach ${hostName} as soon as it answers.`}
+					</AlertDescription>
+				</Alert>
+			) : null}
+			{step.notMerged ? (
+				<Alert>
+					<MergeIcon />
+					<AlertTitle>Your Personal is not merged yet</AlertTitle>
+					<AlertDescription>
+						{step.notMerged} You can merge it later on the Devices page.
+					</AlertDescription>
+				</Alert>
+			) : null}
+			{step.hostAdmin === false ? (
+				<Alert>
+					<EyeIcon />
+					<AlertTitle>The Host admin can read your personal runs</AlertTitle>
+					<AlertDescription>
+						You are not the Host admin of {hostName}. Its Host admin can read
+						your personal runs and their transcripts there.
+					</AlertDescription>
+				</Alert>
+			) : null}
 			<DialogFooter>
 				<DialogClose render={<Button />}>Done</DialogClose>
 			</DialogFooter>

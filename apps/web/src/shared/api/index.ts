@@ -69,6 +69,8 @@ export type {
 	HarnessRowName,
 	McpServer,
 	McpTestResult,
+	MergePreview,
+	MergeResult,
 	ModelProfileRow,
 	OtherDevice,
 	Outcome,

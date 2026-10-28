@@ -2,6 +2,7 @@ import type { AppRouterClient } from "@nightshift/api";
 import { DEFAULT_PORT } from "@nightshift/daemon";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
+import { previewLines, resultLines } from "./merge-words";
 
 /**
  * `nightshift join <host-url> [--guest]` (from source: `bun run join`):
@@ -74,6 +75,7 @@ export async function joinCommand(argv: string[], program: string) {
 			{ url: options.url, role: options.role },
 			{ signal: stop.signal },
 		);
+		let hostName = "your home Host";
 		for await (const step of progress) {
 			if (step.kind === "code") {
 				const code = `${step.userCode.slice(0, 4)}-${step.userCode.slice(4)}`;
@@ -100,7 +102,17 @@ export async function joinCommand(argv: string[], program: string) {
 						`The code works until ${new Date(step.expiresAt).toLocaleTimeString()}. Waiting for the Host…`,
 					].join("\n"),
 				);
+			} else if (step.kind === "merge-preview") {
+				hostName = step.preview.host.name;
+				console.log(`\n${previewLines(step.preview).join("\n")}`);
+			} else if (step.kind === "merged") {
+				console.log(`\n${resultLines(step.result, hostName).join("\n")}`);
+			} else if (step.kind === "merge-skipped") {
+				console.log(
+					`\nYour Personal was not merged: ${step.reason}\nMerge it later from the Devices page of Night Shift.`,
+				);
 			} else {
+				hostName = step.hostName;
 				console.log(
 					`\nPaired with ${step.hostName} as ${step.role === "home" ? "its home Host" : "a guest Host"}. This computer stays connected to it.`,
 				);

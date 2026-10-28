@@ -37,6 +37,9 @@ export type McpTestResult = ApiOutputs["connections"]["test"];
 
 /** One of the owner's other Devices: its profiles and secret names, read-only. */
 export type OtherDevice = ApiOutputs["devices"]["others"][number];
+/** What a merge of this computer's Personal into its home Host's does. */
+export type MergePreview = ApiOutputs["devices"]["merge"]["preview"];
+export type MergeResult = ApiOutputs["devices"]["merge"]["run"];
 
 /** The settings of this computer, their fields and their defaults. */
 export type SettingsView = ApiOutputs["settings"]["get"];

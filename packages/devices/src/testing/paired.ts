@@ -1,8 +1,10 @@
 import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
 import { clone, hostLink, member, project, user } from "@nightshift/db/schema";
 import {
+	createFlowDocuments,
 	createSettingsStore,
 	createSpaceDocuments,
+	type FlowDocuments,
 	type SpaceDocuments,
 } from "@nightshift/engine";
 import {
@@ -29,6 +31,8 @@ export type PairedDevice = {
 	key: DeviceKeyAccess;
 	/** Its Space documents: its read-only copies of A's Spaces. */
 	documents: SpaceDocuments;
+	/** Its flow documents: the engine's. */
+	flows: FlowDocuments;
 	/**
 	 * Brings a project of A to the Device, as the Space document does.
 	 * With `clone`, the Device has a folder of it too, so it can walk its
@@ -58,6 +62,8 @@ export type PairedReplicas = {
 	personId: string;
 	/** B's Space documents: its read-only copies of A's Spaces. */
 	documents: SpaceDocuments;
+	/** B's flow documents: its engine's. */
+	flows: FlowDocuments;
 	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
 	projectOnDevice: PairedDevice["projectOnDevice"];
 	/** Pairs one more Device of A's owner with A, as B is: a third Replica. */
@@ -157,6 +163,7 @@ export async function pairedReplicas(
 			db: sandbox.db,
 			directory: deviceDirectory(sandbox.db),
 		});
+		const flows = createFlowDocuments({ db: sandbox.db });
 		const engine: PeerEngine = createPeerEngine(
 			withPeers({
 				db: sandbox.db,
@@ -165,6 +172,7 @@ export async function pairedReplicas(
 				dataDir: sandbox.dataDir,
 				scheduler: false,
 				spaceDocuments: documents,
+				flowDocuments: flows,
 				relay: createRelay({
 					engine: () => engine,
 					registry: () => engine.devices,
@@ -209,6 +217,7 @@ export async function pairedReplicas(
 			engine,
 			key,
 			documents,
+			flows,
 			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
 				const [row] = await a.db
 					.select()
@@ -238,6 +247,7 @@ export async function pairedReplicas(
 		hostId,
 		personId,
 		documents: paired.documents,
+		flows: paired.flows,
 		projectOnDevice: paired.projectOnDevice,
 		pair,
 	};
@@ -265,6 +275,7 @@ function linksTo(clients: Map<string, HostClient>): DeviceLinks {
 		call: (use) => use(client),
 		ready: async () => client,
 		check: () => {},
+		synced: () => true,
 		close: async () => {},
 	});
 	return {

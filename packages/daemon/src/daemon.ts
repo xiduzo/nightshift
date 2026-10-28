@@ -51,6 +51,7 @@ import {
 	systemGitInstaller,
 	upgradedSources,
 } from "@nightshift/engine";
+import { moveDeliveriesBatch } from "@nightshift/notifications";
 
 import { createAssistant } from "./assistant";
 import {
@@ -409,6 +410,12 @@ export async function createDaemon(
 		disconnect: (deviceId) =>
 			hot.nightshiftSync?.disconnect(
 				(context) => context.deviceId === deviceId,
+			),
+		// A merge of Personal into the home Host's moves the notifier's log
+		// of the moved runs too. The Host notifies for them from then on.
+		moveStatements: (moves) =>
+			moves.flatMap((move) =>
+				moveDeliveriesBatch(db, { ...move, sends: false }),
 			),
 		kept: hot,
 	});

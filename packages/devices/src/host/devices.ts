@@ -13,6 +13,7 @@ import {
 	type HostSpaces,
 	joinHost,
 } from "../links";
+import { mergeOnJoin, type PersonalSpaceMerge } from "../merge";
 import { type Reach, reachFor } from "../reach";
 import type { Host } from "./host";
 import type { Devices, DevicesOverview, OtherDeviceView } from "./types";
@@ -38,6 +39,8 @@ export function createDevices(deps: {
 	copies: Pick<DeviceCopies, "list">;
 	/** On a Host: the Device document it keeps for a paired Device, read. */
 	keptDocument(deviceId: string): Promise<DeviceCopy | null>;
+	/** The merge of this computer's Personal into its home Host's. */
+	merge: Pick<PersonalSpaceMerge, "preview" | "run">;
 	/** The clock, in milliseconds. Default: `Date.now`. */
 	now?: () => number;
 }): Devices {
@@ -148,8 +151,8 @@ export function createDevices(deps: {
 				phones.delete(hostId);
 			}
 		},
-		join: (input, signal) =>
-			joinHost(
+		async *join(input, signal) {
+			for await (const step of joinHost(
 				{
 					self: deps.self,
 					links: deps.hostLinks,
@@ -158,6 +161,23 @@ export function createDevices(deps: {
 				},
 				input,
 				signal,
-			),
+			)) {
+				yield step;
+				// Merge on join: Personal becomes one with the home Host's.
+				if (step.kind === "joined" && step.role === "home") {
+					yield* mergeOnJoin(
+						{
+							merge: deps.merge,
+							links: deps.links,
+							hostSpaces: deps.hostSpaces,
+						},
+						step.hostId,
+						signal,
+					);
+				}
+			}
+		},
+		mergePreview: (input) => deps.merge.preview(input),
+		merge: (input) => deps.merge.run(input),
 	};
 }

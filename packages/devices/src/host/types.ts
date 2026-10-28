@@ -2,6 +2,8 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { DeviceCopy, KeyStoreKind } from "@nightshift/engine";
 import type {
 	HostHello,
+	MergePreview,
+	MergeResult,
 	PairingRedeemed,
 	PairingStart,
 	PhoneView,
@@ -112,7 +114,21 @@ export type Devices = {
 	phonesAt(hostId: string): Promise<PhoneView[]>;
 	/** Signs out one of those phones. */
 	removePhoneAt(hostId: string, phoneId: string): Promise<void>;
-	/** Pairs this computer with a Host, step by step (`nightshift join`). */
+	/**
+	 * What a merge of this computer's Personal into its home Host's would
+	 * do. Refuses when it cannot run now. Changes nothing. `join`: the
+	 * projects to move into the project of a shared Space with their remote.
+	 */
+	mergePreview(input: { join?: readonly string[] }): Promise<MergePreview>;
+	/**
+	 * Merges this computer's Personal into its home Host's, or goes on
+	 * with a merge that stopped. A copy of the database comes first.
+	 */
+	merge(input: { join?: readonly string[] }): Promise<MergeResult>;
+	/**
+	 * Pairs this computer with a Host, step by step (`nightshift join`).
+	 * After a home Host, Personal merges into the Host's.
+	 */
 	join(
 		input: { url: string; role: HostRole },
 		signal?: AbortSignal,

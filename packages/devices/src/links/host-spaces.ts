@@ -2,6 +2,7 @@ import {
 	addMembership,
 	membershipOf,
 	mirrorHostSpace,
+	personalSpaceId,
 	removeMemberships,
 	setMembershipRole,
 	spaceExists,
@@ -39,6 +40,9 @@ export function createHostSpaces(db: Database) {
 			personId: string,
 		): Promise<void> {
 			const listed = spaces.map((s) => s.id);
+			// After a merge (ADR 1), the Person's personal Space here is the
+			// Host's: it keeps the name "Personal".
+			const ownPersonal = await personalSpaceId(db, personId);
 			// No transaction: every write is an upsert, and it runs with each
 			// answer of the Host, beside the walk's own writes.
 			for (const space of spaces) {
@@ -50,7 +54,11 @@ export function createHostSpaces(db: Database) {
 				// A Space of this Replica's own is never taken for a Host's.
 				if (own && !kept) continue;
 				if (kept && kept.hostId !== host.id) continue;
-				const name = space.personal ? `Personal on ${host.name}` : space.name;
+				const name = !space.personal
+					? space.name
+					: space.id === ownPersonal
+						? "Personal"
+						: `Personal on ${host.name}`;
 				const membership = await membershipOf(db, space.id, personId);
 				if (
 					kept?.name === name &&

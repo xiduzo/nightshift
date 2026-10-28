@@ -13,8 +13,9 @@ import { createdAt, spaceId, updatedAt } from "./columns";
 // Owner: `@nightshift/devices`: the registry of Devices (`registry/`, also
 // this computer's own `device` row, `selfDevice`, and its owner,
 // `setSelfOwner`, which the daemon gives `localPerson()`), the links to
-// Hosts and their Spaces (`links/`), and the exchange of run history and
-// commands with them (`exchange/`). The engine reads these rows through its
+// Hosts and their Spaces (`links/`), the exchange of run history and
+// commands with them (`exchange/`), and the merge of this computer's own
+// personal Space into its home Host's (`merge/`). The engine reads these rows through its
 // `DeviceDirectory` port (`deviceDirectory`, in `peers/`).
 
 /**
@@ -165,3 +166,40 @@ export const runCommand = sqliteTable(
 		index("run_command_runId_idx").on(table.runId),
 	],
 );
+
+/**
+ * The merge of this computer's own personal Space into its Person's
+ * personal Space on its home Host (ADR 1), one row per merge, so a merge
+ * cut short goes on where it stopped. Its states, in order:
+ *
+ * - `planned`: the copy of the database is made (`backup`). Nothing
+ *   else changed.
+ * - `mapped`: the Host took the Projects and said where each one goes
+ *   (`project_map`, `person_map`).
+ * - `moved`: the rows are in the Host's Spaces, in one batch with this
+ *   state. The flow documents merge after it.
+ * - `pushed`: the Host has the moved runs. The merge is done.
+ */
+export const spaceMerge = sqliteTable("space_merge", {
+	/** This computer's own personal Space, which merges and goes. */
+	fromSpace: text("from_space").primaryKey(),
+	/** The home Host. */
+	hostId: text("host_id").notNull(),
+	/** The Person who owns this computer. */
+	personId: text("person_id").notNull(),
+	state: text("state", {
+		enum: ["planned", "mapped", "moved", "pushed"],
+	}).notNull(),
+	/** The Person's personal Space on the Host, which stays. Null until `mapped`. */
+	toSpace: text("to_space"),
+	/** JSON: each Project of `from_space` by its id: its Space and id on the Host. */
+	projectMap: text("project_map"),
+	/** JSON: this computer's Person: their id on the Host. */
+	personMap: text("person_map"),
+	/** JSON: the Projects the Person chose to move into a shared Space's Project. */
+	joined: text("joined").notNull().default("[]"),
+	/** The copy of the database made before the merge changed anything. */
+	backup: text("backup").notNull(),
+	createdAt: createdAt(),
+	updatedAt: updatedAt(),
+});

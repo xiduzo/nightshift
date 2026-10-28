@@ -120,6 +120,28 @@ describe("run log", () => {
 		expect((await log.events("r1")).at(-1)).toEqual(logged);
 	});
 
+	test("a run it forgets is read from the database again, with what changed there", async () => {
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		await log.append(started("r1"));
+		// Kept in memory once read.
+		expect(await log.events("r1")).toHaveLength(1);
+		// A merge of Spaces rewrites the rows under the log.
+		await sandbox.db
+			.update(event)
+			.set({
+				payload: JSON.stringify({ ...started("r1").payload, title: "moved" }),
+			})
+			.where(eq(event.runId, "r1"));
+
+		log.forget(["r1"]);
+
+		const [first] = await log.events("r1");
+		expect((first?.payload as { title?: string } | undefined)?.title).toBe(
+			"moved",
+		);
+		expect(await log.events("r1")).toEqual(await fromDb("r1"));
+	});
+
 	test("a read is a copy: a later append does not change it", async () => {
 		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		await log.append(started("r1"));

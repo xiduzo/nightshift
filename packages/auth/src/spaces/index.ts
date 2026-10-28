@@ -27,6 +27,7 @@ export {
 } from "./roles";
 export {
 	activeSpaceId,
+	adoptPersonalSpaceBatch,
 	ensurePersonalSpace,
 	localPerson,
 	mirrorHostSpace,

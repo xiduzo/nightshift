@@ -32,7 +32,14 @@ export {
 	spaceDocumentName,
 	spaceIdOf,
 } from "./space-document";
-export { type MovingProject, projectRowsOf } from "./space-rows";
+export {
+	type MovingProject,
+	projectRowsOf,
+	type SpaceMove,
+	spaceMoveBatch,
+	spaceProjectRows,
+	spaceRunIds,
+} from "./space-rows";
 export type { Branches } from "./worktrees";
 export {
 	createWorktrees,

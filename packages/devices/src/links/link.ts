@@ -67,6 +67,11 @@ export type Link = {
 	ready(signal?: AbortSignal): Promise<HostClient>;
 	/** Asks the Host now instead of at the next heartbeat. */
 	check(): void;
+	/**
+	 * Whether the document of this name syncs over the link and has
+	 * taken the Host's state of it once.
+	 */
+	synced(name: string): boolean;
 	/** Stops the link: no more calls, the document stops syncing, every stream stops. */
 	close(): Promise<void>;
 };
@@ -455,6 +460,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			});
 		},
 		check,
+		synced: (name) => providers.get(name)?.isSynced === true,
 		async close() {
 			stop.abort();
 			goOffline();
