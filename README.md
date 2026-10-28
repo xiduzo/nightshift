@@ -30,12 +30,12 @@ Night Shift turns the pipeline into a flow that you draw. The engine owns the or
 
 - **Local first.** Every session, branch, and token stays on your own computers. Agents run with your own CLI logins.
 - **The engine decides, the model advises.** A model never adds a node or changes the graph. Every loop has a maximum count.
-- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a revision: you see who changed what, and you can restore an earlier one (planned, [ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
+- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a revision: you see who changed what, and you can restore an earlier one ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
 - **No built-in method.** Spec-driven, issue-driven, or one file at a time: each method is just another flow.
 
 ## How it works
 
-A flow is a graph of steps. Each edge leaves a step on a named outcome. This is the [`implement-and-check`](examples/starters/.nightshift/flows/implement-and-check.json) starter:
+A flow is a graph of steps. Each edge leaves a step on a named outcome. This is the [`implement-and-check`](examples/starters/flows/implement-and-check.json) starter:
 
 ```mermaid
 flowchart LR
@@ -108,7 +108,7 @@ Then open the web UI, add a project, and give it the [starter flows](examples/st
 
 ```bash
 # from your project's folder, with the dev daemon on port 3000:
-for file in <this checkout>/examples/starters/.nightshift/flows/*.json; do
+for file in <this checkout>/examples/starters/flows/*.json; do
   bun <this checkout>/apps/server/src/cli.ts flows import "$file"
 done
 ```
@@ -134,7 +134,7 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | `review-pr` | An agent reviews a pull request. A gate asks you before the review is posted. |
 | `per-file` | Applies one instruction to every file that matches a glob. |
 
-Details are in [examples/starters/](examples/starters/). Night Shift's own flows are in [`.nightshift/`](.nightshift/) until the import on upgrade moves them into Night Shift ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)): a review of each pull request, night chores on issues labelled `night`, and a weekly dependency bump.
+Details are in [examples/starters/](examples/starters/).
 
 ### Flows from a terminal
 
