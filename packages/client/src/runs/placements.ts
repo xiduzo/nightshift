@@ -11,6 +11,8 @@ export type PlacementChoice = {
 	thisDevice: boolean;
 	/** Another person's Device: the profiles it offers to this Space. */
 	offers?: string[];
+	/** The Host when another person owns it: their name. */
+	ownerName?: string;
 	online: boolean;
 	/** The project's latest run ran on it. */
 	lastRun?: boolean;
@@ -30,6 +32,7 @@ export function placementChoices(
 		name: placement.name,
 		thisDevice: placement.thisDevice,
 		...(placement.offers !== undefined ? { offers: placement.offers } : {}),
+		...(placement.ownerName ? { ownerName: placement.ownerName } : {}),
 		...(placement.lastRun ? { lastRun: true } : {}),
 		online: true,
 	}));

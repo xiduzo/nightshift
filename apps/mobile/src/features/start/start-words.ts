@@ -48,10 +48,24 @@ export function flowCaption(
 
 /** What one place is, for the person who picks it. */
 export function placementHint(
-	choice: Pick<PlacementChoice, "online" | "offers" | "thisDevice" | "lastRun">,
+	choice: Pick<
+		PlacementChoice,
+		"online" | "offers" | "thisDevice" | "lastRun" | "ownerName"
+	>,
 ): string {
 	if (!choice.online) {
 		return "Offline. Open Night Shift on that computer to run flows on it.";
+	}
+	if (choice.thisDevice && choice.offers !== undefined) {
+		const owner = choice.ownerName;
+		if (!owner) {
+			return choice.offers.length === 0
+				? "This Host belongs to another person. It offers no profiles to this Space."
+				: `This Host belongs to another person. It offers ${choice.offers.join(", ")} to this Space.`;
+		}
+		return choice.offers.length === 0
+			? `This Host belongs to ${owner}. ${owner} has not offered it to this Space.`
+			: `This Host belongs to ${owner}. ${owner} offers ${choice.offers.join(", ")} to this Space.`;
 	}
 	if (choice.offers !== undefined) {
 		return choice.offers.length === 0

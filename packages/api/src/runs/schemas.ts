@@ -437,6 +437,7 @@ export const placementSchema = exact<Placement>()(
 		name: z.string(),
 		thisDevice: z.boolean(),
 		offers: z.array(z.string()).optional(),
+		ownerName: z.string().optional(),
 		lastRun: z.boolean().optional(),
 	}),
 );

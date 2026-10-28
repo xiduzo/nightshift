@@ -141,6 +141,7 @@ const ownDeviceSchema = exact<OwnDevice>()(
 		name: z.string(),
 		thisDevice: z.boolean(),
 		offers: z.array(z.string()).optional(),
+		ownerName: z.string().optional(),
 		online: z.boolean(),
 		hasClone: z.boolean(),
 		profiles: z

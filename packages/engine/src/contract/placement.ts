@@ -15,6 +15,11 @@ export type Placement = {
 	 */
 	offers?: string[];
 	/**
+	 * This computer when another Person owns it: that Person's name, as
+	 * the Host admin of a Host that keeps the Space. Absent on the others.
+	 */
+	ownerName?: string;
+	/**
 	 * The project's latest run ran on it: where a run goes by default when
 	 * this computer has no Clone of the project. Absent on the others.
 	 */
