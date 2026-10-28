@@ -95,16 +95,23 @@ function idAsName(ref: ProfileRef): string | null {
 
 /**
  * Where each node runs, and its profile. Returns the flows with their
- * profiles resolved, each node with a profile placed on the profile's
- * Device (named so in the run's copy), and the Devices by name.
+ * profiles resolved, the Devices the nodes name by their name (`named`),
+ * and the Devices of the profiles by id (`byId`): a node with a profile
+ * runs on its profile's Device, by the id its profile names, so two
+ * Devices of one name never take each other's steps.
  */
 async function placeNodes(
 	flows: readonly Flow[],
 	runDevice: PlacedDevice,
 	devices: PlanDevices,
-): Promise<{ flows: Flow[]; named: Map<string, PlacedDevice> }> {
+): Promise<{
+	flows: Flow[];
+	named: Map<string, PlacedDevice>;
+	byId: Map<string, PlacedDevice>;
+}> {
 	const nodes = flows.flatMap((f) => f.nodes);
 	const named = new Map<string, PlacedDevice>();
+	const byId = new Map<string, PlacedDevice>();
 	for (const node of nodes) {
 		const name = namedDevice(node);
 		if (name === undefined || named.has(name)) continue;
@@ -242,11 +249,10 @@ async function placeNodes(
 				);
 				return node;
 			}
-			const onIt = { ...node, device: at.name } as FlowNode;
 			// Offered: the run's copy never holds the profile's settings.
 			if (at.offered) {
-				named.set(at.name, at);
-				return onIt;
+				byId.set(at.id, at);
+				return node;
 			}
 			const label = labelOf(ref);
 			const settings = found.get(at)?.[ref.profile];
@@ -263,14 +269,14 @@ async function placeNodes(
 				);
 				return node;
 			}
-			const resolved = resolveNodeProfile(onIt, settings, label ?? undefined);
+			const resolved = resolveNodeProfile(node, settings, label ?? undefined);
 			if ("problem" in resolved) {
 				if (!misfits.includes(resolved.problem)) {
 					misfits.push(resolved.problem);
 				}
 				return node;
 			}
-			named.set(at.name, at);
+			byId.set(at.id, at);
 			return resolved.node;
 		}),
 	}));
@@ -285,7 +291,7 @@ async function placeNodes(
 		);
 	}
 	if (misfits.length > 0) throw new Refusal("invalid", misfits.join(" "));
-	return { flows: placed, named };
+	return { flows: placed, named, byId };
 }
 
 /**
@@ -319,7 +325,7 @@ export async function planNodes(
 	}
 	const loaded = flowsForRun(await devices.flows(start.projectId), start);
 	const calledNames = Object.keys(loaded.calledFlows);
-	const { flows, named } = await placeNodes(
+	const { flows, named, byId } = await placeNodes(
 		[loaded.flow, ...Object.values(loaded.calledFlows)],
 		run,
 		devices,
@@ -327,8 +333,13 @@ export async function planNodes(
 	const [flow, ...called] = flows as [Flow, ...Flow[]];
 	const groups = new Map<PlacedDevice, FlowNode[]>();
 	for (const node of flows.flatMap((f) => f.nodes)) {
+		const ref = profileOf(node);
 		const name = namedDevice(node);
-		const at = name !== undefined ? (named.get(name) ?? run) : run;
+		const at = isProfileRef(ref)
+			? (byId.get(ref.device) ?? run)
+			: name !== undefined
+				? (named.get(name) ?? run)
+				: run;
 		groups.set(at, [...(groups.get(at) ?? []), node]);
 	}
 	return {
@@ -336,6 +347,12 @@ export async function planNodes(
 			device: planned(run),
 			named: Object.fromEntries(
 				[...named].map(([name, at]) => [name, planned(at)]),
+			),
+			devices: Object.fromEntries(
+				[run, ...named.values(), ...byId.values()].map((at) => [
+					at.id,
+					planned(at),
+				]),
 			),
 			personId,
 		},

@@ -126,6 +126,10 @@ describe("the node walk of a run's plan", () => {
 		expect(planned.plan).toEqual({
 			device: { id: "studio", name: "studio" },
 			named: { "hetzner-1": { id: "hetzner-1", name: "hetzner-1" } },
+			devices: {
+				studio: { id: "studio", name: "studio" },
+				"hetzner-1": { id: "hetzner-1", name: "hetzner-1" },
+			},
 			personId: "the-person",
 		});
 		expect(planned.run.id).toBe("studio");
@@ -137,7 +141,7 @@ describe("the node walk of a run's plan", () => {
 		]);
 	});
 
-	test("a node's profile names its Device: the node runs there with the profile's settings, named so in the run's copy", async () => {
+	test("a node's profile names its Device: the node runs there with the profile's settings, by the Device's id", async () => {
 		const planned = await planNodes(
 			{
 				projectId: "p",
@@ -149,19 +153,65 @@ describe("the node walk of a run's plan", () => {
 			devices(["here_only"]),
 			"the-person",
 		);
-		expect(planned.plan.named).toEqual({
+		expect(planned.plan.named).toEqual({});
+		expect(planned.plan.devices).toEqual({
 			studio: { id: "studio", name: "studio" },
 			this: { id: "this", name: "this" },
 		});
 		expect(planned.flow.nodes).toMatchObject([
-			{ id: "there", device: "studio", model: "sonnet" },
-			{ id: "here", device: "this", model: "sonnet" },
+			{
+				id: "there",
+				profile: { device: "studio", profile: "everywhere" },
+				model: "sonnet",
+			},
+			{
+				id: "here",
+				profile: { device: "this", profile: "here_only" },
+				model: "sonnet",
+			},
 		]);
+		expect(planned.flow.nodes.some((node) => "device" in node)).toBe(false);
 		expect(
 			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
 		).toEqual([
 			["studio", ["there"]],
 			["this", ["here"]],
+		]);
+	});
+
+	test("two Devices of one name each run the steps of their own profiles: the plan keys them by id", async () => {
+		const twin = (id: string, profiles: string[]): PlacedDevice => ({
+			...at(id, { profiles }),
+			name: "twin",
+		});
+		const mine = twin("twin-a", ["builder"]);
+		const theirs = twin("twin-b", ["reviewer"]);
+		const twins: PlanDevices = {
+			...devices(),
+			profileDevice: async (id) =>
+				[mine, theirs].find((device) => device.id === id) ?? null,
+		};
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				flow: flow([
+					profiled("build", { device: "twin-a", profile: "builder" }),
+					profiled("review", { device: "twin-b", profile: "reviewer" }),
+				]),
+			},
+			twins,
+			"the-person",
+		);
+		expect(planned.plan.devices).toEqual({
+			this: { id: "this", name: "this" },
+			"twin-a": { id: "twin-a", name: "twin" },
+			"twin-b": { id: "twin-b", name: "twin" },
+		});
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([
+			["twin-a", ["build"]],
+			["twin-b", ["review"]],
 		]);
 	});
 
@@ -236,7 +286,7 @@ describe("the node walk of a run's plan", () => {
 			["away", true],
 		]);
 		expect(planned.flow.nodes[1]).toMatchObject({
-			device: "away",
+			profile: { device: "away", profile: "own" },
 			model: "sonnet",
 		});
 		await expect(

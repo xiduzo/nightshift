@@ -643,7 +643,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		const asleep = await until(started.id, "sleeping");
 		expect(asleep.steps[0]?.nodeId).toBe("work");
 		expect(asleep.flow.nodes[0]).toMatchObject({
-			device: "studio-b",
+			profile: { device: B, profile: "everywhere" },
 			model: "sonnet",
 		});
 		online.add(B);
@@ -667,7 +667,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		);
 	});
 
-	test("a node's profile names its Device: the step runs there, named so in the run's copy", async () => {
+	test("a node's profile names its Device: the step runs there, by the Device's id", async () => {
 		await shareRemote();
 		const profiled = (id: string, profile: ProfileRef) =>
 			({
@@ -697,7 +697,15 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		]);
 		expect(
 			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
-		).toEqual(["studio-b", "test"]);
+		).toEqual([null, null]);
+		const [row] = await a.db
+			.select()
+			.from(runTable)
+			.where(eq(runTable.id, started.id));
+		if (!row) throw new Error("No run row.");
+		const plan = planOf(row);
+		expect(plan.named).toEqual({});
+		expect(plan.devices[B]).toEqual({ id: B, name: "studio-b" });
 	});
 });
 
@@ -763,6 +771,10 @@ describe("a run's plan", () => {
 		expect(planOf(row)).toEqual({
 			device: { id: started.device.id, name: "test" },
 			named: { "studio-b": { id: B, name: "studio-b" } },
+			devices: {
+				[started.device.id]: { id: started.device.id, name: "test" },
+				[B]: { id: B, name: "studio-b" },
+			},
 			personId,
 		});
 		// A Replica of a version before the plan reads the same Devices.
@@ -1124,6 +1136,43 @@ describe("the walk, from the plan alone", () => {
 				row({ deviceId: null, placements: null, deviceNames: null }),
 			).id,
 		).toBe(a.deviceId);
+	});
+
+	const agentOn = (device: string, profile = "builder") =>
+		({
+			id: "work",
+			type: "agent",
+			position: { x: 0, y: 0 },
+			prompt: "Work.",
+			profile: { device, profile },
+		}) as Flow["nodes"][number];
+
+	test("a node with a profile runs on its profile's Device by id: two Devices of one name keep their own steps", () => {
+		const placement = placementOfA();
+		const twins = row({
+			placements: null,
+			deviceNames: JSON.stringify({
+				[B]: "studio-b",
+				"twin-a": "twin",
+				"twin-b": "twin",
+			}),
+		});
+		const first = placement.deviceFor(agentOn("twin-a"), twins);
+		const second = placement.deviceFor(agentOn("twin-b"), twins);
+		expect([first.id, first.name]).toEqual(["twin-a", "twin"]);
+		expect([second.id, second.name]).toEqual(["twin-b", "twin"]);
+		expect(placement.deviceFor(agentOn(a.deviceId), twins).id).toBe(a.deviceId);
+	});
+
+	test("a run planned before steps were placed by id still reads: its copy names the profile's Device by name too", () => {
+		const placement = placementOfA();
+		const older = row({});
+		const node = {
+			...agentOn("device-h"),
+			device: "hetzner-1",
+		} as Flow["nodes"][number];
+		const at = placement.deviceFor(node, older);
+		expect([at.id, at.name]).toEqual(["device-h", "hetzner-1"]);
 	});
 });
 
