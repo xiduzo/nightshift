@@ -12,7 +12,6 @@ import type {
 	FlowSources,
 	JsonValue,
 	ProfileSettings,
-	ProfilesSource,
 } from "@nightshift/flows";
 
 /**
@@ -41,12 +40,6 @@ export type Device = {
 	 * this answers a Device that asks over the wire.
 	 */
 	flows(projectId: string): Promise<FlowSources>;
-	/**
-	 * The profiles file of the project's Clone on this Device
-	 * (`.nightshift/profiles.json`), unparsed, or null without one: the
-	 * project's profiles for a run placed here. Throws when it has no Clone.
-	 */
-	projectProfiles(projectId: string): Promise<ProfilesSource>;
 	/**
 	 * One harness session. The first item says whether the session can
 	 * start: `refused` (the stream ends there) or `ready`; the harness

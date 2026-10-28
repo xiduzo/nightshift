@@ -37,7 +37,6 @@ export type WorkFor = {
 export type WorkCall =
 	| { kind: "capabilities"; query: CapabilityQuery }
 	| { kind: "flows" }
-	| { kind: "projectProfiles" }
 	| { kind: "worktree"; run: RunRef }
 	| {
 			kind: "itemBranch";
@@ -64,7 +63,6 @@ export type WorkRequest = WorkFor & { call: WorkCall };
 export const WORK_KINDS = [
 	"capabilities",
 	"flows",
-	"projectProfiles",
 	"worktree",
 	"itemBranch",
 	"handOff",
@@ -208,7 +206,6 @@ const decideInputSchema = z.union([
 const workCallSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
 	z.object({ kind: z.literal("flows") }),
-	z.object({ kind: z.literal("projectProfiles") }),
 	z.object({ kind: z.literal("worktree"), run: runRefSchema }),
 	z.object({
 		kind: z.literal("itemBranch"),

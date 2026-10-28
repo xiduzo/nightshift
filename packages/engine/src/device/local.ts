@@ -19,7 +19,7 @@ import {
 	isCustomHarness,
 	type ProfileSettings,
 } from "@nightshift/flows";
-import { readFlowSources, readProfilesSource } from "@nightshift/flows/files";
+import { readFlowSources } from "@nightshift/flows/files";
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
@@ -386,8 +386,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			deps.flows
 				? deps.flows(projectId)
 				: readFlowSources(await cloneOf(projectId)),
-		projectProfiles: async (projectId) =>
-			readProfilesSource(await cloneOf(projectId)),
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
 			const readiness = await checkProjectFolder(repoPath, { git });

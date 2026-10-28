@@ -6,7 +6,6 @@ import {
 	flowSchema,
 	migrateFlow,
 	type Profile,
-	parseProfilesSource,
 	profileSchema,
 	type Schedule,
 	scheduleSchema,
@@ -29,6 +28,7 @@ import {
 	readLegacyFolder,
 	type TrackedState,
 } from "./legacy-folder";
+import { parseLegacyProfiles } from "./legacy-profiles";
 import { addNotices, type NoticeKind } from "./notices";
 
 /**
@@ -126,7 +126,7 @@ export async function importClone(
 	// Project profiles become this Device's.
 	const madeProfiles: string[] = [];
 	if (folder.profiles !== null) {
-		const { profiles, issues } = parseProfilesSource(folder.profiles);
+		const { profiles, issues } = parseLegacyProfiles(folder.profiles);
 		if (issues.length > 0) {
 			problems.push("Some of the project's profiles are not valid.");
 		}

@@ -1,13 +1,17 @@
+import {
+	migrateToolSets,
+	type Profile,
+	profileSchema,
+} from "@nightshift/flows";
 import { z } from "zod";
-import { migrateToolSets } from "../document";
-import { type Profile, profileSchema } from "./profiles";
+import type { LegacySource } from "./legacy-folder";
 
 /**
- * A project's profiles: `.nightshift/profiles.json` in the repo, with the
- * same profiles as a computer's (Agent Profiles and Model Profiles, each
- * with its name). A flow that names a profile finds it here, so it runs on
- * a computer that has no profile of that name; a computer's own profile of
- * the same name wins.
+ * A project's profiles from before ADR 3: `profiles.json` in the
+ * `.nightshift/` folder of a Clone, with the same profiles as a computer's
+ * (Agent Profiles and Model Profiles, each with its name). Only the import
+ * on upgrade reads it: each profile becomes a profile of the importing
+ * Device.
  *
  * ```json
  * { "version": 1, "profiles": [
@@ -17,19 +21,13 @@ import { type Profile, profileSchema } from "./profiles";
  * ```
  */
 
-export const PROFILES_VERSION = 1;
+const PROFILES_VERSION = 1;
 
 /** The file as a whole. Each profile is read on its own, so one bad entry leaves the rest. */
 const profilesFileSchema = z.object({
 	version: z.literal(PROFILES_VERSION),
 	profiles: z.array(z.unknown()).default([]),
 });
-
-/**
- * What the profiles file of a project holds, as plain data that can cross
- * a wire: its parsed JSON, why it is not JSON, or null when there is none.
- */
-export type ProfilesSource = { json: unknown } | { jsonError: string } | null;
 
 /** One problem in the profiles file. A profile with an error is left out. */
 export type ProfileIssue = {
@@ -40,7 +38,7 @@ export type ProfileIssue = {
 };
 
 /** The profiles of a project's file, and its problems. */
-export type ProjectProfiles = {
+export type LegacyProfiles = {
 	profiles: Profile[];
 	issues: ProfileIssue[];
 };
@@ -51,7 +49,9 @@ export type ProjectProfiles = {
  * does not match the schema, or repeats an earlier name, is left out with
  * an error.
  */
-export function parseProfilesSource(source: ProfilesSource): ProjectProfiles {
+export function parseLegacyProfiles(
+	source: LegacySource | null,
+): LegacyProfiles {
 	if (source === null) return { profiles: [], issues: [] };
 	if (!("json" in source)) {
 		return {

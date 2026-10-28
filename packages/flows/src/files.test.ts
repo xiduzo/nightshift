@@ -9,8 +9,6 @@ import {
 	deleteFlowFile,
 	flowFilePath,
 	readFlowSources,
-	readProfilesFile,
-	readProfilesSource,
 	writeFlowFile,
 } from "./files";
 import { listFlowSources, loadFlowSource } from "./validate";
@@ -352,30 +350,5 @@ describe("calls between flow files", () => {
 			["night", 1],
 			["trace", 0],
 		]);
-	});
-});
-
-describe("the profiles file", () => {
-	test("a repo without .nightshift/profiles.json has no profiles", async () => {
-		expect(await readProfilesSource(repo)).toBeNull();
-		expect(await readProfilesFile(repo)).toEqual({
-			path: join(repo, ".nightshift", "profiles.json"),
-			profiles: [],
-			issues: [],
-		});
-	});
-
-	test("reads the profiles of the repo", async () => {
-		await mkdir(join(repo, ".nightshift"), { recursive: true });
-		await writeFile(
-			join(repo, ".nightshift", "profiles.json"),
-			JSON.stringify({
-				version: 1,
-				profiles: [{ name: "triage", decider: "ollama" }],
-			}),
-		);
-		const read = await readProfilesFile(repo);
-		expect(read.profiles).toEqual([{ name: "triage", decider: "ollama" }]);
-		expect(read.issues).toEqual([]);
 	});
 });

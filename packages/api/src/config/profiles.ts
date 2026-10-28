@@ -9,7 +9,6 @@ import {
 	profileCatalogSchema,
 	profileListSchema,
 	profileViewSchema,
-	projectProfilesSchema,
 } from "./schemas";
 
 /** The profile an edit changes; a new profile has none. */
@@ -87,28 +86,6 @@ export const profiles = {
 				online: d.online,
 				profiles: d.profiles ?? null,
 			}));
-		}),
-	/**
-	 * A project's own profiles, from `.nightshift/profiles.json` in its
-	 * Clone here: each says whether this computer's profile of the same
-	 * name wins over it.
-	 */
-	project: protectedProcedure
-		.route({
-			summary:
-				"Lists the profiles of a project's own file, and whether this computer overrides each.",
-		})
-		.output(output(projectProfilesSchema))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			const read = await context.space.listProjectProfiles(input.projectId);
-			return {
-				profiles: read.profiles.map((p) => ({
-					...p,
-					overridden: context.profiles.byName(p.name) !== null,
-				})),
-				issues: read.issues,
-			};
 		}),
 	/** Flows that name it refuse to start until they name another profile. */
 	remove: ownerProcedure

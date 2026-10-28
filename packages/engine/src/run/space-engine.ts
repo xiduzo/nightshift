@@ -4,7 +4,6 @@ import type {
 	FlowListItem,
 	LoadedFlow,
 	ProjectFlowMap,
-	ProjectProfiles,
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
@@ -171,11 +170,6 @@ export interface SpaceEngine {
 	 * profile. A flow that cannot be read uses nothing.
 	 */
 	flowUse(): Promise<FlowUse>;
-	/**
-	 * The project's own profiles, `.nightshift/profiles.json` in its Clone
-	 * here, with the problems of the file. None without a Clone here.
-	 */
-	listProjectProfiles(projectId: string): Promise<ProjectProfiles>;
 
 	/** Open Gates over the Space's runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
 	listGates(): Promise<OpenGate[]>;
