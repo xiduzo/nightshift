@@ -14,7 +14,7 @@ import {
 	scheduleListSchema,
 } from "./schemas";
 
-/** `.nightshift/schedules.json`: runs the daemon starts on a cron line. */
+/** A project's schedules: runs Night Shift starts at a cron time or on a webhook. */
 export const schedules = {
 	list: protectedProcedure
 		.route({

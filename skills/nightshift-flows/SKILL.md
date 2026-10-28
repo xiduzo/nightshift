@@ -1,20 +1,20 @@
 ---
 name: nightshift-flows
-description: Write, change and check Night Shift flows through the `nightshift` MCP server or the chat in the flow editor. Use when the person asks to build, draw, fix or explain a Night Shift flow, a node, an edge, a loop, a Gate or a Subflow, or when you find a `.nightshift/` folder in a project.
+description: Write, change and check Night Shift flows through the `nightshift` MCP server, the `nightshift flows` command or the chat in the flow editor. Use when the person asks to build, draw, fix or explain a Night Shift flow, a node, an edge, a loop, a Gate or a Subflow, or when you find a `.nightshift/` folder in a project.
 ---
 
 # Night Shift flows
 
 Night Shift runs flows: graphs of steps (agents, shell commands, tools, decisions) that work through the night on a project. This skill tells you how to write a flow that Night Shift accepts.
 
-Night Shift keeps flows, schedules and profiles as its own data, not as files in the repository (ADR 2). You read and save a flow only through Night Shift's tools: `get_flow` gives the flow as Night Shift keeps it, and only `save_flow` checks and saves one. Never write or commit a file in a `.nightshift/` folder, and do not take such a file as the flow the person has. You may read a JSON file that the person gives you, such as a starter flow, and save it with `save_flow`. The guide below still names `.nightshift/flows/<name>.json`, `.nightshift/schedules.json` and `.nightshift/profiles.json`: do not write those files. Write the same JSON and save it with `save_flow`.
+Night Shift keeps flows, schedules and profiles as its own data, not as files in the repository (ADR 2). You read and save a flow only through Night Shift's tools: `get_flow` and `nightshift flows get` give the flow as Night Shift keeps it, and `save_flow` and `nightshift flows save` save one. Each save is a new revision. Never write or commit a file in a `.nightshift/` folder, and do not take such a file as the flow the person has. You may read a JSON file that the person gives you, such as a starter flow, and save it with `save_flow` or `nightshift flows import`.
 
 ## How to work
 
 1. **Read before you write.** Read the flows the project has with `list_flows` and `get_flow` of the `nightshift` MCP server. Reuse a flow with a Subflow (`call`) node instead of copying its steps.
 2. **Look names up, do not invent them.** A node may name an Agent Profile, a connection, a CLI tool, a skill or another flow. Use only ones that exist: `list_profiles`, `list_tools` and `list_skills` of the `nightshift` MCP server, or ask the person.
 3. **Draw the whole flow.** Write the complete JSON document, not a patch. Keep the ids of nodes and edges you do not change, so the person sees a small diff.
-4. **Check it.** Send it to `check_flow` and fix every error. A warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below, then give the JSON to the person. Do not save it as a file. The editor gets a JSON import (planned, ADR 2).
+4. **Check it.** Send it to `check_flow` and fix every error. A warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below, then save it with `nightshift flows save`: it prints the flow's problems.
 5. **Hand it over.** In the flow editor, `propose_flow` shows it to the person, who applies or discards it. In a terminal, `save_flow` saves it. A save is an edit of the flow, like a save in the editor. Never save over a flow the person did not ask you to change.
 
 Ask the person when the goal is not clear: what starts the flow, what it must make, and where a person must approve.
@@ -31,9 +31,15 @@ In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. N
 
 Add the server to Claude Code with `claude mcp add nightshift -- nightshift mcp`. Add `--project <id, name or folder>` to work in another project than the one of your folder.
 
-The `nightshift` command line gets the same flow actions (planned, ADR 2). Until then, use the MCP server.
+Without the MCP server, the `nightshift flows` command reads and saves the flows of the project of your folder (`--project` for another one):
 
-The MCP server cannot save a schedule or a profile:
+- `nightshift flows list`: the flows, one per line: name, steps, errors and description.
+- `nightshift flows get <name>`: the flow as JSON.
+- `nightshift flows save <name> [<file>]`: saves the flow of the file, or of stdin. It prints the flow's problems. A flow with errors saves, but cannot run: fix them and save again.
+- `nightshift flows import <file>`: saves the flow of a file as a new flow. It prints the name it got.
+- `nightshift flows revisions <name>` and `nightshift flows revision <name> <id>`: earlier revisions of the flow.
+
+Night Shift's tools cannot save a schedule or a profile:
 
 - **Schedules**: the person adds, pauses and removes a schedule under the project's Schedules in Night Shift ("Add schedule"). Tell them the flow, the inputs, the cron line or the webhook, and the stop time to use.
 - **Profiles**: `list_profiles` gives the profiles of this computer. The person makes a profile on the Agents page. A project has no profiles of its own (ADR 3). Name a profile in `profile` as `list_profiles` gives it. Later a node names a profile by its Device and its id, not by its name (planned, ADR 3).
@@ -42,7 +48,7 @@ The MCP server cannot save a schedule or a profile:
 
 # Writing Night Shift flows
 
-A flow is a directed graph of nodes and edges, saved as `.nightshift/flows/<name>.json` in the project. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 6. The model never changes the graph at run time.
+A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 6. The model never changes the graph at run time.
 
 ## The file
 
@@ -86,7 +92,7 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its file name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message.
+Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message.
 
 Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `end_message`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 
@@ -163,7 +169,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 
 ## Schedules and webhooks
 
-A schedule in `.nightshift/schedules.json` starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls: the kit `kit:github/wait-for-checks` does it.
+A schedule starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls: the kit `kit:github/wait-for-checks` does it.
 
 ## Kits
 
@@ -180,7 +186,7 @@ A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci
 
 ## Profiles
 
-An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer and in `.nightshift/profiles.json`: `{ "version": 1, "profiles": [{ "name": "triage", "decider": "openrouter" }] }`. The computer's wins. Put the ones a flow needs in the project.
+An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer: `list_profiles` gives them by name.
 
 ## Sections
 

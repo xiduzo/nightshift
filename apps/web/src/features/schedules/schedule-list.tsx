@@ -86,7 +86,7 @@ function whenText(schedule: Schedule): string {
 }
 
 /**
- * The project's schedules, `.nightshift/schedules.json`: what starts when,
+ * The project's schedules: what starts when,
  * the next start, and how the last start went. Pause, edit, add, remove.
  */
 export function ScheduleList({ projectId }: { projectId: string }) {

@@ -61,7 +61,7 @@ export type TerminalPort = {
 		connections: AuthoringToolInfo[];
 	}>;
 	skills(projectId: string): Promise<AuthoringSkill[]>;
-	/** Saves the flow file. Returns its issues as saved. */
+	/** Saves the flow as a new revision. Returns its issues as saved. */
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	startRun(
 		projectId: string,
@@ -219,7 +219,8 @@ export function terminalTools(
 		}),
 		toolDefinition({
 			name: AUTHORING_TOOLS.getFlow,
-			description: "One flow of the project as JSON, by its name.",
+			description:
+				"One flow of the project as Night Shift keeps it, as JSON, by its name.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -246,7 +247,7 @@ export function terminalTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.listProfiles,
 			description:
-				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model. The project's own profiles are in .nightshift/profiles.json.",
+				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model.",
 			inputSchema: { type: "object", properties: {} },
 		}).server(async () => {
 			const profiles = await port.profiles();
@@ -303,7 +304,7 @@ export function terminalTools(
 		toolDefinition({
 			name: TERMINAL_TOOLS.saveFlow,
 			description:
-				"Check a whole flow and save it as the project's flow file `name`: a new flow, or over the flow of that name. A flow with errors is refused: fix them and save again. Save over a flow only when the person asked you to change it.",
+				"Check a whole flow and save it as the project's flow `name`: a new flow, or a new revision of the flow of that name. A flow with errors is refused: fix them and save again. Save over a flow only when the person asked you to change it.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -311,7 +312,7 @@ export function terminalTools(
 					name: {
 						type: "string",
 						description:
-							"The flow's file name: lowercase letters, digits, - and _. Example: fix-issue.",
+							"The flow's name: lowercase letters, digits and -. Example: fix-issue.",
 					},
 					flow: flowProperty,
 				},
@@ -321,7 +322,7 @@ export function terminalTools(
 			const name = flowNameSchema.safeParse(field(args, "name"));
 			if (!name.success) {
 				throw new Error(
-					"Give the flow's file name in `name`: lowercase letters, digits, - and _. Example: fix-issue.",
+					"Give the flow's name in `name`: lowercase letters, digits and -. Example: fix-issue.",
 				);
 			}
 			const project = await projectOf(args);

@@ -16,7 +16,7 @@ import {
 } from "../nodes";
 
 /**
- * The flow file format: `.nightshift/flows/<name>.json` in the user's clone.
+ * The flow format: what Night Shift keeps for each flow of a project.
  * The schema checks shape only. `validateFlow` checks meaning (unbounded
  * loops, unknown names, template references, calls between flows).
  *

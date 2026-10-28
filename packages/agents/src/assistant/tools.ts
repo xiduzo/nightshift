@@ -312,7 +312,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.listProfiles,
 			description:
-				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model. The project's own profiles are in .nightshift/profiles.json.",
+				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model.",
 			inputSchema: noInput,
 		}).server(async () => {
 			const profiles = await port.profiles();

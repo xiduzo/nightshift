@@ -24,26 +24,26 @@ export const flows = {
 	list: protectedProcedure
 		.route({
 			summary:
-				"Lists the flow files of a project, with their node and error counts.",
+				"Lists the flows of a project, with their node and error counts.",
 		})
 		.output(output(z.array(flowListItemSchema)))
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) => context.space.listFlows(input.projectId)),
 	get: protectedProcedure
-		.route({ summary: "Reads one flow file of a project, with its problems." })
+		.route({ summary: "Reads one flow of a project, with its problems." })
 		.output(output(loadedFlowSchema))
 		.input(flowRef)
 		.handler(({ context, input }) =>
 			context.space.getFlow(input.projectId, input.name),
 		),
 	/**
-	 * Every flow file of a project by name, in one read: what the editor
+	 * Every flow of a project by name, in one read: what the editor
 	 * checks Subflow nodes against.
 	 */
 	map: protectedProcedure
 		.route({
 			summary:
-				"Reads every flow file of a project by name: its flow, or null when it is not valid.",
+				"Reads every flow of a project by name: its flow, or null when it is not valid.",
 		})
 		.output(output(z.record(z.string(), flowSchema.nullable())))
 		.input(z.object({ projectId: z.string() }))
