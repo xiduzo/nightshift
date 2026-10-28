@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { defaultPlacement, placementChoices } from "./placements";
+import {
+	defaultPlacement,
+	hostOwnerHint,
+	placementChoices,
+} from "./placements";
 
 const host = { deviceId: "host", name: "Studio", thisDevice: true };
 const laptop = { deviceId: "laptop", name: "Laptop", thisDevice: false };
@@ -79,5 +83,30 @@ describe("where a run can go", () => {
 			laptop,
 		]);
 		expect(defaultPlacement(offering, null)?.deviceId).toBe("host");
+	});
+});
+
+describe("the words for a Host that another person runs", () => {
+	test("name the Host admin and what they offer to this Space", () => {
+		expect(
+			hostOwnerHint({ thisDevice: true, offers: [], ownerName: "Ada" }),
+		).toBe("This Host belongs to Ada. Ada has not offered it to this Space.");
+		expect(
+			hostOwnerHint({
+				thisDevice: true,
+				offers: ["builder", "coder"],
+				ownerName: "Ada",
+			}),
+		).toBe(
+			"This Host belongs to Ada. Ada offers builder, coder to this Space.",
+		);
+	});
+
+	test("say another person without a name, and nothing for your own places", () => {
+		expect(hostOwnerHint({ thisDevice: true, offers: ["coder"] })).toBe(
+			"This Host belongs to another person. It offers coder to this Space.",
+		);
+		expect(hostOwnerHint({ thisDevice: true })).toBeNull();
+		expect(hostOwnerHint({ thisDevice: false, offers: ["coder"] })).toBeNull();
 	});
 });

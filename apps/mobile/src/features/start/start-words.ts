@@ -1,4 +1,8 @@
-import type { FlowListItem, PlacementChoice } from "@nightshift/client";
+import {
+	type FlowListItem,
+	hostOwnerHint,
+	type PlacementChoice,
+} from "@nightshift/client";
 import type { FlowInputDef } from "@nightshift/flows";
 
 /** What New run says, without React Native: the flow rows, the computers and why Start run waits. */
@@ -56,17 +60,8 @@ export function placementHint(
 	if (!choice.online) {
 		return "Offline. Open Night Shift on that computer to run flows on it.";
 	}
-	if (choice.thisDevice && choice.offers !== undefined) {
-		const owner = choice.ownerName;
-		if (!owner) {
-			return choice.offers.length === 0
-				? "This Host belongs to another person. It offers no profiles to this Space."
-				: `This Host belongs to another person. It offers ${choice.offers.join(", ")} to this Space.`;
-		}
-		return choice.offers.length === 0
-			? `This Host belongs to ${owner}. ${owner} has not offered it to this Space.`
-			: `This Host belongs to ${owner}. ${owner} offers ${choice.offers.join(", ")} to this Space.`;
-	}
+	const host = hostOwnerHint(choice);
+	if (host) return host;
 	if (choice.offers !== undefined) {
 		return choice.offers.length === 0
 			? "Another person offers this computer to the Space, with no profiles."

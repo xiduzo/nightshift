@@ -56,6 +56,7 @@ import {
 	jsonProblem,
 	missingInputs,
 } from "./flow-input-fields";
+import { placementDescription } from "./placement-words";
 
 const STORAGE_KEY = "nightshift:stop-time";
 const DEFAULT_TIME = "07:00";
@@ -337,11 +338,7 @@ function StartRunForm({
 							id={`${id}-device-hint`}
 							className={noDevice ? "text-destructive" : undefined}
 						>
-							{noDevice
-								? "None of your devices with this project is online. Start the run when one is."
-								: device?.offers !== undefined
-									? "Another person's device. The run can use only the profiles it offers to this Space."
-									: "Where the steps run: your devices that are online and have this project, and devices other people offer to this Space."}
+							{placementDescription(device, noDevice)}
 						</FieldDescription>
 					</Field>
 				) : null}

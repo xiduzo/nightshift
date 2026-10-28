@@ -189,7 +189,9 @@ flowchart LR
   keeps. Without an Offer, a run that needs the Host is refused: "The
   Host <name> belongs to <admin>. Ask them to offer its profiles to your
   Personal, or pick one of your own devices." Night Shift never offers it
-  on its own.
+  on its own. The start of a run on the phone and in the web app names
+  the Host admin under the Device field: "This Host belongs to Ada. Ada
+  has not offered it to this Space." (`hostOwnerHint` in the client).
 - A Device's configuration (profiles, tools, connections, secret names,
   binary paths) lives in its **Device document**, which syncs only through
   its **home Host** and only to Devices of the same owner. A guest Host

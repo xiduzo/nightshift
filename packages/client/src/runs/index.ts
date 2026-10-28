@@ -14,6 +14,7 @@ export {
 } from "./format";
 export {
 	defaultPlacement,
+	hostOwnerHint,
 	type PlacementChoice,
 	placementChoices,
 } from "./placements";

@@ -149,6 +149,7 @@ export {
 	formatCost,
 	formatKnownCost,
 	hasEnded,
+	hostOwnerHint,
 	type ItemState,
 	type ItemSummary,
 	type KnownCost,
