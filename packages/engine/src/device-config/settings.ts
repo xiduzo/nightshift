@@ -285,6 +285,16 @@ const DEFS = {
 		env: "NIGHTSHIFT_HOST_ADDRESSES",
 		fromEnv: list,
 	} satisfies Def<string[]>,
+	/**
+	 * How long a session this computer runs for a run that another Device
+	 * walks goes on while its replies cannot reach the Host. Then it
+	 * stops: nothing runs here for a Walker that is gone. The runs this
+	 * computer walks itself go on offline: the exchange sends them later.
+	 */
+	offlineWorkMinutes: {
+		schema: positiveMinutes,
+		default: 10,
+	} satisfies Def<number>,
 	/** A Device key that goes this many days without use expires. */
 	deviceKeyIdleDays: {
 		schema: z.number().int().min(1).max(365),

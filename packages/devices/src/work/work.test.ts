@@ -385,3 +385,137 @@ describe("the work hub", () => {
 		expect(hub.online("b", "")).toBe(false);
 	});
 });
+
+describe("a Device that cannot reach its Host", () => {
+	/**
+	 * A link to a Host that hands one call to this computer and takes its
+	 * replies while `online` says so. Its waits move the fake clock.
+	 */
+	function offlineHost(online: () => boolean) {
+		const sent: WorkReply[] = [];
+		const client = partialHostClient({
+			devices: {
+				work: async () =>
+					(async function* () {
+						yield { kind: "call" as const, id: "call-1", request: request() };
+						await new Promise(() => {});
+					})() as never,
+				workReply: async (input) => {
+					sent.push(...input.replies);
+					return { known: true };
+				},
+			},
+		});
+		const link: Parameters<ReturnType<typeof createWorkServer>["attach"]>[0] = {
+			stream: (_name, open) => {
+				const controller = new AbortController();
+				void open(client, controller.signal).catch(() => {});
+				return () => controller.abort();
+			},
+			ready: async () => {
+				if (!online()) throw new TypeError("fetch failed");
+				return client;
+			},
+		};
+		return { link, sent };
+	}
+
+	/** A session that runs until its call is aborted, and says so. */
+	function sessionUntilAborted() {
+		const signals: AbortSignal[] = [];
+		return {
+			signals,
+			async *serve(
+				_request: WorkRequest,
+				signal: AbortSignal,
+			): AsyncIterable<WorkReply> {
+				signals.push(signal);
+				yield { kind: "item", item: { type: "ready", harness: "claude-code" } };
+				await new Promise<void>((resolve) =>
+					signal.addEventListener("abort", () => resolve(), { once: true }),
+				);
+			},
+		};
+	}
+
+	test("its sessions for a Walker elsewhere stop when the replies cannot reach the Host for longer than the setting", async () => {
+		let clock = 0;
+		const minutes = 10;
+		const read: number[] = [];
+		const session = sessionUntilAborted();
+		const host = offlineHost(() => false);
+		const server = createWorkServer({
+			serve: session.serve,
+			replyDeadlineMs: () => {
+				read.push(minutes);
+				return minutes * 60_000;
+			},
+			now: () => clock,
+			pause: async (ms) => {
+				clock += ms;
+				await Bun.sleep(0);
+			},
+		});
+
+		const detach = server.attach(host.link);
+		await waitUntil(() => session.signals.length === 1);
+		await waitUntil(() => session.signals[0]?.aborted === true);
+
+		expect(clock).toBeGreaterThanOrEqual(10 * 60_000);
+		expect(read.length).toBeGreaterThan(0);
+		expect(host.sent).toEqual([]);
+		await waitUntil(() => server.running() === 0);
+		detach();
+	});
+
+	test("a shorter time away does not stop them: the replies go when the Host is back", async () => {
+		let clock = 0;
+		const session = sessionUntilAborted();
+		const host = offlineHost(() => clock >= 9 * 60_000);
+		const server = createWorkServer({
+			serve: session.serve,
+			replyDeadlineMs: () => 10 * 60_000,
+			now: () => clock,
+			pause: async (ms) => {
+				clock += ms;
+				await Bun.sleep(0);
+			},
+		});
+
+		const detach = server.attach(host.link);
+		await waitUntil(() => host.sent.length === 1);
+
+		expect(session.signals[0]?.aborted).toBe(false);
+		expect(host.sent[0]).toEqual({
+			kind: "item",
+			item: { type: "ready", harness: "claude-code" },
+		});
+		expect(server.running()).toBe(1);
+		detach();
+	});
+
+	test("the setting is read when the replies fail: a shorter limit stops them sooner", async () => {
+		let clock = 0;
+		let minutes = 10;
+		const session = sessionUntilAborted();
+		const host = offlineHost(() => false);
+		const server = createWorkServer({
+			serve: session.serve,
+			replyDeadlineMs: () => minutes * 60_000,
+			now: () => clock,
+			pause: async (ms) => {
+				clock += ms;
+				// The person sets 2 minutes while this computer is away.
+				if (clock >= 60_000) minutes = 2;
+				await Bun.sleep(0);
+			},
+		});
+
+		const detach = server.attach(host.link);
+		await waitUntil(() => session.signals[0]?.aborted === true);
+
+		expect(clock).toBeGreaterThanOrEqual(2 * 60_000);
+		expect(clock).toBeLessThan(10 * 60_000);
+		detach();
+	});
+});

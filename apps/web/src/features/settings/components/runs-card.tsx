@@ -20,7 +20,11 @@ import { PageSection } from "@/shared/page";
 import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import { CardForm, FormFooter, SaveError, TextSetting } from "./setting-fields";
 
-const RUN_KEYS = ["maxConcurrentRuns", "maxStepsPerRun"] as const;
+const RUN_KEYS = [
+	"maxConcurrentRuns",
+	"maxStepsPerRun",
+	"offlineWorkMinutes",
+] as const;
 
 export function RunsCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, RUN_KEYS);
@@ -105,6 +109,15 @@ export function RunsCard({ data }: { data: SettingsView }) {
 									label="Max steps per run"
 									description="A safety net for a flow that loops: the run stops after this many steps. You can resume it."
 									inputMode="numeric"
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="offlineWorkMinutes"
+									label="Offline limit"
+									description="A step this computer runs for a run on another computer stops after this long without its Host."
+									unit="min"
+									inputMode="decimal"
 								/>
 							</div>
 							<SaveError error={form.saveError} />
