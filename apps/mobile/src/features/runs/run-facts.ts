@@ -96,7 +96,7 @@ export function runFacts(
 	const end = hasEnded(status) ? (run.endedAt ?? now) : now;
 	return [
 		{ label: "Flow", value: flowLabel(run) },
-		{ label: "Branch", value: run.branch, mono: true },
+		...(run.branch ? [{ label: "Branch", value: run.branch, mono: true }] : []),
 		{ label: "Computer", value: computerName(run.device) },
 		{
 			label: "Started",
