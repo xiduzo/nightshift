@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { event, keptVariable } from "@nightshift/db/schema";
+import { event, keptVariable, user } from "@nightshift/db/schema";
 import type { RunStatus } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -176,6 +176,30 @@ describe("the Host walks a run a Device starts", () => {
 			label: "the kept value on B",
 		});
 		expect(await keptOn(b)).toEqual([["runs", "1"]]);
+	});
+
+	test("B names the Person who started a run on the Host, from the Members of the Space", async () => {
+		// The Host's Person, as the Space document B keeps a copy of names them.
+		const mirror = await paired.documents.open(a.spaceId);
+		await mirror.change(() =>
+			mirror.members.set(paired.personId, { name: "Ada", role: "owner" }),
+		);
+		// B has no account of the Host's Person: only the Space's Members name them.
+		expect(
+			await b.db.select().from(user).where(eq(user.id, paired.personId)),
+		).toEqual([]);
+		const started = await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.startRun({ projectId, flowName: "count", deviceId: b.deviceId });
+		await untilStatus(paired.device, started.id, "finished");
+		const expected = { id: paired.personId, name: "Ada" };
+		expect(
+			(await paired.device.space(a.spaceId).getRun(started.id)).startedBy,
+		).toEqual(expected);
+		const listed = (await paired.device.space(a.spaceId).listRuns()).find(
+			(r) => r.id === started.id,
+		);
+		expect(listed?.startedBy).toEqual(expected);
 	});
 
 	test("a value kept here later than the step ended stays", async () => {

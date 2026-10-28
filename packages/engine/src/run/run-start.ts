@@ -233,6 +233,8 @@ export type RunStartDeps = {
 	plan: PlacementPort["plan"];
 	/** This computer's name: the Walker of the runs it starts. */
 	selfName: string;
+	/** The name of a Person as the Space document's Members name them. Default: none. */
+	memberName?(spaceId: string, personId: string): Promise<string | null>;
 };
 
 export type RunStart = ReturnType<typeof createRunStart>;
@@ -351,10 +353,15 @@ export function createRunStart(deps: RunStartDeps) {
 		});
 		if (!started) throw new Error("Could not create the run.");
 		const { row, walkerId, device } = started;
+		const { memberName } = deps;
 		return toSummary(
 			row,
 			runFacts(await log.events(runId)),
-			await namesOf(db, [row.startedBy]),
+			await namesOf(
+				db,
+				[row.startedBy],
+				memberName && ((personId) => memberName(row.spaceId, personId)),
+			),
 			{ id: walkerId, name: deps.selfName, thisDevice: true },
 			{
 				id: device.id,

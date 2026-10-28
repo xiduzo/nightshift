@@ -37,6 +37,7 @@ import {
 	createRunBranches,
 	createSpaceDocuments,
 	createWorktrees,
+	memberName,
 	systemGit,
 } from "../projects";
 import {
@@ -428,6 +429,9 @@ export function createEngine(
 		}
 	}
 
+	/** A Person's name as the Space document's Members name them: a Device knows the Host's Persons only there. */
+	const membersName = async (spaceId: string, personId: string) =>
+		memberName(await documents.open(spaceId), personId);
 	const reads = createReadModel({
 		db,
 		log: runLog,
@@ -440,6 +444,7 @@ export function createEngine(
 		walkers: peers.runs.walkers,
 		pendingCommands: peers.runs.pendingCommands,
 		stepEntries: peers.runs.stepEntries,
+		memberName: membersName,
 	});
 
 	const runStart = createRunStart({
@@ -450,6 +455,7 @@ export function createEngine(
 		projectRow: (projectId) => projects.find(projectId),
 		plan: placement.plan,
 		selfName: device.name,
+		memberName: membersName,
 	});
 
 	// The Device a schedule names fires it. Without one, the Replica that

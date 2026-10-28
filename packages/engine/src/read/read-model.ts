@@ -43,7 +43,7 @@ import {
 	lastHarnessSession,
 	sumCost,
 } from "./derive-steps";
-import { namesOf, runPerson } from "./people";
+import { type MemberName, namesOf, runPerson } from "./people";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
 import type {
 	ItemSummary,
@@ -545,6 +545,8 @@ export type ReadModelDeps = {
 	): Promise<Map<string, PendingCommand[]>>;
 	/** A step's transcript, wherever its run is walked (`RunsPort.stepEntries`). */
 	stepEntries: StepEntries;
+	/** The name of a Person as the Space document's Members name them. Default: none. */
+	memberName?(spaceId: string, personId: string): Promise<string | null>;
 };
 
 /** A Walker the Replica knows nothing of: a name is all it lacks. */
@@ -556,6 +558,10 @@ export type ReadModel = ReturnType<typeof createReadModel>;
 /** The reads that need the database, the run log or the bus. */
 export function createReadModel(deps: ReadModelDeps) {
 	const { db, log, bus, harnessOf } = deps;
+	const memberIn = (spaceId: string): MemberName | undefined => {
+		const { memberName } = deps;
+		return memberName && ((personId) => memberName(spaceId, personId));
+	};
 
 	/*
 	 * Every read of a run's derived state goes through the run log's
@@ -630,6 +636,7 @@ export function createReadModel(deps: ReadModelDeps) {
 		const names = await namesOf(
 			db,
 			rows.map((r) => r.startedBy),
+			memberIn(spaceId),
 		);
 		return rows.map((row) =>
 			toSummary(
@@ -714,7 +721,7 @@ export function createReadModel(deps: ReadModelDeps) {
 			events,
 			{ facts, steps },
 			harnessOf,
-			await namesOf(db, [row.startedBy]),
+			await namesOf(db, [row.startedBy], memberIn(row.spaceId)),
 			walker,
 			walker.thisDevice
 				? []
