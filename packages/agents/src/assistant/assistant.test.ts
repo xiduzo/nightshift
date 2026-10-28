@@ -275,6 +275,14 @@ describe("the suggestion prompts", () => {
 		expect(text).toContain("# Writing Night Shift flows");
 	});
 
+	test("leave out what only the canvas needs: one field needs no layout", () => {
+		// The guide's examples after the task have positions of their own.
+		const full = suggestionPrompt(request());
+		const prompt = full.slice(0, full.indexOf("# Your task"));
+		expect(prompt).not.toContain('"position"');
+		expect(prompt).not.toContain('"sections"');
+	});
+
 	test("the output kind names the fields later nodes read", () => {
 		const text = suggestionPrompt(request({ kind: "output" }));
 		expect(text).toContain("- `steps`: read by node `build`");

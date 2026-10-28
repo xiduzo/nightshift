@@ -134,6 +134,7 @@ const promptKind: KindPrompt = {
 			"- Use only the references listed above. Weave in the ones the instruction or the task implies, where the agent needs that value.",
 			"- Write to the agent: plain, imperative sentences. Say what to do, with what, and what done looks like.",
 			"- Do not invent file names, commands or tools: read the project when you need them.",
+			"- Keep the language of the current prompt. A new prompt takes the language of the instruction.",
 		];
 		if (node.type === "agent" && node.output) {
 			lines.push(
@@ -494,10 +495,21 @@ const descriptionKind: KindPrompt<{ flow: Flow }> = {
 		"- One or two plain sentences, at most 30 words. Lead with what it does.",
 		"- Say what starts it or what it needs, and what you get at the end.",
 		"- No node ids, no file names, no internals.",
+		"- Write in the language of the current description, or of the prompts.",
 		"",
 		"The flow in short:",
 		draftSummary(flow),
 		"",
+		...((flow.sections ?? []).length > 0
+			? [
+					"Its phases, as the editor groups the steps:",
+					...(flow.sections ?? []).map(
+						(section) =>
+							`- ${section.label}${section.description ? `: ${section.description}` : ""}`,
+					),
+					"",
+				]
+			: []),
 		"Its steps:",
 		...flow.nodes.map(nodeLine),
 	],
@@ -601,7 +613,7 @@ export function suggestionPrompt(
 		`# The flow "${request.flowName}" (the person's draft)`,
 		"",
 		"```json",
-		flowJson(flow),
+		flowJson(flow, { canvas: false }),
 		"```",
 		"",
 		...(node
@@ -609,7 +621,7 @@ export function suggestionPrompt(
 					`# The node \`${node.id}\` (${node.type})`,
 					"",
 					"```json",
-					flowJson(node),
+					flowJson(node, { canvas: false }),
 					"```",
 					"",
 					"# What a template in this node can read",
@@ -628,7 +640,7 @@ export function suggestionPrompt(
 			? `None. Make the suggestion that fits this ${node ? "node" : "flow"} best.`
 			: instruction,
 		"",
-		"Put a note for the person in `summary`: one or two plain sentences on what you suggest and why. Do not name tools or files of Night Shift itself.",
+		'Put a note for the person in `summary`: one or two plain sentences on what you suggest and why, in the language of their instruction. Address them as "you". Do not name tools or files of Night Shift itself.',
 		"",
 		"---",
 		"",

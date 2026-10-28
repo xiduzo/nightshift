@@ -443,13 +443,23 @@ An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, â
 
 ## Sections
 
-\`{ id, label, color?, description?, nodes, sections? }\`: a box around nodes, for the editor only. \`sections\` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. All its nodes, also those of the Sections inside, should form one connected part that the flow enters at one node. Colours: ${code(sectionColors)}. Outcome colours: ${code(outcomeColors)}.
+\`{ id, label, color?, description?, nodes, sections? }\`: a box around nodes, for the editor only. The canvas shows a Section as one box, and the person opens it to see its nodes. \`sections\` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. Colours: ${code(sectionColors)}. Outcome colours: ${code(outcomeColors)}.
+
+Group a flow of more than about six nodes into Sections, one per phase of the work a person knows: "Pick the work", "Fix and check", "Review", "Ship". Put a node you add in the Section of its phase.
+
+- All nodes of a Section, also those of the Sections inside, form one connected part. Every edge from outside goes to one node: its entry. A loop and its way back stay in one Section.
+- A node that several Sections lead to, such as a shared End, stays outside them. Or give each Section its own End.
+- Three to eight nodes per Section. Put Sections inside a Section only when it would hold more.
+- \`label\`: two or three words. \`description\`: one sentence on what the phase does. Give Sections next to each other different colours.
+- The box sits around its nodes' positions. Keep the nodes of a Section together, left to right, and the Sections one after the other, so the boxes do not overlap.
+- \`check_flow\` warns when a Section breaks these rules: fix each warning.
 
 ## Checklist
 
 - \`version\` is ${FLOW_VERSION}, \`start\` names a node, every edge connects known nodes on an outcome its source can end with.
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with \`max\`.
+- A flow of more than about six nodes has Sections, one per phase, without warnings.
 - Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
 
 ## Example: build, test, fix, ask

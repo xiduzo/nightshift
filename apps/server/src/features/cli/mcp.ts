@@ -34,7 +34,7 @@ const NOT_RUNNING =
 	"Night Shift is not running on this computer. Start it, then try again.";
 
 const INSTRUCTIONS =
-	"Night Shift's flow tools. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. The tools work in the project of the folder you work in, or the one you name in `project` (list_projects).";
+	"Night Shift's flow tools. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. To change a flow, start from get_flow and keep the positions and Sections of what you do not change. Group a flow of more than about six nodes into Sections, one per phase. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. The tools work in the project of the folder you work in, or the one you name in `project` (list_projects).";
 
 export type McpOptions = {
 	daemon: string;

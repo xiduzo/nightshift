@@ -13,9 +13,10 @@ Night Shift keeps flows, schedules and profiles as its own data, not as files in
 
 1. **Read before you write.** Read the flows the project has with `list_flows` and `get_flow` of the `nightshift` MCP server. Reuse a flow with a Subflow (`call`) node instead of copying its steps.
 2. **Look names up, do not invent them.** A node may name an Agent Profile, a connection, a CLI tool, a skill or another flow. Use only ones that exist: `list_profiles`, `list_tools` and `list_skills` of the `nightshift` MCP server, or ask the person.
-3. **Draw the whole flow.** Write the complete JSON document, not a patch. Keep the ids of nodes and edges you do not change, so the person sees a small diff.
-4. **Check it.** Send it to `check_flow` and fix every error. A warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below, then save it with `nightshift flows save`: it prints the flow's problems.
-5. **Hand it over.** In the flow editor, `propose_flow` shows it to the person, who applies or discards it. In a terminal, `save_flow` saves it. A save is an edit of the flow, like a save in the editor. Never save over a flow the person did not ask you to change.
+3. **Draw the whole flow.** Write the complete JSON document, not a patch: it replaces the flow. Keep the ids, positions and Sections of what you do not change, so the person sees a small diff. Place a new node next to the nodes it connects to.
+4. **Keep it tidy in Sections.** Group a flow of more than about six nodes into Sections, one per phase of the work, and put a new node in the Section of its phase. See Sections below.
+5. **Check it.** Send it to `check_flow` and fix every error, and every warning about a Section. Another warning can stay when it is on purpose (an outcome that ends the run). Without the MCP server, follow the checklist below, then save it with `nightshift flows save`: it prints the flow's problems.
+6. **Hand it over.** In the flow editor, `propose_flow` shows it to the person, who applies or discards it. In a terminal, `save_flow` saves it. A save is an edit of the flow, like a save in the editor. Never save over a flow the person did not ask you to change.
 
 Ask the person when the goal is not clear: what starts the flow, what it must make, and where a person must approve.
 
@@ -190,13 +191,23 @@ An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is
 
 ## Sections
 
-`{ id, label, color?, description?, nodes, sections? }`: a box around nodes, for the editor only. `sections` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. All its nodes, also those of the Sections inside, should form one connected part that the flow enters at one node. Colours: `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `violet`, `pink`. Outcome colours: `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `pink`, `gray`.
+`{ id, label, color?, description?, nodes, sections? }`: a box around nodes, for the editor only. The canvas shows a Section as one box, and the person opens it to see its nodes. `sections` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. Colours: `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `violet`, `pink`. Outcome colours: `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `pink`, `gray`.
+
+Group a flow of more than about six nodes into Sections, one per phase of the work a person knows: "Pick the work", "Fix and check", "Review", "Ship". Put a node you add in the Section of its phase.
+
+- All nodes of a Section, also those of the Sections inside, form one connected part. Every edge from outside goes to one node: its entry. A loop and its way back stay in one Section.
+- A node that several Sections lead to, such as a shared End, stays outside them. Or give each Section its own End.
+- Three to eight nodes per Section. Put Sections inside a Section only when it would hold more.
+- `label`: two or three words. `description`: one sentence on what the phase does. Give Sections next to each other different colours.
+- The box sits around its nodes' positions. Keep the nodes of a Section together, left to right, and the Sections one after the other, so the boxes do not overlap.
+- `check_flow` warns when a Section breaks these rules: fix each warning.
 
 ## Checklist
 
 - `version` is 7, `start` names a node, every edge connects known nodes on an outcome its source can end with.
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with `max`.
+- A flow of more than about six nodes has Sections, one per phase, without warnings.
 - Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
 
 ## Example: build, test, fix, ask

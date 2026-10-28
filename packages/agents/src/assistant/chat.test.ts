@@ -154,6 +154,25 @@ describe("authoringTools", () => {
 		]);
 	});
 
+	test("get_draft and get_flow keep the positions and Sections, so a proposal keeps them", async () => {
+		const tidy: Flow = flowSchema.parse({
+			...withTests,
+			sections: [{ id: "work", label: "Work", nodes: ["build", "test"] }],
+		});
+		const tools = authoringTools(
+			port({
+				draft: async () => ({ name: "fix", flow: tidy }),
+				flows: async () => ({ fix: tidy }),
+			}),
+		);
+		const fromDraft = await call(tools, "get_draft");
+		const shown = JSON.parse(fromDraft.slice(fromDraft.indexOf("{")));
+		expect(shown.sections).toEqual(tidy.sections);
+		expect(shown.nodes[1].position).toEqual({ x: 300, y: 0 });
+		const fromFlow = JSON.parse(await call(tools, "get_flow", { name: "fix" }));
+		expect(fromFlow.sections).toEqual(tidy.sections);
+	});
+
 	test("check_flow: the issues of a flow, checked against this computer", async () => {
 		const tools = authoringTools(port());
 		expect(await call(tools, "check_flow", { flow: withTests })).not.toContain(

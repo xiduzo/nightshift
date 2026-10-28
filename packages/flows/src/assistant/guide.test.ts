@@ -96,8 +96,10 @@ describe("flowAuthoringGuide", () => {
 		// 2900: the node review added End, Join and profiles (Model Profiles,
 		// the project's own), each with a few lines an author needs, and the
 		// list of kits, one line per kit (about 200 words). 2950: a profile
-		// is a pair of ids (ADR 3), two more words per example node.
-		expect(words).toBeLessThan(2950);
+		// is a pair of ids (ADR 3), two more words per example node. 3150:
+		// how to group a flow into Sections (about 190 words), so the
+		// assistant tidies the flows it builds.
+		expect(words).toBeLessThan(3150);
 	});
 });
 

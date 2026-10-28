@@ -285,7 +285,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.getDraft,
 			description:
-				"The flow the person edits now, as JSON: their draft, saved or not. Base every change on it.",
+				"The flow the person edits now, as JSON: their draft, saved or not, with the nodes' positions and the Sections. Base every change on it.",
 			inputSchema: noInput,
 		}).server(async () => {
 			const draft = await port.draft();
@@ -358,7 +358,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.checkFlow,
 			description:
-				"Check a whole flow as the editor does. Returns its errors and warnings. Fix every error before you propose it.",
+				"Check a whole flow as the editor does. Returns its errors and warnings. Fix every error before you propose it, and every warning about a Section.",
 			inputSchema: flowInput,
 		}).server(async (args: unknown) => {
 			const { issues } = await check(port, field(args, "flow"));
@@ -367,7 +367,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.proposeFlow,
 			description:
-				"Show a new version of the whole flow to the person, who applies or discards it. Keep the ids of what you do not change. A flow with errors is refused: fix them and propose again.",
+				"Show a new version of the whole flow to the person, who applies or discards it. Keep the ids, positions and Sections of what you do not change: the proposal replaces the draft. A flow with errors is refused: fix them and propose again.",
 			inputSchema: {
 				type: "object",
 				properties: {

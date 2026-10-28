@@ -222,7 +222,7 @@ export function terminalTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.getFlow,
 			description:
-				"One flow of the project as Night Shift keeps it, as JSON, by its name.",
+				"One flow of the project as Night Shift keeps it, as JSON, by its name: with the nodes' positions and the Sections. To change a flow, start from this and keep what you do not change.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -279,7 +279,7 @@ export function terminalTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.checkFlow,
 			description:
-				"Check a whole flow as the editor does. Returns its errors and warnings. Fix every error before you save it.",
+				"Check a whole flow as the editor does. Returns its errors and warnings. Fix every error before you save it, and every warning about a Section.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -307,7 +307,7 @@ export function terminalTools(
 		toolDefinition({
 			name: TERMINAL_TOOLS.saveFlow,
 			description:
-				"Check a whole flow and save it as the project's flow `name`: a new flow, or a new revision of the flow of that name. A flow with errors is refused: fix them and save again. Save over a flow only when the person asked you to change it.",
+				"Check a whole flow and save it as the project's flow `name`: a new flow, or a new revision of the flow of that name. The save replaces the whole flow: keep the positions and Sections of what you do not change. A flow with errors is refused: fix them and save again. Save over a flow only when the person asked you to change it.",
 			inputSchema: {
 				type: "object",
 				properties: {

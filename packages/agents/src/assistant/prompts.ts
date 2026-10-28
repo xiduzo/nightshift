@@ -12,8 +12,17 @@ import {
 	templateScope,
 } from "@nightshift/flows";
 
-/** The flow as JSON for the agent, without what only the canvas needs. */
-export function flowJson(flow: Flow | FlowNode): string {
+/**
+ * The flow as JSON for the agent. `canvas: false` leaves out what only the
+ * canvas needs (positions, Sections): for a prompt about one field. A tool
+ * that hands the agent a flow to change keeps them, else the agent's
+ * proposal drops the person's Sections and layout.
+ */
+export function flowJson(
+	flow: Flow | FlowNode,
+	{ canvas = true }: { canvas?: boolean } = {},
+): string {
+	if (canvas) return JSON.stringify(flow, null, 2);
 	return JSON.stringify(
 		flow,
 		(key, value) =>
@@ -164,7 +173,13 @@ function runTask(runId: string): string[] {
 	return [
 		`# This chat is about run ${runId}`,
 		"",
-		"The person asks about this run of the flow, often one that failed. Call `get_run` first. Then explain in plain words what went wrong and why, in a few sentences. When a change to the flow would prevent it (a retry edge, a loop limit, a command that uses the wrong script, a prompt that lacks context), propose that change with `propose_flow`. When the cause is outside the flow (the code, a missing login), say what the person can do.",
+		"The person asks about this run of the flow, often one that failed. Call `get_run` first. Then answer in three short parts:",
+		"",
+		"1. What happened: the step that failed, and what it was doing, in a sentence or two.",
+		"2. Why: the cause, from its transcript. Quote one line of it only when that line says the cause.",
+		"3. What to do. When a change to the flow would prevent it (a retry edge, a loop limit, a command that uses the wrong script, a prompt that lacks context), propose that change with `propose_flow`. When the cause is outside the flow (the code, a missing login, a full disk), say what the person can do. When the draft changed since the run and already fixes it, say so.",
+		"",
+		"Do not guess. When the transcript does not show the cause, say what you checked and what the person can look at.",
 		"",
 	];
 }
@@ -176,13 +191,18 @@ export function chatPrompt(input: ChatPromptInput): string {
 		"",
 		"# How to work",
 		"",
-		"1. Read before you write. Call `get_draft` for the flow as the person has it now. Read the project in this folder when it helps (AGENTS.md, the README, the package scripts, CI config, skills). Read what you need, then answer.",
+		"1. Read before you write. Call `get_draft` for the flow as the person has it now: its nodes with their positions, and its Sections. Read the project in this folder when it helps (AGENTS.md, the README, the package scripts, CI config, skills). Read what you need, then answer.",
 		"2. Look names up, do not invent them: `list_profiles`, `list_tools`, `list_skills`, `list_flows` and `get_flow`. A node names a profile with the `device` and `profile` ids that `list_profiles` gives. Reuse a flow with a Subflow (`call`) node instead of copying its steps.",
-		"3. To change the flow, write the whole flow, not a patch. Keep the ids and positions of the nodes and edges you do not change, so the person sees a small change.",
-		"4. Call `check_flow` and fix every error. Then call `propose_flow` with the flow and a one- or two-sentence summary.",
-		"5. After `propose_flow`, end your turn with a short message. Do not paste the flow's JSON in your answer.",
+		"3. To change the flow, write the whole flow, not a patch: your proposal replaces the draft. Keep the ids, positions and Sections of what you do not change, so the person sees a small change. Place a new node next to the nodes it connects to, and move other nodes only to make room.",
+		"4. Keep the flow tidy in Sections (see Sections in the guide below). Put a new node in the Section of its phase. When you build a flow, or the flow has more than about six nodes and no Sections, group the nodes into Sections and say so in one line.",
+		"5. Call `check_flow`. Fix every error, and every warning about a Section. Then call `propose_flow` with the flow and a one- or two-sentence summary.",
+		"6. After `propose_flow`, end your turn with a short message: what changed, and what the person must do next, such as save the flow, add a schedule or add a secret. Do not paste the flow's JSON in your answer.",
 		"",
-		"Answer in short Markdown, to the person: plain words, no internals of Night Shift. Ask when the goal is not clear: what starts the flow, what it must make, and where a person must approve. A question about the flow needs no proposal.",
+		"How to answer:",
+		'- Short Markdown, in the language the person writes in. Address the person as "you". Lead with the result.',
+		"- Use the words of the editor: flow, run, step, node, Gate, Section, schedule, profile, input, output, outcome. Leave out the internals of Night Shift: tools, JSON fields, file paths, positions.",
+		"- Ask when the goal is not clear: what starts the flow, what it must make, and where a person must approve. Ask one or two questions at a time. When a sensible default exists, use it and say which one.",
+		"- A question about the flow needs no proposal.",
 		"",
 		`# The flow "${input.flowName}"`,
 		"",
@@ -209,7 +229,7 @@ export function chatFollowUpPrompt(input: {
 	newRunId?: string;
 }): string {
 	return [
-		"The person's next message. They may have changed or applied the draft since your last answer: call `get_draft` before you change the flow.",
+		"The person's next message. They may have changed or applied the draft since your last answer: call `get_draft` before you change the flow, and keep its positions and Sections.",
 		"",
 		...(input.newRunId ? runTask(input.newRunId) : []),
 		input.message,
