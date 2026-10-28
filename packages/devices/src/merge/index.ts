@@ -6,10 +6,11 @@
  * that Host: the split of a personal Space of its own (`space_split`).
  */
 
+export { leaveHomeHost } from "./leave";
 export { mergeOnJoin } from "./on-join";
 export {
 	createPersonalMerge,
 	type MergeMove,
 	type PersonalSpaceMerge,
 } from "./personal-merge";
-export { createPersonalSplit } from "./split";
+export { createPersonalSplit, type PersonalSpaceSplit } from "./split";

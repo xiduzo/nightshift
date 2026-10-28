@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { personalSpaceId, spacesOf } from "@nightshift/auth";
 import {
 	event,
+	hostLink as hostLinkTable,
 	hostSpace,
 	keptVariable,
 	organization,
@@ -27,6 +28,7 @@ import { createDeviceExchange } from "../exchange";
 import { createHostLinks, type Link } from "../links";
 import { httpsLink } from "../links/link";
 import { type PairedReplicas, pairedReplicas } from "../testing";
+import { LEAVE_WORDS, leaveHomeHost } from "./leave";
 import { createPersonalMerge } from "./personal-merge";
 import {
 	createPersonalSplit,
@@ -379,6 +381,19 @@ describe("leaving the home Host keeps a copy", () => {
 		);
 	});
 
+	test("two asks at once split once, and both see the same Space", async () => {
+		await mergedIntoA();
+		await revoke();
+		const split = splitter();
+
+		const [first, second] = await Promise.all([split.run(), split.run()]);
+
+		expect(first?.state).toBe("done");
+		expect(second).toBeNull();
+		expect(await split.of(a.spaceId)).toEqual(first);
+		expect(await b.db.select().from(spaceSplit)).toHaveLength(1);
+	});
+
 	test("nothing splits while B still has access to A", async () => {
 		await mergedIntoA();
 
@@ -550,5 +565,130 @@ describe("leaving the home Host keeps a copy", () => {
 			stop.abort();
 		}
 		expect(await personalSpaceId(b.db, localPerson)).not.toBe(a.spaceId);
+	});
+});
+
+describe("nightshift leave", () => {
+	/** B leaves A over `link`, with its own split. */
+	async function leave(link: Link | undefined) {
+		const hostLinks = createHostLinks(b.db);
+		const deleted: string[] = [];
+		const kept: unknown[][] = [];
+		const stopped: string[] = [];
+		const result = await leaveHomeHost({
+			hostLinks,
+			links: {
+				get: () => link,
+				add: async (left) => {
+					if (left.revokedAt !== null) stopped.push(left.hostId);
+				},
+			},
+			keys: {
+				delete: async (hostId) => {
+					deleted.push(hostId);
+				},
+			},
+			copies: {
+				keep: async (devices) => {
+					kept.push([...devices]);
+					return [];
+				},
+			},
+			split: splitter(),
+		});
+		return { result, deleted, kept, stopped };
+	}
+
+	const accessOnA = async () =>
+		(await paired.host.devices.get(b.deviceId))?.revokedAt ?? null;
+
+	test("A removes B's access, and B keeps a copy of its Personal", async () => {
+		const { runId } = await mergedIntoA();
+		const { link } = linkToA({ push: false });
+		await ready(link);
+
+		const { result, deleted, kept, stopped } = await leave(link);
+
+		expect(result).toMatchObject({
+			host: { id: paired.hostId, name: "A" },
+			told: true,
+			split: { state: "done", projects: 1, runs: 1 },
+			waiting: null,
+		});
+		expect(await accessOnA()).not.toBeNull();
+		const [row] = await b.db
+			.select()
+			.from(hostLinkTable)
+			.where(eq(hostLinkTable.hostId, paired.hostId));
+		expect(row?.revokedAt).not.toBeNull();
+		expect(deleted).toEqual([paired.hostId]);
+		expect(stopped).toEqual([paired.hostId]);
+		expect(kept).toEqual([[]]);
+		expect(await runOf(b, runId)).toMatchObject({
+			spaceId: result.split?.spaceId,
+			startedBy: localPerson,
+		});
+	});
+
+	test("a Host that does not answer does not hold B back", async () => {
+		await mergedIntoA();
+		const { link } = linkToA({ push: false, down: () => true });
+
+		const { result } = await leave(link);
+
+		expect(result).toMatchObject({ told: false, split: { state: "done" } });
+		expect(await accessOnA()).toBeNull();
+	});
+
+	test("an older Host without leave: B leaves on its own", async () => {
+		await mergedIntoA();
+		const { link } = linkToA({ push: false });
+		await ready(link);
+		const older: Link = {
+			...link,
+			call: () =>
+				Promise.reject(new ORPCError("NOT_FOUND", { message: "Not found" })),
+		};
+
+		const { result } = await leave(older);
+
+		expect(result.told).toBe(false);
+		expect(result.split?.state).toBe("done");
+	});
+
+	test("a Personal that never merged stays as it is", async () => {
+		const { link } = linkToA({ push: false });
+		await ready(link);
+
+		const { result } = await leave(link);
+
+		expect(result).toMatchObject({ told: true, split: null, waiting: null });
+		expect(await personalSpaceId(b.db, localPerson)).toBe(b.spaceId);
+	});
+
+	test("a run B walks that is not done refuses the leave before anything changes", async () => {
+		const { projectId } = await mergedIntoA();
+		const space = paired.device.space(a.spaceId);
+		const waiting = await space.startRun({ projectId, flow: gateFlow });
+		await waitFor(
+			async () => (await space.getRun(waiting.id)).status === "waiting",
+			{ label: "B's run waits", timeoutMs: 10_000 },
+		);
+		const { link } = linkToA({ push: false });
+		await ready(link);
+
+		await expect(leave(link)).rejects.toThrow(SPLIT_WORDS.notDone(1));
+		expect(await accessOnA()).toBeNull();
+		const [row] = await b.db
+			.select()
+			.from(hostLinkTable)
+			.where(eq(hostLinkTable.hostId, paired.hostId));
+		expect(row?.revokedAt).toBeNull();
+	});
+
+	test("without a home Host, there is nothing to leave", async () => {
+		await revoke();
+
+		await expect(leave(undefined)).rejects.toThrow(LEAVE_WORDS.noHome);
 	});
 });

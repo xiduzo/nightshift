@@ -20,6 +20,7 @@ describe("the Host's contract", () => {
 			"link.heartbeat",
 			"link.phones",
 			"link.removePhone",
+			"link.leave",
 			"pairing.start",
 			"pairing.redeem",
 			"sync.pull",

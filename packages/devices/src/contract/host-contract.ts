@@ -184,6 +184,17 @@ export const hostContract = {
 			.errors({ NOT_FOUND: { status: 404 } })
 			.input(z.object({ id: z.string().min(1) }))
 			.output(described(z.void())),
+		/**
+		 * The Device leaves this Host (`nightshift leave`): its access here
+		 * ends, as when its owner removes it. An older Host has none: the
+		 * Device leaves on its own, and the Host still lists it.
+		 */
+		leave: sync
+			.route({
+				summary:
+					"Removes a paired Device's own access here: it leaves this Host.",
+			})
+			.output(described(z.void())),
 	},
 	/**
 	 * Pairing, as a joining Device calls it before it has a key. No key:

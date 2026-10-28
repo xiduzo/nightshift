@@ -40,7 +40,7 @@ export type HostPeerContext = {
 	/** This computer as the Host of run history. */
 	exchange: HostExchange;
 	/** This computer as a Host: pairing, and the answer to a link. */
-	devices: Pick<Devices, "startPairing" | "redeemPairing" | "hello">;
+	devices: Pick<Devices, "startPairing" | "redeemPairing" | "hello" | "revoke">;
 	phones: HostPhones;
 };
 
@@ -85,6 +85,9 @@ export const hostRouter = os.router({
 		),
 		removePhone: keyed.link.removePhone.handler(({ context, input }) =>
 			context.phones.remove(context.key.personId, input.id),
+		),
+		leave: keyed.link.leave.handler(({ context }) =>
+			context.devices.revoke(context.key.personId, context.key.deviceId),
 		),
 	},
 	pairing: {

@@ -41,3 +41,6 @@ export const mergeQueries = {
 		orpc.devices.merge.preview.queryOptions({ input: { join: [...join] } }),
 	run: () => orpc.devices.merge.run.mutationOptions(),
 };
+
+/** Leaving the home Host: this computer keeps a Personal of its own. Web only. */
+export const leaveMutation = () => orpc.devices.leave.mutationOptions();

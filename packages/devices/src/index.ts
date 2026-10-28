@@ -18,6 +18,7 @@ export {
 	type HostHello,
 	type HostProcedureMeta,
 	hostContract,
+	type LeaveResult,
 	type ListedSpace,
 	type MergePending,
 	type MergePreview,

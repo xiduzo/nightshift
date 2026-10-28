@@ -53,6 +53,7 @@ import { LargerTextarea } from "@/shared/larger-window";
 import { PageSection } from "@/shared/page";
 import { deviceIcon } from "./device-icon";
 import { JoinHostDialog } from "./join-host-dialog";
+import { LeaveHostButton } from "./leave-host";
 import { OpenSpaceButton } from "./open-space";
 import { deviceQueries } from "./queries";
 import { HostStatus } from "./status-badges";
@@ -379,6 +380,11 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 												: "Keeps no Space of yours yet."}
 									</ItemDescription>
 								</ItemContent>
+								{host.role === "home" && host.status !== "revoked" ? (
+									<ItemActions>
+										<LeaveHostButton hostName={host.name} />
+									</ItemActions>
+								) : null}
 								{host.status !== "revoked" && host.spaces.length > 0 ? (
 									<ItemFooter>
 										<ItemGroup className="w-full gap-1">

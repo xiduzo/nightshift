@@ -1,6 +1,7 @@
 import {
 	type DevicesOverview,
 	type JoinProgress,
+	type LeaveResult,
 	type MergePending,
 	type MergePreview,
 	type MergeResult,
@@ -183,6 +184,24 @@ export const mergeResultSchema = exact<MergeResult>()(
 		projects: z.number(),
 		runs: z.number(),
 		backup: z.string(),
+	}),
+);
+
+/** How `nightshift leave` went: the Host, and the split of Personal off its Personal. */
+export const leaveResultSchema = exact<LeaveResult>()(
+	z.object({
+		host: z.object({ id: z.string(), name: z.string() }),
+		told: z.boolean(),
+		split: z
+			.object({
+				state: z.enum(["planned", "moved", "done"]),
+				spaceId: z.string(),
+				projects: z.number(),
+				runs: z.number(),
+				backup: z.string(),
+			})
+			.nullable(),
+		waiting: z.string().nullable(),
 	}),
 );
 

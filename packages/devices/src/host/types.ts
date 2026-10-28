@@ -2,6 +2,7 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { DeviceCopy, KeyStoreKind } from "@nightshift/engine";
 import type {
 	HostHello,
+	LeaveResult,
 	MergePending,
 	MergePreview,
 	MergeResult,
@@ -132,6 +133,14 @@ export type Devices = {
 	 * with a merge that stopped. A copy of the database comes first.
 	 */
 	merge(input: { join?: readonly string[] }): Promise<MergeResult>;
+	/**
+	 * Leaves the home Host (`nightshift leave`): the Host removes this
+	 * computer's access, and Personal splits off the Host's with what this
+	 * computer worked on. The Host keeps everything. Refuses without a
+	 * home Host, and while a run this computer walks in Personal is not
+	 * done.
+	 */
+	leave(): Promise<LeaveResult>;
 	/**
 	 * Pairs this computer with a Host, step by step (`nightshift join`).
 	 * After a home Host, Personal merges into the Host's.

@@ -61,7 +61,6 @@ import { type SplitRow, splitRows } from "./split-rows";
 export type PersonalSpaceSplit = ReturnType<typeof createPersonalSplit>;
 
 export const SPLIT_WORDS = {
-	busy: "Night Shift splits your Personal off already. Wait until it is done.",
 	notDone: (count: number) =>
 		count === 1
 			? "A run on this computer is not done yet. Let it finish or stop it, then leave."
@@ -98,18 +97,27 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 	const now = deps.now ?? Date.now;
 	const rows = splitRows(db);
 	const merges = mergeRows(db);
-	/** The split under way in this process: one at a time. */
-	let running: Promise<unknown> | null = null;
+	/**
+	 * The split under way in this process: one at a time, and the next
+	 * waits for it. The revoke hook, `nightshift leave` and the timer may
+	 * ask at once.
+	 */
+	let last: Promise<unknown> = Promise.resolve();
+	let busy = false;
 
-	async function locked<T>(work: () => Promise<T>): Promise<T> {
-		if (running) throw new Refusal("conflict", SPLIT_WORDS.busy);
-		const task = work();
-		running = task;
-		try {
-			return await task;
-		} finally {
-			running = null;
-		}
+	function serial<T>(work: () => Promise<T>): Promise<T> {
+		const task = last
+			.catch(() => {})
+			.then(async () => {
+				busy = true;
+				try {
+					return await work();
+				} finally {
+					busy = false;
+				}
+			});
+		last = task;
+		return task;
 	}
 
 	/**
@@ -268,18 +276,35 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		 * walks there is not done: it waits for the person.
 		 */
 		run(): Promise<SplitResult | null> {
-			return locked(split);
+			return serial(split);
 		},
 
 		/**
-		 * Refuses when this computer cannot leave its home Host now: a run
-		 * it walks in Personal is not done. Changes nothing.
+		 * The Space that splits off when this computer leaves its home Host
+		 * now: its personal Space when a Host keeps it, else null. Refuses
+		 * when a run this computer walks there is not done. Changes nothing.
 		 */
-		async check(): Promise<void> {
+		async check(): Promise<string | null> {
 			const from = await personalSpaceId(db, deps.ownerId);
-			if (from !== null && (await engine.hostSpaces.hostOf(from)) !== null) {
-				await noRunsNotDone(from);
+			if (from === null || (await engine.hostSpaces.hostOf(from)) === null) {
+				return null;
 			}
+			await noRunsNotDone(from);
+			return from;
+		},
+
+		/** The latest split of that Space, whoever ran it, if any. */
+		async of(fromSpace: string): Promise<SplitResult | null> {
+			const row = await rows.of(fromSpace);
+			return row
+				? {
+						state: row.state,
+						spaceId: row.toSpace,
+						projects: row.projects.length,
+						runs: row.runs,
+						backup: row.backup,
+					}
+				: null;
 		},
 
 		/**
@@ -290,8 +315,8 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		 */
 		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
 			const attempt = () => {
-				if (running || signal.aborted) return;
-				locked(split).catch((error) => {
+				if (busy || signal.aborted) return;
+				serial(split).catch((error) => {
 					if (!(error instanceof Refusal)) {
 						console.error("[devices] the split of Personal failed:", error);
 					}

@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { spaceSplit } from "@nightshift/db/schema";
-import { eq, ne } from "drizzle-orm";
+import { desc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { SplitState } from "../contract";
 
@@ -44,6 +44,17 @@ export function splitRows(db: Database) {
 				.select()
 				.from(spaceSplit)
 				.where(ne(spaceSplit.state, "done"))
+				.limit(1);
+			return row ? rowOf(row) : null;
+		},
+
+		/** The latest split of that Space, done or not. */
+		async of(fromSpace: string): Promise<SplitRow | null> {
+			const [row] = await db
+				.select()
+				.from(spaceSplit)
+				.where(eq(spaceSplit.fromSpace, fromSpace))
+				.orderBy(desc(spaceSplit.createdAt))
 				.limit(1);
 			return row ? rowOf(row) : null;
 		},
