@@ -78,18 +78,34 @@ jobs:
           p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
           p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
 
-      # The macOS runner ran out of space while it made the disk image. The
-      # build does not use the Android SDK or the other Xcode versions.
-      - name: Free disk space
+      # Electrobun makes the disk image with `hdiutil create -srcfolder` and
+      # no -size. hdiutil's guess of the size is at times too small for the
+      # app bundle: "No space left on device" while it copies, with the
+      # runner's disk far from full. This hdiutil, first on the PATH, gives
+      # the image the folder's size plus a fifth and 64 MB.
+      - name: Size the disk image
         if: startsWith(matrix.os, 'macos')
         run: |
-          df -h /
-          sudo rm -rf ~/Library/Android "$ANDROID_HOME" /Users/runner/.dotnet /usr/local/share/dotnet
-          selected="$(cd "$(xcode-select -p)/../.." && pwd -P)"
-          for xcode in /Applications/Xcode_*.app; do
-            [ "$(cd "$xcode" && pwd -P)" = "$selected" ] || sudo rm -rf "$xcode"
-          done
-          df -h /
+          mkdir -p "$RUNNER_TEMP/hdiutil"
+          cat > "$RUNNER_TEMP/hdiutil/hdiutil" <<'EOF'
+          #!/bin/bash
+          if [ "$1" = create ] && [[ " $* " != *" -size "* ]]; then
+            previous=""
+            source=""
+            for argument in "$@"; do
+              [ "$previous" = -srcfolder ] && source="$argument"
+              previous="$argument"
+            done
+            if [ -n "$source" ]; then
+              megabytes=$(($(du -sm "$source" | cut -f1) * 12 / 10 + 64))
+              echo "hdiutil: create with -size ${megabytes}m" >&2
+              set -- create -size "${megabytes}m" "${@:2}"
+            fi
+          fi
+          exec /usr/bin/hdiutil "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/hdiutil/hdiutil"
+          echo "$RUNNER_TEMP/hdiutil" >> "$GITHUB_PATH"
 
       - name: Build
         run: bun run --cwd apps/desktop build:stable
@@ -98,10 +114,6 @@ jobs:
           ELECTROBUN_TEAMID: ${{ secrets.ELECTROBUN_TEAMID }}
           ELECTROBUN_APPLEID: ${{ secrets.ELECTROBUN_APPLEID }}
           ELECTROBUN_APPLEIDPASS: ${{ secrets.ELECTROBUN_APPLEIDPASS }}
-
-      - name: Show disk space
-        if: always() && startsWith(matrix.os, 'macos')
-        run: df -h /
 
       - uses: actions/upload-artifact@v4
         with:
