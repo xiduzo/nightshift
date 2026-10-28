@@ -12,12 +12,14 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import {
+	createProfileStore,
 	createSpaceDocuments,
 	deviceDocumentName,
 	documentRows,
 	HostUnreachableError,
 	type ListedProject,
 	type OwnDevice,
+	openDeviceDocument,
 	planOf,
 	type RunStatus,
 	recordClone,
@@ -597,27 +599,58 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(wakes).toEqual([stopAt - 75, stopAt - 25, stopAt]);
 	}, 20_000);
 
-	test("a profile on a node's Device that is offline cannot be found: the run does not start", async () => {
+	test("a profile on a node's Device that is offline: the run starts from its last known settings, and the step waits there", async () => {
 		await shareRemote();
+		// A keeps B's document, as a home Host does: B's profiles as B last said.
+		const documentOfB = await openDeviceDocument({ db: a.db, deviceId: B });
+		await createProfileStore({ document: documentOfB }).save(
+			{
+				name: "everywhere",
+				harness: "claude-code",
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+				clis: [],
+				connections: [],
+			},
+			"everywhere",
+		);
+		await documentOfB.close();
 		online.delete(B);
+		const work = (profile: string) =>
+			flow([
+				{
+					id: "work",
+					type: "agent",
+					position: { x: 0, y: 0 },
+					prompt: "Do the work.",
+					profile: { device: B, profile },
+				},
+			] as Flow["nodes"]);
 		await expect(
 			space().startRun({
 				projectId,
-				flow: flow([
-					{
-						id: "work",
-						type: "agent",
-						position: { x: 0, y: 0 },
-						prompt: "Do the work.",
-						profile: { device: B, profile: "everywhere" },
-					},
-				] as Flow["nodes"]),
+				flow: work("p-unknown"),
 				startedBy: personId,
 			}),
 		).rejects.toThrow(
-			'studio-b is offline, so Night Shift cannot find its profile for "work". Start the run when it is online.',
+			"studio-b is offline, and Night Shift does not know its profile (work). Start the run when studio-b is online, or pick another profile.",
 		);
-	});
+		const started = await space().startRun({
+			projectId,
+			flow: work("everywhere"),
+			startedBy: personId,
+		});
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps[0]?.nodeId).toBe("work");
+		expect(asleep.flow.nodes[0]).toMatchObject({
+			device: "studio-b",
+			model: "sonnet",
+		});
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		expect(run.steps[0]?.device?.id).toBe(B);
+	}, 20_000);
 
 	test("a node may not name a device its starter does not have", async () => {
 		await shareRemote();

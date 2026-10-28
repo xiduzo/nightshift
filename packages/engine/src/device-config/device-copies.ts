@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { ydoc } from "@nightshift/db/schema";
+import type { ProfileSettings } from "@nightshift/flows";
 import { eq, like, or } from "drizzle-orm";
 import * as Y from "yjs";
 import type { DeviceProfile } from "../contract";
@@ -205,6 +206,44 @@ export async function storedDevices(db: Database): Promise<DeviceCopy[]> {
 		}
 	}
 	return [...found.values()];
+}
+
+/**
+ * The profiles of another Device as its document last said, by id, with
+ * their names: from the document a Host keeps for it, else this Replica's
+ * copy. What a run starts from while that Device is offline (ADR 1,
+ * decision 11). Null when this Replica has neither.
+ */
+export async function lastKnownProfiles(
+	db: Database,
+	deviceId: string,
+): Promise<Map<string, { name: string; settings: ProfileSettings }> | null> {
+	const rows = documentRows(db);
+	const state =
+		(await rows.fetch(deviceDocumentName(deviceId))) ??
+		(await rows.fetch(`${PREFIX}${deviceId}`));
+	if (!state) return null;
+	const doc = new Y.Doc();
+	try {
+		Y.applyUpdate(doc, state);
+		const known = new Map<
+			string,
+			{ name: string; settings: ProfileSettings }
+		>();
+		for (const profile of readProfiles(doc.getMap("profiles")).values()) {
+			const {
+				id,
+				name,
+				description: _description,
+				updatedAt: _at,
+				...settings
+			} = profile;
+			known.set(id, { name, settings });
+		}
+		return known;
+	} finally {
+		doc.destroy();
+	}
 }
 
 /**

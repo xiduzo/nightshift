@@ -28,6 +28,7 @@ export {
 	createDeviceCopies,
 	type DeviceCopies,
 	type DeviceCopy,
+	lastKnownProfiles,
 	storedDeviceCopy,
 	storedDevices,
 } from "./device-copies";

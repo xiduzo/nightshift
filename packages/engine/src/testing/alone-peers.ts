@@ -1,4 +1,5 @@
 import type { OwnDevice } from "../contract";
+import { lastKnownProfiles } from "../device-config";
 import { followOwnStep } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
 import {
@@ -58,6 +59,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 						profileDevice: async (id) =>
 							id === device.id || id === self ? walker : null,
 						profileFor: context.profileFor ?? (() => null),
+						lastKnown: (id) => lastKnownProfiles(context.db, id),
 						flows: context.flows,
 					},
 					start.startedBy ?? context.ownerId(),

@@ -7,6 +7,7 @@ import {
 	deviceNameIn,
 	HostUnreachableError,
 	type ListedProject,
+	lastKnownProfiles,
 	NOT_ON_THIS_COMPUTER,
 	type NodeToPlace,
 	type OfferedPlacement,
@@ -589,6 +590,12 @@ export function createPlacement(deps: PlacementDeps) {
 			{
 				...(await devicesOf(project, runId, personId)),
 				profileFor: deps.profileFor ?? (() => null),
+				// A node's offline Device: its profiles as its document last said.
+				lastKnown: (id) => lastKnownProfiles(db, id),
+				deviceName: async (id) =>
+					deviceNameIn(await documents.open(project.spaceId), id) ??
+					(await registry.get(id))?.name ??
+					null,
 				flows: deps.flows,
 			},
 			personId,

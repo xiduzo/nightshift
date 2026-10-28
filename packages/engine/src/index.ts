@@ -77,6 +77,7 @@ export {
 	isHostAddress,
 	isLoopbackHost,
 	type KeyStoreKind,
+	lastKnownProfiles,
 	openDeviceDocument,
 	type ProfileStore,
 	type ProfileView,
