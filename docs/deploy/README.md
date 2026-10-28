@@ -100,19 +100,17 @@ computer as a Host next to its name.
 
 The image holds Night Shift, git and ssh. It has no agent CLIs and no other
 tools: you choose them. Build your own image on it, with the CLIs your flows
-use. For example:
+use. The image is [Wolfi](https://github.com/wolfi-dev): add packages with
+`apk add`. For example:
 
 ```dockerfile
 FROM xiduzo/nightshift:latest
 USER root
-# A tool from the Debian packages.
-RUN apt-get update && apt-get install -y --no-install-recommends jq \
-  && rm -rf /var/lib/apt/lists/*
-# A CLI from npm needs Node.
-COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-  && npm install -g @anthropic-ai/claude-code@2
+# A tool from the Wolfi packages.
+RUN apk add --no-cache jq
+# A CLI from npm needs Node. npm runs only the install scripts you allow.
+RUN apk add --no-cache nodejs-22 npm \
+  && npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code@2
 ENV DISABLE_AUTOUPDATER=1
 USER bun
 ```

@@ -84,7 +84,7 @@ jobs:
       # The image runs as Docker Swarm and Dokploy run it: a Host that stops
       # at start would only show up as an old container that keeps serving.
       # The runtime stage never comes from the cache: each build gets the
-      # newest Debian image and its security fixes. The push below takes
+      # newest Wolfi image and its security fixes. The push below takes
       # this build from the cache.
       - name: Build the image to test
         uses: docker/build-push-action@v6

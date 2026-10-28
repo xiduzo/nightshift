@@ -28,18 +28,19 @@ RUN bun install --frozen-lockfile --ignore-scripts \
 	&& bun run --cwd apps/server build:binary \
 	&& cp "apps/server/dist/bin/nightshift-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')" /nightshift
 
-# Plain Debian, not the Bun image: the binary holds its own Bun, and the Bun
-# image keeps the Debian packages of the day Bun shipped. `apt-get upgrade`
-# takes the security fixes Debian has made since its own image.
-FROM debian:trixie-slim AS runtime
+# Wolfi, not Debian: Wolfi rebuilds its packages as soon as upstream fixes a
+# vulnerability, Debian leaves many for later. It is glibc, so the binary (which
+# holds its own Bun) runs as is. `apk upgrade` takes the fixes Wolfi has made
+# since its own image. The images built on this one add tools with `apk add`.
+FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 # git for the projects and their worktrees, ssh for git remotes over SSH.
-# The `bun` user (uid 1000) stays, for the images built on this one.
-RUN apt-get update \
-	&& apt-get upgrade -y \
-	&& apt-get install -y --no-install-recommends git openssh-client ca-certificates \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& groupadd --gid 1000 bun \
-	&& useradd --uid 1000 --gid bun --create-home --shell /bin/sh bun \
+# The `bun` user (uid 1000) stays, for the images built on this one. No file
+# keeps a setuid or setgid bit: no program lets `bun` become root.
+RUN apk upgrade --no-cache \
+	&& apk add --no-cache git openssh-client \
+	&& addgroup -g 1000 bun \
+	&& adduser -u 1000 -G bun -D -s /bin/sh bun \
+	&& find / -xdev -perm /6000 -type f -exec chmod a-s {} + \
 	&& mkdir -p /data \
 	&& chown bun:bun /data
 COPY --from=build /nightshift /usr/local/bin/nightshift
