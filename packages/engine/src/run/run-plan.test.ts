@@ -165,66 +165,91 @@ describe("the node walk of a run's plan", () => {
 		]);
 	});
 
-	test("never another Device's profile of the same name: a profile its Device lacks refuses the run", async () => {
+	test("never another Device's profile of the same name: a profile its Device lacks refuses the run, by the name its Device last gave it", async () => {
+		const named: PlanDevices = {
+			...devices(["everywhere"]),
+			lastKnown: async (id) =>
+				id === "hetzner-1"
+					? new Map([["p-77", { name: "deliverer", settings: PROFILE }]])
+					: null,
+		};
 		await expect(
 			planNodes(
 				{
 					projectId: "p",
 					flow: flow([
 						profiled("deliver", { device: "hetzner-1", profile: "everywhere" }),
+						profiled("ship", { device: "hetzner-1", profile: "p-gone" }),
 					]),
 				},
-				devices(["everywhere"]),
+				named,
 				"the-person",
 			),
 		).rejects.toThrow(
-			'The flow uses the profile "everywhere" on hetzner-1, but hetzner-1 has no such profile (deliver). Pick another profile.',
+			"The flow uses everywhere on hetzner-1 (deliver), but hetzner-1 has no such profile. Pick another profile. The flow uses a profile on hetzner-1 (ship) that hetzner-1 no longer has. Pick another profile.",
 		);
 	});
 
-	test("a profile of a device the Space no longer has refuses the run", async () => {
+	test("a profile of a device the Space no longer has refuses the run, by the device's last name when known", async () => {
+		const deliver = flow([
+			profiled("deliver", { device: "sold", profile: "p-1234" }),
+		]);
 		await expect(
-			planNodes(
-				{
-					projectId: "p",
-					flow: flow([
-						profiled("deliver", { device: "sold", profile: "p-1234" }),
-					]),
-				},
-				devices(),
-				"the-person",
-			),
+			planNodes({ projectId: "p", flow: deliver }, devices(), "the-person"),
 		).rejects.toThrow(
 			"The flow uses a profile of a device that is no longer in this Space (deliver). Pick another profile.",
 		);
+		await expect(
+			planNodes(
+				{ projectId: "p", flow: deliver },
+				{ ...devices(), deviceName: async () => "LE2316" },
+				"the-person",
+			),
+		).rejects.toThrow(
+			"LE2316 is no longer in this Space. Pick another profile for deliver.",
+		);
 	});
 
-	test("a node's Device that is offline is not asked, and a profile on it is refused", async () => {
+	test("a profile on an offline Device starts from what its document last said: the step waits for it there", async () => {
 		const away = at("away", { offline: true });
 		const offline: PlanDevices = {
 			...devices(),
 			byName: async (name) => (name === "away" ? away : null),
 			profileDevice: async (id) => (id === "away" ? away : null),
+			lastKnown: async (id) =>
+				id === "away"
+					? new Map([["own", { name: "builder", settings: PROFILE }]])
+					: null,
 		};
 		const planned = await planNodes(
-			{ projectId: "p", flow: flow([command("plain", "away")]) },
+			{
+				projectId: "p",
+				flow: flow([
+					command("plain", "away"),
+					profiled("work", { device: "away", profile: "own" }),
+				]),
+			},
 			offline,
 			"the-person",
 		);
 		expect(planned.groups.map((g) => [g.at.id, g.at.offline])).toEqual([
 			["away", true],
 		]);
+		expect(planned.flow.nodes[1]).toMatchObject({
+			device: "away",
+			model: "sonnet",
+		});
 		await expect(
 			planNodes(
 				{
 					projectId: "p",
-					flow: flow([profiled("work", { device: "away", profile: "own" })]),
+					flow: flow([profiled("work", { device: "away", profile: "other" })]),
 				},
 				offline,
 				"the-person",
 			),
 		).rejects.toThrow(
-			'away is offline, so Night Shift cannot find its profile for "work". Start the run when it is online.',
+			"away is offline, and Night Shift does not know its profile other (work). Start the run when away is online, or pick another profile.",
 		);
 	});
 

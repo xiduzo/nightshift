@@ -161,7 +161,9 @@ describe("profiles at the start", () => {
 					[{ id: "e1", from: "plan", outcome: "pass", to: "work" }],
 				),
 			}),
-		).rejects.toThrow("has no such profile (plan). Pick another profile.");
+		).rejects.toThrow(
+			"The flow uses planner on test (plan), but test has no such profile. Pick another profile.",
+		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);
 	});
