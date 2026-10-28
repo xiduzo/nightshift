@@ -23,6 +23,11 @@ export {
 	phoneSchema,
 } from "./links";
 export { type OfferCaps, offerCapsSchema, offerRefSchema } from "./offers";
+export type {
+	ElsewhereProject,
+	PersonalMerge,
+	PersonalMergeInput,
+} from "./personal";
 export { READS, READS_HEADER, reads } from "./reads";
 export type { HostRelay } from "./relay";
 export type { RunRows, SyncCursors } from "./rows";

@@ -376,3 +376,62 @@ export async function spaceMoveBatch(
 	if (!first) throw new Error("A move has no statements.");
 	return [first, ...rest];
 }
+
+/** A Project's row as a merge of Spaces reads it. */
+export type MovingProject = {
+	id: string;
+	spaceId: string;
+	name: string;
+	remote: string | null;
+	createdAt: number;
+	removedAt: number | null;
+};
+
+const movingColumns = {
+	id: project.id,
+	spaceId: project.spaceId,
+	name: project.name,
+	remote: project.remote,
+	createdAt: project.createdAt,
+	removedAt: project.removedAt,
+};
+
+function moving(row: {
+	id: string;
+	spaceId: string;
+	name: string;
+	remote: string | null;
+	createdAt: Date;
+	removedAt: Date | null;
+}): MovingProject {
+	return {
+		...row,
+		createdAt: row.createdAt.getTime(),
+		removedAt: row.removedAt?.getTime() ?? null,
+	};
+}
+
+/**
+ * The Projects of this Replica with one of `ids` or one of `remotes`, in
+ * any Space, removed ones too: what a Host reads before it takes the
+ * Projects of a Device's personal Space (one Project per remote on a
+ * Replica, `project_remote_idx`).
+ */
+export async function projectRowsOf(
+	db: Database,
+	input: { ids?: readonly string[]; remotes?: readonly string[] },
+): Promise<MovingProject[]> {
+	const ids = [...(input.ids ?? [])];
+	const remotes = [...(input.remotes ?? [])];
+	if (ids.length === 0 && remotes.length === 0) return [];
+	const rows = await db
+		.select(movingColumns)
+		.from(project)
+		.where(
+			or(
+				ids.length > 0 ? inArray(project.id, ids) : undefined,
+				remotes.length > 0 ? inArray(project.remote, remotes) : undefined,
+			),
+		);
+	return rows.map(moving);
+}

@@ -11,6 +11,8 @@ import type {
 	ArchiveRef,
 	CommandBatch,
 	OfferCaps,
+	PersonalMerge,
+	PersonalMergeInput,
 	RunRows,
 	SyncBatch,
 	SyncCursors,
@@ -155,4 +157,15 @@ export type HostExchange = {
 	): AsyncIterable<WorkReply>;
 	/** Whether one of the key's Person's Devices (or this Host) takes work now. */
 	reachable(key: DeviceKeyAccess, deviceId: string): Promise<boolean>;
+	/**
+	 * Takes the Projects of the key's Device's own personal Space into its
+	 * Person's personal Space here: only for a Device whose home Host this
+	 * is. Each Project keeps its id, or takes the id of the Project here
+	 * with its remote. A remote of a shared Space here moves into that
+	 * Space only when the Person chose it. Runs again with the same answer.
+	 */
+	mergePersonal(
+		key: DeviceKeyAccess,
+		input: PersonalMergeInput,
+	): Promise<PersonalMerge>;
 };

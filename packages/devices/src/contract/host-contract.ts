@@ -17,6 +17,7 @@ import {
 	phoneSchema,
 } from "./links";
 import { offerCapsSchema, offerRefSchema } from "./offers";
+import { personalMergeInputSchema, personalMergeSchema } from "./personal";
 import { runRowsSchema, syncCursorsSchema } from "./rows";
 import {
 	commandBatchSchema,
@@ -339,6 +340,20 @@ export const hostContract = {
 				}),
 			)
 			.output(described(z.void())),
+		/**
+		 * Takes the Projects of a home Device's own personal Space into the
+		 * key's Person's personal Space here (ADR 1): each by its remote, a
+		 * Project here with the same remote takes its place. Runs again
+		 * with the same answer. `dryRun` changes nothing. An older Host has
+		 * none: the Device keeps its own personal Space.
+		 */
+		mergePersonal: sync
+			.route({
+				summary:
+					"Takes the projects of a home Device's personal Space into the Person's personal Space here.",
+			})
+			.input(personalMergeInputSchema)
+			.output(described(personalMergeSchema)),
 	},
 	/** The archive: the run state of runs walked elsewhere, per Space, and live transcripts. */
 	archive: {
