@@ -1,8 +1,9 @@
 /**
  * The authoring tools' port for a chat in the editor: the draft from the
  * request, the project's flows and runs as the Person sees them in the
- * Space, and this computer's profiles, CLI tools, connections and skills.
- * Names and descriptions only: never a secret.
+ * Space, the profiles each Device of the Space offers a node, and this
+ * computer's CLI tools, connections and skills. Names and descriptions
+ * only: never a secret.
  */
 import type {
 	AuthoringPort,
@@ -16,18 +17,13 @@ import type {
 	SpaceEngine,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import {
-	type ChatRequest,
-	isAgentProfile,
-	type Profile,
-} from "@nightshift/flows";
+import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 
 /** What the port reads in the Space. */
 export type ChatSpace = Pick<SpaceEngine, "flowMap" | "getRun" | "watchRun">;
 
-/** The chat's Space, and the project's own profiles that the authoring tools list. */
-export type AuthoringSpace = ChatSpace &
-	Pick<SpaceEngine, "listProjectProfiles">;
+/** The chat's Space, and its Devices with the profiles a node may name. */
+export type AuthoringSpace = ChatSpace & Pick<SpaceEngine, "listDevices">;
 
 export type AuthoringPortDeps = {
 	space: AuthoringSpace;
@@ -54,28 +50,35 @@ export function authoringPort(
 	return {
 		draft: async () => ({ name: request.flowName, flow: request.flow }),
 		flows: () => deps.space.flowMap(request.projectId),
-		// This computer's, then the project's that this computer does not override.
+		// Each Device's, with the settings of this computer's own.
 		profiles: async () => {
-			const own = deps.profiles.list();
-			let project: Profile[] = [];
-			try {
-				project = (await deps.space.listProjectProfiles(request.projectId))
-					.profiles;
-			} catch {
-				// No project profiles to read: the computer's are the list.
-			}
-			return [
-				...own,
-				...project.filter((p) => !own.some((o) => o.name === p.name)),
-			].map((profile) => {
-				const description = profile.description ?? null;
-				if (!isAgentProfile(profile)) {
-					const { name, decider, model } = profile;
-					return { name, decider, ...(model ? { model } : {}), description };
-				}
-				const { name, harness, model } = profile;
-				return { name, harness, model, description };
-			});
+			const own = new Map(deps.profiles.list().map((p) => [p.id, p]));
+			const devices = await deps.space.listDevices(request.projectId);
+			return devices.flatMap((device) =>
+				(device.profiles ?? []).map((choice) => {
+					const listed = {
+						device: device.deviceId,
+						profile: choice.id,
+						name: choice.name,
+						deviceName: device.name,
+						kind: choice.kind,
+					};
+					const profile = device.thisDevice ? own.get(choice.id) : undefined;
+					if (!profile) return listed;
+					const description = profile.description ?? null;
+					if (!isAgentProfile(profile)) {
+						const { decider, model } = profile;
+						return {
+							...listed,
+							decider,
+							...(model ? { model } : {}),
+							description,
+						};
+					}
+					const { harness, model } = profile;
+					return { ...listed, harness, model, description };
+				}),
+			);
 		},
 		tools: async () => ({
 			clis: deps.cliTools

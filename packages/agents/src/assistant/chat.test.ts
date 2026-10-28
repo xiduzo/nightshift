@@ -68,7 +68,15 @@ function port(over: Partial<AuthoringPort> = {}): AuthoringPort & {
 		draft: async () => ({ name: "fix", flow: draft }),
 		flows: async () => ({ fix: draft, release: draft, old: null }),
 		profiles: async () => [
-			{ name: "worker", harness: "claude-code", model: "sonnet" },
+			{
+				device: "mac",
+				profile: "worker",
+				name: "worker",
+				deviceName: "MacBook",
+				kind: "agent",
+				harness: "claude-code",
+				model: "sonnet",
+			},
 		],
 		tools: async () => ({
 			clis: [{ name: "gh", description: "GitHub" }],
@@ -134,7 +142,15 @@ describe("authoringTools", () => {
 			'no flow "nope"',
 		);
 		expect(JSON.parse(await call(tools, "list_profiles"))).toEqual([
-			{ name: "worker", harness: "claude-code", model: "sonnet" },
+			{
+				device: "mac",
+				profile: "worker",
+				name: "worker",
+				deviceName: "MacBook",
+				kind: "agent",
+				harness: "claude-code",
+				model: "sonnet",
+			},
 		]);
 	});
 
@@ -145,6 +161,16 @@ describe("authoringTools", () => {
 		);
 		expect(await call(tools, "check_flow", { flow: broken })).toContain(
 			'error: Agent node "build" names the profile "ghost", but Night Shift cannot tell which computer\'s profile it is.',
+		);
+		const elsewhere = {
+			...withTests,
+			nodes: [
+				{ ...draft.nodes[0], profile: { device: "le2316", profile: "worker" } },
+				withTests.nodes[1],
+			],
+		};
+		expect(await call(tools, "check_flow", { flow: elsewhere })).toContain(
+			'There is no profile "worker" on the device "le2316". Use a device and a profile from list_profiles.',
 		);
 	});
 

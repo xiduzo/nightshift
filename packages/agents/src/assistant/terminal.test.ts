@@ -43,7 +43,15 @@ function fakePort(
 		],
 		flows: async (projectId) => ({ ...saved[projectId] }),
 		profiles: async () => [
-			{ name: "worker", harness: "claude-code", model: "sonnet" },
+			{
+				device: "mac",
+				profile: "worker",
+				name: "worker",
+				deviceName: "MacBook",
+				kind: "agent",
+				harness: "claude-code",
+				model: "sonnet",
+			},
 		],
 		tools: async () => ({ clis: [], connections: [] }),
 		skills: async () => [],
@@ -129,6 +137,27 @@ describe("nightshift mcp tools", () => {
 		expect(port.saved.p1?.broken).toBeUndefined();
 		const notAFlow = await call("save_flow", { name: "x", flow: { a: 1 } });
 		expect(notAFlow.text).toStartWith("Refused");
+	});
+
+	test("list_profiles names each profile with its device, and check_flow refuses a pair it does not list", async () => {
+		const { call } = await connect(fakePort(), { project: "App" });
+		const listed = JSON.parse((await call("list_profiles")).text);
+		expect(listed).toEqual([
+			expect.objectContaining({
+				device: "mac",
+				profile: "worker",
+				deviceName: "MacBook",
+			}),
+		]);
+		const elsewhere = {
+			...flow,
+			nodes: [
+				{ ...flow.nodes[0], profile: { device: "le2316", profile: "worker" } },
+			],
+		};
+		expect((await call("check_flow", { flow: elsewhere })).text).toContain(
+			'There is no profile "worker" on the device "le2316". Use a device and a profile from list_profiles.',
+		);
 	});
 
 	test("without a project of the folder it asks for one", async () => {

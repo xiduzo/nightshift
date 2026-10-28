@@ -34,7 +34,7 @@ const NOT_RUNNING =
 	"Night Shift is not running on this computer. Start it, then try again.";
 
 const INSTRUCTIONS =
-	"Night Shift's flow tools. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. The tools work in the project of the folder you work in, or the one you name in `project` (list_projects).";
+	"Night Shift's flow tools. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. The tools work in the project of the folder you work in, or the one you name in `project` (list_projects).";
 
 export type McpOptions = {
 	daemon: string;
@@ -110,26 +110,43 @@ export function apiPort(
 				})),
 			),
 		flows: (projectId) => g(() => client.flows.map({ projectId })),
-		profiles: () =>
-			g(async () =>
-				(await client.profiles.list()).map((p) => {
-					const description = p.description ?? null;
-					if (!("harness" in p)) {
+		// Each Device's profiles a node may name, with this computer's settings.
+		profiles: (projectId) =>
+			g(async () => {
+				const [devices, mine] = await Promise.all([
+					client.runs.devices({ projectId }),
+					client.profiles.list(),
+				]);
+				const own = new Map(mine.map((p) => [p.id, p]));
+				return devices.flatMap((device) =>
+					(device.profiles ?? []).map((choice) => {
+						const listed = {
+							device: device.deviceId,
+							profile: choice.id,
+							name: choice.name,
+							deviceName: device.name,
+							kind: choice.kind,
+						};
+						const p = device.thisDevice ? own.get(choice.id) : undefined;
+						if (!p) return listed;
+						const description = p.description ?? null;
+						if (!("harness" in p)) {
+							return {
+								...listed,
+								decider: p.decider,
+								...(p.model ? { model: p.model } : {}),
+								description,
+							};
+						}
 						return {
-							name: p.name,
-							decider: p.decider,
-							...(p.model ? { model: p.model } : {}),
+							...listed,
+							harness: p.harness,
+							model: p.model,
 							description,
 						};
-					}
-					return {
-						name: p.name,
-						harness: p.harness,
-						model: p.model,
-						description,
-					};
-				}),
-			),
+					}),
+				);
+			}),
 		tools: () =>
 			g(async () => {
 				const [clis, connections] = await Promise.all([

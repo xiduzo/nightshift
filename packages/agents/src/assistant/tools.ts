@@ -23,15 +23,33 @@ import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../port";
 import { flowJson } from "./prompts";
 
-/** A profile as the agent may know it: never its secrets. */
+/**
+ * A profile a node may name, as the agent may know it: never its secrets.
+ * A node names `{ device, profile }` (ADR 3). The settings are known for
+ * this computer's profiles only.
+ */
 export type AuthoringProfile = {
+	/** The id of its Device. */
+	device: string;
+	/** Its id on that Device. */
+	profile: string;
 	name: string;
+	/** Its Device's name: "builder on LE2316". */
+	deviceName: string;
+	/** `agent` for an Agent node, `model` for a Decision or a Value decided by a model. */
+	kind: "agent" | "model";
 	description?: string | null;
-} & (
-	| { harness: string; model: string }
-	/** A Model Profile, for a Decision or a Value decided by a model. */
-	| { decider: string; model?: string }
-);
+	harness?: string;
+	model?: string;
+	decider?: string;
+};
+
+/** The pairs a node may name, for the flow check. */
+export function profileRefs(
+	profiles: readonly AuthoringProfile[],
+): { device: string; profile: string }[] {
+	return profiles.map(({ device, profile }) => ({ device, profile }));
+}
 
 /** A CLI tool or a connection, by name. */
 export type AuthoringToolInfo = { name: string; description: string | null };
@@ -183,14 +201,16 @@ export function flowRows(flows: ProjectFlowMap, skip?: string) {
 
 /** The issues of a flow the agent wrote, checked as the editor checks it. */
 async function check(port: AuthoringPort, flow: unknown) {
-	const [draft, flows, tools] = await Promise.all([
+	const [draft, flows, profiles, tools] = await Promise.all([
 		port.draft(),
 		port.flows(),
+		port.profiles(),
 		port.tools(),
 	]);
 	const issues = proposalIssues(draft.flow, flow, {
 		flows,
 		name: draft.name,
+		profiles: profileRefs(profiles),
 		connections: tools.connections.map((c) => c.name),
 	});
 	return { draft, issues };
@@ -310,13 +330,13 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.listProfiles,
 			description:
-				"The profiles of this computer. An Agent Profile (name, harness, model) is for an Agent node's `profile`. A Model Profile (name, decider, model) is for the `profile` of a Decision or a Value decided by a model.",
+				'The profiles a node may name, each on its computer (a Device). Name one in a node as `"profile": { "device": <device>, "profile": <profile> }`, with both ids from this list; the step runs on that computer. An Agent Profile (`kind` agent) is for an Agent node. A Model Profile (`kind` model) is for a Decision or a Value decided by a model. The settings (harness, model, decider) show for this computer\'s profiles only.',
 			inputSchema: noInput,
 		}).server(async () => {
 			const profiles = await port.profiles();
 			return profiles.length > 0
 				? JSON.stringify(profiles, null, 2)
-				: "This computer has no profiles.";
+				: "None of your computers has a profile yet. Set the harness, model and permission mode on the node.";
 		}),
 		toolDefinition({
 			name: AUTHORING_TOOLS.listTools,
