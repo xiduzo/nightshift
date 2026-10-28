@@ -1,6 +1,12 @@
 import { adoptPersonalSpaceBatch, personalSpaceId } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { device } from "@nightshift/db/schema";
+import {
+	device,
+	event,
+	organization,
+	project,
+	run,
+} from "@nightshift/db/schema";
 import {
 	type Engine,
 	type FlowDocument,
@@ -15,7 +21,7 @@ import {
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, notExists, or } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type {
 	PersonalMerge as HostAnswer,
@@ -62,9 +68,10 @@ import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
  *    (`adoptPersonalSpaceBatch`), adds what the composition root moves
  *    of the same runs (`moveStatements`: the notifier's deliveries), and
  *    sets this state. Then the engine reads the moved runs again.
- * 5. The Space document of the old Space loses the moved Projects. The
- *    flow documents of a Project that joins another merge into it, once
- *    the Host's copy of that document is here.
+ * 5. What the old Space leaves goes once nothing names it: its Space
+ *    document and its facts of no run (a Member that joined). The flow
+ *    documents of a Project that joins another merge into it, once the
+ *    Host's copy of that document is here.
  * 6. `pushed`: the Host has the moved runs: the exchange pushed them.
  *
  * `preview` answers what a merge would do and changes nothing: the Host
@@ -106,7 +113,7 @@ export type PersonalMergeDeps = {
 	};
 	links: Pick<DeviceLinks, "get">;
 	hostLinks: Pick<HostLinks, "list">;
-	spaces: Pick<SpaceDocuments, "open">;
+	spaces: Pick<SpaceDocuments, "open" | "remove">;
 	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
 	self: { id: string; name: string };
@@ -430,23 +437,70 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		return { state, projects, runs: runIds.length, backup: row.backup };
 	}
 
-	/** What follows the batch: the old Space document, the flow documents. Runs again safely. */
+	/** Whether this Replica still has the old Space, or a Project or run of it. */
+	async function stillHere(from: string): Promise<boolean> {
+		const [left] = await db
+			.select({ id: organization.id })
+			.from(organization)
+			.where(eq(organization.id, from))
+			.union(
+				db
+					.select({ id: project.id })
+					.from(project)
+					.where(eq(project.spaceId, from)),
+			)
+			.union(db.select({ id: run.id }).from(run).where(eq(run.spaceId, from)))
+			.limit(1);
+		return left !== undefined;
+	}
+
+	/**
+	 * Removes what the old Space left once nothing names it: its document,
+	 * and its events that belong to no run here (a Member that joined).
+	 * Runs again safely.
+	 */
+	async function cleanUp(from: string): Promise<boolean> {
+		if (await stillHere(from)) return false;
+		await db
+			.delete(event)
+			.where(
+				and(
+					eq(event.spaceId, from),
+					or(
+						isNull(event.runId),
+						notExists(
+							db
+								.select({ id: run.id })
+								.from(run)
+								.where(eq(run.id, event.runId)),
+						),
+					),
+				),
+			);
+		await deps.spaces.remove(from);
+		return true;
+	}
+
+	/** What follows the batch: the old Space, the flow documents. Runs again safely. */
 	async function finishMoved(
 		hostId: string,
 		from: string,
 		projectMap: Record<string, MergeTarget>,
 		personMap: Record<string, string>,
 	) {
-		const old = await deps.spaces.open(from);
-		const moved = Object.keys(projectMap);
-		const stale = [...old.clones.keys()].filter((key) =>
-			moved.some((id) => key.startsWith(`${id}/`)),
-		);
-		if (moved.some((id) => old.projects.has(id)) || stale.length > 0) {
-			await old.change(() => {
-				for (const id of moved) old.projects.delete(id);
-				for (const key of stale) old.clones.delete(key);
-			});
+		if (!(await cleanUp(from))) {
+			// A Project the Host did not take stays: the old Space keeps it.
+			const old = await deps.spaces.open(from);
+			const moved = Object.keys(projectMap);
+			const stale = [...old.clones.keys()].filter((key) =>
+				moved.some((id) => key.startsWith(`${id}/`)),
+			);
+			if (moved.some((id) => old.projects.has(id)) || stale.length > 0) {
+				await old.change(() => {
+					for (const id of moved) old.projects.delete(id);
+					for (const key of stale) old.clones.delete(key);
+				});
+			}
 		}
 
 		const pairs = Object.entries(projectMap).filter(
@@ -568,9 +622,17 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		/**
 		 * Goes on with a merge that moved its rows every `everyMs`, until it
 		 * is done or `signal` aborts: its runs reach the Host when it
-		 * answers. Its failures wait for the next try.
+		 * answers. Its failures wait for the next try. Once at start, it
+		 * removes what a merge that is done left of the old Space: a merge
+		 * of an older version did not.
 		 */
 		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
+			void (async () => {
+				const latest = await rows.latest();
+				if (latest?.state === "pushed") await cleanUp(latest.fromSpace);
+			})().catch((error) => {
+				console.error("[devices] the old Personal was not removed:", error);
+			});
 			const timer = setInterval(() => {
 				if (running) return;
 				void (async () => {

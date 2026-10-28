@@ -16,6 +16,8 @@ export type SplitRow = {
 	/** The Projects that came along. Empty until `moved`. */
 	projects: string[];
 	runs: number;
+	/** How many schedules that named another Device fire here now. */
+	unpinned: number;
 	backup: string;
 };
 
@@ -31,6 +33,7 @@ function rowOf(row: typeof spaceSplit.$inferSelect): SplitRow {
 		projects:
 			row.projects === null ? [] : (JSON.parse(row.projects) as string[]),
 		runs: row.runs,
+		unpinned: row.unpinned,
 		backup: row.backup,
 	};
 }
@@ -61,7 +64,7 @@ export function splitRows(db: Database) {
 
 		/** A new split, planned: its copy of the database is made. */
 		async plan(
-			input: Omit<SplitRow, "state" | "projects" | "runs">,
+			input: Omit<SplitRow, "state" | "projects" | "runs" | "unpinned">,
 		): Promise<SplitRow> {
 			const [row] = await db
 				.insert(spaceSplit)
@@ -74,7 +77,7 @@ export function splitRows(db: Database) {
 		/** The statement that marks the split moved: it goes in the batch that moves the rows. */
 		moved(
 			toSpace: string,
-			input: { projects: readonly string[]; runs: number },
+			input: { projects: readonly string[]; runs: number; unpinned: number },
 		): BatchItem<"sqlite"> {
 			return db
 				.update(spaceSplit)
@@ -82,6 +85,7 @@ export function splitRows(db: Database) {
 					state: "moved",
 					projects: JSON.stringify(input.projects),
 					runs: input.runs,
+					unpinned: input.unpinned,
 					updatedAt: new Date(),
 				})
 				.where(eq(spaceSplit.toSpace, toSpace));

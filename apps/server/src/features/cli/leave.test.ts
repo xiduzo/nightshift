@@ -31,6 +31,7 @@ describe("nightshift leave", () => {
 					spaceId: "s",
 					projects: 2,
 					runs: 1,
+					unpinned: 0,
 					backup: "/data/copy.db",
 				},
 				waiting: null,
@@ -40,6 +41,26 @@ describe("nightshift leave", () => {
 			"Your Personal on this computer has 2 projects and 1 run.",
 			"A copy of your data from before is in /data/copy.db",
 		]);
+	});
+
+	test("the result says which schedules run on this computer now", () => {
+		expect(
+			leaveResultLines({
+				host: { id: "h", name: "studio" },
+				told: true,
+				split: {
+					state: "done",
+					spaceId: "s",
+					projects: 1,
+					runs: 0,
+					unpinned: 2,
+					backup: "/data/copy.db",
+				},
+				waiting: null,
+			}),
+		).toContain(
+			"2 schedules named another device. They run on this computer now.",
+		);
 	});
 
 	test("a Host that did not answer is to remove this computer too", () => {

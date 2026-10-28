@@ -42,6 +42,13 @@ export function leaveQuestionLines(hostName: string): string[] {
 	];
 }
 
+/** The schedules that named another device, and where they run now. */
+function unpinnedLine(count: number): string {
+	return count === 1
+		? "1 schedule named another device. It runs on this computer now."
+		: `${count} schedules named another device. They run on this computer now.`;
+}
+
 /** How leaving went. */
 export function leaveResultLines(result: LeaveResult): string[] {
 	const { host, split } = result;
@@ -53,8 +60,9 @@ export function leaveResultLines(result: LeaveResult): string[] {
 	if (split) {
 		lines.push(
 			`Your Personal on this computer has ${plural(split.projects, "project")} and ${plural(split.runs, "run")}.`,
-			`A copy of your data from before is in ${split.backup}`,
 		);
+		if (split.unpinned > 0) lines.push(unpinnedLine(split.unpinned));
+		lines.push(`A copy of your data from before is in ${split.backup}`);
 	}
 	if (result.waiting !== null) {
 		lines.push(

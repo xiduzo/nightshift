@@ -1,0 +1,1 @@
+ALTER TABLE `space_split` ADD `unpinned` integer DEFAULT 0 NOT NULL;
