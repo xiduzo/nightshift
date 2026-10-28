@@ -1,8 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
 import type { Database } from "@nightshift/db";
-import { member, organization, user } from "@nightshift/db/schema";
+import {
+	invitation,
+	member,
+	organization,
+	session,
+	user,
+} from "@nightshift/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { claimHostAdmin } from "./members";
 import type { Role } from "./roles";
 
@@ -221,4 +228,60 @@ export async function mirrorHostSpace(
 			target: organization.id,
 			set: { name: space.name },
 		});
+}
+
+/**
+ * The statements that make `to` the Person's personal Space in place of
+ * `from`, for the `db.batch` that moves the rows of `from` into `to` (ADR
+ * 1: one personal Space per Home Host). `to` is the Space this Replica
+ * keeps a copy of, the one the Person's Home Host keeps as theirs.
+ *
+ * `to` becomes the Person's personal Space, named "Personal", with the
+ * Person as its owner here. A session that worked in `from` works in
+ * `to`. `from` goes, with its members and invitations: its rows are in
+ * `to` now. Throws when `from` is not the Person's personal Space.
+ */
+export async function adoptPersonalSpaceBatch(
+	db: Database,
+	input: { personId: string; from: string; to: string },
+): Promise<[BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]> {
+	const { personId, from, to } = input;
+	if ((await personalSpaceId(db, personId)) !== from) {
+		throw new Error(
+			`The Space ${from} is not the personal Space of ${personId}.`,
+		);
+	}
+	if (from === to) throw new Error("A Space cannot take its own place.");
+	if (!(await spaceExists(db, to))) {
+		throw new Error(`The Space ${to} is not on this Replica.`);
+	}
+	const [membership] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, to), eq(member.userId, personId)));
+	return [
+		membership
+			? db
+					.update(member)
+					.set({ role: "owner" })
+					.where(eq(member.id, membership.id))
+			: db.insert(member).values({
+					id: randomUUID(),
+					organizationId: to,
+					userId: personId,
+					role: "owner",
+					createdAt: new Date(),
+				}),
+		db
+			.update(organization)
+			.set({ personal: true, name: "Personal" })
+			.where(eq(organization.id, to)),
+		db
+			.update(session)
+			.set({ activeOrganizationId: to })
+			.where(eq(session.activeOrganizationId, from)),
+		db.delete(invitation).where(eq(invitation.organizationId, from)),
+		db.delete(member).where(eq(member.organizationId, from)),
+		db.delete(organization).where(eq(organization.id, from)),
+	];
 }
