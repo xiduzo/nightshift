@@ -82,7 +82,7 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Dialog](https://ui.shadcn.com/docs/components/dialog) | A modal task: start a run, edit a schedule. |
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow). |
-| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), the mobile sidebar. |
+| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
 | ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. The hint of an inspector field, behind an info icon beside its label. Needs `TooltipProvider` (in the root). |

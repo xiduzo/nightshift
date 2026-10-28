@@ -31,6 +31,8 @@ export function FlowPage({
 	name,
 	chat,
 	onChatLinkUsed,
+	revision,
+	onRevisionLinkUsed,
 }: {
 	projectId: string;
 	name: string;
@@ -38,6 +40,10 @@ export function FlowPage({
 	chat?: string;
 	/** Drops `chat` from the address once the editor used it. */
 	onChatLinkUsed?: () => void;
+	/** The `revision` search value: opens the revisions with that one open. */
+	revision?: string;
+	/** Drops `revision` from the address once the editor used it. */
+	onRevisionLinkUsed?: () => void;
 }) {
 	const validName = flowNameSchema.safeParse(name).success;
 	const projects = useQuery(projectQueries.list());
@@ -165,6 +171,8 @@ export function FlowPage({
 			initiallySaved={loaded.data.flow !== null}
 			chatLink={parseChatLink(chat)}
 			onChatLinkUsed={onChatLinkUsed}
+			revisionLink={revision}
+			onRevisionLinkUsed={onRevisionLinkUsed}
 		/>
 	);
 }

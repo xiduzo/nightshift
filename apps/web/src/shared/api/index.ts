@@ -13,6 +13,7 @@ export type {
 	FlowHealthRow,
 	FlowListItem,
 	FlowRange,
+	FlowRevisionItem,
 	FlowRun,
 	GateChoice,
 	GateState,

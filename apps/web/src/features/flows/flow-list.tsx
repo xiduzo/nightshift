@@ -70,6 +70,7 @@ import { PageHeading } from "@/shared/page";
 
 import { chatSearch } from "./chat/chat-link";
 import { FlowNotices } from "./flow-notices";
+import { ImportFlowButton } from "./move/import-flow-button";
 import { flowMutations, flowQueries } from "./queries";
 import { StartRunDialog } from "./start/start-run-dialog";
 
@@ -107,10 +108,17 @@ export function FlowList({ projectId }: { projectId: string }) {
 				title="Flows"
 				description="The steps an agent follows. Run one, or open it to edit."
 				actions={
-					<Button variant="outline" size="sm" onClick={() => setCreating(true)}>
-						<PlusIcon data-icon="inline-start" />
-						New flow
-					</Button>
+					<>
+						<ImportFlowButton projectId={projectId} />
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setCreating(true)}
+						>
+							<PlusIcon data-icon="inline-start" />
+							New flow
+						</Button>
+					</>
 				}
 			/>
 
@@ -134,7 +142,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 								<EmptyDescription>
 									{flows.error
 										? flows.error.message
-										: "A flow is the set of steps an agent follows. Create one to start."}
+										: "A flow is the set of steps an agent follows. Create one, or import a flow file, to start."}
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>

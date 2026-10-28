@@ -10,7 +10,7 @@ import { Link } from "@tanstack/react-router";
 import { InfoIcon, MonitorIcon, WorkflowIcon } from "lucide-react";
 import { useState } from "react";
 import { walkerName } from "@/features/devices";
-import { InspectorSection } from "@/features/flows";
+import { InspectorSection, RunRevision } from "@/features/flows";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { authClient } from "@/shared/api";
 import { formatDayTime } from "@/shared/format";
@@ -110,6 +110,15 @@ function OverviewSection({
 						"Quick run"
 					)}
 				</Fact>
+				{run.flowName && run.flowRevision ? (
+					<Fact label="Revision">
+						<RunRevision
+							projectId={run.projectId}
+							flowName={run.flowName}
+							revisionId={run.flowRevision}
+						/>
+					</Fact>
+				) : null}
 				<Fact label="Started by">
 					<StartedBy run={run} />
 				</Fact>

@@ -35,6 +35,7 @@ export { useSectionCanvas } from "./canvas/sections/use-section-canvas";
 export { useMeasured } from "./canvas/use-measured";
 export { chatAboutRun } from "./chat/chat-link";
 export { InspectorSection } from "./editor/fields";
+export { RunRevision } from "./editor/revisions/run-revision";
 export { FlowPage } from "./flow-page";
 export { preloadFlowPage } from "./preload";
 export { ProjectFlowsPage } from "./project-flows-page";
