@@ -41,6 +41,7 @@ import {
 } from "../links";
 import { backupDatabase } from "./backup";
 import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
+import { runCommandMoves } from "./run-commands";
 
 /**
  * The merge of this computer's own personal Space ("Personal") into its
@@ -65,9 +66,10 @@ import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
  * 4. `moved`: one `db.batch` moves every row (`spaceMoveBatch`, with this
  *    computer's events numbered after its latest), makes the Host's
  *    Space this computer's personal Space named "Personal"
- *    (`adoptPersonalSpaceBatch`), adds what the composition root moves
- *    of the same runs (`moveStatements`: the notifier's deliveries), and
- *    sets this state. Then the engine reads the moved runs again.
+ *    (`adoptPersonalSpaceBatch`), moves the commands of the moved runs
+ *    (`run_command`), adds what the composition root moves of the same
+ *    runs (`moveStatements`: the notifier's deliveries), and sets this
+ *    state. Then the engine reads the moved runs again.
  * 5. What the old Space leaves goes once nothing names it: its Space
  *    document and its facts of no run (a Member that joined). The flow
  *    documents of a Project that joins another merge into it, once the
@@ -416,6 +418,7 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 					from,
 					to,
 				})),
+				...runCommandMoves(db, moves, personMap),
 				...(deps.moveStatements?.(moves) ?? []),
 				rows.moved(from),
 			);

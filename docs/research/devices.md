@@ -225,7 +225,9 @@ rewrites the Device's database, so it is careful:
    (the Host took the projects, `sync.mergePersonal`), `moved` (one
    `db.batch`: every row with `spaceMoveBatch`, the Host's Space becomes
    this Device's "Personal" with `adoptPersonalSpaceBatch`, the
-   notifier's deliveries, and the state), `pushed` (the exchange gave
+   commands of the moved runs (`run_command`, in the name of the Person
+   as the Host knows them), the notifier's deliveries, and the state),
+   `pushed` (the exchange gave
    the Host every moved run). A merge cut short goes on from its state.
    After `moved` it finishes by itself when the Host answers.
 5. **The Host.** It takes each project by its remote into the personal
@@ -284,10 +286,11 @@ reverse of the merge, and as careful:
    as its key): `planned` (the copy is made), `moved` (one `db.batch`: a
    new personal Space of the Device's own with
    `splitPersonalSpaceBatch`, the rows with `spaceMoveBatch` and its
-   `runsOf` the Device, the Host's Space renamed, the notifier's
-   deliveries, an unfinished merge ended, and the state), `done` (the
-   schedules of item 5 name no Device and are paused, and the new Space document took
-   its projects and Clones from the rows).
+   `runsOf` the Device, the Host's Space renamed, the commands of the
+   moved runs (`run_command`), the notifier's deliveries, an unfinished
+   merge ended, and the state), `done` (the schedules of item 5 name no
+   Device and are paused, and the new Space document took its projects
+   and Clones from the rows).
 4. **What comes along.** The projects that the Device has a Clone of or
    walked a run of, with their kept variables and the facts of no run
    that name them, and the runs that the Device walked. The projects
