@@ -1,14 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { device, organization, user } from "@nightshift/db/schema";
+import {
+	device,
+	member,
+	organization,
+	session,
+	user,
+} from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { requestAccess } from "../access";
 import { type Permissions, roleAllows } from "../index";
 import { createLocalSession } from "../local-session";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import {
+	adoptPersonalSpaceBatch,
 	ensurePersonalSpace,
 	LOCAL_EMAIL,
 	localPerson,
+	mirrorHostSpace,
 	personalSpaceId,
 	spacesOf,
 } from "./spaces";
@@ -245,5 +253,87 @@ describe("creating a Space", () => {
 		expect(roleAllows("viewer", { flow: ["save"] })).toBe(false);
 		expect(roleAllows("viewer", { schedule: ["save"] })).toBe(false);
 		expect(roleAllows("nobody", { project: ["add"] })).toBe(false);
+	});
+});
+
+describe("adopting the personal Space of the Home Host", () => {
+	/** Ada's own personal Space, and the copy of her personal Space on her Home Host. */
+	async function setUp(options: { member: boolean }) {
+		const ada = await sandbox.signUp("Ada");
+		const own = await personalSpaceId(sandbox.db, ada.userId);
+		if (!own) throw new Error("no personal Space");
+		const hosted = "space-on-host";
+		await mirrorHostSpace(sandbox.db, {
+			id: hosted,
+			name: "Personal on studio",
+		});
+		if (options.member) {
+			await sandbox.db.insert(member).values({
+				id: "m-hosted",
+				organizationId: hosted,
+				userId: ada.userId,
+				role: "owner",
+				createdAt: new Date(),
+			});
+		}
+		return { ada, own, hosted };
+	}
+
+	for (const withMember of [true, false]) {
+		test(`the Host's Space becomes the one personal Space, named Personal${withMember ? "" : ", also before a membership of it is here"}`, async () => {
+			const { ada, own, hosted } = await setUp({ member: withMember });
+			const statements = await adoptPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: own,
+				to: hosted,
+			});
+			await sandbox.db.batch(statements);
+
+			expect(await spacesOf(sandbox.db, ada.userId)).toEqual([
+				{ id: hosted, name: "Personal", personal: true, role: "owner" },
+			]);
+			// No second personal Space is made for her.
+			expect(await ensurePersonalSpace(sandbox.db, ada.userId)).toBe(hosted);
+			const [old] = await sandbox.db
+				.select()
+				.from(organization)
+				.where(eq(organization.id, own));
+			expect(old).toBeUndefined();
+		});
+	}
+
+	test("a session that worked in the old personal Space works in the new one", async () => {
+		const { ada, own, hosted } = await setUp({ member: true });
+		const statements = await adoptPersonalSpaceBatch(sandbox.db, {
+			personId: ada.userId,
+			from: own,
+			to: hosted,
+		});
+		await sandbox.db.batch(statements);
+		const sessions = await sandbox.db
+			.select({ active: session.activeOrganizationId })
+			.from(session)
+			.where(eq(session.userId, ada.userId));
+		expect(sessions.map((s) => s.active)).toEqual([hosted]);
+	});
+
+	test("only the Person's own personal Space can be adopted, into a Space this Replica has", async () => {
+		const { ada, own, hosted } = await setUp({ member: true });
+		const grace = await sandbox.signUp("Grace");
+		const theirs = await personalSpaceId(sandbox.db, grace.userId);
+		await expect(
+			adoptPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: theirs ?? "",
+				to: hosted,
+			}),
+		).rejects.toThrow("is not the personal Space");
+		await expect(
+			adoptPersonalSpaceBatch(sandbox.db, {
+				personId: ada.userId,
+				from: own,
+				to: "nowhere",
+			}),
+		).rejects.toThrow("is not on this Replica");
 	});
 });
