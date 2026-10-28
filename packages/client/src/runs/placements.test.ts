@@ -63,4 +63,21 @@ describe("where a run can go", () => {
 		const withHost = placementChoices([host, { ...desktop, lastRun: true }]);
 		expect(defaultPlacement(withHost, null)?.deviceId).toBe("host");
 	});
+
+	test("on a Host another person owns that offers you nothing, goes to one of your own Devices", () => {
+		const theirs = { ...host, offers: [] };
+		const choices = placementChoices([theirs, laptop]);
+		expect(defaultPlacement(choices, null)?.deviceId).toBe("laptop");
+		// Not to the latest run's Device either, when it is that Host.
+		const last = placementChoices([{ ...theirs, lastRun: true }, laptop]);
+		expect(defaultPlacement(last, null)?.deviceId).toBe("laptop");
+		// The person can still choose it.
+		expect(defaultPlacement(choices, "host")?.deviceId).toBe("host");
+		// When it offers a profile, it stays the default.
+		const offering = placementChoices([
+			{ ...host, offers: ["claude"] },
+			laptop,
+		]);
+		expect(defaultPlacement(offering, null)?.deviceId).toBe("host");
+	});
 });

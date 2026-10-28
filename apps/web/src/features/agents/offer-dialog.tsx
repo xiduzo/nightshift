@@ -33,6 +33,7 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
+	NativeSelectOptGroup,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Spinner } from "@nightshift/ui/components/spinner";
@@ -55,8 +56,10 @@ const CAPS: PermissionMode[] = [
 
 /**
  * "Offer to a Space…" on a profile: people in a shared Space may run
- * this profile on this computer, within the caps. It says plainly what
- * an Offer cannot hide: the agent runs with your login and your tools.
+ * this profile on this computer, within the caps. On a Host, the Host
+ * admin also offers it to the Personal of a person whose Host it is
+ * ("Personal of Ada"). It says plainly what an Offer cannot hide: the
+ * agent runs with your login and your tools.
  */
 export function OfferDialog({
 	profile,
@@ -91,6 +94,9 @@ function OfferForm({
 	const spaces = listed.data?.spaces ?? [];
 	const [spaceId, setSpaceId] = useState<string | null>(null);
 	const space = spaceId ?? spaces[0]?.id ?? "";
+	const chosen = spaces.find((s) => s.id === space);
+	const shared = spaces.filter((s) => !s.personal);
+	const personal = spaces.filter((s) => s.personal);
 	const [cap, setCap] = useState<PermissionMode>("acceptEdits");
 	const [sessions, setSessions] = useState("1");
 	const sessionCap = Number(sessions);
@@ -100,7 +106,7 @@ function OfferForm({
 		offerMutations.make({
 			onSuccess: () => {
 				toast.success(
-					`Offered ${profile.name} to ${spaces.find((s) => s.id === space)?.name ?? "the Space"}`,
+					`Offered ${profile.name} to ${chosen?.name ?? "the Space"}`,
 				);
 				void queryClient.invalidateQueries({ queryKey: offerQueries.all() });
 				onDone();
@@ -148,16 +154,27 @@ function OfferForm({
 						onChange={(event) => setSpaceId(event.target.value)}
 						disabled={spaces.length === 0}
 					>
-						{spaces.map((s) => (
-							<NativeSelectOption key={s.id} value={s.id}>
-								{s.name}
-							</NativeSelectOption>
-						))}
+						{shared.length > 0 && personal.length > 0 ? (
+							<>
+								<NativeSelectOptGroup label="Shared Spaces">
+									{shared.map(spaceOption)}
+								</NativeSelectOptGroup>
+								<NativeSelectOptGroup label="Personal Spaces on this Host">
+									{personal.map(spaceOption)}
+								</NativeSelectOptGroup>
+							</>
+						) : (
+							spaces.map(spaceOption)
+						)}
 					</NativeSelect>
 					{!listed.isLoading && spaces.length === 0 ? (
 						<FieldDescription>
 							You can offer to a shared Space where you are an owner or an
 							admin. Create one in the Space switcher.
+						</FieldDescription>
+					) : chosen?.personal ? (
+						<FieldDescription>
+							Only this person can run it, and only in their Personal.
 						</FieldDescription>
 					) : null}
 				</Field>
@@ -219,6 +236,14 @@ function OfferForm({
 				</Button>
 			</DialogFooter>
 		</form>
+	);
+}
+
+function spaceOption(space: { id: string; name: string }) {
+	return (
+		<NativeSelectOption key={space.id} value={space.id}>
+			{space.name}
+		</NativeSelectOption>
 	);
 }
 

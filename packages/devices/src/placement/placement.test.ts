@@ -1465,4 +1465,41 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 			}),
 		).rejects.toThrow("test is not your device. It runs only Agent nodes");
 	});
+
+	test("started without a Device, it goes to Ada's own laptop with the project, not the Host that offers her nothing", async () => {
+		const document = await documents.open(ADA_SPACE);
+		await document.change(() =>
+			recordClone(document, {
+				projectId: adaProject,
+				deviceId: "ada-laptop",
+				deviceName: "ada-laptop",
+			}),
+		);
+		online.add("ada-laptop");
+		// B's fake serves the laptop's calls, from Ada's folder.
+		projectId = adaProject;
+		const hello = flow([command("hello", "echo hello")]);
+		const ada = engine.space(ADA_SPACE, { personId: ADA });
+		const started = await ada.startRun({
+			projectId: adaProject,
+			flow: hello,
+			startedBy: ADA,
+		});
+		expect(started.device).toMatchObject({ id: "ada-laptop" });
+		await waitFor(
+			async () => {
+				const run = await ada.getRun(started.id);
+				return run.status === "finished" ? run : null;
+			},
+			{ label: "run finished", timeoutMs: 10_000 },
+		);
+		// Through an Offer the Host is hers to use: it stays the default.
+		await offer();
+		const onHostToo = await ada.startRun({
+			projectId: adaProject,
+			flow: onHost(),
+			startedBy: ADA,
+		});
+		expect(onHostToo.device).toMatchObject({ id: a.deviceId });
+	});
 });

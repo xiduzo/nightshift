@@ -122,7 +122,9 @@ export function createSpaces(deps: SpacesDeps) {
 	/**
 	 * Where a run goes when the person names no Device: this computer, or,
 	 * when it has no Clone of the project (a Host without one), the Device
-	 * of the project's latest run, else the first of the person's own.
+	 * of the project's latest run, else the first of the person's own. A
+	 * Host that another Person owns and that offers this person nothing
+	 * in the Space is no default: one of the person's own Devices is.
 	 */
 	async function runDevice(
 		spaceId: string,
@@ -131,10 +133,17 @@ export function createSpaces(deps: SpacesDeps) {
 	): Promise<string | undefined> {
 		if (input.deviceId !== undefined || !actor) return input.deviceId;
 		const project = await projects.find(input.projectId, spaceId);
-		if (project.repoPath !== null) return undefined;
+		// In a Space a Host keeps, this computer's own Person starts here.
+		if (project.repoPath !== null && (await deps.hostOf(spaceId)) !== null) {
+			return undefined;
+		}
 		const list = await placementsOf(spaceId, actor.personId, input.projectId);
+		const usable = (p: Placement) =>
+			p.offers === undefined || p.offers.length > 0;
+		const here = list.find((p) => p.thisDevice);
+		if (project.repoPath !== null && (!here || usable(here))) return undefined;
 		const pick =
-			list.find((p) => p.lastRun) ??
+			list.find((p) => p.lastRun && usable(p)) ??
 			list.find((p) => p.offers === undefined) ??
 			list[0];
 		return pick && !pick.thisDevice ? pick.deviceId : undefined;
