@@ -286,7 +286,7 @@ reverse of the merge, and as careful:
    `splitPersonalSpaceBatch`, the rows with `spaceMoveBatch` and its
    `runsOf` the Device, the Host's Space renamed, the notifier's
    deliveries, an unfinished merge ended, and the state), `done` (the
-   schedules of item 5 name no Device, and the new Space document took
+   schedules of item 5 name no Device and are paused, and the new Space document took
    its projects and Clones from the rows).
 4. **What comes along.** The projects that the Device has a Clone of or
    walked a run of, with their kept variables and the facts of no run
@@ -298,10 +298,13 @@ reverse of the merge, and as careful:
    Clone too, so each run it walked keeps its project. This is wider
    than ADR 1 decision 6, which names only the projects with a Clone.
 5. **Schedules.** A schedule of those projects that names another
-   Device would never fire again: the new Space has only this Device. It
-   loses its Device (and its Person), so it fires here. The split counts
-   them, and `nightshift leave` and the web app say so: "2 schedules
-   named another device. They run on this computer now."
+   Device is paused on this Device. The Host still fires it on the other
+   Device, so a run here too would run it twice. It loses its Device
+   (and its Person), so when the person turns it on, it fires here: the
+   new Space has only this Device. A schedule that names this Device
+   stays as it is. The split counts the paused ones, and `nightshift
+   leave` and the web app say so: "2 schedules named another device.
+   They are paused here. Turn them on to run them on this computer."
 6. **What stays.** The Host keeps everything. On the Device, the Host's
    Space keeps the runs other Devices walked and the projects without a
    Clone here. The Person is no longer a Member of it on the Device, so

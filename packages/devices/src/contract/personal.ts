@@ -138,7 +138,8 @@ export type SplitResult = {
 	runs: number;
 	/**
 	 * How many schedules of those projects named another Device: they
-	 * fire on this computer now, since it keeps the new Space alone.
+	 * are paused on this computer, since the Host still fires them there.
+	 * Turned on, they fire here.
 	 */
 	unpinned: number;
 	/** The copy of the database made before the split changed anything. */

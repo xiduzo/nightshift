@@ -79,8 +79,10 @@ personal or shared.
   it otherwise.
 - A Device that leaves also takes the Projects that it walked a run of
   without a Clone, so each Run that it walked keeps its Project. A
-  schedule of those Projects that names another Device fires on the
-  leaving Device.
+  schedule of those Projects that names another Device is paused on the
+  leaving Device, because the Host still fires it on that Device. When
+  the person turns it on, it fires on the leaving Device. (Amended
+  2026-10-28: it fired there at once before, which ran it twice.)
 - A Device without a Home Host keeps its own personal Space, as today.
 - The merge is a migration of rows between Spaces. Every row carries its
   Space id (TECH constraint), so the migration rewrites Space ids and the

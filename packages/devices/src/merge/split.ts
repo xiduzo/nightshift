@@ -33,9 +33,12 @@ import { type SplitRow, splitRows } from "./split-rows";
  *
  * The Projects keep their ids, so their flow documents stay as they are
  * here, with their history; they no longer sync with the Host. A schedule
- * of theirs that names another Device would never fire again: it names
- * no Device after the split, so it fires here, the one Replica of the
- * new Space. The result counts them (`unpinned`). The rows
+ * of theirs that names another Device is paused here: the Host still
+ * fires it on that Device, and a run here too would be a second run of
+ * it. It names no Device after the split, so when the person turns it on
+ * it fires here, the one Replica of the new Space. The result counts
+ * them (`unpinned`). A schedule that names this computer stays as it
+ * is. The rows
  * that come along name the Person by their id here again. The Host's
  * Space stays on this computer with the rest of its rows, named
  * "Personal on <Host>", but the Person is no longer a Member of it here:
@@ -56,9 +59,10 @@ import { type SplitRow, splitRows } from "./split-rows";
  *    with this computer's runs only), names the Host's Space "Personal
  *    on <Host>", adds what the composition root moves of the same runs
  *    (`moveStatements`), ends a merge that is not done, and sets this
- *    state with the count of the schedules to unpin. Then the engine
+ *    state with the count of the schedules to pause. Then the engine
  *    reads the moved runs again.
- * 4. `done`: the schedules that name another Device name none, and the
+ * 4. `done`: the schedules that name another Device name none and are
+ *    paused, and the
  *    new Space's document takes its Projects and Clones from the rows, as
  *    a new document does on its first open.
  *
@@ -196,11 +200,12 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 	}
 
 	/**
-	 * The schedules of the Projects that name another Device name none:
-	 * without it they never fire. A schedule's Person goes with it: it
-	 * names who the runs on that Device ran for. Runs again safely.
+	 * The schedules of the Projects that name another Device are paused
+	 * and name none: the Host fires them there still, and turned on they
+	 * fire here. A schedule's Person goes with its Device: it names who
+	 * the runs on that Device ran for. Runs again safely.
 	 */
-	async function unpin(projects: readonly string[]): Promise<void> {
+	async function pauseElsewhere(projects: readonly string[]): Promise<void> {
 		for (const id of projects) {
 			const document = await deps.flows.open(id);
 			const keys = pinnedElsewhere(document);
@@ -212,7 +217,7 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 						person: _person,
 						...rest
 					} = document.schedules.get(key) as Record<string, unknown>;
-					document.schedules.set(key, rest);
+					document.schedules.set(key, { ...rest, enabled: false });
 				}
 			});
 		}
@@ -269,7 +274,7 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		}
 
 		if (state === "moved") {
-			await unpin(projects);
+			await pauseElsewhere(projects);
 			// Its first open takes the Projects and Clones from the rows.
 			await deps.spaces.open(to);
 			await rows.done(to);

@@ -43,7 +43,7 @@ describe("nightshift leave", () => {
 		]);
 	});
 
-	test("the result says which schedules run on this computer now", () => {
+	test("the result says which schedules are paused here, and how to run them on this computer", () => {
 		expect(
 			leaveResultLines({
 				host: { id: "h", name: "studio" },
@@ -59,7 +59,7 @@ describe("nightshift leave", () => {
 				waiting: null,
 			}),
 		).toContain(
-			"2 schedules named another device. They run on this computer now.",
+			"2 schedules named another device. They are paused here. Turn them on to run them on this computer.",
 		);
 	});
 

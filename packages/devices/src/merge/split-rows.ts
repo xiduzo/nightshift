@@ -16,7 +16,7 @@ export type SplitRow = {
 	/** The Projects that came along. Empty until `moved`. */
 	projects: string[];
 	runs: number;
-	/** How many schedules that named another Device fire here now. */
+	/** How many schedules that named another Device are paused here now. */
 	unpinned: number;
 	backup: string;
 };
