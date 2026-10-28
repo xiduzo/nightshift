@@ -11,6 +11,7 @@ export {
 	type ChatExchange,
 	chatCanUseTools,
 	chatTurn,
+	chooseProject,
 	resumesOnAnotherModel,
 	type SuggestFieldInput,
 	serveTools,

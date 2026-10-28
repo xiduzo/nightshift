@@ -104,16 +104,14 @@ bun run db:push
 bun run dev            # web UI and API with hot reload
 ```
 
-Then open the web UI, add a project, and give it a [starter flow](examples/starters/). Night Shift keeps flows itself, so do not copy the files into your project. Ask an agent that has the `nightshift` MCP server to save them:
+Then open the web UI, add a project, and give it the [starter flows](examples/starters/). Night Shift keeps flows itself, so do not copy the files into your project. Choose Import in the project's flow list, or import them from your project's folder:
 
 ```bash
-# from this checkout, with the dev daemon on port 3000 and the web UI on 3001:
-claude mcp add nightshift -- bun "$PWD/apps/server/src/cli.ts" mcp --ui http://localhost:3001
+# from your project's folder, with the dev daemon on port 3000:
+for file in <this checkout>/examples/starters/.nightshift/flows/*.json; do
+  bun <this checkout>/apps/server/src/cli.ts flows import "$file"
+done
 ```
-
-Start Claude Code in your project's folder and ask: "Save each flow in `<this checkout>/examples/starters/.nightshift/flows/` with `save_flow`."
-
-The editor gets a JSON import for this (planned, [ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
 
 Open a flow in the editor, change the prompts and the check to fit your project, and start a run.
 
@@ -137,6 +135,21 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | `per-file` | Applies one instruction to every file that matches a glob. |
 
 Details are in [examples/starters/](examples/starters/). Night Shift's own flows are in [`.nightshift/`](.nightshift/) until the import on upgrade moves them into Night Shift ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)): a review of each pull request, night chores on issues labelled `night`, and a weekly dependency bump.
+
+### Flows from a terminal
+
+A person or an agent in a terminal reads and saves flows through `nightshift`, never as files. Night Shift must run on this computer. Each save is a new revision of the flow, and Night Shift checks it.
+
+```bash
+nightshift flows list                        # name, steps, errors, description
+nightshift flows get fix-issue > fix.json    # the flow as JSON
+nightshift flows save fix-issue fix.json     # or from stdin; prints its problems
+nightshift flows export fix-issue --out ./   # a file to import elsewhere
+nightshift flows import fix-issue.json       # a new flow; a taken name gets a suffix
+nightshift flows revisions fix-issue         # who saved what, newest first
+```
+
+The commands work in the project of the folder you run them in. `--project <id, name or folder>` picks another one. For an agent, `nightshift mcp` serves the same reads and saves as MCP tools: `claude mcp add nightshift -- nightshift mcp`.
 
 ### Run it on a server
 

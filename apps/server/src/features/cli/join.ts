@@ -27,7 +27,7 @@ export function defaultDaemonUrl(
 }
 
 /** The procedures of Night Shift on this computer, once it answers. Exits when it does not. */
-async function daemonClient(daemon: string): Promise<AppRouterClient> {
+export async function daemonClient(daemon: string): Promise<AppRouterClient> {
 	const client: AppRouterClient = createORPCClient(
 		new RPCLink({ url: `${daemon.replace(/\/$/, "")}/rpc` }),
 	);

@@ -23,6 +23,11 @@ import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../port";
 import { flowJson } from "./prompts";
 import {
+	chooseProject,
+	projectOfFolder,
+	type TerminalProject,
+} from "./terminal-project";
+import {
 	AUTHORING_TOOLS,
 	type AuthoringProfile,
 	type AuthoringRun,
@@ -34,9 +39,6 @@ import {
 	issueLines,
 	runReport,
 } from "./tools";
-
-/** A project of the Space. `path`: its Clone on this computer, or null. */
-export type TerminalProject = { id: string; name: string; path: string | null };
 
 /** A run in the list of `list_runs`. */
 export type TerminalRunSummary = {
@@ -113,39 +115,6 @@ const projectOnly: Record<string, unknown> = {
 	properties: { project: projectProperty },
 };
 
-const trimSlash = (path: string) => path.replace(/[/\\]+$/, "");
-
-/** `folder` is `root` or inside it. */
-function within(folder: string, root: string): boolean {
-	const f = trimSlash(folder);
-	const r = trimSlash(root);
-	return f === r || f.startsWith(`${r}/`) || f.startsWith(`${r}\\`);
-}
-
-/** The project an id, a name or a folder names. */
-function match(
-	projects: TerminalProject[],
-	wanted: string,
-): TerminalProject | undefined {
-	const byId = projects.find((p) => p.id === wanted);
-	if (byId) return byId;
-	const named = projects.filter(
-		(p) => p.name.toLowerCase() === wanted.toLowerCase(),
-	);
-	if (named.length === 1) return named[0];
-	return deepest(projects, wanted);
-}
-
-/** The project whose Clone holds `folder`: the deepest one. */
-function deepest(
-	projects: TerminalProject[],
-	folder: string,
-): TerminalProject | undefined {
-	return projects
-		.filter((p) => p.path !== null && within(folder, p.path))
-		.sort((a, b) => (b.path?.length ?? 0) - (a.path?.length ?? 0))[0];
-}
-
 /** Checks `flow` as the editor does, against the project as it is now. */
 async function checkIn(
 	port: TerminalPort,
@@ -195,24 +164,27 @@ export function terminalTools(
 			typeof given === "string" && given.trim() !== ""
 				? given.trim()
 				: options.project?.trim() || null;
-		const projects = await port.projects();
-		if (wanted) {
-			const found = match(projects, wanted);
-			if (!found) {
-				throw new Error(
-					`Night Shift has no project "${wanted}". Call ${TERMINAL_TOOLS.listProjects} for the ids and names.`,
-				);
-			}
-			return found;
-		}
-		const here = options.folder ? deepest(projects, options.folder) : null;
-		if (here) return here;
-		if (projects.length === 1 && projects[0]) return projects[0];
-		throw new Error(
-			projects.length === 0
-				? "Night Shift has no projects yet. Add one in Night Shift first."
-				: `Name the project in \`project\`. Call ${TERMINAL_TOOLS.listProjects} for the ids and names.`,
+		const choice = chooseProject(
+			await port.projects(),
+			wanted,
+			options.folder ?? null,
 		);
+		switch (choice.kind) {
+			case "found":
+				return choice.project;
+			case "unknown":
+				throw new Error(
+					`Night Shift has no project "${choice.wanted}". Call ${TERMINAL_TOOLS.listProjects} for the ids and names.`,
+				);
+			case "none":
+				throw new Error(
+					"Night Shift has no projects yet. Add one in Night Shift first.",
+				);
+			case "ambiguous":
+				throw new Error(
+					`Name the project in \`project\`. Call ${TERMINAL_TOOLS.listProjects} for the ids and names.`,
+				);
+		}
 	}
 
 	return [
@@ -225,7 +197,7 @@ export function terminalTools(
 			const projects = await port.projects();
 			if (projects.length === 0) return "Night Shift has no projects yet.";
 			const here = options.folder
-				? deepest(projects, options.folder)
+				? projectOfFolder(projects, options.folder)
 				: undefined;
 			return JSON.stringify(
 				projects.map((p) => ({ ...p, current: p.id === here?.id })),
