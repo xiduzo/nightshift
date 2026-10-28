@@ -1,10 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { Flow } from "../document";
-import { singleAgentFlow } from "../document";
-import { readSchedulesFile, writeFlowFile, writeSchedulesFile } from "../files";
+import { describe, expect, test } from "bun:test";
 import {
 	cronError,
 	cronToTimeAndDays,
@@ -20,12 +14,8 @@ import {
 	validateSchedules,
 } from "./schedules";
 
-/** Where the schedules of a repo live: `.nightshift/schedules.json`. */
 // biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 const HOOK_SECRET = "${HOOK_SECRET}";
-
-const schedulesPath = (repoPath: string) =>
-	join(repoPath, ".nightshift", "schedules.json");
 
 /** Local time, the daemon's clock. */
 const at = (day: number, hours: number, minutes = 0) =>
@@ -297,89 +287,5 @@ describe("validateSchedules", () => {
 		expect(parse("hunter2")).toBe(false);
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 		expect(parse("${}")).toBe(false);
-	});
-});
-
-describe("the schedules file", () => {
-	let repo: string;
-	beforeEach(async () => {
-		repo = await mkdtemp(join(tmpdir(), "nightshift-schedules-"));
-	});
-	afterEach(async () => {
-		await rm(repo, { recursive: true, force: true });
-	});
-
-	const flow = (): Flow => ({
-		...singleAgentFlow({
-			prompt: "Fix {{epic}}",
-			model: "sonnet",
-			permissionMode: "acceptEdits",
-		}),
-		inputs: [{ name: "epic", type: "text", required: true }],
-	});
-
-	test("a missing file is no schedules", async () => {
-		expect(await readSchedulesFile(repo)).toEqual({
-			path: schedulesPath(repo),
-			schedules: [],
-			issues: [],
-		});
-	});
-
-	test("round-trips, as pretty JSON with a newline, with issues", async () => {
-		await writeFlowFile(repo, "night", flow());
-		const schedules = [
-			schedule({ inputs: { epic: "42" }, stopAt: "07:00", baseRef: "main" }),
-			schedule({ id: "other", flow: "gone", enabled: false }),
-		];
-		const issues = await writeSchedulesFile(repo, schedules);
-		expect(issues).toEqual([
-			{
-				severity: "error",
-				message: 'The flow "gone" does not exist.',
-				scheduleId: "other",
-			},
-		]);
-		const text = await readFile(schedulesPath(repo), "utf8");
-		expect(text).toBe(
-			`${JSON.stringify({ version: 1, schedules }, null, "\t")}\n`,
-		);
-		expect(await readSchedulesFile(repo)).toEqual({
-			path: schedulesPath(repo),
-			schedules,
-			issues,
-		});
-		expect((await readSchedulesFile(repo, { validate: false })).issues).toEqual(
-			[],
-		);
-	});
-
-	test("checks the inputs against the flow file", async () => {
-		await writeFlowFile(repo, "night", flow());
-		expect(await writeSchedulesFile(repo, [schedule()])).toEqual([
-			{
-				severity: "error",
-				message: 'The input "epic" needs a value.',
-				scheduleId: "night",
-			},
-		]);
-	});
-
-	test("a file that is not JSON or not the schema loads empty with issues", async () => {
-		await mkdir(join(repo, ".nightshift"), { recursive: true });
-		await writeFile(schedulesPath(repo), "{ nope");
-		const broken = await readSchedulesFile(repo);
-		expect(broken.schedules).toEqual([]);
-		expect(broken.issues[0]?.message).toStartWith("Not valid JSON");
-
-		await writeFile(
-			schedulesPath(repo),
-			JSON.stringify({ version: 1, schedules: [{ id: "x", flow: 7 }] }),
-		);
-		const wrong = await readSchedulesFile(repo);
-		expect(wrong.schedules).toEqual([]);
-		expect(wrong.issues.map((i) => i.message)).toContain(
-			"schedules.0.flow: Invalid input: expected string, received number",
-		);
 	});
 });

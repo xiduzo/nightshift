@@ -1,4 +1,4 @@
-/** The schedules file: when a flow runs on its own, at set times or when a webhook arrives. */
+/** Schedules: when a flow runs on its own, at set times or when a webhook arrives. */
 
 export {
 	cronError,
@@ -7,14 +7,12 @@ export {
 	latestCronTime,
 	nextCronTimes,
 	nextTimeOfDay,
-	SCHEDULES_VERSION,
 	type Schedule,
 	type ScheduleFlowInfo,
 	type ScheduleInput,
 	type ScheduleIssue,
 	type SchedulesFile,
 	scheduleSchema,
-	schedulesFileSchema,
 	type TimeAndDays,
 	timeAndDaysToCron,
 	validateSchedules,

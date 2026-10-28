@@ -5,9 +5,8 @@ import { fileURLToPath } from "node:url";
 
 /**
  * Where a daemon keeps what happened on this computer: the database, the
- * transcripts and the command logs, together in one data directory. A
- * project's `.nightshift/` folder holds only what is committed (flows and
- * schedules), never run history.
+ * transcripts and the command logs, together in one data directory, never
+ * in a project.
  *
  * - `NIGHTSHIFT_DATA_DIR` wins. `~/` is expanded; a relative path resolves
  *   against the working directory.
