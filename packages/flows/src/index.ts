@@ -1,4 +1,4 @@
-// Browser-safe. File access lives in "@nightshift/flows/files".
+// Browser-safe: no file or network access.
 
 export {
 	type AssistantAgent,

@@ -8,7 +8,6 @@ import {
 	HostUnreachableError,
 	type ListedProject,
 	lastKnownProfiles,
-	NOT_ON_THIS_COMPUTER,
 	type NodeToPlace,
 	type OfferedPlacement,
 	type OwnDevice,
@@ -633,34 +632,6 @@ export function createPlacement(deps: PlacementDeps) {
 		return { id: target.deviceId, name: target.name };
 	}
 
-	/**
-	 * The flow files of a project without a Clone here: from the Clone of
-	 * another of the Person's Devices.
-	 */
-	async function flowsElsewhere(
-		spaceId: string,
-		projectId: string,
-		actor: string | undefined,
-	): Promise<FlowSources> {
-		// In a Host's Space, the Person as the Host knows them.
-		const personId = actor
-			? await personInSpace(db, spaceId, actor)
-			: undefined;
-		const at = personId
-			? (await placements(spaceId, personId, projectId)).find(
-					(p) => !p.thisDevice,
-				)
-			: undefined;
-		if (!personId || !deps.work || !at) {
-			throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
-		}
-		return remoteDevice(
-			work,
-			{ id: at.deviceId, name: at.name },
-			{ spaceId, projectId, personId, runId: null },
-		).flows(projectId);
-	}
-
 	return {
 		plan,
 		deviceFor,
@@ -669,6 +640,5 @@ export function createPlacement(deps: PlacementDeps) {
 		devicesFor,
 		namesFor,
 		placements,
-		flowsElsewhere,
 	};
 }

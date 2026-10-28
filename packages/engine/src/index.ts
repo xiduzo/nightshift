@@ -171,7 +171,6 @@ export {
 	type MovingProject,
 	memberName,
 	memberRole,
-	NOT_ON_THIS_COMPUTER,
 	PROJECT_NOT_FOUND,
 	type ProjectReadiness,
 	projectClones,

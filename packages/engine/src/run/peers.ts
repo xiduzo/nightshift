@@ -157,12 +157,6 @@ export type PlacementPort = {
 		personId: string,
 		projectId: string,
 	): Promise<Placement[]>;
-	/** The flow files of a project without a Clone here: from another of the Person's Devices. */
-	flowsElsewhere(
-		spaceId: string,
-		projectId: string,
-		actor: string | undefined,
-	): Promise<FlowSources>;
 };
 
 /** What a run's plan starts from (`PlacementPort.plan`). */

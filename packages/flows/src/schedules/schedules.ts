@@ -39,8 +39,7 @@ import { ruleProblem, templateRefs } from "../template";
  *
  * The schema checks shape only. `validateSchedules` checks meaning (the flow
  * exists and runs, the cron line parses, the inputs fit the flow, a
- * schedule has a cron line or a webhook). Browser-safe; file access lives
- * in `@nightshift/flows/files`.
+ * schedule has a cron line or a webhook). Browser-safe.
  */
 
 export const SCHEDULES_VERSION = 1;

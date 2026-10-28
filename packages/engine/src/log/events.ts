@@ -699,7 +699,7 @@ export type StepOutcome =
 	| "stopped" // a person stopped the run
 	| "interrupted"; // the daemon died while the step ran
 
-/** What started a run: a person, or a schedule of `.nightshift/schedules.json` at a cron time or on a webhook. */
+/** What started a run: a person, or a schedule of its project at a cron time or on a webhook. */
 export type RunTrigger =
 	| { kind: "manual" }
 	/** `at`: the cron time the run started for (epoch ms). */

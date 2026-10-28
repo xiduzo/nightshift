@@ -89,7 +89,7 @@ flowchart LR
 | --- | --- |
 | `packages/config` | The shared TypeScript configuration. No code. |
 | `packages/db` | Drizzle schema on libsql. Durable facts and the event log. Full transcripts live on disk, indexed here. |
-| `packages/flows` | The flow schema (zod), the `.nightshift/` reader (`./files`: after [ADR 2](adr/0002-flows-are-night-shift-data.md), only the one import on upgrade reads these files), and the validator (unbounded loops, unknown names, missing outcomes). Each node type has one file in `src/nodes/` with its schema, its checks and its output fields. |
+| `packages/flows` | The flow schema (zod) and the validator (unbounded loops, unknown names, missing outcomes). Each node type has one file in `src/nodes/` with its schema, its checks and its output fields. |
 | `packages/ui` | Shared components and tokens. |
 | `packages/auth` | Identity and access on Better Auth: login, two-factor, pairing, device keys, Spaces, members and roles. |
 | `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, CLI tool permissions, the decider providers. |

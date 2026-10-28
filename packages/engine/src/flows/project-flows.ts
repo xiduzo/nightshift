@@ -6,20 +6,12 @@ import type {
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
-import {
-	deleteFlowFile,
-	flowFilePath,
-	readFlowSources,
-	readSchedulesFile,
-	writeFlowFile,
-	writeSchedulesFile,
-} from "@nightshift/flows/files";
 import type { FlowRevision, RevisionKind } from "./flow-document";
 
 /**
  * Where the engine reads and saves the flows and the schedules of a
- * project: one port for every read and every save. The file adapter
- * (`fileProjectFlows`) keeps them in the Clone's `.nightshift/` folder.
+ * project: one port for every read and every save. The document adapter
+ * (`documentProjectFlows`) keeps them in the project's flow document.
  */
 
 /** The project a read or a save is about, and who asks. */
@@ -65,8 +57,7 @@ export type ProjectFlows = {
 	): Promise<FlowIssue[]>;
 	/**
 	 * The revisions of the flow of that name, oldest first. Empty for a
-	 * flow without any: one that does not exist, and every flow of the
-	 * file adapter, which keeps no revisions.
+	 * flow that does not exist.
 	 */
 	revisions(of: FlowsOf, name: string): Promise<FlowRevision[]>;
 	/** Removes a flow. Refuses (`not-found`) a flow that does not exist. */
@@ -82,70 +73,3 @@ export type ProjectFlows = {
 		schedules: readonly Schedule[],
 	): Promise<ScheduleIssue[]>;
 };
-
-export type FileProjectFlowsDeps = {
-	/** The project in the Space, with its Clone here (`repoPath`) or null. Throws when it is not in the Space. */
-	find(
-		projectId: string,
-		spaceId: string,
-	): Promise<{ repoPath: string | null }>;
-	/** The project with its Clone here. Throws without one. */
-	get(projectId: string, spaceId?: string): Promise<{ repoPath: string }>;
-	/** The flow files of a project without a Clone here, from another of the Person's Devices. */
-	elsewhere(
-		spaceId: string,
-		projectId: string,
-		personId: string | undefined,
-	): Promise<FlowSources>;
-};
-
-/**
- * The flows and schedules in the Clone's `.nightshift/` folder. A Person
- * who reads in a Space without a Clone here reads the Clone of another of
- * their Devices. Every other read and every save needs the Clone here.
- */
-export function fileProjectFlows(deps: FileProjectFlowsDeps): ProjectFlows {
-	async function inClone(repoPath: string): Promise<ProjectFlowSet> {
-		return {
-			sources: await readFlowSources(repoPath),
-			pathOf: (name) => flowFilePath(repoPath, name),
-		};
-	}
-
-	const repoPath = async ({ projectId, spaceId }: FlowsOf) =>
-		(await deps.get(projectId, spaceId)).repoPath;
-
-	return {
-		async flows({ projectId, spaceId, personId }) {
-			if (spaceId === undefined) {
-				return inClone((await deps.get(projectId)).repoPath);
-			}
-			const row = await deps.find(projectId, spaceId);
-			if (row.repoPath !== null) return inClone(row.repoPath);
-			return {
-				sources: await deps.elsewhere(spaceId, projectId, personId),
-				pathOf: (name) => flowFilePath("", name),
-			};
-		},
-
-		async save(of, name, flow) {
-			return writeFlowFile(await repoPath(of), name, flow);
-		},
-
-		async remove(of, name) {
-			await deleteFlowFile(await repoPath(of), name);
-		},
-
-		async revisions() {
-			return [];
-		},
-
-		async schedules(of, options = {}) {
-			return readSchedulesFile(await repoPath(of), options);
-		},
-
-		async saveSchedules(of, schedules) {
-			return writeSchedulesFile(await repoPath(of), schedules);
-		},
-	};
-}

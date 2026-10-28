@@ -1,7 +1,6 @@
 import type { OwnDevice } from "../contract";
 import { lastKnownProfiles } from "../device-config";
 import { followOwnStep } from "../log";
-import { NOT_ON_THIS_COMPUTER } from "../projects";
 import {
 	type PeerContext,
 	type Peers,
@@ -78,9 +77,6 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 						name,
 						thisDevice,
 					}));
-			},
-			async flowsElsewhere() {
-				throw new Error(NOT_ON_THIS_COMPUTER);
 			},
 		},
 		offers: {

@@ -35,9 +35,9 @@ export type Device = {
 	capabilities(query?: CapabilityQuery): Promise<Capabilities>;
 	/**
 	 * The project's flows on this Device, unparsed: its flow document. A
-	 * Device from before ADR 2 answers with the flow files of its Clone.
-	 * A run starts from the flow document of its Walker (`PlanDevices.flows`):
-	 * this answers a Device that asks over the wire.
+	 * run starts from the flow document of its Walker (`PlanDevices.flows`):
+	 * this answers a Walker of an older Night Shift that asks over the
+	 * wire. It goes one release after ADR 2.
 	 */
 	flows(projectId: string): Promise<FlowSources>;
 	/**

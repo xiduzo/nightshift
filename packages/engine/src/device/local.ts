@@ -19,7 +19,6 @@ import {
 	isCustomHarness,
 	type ProfileSettings,
 } from "@nightshift/flows";
-import { readFlowSources } from "@nightshift/flows/files";
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
@@ -112,8 +111,8 @@ export type LocalDeviceDeps = {
 	 */
 	clonePath?: (projectId: string) => Promise<string | null>;
 	/**
-	 * The project's flows: its flow document (ADR 2). Without it, the flow
-	 * files of the project's Clone here.
+	 * The project's flows: its flow document (ADR 2), for a Walker of an
+	 * older Night Shift that asks this Device for them. Without it: none.
 	 */
 	flows?: (projectId: string) => Promise<FlowSources>;
 	/**
@@ -382,10 +381,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return callServerTool(server, input);
 		},
 		decide,
-		flows: async (projectId) =>
-			deps.flows
-				? deps.flows(projectId)
-				: readFlowSources(await cloneOf(projectId)),
+		flows: async (projectId) => deps.flows?.(projectId) ?? {},
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
 			const readiness = await checkProjectFolder(repoPath, { git });
