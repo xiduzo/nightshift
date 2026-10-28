@@ -1,5 +1,5 @@
 {
-	"version": 6,
+	"version": 7,
 	"description": "A neutral copy of the shape of a build flow: intake, spec, build, review, ship.",
 	"inputs": [
 		{

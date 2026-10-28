@@ -24,7 +24,7 @@ import {
 import { suggestionPrompt } from "./suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
-	version: 6,
+	version: 7,
 	inputs: [{ name: "issue", type: "text", description: "The issue to fix" }],
 	variables: [{ name: "tries", type: "number" }],
 	start: "plan",
@@ -33,14 +33,14 @@ const flow: Flow = flowSchema.parse({
 			id: "plan",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Plan the fix for {{issue}}.",
 		},
 		{
 			id: "build",
 			type: "agent",
 			position: { x: 300, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Build {{plan.data.steps}} on {{run.branch}}.",
 		},
 		{

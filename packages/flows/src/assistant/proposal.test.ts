@@ -4,7 +4,7 @@ import type { FlowIssue } from "../validate";
 import { proposalIssues } from "./proposal";
 
 const valid: FlowInput = {
-	version: 6,
+	version: 7,
 	inputs: [{ name: "task", type: "text" }],
 	start: "build",
 	nodes: [
@@ -12,7 +12,7 @@ const valid: FlowInput = {
 			id: "build",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Do {{task}}.",
 		},
 		{
@@ -29,14 +29,14 @@ const valid: FlowInput = {
 };
 
 const draft: Flow = flowSchema.parse({
-	version: 6,
+	version: 7,
 	start: "only",
 	nodes: [
 		{
 			id: "only",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "old",
+			profile: { device: "mac", profile: "old" },
 			connections: ["jira"],
 			prompt: "Hi.",
 		},
@@ -56,7 +56,7 @@ describe("proposalIssues", () => {
 		for (const proposal of [null, "flow", { ...valid, version: 4 }, {}]) {
 			const issues = proposalIssues(draft, proposal);
 			expect(issues).toHaveLength(1);
-			expect(issues[0]?.message).toContain('"version": 6');
+			expect(issues[0]?.message).toContain('"version": 7');
 		}
 	});
 
@@ -98,7 +98,7 @@ describe("proposalIssues", () => {
 		build.connections = ["github", "made_up"];
 		const issues = errors(
 			proposalIssues(draft, proposal, {
-				profiles: ["reviewer"],
+				profiles: [{ device: "mac", profile: "reviewer" }],
 				connections: ["github"],
 			}),
 		);
@@ -109,7 +109,7 @@ describe("proposalIssues", () => {
 			],
 			[
 				"build",
-				'Neither this computer nor the project has a profile "worker". Use one they have.',
+				'The device "mac" has no profile "worker". Use a device and a profile from the list of profiles.',
 			],
 		]);
 	});
@@ -118,7 +118,7 @@ describe("proposalIssues", () => {
 		const proposal = structuredClone(valid);
 		const build = proposal.nodes[0];
 		if (build?.type !== "agent") throw new Error("agent");
-		build.profile = "old";
+		build.profile = { device: "mac", profile: "old" };
 		build.connections = ["jira"];
 		expect(
 			errors(
@@ -129,7 +129,7 @@ describe("proposalIssues", () => {
 
 	test("a Call node checks the flows of the project", () => {
 		const proposal: FlowInput = {
-			version: 6,
+			version: 7,
 			start: "sub",
 			nodes: [
 				{
@@ -148,7 +148,7 @@ describe("proposalIssues", () => {
 
 	test("a flow that calls itself, by its own name", () => {
 		const proposal: FlowInput = {
-			version: 6,
+			version: 7,
 			start: "again",
 			nodes: [
 				{ id: "again", type: "call", position: { x: 0, y: 0 }, flow: "me" },

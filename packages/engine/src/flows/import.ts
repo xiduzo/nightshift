@@ -1,6 +1,7 @@
 import {
 	FLOW_VERSION,
 	type Flow,
+	type FlowMigration,
 	flowNameSchema,
 	flowSchema,
 	migrateFlow,
@@ -44,6 +45,9 @@ import { addNotices, type NoticeKind } from "./notices";
  *   profile's name as its id when no profile has it. A Device profile of
  *   that name wins: the project's comes in labelled `<name>_project`,
  *   and the flows keep naming the Device's own.
+ * - The flows come in at the current format: a node that named a profile
+ *   by its name names this Device's profile by its id (ADR 3), or the
+ *   Device's profile its `device` names when this Device knows it.
  * - The folder goes only when git tracks none of it, everything in it
  *   came in and the documents are flushed. Else it stays, with a notice.
  *   A delete removes only the files the import read, unchanged.
@@ -67,6 +71,12 @@ export type CloneImportInput = {
 	): Promise<TrackedState>;
 	/** This Device's profiles. Without them, a folder with profiles stays. */
 	profiles?: Pick<ProfileStore, "list" | "save"> | undefined;
+	/**
+	 * What brings a flow of format 6 to the current one on this Device
+	 * (`FlowMigrations.forDevice`): read after the project's profiles came
+	 * in. Without it, a node keeps its profile's name, to pick again.
+	 */
+	migration?: () => Promise<FlowMigration>;
 	/** Flushes every document the import wrote: the folder goes only after it. */
 	flush(): Promise<void>;
 	at: number;
@@ -113,6 +123,36 @@ export async function importClone(
 	}
 	const notices: { kind: NoticeKind; message: string }[] = [];
 
+	// Project profiles become this Device's.
+	const madeProfiles: string[] = [];
+	if (folder.profiles !== null) {
+		const { profiles, issues } = parseProfilesSource(folder.profiles);
+		if (issues.length > 0) {
+			problems.push("Some of the project's profiles are not valid.");
+		}
+		if (profiles.length > 0 && !input.profiles) {
+			problems.push("This computer cannot keep the project's profiles.");
+		} else if (input.profiles) {
+			const made = await importProfiles(input.profiles, profiles);
+			madeProfiles.push(...made.made);
+			if (made.made.length > 0) {
+				notices.push({
+					kind: "profiles-made",
+					message: `Night Shift made ${made.made.length === 1 ? "this profile" : "these profiles"} on ${device.name} from the project's profiles: ${made.made.join(", ")}.`,
+				});
+			}
+			for (const { name, label } of made.labelled) {
+				notices.push({
+					kind: "profiles-made",
+					message: `${device.name} already has a profile named "${name}", so the project's one is now "${label}". The flows still use the one of ${device.name}.`,
+				});
+			}
+		}
+	}
+
+	// The flows name this Device's profiles by id, the ones just made too.
+	const migration = await input.migration?.();
+
 	// Flows: those the document has with the same content come in once.
 	const incoming = new Map<string, Flow>();
 	for (const [name, source] of [...folder.flows].sort(([a], [b]) =>
@@ -123,7 +163,9 @@ export async function importClone(
 			continue;
 		}
 		const parsed =
-			"json" in source ? flowSchema.safeParse(migrateFlow(source.json)) : null;
+			"json" in source
+				? flowSchema.safeParse(migrateFlow(source.json, migration))
+				: null;
 		if (!parsed?.success) {
 			problems.push(`The flow "${name}" is not valid.`);
 			continue;
@@ -185,33 +227,6 @@ export async function importClone(
 			kind: "schedule-renamed",
 			message: `Two schedules are named "${schedule.id}". Night Shift imported the one from ${device.name} as "${id}".${schedule.webhook ? " Its webhook address changed." : ""}`,
 		});
-	}
-
-	// Project profiles become this Device's.
-	const madeProfiles: string[] = [];
-	if (folder.profiles !== null) {
-		const { profiles, issues } = parseProfilesSource(folder.profiles);
-		if (issues.length > 0) {
-			problems.push("Some of the project's profiles are not valid.");
-		}
-		if (profiles.length > 0 && !input.profiles) {
-			problems.push("This computer cannot keep the project's profiles.");
-		} else if (input.profiles) {
-			const made = await importProfiles(input.profiles, profiles);
-			madeProfiles.push(...made.made);
-			if (made.made.length > 0) {
-				notices.push({
-					kind: "profiles-made",
-					message: `Night Shift made ${made.made.length === 1 ? "this profile" : "these profiles"} on ${device.name} from the project's profiles: ${made.made.join(", ")}.`,
-				});
-			}
-			for (const { name, label } of made.labelled) {
-				notices.push({
-					kind: "profiles-made",
-					message: `${device.name} already has a profile named "${name}", so the project's one is now "${label}". The flows still use the one of ${device.name}.`,
-				});
-			}
-		}
 	}
 
 	// The flows, each with a revision of kind `import`.

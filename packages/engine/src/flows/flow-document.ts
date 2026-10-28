@@ -7,6 +7,8 @@ import {
 	type Flow,
 	type FlowSources,
 	flowNameSchema,
+	flowSchema,
+	migrateFlow,
 	parsedFlows,
 	parseFlow,
 	type Schedule,
@@ -25,6 +27,7 @@ import {
 	type PersistedDocument,
 } from "../device-config";
 import { spaceIdOf } from "../projects";
+import type { FlowMigrations } from "./flow-migration";
 import type { ProjectFlows } from "./project-flows";
 
 /**
@@ -109,13 +112,17 @@ export function documentSpace(
 /** The transaction origin of this Replica's own changes. */
 export const FLOW_ORIGIN = Symbol("flow-document-owner");
 
-/** Why a revision exists. */
+/**
+ * Why a revision exists. `upgrade`: Night Shift brought the flow to a newer
+ * format (`upgradeFlows`), nobody changed it.
+ */
 export const revisionKinds = [
 	"save",
 	"restore",
 	"import",
 	"merge",
 	"copy",
+	"upgrade",
 ] as const;
 export type RevisionKind = (typeof revisionKinds)[number];
 
@@ -256,6 +263,103 @@ export function flowSources(document: FlowDocument): FlowSources {
 				: { json };
 	}
 	return sources;
+}
+
+/**
+ * The Device a flow of an older format took its profiles from: the one
+ * that saved its last revision, else this one (`fallback`).
+ */
+function savedOn(
+	document: FlowDocument,
+	flowId: string,
+	fallback: string,
+): string {
+	return flowRevisions(document, flowId).at(-1)?.deviceId ?? fallback;
+}
+
+/**
+ * `flowSources`, with each flow of format 6 brought to the current format
+ * by the Device that saved it (`FlowMigrations`): its nodes name a
+ * Device's profile. Without `migrations`, as `flowSources` reads them.
+ */
+export async function upgradedSources(
+	document: FlowDocument,
+	migrations: FlowMigrations | undefined,
+	deviceId: string,
+): Promise<FlowSources> {
+	const sources = flowSources(document);
+	if (!migrations) return sources;
+	const ids = new Map(
+		flowEntries(document).map((entry) => [entry.name, entry.flowId]),
+	);
+	for (const [name, source] of Object.entries(sources)) {
+		if (!("json" in source) || !olderFormat(source.json)) continue;
+		const flowId = ids.get(name);
+		const migration = await migrations.forDevice(
+			flowId === undefined ? deviceId : savedOn(document, flowId, deviceId),
+		);
+		sources[name] = { ...source, json: migrateFlow(source.json, migration) };
+	}
+	return sources;
+}
+
+/** A flow of a format older than this Night Shift's. */
+function olderFormat(json: unknown): boolean {
+	const version =
+		typeof json === "object" && json !== null && "version" in json
+			? json.version
+			: undefined;
+	return typeof version === "number" && version < FLOW_VERSION;
+}
+
+/**
+ * Brings every flow of the document of an older format to the current one
+ * (ADR 3: a node names a Device's profile, `FlowMigrations`), each with a
+ * revision of kind `upgrade` by Night Shift on `deviceId`. A node whose
+ * profile it cannot find keeps its name, and the editor asks to pick it
+ * again. Returns the names of the flows it brought up.
+ *
+ * Once per document: a flow of the current format does not change again.
+ * The Replica that keeps the Project's Space runs it. Two Replicas that run
+ * it at once read the same revisions and Device documents, so they write
+ * the same nodes: what one writes, the other writes too.
+ */
+export async function upgradeFlows(
+	document: FlowDocument,
+	input: { migrations: FlowMigrations; deviceId: string; at: number },
+): Promise<string[]> {
+	const upgrades: { entry: FlowEntry; flow: Flow; revisionId: string }[] = [];
+	for (const entry of flowEntries(document)) {
+		if (entry.newer || entry.map.get("version") === FLOW_VERSION) continue;
+		const migration = await input.migrations.forDevice(
+			savedOn(document, entry.flowId, input.deviceId),
+		);
+		const parsed = flowSchema.safeParse(
+			migrateFlow(flowJson(entry.map), migration),
+		);
+		// A flow this version cannot read stays as it is, and reads as before.
+		if (!parsed.success) continue;
+		upgrades.push({ entry, flow: parsed.data, revisionId: randomUUID() });
+	}
+	if (upgrades.length === 0) return [];
+	await document.current.change(() => {
+		for (const { entry, flow } of upgrades) applyFlow(entry.map, flow);
+	});
+	await document.history.change(() => {
+		for (const { entry, flow, revisionId } of upgrades) {
+			document.history.doc.getArray(entry.flowId).push([
+				plain({
+					id: revisionId,
+					at: input.at,
+					personId: null,
+					deviceId: input.deviceId,
+					kind: "upgrade",
+					flow: { ...flow, version: FLOW_VERSION },
+				} satisfies FlowRevision),
+			]);
+		}
+	});
+	return upgrades.map(({ entry }) => entry.name);
 }
 
 /** The flow a Y.Map holds, as JSON. */
@@ -693,6 +797,12 @@ export type DocumentProjectFlowsDeps = {
 	deviceId: string | (() => Promise<string>);
 	/** The clock of a revision. Default `Date.now`. */
 	now?: () => number;
+	/**
+	 * What brings a flow of format 6, and a revision of it, to the current
+	 * format as it is read. Without it, a node of format 6 keeps its
+	 * profile's name and the editor asks to pick the profile again.
+	 */
+	migrations?: FlowMigrations;
 };
 
 /**
@@ -709,10 +819,20 @@ export function documentProjectFlows(
 		return deps.documents.open(projectId);
 	};
 
+	const deviceId = async () =>
+		typeof deps.deviceId === "string" ? deps.deviceId : await deps.deviceId();
+
 	return {
 		async flows({ projectId, spaceId }) {
 			const document = await documentOf(projectId, spaceId);
-			return { sources: flowSources(document), pathOf: (name) => name };
+			return {
+				sources: await upgradedSources(
+					document,
+					deps.migrations,
+					await deviceId(),
+				),
+				pathOf: (name) => name,
+			};
 		},
 
 		async save({ projectId, spaceId, personId }, name, flow, options = {}) {
@@ -729,10 +849,7 @@ export function documentProjectFlows(
 				flow,
 				kind: options.kind ?? "save",
 				personId: personId ?? null,
-				deviceId:
-					typeof deps.deviceId === "string"
-						? deps.deviceId
-						: await deps.deviceId(),
+				deviceId: await deviceId(),
 				at: now(),
 			});
 			const current: Flow = { ...flow, version: FLOW_VERSION };
@@ -749,7 +866,24 @@ export function documentProjectFlows(
 		async revisions({ projectId, spaceId }, name) {
 			const document = await documentOf(projectId, spaceId);
 			const flowId = flowIdOf(document, name);
-			return flowId === null ? [] : flowRevisions(document, flowId);
+			if (flowId === null) return [];
+			const revisions = flowRevisions(document, flowId);
+			const { migrations } = deps;
+			if (!migrations) return revisions;
+			// A revision of format 6 reads as the Device that saved it named its profiles.
+			return Promise.all(
+				revisions.map(async (revision) =>
+					olderFormat(revision.flow)
+						? {
+								...revision,
+								flow: migrateFlow(
+									revision.flow,
+									await migrations.forDevice(revision.deviceId),
+								) as FlowRevision["flow"],
+							}
+						: revision,
+				),
+			);
 		},
 
 		async schedules({ projectId, spaceId }, options = {}) {

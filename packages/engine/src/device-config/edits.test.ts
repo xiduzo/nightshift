@@ -60,7 +60,7 @@ function profile(over: Partial<AgentProfile> = {}): AgentProfile {
 	} as AgentProfile;
 }
 
-const unused = { flowsUsing: async () => [] };
+const unused = {};
 
 async function errorOf(promise: Promise<unknown>): Promise<string> {
 	try {
@@ -89,7 +89,7 @@ describe("saveProfile", () => {
 		expect(stores.profiles.list()).toEqual([]);
 	});
 
-	test("refuses a taken name, a removed profile, and a rename of a profile that flows use", async () => {
+	test("refuses a taken name and a removed profile", async () => {
 		const stores = await makeStores();
 		const fast = await saveProfile(stores, profile(), unused);
 		await saveProfile(stores, profile({ name: "slow" }), unused);
@@ -106,17 +106,6 @@ describe("saveProfile", () => {
 		).toBe('A profile named "slow" already exists. Pick another name.');
 		expect(
 			await errorOf(
-				saveProfile(stores, profile({ name: "quick" }), {
-					id: fast.id,
-					flowsUsing: async (name) =>
-						name === "fast" ? [{ flowName: "night" }] : [],
-				}),
-			),
-		).toBe(
-			'The flows night use "fast". Change it there first, or keep the name.',
-		);
-		expect(
-			await errorOf(
 				saveProfile(stores, profile(), { ...unused, id: "p-gone" }),
 			),
 		).toBe("This profile was removed. Add it again.");
@@ -129,7 +118,7 @@ describe("saveProfile", () => {
 		expect(stores.profiles.get(saved.id)?.name).toBe("fast");
 	});
 
-	test("a rename changes the name and keeps the id", async () => {
+	test("a rename changes the name and keeps the id, so the flows that use it go on: they name the id", async () => {
 		const stores = await makeStores();
 		const fast = await saveProfile(stores, profile(), unused);
 		const quick = await saveProfile(stores, profile({ name: "quick" }), {

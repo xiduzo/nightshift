@@ -3,7 +3,7 @@ import type { Flow, FlowNode } from "@nightshift/flows";
 import { flowsForRun } from "./run-flows";
 
 const flowOf = (calls: string[]): Flow => ({
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: calls.length > 0 ? "call_0" : "hello",

@@ -12,6 +12,7 @@ import {
 	isOptionNode,
 	type ListSource,
 	nodeOptions,
+	type ProfileRef,
 	type ProjectFlowMap,
 	type TemplateField,
 	type TemplateNode,
@@ -44,9 +45,9 @@ export function missingConnectionMessage(name: string): string {
 	return `No connection named ${name}. The flow cannot run until you add it on the Agents page.`;
 }
 
-/** What the editor says about a profile the daemon does not have. */
-export function missingProfileMessage(name: string): string {
-	return `No profile named ${name} on this computer or in the project. The flow cannot run until you add it on the Agents page.`;
+/** What the editor says about a profile that its device does not have. */
+export function missingProfileMessage(_profile: ProfileRef): string {
+	return "Its device no longer has this profile. The flow cannot run until you pick another profile.";
 }
 
 /** One `{{…}}` a template can use. */
@@ -269,15 +270,16 @@ export function completeTemplate(
  * Checks the draft with `checkDraft`, in the editor's words. `flows` holds
  * the project's flow files by name, so Call nodes can check the flows they
  * call; leave it out while they load. `name` is the draft's own file name.
- * `connections` and `profiles` hold the names of the daemon's connections
- * and Agent Profiles; leave them out while they load.
+ * `connections` holds the names of the daemon's connections, and
+ * `profiles` the profiles a node may name, each on its device; leave them
+ * out while they load.
  */
 export function checkFlow(
 	flow: Flow,
 	flows?: ProjectFlowMap,
 	name?: string,
 	connections?: readonly string[],
-	profiles?: readonly string[],
+	profiles?: readonly ProfileRef[],
 ): FlowCheck {
 	return checkDraft(flow, MESSAGES, { flows, name, connections, profiles });
 }

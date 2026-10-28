@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
+	checkNodeProfile,
 	isObjectSchema,
 	jsonSchemaSchema,
 	type NodeCheck,
 	nameSchema,
 	nodeBase,
+	nodeProfileSchema,
 	placed,
 } from "./base";
 import { checkOptions, option } from "./outcomes";
@@ -185,13 +187,15 @@ export const agentNodeSchema = z.object({
 	/** A skill the harness already has, run as `/<skill> <prompt>`. */
 	skill: z.string().min(1).optional(),
 	/**
-	 * An Agent Profile defined on the daemon (the Agents page): its harness,
-	 * model, effort, permission mode, CLI tools and connections. A field the
-	 * node sets itself wins over the profile; CLI tools and connections add
-	 * up. A run resolves the profile when it starts, and a flow that names a
-	 * profile the daemon does not have refuses to start.
+	 * An Agent Profile of one Device (the Agents page), by the Device's id
+	 * and the profile's id: its harness, model, effort, permission mode, CLI
+	 * tools and connections. The step runs on that Device, so a node with a
+	 * profile names no `device`. A field the node sets itself wins over the
+	 * profile; CLI tools and connections add up. A run resolves the profile
+	 * when it starts, and a flow that names a profile its Device does not
+	 * have refuses to start.
 	 */
-	profile: nameSchema.optional(),
+	profile: nodeProfileSchema.optional(),
 	/**
 	 * The coding-agent CLI that runs the session. Each uses its own login.
 	 * Required without a profile. A custom agent is `acp:<slug>`.
@@ -285,6 +289,7 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 			);
 		}
 	}
+	checkNodeProfile(node, "Agent", check);
 	check.template(node.prompt, "prompt");
 	if (node.outcomes !== undefined) {
 		checkOptions(

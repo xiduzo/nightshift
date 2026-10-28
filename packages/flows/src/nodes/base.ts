@@ -125,6 +125,65 @@ export const deviceNameSchema = z.string().trim().min(1).max(64);
 export const placed = { device: deviceNameSchema.optional() };
 
 /**
+ * A profile as a node names it (ADR 3): the Device it belongs to, by the
+ * Device's id, and the profile's id on that Device. The profile's name is a
+ * label, so a rename changes no flow. The profile's Device runs the step.
+ */
+export const profileRefSchema = z.object({
+	/** The Device's id. */
+	device: z.string().trim().min(1).max(128),
+	/** The profile's id: a profile made before ids keeps its name as its id. */
+	profile: z.string().trim().min(1).max(128),
+});
+export type ProfileRef = z.infer<typeof profileRefSchema>;
+
+/**
+ * The `profile` of a node: a `ProfileRef`, or the bare name of a profile
+ * that a flow of format 6 named and that Night Shift could not find when
+ * it brought the flow to format 7. A bare name does not run: the flow
+ * check asks to pick the profile again.
+ */
+export const nodeProfileSchema = z.union([profileRefSchema, nameSchema]);
+export type NodeProfile = z.infer<typeof nodeProfileSchema>;
+
+/** Whether a node's profile names the pair, not a name left from format 6. */
+export function isProfileRef(
+	profile: NodeProfile | undefined,
+): profile is ProfileRef {
+	return typeof profile === "object" && profile !== null;
+}
+
+/** The same profile on the same Device. */
+export function sameProfileRef(a: ProfileRef, b: ProfileRef): boolean {
+	return a.device === b.device && a.profile === b.profile;
+}
+
+/**
+ * The checks of a node's profile: a name left from format 6 must be
+ * picked again, and a node that names a profile names no Device of its
+ * own, because the profile's Device runs it. `title` starts each message:
+ * "Agent".
+ */
+export function checkNodeProfile(
+	node: { id: string; profile?: NodeProfile; device?: string },
+	title: string,
+	check: NodeCheck,
+): void {
+	if (node.profile === undefined) return;
+	if (!isProfileRef(node.profile)) {
+		check.error(
+			`${title} node "${node.id}" names the profile "${node.profile}", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
+		);
+		return;
+	}
+	if (node.device !== undefined) {
+		check.error(
+			`${title} node "${node.id}" names a device and a profile. The step runs on the profile's device. Remove the device, or the profile.`,
+		);
+	}
+}
+
+/**
  * One write of a node to a variable of its flow, applied once when the
  * node's step ends (`set` on every node). Exactly one of `value` and
  * `expression` (the validator checks it). The node's own id reads the step

@@ -1,4 +1,4 @@
-import { saveProfile } from "@nightshift/engine";
+import { profileUseKey, saveProfile } from "@nightshift/engine";
 import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -18,8 +18,8 @@ const edited = { id: z.string().min(1).optional() };
 /**
  * Profiles: an Agent Profile (a harness, a model and its tools) for Agent
  * nodes, or a Model Profile (a decider and its model) for Decisions and
- * Values decided by a model. Each has an id that never changes, and a name
- * that flows use.
+ * Values decided by a model. Each has an id that never changes, which
+ * flows use with this computer's id, and a name a rename changes.
  */
 export const profiles = {
 	list: ownerProcedure
@@ -30,9 +30,10 @@ export const profiles = {
 		.output(output(profileListSchema))
 		.handler(async ({ context }) => {
 			const use = await context.space.flowUse();
+			const self = context.daemon.device.id;
 			return context.profiles.list().map((p) => ({
 				...p,
-				usedBy: use.profiles.get(p.name) ?? [],
+				usedBy: use.profiles.get(profileUseKey(self, p.id)) ?? [],
 			}));
 		}),
 	save: ownerProcedure
@@ -46,11 +47,11 @@ export const profiles = {
 		)
 		.handler(async ({ context, input }) => {
 			const { id, ...profile } = input;
-			const saved = await saveProfile(context, profile, {
-				...(id !== undefined ? { id } : {}),
-				flowsUsing: async (name) =>
-					(await context.space.flowUse()).profiles.get(name) ?? [],
-			});
+			const saved = await saveProfile(
+				context,
+				profile,
+				id !== undefined ? { id } : {},
+			);
 			// The Spaces it is offered to show its new name.
 			if (id !== undefined) {
 				await context.offers.renamed(saved.id, context.session.user.id);

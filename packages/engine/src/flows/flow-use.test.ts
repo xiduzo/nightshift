@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LoadedFlow } from "@nightshift/flows";
 
-import { type FlowReader, flowUse } from "./flow-use";
+import { type FlowReader, flowUse, profileUseKey } from "./flow-use";
 
 const project = (id: string, name: string) => ({ id, name });
 
@@ -15,7 +15,7 @@ const loaded = (name: string, nodes: unknown[]) =>
 	}) as never as LoadedFlow;
 
 describe("flowUse", () => {
-	test("finds the flows that name each connection, CLI tool, secret and profile", async () => {
+	test("finds the flows that name each connection, CLI tool, secret, and each Device's profile", async () => {
 		const flows: Record<string, LoadedFlow> = {
 			night: loaded("night", [
 				{
@@ -23,15 +23,28 @@ describe("flowUse", () => {
 					type: "agent",
 					connections: ["gh"],
 					clis: ["jq"],
-					profile: "fast",
+					profile: { device: "mac", profile: "fast" },
 				},
-				{ id: "fix", type: "agent", connections: ["gh"], profile: "fast" },
+				{
+					id: "fix",
+					type: "agent",
+					connections: ["gh"],
+					profile: { device: "mac", profile: "fast" },
+				},
+				// The same profile id on another Device is another profile.
+				{
+					id: "far",
+					type: "agent",
+					profile: { device: "le2316", profile: "fast" },
+				},
+				// A name left from format 6 names no profile yet.
+				{ id: "old", type: "agent", profile: "fast" },
 				{ id: "file", type: "tool", connection: "linear" },
 				{ id: "login", type: "command", secrets: ["ZAC_USER", "ZAC_PW"] },
 				{ id: "again", type: "command", secrets: ["ZAC_USER"] },
 			]),
 			day: loaded("day", [
-				{ id: "a", type: "agent", profile: "slow" },
+				{ id: "a", type: "agent", profile: { device: "mac", profile: "slow" } },
 				{ id: "check", type: "command" },
 			]),
 		};
@@ -83,10 +96,14 @@ describe("flowUse", () => {
 		expect(use.secrets.get("ZAC_USER")).toEqual([night]);
 		expect(use.secrets.get("ZAC_PW")).toEqual([night]);
 		expect(use.secrets.size).toBe(2);
-		expect(use.profiles.get("fast")).toEqual([
+		expect(use.profiles.get(profileUseKey("mac", "fast"))).toEqual([
 			{ ...night, nodeIds: ["plan", "fix"] },
 		]);
-		expect(use.profiles.get("slow")).toEqual([
+		expect(use.profiles.get(profileUseKey("le2316", "fast"))).toEqual([
+			{ ...night, nodeIds: ["far"] },
+		]);
+		expect(use.profiles.size).toBe(3);
+		expect(use.profiles.get(profileUseKey("mac", "slow"))).toEqual([
 			{ projectId: "p1", projectName: "App", flowName: "day", nodeIds: ["a"] },
 		]);
 		expect([...use.connections.keys()].sort()).toEqual(["gh", "linear"]);

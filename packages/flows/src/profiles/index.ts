@@ -16,6 +16,7 @@ export {
 	modelProfileSchema,
 	type Profile,
 	type ProfileSettings,
+	profileLabel,
 	profileOf,
 	profileSchema,
 	profileSettingsSchema,

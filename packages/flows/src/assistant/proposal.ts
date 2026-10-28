@@ -10,6 +10,7 @@ import {
 	flowSchema,
 } from "../document";
 import { checkDraft, type DraftMessages } from "../draft";
+import { isProfileRef, type ProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 
@@ -18,8 +19,8 @@ export type ProposalCheckOptions = {
 	flows?: ProjectFlowMap;
 	/** The flow's own file name. The proposal stands in for that file. */
 	name?: string;
-	/** The names of this computer's Agent Profiles. Leave it out to skip the check. */
-	profiles?: readonly string[];
+	/** The profiles a node may name, each on its Device. Leave it out to skip the check. */
+	profiles?: readonly ProfileRef[];
 	/** The names of this computer's connections. Leave it out to skip the check. */
 	connections?: readonly string[];
 };
@@ -89,8 +90,8 @@ const messages: DraftMessages = {
 	schemaIssue: (_flow, issue) => issue.message,
 	missingConnection: (name) =>
 		`This computer has no connection "${name}". Use one it has, or leave it out.`,
-	missingProfile: (name) =>
-		`Neither this computer nor the project has a profile "${name}". Use one they have.`,
+	missingProfile: (profile) =>
+		`The device "${profile.device}" has no profile "${profile.profile}". Use a device and a profile from the list of profiles.`,
 };
 
 /** A schema issue, on its node or edge when it has one: `Node "build": prompt: …`. */
@@ -122,9 +123,9 @@ function schemaIssue(
 	};
 }
 
-function profilesOf(node: FlowNode): string[] {
-	const name = profileOf(node);
-	return name !== undefined ? [name] : [];
+function profilesOf(node: FlowNode): ProfileRef[] {
+	const profile = profileOf(node);
+	return isProfileRef(profile) ? [profile] : [];
 }
 
 function connectionsOf(node: FlowNode): string[] {

@@ -3,7 +3,13 @@
  * of the project (`.nightshift/profiles.json`). A computer's profile wins
  * over the project's of the same name, as when a run starts.
  */
-import type { AgentProfile, ModelProfile, Profile } from "@nightshift/flows";
+import {
+	type AgentProfile,
+	type ModelProfile,
+	type NodeProfile,
+	type Profile,
+	profileLabel,
+} from "@nightshift/flows";
 import {
 	NativeSelect,
 	NativeSelectOptGroup,
@@ -41,8 +47,9 @@ function choicesOf<P extends Profile>(
 	mine: readonly P[] | undefined,
 	theirs: readonly P[],
 	loaded: boolean,
-	name: string | undefined,
+	named: NodeProfile | undefined,
 ) {
+	const name = named === undefined ? undefined : profileLabel(named);
 	const choices: ProfileChoice<P>[] = [
 		...(mine ?? []).map((profile) => ({ profile, from: "computer" as const })),
 		...theirs.map((profile) => ({ profile, from: "project" as const })),
@@ -60,7 +67,10 @@ function choicesOf<P extends Profile>(
 }
 
 /** The Agent Profiles an Agent node can name, and the one it names. */
-export function useAgentProfiles(projectId: string, name: string | undefined) {
+export function useAgentProfiles(
+	projectId: string,
+	name: NodeProfile | undefined,
+) {
 	const computer = useQuery({ ...profileQueries.agents(), ...quiet });
 	const project = useProjectProfiles(projectId, isAgent);
 	return choicesOf<AgentProfile>(
@@ -72,7 +82,10 @@ export function useAgentProfiles(projectId: string, name: string | undefined) {
 }
 
 /** The Model Profiles a Decision or a Value by a model can name, and the one it names. */
-export function useModelProfiles(projectId: string, name: string | undefined) {
+export function useModelProfiles(
+	projectId: string,
+	name: NodeProfile | undefined,
+) {
 	const computer = useQuery({ ...profileQueries.models(), ...quiet });
 	const project = useProjectProfiles(projectId, isModel);
 	return choicesOf<ModelProfile>(
@@ -94,7 +107,7 @@ export function ProfileSelect<P extends Profile>({
 	onPick,
 }: {
 	id: string;
-	value: string | undefined;
+	value: NodeProfile | undefined;
 	choices: ProfileChoice<P>[];
 	unknown: boolean;
 	/** The option for no profile. */
@@ -115,10 +128,11 @@ export function ProfileSelect<P extends Profile>({
 				</NativeSelectOption>
 			));
 	const project = group("project");
+	const name = value === undefined ? undefined : profileLabel(value);
 	return (
 		<NativeSelect
 			id={id}
-			value={value ?? ""}
+			value={name ?? ""}
 			aria-describedby={`${id}-hint`}
 			aria-invalid={unknown || undefined}
 			onChange={(event) => {
@@ -135,10 +149,8 @@ export function ProfileSelect<P extends Profile>({
 					{project}
 				</NativeSelectOptGroup>
 			) : null}
-			{unknown && value !== undefined ? (
-				<NativeSelectOption value={value}>
-					{value} (not found)
-				</NativeSelectOption>
+			{unknown && name !== undefined ? (
+				<NativeSelectOption value={name}>{name} (not found)</NativeSelectOption>
 			) : null}
 		</NativeSelect>
 	);

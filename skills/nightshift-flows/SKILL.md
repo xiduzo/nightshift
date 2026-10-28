@@ -48,11 +48,11 @@ Night Shift's tools cannot save a schedule or a profile:
 
 # Writing Night Shift flows
 
-A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 6. The model never changes the graph at run time.
+A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 7. The model never changes the graph at run time.
 
 ## The file
 
-`{ version: 6, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
+`{ version: 7, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
 
 - `inputs`: `{ name, type: "text" | "json", label?, description?, default?, required? }`. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
@@ -72,7 +72,7 @@ A coding-agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`
 
 Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outcome`, `output`, `summary`, `data`, `note`, `visit`, `session_id`.
 
-`{"id":"build","type":"agent","position":{"x":0,"y":0},"profile":"worker","prompt":"Build {{task}}. Earlier failures: {{vars.failures}}","output":{"type":"object","properties":{"files":{"type":"array","items":{"type":"string"}}}}}`
+`{"id":"build","type":"agent","position":{"x":0,"y":0},"profile":{"device":"8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f","profile":"worker"},"prompt":"Build {{task}}. Earlier failures: {{vars.failures}}","output":{"type":"object","properties":{"files":{"type":"array","items":{"type":"string"}}}}}`
 
 ### command
 
@@ -186,7 +186,7 @@ A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci
 
 ## Profiles
 
-An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer: `list_profiles` gives them by name.
+An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model`) for a Decision or a Value by a model. A profile belongs to one computer. A node names both by id, as `list_profiles` gives them: `"profile": { "device": "<id>", "profile": "<id>" }`. The step runs there, so the node has no `device`. The node's own fields win.
 
 ## Sections
 
@@ -194,8 +194,8 @@ An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is
 
 ## Checklist
 
-- `version` is 6, `start` names a node, every edge connects known nodes on an outcome its source can end with.
-- Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names.
+- `version` is 7, `start` names a node, every edge connects known nodes on an outcome its source can end with.
+- Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with `max`.
 - Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
 
@@ -203,7 +203,7 @@ An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is
 
 ```json
 {
- "version": 6,
+ "version": 7,
  "description": "Builds a task, runs the tests, fixes failures, then asks.",
  "inputs": [
   {
@@ -238,7 +238,10 @@ An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is
     "x": 0,
     "y": 0
    },
-   "profile": "worker",
+   "profile": {
+    "device": "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
+    "profile": "worker"
+   },
    "prompt": "Implement {{task}}. Report what you changed.",
    "set": [
     {
@@ -272,7 +275,10 @@ An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is
     "x": 300,
     "y": 200
    },
-   "profile": "worker",
+   "profile": {
+    "device": "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
+    "profile": "worker"
+   },
    "prompt": "The tests fail:\n{{check.log_tail}}\nEarlier failures: {{vars.failures}}\nFix the code, not the tests.",
    "set": [
     {
@@ -353,7 +359,7 @@ This one calls the flow `build-task`, which takes an input `item`.
 
 ```json
 {
- "version": 6,
+ "version": 7,
  "description": "Plans a feature, then builds each task in its own branch.",
  "inputs": [
   {
@@ -372,7 +378,10 @@ This one calls the flow `build-task`, which takes an input `item`.
     "x": 0,
     "y": 0
    },
-   "profile": "planner",
+   "profile": {
+    "device": "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
+    "profile": "planner"
+   },
    "prompt": "Split {{feature}} into small tasks. Change no files.",
    "outcomes": [
     {
@@ -458,7 +467,10 @@ This one calls the flow `build-task`, which takes an input `item`.
     "x": 900,
     "y": 0
    },
-   "profile": "worker",
+   "profile": {
+    "device": "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
+    "profile": "worker"
+   },
    "prompt": "These tasks failed:\n{{build_all.summary}}\nWrite a short report for the team."
   }
  ],

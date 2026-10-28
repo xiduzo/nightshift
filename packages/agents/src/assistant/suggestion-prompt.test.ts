@@ -17,7 +17,7 @@ import {
 import { suggestionPrompt } from "./suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
-	version: 6,
+	version: 7,
 	start: "review",
 	inputs: [{ name: "pr", type: "text" }],
 	nodes: [
@@ -25,7 +25,7 @@ const flow: Flow = flowSchema.parse({
 			id: "review",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Review {{pr}} and say if it can merge.",
 		},
 		{
@@ -67,7 +67,7 @@ const flow: Flow = flowSchema.parse({
 			id: "notify",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Tell {{owner}} about {{gate.outcome}}.",
 		},
 	],

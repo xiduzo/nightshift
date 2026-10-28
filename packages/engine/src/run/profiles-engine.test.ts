@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { fakeDecider, fakeHarness } from "@nightshift/agents/testing";
 import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
 import type {
@@ -9,7 +7,6 @@ import type {
 	DecisionNode,
 	Flow,
 	FlowEdge,
-	Profile,
 } from "@nightshift/flows";
 import { createProfileStore } from "../device-config/profiles";
 import type { RunDetail } from "../read/views";
@@ -23,7 +20,7 @@ import {
 import { createEngine } from "./engine";
 import type { SpaceEngine } from "./space-engine";
 
-/** Profiles, on this computer and in the project: resolved into the run's copy when a run starts. */
+/** Profiles of this computer, by id: resolved into the run's copy when a run starts. */
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -68,18 +65,21 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 		type: "agent",
 		position: { x: 0, y: 0 },
 		prompt: `Work as ${id}.`,
-		profile: "builder",
+		profile: here("builder"),
 		session: "fresh",
 		...extra,
 	};
 }
+
+/** A profile of this computer, by its id. */
+const here = (profile: string) => ({ device: sandbox.deviceId, profile });
 
 function flowOf(
 	nodes: (AgentNode | DecisionNode)[],
 	edges: FlowEdge[] = [],
 ): Flow {
 	return {
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -142,7 +142,7 @@ describe("profiles at the start", () => {
 		expect(harness.calls[0]?.model).toBe("opus");
 		const detail = await engine.getRun(run.id);
 		expect(detail.flow.nodes[0]).toMatchObject({
-			profile: "builder",
+			profile: here("builder"),
 			model: "opus",
 		});
 	});
@@ -157,26 +157,15 @@ describe("profiles at the start", () => {
 			engine.startRun({
 				projectId: await projectId(engine),
 				flow: flowOf(
-					[agent("plan", { profile: "planner" }), agent("work")],
+					[agent("plan", { profile: here("planner") }), agent("work")],
 					[{ id: "e1", from: "plan", outcome: "pass", to: "work" }],
 				),
 			}),
-		).rejects.toThrow(
-			'The flow uses the profile "planner" (plan), but no profile has that name. Add it under Agents, or to the project\'s profiles.',
-		);
+		).rejects.toThrow("has no such profile (plan). Pick another profile.");
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);
 	});
 });
-
-/** Writes the project's `.nightshift/profiles.json`. */
-async function projectProfiles(profiles: unknown[]): Promise<void> {
-	await mkdir(join(sandbox.repoPath, ".nightshift"), { recursive: true });
-	await writeFile(
-		join(sandbox.repoPath, ".nightshift", "profiles.json"),
-		JSON.stringify({ version: 1, profiles }),
-	);
-}
 
 const triage = (extra: Partial<DecisionNode> = {}): DecisionNode => ({
 	id: "triage",
@@ -185,69 +174,21 @@ const triage = (extra: Partial<DecisionNode> = {}): DecisionNode => ({
 	prompt: "Is it small?",
 	options: [{ name: "yes" }, { name: "no" }],
 	by: "model",
-	profile: "small",
+	profile: here("small"),
 	...extra,
-});
-
-describe("the project's profiles", () => {
-	const projectBuilder: Profile = {
-		name: "builder",
-		harness: "claude-code",
-		model: "haiku",
-		permissionMode: "acceptEdits",
-		clis: [],
-		connections: [],
-	};
-
-	test("a flow runs on a computer without the profile when the project has it", async () => {
-		await projectProfiles([projectBuilder]);
-		const harness = fakeHarness();
-		const engine = makeEngine({ "claude-code": harness });
-		const run = await engine.startRun({
-			projectId: await projectId(engine),
-			flow: flowOf([agent("worker")]),
-		});
-		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
-		expect(harness.calls[0]).toMatchObject({
-			model: "haiku",
-			permissionMode: "acceptEdits",
-		});
-	});
-
-	test("the computer's profile of the same name wins", async () => {
-		await projectProfiles([projectBuilder]);
-		const harness = fakeHarness();
-		const engine = makeEngine(
-			{ "claude-code": harness },
-			{ profileFor: (name) => (name === "builder" ? builder : null) },
-		);
-		const run = await engine.startRun({
-			projectId: await projectId(engine),
-			flow: flowOf([agent("worker")]),
-		});
-		await waitForEnd(engine, run.id);
-		expect(harness.calls[0]?.model).toBe("opus");
-	});
-
-	test("a broken profiles file says why its profile is missing", async () => {
-		await projectProfiles([{ name: "builder", harness: "claude-code" }]);
-		const engine = makeEngine({ "claude-code": fakeHarness() });
-		await expect(
-			engine.startRun({
-				projectId: await projectId(engine),
-				flow: flowOf([agent("worker")]),
-			}),
-		).rejects.toThrow('The profile "builder" is not valid.');
-	});
 });
 
 describe("model profiles", () => {
 	test("a Decision by a model asks the decider and the model of its profile", async () => {
-		await projectProfiles([
-			{ name: "small", decider: "ollama", model: "qwen3:4b" },
-		]);
 		const decider = fakeDecider([{ label: "yes" }]);
-		const engine = makeEngine({}, { decider });
+		const engine = makeEngine(
+			{},
+			{
+				decider,
+				profileFor: (id) =>
+					id === "small" ? { decider: "ollama", model: "qwen3:4b" } : null,
+			},
+		);
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([triage()]),
@@ -258,7 +199,7 @@ describe("model profiles", () => {
 			model: "qwen3:4b",
 		});
 		expect((await engine.getRun(run.id)).flow.nodes[0]).toMatchObject({
-			profile: "small",
+			profile: here("small"),
 			decider: "ollama",
 		});
 	});
@@ -294,7 +235,7 @@ describe("model profiles", () => {
 		await expect(
 			engine.startRun({
 				projectId: await projectId(engine),
-				flow: flowOf([agent("worker", { profile: "small" })]),
+				flow: flowOf([agent("worker", { profile: here("small") })]),
 			}),
 		).rejects.toThrow(
 			'The Agent node "worker" names the profile "small", which is for Decision and Value nodes. Pick an agent profile.',

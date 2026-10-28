@@ -9,6 +9,8 @@ import {
 	type DecisionNode,
 	deciderNameSchema,
 	effortSchema,
+	isProfileRef,
+	type NodeProfile,
 	nameSchema,
 	permissionModeSchema,
 	type ValueNode,
@@ -16,12 +18,13 @@ import {
 } from "../nodes";
 
 /**
- * Profiles: a setup under one name that nodes name in `profile`. An Agent
- * Profile holds a harness, a model and its tools, for Agent nodes. A Model
- * Profile holds a decider and its model, for a Decision or a Value decided
- * by a model. Profiles live on a computer (the Agents page) and in a
- * project (`.nightshift/profiles.json`, `./file.ts`); the computer's
- * profile of a name wins over the project's.
+ * Profiles: a setup that nodes name in `profile`. An Agent Profile holds a
+ * harness, a model and its tools, for Agent nodes. A Model Profile holds a
+ * decider and its model, for a Decision or a Value decided by a model. A
+ * profile belongs to one Device (ADR 3): a node names it by the Device and
+ * the profile's id (`ProfileRef`), and its name is a label. A project's
+ * `.nightshift/profiles.json` (`./file.ts`) is read once, by the import on
+ * upgrade, which gives its profiles to the importing Device.
  *
  * A node that names a profile takes its settings unless it sets them
  * itself; CLI tools and connections add up. A run resolves the profiles of
@@ -83,13 +86,27 @@ export function isAgentProfile<P extends ProfileSettings>(
 	return "harness" in profile;
 }
 
-/** The profile a node names, when its kind reads one: an Agent, or a Decision or a Value decided by a model. */
-export function profileOf(node: FlowNode): string | undefined {
+/**
+ * The profile a node names, when its kind reads one: an Agent, or a
+ * Decision or a Value decided by a model. A `ProfileRef`, or a name left
+ * from format 6 that must be picked again.
+ */
+export function profileOf(node: FlowNode): NodeProfile | undefined {
 	if (node.type === "agent") return node.profile;
 	if (node.type === "decision" || node.type === "value") {
 		return node.by === "model" ? node.profile : undefined;
 	}
 	return undefined;
+}
+
+/**
+ * A node's profile as words, when nothing better is known: a name left
+ * from format 6 as it is, a `ProfileRef` by its profile's id. The empty
+ * string for none.
+ */
+export function profileLabel(profile: NodeProfile | undefined): string {
+	if (profile === undefined) return "";
+	return isProfileRef(profile) ? profile.profile : profile;
 }
 
 /** An Agent node with everything it runs with, after its profile is resolved. */
@@ -99,7 +116,7 @@ export type ResolvedAgentNode = AgentNode & {
 	permissionMode: NonNullable<AgentNode["permissionMode"]>;
 };
 
-/** The node with its profile's values filled in. The `profile` name stays, for the record. */
+/** The node with its profile's values filled in. The `profile` stays, for the record. */
 export function resolveAgentNode(
 	node: AgentNode,
 	profile: AgentProfileSettings,
@@ -125,7 +142,7 @@ export function resolveAgentNode(
  * A Decision or a Value with its Model Profile filled in: the node's own
  * decider wins, and so does its own model. A node that picks another
  * decider than the profile's does not take the profile's model, as a model
- * belongs to its decider. The `profile` name stays, for the record.
+ * belongs to its decider. The `profile` stays, for the record.
  */
 export function resolveModelNode<N extends DecisionNode | ValueNode>(
 	node: N,
@@ -149,8 +166,10 @@ export function resolveModelNode<N extends DecisionNode | ValueNode>(
 export function resolveNodeProfile(
 	node: FlowNode,
 	profile: ProfileSettings,
+	/** The profile's name, for the problem. Default: what the node names. */
+	label?: string,
 ): { node: FlowNode } | { problem: string } {
-	const name = profileOf(node) ?? "";
+	const name = label ?? profileLabel(profileOf(node));
 	if (node.type === "agent") {
 		if (isAgentProfile(profile))
 			return { node: resolveAgentNode(node, profile) };
@@ -185,15 +204,16 @@ export function resolveNodeProfile(
  */
 export function resolveFlowProfiles(
 	flow: Flow,
-	profileFor: (name: string) => ProfileSettings | null,
+	profileFor: (profile: NodeProfile) => ProfileSettings | null,
 	missing: Map<string, string[]> = new Map(),
 	problems: string[] = [],
 ): Flow {
 	let changed = false;
 	const nodes = flow.nodes.map((node) => {
-		const name = profileOf(node);
-		if (name === undefined) return node;
-		const profile = profileFor(name);
+		const named = profileOf(node);
+		if (named === undefined) return node;
+		const name = profileLabel(named);
+		const profile = profileFor(named);
 		if (!profile) {
 			const ids = missing.get(name) ?? [];
 			if (!ids.includes(node.id)) ids.push(node.id);

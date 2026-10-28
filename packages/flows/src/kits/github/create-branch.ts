@@ -6,7 +6,7 @@ import { JSON_STRING_FUNCTION } from "../shell";
  * new branch with a name a person reads. Plain git, so it needs no login.
  */
 export const createBranchKit: FlowInput = {
-	version: 6,
+	version: 7,
 	description:
 		"Switches to a new branch with the name you give. It starts at the current commit, or at a branch on GitHub. A branch that exists already is switched to as it is.",
 	inputs: [

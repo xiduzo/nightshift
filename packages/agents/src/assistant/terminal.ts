@@ -122,9 +122,8 @@ async function checkIn(
 	flow: unknown,
 	name: string | undefined,
 ): Promise<FlowIssue[]> {
-	const [flows, profiles, tools] = await Promise.all([
+	const [flows, tools] = await Promise.all([
 		port.flows(projectId),
-		port.profiles(),
 		port.tools(),
 	]);
 	// The saved flow of that name is the base: a profile or a connection it
@@ -137,7 +136,6 @@ async function checkIn(
 	return proposalIssues(base ?? (flow as Flow), flow, {
 		flows,
 		name,
-		profiles: profiles.map((p) => p.name),
 		connections: tools.connections.map((c) => c.name),
 	});
 }

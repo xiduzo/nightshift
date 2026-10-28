@@ -35,6 +35,7 @@ import {
 	createCliToolStore,
 	createConnectionStore,
 	createFlowDocuments,
+	createFlowMigrations,
 	createGitHubClones,
 	createProfileStore,
 	createSettingsStore,
@@ -42,13 +43,13 @@ import {
 	createToolLaunchers,
 	documentRows,
 	documentSpace,
-	flowSources,
 	localDevice,
 	openDeviceDocument,
 	programOf,
 	secretStore,
 	setUpGit,
 	systemGitInstaller,
+	upgradedSources,
 } from "@nightshift/engine";
 
 import { createAssistant } from "./assistant";
@@ -315,6 +316,12 @@ export async function createDaemon(
 		connections,
 		piAcp: options.piAcp,
 	});
+	/** What brings a flow of format 6 to the current one (ADR 3). */
+	const flowMigrations = createFlowMigrations({
+		db,
+		device: async () => ({ id: device.id, name: device.name }),
+		profiles,
+	});
 	/** The project's folder here: where its runs' worktrees branch from. */
 	const clonePath = clonePathOf(db, async () => device.id);
 
@@ -346,14 +353,16 @@ export async function createDaemon(
 			),
 		toolLaunchers,
 		clonePath,
-		// The flows another Device asks this one for: the flow documents.
-		flows: async (projectId) => flowSources(await flows.open(projectId)),
-		// Its profiles, for a run placed here from another Device. A flow names
-		// a profile by its name.
-		profileFor: (name) => {
-			const profile = profiles.byName(name);
-			return profile ? profiles.settingsFor(profile.id) : null;
-		},
+		// The flows another Device asks this one for: the flow documents, a
+		// flow of format 6 as the Device that saved it named its profiles.
+		flows: async (projectId) =>
+			upgradedSources(await flows.open(projectId), flowMigrations, device.id),
+		// Its profiles, for a run placed here from another Device. A flow
+		// names a profile by its id. A Walker of an older Night Shift asks
+		// by the name, which an old profile's id is, else finds it here.
+		profileFor: (id) =>
+			profiles.settingsFor(id) ??
+			profiles.settingsFor(profiles.byName(id)?.id ?? ""),
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
 	});

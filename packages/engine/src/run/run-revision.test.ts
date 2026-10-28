@@ -23,7 +23,7 @@ import { createEngine } from "./engine";
 /** A Run records the Flow revision it runs, and those of the flows it calls (ADR 2). */
 
 const flowOf = (nodes: Flow["nodes"]): Flow => ({
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",

@@ -131,7 +131,7 @@ describe("pickAgent", () => {
 });
 
 const flow: FlowInput = {
-	version: 6,
+	version: 7,
 	inputs: [{ name: "issue", type: "text" }],
 	start: "plan",
 	nodes: [
@@ -139,7 +139,7 @@ const flow: FlowInput = {
 			id: "plan",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Plan {{issue}}.",
 		},
 	],

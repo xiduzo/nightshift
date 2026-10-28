@@ -1,11 +1,12 @@
 import { z } from "zod";
 import {
+	checkNodeProfile,
 	type DeciderName,
 	deciderNameSchema,
 	labelSchema,
 	type NodeCheck,
-	nameSchema,
 	nodeBase,
+	nodeProfileSchema,
 	placed,
 } from "./base";
 import { checkOptions, option } from "./outcomes";
@@ -53,12 +54,12 @@ export const decisionNodeSchema = z.object({
 	options: z.array(option).min(1),
 	by: decidedBySchema,
 	/**
-	 * `by: "model"` only: a Model Profile (on this computer, or in the
-	 * project's `.nightshift/profiles.json`) that names the decider and its
-	 * model. The node's own `decider` and `model` win over it. A run
-	 * resolves it when it starts.
+	 * `by: "model"` only: a Model Profile of one Device, by the Device's id
+	 * and the profile's id, that names the decider and its model. The
+	 * node's own `decider` and `model` win over it. A run resolves it when
+	 * it starts.
 	 */
-	profile: nameSchema.optional(),
+	profile: nodeProfileSchema.optional(),
 	/**
 	 * `by: "model"` only: the decision model that picks. Unset: the
 	 * profile's, else TypeSafe (`decisionDecider`). A Decision by a person
@@ -118,8 +119,10 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 	checkDeadline(node, check);
 	if (node.profile !== undefined && node.by !== "model") {
 		check.error(
-			`Decision node "${node.id}" names the profile "${node.profile}", but ${node.by === "person" ? "you decide" : "a rule decides"} it. Only a model reads a profile. Remove the profile, or let a model decide.`,
+			`Decision node "${node.id}" names a profile, but ${node.by === "person" ? "you decide" : "a rule decides"} it. Only a model reads a profile. Remove the profile, or let a model decide.`,
 		);
+	} else {
+		checkNodeProfile(node, "Decision", check);
 	}
 	check.template(node.prompt, "prompt");
 }

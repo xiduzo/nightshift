@@ -1,12 +1,13 @@
 import { z } from "zod";
 import {
+	checkNodeProfile,
 	type DeciderName,
 	deciderNameSchema,
 	isObjectSchema,
 	jsonSchemaSchema,
 	type NodeCheck,
-	nameSchema,
 	nodeBase,
+	nodeProfileSchema,
 	placed,
 } from "./base";
 
@@ -63,12 +64,12 @@ export const valueNodeSchema = z.object({
 	/** `by: "model"` only: the brief for the model. Supports templates. */
 	prompt: z.string().optional(),
 	/**
-	 * `by: "model"` only: a Model Profile (on this computer, or in the
-	 * project's `.nightshift/profiles.json`) that names the decider and its
-	 * model. Its decider must make values. The node's own `decider` and
-	 * `model` win over it. A run resolves it when it starts.
+	 * `by: "model"` only: a Model Profile of one Device, by the Device's id
+	 * and the profile's id, that names the decider and its model. Its
+	 * decider must make values. The node's own `decider` and `model` win
+	 * over it. A run resolves it when it starts.
 	 */
-	profile: nameSchema.optional(),
+	profile: nodeProfileSchema.optional(),
 	/**
 	 * `by: "model"` only: a decider that can make a value
 	 * (`valueDeciderNameSchema`). Unset: the profile's, else OpenRouter
@@ -116,6 +117,7 @@ function checkMaker(node: ValueNode, check: NodeCheck): void {
 		// A profile gives the decider when the node names none.
 		const fromProfile =
 			node.profile !== undefined && node.decider === undefined;
+		checkNodeProfile(node, "Value", check);
 		if (!fromProfile && !canMakeValue(decider)) {
 			check.error(
 				`Value node "${node.id}" uses the decider "${decider}", which cannot make a value. Choose one of: ${valueDeciderNameSchema.options.join(", ")}.`,
@@ -125,7 +127,7 @@ function checkMaker(node: ValueNode, check: NodeCheck): void {
 	}
 	if (node.profile !== undefined) {
 		check.error(
-			`Value node "${node.id}" names the profile "${node.profile}", but a rule makes it. Only a model reads a profile. Remove the profile, or let a model make it.`,
+			`Value node "${node.id}" names a profile, but a rule makes it. Only a model reads a profile. Remove the profile, or let a model make it.`,
 		);
 	}
 	const expression = node.expression ?? "";

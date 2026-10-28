@@ -117,11 +117,13 @@ export type {
 } from "./flows";
 export {
 	createFlowDocuments,
+	createFlowMigrations,
 	documentProjectFlows,
 	documentSpace,
-	flowSources,
 	flowsForRun,
+	profileUseKey,
 	revisionKinds,
+	upgradedSources,
 } from "./flows";
 export type { WalkFile, WalkFiles, WalkRef } from "./graph";
 export type {

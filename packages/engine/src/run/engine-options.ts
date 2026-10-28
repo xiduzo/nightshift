@@ -54,11 +54,12 @@ export type EngineOptions = {
 	 */
 	settings?: () => RunSettings;
 	/**
-	 * An Agent Profile by name. A run resolves the profiles its Agent nodes
-	 * name when it starts; a flow that names a profile this returns null for
-	 * refuses to start. Without it, no profile exists.
+	 * A profile of this computer by its id. A run resolves the profiles its
+	 * nodes name when it starts; a flow that names a profile of this
+	 * computer that this returns null for refuses to start. Without it, no
+	 * profile exists.
 	 */
-	profileFor?: (name: string) => ProfileSettings | null;
+	profileFor?: (id: string) => ProfileSettings | null;
 	/**
 	 * The Space documents, where Projects are defined. The daemon passes
 	 * the ones the relay serves. Default: new ones over `db` and `directory`.

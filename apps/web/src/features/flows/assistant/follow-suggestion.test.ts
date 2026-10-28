@@ -14,7 +14,7 @@ const request: SuggestionRequest = {
 	projectId: "p",
 	flowName: "f",
 	flow: flowSchema.parse({
-		version: 6,
+		version: 7,
 		start: "a",
 		nodes: [
 			{

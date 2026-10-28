@@ -7,6 +7,7 @@ import {
 	type FlowDiffSummary,
 	type FlowIssue,
 	type FlowListItem,
+	type FlowMigration,
 	flowDiffSummary,
 	flowSchema,
 	type LoadedFlow,
@@ -36,6 +37,12 @@ export type FlowFilesDeps = {
 	deviceNames?: (
 		ids: readonly string[],
 	) => Promise<ReadonlyMap<string, string>>;
+	/**
+	 * What brings an imported file of format 6 to the current format: its
+	 * nodes name the profiles of this Device, the one that imports it.
+	 * Without it, a node keeps its profile's name, to pick again.
+	 */
+	migration?: () => Promise<FlowMigration>;
 };
 
 /** Who or what a revision names, with its name when known. */
@@ -299,7 +306,7 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 			json: string,
 			personId: string | undefined,
 		): Promise<SavedFlow> {
-			const flow = importedFlow(json);
+			const flow = importedFlow(json, await deps.migration?.());
 			const of = { projectId, spaceId, personId };
 			const set = await deps.flows.flows(of);
 			const free = suffixedName(name, new Set(Object.keys(set.sources)));
@@ -340,7 +347,7 @@ export function createFlowFiles(deps: FlowFilesDeps) {
 }
 
 /** The flow a JSON file holds, brought to the current format, or a refusal that says what is wrong. */
-function importedFlow(json: string): Flow {
+function importedFlow(json: string, migration?: FlowMigration): Flow {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(json);
@@ -350,7 +357,7 @@ function importedFlow(json: string): Flow {
 			"This file is not a flow. Choose a flow file that Night Shift exported.",
 		);
 	}
-	const migrated = migrateFlow(parsed);
+	const migrated = migrateFlow(parsed, migration);
 	const version =
 		migrated !== null && typeof migrated === "object" && "version" in migrated
 			? migrated.version

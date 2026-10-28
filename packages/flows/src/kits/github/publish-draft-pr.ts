@@ -6,7 +6,7 @@ import { JSON_STRING_FUNCTION } from "../shell";
  * draft pull request for it, or finds the one that is open. git and `gh`.
  */
 export const publishDraftPrKit: FlowInput = {
-	version: 6,
+	version: 7,
 	description:
 		"Pushes the current branch to GitHub and opens a draft pull request for it. A pull request that is open for the branch stays as it is. A branch without new commits ends with nothing to do.",
 	inputs: [

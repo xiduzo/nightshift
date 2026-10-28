@@ -67,7 +67,7 @@ function startDaemon(
 
 function commandFlow(command: string): Flow {
 	return {
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -191,7 +191,7 @@ describe("the overview and the actions of a person", () => {
 		const started = await engine.startRun({
 			projectId: project.id,
 			flow: {
-				version: 6,
+				version: 7,
 				inputs: [],
 				outputs: [],
 				start: "ask",

@@ -7,9 +7,10 @@ export {
 	documentSpace,
 	type FlowDocument,
 	type FlowDocuments,
-	flowSources,
 	type RevisionKind,
 	revisionKinds,
+	upgradedSources,
+	upgradeFlows,
 } from "./flow-document";
 export type {
 	FlowExport,
@@ -20,8 +21,9 @@ export type {
 	SavedFlow,
 } from "./flow-files";
 export { createFlowFiles } from "./flow-files";
+export { createFlowMigrations } from "./flow-migration";
 export type { FlowRef, FlowUse } from "./flow-use";
-export { flowUse } from "./flow-use";
+export { flowUse, profileUseKey } from "./flow-use";
 export { dismissNotice, type FlowNotice, flowNotices } from "./notices";
 export type { ProjectFlows } from "./project-flows";
 export { flowsForRun } from "./run-flows";

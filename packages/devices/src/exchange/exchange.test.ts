@@ -53,7 +53,7 @@ const HOST = "the-host";
 
 /** A command, then a Gate. */
 const gateFlow: Flow = {
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -229,7 +229,7 @@ describe("the run history exchange", () => {
 		const run = await engineA.space(a.spaceId).startRun({
 			projectId,
 			flow: {
-				version: 6,
+				version: 7,
 				inputs: [],
 				outputs: [],
 				start: "agent",

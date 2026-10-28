@@ -121,8 +121,8 @@ export type LocalDeviceDeps = {
 	 * before a worktree is added. Default: the git programs on this computer.
 	 */
 	git?: Git;
-	/** An Agent Profile defined on this computer, by name, or null. */
-	profileFor?: (name: string) => ProfileSettings | null;
+	/** A profile defined on this computer, by its id, or null. */
+	profileFor?: (id: string) => ProfileSettings | null;
 	/** Where a session keeps its artifacts. Without it, sessions keep none. */
 	artifacts?: Pick<ArtifactStore, "save">;
 };
@@ -359,9 +359,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					(query.programs ?? []).map((name) => [name, findCli(name)]),
 				),
 				profiles: Object.fromEntries(
-					(query.profiles ?? []).flatMap((name) => {
-						const profile = deps.profileFor?.(name) ?? null;
-						return profile ? [[name, profile]] : [];
+					(query.profiles ?? []).flatMap((id) => {
+						const profile = deps.profileFor?.(id) ?? null;
+						return profile ? [[id, profile]] : [];
 					}),
 				),
 				decider: deciderFacts,

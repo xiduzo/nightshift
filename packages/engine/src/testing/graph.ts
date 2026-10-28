@@ -111,14 +111,14 @@ export function flowOf(
 ): Flow {
 	if (Array.isArray(input)) {
 		return flowSchema.parse({
-			version: 6,
+			version: 7,
 			start: input[0]?.id ?? "",
 			nodes: input,
 			edges,
 			...extra,
 		});
 	}
-	return flowSchema.parse({ version: 6, ...input });
+	return flowSchema.parse({ version: 7, ...input });
 }
 
 /** How long one minute of a timeout or a policy wait lasts in these tests. */

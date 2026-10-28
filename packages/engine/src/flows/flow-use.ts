@@ -1,5 +1,6 @@
 import {
 	type FlowListItem,
+	isProfileRef,
 	type LoadedFlow,
 	profileOf,
 } from "@nightshift/flows";
@@ -14,8 +15,9 @@ export type FlowRef = {
 /**
  * Who uses what, from every flow of the Space's projects: the flows whose
  * Agent or Tool nodes name each connection, whose Agent nodes name each CLI
- * tool, whose Command nodes name each secret, and the nodes that name each
- * profile (Agents, and Decisions and Values decided by a model). By name.
+ * tool, whose Command nodes name each secret, by name, and the nodes that
+ * name each profile (Agents, and Decisions and Values decided by a model),
+ * by `profileUseKey`.
  */
 export type FlowUse = {
 	connections: Map<string, FlowRef[]>;
@@ -23,6 +25,11 @@ export type FlowUse = {
 	secrets: Map<string, FlowRef[]>;
 	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
 };
+
+/** The key of a Device's profile in `FlowUse.profiles`. */
+export function profileUseKey(deviceId: string, profileId: string): string {
+	return `${deviceId}/${profileId}`;
+}
 
 /** What `flowUse` reads: the Space's projects and their flow files. */
 export type FlowReader = {
@@ -75,8 +82,9 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			const byProfile = new Map<string, string[]>();
 			for (const node of loaded?.flow?.nodes ?? []) {
 				const profile = profileOf(node);
-				if (profile === undefined) continue;
-				byProfile.set(profile, [...(byProfile.get(profile) ?? []), node.id]);
+				if (!isProfileRef(profile)) continue;
+				const key = profileUseKey(profile.device, profile.profile);
+				byProfile.set(key, [...(byProfile.get(key) ?? []), node.id]);
 			}
 			for (const [name, nodeIds] of byProfile) {
 				profiles.set(name, [
