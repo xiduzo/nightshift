@@ -136,6 +136,9 @@ export const hostRouter = os.router({
 		addClone: keyed.sync.addClone.handler(({ context, input }) =>
 			context.exchange.addClone(context.key, input),
 		),
+		mergePersonal: keyed.sync.mergePersonal.handler(({ context, input }) =>
+			context.exchange.mergePersonal(context.key, input),
+		),
 	},
 	archive: {
 		put: keyed.archive.put.handler(({ context, input }) =>

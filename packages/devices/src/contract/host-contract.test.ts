@@ -33,6 +33,7 @@ describe("the Host's contract", () => {
 			"sync.offer",
 			"sync.withdrawOffer",
 			"sync.addClone",
+			"sync.mergePersonal",
 			"archive.put",
 			"archive.get",
 			"archive.follow",

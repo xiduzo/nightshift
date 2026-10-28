@@ -20,6 +20,7 @@ import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import type { WorkHub } from "../work";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
+import { mergePersonalHere } from "./personal-merge";
 import {
 	ForeignRowsError,
 	isEmpty,
@@ -474,6 +475,24 @@ export function createHostExchange(deps: {
 			}
 			// Another Person's Device checks its Offers again itself.
 			yield* deps.work.call(deviceId, request, signal);
+		},
+
+		async mergePersonal(key, input) {
+			await admit(key);
+			const paired = await registry.get(key.deviceId);
+			// A Guest Host never merges: it keeps only shared Spaces.
+			if (!paired?.homeHost) {
+				throw new Refusal(
+					"forbidden",
+					"This Host is not the home Host of this device. Only a home Host takes its personal Space.",
+				);
+			}
+			return mergePersonalHere(
+				{ db, documents: deps.documents },
+				key,
+				{ name: paired.name },
+				input,
+			);
 		},
 
 		async reachable(key, deviceId) {
