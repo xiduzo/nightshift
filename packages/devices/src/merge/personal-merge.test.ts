@@ -9,6 +9,7 @@ import {
 	hostSpace,
 	organization,
 	project,
+	runCommand,
 	run as runTable,
 	spaceMerge,
 	user,
@@ -244,6 +245,55 @@ describe("the merge of Personal", () => {
 		);
 		const [row] = await b.db.select().from(spaceMerge);
 		expect(row?.state).toBe("pushed");
+	});
+
+	test("the commands of the moved runs move with them, in the name of the Person as the Host knows them", async () => {
+		const { runId } = await projectWithRun();
+		await b.db.insert(runCommand).values([
+			{
+				id: "command-of-moved-run",
+				spaceId: b.spaceId,
+				runId,
+				walkerId: b.deviceId,
+				kind: "run.stop",
+				payload: "{}",
+				personId: localPerson,
+			},
+			{
+				id: "command-of-other-space",
+				spaceId: "space-elsewhere",
+				runId: "run-elsewhere",
+				walkerId: b.deviceId,
+				kind: "run.stop",
+				payload: "{}",
+				personId: localPerson,
+			},
+		]);
+		const { link } = online();
+		await ready(link);
+
+		await merger(link).run();
+
+		const commands = await b.db
+			.select({
+				id: runCommand.id,
+				spaceId: runCommand.spaceId,
+				personId: runCommand.personId,
+			})
+			.from(runCommand)
+			.orderBy(runCommand.id);
+		expect(commands).toEqual([
+			{
+				id: "command-of-moved-run",
+				spaceId: a.spaceId,
+				personId: paired.personId,
+			},
+			{
+				id: "command-of-other-space",
+				spaceId: "space-elsewhere",
+				personId: localPerson,
+			},
+		]);
 	});
 
 	test("the author's shape: two Persons, two Spaces, the Host's Personal empty", async () => {

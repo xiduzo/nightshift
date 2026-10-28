@@ -8,6 +8,7 @@ import {
 	hostSpace,
 	keptVariable,
 	organization,
+	runCommand,
 	run as runTable,
 	spaceMerge,
 	spaceSplit,
@@ -418,6 +419,46 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(
 			turnedOn.schedules.find((s) => s.id === "on-c")?.nextAt,
 		).not.toBeNull();
+	});
+
+	test("the commands of the runs B walked move with them, in the name of B's own Person; those of A's runs stay", async () => {
+		const { projectId, runId } = await mergedIntoA();
+		await walkedByA(projectId);
+		const command = (id: string, ofRun: string, walkerId: string) => ({
+			id,
+			spaceId: a.spaceId,
+			runId: ofRun,
+			walkerId,
+			kind: "run.stop" as const,
+			payload: "{}",
+			personId: paired.personId,
+		});
+		await b.db
+			.insert(runCommand)
+			.values([
+				command("command-of-b", runId, b.deviceId),
+				command("command-of-a", "run-walked-by-a", a.deviceId),
+			]);
+		await revoke();
+
+		const result = await splitter().run();
+
+		const commands = await b.db
+			.select({
+				id: runCommand.id,
+				spaceId: runCommand.spaceId,
+				personId: runCommand.personId,
+			})
+			.from(runCommand)
+			.orderBy(runCommand.id);
+		expect(commands).toEqual([
+			{ id: "command-of-a", spaceId: a.spaceId, personId: paired.personId },
+			{
+				id: "command-of-b",
+				spaceId: result?.spaceId as string,
+				personId: localPerson,
+			},
+		]);
 	});
 
 	test("a split that is done does not run again", async () => {

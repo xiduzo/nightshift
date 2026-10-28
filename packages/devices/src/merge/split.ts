@@ -19,6 +19,7 @@ import type { HostLinks, HostSpaces } from "../links";
 import { backupDatabase } from "./backup";
 import { mergeRows } from "./merge-rows";
 import { type MergeMove, NOT_DONE } from "./personal-merge";
+import { runCommandMoves } from "./run-commands";
 import { type SplitRow, splitRows } from "./split-rows";
 
 /**
@@ -57,7 +58,8 @@ import { type SplitRow, splitRows } from "./split-rows";
  * 3. `moved`: one `db.batch` makes the new Space the Person's personal
  *    Space (`splitPersonalSpaceBatch`), moves the rows (`spaceMoveBatch`
  *    with this computer's runs only), names the Host's Space "Personal
- *    on <Host>", adds what the composition root moves of the same runs
+ *    on <Host>", moves the commands of the moved runs (`run_command`),
+ *    adds what the composition root moves of the same runs
  *    (`moveStatements`), ends a merge that is not done, and sets this
  *    state with the count of the schedules to pause. Then the engine
  *    reads the moved runs again.
@@ -262,6 +264,9 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 					.update(hostSpace)
 					.set({ name: fromName, updatedAt: new Date() })
 					.where(eq(hostSpace.spaceId, from)),
+				...runCommandMoves(db, [{ from, to, runIds }], {
+					[row.hostPersonId]: row.personId,
+				}),
 				...(deps.moveStatements?.([{ from, to, runIds }]) ?? []),
 				merges.abandon(),
 				rows.moved(to, { projects, runs, unpinned }),
