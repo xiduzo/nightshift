@@ -322,6 +322,48 @@ describe("procedures", () => {
 		).toBe("FORBIDDEN");
 	});
 
+	test("the owner sees the profiles and secret names of their other devices; another Person sees nothing", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const others = [
+			{
+				id: "laptop",
+				name: "Laptop",
+				online: null,
+				platform: "darwin",
+				profiles: [{ id: "p-1", name: "builder", kind: "agent" as const }],
+				secrets: [{ name: "GH_TOKEN", setAt: 1 }],
+				checkedAt: 2,
+			},
+		];
+		const base = await contextFor(ada.headers);
+		const asked: string[] = [];
+		const devices = {
+			others: async (ownerId: string) => {
+				asked.push(ownerId);
+				return others;
+			},
+		} as unknown as Context["devices"];
+		expect(
+			await errorOf(
+				call(appRouter.devices.others, undefined, {
+					context: { ...base, devices },
+				}),
+			),
+		).toBe("FORBIDDEN");
+		const owner = {
+			...base,
+			daemon: {
+				...base.daemon,
+				device: { ...base.daemon.device, ownerId: ada.userId },
+			},
+			devices,
+		} as Context;
+		expect(
+			await call(appRouter.devices.others, undefined, { context: owner }),
+		).toEqual(others);
+		expect(asked).toEqual([ada.userId]);
+	});
+
 	test("a Person creates a Space, owns it, and works in it", async () => {
 		const ada = await sandbox.signUp("Ada");
 		let context = await contextFor(ada.headers);

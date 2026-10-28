@@ -20,6 +20,7 @@ import type {
 	Connection,
 	ConnectionList,
 	HarnessRow,
+	OtherDevice,
 	ProfileRow,
 	SecretView,
 	SettingsView,
@@ -33,6 +34,7 @@ import {
 	ModelProfileDetail,
 	newModelProfileDraft,
 } from "./model-profile-detail";
+import { OtherDeviceDetail, OtherDevicesSecrets } from "./other-device";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
 import { ToolDetail } from "./tool-detail";
 
@@ -43,6 +45,8 @@ type PageData = {
 	cliTools: CliTool[];
 	secrets: SecretView[];
 	settings: SettingsView | undefined;
+	/** Your other devices, read-only here. */
+	otherDevices: OtherDevice[];
 };
 
 export function Detail({
@@ -235,10 +239,16 @@ export function Detail({
 		}
 		case "secrets":
 			return (
-				<div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+				<div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-8 md:px-8">
 					<SecretsCard secrets={data.secrets} />
+					<OtherDevicesSecrets devices={data.otherDevices} />
 				</div>
 			);
+		case "device": {
+			const device = data.otherDevices.find((d) => d.id === selection.id);
+			if (!device) return <Gone what="device" />;
+			return <OtherDeviceDetail key={device.id} device={device} />;
+		}
 	}
 }
 

@@ -14,7 +14,7 @@ import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { PanelSection } from "@/shared/panel";
 
-/** One group of the list: a heading that folds it, its count, and an Add button. */
+/** One group of the list: a heading that folds it, its count, and an Add button when you can add here. */
 export function Group({
 	title,
 	count,
@@ -25,8 +25,8 @@ export function Group({
 	title: string;
 	/** Undefined while it loads. */
 	count: number | undefined;
-	addLabel: string;
-	onAdd: () => void;
+	addLabel?: string;
+	onAdd?: () => void;
 	children: ReactNode;
 }) {
 	return (
@@ -40,15 +40,17 @@ export function Group({
 				)
 			}
 			action={
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label={addLabel}
-					title={addLabel}
-					onClick={onAdd}
-				>
-					<PlusIcon />
-				</Button>
+				onAdd ? (
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label={addLabel}
+						title={addLabel}
+						onClick={onAdd}
+					>
+						<PlusIcon />
+					</Button>
+				) : null
 			}
 			contentClassName="px-2 pb-3"
 		>

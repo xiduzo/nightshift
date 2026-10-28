@@ -1,4 +1,9 @@
-import { HostUnreachableError, type SettingsStore } from "@nightshift/engine";
+import {
+	type DeviceCopies,
+	type DeviceCopy,
+	HostUnreachableError,
+	type SettingsStore,
+} from "@nightshift/engine";
 import type { HostClient, PhoneView } from "../contract";
 import {
 	type DeviceKeyStore,
@@ -10,7 +15,7 @@ import {
 } from "../links";
 import { type Reach, reachFor } from "../reach";
 import type { Host } from "./host";
-import type { Devices, DevicesOverview } from "./types";
+import type { Devices, DevicesOverview, OtherDeviceView } from "./types";
 
 /** How long the phones a Host listed stay as they are, in milliseconds. */
 const PHONES_FOR_MS = 30_000;
@@ -29,6 +34,10 @@ export function createDevices(deps: {
 	reach: Reach;
 	/** The SHA-256 fingerprint of the certificate this daemon serves itself. */
 	fingerprint: string | null;
+	/** The copies of the owner's other Devices' documents, from the home Host. */
+	copies: Pick<DeviceCopies, "list">;
+	/** On a Host: the Device document it keeps for a paired Device, read. */
+	keptDocument(deviceId: string): Promise<DeviceCopy | null>;
 	/** The clock, in milliseconds. Default: `Date.now`. */
 	now?: () => number;
 }): Devices {
@@ -90,6 +99,34 @@ export function createDevices(deps: {
 		deny: (headers, code) => host.deny(headers, code),
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),
 		hello: (key) => host.hello(key),
+		async others(ownerId) {
+			const view = (
+				copy: DeviceCopy,
+				name: string,
+				online: boolean | null,
+			): OtherDeviceView => {
+				const { deviceId, name: _reported, ...rest } = copy;
+				return { ...rest, id: deviceId, name, online };
+			};
+			const listed: OtherDeviceView[] = [];
+			const seen = new Set([deps.self.id]);
+			// On a Host: the owner's Devices whose home it is.
+			for (const paired of await host.registry.list(ownerId)) {
+				if (paired.revokedAt !== null || paired.homeHost === null) continue;
+				const kept = await deps.keptDocument(paired.id);
+				if (!kept) continue;
+				seen.add(paired.id);
+				listed.push(view(kept, paired.name, paired.online));
+			}
+			// On a Device: the copies its home Host syncs.
+			for (const copy of await deps.copies.list()) {
+				if (seen.has(copy.deviceId)) continue;
+				listed.push(view(copy, copy.name ?? "Device", null));
+			}
+			return listed.sort(
+				(a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+			);
+		},
 		hostOf: (spaceId) => deps.hostSpaces.hostOf(spaceId),
 		phonesAt(hostId) {
 			const known = phones.get(hostId);

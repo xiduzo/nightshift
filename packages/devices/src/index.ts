@@ -43,6 +43,7 @@ export {
 	type HostPeerContext,
 	type HostPhones,
 	hostRouter,
+	type OtherDeviceView,
 	type PairingReviewView,
 } from "./host";
 export type { HostRole, JoinProgress } from "./links";

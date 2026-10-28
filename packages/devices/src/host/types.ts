@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import type { KeyStoreKind } from "@nightshift/engine";
+import type { DeviceCopy, KeyStoreKind } from "@nightshift/engine";
 import type {
 	HostHello,
 	PairingRedeemed,
@@ -42,6 +42,19 @@ export type DevicesOverview = {
 	} | null;
 	/** The Person's Devices paired with this computer, when it is a Host. */
 	devices: PairedDevice[];
+};
+
+/**
+ * One of the owner's other Devices, as this computer knows it from that
+ * Device's document: read-only here. On a Host, the Devices whose home it
+ * is; on a Device, the copies its home Host syncs. Secret names, never
+ * their values.
+ */
+export type OtherDeviceView = Omit<DeviceCopy, "deviceId" | "name"> & {
+	id: string;
+	name: string;
+	/** Its Link answers this Host now. Null: this computer cannot tell. */
+	online: boolean | null;
 };
 
 /** A pairing code, as the Person approving it sees it. */
@@ -91,6 +104,8 @@ export type Devices = {
 	revoke(personId: string, deviceId: string): Promise<void>;
 	/** A paired Device's link answered. */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
+	/** The owner's other Devices, from their documents: their profiles and secret names. */
+	others(ownerId: string): Promise<OtherDeviceView[]>;
 	/** The Host this computer joined that keeps the Space, or null for a Space it keeps itself. */
 	hostOf(spaceId: string): Promise<string | null>;
 	/** The phones of this computer's owner on a Host it joined. */

@@ -11,6 +11,7 @@ import {
 	profileChoice,
 	type SettingsStore,
 	type SpaceDocuments,
+	storedDeviceCopy,
 } from "@nightshift/engine";
 import type * as Y from "yjs";
 import {
@@ -395,6 +396,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		self: { id: self.id, name: self.name, platform: process.platform },
 		reach,
 		fingerprint,
+		copies,
+		keptDocument: (deviceId) => storedDeviceCopy(db, deviceId),
 	});
 
 	return {

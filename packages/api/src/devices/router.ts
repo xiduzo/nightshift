@@ -8,6 +8,7 @@ import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
 	joinProgressSchema,
+	otherDeviceViewSchema,
 	pairingReviewViewSchema,
 	spaceDeviceViewSchema,
 } from "./schemas";
@@ -32,6 +33,18 @@ export const devices = {
 				owner: context.session.user.id === context.daemon.device.ownerId,
 			}),
 		),
+	/**
+	 * The owner's other Devices, as this computer knows them from their
+	 * documents: their profiles and secret names, read-only. Change them
+	 * on that Device.
+	 */
+	others: ownerProcedure
+		.route({
+			summary:
+				"Lists your other devices with their profiles and secret names, read-only.",
+		})
+		.output(output(z.array(otherDeviceViewSchema)))
+		.handler(({ context }) => context.devices.others(context.session.user.id)),
 	/**
 	 * The Devices of the session's Space, as every Member sees them: name,
 	 * online, Clones of its Projects, offered profiles. Nothing else.

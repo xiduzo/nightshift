@@ -357,7 +357,9 @@ profile labelled "builder"; Night Shift never uses one for the other. When
 the profile's Device is offline, the step waits for it. A Project has no
 profiles of its own (ADR 3). In a personal Space, every profile of the
 Person's Devices is usable without an Offer (ADR 1). Across Persons, a
-profile is visible only as an Offer.
+profile is visible only as an Offer. The Agents page shows the profiles
+and secret names of the Person's other Devices read-only: they change
+on their own Device.
 
 ### Placement
 
@@ -1191,6 +1193,12 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      a Device document (ADR 1, decision 3), so no copy has one. A copy
      also has the Device's Clone paths and settings: its owner's, like
      the rest of the document.
+   - **Seen on the Agents page** (`devices.others`, the owner only): "Your
+     other devices" lists each with its profiles and secret names,
+     read-only, and says to open Night Shift on that device to change
+     them. Secrets lists the secret names of each other device under this
+     computer's own. On a Host the list comes from the documents it keeps
+     (with online), on a Device from its copies.
 
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
