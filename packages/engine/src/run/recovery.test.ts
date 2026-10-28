@@ -83,6 +83,7 @@ async function insertRun(
 	worktreePath: string,
 	ownFlow: Flow | string = flow,
 	bodyFlows: Record<string, Flow> = {},
+	branch = "b",
 ) {
 	await sandbox.db
 		.insert(project)
@@ -97,7 +98,7 @@ async function insertRun(
 		bodyFlows: JSON.stringify(bodyFlows),
 		title: "f",
 		worktreePath,
-		branch: "b",
+		branch,
 		baseRef: "main",
 		walkerId: sandbox.deviceId,
 	});
@@ -209,6 +210,28 @@ describe("daemonResumeBlock", () => {
 		expect(await daemonResumeBlock(RUN_ID, logOf(started()), deps())).toBe(
 			"the copy of the project it worked in is gone.",
 		);
+	});
+
+	test("a run that waits for its worktree has none to lose", async () => {
+		await insertRun("", flow, {}, "");
+		expect(
+			await daemonResumeBlock(RUN_ID, logOf(started()), deps()),
+		).toBeNull();
+	});
+
+	test("a worktree a step made later is checked from the log", async () => {
+		await insertRun("", flow, {}, "");
+		const made = {
+			type: "WorktreeCreated" as const,
+			payload: {
+				worktreePath: join(sandbox.root, "gone"),
+				branch: "nightshift/b",
+				baseRef: "main",
+			},
+		};
+		expect(
+			await daemonResumeBlock(RUN_ID, logOf(started(), made), deps()),
+		).toBe("the copy of the project it worked in is gone.");
 	});
 
 	test("a check that throws is a reason, not a crash", async () => {

@@ -184,9 +184,12 @@ function WhereSection({ run }: { run: RunDetail }) {
 	return (
 		<InspectorSection title="Where it runs">
 			<dl className="flex flex-col gap-3">
-				<Fact label="Branch">
-					<CopyValue label="branch" value={run.branch} />
-				</Fact>
+				{/* A run whose computer was offline at the start has no branch yet. */}
+				{run.branch ? (
+					<Fact label="Branch">
+						<CopyValue label="branch" value={run.branch} />
+					</Fact>
+				) : null}
 				<Fact label="Base">
 					<CopyValue
 						label="base"

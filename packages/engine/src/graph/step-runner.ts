@@ -62,6 +62,7 @@ import {
 	scopeOf,
 } from "./route";
 import { positionOf } from "./run-position";
+import { makeRunWorktree, withLoggedWorktree } from "./run-worktree";
 import {
 	type DeviceWait,
 	type OwnWait,
@@ -283,6 +284,7 @@ export async function runStep(
 	spec: StepSpec,
 ): Promise<Command> {
 	const events = await ctx.log.events(ctx.run.id);
+	withLoggedWorktree(ctx, events);
 	const entry = resumePoint(node, state, events, scopeOf(config), spec.rules);
 	const extra = spec.update;
 	if (entry.kind === "done") {
@@ -884,8 +886,10 @@ function worktreeOn(
 /**
  * What a step's Device must be before the body runs, or null when it is
  * ready. A step that needs a computer (`NodeKind.works`) sleeps while its
- * Device is offline (`device-offline`). A step
- * that works in the worktree on another Device than the one that has the
+ * Device is offline (`device-offline`). A step that works in the worktree
+ * of a run that has none yet (its Device was offline at the start) makes
+ * it on the run's Device first, and sleeps while that Device is offline.
+ * A step that works in the worktree on another Device than the one that has the
  * run's work gets it by a Hand-off first: the Device that has it pushes
  * the branch (a worktree with uncommitted changes fails the step: nothing
  * is committed for you), this one fetches it into its own worktree of the
@@ -907,17 +911,34 @@ export async function readyDevice(
 	});
 	if (!(await device.state()).online) return offline(device);
 	if (works !== "worktree") return null;
-	const events = await ctx.log.events(ctx.run.id);
-	const { holder, paths } = deriveWorktrees(events, ctx.run);
-	if (isDevice(ctx, holder, device)) return null;
-	const from = ctx.deviceById(holder, ctx.run);
-	if (!(await from.state()).online) return offline(from);
 	const fail = (error: string): BodyResult => ({
 		kind: "end",
 		outcome: "error",
 		outputs: { visit: step.visit },
 		error,
 	});
+	let events = await ctx.log.events(ctx.run.id);
+	const made = await makeRunWorktree(ctx, events);
+	if (made?.kind === "offline") return offline(made.at);
+	if (made?.kind === "refused") {
+		return fail(
+			`${made.at.name} could not make the run's copy of the project. ${stepFailure(made.error, `the worktree of run ${ctx.run.id}`)}`,
+		);
+	}
+	if (made?.kind === "made") {
+		events = await ctx.log.events(ctx.run.id);
+		step.tctx.run.worktree = made.worktree.worktreePath;
+		step.tctx.run.base_ref = made.worktree.baseRef;
+		if (step.tctx.run.branch === "")
+			step.tctx.run.branch = made.worktree.branch;
+	}
+	const { holder, paths } = deriveWorktrees(events, ctx.run);
+	if (isDevice(ctx, holder, device)) {
+		step.worktree = paths.get(holder) ?? step.worktree;
+		return null;
+	}
+	const from = ctx.deviceById(holder, ctx.run);
+	if (!(await from.state()).online) return offline(from);
 	let sent: { commit: string; branch: string };
 	try {
 		sent = await from.handOff({

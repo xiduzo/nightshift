@@ -21,7 +21,13 @@ import {
 	type RunRow,
 	runsArriving,
 } from "../log";
-import { countDaemonResumes, deriveRunState, deriveStopAt } from "../read";
+import {
+	awaitsWorktree,
+	countDaemonResumes,
+	deriveRunState,
+	deriveStopAt,
+	runWorktree,
+} from "../read";
 
 /**
  * Startup recovery: what a new daemon does about the runs the last one
@@ -109,7 +115,11 @@ export async function daemonResumeBlock(
 		// A run placed on another Device has its worktree there: that Device
 		// says when it is gone.
 		if (deps.placedElsewhere?.(row)) return null;
-		const worktree = await stat(row.worktreePath).catch(() => null);
+		// A run whose Device was offline at the start has no worktree yet: a step makes it.
+		if (awaitsWorktree(row, events)) return null;
+		const worktree = await stat(runWorktree(row, events).worktreePath).catch(
+			() => null,
+		);
 		if (!worktree?.isDirectory()) {
 			return "the copy of the project it worked in is gone.";
 		}

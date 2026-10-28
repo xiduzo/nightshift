@@ -215,7 +215,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | MemberRoleChanged | A Member got another role, and who changed it. |
 | MemberRemoved | A Person is no longer a Member of a Space, and who removed them. |
 | RunStarted | A Run began, with its copy of the Flow, and the Person who started it (for a Schedule, the Person it runs for). |
-| WorktreeCreated | A Worktree was created for a Run. |
+| WorktreeCreated | A Worktree was created for a Run: at the start, or when the Run's Device is back if it was offline at the start. A Run row is never updated, so every Replica reads the Run's Worktree and branch from this event. |
 | WorktreeRemoved | Night Shift removed what a Run left on this computer: its Worktree, its local branches, or both. `by` says whether a person or the Cleanup did it. A fact of this computer: it names the Run in its payload and is not copied to other Devices. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). `action` says when it was more: `restart` (a person restarted the running Step) or `rerun` (a person ran the Run again from a Node). |
 | StepStarted | A Step began a Visit of a Node. |

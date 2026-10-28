@@ -294,6 +294,41 @@ describe("nodes on two Devices", () => {
 		expect(String(detail.steps[1]?.outputs.log_tail).trim()).toBe("from B");
 	}, 120_000);
 
+	test("a run on B while B is offline waits, makes its worktree on B when it is back, and both Replicas show it", async () => {
+		await flowIn(a, "offline-start", [shell("where", "pwd")]);
+		const bId = (await b.client.devices.list()).thisComputer?.id as string;
+		await stopDaemon(b);
+		const started = await a.client.runs.start({
+			projectId,
+			flowName: "offline-start",
+			deviceId: bId,
+		});
+		expect(started.branch).toBe("");
+		await waitFor(
+			() => a.client.runs.get({ runId: started.id }),
+			(r) => r.status === "sleeping",
+			30_000,
+		);
+		b = await startDaemon(root, "b", b.env, b.port);
+		const done = await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.status === "finished",
+			60_000,
+		);
+		expect(done?.branch).toStartWith("nightshift/");
+		const detail = await a.client.runs.get({ runId: started.id });
+		expect(String(detail.steps[0]?.outputs.log_tail).trim()).toStartWith(
+			realpathSync(root),
+		);
+		// B has the run from A's log: the branch comes from the event.
+		const onB = await waitFor(
+			() => runOn(b, started.id),
+			(r) => r?.status === "finished",
+			60_000,
+		);
+		expect(onB?.branch).toBe(done?.branch);
+	}, 120_000);
+
 	test("Move to: B walks a run A started, from A's archived checkpoint", async () => {
 		await flowIn(a, "moving", [
 			shell("before", "echo before"),

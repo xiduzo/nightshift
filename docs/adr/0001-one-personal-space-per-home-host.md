@@ -80,8 +80,10 @@ personal or shared.
   Host takes the result through the Exchange.
 - The placement rule does not change (node, profile, Run's Device, Walker).
   Only the default of the Run's Device and of the Walker change.
-- Today a Run refuses to start when a placed Device is offline. Decision 11
-  replaces that refusal with a wait.
+- A Run starts when a placed Device is offline, also its own Device. Its
+  steps wait for that Device (decision 11). When the Run's Device is
+  offline, its Worktree is made when the Device is back, and
+  `WorktreeCreated` names it to every Replica.
 
 See also [ADR 2](0002-flows-are-night-shift-data.md) and
 [ADR 3](0003-a-profile-belongs-to-one-device.md).
