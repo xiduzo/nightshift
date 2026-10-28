@@ -1546,6 +1546,17 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 		];
 	}
 
+	test("Ada's places name the Host admin on the Host", async () => {
+		const places = await engine
+			.space(ADA_SPACE, { personId: ADA })
+			.listPlacements(adaProject);
+		expect(places.find((p) => p.deviceId === a.deviceId)).toMatchObject({
+			thisDevice: true,
+			offers: [],
+			ownerName: adminName,
+		});
+	});
+
 	test("without an Offer, the run is refused: the Host is the admin's, and Ada learns what to do", async () => {
 		await expect(start()).rejects.toThrow(refusal());
 		expect(await engine.space(ADA_SPACE).listRuns()).toEqual([]);

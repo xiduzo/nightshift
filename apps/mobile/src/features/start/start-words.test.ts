@@ -74,6 +74,28 @@ test("placementHint says what each place is", () => {
 	);
 });
 
+test("placementHint names the Host admin of a Host that another person runs", () => {
+	expect(
+		placementHint({
+			online: true,
+			thisDevice: true,
+			offers: [],
+			ownerName: "Ada",
+		}),
+	).toBe("This Host belongs to Ada. Ada has not offered it to this Space.");
+	expect(
+		placementHint({
+			online: true,
+			thisDevice: true,
+			offers: ["builder"],
+			ownerName: "Ada",
+		}),
+	).toBe("This Host belongs to Ada. Ada offers builder to this Space.");
+	expect(placementHint({ online: true, thisDevice: true, offers: [] })).toBe(
+		"This Host belongs to another person. It offers no profiles to this Space.",
+	);
+});
+
 describe("startBlocker", () => {
 	const ok = {
 		flowChosen: true,

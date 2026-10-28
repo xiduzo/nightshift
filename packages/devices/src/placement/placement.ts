@@ -395,6 +395,7 @@ export function createPlacement(deps: PlacementDeps) {
 		const asking = await personInSpace(db, spaceId, personId);
 		const offeredHere =
 			owner === asking ? [] : ((await deps.offersHere?.(spaceId)) ?? []);
+		const ownerName = owner === asking ? undefined : await nameOfOwner(owner);
 		const thisOne: OwnDevice =
 			owner === asking
 				? here
@@ -402,6 +403,7 @@ export function createPlacement(deps: PlacementDeps) {
 						...here,
 						offers: offeredHere.map((o) => o.profileName),
 						profiles: offeredHere.map(offeredChoice),
+						...(ownerName ? { ownerName } : {}),
 					};
 		const all = [
 			thisOne,
@@ -433,11 +435,12 @@ export function createPlacement(deps: PlacementDeps) {
 	): Promise<Placement[]> {
 		return (await devicesFor(spaceId, personId, projectId))
 			.filter((d) => d.online && d.hasClone)
-			.map(({ deviceId, name, thisDevice, offers }) => ({
+			.map(({ deviceId, name, thisDevice, offers, ownerName }) => ({
 				deviceId,
 				name,
 				thisDevice,
 				...(offers ? { offers } : {}),
+				...(ownerName ? { ownerName } : {}),
 			}));
 	}
 
@@ -636,9 +639,16 @@ export function createPlacement(deps: PlacementDeps) {
 		if (personId === null || !at.offered.mayUse) return null;
 		if ((await hostSpaces.hostOf(spaceId)) !== null) return null;
 		if ((await personalSpaceIdBySlug(db, personId)) !== spaceId) return null;
-		const owner = await selfOwnerId(db);
-		const name = owner ? (await personNames(db, [owner])).get(owner) : null;
-		return hostOffersNothing(device.name, name || "another person");
+		const name = await nameOfOwner(await selfOwnerId(db));
+		return hostOffersNothing(device.name, name ?? "another person");
+	}
+
+	/** The name of this computer's owner, when Night Shift knows it. */
+	async function nameOfOwner(
+		owner: string | null,
+	): Promise<string | undefined> {
+		if (!owner) return undefined;
+		return (await personNames(db, [owner])).get(owner) || undefined;
 	}
 
 	/**
