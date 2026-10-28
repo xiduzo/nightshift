@@ -1395,7 +1395,12 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      keeps walks a run it starts for itself; a run it starts for another
      Device goes to the Host (`sync.startRun`, `run.start` checked there)
      and the Host walks it; the Device returns once the run's rows arrived
-     by the exchange. A schedule's run runs on this computer.
+     by the exchange. The Host starts the run from its own copy of the
+     flow document, so the Device first waits until the Link has the
+     Project's flow documents in sync (`Link.synced`, up to 10 s), and
+     else refuses with "The flows of this project have not reached the
+     computer that keeps this Space yet". A schedule's run runs on this
+     computer.
    - **Run start reads the placed Device**: its flow files, its
      capabilities (harnesses, connections, CLI tools, programs, decider),
      its Clone. Refusals name it: "The flow uses the CLI tool "gh" on

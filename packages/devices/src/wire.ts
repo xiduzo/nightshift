@@ -260,6 +260,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				engine: () => engine,
 				registry: () => engine.devices,
 				links: () => links,
+				flows: deps.flows,
 			}),
 			// This computer's own Offers, the sessions and calls under them,
 			// and who may use Offers in a Space.

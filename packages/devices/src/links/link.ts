@@ -68,8 +68,9 @@ export type Link = {
 	/** Asks the Host now instead of at the next heartbeat. */
 	check(): void;
 	/**
-	 * Whether the document of this name syncs over the link and has
-	 * taken the Host's state of it once.
+	 * Whether the document of this name syncs over the link, has taken
+	 * the Host's state of it once, and the Host has every change this
+	 * computer made to it.
 	 */
 	synced(name: string): boolean;
 	/** Stops the link: no more calls, the document stops syncing, every stream stops. */
@@ -460,7 +461,10 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			});
 		},
 		check,
-		synced: (name) => providers.get(name)?.isSynced === true,
+		synced: (name) => {
+			const provider = providers.get(name);
+			return provider?.isSynced === true && !provider.hasUnsyncedChanges;
+		},
 		async close() {
 			stop.abort();
 			goOffline();
