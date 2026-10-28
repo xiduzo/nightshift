@@ -38,6 +38,7 @@ import {
 	createFlowMigrations,
 	createGitHubClones,
 	createProfileStore,
+	createProjectCopies,
 	createSettingsStore,
 	createSpaceDocuments,
 	createToolLaunchers,
@@ -180,6 +181,7 @@ export async function createDaemon(
 				hot.nightshiftFlows?.flush(),
 				hot.nightshiftNotifications?.stop(),
 				hot.nightshiftKeepAwake?.stop(),
+				hot.nightshiftProjectCopies?.stop(),
 				lease.release(),
 			]),
 		);
@@ -481,6 +483,23 @@ export async function createDaemon(
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
 	hot.nightshiftGitHubClones ??= createGitHubClones({ dataDir });
 	const gitHubClones = hot.nightshiftGitHubClones;
+	/**
+	 * "Copy every project": a Host copies each project of its Spaces it has
+	 * no Clone of. New on each reload, so it adds Clones through this
+	 * engine. A clone it started goes on in `gitHubClones`.
+	 */
+	hot.nightshiftProjectCopies?.stop();
+	const projectCopies = createProjectCopies({
+		gitHub: gitHubClones,
+		spaceIds: () => spaceIds(db),
+		space: (spaceId) => engine.space(spaceId),
+		enabled: () => {
+			const current = settings.current();
+			return current.host && current.copyProjects;
+		},
+	});
+	hot.nightshiftProjectCopies = projectCopies;
+	projectCopies.start();
 	const info: DaemonInfo = {
 		dataDir,
 		device: { ...device, ownerId: person.userId },
@@ -533,6 +552,7 @@ export async function createDaemon(
 			chooseFolder: (prompt) => chooseFolder(prompt),
 			folderPicker: canChooseFolder(),
 			gitHub: gitHubClones,
+			copies: projectCopies,
 		},
 		daemon: {
 			dataDir: info.dataDir,

@@ -1,6 +1,7 @@
-/** Projects: the project page and its menu, adding, moving, renaming and removing a project, its readiness check. */
+/** Projects: the project page and its menu, adding, copying from GitHub, moving, renaming and removing a project, its readiness check. */
 
 export { AddProjectDialog } from "./add-project-form";
+export { CopyProjectHere } from "./copy-project-here";
 export { ProjectList } from "./project-list";
 export { ProjectMenu } from "./project-menu";
 export { ProjectPage } from "./project-page";

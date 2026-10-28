@@ -1,4 +1,5 @@
-import type { ProjectRuns } from "@nightshift/engine";
+import { PROJECT_NOT_FOUND, type ProjectRuns } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -16,6 +17,7 @@ import {
 	gitHubRepoSchema,
 	gitInstallSchema,
 	listedProjectSchema,
+	projectCopySchema,
 	projectReadinessSchema,
 	projectSchema,
 	projectSourcesSchema,
@@ -198,6 +200,43 @@ export const projects = {
 		.handler(({ context, input }) =>
 			context.projectSetup.gitHub.status(input.repo),
 		),
+	/** The copies of the Space's projects to this computer that run or failed. */
+	copies: protectedProcedure
+		.route({
+			summary:
+				"Lists the copies of the Space's projects to this computer that run or failed.",
+		})
+		.output(output(z.array(projectCopySchema)))
+		.handler(async ({ context }) => {
+			const ids = new Set(
+				(await context.space.listProjects()).map((project) => project.id),
+			);
+			return context.projectSetup.copies
+				.list()
+				.filter((copy) => ids.has(copy.projectId));
+		}),
+	/**
+	 * Copies a project of the Space to this computer from GitHub, and adds
+	 * it as its Clone here. The owner's: it is this computer's disk. Returns
+	 * at once: poll `copies`.
+	 */
+	copyHere: ownerProcedure
+		.route({
+			summary:
+				"Starts to copy a project from GitHub to this computer, as its Clone here.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			const projects = await context.space.listProjects();
+			if (!projects.some((project) => project.id === input.projectId)) {
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
+			}
+			// Not awaited: a copy may take minutes. `copies` says how it goes.
+			void context.projectSetup.copies
+				.copy(context.space, input.projectId)
+				.catch(() => null);
+		}),
 	remove: permitted({ project: ["remove"] })
 		.route({
 			summary: "Removes a project from the Space. Its runs and history stay.",

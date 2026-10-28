@@ -4,6 +4,7 @@ import type {
 	DeviceDocument,
 	FlowDocuments,
 	GitHubClones,
+	ProjectCopies,
 	SpaceDocuments,
 } from "@nightshift/engine";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
@@ -55,6 +56,7 @@ export type HotRegistry = KeptDevices &
 		nightshiftScheduler?: AbortController;
 		/** The clones from GitHub that run, and how the last ones ended. */
 		nightshiftGitHubClones?: GitHubClones;
+		nightshiftProjectCopies?: ProjectCopies;
 		nightshiftFacts?: Timer;
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;

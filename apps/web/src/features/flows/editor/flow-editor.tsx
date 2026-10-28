@@ -36,7 +36,7 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CopyProjectHere, projectQueries } from "@/features/projects";
 import { formatDateTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
@@ -550,6 +551,10 @@ function Editor({
 		readFlow: () => draftRef.current,
 		changeFlow,
 	};
+	// The agent reads the project's folder: without one here, it says how to get it.
+	const project = useQuery(projectQueries.list()).data?.find(
+		(p) => p.id === projectId,
+	);
 	// The chat beside the canvas, and the proposal the canvas shows instead of the draft.
 	const chat = useChatPanel(assistant, {
 		openAtStart: !initiallySaved,
@@ -930,6 +935,11 @@ function Editor({
 						{chat.open ? (
 							<FlowChatPanel
 								{...chat.panel}
+								notice={
+									project?.repoPath === null ? (
+										<CopyProjectHere project={project} />
+									) : null
+								}
 								className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(380px,calc(100%-1.5rem))]"
 							/>
 						) : null}

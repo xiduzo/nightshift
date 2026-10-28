@@ -22,6 +22,7 @@ import type {
 	GitHubClones,
 	GitInstall,
 	ProfileStore,
+	ProjectCopies,
 	ProjectReadiness,
 	SettingsStore,
 	ToolLaunchers,
@@ -128,6 +129,8 @@ export type Context = {
 		folderPicker: boolean;
 		/** Clones from GitHub into Night Shift's own projects folder, and the GitHub CLI on this computer. */
 		gitHub: GitHubClones;
+		/** Copies of the Space's projects to this computer, from GitHub: a Host's, and the ones a person asks for. */
+		copies: ProjectCopies;
 	};
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {

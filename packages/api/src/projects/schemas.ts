@@ -5,6 +5,7 @@ import type {
 	GitHubRepo,
 	GitInstall,
 	Project,
+	ProjectCopy,
 	ProjectReadiness,
 	ProjectRuns,
 	RunCopies,
@@ -153,6 +154,15 @@ export const gitHubCloneSchema = exact<GitHubClone>()(
 			problem: z.string(),
 		}),
 	]),
+);
+
+/** A copy of a project to this computer that runs or failed. */
+export const projectCopySchema = exact<ProjectCopy>()(
+	z.object({
+		projectId: z.string(),
+		state: z.enum(["copying", "failed"]),
+		problem: z.string().nullable(),
+	}),
 );
 
 /** What starting the git installer did. */

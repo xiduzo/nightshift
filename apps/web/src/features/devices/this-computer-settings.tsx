@@ -188,10 +188,11 @@ function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 	);
 }
 
-/** "Be a Host", its addresses, and whom this computer answers. */
+/** "Be a Host", its addresses, "Copy every project", and whom this computer answers. */
 function HostSettings({ computer }: { computer: ThisComputer }) {
 	const id = useId();
 	const queryClient = useQueryClient();
+	const settings = useQuery(settingsQueries.get());
 	const { host } = computer;
 	const saved = host.addresses.join("\n");
 	const [draft, setDraft] = useState(saved);
@@ -242,6 +243,23 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 			</Item>
 			{host.enabled ? (
 				<div className="flex flex-col gap-4 pb-3 pl-12">
+					<Field orientation="horizontal">
+						<FieldContent>
+							<FieldLabel htmlFor={`${id}-copy`}>Copy every project</FieldLabel>
+							<FieldDescription>
+								When someone adds a project from GitHub, this computer copies it
+								too. Its schedules and chats can then use it here.
+							</FieldDescription>
+						</FieldContent>
+						<Switch
+							id={`${id}-copy`}
+							checked={settings.data?.values.copyProjects ?? true}
+							disabled={!settings.data || save.isPending}
+							onCheckedChange={(checked) =>
+								save.mutate({ copyProjects: checked })
+							}
+						/>
+					</Field>
 					<Field data-invalid={wrong ? true : undefined}>
 						<FieldContent>
 							<FieldLabel htmlFor={`${id}-addresses`}>Addresses</FieldLabel>

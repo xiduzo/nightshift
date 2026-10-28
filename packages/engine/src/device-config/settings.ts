@@ -275,6 +275,17 @@ const DEFS = {
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
 	/**
+	 * "Copy every project": a Host copies each project of its Spaces that
+	 * has a GitHub remote and no Clone on it yet (`ProjectCopies`). Only a
+	 * Host does: it runs every schedule.
+	 */
+	copyProjects: {
+		schema: z.boolean(),
+		default: true,
+		env: "NIGHTSHIFT_COPY_PROJECTS",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	/**
 	 * A Host's addresses, in the order a Device tries them: a LAN name, a
 	 * tailnet name, a public name. A Host listens beyond this computer only
 	 * when one of them is `https://`.

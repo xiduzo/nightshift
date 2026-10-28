@@ -132,6 +132,24 @@ describe("createGitHubClones", () => {
 		expect(seen.gitClones).toEqual([]);
 	});
 
+	test("copy waits for the clone, and joins the one that runs", async () => {
+		const { git, gh, seen } = ports("signed-in");
+		const clones = createGitHubClones({ dataDir, git, gh });
+		const [first, second] = await Promise.all([
+			clones.copy("github.com/acme/app"),
+			clones.copy("acme/app"),
+		]);
+		const path = gitHubClonePath(dataDir, { owner: "acme", repo: "app" });
+		expect(first).toEqual({
+			state: "done",
+			repo: "acme/app",
+			path,
+			reused: false,
+		});
+		expect(second.state).toBe("done");
+		expect(seen.ghClones).toEqual(["acme/app"]);
+	});
+
 	test("uses a clone of the same repository that is already there", async () => {
 		const { git, gh, seen } = ports("signed-out");
 		const clones = createGitHubClones({ dataDir, git, gh });

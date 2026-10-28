@@ -49,7 +49,13 @@ import {
 	SquarePenIcon,
 	XIcon,
 } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
+import {
+	type FormEvent,
+	type KeyboardEvent,
+	type ReactNode,
+	useMemo,
+	useState,
+} from "react";
 import type { RunStatus } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
@@ -87,6 +93,8 @@ type Props = {
 	onToggleShown: (messageId: string) => void;
 	onApply: (messageId: string, proposal: ChatProposal) => void;
 	onDiscard: (messageId: string) => void;
+	/** Above the message box: why the agent cannot read the project here yet, and how to fix it. */
+	notice?: ReactNode;
 	className?: string;
 };
 
@@ -140,6 +148,9 @@ export function FlowChatPanel(props: Props) {
 				</div>
 				{props.run ? <RunChip run={props.run} /> : null}
 				{empty ? <ChatEmpty {...props} /> : <ChatMessages {...props} />}
+				{props.notice ? (
+					<div className="shrink-0 px-3 pt-3">{props.notice}</div>
+				) : null}
 				<Composer {...props} />
 			</Card>
 		</aside>

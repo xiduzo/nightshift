@@ -168,6 +168,24 @@ on.
 For other secrets, see
 [Secrets on a computer without a keychain](#secrets-on-a-computer-without-a-keychain).
 
+### Projects come to the Host by themselves
+
+A Host copies each project of its Spaces from GitHub: a project that a
+computer added, with a remote on `github.com`. Its schedules and chats can
+then use the project on the Host. The copies go into
+`/data/projects/<owner>/<repo>`. Night Shift looks for new projects every
+minute. A copy that fails is tried again later. Open the project on the
+Host to see why it failed. "Try again" there copies it at once.
+
+- **A private repository** needs `gh`, signed in, for Night Shift itself:
+  add `gh` to your image and set `GH_TOKEN` in the environment of the
+  container. The logins of your tools are only for the steps of a flow.
+  Without `gh`, the Host copies public repositories only.
+- **Another git host**, such as GitLab: the Host does not copy it. Add its
+  folder on the Host yourself.
+- **Turn it off** under Settings → This computer → Copy every project, or
+  with `NIGHTSHIFT_COPY_PROJECTS=off`.
+
 ### Keep it running
 
 Night Shift can stop responding while it still answers web requests. Each

@@ -5,6 +5,11 @@ export { systemGit, systemGitInstaller } from "./git";
 export type { GitHubAccess, GitHubRepo } from "./github";
 export type { GitHubClone, GitHubClones } from "./github-clone";
 export { createGitHubClones } from "./github-clone";
+export {
+	createProjectCopies,
+	type ProjectCopies,
+	type ProjectCopy,
+} from "./project-copies";
 export type { ProjectReadiness } from "./project-setup";
 export { checkProjectFolder, setUpGit } from "./project-setup";
 export type { ListedProject, Project, Projects } from "./projects";

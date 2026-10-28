@@ -50,6 +50,8 @@ export type GitHubClones = {
 	start(input: string): Promise<GitHubClone>;
 	/** The clone of the repository, or null when none started since this daemon did. */
 	status(input: string): GitHubClone | null;
+	/** Starts or joins the clone of the repository, like `start`, and waits until it is done or failed. */
+	copy(input: string): Promise<GitHubClone>;
 };
 
 /** How long one clone may take before Night Shift stops it. */
@@ -79,7 +81,11 @@ export function createGitHubClones(deps: {
 	const git = deps.git ?? systemGit();
 	const gh = deps.gh ?? systemGitHubCli();
 	const timeoutMs = deps.timeoutMs ?? CLONE_TIMEOUT_MS;
-	const clones = new Map<string, GitHubClone>();
+	const states = new Map<string, GitHubClone>();
+	/** The clones that run, until they end. */
+	const ends = new Map<string, Promise<GitHubClone>>();
+	/** The starts that look at the folder now. */
+	const starting = new Map<string, Promise<GitHubClone>>();
 	const keyOf = (name: GitHubRepoName) => gitHubRepoLabel(name).toLowerCase();
 
 	/** Whether `path` is the top of a clone whose `origin` is the repository. */
@@ -170,7 +176,59 @@ export function createGitHubClones(deps: {
 		}
 	}
 
-	return {
+	/** Looks at the repository's folder and starts its clone, unless the folder holds it. */
+	async function begin(
+		name: GitHubRepoName,
+		key: string,
+	): Promise<GitHubClone> {
+		const label = gitHubRepoLabel(name);
+		const path = gitHubClonePath(deps.dataDir, name);
+		const found = await existing(path, name);
+		if (found === "clone") {
+			const done: GitHubClone = {
+				state: "done",
+				repo: label,
+				path,
+				reused: true,
+			};
+			states.set(key, done);
+			return done;
+		}
+		if (found === "other") {
+			const failed: GitHubClone = {
+				state: "failed",
+				repo: label,
+				problem: taken(path),
+			};
+			states.set(key, failed);
+			return failed;
+		}
+		if (found === "empty") await rm(path, { recursive: true, force: true });
+
+		const cloning: GitHubClone = { state: "cloning", repo: label };
+		states.set(key, cloning);
+		// Not awaited: the clone may take minutes. `clone` catches its own errors.
+		const ended = clone(name, label, path)
+			.catch(
+				(): GitHubClone => ({
+					state: "failed",
+					repo: label,
+					problem: `Night Shift could not copy ${label} from GitHub. Try again.`,
+				}),
+			)
+			.then((end) => {
+				if (end.state === "failed") {
+					console.warn(`[projects] clone of ${label} failed: ${end.problem}`);
+				}
+				states.set(key, end);
+				ends.delete(key);
+				return end;
+			});
+		ends.set(key, ended);
+		return cloning;
+	}
+
+	const clones: GitHubClones = {
 		access: () => gh.access(),
 		async repos() {
 			return (await gh.access()) === "signed-in" ? gh.repos() : [];
@@ -179,57 +237,28 @@ export function createGitHubClones(deps: {
 			const name = parseGitHubRepo(input);
 			if (name === null) throw new Refusal("invalid", NOT_A_GITHUB_REPO);
 			const key = keyOf(name);
-			const running = clones.get(key);
+			const running = states.get(key);
 			if (running?.state === "cloning") return running;
-
-			const label = gitHubRepoLabel(name);
-			const path = gitHubClonePath(deps.dataDir, name);
-			const found = await existing(path, name);
-			if (found === "clone") {
-				const done: GitHubClone = {
-					state: "done",
-					repo: label,
-					path,
-					reused: true,
-				};
-				clones.set(key, done);
-				return done;
-			}
-			if (found === "other") {
-				const failed: GitHubClone = {
-					state: "failed",
-					repo: label,
-					problem: taken(path),
-				};
-				clones.set(key, failed);
-				return failed;
-			}
-			if (found === "empty") await rm(path, { recursive: true, force: true });
-
-			const cloning: GitHubClone = { state: "cloning", repo: label };
-			clones.set(key, cloning);
-			// Not awaited: the clone may take minutes. `clone` catches its own errors.
-			void clone(name, label, path)
-				.catch(
-					(): GitHubClone => ({
-						state: "failed",
-						repo: label,
-						problem: `Night Shift could not copy ${label} from GitHub. Try again.`,
-					}),
-				)
-				.then((end) => {
-					if (end.state === "failed") {
-						console.warn(`[projects] clone of ${label} failed: ${end.problem}`);
-					}
-					clones.set(key, end);
-				});
-			return cloning;
+			// Two starts at once look at the folder once and clone once.
+			const pending = starting.get(key);
+			if (pending) return pending;
+			const begun = begin(name, key).finally(() => starting.delete(key));
+			starting.set(key, begun);
+			return begun;
 		},
 		status(input) {
 			const name = parseGitHubRepo(input);
-			return name === null ? null : (clones.get(keyOf(name)) ?? null);
+			return name === null ? null : (states.get(keyOf(name)) ?? null);
+		},
+		async copy(input) {
+			const started = await clones.start(input);
+			if (started.state !== "cloning") return started;
+			const name = parseGitHubRepo(input);
+			const ended = name && ends.get(keyOf(name));
+			return ended ? await ended : (clones.status(input) ?? started);
 		},
 	};
+	return clones;
 }
 
 /** What went wrong with a clone, and how to fix it. */

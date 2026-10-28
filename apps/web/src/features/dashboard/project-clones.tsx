@@ -8,12 +8,14 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { LaptopIcon, MonitorIcon } from "lucide-react";
+import { CopyProjectHere } from "@/features/projects";
 import type { Project } from "@/shared/api";
 import { PageSection } from "@/shared/page";
 
 /**
  * The computers that have the project's repository (its Clones), this one
- * first. Where another computer keeps it is that computer's own.
+ * first. Where another computer keeps it is that computer's own. Without
+ * a Clone here: how its copy from GitHub goes.
  */
 export function ProjectClones({ project }: { project: Project }) {
 	return (
@@ -22,7 +24,8 @@ export function ProjectClones({ project }: { project: Project }) {
 			description="The computers that have this repository."
 		>
 			<Card size="sm">
-				<CardContent>
+				<CardContent className="flex flex-col gap-2">
+					<CopyProjectHere project={project} />
 					<ItemGroup className="gap-1">
 						{project.clones.map((clone) => (
 							<Item key={clone.deviceId} size="xs">

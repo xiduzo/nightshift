@@ -56,6 +56,7 @@ import {
 	jsonProblem,
 	missingInputs,
 } from "@/features/flows";
+import { CopyProjectHere, projectQueries } from "@/features/projects";
 import { formatDayTime } from "@/shared/format";
 import { scheduleQueries } from "./queries";
 import {
@@ -265,6 +266,9 @@ function ScheduleForm({
 	}));
 	const [baseRef, setBaseRef] = useState(schedule?.baseRef ?? "");
 	const machines = useSpaceMachines();
+	const project = useQuery(projectQueries.list()).data?.find(
+		(p) => p.id === projectId,
+	);
 	// Null until the person picks one: a new schedule runs on the computer
 	// that starts it when that one has the project, else on this computer.
 	const [device, setDevice] = useState<string | null>(
@@ -672,7 +676,11 @@ function ScheduleForm({
 								</NativeSelectOption>
 							) : null}
 						</NativeSelect>
-						{!hasProject(runsOnMachine, projectId) ? (
+						{!hasProject(runsOnMachine, projectId) &&
+						runsOnMachine?.thisDevice &&
+						project ? (
+							<CopyProjectHere project={project} />
+						) : !hasProject(runsOnMachine, projectId) ? (
 							<FieldError>
 								{runsOnMachine?.name} does not have this project. Add its folder
 								there, or choose another computer.
