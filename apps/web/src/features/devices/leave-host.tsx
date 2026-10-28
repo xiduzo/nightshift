@@ -52,8 +52,8 @@ export function LeaveHostButton({ hostName }: { hostName: string }) {
 			if (unpinned > 0) {
 				toast.info(
 					unpinned === 1
-						? "1 schedule named another device. It runs on this computer now."
-						: `${unpinned} schedules named another device. They run on this computer now.`,
+						? "1 schedule named another device. It is paused here. Turn it on to run it on this computer."
+						: `${unpinned} schedules named another device. They are paused here. Turn them on to run them on this computer.`,
 				);
 			}
 		},

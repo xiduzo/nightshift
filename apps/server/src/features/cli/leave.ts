@@ -42,11 +42,11 @@ export function leaveQuestionLines(hostName: string): string[] {
 	];
 }
 
-/** The schedules that named another device, and where they run now. */
+/** The schedules that named another device, and how to run them here. */
 function unpinnedLine(count: number): string {
 	return count === 1
-		? "1 schedule named another device. It runs on this computer now."
-		: `${count} schedules named another device. They run on this computer now.`;
+		? "1 schedule named another device. It is paused here. Turn it on to run it on this computer."
+		: `${count} schedules named another device. They are paused here. Turn them on to run them on this computer.`;
 }
 
 /** How leaving went. */

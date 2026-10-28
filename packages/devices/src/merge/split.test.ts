@@ -375,7 +375,7 @@ describe("leaving the home Host keeps a copy", () => {
 		).toHaveLength(1);
 	});
 
-	test("a schedule that names another device fires on B after the split; one that names B stays", async () => {
+	test("a schedule that names another device is paused on B after the split and names no device; turned on, it has a next start; one that names B stays", async () => {
 		const { projectId } = await mergedIntoA();
 		const flows = await paired.flows.open(projectId);
 		await flows.current.change(() => {
@@ -399,11 +399,25 @@ describe("leaving the home Host keeps a copy", () => {
 			.space(own)
 			.listSchedules(projectId);
 		const byId = new Map(schedules.map((s) => [s.id, s]));
-		expect(byId.get("nightly")?.device).toBe("B");
+		expect(byId.get("nightly")).toMatchObject({ device: "B", enabled: true });
+		// A still fires it on C: B does not run it a second time.
+		expect(byId.get("on-c")).toMatchObject({
+			enabled: false,
+			nextAt: null,
+			cron: "0 6 * * *",
+		});
 		expect(byId.get("on-c")?.device).toBeUndefined();
 		expect(byId.get("on-c")?.person).toBeUndefined();
-		expect(byId.get("on-c")?.cron).toBe("0 6 * * *");
 		expect(await splitter().of(a.spaceId)).toMatchObject({ unpinned: 1 });
+
+		await flows.current.change(() => {
+			const value = flows.schedules.get("on-c") as Record<string, unknown>;
+			flows.schedules.set("on-c", { ...value, enabled: true });
+		});
+		const turnedOn = await paired.device.space(own).listSchedules(projectId);
+		expect(
+			turnedOn.schedules.find((s) => s.id === "on-c")?.nextAt,
+		).not.toBeNull();
 	});
 
 	test("a split that is done does not run again", async () => {
