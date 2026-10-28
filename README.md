@@ -81,7 +81,7 @@ An Agent node names the coding agent it runs on. One flow can mix them.
 | Any other agent that speaks the Agent Client Protocol | Add it as a custom agent with its command, for example `goose acp` |
 | GitHub Copilot, Gemini CLI, Cursor | Through the Agent Client Protocol, not yet verified |
 
-A node can add connections (MCP servers) and CLI tools such as `gh`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" (planned, [ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
+A node can add connections (MCP servers) and CLI tools such as `gh`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" ([ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
 
 Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Call runs one as `kit:github/publish-draft-pr`.
 
@@ -153,7 +153,7 @@ The commands work in the project of the folder you run them in. `--project <id, 
 
 ### Run it on a server
 
-`nightshift` is Night Shift in one file: the server, the web UI, and the database. It runs on Linux (x64, arm64) and macOS (arm64), with Docker and systemd recipes. Your laptop can pair with it over your LAN, Tailscale, a public server, or a tunnel. See [docs/deploy/](docs/deploy/).
+`nightshift` is Night Shift in one file: the server, the web UI, and the database. It runs on Linux (x64, arm64) and macOS (arm64), with Docker and systemd recipes. Your laptop can pair with it over your LAN, Tailscale, a public server, or a tunnel. See [docs/deploy/](docs/deploy/). When it is your home Host, your Personal is one Space on all your computers and on your phone ([ADR 1](docs/adr/0001-one-personal-space-per-home-host.md)).
 
 ## Status
 

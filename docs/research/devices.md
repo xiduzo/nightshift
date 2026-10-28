@@ -234,15 +234,19 @@ rewrites the Device's database, so it is careful:
    a shared Space stays apart from it, in Personal without that remote
    there, unless the person chooses to join it: then the Members of that
    Space see its runs. The Host's Space id stays.
-6. **After the batch.** The old Space document loses the moved
-   projects. The flow documents of a project that joins another merge
-   into it (`mergeFlowDocuments`), once the Host's copy is here. Each
+6. **After the batch.** The old Space's document and its events of no
+   run (a Member that joined) go, once no Space, project or run row names
+   the old Space. A merge of an older version left them: the daemon
+   removes them at its next start. The flow documents of a project that
+   joins another merge into it (`mergeFlowDocuments`), once the Host's
+   copy is here: `Link.synced` says that the two copies are in sync, and
+   that the Host has every change this Device made. Each
    schedule that names no Device is pinned to this Device, so it keeps
    firing where it fired. The engine reads the moved runs again
    (`Engine.reindex`). The moved events of this Device take the numbers
    after its latest, so they reach the Host after every cursor.
-7. **The name.** The merged Space is "Personal" on the Device: the
-   Host's answer no longer renames it "Personal on <Host>".
+7. **The name.** The merged Space is "Personal" on the Device, also
+   after each answer of the Host.
 
 On a new join, the merge runs at once and the join shows its preview and
 its result. When it cannot run, the join says why, and the merge waits
@@ -281,22 +285,29 @@ reverse of the merge, and as careful:
    new personal Space of the Device's own with
    `splitPersonalSpaceBatch`, the rows with `spaceMoveBatch` and its
    `runsOf` the Device, the Host's Space renamed, the notifier's
-   deliveries, an unfinished merge ended, and the state), `done` (the new
-   Space document took its projects and Clones from the rows).
+   deliveries, an unfinished merge ended, and the state), `done` (the
+   schedules of item 5 name no Device, and the new Space document took
+   its projects and Clones from the rows).
 4. **What comes along.** The projects that the Device has a Clone of or
    walked a run of, with their kept variables and the facts of no run
    that name them, and the runs that the Device walked. The projects
    keep their ids, so their flow documents, with their history and
    schedules, stay as they are here. They no longer sync with the Host.
    The rows that come along name the Person by their id on the Device
-   again.
-5. **What stays.** The Host keeps everything. On the Device, the Host's
+   again. A project the Device walked a run of comes along without a
+   Clone too, so each run it walked keeps its project. This is wider
+   than ADR 1 decision 6, which names only the projects with a Clone.
+5. **Schedules.** A schedule of those projects that names another
+   Device would never fire again: the new Space has only this Device. It
+   loses its Device (and its Person), so it fires here. The split counts
+   them, and `nightshift leave` and the web app say so: "2 schedules
+   named another device. They run on this computer now."
+6. **What stays.** The Host keeps everything. On the Device, the Host's
    Space keeps the runs other Devices walked and the projects without a
-   Clone here, named "Personal on <Host>". The Person is no longer a
-   Member of it on the Device, so it leaves the Space switcher. A Device
-   that joins the Host again sees it as "Personal on <Host>" and can
-   merge again.
-6. **The other Devices.** The Device drops its copies of the documents of
+   Clone here. The Person is no longer a Member of it on the Device, so
+   it leaves the Space switcher. A Device that joins the Host again lists
+   it beside its own Personal and can merge again.
+7. **The other Devices.** The Device drops its copies of the documents of
    the Person's other Devices.
 
 A Device whose Personal never merged keeps it as it is. A merge that
@@ -529,8 +540,9 @@ A Run's Walker is chosen at start; the default is the Space's Host, because
 it stays on and a browser-only client has no daemon. A Device that starts
 a Run in a Space a Host keeps gives the walk to the Host, and its unplaced
 steps still run on that Device (ADR 1). A Device that cannot reach its Host
-walks the Run itself, and the Exchange sends it to the Host later. The Run's worktree lives on the Device
-of its first placed step. "Move this Run to studio" ends the walk here and
+walks the Run itself, and the Exchange sends it to the Host later. The
+Run's worktree lives on the Run's Device: made at the start, or when that
+Device is back when it was offline. "Move this Run to studio" ends the walk here and
 resumes it there from the archived checkpoint.
 
 ### Projects and Clones
@@ -562,8 +574,10 @@ Between two steps on different Devices: push, fetch and checkout,
   session id (`continue, with-session`).
 - Walker offline during a remote step: the placed Device keeps running;
   the Walker's recovery asks it before re-running.
-- Host offline: every Device keeps walking its own runs on its Replica.
-  Cross-device steps wait. Sync catches up.
+- Host offline: a Device walks the runs it starts while the Host is
+  away, and the runs moved to it. A run that the Host walks waits for
+  the Host. A step placed on another Device waits until the link is
+  back. The exchange then sends the Device's runs to the Host.
 - A Device that cannot reach anyone for long aborts its sessions. The
   limit is a Device setting.
 
@@ -1194,8 +1208,10 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      The Device keeps them in `host_space`, with an `organization` row and
      a `member` row for its own Person in that role: this computer's
      Person acts there as its owner does on the Host, so sessions, the
-     Space switcher and `hasPermission` work unchanged. A personal Space
-     there is "Personal on <Host>", never this computer's personal Space.
+     Space switcher and `hasPermission` work unchanged. The Person's
+     personal Space on their Home Host becomes this computer's personal
+     Space, "Personal", when the merge is done (ADR 1). Until then it is
+     listed beside it as "Personal on <Host>".
      Their documents sync read-only over the link (one WebSocket per link
      for every document); the copy here is the Host's: no import, no
      member mirror. A batch whose project has not arrived waits for it
