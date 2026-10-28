@@ -181,6 +181,15 @@ flowchart LR
   Devices, with their profiles, CLI Tools and Connections, are usable there
   without Offers. A Guest Host never merges: it gets only shared Spaces
   (ADR 1).
+- **A Host that another Person runs is not your Device.** The Host Device
+  belongs to the Host admin. In your Personal there, its Agent Profiles
+  run only through an Offer: the Host admin offers them to "Personal of
+  <you>" in the Offer dialog, and withdraws them the same way. Only the
+  Personal that this Host keeps is listed, never one that another Host
+  keeps. Without an Offer, a run that needs the Host is refused: "The
+  Host <name> belongs to <admin>. Ask them to offer its profiles to your
+  Personal, or pick one of your own devices." Night Shift never offers it
+  on its own.
 - A Device's configuration (profiles, tools, connections, secret names,
   binary paths) lives in its **Device document**, which syncs only through
   its **home Host** and only to Devices of the same owner. A guest Host

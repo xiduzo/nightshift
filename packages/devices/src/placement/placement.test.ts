@@ -7,6 +7,7 @@ import {
 	device as deviceTable,
 	event,
 	hostLink,
+	member,
 	organization,
 	run as runTable,
 	user,
@@ -44,7 +45,7 @@ import {
 	workRequestSchema,
 } from "../contract";
 import { createHostSpaces } from "../links";
-import { NO_STARTER } from "../offers";
+import { type DeviceOffer, NO_STARTER } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
@@ -176,10 +177,15 @@ const A_PROFILES = [
 /** A's engine. Without `internals`, it fires no schedules. */
 function peerEngine(
 	internals?: Parameters<typeof createPeerEngine>[1],
+	options: Pick<
+		Parameters<typeof withPeers>[0],
+		"ownOffers" | "mayUseOffers" | "deviceId"
+	> = {},
 ): PeerEngine {
 	lifetime = new AbortController();
 	return createPeerEngine(
 		withPeers({
+			...options,
 			db: a.db,
 			dataDir: a.dataDir,
 			...(internals ? {} : { scheduler: false as const }),
@@ -1321,4 +1327,142 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		expect(requests.length).toBeGreaterThan(0);
 		for (const request of requests) expect(request.personId).toBe(personId);
 	}, 30_000);
+});
+
+describe("a run in the Personal of another Person whose home Host this is", () => {
+	const ADA = "ada";
+	const ADA_SPACE = "personal-ada";
+	/** This computer's Offers, as its Device document keeps them. */
+	let offered: DeviceOffer[];
+	let adaProject: string;
+	/** The name of this computer's owner: the Host admin. */
+	let adminName: string;
+
+	beforeEach(async () => {
+		await a.db
+			.insert(user)
+			.values({ id: ADA, name: "Ada", email: "ada@example.invalid" });
+		await a.db.insert(organization).values({
+			id: ADA_SPACE,
+			name: "Personal",
+			slug: ADA_SPACE,
+			personal: true,
+			createdAt: new Date(),
+		});
+		await a.db.insert(member).values({
+			id: "m-ada",
+			organizationId: ADA_SPACE,
+			userId: ADA,
+			role: "owner",
+			createdAt: new Date(),
+		});
+		await engine.devices.join({
+			id: "ada-laptop",
+			name: "ada-laptop",
+			platform: "darwin",
+			ownerId: ADA,
+			homeHost: "https://host.invalid",
+		});
+		adminName = "Sander";
+		await a.db
+			.update(user)
+			.set({ name: adminName })
+			.where(eq(user.id, personId));
+		// The Host's engine, with its own Offers.
+		lifetime.abort();
+		offered = [];
+		engine = peerEngine(undefined, {
+			deviceId: a.deviceId,
+			ownOffers: () => offered,
+			mayUseOffers: async () => true,
+		});
+		// Ada's project, with a Clone on the Host.
+		adaProject = (
+			await engine.space(ADA_SPACE).addProject({ repoPath: b.repoPath })
+		).id;
+	});
+
+	const onHost = (): Flow =>
+		flow([
+			{
+				id: "work",
+				type: "agent",
+				position: { x: 0, y: 0 },
+				prompt: "Work.",
+				profile: { device: a.deviceId, profile: "everywhere" },
+			} as Flow["nodes"][number],
+		]);
+	const start = () =>
+		engine
+			.space(ADA_SPACE, { personId: ADA })
+			.startRun({ projectId: adaProject, flow: onHost(), startedBy: ADA });
+	const refusal = () =>
+		`The Host test belongs to ${adminName}. Ask them to offer its profiles to your Personal, or pick one of your own devices.`;
+
+	async function offer() {
+		await engine.offers.publish({
+			spaceId: ADA_SPACE,
+			deviceId: a.deviceId,
+			deviceName: "test",
+			profile: "everywhere",
+			profileName: "everywhere",
+			permissionCap: "auto",
+			sessionCap: 1,
+			by: personId,
+		});
+		offered = [
+			{
+				spaceId: ADA_SPACE,
+				profile: "everywhere",
+				profileName: "everywhere",
+				permissionCap: "auto",
+				sessionCap: 1,
+				offeredAt: 1,
+			},
+		];
+	}
+
+	test("without an Offer, the run is refused: the Host is the admin's, and Ada learns what to do", async () => {
+		await expect(start()).rejects.toThrow(refusal());
+		expect(await engine.space(ADA_SPACE).listRuns()).toEqual([]);
+	});
+
+	test("the admin offers a profile to Ada's Personal: her run uses it on the Host", async () => {
+		await offer();
+		const started = await start();
+		const run = await waitFor(
+			async () => {
+				const found = await engine.space(ADA_SPACE).getRun(started.id);
+				return found.status === "finished" ? found : null;
+			},
+			{ label: "run finished", timeoutMs: 10_000 },
+		);
+		expect(run.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["work", "pass"],
+		]);
+		expect(run.device.id).toBe(a.deviceId);
+	});
+
+	test("withdrawn, the next run is refused again with the same words", async () => {
+		await offer();
+		await engine.offers.withdraw({
+			spaceId: ADA_SPACE,
+			deviceId: a.deviceId,
+			profile: "everywhere",
+			by: personId,
+		});
+		offered = [];
+		await expect(start()).rejects.toThrow(refusal());
+	});
+
+	test("a command on the Host is refused even with an Offer: an Offer runs only its profile", async () => {
+		await offer();
+		await expect(
+			engine.space(ADA_SPACE, { personId: ADA }).startRun({
+				projectId: adaProject,
+				flow: flow([command("hi", "echo hi")]),
+				startedBy: ADA,
+			}),
+		).rejects.toThrow("test is not your device. It runs only Agent nodes");
+	});
 });

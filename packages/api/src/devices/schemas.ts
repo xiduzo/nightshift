@@ -282,6 +282,11 @@ const offerViewSchema = exact<OfferView>()(
 
 export const offerListSchema = z.object({
 	offers: z.array(offerViewSchema),
-	/** The Spaces this computer can offer to. */
-	spaces: z.array(z.object({ id: z.string(), name: z.string() })),
+	/**
+	 * The Spaces this computer can offer to: shared ones, and on a Host the
+	 * Personal of each Person whose home Host it is ("Personal of Ada").
+	 */
+	spaces: z.array(
+		z.object({ id: z.string(), name: z.string(), personal: z.boolean() }),
+	),
 });

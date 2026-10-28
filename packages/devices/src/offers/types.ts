@@ -49,11 +49,23 @@ export type SpaceDeviceView = {
 	offers: (OfferCaps & { profile: string; profileName: string })[];
 };
 
+/**
+ * A Space this computer's owner can offer its profiles to: a shared Space
+ * where their role allows it, or, on a Host, the personal Space of a
+ * Person whose home Host it is ("Personal of Ada").
+ */
+export type OfferSpace = { id: string; name: string; personal: boolean };
+
 /** This computer's Offers into Spaces, made by its owner. */
 export type Offers = {
 	/** Its Offers, every Space, oldest first. */
 	list(): Promise<OfferView[]>;
-	/** Offers one of its profiles (`profile`: its id) to a Space, or changes the caps. */
+	/** The Spaces it can offer to: the shared ones, then the personal ones, by name. */
+	spaces(): Promise<OfferSpace[]>;
+	/**
+	 * Offers one of its profiles (`profile`: its id) to a Space, or changes
+	 * the caps. Only to a Space of `spaces()`.
+	 */
 	make(
 		input: OfferCaps & { spaceId: string; profile: string },
 		by: string,

@@ -439,3 +439,31 @@ describe("a colleague's run on another Person's Device", () => {
 		).rejects.toThrow("It offers nothing to this Space.");
 	}, 90_000);
 });
+
+describe("offers into a person's Personal", () => {
+	test("only the Host's owner offers its profiles: the colleague cannot, not even into their own Personal", async () => {
+		const personal = (await colleague.spaces.list()).spaces.find(
+			(s) => s.personal,
+		)?.id as string;
+		await expect(
+			colleague.offers.make({
+				spaceId: personal,
+				profile: coderId,
+				permissionCap: "plan",
+				sessionCap: 1,
+			}),
+		).rejects.toThrow(
+			"Only the owner of this computer can see or change this.",
+		);
+	}, 30_000);
+
+	test("A does not list the colleague's Personal: no Device of theirs has A as its home Host", async () => {
+		const { spaces } = await a.client.offers.list();
+		expect(spaces).toContainEqual({
+			id: spaceId,
+			name: "Platform",
+			personal: false,
+		});
+		expect(spaces.filter((s) => s.personal)).toEqual([]);
+	}, 30_000);
+});

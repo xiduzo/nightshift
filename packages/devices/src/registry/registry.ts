@@ -7,7 +7,7 @@ import {
 	type RunLog,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 /**
  * A paired Device whose Link says nothing for this long is offline: three
@@ -104,6 +104,25 @@ export async function deviceNamesOf(
 		.from(device)
 		.where(inArray(device.id, [...ids]));
 	return new Map(rows.map((d) => [d.id, d.name]));
+}
+
+/**
+ * The Persons whose home Host this computer is: each has a paired Device
+ * with access that joined it as its home Host. Only a Host has such rows.
+ */
+export async function homePersonsOf(db: Database): Promise<string[]> {
+	const rows = await db
+		.selectDistinct({ ownerId: device.ownerId })
+		.from(device)
+		.where(
+			and(
+				eq(device.self, false),
+				isNotNull(device.homeHost),
+				isNull(device.revokedAt),
+				isNotNull(device.ownerId),
+			),
+		);
+	return rows.flatMap((row) => (row.ownerId ? [row.ownerId] : []));
 }
 
 export function createDeviceRegistry(deps: {

@@ -1,10 +1,15 @@
-import { spacesOf } from "@nightshift/auth";
+import {
+	personalSpaceIdBySlug,
+	personNames,
+	roleAllows,
+	spacesOf,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceDocument, Engine, ProfileStore } from "@nightshift/engine";
 import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { personInSpace } from "../links";
-import type { DeviceRegistry } from "../registry";
+import { createHostSpaces, personInSpace } from "../links";
+import { type DeviceRegistry, homePersonsOf } from "../registry";
 import type { EngineOffers } from "./engine-offers";
 import {
 	deviceOffers,
@@ -12,7 +17,7 @@ import {
 	removeDeviceOffer,
 	setDeviceOffer,
 } from "./offers";
-import type { Offers, SpaceDeviceView } from "./types";
+import type { OfferSpace, Offers, SpaceDeviceView } from "./types";
 
 /**
  * This computer's Offers, as its owner makes and withdraws them (the
@@ -26,6 +31,11 @@ import type { Offers, SpaceDeviceView } from "./types";
  * once; then the Space stops listing it and the runs walked there stop
  * their steps under it; then whatever still runs here under it is
  * aborted, also when the Host cannot be reached.
+ *
+ * On a Host, its owner (the Host admin) also offers to the personal Space
+ * of each Person whose home Host it is: there the Host is not one of that
+ * Person's own Devices (ADR 1). A personal Space kept elsewhere is not
+ * theirs to offer to.
  */
 export function createOffers(deps: {
 	db: Database;
@@ -50,11 +60,36 @@ export function createOffers(deps: {
 	withdrawn(spaceId: string, profile: string): void;
 }): Offers {
 	const { db, engine, document, self } = deps;
+	const hostSpaces = createHostSpaces(db);
 
-	/** A Space of this computer's owner, or null for one they are not in. */
+	/**
+	 * The personal Spaces this computer keeps of the Persons whose home Host
+	 * it is, as "Personal of <name>", by name.
+	 */
+	async function theirPersonals(): Promise<OfferSpace[]> {
+		const persons = (await homePersonsOf(db)).filter(
+			(person) => person !== deps.ownerId,
+		);
+		const names = await personNames(db, persons);
+		const spaces: OfferSpace[] = [];
+		for (const person of persons) {
+			const id = await personalSpaceIdBySlug(db, person);
+			if (id === null || (await hostSpaces.hostOf(id)) !== null) continue;
+			spaces.push({
+				id,
+				name: `Personal of ${names.get(person) ?? "a person"}`,
+				personal: true,
+			});
+		}
+		return spaces.sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	/** A Space this computer's owner is in, or a Personal they offer to; null for any other. */
 	async function spaceRow(spaceId: string) {
 		return (
-			(await spacesOf(db, deps.ownerId)).find((s) => s.id === spaceId) ?? null
+			(await spacesOf(db, deps.ownerId)).find((s) => s.id === spaceId) ??
+			(await theirPersonals()).find((s) => s.id === spaceId) ??
+			null
 		);
 	}
 
@@ -103,6 +138,13 @@ export function createOffers(deps: {
 			return views;
 		},
 
+		async spaces() {
+			const shared = (await spacesOf(db, deps.ownerId))
+				.filter((s) => !s.personal && roleAllows(s.role, { offer: ["make"] }))
+				.map((s) => ({ id: s.id, name: s.name, personal: false }));
+			return [...shared, ...(await theirPersonals())];
+		},
+
 		async make(input, by) {
 			const profile = deps.profiles.get(input.profile);
 			if (!profile) {
@@ -117,13 +159,26 @@ export function createOffers(deps: {
 					`The profile "${profile.name}" is for Decision and Value nodes. Only an agent profile can be offered.`,
 				);
 			}
-			const space = await spaceRow(input.spaceId);
-			if (!space) throw new Refusal("not-found", "That Space does not exist.");
-			if (space.personal) {
+			const own = (await spacesOf(db, deps.ownerId)).find(
+				(s) => s.id === input.spaceId,
+			);
+			if (own?.personal) {
 				throw new Refusal(
 					"invalid",
-					"Nobody else is in a personal Space. Offer the profile to a shared Space.",
+					"Nobody else is in your personal Space. Offer the profile to a shared Space.",
 				);
+			}
+			if (own && !roleAllows(own.role, { offer: ["make"] })) {
+				throw new Refusal(
+					"forbidden",
+					"Your role in that Space does not allow offering profiles.",
+				);
+			}
+			if (
+				!own &&
+				!(await theirPersonals()).some((s) => s.id === input.spaceId)
+			) {
+				throw new Refusal("not-found", "That Space does not exist.");
 			}
 			await engine.offers.publish({
 				...input,
@@ -251,7 +306,11 @@ export function createOffers(deps: {
 				const owner = owners.get(device.id);
 				if (owner) {
 					device.mine = owner === me;
-					device.owner = await engine.members.name(spaceId, owner);
+					// The Host admin offers to a Personal they are no Member of.
+					device.owner =
+						(await engine.members.name(spaceId, owner)) ??
+						(await personNames(db, [owner])).get(owner) ??
+						null;
 				}
 			}
 			return [...devices.values()];

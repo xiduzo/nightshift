@@ -296,6 +296,14 @@ export function offersNothing(deviceName: string): string {
 }
 
 /**
+ * The refusal of a run in a Person's Personal on their home Host, when
+ * the Host is another Person's (the Host admin's) and offers nothing there.
+ */
+export function hostOffersNothing(hostName: string, ownerName: string): string {
+	return `The Host ${hostName} belongs to ${ownerName}. Ask them to offer its profiles to your Personal, or pick one of your own devices.`;
+}
+
+/**
  * The Walker's check at run start, for a run placed on a Device another
  * Person owns: every node that touches that Device is an Agent node that
  * names a profile it offers to the Space, sets nothing the profile sets,
