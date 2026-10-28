@@ -119,6 +119,14 @@ export function mergeRows(db: Database) {
 				.where(eq(spaceMerge.fromSpace, fromSpace));
 		},
 
+		/**
+		 * The statement that ends a merge that is not done, when this
+		 * computer leaves its home Host: it can no longer go on.
+		 */
+		abandon(): BatchItem<"sqlite"> {
+			return db.delete(spaceMerge).where(ne(spaceMerge.state, "pushed"));
+		},
+
 		/** The Host has the moved runs. */
 		async pushed(fromSpace: string): Promise<void> {
 			await db

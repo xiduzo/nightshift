@@ -90,8 +90,13 @@ export const MERGE_WORDS = {
 	busy: "Night Shift merges your Personal already. Wait until it is done.",
 } as const;
 
-/** The statuses of a run that is not done: a merge waits for them. */
-const NOT_DONE = ["running", "waiting", "sleeping", "interrupted"] as const;
+/** The statuses of a run that is not done: a merge and a split wait for them. */
+export const NOT_DONE = [
+	"running",
+	"waiting",
+	"sleeping",
+	"interrupted",
+] as const;
 
 export type PersonalMergeDeps = {
 	db: Database;

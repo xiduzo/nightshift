@@ -252,6 +252,47 @@ does the same: `nightshift merge` shows the preview and asks,
 An older Host has no `sync.mergePersonal`: the Device keeps its
 Personal and says to update the Host.
 
+### Leaving keeps a copy
+
+When a Device leaves its Home Host, its Personal splits off the Host's
+again (ADR 1 decision 6, `devices/src/merge/split.ts`). It leaves when
+the Host removes its access (the link learns it at its next answer, also
+after a time offline) or when its person leaves. The split is the
+reverse of the merge, and as careful:
+
+1. **When.** The Person's personal Space is one that a Host keeps, and
+   the Device has no link with access to that Host. It waits while a run
+   that this Device walks there is running, waiting, sleeping or
+   interrupted. The daemon tries at start and every 30 s, so a split
+   cut short or held back goes on by itself.
+2. **Copy.** `VACUUM INTO` writes `backups/before-leaving-host-*.db`
+   first.
+3. **States** (`space_split`, a sibling of `space_merge` with a new Space
+   as its key): `planned` (the copy is made), `moved` (one `db.batch`: a
+   new personal Space of the Device's own with
+   `splitPersonalSpaceBatch`, the rows with `spaceMoveBatch` and its
+   `runsOf` the Device, the Host's Space renamed, the notifier's
+   deliveries, an unfinished merge ended, and the state), `done` (the new
+   Space document took its projects and Clones from the rows).
+4. **What comes along.** The projects that the Device has a Clone of or
+   walked a run of, with their kept variables and the facts of no run
+   that name them, and the runs that the Device walked. The projects
+   keep their ids, so their flow documents, with their history and
+   schedules, stay as they are here. They no longer sync with the Host.
+   The rows that come along name the Person by their id on the Device
+   again.
+5. **What stays.** The Host keeps everything. On the Device, the Host's
+   Space keeps the runs other Devices walked and the projects without a
+   Clone here, named "Personal on <Host>". The Person is no longer a
+   Member of it on the Device, so it leaves the Space switcher. A Device
+   that joins the Host again sees it as "Personal on <Host>" and can
+   merge again.
+6. **The other Devices.** The Device drops its copies of the documents of
+   the Person's other Devices.
+
+A Device whose Personal never merged keeps it as it is. A merge that
+never moved a row ends when the Device leaves.
+
 ### Sharing a project with a colleague
 
 1. You create a Space "Platform" and invite the colleague by email. Your

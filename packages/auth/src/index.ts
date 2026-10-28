@@ -75,5 +75,6 @@ export {
 	spaceIds,
 	spaceRoster,
 	spacesOf,
+	splitPersonalSpaceBatch,
 } from "./spaces";
 export { TRUSTED_BROWSER_DAYS } from "./two-factor";

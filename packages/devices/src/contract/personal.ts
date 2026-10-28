@@ -124,3 +124,18 @@ export type MergePending = {
 	/** Why it cannot run now. Null: it can. */
 	blocked: string | null;
 };
+
+/** How far a split of Personal off the home Host's came, when this computer leaves it. */
+export type SplitState = "planned" | "moved" | "done";
+
+/** How a split of Personal off the home Host's went. */
+export type SplitResult = {
+	state: SplitState;
+	/** The new personal Space of this computer's own. */
+	spaceId: string;
+	/** How many projects and runs came along. */
+	projects: number;
+	runs: number;
+	/** The copy of the database made before the split changed anything. */
+	backup: string;
+};

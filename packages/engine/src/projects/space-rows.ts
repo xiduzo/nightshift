@@ -53,6 +53,11 @@ import { personFieldTypes } from "../log";
  *   exchange counts a Walker's events per Space, so the events then come
  *   after every cursor of `to` and reach its Host. Without it, the numbers
  *   stay: a move between two Spaces this Replica keeps.
+ * - `runsOf`: only the runs this Walker walks move, with their steps,
+ *   Agent sessions and events. The others stay in `from` as they are: a
+ *   Device that leaves its Home Host takes the runs it walked, and the
+ *   Host keeps all. Every Project then keeps its id (`projectMap` maps
+ *   each one onto itself), so the runs that stay still name it.
  */
 export type SpaceMove = {
 	from: string;
@@ -63,6 +68,8 @@ export type SpaceMove = {
 	personMap?: Readonly<Record<string, string>>;
 	/** This computer: its moved events get new numbers after its latest. */
 	walkerId?: string;
+	/** Only the runs this Walker walks move. */
+	runsOf?: string;
 };
 
 /** The statements of one move, in the order they must run. */
@@ -86,6 +93,15 @@ export async function spaceMoveBatch(
 	const kept = pairs.filter(([source, target]) => source === target);
 	const merged = pairs.filter(([source, target]) => source !== target);
 	const keptIds = kept.map(([source]) => source);
+	if (move.runsOf !== undefined && merged.length > 0) {
+		throw new Error("A move of one Walker's runs keeps every Project's id.");
+	}
+	/** The runs of the moved Projects in `from` that move. */
+	const ofMovedProjects = and(
+		eq(run.spaceId, from),
+		inArray(run.projectId, sources),
+		move.runsOf === undefined ? undefined : eq(run.walkerId, move.runsOf),
+	);
 
 	const rows = new Map(
 		(await db.select().from(project).where(inArray(project.id, sources))).map(
@@ -126,10 +142,7 @@ export async function spaceMoveBatch(
 		}
 	}
 
-	const movedRuns = db
-		.select({ id: run.id })
-		.from(run)
-		.where(and(eq(run.spaceId, from), inArray(run.projectId, sources)));
+	const movedRuns = db.select({ id: run.id }).from(run).where(ofMovedProjects);
 	/** The events that move, of `e`: never null, also for a row without a run. */
 	const moving = (e: {
 		spaceId: AnySQLiteColumn;
@@ -331,8 +344,7 @@ export async function spaceMoveBatch(
 				})
 				.where(
 					and(
-						eq(run.spaceId, from),
-						inArray(run.projectId, sources),
+						ofMovedProjects,
 						inArray(
 							run.startedBy,
 							persons.map(([local]) => local),
@@ -356,7 +368,7 @@ export async function spaceMoveBatch(
 								sql` `,
 							)} else ${run.projectId} end`,
 			})
-			.where(and(eq(run.spaceId, from), inArray(run.projectId, sources))),
+			.where(ofMovedProjects),
 		db.update(project).set({ spaceId: to }).where(inArray(project.id, keptIds)),
 	);
 	for (const [source, target] of merged) {
@@ -461,18 +473,26 @@ export async function spaceProjectRows(
 	}));
 }
 
-/** The runs of these Projects in the Space: the runs a move of them takes along. */
+/**
+ * The runs of these Projects in the Space: the runs a move of them takes
+ * along. With `walkerId`, only the runs that Walker walks (`runsOf`).
+ */
 export async function spaceRunIds(
 	db: Database,
 	spaceId: string,
 	projectIds: readonly string[],
+	walkerId?: string,
 ): Promise<string[]> {
 	if (projectIds.length === 0) return [];
 	const rows = await db
 		.select({ id: run.id })
 		.from(run)
 		.where(
-			and(eq(run.spaceId, spaceId), inArray(run.projectId, [...projectIds])),
+			and(
+				eq(run.spaceId, spaceId),
+				inArray(run.projectId, [...projectIds]),
+				walkerId === undefined ? undefined : eq(run.walkerId, walkerId),
+			),
 		);
 	return rows.map((row) => row.id);
 }

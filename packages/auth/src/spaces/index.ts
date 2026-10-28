@@ -38,4 +38,5 @@ export {
 	spaceExists,
 	spaceIds,
 	spacesOf,
+	splitPersonalSpaceBatch,
 } from "./spaces";
