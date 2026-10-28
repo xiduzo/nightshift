@@ -17,6 +17,7 @@ import {
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
 import { OnlineDot } from "./devices-list";
+import { LeaveHostButton } from "./leave-host";
 import type { SpaceHost } from "./space-view";
 import { HostStatus } from "./status-badges";
 
@@ -130,6 +131,14 @@ function LinkedHostDetail({
 					))}
 				</div>
 			</DetailSection>
+			{home && host.status !== "revoked" ? (
+				<DetailSection
+					title="Leave"
+					description={`${host.name} keeps everything. This computer keeps its own Personal.`}
+				>
+					<LeaveHostButton hostName={host.name} />
+				</DetailSection>
+			) : null}
 		</DetailShell>
 	);
 }

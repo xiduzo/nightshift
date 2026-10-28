@@ -454,6 +454,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		copies,
 		keptDocument: (deviceId) => storedDeviceCopy(db, deviceId),
 		merge,
+		split,
 	});
 
 	return {

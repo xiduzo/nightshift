@@ -21,6 +21,7 @@ import {
 import { flowsCommand } from "./flows";
 import { healthCommand } from "./health";
 import { adminCommand, joinCommand, pairCommand } from "./join";
+import { leaveCommand } from "./leave";
 import { mcpCommand } from "./mcp";
 import { mergeCommand } from "./merge";
 
@@ -39,6 +40,9 @@ Usage:
   nightshift merge [--dry-run] [--yes]      Merge the Personal of this computer into
                                             the Personal of its home Host. It shows
                                             what moves and asks first.
+  nightshift leave [--yes]                  Leave the home Host of this computer. The
+                                            Host keeps everything. This computer keeps
+                                            its own Personal. It asks first.
   nightshift admin --email <email>          Set how the Host admin signs in from
                                             another computer. --reset-two-factor
                                             also turns two-factor sign-in off.
@@ -216,6 +220,8 @@ export async function main(argv: string[]) {
 			return pairCommand(rest, "nightshift pair");
 		case "merge":
 			return mergeCommand(rest, "nightshift merge");
+		case "leave":
+			return leaveCommand(rest, "nightshift leave");
 		case "admin":
 			return adminCommand(rest, "nightshift admin");
 		case "health":

@@ -139,3 +139,19 @@ export type SplitResult = {
 	/** The copy of the database made before the split changed anything. */
 	backup: string;
 };
+
+/** How `nightshift leave` went. */
+export type LeaveResult = {
+	/** The home Host this computer left. */
+	host: { id: string; name: string };
+	/**
+	 * The Host took the leave: this computer's access there is gone. False:
+	 * it did not answer, so it still lists this computer until its owner
+	 * removes it there.
+	 */
+	told: boolean;
+	/** The split of Personal off the Host's. Null: Personal was this computer's own. */
+	split: SplitResult | null;
+	/** Why the split waits. Null: it is done, or there was nothing to split. */
+	waiting: string | null;
+};

@@ -138,7 +138,11 @@ export async function pairedReplicas(
 		work: createWorkHub(),
 	});
 	const hello = asHost.hello;
-	const memory = inMemoryHost({ exchange: hostExchange, hello });
+	const memory = inMemoryHost({
+		exchange: hostExchange,
+		hello,
+		revoke: asHost.revoke,
+	});
 
 	async function pair(sandbox: Sandbox, name: string): Promise<PairedDevice> {
 		await host.devices.join({

@@ -13,7 +13,12 @@ import {
 	type HostSpaces,
 	joinHost,
 } from "../links";
-import { mergeOnJoin, type PersonalSpaceMerge } from "../merge";
+import {
+	leaveHomeHost,
+	mergeOnJoin,
+	type PersonalSpaceMerge,
+	type PersonalSpaceSplit,
+} from "../merge";
 import { type Reach, reachFor } from "../reach";
 import type { Host } from "./host";
 import type { Devices, DevicesOverview, OtherDeviceView } from "./types";
@@ -36,11 +41,13 @@ export function createDevices(deps: {
 	/** The SHA-256 fingerprint of the certificate this daemon serves itself. */
 	fingerprint: string | null;
 	/** The copies of the owner's other Devices' documents, from the home Host. */
-	copies: Pick<DeviceCopies, "list">;
+	copies: Pick<DeviceCopies, "list" | "keep">;
 	/** On a Host: the Device document it keeps for a paired Device, read. */
 	keptDocument(deviceId: string): Promise<DeviceCopy | null>;
 	/** The merge of this computer's Personal into its home Host's. */
 	merge: Pick<PersonalSpaceMerge, "preview" | "run" | "pending">;
+	/** The split of this computer's Personal off its home Host's, when it leaves. */
+	split: Pick<PersonalSpaceSplit, "check" | "run" | "of">;
 	/** The clock, in milliseconds. Default: `Date.now`. */
 	now?: () => number;
 }): Devices {
@@ -180,5 +187,13 @@ export function createDevices(deps: {
 		mergePending: () => deps.merge.pending(),
 		mergePreview: (input) => deps.merge.preview(input),
 		merge: (input) => deps.merge.run(input),
+		leave: () =>
+			leaveHomeHost({
+				hostLinks: deps.hostLinks,
+				links: deps.links,
+				keys: deps.keys,
+				copies: deps.copies,
+				split: deps.split,
+			}),
 	};
 }

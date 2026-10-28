@@ -49,6 +49,8 @@ export function inMemoryHost(deps: {
 	exchange: HostExchange;
 	/** `link.hello` and `link.heartbeat`: the Host's answer for the key (`Host.hello`). */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
+	/** `link.leave`: the Host removes the Device's access (`Host.revoke`). Default: not served. */
+	revoke?(personId: string, deviceId: string): Promise<void>;
 }): MemoryHost {
 	let network = new AbortController();
 
@@ -68,6 +70,7 @@ export function inMemoryHost(deps: {
 					hello: deps.hello,
 					startPairing: notServed,
 					redeemPairing: notServed,
+					revoke: deps.revoke ?? notServed,
 				},
 				phones: {
 					list: async () => [],
@@ -139,7 +142,7 @@ export function inMemoryHostClient(
 }
 
 async function notServed(): Promise<never> {
-	throw new Error("Pairing is not served in memory.");
+	throw new Error("This is not served in memory.");
 }
 
 function isStream(value: unknown): value is AsyncIterable<unknown> {

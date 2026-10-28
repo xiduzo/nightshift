@@ -8,6 +8,7 @@ import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
 	joinProgressSchema,
+	leaveResultSchema,
 	mergePendingSchema,
 	mergePreviewSchema,
 	mergeResultSchema,
@@ -182,6 +183,19 @@ export const devices = {
 			.output(output(mergeResultSchema))
 			.handler(({ context, input }) => context.devices.merge(input)),
 	},
+	/**
+	 * This computer leaves its home Host (`nightshift leave`, ADR 1): the
+	 * Host removes its access, and Personal splits off the Host's with the
+	 * projects this computer has and the runs it walked. The Host keeps
+	 * everything.
+	 */
+	leave: ownerProcedure
+		.route({
+			summary:
+				"Leaves this computer's home Host. This computer keeps a Personal of its own, after a copy of its data.",
+		})
+		.output(output(leaveResultSchema))
+		.handler(({ context }) => context.devices.leave()),
 	/**
 	 * Pairs this computer with a Host (`nightshift join`): yields the code to
 	 * approve there, then the Host once it is approved. After a home Host,

@@ -293,6 +293,17 @@ reverse of the merge, and as careful:
 A Device whose Personal never merged keeps it as it is. A merge that
 never moved a row ends when the Device leaves.
 
+The person leaves with `nightshift leave` (it says that the Host keeps
+everything and asks first, `--yes` skips the question), the API's
+`devices.leave`, or "Leave <Host>" where the web app shows the home Host
+(Settings, and the Host of a Space). It refuses while a run that this
+Device walks in Personal is not done. The Device asks the Host to remove
+its access (`link.leave`, the Host's `revoke` for the key's own Device),
+then stops the link, deletes its key and splits Personal off. A Host that
+does not answer, or an older one without `link.leave`, does not hold the
+Device back: it leaves on its own and says to remove it on the Host's
+Devices page too.
+
 ### Sharing a project with a colleague
 
 1. You create a Space "Platform" and invite the colleague by email. Your
