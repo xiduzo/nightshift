@@ -1,6 +1,6 @@
 /**
  * The model of a Decision or a Value decided by a model: a Model Profile
- * first, from this computer or the project, and the decider and model as
+ * of one of the person's computers first, and the decider and model as
  * overrides of it. Without a profile, the node sets the decider and the
  * model itself, as before profiles.
  */
@@ -30,20 +30,30 @@ import { deciderQueries } from "@/features/agents";
 import { Field, InspectorSection } from "../fields";
 import { OverrideBadge } from "./agent-fields";
 import { deciderModelHint, withoutField } from "./model-defaults";
-import { ProfileSelect, useModelProfiles } from "./profile-select";
+import {
+	type ProfileChoice,
+	ProfileSelect,
+	profileOnDevice,
+	profileProblem,
+	useModelProfiles,
+} from "./profile-select";
 
 /**
  * The node on another profile, or on none. Picking a profile hands it the
- * decider and the model (the node's own go); picking none keeps what the
- * old profile gave, so the node decides as before.
+ * decider and the model (the node's own go) and the profile's Device, so
+ * the node names no device of its own; picking none keeps what the old
+ * profile gave, so the node decides as before.
  */
 function pickProfile<N extends DecisionNode | ValueNode>(
 	node: N,
-	next: ModelProfile | undefined,
+	next: ProfileChoice<ModelProfile> | undefined,
 	before: ModelProfile | undefined,
 ): N {
 	const { profile: _profile, decider, model, ...rest } = node;
-	if (next) return { ...rest, profile: next.name } as N;
+	if (next) {
+		const { device: _device, ...free } = rest;
+		return { ...free, profile: next.ref } as N;
+	}
 	const keptDecider = decider ?? before?.decider;
 	const keptModel =
 		model ?? (decider === undefined ? before?.model : undefined);
@@ -66,10 +76,9 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 	const id = useId();
 	const makes = node.type === "value" ? "value" : "decision";
 	const deciders = useQuery(deciderQueries.list());
-	const { choices, chosen, unknown } = useModelProfiles(
-		projectId,
-		node.profile,
-	);
+	const found = useModelProfiles(projectId, node.profile);
+	const { choices, chosen } = found;
+	const problem = profileProblem(found);
 	const profile = chosen?.profile;
 	const named = node.profile !== undefined;
 	// The decider that runs: the node's own, else the profile's, else the default.
@@ -200,28 +209,24 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 			<Field
 				id={`${id}-profile`}
 				label="Profile"
-				error={
-					unknown
-						? `There is no model profile named ${node.profile} on this computer or in the project. The flow cannot run until you pick another or add it under Agents.`
-						: null
-				}
+				error={problem}
 				hint={
-					profile
-						? chosen?.from === "project"
-							? "The project's profile, so the flow runs on any computer. Override the decider or the model for this node only."
-							: "This node uses the profile. Override the decider or the model for this node only."
-						: "A model profile from the Agents page or the project. Without one, pick the decider and the model below."
+					chosen
+						? chosen.thisDevice
+							? `This node uses ${profileOnDevice(chosen)}, this computer. Override the decider or the model for this node only.`
+							: `This node runs on ${chosen.deviceName} with ${profileOnDevice(chosen)}. Open Night Shift on ${chosen.deviceName} to see or change the profile. Override the decider or the model for this node only.`
+						: "A model profile of one of your computers. The node runs on that computer. Without one, pick the decider and the model below."
 				}
 			>
 				<ProfileSelect
 					id={`${id}-profile`}
 					value={node.profile}
 					choices={choices}
-					unknown={unknown}
+					invalid={problem !== null}
 					none="None: set it on this node"
 					label={(p) => `${label(p.decider)} · ${p.model ?? "default model"}`}
 					onPick={(next) =>
-						onChange((current) => pickProfile(current, next?.profile, profile))
+						onChange((current) => pickProfile(current, next, profile))
 					}
 				/>
 			</Field>

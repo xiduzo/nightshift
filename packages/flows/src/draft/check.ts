@@ -40,6 +40,8 @@ export type DraftCheckOptions = {
 	 * of. Leave it out while they load.
 	 */
 	profiles?: readonly ProfileRef[];
+	/** The Devices whose profiles this computer cannot tell: a profile on one is not checked. */
+	untoldDevices?: readonly string[];
 };
 
 /**
@@ -51,7 +53,7 @@ export type DraftCheckOptions = {
 export function checkDraft(
 	flow: Flow,
 	messages: DraftMessages,
-	{ flows, name, connections, profiles }: DraftCheckOptions = {},
+	{ flows, name, connections, profiles, untoldDevices }: DraftCheckOptions = {},
 ): FlowCheck {
 	const issues: FlowIssue[] = [];
 	const parsed = flowSchema.safeParse(flow);
@@ -94,6 +96,7 @@ export function checkDraft(
 			const profile = profileOf(node);
 			// A name left from format 6: `validateFlow` asks to pick it again.
 			if (!isProfileRef(profile)) continue;
+			if (untoldDevices?.includes(profile.device)) continue;
 			if (profiles.some((known) => sameProfileRef(known, profile))) continue;
 			issues.push({
 				severity: "error",

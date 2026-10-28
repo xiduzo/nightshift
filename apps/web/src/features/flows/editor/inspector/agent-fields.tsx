@@ -44,29 +44,38 @@ import { SkillCombobox } from "../skill-combobox";
 import { TemplateField } from "../template-field";
 import { AgentOutcomeSection } from "./agent-outcomes";
 import { withoutField } from "./model-defaults";
-import { ProfileSelect, useAgentProfiles } from "./profile-select";
+import {
+	type ProfileChoice,
+	ProfileSelect,
+	profileOnDevice,
+	profileProblem,
+	useAgentProfiles,
+} from "./profile-select";
 
 /**
  * The node on another profile, or on none. Picking a profile hands it the
- * harness, model, effort and permission mode (the node's own go); picking
- * none keeps what the old profile gave, so the node runs as before.
+ * harness, model, effort and permission mode (the node's own go) and the
+ * profile's Device, so the node names no device of its own; picking none
+ * keeps what the old profile gave, so the node runs as before.
  */
 function pickProfile(
 	node: AgentNode,
-	next: AgentProfile | undefined,
+	next: ProfileChoice<AgentProfile> | undefined,
 	before: AgentProfile | undefined,
 ): AgentNode {
 	const {
 		profile: _profile,
+		device,
 		harness,
 		model,
 		effort,
 		permissionMode,
 		...rest
 	} = node;
-	if (next) return { ...rest, profile: next.name };
+	if (next) return { ...rest, profile: next.ref };
 	const kept: AgentNode = {
 		...rest,
+		...(device !== undefined ? { device } : {}),
 		harness: harness ?? before?.harness ?? "claude-code",
 		model: model ?? before?.model ?? harnessInfo("claude-code").defaultModel,
 		permissionMode: permissionMode ?? before?.permissionMode ?? "auto",
@@ -76,17 +85,15 @@ function pickProfile(
 	return kept;
 }
 
-/** The profile the node names, from this computer or the project, and the profiles it can name. */
+/** The profile the node names, the profiles it can name, and why its profile does not run. */
 export function useProfile(projectId: string, node: AgentNode) {
-	const { choices, chosen, unknown } = useAgentProfiles(
-		projectId,
-		node.profile,
-	);
+	const found = useAgentProfiles(projectId, node.profile);
 	return {
-		choices,
-		profile: chosen?.profile,
-		fromProject: chosen?.from === "project",
-		unknownProfile: unknown,
+		choices: found.choices,
+		chosen: found.chosen,
+		/** Its settings: known for this computer's profiles only. */
+		profile: found.chosen?.profile,
+		problem: profileProblem(found),
 	};
 }
 
@@ -114,10 +121,7 @@ export function AgentFields({
 	onSetOutcomes: (outcomes: NodeOption[] | undefined) => void;
 }) {
 	const id = useId();
-	const { choices, profile, fromProject, unknownProfile } = useProfile(
-		projectId,
-		node,
-	);
+	const { choices, chosen, profile, problem } = useProfile(projectId, node);
 	const customAgents = useCustomAgents();
 	const info = (name: HarnessName) => harnessInfo(name, customAgents);
 	// With a profile, a field the node leaves out comes from the profile.
@@ -321,30 +325,24 @@ export function AgentFields({
 				<Field
 					id={`${id}-profile`}
 					label="Profile"
-					error={
-						unknownProfile
-							? `There is no profile named ${node.profile} on this computer or in the project. The flow cannot run until you pick another or add it under Agents.`
-							: null
-					}
+					error={problem}
 					hint={
-						profile
-							? fromProject
-								? "The project's profile, so the flow runs on any computer. Override a setting for this node only, or leave it to the profile."
-								: "This node runs with the profile. Override a setting for this node only, or leave it to the profile."
-							: "A saved agent setup from the Agents page or the project. Without one, set the harness, model and permission mode below."
+						chosen
+							? chosen.thisDevice
+								? `This node runs on this computer with ${profileOnDevice(chosen)}. Override a setting for this node only, or leave it to the profile.`
+								: `This node runs on ${chosen.deviceName} with ${profileOnDevice(chosen)}. Open Night Shift on ${chosen.deviceName} to see or change the profile. Override a setting for this node only, or leave it to the profile.`
+							: "A saved agent setup of one of your computers. The node runs on that computer. Without one, set the harness, model and permission mode below."
 					}
 				>
 					<ProfileSelect
 						id={`${id}-profile`}
 						value={node.profile}
 						choices={choices}
-						unknown={unknownProfile}
+						invalid={problem !== null}
 						none="None: set it on this node"
 						label={(p) => `${info(p.harness).label} · ${p.model}`}
 						onPick={(next) =>
-							onChange((current) =>
-								pickProfile(current, next?.profile, profile),
-							)
+							onChange((current) => pickProfile(current, next, profile))
 						}
 					/>
 				</Field>

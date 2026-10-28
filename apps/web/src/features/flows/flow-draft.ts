@@ -271,17 +271,28 @@ export function completeTemplate(
  * the project's flow files by name, so Call nodes can check the flows they
  * call; leave it out while they load. `name` is the draft's own file name.
  * `connections` holds the names of the daemon's connections, and
- * `profiles` the profiles a node may name, each on its device; leave them
- * out while they load.
+ * `profiles` the profiles a node may name, each on its device, with the
+ * devices whose profiles this computer cannot tell; leave them out while
+ * they load.
  */
 export function checkFlow(
 	flow: Flow,
 	flows?: ProjectFlowMap,
 	name?: string,
 	connections?: readonly string[],
-	profiles?: readonly ProfileRef[],
+	profiles?: {
+		known: readonly ProfileRef[];
+		untoldDevices: readonly string[];
+	},
 ): FlowCheck {
-	return checkDraft(flow, MESSAGES, { flows, name, connections, profiles });
+	return checkDraft(flow, MESSAGES, {
+		flows,
+		name,
+		connections,
+		...(profiles
+			? { profiles: profiles.known, untoldDevices: profiles.untoldDevices }
+			: {}),
+	});
 }
 
 /** A bad label, choice or outcome name: `labels.1.name` reads as `Label "Yes": …`. */

@@ -7,6 +7,7 @@ import {
 	type CallEach,
 	type Flow,
 	type FlowNode,
+	isProfileRef,
 	type NodeOption,
 	nodeIdSchema,
 } from "@nightshift/flows";
@@ -73,12 +74,14 @@ export function NodeInspector({
 }) {
 	const id = useId();
 	const isStart = flow.start === node.id;
-	// The devices this node may name, as the Host says: by its profile.
-	const named = node.type === "agent" ? node.profile : undefined;
+	// The devices this node may name, as the Host says. A node with a
+	// profile runs on the profile's device and names none of its own.
+	const named = "profile" in node ? node.profile : undefined;
 	const profile = typeof named === "string" ? named : undefined;
+	const onDevice = runsOnDevice(node) && !isProfileRef(named);
 	const nodeDevices = useQuery({
 		...runQueries.devices(projectId, profile !== undefined ? { profile } : {}),
-		enabled: runsOnDevice(node),
+		enabled: onDevice,
 		meta: { quietErrors: true },
 	});
 	const { label: typeLabel, icon: Icon } = nodeMeta(node);
@@ -283,7 +286,7 @@ export function NodeInspector({
 
 				<VariableWritesSection flow={flow} node={node} onChange={onChange} />
 
-				{runsOnDevice(node) ? (
+				{onDevice ? (
 					<InspectorSection
 						title="Device"
 						tab="setup"
