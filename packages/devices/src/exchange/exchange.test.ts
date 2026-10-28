@@ -908,7 +908,7 @@ describe("a Walker's paths", () => {
 });
 
 describe("projects of a Space without a Clone here", () => {
-	test("are listed, and what needs their folder says so", async () => {
+	test("are listed with their flows, and what needs their folder says so", async () => {
 		const engineA = engineOf(a);
 		const engineB = engineOf(b);
 		const { id: projectId } = await engineA
@@ -920,9 +920,7 @@ describe("projects of a Space without a Clone here", () => {
 			expect.objectContaining({ id: projectId, repoPath: null }),
 		]);
 		expect(listed[0]?.clones.some((c) => c.thisDevice)).toBe(false);
-		expect(engineB.space(a.spaceId).listFlows(projectId)).rejects.toThrow(
-			"not on this computer",
-		);
+		expect(await engineB.space(a.spaceId).listFlows(projectId)).toEqual([]);
 		expect(
 			engineB.space(a.spaceId).startRun({ projectId, flow: gateFlow }),
 		).rejects.toThrow("not on this computer");

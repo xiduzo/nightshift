@@ -87,6 +87,8 @@ export type PeerContext = {
 	now(): number;
 	/** An Agent Profile of this computer by name (`EngineOptions.profileFor`). */
 	profileFor?: (name: string) => ProfileSettings | null;
+	/** The project's flows, from this Replica's flow document: what a run starts from. */
+	flows(projectId: string): Promise<FlowSources>;
 	/** Resolves when the engine is ready. */
 	ready: Promise<void>;
 	/** The Person who owns this computer, or null before the engine is ready. */

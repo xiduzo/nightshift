@@ -4,7 +4,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService } from "../cleanup";
 import type { Actor, StartRunInput } from "../contract";
-import { type FlowFiles, flowUse } from "../flows";
+import { type FlowFiles, type FlowNotice, flowUse } from "../flows";
 import type { Runner } from "../graph";
 import {
 	RUN_NOT_FOUND,
@@ -63,6 +63,13 @@ export type SpacesDeps = {
 	>;
 	placement: Pick<PlacementPort, "devicesFor" | "placements">;
 	flowFiles: FlowFiles;
+	/** The notices of a project's flow document. */
+	flowNotices: {
+		list(projectId: string): Promise<FlowNotice[]>;
+		dismiss(projectId: string, noticeId: string): Promise<void>;
+	};
+	/** The import on upgrade of this Device's Clone of the project, once. Never throws. */
+	importClone(projectId: string): Promise<void>;
 	/** The kept variables of a project's flows on this computer. */
 	kept: {
 		list(flow: KeptFlow): Promise<KeptValue[]>;
@@ -139,9 +146,10 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async addProject(input) {
 				await ready;
-				const [added] = await withClones(spaceId, [
-					await projects.add(input, spaceId),
-				]);
+				const row = await projects.add(input, spaceId);
+				// A folder from before ADR 2 brings its flows in.
+				await deps.importClone(row.id);
+				const [added] = await withClones(spaceId, [row]);
 				if (!added) throw new Error("Could not add the project.");
 				return added;
 			},
@@ -251,6 +259,18 @@ export function createSpaces(deps: SpacesDeps) {
 			async deleteFlow(projectId, name) {
 				await ready;
 				await deps.flowFiles.remove(spaceId, projectId, name);
+			},
+
+			async listFlowNotices(projectId) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				return deps.flowNotices.list(projectId);
+			},
+
+			async dismissFlowNotice(projectId, noticeId) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				await deps.flowNotices.dismiss(projectId, noticeId);
 			},
 
 			async listKeptValues(projectId, flowName) {

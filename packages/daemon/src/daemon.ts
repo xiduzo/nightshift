@@ -42,6 +42,7 @@ import {
 	createToolLaunchers,
 	documentRows,
 	documentSpace,
+	flowSources,
 	localDevice,
 	openDeviceDocument,
 	programOf,
@@ -345,6 +346,8 @@ export async function createDaemon(
 			),
 		toolLaunchers,
 		clonePath,
+		// The flows another Device asks this one for: the flow documents.
+		flows: async (projectId) => flowSources(await flows.open(projectId)),
 		// Its profiles, for a run placed here from another Device. A flow names
 		// a profile by its name.
 		profileFor: (name) => {

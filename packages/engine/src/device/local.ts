@@ -15,6 +15,7 @@ import {
 	type AgentNode,
 	type CustomHarnessName,
 	deciderNameSchema,
+	type FlowSources,
 	isCustomHarness,
 	type ProfileSettings,
 } from "@nightshift/flows";
@@ -110,6 +111,11 @@ export type LocalDeviceDeps = {
 	 * none. Without it, this computer has no Clones: a run cannot start here.
 	 */
 	clonePath?: (projectId: string) => Promise<string | null>;
+	/**
+	 * The project's flows: its flow document (ADR 2). Without it, the flow
+	 * files of the project's Clone here.
+	 */
+	flows?: (projectId: string) => Promise<FlowSources>;
 	/**
 	 * The git port: worktrees, Hand-offs and item branches, and finding git
 	 * before a worktree is added. Default: the git programs on this computer.
@@ -376,7 +382,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return callServerTool(server, input);
 		},
 		decide,
-		flows: async (projectId) => readFlowSources(await cloneOf(projectId)),
+		flows: async (projectId) =>
+			deps.flows
+				? deps.flows(projectId)
+				: readFlowSources(await cloneOf(projectId)),
 		projectProfiles: async (projectId) =>
 			readProfilesSource(await cloneOf(projectId)),
 		async worktree(run) {

@@ -17,6 +17,7 @@ import { seedFlows } from "@nightshift/engine/testing";
 import {
 	type Daemon,
 	pair,
+	savesOn,
 	startDaemon,
 	stopDaemon,
 	waitFor,
@@ -72,9 +73,9 @@ function repo(name: string): string {
 	return path;
 }
 
-/** A flow file in B's Clone: the only copy of the project's flows. */
-async function flowOnB(name: string, nodes: unknown[], edges: unknown[] = []) {
-	await seedFlows(folderOnB, {
+/** A flow of the project, saved on A: the Host, which walks the runs. */
+async function saveFlow(name: string, nodes: unknown[], edges: unknown[] = []) {
+	await seedFlows(savesOn(a), projectId, {
 		[name]: {
 			version: 6,
 			inputs: [],
@@ -175,7 +176,7 @@ describe("a run placed on another Device", () => {
 			{ deviceId: bId, name: expect.any(String), thisDevice: true },
 		]);
 
-		await flowOnB(
+		await saveFlow(
 			"placed",
 			[
 				{
@@ -189,7 +190,7 @@ describe("a run placed on another Device", () => {
 			],
 			[{ id: "e1", from: "where", outcome: "pass", to: "work" }],
 		);
-		// A reads the flows from B's Clone.
+		// A reads the flows from its flow document, without a Clone.
 		expect(
 			(await a.client.flows.list({ projectId })).map((f) => f.name),
 		).toEqual(["placed"]);
@@ -240,7 +241,7 @@ describe("a run placed on another Device", () => {
 
 	test("a stop on A ends B's session", async () => {
 		writeFileSync(SLEEP_MS, "60000");
-		await flowOnB("slow", [agentNode]);
+		await saveFlow("slow", [agentNode]);
 		const before = pids().length;
 		const started = await a.client.runs.start({
 			projectId,
@@ -281,7 +282,7 @@ describe("a run placed on another Device", () => {
 			[now],
 		);
 		db.close();
-		await flowOnB("hello", [
+		await saveFlow("hello", [
 			{
 				id: "hi",
 				type: "command",

@@ -1,6 +1,7 @@
 import {
 	type Flow,
 	type FlowNode,
+	type FlowSources,
 	type ProfileIssue,
 	type ProfileSettings,
 	type ProfilesSource,
@@ -12,6 +13,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
 import { flowsForRun } from "../flows";
 import type { PlannedDevice } from "../log";
+import { NOT_ON_THIS_COMPUTER } from "../projects";
 import type { PlacedDevice, PlannedRun } from "./peers";
 
 /**
@@ -49,6 +51,8 @@ export type PlanDevices = {
 	byName(name: string): Promise<PlacedDevice | null>;
 	/** A profile of this computer by name, or null. */
 	profileFor(name: string): ProfileSettings | null;
+	/** The project's flows, from this Replica's flow document. */
+	flows(projectId: string): Promise<FlowSources>;
 };
 
 /** The refusal of a Device this computer cannot reach: the devices' planner refuses with it too. */
@@ -254,7 +258,7 @@ async function placeNodes(
  * Plans a run over the Devices it may use (`PlanDevices`), in the order the
  * person sees the refusals: the run's Device (it needs a Clone of the
  * project, unless it is this computer), the flow and its called flows from
- * that Clone, then each node's Device and profile. Every Device answers
+ * the flow document, then each node's Device and profile. Every Device answers
  * for its own nodes afterwards: run start checks their requirements, the
  * devices' planner an offered Device's Offers.
  */
@@ -276,7 +280,10 @@ export async function planNodes(
 			`${run.name} does not have this project. Add its folder there first.`,
 		);
 	}
-	const loaded = flowsForRun(await run.device.flows(start.projectId), start);
+	if (run === walker && !walker.hasClone) {
+		throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
+	}
+	const loaded = flowsForRun(await devices.flows(start.projectId), start);
 	const calledNames = Object.keys(loaded.calledFlows);
 	const { flows, named } = await placeNodes(
 		[loaded.flow, ...Object.values(loaded.calledFlows)],

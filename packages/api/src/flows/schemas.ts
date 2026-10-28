@@ -1,4 +1,4 @@
-import type { KeptValue } from "@nightshift/engine";
+import type { FlowNotice, KeptValue } from "@nightshift/engine";
 import {
 	type FlowIssue,
 	type FlowListItem,
@@ -53,5 +53,16 @@ export const keptValueSchema = exact<KeptValue>()(
 		value: z.json(),
 		runId: z.string(),
 		updatedAt: z.number(),
+	}),
+);
+
+/** What a person must know about a project's flows: what the import on upgrade did. */
+export const flowNoticeSchema = exact<FlowNotice>()(
+	z.object({
+		id: z.string(),
+		at: z.number(),
+		deviceId: z.string(),
+		kind: z.string(),
+		message: z.string(),
 	}),
 );

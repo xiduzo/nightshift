@@ -232,6 +232,9 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				return profile ? deps.profiles.settingsFor(profile.id) : null;
 			},
 			spaceDocuments: deps.spaces,
+			flowDocuments: deps.flows,
+			// The import on upgrade gives a Clone's project profiles to this Device.
+			profiles: deps.profiles,
 			scheduler: deps.scheduler,
 			...(deps.secret ? { secret: deps.secret } : {}),
 			// The hub for the Spaces this computer keeps; its Hosts for the others.

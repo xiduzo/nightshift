@@ -206,26 +206,26 @@ const quickFlow = {
 	edges: [],
 } as Flow;
 
-/** A For Each over three items; its body (`say`, in the folder at `repoPath`) prints the item. */
-async function forEachFlow(repoPath: string): Promise<Flow> {
-	await seedFlows(repoPath, {
-		say: {
-			version: 6,
-			inputs: [{ name: "item", type: "json", required: true }],
-			outputs: [],
-			start: "say",
-			nodes: [
-				{
-					id: "say",
-					type: "command",
-					position: { x: 0, y: 0 },
-					command: "echo item {{item.id}}",
-					output: "text",
-				},
-			],
-			edges: [],
+/** The body of `forEachFlow`: it prints the item. */
+const sayFlow = {
+	version: 6,
+	inputs: [{ name: "item", type: "json", required: true }],
+	outputs: [],
+	start: "say",
+	nodes: [
+		{
+			id: "say",
+			type: "command",
+			position: { x: 0, y: 0 },
+			command: "echo item {{item.id}}",
+			output: "text",
 		},
-	});
+	],
+	edges: [],
+};
+
+/** A For Each over three items; its body is `say` (`sayFlow`). */
+function forEachFlow(): Flow {
 	return {
 		version: 6,
 		inputs: [],
@@ -296,8 +296,9 @@ async function eventsOf(sandbox: Sandbox, runId: string) {
 }
 
 /** B walks a run of A's project in A's Space. */
-async function walkOnB(flow: Flow) {
+async function walkOnB(flow: Flow, flows: Record<string, unknown> = {}) {
 	await paired.projectOnDevice(projectId, { clone: true });
+	await seedFlows(paired.device.space(a.spaceId), projectId, flows);
 	return paired.device.space(a.spaceId).startRun({ projectId, flow });
 }
 
@@ -1264,7 +1265,7 @@ describe("live transcripts over the exchange", () => {
 	}, 20_000);
 
 	test("B puts a run's walk state in A's archive only when it changed", async () => {
-		const run = await walkOnB(await forEachFlow(b.repoPath));
+		const run = await walkOnB(forEachFlow(), { say: sayFlow });
 		await untilStatus(paired.device, run.id, "finished");
 		const client = paired.memory.client(paired.key);
 		/** The walk states B put, in order. */
@@ -1309,7 +1310,7 @@ describe("live transcripts over the exchange", () => {
 	});
 
 	test("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {
-		const run = await walkOnB(await forEachFlow(b.repoPath));
+		const run = await walkOnB(forEachFlow(), { say: sayFlow });
 		await untilStatus(paired.device, run.id, "finished");
 		online();
 		await untilStatus(paired.host, run.id, "finished");

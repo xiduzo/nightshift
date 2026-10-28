@@ -3,8 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
-import { seedFlows } from "../testing";
 import { projectFlowsContract } from "../testing/project-flows-contract";
+import { seedFlowFolder } from "../testing/seed-flows";
 import { type FileProjectFlowsDeps, fileProjectFlows } from "./project-flows";
 
 const NOT_HERE = "Not on this computer.";
@@ -44,7 +44,7 @@ describe("fileProjectFlows", () => {
 	test("reads the flow files of the Clone here, with their paths", async () => {
 		const { repoPath, dispose } = await clone();
 		try {
-			await seedFlows(repoPath, { quick: { version: 1 } });
+			await seedFlowFolder(repoPath, { quick: { version: 1 } });
 			const set = await fileProjectFlows(inClone(repoPath)).flows({
 				projectId: "project",
 			});

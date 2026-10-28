@@ -16,6 +16,9 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 		/** One flow file: the flow and its issues. */
 		get: (projectId: string, name: string) =>
 			orpc.flows.get.queryOptions({ input: { projectId, name } }),
+		/** What the import of the project's flow folder did that a person must know. */
+		notices: (projectId: string) =>
+			orpc.flows.notices.queryOptions({ input: { projectId } }),
 		/** The values a flow's kept variables carry from one run to the next. */
 		kept: (projectId: string, name: string) =>
 			orpc.flows.kept.queryOptions({ input: { projectId, name } }),
@@ -27,6 +30,7 @@ export function createFlowMutations(orpc: ApiQueryUtils) {
 	return {
 		save: orpc.flows.save.mutationOptions,
 		remove: orpc.flows.remove.mutationOptions,
+		dismissNotice: orpc.flows.dismissNotice.mutationOptions,
 		resetKept: orpc.flows.resetKept.mutationOptions,
 	};
 }

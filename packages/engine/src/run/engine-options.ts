@@ -2,7 +2,8 @@ import type { Database } from "@nightshift/db";
 import type { ProfileSettings } from "@nightshift/flows";
 import type { DeviceDirectory } from "../contract";
 import type { Device } from "../device";
-import type { RunSettings } from "../device-config";
+import type { ProfileStore, RunSettings } from "../device-config";
+import type { FlowDocuments } from "../flows";
 import type { Git, SpaceDocuments } from "../projects";
 import type { PeersFactory } from "./peers";
 
@@ -40,7 +41,7 @@ export type EngineOptions = {
 	/** Safety net against runaway flows: the most steps one run may take, unless the flow's policy sets `maxSteps`. Default 500. */
 	maxStepsPerRun?: number;
 	/**
-	 * The scheduler starts the runs of `.nightshift/schedules.json` when
+	 * The scheduler starts the runs of the projects' schedules when
 	 * their cron times come due. On by default; `false` turns it off.
 	 * Aborting `signal` stops it for good, for example when a hot reload
 	 * replaces the engine.
@@ -63,6 +64,18 @@ export type EngineOptions = {
 	 * the ones the relay serves. Default: new ones over `db` and `directory`.
 	 */
 	spaceDocuments?: SpaceDocuments;
+	/**
+	 * The flow documents: the flows and schedules of each Project (ADR 2).
+	 * The daemon passes the ones the relay serves. Default: new ones over
+	 * `db`.
+	 */
+	flowDocuments?: FlowDocuments;
+	/**
+	 * This Device's profiles, where the import on upgrade puts the profiles
+	 * of a Clone's `.nightshift/profiles.json`. Without them, a Clone with
+	 * project profiles keeps its folder.
+	 */
+	profiles?: Pick<ProfileStore, "list" | "save">;
 	/**
 	 * The git port, for a new project's clone and remote and the branches
 	 * of a clone. Default: the git programs on this computer.

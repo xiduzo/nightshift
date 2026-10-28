@@ -16,7 +16,7 @@ import type {
 	Placement,
 	StartRunInput,
 } from "../contract";
-import type { FlowUse } from "../flows";
+import type { FlowNotice, FlowUse } from "../flows";
 import type { Branches, Project } from "../projects";
 import type {
 	OpenGate,
@@ -93,11 +93,7 @@ export interface SpaceEngine {
 		options?: { force?: boolean },
 	): Promise<void>;
 
-	/**
-	 * The flow files in the project's clone, `.nightshift/flows/*.json`:
-	 * this computer's, else the Clone of another of the actor's Devices
-	 * (read-only here).
-	 */
+	/** The project's flows, from its flow document: every Device has them, with or without a Clone. */
 	listFlows(projectId: string): Promise<FlowListItem[]>;
 	getFlow(projectId: string, name: string): Promise<LoadedFlow>;
 	/** Every flow file of a project by name: its flow, null when it does not load. One read for the editor. */
@@ -105,6 +101,10 @@ export interface SpaceEngine {
 	/** Saves drafts with errors too. Returns the issues of the saved flow. */
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	deleteFlow(projectId: string, name: string): Promise<void>;
+	/** What a person must know about the project's flows (the import on upgrade), oldest first. */
+	listFlowNotices(projectId: string): Promise<FlowNotice[]>;
+	/** Removes a notice, on every Device of the Space. */
+	dismissFlowNotice(projectId: string, noticeId: string): Promise<void>;
 	/**
 	 * The values the flow's kept variables (`keep`) have between runs on
 	 * this computer, by name. A variable without one starts from `initial`.
@@ -132,13 +132,13 @@ export interface SpaceEngine {
 	listGates(): Promise<OpenGate[]>;
 
 	/**
-	 * The schedules of `.nightshift/schedules.json` in the project's clone,
-	 * with the next start and how the last cron time went.
+	 * The schedules of the project, from its flow document, with the next
+	 * start and how the last cron time went.
 	 */
 	listSchedules(projectId: string): Promise<ScheduleList>;
 	/**
-	 * Writes the schedules file. Saves schedules with problems too; returns
-	 * the issues. The scheduler reads the file on its next tick.
+	 * Saves the schedules. Saves schedules with problems too; returns the
+	 * issues. The scheduler reads them on its next tick.
 	 */
 	saveSchedules(
 		projectId: string,

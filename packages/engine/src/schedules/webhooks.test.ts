@@ -101,7 +101,8 @@ function hook(extra: Partial<Schedule> = {}): Schedule {
 
 async function setup(schedules: Schedule[]) {
 	await seedFlows(
-		sandbox.repoPath,
+		space,
+		projectId,
 		{ echo: echoFlow, wait: waitFlow },
 		schedules,
 	);
@@ -283,7 +284,7 @@ describe("a webhook schedule", () => {
 		});
 		expect((await space.listRuns())[0]?.inputs).toMatchObject({ pr: "8" });
 
-		await seedFlows(sandbox.repoPath, {}, [hook({ enabled: false })]);
+		await seedFlows(space, projectId, {}, [hook({ enabled: false })]);
 		expect(await send(payload, bearer("pull_request"))).toEqual({
 			kind: "refused",
 			reason: "The schedule is paused.",

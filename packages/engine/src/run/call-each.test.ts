@@ -25,7 +25,7 @@ import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
 import type { RunDetail, RunStreamItem, StepSummary } from "../read/views";
-import { seedFlows } from "../testing/seed-flows";
+import { seedFlowFolder, seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -167,17 +167,21 @@ function flowOf(
 	};
 }
 
-/** Writes a called flow file (with the input `item`) into the clone. */
+/** A called flow, with the input `item`. */
+function bodyFlow(nodes: Flow["nodes"], edges: FlowEdge[] = []): FlowInput {
+	return {
+		...flowOf(nodes, edges),
+		inputs: [{ name: "item", type: "json", required: true }],
+	};
+}
+
+/** Writes a called flow into the Clone's folder: the project brings it in when it is added. */
 async function saveBody(
 	name: string,
 	nodes: Flow["nodes"],
 	edges: FlowEdge[] = [],
 ): Promise<void> {
-	const flow: FlowInput = {
-		...flowOf(nodes, edges),
-		inputs: [{ name: "item", type: "json", required: true }],
-	};
-	await seedFlows(sandbox.repoPath, { [name]: flow });
+	await seedFlowFolder(sandbox.repoPath, { [name]: bodyFlow(nodes, edges) });
 }
 
 /** A command source that prints these items. */
@@ -725,7 +729,9 @@ describe("Call with each", () => {
 			}),
 		).rejects.toThrow("cannot run");
 
-		await saveBody("broken", [agent("worker", "{{nowhere.output}}")]);
+		await seedFlows(engine, id, {
+			broken: bodyFlow([agent("worker", "{{nowhere.output}}")]),
+		});
 		await expect(
 			engine.startRun({
 				projectId: id,
@@ -733,7 +739,9 @@ describe("Call with each", () => {
 			}),
 		).rejects.toThrow("cannot run");
 
-		await saveBody("fine", [agent("worker", "Build {{item.title}}")]);
+		await seedFlows(engine, id, {
+			fine: bodyFlow([agent("worker", "Build {{item.title}}")]),
+		});
 		await expect(
 			engine.startRun({ projectId: id, flowName: "fine" }),
 		).rejects.toThrow("The flow needs a value for: item.");
@@ -1444,7 +1452,7 @@ describe("run inputs", () => {
 				{ name: "epic", required: true },
 			],
 		};
-		await seedFlows(sandbox.repoPath, { body });
+		await seedFlowFolder(sandbox.repoPath, { body });
 		const flow = flowOf(
 			[
 				command("hello", `echo "epic {{epic}} model {{model}}"`),

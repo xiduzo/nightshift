@@ -102,11 +102,18 @@ export {
 	storedDeviceProfiles,
 	valueStore,
 } from "./device-config";
-export type { FlowDocument, FlowDocuments, FlowRef, FlowUse } from "./flows";
+export type {
+	FlowDocument,
+	FlowDocuments,
+	FlowNotice,
+	FlowRef,
+	FlowUse,
+} from "./flows";
 export {
 	createFlowDocuments,
 	documentProjectFlows,
 	documentSpace,
+	flowSources,
 	flowsForRun,
 } from "./flows";
 export type { WalkFile, WalkFiles, WalkRef } from "./graph";

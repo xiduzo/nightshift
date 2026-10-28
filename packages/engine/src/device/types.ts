@@ -35,8 +35,10 @@ export type Device = {
 	/** What a run start checks before it writes anything. */
 	capabilities(query?: CapabilityQuery): Promise<Capabilities>;
 	/**
-	 * The flow files of the project's Clone on this Device, unparsed: the
-	 * flows a run placed here starts from. Throws when it has no Clone.
+	 * The project's flows on this Device, unparsed: its flow document. A
+	 * Device from before ADR 2 answers with the flow files of its Clone.
+	 * A run starts from the flow document of its Walker (`PlanDevices.flows`):
+	 * this answers a Device that asks over the wire.
 	 */
 	flows(projectId: string): Promise<FlowSources>;
 	/**

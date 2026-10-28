@@ -69,11 +69,12 @@ import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 
 import { chatSearch } from "./chat/chat-link";
+import { FlowNotices } from "./flow-notices";
 import { flowMutations, flowQueries } from "./queries";
 import { StartRunDialog } from "./start/start-run-dialog";
 
 /**
- * The project's flow files as a grid of cards: name, description, inputs and
+ * The project's flows as a grid of cards: name, description, inputs and
  * callers, size and errors. Run one, open it in the editor, add or delete one.
  */
 export function FlowList({ projectId }: { projectId: string }) {
@@ -112,6 +113,8 @@ export function FlowList({ projectId }: { projectId: string }) {
 					</Button>
 				}
 			/>
+
+			<FlowNotices projectId={projectId} />
 
 			{flows.isLoading ? (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
