@@ -5,6 +5,7 @@ export {
 	type DevicePresence,
 	type DeviceRegistry,
 	deviceNamesOf,
+	homePersonsOf,
 	OFFLINE_AFTER_MS,
 	type PairedDevice,
 } from "./registry";

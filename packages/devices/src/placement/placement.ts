@@ -1,3 +1,4 @@
+import { personalSpaceIdBySlug, personNames } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Actor,
@@ -37,6 +38,7 @@ import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, keptByHomeHost, personInSpace } from "../links";
 import {
 	type DeviceOffer,
+	hostOffersNothing,
 	NO_STARTER,
 	offerRefusal,
 	offersNothing,
@@ -612,9 +614,34 @@ export function createPlacement(deps: PlacementDeps) {
 		for (const { at, nodes } of planned.groups) {
 			if (!at.offered) continue;
 			const refusal = offerRefusal(nodes, at.offered);
-			if (refusal !== null) throw new Refusal("conflict", refusal);
+			if (refusal === null) continue;
+			throw new Refusal(
+				"conflict",
+				(await hostRefusal(at, project.spaceId, personId)) ?? refusal,
+			);
 		}
 		return planned;
+	}
+
+	/**
+	 * In the starter's Personal on their home Host, this computer is the
+	 * Host admin's: a refusal that says whose it is and what to do. Null
+	 * anywhere else, or when it offers something there.
+	 */
+	async function hostRefusal(
+		at: PlacedDevice,
+		spaceId: string,
+		personId: string | null,
+	): Promise<string | null> {
+		if (!at.thisDevice || !at.offered || at.offered.offers.length > 0) {
+			return null;
+		}
+		if (personId === null || !at.offered.mayUse) return null;
+		if ((await hostSpaces.hostOf(spaceId)) !== null) return null;
+		if ((await personalSpaceIdBySlug(db, personId)) !== spaceId) return null;
+		const owner = await selfOwnerId(db);
+		const name = owner ? (await personNames(db, [owner])).get(owner) : null;
+		return hostOffersNothing(device.name, name || "another person");
 	}
 
 	/**

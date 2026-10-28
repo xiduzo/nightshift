@@ -1,11 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
+	device as deviceTable,
+	hostSpace,
+	member,
+	organization,
+	user,
+} from "@nightshift/db/schema";
+import {
 	createProfileStore,
 	HostUnreachableError,
 	type SpaceDocument,
 } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import type { AgentProfile } from "@nightshift/flows";
+import { selfOwnerId } from "../registry";
 import { createEngineOffers } from "./engine-offers";
 import {
 	deviceOffers,
@@ -329,5 +337,136 @@ describe("spaceDevices", () => {
 			mine: false,
 			owner: null,
 		});
+	});
+});
+
+describe("the Host admin offers to a person's Personal", () => {
+	/** A Person on this Host with their Personal, and a paired Device of theirs. */
+	async function person(
+		id: string,
+		name: string,
+		device?: { home: boolean; revoked?: boolean },
+	): Promise<string> {
+		const spaceId = `personal-${id}`;
+		await sandbox.db
+			.insert(user)
+			.values({ id, name, email: `${id}@example.invalid` });
+		await sandbox.db.insert(organization).values({
+			id: spaceId,
+			name: "Personal",
+			slug: spaceId,
+			personal: true,
+			createdAt: new Date(),
+		});
+		await sandbox.db.insert(member).values({
+			id: `m-${id}`,
+			organizationId: spaceId,
+			userId: id,
+			role: "owner",
+			createdAt: new Date(),
+		});
+		if (device) {
+			await sandbox.db.insert(deviceTable).values({
+				id: `${id}-laptop`,
+				name: `${name}'s laptop`,
+				platform: "darwin",
+				ownerId: id,
+				homeHost: device.home ? "https://host.invalid" : null,
+				revokedAt: device.revoked ? new Date() : null,
+			});
+		}
+		return spaceId;
+	}
+
+	async function hostOffers() {
+		const document = await sandbox.openDocument();
+		const profiles = createProfileStore({ document });
+		const saved = await profiles.save(coder);
+		const published: { spaceId: string; by: string | null }[] = [];
+		const offers = createOffers({
+			db: sandbox.db,
+			engine: {
+				space: () => ({ listRuns: async () => [] }),
+				offers: {
+					list: async () => [],
+					publish: async (input: { spaceId: string; by: string | null }) => {
+						published.push({ spaceId: input.spaceId, by: input.by });
+					},
+				},
+			} as never,
+			document,
+			profiles,
+			self: { id: "self", name: "studio" },
+			ownerId: (await selfOwnerId(sandbox.db)) as string,
+			withdrawn: () => {},
+		});
+		return { offers, document, profile: saved.id, published };
+	}
+
+	test("lists the Personal of each Person whose home Host this is, by name, after the shared Spaces", async () => {
+		const ada = await person("ada", "Ada", { home: true });
+		await person("bram", "Bram", { home: true });
+		const { offers, document } = await hostOffers();
+		expect(await offers.spaces()).toEqual([
+			{ id: ada, name: "Personal of Ada", personal: true },
+			{ id: "personal-bram", name: "Personal of Bram", personal: true },
+		]);
+		await document.close();
+	});
+
+	test("not the Personal of a Person whose Device is a guest here or has no access, nor one kept elsewhere", async () => {
+		await person("guest", "Guest", { home: false });
+		await person("gone", "Gone", { home: true, revoked: true });
+		await person("nobody", "Nobody");
+		const elsewhere = await person("ada", "Ada", { home: true });
+		await sandbox.db.insert(hostSpace).values({
+			spaceId: elsewhere,
+			hostId: "other-host",
+			name: "Personal on other",
+			role: "owner",
+			personal: true,
+		});
+		const { offers, document, profile } = await hostOffers();
+		expect(await offers.spaces()).toEqual([]);
+		await expect(
+			offers.make({ spaceId: "personal-guest", profile, ...caps }, "me"),
+		).rejects.toThrow("That Space does not exist.");
+		await expect(
+			offers.make({ spaceId: elsewhere, profile, ...caps }, "me"),
+		).rejects.toThrow("That Space does not exist.");
+		await document.close();
+	});
+
+	test("an Offer to Ada's Personal is published there and kept here, and lists under that name", async () => {
+		const ada = await person("ada", "Ada", { home: true });
+		const { offers, document, profile, published } = await hostOffers();
+		const owner = (await selfOwnerId(sandbox.db)) as string;
+		await offers.make({ spaceId: ada, profile, ...caps }, owner);
+		expect(published).toEqual([{ spaceId: ada, by: owner }]);
+		expect(deviceOffers(document, () => "coder")).toMatchObject([
+			{ spaceId: ada, profile },
+		]);
+		expect(await offers.list()).toMatchObject([
+			{ spaceId: ada, spaceName: "Personal of Ada", profile },
+		]);
+		await document.close();
+	});
+
+	test("the owner's own Personal still takes no Offer", async () => {
+		const { offers, document, profile } = await hostOffers();
+		await expect(
+			offers.make({ spaceId: sandbox.spaceId, profile, ...caps }, "me"),
+		).rejects.toThrow("Nobody else is in your personal Space.");
+		await document.close();
+	});
+
+	test("a Device that is not a Host offers to no other Person's Personal", async () => {
+		// Ada's Personal on this Replica, without a Device of hers paired here.
+		const ada = await person("ada", "Ada");
+		const { offers, document, profile } = await hostOffers();
+		await expect(
+			offers.make({ spaceId: ada, profile, ...caps }, "me"),
+		).rejects.toThrow("That Space does not exist.");
+		await document.close();
 	});
 });
