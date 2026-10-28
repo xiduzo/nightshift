@@ -2,26 +2,9 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import {
-	agentSession,
-	clone,
-	event,
-	keptVariable,
-	project,
-	run,
-	step,
-} from "@nightshift/db/schema";
+import { clone, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
-import {
-	and,
-	asc,
-	eq,
-	getColumns,
-	inArray,
-	isNull,
-	or,
-	sql,
-} from "drizzle-orm";
+import { and, asc, eq, getColumns, isNull } from "drizzle-orm";
 import type { DeviceDirectory, Relay } from "../contract";
 import type { RunLog } from "../log";
 import { type Git, systemGit } from "./git";
@@ -36,6 +19,7 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 } from "./space-document";
+import { spaceMoveBatch } from "./space-rows";
 import { createWorktrees } from "./worktrees";
 
 /**
@@ -445,7 +429,8 @@ export function createProjects(deps: ProjectsDeps) {
 
 		/**
 		 * Moves the project to another Space: its row, Clones, runs, steps,
-		 * sessions, events and kept variables take the new Space in one batch. Then the
+		 * sessions, events and kept variables take the new Space in one batch
+		 * (`spaceMoveBatch`). Then the
 		 * new Space's document gets its entry and Clones, and the old
 		 * one loses them. `ProjectMoved` is logged in the new Space.
 		 */
@@ -464,42 +449,13 @@ export function createProjects(deps: ProjectsDeps) {
 			if (row.spaceId !== from) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
-			const runs = db
-				.select({ id: run.id })
-				.from(run)
-				.where(eq(run.projectId, projectId));
-			await db.batch([
-				db
-					.update(project)
-					.set({ spaceId: to })
-					.where(eq(project.id, projectId)),
-				db
-					.update(clone)
-					.set({ spaceId: to })
-					.where(eq(clone.projectId, projectId)),
-				db.update(step).set({ spaceId: to }).where(inArray(step.runId, runs)),
-				db
-					.update(agentSession)
-					.set({ spaceId: to })
-					.where(inArray(agentSession.runId, runs)),
-				db
-					.update(event)
-					.set({ spaceId: to })
-					.where(
-						or(
-							inArray(event.runId, runs),
-							and(
-								isNull(event.runId),
-								sql`json_extract(${event.payload}, '$.projectId') = ${projectId}`,
-							),
-						),
-					),
-				db.update(run).set({ spaceId: to }).where(eq(run.projectId, projectId)),
-				db
-					.update(keptVariable)
-					.set({ spaceId: to })
-					.where(eq(keptVariable.projectId, projectId)),
-			]);
+			await db.batch(
+				await spaceMoveBatch(db, {
+					from,
+					to,
+					projectMap: { [projectId]: projectId },
+				}),
+			);
 
 			const source = await documents.open(from);
 			const destination = await documents.open(to);
