@@ -92,6 +92,11 @@ export type StepSummary = {
 		/** When nobody answered by `at`, the Gate takes `choose`. Null without a deadline. */
 		deadline: GateDeadline | null;
 	} | null;
+	/**
+	 * When the step slept (a Wait node, a usage limit, the network), oldest
+	 * first. `to` is null while it sleeps. Older Hosts send none.
+	 */
+	sleeps?: { from: number; to: number | null }[];
 };
 
 /**
@@ -203,6 +208,11 @@ export type RunSummary = {
 	 * `closedAt` is null while the Gate waits for an answer.
 	 */
 	gates: { openedAt: number; closedAt: number | null }[];
+	/**
+	 * Every time a step of the run slept, also in called flows, oldest
+	 * first. `to` is null while it sleeps. Older Hosts send none.
+	 */
+	sleeps?: { from: number; to: number | null }[];
 };
 
 /** How the runs of one project stand: what a project's row and the sidebar show. */

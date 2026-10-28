@@ -57,7 +57,7 @@ export function StepDuration({ step }: { step: StepSummary }) {
 	return <WorkTime steps={[step]} start={step.startedAt} />;
 }
 
-/** From the first step's start to the last one's end, without the time a Gate waited for you. */
+/** From the first step's start to the last one's end, without the time a Gate waited for you or a step slept. */
 function spanOf(list: StepSummary[]): ReactNode {
 	if (list.length === 0) return undefined;
 	const start = Math.min(...list.map((step) => step.startedAt));

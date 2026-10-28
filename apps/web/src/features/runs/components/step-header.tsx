@@ -95,7 +95,7 @@ export function stepGist(step: StepSummary): string | undefined {
 	return undefined;
 }
 
-/** The step's facts in a grid of small label-over-value cells: when, how long, cost, visit, exit code, sessions. */
+/** The step's facts in a grid of small label-over-value cells: when, how long, how long it waited or slept, cost, visit, exit code, sessions. */
 export function StepFacts({ step }: { step: StepSummary }) {
 	const exit = step.outputs.exit_code;
 	const time = useWorkTime([step], step.startedAt);
@@ -114,6 +114,7 @@ export function StepFacts({ step }: { step: StepSummary }) {
 		{ label: "Took", value: time.active },
 	];
 	if (time.waited) facts.push({ label: "Waited for you", value: time.waited });
+	if (time.slept) facts.push({ label: "Slept", value: time.slept });
 	if (hasCost(step)) {
 		facts.push({
 			label: "Cost",

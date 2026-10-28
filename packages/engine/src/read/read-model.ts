@@ -159,6 +159,9 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		trigger: deriveTrigger(events),
 		calls: deriveCalls(steps),
 		gates: deriveGateWaits(events),
+		sleeps: steps
+			.flatMap((step) => step.sleeps.map(({ from, to }) => ({ from, to })))
+			.sort((a, b) => a.from - b.from),
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: deriveWorktree(events),
 	};
@@ -455,6 +458,7 @@ export function toStepSummary(
 					deadline: derived.gate.deadline,
 				}
 			: null,
+		sleeps: derived.sleeps.map(({ from, to }) => ({ from, to })),
 	};
 }
 

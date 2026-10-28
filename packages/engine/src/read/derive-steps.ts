@@ -158,11 +158,15 @@ export type DerivedStep = {
 		/** When nobody answered by then, the Gate takes an option. Null without one. */
 		deadline: GateDeadline | null;
 	} | null;
+	/** When the step slept (a Wait node, a usage limit, the network), oldest first. `to` is null while it sleeps. */
+	sleeps: StepSleep[];
 	/** Call steps with `each` only: its items in the order they started or were blocked. */
 	items: DerivedItem[];
 	/** Call steps (once) only: the call, once its inputs were bound. */
 	call: EnginePayloads["FlowCalled"] | null;
 };
+
+export type StepSleep = { from: number; to: number | null };
 
 /**
  * The node types of runs from before flow version 4, read as today's: a
@@ -187,6 +191,17 @@ export function nodeTypeOf(logged: string): FlowNodeType {
 export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 	const steps = new Map<string, DerivedStep>();
 	for (const e of bySeq(events)) {
+		if (
+			e.type === "RunStarted" ||
+			e.type === "RunResumed" ||
+			e.type === "RunEnded"
+		) {
+			// A stop ends the sleep, and a resume goes on awake.
+			for (const step of steps.values()) {
+				const sleep = step.sleeps.at(-1);
+				if (sleep && sleep.to === null) sleep.to = e.at;
+			}
+		}
 		if (!e.stepId) continue;
 		if (e.type === "StepStarted") {
 			steps.set(e.stepId, {
@@ -208,6 +223,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				sessions: [],
 				cost: NO_COST,
 				gate: null,
+				sleeps: [],
 				items: [],
 				call: null,
 			});
@@ -215,7 +231,20 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 		}
 		const step = steps.get(e.stepId);
 		if (!step) continue;
-		if (e.type === "GateOpened") {
+		const sleep = step.sleeps.at(-1);
+		const asleep = sleep !== undefined && sleep.to === null;
+		if (
+			asleep &&
+			(e.type === "WaitEnded" ||
+				e.type === "StepEnded" ||
+				e.type === "StepReopened")
+		) {
+			sleep.to = e.at;
+		}
+		if (e.type === "WaitStarted") {
+			// A wait logged again in the same sleep (a new daemon) goes on with it.
+			if (!asleep) step.sleeps.push({ from: e.at, to: null });
+		} else if (e.type === "GateOpened") {
 			step.gate = {
 				question: e.payload.question,
 				choices: e.payload.choices,

@@ -130,11 +130,18 @@ function OverviewSection({
 						<span className="tabular-nums">{time.active}</span>
 					</Fact>
 				</div>
-				{time.waited ? (
+				{time.waited || time.slept ? (
 					<div className="grid grid-cols-2 gap-3">
-						<Fact label="Waited for you">
-							<span className="tabular-nums">{time.waited}</span>
-						</Fact>
+						{time.waited ? (
+							<Fact label="Waited for you">
+								<span className="tabular-nums">{time.waited}</span>
+							</Fact>
+						) : null}
+						{time.slept ? (
+							<Fact label="Slept">
+								<span className="tabular-nums">{time.slept}</span>
+							</Fact>
+						) : null}
 						<Fact label="Open for">
 							<span className="tabular-nums">{time.open}</span>
 						</Fact>

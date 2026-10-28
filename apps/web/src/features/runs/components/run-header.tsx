@@ -115,16 +115,20 @@ export function RunTitle({
 				) : null}
 			</div>
 			<p className="ml-auto shrink-0 text-muted-foreground text-sm tabular-nums">
-				{time.waited ? (
+				{time.waited || time.slept ? (
 					<Tooltip>
 						<TooltipTrigger render={<span />}>
 							<span className="sr-only">Worked for </span>
 							{time.active}
-							<span className="sr-only">, waited for you {time.waited}</span>
+							<span className="sr-only">
+								{time.waited ? `, waited for you ${time.waited}` : ""}
+								{time.slept ? `, slept ${time.slept}` : ""}
+							</span>
 						</TooltipTrigger>
 						<TooltipContent>
-							Worked {time.active} · waited for you {time.waited} · open{" "}
-							{time.open}
+							Worked {time.active}
+							{time.waited ? ` · waited for you ${time.waited}` : ""}
+							{time.slept ? ` · slept ${time.slept}` : ""} · open {time.open}
 						</TooltipContent>
 					</Tooltip>
 				) : (

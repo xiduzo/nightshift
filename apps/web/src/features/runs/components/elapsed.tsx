@@ -13,8 +13,9 @@ export function Elapsed({ start, end }: { start: number; end: number | null }) {
 
 /**
  * How long these steps worked from `start`, how long they waited for you at
- * a Gate, and both together, in words. The work time stands still while a
- * Gate waits. Counts each second while a step runs or waits.
+ * a Gate, how long they slept, and all together, in words. The work time
+ * stands still while a Gate waits or a step sleeps. Counts each second while
+ * a step runs, waits or sleeps.
  */
 export function useWorkTime(steps: StepSummary[], start: number) {
 	const going = steps.some((step) => step.endedAt === null);
@@ -23,11 +24,12 @@ export function useWorkTime(steps: StepSummary[], start: number) {
 	return {
 		active: formatDuration(time.active),
 		waited: time.waited >= 1000 ? formatDuration(time.waited) : null,
+		slept: time.slept >= 1000 ? formatDuration(time.slept) : null,
 		open: formatDuration(time.open),
 	};
 }
 
-/** How long these steps worked, without the time a Gate waited for you. */
+/** How long these steps worked, without the time a Gate waited for you or a step slept. */
 export function WorkTime({
 	steps,
 	start,

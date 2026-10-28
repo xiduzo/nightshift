@@ -23,7 +23,7 @@ const NOW = new Date(2026, 9, 23, 10, 0).getTime();
 
 type Row = Pick<
 	RunSummary,
-	"id" | "status" | "createdAt" | "projectId" | "gates" | "title"
+	"id" | "status" | "createdAt" | "projectId" | "gates" | "sleeps" | "title"
 >;
 
 function run(fields: Partial<Row> & { status: RunStatus }): Row {
@@ -32,6 +32,7 @@ function run(fields: Partial<Row> & { status: RunStatus }): Row {
 		createdAt: NOW - 60 * MIN,
 		projectId: "website",
 		gates: [],
+		sleeps: [],
 		title: "Feature factory · WEB-142",
 		...fields,
 	};
@@ -127,6 +128,22 @@ describe("rowValue", () => {
 		).toEqual({
 			value: "12 min",
 			valueLabel: "12 min so far",
+		});
+	});
+
+	test("a run on its way: the time it slept or waited for you does not count", () => {
+		const sleeping = run({
+			status: "sleeping",
+			createdAt: NOW - 60 * MIN,
+			gates: [{ openedAt: NOW - 50 * MIN, closedAt: NOW - 40 * MIN }],
+			sleeps: [
+				{ from: NOW - 30 * MIN, to: NOW - 20 * MIN },
+				{ from: NOW - 15 * MIN, to: null },
+			],
+		});
+		expect(rowValue(sleeping, NOW)).toEqual({
+			value: "25 min",
+			valueLabel: "25 min so far",
 		});
 	});
 

@@ -49,6 +49,7 @@ function aRun(fields: Partial<RunSummary> = {}): RunSummary {
 		warnings: [],
 		subflows: [],
 		gates: [],
+		sleeps: [],
 		...fields,
 	};
 }
@@ -112,10 +113,16 @@ describe("the stat cards", () => {
 		const summary = summarize([
 			aRun({ status: "finished", costUsd: 1, createdAt: NOW - 2 * HOUR }),
 			aRun({ status: "failed", costUsd: 2, createdAt: NOW - 25 * HOUR }),
-			// At work this time yesterday, with a Gate open.
+			// At work this time yesterday.
 			aRun({
 				status: "finished",
 				costUsd: 0.5,
+				createdAt: NOW - 26 * HOUR,
+				endedAt: NOW - 23 * HOUR,
+			}),
+			// Waiting for a person this time yesterday, not at work.
+			aRun({
+				status: "finished",
 				createdAt: NOW - 26 * HOUR,
 				endedAt: NOW - 23 * HOUR,
 				gates: [{ openedAt: NOW - 25 * HOUR, closedAt: NOW - 23 * HOUR }],
@@ -124,8 +131,8 @@ describe("the stat cards", () => {
 			aRun({ status: "finished", costUsd: 4, createdAt: NOW - 50 * HOUR }),
 		]);
 		expect(summary.cards.dayBefore).toEqual({
-			runs: 2,
-			finished: 1,
+			runs: 3,
+			finished: 2,
 			failed: 1,
 			cost: { costUsd: 2.5, costEstimated: false, costMissing: 0 },
 		});
@@ -165,6 +172,17 @@ describe("the stat cards", () => {
 		]).cards;
 		expect(hours.slice(-4).map((hour) => hour.active)).toEqual([1, 1, 1, 1]);
 		expect(hours.at(-5)?.active).toBe(0);
+	});
+
+	test("a run that sleeps is not at work in the hours it sleeps", () => {
+		const { hours } = summarize([
+			aRun({
+				status: "sleeping",
+				createdAt: NOW - 3 * HOUR,
+				sleeps: [{ from: NOW - HOUR - HOUR / 2, to: null }],
+			}),
+		]).cards;
+		expect(hours.slice(-4).map((hour) => hour.active)).toEqual([1, 1, 0, 0]);
 	});
 
 	test("a Gate waits in every hour until it closes, an open one until now", () => {
@@ -214,6 +232,32 @@ describe("the activity details", () => {
 			longest: HOUR,
 		});
 		expect(summary.activity.map((range) => range.hours)).toEqual([24, 48, 168]);
+	});
+
+	test("leave the time a run slept or waited for a person out of its time at work", () => {
+		const summary = summarize([
+			aRun({
+				status: "finished",
+				createdAt: NOW - 4 * HOUR,
+				endedAt: NOW,
+				gates: [{ openedAt: NOW - 3 * HOUR, closedAt: NOW - 2 * HOUR }],
+				sleeps: [
+					{ from: NOW - 2 * HOUR, to: NOW - HOUR - HOUR / 2 },
+					{ from: NOW - HOUR, to: NOW - HOUR / 2 },
+				],
+			}),
+			aRun({
+				status: "sleeping",
+				createdAt: NOW - HOUR,
+				sleeps: [{ from: NOW - HOUR / 2, to: null }],
+			}),
+		]);
+		const day = summary.activity.find((range) => range.hours === 24);
+		expect(day?.groups.rows[0]).toMatchObject({
+			runs: 2,
+			atWork: 2 * HOUR + HOUR / 2,
+			longest: 2 * HOUR,
+		});
 	});
 
 	test("list the open runs, the oldest first", () => {

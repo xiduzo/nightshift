@@ -5,6 +5,7 @@ import {
 	runStatusLabel,
 	waitedText,
 	whenLabel,
+	workedSoFar,
 } from "@nightshift/client";
 
 /**
@@ -152,10 +153,11 @@ export function startedShort(at: number, now: number): string {
 /**
  * What a run's row shows at its end, and how a screen reader says it. A
  * run that waits: how long its Gate has waited. A run on its way: how long
- * it has run. An ended run: when it started.
+ * it has worked, without the time it slept or waited. An ended run: when
+ * it started.
  */
 export function rowValue(
-	run: Pick<RunSummary, "status" | "createdAt" | "gates">,
+	run: Pick<RunSummary, "status" | "createdAt" | "gates" | "sleeps">,
 	now: number,
 ): { value: string; valueLabel: string } {
 	if (run.status === "waiting") {
@@ -172,7 +174,7 @@ export function rowValue(
 		}
 	}
 	if (!hasEnded(run.status)) {
-		const took = waitedText(now - run.createdAt);
+		const took = waitedText(workedSoFar(run, now));
 		return { value: took, valueLabel: `${took} so far` };
 	}
 	return {

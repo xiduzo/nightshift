@@ -64,9 +64,50 @@ function spanOf(run: RunSummary, now: number) {
 
 type Span = { from: number; to: number };
 
-/** How many spans include the moment `at`. */
-function atMoment(at: number, spans: readonly Span[]): number {
-	return spans.filter((span) => span.from <= at && span.to >= at).length;
+/**
+ * When a run slept or a Gate of it waited for a person, in order. One that
+ * is still open lasts until now while the run sleeps or waits.
+ */
+function idleSpans(run: RunSummary, now: number): Span[] {
+	const gates = run.gates.map((gate) => ({
+		from: gate.openedAt,
+		to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
+	}));
+	const sleeps = (run.sleeps ?? []).map((sleep) => ({
+		from: sleep.from,
+		to: sleep.to ?? (run.status === "sleeping" ? now : sleep.from),
+	}));
+	return [...gates, ...sleeps].sort((a, b) => a.from - b.from);
+}
+
+/** When a run was at work: its span without the time it slept or waited for a person. */
+function workSpans(run: RunSummary, now: number): Span[] {
+	const span = spanOf(run, now);
+	const work: Span[] = [];
+	let at = span.from;
+	for (const idle of idleSpans(run, now)) {
+		if (idle.to <= at || idle.from >= span.to) continue;
+		if (idle.from > at) work.push({ from: at, to: idle.from });
+		at = Math.max(at, idle.to);
+	}
+	if (at < span.to) work.push({ from: at, to: span.to });
+	// Like a run that never ended: it counts for its start only.
+	return work.length > 0 ? work : [{ from: span.from, to: span.from }];
+}
+
+/** How long the spans last after `since`. */
+function lengthSince(spans: readonly Span[], since: number): number {
+	return spans.reduce(
+		(sum, span) => sum + Math.max(span.to - Math.max(span.from, since), 0),
+		0,
+	);
+}
+
+/** How many runs, each with its spans, were at work at the moment `at`. */
+function atMoment(at: number, runs: readonly Span[][]): number {
+	return runs.filter((spans) =>
+		spans.some((span) => span.from <= at && span.to >= at),
+	).length;
 }
 
 /** How many runs started, how they ended and what they cost. */
@@ -79,12 +120,13 @@ function dayCountsOf(runs: readonly RunSummary[]): DayCounts {
 	};
 }
 
-/** How many spans touch each hour. */
-function perHour(hours: readonly number[], spans: readonly Span[]): number[] {
+/** How many runs, each with its spans, touch each hour. */
+function perHour(hours: readonly number[], runs: readonly Span[][]): number[] {
 	return hours.map(
 		(hour) =>
-			spans.filter((span) => span.from < hour + HOUR_MS && span.to >= hour)
-				.length,
+			runs.filter((spans) =>
+				spans.some((span) => span.from < hour + HOUR_MS && span.to >= hour),
+			).length,
 	);
 }
 
@@ -107,12 +149,14 @@ function cardsOf(
 	);
 	const hours = lastHours(CARD_HOURS, now, timeZone);
 	const first = hours[0] ?? now;
-	const runSpans = runs.map((run) => spanOf(run, now));
+	const runSpans = runs.map((run) => workSpans(run, now));
 	const gateSpans = runs.flatMap((run) =>
-		run.gates.map((gate) => ({
-			from: gate.openedAt,
-			to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
-		})),
+		run.gates.map((gate) => [
+			{
+				from: gate.openedAt,
+				to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
+			},
+		]),
 	);
 	const active = perHour(hours, runSpans);
 	const gates = perHour(hours, gateSpans);
@@ -165,6 +209,7 @@ function earliest(times: readonly (number | null)[]): number | null {
 /**
  * How long the runs of each group were at work since `since`, the most
  * first. Only the part since `since` counts. An open run works until now.
+ * The time a run slept or waited for a person is not work.
  */
 function atWorkPerGroup(
 	runs: readonly PlacedRun[],
@@ -182,7 +227,7 @@ function atWorkPerGroup(
 			atWork: 0,
 			longest: 0,
 		};
-		const atWork = Math.max(to - Math.max(run.createdAt, since), 0);
+		const atWork = lengthSince(workSpans(run, now), since);
 		group.runs += 1;
 		if (run.createdAt >= since) group.started += 1;
 		group.atWork += atWork;
@@ -202,7 +247,7 @@ function activityOf(
 	const hours = lastHours(range, now, timeZone);
 	const active = perHour(
 		hours,
-		runs.map(({ run }) => spanOf(run, now)),
+		runs.map(({ run }) => workSpans(run, now)),
 	);
 	const since = hours[0] ?? now;
 	return {

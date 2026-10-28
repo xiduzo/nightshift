@@ -41,7 +41,7 @@ export {
 	type Wait,
 	waitFor,
 } from "./stream";
-export { runTime } from "./time";
+export { runTime, workedSoFar } from "./time";
 export type {
 	AgentErrorKind,
 	AgentUsage,

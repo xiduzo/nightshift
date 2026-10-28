@@ -52,6 +52,7 @@ function aRun(fields: Partial<RunSummary>): RunSummary {
 		warnings: [],
 		subflows: [],
 		gates: [],
+		sleeps: [],
 		...fields,
 	};
 }

@@ -76,6 +76,9 @@ const costFields = {
 	costCalls: z.number(),
 };
 
+/** A time a step slept; `to` is null while it sleeps. Older Hosts send no sleeps. */
+const sleepSchema = z.object({ from: z.number(), to: z.number().nullable() });
+
 export const runSummarySchema = exact<RunSummary>()(
 	z.object({
 		id: z.string(),
@@ -123,6 +126,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		gates: z.array(
 			z.object({ openedAt: z.number(), closedAt: z.number().nullable() }),
 		),
+		sleeps: z.array(sleepSchema).optional(),
 	}),
 );
 
@@ -191,6 +195,7 @@ const stepSummarySchema = z.object({
 			deadline: gateDeadlineSchema.nullable(),
 		})
 		.nullable(),
+	sleeps: z.array(sleepSchema).optional(),
 });
 
 /** One step with the prompt of each session and the element of each item. */

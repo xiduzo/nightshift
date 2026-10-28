@@ -649,6 +649,57 @@ describe("gates", () => {
 	});
 });
 
+describe("sleeps", () => {
+	const waitStarted = (b: ReturnType<typeof log>, stepId: string) =>
+		b.push(
+			"WaitStarted",
+			{ reason: "command", until: 9999, message: "Tries again", since: 0 },
+			{ stepId },
+		);
+	const waitEnded = (b: ReturnType<typeof log>, stepId: string) =>
+		b.push("WaitEnded", { early: false }, { stepId });
+	const at = (b: ReturnType<typeof log>, index: number) =>
+		b.events[index]?.at ?? 0;
+
+	test("a step keeps each time it slept, and the one it sleeps in stays open", () => {
+		const b = log().runStarted().stepStarted("s1", "check");
+		waitStarted(b, "s1");
+		waitEnded(b, "s1");
+		waitStarted(b, "s1");
+		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: at(b, 3) },
+			{ from: at(b, 4), to: null },
+		]);
+	});
+
+	test("a wait logged again in the same sleep does not start a new one", () => {
+		const b = log().runStarted().stepStarted("s1", "check");
+		waitStarted(b, "s1");
+		waitStarted(b, "s1");
+		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: null },
+		]);
+	});
+
+	test("a sleep ends when the run ends, also with its step still open", () => {
+		const b = log().runStarted().stepStarted("s1", "check");
+		waitStarted(b, "s1");
+		b.ended("stopped");
+		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: at(b, 3) },
+		]);
+	});
+
+	test("a sleep ends when its step ends", () => {
+		const b = log().runStarted().stepStarted("s1", "check");
+		waitStarted(b, "s1");
+		b.stepEnded("s1", "stopped");
+		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: at(b, 3) },
+		]);
+	});
+});
+
 describe("node types of runs from before flow version 4", () => {
 	test("a Subflow step and a For Each step read as Call steps", () => {
 		const b = log().runStarted();
