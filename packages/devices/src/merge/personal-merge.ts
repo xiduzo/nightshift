@@ -62,7 +62,8 @@ import { runCommandMoves } from "./run-commands";
  * 3. `mapped`: the Host takes the Projects (`sync.mergePersonal`) and
  *    says where each one goes. It answers the same when it is asked
  *    again. The schedules that name no device are pinned to this
- *    computer, so they keep firing where they fired.
+ *    computer, so their runs keep running where they ran: the Host
+ *    fires them from now on, and starts their runs here.
  * 4. `moved`: no run starts in Personal from the last check for runs
  *    that are not done through the batch (`Engine.holdStarts`). One
  *    `db.batch` moves every row (`spaceMoveBatch`, with this
@@ -378,7 +379,8 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 			const release = await engine.holdStarts(from);
 			try {
 				await noRunsNotDone(from);
-				// The schedules keep firing where they fired: on this computer.
+				// The Host fires the schedules from now on; their runs keep
+				// running where they ran: on this computer.
 				for (const source of Object.keys(projectMap)) {
 					const document = await deps.flows.open(source);
 					const keys = unpinned(document);

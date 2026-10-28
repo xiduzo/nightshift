@@ -468,11 +468,11 @@ export function createEngine(
 		memberName: membersName,
 	});
 
-	// The Device a schedule names fires it. Without one, the Replica that
-	// keeps the Space (its Host, or the one Device of a Space without one).
-	// A webhook schedule's webhooks go to the same Device.
-	const firesHere = async (projectId: string, schedule: Schedule) => {
-		if (schedule.device !== undefined) return schedule.device === device.name;
+	// The Replica that keeps the Space fires every schedule of it (its Host,
+	// or the one Device of a Space without one), so one that is always on
+	// starts them. The Device a schedule names runs the run (`deviceName`).
+	// A webhook schedule's webhooks go to the same Replica.
+	const firesHere = async (projectId: string, _schedule: Schedule) => {
 		const row = await projects.find(projectId);
 		return (await hostOf(row.spaceId)) === null;
 	};

@@ -31,6 +31,12 @@ export type StartRunInput = {
 	 * (`listPlacements`). Default: this computer.
 	 */
 	deviceId?: string;
+	/**
+	 * The run's Device by the name a schedule gives it (`Schedule.device`):
+	 * the Host fires the schedule, and the run runs there. Without
+	 * `deviceId` only. Default: this computer.
+	 */
+	deviceName?: string;
 } & (
 	| { flowName: string; flow?: never }
 	/** A flow that is not a file, for example a quick run. */

@@ -1,9 +1,15 @@
 import { Refusal } from "@nightshift/refusal";
 import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../document";
-import { flowNameSchema } from "../nodes";
+import { flowNameSchema, isProfileRef } from "../nodes";
+import { profileOf } from "../profiles";
 import type { ScheduleFlowInfo } from "../schedules";
 import { parseFlow } from "./flow";
-import type { FlowListItem, LoadedFlow, ProjectFlowMap } from "./issues";
+import type {
+	FlowDevices,
+	FlowListItem,
+	LoadedFlow,
+	ProjectFlowMap,
+} from "./issues";
 
 /**
  * The flows of a project as plain data: what a Clone's flow files hold,
@@ -45,6 +51,7 @@ export function listFlowSources(
 				.length,
 			inputs: loaded.flow?.inputs ?? [],
 			callers: callersOf(name, flows),
+			devices: devicesOf(name, flows),
 		});
 	}
 	return items;
@@ -109,6 +116,29 @@ export function callersOf(name: string, flows: ProjectFlowMap): string[] {
 		)
 		.map(([caller]) => caller)
 		.sort();
+}
+
+/**
+ * The Devices `name` and the flows it calls run on, as run start places
+ * their nodes: a node's profile names its Device, else the node's
+ * `device`. Each called flow counts once.
+ */
+export function devicesOf(name: string, flows: ProjectFlowMap): FlowDevices {
+	const names = new Set<string>();
+	const ids = new Set<string>();
+	const seen = new Set<string>();
+	const walk = (flowName: string) => {
+		if (seen.has(flowName)) return;
+		seen.add(flowName);
+		for (const node of flows[flowName]?.nodes ?? []) {
+			const profile = profileOf(node);
+			if (isProfileRef(profile)) ids.add(profile.device);
+			else if ("device" in node && node.device) names.add(node.device);
+			if (node.type === "call") walk(node.flow);
+		}
+	};
+	walk(name);
+	return { names: [...names].sort(), ids: [...ids].sort() };
 }
 
 /**

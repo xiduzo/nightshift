@@ -48,8 +48,8 @@ import type { RunSummary } from "../read";
  *   (`WebhookReceived`), accepted or filtered out.
  *
  * The same Device that fires a schedule's cron times takes its webhooks
- * (`firesHere`): the one it names, else the Space's Host, else the one
- * Device of a Space without a Host.
+ * (`firesHere`): the Space's Host, else the one Device of a Space without
+ * a Host. The Device the schedule names runs the run.
  */
 
 /** A webhook as the HTTP server hands it over. */
@@ -245,6 +245,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 						inputs,
 						...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
 						...(stopAt !== undefined ? { stopAt } : {}),
+						...(schedule.device ? { deviceName: schedule.device } : {}),
 						...(schedule.person ? { startedBy: schedule.person } : {}),
 					},
 					{ kind: "webhook", scheduleId: schedule.id, at },
@@ -318,7 +319,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 				: !deps.enabled()
 					? "Schedules are paused."
 					: !(await deps.firesHere(projectId, schedule))
-						? "Another device runs this schedule. Send the webhook there."
+						? "The Host of this Space takes this webhook. Send it there."
 						: null;
 			if (refusal !== null) {
 				refuse(projectId, scheduleId, at, refusal);

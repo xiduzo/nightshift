@@ -124,9 +124,10 @@ export const scheduleSchema = z.object({
 	/** A paused schedule stays in the file and starts nothing. */
 	enabled: z.boolean().default(true),
 	/**
-	 * The Device that fires it, by name: only that Device starts its runs,
-	 * so a schedule every Clone has never fires twice. Unset: the Space's
-	 * Host, or the one Device of a Space without a Host.
+	 * The Device its runs run on, by name. The Space's Host fires every
+	 * schedule (or the one Device of a Space without a Host), so a schedule
+	 * every Clone has never fires twice, and starts the run there. Unset:
+	 * the run runs on the Device that fires it.
 	 */
 	device: deviceNameSchema.optional(),
 	/**

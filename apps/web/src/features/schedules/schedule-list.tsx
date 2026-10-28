@@ -42,6 +42,13 @@ import {
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import {
+	type Machine,
+	MachineBadge,
+	neededMachines,
+	useSpaceMachines,
+} from "@/features/devices";
+import { flowQueries } from "@/features/flows";
 import { RunStatusBadge } from "@/features/runs";
 import { settingsQueries } from "@/features/settings";
 import type {
@@ -103,6 +110,19 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	const settings = useQuery(settingsQueries.get());
 	const schedulerOff = settings.data ? !settings.data.values.scheduler : false;
 	const schedulerLock = settings.data?.fields.scheduler.locked;
+	const machines = useSpaceMachines();
+	const flows = useQuery(flowQueries.list(projectId));
+	/** The computers each schedule's run needs. Empty while they load. */
+	const needs = (schedule: ScheduleSummary): Machine[] =>
+		machines
+			? neededMachines(
+					machines,
+					schedule.device,
+					schedule.flow === undefined
+						? { names: [], ids: [] }
+						: flows.data?.find((flow) => flow.name === schedule.flow)?.devices,
+				)
+			: [];
 
 	const save = useMutation(
 		scheduleMutations.save({
@@ -141,7 +161,11 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 			<PageHeading
 				id="schedules-heading"
 				title="Schedules"
-				description="Flows that start on their own, at set times or when a webhook arrives."
+				description={
+					machines?.starterIsHost
+						? `Flows that start on their own, at set times or when a webhook arrives. ${machines.starter.name}, the Host, starts them.`
+						: "Flows that start on their own, at set times or when a webhook arrives."
+				}
 				actions={
 					<Button
 						variant="outline"
@@ -222,6 +246,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 								now,
 								busy: save.isPending,
 								schedulerOff,
+								needs,
 								onToggle: (schedule, enabled) =>
 									saveAll(
 										schedules.map((s) =>
@@ -362,6 +387,7 @@ function scheduleColumns({
 	now,
 	busy,
 	schedulerOff,
+	needs,
 	onToggle,
 	onEdit,
 	onDelete,
@@ -371,6 +397,8 @@ function scheduleColumns({
 	busy: boolean;
 	/** The daemon's scheduler is off: nothing starts, whatever the cron says. */
 	schedulerOff: boolean;
+	/** The computers a schedule's run needs: the one it runs on first. */
+	needs: (schedule: ScheduleSummary) => Machine[];
 	onToggle: (schedule: ScheduleSummary, enabled: boolean) => void;
 	onEdit: (schedule: ScheduleSummary) => void;
 	onDelete: (schedule: ScheduleSummary) => void;
@@ -406,6 +434,9 @@ function scheduleColumns({
 								: null}
 							{nextStart(schedule, now, schedulerOff)}
 						</span>
+						<div className="lg:hidden">
+							<RunsOn machines={needs(schedule)} />
+						</div>
 						<div className="xl:hidden">
 							<Latest schedule={schedule} />
 						</div>
@@ -433,6 +464,14 @@ function scheduleColumns({
 			meta: {
 				headClassName: "hidden md:table-cell",
 				cellClassName: "hidden py-3 align-top md:table-cell",
+			},
+		}),
+		column.accessor("device", {
+			header: "Runs on",
+			cell: ({ row }) => <RunsOn machines={needs(row.original)} />,
+			meta: {
+				headClassName: "hidden lg:table-cell",
+				cellClassName: "hidden py-3 align-top lg:table-cell",
 			},
 		}),
 		column.accessor("nextAt", {
@@ -525,6 +564,40 @@ function scheduleColumns({
 			},
 		}),
 	]);
+}
+
+/**
+ * The computers a run needs, each with a dot for whether it is online,
+ * and a line for each one that is offline now.
+ */
+function RunsOn({ machines }: { machines: Machine[] }) {
+	if (machines.length === 0) return null;
+	const [runsOn, ...more] = machines;
+	const offline = machines.filter((machine) => machine.online === false);
+	return (
+		<div className="flex flex-col gap-1">
+			<div className="flex flex-wrap gap-1">
+				{runsOn ? (
+					<MachineBadge machine={runsOn} label="The run runs here." />
+				) : null}
+				{more.map((machine) => (
+					<MachineBadge
+						key={machine.name}
+						machine={machine}
+						label="Steps of the flow run here."
+					/>
+				))}
+			</div>
+			{offline.map((machine) => (
+				<p
+					key={machine.name}
+					className="whitespace-normal text-destructive text-xs"
+				>
+					{machine.name} is offline now. Its steps cannot run until it is back.
+				</p>
+			))}
+		</div>
+	);
 }
 
 /** How the last start went: the cron time's result, or the latest webhook. */

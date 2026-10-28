@@ -44,6 +44,20 @@ export type FlowListItem = FlowFile & {
 	inputs: FlowInputDef[];
 	/** The flows whose Subflow nodes run this one, by name. */
 	callers: string[];
+	/** The Devices its nodes and the flows it calls run on (`FlowDevices`). */
+	devices: FlowDevices;
+};
+
+/**
+ * The Devices a flow names, with the flows it calls: what must be online
+ * for its steps to run. A run also uses the Device it runs on, which a
+ * flow does not name.
+ */
+export type FlowDevices = {
+	/** The Devices nodes name (`device`), sorted. */
+	names: string[];
+	/** The Devices of the nodes' profiles, by the Device's id, sorted. */
+	ids: string[];
 };
 
 export type LoadedFlow = FlowFile & {

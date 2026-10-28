@@ -252,8 +252,8 @@ rewrites the Device's database, so it is careful:
    joins another merge into it (`mergeFlowDocuments`), once the Host's
    copy is here: `Link.synced` says that the two copies are in sync, and
    that the Host has every change this Device made. Each
-   schedule that names no Device is pinned to this Device, so it keeps
-   firing where it fired. The engine reads the moved runs again
+   schedule that names no Device is pinned to this Device, so its runs
+   keep running where they ran; the Host fires it from now on. The engine reads the moved runs again
    (`Engine.reindex`). The moved events of this Device take the numbers
    after its latest, so they reach the Host after every cursor.
 7. **The name.** The merged Space is "Personal" on the Device, also
@@ -1584,12 +1584,14 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      their whole log, so a run that arrived gets its timer back after a
      restart. A run walked elsewhere moves by a `run.move` command to its
      Walker. A moved step's transcript is read from the archive.
-   - **Schedules**: `device` in `schedules.json` names the Device that
-     fires the schedule; without one, the Replica that keeps the Space
-     fires it (its Host, or the one Device of a Space without one), so a
-     schedule every Clone reads fires once. A Host without a Clone cannot
-     read the file: name a Device then. A schedule's run with placed nodes
-     uses this computer's owner's Devices.
+   - **Schedules**: the Replica that keeps the Space fires every schedule
+     (its Host, or the one Device of a Space without one), so a schedule
+     every Clone reads fires once, and an always-on Host starts it while
+     the laptops sleep. `device` names the Device the run runs on
+     (`StartRunInput.deviceName`); without one, the run runs on the
+     Replica that fires it, which then needs a Clone. A schedule's run
+     with placed nodes uses this computer's owner's Devices. (Changed
+     2026-10-28: `device` used to name the Device that fires it.)
    - **The resume grace** now counts from when the engine is ready (it
      started at recovery, before the engine's start ended: the flaky
      "an open run continues on its own" test).

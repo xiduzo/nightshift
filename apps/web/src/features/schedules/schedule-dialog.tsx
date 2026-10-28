@@ -46,6 +46,7 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
+import { type Machine, useSpaceMachines } from "@/features/devices";
 import {
 	BaseRefCombobox,
 	FlowInputFields,
@@ -137,9 +138,18 @@ function freeId(flow: string, taken: readonly string[]): string {
 	}
 }
 
+/** The choice of the computer that starts the schedules: the schedule names no device. */
+const STARTER = "";
+
+/** Whether a computer has a copy of the project. True when this computer cannot tell. */
+function hasProject(machine: Machine | null, projectId: string): boolean {
+	return machine?.projectIds?.includes(projectId) ?? true;
+}
+
 /**
  * Adds or edits one schedule: the flow and its inputs, when it starts (a
- * time and days, or a cron line), when it stops, and the ref to start from.
+ * time and days, or a cron line), when it stops, the computer it runs on,
+ * and the ref to start from.
  */
 export function ScheduleDialog({
 	open,
@@ -254,6 +264,29 @@ function ScheduleForm({
 		time: schedule?.stopAt ?? DEFAULT_STOP,
 	}));
 	const [baseRef, setBaseRef] = useState(schedule?.baseRef ?? "");
+	const machines = useSpaceMachines();
+	// Null until the person picks one: a new schedule runs on the computer
+	// that starts it when that one has the project, else on this computer.
+	const [device, setDevice] = useState<string | null>(
+		schedule ? (schedule.device ?? STARTER) : null,
+	);
+	const self = machines?.computers.find((c) => c.thisDevice) ?? null;
+	const runsOn =
+		device ??
+		(machines &&
+		!hasProject(machines.starter, projectId) &&
+		self &&
+		self.name !== machines.starter.name
+			? self.name
+			: STARTER);
+	const runsOnMachine = machines
+		? runsOn === STARTER
+			? machines.starter
+			: machines.byName(runsOn)
+		: null;
+	const deviceChoices = machines
+		? machines.computers.filter((c) => c.name !== machines.starter.name)
+		: [];
 
 	const chosenItem = startsFlow
 		? list.data?.find((item) => item.name === chosen)
@@ -305,6 +338,7 @@ function ScheduleForm({
 			id: scheduleId,
 			...(stop.on ? { stopAt: stop.time } : {}),
 			...(ref === "" ? {} : { baseRef: ref }),
+			...(runsOn === STARTER ? {} : { device: runsOn }),
 			enabled: schedule?.enabled ?? true,
 		};
 		if (trigger === "times") {
@@ -609,6 +643,56 @@ function ScheduleForm({
 						}
 					/>
 				</Field>
+
+				{machines ? (
+					<Field
+						data-invalid={!hasProject(runsOnMachine, projectId) || undefined}
+					>
+						<FieldLabel htmlFor={`${id}-device`}>Runs on</FieldLabel>
+						<NativeSelect
+							id={`${id}-device`}
+							value={runsOn}
+							className="w-full"
+							onChange={(event) => setDevice(event.target.value)}
+						>
+							<NativeSelectOption value={STARTER}>
+								{machines.starter.name}
+								{machines.starterIsHost ? " (the Host)" : " (this computer)"}
+							</NativeSelectOption>
+							{deviceChoices.map((machine) => (
+								<NativeSelectOption key={machine.name} value={machine.name}>
+									{machine.name}
+									{machine.thisDevice ? " (this computer)" : ""}
+									{machine.online === false ? ", offline now" : ""}
+								</NativeSelectOption>
+							))}
+							{runsOn !== STARTER && runsOnMachine === null ? (
+								<NativeSelectOption value={runsOn}>
+									{runsOn}, not in this Space
+								</NativeSelectOption>
+							) : null}
+						</NativeSelect>
+						{!hasProject(runsOnMachine, projectId) ? (
+							<FieldError>
+								{runsOnMachine?.name} does not have this project. Add its folder
+								there, or choose another computer.
+							</FieldError>
+						) : runsOnMachine?.online === false ? (
+							<FieldError>
+								{runsOnMachine.name} is offline now. The run cannot start there
+								until it is back.
+							</FieldError>
+						) : (
+							<FieldDescription>
+								{!machines.starterIsHost
+									? "Night Shift starts the run here at its time."
+									: runsOn === STARTER
+										? `${machines.starter.name}, the Host, starts the run at its time and runs it.`
+										: `${machines.starter.name}, the Host, starts the run at its time. The steps run on ${runsOn}.`}
+							</FieldDescription>
+						)}
+					</Field>
+				) : null}
 
 				<Field>
 					<FieldLabel htmlFor={`${id}-base`}>

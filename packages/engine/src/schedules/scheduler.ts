@@ -85,9 +85,10 @@ export type SchedulerDeps = {
 	/** Read on every tick: false skips the tick, like a pause of every schedule. Default on. */
 	enabled?: () => boolean;
 	/**
-	 * Whether this Device fires the schedule: the one it names (`device`),
-	 * else the Space's Host, so a schedule every Clone reads fires once.
-	 * Default: every schedule fires here.
+	 * Whether this Device fires the schedule: the Space's Host, else the one
+	 * Device of a Space without a Host, so a schedule every Clone reads
+	 * fires once. The Device it names (`device`) runs the run. Default:
+	 * every schedule fires here.
 	 */
 	firesHere?: (projectId: string, schedule: Schedule) => Promise<boolean>;
 };
@@ -305,6 +306,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					inputs: schedule.inputs,
 					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
 					...(stopAt !== undefined ? { stopAt } : {}),
+					// The Device it names runs it; this computer only fires it.
+					...(schedule.device ? { deviceName: schedule.device } : {}),
 					// Another Person's schedule: their run, through the Offers here.
 					...(schedule.person ? { startedBy: schedule.person } : {}),
 				},

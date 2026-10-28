@@ -61,6 +61,7 @@ describe("flowUse", () => {
 						errorCount: 0,
 						inputs: [],
 						callers: [],
+						devices: { names: [], ids: [] },
 					},
 					{
 						name: "day",
@@ -70,6 +71,7 @@ describe("flowUse", () => {
 						errorCount: 0,
 						inputs: [],
 						callers: [],
+						devices: { names: [], ids: [] },
 					},
 					{
 						name: "broken",
@@ -79,6 +81,7 @@ describe("flowUse", () => {
 						errorCount: 1,
 						inputs: [],
 						callers: [],
+						devices: { names: [], ids: [] },
 					},
 				];
 			},

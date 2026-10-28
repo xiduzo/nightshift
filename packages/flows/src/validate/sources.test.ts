@@ -10,6 +10,7 @@ import { flowNameSchema } from "../nodes";
 import {
 	callersOf,
 	canonicalFlowJson,
+	devicesOf,
 	type FlowSources,
 	flowNameOfFile,
 	listFlowSources,
@@ -73,6 +74,7 @@ describe("listFlowSources", () => {
 				errorCount: 1,
 				inputs: quick().inputs,
 				callers: [],
+				devices: { names: [], ids: [] },
 			},
 			{
 				name: "broken",
@@ -82,6 +84,7 @@ describe("listFlowSources", () => {
 				errorCount: 1,
 				inputs: [],
 				callers: [],
+				devices: { names: [], ids: [] },
 			},
 			{
 				name: "quick",
@@ -91,6 +94,7 @@ describe("listFlowSources", () => {
 				errorCount: 0,
 				inputs: quick().inputs,
 				callers: ["zeta"],
+				devices: { names: [], ids: [] },
 			},
 			{
 				name: "zeta",
@@ -100,6 +104,7 @@ describe("listFlowSources", () => {
 				errorCount: 0,
 				inputs: [],
 				callers: [],
+				devices: { names: [], ids: [] },
 			},
 		]);
 	});
@@ -189,6 +194,49 @@ describe("callersOf", () => {
 				broken: null,
 			}),
 		).toEqual(["beta", "zeta"]);
+	});
+});
+
+describe("devicesOf", () => {
+	const placed = (device: string): Flow => ({
+		...quick(),
+		nodes: quick().nodes.map((node) => ({ ...node, device })),
+	});
+	const profiled = (): Flow => ({
+		...quick(),
+		nodes: quick().nodes.map((node) => ({
+			...node,
+			device: "ignored",
+			profile: { device: "device-id", profile: "p1" },
+		})),
+	});
+
+	test("names the Devices of the flow and of the flows it calls, once each, sorted", () => {
+		expect(
+			devicesOf("zeta", { zeta: caller(), quick: placed("studio") }),
+		).toEqual({ names: ["studio"], ids: [] });
+		expect(devicesOf("quick", { quick: placed("hetzner-1") })).toEqual({
+			names: ["hetzner-1"],
+			ids: [],
+		});
+	});
+
+	test("a node's profile names its Device by id, not the node's device", () => {
+		expect(devicesOf("quick", { quick: profiled() })).toEqual({
+			names: [],
+			ids: ["device-id"],
+		});
+	});
+
+	test("a flow that names no Device, or does not load, needs none", () => {
+		expect(devicesOf("quick", { quick: quick() })).toEqual({
+			names: [],
+			ids: [],
+		});
+		expect(devicesOf("broken", { broken: null })).toEqual({
+			names: [],
+			ids: [],
+		});
 	});
 });
 

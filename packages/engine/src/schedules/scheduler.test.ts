@@ -548,19 +548,27 @@ describe("the scheduler", () => {
 		);
 	});
 
-	test("a schedule that names another Device does not fire here; one that names this one does", async () => {
+	test("the computer that keeps the Space fires every schedule; the Device a schedule names runs its run", async () => {
 		const { engine } = startDaemon();
 		await setup(engine, [
 			nightly({ id: "elsewhere", device: "hetzner-1" }),
 			nightly({ id: "here", device: "test" }),
 		]);
 		clock = at(16, 22, 1);
-		const facts = await waitForFacts(1);
+		await waitForFacts(2);
 		await settle();
-		expect((await scheduleFacts()).map((f) => f.payload.scheduleId)).toEqual([
-			"here",
-		]);
-		expect(facts).toHaveLength(1);
+		const facts = await scheduleFacts();
+		const of = (id: string) =>
+			facts.find((f) => f.payload.scheduleId === id)?.payload;
+		expect(of("here")).toMatchObject({ error: null });
+		expect(of("here")?.runId).toBeString();
+		// This computer alone has no Device of that name: the start is refused.
+		expect(of("elsewhere")).toMatchObject({
+			runId: null,
+			error:
+				'There is no device named "hetzner-1" in this Space. Choose another device for this schedule.',
+		});
+		await waitForEnd(engine, of("here")?.runId as string);
 	});
 
 	test("picks up an edit of the schedules on the next tick, without a restart", async () => {

@@ -64,6 +64,11 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import {
+	MachineBadge,
+	neededMachines,
+	useSpaceMachines,
+} from "@/features/devices";
 import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
@@ -296,7 +301,7 @@ function FlowCard({
 					</Tooltip>
 				</CardAction>
 			</CardHeader>
-			<FlowSignature inputs={inputs} callers={callers} />
+			<FlowSignature inputs={inputs} callers={callers} devices={flow.devices} />
 			<CardFooter className="mt-auto gap-2 border-t">
 				<FlowMeta flow={flow} />
 				<div className="relative z-10 ml-auto flex items-center gap-1.5">
@@ -341,15 +346,26 @@ function FlowCard({
 	);
 }
 
-/** The flow's inputs, briefly, and the flows that call it. */
+/** The flow's inputs, briefly, the flows that call it, and the computers its steps need. */
 function FlowSignature({
 	inputs,
 	callers,
+	devices,
 }: {
 	inputs: readonly FlowInputDef[] | undefined;
 	callers: string[];
+	devices: FlowListItem["devices"];
 }) {
-	if ((!inputs || inputs.length === 0) && callers.length === 0) return null;
+	const machines = useSpaceMachines();
+	// The run's own computer is the one you start it on: only what the flow names.
+	const needs = machines ? neededMachines(machines, null, devices) : [];
+	if (
+		(!inputs || inputs.length === 0) &&
+		callers.length === 0 &&
+		needs.length === 0
+	) {
+		return null;
+	}
 	return (
 		<CardContent className="flex flex-col gap-2 text-muted-foreground text-xs">
 			{inputs && inputs.length > 0 ? (
@@ -376,6 +392,19 @@ function FlowSignature({
 				<span className="min-w-0 truncate">
 					Called by <span className="font-mono">{callers.join(", ")}</span>
 				</span>
+			) : null}
+			{needs.length > 0 ? (
+				<div className="flex flex-wrap items-center gap-1.5">
+					<span>Needs</span>
+					{needs.map((machine) => (
+						<MachineBadge
+							key={machine.name}
+							machine={machine}
+							label="Steps of this flow run here."
+							className="relative z-10"
+						/>
+					))}
+				</div>
 			) : null}
 		</CardContent>
 	);

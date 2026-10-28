@@ -313,6 +313,15 @@ export async function planNodes(
 		const found = await devices.byId(start.deviceId);
 		if (!found) throw new Refusal("invalid", UNREACHABLE_DEVICE);
 		run = found;
+	} else if (start.deviceName !== undefined) {
+		const found = await devices.byName(start.deviceName);
+		if (!found) {
+			throw new Refusal(
+				"invalid",
+				`There is no device named "${start.deviceName}" in this Space. Choose another device for this schedule.`,
+			);
+		}
+		run = found;
 	}
 	if (run !== walker && !run.hasClone) {
 		throw new Refusal(

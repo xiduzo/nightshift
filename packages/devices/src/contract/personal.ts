@@ -92,7 +92,7 @@ export type MergeProjectView = {
 	sharedSpace: { id: string; name: string } | null;
 	/** The flows that take another name, because the project they join has one by that name. */
 	renamedFlows: { from: string; to: string }[];
-	/** Schedules that name no device: they keep firing on this computer. */
+	/** Schedules that name no device: their runs keep running on this computer. */
 	schedules: number;
 };
 
