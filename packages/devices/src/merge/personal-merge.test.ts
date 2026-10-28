@@ -721,6 +721,31 @@ describe("the merge of Personal", () => {
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
 	});
 
+	test("an interrupted run has ended: it moves along and holds nothing back", async () => {
+		const { runId } = await projectWithRun();
+		// A restart that did not continue the run, as recovery ends it.
+		await b.db.insert(event).values({
+			spaceId: b.spaceId,
+			runId,
+			type: "RunEnded",
+			payload: JSON.stringify({
+				status: "interrupted",
+				reason: "Night Shift stopped while this run ran.",
+			}),
+			walkerId: b.deviceId,
+			walkerSeq: 1_000,
+		});
+		paired.device.reindex([runId]);
+		expect((await paired.device.space(b.spaceId).getRun(runId)).status).toBe(
+			"interrupted",
+		);
+		const { link } = online();
+		await ready(link);
+
+		expect(await merger(link).run()).toMatchObject({ runs: 1 });
+		expect((await spaceOfRun(b, runId))?.spaceId).toBe(a.spaceId);
+	});
+
 	test("an older Host without the merge refuses it politely", async () => {
 		const { link } = online({ push: false });
 		await ready(link);

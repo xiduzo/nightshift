@@ -214,8 +214,8 @@ Person's Personal on that Host (ADR 1, `devices/src/merge/`). The merge
 rewrites the Device's database, so it is careful:
 
 1. **Checks.** The Home Host answers now and lists the Person's personal
-   Space. No run in Personal is running, waiting, sleeping or
-   interrupted. The Device is not a Host with paired Devices of its own:
+   Space. No run in Personal is running, waiting or sleeping. An
+   interrupted run has ended and moves along. The Device is not a Host with paired Devices of its own:
    such a Device keeps its Personal. One merge runs at a time, inside the
    daemon that holds the database.
 2. **Preview.** The Host answers a dry run of `sync.mergePersonal`. The
@@ -286,8 +286,7 @@ reverse of the merge, and as careful:
 
 1. **When.** The Person's personal Space is one that a Host keeps, and
    the Device has no link with access to that Host. It waits while a run
-   that this Device walks there is running, waiting, sleeping or
-   interrupted. The daemon tries at start and every 30 s, so a split
+   that this Device walks there is running, waiting or sleeping. The daemon tries at start and every 30 s, so a split
    cut short or held back goes on by itself. As in the merge, no run
    starts from its last check through its batch.
 2. **Copy.** `VACUUM INTO` writes `backups/before-leaving-host-*.db`
