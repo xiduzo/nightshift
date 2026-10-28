@@ -2,7 +2,7 @@
 # prerelease. Apps with "Get Nightly Builds" on update from there. The Docker
 # image of the same build gets the `nightly` tag. A night without new
 # commits skips the apps, but builds the image again: it then gets the newest
-# Debian security fixes. Run it from the Actions tab to build now.
+# Wolfi security fixes. Run it from the Actions tab to build now.
 name: Nightly
 
 on:
