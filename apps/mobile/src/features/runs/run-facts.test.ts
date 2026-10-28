@@ -66,6 +66,15 @@ describe("runFacts", () => {
 		expect(fact.get("Run")).toMatchObject({ value: "run_42", mono: true });
 	});
 
+	test("a run that waits for its computer to make its worktree shows no branch yet", () => {
+		const facts = runFacts(factRun({ branch: "" }), {
+			status: "sleeping",
+			steps: 0,
+			now: NOW,
+		});
+		expect(facts.map((fact) => fact.label)).not.toContain("Branch");
+	});
+
 	test("an ended run counts to its end; a scheduled quick run on an unnamed Host", () => {
 		const fact = byLabel(
 			runFacts(
