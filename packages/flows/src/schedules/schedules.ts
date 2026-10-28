@@ -6,11 +6,10 @@ import { deviceNameSchema, flowNameSchema, labelSchema } from "../nodes";
 import { ruleProblem, templateRefs } from "../template";
 
 /**
- * The schedules file: `.nightshift/schedules.json` in the project's clone,
- * next to the flows and versioned with them. Each schedule starts one flow
- * file when its cron line comes due, or when a webhook arrives at its
- * address (`webhook`). The daemon reads the file again on every tick and on
- * every webhook, so an edit applies without a restart.
+ * A project's schedules, which Night Shift keeps next to its flows. Each
+ * schedule starts one flow when its cron line comes due, or when a webhook
+ * arrives at its address (`webhook`). The daemon reads them again on every
+ * tick and on every webhook, so an edit applies without a restart.
  *
  * ```json
  * {

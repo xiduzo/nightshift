@@ -125,7 +125,7 @@ describe("each kind gets its own task and context", () => {
 		);
 		expect(text).toContain("Print one JSON array on stdout");
 		expect(text).toContain("`dependsOn`");
-		expect(text).toContain("`.nightshift/flows/trace.json`");
+		expect(text).toContain("`nightshift flows get trace`");
 		expect(text).toContain("`{{task.<field>}}`");
 		expect(text).toContain("subIssues(first: 100)");
 		expect(text).toContain("cat tasks.json");

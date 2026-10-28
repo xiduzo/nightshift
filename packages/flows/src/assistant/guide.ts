@@ -33,7 +33,6 @@ import {
 	valueDeciderNameSchema,
 	waitNodeSchema,
 } from "../nodes";
-import { PROFILES_VERSION } from "../profiles";
 import { runFields } from "../template";
 
 const at = { x: 0, y: 0 };
@@ -150,7 +149,7 @@ const nodeText: Record<FlowNodeType, string> = {
 			", ",
 		)} (\`{ kind: "duration", minutes }\`, \`{ kind: "time", at: "07:00" }\`, \`{ kind: "command", command, everyMinutes }\` until it exits 0, \`{ kind: "signal", name, key? }\`). \`timeoutMinutes\` ends it \`timeout\`. A signal comes from a person on the run page, or from a webhook schedule of the project: then \`data\` holds the webhook (\`{{wait_ci.data.body.check_suite.conclusion}}\`). With \`key\` (a template, for example \`{{pr}}\`), only a webhook whose signal key is that text wakes it.`,
 	join: `Where parallel branches meet. \`wait\`: \`all\` (default), or \`first\` (stops the other branches). \`data\` holds each branch's \`data\` by the node it came from: \`{{reviewed.data.security}}\`.`,
-	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its file name), or a kit (\`kit:github/publish-draft-pr\`, see Kits), with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message.`,
+	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its name), or a kit (\`kit:github/publish-draft-pr\`, see Kits), with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Call \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message.`,
 	end: `Ends the run on purpose. \`status\`: ${endStatusSchema.options.map((status) => `\`${status}\``).join(", ")}. \`message\` (template) is one line for a person: the runs list and the notification show it. \`nothing-to-do\` is for a run that found no work: it is not a failure. \`failed\` fails the run on purpose. No edge leaves an End node.`,
 };
 
@@ -374,7 +373,7 @@ function kitLine({ name, flow }: Kit): string {
 export function flowAuthoringGuide(): string {
 	return `# Writing Night Shift flows
 
-A flow is a directed graph of nodes and edges, saved as \`.nightshift/flows/<name>.json\` in the project. A run starts at \`start\`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes \`inputs\` and returns \`outputs\`. Write version ${FLOW_VERSION}. The model never changes the graph at run time.
+A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at \`start\`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes \`inputs\` and returns \`outputs\`. Write version ${FLOW_VERSION}. The model never changes the graph at run time.
 
 ## The file
 
@@ -425,7 +424,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in \
 
 ## Schedules and webhooks
 
-A schedule in \`.nightshift/schedules.json\` starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, not with a command that polls: the kit \`kit:github/wait-for-checks\` does it.
+A schedule starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, not with a command that polls: the kit \`kit:github/wait-for-checks\` does it.
 
 ## Kits
 
@@ -437,7 +436,7 @@ A webhook schedule wakes \`wait-for-checks\` when CI is done: \`signal: { name: 
 
 ## Profiles
 
-An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, …) is for Agents, a Model Profile (\`decider\`, optional \`model\`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer and in \`.nightshift/profiles.json\`: \`{ "version": ${PROFILES_VERSION}, "profiles": [{ "name": "triage", "decider": "openrouter" }] }\`. The computer's wins. Put the ones a flow needs in the project.
+An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, …) is for Agents, a Model Profile (\`decider\`, optional \`model\`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer: \`list_profiles\` gives them by name.
 
 ## Sections
 

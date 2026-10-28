@@ -23,10 +23,10 @@ import type { RunSummary } from "../read";
 import type { WebhookDelivery } from "./webhooks";
 
 /**
- * The scheduler: starts the runs of `.nightshift/schedules.json` when their
+ * The scheduler: starts the runs of the projects' schedules when their
  * cron times come due. It lives inside the engine and ticks on an interval
- * (and once at start). Each tick reads every project's schedules file again,
- * so an edit applies without a restart.
+ * (and once at start). Each tick reads every project's schedules again, so
+ * an edit applies without a restart.
  *
  * Durable rules, all derived from the event log:
  * - A cron time fires at most once. The latest handled cron time of each
@@ -459,7 +459,7 @@ export type ScheduleSummary = Schedule & {
 };
 
 export type ScheduleList = {
-	/** Absolute path of `.nightshift/schedules.json`. */
+	/** Where the schedules are. */
 	path: string;
 	schedules: ScheduleSummary[];
 	/** Problems of the whole file, for example JSON that does not parse. */

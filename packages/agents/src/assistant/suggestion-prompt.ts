@@ -387,7 +387,7 @@ function listCommandTask(
 		"- Print one JSON array on stdout, nothing else. Each item is an object.",
 		"- Give each item `id` (text, unique in the list) and `title`. Add `url` when the source has one.",
 		"- Add `dependsOn` (a list of ids, or of `{ id, done }`) when the source knows what blocks an item: an item waits until those are done. Add `done: true` for an item that is finished: the node skips it.",
-		`- Keep the fields the called flow reads. Read \`.nightshift/flows/${node.flow}.json\` and look for \`{{${as}.<field>}}\`.`,
+		`- Keep the fields the called flow reads. Run \`nightshift flows get ${node.flow}\` to read it, and look for \`{{${as}.<field>}}\`.`,
 		"- Use the tracker this project uses. Check `git remote -v` and which CLI is installed: `gh`, `glab`, `acli`. A file of tasks in the project works too.",
 		'- A `{{reference}}` reaches the shell as an environment variable, never as shell text: put it in double quotes, `--label "{{label}}"`.',
 		"- Only read. Never change an issue, a file or git. Never ask for input or open a pager. You may run the command once to check what it prints.",
