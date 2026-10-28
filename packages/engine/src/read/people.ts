@@ -9,13 +9,29 @@ import type { RunPerson } from "./views";
  * its worktree get.
  */
 
-/** The names of these Persons, by id. A Person this Replica does not know is missing. */
+/** The name of a Person as the Members of a Space name them, or null. */
+export type MemberName = (personId: string) => Promise<string | null>;
+
+/**
+ * The names of these Persons, by id: from the Replica's accounts, else
+ * from `member` (the Members the Space document mirrors). A Device has no
+ * account of a Person its Host knows, such as the one who started a run
+ * on the Host. A Person neither knows is missing.
+ */
 export async function namesOf(
 	db: Database,
 	ids: readonly (string | null)[],
+	member?: MemberName,
 ): Promise<ReadonlyMap<string, string>> {
 	const wanted = [...new Set(ids.filter((id): id is string => id !== null))];
-	return personNames(db, wanted);
+	const names = new Map(await personNames(db, wanted));
+	if (!member) return names;
+	for (const id of wanted) {
+		if (names.has(id)) continue;
+		const name = await member(id);
+		if (name) names.set(id, name);
+	}
+	return names;
 }
 
 /** The Person of `id` as a run names them, with their name when known. */
