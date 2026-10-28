@@ -36,6 +36,10 @@ import type { Lease } from "./lease";
  *
  * The names stay as they are: a running dev daemon reloads into new code
  * with the same names.
+ *
+ * The kept documents are Yjs documents. A reload evaluates Yjs again too,
+ * so the dev entry's preload (`apps/server/src/hot-preload.ts`) gives every
+ * reload the one Yjs of the process: the new code reads them as its own.
  */
 export type HotRegistry = KeptDevices &
 	KeptSync & {

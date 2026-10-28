@@ -5,7 +5,7 @@
 		"build": "tsc -b ../../packages/api && tsdown",
 		"check-types": "tsc -b ../../packages/api && tsc --noEmit",
 		"build:binary": "bun scripts/build-binary.ts",
-		"dev": "NIGHTSHIFT_DEV=true bun run --hot src/main.ts",
+		"dev": "NIGHTSHIFT_DEV=true bun run --hot --preload ./src/hot-preload.ts src/main.ts",
 		"test": "bun test",
 		"start": "bun run dist/main.mjs",
 		"data:migrate": "bun src/features/cli/data-migrate.ts",
