@@ -29,7 +29,7 @@ import type { ScheduleFiles } from "../schedules";
 import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
 import type { PlacementPort, WithPaths } from "./peers";
-import type { RunRelay } from "./relay";
+import { HostUnreachableError, type RunRelay } from "./relay";
 import type { SpaceEngine } from "./space-engine";
 
 /**
@@ -44,8 +44,6 @@ export type SpacesDeps = {
 	ready: Promise<unknown>;
 	/** The engine's lifetime: a watch ends with it. */
 	signal: AbortSignal;
-	/** This computer's Device id. */
-	deviceId: string;
 	log: RunLog;
 	runner: Pick<Runner, "isActive">;
 	projects: Projects;
@@ -393,15 +391,20 @@ export function createSpaces(deps: SpacesDeps) {
 			async startRun(input: StartRunInput) {
 				await ready;
 				await projects.find(input.projectId, spaceId);
-				const { deviceId } = input;
-				if (
-					deviceId !== undefined &&
-					deviceId !== deps.deviceId &&
-					deviceId !== (await log.walkerId()) &&
-					(await deps.hostOf(spaceId)) !== null
-				) {
-					// A run for another Device: the Space's Host walks it.
-					return deps.relay.startOnHost({ ...input, deviceId }, spaceId);
+				if ((await deps.hostOf(spaceId)) !== null) {
+					// The Space's Host walks the run (ADR 1, decision 9). Its
+					// unplaced steps run on the Device that started it.
+					const deviceId = input.deviceId ?? (await log.walkerId());
+					try {
+						return await deps.relay.startOnHost(
+							{ ...input, deviceId },
+							spaceId,
+						);
+					} catch (error) {
+						// A Device that cannot reach its Host walks the run itself:
+						// the exchange sends it to the Host later (decision 10).
+						if (!(error instanceof HostUnreachableError)) throw error;
+					}
 				}
 				return (await deps.pathsFor(spaceId, actor))(
 					await deps.startRun(input, { kind: "manual" }),

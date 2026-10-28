@@ -5,6 +5,7 @@ import {
 	createSettingsStore,
 	createSpaceDocuments,
 	type FlowDocuments,
+	HostUnreachableError,
 	type SpaceDocuments,
 } from "@nightshift/engine";
 import {
@@ -13,7 +14,7 @@ import {
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
-import type { HostClient } from "../contract";
+import type { HostClient, HostRelay, WorkRelay } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
 import { createHost } from "../host";
 import type { DeviceLinks, Link } from "../links";
@@ -70,6 +71,19 @@ export type PairedReplicas = {
 	pair(sandbox: Sandbox, name: string): Promise<PairedDevice>;
 };
 
+/** How the paired Replicas behave. */
+export type PairedOptions = Partial<Pick<TestEngineOptions, "harnesses">> & {
+	/**
+	 * A run a Device starts goes to A, which walks it (ADR 1). Default:
+	 * A does not take run starts, so a Device walks the runs it starts
+	 * itself, as when it cannot reach its Host. The steps of a run A walks
+	 * need a work relay to the Device, which these Replicas do not run.
+	 */
+	hostWalks?: boolean;
+	/** How A's calls reach its paired Devices. Default: they reach none. */
+	hostWork?: WorkRelay;
+};
+
 /**
  * Pairs B with A by hand, as pairing and the Host's documents would: B is
  * on A's registry with a key of A's owner, B keeps A's Spaces (a
@@ -81,7 +95,7 @@ export type PairedReplicas = {
 export async function pairedReplicas(
 	a: Sandbox,
 	b: Sandbox,
-	options: Partial<Pick<TestEngineOptions, "harnesses">> = {},
+	options: PairedOptions = {},
 ): Promise<PairedReplicas> {
 	const harnesses = options.harnesses ?? {};
 	const [owner] = await a.db.select().from(user);
@@ -102,6 +116,7 @@ export async function pairedReplicas(
 			dataDir: a.dataDir,
 			scheduler: false,
 			spaceDocuments: hostDocuments,
+			...(options.hostWork ? { work: options.hostWork } : {}),
 			relay: createRelay({
 				engine: () => host,
 				registry: () => host.devices,
@@ -177,11 +192,14 @@ export async function pairedReplicas(
 				scheduler: false,
 				spaceDocuments: documents,
 				flowDocuments: flows,
-				relay: createRelay({
-					engine: () => engine,
-					registry: () => engine.devices,
-					links: () => linksTo(new Map([[hostId, memory.client(key)]])),
-				}),
+				relay: startsOnHost(
+					createRelay({
+						engine: () => engine,
+						registry: () => engine.devices,
+						links: () => linksTo(new Map([[hostId, memory.client(key)]])),
+					}),
+					options.hostWalks ?? false,
+				),
 			}),
 			{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
 		);
@@ -254,6 +272,17 @@ export async function pairedReplicas(
 		flows: paired.flows,
 		projectOnDevice: paired.projectOnDevice,
 		pair,
+	};
+}
+
+/** A Device's relay, whose run starts reach the Host only when it walks them. */
+function startsOnHost(relay: HostRelay, hostWalks: boolean): HostRelay {
+	if (hostWalks) return relay;
+	return {
+		...relay,
+		async startRun() {
+			throw new HostUnreachableError();
+		},
 	};
 }
 

@@ -559,7 +559,6 @@ export function createEngine(
 	const space = createSpaces({
 		ready,
 		signal,
-		deviceId: device.id,
 		log: runLog,
 		runner,
 		projects,

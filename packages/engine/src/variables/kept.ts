@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { keptVariable } from "@nightshift/db/schema";
 import type { Flow, JsonValue } from "@nightshift/flows";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 /**
@@ -15,6 +15,9 @@ import type { BatchItem } from "drizzle-orm/batch";
  *
  * The run's own history of the values stays in its events (`VariablesSet`,
  * `StepEnded.variables`), so a resume reads the log, never this table.
+ * Another Replica saves them from the `StepEnded` the exchange brings
+ * (`saveKeptWrites`): a run it walks next, while its Host is away, starts
+ * from them too.
  */
 
 /** A kept value as a person sees it on the flow's page. */
@@ -116,6 +119,62 @@ export function saveKeptValues(
 					},
 				});
 		});
+}
+
+/**
+ * A step's writes of kept variables as another Replica logged them: what
+ * its `StepEnded` names (`kept`), with the time it ended.
+ */
+export type KeptWrite = {
+	flow: KeptFlow;
+	values: Readonly<Record<string, JsonValue>>;
+	runId: string;
+	stepId: string;
+	/** When the step ended, in ms since the epoch. */
+	at: number;
+};
+
+/**
+ * The statements that save the kept values of steps another Replica
+ * walked, as the exchange brings their `StepEnded`: the Replica that
+ * walks the next run starts from them. A value saved here later than the
+ * step ended stays: the latest write wins, as between two steps here.
+ */
+export function saveKeptWrites(
+	db: Database,
+	writes: readonly KeptWrite[],
+): BatchItem<"sqlite">[] {
+	return writes.flatMap((write) =>
+		Object.entries(write.values).map(([name, value]) => {
+			const json = JSON.stringify(value);
+			const updatedAt = new Date(write.at);
+			return db
+				.insert(keptVariable)
+				.values({
+					...write.flow,
+					name,
+					value: json,
+					runId: write.runId,
+					stepId: write.stepId,
+					updatedAt,
+				})
+				.onConflictDoUpdate({
+					target: [
+						keptVariable.projectId,
+						keptVariable.flowName,
+						keptVariable.name,
+					],
+					set: {
+						value: json,
+						runId: write.runId,
+						stepId: write.stepId,
+						spaceId: write.flow.spaceId,
+						updatedAt,
+					},
+					setWhere: lt(keptVariable.updatedAt, updatedAt),
+				});
+		}),
+	);
 }
 
 /** Forgets one kept value: the next run starts the variable from `initial`. */

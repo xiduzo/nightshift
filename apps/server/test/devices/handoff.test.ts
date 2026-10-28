@@ -236,17 +236,22 @@ describe("nodes on two Devices", () => {
 		expect(detail.steps[1]?.error).toContain("not committed (draft.txt)");
 	}, 90_000);
 
-	test("B walks a run with a node on A: the call goes through A, and the work moves both ways", async () => {
+	test("B starts a run with a node on A: A walks it, and the work moves both ways", async () => {
 		await flowIn(b, "visit", [
 			commits("here", "here.txt"),
 			commits("there", "there.txt", aName),
 			shell("back", "ls"),
 		]);
+		// The Host walks it: the flow B saved reaches A first.
+		await waitFor(
+			async () => (await a.client.flows.list({ projectId })).map((f) => f.name),
+			(names) => names.includes("visit"),
+		);
 		const started = await b.client.runs.start({
 			projectId,
 			flowName: "visit",
 		});
-		expect(started.walker.thisDevice).toBe(true);
+		expect(started.walker.thisDevice).toBe(false);
 		await waitFor(
 			() => runOn(b, started.id),
 			(r) => r?.status === "finished" || r?.status === "failed",

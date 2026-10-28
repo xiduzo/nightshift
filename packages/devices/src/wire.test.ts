@@ -19,6 +19,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import { deviceKeyStore } from "./links";
@@ -448,6 +449,10 @@ describe("the devices runtime across a reload", () => {
 					...client,
 					sync: {
 						...client.sync,
+						// A takes no run start here: B walks the run itself.
+						startRun: async () => {
+							throw new ORPCError("HOST_UNREACHABLE");
+						},
 						commandDone: async () => {
 							throw new TypeError("The network connection was lost.");
 						},

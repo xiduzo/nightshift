@@ -780,6 +780,12 @@ export async function beginStep(
 			// A write of a kept variable saves it for the next run, in the
 			// same batch as the step's end.
 			const keptFlow = variables ? keptFlowOf(ctx, scope) : null;
+			const keptWritten =
+				variables && keptFlow
+					? Object.keys(variables).filter((name) =>
+							keptNames(ctx.flow).has(name),
+						)
+					: [];
 			const saveKept =
 				variables && keptFlow
 					? saveKeptValues(ctx.db, keptFlow, keptNames(ctx.flow), variables, {
@@ -797,6 +803,11 @@ export async function beginStep(
 						outputs,
 						error,
 						...(variables ? { variables } : {}),
+						...(keptFlow && keptWritten.length > 0
+							? {
+									kept: { flowName: keptFlow.flowName, names: keptWritten },
+								}
+							: {}),
 						...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
 						...(extra?.costSource !== undefined
 							? { costSource: extra.costSource }
