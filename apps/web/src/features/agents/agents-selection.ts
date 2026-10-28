@@ -10,7 +10,8 @@ export type Selection =
 	| { kind: "harness"; name: HarnessRowName }
 	| { kind: "tool"; name: string }
 	| { kind: "cli"; name: string }
-	| { kind: "secrets" };
+	| { kind: "secrets" }
+	| { kind: "device"; id: string };
 
 export function parseItem(item: string | undefined): Selection | null {
 	if (!item) return null;
@@ -20,6 +21,7 @@ export function parseItem(item: string | undefined): Selection | null {
 	const name = colon === -1 ? "" : item.slice(colon + 1);
 	switch (kind) {
 		case "profile":
+		case "device":
 			return name ? { kind, id: name } : null;
 		case "harness":
 			return isHarnessName(name) ? { kind, name } : null;

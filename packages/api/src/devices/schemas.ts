@@ -2,6 +2,7 @@ import {
 	type DevicesOverview,
 	type JoinProgress,
 	type OfferView,
+	type OtherDeviceView,
 	offerCapsSchema,
 	type PairingReviewView,
 	type SpaceDeviceView,
@@ -94,6 +95,32 @@ export const spaceDeviceViewSchema = exact<SpaceDeviceView>()(
 		offers: z.array(
 			offerCapsSchema.extend({ profile: z.string(), profileName: z.string() }),
 		),
+	}),
+);
+
+/**
+ * One of the owner's other Devices, from its document: its profiles and
+ * the names of its secrets, never their values. Read-only here.
+ */
+export const otherDeviceViewSchema = exact<OtherDeviceView>()(
+	z.object({
+		id: z.string(),
+		name: z.string(),
+		/** Null when this computer cannot tell. */
+		online: z.boolean().nullable(),
+		platform: z.string().nullable(),
+		profiles: z.array(
+			z.object({
+				id: z.string(),
+				name: z.string(),
+				kind: z.enum(["agent", "model"]),
+			}),
+		),
+		secrets: z.array(
+			z.object({ name: z.string(), setAt: z.number().nullable() }),
+		),
+		/** When the Device last looked at itself. */
+		checkedAt: z.number().nullable(),
 	}),
 );
 

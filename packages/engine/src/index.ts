@@ -98,6 +98,7 @@ export {
 	secretStore,
 	settingsPatchSchema,
 	settingsSchema,
+	storedDeviceCopy,
 	storedDeviceProfiles,
 	valueStore,
 } from "./device-config";

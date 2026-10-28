@@ -103,6 +103,11 @@ export const cliToolMutations = {
 	signIn: orpc.cliTools.signIn.mutationOptions,
 };
 
+export const otherDeviceQueries = {
+	/** The owner's other Devices: their profiles and secret names, read-only here. */
+	list: () => orpc.devices.others.queryOptions(),
+};
+
 export const deciderQueries = {
 	/** The deciders of this computer: who decides a Decision node, and whether its key is set. */
 	list: () => orpc.deciders.list.queryOptions(),

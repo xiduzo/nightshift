@@ -1,12 +1,16 @@
 import type { Database } from "@nightshift/db";
 import { ydoc } from "@nightshift/db/schema";
 import { eq, like } from "drizzle-orm";
-import type * as Y from "yjs";
+import * as Y from "yjs";
 import type { DeviceProfile } from "../contract";
 import { savedSecretSchema } from "./connections";
 import { deviceDocumentName } from "./device-document";
 import { profileChoice, readProfiles } from "./profiles";
-import { openPersistedDocument, type PersistedDocument } from "./ydoc";
+import {
+	documentRows,
+	openPersistedDocument,
+	type PersistedDocument,
+} from "./ydoc";
 
 /**
  * Copies of the Device documents of this computer's owner's other
@@ -172,4 +176,24 @@ function readCopy(deviceId: string, doc: Y.Doc): DeviceCopy {
 		secrets: secrets.sort((a, b) => a.name.localeCompare(b.name)),
 		checkedAt: typeof checkedAt === "number" ? checkedAt : null,
 	};
+}
+
+/**
+ * What a Host's Device document of a Device whose home Host it is says of
+ * that Device (the document it keeps, `device:<id>`). Null when it keeps
+ * none.
+ */
+export async function storedDeviceCopy(
+	db: Database,
+	deviceId: string,
+): Promise<DeviceCopy | null> {
+	const state = await documentRows(db).fetch(deviceDocumentName(deviceId));
+	if (!state) return null;
+	const doc = new Y.Doc();
+	try {
+		Y.applyUpdate(doc, state);
+		return readCopy(deviceId, doc);
+	} finally {
+		doc.destroy();
+	}
 }

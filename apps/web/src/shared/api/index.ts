@@ -69,6 +69,7 @@ export type {
 	McpServer,
 	McpTestResult,
 	ModelProfileRow,
+	OtherDevice,
 	Outcome,
 	PermissionMode,
 	ProfileRow,

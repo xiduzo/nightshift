@@ -71,3 +71,64 @@ describe("the phones on a Host this computer joined", () => {
 		await expect(devices.phonesAt("h2")).rejects.toThrow();
 	});
 });
+
+describe("the owner's other Devices", () => {
+	const copy = (deviceId: string, name: string | null) => ({
+		deviceId,
+		name,
+		platform: "darwin",
+		profiles: [{ id: "p-1", name: "builder", kind: "agent" as const }],
+		secrets: [{ name: "GH_TOKEN", setAt: 1 }],
+		checkedAt: 2,
+	});
+	const paired = (id: string, fields: object = {}) => ({
+		id,
+		name: id,
+		platform: "linux",
+		ownerId: "ada",
+		homeHost: "https://studio.invalid",
+		lastSeenAt: null,
+		online: true,
+		pairedAt: 0,
+		revokedAt: null,
+		...fields,
+	});
+
+	test("on a Host, its home Devices from the documents it keeps; on a Device, the copies; never this computer", async () => {
+		const devices = createDevices({
+			self: { id: "this-one", name: "Studio", platform: "linux" },
+			host: {
+				registry: {
+					list: async () => [
+						paired("desktop"),
+						paired("guest-only", { homeHost: null }),
+						paired("removed", { revokedAt: 5 }),
+						paired("never-synced"),
+					],
+				},
+			},
+			keptDocument: async (id: string) =>
+				id === "never-synced" ? null : copy(id, "reported"),
+			copies: {
+				list: async () => [
+					copy("desktop", "Desktop"),
+					copy("laptop", null),
+					copy("this-one", "Studio"),
+				],
+			},
+		} as unknown as Parameters<typeof createDevices>[0]);
+
+		expect(await devices.others("ada")).toEqual([
+			expect.objectContaining({ id: "desktop", name: "desktop", online: true }),
+			{
+				id: "laptop",
+				name: "Device",
+				online: null,
+				platform: "darwin",
+				profiles: [{ id: "p-1", name: "builder", kind: "agent" }],
+				secrets: [{ name: "GH_TOKEN", setAt: 1 }],
+				checkedAt: 2,
+			},
+		]);
+	});
+});

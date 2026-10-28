@@ -122,6 +122,21 @@ describe("two Devices", () => {
 			() => copyOn(b, aId),
 			(copied) => copied,
 		);
+		// Each shows the other among its owner's other devices, read-only.
+		const aName = (await a.client.devices.list()).thisComputer?.name;
+		const othersOnB = await waitFor(
+			() => b.client.devices.others(),
+			(others) => others.some((d) => d.id === aId && d.name === aName),
+		);
+		expect(othersOnB.map((d) => d.id)).toEqual([aId]);
+		// A stores B's document a moment after it changes.
+		const othersOnA = await waitFor(
+			() => a.client.devices.others(),
+			(others) => others.length > 0,
+		);
+		expect(othersOnA).toEqual([
+			expect.objectContaining({ id: bId, online: true, secrets: [] }),
+		]);
 
 		// A's Person removes B's access: B's link ends, and B's copy goes.
 		await a.client.devices.revoke({ deviceId: bId });

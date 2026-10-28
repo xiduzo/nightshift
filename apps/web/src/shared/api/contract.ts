@@ -35,5 +35,8 @@ export type CliTool = ApiOutputs["cliTools"]["list"][number];
 export type CheckTarget = ApiInputs["connections"]["check"]["target"];
 export type McpTestResult = ApiOutputs["connections"]["test"];
 
+/** One of the owner's other Devices: its profiles and secret names, read-only. */
+export type OtherDevice = ApiOutputs["devices"]["others"][number];
+
 /** The settings of this computer, their fields and their defaults. */
 export type SettingsView = ApiOutputs["settings"]["get"];

@@ -30,6 +30,7 @@ import type {
 	CliTool,
 	Connection,
 	ModelProfileRow,
+	OtherDevice,
 	ProfileRow,
 } from "@/shared/api";
 import { SiteHeader } from "@/shared/page";
@@ -48,13 +49,15 @@ import {
 	connectionQueries,
 	deciderQueries,
 	harnessQueries,
+	otherDeviceQueries,
 	profileQueries,
 } from "./queries";
 import { ToolPicker } from "./tool-detail";
 
 /**
  * The Agents page: Agent Profiles, the harnesses they run on, the tools they
- * hand out, and the secrets those tools read, all on this computer. The
+ * hand out, and the secrets those tools read, all on this computer. Your
+ * other devices show their profiles and secret names, read-only. The
  * selected thing opens on the left; the list sits in a card on the right,
  * like the flow inspector. Each pane scrolls on its own.
  */
@@ -70,6 +73,7 @@ export function AgentsPage({
 	const tools = useQuery(connectionQueries.list());
 	const cliTools = useQuery(cliToolQueries.list());
 	const settings = useQuery(settingsQueries.get());
+	const otherDevices = useQuery(otherDeviceQueries.list());
 	const [picking, setPicking] = useState<"harness" | "tool" | null>(null);
 	const [editing, setEditing] = useState<{
 		open: boolean;
@@ -187,6 +191,7 @@ export function AgentsPage({
 								cliTools: cliTools.data ?? [],
 								secrets,
 								settings: settings.data,
+								otherDevices: otherDevices.data ?? [],
 							}}
 						/>
 					)}
@@ -342,6 +347,22 @@ export function AgentsPage({
 										})
 									)}
 								</Group>
+								{(otherDevices.data ?? []).length > 0 ? (
+									<Group
+										title="Your other devices"
+										count={otherDevices.data?.length}
+									>
+										{(otherDevices.data ?? []).map((d) => (
+											<ListItem
+												key={d.id}
+												selected={isSel({ kind: "device", id: d.id })}
+												onClick={() => select({ kind: "device", id: d.id })}
+												title={d.name}
+												description={deviceSummary(d)}
+											/>
+										))}
+									</Group>
+								) : null}
 								<Separator />
 								<div className="p-2">
 									<ListItem
@@ -451,4 +472,11 @@ function UsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {
 				: `In ${usedBy.length} ${usedBy.length === 1 ? "flow" : "flows"}`}
 		</span>
 	);
+}
+
+/** What a list row says of another device: how many profiles and secrets it has. */
+function deviceSummary(device: OtherDevice): string {
+	const profiles = device.profiles.length;
+	const secrets = device.secrets.length;
+	return `${profiles} ${profiles === 1 ? "profile" : "profiles"} · ${secrets} ${secrets === 1 ? "secret" : "secrets"}`;
 }
