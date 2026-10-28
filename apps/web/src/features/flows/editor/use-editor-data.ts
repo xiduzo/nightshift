@@ -2,13 +2,14 @@ import { type ProfileRef, policyFromSettings } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { connectionQueries } from "@/features/agents";
+import { runQueries } from "@/features/runs/queries";
 import { settingsQueries } from "@/features/settings/queries";
 import { useProjectFlows } from "../use-project-flows";
 
 /**
  * What the editor reads besides the draft: the project's other flows, the
- * settings (new-node defaults, run policy), the connections and the Agent
- * Profiles. Each part is undefined while it loads. A node's Device field
+ * settings (new-node defaults, run policy), the connections and each
+ * Device's profiles a node may name. Each part is undefined while it loads. A node's Device field
  * asks for the devices that node may name itself.
  */
 export function useEditorData(projectId: string, name: string) {
@@ -27,7 +28,26 @@ export function useEditorData(projectId: string, name: string) {
 		() => connections?.map((connection) => connection.name),
 		[connections],
 	);
-	const profileRefs: readonly ProfileRef[] | undefined = undefined;
+	// Every Device's profiles a node may name, as the Host lists them.
+	const devices = useQuery({
+		...runQueries.devices(projectId),
+		meta: { quietErrors: true },
+	});
+	const profileRefs = useMemo(
+		() =>
+			devices.data && {
+				known: devices.data.flatMap((device): ProfileRef[] =>
+					(device.profiles ?? []).map((profile) => ({
+						device: device.deviceId,
+						profile: profile.id,
+					})),
+				),
+				untoldDevices: devices.data
+					.filter((device) => device.profiles === undefined)
+					.map((device) => device.deviceId),
+			},
+		[devices.data],
+	);
 	return {
 		projectFlows,
 		nodeDefaults,

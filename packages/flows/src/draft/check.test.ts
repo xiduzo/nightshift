@@ -56,6 +56,15 @@ describe("checkDraft", () => {
 		});
 	});
 
+	test("a profile on a Device whose profiles this computer cannot tell is not marked", () => {
+		const issues = checkDraft(flow, messages, {
+			connections: ["github"],
+			profiles: [],
+			untoldDevices: ["mac"],
+		}).issues.map((i) => i.message);
+		expect(issues).not.toContain("profile night");
+	});
+
 	test("a Decision by a model names a profile too; by a person it reads none", () => {
 		const decision = {
 			id: "pick",
