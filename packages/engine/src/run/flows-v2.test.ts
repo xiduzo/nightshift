@@ -143,7 +143,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -1261,7 +1261,7 @@ describe("flow format 1", () => {
 			inputs: { epic: "7" },
 		});
 		const loaded = await engine.getRun(runId);
-		expect(loaded.flow.version).toBe(6);
+		expect(loaded.flow.version).toBe(7);
 		expect(loaded.flow.inputs).toEqual([
 			expect.objectContaining({ name: "epic", type: "text", required: true }),
 		]);

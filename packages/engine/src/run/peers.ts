@@ -85,8 +85,8 @@ export type PeerContext = {
 	walks: WalkFiles;
 	documents: SpaceDocuments;
 	now(): number;
-	/** An Agent Profile of this computer by name (`EngineOptions.profileFor`). */
-	profileFor?: (name: string) => ProfileSettings | null;
+	/** A profile of this computer by its id (`EngineOptions.profileFor`). */
+	profileFor?: (id: string) => ProfileSettings | null;
 	/** The project's flows, from this Replica's flow document: what a run starts from. */
 	flows(projectId: string): Promise<FlowSources>;
 	/** Resolves when the engine is ready. */

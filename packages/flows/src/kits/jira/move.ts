@@ -2,7 +2,7 @@ import type { FlowInput } from "../../document";
 
 /** `kit:jira/move`: moves a Jira work item to another status, with the Atlassian CLI (`acli`). */
 export const jiraMoveKit: FlowInput = {
-	version: 6,
+	version: 7,
 	description:
 		"Moves a Jira work item to another status, for example In Progress. Needs the Atlassian CLI, signed in.",
 	inputs: [

@@ -2,10 +2,9 @@ import {
 	type Flow,
 	type FlowNode,
 	type FlowSources,
-	type ProfileIssue,
+	isProfileRef,
+	type ProfileRef,
 	type ProfileSettings,
-	type ProfilesSource,
-	parseProfilesSource,
 	profileOf,
 	resolveNodeProfile,
 } from "@nightshift/flows";
@@ -18,23 +17,20 @@ import type { PlacedDevice, PlannedRun } from "./peers";
 
 /**
  * The node walk of a run's plan: where each node runs, and its profile.
- * The Placement rule is written once here: a node's `device`, else its
- * profile's Device (the run's Device when it has the profile or the
- * project has it, else this computer when only it has it), else the run's
- * Device. Who the Devices are (the Person's own or offered, online, by
- * name) is the caller's: the devices' planner (`PlacementPort.plan`)
- * passes its lookups, and so does the engine's own fake of a computer
- * alone.
+ * The Placement rule is written once here: a node's profile names its
+ * Device (ADR 3), else the node's `device`, else the run's Device. Who the
+ * Devices are (the Person's own or offered, online, by id or by name) is
+ * the caller's: the devices' planner (`PlacementPort.plan`) passes its
+ * lookups, and so does the engine's own fake of a computer alone.
  *
  * A profile is an Agent Profile for an Agent node, or a Model Profile for
- * a Decision or a Value decided by a model. A Device's own profile of a
- * name wins over the project's (`.nightshift/profiles.json` in the run's
- * Clone), so a person can change a project's profile on their computer.
+ * a Decision or a Value decided by a model. The run finds it on its own
+ * Device, by its id: never another Device's profile of the same name.
  */
 
 /** What the node walk asks of the Devices a run may use. */
 export type PlanDevices = {
-	/** This computer: the Walker, and where a profile only it has runs. */
+	/** This computer: the Walker. */
 	walker: PlacedDevice;
 	/**
 	 * The run's Device by its id: this computer (`walker`), or another
@@ -49,8 +45,15 @@ export type PlanDevices = {
 	 * steps wait for it. Throws a refusal of its own (two of that name).
 	 */
 	byName(name: string): Promise<PlacedDevice | null>;
-	/** A profile of this computer by name, or null. */
-	profileFor(name: string): ProfileSettings | null;
+	/**
+	 * The Device a node's profile belongs to, by its id: this computer, one
+	 * of the Person's other Devices, or another Person's through its Offers.
+	 * Null when the Person cannot use a Device of that id in the Space. An
+	 * offline one is `offline`. Throws a refusal of its own.
+	 */
+	profileDevice(id: string): Promise<PlacedDevice | null>;
+	/** A profile of this computer by its id, or null. */
+	profileFor(id: string): ProfileSettings | null;
 	/** The project's flows, from this Replica's flow document. */
 	flows(projectId: string): Promise<FlowSources>;
 };
@@ -69,55 +72,29 @@ const planned = (at: PlacedDevice): PlannedDevice => ({
 	name: at.name,
 });
 
-/** The project's profiles, from the profiles file of the run's Clone. */
-type ProjectProfileSet = {
-	byName: Record<string, ProfileSettings>;
-	/** Why the file gives fewer profiles than it holds. */
-	issues: ProfileIssue[];
-};
-
-/**
- * Reads the project's profiles from the run's Device. A Device that cannot
- * answer (one from before project profiles) gives none.
- */
-async function projectProfiles(
-	run: PlacedDevice,
-	projectId: string,
-): Promise<ProjectProfileSet> {
-	let source: ProfilesSource = null;
-	try {
-		source = await run.device.projectProfiles(projectId);
-	} catch {
-		// None: the flows came from this Clone, so it answers when it can.
-	}
-	const { profiles, issues } = parseProfilesSource(source);
-	return {
-		byName: Object.fromEntries(
-			profiles.map(({ name, description: _description, ...settings }) => [
-				name,
-				settings,
-			]),
-		),
-		issues,
-	};
+/** The words of a profile in a refusal: an old profile's id is its name. */
+function profileWords(ref: ProfileRef): string {
+	return /^[a-z][a-z0-9_]{0,39}$/.test(ref.profile)
+		? `the profile "${ref.profile}"`
+		: "a profile";
 }
 
 /**
  * Where each node runs, and its profile. Returns the flows with their
- * profiles resolved, a node that runs on this computer for its profile
- * named so, and the Devices by name.
+ * profiles resolved, each node with a profile placed on the profile's
+ * Device (named so in the run's copy), and the Devices by name.
  */
 async function placeNodes(
 	flows: readonly Flow[],
 	runDevice: PlacedDevice,
 	devices: PlanDevices,
-	project: ProjectProfileSet,
 ): Promise<{ flows: Flow[]; named: Map<string, PlacedDevice> }> {
 	const nodes = flows.flatMap((f) => f.nodes);
 	const named = new Map<string, PlacedDevice>();
 	for (const node of nodes) {
 		const name = namedDevice(node);
 		if (name === undefined || named.has(name)) continue;
+		if (isProfileRef(profileOf(node))) continue;
 		if (name === runDevice.name) {
 			named.set(name, runDevice);
 			continue;
@@ -132,119 +109,109 @@ async function placeNodes(
 		named.set(name, found);
 	}
 
-	// The profiles each Device is asked for: a node's own Device, else the
-	// run's, with this computer as the fallback.
-	const walker = devices.walker.id !== runDevice.id ? devices.walker : null;
-	const wanted = new Map<PlacedDevice, Set<string>>();
-	const want = (at: PlacedDevice, profile: string) => {
-		const set = wanted.get(at) ?? new Set();
-		set.add(profile);
-		wanted.set(at, set);
-	};
-	// Another Person's Device resolves its offered profiles itself.
-	const fallback =
-		walker && !walker.offered && !runDevice.offered ? walker : null;
+	// The Device of each profile, by its id: null when the Space has none.
+	const owners = new Map<string, PlacedDevice | null>();
 	for (const node of nodes) {
-		const profile = profileOf(node);
-		if (profile === undefined) continue;
-		const name = namedDevice(node);
-		const at =
-			name !== undefined ? (named.get(name) as PlacedDevice) : runDevice;
-		if (!at.offered) want(at, profile);
-		if (name === undefined && fallback) want(fallback, profile);
+		const ref = profileOf(node);
+		if (!isProfileRef(ref) || owners.has(ref.device)) continue;
+		owners.set(
+			ref.device,
+			ref.device === runDevice.id
+				? runDevice
+				: ref.device === devices.walker.id
+					? devices.walker
+					: await devices.profileDevice(ref.device),
+		);
+	}
+	const wanted = new Map<PlacedDevice, Set<string>>();
+	for (const node of nodes) {
+		const ref = profileOf(node);
+		if (!isProfileRef(ref)) continue;
+		const at = owners.get(ref.device);
+		// Another Person's Device resolves its offered profiles itself.
+		if (!at || at.offered || at.offline) continue;
+		const set = wanted.get(at) ?? new Set();
+		set.add(ref.profile);
+		wanted.set(at, set);
 	}
 	const found = new Map<PlacedDevice, Record<string, ProfileSettings>>();
-	for (const [at, names] of wanted) {
-		// An offline Device cannot say which profiles it has.
-		if (at.offline) continue;
+	for (const [at, ids] of wanted) {
 		found.set(
 			at,
 			at.thisDevice
 				? Object.fromEntries(
-						[...names].flatMap((n) => {
-							const profile = devices.profileFor(n);
-							return profile ? [[n, profile]] : [];
+						[...ids].flatMap((id) => {
+							const profile = devices.profileFor(id);
+							return profile ? [[id, profile]] : [];
 						}),
 					)
-				: (await at.device.capabilities({ profiles: [...names] })).profiles,
+				: (await at.device.capabilities({ profiles: [...ids] })).profiles,
 		);
 	}
 
-	const missing = new Map<string, { nodeIds: string[]; on: string | null }>();
-	const miss = (profile: string, nodeId: string, on: string | null) => {
-		const key = `${profile}\u0000${on ?? ""}`;
-		const entry = missing.get(key) ?? { nodeIds: [], on };
-		if (!entry.nodeIds.includes(nodeId)) entry.nodeIds.push(nodeId);
-		missing.set(key, entry);
+	const problems = new Map<string, string[]>();
+	const problem = (words: string, nodeId: string) => {
+		const ids = problems.get(words) ?? [];
+		if (!ids.includes(nodeId)) ids.push(nodeId);
+		problems.set(words, ids);
 	};
 	// A profile that does not fit its node: an Agent on a Model Profile, a
 	// Decision on an Agent Profile, a Value on a decider that cannot make one.
 	const misfits: string[] = [];
 	const offlineProfiles: string[] = [];
-	const resolve = (node: FlowNode, profile: ProfileSettings): FlowNode => {
-		const resolved = resolveNodeProfile(node, profile);
-		if ("node" in resolved) return resolved.node;
-		if (!misfits.includes(resolved.problem)) misfits.push(resolved.problem);
-		return node;
-	};
 	const placed = flows.map((flow) => ({
 		...flow,
 		nodes: flow.nodes.map((node): FlowNode => {
-			const profile = profileOf(node);
-			if (profile === undefined) return node;
-			const fromProject = Object.hasOwn(project.byName, profile)
-				? project.byName[profile]
-				: undefined;
-			const name = namedDevice(node);
-			const placedAt =
-				name !== undefined ? (named.get(name) as PlacedDevice) : runDevice;
+			const ref = profileOf(node);
+			if (!isProfileRef(ref)) return node;
+			const at = owners.get(ref.device);
+			if (!at) {
+				problem(
+					`The flow uses ${profileWords(ref)} of a device that is no longer in this Space`,
+					node.id,
+				);
+				return node;
+			}
+			const onIt = { ...node, device: at.name } as FlowNode;
 			// Offered: the run's copy never holds the profile's settings.
-			if (placedAt.offered) return node;
-			if (name !== undefined) {
-				const at = named.get(name) as PlacedDevice;
-				const settings = found.get(at)?.[profile] ?? fromProject;
-				if (!settings && at.offline) {
-					offlineProfiles.push(
-						`${at.name} is offline, so Night Shift cannot find its profile "${profile}" (${node.id}). Start the run when it is online.`,
-					);
-					return node;
-				}
-				if (!settings) {
-					miss(profile, node.id, at.thisDevice ? null : at.name);
-					return node;
-				}
-				return resolve(node, settings);
+			if (at.offered) {
+				named.set(at.name, at);
+				return onIt;
 			}
-			const own = found.get(runDevice)?.[profile];
-			if (own) return resolve(node, own);
-			// The project's profile runs on the run's Device: it has the project.
-			if (fromProject) return resolve(node, fromProject);
-			const here = fallback ? found.get(fallback)?.[profile] : undefined;
-			if (fallback && here) {
-				// The profile's Device: only this computer has it.
-				named.set(fallback.name, fallback);
-				return { ...resolve(node, here), device: fallback.name } as FlowNode;
+			if (at.offline) {
+				offlineProfiles.push(
+					`${at.name} is offline, so Night Shift cannot find its profile for "${node.id}". Start the run when it is online.`,
+				);
+				return node;
 			}
-			miss(profile, node.id, runDevice.thisDevice ? null : runDevice.name);
-			return node;
+			const settings = found.get(at)?.[ref.profile];
+			if (!settings) {
+				problem(
+					`The flow uses ${profileWords(ref)} on ${at.name}, but ${at.name} has no such profile`,
+					node.id,
+				);
+				return node;
+			}
+			const resolved = resolveNodeProfile(onIt, settings);
+			if ("problem" in resolved) {
+				if (!misfits.includes(resolved.problem)) {
+					misfits.push(resolved.problem);
+				}
+				return node;
+			}
+			named.set(at.name, at);
+			return resolved.node;
 		}),
 	}));
-	if (missing.size > 0) {
-		// A broken profiles file explains a profile the project should have.
-		const fileProblem =
-			project.issues.length > 0
-				? ` The project's profiles have a problem: ${project.issues.map((i) => i.message).join(" ")}`
-				: "";
+	if (problems.size > 0) {
 		throw new Refusal(
 			"invalid",
-			[...missing]
-				.map(([key, { nodeIds, on }]) => {
-					const name = key.split("\u0000")[0];
-					return on === null
-						? `The flow uses the profile "${name}" (${nodeIds.join(", ")}), but no profile has that name. Add it under Agents, or to the project's profiles.`
-						: `The flow uses the profile "${name}" (${nodeIds.join(", ")}) on ${on}, but that device has no profile of that name. Add it under Agents, or to the project's profiles.`;
-				})
-				.join(" ") + fileProblem,
+			[...problems]
+				.map(
+					([words, nodeIds]) =>
+						`${words} (${nodeIds.join(", ")}). Pick another profile.`,
+				)
+				.join(" "),
 		);
 	}
 	if (misfits.length > 0) throw new Refusal("invalid", misfits.join(" "));
@@ -289,7 +256,6 @@ export async function planNodes(
 		[loaded.flow, ...Object.values(loaded.calledFlows)],
 		run,
 		devices,
-		await projectProfiles(run, start.projectId),
 	);
 	const [flow, ...called] = flows as [Flow, ...Flow[]];
 	const groups = new Map<PlacedDevice, FlowNode[]>();

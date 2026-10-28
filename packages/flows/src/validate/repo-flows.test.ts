@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { FLOW_VERSION, type Flow } from "../document";
+import type { Flow, FlowMigration } from "../document";
+import { isProfileRef } from "../nodes";
 import { parseProfilesSource, profileOf } from "../profiles";
 import { schedulesFileSchema, validateSchedules } from "../schedules";
 import { parseFlow, validateFlow } from "./flow";
@@ -22,6 +23,17 @@ const nightshiftDir = join(
 );
 const flowsDir = join(nightshiftDir, "flows");
 
+/**
+ * The import of a project folder on this computer: it gives the project's
+ * profiles to this computer under their names, so every name a node of
+ * format 6 gives finds its profile here.
+ */
+const importedHere: FlowMigration = {
+	deviceId: "this-computer",
+	deviceIdByName: () => null,
+	profileIdByName: (_device, name) => name,
+};
+
 /** Flows a person drew in the editor while trying it out: kept as they are, not checked. */
 const SCRATCH = new Set(["sadfsdf"]);
 
@@ -35,7 +47,7 @@ const parsed = readdirSync(flowsDir)
 	.sort()
 	.map((name) => {
 		const raw = readJson(join(flowsDir, `${name}.json`));
-		return { name, raw, ...parseFlow(raw) };
+		return { name, raw, ...parseFlow(raw, { migration: importedHere }) };
 	});
 const flows: Record<string, Flow | null> = Object.fromEntries(
 	parsed.map(({ name, flow }) => [name, flow]),
@@ -51,8 +63,8 @@ describe("Night Shift's own flows", () => {
 	});
 
 	for (const { name, raw, flow, issues } of parsed) {
-		test(`${name}.json is version ${FLOW_VERSION} and parses`, () => {
-			expect((raw as { version?: unknown }).version).toBe(FLOW_VERSION);
+		test(`${name}.json is format 6, the last one in a project folder, and parses`, () => {
+			expect((raw as { version?: unknown }).version).toBe(6);
 			expect(flow === null ? issues : []).toEqual([]);
 		});
 
@@ -69,7 +81,10 @@ describe("Night Shift's own flows", () => {
 		expect(issues).toEqual([]);
 		const names = new Set(profiles.map((profile) => profile.name));
 		const named = parsed.flatMap(({ flow }) =>
-			(flow?.nodes ?? []).flatMap((node) => profileOf(node) ?? []),
+			(flow?.nodes ?? []).flatMap((node) => {
+				const profile = profileOf(node);
+				return isProfileRef(profile) ? [profile.profile] : [];
+			}),
 		);
 		expect(named.filter((profile) => !names.has(profile))).toEqual([]);
 	});

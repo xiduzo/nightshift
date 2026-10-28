@@ -54,7 +54,7 @@ const gate: DecisionNode = {
 };
 
 const flowOf = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow => ({
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",

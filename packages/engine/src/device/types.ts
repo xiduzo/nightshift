@@ -116,7 +116,7 @@ export type DeviceState = { online: boolean };
 export type CapabilityQuery = {
 	/** The programs to look for on the Device (CLI tools by name). */
 	programs?: readonly string[];
-	/** The profiles (Agent and Model Profiles) to look up on the Device, by name. */
+	/** The profiles (Agent and Model Profiles) to look up on the Device, by id. */
 	profiles?: readonly string[];
 };
 
@@ -134,7 +134,7 @@ export type Capabilities = {
 	clis: string[];
 	/** Where each asked program is on the Device, or null when it has none. */
 	programs: Record<string, string | null>;
-	/** The asked profiles the Device defines, by name; one it lacks is left out. */
+	/** The asked profiles the Device defines, by id; one it lacks is left out. */
 	profiles: Record<string, ProfileSettings>;
 	/** The decider, when one is configured. */
 	decider: DeciderFacts | null;

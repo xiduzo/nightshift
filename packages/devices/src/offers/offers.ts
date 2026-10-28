@@ -9,6 +9,7 @@ import type {
 import {
 	type AgentNode,
 	type FlowNode,
+	isProfileRef,
 	nameSchema,
 	type permissionModeSchema,
 } from "@nightshift/flows";
@@ -275,6 +276,20 @@ export function offerTakes(
 	return mayUse && node.profile !== undefined && offers.includes(node.profile);
 }
 
+/**
+ * The Offer of a profile, by the profile's id, as a node names it, or by
+ * its name, as a Walker of an older Night Shift names it.
+ */
+export function offerFor<O extends { profile: string; profileName: string }>(
+	offers: readonly O[],
+	profile: string,
+): O | undefined {
+	return (
+		offers.find((o) => o.profile === profile) ??
+		offers.find((o) => o.profileName === profile)
+	);
+}
+
 /** The refusal of a run on another Person's Device that offers nothing to the Space. */
 export function offersNothing(deviceName: string): string {
 	return `${deviceName} is not your device. It offers nothing to this Space. A run can use your own devices, or a profile another person offers to this Space.`;
@@ -304,12 +319,14 @@ export function offerRefusal(
 	}
 	for (const node of nodes) {
 		if (node.type !== "agent") continue;
-		// A flow names a profile by its name.
-		const offer = offers.find((o) => o.profileName === node.profile);
-		if (node.profile === undefined || !offer) {
-			return node.profile === undefined
+		const profile = node.profile;
+		const offer = isProfileRef(profile)
+			? offers.find((o) => o.profile === profile.profile)
+			: undefined;
+		if (profile === undefined || !offer) {
+			return profile === undefined
 				? `The Agent node "${node.id}" names no profile. ${offersNothingOr(deviceName, offers)}`
-				: `${offersNothingOr(deviceName, offers, node.profile)} Change the profile of "${node.id}".`;
+				: `${offersNothingOr(deviceName, offers)} Change the profile of "${node.id}".`;
 		}
 		const own = OWN_SETTINGS.filter((field) => node[field] !== undefined);
 		if (own.length > 0) {

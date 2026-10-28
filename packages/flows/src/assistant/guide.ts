@@ -51,6 +51,9 @@ function parsed(node: NodeInput): FlowNode {
 	return flow.nodes[0] as FlowNode;
 }
 
+/** The id of the Device that the profiles of the examples belong to. */
+const EXAMPLE_DEVICE = "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f";
+
 /**
  * One small, valid node per type: the guide shows it, and reads the type's
  * fixed outcomes from it. `satisfies` keeps the list complete.
@@ -60,7 +63,7 @@ export const sampleNodes = {
 		id: "build",
 		type: "agent",
 		position: at,
-		profile: "worker",
+		profile: { device: EXAMPLE_DEVICE, profile: "worker" },
 		prompt: "Build {{task}}. Earlier failures: {{vars.failures}}",
 		output: {
 			type: "object",
@@ -198,7 +201,7 @@ export const fixLoopExample: FlowInput = {
 			id: "build",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: EXAMPLE_DEVICE, profile: "worker" },
 			prompt: "Implement {{task}}. Report what you changed.",
 			set: [{ variable: "summary", value: "{{build.summary}}" }],
 		},
@@ -219,7 +222,7 @@ export const fixLoopExample: FlowInput = {
 			id: "fix",
 			type: "agent",
 			position: { x: 300, y: 200 },
-			profile: "worker",
+			profile: { device: EXAMPLE_DEVICE, profile: "worker" },
 			prompt:
 				"The tests fail:\n{{check.log_tail}}\nEarlier failures: {{vars.failures}}\nFix the code, not the tests.",
 			set: [{ variable: "summary", value: "{{fix.summary}}" }],
@@ -268,7 +271,7 @@ export const planEachExample: FlowInput = {
 			id: "plan",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "planner",
+			profile: { device: EXAMPLE_DEVICE, profile: "planner" },
 			prompt: "Split {{feature}} into small tasks. Change no files.",
 			outcomes: [
 				{ name: "planned", description: "The tasks are ready." },
@@ -319,7 +322,7 @@ export const planEachExample: FlowInput = {
 			id: "report",
 			type: "agent",
 			position: { x: 900, y: 0 },
-			profile: "worker",
+			profile: { device: EXAMPLE_DEVICE, profile: "worker" },
 			prompt:
 				"These tasks failed:\n{{build_all.summary}}\nWrite a short report for the team.",
 		},
@@ -436,7 +439,7 @@ A webhook schedule wakes \`wait-for-checks\` when CI is done: \`signal: { name: 
 
 ## Profiles
 
-An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, …) is for Agents, a Model Profile (\`decider\`, optional \`model\`) for a Decision or a Value by a model. The node's own fields win. Profiles live on a computer: \`list_profiles\` gives them by name.
+An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, …) is for Agents, a Model Profile (\`decider\`, optional \`model\`) for a Decision or a Value by a model. A profile belongs to one computer. A node names both by id, as \`list_profiles\` gives them: \`"profile": { "device": "<id>", "profile": "<id>" }\`. The step runs there, so the node has no \`device\`. The node's own fields win.
 
 ## Sections
 
@@ -445,7 +448,7 @@ An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, �
 ## Checklist
 
 - \`version\` is ${FLOW_VERSION}, \`start\` names a node, every edge connects known nodes on an outcome its source can end with.
-- Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names.
+- Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with \`max\`.
 - Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
 

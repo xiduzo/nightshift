@@ -23,7 +23,7 @@ import {
 } from "./tools";
 
 const draft: Flow = flowSchema.parse({
-	version: 6,
+	version: 7,
 	inputs: [{ name: "issue", type: "text" }],
 	start: "build",
 	nodes: [
@@ -31,7 +31,7 @@ const draft: Flow = flowSchema.parse({
 			id: "build",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Fix {{issue}}.",
 		},
 	],
@@ -144,7 +144,7 @@ describe("authoringTools", () => {
 			"error:",
 		);
 		expect(await call(tools, "check_flow", { flow: broken })).toContain(
-			'error: Neither this computer nor the project has a profile "ghost"',
+			'error: Agent node "build" names the profile "ghost", but Night Shift cannot tell which computer\'s profile it is.',
 		);
 	});
 

@@ -35,6 +35,7 @@ export {
 	variableTypeSchema,
 } from "./flow";
 export {
+	type FlowMigration,
 	migrateFlow,
 	migrateToolSets,
 } from "./migrate";

@@ -1,5 +1,6 @@
 /** Checks a draft: the schema, the connections and profiles it names, and `validateFlow`. */
 import { type Flow, flowSchema } from "../document";
+import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 import { validateFlow } from "../validate";
@@ -23,8 +24,8 @@ export type DraftMessages = {
 	schemaIssue: (flow: Flow, issue: DraftSchemaIssue) => string;
 	/** A connection the node names that this computer does not have. */
 	missingConnection: (name: string) => string;
-	/** A profile the node names that neither this computer nor the project has. */
-	missingProfile: (name: string) => string;
+	/** A profile the node names that its Device does not have, as far as this computer knows. */
+	missingProfile: (profile: ProfileRef) => string;
 };
 
 export type DraftCheckOptions = {
@@ -34,8 +35,11 @@ export type DraftCheckOptions = {
 	name?: string;
 	/** The names of the connections. Leave it out while they load. */
 	connections?: readonly string[];
-	/** The names of the profiles, this computer's and the project's. Leave it out while they load. */
-	profiles?: readonly string[];
+	/**
+	 * The profiles a node may name: each Device's that this computer knows
+	 * of. Leave it out while they load.
+	 */
+	profiles?: readonly ProfileRef[];
 };
 
 /**
@@ -88,7 +92,9 @@ export function checkDraft(
 	if (profiles) {
 		for (const node of flow.nodes) {
 			const profile = profileOf(node);
-			if (profile === undefined || profiles.includes(profile)) continue;
+			// A name left from format 6: `validateFlow` asks to pick it again.
+			if (!isProfileRef(profile)) continue;
+			if (profiles.some((known) => sameProfileRef(known, profile))) continue;
 			issues.push({
 				severity: "error",
 				message: messages.missingProfile(profile),

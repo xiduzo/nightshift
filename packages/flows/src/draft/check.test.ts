@@ -6,7 +6,7 @@ import { agentNode, commandNode } from "./nodes";
 const messages: DraftMessages = {
 	schemaIssue: (_flow, issue) => `schema ${issue.path.map(String).join(".")}`,
 	missingConnection: (name) => `connection ${name}`,
-	missingProfile: (name) => `profile ${name}`,
+	missingProfile: (profile) => `profile ${profile.profile}`,
 };
 
 const flow: Flow = {
@@ -19,7 +19,7 @@ const flow: Flow = {
 			...agentNode("worker", { x: 0, y: 0 }),
 			prompt: "Work.",
 			connections: ["github"],
-			profile: "night",
+			profile: { device: "mac", profile: "night" },
 		},
 		{ ...commandNode("check", { x: 0, y: 0 }), command: "" },
 	],
@@ -42,7 +42,7 @@ describe("checkDraft", () => {
 		expect(loading).not.toContain("connection github");
 		const loaded = checkDraft(flow, messages, {
 			connections: [],
-			profiles: ["day"],
+			profiles: [{ device: "mac", profile: "day" }],
 		}).issues;
 		expect(loaded).toContainEqual({
 			severity: "error",
@@ -64,13 +64,13 @@ describe("checkDraft", () => {
 			prompt: "Go?",
 			options: [{ name: "yes" }],
 			by: "model" as const,
-			profile: "small",
+			profile: { device: "mac", profile: "small" },
 		};
 		const check = (by: "model" | "person") =>
 			checkDraft(
 				{ ...flow, nodes: [{ ...decision, by }], start: "pick" },
 				messages,
-				{ profiles: ["day"] },
+				{ profiles: [{ device: "mac", profile: "day" }] },
 			).issues.map((i) => i.message);
 		expect(check("model")).toContain("profile small");
 		expect(check("person")).not.toContain("profile small");

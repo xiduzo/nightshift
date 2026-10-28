@@ -23,6 +23,7 @@ import {
 	readSchedules,
 	saveFlow,
 } from "./flow-document";
+import { createFlowMigrations } from "./flow-migration";
 import { type CloneImport, importClone, importMarker } from "./import";
 import { trackedState } from "./legacy-folder";
 import { flowNotices } from "./notices";
@@ -30,7 +31,7 @@ import { flowNotices } from "./notices";
 /** A flow of one Command node that says `word`, and calls `calls` after it when given. */
 function flow(word: string, calls?: string): Flow {
 	return flowSchema.parse({
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: "say",
@@ -160,6 +161,12 @@ async function replica(name: string): Promise<Replica> {
 				tracked: (repoPath, folder) =>
 					trackedState(systemGit(), repoPath, folder),
 				profiles,
+				migration: () =>
+					createFlowMigrations({
+						db: sandbox.db,
+						device: async () => ({ id: sandbox.deviceId, name }),
+						profiles,
+					}).forDevice(sandbox.deviceId),
 				flush: () => documents.flush(),
 				at: Date.now(),
 			}),
@@ -546,6 +553,45 @@ describe("the import on upgrade", () => {
 		expect(await noticesOf(laptop)).toEqual([
 			"Night Shift made this profile on laptop from the project's profiles: triage.",
 			'laptop already has a profile named "builder", so the project\'s one is now "builder_project". The flows still use the one of laptop.',
+		]);
+	});
+
+	test("a flow of format 6 comes in naming this Device's profiles by id, its own one on a clash", async () => {
+		const own = await laptop.profiles.save({ ...builder, model: "opus" });
+		const agent = (id: string, profile: string, device?: string) => ({
+			id,
+			type: "agent",
+			position: { x: 0, y: 0 },
+			prompt: "Work.",
+			profile,
+			...(device ? { device } : {}),
+		});
+		await writeFolder(laptop.sandbox.repoPath, {
+			flows: {
+				build: {
+					version: 6,
+					start: "build",
+					nodes: [
+						agent("build", "builder"),
+						agent("check", "triage"),
+						agent("far", "builder", "hetzner-1"),
+					],
+					edges: [],
+				},
+			},
+			profiles: [builder, { ...builder, name: "triage" }],
+		});
+
+		await laptop.importClone();
+
+		const nodes = (await flowsOf(laptop)).build?.nodes ?? [];
+		expect(
+			nodes.map((node) => ("profile" in node ? node.profile : null)),
+		).toEqual([
+			{ device: laptop.sandbox.deviceId, profile: own.id },
+			{ device: laptop.sandbox.deviceId, profile: "triage" },
+			// No Device of that name: the node keeps the name, to pick again.
+			"builder",
 		]);
 	});
 

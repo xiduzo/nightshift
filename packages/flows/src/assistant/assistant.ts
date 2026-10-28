@@ -29,6 +29,7 @@ import {
 	flowNameSchema,
 	jsonSchemaSchema,
 	labelSchema,
+	nameSchema,
 	nodeIdSchema,
 	option,
 	variableWriteSchema,
@@ -82,7 +83,8 @@ const agentFields = agentNodeSchema.shape;
  * connections never apply.
  */
 export const assistantAgentSchema = z.object({
-	profile: agentFields.profile,
+	/** An Agent Profile of this computer, by its name: the chat runs here. */
+	profile: nameSchema.optional(),
 	harness: agentFields.harness,
 	model: agentFields.model,
 	effort: agentFields.effort,

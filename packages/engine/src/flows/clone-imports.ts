@@ -4,6 +4,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import type { ProfileStore } from "../device-config";
 import type { Git } from "../projects";
 import type { FlowDocuments } from "./flow-document";
+import type { FlowMigrations } from "./flow-migration";
 import { importClone } from "./import";
 import { trackedState } from "./legacy-folder";
 
@@ -27,6 +28,8 @@ export function createCloneImports(deps: {
 	/** This Device: the owner of its Clones, and the name a notice gives it. */
 	device(): Promise<{ id: string; name: string }>;
 	profiles?: Pick<ProfileStore, "list" | "save"> | undefined;
+	/** What brings the folder's flows to the current format on this Device. */
+	migrations?: FlowMigrations;
 	now(): number;
 }): CloneImports {
 	const running = new Map<string, Promise<void>>();
@@ -65,6 +68,14 @@ export function createCloneImports(deps: {
 				device: await deps.device(),
 				tracked: (repoPath, folder) => trackedState(deps.git, repoPath, folder),
 				profiles: deps.profiles,
+				...(deps.migrations
+					? {
+							migration: async () =>
+								(deps.migrations as FlowMigrations).forDevice(
+									(await deps.device()).id,
+								),
+						}
+					: {}),
 				flush: () => deps.documents.flush(),
 				at: deps.now(),
 			});

@@ -38,6 +38,9 @@ const node = (n: Partial<FlowNode> & { id: string; type: string }) =>
 const agent = (extra: Record<string, unknown> = {}) =>
 	node({ id: "work", type: "agent", prompt: "Do the work.", ...extra });
 
+/** The offered profile "coder" of hetzner-1, as a node names it. */
+const offeredCoder = { device: "hetzner", profile: "p-coder" };
+
 const placed = {
 	deviceName: "hetzner-1",
 	offers: [
@@ -65,10 +68,10 @@ describe("offerRefusal: the Walker's check at run start", () => {
 	});
 
 	test("an Agent node that names an offered profile, and sets nothing it sets, passes", () => {
-		expect(offerRefusal([agent({ profile: "coder" })], placed)).toBeNull();
+		expect(offerRefusal([agent({ profile: offeredCoder })], placed)).toBeNull();
 		expect(
 			offerRefusal(
-				[agent({ profile: "coder", permissionMode: "plan" })],
+				[agent({ profile: offeredCoder, permissionMode: "plan" })],
 				placed,
 			),
 		).toBeNull();
@@ -76,22 +79,33 @@ describe("offerRefusal: the Walker's check at run start", () => {
 
 	test("refusals name the Device and what it offers", () => {
 		expect(
-			offerRefusal([agent({ profile: "coder" })], { ...placed, mayUse: false }),
+			offerRefusal([agent({ profile: offeredCoder })], {
+				...placed,
+				mayUse: false,
+			}),
 		).toBe(
 			"hetzner-1 is not your device, and your role in this Space does not allow using what others offer.",
 		);
 		expect(
-			offerRefusal([agent({ profile: "coder" })], { ...placed, offers: [] }),
+			offerRefusal([agent({ profile: offeredCoder })], {
+				...placed,
+				offers: [],
+			}),
 		).toBe(
 			"hetzner-1 is not your device. It offers nothing to this Space. A run can use your own devices, or a profile another person offers to this Space.",
 		);
-		expect(offerRefusal([agent({ profile: "claude" })], placed)).toBe(
-			'hetzner-1 offers "coder" to this Space, not "claude". Change the profile of "work".',
+		expect(
+			offerRefusal(
+				[agent({ profile: { device: "hetzner", profile: "p-claude" } })],
+				placed,
+			),
+		).toBe(
+			'hetzner-1 offers "coder" to this Space. Change the profile of "work".',
 		);
 		expect(
 			offerRefusal(
 				[
-					agent({ profile: "coder" }),
+					agent({ profile: offeredCoder }),
 					node({ id: "build", type: "command", command: "make" }),
 				],
 				placed,
@@ -100,7 +114,7 @@ describe("offerRefusal: the Walker's check at run start", () => {
 			'hetzner-1 is not your device. It runs only Agent nodes with a profile its owner offers to this Space, not "build". Choose one of your own devices for this run.',
 		);
 		expect(
-			offerRefusal([agent({ profile: "coder", model: "opus" })], placed),
+			offerRefusal([agent({ profile: offeredCoder, model: "opus" })], placed),
 		).toBe(
 			'The Agent node "work" sets its own model. On hetzner-1, the offered profile "coder" runs as its owner set it. Remove them from the node.',
 		);
@@ -109,7 +123,7 @@ describe("offerRefusal: the Walker's check at run start", () => {
 	test("a permission mode wider than the cap is refused", () => {
 		expect(
 			offerRefusal(
-				[agent({ profile: "coder", permissionMode: "bypassPermissions" })],
+				[agent({ profile: offeredCoder, permissionMode: "bypassPermissions" })],
 				placed,
 			),
 		).toBe(
@@ -138,11 +152,17 @@ describe("another Person's run on the computer that walks it", () => {
 	const carol = "person-carol";
 
 	const flow = (prompt: string, extra: Record<string, unknown> = {}): Flow => ({
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: "work",
-		nodes: [agent({ profile: "coder", prompt, ...extra })],
+		nodes: [
+			agent({
+				profile: { device: sandbox.deviceId, profile: "coder" },
+				prompt,
+				...extra,
+			}),
+		],
 		edges: [],
 	});
 
@@ -472,11 +492,13 @@ describe("a schedule that fires on another Person's Device", () => {
 			repoPath: sandbox.repoPath,
 		});
 		await owner.saveFlow(projectId, "night", {
-			version: 6,
+			version: 7,
 			inputs: [],
 			outputs: [],
 			start: "work",
-			nodes: [agent({ profile: "coder" })],
+			nodes: [
+				agent({ profile: { device: sandbox.deviceId, profile: "coder" } }),
+			],
 			edges: [],
 		});
 		// Carol saves a schedule that fires on this computer, which she does not own.

@@ -8,9 +8,11 @@ import {
 	createCloneImports,
 	createFlowDocuments,
 	createFlowFiles,
+	createFlowMigrations,
 	dismissNotice,
 	documentProjectFlows,
 	flowNotices,
+	upgradeFlows,
 } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
@@ -293,20 +295,32 @@ export function createEngine(
 		git,
 		...(hosts ? { relay: hosts } : {}),
 	});
+	/** What brings a flow of format 6 to the current one: its nodes name a Device's profile. */
+	const thisDevice = async () => ({
+		id: await runLog.walkerId(),
+		name: device.name,
+	});
+	const migrations = createFlowMigrations({
+		db,
+		device: thisDevice,
+		profiles: options.profiles,
+	});
 	/** The flows and schedules of every project: its flow document (ADR 2). */
 	const projectFlows = documentProjectFlows({
 		documents: flowDocuments,
 		find: (projectId, spaceId) => projects.find(projectId, spaceId),
 		deviceId: () => runLog.walkerId(),
 		now,
+		migrations,
 	});
 	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
 	const cloneImports = createCloneImports({
 		db,
 		documents: flowDocuments,
 		git,
-		device: async () => ({ id: await runLog.walkerId(), name: device.name }),
+		device: thisDevice,
 		profiles: options.profiles,
+		migrations,
 		now,
 	});
 	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`
@@ -370,6 +384,8 @@ export function createEngine(
 		)
 		// The flows of each Clone from before ADR 2, once: before a schedule fires.
 		.then(() => cloneImports.all())
+		// The flows of format 6 of the Spaces this Replica keeps, once (ADR 3).
+		.then(() => upgradeKeptFlows())
 		// Whose runs are this computer's own: another Person's take an Offer.
 		.then(async () => {
 			ownerId = await directory.selfOwnerId();
@@ -382,6 +398,27 @@ export function createEngine(
 
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	const hostOf = peers.hostOf;
+
+	/**
+	 * Brings the flows of format 6 of every Project whose Space this
+	 * Replica keeps to the current format, once (ADR 3). A failure is
+	 * logged, and the next start tries again; reads migrate meanwhile.
+	 */
+	async function upgradeKeptFlows(): Promise<void> {
+		try {
+			const self = await runLog.walkerId();
+			for (const document of await flowDocuments.openAll()) {
+				const row = await projects.find(document.projectId).catch(() => null);
+				if (!row || (await hostOf(row.spaceId)) !== null) continue;
+				await upgradeFlows(document, { migrations, deviceId: self, at: now() });
+			}
+		} catch (error) {
+			console.warn(
+				"Night Shift could not bring the flows to their new format. It tries again at the next start:",
+				error,
+			);
+		}
+	}
 
 	const reads = createReadModel({
 		db,
@@ -529,6 +566,7 @@ export function createEngine(
 			flows: projectFlows,
 			personNames: (ids) => namesOf(db, ids),
 			deviceNames: (ids) => directory.names(ids),
+			migration: async () => migrations.forDevice(await runLog.walkerId()),
 		}),
 		flowNotices: {
 			list: async (projectId) =>

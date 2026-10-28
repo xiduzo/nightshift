@@ -159,8 +159,9 @@ beforeEach(async () => {
 		device,
 		documents,
 		ownOffers: () => own,
-		profileFor: (name) =>
-			name === "coder"
+		// "coder", and "builder" that a test renames to "coder": by id.
+		profileFor: (id) =>
+			id === "coder" || id === "builder"
 				? {
 						harness: "claude-code",
 						model: "sonnet",
@@ -313,7 +314,7 @@ for (const [path, call] of Object.entries(paths)) {
 	}
 
 	describe(`Offer admission, a run ${path}`, () => {
-		test("a renamed profile stays offered: a node names its new name, and the Offer keeps its id", async () => {
+		test("a renamed profile stays offered: a node names its id, a Walker of an older Night Shift its new name", async () => {
 			// "builder", offered before profiles had ids, is now named "coder".
 			own = [
 				{
@@ -326,12 +327,17 @@ for (const [path, call] of Object.entries(paths)) {
 				},
 			];
 			await listed("builder");
-			expect(await outcome(request({ call: offered() }))).toBe("served");
 			expect(
 				await outcome(
 					request({ call: offered("Do the work.", { profile: "builder" }) }),
 				),
-			).toBe('hetzner-1 offers "coder" to this Space, not "builder".');
+			).toBe("served");
+			expect(await outcome(request({ call: offered() }))).toBe("served");
+			expect(
+				await outcome(
+					request({ call: offered("Do the work.", { profile: "maker" }) }),
+				),
+			).toBe('hetzner-1 offers "coder" to this Space, not "maker".');
 		});
 
 		test("another Person's run takes an Offer in force: its offered sessions and the run's own folder work", async () => {

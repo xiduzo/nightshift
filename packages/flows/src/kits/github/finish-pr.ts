@@ -8,7 +8,7 @@ const VIEW = `gh pr view "$pr" --json number,url,state,isDraft --jq '{number, ur
  * closes it with a comment. `gh` only.
  */
 export const finishPrKit: FlowInput = {
-	version: 6,
+	version: 7,
 	description:
 		"Marks a pull request ready for review, or closes it. Both can leave a comment on it.",
 	inputs: [

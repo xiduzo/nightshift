@@ -16,12 +16,17 @@ type OfferedSession = {
 	runId: string;
 	deviceId: string;
 	spaceId: string;
-	/** The profile's name, as the node names it. */
-	profileName: string;
+	/** The profile as the node names it: its id, or its name for a run from before ids. */
+	profile: string;
 };
 
-/** An Offer whose sessions withdrawing it stops. */
-type OfferRef = { spaceId: string; deviceId: string; profileName: string };
+/** An Offer whose sessions withdrawing it stops: its profile's id and name. */
+type OfferRef = {
+	spaceId: string;
+	deviceId: string;
+	profile: string;
+	profileName: string;
+};
 
 /**
  * The offered sessions running now, of the runs this computer walks: what
@@ -56,7 +61,7 @@ export function createOfferedSessions() {
 									runId: request.runId,
 									deviceId,
 									spaceId: request.spaceId,
-									profileName: call.input.offered.profile,
+									profile: call.input.offered.profile,
 								})
 							: null;
 					try {
@@ -77,7 +82,8 @@ export function createOfferedSessions() {
 							(e) =>
 								e.spaceId === offer.spaceId &&
 								e.deviceId === offer.deviceId &&
-								e.profileName === offer.profileName,
+								(e.profile === offer.profile ||
+									e.profile === offer.profileName),
 						)
 						.map((e) => e.runId),
 				),
@@ -196,13 +202,15 @@ export function createEngineOffers(deps: {
 			await deps.ready;
 			const { spaceId, deviceId, profile, by } = input;
 			const document = await documents.open(spaceId);
-			// The sessions name the profile by its name, as the Space lists it.
+			// A session names the profile by its id, one from before ids by
+			// its name, as the Space lists it.
 			const listed = spaceOffers(document, deviceId).find(
 				(o) => o.profile === profile,
 			);
 			const stop = {
 				spaceId,
 				deviceId,
+				profile,
 				profileName: listed?.profileName ?? profile,
 			};
 			if ((await deps.hostOf(spaceId)) !== null) {

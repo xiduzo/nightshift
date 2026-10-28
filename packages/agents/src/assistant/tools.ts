@@ -183,16 +183,14 @@ export function flowRows(flows: ProjectFlowMap, skip?: string) {
 
 /** The issues of a flow the agent wrote, checked as the editor checks it. */
 async function check(port: AuthoringPort, flow: unknown) {
-	const [draft, flows, profiles, tools] = await Promise.all([
+	const [draft, flows, tools] = await Promise.all([
 		port.draft(),
 		port.flows(),
-		port.profiles(),
 		port.tools(),
 	]);
 	const issues = proposalIssues(draft.flow, flow, {
 		flows,
 		name: draft.name,
-		profiles: profiles.map((p) => p.name),
 		connections: tools.connections.map((c) => c.name),
 	});
 	return { draft, issues };

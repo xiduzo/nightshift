@@ -89,7 +89,7 @@ const gate: DecisionNode = {
 
 /** An Agent step, then a Gate: the run waits with a step, a session and events. */
 const flow: Flow = {
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: "work",

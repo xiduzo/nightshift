@@ -1,5 +1,6 @@
 import {
 	type Flow,
+	type FlowMigration,
 	type FlowNode,
 	fanOutsOf,
 	flowSchema,
@@ -254,14 +255,16 @@ const errorsOf: ErrorsOf = (flow, options, chain) =>
 		.length;
 
 /**
- * Migrates (`migrateFlow`), parses and validates unknown JSON. Schema errors
- * come back as issues.
+ * Migrates (`migrateFlow`, with `migration` for a flow of format 6 when
+ * given), parses and validates unknown JSON. Schema errors come back as
+ * issues.
  */
 export function parseFlow(
 	json: unknown,
-	options: ValidateOptions = {},
+	options: ValidateOptions & { migration?: FlowMigration } = {},
 ): { flow: Flow; issues: FlowIssue[] } | { flow: null; issues: FlowIssue[] } {
-	const result = flowSchema.safeParse(migrateFlow(json));
+	const { migration, ...validate } = options;
+	const result = flowSchema.safeParse(migrateFlow(json, migration));
 	if (!result.success) {
 		return {
 			flow: null,
@@ -271,5 +274,5 @@ export function parseFlow(
 			})),
 		};
 	}
-	return { flow: result.data, issues: validateFlow(result.data, options) };
+	return { flow: result.data, issues: validateFlow(result.data, validate) };
 }

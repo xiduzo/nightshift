@@ -58,9 +58,7 @@ export async function saveProfile(
 	profile: Profile,
 	options: {
 		id?: string;
-		/** The flows that name a profile, read only for a rename. */
-		flowsUsing(name: string): Promise<readonly { flowName: string }[]>;
-	},
+	} = {},
 ): Promise<ProfileView> {
 	const { id } = options;
 	const current = id === undefined ? null : stores.profiles.get(id);
@@ -73,16 +71,6 @@ export async function saveProfile(
 			"conflict",
 			`A profile named "${profile.name}" already exists. Pick another name.`,
 		);
-	}
-	// Flows name a profile by its name, so a rename would cut them off.
-	if (current && current.name !== profile.name) {
-		const use = await options.flowsUsing(current.name);
-		if (use.length > 0) {
-			throw new Refusal(
-				"conflict",
-				`The flows ${use.map((u) => u.flowName).join(", ")} use "${current.name}". Change it there first, or keep the name.`,
-			);
-		}
 	}
 	const unknown = (isAgentProfile(profile) ? profile.connections : []).filter(
 		(name) => !stores.connections.get(name),

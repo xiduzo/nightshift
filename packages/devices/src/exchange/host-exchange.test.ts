@@ -109,7 +109,7 @@ function host() {
 }
 
 const commandFlow = {
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: "hello",

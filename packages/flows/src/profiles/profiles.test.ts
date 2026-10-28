@@ -12,6 +12,7 @@ import {
 	type AgentProfileSettings,
 	agentProfileSettingsSchema,
 	type ModelProfileSettings,
+	profileLabel,
 	profileSettingsSchema,
 	resolveAgentNode,
 	resolvedAgent,
@@ -35,7 +36,7 @@ function node(extra: Partial<AgentNode> = {}): AgentNode {
 		type: "agent",
 		position: { x: 0, y: 0 },
 		prompt: "Do the work",
-		profile: "builder",
+		profile: { device: "mac", profile: "builder" },
 		session: "fresh",
 		...extra,
 	};
@@ -54,7 +55,7 @@ function decision(extra: Partial<DecisionNode> = {}): DecisionNode {
 		prompt: "Is it green?",
 		options: [{ name: "yes" }, { name: "no" }],
 		by: "model",
-		profile: "triage",
+		profile: { device: "mac", profile: "triage" },
 		...extra,
 	};
 }
@@ -67,7 +68,7 @@ function value(extra: Partial<ValueNode> = {}): ValueNode {
 		by: "model",
 		prompt: "List the tasks.",
 		output: { type: "object" },
-		profile: "triage",
+		profile: { device: "mac", profile: "triage" },
 		...extra,
 	};
 }
@@ -87,7 +88,7 @@ describe("resolveAgentNode", () => {
 	test("takes the harness, model, effort, permission mode, CLI tools and connections of the profile", () => {
 		const resolved = resolveAgentNode(node(), builder);
 		expect(resolved).toMatchObject({
-			profile: "builder",
+			profile: { device: "mac", profile: "builder" },
 			harness: "opencode",
 			model: "openai/gpt-5.2",
 			effort: "high",
@@ -127,10 +128,13 @@ describe("resolveAgentNode", () => {
 describe("resolveFlowProfiles", () => {
 	test("collects the profiles it cannot find, with their nodes", () => {
 		const missing = new Map<string, string[]>();
-		const flow = flowOf(node(), node({ id: "review", profile: "reviewer" }));
+		const flow = flowOf(
+			node(),
+			node({ id: "review", profile: { device: "mac", profile: "reviewer" } }),
+		);
 		const resolved = resolveFlowProfiles(
 			flow,
-			(name) => (name === "builder" ? builder : null),
+			(profile) => (profileLabel(profile) === "builder" ? builder : null),
 			missing,
 		);
 		expect([...missing]).toEqual([["reviewer", ["review"]]]);
@@ -155,6 +159,20 @@ describe("validateFlow and profiles", () => {
 	test("a node with a profile needs no harness or model of its own", () => {
 		const issues = validateFlow(flowOf(node()));
 		expect(issues.filter((i) => i.severity === "error")).toEqual([]);
+	});
+
+	test("a profile name left from format 6 runs nowhere: pick the profile again", () => {
+		const issues = validateFlow(flowOf(node({ profile: "builder" })));
+		expect(issues.map((i) => i.message)).toContain(
+			`Agent node "work" names the profile "builder", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
+		);
+	});
+
+	test("a node with a profile names no device: the profile's device runs it", () => {
+		const issues = validateFlow(flowOf(node({ device: "LE2316" })));
+		expect(issues.map((i) => i.message)).toContain(
+			'Agent node "work" names a device and a profile. The step runs on the profile\'s device. Remove the device, or the profile.',
+		);
 	});
 
 	test("a node without a profile needs a harness, a model and a permission mode", () => {
@@ -205,7 +223,7 @@ describe("model profiles", () => {
 
 	test("a Decision takes the decider and the model of its profile", () => {
 		expect(resolveModelNode(decision(), triage)).toMatchObject({
-			profile: "triage",
+			profile: { device: "mac", profile: "triage" },
 			decider: "openrouter",
 			model: "~typesafe/jev-latest",
 		});
@@ -257,12 +275,16 @@ describe("model profiles", () => {
 			node(),
 			decision(),
 			decision({ id: "gate", by: "person", profile: undefined }),
-			value({ id: "agentish", profile: "builder" }),
+			value({ id: "agentish", profile: { device: "mac", profile: "builder" } }),
 		);
 		const resolved = resolveFlowProfiles(
 			flow,
-			(name) =>
-				name === "builder" ? builder : name === "triage" ? triage : null,
+			(profile) =>
+				profileLabel(profile) === "builder"
+					? builder
+					: profileLabel(profile) === "triage"
+						? triage
+						: null,
 			new Map(),
 			problems,
 		);
@@ -282,10 +304,10 @@ describe("model profiles", () => {
 			),
 		).map((i) => i.message);
 		expect(issues).toContain(
-			'Decision node "pick" names the profile "triage", but you decide it. Only a model reads a profile. Remove the profile, or let a model decide.',
+			'Decision node "pick" names a profile, but you decide it. Only a model reads a profile. Remove the profile, or let a model decide.',
 		);
 		expect(issues).toContain(
-			'Value node "rule" names the profile "triage", but a rule makes it. Only a model reads a profile. Remove the profile, or let a model make it.',
+			'Value node "rule" names a profile, but a rule makes it. Only a model reads a profile. Remove the profile, or let a model make it.',
 		);
 	});
 

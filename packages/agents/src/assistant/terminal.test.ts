@@ -11,7 +11,7 @@ import { serveTools } from "./mcp";
 import { type TerminalPort, terminalTools } from "./terminal";
 
 const flow: Flow = flowSchema.parse({
-	version: 6,
+	version: 7,
 	inputs: [{ name: "issue", type: "text" }],
 	outputs: [],
 	start: "build",
@@ -20,7 +20,7 @@ const flow: Flow = flowSchema.parse({
 			id: "build",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: { device: "mac", profile: "worker" },
 			prompt: "Fix {{issue}}.",
 		},
 	],

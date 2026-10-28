@@ -142,7 +142,7 @@ const status = (period: { link: Link }) => period.link.state().status;
 
 /** A command, then a Gate. */
 const gateFlow = {
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -169,7 +169,7 @@ const gateFlow = {
 
 /** One Agent step. */
 const agentFlow = {
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: "work",
@@ -190,7 +190,7 @@ const agentFlow = {
 
 /** One command step: a run that ends on its own. */
 const quickFlow = {
-	version: 6,
+	version: 7,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -208,7 +208,7 @@ const quickFlow = {
 
 /** The body of `forEachFlow`: it prints the item. */
 const sayFlow = {
-	version: 6,
+	version: 7,
 	inputs: [{ name: "item", type: "json", required: true }],
 	outputs: [],
 	start: "say",
@@ -227,7 +227,7 @@ const sayFlow = {
 /** A For Each over three items; its body is `say` (`sayFlow`). */
 function forEachFlow(): Flow {
 	return {
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: "loop",
@@ -256,7 +256,7 @@ function forEachFlow(): Flow {
 /** One command that prints, waits for a file, and prints again. */
 function slowFlow(marker: string): Flow {
 	return {
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: "build",

@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { ydoc } from "@nightshift/db/schema";
-import { eq, like } from "drizzle-orm";
+import { eq, like, or } from "drizzle-orm";
 import * as Y from "yjs";
 import type { DeviceProfile } from "../contract";
 import { savedSecretSchema } from "./connections";
@@ -176,6 +176,35 @@ function readCopy(deviceId: string, doc: Y.Doc): DeviceCopy {
 		secrets: secrets.sort((a, b) => a.name.localeCompare(b.name)),
 		checkedAt: typeof checkedAt === "number" ? checkedAt : null,
 	};
+}
+
+/**
+ * Every Device whose document this Replica keeps, as that document says:
+ * its own (`device:<id>`), those a Host keeps for the Devices whose home
+ * it is, and the copies of its owner's other Devices (`device-copy:<id>`).
+ * One entry per Device: a kept document wins over a copy.
+ */
+export async function storedDevices(db: Database): Promise<DeviceCopy[]> {
+	const rows = await db
+		.select({ name: ydoc.name, state: ydoc.state })
+		.from(ydoc)
+		.where(or(like(ydoc.name, "device:%"), like(ydoc.name, `${PREFIX}%`)));
+	const found = new Map<string, DeviceCopy>();
+	for (const row of rows.sort((a, b) => (a.name < b.name ? -1 : 1))) {
+		const copy = row.name.startsWith(PREFIX);
+		const deviceId = row.name.slice(copy ? PREFIX.length : "device:".length);
+		if (deviceId === "" || (copy && found.has(deviceId))) continue;
+		const doc = new Y.Doc();
+		try {
+			Y.applyUpdate(doc, new Uint8Array(row.state));
+			found.set(deviceId, readCopy(deviceId, doc));
+		} catch {
+			// A document this version cannot read names no Device.
+		} finally {
+			doc.destroy();
+		}
+	}
+	return [...found.values()];
 }
 
 /**

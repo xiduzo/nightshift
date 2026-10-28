@@ -30,7 +30,7 @@ const MAX_WAITS = 18;
  * wait times out and the kit reads the checks again: a slower poll.
  */
 export const waitForChecksKit: FlowInput = {
-	version: 6,
+	version: 7,
 	description: `Waits until the checks of a commit on GitHub are done, for at most ${(WAIT_MINUTES * MAX_WAITS) / 60} hours. Failed checks end it as failed. To wake it as soon as GitHub is done, add a webhook schedule for check suites that sends the signal ci-done with the commit as its key: event.body.check_suite.head_sha. Without one, it looks again every ${WAIT_MINUTES} minutes.`,
 	inputs: [
 		{

@@ -74,7 +74,8 @@ export function NodeInspector({
 	const id = useId();
 	const isStart = flow.start === node.id;
 	// The devices this node may name, as the Host says: by its profile.
-	const profile = node.type === "agent" ? node.profile : undefined;
+	const named = node.type === "agent" ? node.profile : undefined;
+	const profile = typeof named === "string" ? named : undefined;
 	const nodeDevices = useQuery({
 		...runQueries.devices(projectId, profile !== undefined ? { profile } : {}),
 		enabled: runsOnDevice(node),

@@ -7,7 +7,7 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
 import { renderCommand, templateRefs } from "../template";
 import { parseFlow, validateFlow } from "../validate";
 import { type Flow, flowSchema } from "./flow";
-import { migrateFlow } from "./migrate";
+import { type FlowMigration, migrateFlow } from "./migrate";
 
 const agent = {
 	type: "agent",
@@ -88,7 +88,7 @@ const v1Body = {
 
 describe("migrateFlow", () => {
 	test("leaves anything that is not a version 1 object alone", () => {
-		for (const value of [null, "x", 3, [1], { version: 6 }, {}]) {
+		for (const value of [null, "x", 3, [1], { version: 7 }, {}]) {
 			expect(migrateFlow(value)).toBe(value);
 		}
 	});
@@ -107,7 +107,7 @@ describe("migrateFlow", () => {
 
 	test("input item becomes a required json input; there are no outputs", () => {
 		const flow = migrateFlow(v1Body) as Record<string, unknown>;
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.inputs).toEqual([
 			{ name: "item", type: "json", required: true },
 		]);
@@ -194,7 +194,7 @@ describe("migrateFlow", () => {
 			edges: [],
 		});
 		expect(flow).toMatchObject({
-			version: 6,
+			version: 7,
 			inputs: [
 				{ name: "epic", label: "Epic", required: true, type: "text" },
 				{ name: "base", default: "main", type: "text" },
@@ -329,7 +329,7 @@ describe("the rpgdotexe night, as version 1", () => {
 
 describe("migrateFlow: tool sets", () => {
 	const current = (nodes: unknown[]) => ({
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -405,7 +405,7 @@ describe("migrateFlow: tool sets", () => {
 
 describe("migrateFlow: list sources", () => {
 	const current = (source: unknown) => ({
-		version: 6,
+		version: 7,
 		inputs: [{ name: "epic", type: "text", required: true }],
 		outputs: [],
 		start: "each",
@@ -673,7 +673,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a Gate becomes a Decision decided by you; a Decision one decided by a model, off the Claude Code decider", () => {
 		const flow = migrateFlow(v2()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.nodes[1]).toEqual({
 			id: "decide",
 			type: "decision",
@@ -718,7 +718,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a version 1 flow goes through both steps", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.nodes.find((n) => n.id === "decide")).toMatchObject({
 			type: "decision",
 			by: "model",
@@ -790,7 +790,7 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 
 	test("a Subflow node becomes a Call node; a For Each node a Call node with each", () => {
 		const flow = migrateFlow(v3()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.nodes[0]).toEqual({
 			id: "sub",
 			label: "Review",
@@ -861,7 +861,7 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 
 	test("a version 1 flow goes through every step", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.nodes.map((n) => n.type)).toEqual([
 			"command",
 			"agent",
@@ -923,7 +923,7 @@ describe("migrateFlow: version 5 → 6, deciders and the files source", () => {
 				},
 			]),
 		) as { version: number; nodes: Record<string, unknown>[] };
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(
 			flow.nodes.map((node) => [node.id, node.decider, node.model]),
 		).toEqual([
@@ -1029,7 +1029,7 @@ describe("migrateFlow: version 5 → 6, Agent nodes", () => {
 				{ ...agent, id: "none", prompt: "Go.", nodeClis: [] },
 			]),
 		) as { version: number; nodes: Record<string, unknown>[] };
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.nodes[0]).toEqual({
 			...agent,
 			id: "build",
@@ -1083,7 +1083,7 @@ describe("migrateFlow: version 5 → 6, edges a fan-out would take", () => {
 
 	test("an edge without a max after another one on the same outcome goes: version 5 never took it", () => {
 		const flow = migrateFlow(v5()) as { version: number; edges: unknown[] };
-		expect(flow.version).toBe(6);
+		expect(flow.version).toBe(7);
 		expect(flow.edges.map((edge) => (edge as { id: string }).id)).toEqual([
 			"a",
 			"b",
@@ -1099,5 +1099,122 @@ describe("migrateFlow: version 5 → 6, edges a fan-out would take", () => {
 		const input = { ...v5(), edges: v5().edges.slice(0, 2) };
 		const flow = migrateFlow(input) as { edges: unknown };
 		expect(flow.edges).toBe(input.edges);
+	});
+});
+
+describe("migrateFlow: version 6 to 7, a node names a device's profile", () => {
+	const v6 = (nodes: Record<string, unknown>[]) => ({
+		version: 6,
+		inputs: [],
+		outputs: [],
+		start: "build",
+		nodes,
+		edges: [],
+	});
+	const builder = {
+		id: "build",
+		type: "agent",
+		position: { x: 0, y: 0 },
+		prompt: "Build.",
+		profile: "builder",
+	};
+	const triage = {
+		id: "pick",
+		type: "decision",
+		position: { x: 0, y: 0 },
+		prompt: "Go?",
+		options: [{ name: "go" }],
+		by: "model",
+		profile: "triage",
+	};
+	/**
+	 * This Device ("mac") has "builder", renamed from "maker": its id is
+	 * still "maker". LE2316 has "triage". Another name has no Device.
+	 */
+	const migration: FlowMigration = {
+		deviceId: "mac",
+		deviceIdByName: (name) => (name === "LE2316" ? "le-2316" : null),
+		profileIdByName: (deviceId, name) => {
+			const ids: Record<string, Record<string, string>> = {
+				mac: { builder: "maker", triage: "p-mac-triage" },
+				"le-2316": { triage: "p-le-triage" },
+			};
+			return ids[deviceId]?.[name] ?? null;
+		},
+	};
+
+	test("a node without a device names the profile of that name on the migrating device, by its id", () => {
+		const flow = flowSchema.parse(
+			migrateFlow(v6([builder, triage]), migration),
+		);
+		expect(flow.version).toBe(7);
+		expect(flow.nodes[0]).toMatchObject({
+			profile: { device: "mac", profile: "maker" },
+		});
+		expect(flow.nodes[1]).toMatchObject({
+			profile: { device: "mac", profile: "p-mac-triage" },
+		});
+	});
+
+	test("a node with a device names that device's profile, and loses its device", () => {
+		const flow = flowSchema.parse(
+			migrateFlow(
+				{ ...v6([{ ...triage, device: "LE2316" }]), start: "pick" },
+				migration,
+			),
+		);
+		expect(flow.nodes[0]?.type === "decision" && flow.nodes[0]).toMatchObject({
+			profile: { device: "le-2316", profile: "p-le-triage" },
+		});
+		expect("device" in (flow.nodes[0] ?? {})).toBe(false);
+		expect(
+			validateFlow(flow).filter((issue) => issue.severity === "error"),
+		).toEqual([]);
+	});
+
+	test("a profile or a device that is not known keeps its name: the check asks to pick it again", () => {
+		const flow = flowSchema.parse(
+			migrateFlow(
+				v6([
+					{ ...builder, profile: "reviewer" },
+					{ ...triage, id: "far", device: "hetzner-1" },
+				]),
+				migration,
+			),
+		);
+		expect(flow.nodes[0]).toMatchObject({ profile: "reviewer" });
+		expect(flow.nodes[1]).toMatchObject({
+			profile: "triage",
+			device: "hetzner-1",
+		});
+		expect(
+			validateFlow(flow)
+				.filter((issue) => issue.severity === "error")
+				.map((issue) => issue.message),
+		).toEqual([
+			`Agent node "build" names the profile "reviewer", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
+			`Decision node "far" names the profile "triage", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
+		]);
+	});
+
+	test("without a migration every node keeps its name, and the flow reads as version 7", () => {
+		const flow = flowSchema.parse(migrateFlow(v6([builder])));
+		expect(flow.version).toBe(7);
+		expect(flow.nodes[0]).toMatchObject({ profile: "builder" });
+	});
+
+	test("a flow of version 7 does not change, with or without a migration", () => {
+		const once = migrateFlow(v6([builder]), migration);
+		expect(migrateFlow(once, migration)).toBe(once);
+		expect(migrateFlow(once)).toBe(once);
+	});
+
+	test("a version 5 flow goes on to version 7 with the migration", () => {
+		const flow = flowSchema.parse(
+			migrateFlow({ ...v6([builder]), version: 5 }, migration),
+		);
+		expect(flow.nodes[0]).toMatchObject({
+			profile: { device: "mac", profile: "maker" },
+		});
 	});
 });

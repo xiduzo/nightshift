@@ -29,6 +29,7 @@ export {
 	type DeviceCopies,
 	type DeviceCopy,
 	storedDeviceCopy,
+	storedDevices,
 } from "./device-copies";
 export type { DeviceDocument } from "./device-document";
 export {

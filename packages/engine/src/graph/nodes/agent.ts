@@ -13,6 +13,7 @@ import {
 	type FlowNode,
 	type JsonValue,
 	type Outcome,
+	profileLabel,
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
@@ -385,7 +386,8 @@ async function runSession(
 				: {
 						...common,
 						offered: {
-							profile: node.profile as string,
+							// By id. A run copied from format 6 still holds the name.
+							profile: profileLabel(node.profile),
 							...(node.permissionMode
 								? { permissionMode: node.permissionMode }
 								: {}),

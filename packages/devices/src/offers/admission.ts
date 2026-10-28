@@ -25,6 +25,7 @@ import {
 	clampToCap,
 	type DeviceOffer,
 	inForce,
+	offerFor,
 	offersNothingOr,
 	spaceOffers,
 } from "./offers";
@@ -116,8 +117,8 @@ export function createOfferAdmission(deps: {
 	 * their profiles have now. Without it, none.
 	 */
 	ownOffers?: () => readonly DeviceOffer[];
-	/** A profile of this computer by name, as its owner set it. */
-	profileFor?: (name: string) => ProfileSettings | null;
+	/** A profile of this computer by its id, as its owner set it. */
+	profileFor?: (id: string) => ProfileSettings | null;
 	/** The offered sessions of the runs this computer walks: what withdrawing an Offer stops. */
 	sessions?: Pick<OfferedSessions, "relay">;
 	/** The Offers in use, kept across a reload (`createOfferUse`). Default: its own. */
@@ -239,14 +240,12 @@ export function createOfferAdmission(deps: {
 				return;
 			}
 			// Another Person's session: this computer's own profile, its caps.
-			// The node names the profile by its name, and `ownOffers` gives
-			// each Offer the name its profile has now: so the name finds the
-			// offered profile, also after a rename.
+			// The node names the profile by its id. A Walker of an older
+			// Night Shift names it by its name, which `ownOffers` keeps
+			// current: both find the offered profile, also after a rename.
 			const { profile } = call.input.offered;
-			const offer = admitted.offers.find((o) => o.profileName === profile);
-			const found = offer
-				? (deps.profileFor?.(offer.profileName) ?? null)
-				: null;
+			const offer = offerFor(admitted.offers, profile);
+			const found = offer ? (deps.profileFor?.(offer.profile) ?? null) : null;
 			// Only an Agent Profile runs a session.
 			const settings = found && isAgentProfile(found) ? found : null;
 			if (!offer || !settings) {
@@ -417,7 +416,7 @@ function offeredCallRefusal(
 		case "session": {
 			if (!("offered" in call.input)) return refused;
 			const { profile } = call.input.offered;
-			return offers.some((o) => o.profileName === profile)
+			return offerFor(offers, profile) !== undefined
 				? null
 				: offersNothingOr(deviceName, offers, profile);
 		}

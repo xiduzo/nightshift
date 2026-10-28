@@ -20,7 +20,7 @@ const guide = flowAuthoringGuide();
 
 /** The flow `planEachExample` calls: it takes one task as `item`. */
 const buildTask: Flow = flowSchema.parse({
-	version: 6,
+	version: 7,
 	inputs: [{ name: "item", type: "json", required: true }],
 	start: "work",
 	nodes: [
@@ -28,7 +28,10 @@ const buildTask: Flow = flowSchema.parse({
 			id: "work",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: "worker",
+			profile: {
+				device: "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
+				profile: "worker",
+			},
 			prompt: "Do {{item.title}}: {{item.details}}",
 		},
 	],
@@ -57,7 +60,7 @@ describe("the examples of the guide", () => {
 	test("each sample node is a valid node of its type", () => {
 		for (const [type, node] of Object.entries(sampleNodes)) {
 			const parsed = flowSchema.safeParse({
-				version: 6,
+				version: 7,
 				start: node.id,
 				nodes: [node],
 				edges: [],
@@ -92,8 +95,9 @@ describe("flowAuthoringGuide", () => {
 		const words = guide.split(/\s+/).filter(Boolean).length;
 		// 2900: the node review added End, Join and profiles (Model Profiles,
 		// the project's own), each with a few lines an author needs, and the
-		// list of kits, one line per kit (about 200 words).
-		expect(words).toBeLessThan(2900);
+		// list of kits, one line per kit (about 200 words). 2950: a profile
+		// is a pair of ids (ADR 3), two more words per example node.
+		expect(words).toBeLessThan(2950);
 	});
 });
 

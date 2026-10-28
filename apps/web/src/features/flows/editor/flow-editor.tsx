@@ -216,12 +216,12 @@ function Editor({
 		policyDefaults,
 		connections,
 		connectionNames,
-		profileNames,
+		profileRefs,
 	} = useEditorData(projectId, name);
 	const check = useMemo(
 		() =>
-			checkFlow(draft, projectFlows.flows, name, connectionNames, profileNames),
-		[draft, projectFlows.flows, name, connectionNames, profileNames],
+			checkFlow(draft, projectFlows.flows, name, connectionNames, profileRefs),
+		[draft, projectFlows.flows, name, connectionNames, profileRefs],
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
@@ -587,9 +587,9 @@ function Editor({
 				projectFlows.flows,
 				name,
 				connectionNames,
-				profileNames,
+				profileRefs,
 			),
-		[preview, projectFlows.flows, name, connectionNames, profileNames],
+		[preview, projectFlows.flows, name, connectionNames, profileRefs],
 	);
 
 	const inspector = selectedNode ? (

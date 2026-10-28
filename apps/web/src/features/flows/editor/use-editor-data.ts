@@ -1,7 +1,7 @@
-import { policyFromSettings } from "@nightshift/flows";
+import { type ProfileRef, policyFromSettings } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { connectionQueries, profileQueries } from "@/features/agents";
+import { connectionQueries } from "@/features/agents";
 import { settingsQueries } from "@/features/settings/queries";
 import { useProjectFlows } from "../use-project-flows";
 
@@ -27,28 +27,13 @@ export function useEditorData(projectId: string, name: string) {
 		() => connections?.map((connection) => connection.name),
 		[connections],
 	);
-	const daemonProfiles = useQuery(profileQueries.list());
-	const projectProfiles = useQuery({
-		...profileQueries.project(projectId),
-		meta: { quietErrors: true },
-	});
-	// This computer's and the project's: a run finds a profile in either.
-	const profileNames = useMemo(
-		() =>
-			daemonProfiles.data && (projectProfiles.data || projectProfiles.isError)
-				? [
-						...daemonProfiles.data.map((profile) => profile.name),
-						...(projectProfiles.data?.profiles ?? []).map((p) => p.name),
-					]
-				: undefined,
-		[daemonProfiles.data, projectProfiles.data, projectProfiles.isError],
-	);
+	const profileRefs: readonly ProfileRef[] | undefined = undefined;
 	return {
 		projectFlows,
 		nodeDefaults,
 		policyDefaults,
 		connections,
 		connectionNames,
-		profileNames,
+		profileRefs,
 	};
 }

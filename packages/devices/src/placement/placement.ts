@@ -72,8 +72,8 @@ export type PlacementDeps = {
 	hostSpaces: HostSpaces;
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
-	/** An Agent Profile of this computer by name. Default: none. */
-	profileFor?: (name: string) => ProfileSettings | null;
+	/** A profile of this computer by its id. Default: none. */
+	profileFor?: (id: string) => ProfileSettings | null;
 	/** The project's flows, from this Replica's flow document: what a run starts from. */
 	flows(projectId: string): Promise<FlowSources>;
 	/** How calls reach other Devices. Without it, every step runs here. */
@@ -554,6 +554,12 @@ export function createPlacement(deps: PlacementDeps) {
 			async byName(name) {
 				const match = deviceNamed(await list(), name);
 				if (!match) return name === device.name ? walker : null;
+				return match.thisDevice ? walker : other(match.deviceId, "node");
+			},
+			async profileDevice(id) {
+				if (await isHere(id)) return walker;
+				const match = (await list()).find((d) => d.deviceId === id);
+				if (!match) return null;
 				return match.thisDevice ? walker : other(match.deviceId, "node");
 			},
 		};

@@ -37,6 +37,10 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
  *   now on (a fan-out). Before, the first one won and the others were never
  *   taken: those others go (`dropShadowedEdges`).
  *
+ * Version 6 → 7 (`migrateV6`): a profile belongs to one Device (ADR 3).
+ * A node names the pair `{ device, profile }` by ids instead of a profile
+ * name: see `FlowMigration`.
+ *
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
@@ -44,7 +48,7 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
  * - A list source `kind: "github"` → a `command` source that asks `gh`
  *   for the same items (see `migrateListSource`).
  */
-export function migrateFlow(json: unknown): unknown {
+export function migrateFlow(json: unknown, migration?: FlowMigration): unknown {
 	let current = isRecord(json) && json.version === 1 ? migrateV1(json) : json;
 	if (isRecord(current) && current.version === 2) {
 		current = migrateDecisionNodes(current);
@@ -58,6 +62,9 @@ export function migrateFlow(json: unknown): unknown {
 	if (isRecord(current) && current.version === 5) {
 		current = migrateV5(current);
 	}
+	if (isRecord(current) && current.version === 6) {
+		current = migrateV6(current, migration);
+	}
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
 	const nodes = current.nodes.map((node) => {
@@ -66,6 +73,69 @@ export function migrateFlow(json: unknown): unknown {
 		return migrated;
 	});
 	return changed ? { ...current, nodes } : current;
+}
+
+/**
+ * What the step to version 7 needs to find the profile a node named by its
+ * name. A flow of format 6 named a profile by its name, and the run found
+ * it on the node's Device (`device`, a Device name), else on the Device
+ * that ran the step. Format 7 names the Device and the profile's id.
+ */
+export type FlowMigration = {
+	/**
+	 * The Device a node without `device` takes its profile from: the Device
+	 * that saved the flow, or the one that imports it.
+	 */
+	deviceId: string;
+	/** A Device's id by its name, or null when it is not known. */
+	deviceIdByName(name: string): string | null;
+	/**
+	 * The id of a Device's profile by its name, or null when that Device
+	 * has no profile of that name, or this computer cannot tell.
+	 */
+	profileIdByName(deviceId: string, name: string): string | null;
+};
+
+/**
+ * Version 6 → 7. A node's profile name becomes the pair `{ device,
+ * profile }`: the Device from the node's `device` (which goes, as the
+ * profile's Device runs the step), else `migration.deviceId`, and the
+ * profile's id on that Device (`profileIdByName`, never the name: a
+ * profile renamed after ids came keeps its old name as its id). Without a
+ * migration, or when the Device or the profile is not known, the node
+ * keeps its name and its `device`: the flow check asks to pick the
+ * profile again. Night Shift never guesses another Device's profile.
+ */
+export function migrateV6(
+	json: Record<string, unknown>,
+	migration?: FlowMigration,
+): Record<string, unknown> {
+	const nodes = Array.isArray(json.nodes)
+		? json.nodes.map((node) => migrateProfileName(node, migration))
+		: json.nodes;
+	return {
+		...json,
+		version: 7,
+		...(nodes === undefined ? {} : { nodes }),
+	};
+}
+
+function migrateProfileName(
+	json: unknown,
+	migration: FlowMigration | undefined,
+): unknown {
+	if (!isRecord(json) || typeof json.profile !== "string") return json;
+	if (!migration) return json;
+	const deviceName = typeof json.device === "string" ? json.device : null;
+	const deviceId =
+		deviceName === null
+			? migration.deviceId
+			: migration.deviceIdByName(deviceName);
+	if (deviceId === null) return json;
+	const profileId = migration.profileIdByName(deviceId, json.profile);
+	if (profileId === null) return json;
+	const { device: _device, ...rest } = json;
+	return { ...rest, profile: { device: deviceId, profile: profileId } };
 }
 
 /**

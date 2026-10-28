@@ -32,7 +32,7 @@ import {
 	testDevice,
 	waitFor,
 } from "@nightshift/engine/testing";
-import type { Flow } from "@nightshift/flows";
+import type { Flow, ProfileRef } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
 import {
@@ -194,7 +194,7 @@ function peerEngine(
 
 const flow = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow =>
 	({
-		version: 6,
+		version: 7,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "a",
@@ -609,14 +609,13 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 						type: "agent",
 						position: { x: 0, y: 0 },
 						prompt: "Do the work.",
-						profile: "everywhere_but_here",
-						device: "studio-b",
+						profile: { device: B, profile: "everywhere" },
 					},
 				] as Flow["nodes"]),
 				startedBy: personId,
 			}),
 		).rejects.toThrow(
-			'studio-b is offline, so Night Shift cannot find its profile "everywhere_but_here" (work). Start the run when it is online.',
+			'studio-b is offline, so Night Shift cannot find its profile for "work". Start the run when it is online.',
 		);
 	});
 
@@ -635,9 +634,9 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		);
 	});
 
-	test("a node's profile picks its Device: the run's when it has it, else this computer", async () => {
+	test("a node's profile names its Device: the step runs there, named so in the run's copy", async () => {
 		await shareRemote();
-		const profiled = (id: string, profile: string) =>
+		const profiled = (id: string, profile: ProfileRef) =>
 			({
 				id,
 				type: "agent",
@@ -648,7 +647,10 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		const started = await space().startRun({
 			projectId,
 			flow: flow(
-				[profiled("there", "everywhere"), profiled("here", "here_only")],
+				[
+					profiled("there", { device: B, profile: "everywhere" }),
+					profiled("here", { device: a.deviceId, profile: "here_only" }),
+				],
 				[{ id: "e1", from: "there", outcome: "pass", to: "here" }],
 			),
 			startedBy: personId,
@@ -660,10 +662,9 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			["there", B],
 			["here", run.walker.id === a.deviceId ? "test-device" : run.walker.id],
 		]);
-		// The snapshot names this computer for the node only it can run.
 		expect(
 			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
-		).toEqual([null, "test"]);
+		).toEqual(["studio-b", "test"]);
 	});
 });
 

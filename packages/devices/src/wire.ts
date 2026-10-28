@@ -226,11 +226,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			device: local,
 			dataDir: deps.dataDir,
 			settings: () => deps.settings.run(),
-			// A flow names a profile by its name.
-			profileFor: (name) => {
-				const profile = deps.profiles.byName(name);
-				return profile ? deps.profiles.settingsFor(profile.id) : null;
-			},
+			// A flow names a profile by its id. A Walker of an older Night
+			// Shift asks by the name, which an old profile's id is.
+			profileFor: (id) =>
+				deps.profiles.settingsFor(id) ??
+				deps.profiles.settingsFor(deps.profiles.byName(id)?.id ?? ""),
 			spaceDocuments: deps.spaces,
 			flowDocuments: deps.flows,
 			// The import on upgrade gives a Clone's project profiles to this Device.

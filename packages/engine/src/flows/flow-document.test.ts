@@ -21,7 +21,9 @@ import {
 	flowRevisions,
 	flowSources,
 	saveFlow,
+	upgradeFlows,
 } from "./flow-document";
+import type { FlowMigrations } from "./flow-migration";
 import type { ProjectFlows } from "./project-flows";
 
 projectFlowsContract("the document adapter", async () => {
@@ -499,5 +501,158 @@ describe("the documents of a Replica, for the relay", () => {
 		}
 		expect(await spaceOf("flows:elsewhere")).toBeNull();
 		expect(await spaceOf("device:someone")).toBeNull();
+	});
+});
+
+describe("flows of format 6 in the document (ADR 3)", () => {
+	const clock = { at: 1_000 };
+	let laptop: Replica;
+	let desktop: Replica;
+
+	/** The laptop has "builder" (id "p-laptop"), the desktop its own "builder". */
+	const migrations: FlowMigrations = {
+		async forDevice(deviceId) {
+			return {
+				deviceId,
+				deviceIdByName: (name) => (name === "LE2316" ? "le-2316" : null),
+				profileIdByName: (device, name) =>
+					name !== "builder"
+						? null
+						: device === "laptop"
+							? "p-laptop"
+							: device === "desktop"
+								? "p-desktop"
+								: null,
+			};
+		},
+	};
+
+	/** The flow `build` as a Night Shift of format 6 saved it on `deviceId`. */
+	async function storeFormat6(device: Replica, deviceId: string) {
+		const flow = twoNodes();
+		const old: Flow = {
+			...flow,
+			nodes: flow.nodes.map((node) => {
+				if (node.type !== "agent") return node;
+				const { harness: _h, model: _m, permissionMode: _p, ...rest } = node;
+				return node.id === "b"
+					? { ...rest, profile: "builder", device: "LE2316" }
+					: { ...rest, profile: "builder" };
+			}),
+		};
+		const document = await device.document();
+		await saveFlow(document, {
+			name: "build",
+			flow: old,
+			kind: "import",
+			personId: null,
+			deviceId,
+			at: 1,
+		});
+		const flowId = flowIdOf(document, "build") ?? "";
+		await document.current.change(() => {
+			(document.flows.get(flowId) as Y.Map<unknown>).set("version", 6);
+		});
+		await document.history.change(() => {
+			const revisions = document.history.doc.getArray<{ flow: unknown }>(
+				flowId,
+			);
+			const [last] = revisions.toArray();
+			revisions.delete(0, 1);
+			revisions.push([
+				{ ...last, flow: { ...(last?.flow as object), version: 6 } },
+			]);
+		});
+		return flowId;
+	}
+
+	const profiles = (flow: Flow | null | undefined) =>
+		flow?.nodes.map((node) => ("profile" in node ? node.profile : null));
+
+	beforeEach(async () => {
+		clock.at = 1_000;
+		laptop = await replica(clock);
+		desktop = await replica(clock);
+	});
+
+	afterEach(async () => {
+		await laptop.dispose();
+		await desktop.dispose();
+	});
+
+	test("a read names the profiles of the Device that saved the flow, and the Device a node named", async () => {
+		await storeFormat6(desktop, "laptop");
+		const flows = documentProjectFlows({
+			documents: desktop.documents,
+			find: async () => ({}),
+			deviceId: "desktop",
+			migrations,
+		});
+		const read = parsedFlows((await flows.flows(of)).sources);
+		expect(profiles(read.build)).toEqual([
+			{ device: "laptop", profile: "p-laptop" },
+			"builder",
+		]);
+		// LE2316 has no "builder": the node keeps the name and its device, to pick again.
+		expect(read.build?.nodes[1]).toMatchObject({ device: "LE2316" });
+		const [revision] = await flows.revisions(of, "build");
+		expect(revision?.flow).toMatchObject({
+			version: FLOW_VERSION,
+			nodes: [{ profile: { device: "laptop", profile: "p-laptop" } }, {}],
+		});
+	});
+
+	test("upgradeFlows writes the current format once, with a revision of kind upgrade", async () => {
+		const flowId = await storeFormat6(laptop, "laptop");
+		const document = await laptop.document();
+		clock.at = 2_000;
+		expect(
+			await upgradeFlows(document, {
+				migrations,
+				deviceId: "laptop",
+				at: clock.at,
+			}),
+		).toEqual(["build"]);
+		expect(profiles(parsedFlows(flowSources(document)).build)).toEqual([
+			{ device: "laptop", profile: "p-laptop" },
+			"builder",
+		]);
+		expect(
+			flowRevisions(document, flowId).map((r) => [r.kind, r.flow.version]),
+		).toEqual([
+			["import", 6],
+			["upgrade", FLOW_VERSION],
+		]);
+		expect(
+			await upgradeFlows(document, {
+				migrations,
+				deviceId: "laptop",
+				at: 3_000,
+			}),
+		).toEqual([]);
+		expect(flowRevisions(document, flowId)).toHaveLength(2);
+	});
+
+	test("two Replicas that upgrade at once arrive at the same flow: the saver's profiles, not their own", async () => {
+		await storeFormat6(laptop, "laptop");
+		await sync(laptop, desktop);
+		for (const [device, deviceId] of [
+			[laptop, "laptop"],
+			[desktop, "desktop"],
+		] as const) {
+			await upgradeFlows(await device.document(), {
+				migrations,
+				deviceId,
+				at: 2_000,
+			});
+		}
+		await sync(laptop, desktop);
+		const left = parsedFlows(flowSources(await laptop.document())).build;
+		const right = parsedFlows(flowSources(await desktop.document())).build;
+		expect(left).toEqual(right);
+		expect(profiles(left)).toEqual([
+			{ device: "laptop", profile: "p-laptop" },
+			"builder",
+		]);
 	});
 });
