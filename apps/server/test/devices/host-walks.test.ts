@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,7 +18,9 @@ import {
  * Who walks a run B starts, between two daemons (ADR 1, decisions 9 and
  * 10): A is the Host, B pairs with it and has a Clone. A walks the run,
  * and its unplaced steps run on B. While A is away, B walks the run
- * itself; A gets it, and the value it kept, when it is back.
+ * itself; A gets it, and the value it kept, when it is back. A run
+ * started on A (a phone or a browser there) runs its steps on A, or, when
+ * A has no copy of the project, where the project's last run ran.
  */
 
 const root = mkdtempSync(join(tmpdir(), "nightshift-host-walks-"));
@@ -184,4 +187,56 @@ describe("who walks a run B starts", () => {
 			["runs", 2, started.id],
 		]);
 	}, 120_000);
+});
+
+describe("a run started on the Host, from a phone or a browser", () => {
+	test("runs its steps on the Host when it has the project", async () => {
+		const started = await a.client.runs.start({
+			projectId,
+			flowName: "count",
+		});
+		expect(started.walker).toMatchObject({ id: aId, thisDevice: true });
+		expect(started.device).toMatchObject({ id: aId, thisDevice: true });
+		await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.status === "finished",
+			30_000,
+		);
+	}, 60_000);
+
+	test("runs its steps where the project's last run ran when the Host has no copy of it", async () => {
+		const fromB = await b.client.runs.start({ projectId, flowName: "count" });
+		await waitFor(
+			() => runOn(a, fromB.id),
+			(r) => r?.status === "finished",
+			30_000,
+		);
+		// A's own folder goes: only B has the project now.
+		const db = new Database(join(a.dataDir, "nightshift.db"));
+		db.run("delete from clone where project_id = ? and device_id = ?", [
+			projectId,
+			aId,
+		]);
+		db.close();
+
+		expect(await a.client.runs.placements({ projectId })).toEqual([
+			{
+				deviceId: bId,
+				name: expect.any(String),
+				thisDevice: false,
+				lastRun: true,
+			},
+		]);
+		const started = await a.client.runs.start({
+			projectId,
+			flowName: "count",
+		});
+		expect(started.walker).toMatchObject({ id: aId, thisDevice: true });
+		expect(started.device).toMatchObject({ id: bId, thisDevice: false });
+		await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.status === "finished",
+			30_000,
+		);
+	}, 90_000);
 });

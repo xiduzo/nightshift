@@ -283,6 +283,48 @@ describe("a run placed on another Device", () => {
 		);
 	});
 
+	test("started here without a Device, on a computer without the project, it goes where the project's last run ran", async () => {
+		// C, a third Device of the Person, has the project too.
+		const C = "device-c";
+		await engine.devices.join({
+			id: C,
+			name: "studio-c",
+			platform: "linux",
+			ownerId: personId,
+			homeHost: null,
+		});
+		const document = await documents.open(a.spaceId);
+		await document.change(() =>
+			recordClone(document, { projectId, deviceId: C, deviceName: "studio-c" }),
+		);
+		online.add(C);
+		const hello = flow([command("hello", "echo hello")]);
+		// The last run goes to the Device that is not first in the list.
+		const listed = (await space().listPlacements(projectId)).map(
+			(p) => p.deviceId,
+		);
+		expect([...listed].sort()).toEqual([B, C]);
+		const first = listed[0] as string;
+		const last = listed[1] as string;
+		await until(
+			(await space().startRun({ projectId, flow: hello, deviceId: last })).id,
+			"finished",
+		);
+		expect(
+			(await space().listPlacements(projectId)).map((p) => [
+				p.deviceId,
+				p.lastRun ?? false,
+			]),
+		).toEqual([
+			[first, false],
+			[last, true],
+		]);
+
+		const started = await space().startRun({ projectId, flow: hello });
+		expect(started.device).toMatchObject({ id: last, thisDevice: false });
+		await until(started.id, "finished");
+	});
+
 	test("a command's secrets are read there: the call names them, and the value comes back as •••", async () => {
 		const started = await space().startRun({
 			projectId,

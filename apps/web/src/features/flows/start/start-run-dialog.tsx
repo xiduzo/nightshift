@@ -197,13 +197,15 @@ function StartRunForm({
 		readStoredInputs(projectId, flowName, inputs),
 	);
 	const [baseRef, setBaseRef] = useState("");
-	// Where the steps run: this computer when it has the project, else the first.
+	// Where the steps run: this computer when it has the project, else the
+	// device of the project's latest run, else the first.
 	const placements = useQuery(runQueries.placements(projectId));
 	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
 	const devices = placements.data ?? [];
 	const device =
 		devices.find((d) => d.deviceId === chosenDevice) ??
 		devices.find((d) => d.thisDevice) ??
+		devices.find((d) => d.lastRun) ??
 		devices[0];
 	// One choice that is this computer: nothing to ask.
 	const askDevice = devices.length > 1 || (device && !device.thisDevice);
@@ -454,8 +456,13 @@ function placementLabel(d: {
 	name: string;
 	thisDevice: boolean;
 	offers?: string[];
+	lastRun?: boolean;
 }): string {
-	const name = d.thisDevice ? `${d.name} (this computer)` : d.name;
+	const name = d.thisDevice
+		? `${d.name} (this computer)`
+		: d.lastRun
+			? `${d.name} (last run)`
+			: d.name;
 	if (d.offers === undefined) return name;
 	return d.offers.length === 0
 		? `${name} · offers nothing`

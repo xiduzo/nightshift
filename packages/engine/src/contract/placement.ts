@@ -14,6 +14,11 @@ export type Placement = {
 	 * own Devices.
 	 */
 	offers?: string[];
+	/**
+	 * The project's latest run ran on it: where a run goes by default when
+	 * this computer has no Clone of the project. Absent on the others.
+	 */
+	lastRun?: boolean;
 };
 
 /**
@@ -34,7 +39,7 @@ export type DeviceProfile = {
 };
 
 /** One of a Person's Devices, as placement sees it. */
-export type OwnDevice = Placement & {
+export type OwnDevice = Omit<Placement, "lastRun"> & {
 	/** It takes work now. */
 	online: boolean;
 	/** It has a Clone of the project. */

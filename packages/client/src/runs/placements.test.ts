@@ -52,4 +52,15 @@ describe("where a run can go", () => {
 		);
 		expect(defaultPlacement(choices.slice(2), null)).toBeNull();
 	});
+
+	test("on a Host without the project, goes where the project's latest run ran", () => {
+		const desktop = { deviceId: "desktop", name: "Desktop", thisDevice: false };
+		const choices = placementChoices([laptop, { ...desktop, lastRun: true }]);
+		expect(choices.map((c) => c.lastRun ?? false)).toEqual([false, true]);
+		expect(defaultPlacement(choices, null)?.deviceId).toBe("desktop");
+		expect(defaultPlacement(choices, "laptop")?.deviceId).toBe("laptop");
+		// This computer has the project: it goes first.
+		const withHost = placementChoices([host, { ...desktop, lastRun: true }]);
+		expect(defaultPlacement(withHost, null)?.deviceId).toBe("host");
+	});
 });

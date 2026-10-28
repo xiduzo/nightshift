@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { LoggedEvent } from "./events";
 
 /**
@@ -229,6 +229,23 @@ export async function runIdsOfProject(
 		.from(run)
 		.where(eq(run.projectId, projectId));
 	return rows.map((r) => r.id);
+}
+
+/**
+ * The Device the project's latest run ran on: its run's Device, else its
+ * Walker. Null for a project without runs.
+ */
+export async function lastRunDevice(
+	db: Database,
+	projectId: string,
+): Promise<string | null> {
+	const [row] = await db
+		.select({ deviceId: run.deviceId, walkerId: run.walkerId })
+		.from(run)
+		.where(eq(run.projectId, projectId))
+		.orderBy(desc(run.createdAt), desc(run.id))
+		.limit(1);
+	return row ? (row.deviceId ?? row.walkerId) : null;
 }
 
 /** The ids of the runs a Device walks. */

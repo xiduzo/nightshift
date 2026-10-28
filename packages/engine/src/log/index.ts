@@ -51,6 +51,7 @@ export {
 	applyWalkerMoves,
 	getRunRow,
 	hasRunRow,
+	lastRunDevice,
 	planColumns,
 	planOf,
 	RUN_NOT_FOUND,
