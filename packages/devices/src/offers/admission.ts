@@ -340,8 +340,6 @@ export function createOfferAdmission(deps: {
 				state: async () => (await pick()).state(),
 				capabilities: async (query) => (await pick()).capabilities(query),
 				flows: async (projectId) => (await pick()).flows(projectId),
-				projectProfiles: async (projectId) =>
-					(await pick()).projectProfiles(projectId),
 				async *session(input) {
 					yield* (await pick()).session(input);
 				},
@@ -366,7 +364,6 @@ const offerKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
 /** The calls that work in the project's Clone; a model or a tool needs none. */
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
-	"projectProfiles",
 	"worktree",
 	"itemBranch",
 	"handOff",
@@ -407,7 +404,6 @@ function offeredCallRefusal(
 	const refused = `${deviceName} runs only the profiles its owner offers to this Space. ${offersNothingOr(deviceName, offers)}`;
 	switch (call.kind) {
 		case "flows":
-		case "projectProfiles":
 		case "worktree":
 		case "itemBranch":
 		case "handOff":

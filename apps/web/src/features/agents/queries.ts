@@ -31,9 +31,6 @@ export const profileQueries = {
 		select: (rows: ProfileRow[]) =>
 			rows.filter((p): p is ModelProfileRow => "decider" in p),
 	}),
-	/** A project's own profiles, and whether this computer overrides each. */
-	project: (projectId: string) =>
-		orpc.profiles.project.queryOptions({ input: { projectId } }),
 };
 
 export const profileMutations = {

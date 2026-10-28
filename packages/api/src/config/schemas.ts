@@ -31,8 +31,6 @@ import {
 	loginSchema,
 	mcpServerSchema,
 	modelProfileSchema,
-	type ProfileIssue,
-	profileSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -330,25 +328,3 @@ export const profileListSchema = z.array(
 		modelProfileSchema.extend(profileUse),
 	]),
 );
-
-const profileIssueSchema = exact<ProfileIssue>()(
-	z.object({
-		severity: z.enum(["error", "warning"]),
-		message: z.string(),
-		profile: z.string().optional(),
-	}),
-);
-
-/** A project's own profiles (`.nightshift/profiles.json`), and the problems of its file. */
-export const projectProfilesSchema = z.object({
-	profiles: z.array(
-		z.intersection(
-			profileSchema,
-			z.object({
-				/** This computer has a profile of the same name, which wins. */
-				overridden: z.boolean(),
-			}),
-		),
-	),
-	issues: z.array(profileIssueSchema),
-});

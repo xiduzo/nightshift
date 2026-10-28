@@ -15,7 +15,7 @@ import type {
 	ToolResult,
 	Worktree,
 } from "@nightshift/engine";
-import type { FlowSources, ProfilesSource } from "@nightshift/flows";
+import type { FlowSources } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type {
 	WorkCall,
@@ -186,14 +186,6 @@ export function remoteDevice(
 			}
 			throw new Refusal("unavailable", stopped(device.name));
 		},
-		projectProfiles: async (projectId) => {
-			const call = ask({ kind: "projectProfiles" }, undefined, projectId);
-			for await (const reply of call) {
-				if (reply.kind === "result") return reply.value as ProfilesSource;
-				if (reply.kind === "error") throw refusalOf(reply);
-			}
-			throw new Refusal("unavailable", stopped(device.name));
-		},
 		session,
 		exec,
 		async callTool(input): Promise<ToolResult> {
@@ -242,9 +234,6 @@ export async function* serveWork(
 				return;
 			case "flows":
 				yield result(await device.flows(request.projectId));
-				return;
-			case "projectProfiles":
-				yield result(await device.projectProfiles(request.projectId));
 				return;
 			case "worktree":
 				yield result(await device.worktree(call.run));
