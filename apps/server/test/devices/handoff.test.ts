@@ -329,6 +329,21 @@ describe("nodes on two Devices", () => {
 		expect(onB?.branch).toBe(done?.branch);
 	}, 120_000);
 
+	test("B starts a flow it saved a moment ago: the Host waits for it and walks the run", async () => {
+		await flowIn(b, "fresh-on-b", [shell("hello", "echo fresh")]);
+		const started = await b.client.runs.start({
+			projectId,
+			flowName: "fresh-on-b",
+		});
+		const done = await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.status === "finished" || r?.status === "failed",
+			60_000,
+		);
+		expect(done?.status).toBe("finished");
+		expect(done?.walker.name).toBe(aName);
+	}, 120_000);
+
 	test("Move to: B walks a run A started, from A's archived checkpoint", async () => {
 		await flowIn(a, "moving", [
 			shell("before", "echo before"),

@@ -100,9 +100,24 @@ function fakeHost(
 
 async function* noReplies(): AsyncIterable<WorkReply> {}
 
-/** Links by Host: a client is an online Link, null an offline one, no key no Link. */
+/** The flow documents of a project, by name only: the relay reads their names. */
+const FLOWS = {
+	open: async (projectId: string) =>
+		({
+			current: { name: `flows:${projectId}` },
+			history: { name: `flow-history:${projectId}` },
+		}) as never,
+};
+
+/**
+ * Links by Host: a client is an online Link, null an offline one, no key
+ * no Link. `synced` says which documents the Host has as this computer
+ * has them (default: all); `checks` counts the asks for the Host now.
+ */
 function fakeLinks(
 	clients: Record<string, HostClient | null>,
+	synced: (name: string) => boolean = () => true,
+	checks: { count: number } = { count: 0 },
 ): Pick<DeviceLinks, "get"> {
 	return {
 		get(hostId) {
@@ -124,8 +139,10 @@ function fakeLinks(
 					if (!client) throw new Error("offline");
 					return client;
 				},
-				check: () => {},
-				synced: () => true,
+				check: () => {
+					checks.count++;
+				},
+				synced,
 				close: async () => {},
 			};
 		},
@@ -136,7 +153,14 @@ const hostSpaces = {
 	hostOf: async (spaceId: string) => HOSTS[spaceId] ?? null,
 };
 
-function relayWith(host = fakeHost()) {
+function relayWith(
+	host = fakeHost(),
+	options: {
+		synced?: (name: string) => boolean;
+		checks?: { count: number };
+		flowSyncMs?: number;
+	} = {},
+) {
 	const enqueued: unknown[] = [];
 	const relay = createRelay({
 		engine: () => ({
@@ -158,7 +182,16 @@ function relayWith(host = fakeHost()) {
 						? ({ id, revokedAt: 1 } as never)
 						: null,
 		}),
-		links: () => fakeLinks({ "host-1": host.client, "host-3": null }),
+		links: () =>
+			fakeLinks(
+				{ "host-1": host.client, "host-3": null },
+				options.synced,
+				options.checks,
+			),
+		flows: FLOWS,
+		...(options.flowSyncMs !== undefined
+			? { flowSyncMs: options.flowSyncMs }
+			: {}),
 	});
 	return { relay, host, enqueued };
 }
@@ -180,7 +213,7 @@ const ref = (spaceId: string) => ({
 });
 
 const start = (spaceId: string) => ({
-	flowId: "flow-1",
+	flowName: "flow-1",
 	projectId: "project-1",
 	inputs: {},
 	spaceId,
@@ -394,6 +427,48 @@ describe("the relay, for a Space a Host keeps", () => {
 		expect(enqueued).toEqual([]);
 	});
 
+	test("a run starts on the Host once the project's flows reached it", async () => {
+		let arrived = false;
+		const checks = { count: 0 };
+		const { relay, host } = relayWith(fakeHost(), {
+			synced: (name) =>
+				arrived ||
+				!["flows:project-1", "flow-history:project-1"].includes(name),
+			checks,
+		});
+		const started = relay.startRun(start("space-team") as never);
+		await Bun.sleep(150);
+		// A flow saved here a moment ago is still on its way: the Host is asked now.
+		expect(host.taken).toEqual([]);
+		expect(checks.count).toBe(1);
+		arrived = true;
+		expect(await started).toEqual({ runId: "run-on-host" });
+		expect(host.taken.map((t) => t.procedure)).toEqual(["sync.startRun"]);
+	});
+
+	test("a run start refuses in plain words when the flows do not reach the Host in time", async () => {
+		const { relay, host } = relayWith(fakeHost(), {
+			synced: (name) => name !== "flows:project-1",
+			flowSyncMs: 200,
+		});
+		await expect(relay.startRun(start("space-team") as never)).rejects.toThrow(
+			"The flows of this project have not reached the computer that keeps this Space yet. Start the run again in a moment.",
+		);
+		expect(host.taken).toEqual([]);
+	});
+
+	test("a quick run carries its flow: it starts on the Host at once", async () => {
+		const { relay, host } = relayWith(fakeHost(), {
+			synced: () => false,
+			flowSyncMs: 60_000,
+		});
+		const { flowName: _name, ...quick } = start("space-team");
+		expect(
+			await relay.startRun({ ...quick, flow: { nodes: [] } } as never),
+		).toEqual({ runId: "run-on-host" });
+		expect(host.taken.map((t) => t.procedure)).toEqual(["sync.startRun"]);
+	});
+
 	test("a live transcript is the Host's", async () => {
 		const { relay } = relayWith();
 		const entries = [];
@@ -569,6 +644,7 @@ describe("the relay of a paired Device", () => {
 					engine: () => paired.device,
 					registry: () => paired.device.devices,
 					links: () => fakeLinks({ [paired.hostId]: client }),
+					flows: FLOWS,
 				});
 
 			const online = relayOver(paired.memory.client(paired.key));
@@ -598,6 +674,7 @@ describe("the relay of a paired Device", () => {
 				registry: () => paired.device.devices,
 				links: () =>
 					fakeLinks({ [paired.hostId]: paired.memory.client(() => key) }),
+				flows: FLOWS,
 			});
 			const unknownRun = {
 				kind: "signal.send" as const,
