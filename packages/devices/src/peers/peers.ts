@@ -144,6 +144,7 @@ export function createPeers(
 		hostSpaces,
 		project: context.project,
 		...(context.profileFor ? { profileFor: context.profileFor } : {}),
+		flows: context.flows,
 		...(work ? { work } : {}),
 		...(relay ? { relay } : {}),
 		// Another Person's run here uses this computer through its Offers.

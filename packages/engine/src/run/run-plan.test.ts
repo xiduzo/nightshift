@@ -113,6 +113,7 @@ function devices(walkerProfiles: string[] = []): PlanDevices {
 		byName: async (name) =>
 			name === "this" ? walker : (others.find((d) => d.name === name) ?? null),
 		profileFor: (name) => (walkerProfiles.includes(name) ? PROFILE : null),
+		flows: async () => ({}),
 	};
 }
 

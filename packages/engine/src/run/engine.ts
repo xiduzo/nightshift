@@ -4,7 +4,14 @@ import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
 import type { Actor, MemberChange, StartRunInput } from "../contract";
 import { defaultRunSettings, type RunSettings } from "../device-config";
-import { createFlowFiles, fileProjectFlows } from "../flows";
+import {
+	createCloneImports,
+	createFlowDocuments,
+	createFlowFiles,
+	dismissNotice,
+	documentProjectFlows,
+	flowNotices,
+} from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
 	copyStamps,
@@ -76,8 +83,9 @@ import { wakeOfflineSleeps } from "./wake";
  *   events. `take-over.ts` is the other end of a move. `wake.ts` wakes
  *   the runs that slept for a Device that is back.
  * - `read/read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
- * - `flows/`: the flow files of a project. `schedules/`: the scheduler and
- *   the schedules file.
+ * - `flows/`: the flows and schedules of a project in its flow document,
+ *   and the import of a Clone's folder from before it. `schedules/`: the
+ *   scheduler and the webhooks.
  * - `cleanup/`: what ended runs left on this computer (worktrees and
  *   branches), their removal, and the scheduled sweep.
  * - `projects/`: projects by remote and their Clones on this computer,
@@ -215,6 +223,7 @@ export function createEngine(
 		createRunLog(db, { walkerId: options.walkerId || directory.selfId });
 	const documents =
 		options.spaceDocuments ?? createSpaceDocuments({ db, directory });
+	const flowDocuments = options.flowDocuments ?? createFlowDocuments({ db });
 
 	/** Whether a run's own worktree is on this computer, as its plan says. */
 	const placedHere = (row: RunRow) => {
@@ -254,6 +263,8 @@ export function createEngine(
 		documents,
 		now,
 		...(options.profileFor ? { profileFor: options.profileFor } : {}),
+		flows: async (projectId) =>
+			(await projectFlows.flows({ projectId })).sources,
 		ready: peersReady,
 		ownerId: () => ownerId,
 		// Every open step's reader asks on each change of the run: the run
@@ -281,10 +292,21 @@ export function createEngine(
 		git,
 		...(hosts ? { relay: hosts } : {}),
 	});
-	const projectFlows = fileProjectFlows({
-		find: projects.find,
-		get: projects.get,
-		elsewhere: placement.flowsElsewhere,
+	/** The flows and schedules of every project: its flow document (ADR 2). */
+	const projectFlows = documentProjectFlows({
+		documents: flowDocuments,
+		find: (projectId, spaceId) => projects.find(projectId, spaceId),
+		deviceId: () => runLog.walkerId(),
+		now,
+	});
+	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
+	const cloneImports = createCloneImports({
+		db,
+		documents: flowDocuments,
+		git,
+		device: async () => ({ id: await runLog.walkerId(), name: device.name }),
+		profiles: options.profiles,
+		now,
 	});
 	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`
 	// handover) ends it.
@@ -345,6 +367,8 @@ export function createEngine(
 			// leaves it for the next start.
 			projects.readRemotes().catch(() => {}),
 		)
+		// The flows of each Clone from before ADR 2, once: before a schedule fires.
+		.then(() => cloneImports.all())
 		// Whose runs are this computer's own: another Person's take an Offer.
 		.then(async () => {
 			ownerId = await directory.selfOwnerId();
@@ -501,6 +525,13 @@ export function createEngine(
 		runCopies,
 		placement,
 		flowFiles: createFlowFiles({ flows: projectFlows }),
+		flowNotices: {
+			list: async (projectId) =>
+				flowNotices(await flowDocuments.open(projectId)),
+			dismiss: async (projectId, id) =>
+				dismissNotice(await flowDocuments.open(projectId), id),
+		},
+		importClone: (projectId) => cloneImports.project(projectId),
 		kept: {
 			list: (flow) => listKeptValues(db, flow),
 			reset: (flow, name) => resetKeptValue(db, flow, name),

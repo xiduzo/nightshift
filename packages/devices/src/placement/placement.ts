@@ -74,6 +74,8 @@ export type PlacementDeps = {
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
 	/** An Agent Profile of this computer by name. Default: none. */
 	profileFor?: (name: string) => ProfileSettings | null;
+	/** The project's flows, from this Replica's flow document: what a run starts from. */
+	flows(projectId: string): Promise<FlowSources>;
 	/** How calls reach other Devices. Without it, every step runs here. */
 	work?: WorkRelay;
 	/** The Hosts this computer links to. */
@@ -437,7 +439,7 @@ export function createPlacement(deps: PlacementDeps) {
 		project: ListedProject,
 		runId: string,
 		starter: string | null,
-	): Promise<Omit<PlanDevices, "profileFor">> {
+	): Promise<Omit<PlanDevices, "profileFor" | "flows">> {
 		const spaceId = project.spaceId;
 		const owner = await ownerHere(spaceId);
 		// A run without a starter uses this computer's owner's Devices.
@@ -581,6 +583,7 @@ export function createPlacement(deps: PlacementDeps) {
 			{
 				...(await devicesOf(project, runId, personId)),
 				profileFor: deps.profileFor ?? (() => null),
+				flows: deps.flows,
 			},
 			personId,
 		);

@@ -274,14 +274,10 @@ describe("a run placed on another Device", () => {
 				personId,
 			});
 		}
+		// The flows come from this Replica's flow document: B is not asked for them.
+		expect(requests.map((r) => r.call.kind)).not.toContain("flows");
 		expect(requests.map((r) => r.call.kind)).toEqual(
-			expect.arrayContaining([
-				"flows",
-				"capabilities",
-				"worktree",
-				"exec",
-				"session",
-			]),
+			expect.arrayContaining(["capabilities", "worktree", "exec", "session"]),
 		);
 	});
 
@@ -314,8 +310,10 @@ describe("a run placed on another Device", () => {
 		await waitFor(() => running === 0, { label: "B's command to end" });
 	});
 
-	test("the flows come from that Device's Clone, and the project is renamed without one here", async () => {
-		await seedFlows(b.repoPath, { hello: flow([command("hi", "echo hi")]) });
+	test("the flows come from this Replica's flow document, and the project is renamed without a Clone here", async () => {
+		await seedFlows(space(), projectId, {
+			hello: flow([command("hi", "echo hi")]),
+		});
 		expect(await space().listPlacements(projectId)).toEqual([
 			{ deviceId: B, name: "studio-b", thisDevice: false },
 		]);
@@ -904,6 +902,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			documents: spaceDocuments,
 			hostSpaces: createHostSpaces(b.db),
 			project: async () => ({ repoPath: null }) as ListedProject,
+			flows: async () => ({}),
 			relay: {
 				devices: async () => {
 					if (!options.devices) throw new HostUnreachableError();
@@ -1044,6 +1043,7 @@ describe("the walk, from the plan alone", () => {
 			project: async () => {
 				throw new Error("No project here.");
 			},
+			flows: async () => ({}),
 			work,
 		});
 	const row = (fields: object) =>
@@ -1105,6 +1105,7 @@ describe("a run with no starter", () => {
 			project: async () => {
 				throw new Error("No project here.");
 			},
+			flows: async () => ({}),
 			work,
 		});
 		// A run from before every run had a starter, moved here.
@@ -1160,7 +1161,8 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		await mustGit(b.repoPath, ["remote", "add", "origin", remote]);
 		// The schedule names no Person: it fires here, for A's owner.
 		await seedFlows(
-			a.repoPath,
+			engine.space(a.spaceId),
+			projectId,
 			{
 				night: flow([
 					{ ...command("there", "echo from B"), device: "studio-b" },

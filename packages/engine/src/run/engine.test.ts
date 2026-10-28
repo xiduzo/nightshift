@@ -29,6 +29,7 @@ import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
 import type { RunDetail, RunStreamItem } from "../read/views";
+import { seedFlowFolder } from "../testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -347,18 +348,46 @@ describe("projects", () => {
 });
 
 describe("flows", () => {
-	test("save, list, get and delete go to .nightshift/flows in the clone", async () => {
+	test("save, list, get and delete go to the flow document, not the clone", async () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const id = await projectId(engine);
 		const flow = retryFlow("true", 2);
 		expect(await engine.saveFlow(id, "retry", flow)).toEqual([]);
-		expect(
-			existsSync(join(sandbox.repoPath, ".nightshift", "flows", "retry.json")),
-		).toBe(true);
+		expect(existsSync(join(sandbox.repoPath, ".nightshift"))).toBe(false);
 		expect((await engine.listFlows(id)).map((f) => f.name)).toEqual(["retry"]);
 		expect((await engine.getFlow(id, "retry")).flow).toEqual(flow);
 		await engine.deleteFlow(id, "retry");
 		expect(await engine.listFlows(id)).toEqual([]);
+	});
+
+	test("a folder from before flows were Night Shift data comes in when the project is added, with a notice a person dismisses", async () => {
+		await seedFlowFolder(sandbox.repoPath, { retry: retryFlow("true", 2) });
+		await mustGit(sandbox.repoPath, ["add", ".nightshift"]);
+		await mustGit(sandbox.repoPath, [
+			"-c",
+			"user.name=t",
+			"-c",
+			"user.email=t@nightshift.invalid",
+			"-c",
+			"commit.gpgsign=false",
+			"commit",
+			"-q",
+			"-m",
+			"flows",
+		]);
+		const engine = makeEngine(scriptedHarness().harness);
+
+		const id = await projectId(engine);
+
+		expect((await engine.getFlow(id, "retry")).flow).toEqual(
+			retryFlow("true", 2),
+		);
+		const notices = await engine.listFlowNotices(id);
+		expect(notices.map((notice) => notice.message)).toEqual([
+			"Night Shift imported the .nightshift folder on test. Git tracks that folder, so Night Shift left it in place. Remove it in a commit.",
+		]);
+		await engine.dismissFlowNotice(id, notices[0]?.id ?? "");
+		expect(await engine.listFlowNotices(id)).toEqual([]);
 	});
 });
 

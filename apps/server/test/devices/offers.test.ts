@@ -20,6 +20,7 @@ import { RPCLink } from "@orpc/client/fetch";
 import {
 	type Daemon,
 	pair,
+	savesOn,
 	startDaemon,
 	stopDaemon,
 	waitFor,
@@ -88,9 +89,9 @@ function repo(name: string): string {
 	return path;
 }
 
-/** A flow in B's Clone with one Agent node. */
-async function flowOnB(name: string, agent: Record<string, unknown>) {
-	await seedFlows(folderOnB, {
+/** A flow of the project with one Agent node, saved on A: the Host, where the colleague starts it. */
+async function saveFlow(name: string, agent: Record<string, unknown>) {
+	await seedFlows(savesOn(a), projectId, {
 		[name]: {
 			version: 6,
 			inputs: [],
@@ -224,7 +225,7 @@ beforeAll(async () => {
 			connections: [],
 		})
 	).id;
-	await flowOnB("offered", { profile: "coder" });
+	await saveFlow("offered", { profile: "coder" });
 }, 180_000);
 
 afterAll(async () => {
@@ -311,11 +312,11 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 60_000);
 
 	test("naming another profile, or a wider permission mode, is refused at start", async () => {
-		await flowOnB("other", { profile: "claude" });
+		await saveFlow("other", { profile: "claude" });
 		await expect(
 			colleague.runs.start({ projectId, flowName: "other", deviceId: bId }),
 		).rejects.toThrow(`${bName} offers "coder" to this Space, not "claude".`);
-		await flowOnB("wide", {
+		await saveFlow("wide", {
 			profile: "coder",
 			permissionMode: "bypassPermissions",
 		});

@@ -14,6 +14,7 @@ import { seedFlows } from "@nightshift/engine/testing";
 import {
 	type Daemon,
 	pair,
+	savesOn,
 	startDaemon,
 	stopDaemon,
 	waitFor,
@@ -68,9 +69,9 @@ function repo(name: string): string {
 	return path;
 }
 
-/** A flow file in a Clone. */
-async function flowIn(folder: string, name: string, nodes: unknown[]) {
-	await seedFlows(folder, {
+/** A flow of the project, saved on that daemon. */
+async function flowIn(daemon: Daemon, name: string, nodes: unknown[]) {
+	await seedFlows(savesOn(daemon), projectId, {
 		[name]: {
 			version: 6,
 			inputs: [],
@@ -184,7 +185,7 @@ afterAll(async () => {
 describe("nodes on two Devices", () => {
 	test("A walks a run whose middle node runs on B: the work goes there and back", async () => {
 		expect(aName).not.toBe(bName);
-		await flowIn(folderOnA, "relay", [
+		await flowIn(a, "relay", [
 			commits("one", "one.txt"),
 			commits("two", "two.txt", bName),
 			shell("three", "ls"),
@@ -217,7 +218,7 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("a dirty worktree fails the step that needs the work on the other Device", async () => {
-		await flowIn(folderOnA, "dirty", [
+		await flowIn(a, "dirty", [
 			shell("scribble", "echo draft > draft.txt"),
 			shell("there", "ls", bName),
 		]);
@@ -236,7 +237,7 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("B walks a run with a node on A: the call goes through A, and the work moves both ways", async () => {
-		await flowIn(folderOnB, "visit", [
+		await flowIn(b, "visit", [
 			commits("here", "here.txt"),
 			commits("there", "there.txt", aName),
 			shell("back", "ls"),
@@ -263,7 +264,7 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("a node whose Device is offline sleeps, and continues when it is back", async () => {
-		await flowIn(folderOnA, "later", [
+		await flowIn(a, "later", [
 			shell("first", "sleep 2"),
 			shell("there", "echo from B", bName),
 		]);
@@ -289,7 +290,7 @@ describe("nodes on two Devices", () => {
 	}, 120_000);
 
 	test("Move to: B walks a run A started, from A's archived checkpoint", async () => {
-		await flowIn(folderOnA, "moving", [
+		await flowIn(a, "moving", [
 			shell("before", "echo before"),
 			{
 				id: "ask",

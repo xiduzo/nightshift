@@ -162,7 +162,8 @@ const settle = () => Bun.sleep(TICK_MS * 12);
 async function setup(engine: SpaceEngine, schedules: Schedule[], flow?: Flow) {
 	const project = await engine.addProject({ repoPath: sandbox.repoPath });
 	await seedFlows(
-		sandbox.repoPath,
+		engine,
+		project.id,
 		{ night: flow ?? commandFlow() },
 		schedules,
 	);
@@ -479,7 +480,7 @@ describe("the scheduler", () => {
 		expect(facts).toHaveLength(1);
 	});
 
-	test("picks up an edit of the file on the next tick, without a restart", async () => {
+	test("picks up an edit of the schedules on the next tick, without a restart", async () => {
 		const { engine } = startDaemon();
 		const project = await setup(engine, [nightly({ cron: "0 23 * * *" })]);
 		await settle();

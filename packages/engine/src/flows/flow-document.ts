@@ -686,7 +686,7 @@ export type DocumentProjectFlowsDeps = {
 	/** The project, in the Space when one is given. Throws when it is not there. */
 	find(projectId: string, spaceId?: string): Promise<unknown>;
 	/** This Device: where a save happens. */
-	deviceId: string;
+	deviceId: string | (() => Promise<string>);
 	/** The clock of a revision. Default `Date.now`. */
 	now?: () => number;
 };
@@ -725,7 +725,10 @@ export function documentProjectFlows(
 				flow,
 				kind: "save",
 				personId: personId ?? null,
-				deviceId: deps.deviceId,
+				deviceId:
+					typeof deps.deviceId === "string"
+						? deps.deviceId
+						: await deps.deviceId(),
 				at: now(),
 			});
 			const current: Flow = { ...flow, version: FLOW_VERSION };

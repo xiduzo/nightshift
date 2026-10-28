@@ -56,6 +56,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 							id === device.id || id === self ? walker : null,
 						byName: async (name) => (name === device.name ? walker : null),
 						profileFor: context.profileFor ?? (() => null),
+						flows: context.flows,
 					},
 					start.startedBy ?? context.ownerId(),
 				);

@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
+import type { SpaceEngine } from "@nightshift/engine";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { Subprocess } from "bun";
@@ -22,6 +23,21 @@ export type Daemon = {
 	client: AppRouterClient;
 	process: Subprocess<"ignore", "ignore", "pipe">;
 };
+
+/**
+ * The flow saves of a daemon, as a person makes them in its Space: what
+ * `seedFlows` takes. Every Device of the Space gets them through the Host.
+ */
+export function savesOn(
+	daemon: Daemon,
+): Pick<SpaceEngine, "saveFlow" | "saveSchedules"> {
+	return {
+		saveFlow: (projectId, name, flow) =>
+			daemon.client.flows.save({ projectId, name, flow }),
+		saveSchedules: (projectId, schedules) =>
+			daemon.client.schedules.save({ projectId, schedules: [...schedules] }),
+	};
+}
 
 export async function freePort(): Promise<number> {
 	const probe = Bun.serve({

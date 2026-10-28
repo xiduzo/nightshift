@@ -22,7 +22,7 @@ import { saverFor } from "../graph/checkpointer";
 import { appendEvent } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { RunDetail, StepSummary } from "../read/views";
-import { seedFlows } from "../testing/seed-flows";
+import { seedFlowFolder } from "../testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -154,7 +154,7 @@ function flowOf(
 }
 
 async function saveFlow(name: string, flow: FlowInput | unknown) {
-	await seedFlows(sandbox.repoPath, { [name]: flow });
+	await seedFlowFolder(sandbox.repoPath, { [name]: flow });
 }
 
 async function projectId(engine: SpaceEngine): Promise<string> {
@@ -1303,7 +1303,7 @@ describe("flow format 1", () => {
 				await readFile(join(fixtures, `${name}.json`), "utf8"),
 			);
 		}
-		await seedFlows(sandbox.repoPath, flows);
+		await seedFlowFolder(sandbox.repoPath, flows);
 		// What the night's commands need: an ignored `.build/`, the script, and `gh`.
 		await writeFile(join(sandbox.repoPath, ".gitignore"), ".build/\n");
 		await mkdir(join(sandbox.repoPath, "tools", "night-shift"), {

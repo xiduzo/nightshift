@@ -6,6 +6,7 @@ import { ownerProcedure, protectedProcedure } from "../procedures";
 import {
 	flowIssueSchema,
 	flowListItemSchema,
+	flowNoticeSchema,
 	keptValueSchema,
 	loadedFlowSchema,
 } from "./schemas";
@@ -70,6 +71,24 @@ export const flows = {
 		.input(flowRef.extend({ variable: nameSchema }))
 		.handler(({ context, input }) =>
 			context.space.resetKeptValue(input.projectId, input.name, input.variable),
+		),
+	/** What the import on upgrade did that a person must know, oldest first. */
+	notices: protectedProcedure
+		.route({
+			summary:
+				"Lists the notices of a project's flows: what the import of its flow folder did.",
+		})
+		.output(output(z.array(flowNoticeSchema)))
+		.input(z.object({ projectId: z.string() }))
+		.handler(({ context, input }) =>
+			context.space.listFlowNotices(input.projectId),
+		),
+	dismissNotice: ownerProcedure
+		.route({ summary: "Removes a notice of a project's flows." })
+		.output(output(z.void()))
+		.input(z.object({ projectId: z.string(), id: z.string() }))
+		.handler(({ context, input }) =>
+			context.space.dismissFlowNotice(input.projectId, input.id),
 		),
 	remove: ownerProcedure
 		.route({ summary: "Removes a flow file from the project." })
