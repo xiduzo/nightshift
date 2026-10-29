@@ -1,3 +1,4 @@
+import { delimiter } from "node:path";
 import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
 	AgentHarness,
@@ -104,7 +105,7 @@ export type LocalDeviceDeps = {
 	 * The CLI tools' launchers and logins (`createToolLaunchers`). Without
 	 * it, a tool runs the program of its name with this computer's sign-in.
 	 */
-	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "guarded">;
+	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "forCommand" | "guarded">;
 	/**
 	 * The folder of a project's Clone on this computer, or null when it has
 	 * none. Without it, this computer has no Clones: a run cannot start here.
@@ -308,6 +309,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	 * environment, on this computer: one it does not have refuses the
 	 * command before it starts. Their values go to the command only; its
 	 * output has them as `•••` before it leaves this computer.
+	 *
+	 * Each CLI tool with a login runs through its launcher, found first on
+	 * PATH: `gh` in the command runs as the gh tool. The login's values go
+	 * to the launcher only, and come back as `•••` too.
 	 */
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
 		const { secrets = [], ...command } = input;
@@ -316,22 +321,32 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		const scrub = (deps.toolLaunchers?.guarded() ?? []).filter(
 			(name) => !secrets.includes(name),
 		);
-		if (secrets.length === 0) {
-			yield* spawnCommand(command, scrub);
-			return;
-		}
-		const found = await secretEnv(secrets);
+		const found =
+			secrets.length > 0
+				? await secretEnv(secrets)
+				: { ok: true as const, env: {} };
 		if (!found.ok) {
 			yield { type: "refused", message: missingSecretsMessage(found.missing) };
 			return;
 		}
-		yield* redactExec(
-			spawnCommand(
-				{ ...command, env: { ...command.env, ...found.env } },
-				scrub,
-			),
-			Object.values(found.env),
-		);
+		const tools = (await deps.toolLaunchers?.forCommand()) ?? null;
+		try {
+			const env: Record<string, string> = {
+				...command.env,
+				...tools?.env,
+				...found.env,
+			};
+			if (tools?.toolsPath) {
+				env.PATH = [tools.toolsPath, command.env?.PATH ?? process.env.PATH]
+					.filter(Boolean)
+					.join(delimiter);
+			}
+			const hidden = [...Object.values(found.env), ...(tools?.values ?? [])];
+			const events = spawnCommand({ ...command, env }, scrub);
+			yield* hidden.length > 0 ? redactExec(events, hidden) : events;
+		} finally {
+			await tools?.cleanup();
+		}
 	}
 
 	/** The folder of the project's Clone here; throws without one. */

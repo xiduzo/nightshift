@@ -2,7 +2,11 @@ import { Button } from "@nightshift/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import { ZapIcon } from "lucide-react";
 import { useState } from "react";
-import { ProjectMenu, ProjectPage, projectFolder } from "@/features/projects";
+import {
+	ProjectFolderLine,
+	ProjectMenu,
+	ProjectPage,
+} from "@/features/projects";
 import { QuickRunDialog } from "@/features/runs";
 import { PageHeading } from "@/shared/page";
 import { FlowHealth } from "./flow-health";
@@ -28,14 +32,7 @@ export function ProjectDashboardPage({ projectId }: { projectId: string }) {
 				<>
 					<PageHeading
 						title={project.name}
-						description={
-							<span
-								className="block truncate font-mono"
-								title={projectFolder(project)}
-							>
-								{projectFolder(project)}
-							</span>
-						}
+						description={<ProjectFolderLine project={project} />}
 						actions={
 							<>
 								<Button

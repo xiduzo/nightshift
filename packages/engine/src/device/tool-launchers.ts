@@ -34,6 +34,9 @@ import { redactText } from "./redact";
  * value it reads changes. A tool with a git host makes git there ask the
  * tool, through `GIT_CONFIG_COUNT`: no file changes.
  *
+ * A command gets the launchers of every tool with a login, so `gh` in a
+ * command signs in as the gh tool.
+ *
  * The variables that logins read are the guarded ones: no agent or
  * command gets them from Night Shift's own environment. A Command node
  * that names one in `secrets` still gets it.
@@ -77,6 +80,12 @@ export type ToolLaunchers = {
 	prepare(
 		names: readonly string[],
 	): Promise<({ ok: true } & PreparedTools) | { ok: false; message: string }>;
+	/**
+	 * Prepares every CLI tool with a login, for a command: `gh` in the
+	 * command then runs as the gh tool. A tool that cannot run is left out,
+	 * and the program says what it misses.
+	 */
+	forCommand(): Promise<PreparedTools>;
 	/** Signs a tool's login in now, with its folder. */
 	signIn(name: string): Promise<SignInResult>;
 	/** When the tool last signed in, or null. */
@@ -336,108 +345,137 @@ export function createToolLaunchers(options: {
 			"",
 		].join("\n");
 
-	return {
-		guarded,
-		async prepare(names) {
-			const launchers: {
-				tool: CliTool;
-				path: string;
-				env: Record<string, string>;
-			}[] = [];
-			const git = new Map<string, { tool: string; helper: string }>();
-			const values: string[] = [];
-			for (const name of new Set(names)) {
-				const tool = tools.get(name);
-				if (!tool) continue;
-				const needsLauncher = tool.login !== null || tool.program !== null;
-				if (!needsLauncher && tool.git === null) continue;
-				const program = programOf(tool);
-				const path = which(program);
-				if (path === null) {
+	/**
+	 * The launchers and git settings of the tools `names`. Strict, the first
+	 * tool that cannot run stops the step, with what to fix. Not strict, that
+	 * tool is left out, and so is git's setting for a host two tools sign in
+	 * to: the step runs without them.
+	 */
+	async function build(
+		names: readonly string[],
+		strict: boolean,
+	): Promise<({ ok: true } & PreparedTools) | { ok: false; message: string }> {
+		const launchers: {
+			tool: CliTool;
+			path: string;
+			env: Record<string, string>;
+		}[] = [];
+		const git = new Map<string, { tool: string; helper: string }>();
+		const values: string[] = [];
+		/** Hosts that two tools sign in to: git keeps its own settings there. */
+		const shared = new Set<string>();
+		for (const name of new Set(names)) {
+			const tool = tools.get(name);
+			if (!tool) continue;
+			const needsLauncher = tool.login !== null || tool.program !== null;
+			if (!needsLauncher && tool.git === null) continue;
+			const program = programOf(tool);
+			const path = which(program);
+			if (path === null) {
+				if (!strict) continue;
+				return {
+					ok: false,
+					message: `The CLI tool ${tool.name} runs ${program}, but this computer does not have it. Install ${program}, or change the tool.`,
+				};
+			}
+			let vars: Record<string, string> = {};
+			if (tool.login) {
+				const resolved = await resolveLogin(tool, tool.login);
+				if (!resolved.ok) {
+					if (!strict) continue;
+					return resolved;
+				}
+				const signedIn = await ensureSignedIn(
+					tool,
+					tool.login,
+					resolved,
+					false,
+				);
+				if (!signedIn.ok) {
+					if (!strict) continue;
 					return {
 						ok: false,
-						message: `The CLI tool ${tool.name} runs ${program}, but this computer does not have it. Install ${program}, or change the tool.`,
+						message: `The CLI tool ${tool.name} could not sign in. ${signedIn.output || "Its sign-in command failed."} Check its login under Agents → Tools, then start the run again.`,
 					};
 				}
-				let vars: Record<string, string> = {};
-				if (tool.login) {
-					const resolved = await resolveLogin(tool, tool.login);
-					if (!resolved.ok) return resolved;
-					const signedIn = await ensureSignedIn(
-						tool,
-						tool.login,
-						resolved,
-						false,
-					);
-					if (!signedIn.ok) {
-						return {
-							ok: false,
-							message: `The CLI tool ${tool.name} could not sign in. ${signedIn.output || "Its sign-in command failed."} Check its login under Agents → Tools, then start the run again.`,
-						};
-					}
-					vars = resolved.env;
-					values.push(...resolved.values);
-				}
-				if (needsLauncher) launchers.push({ tool, path, env: vars });
-				if (tool.git) {
-					const other = git.get(tool.git.host);
-					if (other) {
-						return {
-							ok: false,
-							message: `Two CLI tools of this step sign in to git on ${tool.git.host}: ${other.tool} and ${tool.name}. Take the git host off one of them.`,
-						};
-					}
+				vars = resolved.env;
+				values.push(...resolved.values);
+			}
+			if (needsLauncher) launchers.push({ tool, path, env: vars });
+			if (tool.git) {
+				const other = git.get(tool.git.host);
+				if (!other) {
 					git.set(tool.git.host, { tool: tool.name, helper: tool.git.helper });
+				} else if (strict) {
+					return {
+						ok: false,
+						message: `Two CLI tools of this step sign in to git on ${tool.git.host}: ${other.tool} and ${tool.name}. Take the git host off one of them.`,
+					};
+				} else {
+					shared.add(tool.git.host);
 				}
 			}
-			if (launchers.length === 0 && git.size === 0) {
-				return {
-					ok: true,
-					toolsPath: null,
-					env: {},
-					values: [],
-					cleanup: async () => {},
-				};
-			}
-			const folder =
-				launchers.length > 0
-					? await mkdtemp(
-							join(options.tempDir ?? tmpdir(), "nightshift-tools-"),
-						)
-					: null;
-			const cleanup = async () => {
-				if (folder) await rm(folder, { recursive: true, force: true });
+		}
+		for (const host of shared) git.delete(host);
+		if (launchers.length === 0 && git.size === 0) {
+			return {
+				ok: true,
+				toolsPath: null,
+				env: {},
+				values: [],
+				cleanup: async () => {},
 			};
-			try {
-				if (folder) {
-					await chmod(folder, 0o700);
-					for (const { tool, path, env: vars } of launchers) {
-						const file = join(folder, tool.name);
-						await writeFile(file, launcher(tool, path, vars), { mode: 0o700 });
-						await chmod(file, 0o700);
-					}
+		}
+		const folder =
+			launchers.length > 0
+				? await mkdtemp(join(options.tempDir ?? tmpdir(), "nightshift-tools-"))
+				: null;
+		const cleanup = async () => {
+			if (folder) await rm(folder, { recursive: true, force: true });
+		};
+		try {
+			if (folder) {
+				await chmod(folder, 0o700);
+				for (const { tool, path, env: vars } of launchers) {
+					const file = join(folder, tool.name);
+					await writeFile(file, launcher(tool, path, vars), { mode: 0o700 });
+					await chmod(file, 0o700);
 				}
-				return {
-					ok: true,
-					toolsPath: folder,
-					env: gitEnv(
-						git,
-						(name) => {
-							const tool = tools.get(name);
-							if (folder && tool && (tool.login || tool.program)) {
-								return join(folder, name);
-							}
-							return tool ? (which(programOf(tool)) ?? programOf(tool)) : name;
-						},
-						env,
-					),
-					values: [...new Set(values)],
-					cleanup,
-				};
-			} catch (error) {
-				await cleanup();
-				throw error;
 			}
+			return {
+				ok: true,
+				toolsPath: folder,
+				env: gitEnv(
+					git,
+					(name) => {
+						const tool = tools.get(name);
+						if (folder && tool && (tool.login || tool.program)) {
+							return join(folder, name);
+						}
+						return tool ? (which(programOf(tool)) ?? programOf(tool)) : name;
+					},
+					env,
+				),
+				values: [...new Set(values)],
+				cleanup,
+			};
+		} catch (error) {
+			await cleanup();
+			throw error;
+		}
+	}
+
+	return {
+		guarded,
+		prepare: (names) => build(names, true),
+		async forCommand() {
+			const names = tools
+				.list()
+				.flatMap((tool) => (tool.login ? [tool.name] : []));
+			const built = await build(names, false);
+			// Not strict: nothing stops it.
+			if (!built.ok) throw new Error(built.message);
+			return built;
 		},
 		async signIn(name) {
 			const tool = tools.get(name);
