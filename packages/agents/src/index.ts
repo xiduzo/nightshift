@@ -91,7 +91,6 @@ export {
 export {
 	type CliToolCheck,
 	checkCli,
-	cliHelp,
 	type McpTestResult,
 	type McpToolCall,
 	type McpToolInfo,

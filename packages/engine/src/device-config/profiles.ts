@@ -36,8 +36,14 @@ export type ProfileStore = {
 	get(id: string): ProfileView | null;
 	/** The profile with that name, as a flow names it. */
 	byName(name: string): ProfileView | null;
-	/** What a run resolves a node with, or null when there is no such profile. */
-	settingsFor(id: string): ProfileSettings | null;
+	/**
+	 * What a run resolves a node with, or null when there is no such
+	 * profile. A flow names a profile by its id. A Walker of an older Night
+	 * Shift asks by the name: an old profile's id is its name, and a newer
+	 * profile of that name is found by it. Only this Device's own profiles:
+	 * never another Device's of the same name (ADR 3).
+	 */
+	settingsFor(ref: string): ProfileSettings | null;
 	/** Adds a profile, or replaces the one of `id`. A rename keeps the id. */
 	save(input: Profile, id?: string): Promise<ProfileView>;
 	remove(id: string): Promise<void>;
@@ -138,8 +144,10 @@ export function createProfileStore(options: {
 		list,
 		get: (id) => profiles().get(id) ?? null,
 		byName: (name) => list().find((p) => p.name === name) ?? null,
-		settingsFor(id) {
-			const found = profiles().get(id);
+		settingsFor(ref) {
+			// An id never equals a name (`newProfileId`): the two never mix up.
+			const found =
+				profiles().get(ref) ?? list().find((p) => p.name === ref) ?? null;
 			if (!found) return null;
 			const {
 				id: _id,

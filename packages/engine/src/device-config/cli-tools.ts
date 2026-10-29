@@ -1,3 +1,4 @@
+import { cliHelp } from "@nightshift/agents/tools";
 import { cliNameSchema, type Login, loginSchema } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -69,6 +70,13 @@ export type CliToolStore = {
 	names(): ReadonlySet<string>;
 	list(): CliTool[];
 	get(name: string): CliTool | null;
+	/** The program a tool of that name runs. A name no tool has is a program. */
+	program(name: string): string;
+	/**
+	 * What an agent learns about the tools of these names when its session
+	 * starts: each description, and the program's own help.
+	 */
+	guides(names: readonly string[]): Promise<CliToolGuide[]>;
 	/** Creates or replaces a CLI tool. */
 	save(input: CliToolInput): Promise<CliTool>;
 	remove(name: string): Promise<void>;
@@ -99,8 +107,11 @@ function loginOrNull(login: Login | undefined): Login | null {
 
 export function createCliToolStore(options: {
 	document: DeviceDocument;
+	/** A program's own help (`--help`), or null. Default: `cliHelp`. */
+	help?: (program: string) => Promise<string | null>;
 }): CliToolStore {
 	const { document } = options;
+	const help = options.help ?? ((program: string) => cliHelp(program));
 	const tools = mapView(document, document.cliTools, () => {
 		const out = new Map<string, CliTool>();
 		for (const [name, value] of document.cliTools.entries()) {
@@ -118,6 +129,20 @@ export function createCliToolStore(options: {
 		list: () =>
 			[...tools().values()].sort((a, b) => a.name.localeCompare(b.name)),
 		get: (name) => tools().get(name) ?? null,
+		program: (name) => programOf(tools().get(name) ?? { name, program: null }),
+		guides: (names) =>
+			Promise.all(
+				names.map(async (name): Promise<CliToolGuide> => {
+					const tool = tools().get(name);
+					return {
+						name,
+						...(tool?.program ? { program: tool.program } : {}),
+						...(tool?.login ? { login: true } : {}),
+						description: tool?.description ?? null,
+						help: await help(tool ? programOf(tool) : name),
+					};
+				}),
+			),
 		async save(input) {
 			const parsed = cliToolInputSchema.parse(input);
 			const saved: CliTool = {

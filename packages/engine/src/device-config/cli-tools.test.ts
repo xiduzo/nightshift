@@ -48,6 +48,40 @@ describe("createCliToolStore", () => {
 		expect([...third.names()]).toEqual(["gh"]);
 	});
 
+	test("a tool's program and guide: its own program, else its name; a name no tool has is a program", async () => {
+		const asked: string[] = [];
+		const store = createCliToolStore({
+			document: await sandbox.openDocument(),
+			help: async (program) => {
+				asked.push(program);
+				return program === "gh" ? "Work with GitHub." : null;
+			},
+		});
+		await store.save({
+			name: "gh-work",
+			program: "gh",
+			description: "The work account.",
+			login: { env: { GH_TOKEN: "${GH_WORK_TOKEN}" } },
+		});
+		await store.save({ name: "jq" });
+
+		expect(store.program("gh-work")).toBe("gh");
+		expect(store.program("jq")).toBe("jq");
+		expect(store.program("rg")).toBe("rg");
+		expect(await store.guides(["gh-work", "jq", "rg"])).toEqual([
+			{
+				name: "gh-work",
+				program: "gh",
+				login: true,
+				description: "The work account.",
+				help: "Work with GitHub.",
+			},
+			{ name: "jq", description: null, help: null },
+			{ name: "rg", description: null, help: null },
+		]);
+		expect(asked).toEqual(["gh", "jq", "rg"]);
+	});
+
 	test("keeps a tool's program, login and git host", async () => {
 		const store = createCliToolStore({
 			document: await sandbox.openDocument(),

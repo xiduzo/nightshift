@@ -284,8 +284,12 @@ describe("createProfileStore", () => {
 		expect(again.get(id)?.description).toBe("Builds.");
 		expect(again.byName("builder")?.id).toBe(id);
 		expect(again.settingsFor(id)).toEqual(builder);
+		// A Walker of an older Night Shift asks by the name.
+		expect(again.settingsFor("builder")).toEqual(builder);
+		expect(again.settingsFor("nobody")).toBeNull();
 		await again.remove(id);
 		expect(again.settingsFor(id)).toBeNull();
+		expect(again.settingsFor("builder")).toBeNull();
 		const third = createProfileStore({
 			document: await sandbox.openDocument(),
 		});

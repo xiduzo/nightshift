@@ -12,14 +12,9 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
-import type { CliToolStore } from "./cli-tools";
-import type {
-	Connection,
-	ConnectionInput,
-	ConnectionStore,
-} from "./connections";
+import type { ConfigStores } from "./config-stores";
+import type { Connection, ConnectionInput } from "./connections";
 import type { ProfileStore, ProfileView } from "./profiles";
-import type { SettingsStore } from "./settings";
 
 /**
  * The edits of this computer's configuration that touch more than one store:
@@ -27,14 +22,6 @@ import type { SettingsStore } from "./settings";
  * the profiles that name it, and the harnesses are settings. Each function
  * checks, then writes, in one fixed order. The API's procedures call them.
  */
-
-/** The stores of the configuration, as the API's context holds them. */
-export type ConfigStores = {
-	settings: SettingsStore;
-	connections: ConnectionStore;
-	cliTools: CliToolStore;
-	profiles: ProfileStore;
-};
 
 /** The custom agent of that flow name on this computer, or undefined. */
 export function customAgentOf(

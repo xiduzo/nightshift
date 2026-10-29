@@ -12,6 +12,7 @@ export {
 	createCliToolStore,
 	programOf,
 } from "./cli-tools";
+export { openConfigStores } from "./config-stores";
 export type {
 	Connection,
 	ConnectionStore,

@@ -77,6 +77,7 @@ export {
 	isLoopbackHost,
 	type KeyStoreKind,
 	lastKnownProfiles,
+	openConfigStores,
 	openDeviceDocument,
 	type ProfileStore,
 	type ProfileView,

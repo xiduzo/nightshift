@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { AgentProfile } from "@nightshift/flows";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createCliToolStore } from "./cli-tools";
-import { createConnectionStore, type SecretBackend } from "./connections";
+import { type ConfigStores, openConfigStores } from "./config-stores";
+import type { SecretBackend } from "./connections";
 import {
 	addHarness,
-	type ConfigStores,
 	removeCliTool,
 	removeConnection,
 	removeHarness,
@@ -13,8 +12,6 @@ import {
 	saveCustomAgent,
 	saveProfile,
 } from "./edits";
-import { createProfileStore } from "./profiles";
-import { createSettingsStore } from "./settings";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -31,19 +28,11 @@ const noSecrets: SecretBackend = {
 };
 
 async function makeStores(): Promise<ConfigStores> {
-	const document = await sandbox.openDocument();
-	const stores = {
-		settings: createSettingsStore({ document, env: {} }),
-		connections: createConnectionStore({
-			document,
-			env: {},
-			secrets: noSecrets,
-		}),
-		cliTools: createCliToolStore({ document }),
-		profiles: createProfileStore({ document }),
-	};
-	await Promise.all(Object.values(stores).map((s) => s.load()));
-	return stores;
+	return openConfigStores({
+		document: await sandbox.openDocument(),
+		env: {},
+		secrets: noSecrets,
+	});
 }
 
 const server = { command: "gh-mcp", args: [], env: {} };
