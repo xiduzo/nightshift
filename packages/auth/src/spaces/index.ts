@@ -33,6 +33,7 @@ export {
 	mirrorHostSpace,
 	personalSpaceId,
 	personalSpaceIdBySlug,
+	personalSpaceName,
 	roleIn,
 	type Space,
 	spaceExists,

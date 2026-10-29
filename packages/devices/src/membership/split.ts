@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { personalSpaceId, splitPersonalSpaceBatch } from "@nightshift/auth";
+import {
+	personalSpaceId,
+	personalSpaceName,
+	splitPersonalSpaceBatch,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { hostSpace, run } from "@nightshift/db/schema";
+import { run } from "@nightshift/db/schema";
 import {
 	type Engine,
 	type FlowDocuments,
@@ -11,7 +15,7 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { and, eq } from "drizzle-orm";
 import type { SplitResult, SplitState } from "../contract";
-import type { HostLinks, HostSpaces } from "../links";
+import type { HostSpaces } from "../links";
 import { backupDatabase } from "./backup";
 import { NOT_DONE } from "./merge";
 import type { MembershipRecord, SplitRow } from "./record";
@@ -71,9 +75,8 @@ export const SPLIT_WORDS = {
 export type SplitDeps = {
 	db: Database;
 	engine: Pick<Engine, "space" | "moveProjects"> & {
-		hostSpaces: Pick<HostSpaces, "hostOf">;
+		hostSpaces: Pick<HostSpaces, "hostOf" | "keeper" | "named">;
 	};
-	hostLinks: Pick<HostLinks, "get">;
 	spaces: Pick<SpaceDocuments, "open">;
 	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
@@ -107,9 +110,9 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	async function left(): Promise<Left | null> {
 		const from = await personalSpaceId(db, deps.ownerId);
 		if (from === null) return null;
-		const hostId = await engine.hostSpaces.hostOf(from);
-		if (hostId === null) return null;
-		const link = await deps.hostLinks.get(hostId);
+		const keeper = await engine.hostSpaces.keeper(from);
+		if (keeper === null) return null;
+		const { hostId, link } = keeper;
 		if (link && link.revokedAt === null) return null;
 		// A link that a new home Host replaced is gone: the merge says who the Person was there.
 		const merged = await merges.latest();
@@ -156,7 +159,6 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		let unpinned = row.unpinned;
 
 		if (state === "planned") {
-			const fromName = `Personal on ${row.hostName}`;
 			const moved = await engine.moveProjects({
 				from,
 				plan: async () => {
@@ -188,12 +190,9 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 						personId: row.personId,
 						from,
 						to,
-						fromName,
+						hostName: row.hostName,
 					})),
-					db
-						.update(hostSpace)
-						.set({ name: fromName, updatedAt: new Date() })
-						.where(eq(hostSpace.spaceId, from)),
+					engine.hostSpaces.named(from, personalSpaceName(row.hostName)),
 					merges.abandon(),
 					rows.moved(to, {
 						projects: done.projects,

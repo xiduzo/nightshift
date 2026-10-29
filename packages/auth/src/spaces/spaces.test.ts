@@ -365,7 +365,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 				personId: ada.userId,
 				from: hosted,
 				to: "space-of-her-own",
-				fromName: "Personal on studio",
+				hostName: "studio",
 			}),
 		);
 
@@ -399,7 +399,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 				personId: ada.userId,
 				from: "elsewhere",
 				to: "new",
-				fromName: "x",
+				hostName: "x",
 			}),
 		).rejects.toThrow("is not the personal Space");
 		await expect(
@@ -407,7 +407,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 				personId: ada.userId,
 				from: hosted,
 				to: hosted,
-				fromName: "x",
+				hostName: "x",
 			}),
 		).rejects.toThrow("is on this Replica already");
 	});

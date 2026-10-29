@@ -33,6 +33,17 @@ export type Space = {
 /** The email of the Person Night Shift makes for this computer. Never a mailbox. */
 export const LOCAL_EMAIL = "local@nightshift.invalid";
 
+/**
+ * The name of a personal Space on this Replica (ADR 1): "Personal" for
+ * the Person's own, and "Personal on <Host>" for one that Host keeps
+ * that is not theirs here (`keptBy`: the Host's name). The one place
+ * these names are decided: every writer of a personal Space's name asks
+ * here.
+ */
+export function personalSpaceName(keptBy?: string): string {
+	return keptBy === undefined ? "Personal" : `Personal on ${keptBy}`;
+}
+
 /** The id of the Person's personal Space, or null. */
 export async function personalSpaceId(
 	db: Database,
@@ -59,7 +70,7 @@ export async function ensurePersonalSpace(
 	await db.batch([
 		db.insert(organization).values({
 			id,
-			name: "Personal",
+			name: personalSpaceName(),
 			slug: `personal-${userId}`,
 			personal: true,
 			createdAt,
@@ -274,7 +285,7 @@ export async function adoptPersonalSpaceBatch(
 				}),
 		db
 			.update(organization)
-			.set({ personal: true, name: "Personal" })
+			.set({ personal: true, name: personalSpaceName() })
 			.where(eq(organization.id, to)),
 		db
 			.update(session)
@@ -295,14 +306,15 @@ export async function adoptPersonalSpaceBatch(
  * `to` is made, named "Personal", with the Person as its owner. A session
  * that worked in `from` works in `to`. `from` stays, with the rows that
  * do not come along, as the Host's Space: it is no longer personal here,
- * it takes `fromName`, and the Person is no longer a Member of it here.
+ * it takes the name "Personal on <Host>" (`hostName`), and the Person is
+ * no longer a Member of it here.
  * Throws when `from` is not the Person's personal Space, or `to` exists.
  */
 export async function splitPersonalSpaceBatch(
 	db: Database,
-	input: { personId: string; from: string; to: string; fromName: string },
+	input: { personId: string; from: string; to: string; hostName: string },
 ): Promise<[BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]> {
-	const { personId, from, to, fromName } = input;
+	const { personId, from, to, hostName } = input;
 	if ((await personalSpaceId(db, personId)) !== from) {
 		throw new Error(
 			`The Space ${from} is not the personal Space of ${personId}.`,
@@ -321,7 +333,7 @@ export async function splitPersonalSpaceBatch(
 	return [
 		db.insert(organization).values({
 			id: to,
-			name: "Personal",
+			name: personalSpaceName(),
 			slug: taken ? `${slug}-${to}` : slug,
 			personal: true,
 			createdAt,
@@ -335,7 +347,7 @@ export async function splitPersonalSpaceBatch(
 		}),
 		db
 			.update(organization)
-			.set({ personal: false, name: fromName })
+			.set({ personal: false, name: personalSpaceName(hostName) })
 			.where(eq(organization.id, from)),
 		db
 			.delete(member)

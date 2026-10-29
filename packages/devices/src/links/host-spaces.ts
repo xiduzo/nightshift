@@ -3,6 +3,7 @@ import {
 	membershipOf,
 	mirrorHostSpace,
 	personalSpaceId,
+	personalSpaceName,
 	removeMemberships,
 	setMembershipRole,
 	spaceExists,
@@ -10,7 +11,9 @@ import {
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
 import { and, asc, desc, eq, inArray, notInArray } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import type { ListedSpace } from "../contract";
+import type { HostLink } from "./host-links";
 
 /**
  * The Spaces this computer takes part in through its Hosts. A Host lists
@@ -24,12 +27,28 @@ import type { ListedSpace } from "../contract";
  *
  * Such a Space is the Host's: this Replica never writes its document. It
  * changes it only through the Host's procedures.
+ *
+ * The one module that answers which Host keeps a Space (`hostOf`), this
+ * computer's tie to that Host (`keeper`: its link, and whether it is
+ * the home Host), and the Space's name here (`personalSpaceName` of
+ * `@nightshift/auth` for a personal one). `host_space` is its own table:
+ * nothing else writes it.
  */
 
 export type HostSpaces = ReturnType<typeof createHostSpaces>;
 
 /** A Space a Host keeps, as this computer lists it. */
 export type HostSpaceRef = { id: string; name: string; personal: boolean };
+
+/**
+ * The Host that keeps a Space, and this computer's link to it: the
+ * Host's name, the Person of this computer there, its role and whether
+ * the Host removed its access. No link: a new home Host replaced it.
+ */
+export type SpaceKeeper = {
+	hostId: string;
+	link: Pick<HostLink, "name" | "personId" | "role" | "revokedAt"> | null;
+};
 
 export function createHostSpaces(db: Database) {
 	return {
@@ -41,7 +60,7 @@ export function createHostSpaces(db: Database) {
 		): Promise<void> {
 			const listed = spaces.map((s) => s.id);
 			// After a merge (ADR 1), the Person's personal Space here is the
-			// Host's: it keeps the name "Personal".
+			// Host's: it is named as their own.
 			const ownPersonal = await personalSpaceId(db, personId);
 			// No transaction: every write is an upsert, and it runs with each
 			// answer of the Host, beside the walk's own writes.
@@ -56,9 +75,7 @@ export function createHostSpaces(db: Database) {
 				if (kept && kept.hostId !== host.id) continue;
 				const name = !space.personal
 					? space.name
-					: space.id === ownPersonal
-						? "Personal"
-						: `Personal on ${host.name}`;
+					: personalSpaceName(space.id === ownPersonal ? undefined : host.name);
 				const membership = await membershipOf(db, space.id, personId);
 				if (
 					kept?.name === name &&
@@ -124,6 +141,21 @@ export function createHostSpaces(db: Database) {
 			return row?.hostId ?? null;
 		},
 
+		/** The Host that keeps the Space and this computer's link to it, or null for a Space of this Replica's own. */
+		keeper: (spaceId: string) => keeperOf(db, spaceId),
+
+		/**
+		 * The statement that gives a Space a Host keeps its name here, for
+		 * the batch of a split: the Host's Space stays, as "Personal on
+		 * <Host>".
+		 */
+		named(spaceId: string, name: string): BatchItem<"sqlite"> {
+			return db
+				.update(hostSpace)
+				.set({ name, updatedAt: new Date() })
+				.where(eq(hostSpace.spaceId, spaceId));
+		},
+
 		/** The Spaces this computer takes part in through the Host, by name. */
 		async listed(hostId: string): Promise<HostSpaceRef[]> {
 			return db
@@ -182,12 +214,7 @@ export async function personOnHost(
 	db: Database,
 	spaceId: string,
 ): Promise<string | null> {
-	const [row] = await db
-		.select({ personId: hostLink.personId })
-		.from(hostSpace)
-		.innerJoin(hostLink, eq(hostLink.hostId, hostSpace.hostId))
-		.where(eq(hostSpace.spaceId, spaceId));
-	return row?.personId ?? null;
+	return (await keeperOf(db, spaceId))?.link?.personId ?? null;
 }
 
 /**
@@ -198,10 +225,32 @@ export async function keptByHomeHost(
 	db: Database,
 	spaceId: string,
 ): Promise<boolean> {
+	return (await keeperOf(db, spaceId))?.link?.role === "home";
+}
+
+/** The Host that keeps the Space and this computer's link to it, or null for a Space of this Replica's own. */
+async function keeperOf(
+	db: Database,
+	spaceId: string,
+): Promise<SpaceKeeper | null> {
 	const [row] = await db
-		.select({ role: hostLink.role })
+		.select({
+			hostId: hostSpace.hostId,
+			name: hostLink.name,
+			personId: hostLink.personId,
+			role: hostLink.role,
+			revokedAt: hostLink.revokedAt,
+		})
 		.from(hostSpace)
-		.innerJoin(hostLink, eq(hostLink.hostId, hostSpace.hostId))
+		.leftJoin(hostLink, eq(hostLink.hostId, hostSpace.hostId))
 		.where(eq(hostSpace.spaceId, spaceId));
-	return row?.role === "home";
+	if (!row) return null;
+	const { hostId, name, personId, role, revokedAt } = row;
+	return {
+		hostId,
+		link:
+			name !== null && personId !== null && role !== null
+				? { name, personId, role, revokedAt: revokedAt?.getTime() ?? null }
+				: null,
+	};
 }

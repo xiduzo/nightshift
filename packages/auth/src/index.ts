@@ -66,6 +66,7 @@ export {
 	type Permissions,
 	personalSpaceId,
 	personalSpaceIdBySlug,
+	personalSpaceName,
 	personContact,
 	personNames,
 	type Role,
