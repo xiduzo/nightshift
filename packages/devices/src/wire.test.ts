@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
 import { createAuthSandbox } from "@nightshift/auth/testing";
-import { event, hostLink, runCommand, user } from "@nightshift/db/schema";
+import { event, runCommand, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
 	type Device,
@@ -21,7 +21,6 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
-import { deviceKeyStore } from "./links";
 import { setDeviceOffer } from "./offers/offers";
 import type { PeerEngine } from "./peers";
 import { OFFLINE_AFTER_MS } from "./registry";
@@ -66,13 +65,6 @@ beforeEach(async () => {
 	sessions = [];
 	open = new Map();
 	opened = new Map();
-	// B's Link to A: an address, and B's key there.
-	await b.db
-		.update(hostLink)
-		.set({ addresses: JSON.stringify(["http://127.0.0.1:9"]) })
-		.where(eq(hostLink.hostId, paired.hostId));
-	const keys = await deviceKeyStore({ dataDir: b.dataDir, prefer: "file" });
-	await keys.set(paired.hostId, "memory");
 });
 afterEach(async () => {
 	await kept.nightshiftDevices?.release();
