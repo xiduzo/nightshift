@@ -357,7 +357,6 @@ describe("another Person's run on the computer that walks it", () => {
 		const host = createHostExchange({
 			db: sandbox.db,
 			engine,
-			documents,
 			registry: {
 				get: async (id: string) =>
 					id === "device-carol"

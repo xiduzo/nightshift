@@ -3,14 +3,11 @@ import { ROLE_REFUSAL, roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
+	type PeerProjects,
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
-import {
-	PROJECT_NOT_FOUND,
-	recordClone,
-	type SpaceDocuments,
-} from "@nightshift/engine/projects";
+import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import {
@@ -19,6 +16,7 @@ import {
 	type SyncBatch,
 	type SyncCursors,
 } from "../contract";
+import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import type { WorkHub } from "../work";
@@ -67,16 +65,18 @@ export function createHostExchange(deps: {
 	db: Database;
 	/**
 	 * This Host's engine (`PeerEngine`): its run history, the Offers of its
-	 * Spaces, and its admission of the calls of runs a Device walks with
-	 * steps here.
+	 * Spaces, its admission of the calls of runs a Device walks with steps
+	 * here, and its Projects, where a Device's Clone and the Projects of
+	 * its personal Space are recorded. A Space a Host keeps (`hostSpaces`)
+	 * is not this Host's to change.
 	 */
 	engine: Engine & {
 		exchange: RunHistoryExchange;
 		offers: EngineOffers;
 		admission: Pick<OfferAdmission, "serve">;
+		projects: Pick<PeerProjects, "recordClone" | "matching" | "take">;
+		hostSpaces: Pick<HostSpaces, "hostOf">;
 	};
-	/** The Space documents of this Host: a Device's Clone is recorded there. */
-	documents: SpaceDocuments;
 	registry: DeviceRegistry;
 	/** This Host's Device id: the Walker of its own runs. */
 	selfId: string;
@@ -323,13 +323,11 @@ export function createHostExchange(deps: {
 			if (!role || !roleAllows(role, { project: ["add"] })) {
 				forbidden(ROLE_REFUSAL.message);
 			}
-			const document = await deps.documents.open(input.spaceId);
-			if (document.hostedElsewhere || !document.projects.has(input.projectId)) {
-				throw new Refusal("not-found", PROJECT_NOT_FOUND);
-			}
-			await document.change(() =>
-				recordClone(document, { ...input, deviceId: key.deviceId }),
-			);
+			await engine.projects.recordClone(input.spaceId, {
+				projectId: input.projectId,
+				deviceId: key.deviceId,
+				deviceName: input.deviceName,
+			});
 		},
 
 		async offer(key, input) {
@@ -490,7 +488,12 @@ export function createHostExchange(deps: {
 				);
 			}
 			return mergePersonalHere(
-				{ db, documents: deps.documents },
+				{
+					db,
+					projects: engine.projects,
+					hostedElsewhere: async (spaceId) =>
+						(await engine.hostSpaces.hostOf(spaceId)) !== null,
+				},
 				key,
 				{ name: paired.name },
 				input,

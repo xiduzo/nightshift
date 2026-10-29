@@ -295,7 +295,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const hostExchange = createHostExchange({
 		db,
 		engine,
-		documents: deps.spaces,
 		registry: engine.devices,
 		selfId: self.id,
 		ownerId,

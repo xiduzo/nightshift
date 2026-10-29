@@ -115,7 +115,6 @@ export async function hostInMemory(
 	const hostExchange = createHostExchange({
 		db: a.db,
 		engine: host,
-		documents,
 		registry: host.devices,
 		selfId: a.deviceId,
 		ownerId: personId,

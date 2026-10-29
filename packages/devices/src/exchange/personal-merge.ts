@@ -6,18 +6,21 @@ import {
 	spacesOf,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import {
-	projectRowsOf,
-	recordClone,
-	type SpaceDocument,
-	type SpaceDocuments,
-} from "@nightshift/engine/projects";
+import type { PeerProjects } from "@nightshift/engine";
+import type { TakenProjects } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import type {
 	ElsewhereProject,
 	PersonalMerge,
 	PersonalMergeInput,
 } from "../contract";
+
+/** What one Space takes (`TakenProjects`), as the merge adds to it. */
+type Taking = {
+	define: NonNullable<TakenProjects["define"]>[number][];
+	restore: string[];
+	clones: NonNullable<TakenProjects["clones"]>[number][];
+};
 
 /**
  * The Host's half of the merge of a Device's own personal Space into its
@@ -41,14 +44,22 @@ import type {
  * - It runs again with the same answer: a Project here with the
  *   Device's id is the one it took before.
  * - `dryRun` answers the same and changes nothing.
+ *
+ * The engine's Projects read the Projects here (`matching`) and write
+ * what each Space takes in one change of its document (`take`).
  */
 export async function mergePersonalHere(
-	deps: { db: Database; documents: SpaceDocuments },
+	deps: {
+		db: Database;
+		projects: Pick<PeerProjects, "matching" | "take">;
+		/** Whether a Host keeps the Space, not this Replica. */
+		hostedElsewhere(spaceId: string): Promise<boolean>;
+	},
 	key: DeviceKeyAccess,
 	device: { name: string },
 	input: PersonalMergeInput,
 ): Promise<PersonalMerge> {
-	const { db, documents } = deps;
+	const { db, projects: engineProjects } = deps;
 	const spaceId =
 		(await personalSpaceIdBySlug(db, key.personId)) ??
 		(await personalSpaceId(db, key.personId));
@@ -58,8 +69,7 @@ export async function mergePersonalHere(
 			"Your personal Space is not on this Host. Sign in on the Host once, then try again.",
 		);
 	}
-	const personal = await documents.open(spaceId);
-	if (personal.hostedElsewhere) {
+	if (await deps.hostedElsewhere(spaceId)) {
 		throw new Refusal(
 			"conflict",
 			"This Host does not keep your personal Space itself.",
@@ -67,7 +77,7 @@ export async function mergePersonalHere(
 	}
 	const projects = input.projects;
 	const join = new Set(input.join ?? []);
-	const known = await projectRowsOf(db, {
+	const known = await engineProjects.matching({
 		ids: projects.map((p) => p.id),
 		remotes: projects.flatMap((p) => (p.remote === null ? [] : [p.remote])),
 	});
@@ -81,19 +91,22 @@ export async function mergePersonalHere(
 
 	const projectMap: Record<string, string> = {};
 	const elsewhere: ElsewhereProject[] = [];
-	/** What each Space document gets, by Space. */
-	const changes = new Map<string, ((document: SpaceDocument) => void)[]>();
-	const change = (target: string, apply: (document: SpaceDocument) => void) => {
-		changes.set(target, [...(changes.get(target) ?? []), apply]);
+	/** What each Space takes, by Space, in the order the Spaces come up. */
+	const taken = new Map<string, Taking>();
+	const takenBy = (target: string) => {
+		let found = taken.get(target);
+		if (!found) {
+			found = { define: [], restore: [], clones: [] };
+			taken.set(target, found);
+		}
+		return found;
 	};
 	const clone = (target: string, projectId: string) =>
-		change(target, (document) =>
-			recordClone(document, {
-				projectId,
-				deviceId: key.deviceId,
-				deviceName: device.name,
-			}),
-		);
+		takenBy(target).clones.push({
+			projectId,
+			deviceId: key.deviceId,
+			deviceName: device.name,
+		});
 
 	for (const p of projects) {
 		const taken = byId.get(p.id);
@@ -113,16 +126,7 @@ export async function mergePersonalHere(
 		if (there && there.spaceId === spaceId) {
 			projectMap[p.id] = there.id;
 			if (there.removedAt !== null && p.removedAt === null) {
-				change(spaceId, (document) => {
-					const entry = document.projects.get(there.id);
-					if (entry && typeof entry === "object") {
-						document.projects.set(there.id, {
-							...(entry as Record<string, unknown>),
-							removedAt: null,
-							updatedAt: Date.now(),
-						});
-					}
-				});
+				takenBy(spaceId).restore.push(there.id);
 			}
 			if (p.clone) clone(spaceId, there.id);
 			continue;
@@ -149,33 +153,23 @@ export async function mergePersonalHere(
 		// A Project of its own here. Its remote goes when another Project
 		// here has it: a Replica keeps one Project per remote.
 		projectMap[p.id] = p.id;
-		const entry = {
+		takenBy(spaceId).define.push({
+			id: p.id,
 			name: p.name,
 			remote: there ? null : p.remote,
 			createdAt: p.createdAt,
 			removedAt: p.removedAt,
-			updatedAt: Date.now(),
-		};
-		change(spaceId, (document) => {
-			if (!document.projects.has(p.id)) document.projects.set(p.id, entry);
 		});
 		if (p.clone) clone(spaceId, p.id);
 	}
 
 	if (!input.dryRun) {
-		// The personal Space first: the Projects that move are there.
-		const order = [
-			spaceId,
-			...[...changes.keys()].filter((s) => s !== spaceId),
-		];
+		// The personal Space first: the Projects that move are there. A
+		// Space a Host keeps is left alone.
+		const order = [spaceId, ...[...taken.keys()].filter((s) => s !== spaceId)];
 		for (const target of order) {
-			const applies = changes.get(target);
-			if (!applies) continue;
-			const document = await documents.open(target);
-			if (document.hostedElsewhere) continue;
-			await document.change(() => {
-				for (const apply of applies) apply(document);
-			});
+			const into = taken.get(target);
+			if (into) await engineProjects.take(target, into);
 		}
 	}
 

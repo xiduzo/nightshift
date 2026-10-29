@@ -19,7 +19,7 @@ export {
 } from "./project-copies";
 export type { ProjectReadiness } from "./project-setup";
 export { checkProjectFolder, setUpGit } from "./project-setup";
-export type { ListedProject, Project } from "./projects";
+export type { ListedProject, Project, TakenProjects } from "./projects";
 export { clonePathOf, PROJECT_NOT_FOUND } from "./projects";
 export type { SpaceDocument, SpaceDocuments } from "./space-document";
 export {
@@ -27,8 +27,7 @@ export {
 	deviceNameIn,
 	memberName,
 	memberRole,
-	recordClone,
 } from "./space-document";
-export { projectRowsOf, spaceProjectRows } from "./space-rows";
+export { spaceProjectRows } from "./space-rows";
 export type { Branches } from "./worktrees";
 export { worktreeLocation } from "./worktrees";

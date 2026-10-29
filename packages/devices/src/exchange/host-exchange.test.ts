@@ -102,7 +102,6 @@ function host() {
 	return createHostExchange({
 		db: sandbox.db,
 		engine,
-		documents,
 		registry,
 		selfId: sandbox.deviceId,
 		ownerId,
