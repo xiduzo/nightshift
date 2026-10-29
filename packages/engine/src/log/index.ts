@@ -6,6 +6,7 @@ export { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
 export type {
 	EngineEventType,
 	EnginePayloads,
+	EventWrites,
 	GateChoice,
 	GateDeadline,
 	InputValues,
@@ -37,9 +38,10 @@ export {
 	type OwnStepFiles,
 	type RunHistory,
 } from "./history";
-export type {
-	LandedRunEvent,
-	LandedScope,
+export {
+	createLandedFeed,
+	type LandedRunEvent,
+	type LandedScope,
 } from "./landed";
 export { logMemberChange } from "./member-events";
 export { personFieldTypes } from "./person-fields";

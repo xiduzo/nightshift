@@ -1,16 +1,14 @@
 import { roleAllows } from "@nightshift/auth";
+import type { Database } from "@nightshift/db";
 import { syncCursor } from "@nightshift/db/schema";
 import {
 	type CopyStamp,
 	type Engine,
-	type LandedScope,
 	type LoggedEvent,
-	landedFacts,
 	memberRole,
 	type PeerContext,
 	parseTranscript,
 	type WalkFile,
-	type WalkFiles,
 } from "@nightshift/engine";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
@@ -101,7 +99,7 @@ export type RunHistoryExchange = {
 	landed(
 		signal: AbortSignal,
 		timeoutMs: number,
-		scope?: LandedScope,
+		scope?: Parameters<PeerContext["history"]["onLanded"]>[1],
 	): Promise<void>;
 	/**
 	 * Applies a Command for a run this computer walks, through `engine`,
@@ -148,27 +146,21 @@ export type RunHistoryExchange = {
 		 * step's transcript or command log, or the run's Checkpoint. Null
 		 * when it has none, or another Device walks the run.
 		 */
-		own: WalkFiles["ownFile"];
+		own: PeerContext["runs"]["ownFile"];
 	};
 	/** Stops the take-overs that wait to be tried again. */
 	close(): void;
 };
 
 export function createRunHistoryExchange(deps: {
-	/** The engine's own parts, as the peers get them. */
+	/** This Replica's database: the cursors and Commands (`sync_cursor`, `run_command`). */
+	db: Database;
+	/** This computer's data folder: the archive files. */
+	dataDir: string;
+	/** What the engine offers the peers. */
 	context: Pick<
 		PeerContext,
-		| "db"
-		| "dataDir"
-		| "device"
-		| "log"
-		| "bus"
-		| "history"
-		| "walks"
-		| "documents"
-		| "ready"
-		| "stepStamp"
-		| "takeOver"
+		"device" | "walkerId" | "history" | "runs" | "documents" | "ready"
 	>;
 	/** The Spaces the Hosts keep. */
 	hostSpaces: HostSpaces;
@@ -181,32 +173,32 @@ export function createRunHistoryExchange(deps: {
 	 */
 	archived?(ref: ArchiveRef): Promise<string | null>;
 }): RunHistoryExchange {
-	const { context, hostSpaces } = deps;
-	const { db, dataDir, log, bus, history, walks, documents } = context;
+	const { db, dataDir, context, hostSpaces } = deps;
+	const { history, runs, documents } = context;
 	const { runOwner } = history;
 
 	/** This computer's ids: the runs it walks name one of them. */
-	const here = async () => [await log.walkerId(), context.device.id];
+	const here = async () => [await context.walkerId(), context.device.id];
 
 	const takeOvers = createTakeOvers({
 		ready: context.ready,
 		arriving: async () => history.arriving(await here()),
-		takeOver: (runId) => context.takeOver(runId),
+		takeOver: (runId) => runs.takeOver(runId),
 	});
 
 	const feeds = createTranscriptFeeds({
-		bus,
-		selfId: () => log.walkerId(),
+		watch: history.watch,
+		selfId: () => context.walkerId(),
 		runOwner,
 		hostOf: (spaceId) => hostSpaces.hostOf(spaceId),
-		stepEnded: async (step) => (await context.stepStamp(step))?.ended === true,
+		stepEnded: async (step) => (await runs.stepStamp(step))?.ended === true,
 		ownEntries: (at) => history.ownTranscript(at),
 		// Asked only for a step that ended. A copy of another end is not
 		// there yet: the feed reads the step instead, and again later. A
 		// copy from the Host is kept here, with the end it holds.
 		async archived(at) {
 			const ref: ArchiveRef = { kind: "transcript", ...at };
-			const known = await context.stepStamp(at);
+			const known = await runs.stepStamp(at);
 			const local = await readCopy(dataDir, ref, known);
 			if (local !== null) return parseTranscript(local);
 			const fetched = await deps.archived?.(ref).catch(() => null);
@@ -261,7 +253,7 @@ export function createRunHistoryExchange(deps: {
 		if (owner.spaceId !== spaceId) return NOT_HERE;
 		const ids = await here();
 		if (ids.includes(owner.walkerId)) return "here";
-		const events = await log.events(runId);
+		const events = await history.events(runId);
 		const lastMove = events.findLast((e) => e.type === "WalkerMoved");
 		if (
 			lastMove?.type === "WalkerMoved" &&
@@ -279,7 +271,7 @@ export function createRunHistoryExchange(deps: {
 	function landedWithin(
 		timeoutMs: number,
 		signal?: AbortSignal,
-		scope?: LandedScope,
+		scope?: Parameters<typeof history.onLanded>[1],
 	) {
 		return new Promise<void>((resolve) => {
 			if (signal?.aborted) return resolve();
@@ -292,11 +284,10 @@ export function createRunHistoryExchange(deps: {
 			const timer = setTimeout(done, timeoutMs);
 			// A session's spend so far lands every few seconds while an agent
 			// works, more than half of all events, and only its latest counts:
-			// it goes with the next event that wakes the exchange, or at the
-			// next look when nothing else lands.
-			const off = history.landed.subscribe((events) => {
-				if (landedFacts(events).some((f) => f.changes !== "spend")) done();
-			}, scope);
+			// it goes with the next event that wakes the exchange (the
+			// engine's `onLanded` skips it), or at the next look when nothing
+			// else lands.
+			const off = history.onLanded(done, scope);
 			signal?.addEventListener("abort", done, { once: true });
 		});
 	}
@@ -403,7 +394,7 @@ export function createRunHistoryExchange(deps: {
 			const files: WalkFile[] = [];
 			for (const [runId, steps] of ended) {
 				// Empty for a run that has moved since.
-				files.push(...(await walks.exportWalk(runId, { steps })));
+				files.push(...(await runs.exportWalk(runId, { steps })));
 			}
 			return files;
 		},
@@ -415,17 +406,16 @@ export function createRunHistoryExchange(deps: {
 		archive: {
 			async read(ref) {
 				const known =
-					ref.kind === "checkpoint" ? null : await context.stepStamp(ref);
+					ref.kind === "checkpoint" ? null : await runs.stepStamp(ref);
 				return readCopy(dataDir, ref, known);
 			},
 			async write(ref, content, stamp) {
 				await writeArchive(dataDir, ref, content, stamp);
 				// A watcher of the run reads the step's transcript again.
-				if (ref.kind === "transcript") {
-					bus.publish(ref.runId, { kind: "step-changed", stepId: ref.stepId });
-				}
+				if (ref.kind === "transcript")
+					history.stepChanged(ref.runId, ref.stepId);
 			},
-			own: walks.ownFile,
+			own: runs.ownFile,
 		},
 		close: () => takeOvers.close(),
 	};

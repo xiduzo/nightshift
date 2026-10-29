@@ -99,10 +99,8 @@ describe("withdraw", () => {
 			documents: {
 				open: async () => ({ offers: new Map() }),
 			} as never,
-			log: {
-				append: async () => {
-					throw new Error("A Space a Host keeps logs its Offers there.");
-				},
+			logFact: async () => {
+				throw new Error("A Space a Host keeps logs its Offers there.");
 			},
 			deviceId: "self",
 			now: () => 1,

@@ -76,7 +76,6 @@ export {
 	isHostAddress,
 	isLoopbackHost,
 	type KeyStoreKind,
-	lastKnownProfiles,
 	openConfigStores,
 	openDeviceDocument,
 	type ProfileStore,
@@ -99,7 +98,6 @@ export {
 	settingsPatchSchema,
 	settingsSchema,
 	storedDeviceCopy,
-	storedDeviceProfiles,
 	valueStore,
 } from "./device-config";
 export type {
@@ -199,7 +197,6 @@ export type {
 export {
 	exportRun,
 	inboxOf,
-	landedFacts,
 	lockScreenRefusal,
 	openRunBundle,
 	type RunBundleSummary,
@@ -212,6 +209,7 @@ export type {
 	MoveRows,
 	OfferedPlacement,
 	PeerContext,
+	PeerProfiles,
 	Peers,
 	PlacedDevice,
 	PlanInput,

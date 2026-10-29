@@ -232,7 +232,7 @@ describe("a run that moves to another Device", () => {
 
 		const added = await copyRows(a, b, projectId);
 		expect(added.some((e) => e.type === "WalkerMoved")).toBe(true);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		const onB = spaceOf(b, a);
 		expect(await onB.getRun(runId)).toMatchObject({
 			status: "waiting",
@@ -250,7 +250,7 @@ describe("a run that moves to another Device", () => {
 			["gate", "approve"],
 		]);
 		// A walks it no more: its walk state is empty there.
-		expect(await a.context.walks.exportWalk(runId)).toEqual([]);
+		expect(await a.context.runs.exportWalk(runId)).toEqual([]);
 	});
 
 	test("its new Walker stamps each step's copy as the old one did, and the Gate's with its end once answered", async () => {
@@ -277,10 +277,10 @@ describe("a run that moves to another Device", () => {
 		});
 
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		/** The stamp of a step's transcript as B exports it. */
 		const onB = async (stepId: string) =>
-			(await b.context.walks.exportWalk(runId)).find(
+			(await b.context.runs.exportWalk(runId)).find(
 				(f) => keyOf(f.ref) === keyOf(transcript(stepId)),
 			)?.stamp;
 		// From B's log: the same stamps, wherever the run's events came from.
@@ -307,7 +307,7 @@ describe("a run that moves to another Device", () => {
 			force: true,
 		});
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 
 		const onB = spaceOf(b, a);
 		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
@@ -358,7 +358,7 @@ describe("a run that moves to another Device", () => {
 			force: true,
 		});
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 
 		const onB = spaceOf(b, a);
 		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
@@ -366,7 +366,7 @@ describe("a run that moves to another Device", () => {
 			label: "the run to end on B",
 		});
 		// What B archives of the step once it ended: A's entries, then B's.
-		const [file] = (await b.context.walks.exportWalk(runId)).filter(
+		const [file] = (await b.context.runs.exportWalk(runId)).filter(
 			(f) => f.ref.kind === "transcript" && f.ref.stepId === open,
 		);
 		const kept = parseTranscript(file?.content ?? "");
@@ -402,7 +402,7 @@ describe("a run that moves to another Device", () => {
 		expect(fromA.length).toBeGreaterThan(0);
 		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 
 		const onB = spaceOf(b, a);
 		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
@@ -435,7 +435,7 @@ describe("a run that moves to another Device", () => {
 		const first = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
 		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		const onB = spaceOf(b, a);
 		await onB.resolveGate({ runId, stepId: first, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).steps.length === 3, {
@@ -450,7 +450,7 @@ describe("a run that moves to another Device", () => {
 
 		await onB.moveRun(runId, a.sandbox.deviceId);
 		await copyRows(b, a, projectId, a.sandbox.spaceId);
-		await a.context.takeOver(runId);
+		await a.context.runs.takeOver(runId);
 		// A's own file of the step had only A's part: now it has B's too.
 		expect(
 			await readTranscriptFile(transcriptPath(a.sandbox.dataDir, runId, first)),
@@ -473,8 +473,8 @@ describe("a run that moves to another Device", () => {
 		const open = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
 		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		const onB = spaceOf(b, a);
 		await onB.resolveGate({ runId, stepId: open, choice: "reject" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
@@ -569,7 +569,7 @@ describe("a run that moves to another Device", () => {
 		);
 		await space.moveRun(runId, b.sandbox.deviceId);
 		await copyRows(a, b, projectId);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		// B restarts before the wake: the next engine's recovery sets the timer.
 		await b.engine.dispose();
 		const again = await computer(() => [deviceOf(a)], b.sandbox);
@@ -587,7 +587,7 @@ describe("a run that moves to another Device", () => {
 		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
 		await copyRows(a, b, projectId);
 		const onB = spaceOf(b, a);
-		const before = await b.context.log.events(runId);
+		const before = await b.context.history.events(runId);
 
 		// B walks it now, but has no Checkpoint of it yet.
 		const arriving =
@@ -599,9 +599,9 @@ describe("a run that moves to another Device", () => {
 		await expect(onB.stopRun(runId, { when: "after-step" })).rejects.toThrow(
 			arriving,
 		);
-		expect(await b.context.log.events(runId)).toEqual(before);
+		expect(await b.context.history.events(runId)).toEqual(before);
 
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
@@ -616,15 +616,15 @@ describe("a run that moves to another Device", () => {
 		archive.clear();
 		await copyRows(a, b, projectId);
 		const here = [b.sandbox.deviceId];
-		await expect(b.context.takeOver(runId)).rejects.toThrow(
+		await expect(b.context.runs.takeOver(runId)).rejects.toThrow(
 			"The archive has no checkpoint of the run.",
 		);
 		// Nothing says it arrived: the take-over is tried again.
 		expect(await b.context.history.arriving(here)).toEqual([runId]);
 		for (const [key, content] of kept) archive.set(key, content);
-		await b.context.takeOver(runId);
+		await b.context.runs.takeOver(runId);
 		expect(await b.context.history.arriving(here)).toEqual([]);
-		expect((await b.context.log.events(runId)).at(-1)).toMatchObject({
+		expect((await b.context.history.events(runId)).at(-1)).toMatchObject({
 			type: "WalkerArrived",
 			payload: { from: a.sandbox.deviceId },
 		});

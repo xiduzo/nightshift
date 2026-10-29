@@ -6,6 +6,7 @@ export type { EngineOptions } from "./engine-options";
 export type {
 	OfferedPlacement,
 	PeerContext,
+	PeerProfiles,
 	Peers,
 	PlacedDevice,
 	PlanInput,

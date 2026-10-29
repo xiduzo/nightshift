@@ -3,7 +3,12 @@ import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
 import type { Actor, MemberChange, StartRunInput } from "../contract";
-import { defaultRunSettings, type RunSettings } from "../device-config";
+import {
+	defaultRunSettings,
+	lastKnownProfiles,
+	type RunSettings,
+	storedDeviceProfiles,
+} from "../device-config";
 import {
 	createCloneImports,
 	createFlowDocuments,
@@ -15,6 +20,7 @@ import {
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
 	copyStamps,
+	createLandedFeed,
 	createRunBus,
 	createRunHistory,
 	createRunLog,
@@ -281,7 +287,9 @@ export function createEngine(
 	});
 	peersReady.catch(() => {});
 
-	const history = createRunHistory({ db, dataDir, log: runLog, bus });
+	/** Every run event as it lands here, appended or ingested. */
+	const landed = createLandedFeed({ db, log: runLog });
+	const history = createRunHistory({ db, dataDir, log: runLog, bus, landed });
 	/** The walk state of the runs this computer walks, as files (`graph/walk-state.ts`). */
 	const walks = createRunWalks({ db, dataDir, log: runLog, history });
 
@@ -290,29 +298,47 @@ export function createEngine(
 	 * Host that keeps a Space, and the runs walked elsewhere.
 	 */
 	const peers = options.peers({
-		db,
-		dataDir,
 		device,
-		log: runLog,
-		bus,
-		history,
-		walks: { exportWalk: walks.exportWalk, ownFile: walks.ownFile },
-		documents,
-		now,
-		...(options.profileFor ? { profileFor: options.profileFor } : {}),
-		flows: (projectId) => projectFlows.flows(projectId),
-		ready: peersReady,
+		walkerId: () => runLog.walkerId(),
 		ownerId: () => ownerId,
-		// Every open step's reader asks on each change of the run: the run
-		// log derives the stamps once per append for all of them.
-		stepStamp: async ({ runId, stepId }) =>
-			(await runLog.derive([runId], copyStamps)).get(runId)?.get(stepId) ??
-			null,
+		ready: peersReady,
+		now,
+		documents,
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
-		takeOver: (runId) =>
-			takeOver({ db, log: runLog, runner, archive: peers.runs, walks }, runId),
-		stopRun: async (runId) => {
-			await runner.take(runId, { kind: "stop" });
+		flows: (projectId) => projectFlows.flows(projectId),
+		profiles: {
+			here: options.profileFor ?? (() => null),
+			stored: (deviceId) => storedDeviceProfiles(db, deviceId),
+			lastKnown: (deviceId) => lastKnownProfiles(db, deviceId),
+		},
+		history: {
+			...history,
+			onLanded: (listener, scope) =>
+				landed.subscribe((events) => {
+					if (landedFacts(events).some((f) => f.changes !== "spend")) {
+						listener();
+					}
+				}, scope),
+		},
+		runs: {
+			exportWalk: walks.exportWalk,
+			ownFile: walks.ownFile,
+			// Every open step's reader asks on each change of the run: the run
+			// log derives the stamps once per append for all of them.
+			stepStamp: async ({ runId, stepId }) =>
+				(await runLog.derive([runId], copyStamps)).get(runId)?.get(stepId) ??
+				null,
+			takeOver: (runId) =>
+				takeOver(
+					{ db, log: runLog, runner, archive: peers.runs, walks },
+					runId,
+				),
+			stop: async (runId) => {
+				await runner.take(runId, { kind: "stop" });
+			},
+		},
+		async logFact(fact, writes) {
+			await runLog.append(fact, writes);
 		},
 	});
 	const { placement, relay: hosts } = peers;
@@ -641,7 +667,7 @@ export function createEngine(
 		// Their rows moved under the run log, in a batch that logged nothing.
 		reread: (runIds) => {
 			runLog.forget(runIds);
-			history.landed.reread();
+			landed.reread();
 		},
 		rows: options.moveRows ?? [],
 	});
@@ -696,7 +722,7 @@ export function createEngine(
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		onLandedFacts: (listener) =>
-			history.landed.subscribe((events) => listener(landedFacts(events))),
+			landed.subscribe((events) => listener(landedFacts(events))),
 		moveProjects,
 		flows: projectFlows,
 		async runHere(runId) {
@@ -713,7 +739,7 @@ export function createEngine(
 		},
 		async dispose() {
 			lifetime.abort();
-			history.landed.close();
+			landed.close();
 			await runner.release();
 		},
 	};

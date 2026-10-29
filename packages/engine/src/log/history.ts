@@ -15,7 +15,7 @@ import {
 	sql,
 } from "drizzle-orm";
 import { type KeptWrite, saveKeptWrites } from "../variables";
-import type { RunBus } from "./bus";
+import type { BusItem, RunBus } from "./bus";
 import { asCommand } from "./command-stamp";
 import type { LoggedEvent } from "./events";
 import { createLandedFeed, type LandedFeed } from "./landed";
@@ -171,9 +171,11 @@ export function createRunHistory(deps: {
 	dataDir: string;
 	log: RunLog;
 	bus: RunBus;
+	/** Every run event as it lands here (the engine's own). Default: a new one on `log`. */
+	landed?: LandedFeed;
 }) {
 	const { db, dataDir, log, bus } = deps;
-	const landed: LandedFeed = createLandedFeed({ db, log });
+	const landed: LandedFeed = deps.landed ?? createLandedFeed({ db, log });
 
 	/**
 	 * The run rows of `spaces` after `cursors`, in the order their events
@@ -711,8 +713,6 @@ export function createRunHistory(deps: {
 	}
 
 	return {
-		/** Every run event as it lands here, with its Space; and the latest per Space and Walker. */
-		landed,
 		rowsAfter,
 		ingest,
 		runOwner,
@@ -724,5 +724,14 @@ export function createRunHistory(deps: {
 		/** Runs `fn` as the Command: the first event it writes to the Command's run carries its id (`command-stamp.ts`). */
 		applying: asCommand,
 		arriving,
+		/** A run's events as this Replica's log has them, in their order. */
+		events: (runId: string) => log.events(runId),
+		/** Calls `listener` with each change of the run as it happens here, until the returned function is called. */
+		watch: (runId: string, listener: (item: BusItem) => void) =>
+			bus.subscribe(runId, listener),
+		/** Tells the run's watchers that a step's files changed: a copy of its transcript came. */
+		stepChanged(runId: string, stepId: string): void {
+			bus.publish(runId, { kind: "step-changed", stepId });
+		},
 	};
 }

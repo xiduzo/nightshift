@@ -1,4 +1,4 @@
-import type { RunBus } from "./bus";
+import type { BusItem } from "./bus";
 import type { TranscriptEntry } from "./step-events";
 
 /** One step, by its Space and run. */
@@ -6,7 +6,8 @@ type Step = { spaceId: string; runId: string; stepId: string };
 
 /** What the live transcript of a step this Replica walks reads. */
 export type OwnFeedPorts = {
-	bus: RunBus;
+	/** Calls back with each change of the run as it happens here (`RunHistory.watch`). */
+	watch(runId: string, listener: (item: BusItem) => void): () => void;
 	/** Whether the step has ended, as this Replica's log says. */
 	stepEnded(step: Step): Promise<boolean>;
 	/** The transcript of a step this Replica walked, from its own file. */
@@ -17,7 +18,7 @@ export type OwnFeedPorts = {
 
 /**
  * The live transcript of a step this Replica walks: its entries after
- * `afterSeq` from its file, then each new one from the bus, until the
+ * `afterSeq` from its file, then each new one as it is written, until the
  * step ends or the signal aborts. The cursor is the entry's `seq`.
  */
 export async function* followOwnStep(
@@ -31,7 +32,7 @@ export async function* followOwnStep(
 	const wakeUp = waker(signal);
 	// Subscribe before reading: an entry is on disk before it is
 	// published, so every entry is on disk or queued.
-	const off = ports.bus.subscribe(step.runId, (item) => {
+	const off = ports.watch(step.runId, (item) => {
 		if (item.kind === "transcript") {
 			if (item.entry.stepId !== step.stepId) return;
 			queue.push(item.entry);

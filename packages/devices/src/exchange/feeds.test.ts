@@ -53,7 +53,7 @@ beforeEach(() => {
 	pushes = [];
 	seq = 0;
 	w = createTranscriptFeeds({
-		bus: wBus,
+		watch: wBus.subscribe,
 		selfId: async () => "w",
 		runOwner: owner,
 		hostOf: async () => "h",
@@ -63,7 +63,7 @@ beforeEach(() => {
 		retryMs: 5,
 	});
 	h = createTranscriptFeeds({
-		bus: createRunBus(),
+		watch: createRunBus().subscribe,
 		selfId: async () => "h",
 		runOwner: owner,
 		hostOf: async () => null,
@@ -72,7 +72,7 @@ beforeEach(() => {
 		archived: async (s) => archiveOnH.get(s.stepId) ?? null,
 	});
 	v = createTranscriptFeeds({
-		bus: createRunBus(),
+		watch: createRunBus().subscribe,
 		selfId: async () => "v",
 		runOwner: owner,
 		hostOf: async () => "h",
@@ -300,7 +300,7 @@ describe("a step's feed", () => {
 
 	test("a Walker refuses to pump a run it does not walk", async () => {
 		const other = createTranscriptFeeds({
-			bus: createRunBus(),
+			watch: createRunBus().subscribe,
 			selfId: async () => "someone-else",
 			runOwner: owner,
 			hostOf: async () => "h",
@@ -352,7 +352,7 @@ describe("a viewer's transcript of a step (entries)", () => {
 	/** V, a viewer through H, with its own log and archive. */
 	function viewer(upstream = true) {
 		return createTranscriptFeeds({
-			bus: createRunBus(),
+			watch: createRunBus().subscribe,
 			selfId: async () => "v",
 			runOwner: owner,
 			hostOf: async () => "h",
@@ -491,7 +491,7 @@ describe("a viewer's transcript of a step (entries)", () => {
 		files.delete(STEP.stepId);
 		endedOnW.add("moved");
 		const walker = createTranscriptFeeds({
-			bus: wBus,
+			watch: wBus.subscribe,
 			selfId: async () => "w",
 			runOwner: owner,
 			hostOf: async () => "h",

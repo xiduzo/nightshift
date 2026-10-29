@@ -22,7 +22,9 @@ function newRegistry() {
 	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	return createDeviceRegistry({
 		db: sandbox.db,
-		log,
+		logFact: async (fact, writes) => {
+			await log.append(fact, writes);
+		},
 		history: createRunHistory({
 			db: sandbox.db,
 			dataDir: sandbox.dataDir,

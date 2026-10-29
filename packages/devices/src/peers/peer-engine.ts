@@ -79,7 +79,7 @@ export function createPeerEngine(
 			// rows of the packages above (the notifier's deliveries).
 			moveRows: [commandMoves(options.db), ...(options.moveRows ?? [])],
 			peers: (context) => {
-				built = createPeers(context, {
+				built = createPeers(context, options, {
 					...(relay ? { relay } : {}),
 					...(work ? { work } : {}),
 					...(ownOffers ? { ownOffers } : {}),

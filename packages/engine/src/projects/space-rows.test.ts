@@ -12,6 +12,7 @@ import {
 import { asc, eq, inArray } from "drizzle-orm";
 import { createRunBus } from "../log/bus";
 import { createRunHistory } from "../log/history";
+import { createLandedFeed } from "../log/landed";
 import { createRunLog, type RunLog } from "../log/run-log";
 import {
 	createSandbox,
@@ -456,11 +457,13 @@ describe("spaceMoveBatch", () => {
 
 	test("the exchange finds the moved events after the cursor its Host has of the new Space", async () => {
 		await seed({ hostedRow: true });
+		const landed = createLandedFeed({ db: sandbox.db, log });
 		const history = createRunHistory({
 			db: sandbox.db,
 			dataDir: sandbox.dataDir,
 			log,
 			bus: createRunBus(),
+			landed,
 		});
 		// The Host has every event of this computer in the new Space.
 		const hostedEvents = await eventsOf(["r-hosted"]);
@@ -490,7 +493,7 @@ describe("spaceMoveBatch", () => {
 			"RunStarted",
 			"WalkerMoved",
 		]);
-		history.landed.close();
+		landed.close();
 	});
 
 	test("without this computer, the moved events keep their numbers", async () => {

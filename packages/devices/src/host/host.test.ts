@@ -33,7 +33,9 @@ beforeEach(async () => {
 		db: people.db,
 		registry: createDeviceRegistry({
 			db: people.db,
-			log,
+			logFact: async (fact, writes) => {
+				await log.append(fact, writes);
+			},
 			history: createRunHistory({
 				db: people.db,
 				dataDir,

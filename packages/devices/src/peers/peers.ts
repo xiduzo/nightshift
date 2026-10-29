@@ -1,3 +1,4 @@
+import type { Database } from "@nightshift/db";
 import {
 	type DeviceCopies,
 	type DeviceProfile,
@@ -98,19 +99,22 @@ export type BuiltPeers = {
 };
 
 /**
- * The peers of this computer, over the engine's own parts: the device
- * registry, Placement, Offers, the archive and the exchange of run
- * history, wired into the engine's port (`Peers`).
+ * The peers of this computer, over what the engine offers them
+ * (`PeerContext`) and their own rows (`own.db`) and files (`own.dataDir`):
+ * the device registry, Placement, Offers, the archive and the exchange of
+ * run history, wired into the engine's port (`Peers`).
  */
 export function createPeers(
 	context: PeerContext,
+	own: { db: Database; dataDir: string },
 	options: PeerOptions = {},
 ): BuiltPeers {
-	const { db, dataDir, device, log, history, documents, now } = context;
+	const { device, history, documents, now } = context;
+	const { db, dataDir } = own;
 	const { relay } = options;
 	const registry = createDeviceRegistry({
 		db,
-		log,
+		logFact: context.logFact,
 		history,
 		now,
 		...(options.presence ? { presence: options.presence } : {}),
@@ -129,7 +133,7 @@ export function createPeers(
 		device,
 		documents,
 		...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
-		...(context.profileFor ? { profileFor: context.profileFor } : {}),
+		profileFor: context.profiles.here,
 		...(options.offerUse ? { use: options.offerUse } : {}),
 		sessions: offeredSessions,
 	});
@@ -138,12 +142,12 @@ export function createPeers(
 	const placement = createPlacement({
 		db,
 		device,
-		log,
+		walkerId: context.walkerId,
 		registry,
 		documents,
 		hostSpaces,
 		project: context.project,
-		...(context.profileFor ? { profileFor: context.profileFor } : {}),
+		profiles: context.profiles,
 		flows: context.flows,
 		...(work ? { work } : {}),
 		...(relay ? { relay } : {}),
@@ -162,9 +166,11 @@ export function createPeers(
 		dataDir,
 		hostOf,
 		...(relay ? { relay } : {}),
-		stepStamp: context.stepStamp,
+		stepStamp: context.runs.stepStamp,
 	});
 	const exchange = createRunHistoryExchange({
+		db,
+		dataDir,
 		context,
 		hostSpaces,
 		// A Space a Host keeps: that Host's feed of the step, over its link.
@@ -176,7 +182,7 @@ export function createPeers(
 	const offers = createEngineOffers({
 		ready: context.ready,
 		documents,
-		log,
+		logFact: context.logFact,
 		deviceId: device.id,
 		now,
 		hostOf,
@@ -184,7 +190,7 @@ export function createPeers(
 		async stopUnder(offer) {
 			await Promise.all(
 				offeredSessions.runsUnder(offer).map((runId) =>
-					context.stopRun(runId).catch((error) => {
+					context.runs.stop(runId).catch((error) => {
 						console.error(`The run ${runId} was not stopped:`, error);
 					}),
 				),
@@ -204,7 +210,12 @@ export function createPeers(
 			}),
 		},
 		runs: {
-			walkers: createWalkers({ db, log, device, documents }),
+			walkers: createWalkers({
+				db,
+				walkerId: context.walkerId,
+				device,
+				documents,
+			}),
 			pendingCommands: async (runIds) => {
 				const byRun = new Map<
 					string,

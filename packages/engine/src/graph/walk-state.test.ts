@@ -149,7 +149,7 @@ describe("the walk state of a run", () => {
 		const detail = await waitingRun(a.space, a.sandbox.repoPath);
 		const [build, open] = detail.steps.map((s) => s.id) as [string, string];
 
-		const files = await a.context.walks.exportWalk(detail.id);
+		const files = await a.context.runs.exportWalk(detail.id);
 		expect(files.at(-1)?.ref).toEqual({
 			kind: "checkpoint",
 			spaceId: a.sandbox.spaceId,
@@ -160,7 +160,7 @@ describe("the walk state of a run", () => {
 		expect(kinds(files)).toContainEqual(["transcript", open]);
 		for (const f of files.slice(0, -1)) {
 			expect(f.content).toBe(
-				(await a.context.walks.ownFile(f.ref)) ?? "missing",
+				(await a.context.runs.ownFile(f.ref)) ?? "missing",
 			);
 		}
 		const snapshot = JSON.parse(files.at(-1)?.content ?? "{}");
@@ -169,14 +169,14 @@ describe("the walk state of a run", () => {
 		expect(snapshot.checkpoints.length).toBeGreaterThan(0);
 
 		// `steps` keeps the files of those steps only.
-		const onlyBuild = await a.context.walks.exportWalk(detail.id, {
+		const onlyBuild = await a.context.runs.exportWalk(detail.id, {
 			steps: [build],
 		});
 		expect(
 			onlyBuild.every((f) => !("stepId" in f.ref) || f.ref.stepId === build),
 		).toBe(true);
 		expect(
-			kinds(await a.context.walks.exportWalk(detail.id, { steps: [] })),
+			kinds(await a.context.runs.exportWalk(detail.id, { steps: [] })),
 		).toEqual([["checkpoint", null]]);
 		await a.space.stopRun(detail.id);
 	});
@@ -186,7 +186,7 @@ describe("the walk state of a run", () => {
 		const detail = await waitingRun(a.space, a.sandbox.repoPath);
 		const [build, open] = detail.steps.map((s) => s.id) as [string, string];
 
-		const files = await a.context.walks.exportWalk(detail.id);
+		const files = await a.context.runs.exportWalk(detail.id);
 		const stampOf = (kind: string, stepId: string) =>
 			files.find(
 				(f) =>
@@ -203,15 +203,15 @@ describe("the walk state of a run", () => {
 			runId: detail.id,
 			stepId,
 		});
-		expect(await a.context.stepStamp(step(build))).toEqual({
+		expect(await a.context.runs.stepStamp(step(build))).toEqual({
 			opening: 1,
 			ended: true,
 		});
-		expect(await a.context.stepStamp(step(open))).toEqual({
+		expect(await a.context.runs.stepStamp(step(open))).toEqual({
 			opening: 1,
 			ended: false,
 		});
-		expect(await a.context.stepStamp(step("no-such-step"))).toBeNull();
+		expect(await a.context.runs.stepStamp(step("no-such-step"))).toBeNull();
 		await a.space.stopRun(detail.id);
 	});
 
@@ -225,16 +225,16 @@ describe("the walk state of a run", () => {
 			runId: detail.id,
 			stepId,
 		};
-		expect(await a.context.walks.ownFile(ref)).not.toBeNull();
+		expect(await a.context.runs.ownFile(ref)).not.toBeNull();
 
 		await a.sandbox.db
 			.update(run)
 			.set({ walkerId: "another-device" })
 			.where(eq(run.id, detail.id));
-		expect(await a.context.walks.exportWalk(detail.id)).toEqual([]);
-		expect(await a.context.walks.ownFile(ref)).toBeNull();
+		expect(await a.context.runs.exportWalk(detail.id)).toEqual([]);
+		expect(await a.context.runs.ownFile(ref)).toBeNull();
 		expect(
-			await a.context.walks.ownFile({
+			await a.context.runs.ownFile({
 				kind: "checkpoint",
 				spaceId: a.sandbox.spaceId,
 				runId: detail.id,
@@ -259,7 +259,7 @@ describe("the walk state of a run", () => {
 			.from(step)
 			.where(eq(step.runId, second.id));
 		expect(
-			await a.context.walks.ownFile({
+			await a.context.runs.ownFile({
 				kind: "log",
 				spaceId: a.sandbox.spaceId,
 				runId: first.id,
@@ -272,7 +272,7 @@ describe("the walk state of a run", () => {
 	test("imports on another Replica as the latest checkpoint rows, byte for byte, once", async () => {
 		const a = await computer();
 		const detail = await waitingRun(a.space, a.sandbox.repoPath);
-		const files = await a.context.walks.exportWalk(detail.id);
+		const files = await a.context.runs.exportWalk(detail.id);
 		const checkpoint = files.at(-1)?.content as string;
 
 		const b = await createSandbox();
@@ -332,7 +332,7 @@ describe("the walk state of a run", () => {
 	test("refuses a Checkpoint with a row of another run, and writes nothing", async () => {
 		const a = await computer();
 		const detail = await waitingRun(a.space, a.sandbox.repoPath);
-		const checkpoint = (await a.context.walks.exportWalk(detail.id)).at(-1)
+		const checkpoint = (await a.context.runs.exportWalk(detail.id)).at(-1)
 			?.content as string;
 		const parsed = JSON.parse(checkpoint) as {
 			runId: string;

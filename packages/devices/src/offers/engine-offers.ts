@@ -1,6 +1,6 @@
 import {
 	HostUnreachableError,
-	type RunLog,
+	type PeerContext,
 	type SpaceDocuments,
 } from "@nightshift/engine";
 import type { HostRelay, OfferCaps, WorkRelay } from "../contract";
@@ -146,7 +146,8 @@ export function createEngineOffers(deps: {
 	/** Every method waits for the engine to be ready. */
 	ready: Promise<unknown>;
 	documents: SpaceDocuments;
-	log: Pick<RunLog, "append">;
+	/** Logs an Offer's facts (`PeerContext.logFact`). */
+	logFact: PeerContext["logFact"];
 	deviceId: string;
 	now(): number;
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
@@ -155,7 +156,7 @@ export function createEngineOffers(deps: {
 	/** Stops the runs walked here whose running step is a session under the Offer. */
 	stopUnder(offer: OfferRef): Promise<void>;
 }): EngineOffers {
-	const { documents, log, relay } = deps;
+	const { documents, logFact, relay } = deps;
 	return {
 		async list(spaceId) {
 			await deps.ready;
@@ -183,7 +184,7 @@ export function createEngineOffers(deps: {
 			await document.change(() =>
 				publishOffer(document, { ...offer, offeredAt: deps.now(), by }),
 			);
-			await log.append({
+			await logFact({
 				type: "OfferMade",
 				spaceId,
 				payload: {
@@ -231,7 +232,7 @@ export function createEngineOffers(deps: {
 				removed = unpublishOffer(document, deviceId, profile);
 			});
 			if (removed) {
-				await log.append({
+				await logFact({
 					type: "OfferWithdrawn",
 					spaceId,
 					payload: { deviceId, profile, by },

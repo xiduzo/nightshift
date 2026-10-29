@@ -21,6 +21,7 @@ import {
 	type ListedProject,
 	type OwnDevice,
 	openDeviceDocument,
+	type PeerProfiles,
 	placedRun,
 	type RunStatus,
 	recordClone,
@@ -50,6 +51,13 @@ import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
 import { createPlacement, deviceNamed } from "./placement";
+
+/** No profile of this computer, and no Device document kept here. */
+const NO_PROFILES: PeerProfiles = {
+	here: () => null,
+	stored: async () => null,
+	lastKnown: async () => null,
+};
 
 /**
  * Run-level Placement in one process: A walks a run whose steps run on
@@ -1115,7 +1123,8 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 		const placement = createPlacement({
 			db: b.db,
 			device: testDevice({ harnesses: {} }, b.deviceId),
-			log: { walkerId: async () => b.deviceId } as never,
+			walkerId: async () => b.deviceId,
+			profiles: NO_PROFILES,
 			registry: {} as never,
 			documents: spaceDocuments,
 			hostSpaces: createHostSpaces(b.db),
@@ -1254,7 +1263,8 @@ describe("the walk, from the plan alone", () => {
 		createPlacement({
 			db: a.db,
 			device: testDevice({ harnesses: {} }, a.deviceId),
-			log: { walkerId: async () => a.deviceId } as never,
+			walkerId: async () => a.deviceId,
+			profiles: NO_PROFILES,
 			registry: {} as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
@@ -1353,7 +1363,8 @@ describe("a run with no starter", () => {
 		const placement = createPlacement({
 			db: a.db,
 			device: testDevice({ harnesses: {} }, a.deviceId),
-			log: { walkerId: async () => a.deviceId } as never,
+			walkerId: async () => a.deviceId,
+			profiles: NO_PROFILES,
 			registry: {} as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),

@@ -1,5 +1,4 @@
 import type { OwnDevice } from "../contract";
-import { lastKnownProfiles } from "../device-config";
 import { followOwnStep } from "../log";
 import {
 	type PeerContext,
@@ -17,12 +16,12 @@ import type { PeersFactory } from "../run/peers";
  * `@nightshift/devices`, whose tests cover the engine among other Devices.
  */
 export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
-	const { device, log } = context;
+	const { device } = context;
 
 	async function here(spaceId: string, projectId: string): Promise<OwnDevice> {
 		const project = await context.project(projectId, spaceId);
 		return {
-			deviceId: await log.walkerId(),
+			deviceId: await context.walkerId(),
 			name: device.name,
 			thisDevice: true,
 			online: true,
@@ -46,7 +45,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 					thisDevice: true,
 					hasClone: project.repoPath !== null,
 				};
-				const self = await log.walkerId();
+				const self = await context.walkerId();
 				// No other Device: the node walk refuses every other one.
 				return planNodes(
 					start,
@@ -57,8 +56,8 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 						byName: async (name) => (name === device.name ? walker : null),
 						profileDevice: async (id) =>
 							id === device.id || id === self ? walker : null,
-						profileFor: context.profileFor ?? (() => null),
-						lastKnown: (id) => lastKnownProfiles(context.db, id),
+						profileFor: context.profiles.here,
+						lastKnown: context.profiles.lastKnown,
 						flows: context.flows,
 					},
 					start.startedBy ?? context.ownerId(),
@@ -89,7 +88,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 		},
 		runs: {
 			async walkers(_spaceId, ids) {
-				const self = await log.walkerId();
+				const self = await context.walkerId();
 				return new Map(
 					[...new Set(ids)].map((id) => {
 						const mine = id === self || id === device.id;
@@ -105,9 +104,9 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 			stepEntries: (step, afterSeq, signal) =>
 				followOwnStep(
 					{
-						bus: context.bus,
+						watch: context.history.watch,
 						stepEnded: async (step) =>
-							(await context.stepStamp(step))?.ended === true,
+							(await context.runs.stepStamp(step))?.ended === true,
 						ownEntries: context.history.ownTranscript,
 						archived: async () => null,
 					},

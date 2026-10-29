@@ -2,8 +2,8 @@ import {
 	type FeedStep,
 	followOwnStep,
 	HostUnreachableError,
+	type PeerContext,
 	RUN_NOT_FOUND,
-	type RunBus,
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
@@ -20,7 +20,7 @@ import { pause } from "../links";
  * was written, then each entry as it is written, and ends when the step
  * ends. Where the entries come from depends on who walks the run:
  *
- * - This Replica walks it: its own file, then its bus.
+ * - This Replica walks it: its own file, then each entry as it is written.
  * - This Replica keeps the Space (it is the Host) and a Device walks it:
  *   the Host's tail of the step. The tail asks the Walker for the step
  *   while it has followers (`wanted`, carried to the Walker on its sync
@@ -40,7 +40,8 @@ import { pause } from "../links";
  */
 
 export type FeedPorts = {
-	bus: RunBus;
+	/** Calls back with each change of a run as it happens here (`RunHistory.watch`). */
+	watch: PeerContext["history"]["watch"];
 	/** This Replica's Walker id. */
 	selfId(): Promise<string>;
 	/** A run's Walker and Space, or null for a run this Replica lacks. */
@@ -172,7 +173,7 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 		}
 	}
 
-	/** The step's own feed: its file, then its bus, until it ends. */
+	/** The step's own feed: its file, then each entry as it is written, until it ends. */
 	const own = (step: FeedStep, afterSeq: number, signal: AbortSignal) =>
 		followOwnStep(ports, step, afterSeq, signal);
 
@@ -332,7 +333,7 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 				grace = setTimeout(stop, graceMs);
 			};
 			if (ended) silent();
-			const off = ports.bus.subscribe(step.runId, (item) => {
+			const off = ports.watch(step.runId, (item) => {
 				if (grace || item.kind === "transcript") return;
 				void ports
 					.stepEnded(step)

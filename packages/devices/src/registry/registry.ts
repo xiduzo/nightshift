@@ -1,11 +1,7 @@
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
-import {
-	deviceDocumentName,
-	type RunHistory,
-	type RunLog,
-} from "@nightshift/engine";
+import { deviceDocumentName, type PeerContext } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
@@ -127,14 +123,15 @@ export async function homePersonsOf(db: Database): Promise<string[]> {
 
 export function createDeviceRegistry(deps: {
 	db: Database;
-	log: RunLog;
+	/** Logs a Device's facts (`PeerContext.logFact`). */
+	logFact: PeerContext["logFact"];
 	/** The engine's event log: the latest presence of each Device. */
-	history: Pick<RunHistory, "devicePresence">;
+	history: Pick<PeerContext["history"], "devicePresence">;
 	/** The presence of the registry before a reload. Default: every Device offline. */
 	presence?: DevicePresence;
 	now?: () => number;
 }): DeviceRegistry {
-	const { db, log } = deps;
+	const { db, logFact } = deps;
 	const now = deps.now ?? Date.now;
 	const online: DevicePresence = deps.presence ?? new Map();
 
@@ -177,7 +174,7 @@ export function createDeviceRegistry(deps: {
 		type: "DeviceOnline" | "DeviceOffline",
 		deviceRow: { id: string; ownerId: string | null },
 	) {
-		await log.append({
+		await logFact({
 			type,
 			payload: { deviceId: deviceRow.id },
 			spaceId: await spaceOf(deviceRow.ownerId ?? ""),
@@ -216,7 +213,7 @@ export function createDeviceRegistry(deps: {
 				revokedAt: null,
 			};
 			// The row and its event are one batch.
-			await log.append(
+			await logFact(
 				{
 					type: "DeviceJoined",
 					payload: {
@@ -294,7 +291,7 @@ export function createDeviceRegistry(deps: {
 				);
 			}
 			if (found.revokedAt) return;
-			await log.append(
+			await logFact(
 				{
 					type: "DeviceRevoked",
 					payload: { deviceId: id },

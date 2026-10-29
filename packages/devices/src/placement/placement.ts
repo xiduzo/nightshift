@@ -8,10 +8,10 @@ import {
 	deviceNameIn,
 	HostUnreachableError,
 	type ListedProject,
-	lastKnownProfiles,
 	type NodeToPlace,
 	type OfferedPlacement,
 	type OwnDevice,
+	type PeerProfiles,
 	type PlacedDevice,
 	type PlacedRun,
 	type Placement,
@@ -20,16 +20,13 @@ import {
 	type PlannedRun,
 	planNodes,
 	projectClones,
-	type RunLog,
 	type SpaceDocuments,
-	storedDeviceProfiles,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
 import {
 	type FlowNode,
 	type FlowSources,
 	isProfileRef,
-	type ProfileSettings,
 	profileOf,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -74,14 +71,15 @@ export type PlacementDeps = {
 	db: Database;
 	/** This computer as a Device. */
 	device: Device;
-	log: RunLog;
+	/** This computer as the Walker of its runs (`PeerContext.walkerId`). */
+	walkerId(): Promise<string>;
 	registry: DeviceRegistry;
 	documents: SpaceDocuments;
 	hostSpaces: HostSpaces;
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
-	/** A profile of this computer by its id. Default: none. */
-	profileFor?: (id: string) => ProfileSettings | null;
+	/** The profiles of this computer and of the Devices this Replica knows. */
+	profiles: PeerProfiles;
 	/** The project's flows, from this Replica's flow document: what a run starts from. */
 	flows(projectId: string): Promise<FlowSources>;
 	/** How calls reach other Devices. Without it, every step runs here. */
@@ -171,7 +169,7 @@ export function createPlacement(deps: PlacementDeps) {
 
 	/** Whether an id is this computer. */
 	async function isHere(id: string): Promise<boolean> {
-		return id === device.id || id === (await deps.log.walkerId());
+		return id === device.id || id === (await deps.walkerId());
 	}
 
 	/**
@@ -235,7 +233,7 @@ export function createPlacement(deps: PlacementDeps) {
 		projectId: string,
 	): Promise<OwnDevice[]> {
 		const project = await deps.project(projectId, spaceId);
-		const self = await deps.log.walkerId();
+		const self = await deps.walkerId();
 		const here: OwnDevice = {
 			deviceId: self,
 			name: device.name,
@@ -303,7 +301,7 @@ export function createPlacement(deps: PlacementDeps) {
 		for (const d of await registry.list(personId)) {
 			if (d.revokedAt !== null || d.id === self) continue;
 			// Known only when this Replica keeps a copy of its Device document.
-			const profiles = await storedDeviceProfiles(db, d.id);
+			const profiles = await deps.profiles.stored(d.id);
 			own.push({
 				deviceId: d.id,
 				name: d.name,
@@ -334,7 +332,7 @@ export function createPlacement(deps: PlacementDeps) {
 			projectClones(document, projectId).map((c) => c.deviceId),
 		);
 		const mine = new Set(own.map((d) => d.deviceId));
-		const self = await deps.log.walkerId();
+		const self = await deps.walkerId();
 		const byDevice = new Map<
 			string,
 			{ name: string; offers: string[]; profiles: DeviceProfile[] }
@@ -599,9 +597,9 @@ export function createPlacement(deps: PlacementDeps) {
 			start,
 			{
 				...(await devicesOf(project, runId, personId)),
-				profileFor: deps.profileFor ?? (() => null),
+				profileFor: deps.profiles.here,
 				// A node's offline Device: its profiles as its document last said.
-				lastKnown: (id) => lastKnownProfiles(db, id),
+				lastKnown: deps.profiles.lastKnown,
 				deviceName: async (id) =>
 					deviceNameIn(await documents.open(project.spaceId), id) ??
 					(await registry.get(id))?.name ??

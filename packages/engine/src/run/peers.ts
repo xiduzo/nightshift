@@ -1,4 +1,3 @@
-import type { Database } from "@nightshift/db";
 import type {
 	Flow,
 	FlowNode,
@@ -9,6 +8,7 @@ import type {
 import type { z } from "zod";
 import type {
 	Actor,
+	DeviceProfile,
 	NodeToPlace,
 	OffersPort,
 	OwnDevice,
@@ -20,10 +20,11 @@ import type { Device } from "../device";
 import type { WalkFile, WalkFiles, WalkRef } from "../graph";
 import type {
 	CopyStamp,
+	EnginePayloads,
+	EventWrites,
+	LandedScope,
 	PlacedRun,
-	RunBus,
 	RunHistory,
-	RunLog,
 	RunPlan,
 	TranscriptEntry,
 } from "../log";
@@ -63,48 +64,102 @@ export type Peers = {
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 };
 
-/** What `createEngine` gives the port: its own parts, made before the port. */
+/**
+ * What `createEngine` offers the port, made before it: capabilities in
+ * the words of runs, Projects and profiles. The engine owns the tables of
+ * runs, events, Projects and walk state: the peers never get its
+ * database, its run log or its bus. Their own rows (`@nightshift/devices`'
+ * tables) they keep in their own database handle.
+ */
 export type PeerContext = {
-	db: Database;
-	dataDir: string;
 	/** This computer as a Device. */
 	device: Device;
-	log: RunLog;
-	bus: RunBus;
-	/**
-	 * The rows of runs, steps, agent sessions and events, as the exchange
-	 * reads and adds them, and the files of the steps this computer walked.
-	 * The engine owns those tables: the peers touch them only here.
-	 */
-	history: RunHistory;
-	/**
-	 * The walk state of the runs this computer walks, as the archive keeps
-	 * it. The engine owns the checkpoint tables: the peers read them only
-	 * here, and never write them.
-	 */
-	walks: WalkFiles;
-	documents: SpaceDocuments;
-	now(): number;
-	/** A profile of this computer by its id (`EngineOptions.profileFor`). */
-	profileFor?: (id: string) => ProfileSettings | null;
-	/** The project's flows, from this Replica's flow document: what a run starts from. */
-	flows(projectId: string): Promise<FlowSources>;
-	/** Resolves when the engine is ready. */
-	ready: Promise<void>;
+	/** This computer as the Walker of the runs it walks: the id its events carry. */
+	walkerId(): Promise<string>;
 	/** The Person who owns this computer, or null before the engine is ready. */
 	ownerId(): string | null;
+	/** Resolves when the engine is ready. */
+	ready: Promise<void>;
+	now(): number;
+	documents: SpaceDocuments;
+	/** A project a person has not removed, with its Clone here or null. */
+	project(projectId: string, spaceId: string): Promise<ListedProject>;
+	/** The project's flows, from this Replica's flow document: what a run starts from. */
+	flows(projectId: string): Promise<FlowSources>;
+	/** The profiles of this computer, and of the Devices whose documents this Replica keeps. */
+	profiles: PeerProfiles;
+	/**
+	 * The run history of this Replica, as the exchange reads and adds to
+	 * it: rows by cursor, the ingest, a run's owners and events, the files
+	 * of the steps this computer walked, and what lands.
+	 */
+	history: PeerHistory;
+	/** The runs this computer walks, as the peers act on them. */
+	runs: PeerRuns;
+	/**
+	 * Logs a fact of no run the peers own (a Device's, an Offer's), in
+	 * the Space it names, in one batch with the rows it names (`before`).
+	 */
+	logFact(fact: PeerFact, writes?: Pick<EventWrites, "before">): Promise<void>;
+};
+
+/** The facts of no run the peers log: a Device paired, gone, online or offline; an Offer made or withdrawn. */
+type PeerFactType =
+	| "DeviceJoined"
+	| "DeviceRevoked"
+	| "DeviceOnline"
+	| "DeviceOffline"
+	| "OfferMade"
+	| "OfferWithdrawn";
+
+/** A fact the peers log (`PeerContext.logFact`). */
+export type PeerFact = {
+	[T in PeerFactType]: {
+		type: T;
+		spaceId: string;
+		payload: EnginePayloads[T];
+	};
+}[PeerFactType];
+
+/** The profiles a run's steps may use, as this Replica knows them (`PeerContext.profiles`). */
+export type PeerProfiles = {
+	/** A profile of this computer by its id (`EngineOptions.profileFor`). Null for none. */
+	here(id: string): ProfileSettings | null;
+	/** The profiles a Device's document lists, when this Replica keeps a copy of it. Null otherwise. */
+	stored(deviceId: string): Promise<DeviceProfile[] | null>;
+	/**
+	 * A Device's profiles as its document last said, by id, with their
+	 * settings: for a node on a Device that is offline. Null when this
+	 * Replica never had its document.
+	 */
+	lastKnown(
+		deviceId: string,
+	): Promise<Map<string, { name: string; settings: ProfileSettings }> | null>;
+};
+
+/** The run history as the peers get it (`PeerContext.history`). */
+export type PeerHistory = RunHistory & {
+	/**
+	 * Calls `listener` when a run event of `scope` lands here (appended or
+	 * ingested) that changes what a reader shows, until the returned
+	 * function is called. A spend so far (`SessionUsage`) alone does not:
+	 * it goes with the next event that does.
+	 */
+	onLanded(listener: () => void, scope?: LandedScope): () => void;
+};
+
+/** What the peers do to the runs this computer walks (`PeerContext.runs`). */
+export type PeerRuns = WalkFiles & {
 	/**
 	 * The stamp a copy of a step's files taken now carries, as this
 	 * Replica's log says: which opening of the step, and whether it ended
 	 * (and was not reopened since). Null for a step this Replica lacks.
 	 */
 	stepStamp(step: FeedStep): Promise<CopyStamp | null>;
-	/** A project a person has not removed, with its Clone here or null. */
-	project(projectId: string, spaceId: string): Promise<ListedProject>;
 	/** This computer walks a run another Device moved here, from now on. */
 	takeOver(runId: string): Promise<void>;
 	/** Stops a run this computer walks: its running step ends as stopped. */
-	stopRun(runId: string): Promise<void>;
+	stop(runId: string): Promise<void>;
 };
 
 /** Makes the port, once per engine. */

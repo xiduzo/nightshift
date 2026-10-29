@@ -1,7 +1,6 @@
 import type { Database } from "@nightshift/db";
 import {
 	deviceNameIn,
-	type RunLog,
 	type RunWalker,
 	type SpaceDocuments,
 } from "@nightshift/engine";
@@ -14,7 +13,8 @@ import { deviceNamesOf } from "../registry";
  */
 export function createWalkers(deps: {
 	db: Database;
-	log: Pick<RunLog, "walkerId">;
+	/** This computer as the Walker of its runs (`PeerContext.walkerId`). */
+	walkerId(): Promise<string>;
 	device: { id: string; name: string };
 	documents: SpaceDocuments;
 }) {
@@ -23,7 +23,7 @@ export function createWalkers(deps: {
 		spaceId: string,
 		ids: readonly string[],
 	): Promise<Map<string, RunWalker>> {
-		const self = await deps.log.walkerId();
+		const self = await deps.walkerId();
 		const unique = [...new Set(ids)];
 		const others = unique.filter((id) => id !== self && id !== device.id);
 		const named = await deviceNamesOf(db, others);
