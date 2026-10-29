@@ -8,7 +8,6 @@ import {
 	lastKnownProfiles,
 	type RunSettings,
 	storedDeviceCopy,
-	storedDeviceProfiles,
 } from "../device-config";
 import {
 	createCloneImports,
@@ -314,7 +313,6 @@ export function createEngine(
 		ready: peersReady,
 		now,
 		documents,
-		project: (projectId, spaceId) => projects.find(projectId, spaceId),
 		// Made below: the Projects record a Clone through the peers' relay.
 		projects: {
 			find: (projectId, spaceId) => projects.find(projectId, spaceId),
@@ -328,7 +326,7 @@ export function createEngine(
 		flows: (projectId) => projectFlows.flows(projectId),
 		profiles: {
 			here: options.profileFor ?? (() => null),
-			stored: (deviceId) => storedDeviceProfiles(db, deviceId),
+
 			lastKnown: (deviceId) => lastKnownProfiles(db, deviceId),
 		},
 		keptDevice: (deviceId) => storedDeviceCopy(db, deviceId),

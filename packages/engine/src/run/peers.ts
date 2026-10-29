@@ -8,7 +8,6 @@ import type {
 import type { z } from "zod";
 import type {
 	Actor,
-	DeviceProfile,
 	NodeToPlace,
 	OffersPort,
 	OwnDevice,
@@ -84,8 +83,6 @@ export type PeerContext = {
 	ready: Promise<void>;
 	now(): number;
 	documents: SpaceDocuments;
-	/** A project a person has not removed, with its Clone here or null. */
-	project(projectId: string, spaceId: string): Promise<ListedProject>;
 	/** The Projects and their Clones, as the peers read and record them. */
 	projects: PeerProjects;
 	/** The project's flows, from this Replica's flow document: what a run starts from. */
@@ -153,8 +150,6 @@ export type PeerProjects = Pick<
 export type PeerProfiles = {
 	/** A profile of this computer by its id (`EngineOptions.profileFor`). Null for none. */
 	here(id: string): ProfileSettings | null;
-	/** The profiles a Device's document lists, when this Replica keeps a copy of it. Null otherwise. */
-	stored(deviceId: string): Promise<DeviceProfile[] | null>;
 	/**
 	 * A Device's profiles as its document last said, by id, with their
 	 * settings: for a node on a Device that is offline. Null when this

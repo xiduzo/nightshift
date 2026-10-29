@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { Database } from "@nightshift/db";
 import {
 	isAgentProfile,
 	migrateToolSets,
@@ -8,15 +7,10 @@ import {
 	profileSchema,
 	profileSettingsSchema,
 } from "@nightshift/flows";
-import * as Y from "yjs";
+import type * as Y from "yjs";
 import { z } from "zod";
 import type { DeviceProfile } from "../contract";
-import {
-	type DeviceDocument,
-	deviceDocumentName,
-	mapView,
-} from "./device-document";
-import { documentRows } from "./ydoc";
+import { type DeviceDocument, mapView } from "./device-document";
 
 /**
  * Profiles: an Agent Profile (a harness, a model and its tools) or a Model
@@ -93,28 +87,6 @@ export function readProfiles(
 		});
 	}
 	return out;
-}
-
-/**
- * The profiles in this Replica's copy of another Device's document, as
- * a Person picks them: a Host keeps the copies of the Devices whose home
- * Host it is. Null when this Replica has no copy.
- */
-export async function storedDeviceProfiles(
-	db: Database,
-	deviceId: string,
-): Promise<DeviceProfile[] | null> {
-	const state = await documentRows(db).fetch(deviceDocumentName(deviceId));
-	if (!state) return null;
-	const doc = new Y.Doc();
-	try {
-		Y.applyUpdate(doc, state);
-		return [...readProfiles(doc.getMap("profiles")).values()]
-			.map(profileChoice)
-			.sort((a, b) => a.name.localeCompare(b.name));
-	} finally {
-		doc.destroy();
-	}
 }
 
 /** A profile as a Person picks it for a node. */

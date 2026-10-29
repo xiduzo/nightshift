@@ -16,7 +16,7 @@ export {
 } from "./device-copies";
 export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
-export { storedDeviceProfiles } from "./profiles";
+
 export type { RunSettings } from "./settings";
 export { defaultRunSettings } from "./settings";
 export type { PersistedDocument } from "./ydoc";
