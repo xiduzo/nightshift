@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OPEN_HOST, personalSpaceId, requestAccess } from "@nightshift/auth";
 import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
-import type { Project, RunSummary, SpaceEngine } from "@nightshift/engine";
+import type {
+	Project,
+	RunSummary,
+	SpaceEngine,
+	SpaceFlows,
+} from "@nightshift/engine";
 import type { FlowListItem } from "@nightshift/flows";
 import { call, ORPCError } from "@orpc/server";
 
@@ -82,8 +87,10 @@ function engineOf(data: Record<string, SpaceData>) {
 							input?.projectId === undefined ||
 							run.projectId === input.projectId,
 					),
-				listFlows: async () =>
-					space.flows.map((name) => stub<FlowListItem>("flow", { name })),
+				flows: stub<SpaceFlows>("flows", {
+					list: async () =>
+						space.flows.map((name) => stub<FlowListItem>("flow", { name })),
+				}),
 			});
 		},
 	};

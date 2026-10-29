@@ -7,12 +7,10 @@ import { defaultRunSettings, type RunSettings } from "../device-config";
 import {
 	createCloneImports,
 	createFlowDocuments,
-	createFlowFiles,
 	createFlowMigrations,
-	dismissNotice,
-	documentProjectFlows,
-	flowNotices,
-	upgradeFlows,
+	createProjectFlows,
+	createSpaceFlows,
+	type ProjectFlows,
 } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
@@ -97,9 +95,10 @@ import { wakeOfflineSleeps } from "./wake";
  *   events. `take-over.ts` is the other end of a move. `wake.ts` wakes
  *   the runs that slept for a Device that is back.
  * - `read/read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
- * - `flows/`: the flows and schedules of a project in its flow document,
- *   and the import of a Clone's folder from before it. `schedules/`: the
- *   scheduler and the webhooks.
+ * - `flows/`: the flows and schedules of the projects in their flow
+ *   documents (`ProjectFlows`), what a person does with them in a Space
+ *   (`SpaceFlows`, `SpaceEngine.flows`), and the import of a Clone's
+ *   folder from before it. `schedules/`: the scheduler and the webhooks.
  * - `cleanup/`: what ended runs left on this computer (worktrees and
  *   branches), their removal, and the scheduled sweep.
  * - `projects/`: projects by remote and their Clones on this computer,
@@ -164,6 +163,17 @@ export interface Engine {
 	 * Host's and its split off it all go through it.
 	 */
 	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
+	/**
+	 * The flows of every Project of this Replica, by Project, whatever its
+	 * Space (`ProjectFlows`): what another Device's older Walker asks this
+	 * one for, and the merge of one Project's flows into another's (the
+	 * merge of Personal). Who may see the Project is the caller's check. A
+	 * person reads and saves through `space(id).flows`.
+	 */
+	readonly flows: Pick<
+		ProjectFlows,
+		"flows" | "schedules" | "planMerge" | "merge"
+	>;
 	/**
 	 * A run's status, when it wakes, and whether this computer walks it or
 	 * runs its steps, in any Space of this Replica. Null for a run it does
@@ -289,8 +299,7 @@ export function createEngine(
 		documents,
 		now,
 		...(options.profileFor ? { profileFor: options.profileFor } : {}),
-		flows: async (projectId) =>
-			(await projectFlows.flows({ projectId })).sources,
+		flows: (projectId) => projectFlows.flows(projectId),
 		ready: peersReady,
 		ownerId: () => ownerId,
 		// Every open step's reader asks on each change of the run: the run
@@ -329,9 +338,9 @@ export function createEngine(
 		profiles: options.profiles,
 	});
 	/** The flows and schedules of every project: its flow document (ADR 2). */
-	const projectFlows = documentProjectFlows({
+	const projectFlows = createProjectFlows({
 		documents: flowDocuments,
-		find: (projectId, spaceId) => projects.find(projectId, spaceId),
+		project: (projectId) => projects.find(projectId),
 		deviceId: () => runLog.walkerId(),
 		now,
 		migrations,
@@ -434,12 +443,9 @@ export function createEngine(
 	 */
 	async function upgradeKeptFlows(): Promise<void> {
 		try {
-			const self = await runLog.walkerId();
-			for (const document of await flowDocuments.openAll()) {
-				const row = await projects.find(document.projectId).catch(() => null);
-				if (!row || (await hostedElsewhere(row.spaceId))) continue;
-				await upgradeFlows(document, { migrations, deviceId: self, at: now() });
-			}
+			await projectFlows.upgrade(
+				async (spaceId) => !(await hostedElsewhere(spaceId)),
+			);
 		} catch (error) {
 			console.warn(
 				"Night Shift could not bring the flows to their new format. It tries again at the next start:",
@@ -652,18 +658,14 @@ export function createEngine(
 		runCopies,
 		placement,
 		placements: places.placements,
-		flowFiles: createFlowFiles({
+		flows: createSpaceFlows({
+			ready,
 			flows: projectFlows,
+			project: (projectId, spaceId) => projects.find(projectId, spaceId),
 			personNames: (ids) => namesOf(db, ids),
 			deviceNames: (ids) => directory.names(ids),
 			migration: async () => migrations.forDevice(await runLog.walkerId()),
 		}),
-		flowNotices: {
-			list: async (projectId) =>
-				flowNotices(await flowDocuments.open(projectId)),
-			dismiss: async (projectId, id) =>
-				dismissNotice(await flowDocuments.open(projectId), id),
-		},
 		importClone: (projectId) => cloneImports.project(projectId),
 		kept: {
 			list: (flow) => listKeptValues(db, flow),
@@ -695,6 +697,7 @@ export function createEngine(
 		onLandedFacts: (listener) =>
 			history.landed.subscribe((events) => listener(landedFacts(events))),
 		moveProjects,
+		flows: projectFlows,
 		async runHere(runId) {
 			await ready;
 			return reads.runHere(runId);

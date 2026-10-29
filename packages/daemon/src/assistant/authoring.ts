@@ -15,12 +15,15 @@ import type {
 	ConnectionStore,
 	ProfileStore,
 	SpaceEngine,
+	SpaceFlows,
 	TranscriptEntry,
 } from "@nightshift/engine";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 
 /** What the port reads in the Space. */
-export type ChatSpace = Pick<SpaceEngine, "flowMap" | "getRun" | "watchRun">;
+export type ChatSpace = Pick<SpaceEngine, "getRun" | "watchRun"> & {
+	flows: Pick<SpaceFlows, "map">;
+};
 
 /** The chat's Space, and its Devices with the profiles a node may name. */
 export type AuthoringSpace = ChatSpace & Pick<SpaceEngine, "listDevices">;
@@ -49,7 +52,7 @@ export function authoringPort(
 	const { runId } = request;
 	return {
 		draft: async () => ({ name: request.flowName, flow: request.flow }),
-		flows: () => deps.space.flowMap(request.projectId),
+		flows: () => deps.space.flows.map(request.projectId),
 		// Each Device's, with the settings of this computer's own.
 		profiles: async () => {
 			const own = new Map(deps.profiles.list().map((p) => [p.id, p]));

@@ -367,11 +367,11 @@ describe("a run placed on another Device", () => {
 		expect(await space().listPlacements(projectId)).toEqual([
 			{ deviceId: B, name: "studio-b", thisDevice: false, default: true },
 		]);
-		expect((await space().listFlows(projectId)).map((f) => f.name)).toEqual([
+		expect((await space().flows.list(projectId)).map((f) => f.name)).toEqual([
 			"hello",
 		]);
 		expect(
-			(await space().getFlow(projectId, "hello")).flow?.nodes,
+			(await space().flows.get(projectId, "hello")).flow?.nodes,
 		).toHaveLength(1);
 		const renamed = await space().renameProject(projectId, "Renamed");
 		expect(renamed.name).toBe("Renamed");

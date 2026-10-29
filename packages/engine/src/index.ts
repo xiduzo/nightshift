@@ -103,7 +103,6 @@ export {
 	valueStore,
 } from "./device-config";
 export type {
-	FlowDocument,
 	FlowDocuments,
 	FlowExport,
 	FlowNotice,
@@ -114,21 +113,17 @@ export type {
 	RevisionKind,
 	RevisionName,
 	SavedFlow,
+	SpaceFlows,
 } from "./flows";
 export {
 	cliToolsInUse,
 	connectionsInUse,
 	createFlowDocuments,
-	createFlowMigrations,
-	documentProjectFlows,
+	createProjectFlows,
 	documentSpace,
-	type FlowMergePlan,
 	flowsForRun,
-	mergeFlowDocuments,
-	planFlowMerge,
 	profilesInUse,
 	revisionKinds,
-	upgradedSources,
 } from "./flows";
 export type { WalkFile, WalkFiles, WalkRef } from "./graph";
 export type {

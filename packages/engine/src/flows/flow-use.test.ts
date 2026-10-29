@@ -50,45 +50,47 @@ describe("flowUse", () => {
 		};
 		const reader: FlowReader = {
 			listProjects: async () => [project("p1", "App"), project("p2", "Site")],
-			listFlows: async (projectId) => {
-				if (projectId === "p2") throw new Error("not on this computer");
-				return [
-					{
-						name: "night",
-						path: "",
-						description: null,
-						nodeCount: 3,
-						errorCount: 0,
-						inputs: [],
-						callers: [],
-						devices: { names: [], ids: [] },
-					},
-					{
-						name: "day",
-						path: "",
-						description: null,
-						nodeCount: 1,
-						errorCount: 0,
-						inputs: [],
-						callers: [],
-						devices: { names: [], ids: [] },
-					},
-					{
-						name: "broken",
-						path: "",
-						description: null,
-						nodeCount: null,
-						errorCount: 1,
-						inputs: [],
-						callers: [],
-						devices: { names: [], ids: [] },
-					},
-				];
-			},
-			getFlow: async (_projectId, name) => {
-				const flow = flows[name];
-				if (!flow) throw new Error("does not parse");
-				return flow;
+			flows: {
+				list: async (projectId) => {
+					if (projectId === "p2") throw new Error("not on this computer");
+					return [
+						{
+							name: "night",
+							path: "",
+							description: null,
+							nodeCount: 3,
+							errorCount: 0,
+							inputs: [],
+							callers: [],
+							devices: { names: [], ids: [] },
+						},
+						{
+							name: "day",
+							path: "",
+							description: null,
+							nodeCount: 1,
+							errorCount: 0,
+							inputs: [],
+							callers: [],
+							devices: { names: [], ids: [] },
+						},
+						{
+							name: "broken",
+							path: "",
+							description: null,
+							nodeCount: null,
+							errorCount: 1,
+							inputs: [],
+							callers: [],
+							devices: { names: [], ids: [] },
+						},
+					];
+				},
+				get: async (_projectId, name) => {
+					const flow = flows[name];
+					if (!flow) throw new Error("does not parse");
+					return flow;
+				},
 			},
 		};
 		const use = await flowUse(reader);

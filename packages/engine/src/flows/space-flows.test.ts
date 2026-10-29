@@ -7,15 +7,50 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import {
-	createFlowDocuments,
-	documentProjectFlows,
-	type FlowDocuments,
-} from "./flow-document";
-import { createFlowFiles, type FlowFiles } from "./flow-files";
+import { createFlowDocuments, type FlowDocuments } from "./flow-document";
+import { createProjectFlows } from "./project-flows";
+import { createSpaceFlows, type SpaceFlows } from "./space-flows";
 
 const SPACE = "space";
 const PROJECT = "project";
+/** Two projects of the Space, and one of another Space. */
+const SPACE_OF: Record<string, string> = {
+	project: SPACE,
+	other: SPACE,
+	elsewhere: "another-space",
+};
+
+/** The flows of the Space for Ada, over the documents. */
+function adasFlows(
+	documents: FlowDocuments,
+	options: Partial<Parameters<typeof createSpaceFlows>[0]> & {
+		now?: () => number;
+	} = {},
+): SpaceFlows {
+	const { now, ...rest } = options;
+	const spaceOf = async (projectId: string) => {
+		const spaceId = SPACE_OF[projectId];
+		if (spaceId === undefined) {
+			throw new Refusal("not-found", "This project does not exist.");
+		}
+		return spaceId;
+	};
+	return createSpaceFlows({
+		ready: Promise.resolve(),
+		flows: createProjectFlows({
+			documents,
+			project: async (projectId) => ({ spaceId: await spaceOf(projectId) }),
+			deviceId: "laptop",
+			...(now ? { now } : {}),
+		}),
+		project: async (projectId, spaceId) => {
+			if ((await spaceOf(projectId)) !== spaceId) {
+				throw new Refusal("not-found", "This project does not exist.");
+			}
+		},
+		...rest,
+	})(SPACE, "ada");
+}
 
 const quick = (prompt: string): Flow =>
 	flowSchema.parse(
@@ -49,19 +84,14 @@ describe("the revisions of a flow", () => {
 	const clock = { at: 1_000 };
 	let sandbox: Sandbox;
 	let documents: FlowDocuments;
-	let files: FlowFiles;
+	let files: SpaceFlows;
 
 	beforeEach(async () => {
 		clock.at = 1_000;
 		sandbox = await createSandbox();
 		documents = createFlowDocuments({ db: sandbox.db });
-		files = createFlowFiles({
-			flows: documentProjectFlows({
-				documents,
-				find: async () => ({}),
-				deviceId: "laptop",
-				now: () => clock.at,
-			}),
+		files = adasFlows(documents, {
+			now: () => clock.at,
 			personNames: async () => new Map([["ada", "Ada"]]),
 			deviceNames: async () => new Map([["laptop", "MacBook"]]),
 		});
@@ -74,16 +104,10 @@ describe("the revisions of a flow", () => {
 
 	/** Saves the first flow at 1000 and the one with a second node at 2000, both by Ada. */
 	async function twoSaves() {
-		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
+		await files.save(PROJECT, "build", quick("Fix it"));
 		clock.at = 2_000;
-		await files.save(
-			SPACE,
-			PROJECT,
-			"build",
-			withSecondNode(quick("Fix it")),
-			"ada",
-		);
-		return files.revisions(SPACE, PROJECT, "build", "ada");
+		await files.save(PROJECT, "build", withSecondNode(quick("Fix it")));
+		return files.revisions(PROJECT, "build");
 	}
 
 	test("lists each save newest first: who, when, on which Device, and what it changed", async () => {
@@ -101,16 +125,8 @@ describe("the revisions of a flow", () => {
 
 	test("a save that changes nothing adds no revision", async () => {
 		await twoSaves();
-		await files.save(
-			SPACE,
-			PROJECT,
-			"build",
-			withSecondNode(quick("Fix it")),
-			"ada",
-		);
-		expect(await files.revisions(SPACE, PROJECT, "build", "ada")).toHaveLength(
-			2,
-		);
+		await files.save(PROJECT, "build", withSecondNode(quick("Fix it")));
+		expect(await files.revisions(PROJECT, "build")).toHaveLength(2);
 	});
 
 	test("shows a revision with what changes from the flow now to it, or from another revision", async () => {
@@ -118,12 +134,10 @@ describe("the revisions of a flow", () => {
 		if (!first || !second) throw new Error("Expected two revisions.");
 
 		const againstNow = await files.revision(
-			SPACE,
 			PROJECT,
 			"build",
 			first.id,
 			undefined,
-			"ada",
 		);
 		expect(againstNow.revision.flow?.nodes).toHaveLength(1);
 		expect(againstNow.against.revisionId).toBeNull();
@@ -133,12 +147,10 @@ describe("the revisions of a flow", () => {
 		]);
 
 		const againstFirst = await files.revision(
-			SPACE,
 			PROJECT,
 			"build",
 			second.id,
 			first.id,
-			"ada",
 		);
 		expect(againstFirst.against.revisionId).toBe(first.id);
 		expect(againstFirst.diff?.nodes.added.map((node) => node.id)).toEqual([
@@ -151,11 +163,11 @@ describe("the revisions of a flow", () => {
 		if (!first) throw new Error("Expected two revisions.");
 		clock.at = 3_000;
 
-		await files.restore(SPACE, PROJECT, "build", first.id, "ada");
+		await files.restore(PROJECT, "build", first.id);
 
-		const loaded = await files.get(SPACE, PROJECT, "build", "ada");
+		const loaded = await files.get(PROJECT, "build");
 		expect(loaded.flow?.nodes).toHaveLength(1);
-		const [restored] = await files.revisions(SPACE, PROJECT, "build", "ada");
+		const [restored] = await files.revisions(PROJECT, "build");
 		expect(restored).toMatchObject({
 			at: 3_000,
 			kind: "restore",
@@ -168,35 +180,28 @@ describe("the revisions of a flow", () => {
 	test("refuses a revision that the flow does not have, and a flow that does not exist", async () => {
 		await twoSaves();
 		const unknown = await refusal(
-			files.revision(SPACE, PROJECT, "build", "nope", undefined, "ada"),
+			files.revision(PROJECT, "build", "nope", undefined),
 		);
 		expect(unknown.kind).toBe("not-found");
-		expect(
-			(await refusal(files.restore(SPACE, PROJECT, "build", "nope", "ada")))
-				.kind,
-		).toBe("not-found");
-		expect(
-			(await refusal(files.revisions(SPACE, PROJECT, "other", "ada"))).kind,
-		).toBe("not-found");
+		expect((await refusal(files.restore(PROJECT, "build", "nope"))).kind).toBe(
+			"not-found",
+		);
+		expect((await refusal(files.revisions(PROJECT, "other"))).kind).toBe(
+			"not-found",
+		);
 	});
 });
 
 describe("moving a flow between projects", () => {
 	let sandbox: Sandbox;
 	let documents: FlowDocuments;
-	let files: FlowFiles;
+	let files: SpaceFlows;
 	const OTHER = "other";
 
 	beforeEach(async () => {
 		sandbox = await createSandbox();
 		documents = createFlowDocuments({ db: sandbox.db });
-		files = createFlowFiles({
-			flows: documentProjectFlows({
-				documents,
-				find: async () => ({}),
-				deviceId: "laptop",
-			}),
-		});
+		files = adasFlows(documents);
 	});
 
 	afterEach(async () => {
@@ -223,38 +228,33 @@ describe("moving a flow between projects", () => {
 	}
 
 	test("an export is the flow as JSON, which an import in another project saves as a revision of kind import", async () => {
-		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
-		const exported = await files.export(SPACE, PROJECT, "build", "ada");
+		await files.save(PROJECT, "build", quick("Fix it"));
+		const exported = await files.export(PROJECT, "build");
 		expect(exported.fileName).toBe("build.json");
 		expect(JSON.parse(exported.json)).toMatchObject({ version: FLOW_VERSION });
 
-		const saved = await files.import(
-			SPACE,
-			OTHER,
-			"build",
-			exported.json,
-			"ada",
-		);
+		const saved = await files.import(OTHER, "build", exported.json);
 		expect(saved).toEqual({ name: "build", issues: [] });
-		const [revision] = await files.revisions(SPACE, OTHER, "build", "ada");
+		const [revision] = await files.revisions(OTHER, "build");
 		expect(revision).toMatchObject({ kind: "import", person: { id: "ada" } });
 	});
 
 	test("an import of a name the project has gets a suffix", async () => {
-		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
-		const { json } = await files.export(SPACE, PROJECT, "build", "ada");
-		const saved = await files.import(SPACE, PROJECT, "build", json, "ada");
+		await files.save(PROJECT, "build", quick("Fix it"));
+		const { json } = await files.export(PROJECT, "build");
+		const saved = await files.import(PROJECT, "build", json);
 		expect(saved.name).toBe("build-2");
-		expect(
-			(await files.list(SPACE, PROJECT, "ada")).map((f) => f.name),
-		).toEqual(["build", "build-2"]);
+		expect((await files.list(PROJECT)).map((f) => f.name)).toEqual([
+			"build",
+			"build-2",
+		]);
 	});
 
 	test("an import brings a flow of an older format up to date", async () => {
 		const flow = quick("Fix it");
 		const old = JSON.stringify({ ...flow, version: 5 });
-		await files.import(SPACE, PROJECT, "old", old, "ada");
-		const loaded = await files.get(SPACE, PROJECT, "old", "ada");
+		await files.import(PROJECT, "old", old);
+		const loaded = await files.get(PROJECT, "old");
 		expect(loaded.flow?.version).toBe(FLOW_VERSION);
 	});
 
@@ -264,53 +264,81 @@ describe("moving a flow between projects", () => {
 			version: FLOW_VERSION + 1,
 		});
 		for (const json of ["{", JSON.stringify({ nodes: "none" }), newer]) {
-			const refused = await refusal(
-				files.import(SPACE, PROJECT, "bad", json, "ada"),
-			);
+			const refused = await refusal(files.import(PROJECT, "bad", json));
 			expect(refused.kind).toBe("invalid");
 		}
 		expect(
-			(await refusal(files.import(SPACE, PROJECT, "bad", newer, "ada")))
-				.message,
+			(await refusal(files.import(PROJECT, "bad", newer))).message,
 		).toContain("newer version of Night Shift");
-		expect(await files.list(SPACE, PROJECT, "ada")).toEqual([]);
+		expect(await files.list(PROJECT)).toEqual([]);
 	});
 
 	test("a copy into another project leaves the flows it calls behind, and says so", async () => {
-		await files.save(SPACE, PROJECT, "helper", quick("Help"), "ada");
-		await files.save(SPACE, PROJECT, "build", caller(), "ada");
+		await files.save(PROJECT, "helper", quick("Help"));
+		await files.save(PROJECT, "build", caller());
 
-		const copied = await files.copy(
-			SPACE,
-			PROJECT,
-			"build",
-			{ projectId: OTHER, name: "build" },
-			"ada",
-		);
+		const copied = await files.copy(PROJECT, "build", {
+			projectId: OTHER,
+			name: "build",
+		});
 		expect(copied.name).toBe("build");
 		expect(copied.issues).toContainEqual(
 			expect.objectContaining({ severity: "error", nodeId: "check" }),
 		);
-		expect((await files.list(SPACE, OTHER, "ada")).map((f) => f.name)).toEqual([
-			"build",
-		]);
-		const [revision] = await files.revisions(SPACE, OTHER, "build", "ada");
+		expect((await files.list(OTHER)).map((f) => f.name)).toEqual(["build"]);
+		const [revision] = await files.revisions(OTHER, "build");
 		expect(revision?.kind).toBe("copy");
 	});
 
 	test("a copy refuses a name the other project has, and suggests a free one", async () => {
-		await files.save(SPACE, PROJECT, "build", quick("Fix it"), "ada");
-		await files.save(SPACE, OTHER, "build", quick("Theirs"), "ada");
+		await files.save(PROJECT, "build", quick("Fix it"));
+		await files.save(OTHER, "build", quick("Theirs"));
 		const refused = await refusal(
-			files.copy(
-				SPACE,
-				PROJECT,
-				"build",
-				{ projectId: OTHER, name: "build" },
-				"ada",
-			),
+			files.copy(PROJECT, "build", { projectId: OTHER, name: "build" }),
 		);
 		expect(refused.kind).toBe("conflict");
 		expect(refused.message).toContain('"build-2"');
+	});
+});
+
+describe("the Space of a project", () => {
+	let sandbox: Sandbox;
+	let documents: FlowDocuments;
+	let files: SpaceFlows;
+
+	beforeEach(async () => {
+		sandbox = await createSandbox();
+		documents = createFlowDocuments({ db: sandbox.db });
+		files = adasFlows(documents);
+	});
+
+	afterEach(async () => {
+		await documents.close();
+		await sandbox.cleanup();
+	});
+
+	test("a project of another Space is not found, for every read and save", async () => {
+		const flow = quick("Fix it");
+		for (const attempt of [
+			files.list("elsewhere"),
+			files.get("elsewhere", "build"),
+			files.map("elsewhere"),
+			files.save("elsewhere", "build", flow),
+			files.remove("elsewhere", "build"),
+			files.notices("elsewhere"),
+			files.revisions("elsewhere", "build"),
+			files.export("elsewhere", "build"),
+			files.import("elsewhere", "build", JSON.stringify(flow)),
+		]) {
+			expect((await refusal(attempt)).kind).toBe("not-found");
+		}
+	});
+
+	test("a copy into a project of another Space is not found, and saves nothing", async () => {
+		await files.save(PROJECT, "build", quick("Fix it"));
+		const refused = await refusal(
+			files.copy(PROJECT, "build", { projectId: "elsewhere", name: "build" }),
+		);
+		expect(refused.kind).toBe("not-found");
 	});
 });

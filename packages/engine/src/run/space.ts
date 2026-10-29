@@ -3,7 +3,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService } from "../cleanup";
 import type { Actor, StartRunInput } from "../contract";
-import { type FlowFiles, type FlowNotice, flowUse } from "../flows";
+import { flowUse, type SpaceFlows } from "../flows";
 import type { Runner } from "../graph";
 import {
 	RUN_NOT_FOUND,
@@ -39,7 +39,8 @@ import type { StartPlaces } from "./start-place";
  * "not found", the same answer as one that does not exist. Each method
  * waits for the engine to be ready, then hands over to the module that
  * owns the action: the run actions to `actions.ts`, which reads the run's
- * row itself.
+ * row itself. The flows are the module itself (`flows`): it waits and
+ * checks the Space on its own.
  */
 export type SpacesDeps = {
 	ready: Promise<unknown>;
@@ -62,12 +63,8 @@ export type SpacesDeps = {
 	placement: Pick<PlacementPort, "devicesFor">;
 	/** The Devices a run of the project can run on, the default marked (`start-place.ts`). */
 	placements: StartPlaces["placements"];
-	flowFiles: FlowFiles;
-	/** The notices of a project's flow document. */
-	flowNotices: {
-		list(projectId: string): Promise<FlowNotice[]>;
-		dismiss(projectId: string, noticeId: string): Promise<void>;
-	};
+	/** The flows of the Space's projects, for the Person who acts (`flows/space-flows.ts`). */
+	flows(spaceId: string, personId?: string): SpaceFlows;
 	/** The import on upgrade of this Device's Clone of the project, once. Never throws. */
 	importClone(projectId: string): Promise<void>;
 	/** The kept variables of a project's flows on this computer. */
@@ -256,109 +253,6 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.placements(spaceId, actor.personId, projectId);
 			},
 
-			async listFlows(projectId) {
-				await ready;
-				return deps.flowFiles.list(spaceId, projectId, actor?.personId);
-			},
-
-			async getFlow(projectId, name) {
-				await ready;
-				return deps.flowFiles.get(spaceId, projectId, name, actor?.personId);
-			},
-
-			async flowMap(projectId) {
-				await ready;
-				return deps.flowFiles.map(spaceId, projectId, actor?.personId);
-			},
-
-			async saveFlow(projectId, name, flow) {
-				await ready;
-				return deps.flowFiles.save(
-					spaceId,
-					projectId,
-					name,
-					flow,
-					actor?.personId,
-				);
-			},
-
-			async deleteFlow(projectId, name) {
-				await ready;
-				await deps.flowFiles.remove(spaceId, projectId, name);
-			},
-
-			async listFlowNotices(projectId) {
-				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.flowNotices.list(projectId);
-			},
-
-			async dismissFlowNotice(projectId, noticeId) {
-				await ready;
-				await projects.find(projectId, spaceId);
-				await deps.flowNotices.dismiss(projectId, noticeId);
-			},
-
-			async listFlowRevisions(projectId, name) {
-				await ready;
-				return deps.flowFiles.revisions(
-					spaceId,
-					projectId,
-					name,
-					actor?.personId,
-				);
-			},
-
-			async getFlowRevision(projectId, name, revisionId, against) {
-				await ready;
-				return deps.flowFiles.revision(
-					spaceId,
-					projectId,
-					name,
-					revisionId,
-					against,
-					actor?.personId,
-				);
-			},
-
-			async restoreFlowRevision(projectId, name, revisionId) {
-				await ready;
-				return deps.flowFiles.restore(
-					spaceId,
-					projectId,
-					name,
-					revisionId,
-					actor?.personId,
-				);
-			},
-
-			async exportFlow(projectId, name) {
-				await ready;
-				return deps.flowFiles.export(spaceId, projectId, name, actor?.personId);
-			},
-
-			async importFlow(projectId, name, json) {
-				await ready;
-				return deps.flowFiles.import(
-					spaceId,
-					projectId,
-					name,
-					json,
-					actor?.personId,
-				);
-			},
-
-			async copyFlow(projectId, name, to) {
-				await ready;
-				return deps.flowFiles.copy(
-					spaceId,
-					projectId,
-					name,
-					to,
-					actor?.personId,
-				);
-			},
-
 			async listKeptValues(projectId, flowName) {
 				await ready;
 				await projects.find(projectId, spaceId);
@@ -370,6 +264,8 @@ export function createSpaces(deps: SpacesDeps) {
 				await projects.find(projectId, spaceId);
 				await deps.kept.reset({ spaceId, projectId, flowName }, name);
 			},
+
+			flows: deps.flows(spaceId, actor?.personId),
 
 			flowUse() {
 				return flowUse(this);
@@ -476,7 +372,8 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listSchedules(projectId) {
 				await ready;
-				return deps.scheduleFiles.list(spaceId, projectId);
+				await projects.find(projectId, spaceId);
+				return deps.scheduleFiles.list(projectId);
 			},
 
 			async saveSchedules(projectId, schedules) {

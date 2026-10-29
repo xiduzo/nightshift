@@ -66,7 +66,7 @@ function deps(over: Partial<AssistantDeps> = {}): AssistantDeps {
 		installed: (name) => name === "claude-code",
 		clonePath: async () => "/repo",
 		space: () => ({
-			flowMap: async () => ({ fix: null }),
+			flows: { map: async () => ({ fix: null }) },
 			getRun: async () => {
 				throw new Error("No such run");
 			},
@@ -546,7 +546,7 @@ describe("chatRun", () => {
 	});
 	const space = (): ChatSpace =>
 		({
-			flowMap: async () => ({}),
+			flows: { map: async () => ({}) },
 			getRun: async (id: string) => {
 				if (id !== "r1") throw new Error("No such run");
 				return run;
@@ -617,7 +617,7 @@ describe("chatRun", () => {
 		};
 		const found = await chatRun(
 			{
-				flowMap: async () => ({}),
+				flows: { map: async () => ({}) },
 				getRun: async () => nested,
 				watchRun: async function* () {},
 			} as unknown as ChatSpace,

@@ -343,7 +343,9 @@ describe("the dashboard of Spaces and of one project", () => {
 				),
 			listProjects: async () =>
 				Object.entries(projects).map(([id, name]) => ({ id, name })) as never,
-			listFlows: async () => [{ name: "night" }, { name: "fix" }] as never,
+			flows: {
+				list: async () => [{ name: "night" }, { name: "fix" }] as never,
+			},
 		};
 	}
 

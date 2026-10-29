@@ -491,7 +491,7 @@ describe("a schedule that fires on another Person's Device", () => {
 		const { id: projectId } = await owner.addProject({
 			repoPath: sandbox.repoPath,
 		});
-		await owner.saveFlow(projectId, "night", {
+		await owner.flows.save(projectId, "night", {
 			version: 7,
 			inputs: [],
 			outputs: [],

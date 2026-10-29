@@ -29,7 +29,6 @@ import {
 	clonePathOf,
 	createArtifactStore,
 	createFlowDocuments,
-	createFlowMigrations,
 	createGitHubClones,
 	createProjectCopies,
 	createSpaceDocuments,
@@ -42,7 +41,6 @@ import {
 	secretStore,
 	setUpGit,
 	systemGitInstaller,
-	upgradedSources,
 } from "@nightshift/engine";
 import { deliveryMoves } from "@nightshift/notifications";
 
@@ -320,12 +318,6 @@ export async function createDaemon(
 		connections,
 		piAcp: options.piAcp,
 	});
-	/** What brings a flow of format 6 to the current one (ADR 3). */
-	const flowMigrations = createFlowMigrations({
-		db,
-		device: async () => ({ id: device.id, name: device.name }),
-		profiles,
-	});
 	/** The project's folder here: where its runs' worktrees branch from. */
 	const clonePath = clonePathOf(db, async () => device.id);
 
@@ -345,10 +337,10 @@ export async function createDaemon(
 		cliToolsFor: (names) => cliTools.guides(names),
 		toolLaunchers,
 		clonePath,
-		// The flows another Device asks this one for: the flow documents, a
-		// flow of format 6 as the Device that saved it named its profiles.
-		flows: async (projectId) =>
-			upgradedSources(await flows.open(projectId), flowMigrations, device.id),
+		// The flows another Device's older Walker asks this one for: the
+		// engine's (made below, before anyone can ask), a flow of format 6
+		// as the Device that saved it named its profiles.
+		flows: (projectId) => devices.engine.flows.flows(projectId),
 		// Its profiles, for a run placed here from another Device.
 		profileFor: (ref) => profiles.settingsFor(ref),
 		// The files agents keep for the person, next to the run history.

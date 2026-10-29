@@ -18,15 +18,16 @@ import {
 	type FlowDocument,
 	type FlowDocuments,
 	flowIdOf,
+	flowNotices,
 	flowRevisions,
 	flowSources,
+	marked,
 	readSchedules,
 	saveFlow,
 } from "./flow-document";
 import { createFlowMigrations } from "./flow-migration";
 import { type CloneImport, importClone, importMarker } from "./import";
 import { trackedState } from "./legacy-folder";
-import { flowNotices } from "./notices";
 
 /** A flow of one Command node that says `word`, and calls `calls` after it when given. */
 function flow(word: string, calls?: string): Flow {
@@ -248,7 +249,7 @@ describe("the import on upgrade", () => {
 				deviceId: laptop.sandbox.deviceId,
 			}),
 		]);
-		expect(document.meta.has(importMarker("clone-laptop"))).toBe(true);
+		expect(marked(document, importMarker("clone-laptop"))).toBe(true);
 		expect(laptop.profiles.get("builder")).toMatchObject({
 			id: "builder",
 			name: "builder",

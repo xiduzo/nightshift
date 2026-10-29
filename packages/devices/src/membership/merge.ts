@@ -9,11 +9,8 @@ import {
 } from "@nightshift/db/schema";
 import {
 	type Engine,
-	type FlowDocument,
 	type FlowDocuments,
 	HostUnreachableError,
-	mergeFlowDocuments,
-	planFlowMerge,
 	type SpaceDocuments,
 	spaceProjectRows,
 } from "@nightshift/engine";
@@ -119,7 +116,7 @@ type MergeReady = {
 
 export type MergeDeps = {
 	db: Database;
-	engine: Pick<Engine, "space" | "moveProjects"> & {
+	engine: Pick<Engine, "space" | "moveProjects" | "flows"> & {
 		exchange: Pick<RunHistoryExchange, "rowsAfter" | "cursorsWith">;
 		hostSpaces: Pick<HostSpaces, "listed">;
 	};
@@ -127,6 +124,7 @@ export type MergeDeps = {
 	/** The home Host this computer merges into (`HostLinks.home`). */
 	hostLinks: Pick<HostLinks, "home">;
 	spaces: Pick<SpaceDocuments, "open" | "remove">;
+	/** The flow documents, to wait until the Host's copies arrived. */
 	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
 	self: { id: string; name: string };
@@ -301,14 +299,13 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		);
 	}
 
-	/** The schedules of a flow document that name no device. */
-	function unpinned(document: FlowDocument): string[] {
-		return [...document.schedules.entries()].flatMap(([key, value]) => {
-			const device = (value as { device?: unknown } | null)?.device;
-			return value !== null && typeof value === "object" && device === undefined
-				? [key]
-				: [];
+	/** How many schedules of the project name no device. A removed project has none that fire. */
+	async function unpinned(projectId: string, removed: boolean) {
+		if (removed) return 0;
+		const { schedules } = await engine.flows.schedules(projectId, {
+			validate: false,
 		});
+		return schedules.filter((schedule) => schedule.device === undefined).length;
 	}
 
 	async function preview(
@@ -325,14 +322,15 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 			const target = targets[p.id];
 			if (!target) continue;
 			const shared = elsewhere.get(p.id);
-			const source = await deps.flows.open(p.id);
 			const renamed =
 				target.projectId === p.id
 					? {}
-					: planFlowMerge(
-							source,
-							await deps.flows.open(target.projectId),
-							answer.personMap,
+					: (
+							await engine.flows.planMerge(
+								p.id,
+								target.projectId,
+								answer.personMap,
+							)
 						).flows;
 			views.push({
 				id: p.id,
@@ -354,7 +352,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 					from: fromName,
 					to: toName,
 				})),
-				schedules: unpinned(source).length,
+				schedules: await unpinned(p.id, p.removedAt !== null),
 			});
 		}
 		return { host, projects: views, runs };
@@ -515,9 +513,8 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 					"The flows of your projects are still on their way from your home Host. Night Shift merges them when they are here.",
 				);
 			}
-			await mergeFlowDocuments(await deps.flows.open(source), destination, {
+			await engine.flows.merge(source, target.projectId, {
 				persons: personMap,
-				at: now(),
 			});
 		}
 	}

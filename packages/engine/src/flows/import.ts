@@ -14,8 +14,12 @@ import {
 import { z } from "zod";
 import type { ProfileStore } from "../device-config";
 import {
+	addNotices,
 	type FlowDocument,
 	flowSources,
+	mark,
+	marked,
+	type NoticeKind,
 	readSchedules,
 	same,
 	saveFlow,
@@ -29,7 +33,6 @@ import {
 	type TrackedState,
 } from "./legacy-folder";
 import { parseLegacyProfiles } from "./legacy-profiles";
-import { addNotices, type NoticeKind } from "./notices";
 
 /**
  * The import on upgrade (ADR 2, decision 8; ADR 3, decision 4): once per
@@ -109,11 +112,11 @@ export async function importClone(
 ): Promise<CloneImport> {
 	const { document, clone, device, at } = input;
 	const marker = importMarker(clone.id);
-	if (document.meta.has(marker)) return { status: "already" };
+	if (marked(document, marker)) return { status: "already" };
 
 	const folder = await readLegacyFolder(clone.repoPath);
 	if (folder === null) {
-		await document.current.change(() => document.meta.set(marker, at));
+		await mark(document, marker, at);
 		return { status: "no-folder" };
 	}
 
@@ -260,13 +263,12 @@ export async function importClone(
 			message: keptMessage(device.name, state, problems),
 		});
 	}
-	await document.current.change(() => {
-		addNotices(
-			document,
-			notices.map((notice) => ({ ...notice, deviceId: device.id, at })),
-		);
-		document.meta.set(marker, at);
-	});
+	await mark(
+		document,
+		marker,
+		at,
+		notices.map((notice) => ({ ...notice, deviceId: device.id, at })),
+	);
 	// Everything is in the Replica before anything of the folder goes.
 	await input.flush();
 
@@ -276,16 +278,14 @@ export async function importClone(
 			() => false,
 		);
 		if (!deleted) {
-			await document.current.change(() =>
-				addNotices(document, [
-					{
-						kind: "folder-kept",
-						message: `Night Shift imported the ${LEGACY_FOLDER} folder on ${device.name}, but some of its files changed since. Night Shift left the folder in place. Remove it when you no longer need it.`,
-						deviceId: device.id,
-						at,
-					},
-				]),
-			);
+			await addNotices(document, [
+				{
+					kind: "folder-kept",
+					message: `Night Shift imported the ${LEGACY_FOLDER} folder on ${device.name}, but some of its files changed since. Night Shift left the folder in place. Remove it when you no longer need it.`,
+					deviceId: device.id,
+					at,
+				},
+			]);
 		}
 	}
 	return {

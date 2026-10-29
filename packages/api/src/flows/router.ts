@@ -28,13 +28,13 @@ export const flows = {
 		})
 		.output(output(z.array(flowListItemSchema)))
 		.input(z.object({ projectId: z.string() }))
-		.handler(({ context, input }) => context.space.listFlows(input.projectId)),
+		.handler(({ context, input }) => context.space.flows.list(input.projectId)),
 	get: protectedProcedure
 		.route({ summary: "Reads one flow of a project, with its problems." })
 		.output(output(loadedFlowSchema))
 		.input(flowRef)
 		.handler(({ context, input }) =>
-			context.space.getFlow(input.projectId, input.name),
+			context.space.flows.get(input.projectId, input.name),
 		),
 	/**
 	 * Every flow of a project by name, in one read: what the editor
@@ -47,7 +47,7 @@ export const flows = {
 		})
 		.output(output(z.record(z.string(), flowSchema.nullable())))
 		.input(z.object({ projectId: z.string() }))
-		.handler(({ context, input }) => context.space.flowMap(input.projectId)),
+		.handler(({ context, input }) => context.space.flows.map(input.projectId)),
 	/** Saves drafts with errors too, as a new revision. Returns the issues. */
 	save: permitted({ flow: ["save"] })
 		.route({
@@ -57,7 +57,7 @@ export const flows = {
 		.output(output(z.array(flowIssueSchema)))
 		.input(flowRef.extend({ flow: flowSchema }))
 		.handler(({ context, input }) =>
-			context.space.saveFlow(input.projectId, input.name, input.flow),
+			context.space.flows.save(input.projectId, input.name, input.flow),
 		),
 	/** The values the flow's kept variables carry from one run to the next. */
 	kept: protectedProcedure
@@ -89,14 +89,14 @@ export const flows = {
 		.output(output(z.array(flowNoticeSchema)))
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
-			context.space.listFlowNotices(input.projectId),
+			context.space.flows.notices(input.projectId),
 		),
 	dismissNotice: ownerProcedure
 		.route({ summary: "Removes a notice of a project's flows." })
 		.output(output(z.void()))
 		.input(z.object({ projectId: z.string(), id: z.string() }))
 		.handler(({ context, input }) =>
-			context.space.dismissFlowNotice(input.projectId, input.id),
+			context.space.flows.dismissNotice(input.projectId, input.id),
 		),
 	remove: permitted({ flow: ["remove"] })
 		.route({
@@ -105,7 +105,7 @@ export const flows = {
 		.output(output(z.void()))
 		.input(flowRef)
 		.handler(({ context, input }) =>
-			context.space.deleteFlow(input.projectId, input.name),
+			context.space.flows.remove(input.projectId, input.name),
 		),
 	revisions: protectedProcedure
 		.route({
@@ -115,7 +115,7 @@ export const flows = {
 		.output(output(z.array(flowRevisionItemSchema)))
 		.input(flowRef)
 		.handler(({ context, input }) =>
-			context.space.listFlowRevisions(input.projectId, input.name),
+			context.space.flows.revisions(input.projectId, input.name),
 		),
 	revision: protectedProcedure
 		.route({
@@ -131,7 +131,7 @@ export const flows = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.space.getFlowRevision(
+			context.space.flows.revision(
 				input.projectId,
 				input.name,
 				input.revisionId,
@@ -146,7 +146,7 @@ export const flows = {
 		.output(output(z.array(flowIssueSchema)))
 		.input(flowRef.extend({ revisionId: z.string() }))
 		.handler(({ context, input }) =>
-			context.space.restoreFlowRevision(
+			context.space.flows.restore(
 				input.projectId,
 				input.name,
 				input.revisionId,
@@ -159,7 +159,7 @@ export const flows = {
 		.output(output(flowExportSchema))
 		.input(flowRef)
 		.handler(({ context, input }) =>
-			context.space.exportFlow(input.projectId, input.name),
+			context.space.flows.export(input.projectId, input.name),
 		),
 	import: permitted({ flow: ["save"] })
 		.route({
@@ -174,7 +174,7 @@ export const flows = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.space.importFlow(input.projectId, input.name, input.json),
+			context.space.flows.import(input.projectId, input.name, input.json),
 		),
 	copy: permitted({ flow: ["save"] })
 		.route({
@@ -190,7 +190,7 @@ export const flows = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.space.copyFlow(input.projectId, input.name, {
+			context.space.flows.copy(input.projectId, input.name, {
 				projectId: input.toProjectId,
 				name: input.as,
 			}),

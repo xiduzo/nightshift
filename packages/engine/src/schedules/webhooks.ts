@@ -173,10 +173,9 @@ export function createWebhooks(deps: WebhooksDeps) {
 		scheduleId: string,
 	): Promise<{ schedule: Schedule } | null> {
 		try {
-			const { schedules } = await deps.flows.schedules(
-				{ projectId },
-				{ validate: false },
-			);
+			const { schedules } = await deps.flows.schedules(projectId, {
+				validate: false,
+			});
 			// A duplicate id is an issue in the UI; the first one counts.
 			const schedule = schedules.find((s) => s.id === scheduleId);
 			return schedule?.webhook ? { schedule } : null;
@@ -191,8 +190,8 @@ export function createWebhooks(deps: WebhooksDeps) {
 		flow: string,
 	): Promise<readonly FlowInputDef[]> {
 		try {
-			const set = await deps.flows.flows({ projectId });
-			return loadFlowSource(set.sources, flow, set.pathOf).flow?.inputs ?? [];
+			const sources = await deps.flows.flows(projectId);
+			return loadFlowSource(sources, flow, (name) => name).flow?.inputs ?? [];
 		} catch {
 			return [];
 		}

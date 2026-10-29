@@ -80,29 +80,44 @@ beforeAll(() => {
 });
 afterAll(() => quiet());
 
+/** A method of a Space's engine that records its Space and name (`flows.save` for a verb of its flows). */
+const recorder =
+	(space: string, method: string) =>
+	(input: unknown, ...rest: unknown[]) => {
+		calls.push({ space, method });
+		inputs.push(input);
+		args.push([input, ...rest]);
+		// A watch is a stream, not a promise: this one has no items.
+		if (method === "watchRun") return (async function* () {})();
+		return (async () => {
+			if (method === "listGates") return gatesIn.get(space) ?? [];
+			if (method === "resolveGate") return onResolve();
+			return method === "listRuns" ? [] : { id: "run-1" };
+		})();
+	};
+
 /** An engine that records the Space and method of every call. */
 const engine: Context["engine"] = {
 	space: (space) =>
 		new Proxy({} as SpaceEngine, {
-			get:
-				(_, method) =>
-				(input: unknown, ...rest: unknown[]) => {
-					calls.push({ space, method: String(method) });
-					inputs.push(input);
-					args.push([input, ...rest]);
-					// A watch is a stream, not a promise: this one has no items.
-					if (method === "watchRun") return (async function* () {})();
-					return (async () => {
-						if (method === "listGates") return gatesIn.get(space) ?? [];
-						if (method === "resolveGate") return onResolve();
-						return method === "listRuns" ? [] : { id: "run-1" };
-					})();
-				},
+			get: (_, method) =>
+				method === "flows"
+					? new Proxy(
+							{},
+							{ get: (_, verb) => recorder(space, `flows.${String(verb)}`) },
+						)
+					: recorder(space, String(method)),
 		}),
 	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
 	logMemberChange: async () => {},
 	onLandedFacts: () => () => {},
 	moveProjects: async () => ({ projects: [], runIds: [], schedules: 0 }),
+	flows: {
+		flows: async () => ({}),
+		schedules: async () => ({ path: "schedules", schedules: [], issues: [] }),
+		planMerge: async () => ({ flows: {}, schedules: {} }),
+		merge: async () => ({ flows: {}, schedules: {} }),
+	},
 	runHere: async () => null,
 	deviceBack: async () => {},
 	webhook: async () => ({
@@ -280,17 +295,17 @@ describe("procedures", () => {
 			expect(await errorOf(write())).toBe("FORBIDDEN");
 		// Reading the revisions is fine.
 		await call(appRouter.flows.revisions, ref, { context });
-		expect(calls).toEqual([{ space: spaceId, method: "listFlowRevisions" }]);
+		expect(calls).toEqual([{ space: spaceId, method: "flows.revisions" }]);
 
 		// A member is not this computer's owner, and still saves.
 		context = await contextFor(bob.headers);
 		for (const write of writes) await write();
 		expect(calls.slice(1).map((c) => c.method)).toEqual([
-			"saveFlow",
-			"deleteFlow",
-			"restoreFlowRevision",
-			"importFlow",
-			"copyFlow",
+			"flows.save",
+			"flows.remove",
+			"flows.restore",
+			"flows.import",
+			"flows.copy",
 		]);
 	});
 

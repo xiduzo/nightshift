@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
-import type { SpaceEngine } from "@nightshift/engine";
+import type { SpaceEngine, SpaceFlows } from "@nightshift/engine";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { Subprocess } from "bun";
@@ -30,10 +30,12 @@ export type Daemon = {
  */
 export function savesOn(
 	daemon: Daemon,
-): Pick<SpaceEngine, "saveFlow" | "saveSchedules"> {
+): { flows: Pick<SpaceFlows, "save"> } & Pick<SpaceEngine, "saveSchedules"> {
 	return {
-		saveFlow: (projectId, name, flow) =>
-			daemon.client.flows.save({ projectId, name, flow }),
+		flows: {
+			save: (projectId, name, flow) =>
+				daemon.client.flows.save({ projectId, name, flow }),
+		},
 		saveSchedules: (projectId, schedules) =>
 			daemon.client.schedules.save({ projectId, schedules: [...schedules] }),
 	};

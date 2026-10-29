@@ -1,9 +1,5 @@
-import {
-	type FlowListItem,
-	isProfileRef,
-	type LoadedFlow,
-	profileOf,
-} from "@nightshift/flows";
+import { isProfileRef, profileOf } from "@nightshift/flows";
+import type { SpaceFlows } from "./space-flows";
 
 /** A flow file of a project of the Space. */
 export type FlowRef = {
@@ -34,8 +30,7 @@ export function profileUseKey(deviceId: string, profileId: string): string {
 /** What `flowUse` reads: the Space's projects and their flow files. */
 export type FlowReader = {
 	listProjects(): Promise<{ id: string; name: string }[]>;
-	listFlows(projectId: string): Promise<FlowListItem[]>;
-	getFlow(projectId: string, name: string): Promise<LoadedFlow>;
+	flows: Pick<SpaceFlows, "list" | "get">;
 };
 
 /**
@@ -48,10 +43,10 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 	const secrets = new Map<string, FlowRef[]>();
 	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
 	for (const project of await space.listProjects()) {
-		const files = await space.listFlows(project.id).catch(() => []);
+		const files = await space.flows.list(project.id).catch(() => []);
 		for (const file of files) {
-			const loaded = await space
-				.getFlow(project.id, file.name)
+			const loaded = await space.flows
+				.get(project.id, file.name)
 				.catch(() => null);
 			const ref = {
 				projectId: project.id,

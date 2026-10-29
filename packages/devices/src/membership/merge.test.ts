@@ -418,7 +418,7 @@ describe("the merge of Personal", () => {
 			[hostRun.id, mine.runId].sort(),
 		);
 		// Both flows, both histories.
-		const flows = await paired.device.space(a.spaceId).listFlows(onA.id);
+		const flows = await paired.device.space(a.spaceId).flows.list(onA.id);
 		expect(flows.map((f) => f.name).sort()).toEqual(["hello", "hello-2"]);
 	});
 
@@ -541,7 +541,7 @@ describe("the merge of Personal", () => {
 		const done = await merger(link).merge();
 
 		expect(done.state).toBe("pushed");
-		const flows = await paired.device.space(a.spaceId).listFlows(onA.id);
+		const flows = await paired.device.space(a.spaceId).flows.list(onA.id);
 		expect(flows.map((f) => f.name)).toEqual(["hello"]);
 	});
 

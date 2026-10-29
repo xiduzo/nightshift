@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { flowSchema, migrateFlow, type Schedule } from "@nightshift/flows";
+import type { SpaceFlows } from "../flows";
 import type { SpaceEngine } from "../run/space-engine";
 
 /**
@@ -9,13 +10,20 @@ import type { SpaceEngine } from "../run/space-engine";
  * schedules too.
  */
 export async function seedFlows(
-	engine: Pick<SpaceEngine, "saveFlow" | "saveSchedules">,
+	engine: { flows: Pick<SpaceFlows, "save"> } & Pick<
+		SpaceEngine,
+		"saveSchedules"
+	>,
 	projectId: string,
 	flows: Readonly<Record<string, unknown>>,
 	schedules?: readonly Schedule[],
 ): Promise<void> {
 	for (const [name, json] of Object.entries(flows)) {
-		await engine.saveFlow(projectId, name, flowSchema.parse(migrateFlow(json)));
+		await engine.flows.save(
+			projectId,
+			name,
+			flowSchema.parse(migrateFlow(json)),
+		);
 	}
 	if (schedules !== undefined) {
 		await engine.saveSchedules(projectId, schedules);

@@ -149,7 +149,7 @@ describe("Spaces", () => {
 			notFound,
 		);
 		const projectGone = "Night Shift cannot find this project.";
-		await expect(other.listFlows(added.id)).rejects.toMatchObject({
+		await expect(other.flows.list(added.id)).rejects.toMatchObject({
 			kind: "not-found",
 			message: projectGone,
 		});

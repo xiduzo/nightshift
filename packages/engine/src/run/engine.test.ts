@@ -336,7 +336,7 @@ describe("projects", () => {
 		expect(await engine.listProjects()).toEqual([]);
 		expect((await engine.listRuns()).map((r) => r.id)).toEqual([run.id]);
 		expect((await engine.getRun(run.id)).status).toBe("finished");
-		await expect(engine.listFlows(id)).rejects.toThrow(
+		await expect(engine.flows.list(id)).rejects.toThrow(
 			"Night Shift cannot find this project.",
 		);
 		await expect(
@@ -355,12 +355,12 @@ describe("flows", () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const id = await projectId(engine);
 		const flow = retryFlow("true", 2);
-		expect(await engine.saveFlow(id, "retry", flow)).toEqual([]);
+		expect(await engine.flows.save(id, "retry", flow)).toEqual([]);
 		expect(existsSync(join(sandbox.repoPath, ".nightshift"))).toBe(false);
-		expect((await engine.listFlows(id)).map((f) => f.name)).toEqual(["retry"]);
-		expect((await engine.getFlow(id, "retry")).flow).toEqual(flow);
-		await engine.deleteFlow(id, "retry");
-		expect(await engine.listFlows(id)).toEqual([]);
+		expect((await engine.flows.list(id)).map((f) => f.name)).toEqual(["retry"]);
+		expect((await engine.flows.get(id, "retry")).flow).toEqual(flow);
+		await engine.flows.remove(id, "retry");
+		expect(await engine.flows.list(id)).toEqual([]);
 	});
 
 	test("a folder from before flows were Night Shift data comes in when the project is added, with a notice a person dismisses", async () => {
@@ -382,15 +382,15 @@ describe("flows", () => {
 
 		const id = await projectId(engine);
 
-		expect((await engine.getFlow(id, "retry")).flow).toEqual(
+		expect((await engine.flows.get(id, "retry")).flow).toEqual(
 			retryFlow("true", 2),
 		);
-		const notices = await engine.listFlowNotices(id);
+		const notices = await engine.flows.notices(id);
 		expect(notices.map((notice) => notice.message)).toEqual([
 			"Night Shift imported the .nightshift folder on test. Git tracks that folder, so Night Shift left it in place. Remove it in a commit.",
 		]);
-		await engine.dismissFlowNotice(id, notices[0]?.id ?? "");
-		expect(await engine.listFlowNotices(id)).toEqual([]);
+		await engine.flows.dismissNotice(id, notices[0]?.id ?? "");
+		expect(await engine.flows.notices(id)).toEqual([]);
 	});
 });
 
@@ -854,7 +854,7 @@ describe("runs", () => {
 			engine.startRun({ projectId: id, flow: unbounded }),
 		).rejects.toThrow("The flow cannot run");
 
-		await engine.saveFlow(id, "broken", { ...unbounded, start: "nowhere" });
+		await engine.flows.save(id, "broken", { ...unbounded, start: "nowhere" });
 		const error = await engine
 			.startRun({ projectId: id, flowName: "broken" })
 			.catch((e: Error) => e);
@@ -868,11 +868,11 @@ describe("runs", () => {
 	test("a flow file runs by name and keeps its snapshot", async () => {
 		const engine = makeEngine(fakeHarness());
 		const id = await projectId(engine);
-		await engine.saveFlow(id, "night", retryFlow("true", 2));
+		await engine.flows.save(id, "night", retryFlow("true", 2));
 		const run = await engine.startRun({ projectId: id, flowName: "night" });
 		expect(run.flowName).toBe("night");
 		expect(run.title).toBe("night");
-		await engine.deleteFlow(id, "night");
+		await engine.flows.remove(id, "night");
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		expect((await engine.getRun(run.id)).flow.nodes.map((n) => n.id)).toEqual([
 			"worker",
@@ -2700,7 +2700,7 @@ describe("gates", () => {
 		);
 		const engine = makeEngine(harness, { maxConcurrentRuns: 1 });
 		const id = await projectId(engine);
-		await engine.saveFlow(id, "ship", gateFlow());
+		await engine.flows.save(id, "ship", gateFlow());
 		const run = await engine.startRun({ projectId: id, flowName: "ship" });
 
 		expect(await openGateOf(engine, run.id)).toMatchObject({

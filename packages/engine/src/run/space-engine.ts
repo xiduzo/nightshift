@@ -1,12 +1,4 @@
-import type {
-	Flow,
-	FlowIssue,
-	FlowListItem,
-	LoadedFlow,
-	ProjectFlowMap,
-	Schedule,
-	ScheduleIssue,
-} from "@nightshift/flows";
+import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import type { Artifact } from "../artifacts";
 import type { RunCopies } from "../cleanup";
 import type {
@@ -15,14 +7,7 @@ import type {
 	Placement,
 	StartRunInput,
 } from "../contract";
-import type {
-	FlowExport,
-	FlowNotice,
-	FlowRevisionItem,
-	FlowRevisionView,
-	FlowUse,
-	SavedFlow,
-} from "../flows";
+import type { FlowUse, SpaceFlows } from "../flows";
 import type { Branches, Project } from "../projects";
 import type {
 	OpenGate,
@@ -99,60 +84,13 @@ export interface SpaceEngine {
 		options?: { force?: boolean },
 	): Promise<void>;
 
-	/** The project's flows, from its flow document: every Device has them, with or without a Clone. */
-	listFlows(projectId: string): Promise<FlowListItem[]>;
-	getFlow(projectId: string, name: string): Promise<LoadedFlow>;
-	/** Every flow file of a project by name: its flow, null when it does not load. One read for the editor. */
-	flowMap(projectId: string): Promise<ProjectFlowMap>;
-	/** Saves drafts with errors too, as a new revision. Returns the issues of the saved flow. */
-	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
-	/** Removes the flow. Its revisions stay. */
-	deleteFlow(projectId: string, name: string): Promise<void>;
-	/** What a person must know about the project's flows (the import on upgrade), oldest first. */
-	listFlowNotices(projectId: string): Promise<FlowNotice[]>;
-	/** Removes a notice, on every Device of the Space. */
-	dismissFlowNotice(projectId: string, noticeId: string): Promise<void>;
 	/**
-	 * The revisions of a flow, newest first: who saved each, when, on which
-	 * Device, and what it changed from the one before.
+	 * The flows of the Space's projects, for the actor: list, read, save,
+	 * remove, their notices and revisions, a restore, export, import and
+	 * copy (`flows/space-flows.ts`). From each project's flow document:
+	 * every Device has them, with or without a Clone.
 	 */
-	listFlowRevisions(
-		projectId: string,
-		name: string,
-	): Promise<FlowRevisionItem[]>;
-	/**
-	 * One revision of a flow with its flow, and the diff to it from
-	 * `against`: another revision, or the flow as it is now.
-	 */
-	getFlowRevision(
-		projectId: string,
-		name: string,
-		revisionId: string,
-		against?: string,
-	): Promise<FlowRevisionView>;
-	/** Saves a revision's flow as the flow now, as a new revision. Returns its issues. */
-	restoreFlowRevision(
-		projectId: string,
-		name: string,
-		revisionId: string,
-	): Promise<FlowIssue[]>;
-	/** The flow as a JSON file, to import into another project. Refuses a flow that is not valid. */
-	exportFlow(projectId: string, name: string): Promise<FlowExport>;
-	/**
-	 * Saves the flow of a JSON file as a new flow of the project. A name
-	 * the project has already gets a suffix. Returns the name and the issues.
-	 */
-	importFlow(projectId: string, name: string, json: string): Promise<SavedFlow>;
-	/**
-	 * Copies the flow into a project of this Space as `to.name`, without
-	 * the flows it calls. Refuses a name that project has, with a free one
-	 * to use. Returns the name and the issues there.
-	 */
-	copyFlow(
-		projectId: string,
-		name: string,
-		to: { projectId: string; name: string },
-	): Promise<SavedFlow>;
+	readonly flows: SpaceFlows;
 	/**
 	 * The values the flow's kept variables (`keep`) have between runs on
 	 * this computer, by name. A variable without one starts from `initial`.

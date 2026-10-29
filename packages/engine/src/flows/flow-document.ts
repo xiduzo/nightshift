@@ -5,18 +5,14 @@ import { project } from "@nightshift/db/schema";
 import {
 	FLOW_VERSION,
 	type Flow,
+	type FlowSource,
 	type FlowSources,
 	flowNameSchema,
 	flowSchema,
 	migrateFlow,
-	parsedFlows,
-	parseFlow,
 	type Schedule,
-	type ScheduleIssue,
-	scheduleFlowInfos,
 	scheduleSchema,
 	suffixedName,
-	validateSchedules,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
@@ -28,7 +24,6 @@ import {
 } from "../device-config";
 import { spaceIdOf } from "../projects";
 import type { FlowMigrations } from "./flow-migration";
-import type { ProjectFlows } from "./project-flows";
 
 /**
  * The flow document: the flows and the schedules of one Project as Night
@@ -56,6 +51,10 @@ import type { ProjectFlows } from "./project-flows";
  * writes that name. A newer one with the same content too (two Devices
  * that imported one Clone folder) does not read at all, and a save of
  * the older removes it.
+ *
+ * This file is the only one that knows the Yjs encoding. Outside it a
+ * flow document is the pair of documents a Link syncs (`FlowDocument`),
+ * and the engine reads and changes the flows through `ProjectFlows`.
  */
 export type FlowDocument = {
 	readonly projectId: string;
@@ -63,12 +62,29 @@ export type FlowDocument = {
 	readonly current: PersistedDocument;
 	/** `flows-history:<projectId>`: the revisions. */
 	readonly history: PersistedDocument;
+};
+
+/** The flow document with the parts of `current` that hold the flows: only this file's. */
+type FlowMaps = FlowDocument & {
 	readonly flows: Y.Map<unknown>;
 	readonly schedules: Y.Map<unknown>;
 	readonly scheduleOrder: Y.Array<string>;
 	readonly notices: Y.Map<unknown>;
 	readonly meta: Y.Map<unknown>;
 };
+
+/** The parts of the flow document. A Y.Doc gives the same shared type for a name each time. */
+function mapsOf(document: FlowDocument): FlowMaps {
+	const { doc } = document.current;
+	return {
+		...document,
+		flows: doc.getMap("flows"),
+		schedules: doc.getMap("schedules"),
+		scheduleOrder: doc.getArray("scheduleOrder"),
+		notices: doc.getMap("notices"),
+		meta: doc.getMap("meta"),
+	};
+}
 
 /** The name of a Project's flow document. */
 export function flowDocumentName(projectId: string): string {
@@ -175,8 +191,9 @@ function scanFlows(document: FlowDocument): {
 	entries: FlowEntry[];
 	copies: Map<string, string[]>;
 } {
+	const maps = mapsOf(document);
 	const all: Omit<FlowEntry, "name">[] = [];
-	for (const [flowId, value] of document.flows.entries()) {
+	for (const [flowId, value] of maps.flows.entries()) {
 		if (!(value instanceof Y.Map)) continue;
 		const map = value as Y.Map<unknown>;
 		const stored = map.get("name");
@@ -304,7 +321,7 @@ export async function upgradedSources(
 }
 
 /** A flow of a format older than this Night Shift's. */
-function olderFormat(json: unknown): boolean {
+export function olderFormat(json: unknown): boolean {
 	const version =
 		typeof json === "object" && json !== null && "version" in json
 			? json.version
@@ -417,6 +434,7 @@ export async function saveFlow(
 		at: number;
 	},
 ): Promise<{ flowId: string; revisionId: string | null }> {
+	const maps = mapsOf(document);
 	const scan = scanFlows(document);
 	const found = scan.entries.find((entry) => entry.name === input.name);
 	if (found?.newer) {
@@ -432,15 +450,15 @@ export async function saveFlow(
 		last !== undefined && same(last.flow, snapshot) ? null : randomUUID();
 
 	await document.current.change(() => {
-		if (document.meta.get("projectId") !== document.projectId) {
-			document.meta.set("projectId", document.projectId);
+		if (maps.meta.get("projectId") !== document.projectId) {
+			maps.meta.set("projectId", document.projectId);
 		}
-		const map = found?.map ?? newFlowMap(document.flows, flowId, input.at);
+		const map = found?.map ?? newFlowMap(maps.flows, flowId, input.at);
 		if (map.get("name") !== input.name) map.set("name", input.name);
 		applyFlow(map, input.flow);
 		// A copy reads again once its original changes: it goes, its revisions stay.
 		for (const copy of scan.copies.get(flowId) ?? []) {
-			document.flows.delete(copy);
+			maps.flows.delete(copy);
 		}
 	});
 	if (revisionId !== null) {
@@ -465,6 +483,7 @@ export async function removeFlow(
 	document: FlowDocument,
 	name: string,
 ): Promise<void> {
+	const maps = mapsOf(document);
 	const scan = scanFlows(document);
 	const found = scan.entries.find(
 		(entry) => entry.name === name && !entry.newer,
@@ -477,7 +496,7 @@ export async function removeFlow(
 			found.flowId,
 			...(scan.copies.get(found.flowId) ?? []),
 		]) {
-			document.flows.delete(flowId);
+			maps.flows.delete(flowId);
 		}
 	});
 }
@@ -621,10 +640,11 @@ export function readSchedules(document: FlowDocument): {
 	schedules: Schedule[];
 	unreadable: number;
 } {
+	const maps = mapsOf(document);
 	const schedules: Schedule[] = [];
 	let unreadable = 0;
-	for (const key of orderedKeys(document.schedules, document.scheduleOrder)) {
-		const parsed = scheduleSchema.safeParse(document.schedules.get(key));
+	for (const key of orderedKeys(maps.schedules, maps.scheduleOrder)) {
+		const parsed = scheduleSchema.safeParse(maps.schedules.get(key));
 		if (parsed.success) schedules.push(parsed.data);
 		else unreadable++;
 	}
@@ -654,24 +674,25 @@ export async function saveSchedules(
 	document: FlowDocument,
 	schedules: readonly Schedule[],
 ): Promise<void> {
+	const maps = mapsOf(document);
 	await document.current.change(() => {
 		const keyed = keyedById(schedules);
 		const wanted = new Map(keyed);
 		const kept: string[] = [];
-		for (const key of orderedKeys(document.schedules, document.scheduleOrder)) {
+		for (const key of orderedKeys(maps.schedules, maps.scheduleOrder)) {
 			if (wanted.has(key)) continue;
-			if (scheduleSchema.safeParse(document.schedules.get(key)).success) {
-				document.schedules.delete(key);
+			if (scheduleSchema.safeParse(maps.schedules.get(key)).success) {
+				maps.schedules.delete(key);
 			} else {
 				kept.push(key);
 			}
 		}
 		for (const [key, schedule] of keyed) {
-			if (!same(document.schedules.get(key), schedule)) {
-				document.schedules.set(key, plain(schedule));
+			if (!same(maps.schedules.get(key), schedule)) {
+				maps.schedules.set(key, plain(schedule));
 			}
 		}
-		applyOrder(document.scheduleOrder, [...keyed.map(([key]) => key), ...kept]);
+		applyOrder(maps.scheduleOrder, [...keyed.map(([key]) => key), ...kept]);
 	});
 }
 
@@ -693,6 +714,329 @@ function stableJson(value: unknown): string {
 /** As JSON: without `undefined` fields, and shared with nothing. */
 function plain<T>(value: T): T {
 	return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * What a person must know about the flows of a Project: what the import
+ * on upgrade did that they did not ask for. A notice lives in the flow
+ * document, so every Device of the Space shows it, until a person
+ * dismisses it.
+ */
+
+/** Why a notice exists. */
+export const noticeKinds = [
+	"folder-kept",
+	"flow-renamed",
+	"schedule-renamed",
+	"profiles-made",
+] as const;
+export type NoticeKind = (typeof noticeKinds)[number];
+
+const storedNoticeSchema = z.object({
+	at: z.number(),
+	deviceId: z.string(),
+	kind: z.string(),
+	message: z.string(),
+});
+
+/** A notice as a person reads it. */
+export type FlowNotice = {
+	id: string;
+	at: number;
+	/** The Device whose import made it. */
+	deviceId: string;
+	kind: string;
+	message: string;
+};
+
+/** Every notice of the document, oldest first. One this Night Shift cannot read is left out. */
+export function flowNotices(document: FlowDocument): FlowNotice[] {
+	const notices: FlowNotice[] = [];
+	for (const [id, value] of mapsOf(document).notices.entries()) {
+		const parsed = storedNoticeSchema.safeParse(value);
+		if (parsed.success) notices.push({ id, ...parsed.data });
+	}
+	return notices.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+}
+
+/** A notice as Night Shift adds it. */
+export type NewNotice = {
+	kind: NoticeKind;
+	message: string;
+	deviceId: string;
+	at: number;
+};
+
+/** The notices as they go into the document in one change: call inside `current.change`. */
+function putNotices(maps: FlowMaps, notices: readonly NewNotice[]): void {
+	// The index leads the id, so notices of one change and one time keep their order.
+	notices.forEach((notice, index) => {
+		maps.notices.set(`${String(index).padStart(4, "0")}-${randomUUID()}`, {
+			...notice,
+		});
+	});
+}
+
+/** Adds the notices, in one change. */
+export async function addNotices(
+	document: FlowDocument,
+	notices: readonly NewNotice[],
+): Promise<void> {
+	const maps = mapsOf(document);
+	await document.current.change(() => putNotices(maps, notices));
+}
+
+/** Whether the document holds this marker: a step done once per document (the import of a Clone). */
+export function marked(document: FlowDocument, marker: string): boolean {
+	return mapsOf(document).meta.has(marker);
+}
+
+/** Sets the marker, with these notices, in one change. */
+export async function mark(
+	document: FlowDocument,
+	marker: string,
+	at: number,
+	notices: readonly NewNotice[] = [],
+): Promise<void> {
+	const maps = mapsOf(document);
+	await document.current.change(() => {
+		putNotices(maps, notices);
+		maps.meta.set(marker, at);
+	});
+}
+
+/** Removes a notice. One that is gone already is no error. */
+export async function dismissNotice(
+	document: FlowDocument,
+	id: string,
+): Promise<void> {
+	const maps = mapsOf(document);
+	if (!maps.notices.has(id)) return;
+	await document.current.change(() => maps.notices.delete(id));
+}
+
+/**
+ * Merges the flow document of one Project into the flow document of
+ * another: what a Project that maps onto a Project of another Space
+ * (`spaceMoveBatch`) does with its flows and schedules. Both keep every
+ * flow and every revision.
+ *
+ * - The flows of the destination keep their names. A flow of the source
+ *   with the name and the content of a flow there keeps its name: a read
+ *   takes the older of the two. Another flow of the source whose name the
+ *   destination has takes the next free name
+ *   (`suffixedName`: `triage-2`), and keeps it: the name is stored, so it
+ *   does not change when the other flow goes. Its schedules follow it.
+ * - Each flow keeps its id, and with it its revisions: the history of
+ *   each flow of the source joins the destination's history.
+ * - A schedule of the source that the destination has as it is, is one
+ *   schedule. One with the id of another schedule there takes the next
+ *   free id.
+ * - `persons` gives a Person of the source their id in the destination:
+ *   a schedule's Person and a revision's Person take it.
+ *
+ * A merge that runs again changes nothing: a revision that the
+ * destination has stays one, and the flows and schedules of a source
+ * that merged into the destination before are not added again.
+ */
+
+/** What a merge renames, by the name a read of the source gives. */
+export type FlowMergePlan = {
+	/** A flow of the source: the name it takes in the destination. */
+	flows: Record<string, string>;
+	/** A schedule of the source: the id it takes in the destination. */
+	schedules: Record<string, string>;
+};
+
+/** The key in `meta` that says the source merged into this document. */
+const mergedKey = (projectId: string) => `mergedFrom:${projectId}`;
+
+/** Whether the source's flows and schedules merged into the destination already. */
+function flowsMerged(
+	source: Pick<FlowDocument, "projectId">,
+	destination: FlowDocument,
+): boolean {
+	return marked(destination, mergedKey(source.projectId));
+}
+
+/**
+ * The names the source's flows and the ids its schedules take in the
+ * destination, only those that change. Changes nothing: what a preview
+ * of the merge shows.
+ */
+export function planFlowMerge(
+	source: FlowDocument,
+	destination: FlowDocument,
+	persons: Readonly<Record<string, string>> = {},
+): FlowMergePlan {
+	const plan: FlowMergePlan = { flows: {}, schedules: {} };
+	if (flowsMerged(source, destination)) return plan;
+	const from = mapsOf(source);
+	const into = mapsOf(destination);
+	const taken = new Set(
+		flowEntries(destination).flatMap((entry) => [entry.name, entry.stored]),
+	);
+	const theirs = flowSources(destination);
+	const ours = flowSources(source);
+	for (const entry of flowEntries(source)) {
+		if (into.flows.has(entry.flowId)) continue;
+		// The same flow on both sides keeps its name: a read takes the older.
+		if (sameFlow(ours[entry.name], theirs[entry.name])) continue;
+		const name = suffixedName(entry.name, taken);
+		taken.add(name);
+		if (name !== entry.name) plan.flows[entry.name] = name;
+	}
+	const ids = new Set(into.schedules.keys());
+	for (const key of orderedKeys(from.schedules, from.scheduleOrder)) {
+		const schedule = scheduleOf(from, key, plan.flows, persons);
+		const there = into.schedules.get(key);
+		if (there === undefined) {
+			ids.add(key);
+			continue;
+		}
+		if (same(there, schedule)) continue;
+		const id = suffixedName(key, ids);
+		ids.add(id);
+		plan.schedules[key] = id;
+	}
+	return plan;
+}
+
+/**
+ * Merges the source's flows, their revisions and its schedules into the
+ * destination. The history first, then the flows and schedules in one
+ * change: a merge cut short runs again from the start. Returns what it
+ * renamed.
+ */
+export async function mergeFlowDocuments(
+	source: FlowDocument,
+	destination: FlowDocument,
+	options: { persons?: Readonly<Record<string, string>>; at: number },
+): Promise<FlowMergePlan> {
+	const persons = options.persons ?? {};
+	const plan = planFlowMerge(source, destination, persons);
+
+	const history = source.history.doc;
+	const flowIds = [...history.share.keys()];
+	await destination.history.change(() => {
+		for (const flowId of flowIds) {
+			const revisions = destination.history.doc.getArray(flowId);
+			const known = new Set(
+				revisions.toArray().flatMap((revision) => {
+					const id = (revision as { id?: unknown } | null)?.id;
+					return typeof id === "string" ? [id] : [];
+				}),
+			);
+			const added = history
+				.getArray(flowId)
+				.toArray()
+				.filter((revision) => {
+					const id = (revision as { id?: unknown } | null)?.id;
+					return typeof id !== "string" || !known.has(id);
+				})
+				.map((revision) => withPerson(copyOf(revision), "personId", persons));
+			if (added.length > 0) revisions.push(added);
+		}
+	});
+
+	if (flowsMerged(source, destination)) return plan;
+	const from = mapsOf(source);
+	const into = mapsOf(destination);
+	const names = new Map(
+		flowEntries(source).map((entry) => [entry.flowId, entry.name]),
+	);
+	await destination.current.change(() => {
+		if (into.meta.get("projectId") !== destination.projectId) {
+			into.meta.set("projectId", destination.projectId);
+		}
+		for (const [flowId, value] of from.flows.entries()) {
+			if (into.flows.has(flowId)) continue;
+			const copy = copyOf(value);
+			const name = names.get(flowId);
+			const renamed = name === undefined ? undefined : plan.flows[name];
+			if (renamed !== undefined && copy instanceof Y.Map) {
+				copy.set("name", renamed);
+			}
+			into.flows.set(flowId, copy);
+		}
+		for (const key of orderedKeys(from.schedules, from.scheduleOrder)) {
+			const id = plan.schedules[key] ?? key;
+			const schedule = scheduleOf(from, key, plan.flows, persons);
+			if (into.schedules.has(id)) continue;
+			into.schedules.set(
+				id,
+				isRecord(schedule) && id !== key ? { ...schedule, id } : schedule,
+			);
+			into.scheduleOrder.push([id]);
+		}
+		for (const [key, notice] of from.notices.entries()) {
+			if (!into.notices.has(key)) {
+				into.notices.set(key, copyOf(notice));
+			}
+		}
+		into.meta.set(mergedKey(source.projectId), options.at);
+	});
+	return plan;
+}
+
+function sameFlow(a: FlowSource | undefined, b: FlowSource | undefined) {
+	return (
+		a !== undefined &&
+		b !== undefined &&
+		"json" in a &&
+		"json" in b &&
+		same(a.json, b.json)
+	);
+}
+
+/** A schedule of the source as the destination takes it: its flow by its new name, its Person by their id there. */
+function scheduleOf(
+	source: FlowMaps,
+	key: string,
+	flows: Readonly<Record<string, string>>,
+	persons: Readonly<Record<string, string>>,
+): unknown {
+	const schedule = copyOf(source.schedules.get(key));
+	if (!isRecord(schedule)) return schedule;
+	const flow = schedule.flow;
+	const renamed =
+		typeof flow === "string" && Object.hasOwn(flows, flow)
+			? { ...schedule, flow: flows[flow] }
+			: schedule;
+	return withPerson(renamed, "person", persons);
+}
+
+/** The value with the Person in `field` replaced by their id in `persons`, when it names one. */
+function withPerson(
+	value: unknown,
+	field: string,
+	persons: Readonly<Record<string, string>>,
+): unknown {
+	if (!isRecord(value)) return value;
+	const person = value[field];
+	if (typeof person !== "string" || !Object.hasOwn(persons, person)) {
+		return value;
+	}
+	return { ...value, [field]: persons[person] };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** A copy of a value of a Yjs document, its shared types new ones, for another document. */
+function copyOf(value: unknown): unknown {
+	if (value instanceof Y.Map) {
+		const map = new Y.Map<unknown>();
+		for (const [key, inner] of value.entries()) map.set(key, copyOf(inner));
+		return map;
+	}
+	if (value instanceof Y.Array) {
+		const array = new Y.Array<unknown>();
+		array.push(value.toArray().map(copyOf));
+		return array;
+	}
+	return value === undefined ? undefined : structuredClone(value);
 }
 
 /** The flow documents this Replica holds, opened once each. */
@@ -735,17 +1079,7 @@ export function createFlowDocuments(options: { db: Database }): FlowDocuments {
 		]);
 		opened.set(current.name, current);
 		opened.set(history.name, history);
-		const { doc } = current;
-		return {
-			projectId,
-			current,
-			history,
-			flows: doc.getMap("flows"),
-			schedules: doc.getMap("schedules"),
-			scheduleOrder: doc.getArray("scheduleOrder"),
-			notices: doc.getMap("notices"),
-			meta: doc.getMap("meta"),
-		};
+		return { projectId, current, history };
 	}
 
 	function open(projectId: string): Promise<FlowDocument> {
@@ -785,138 +1119,6 @@ export function createFlowDocuments(options: { db: Database }): FlowDocuments {
 			await Promise.all([...opened.values()].map((d) => d.close()));
 			opened.clear();
 			opening.clear();
-		},
-	};
-}
-
-export type DocumentProjectFlowsDeps = {
-	documents: Pick<FlowDocuments, "open">;
-	/** The project, in the Space when one is given. Throws when it is not there. */
-	find(projectId: string, spaceId?: string): Promise<unknown>;
-	/** This Device: where a save happens. */
-	deviceId: string | (() => Promise<string>);
-	/** The clock of a revision. Default `Date.now`. */
-	now?: () => number;
-	/**
-	 * What brings a flow of format 6, and a revision of it, to the current
-	 * format as it is read. Without it, a node of format 6 keeps its
-	 * profile's name and the editor asks to pick the profile again.
-	 */
-	migrations?: FlowMigrations;
-};
-
-/**
- * The flows and schedules of a project in its flow document. Every
- * Device reads and saves them, with or without a Clone of the project.
- * A save records a revision of kind `save`, or the kind it names.
- */
-export function documentProjectFlows(
-	deps: DocumentProjectFlowsDeps,
-): ProjectFlows {
-	const now = deps.now ?? Date.now;
-	const documentOf = async (projectId: string, spaceId?: string) => {
-		await deps.find(projectId, spaceId);
-		return deps.documents.open(projectId);
-	};
-
-	const deviceId = async () =>
-		typeof deps.deviceId === "string" ? deps.deviceId : await deps.deviceId();
-
-	return {
-		async flows({ projectId, spaceId }) {
-			const document = await documentOf(projectId, spaceId);
-			return {
-				sources: await upgradedSources(
-					document,
-					deps.migrations,
-					await deviceId(),
-				),
-				pathOf: (name) => name,
-			};
-		},
-
-		async save({ projectId, spaceId, personId }, name, flow, options = {}) {
-			const valid = flowNameSchema.safeParse(name);
-			if (!valid.success) {
-				throw new Refusal(
-					"invalid",
-					`The flow name "${name}" is not valid. ${valid.error.issues[0]?.message ?? "Pick another name."}`,
-				);
-			}
-			const document = await documentOf(projectId, spaceId);
-			await saveFlow(document, {
-				name,
-				flow,
-				kind: options.kind ?? "save",
-				personId: personId ?? null,
-				deviceId: await deviceId(),
-				at: now(),
-			});
-			const current: Flow = { ...flow, version: FLOW_VERSION };
-			return parseFlow(current, {
-				flows: parsedFlows(flowSources(document)),
-				name,
-			}).issues;
-		},
-
-		async remove({ projectId, spaceId }, name) {
-			await removeFlow(await documentOf(projectId, spaceId), name);
-		},
-
-		async revisions({ projectId, spaceId }, name) {
-			const document = await documentOf(projectId, spaceId);
-			const flowId = flowIdOf(document, name);
-			if (flowId === null) return [];
-			const revisions = flowRevisions(document, flowId);
-			const { migrations } = deps;
-			if (!migrations) return revisions;
-			// A revision of format 6 reads as the Device that saved it named its profiles.
-			return Promise.all(
-				revisions.map(async (revision) =>
-					olderFormat(revision.flow)
-						? {
-								...revision,
-								flow: migrateFlow(
-									revision.flow,
-									await migrations.forDevice(revision.deviceId),
-								) as FlowRevision["flow"],
-							}
-						: revision,
-				),
-			);
-		},
-
-		async schedules({ projectId, spaceId }, options = {}) {
-			const document = await documentOf(projectId, spaceId);
-			const { schedules, unreadable } = readSchedules(document);
-			const issues: ScheduleIssue[] =
-				unreadable > 0
-					? [
-							{
-								severity: "warning",
-								message:
-									"A newer version of Night Shift saved some schedules. Update Night Shift to see them.",
-							},
-						]
-					: [];
-			if (options.validate !== false) {
-				issues.push(
-					...validateSchedules(
-						schedules,
-						scheduleFlowInfos(flowSources(document)),
-					),
-				);
-			}
-			return { path: "schedules", schedules, issues };
-		},
-
-		async saveSchedules({ projectId, spaceId }, schedules) {
-			const document = await documentOf(projectId, spaceId);
-			await saveSchedules(document, schedules);
-			return validateSchedules(
-				schedules,
-				scheduleFlowInfos(flowSources(document)),
-			);
 		},
 	};
 }

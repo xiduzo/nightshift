@@ -130,7 +130,7 @@ export function createProjectsMove(deps: ProjectsMoveDeps) {
 		let changed = 0;
 		for (const projectId of projectIds) {
 			const read = await deps.flows
-				.schedules({ projectId }, { validate: false })
+				.schedules(projectId, { validate: false })
 				.catch((error: unknown) => {
 					// A removed Project has no schedules that fire.
 					if (error instanceof Refusal && error.kind === "not-found") {
@@ -142,7 +142,7 @@ export function createProjectsMove(deps: ProjectsMoveDeps) {
 			const edited = read.schedules.map(edit);
 			const count = edited.filter((s, i) => s !== read.schedules[i]).length;
 			if (count === 0) continue;
-			await deps.flows.saveSchedules({ projectId }, edited);
+			await deps.flows.saveSchedules(projectId, edited);
 			changed += count;
 		}
 		return changed;

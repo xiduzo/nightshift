@@ -14,6 +14,7 @@ import {
 	spaceSplit,
 	user,
 } from "@nightshift/db/schema";
+import { createProjectFlows } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
@@ -253,7 +254,7 @@ async function mergedIntoA() {
 		},
 	]);
 	// A second save: the flow has history.
-	await space.saveFlow(added.id, "hello", {
+	await space.flows.save(added.id, "hello", {
 		...quickFlow,
 		nodes: [{ ...quickFlow.nodes[0], command: "echo again" }],
 	} as Flow);
@@ -361,11 +362,11 @@ describe("leaving the home Host keeps a copy", () => {
 		const runs = await paired.device.space(own).listRuns();
 		expect(runs.map((r) => r.id)).toEqual([runId]);
 		// The flow with its history, and its schedule.
-		const flows = await paired.device.space(own).listFlows(projectId);
+		const flows = await paired.device.space(own).flows.list(projectId);
 		expect(flows.map((f) => f.name)).toEqual(["hello"]);
 		const revisions = await paired.device
 			.space(own)
-			.listFlowRevisions(projectId, "hello");
+			.flows.revisions(projectId, "hello");
 		expect(revisions.length).toBeGreaterThanOrEqual(2);
 		const schedules = await paired.device.space(own).listSchedules(projectId);
 		expect(schedules.schedules.map((s) => s.id)).toEqual(["nightly"]);
@@ -401,9 +402,16 @@ describe("leaving the home Host keeps a copy", () => {
 
 	test("a schedule that names another device is paused on B after the split and names no device; turned on, it has a next start; one that names B stays", async () => {
 		const { projectId } = await mergedIntoA();
-		const flows = await paired.flows.open(projectId);
-		await flows.current.change(() => {
-			flows.schedules.set("on-c", {
+		// What A saved: a schedule on C, for the Person.
+		const flows = createProjectFlows({
+			documents: paired.flows,
+			project: async () => ({ spaceId: "" }),
+			deviceId: "A",
+		});
+		const saved = await flows.schedules(projectId, { validate: false });
+		await flows.saveSchedules(projectId, [
+			...saved.schedules,
+			{
 				id: "on-c",
 				flow: "hello",
 				inputs: {},
@@ -411,8 +419,8 @@ describe("leaving the home Host keeps a copy", () => {
 				enabled: true,
 				device: "C",
 				person: paired.personId,
-			});
-		});
+			},
+		]);
 		await revoke();
 
 		const result = await splitter().revoked(home);
@@ -434,10 +442,13 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(byId.get("on-c")?.person).toBeUndefined();
 		expect((await b.db.select().from(spaceSplit))[0]?.unpinned).toBe(1);
 
-		await flows.current.change(() => {
-			const value = flows.schedules.get("on-c") as Record<string, unknown>;
-			flows.schedules.set("on-c", { ...value, enabled: true });
-		});
+		const paused = await flows.schedules(projectId, { validate: false });
+		await flows.saveSchedules(
+			projectId,
+			paused.schedules.map((schedule) =>
+				schedule.id === "on-c" ? { ...schedule, enabled: true } : schedule,
+			),
+		);
 		const turnedOn = await paired.device.space(own).listSchedules(projectId);
 		expect(
 			turnedOn.schedules.find((s) => s.id === "on-c")?.nextAt,

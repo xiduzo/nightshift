@@ -45,8 +45,8 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 
 	return {
 		/** The project's schedules, each with its next start, its last result and its issues. */
-		async list(spaceId: string, projectId: string): Promise<ScheduleList> {
-			const loaded = await deps.flows.schedules({ projectId, spaceId });
+		async list(projectId: string): Promise<ScheduleList> {
+			const loaded = await deps.flows.schedules(projectId);
 			await scheduler.refresh();
 			const at = deps.now();
 			const schedules = [];
@@ -77,13 +77,12 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 			actor: Actor | undefined,
 			schedules: readonly Schedule[],
 		) {
-			const of = { projectId, spaceId };
 			const project = {
 				id: projectId,
-				flows: async () => (await deps.flows.flows(of)).sources,
+				flows: () => deps.flows.flows(projectId),
 			};
 			return deps.flows.saveSchedules(
-				of,
+				projectId,
 				await deps.schedulesWithOffers(project, spaceId, actor, schedules),
 			);
 		},

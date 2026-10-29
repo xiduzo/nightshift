@@ -19,10 +19,10 @@ import { deviceDirectory } from "@nightshift/devices";
 import {
 	createCliToolStore,
 	createFlowDocuments,
+	createProjectFlows,
 	createSettingsStore,
 	createSpaceDocuments,
 	type DeviceDocument,
-	documentProjectFlows,
 	documentSpace,
 	type FlowDocuments,
 	type SpaceDocuments,
@@ -656,7 +656,7 @@ describe("documentAccess: a flow document", () => {
 	const PROJECT = "project-shop";
 	const name = `flows:${PROJECT}`;
 	const historyName = `flows-history:${PROJECT}`;
-	const of = { projectId: PROJECT };
+	const of = PROJECT;
 
 	/** A flow with two Agent nodes, `a` and `b`. */
 	const twoNodes = (prompts: { a?: string; b?: string } = {}): Flow => {
@@ -730,9 +730,9 @@ describe("documentAccess: a flow document", () => {
 
 	/** The flows on this Host, as its engine saves them. */
 	const onHost = () =>
-		documentProjectFlows({
+		createProjectFlows({
 			documents: flows,
-			find: async () => ({}),
+			project: async () => ({ spaceId: sandbox.spaceId }),
 			deviceId: "host",
 		});
 
@@ -749,9 +749,9 @@ describe("documentAccess: a flow document", () => {
 		return {
 			documents,
 			opened,
-			flows: documentProjectFlows({
+			flows: createProjectFlows({
 				documents,
-				find: async () => ({}),
+				project: async () => ({ spaceId: sandbox.spaceId }),
 				deviceId: "device-bob",
 			}),
 			/** Its Link to this Host: both documents. */
@@ -778,7 +778,9 @@ describe("documentAccess: a flow document", () => {
 				member.doc.getMap("flows").size === 1 &&
 				viewer.doc.getMap("flows").size === 1,
 		);
-		expect((await flows.open(PROJECT)).meta.has("from")).toBe(false);
+		expect(
+			(await flows.open(PROJECT)).current.doc.getMap("meta").has("from"),
+		).toBe(false);
 	});
 
 	test("a Device of a member saves into it; a Device of a viewer only reads", async () => {
@@ -789,22 +791,21 @@ describe("documentAccess: a flow document", () => {
 			await waitFor(
 				() => !!current?.provider.isSynced && !!history?.provider.isSynced,
 			);
-			await device.flows.save(
-				{ ...of, personId: "bob" },
-				"build",
-				twoNodes({ a: "From Bob" }),
-			);
+			await device.flows.save(of, "build", twoNodes({ a: "From Bob" }), {
+				personId: "bob",
+			});
 			await waitFor(
 				async () =>
-					promptsOf(parsedFlows((await onHost().flows(of)).sources)).a ===
-					"From Bob",
+					promptsOf(parsedFlows(await onHost().flows(of))).a === "From Bob",
 			);
 
 			const viewer = connect(name, { token: "nsd_cy" });
 			await waitFor(() => viewer.provider.isSynced);
 			viewer.doc.getMap("meta").set("from", "Cy");
 			await Bun.sleep(100);
-			expect((await flows.open(PROJECT)).meta.has("from")).toBe(false);
+			expect(
+				(await flows.open(PROJECT)).current.doc.getMap("meta").has("from"),
+			).toBe(false);
 		} finally {
 			await device.documents.close();
 		}
@@ -835,27 +836,24 @@ describe("documentAccess: a flow document", () => {
 		try {
 			const first = device.link("nsd_bob");
 			await waitFor(async () => {
-				const sources = (await device.flows.flows(of)).sources;
+				const sources = await device.flows.flows(of);
 				return "build" in sources;
 			});
 			for (const client of first) client.provider.destroy();
 
 			await host.save(of, "build", twoNodes({ a: "On the Host" }));
-			await device.flows.save(
-				{ ...of, personId: "bob" },
-				"build",
-				twoNodes({ b: "On the Device" }),
-			);
+			await device.flows.save(of, "build", twoNodes({ b: "On the Device" }), {
+				personId: "bob",
+			});
 
 			device.link("nsd_bob");
 			const merged = { a: "On the Host", b: "On the Device" };
 			await waitFor(
 				async () =>
+					JSON.stringify(promptsOf(parsedFlows(await host.flows(of)))) ===
+						JSON.stringify(merged) &&
 					JSON.stringify(
-						promptsOf(parsedFlows((await host.flows(of)).sources)),
-					) === JSON.stringify(merged) &&
-					JSON.stringify(
-						promptsOf(parsedFlows((await device.flows.flows(of)).sources)),
+						promptsOf(parsedFlows(await device.flows.flows(of))),
 					) === JSON.stringify(merged),
 				{ label: "both edits on both sides" },
 			);

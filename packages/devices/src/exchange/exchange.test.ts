@@ -923,7 +923,7 @@ describe("projects of a Space without a Clone here", () => {
 			expect.objectContaining({ id: projectId, repoPath: null }),
 		]);
 		expect(listed[0]?.clones.some((c) => c.thisDevice)).toBe(false);
-		expect(await engineB.space(a.spaceId).listFlows(projectId)).toEqual([]);
+		expect(await engineB.space(a.spaceId).flows.list(projectId)).toEqual([]);
 		expect(
 			engineB.space(a.spaceId).startRun({ projectId, flow: gateFlow }),
 		).rejects.toThrow("not on this computer");

@@ -1,3 +1,4 @@
+import type { SpaceFlows } from "../flows";
 import type { SpaceEngine } from "../run";
 import { summarizeDashboard } from "./summary";
 import type { DashboardSummary } from "./types";
@@ -7,13 +8,13 @@ export type DashboardRead = { now: number; timeZone: string };
 
 /** The dashboard of one project of a Space: its runs, grouped by flow. */
 export async function projectDashboard(
-	space: Pick<SpaceEngine, "listRuns" | "listFlows">,
+	space: Pick<SpaceEngine, "listRuns"> & { flows: Pick<SpaceFlows, "list"> },
 	projectId: string,
 	read: DashboardRead,
 ): Promise<DashboardSummary> {
 	const [runs, flows] = await Promise.all([
 		space.listRuns({ projectId }),
-		space.listFlows(projectId),
+		space.flows.list(projectId),
 	]);
 	return summarizeDashboard(runs, {
 		...read,

@@ -1,4 +1,4 @@
-/** The flows and schedules of a project (the `ProjectFlows` port; list, read, save, delete), the flows a run starts from, and what uses this computer's configuration. */
+/** The flows and schedules of the Projects, in their flow documents (`ProjectFlows`), what a Person does with them in a Space (`SpaceFlows`), the flows a run starts from, and what uses this computer's configuration. */
 
 export { createCloneImports } from "./clone-imports";
 export {
@@ -8,32 +8,23 @@ export {
 } from "./config-use";
 export {
 	createFlowDocuments,
-	documentProjectFlows,
 	documentSpace,
-	type FlowDocument,
 	type FlowDocuments,
+	type FlowNotice,
 	type RevisionKind,
 	revisionKinds,
-	upgradedSources,
-	upgradeFlows,
 } from "./flow-document";
-export type {
-	FlowExport,
-	FlowFiles,
-	FlowRevisionItem,
-	FlowRevisionView,
-	RevisionName,
-	SavedFlow,
-} from "./flow-files";
-export { createFlowFiles } from "./flow-files";
-export {
-	type FlowMergePlan,
-	mergeFlowDocuments,
-	planFlowMerge,
-} from "./flow-merge";
 export { createFlowMigrations } from "./flow-migration";
 export type { FlowRef, FlowUse } from "./flow-use";
 export { flowUse } from "./flow-use";
-export { dismissNotice, type FlowNotice, flowNotices } from "./notices";
-export type { ProjectFlows } from "./project-flows";
+export { createProjectFlows, type ProjectFlows } from "./project-flows";
 export { flowsForRun } from "./run-flows";
+export {
+	createSpaceFlows,
+	type FlowExport,
+	type FlowRevisionItem,
+	type FlowRevisionView,
+	type RevisionName,
+	type SavedFlow,
+	type SpaceFlows,
+} from "./space-flows";

@@ -251,7 +251,7 @@ rewrites the Device's database, so it is careful:
    run (a Member that joined) go, once no Space, project or run row names
    the old Space. A merge of an older version left them: the daemon
    removes them at its next start. The flow documents of a project that
-   joins another merge into it (`mergeFlowDocuments`), once the Host's
+   joins another merge into it (`ProjectFlows.merge`), once the Host's
    copy is here: `Link.synced` says that the two copies are in sync, and
    that the Host has every change this Device made. Each
    schedule that names no Device is pinned to this Device, so its runs

@@ -208,7 +208,7 @@ export function apiPort(
 			g(async () => {
 				let flowName: string | null = null;
 				const space: ChatSpace = {
-					flowMap: (id) => client.flows.map({ projectId: id }),
+					flows: { map: (id) => client.flows.map({ projectId: id }) },
 					getRun: async (id) => {
 						const detail = await client.runs.get({ runId: id });
 						flowName = detail.flowName;

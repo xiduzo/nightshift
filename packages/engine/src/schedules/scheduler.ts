@@ -352,10 +352,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			if (stopped || holds > 0) return;
 			let schedules: Schedule[];
 			try {
-				({ schedules } = await deps.flows.schedules(
-					{ projectId },
-					{ validate: false },
-				));
+				({ schedules } = await deps.flows.schedules(projectId, {
+					validate: false,
+				}));
 			} catch {
 				continue;
 			}

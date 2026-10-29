@@ -35,7 +35,7 @@ below it, from the bottom up:
 | `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run and step rows (`run-row.ts`), the member events, the transcript files and the transcript event types (`step-events.ts`). |
 | `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
 | `projects/` | Projects, the Space document that defines them, the git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), the git setup of a project folder, and run worktrees (`createWorktrees(git)`). |
-| `flows/` | The flow files of a project (`flow-files.ts`) and the flows a run starts from (`run-flows.ts`). |
+| `flows/` | The flows of the projects in their flow documents (`project-flows.ts`), what a person does with them in a Space (`space-flows.ts`), and the flows a run starts from (`run-flows.ts`). |
 | `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |
 | `schedules/` | The scheduler and the schedules file of a project (`schedule-files.ts`). |

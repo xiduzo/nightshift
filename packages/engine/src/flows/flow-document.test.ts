@@ -9,11 +9,9 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
-import { projectFlowsContract } from "../testing/project-flows-contract";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	createFlowDocuments,
-	documentProjectFlows,
 	documentSpace,
 	type FlowDocument,
 	type FlowDocuments,
@@ -24,24 +22,7 @@ import {
 	upgradeFlows,
 } from "./flow-document";
 import type { FlowMigrations } from "./flow-migration";
-import type { ProjectFlows } from "./project-flows";
-
-projectFlowsContract("the document adapter", async () => {
-	const sandbox = await createSandbox();
-	const documents = createFlowDocuments({ db: sandbox.db });
-	return {
-		flows: documentProjectFlows({
-			documents,
-			find: async () => ({}),
-			deviceId: sandbox.deviceId,
-		}),
-		of: { projectId: "project", spaceId: sandbox.spaceId },
-		dispose: async () => {
-			await documents.close();
-			await sandbox.cleanup();
-		},
-	};
-});
+import { createProjectFlows, type ProjectFlows } from "./project-flows";
 
 /** A flow with two Agent nodes, `a` then `b`. */
 const twoNodes = (): Flow => {
@@ -75,13 +56,21 @@ function withPrompt(flow: Flow, nodeId: string, prompt: string): Flow {
 	};
 }
 
+/** The parts of the document's encoding that a test writes as another Night Shift would. */
+const flowMap = (document: FlowDocument) =>
+	document.current.doc.getMap<unknown>("flows");
+const scheduleMap = (document: FlowDocument) =>
+	document.current.doc.getMap<unknown>("schedules");
+const scheduleOrderOf = (document: FlowDocument) =>
+	document.current.doc.getArray<string>("scheduleOrder");
+
 function promptOf(flow: Flow | null | undefined, nodeId: string): string {
 	const node = flow?.nodes.find((each) => each.id === nodeId);
 	if (node?.type !== "agent") throw new Error(`No Agent node ${nodeId}.`);
 	return node.prompt;
 }
 
-/** One Device: its database, its flow documents, and the adapter on them. */
+/** One Device: its database, its flow documents, and its `ProjectFlows`. */
 type Replica = {
 	sandbox: Sandbox;
 	documents: FlowDocuments;
@@ -90,7 +79,7 @@ type Replica = {
 	dispose(): Promise<void>;
 };
 
-const of = { projectId: "project", personId: "person" };
+const of = "project";
 
 async function replica(clock: { at: number }): Promise<Replica> {
 	const sandbox = await createSandbox();
@@ -98,13 +87,13 @@ async function replica(clock: { at: number }): Promise<Replica> {
 	return {
 		sandbox,
 		documents,
-		flows: documentProjectFlows({
+		flows: createProjectFlows({
 			documents,
-			find: async () => ({}),
+			project: async () => ({ spaceId: sandbox.spaceId }),
 			deviceId: sandbox.deviceId,
 			now: () => clock.at,
 		}),
-		document: () => documents.open(of.projectId),
+		document: () => documents.open(of),
 		dispose: async () => {
 			await documents.close();
 			await sandbox.cleanup();
@@ -125,7 +114,7 @@ async function sync(a: Replica, b: Replica): Promise<void> {
 }
 
 async function read(device: Replica): Promise<Record<string, Flow | null>> {
-	return parsedFlows((await device.flows.flows(of)).sources);
+	return parsedFlows(await device.flows.flows(of));
 }
 
 async function refusal(promise: Promise<unknown>): Promise<Refusal> {
@@ -217,7 +206,7 @@ describe("the flow document", () => {
 		);
 		const document = await desktop.document();
 		const flowId = flowIdOf(document, "build-2");
-		const entry = document.flows.get(flowId ?? "") as Y.Map<unknown>;
+		const entry = flowMap(document).get(flowId ?? "") as Y.Map<unknown>;
 		expect(entry.get("name")).toBe("build-2");
 		expect(Object.keys(await read(desktop))).toEqual(["build", "build-2"]);
 	});
@@ -263,7 +252,7 @@ describe("the flow document", () => {
 		const document = await laptop.document();
 		await document.current.change(() => {
 			const future = new Y.Map<unknown>();
-			document.flows.set("future-id", future);
+			flowMap(document).set("future-id", future);
 			future.set("name", "future");
 			future.set("createdAt", 1);
 			future.set("version", FLOW_VERSION + 1);
@@ -273,7 +262,7 @@ describe("the flow document", () => {
 		expect(await read(laptop)).toEqual({});
 		const refused = await refusal(laptop.flows.save(of, "future", twoNodes()));
 		expect(refused.kind).toBe("conflict");
-		expect(document.flows.size).toBe(1);
+		expect(flowMap(document).size).toBe(1);
 	});
 
 	test("a revision from a newer Night Shift is left out of the history", async () => {
@@ -301,7 +290,7 @@ describe("the flow document", () => {
 		await laptop.flows.save(of, "build", twoNodes());
 		const document = await laptop.document();
 		const [saved] = flowRevisions(document, flowIdOf(document, "build") ?? "");
-		expect((await laptop.flows.flows(of)).sources.build).toEqual({
+		expect((await laptop.flows.flows(of)).build).toEqual({
 			json: twoNodes(),
 			revision: saved?.id as string,
 		});
@@ -314,17 +303,13 @@ describe("the flow document", () => {
 			withPrompt(twoNodes(), "b", "Desktop"),
 		);
 		await sync(laptop, desktop);
-		expect((await laptop.flows.flows(of)).sources.build).not.toHaveProperty(
-			"revision",
-		);
+		expect((await laptop.flows.flows(of)).build).not.toHaveProperty("revision");
 	});
 
 	test("a save records a revision: who, when, on which Device, and the flow", async () => {
 		clock.at = 5_000;
-		await laptop.flows.save(of, "build", twoNodes());
-		const document = await laptop.document();
-		const flowId = flowIdOf(document, "build") ?? "";
-		expect(flowRevisions(document, flowId)).toEqual([
+		await laptop.flows.save(of, "build", twoNodes(), { personId: "person" });
+		expect(await laptop.flows.revisions(of, "build")).toEqual([
 			{
 				id: expect.any(String),
 				at: 5_000,
@@ -406,11 +391,11 @@ describe("the flow document", () => {
 
 		const again = createFlowDocuments({ db: laptop.sandbox.db });
 		try {
-			const document = await again.open(of.projectId);
+			const document = await again.open(of);
 			expect(parsedFlows(flowSources(document))).toEqual({
 				build: twoNodes(),
 			});
-			expect(document.scheduleOrder.toArray()).toEqual(["nightly"]);
+			expect(scheduleOrderOf(document).toArray()).toEqual(["nightly"]);
 		} finally {
 			await again.close();
 		}
@@ -439,8 +424,8 @@ describe("the flow document", () => {
 	test("a schedule that a newer Night Shift saved stays when the schedules are saved", async () => {
 		const document = await laptop.document();
 		await document.current.change(() => {
-			document.schedules.set("future", { id: "future", enabled: "later" });
-			document.scheduleOrder.push(["future"]);
+			scheduleMap(document).set("future", { id: "future", enabled: "later" });
+			scheduleOrderOf(document).push(["future"]);
 		});
 		const nightly = {
 			id: "nightly",
@@ -455,7 +440,7 @@ describe("the flow document", () => {
 		expect(loaded.issues).toEqual([
 			expect.objectContaining({ severity: "warning" }),
 		]);
-		expect(document.schedules.has("future")).toBe(true);
+		expect(scheduleMap(document).has("future")).toBe(true);
 	});
 });
 
@@ -551,7 +536,7 @@ describe("flows of format 6 in the document (ADR 3)", () => {
 		});
 		const flowId = flowIdOf(document, "build") ?? "";
 		await document.current.change(() => {
-			(document.flows.get(flowId) as Y.Map<unknown>).set("version", 6);
+			(flowMap(document).get(flowId) as Y.Map<unknown>).set("version", 6);
 		});
 		await document.history.change(() => {
 			const revisions = document.history.doc.getArray<{ flow: unknown }>(
@@ -582,13 +567,13 @@ describe("flows of format 6 in the document (ADR 3)", () => {
 
 	test("a read names the profiles of the Device that saved the flow, and the Device a node named", async () => {
 		await storeFormat6(desktop, "laptop");
-		const flows = documentProjectFlows({
+		const flows = createProjectFlows({
 			documents: desktop.documents,
-			find: async () => ({}),
+			project: async () => ({ spaceId: desktop.sandbox.spaceId }),
 			deviceId: "desktop",
 			migrations,
 		});
-		const read = parsedFlows((await flows.flows(of)).sources);
+		const read = parsedFlows(await flows.flows(of));
 		expect(profiles(read.build)).toEqual([
 			{ device: "laptop", profile: "p-laptop" },
 			"builder",
