@@ -174,8 +174,9 @@ export interface Engine {
 	/**
 	 * Forgets a Space a move emptied: its facts of no run here (a Member
 	 * that joined) and its Space document. False, and nothing removed,
-	 * while a Project or a run of it is still here. The Space's own row
-	 * is the caller's to check (`@nightshift/auth`). Runs again safely.
+	 * while the Space's own row, a Project or a run of it is still here.
+	 * The caller removes the Space's row first (`@nightshift/auth`), and
+	 * checks it too. Runs again safely.
 	 */
 	forgetSpace(spaceId: string): Promise<boolean>;
 	/**

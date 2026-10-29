@@ -1,3 +1,4 @@
+import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	agentSession,
@@ -490,13 +491,16 @@ export async function spaceProjectRows(
 
 /**
  * Removes the events a Space left on this Replica that belong to no run
- * here (a Member that joined), once no Project and no run of it is here.
- * False, and nothing removed, while one is. Runs again safely.
+ * here (a Member that joined), once the Space's own row, every Project
+ * and every run of it are gone. False, and nothing removed, while one is
+ * here. Runs again safely.
  */
 export async function forgetSpaceRows(
 	db: Database,
 	spaceId: string,
 ): Promise<boolean> {
+	// The Space's own row is `@nightshift/auth`'s: its caller removes it first.
+	if (await spaceExists(db, spaceId)) return false;
 	const [left] = await db
 		.select({ id: project.id })
 		.from(project)

@@ -456,6 +456,29 @@ describe("forgetting a Space a move emptied", () => {
 		expect(await whatIsLeft(team)).toEqual(left);
 	});
 
+	test("is refused while the Space's own row is here, even once a move emptied it: nothing goes", async () => {
+		const engine = makeEngine();
+		const { team, app } = await twoSpaces(engine);
+		const platform = await otherSpace(sandbox.db, "Platform");
+		await engine.moveProjects({
+			from: team,
+			plan: async () => ({
+				projects: { [app.id]: { spaceId: platform, projectId: app.id } },
+			}),
+		});
+		// The caller has not removed the Space's own row yet.
+		const left = await whatIsLeft(team);
+		expect(left).toMatchObject({
+			projects: 0,
+			runs: 0,
+			events: 1,
+			document: true,
+		});
+
+		expect(await engine.forgetSpace(team)).toBe(false);
+		expect(await whatIsLeft(team)).toEqual(left);
+	});
+
 	test("once a move emptied it, its facts of no run and its document go; the Space its runs went to and another Space keep everything", async () => {
 		const engine = makeEngine();
 		const { team, kept, app, tools, teamRun, keptRun } =
