@@ -143,6 +143,8 @@ export const commandNodeSchema = z.object({
 	 * runs the step reads them: its keychain, then its daemon's environment.
 	 * A secret it does not have errors the step before the command runs.
 	 * Their values become `•••` in the step's output, log tail and data.
+	 * A CLI tool with a login needs none of its secrets here: `gh` in the
+	 * command runs as the gh tool.
 	 */
 	secrets: z.array(secretNameSchema).optional(),
 });
