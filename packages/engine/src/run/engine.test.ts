@@ -34,6 +34,7 @@ import { seedFlowFolder } from "../testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
+	holdSpace,
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
@@ -1816,7 +1817,7 @@ describe("a Space whose Projects move", () => {
 		await engine.stopRun(run.id);
 		expect(await statusOf(engine, run.id)).toBe("stopped");
 
-		const release = await daemon.holdStarts(sandbox.spaceId);
+		const release = await holdSpace(daemon, sandbox.spaceId);
 		for (const act of [
 			() => engine.resumeRun(run.id),
 			() => engine.restartStep(run.id),
@@ -1830,7 +1831,7 @@ describe("a Space whose Projects move", () => {
 		expect(sessions).toHaveLength(1);
 		expect(await statusOf(engine, run.id)).toBe("stopped");
 
-		release();
+		await release();
 		await engine.resumeRun(run.id);
 		(await waitFor(() => sessions[1], { label: "the resume" })).finish();
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
@@ -2178,15 +2179,15 @@ describe("automatic resume after a restart", () => {
 		const { harness, sessions } = scriptedHarness({
 			harnessSessionId: () => "harness-0",
 		});
-		const daemon = makeDaemon(harness, {}, { resumeGraceMs: 30 });
-		const release = await daemon.holdStarts(sandbox.spaceId);
+		const daemon = makeDaemon(harness, {}, { resumeGraceMs: 100 });
+		const release = await holdSpace(daemon, sandbox.spaceId);
 		const engine = daemon.space(sandbox.spaceId);
 		expect(await statusOf(engine, run.id)).toBe("interrupted");
-		await Bun.sleep(120);
+		await Bun.sleep(250);
 		expect(sessions).toHaveLength(0);
 		expect(await statusOf(engine, run.id)).toBe("interrupted");
 
-		release();
+		await release();
 		const resumed = await waitFor(() => sessions[0], { label: "the resume" });
 		resumed.finish();
 		expect(await waitForEnd(engine, run.id)).toBe("finished");

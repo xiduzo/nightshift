@@ -59,6 +59,11 @@ import {
 import { listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
+import {
+	createProjectsMove,
+	type MovedProjects,
+	type ProjectsMove,
+} from "./projects-move";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
@@ -145,22 +150,17 @@ export interface Engine {
 	 */
 	onLandedFacts(listener: (facts: readonly LandedFact[]) => void): () => void;
 	/**
-	 * The rows of these runs changed in the database under the engine, in
-	 * one batch that logged no `ProjectMoved` (a merge of Spaces): their
-	 * logs are read from the database again, and so are the latest counts
-	 * of the landed feed, so the exchange sees the moved events.
+	 * Moves Projects from one Space to others, as one operation (a Space
+	 * move, `projects-move.ts`): no run becomes active in `move.from` and
+	 * no schedule fires from the caller's `plan` through the batch, the
+	 * schedules change through `ProjectFlows`, every row of the Projects
+	 * and of the packages above the engine (`EngineOptions.moveRows`)
+	 * moves in one batch with the caller's own, the run log reads the moved
+	 * runs again, and the Space documents this Replica writes follow. A
+	 * person's move of a Project, the merge of Personal into the home
+	 * Host's and its split off it all go through it.
 	 */
-	reindex(runIds: readonly string[]): void;
-	/**
-	 * Holds the start of new runs while a merge of Spaces moves the rows
-	 * of `spaceId`: from its last check for runs that are not done
-	 * through its batch. No schedule fires anywhere, a webhook's run or a
-	 * person's run, resume, restart or run again in that Space is refused,
-	 * the daemon's own resume of an interrupted run waits, and the starts
-	 * under way end first. A schedule that came due meanwhile fires after the
-	 * release, within its grace. Always release it, on success or failure.
-	 */
-	holdStarts(spaceId: string): Promise<() => void>;
+	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
 	/**
 	 * A run's status, when it wakes, and whether this computer walks it or
 	 * runs its steps, in any Space of this Replica. Null for a run it does
@@ -580,6 +580,23 @@ export function createEngine(
 			: {}),
 	});
 
+	/** A Space move: Projects to other Spaces, as one operation. */
+	const moveProjects = createProjectsMove({
+		db,
+		ready,
+		holds: startHolds,
+		holdSchedules: () => scheduler.hold(),
+		walkerId: () => runLog.walkerId(),
+		flows: projectFlows,
+		documents,
+		// Their rows moved under the run log, in a batch that logged nothing.
+		reread: (runIds) => {
+			runLog.forget(runIds);
+			history.landed.reread();
+		},
+		rows: options.moveRows ?? [],
+	});
+
 	const space = createSpaces({
 		ready,
 		signal,
@@ -624,6 +641,7 @@ export function createEngine(
 		relay,
 		hostOf,
 		startRun: startRunWith,
+		moveProjects,
 		pathsFor: peers.pathsFor,
 	});
 
@@ -636,18 +654,7 @@ export function createEngine(
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		onLandedFacts: (listener) =>
 			history.landed.subscribe((events) => listener(landedFacts(events))),
-		reindex(runIds) {
-			runLog.forget(runIds);
-			history.landed.reread();
-		},
-		async holdStarts(spaceId) {
-			const releaseScheduler = await scheduler.hold();
-			const releaseStarts = await startHolds.hold(spaceId);
-			return () => {
-				releaseStarts();
-				releaseScheduler();
-			};
-		},
+		moveProjects,
 		async runHere(runId) {
 			await ready;
 			return reads.runHere(runId);

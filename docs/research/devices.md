@@ -225,7 +225,8 @@ rewrites the Device's database, so it is careful:
    `backups/` in the data directory before any change.
 4. **States** (`space_merge`): `planned` (the copy is made), `mapped`
    (the Host took the projects, `sync.mergePersonal`), `moved` (one
-   `db.batch`: every row with `spaceMoveBatch`, the Host's Space becomes
+   Space move, `Engine.moveProjects`, with one `db.batch`: every row with
+   `spaceMoveBatch`, the Host's Space becomes
    this Device's "Personal" with `adoptPersonalSpaceBatch`, the
    commands of the moved runs (`run_command`, in the name of the Person
    as the Host knows them), the notifier's deliveries, and the state),
@@ -233,12 +234,13 @@ rewrites the Device's database, so it is careful:
    the Host every moved run). A merge cut short goes on from its state.
    After `moved` it finishes by itself when the Host answers. From its
    last check for runs that are not done through its batch, no run
-   starts (`Engine.holdStarts`): the scheduler skips its ticks, and a
-   person's run or a webhook's run in Personal is refused with "Night
-   Shift moves the projects of this Space now. Start the run again in a
-   minute." The hold waits for the starts under way first. A schedule
-   that came due meanwhile fires after it, within its 15 minutes of
-   grace. The hold ends on success and on failure.
+   becomes active (the Space move's hold): the scheduler skips its
+   ticks, a person's run, resume, restart or run again or a webhook's
+   run in Personal is refused with "Night Shift moves the projects of
+   this Space now. Try again in a minute.", and the automatic resume of
+   an interrupted run waits. The hold waits for the starts under way
+   first. A schedule that came due meanwhile fires after it, within its
+   15 minutes of grace. The hold ends on success and on failure.
 5. **The Host.** It takes each project by its remote into the personal
    Space: a remote it has takes that project's id, so the runs of both
    sides are one history. Every other project keeps its id. A remote of
@@ -253,8 +255,9 @@ rewrites the Device's database, so it is careful:
    copy is here: `Link.synced` says that the two copies are in sync, and
    that the Host has every change this Device made. Each
    schedule that names no Device is pinned to this Device, so its runs
-   keep running where they ran; the Host fires it from now on. The engine reads the moved runs again
-   (`Engine.reindex`). The moved events of this Device take the numbers
+   keep running where they ran; the Host fires it from now on (before
+   the batch, through `ProjectFlows`). The engine reads the moved runs
+   again. The moved events of this Device take the numbers
    after its latest, so they reach the Host after every cursor.
 7. **The name.** The merged Space is "Personal" on the Device, also
    after each answer of the Host.

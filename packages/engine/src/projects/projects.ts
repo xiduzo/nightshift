@@ -10,7 +10,6 @@ import type { RunLog } from "../log";
 import { type Git, systemGit } from "./git";
 import { normaliseRemote } from "./remote";
 import {
-	cloneKey,
 	projectClones,
 	projectEntry,
 	recordClone,
@@ -19,7 +18,6 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 } from "./space-document";
-import { spaceMoveBatch } from "./space-rows";
 import { createWorktrees } from "./worktrees";
 
 /**
@@ -428,14 +426,12 @@ export function createProjects(deps: ProjectsDeps) {
 		},
 
 		/**
-		 * Moves the project to another Space: its row, Clones, runs, steps,
-		 * sessions, events and kept variables take the new Space in one batch
-		 * (`spaceMoveBatch`). Then the
-		 * new Space's document gets its entry and Clones, and the old
-		 * one loses them. `ProjectMoved` is logged in the new Space.
+		 * Refuses a move of the project from `from` to `to`: a Space a Host
+		 * keeps changes its projects there, `to` must exist, and the project
+		 * must be in `from`. The move itself is a Space move
+		 * (`Engine.moveProjects`).
 		 */
-		async move(projectId: string, from: string, to: string): Promise<void> {
-			if (from === to) return;
+		async refuseMove(projectId: string, from: string, to: string) {
 			if (
 				(await directory.hostedElsewhere(from)) ||
 				(await directory.hostedElsewhere(to))
@@ -449,44 +445,6 @@ export function createProjects(deps: ProjectsDeps) {
 			if (row.spaceId !== from) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
-			await db.batch(
-				await spaceMoveBatch(db, {
-					from,
-					to,
-					projectMap: { [projectId]: projectId },
-				}),
-			);
-
-			const source = await documents.open(from);
-			const destination = await documents.open(to);
-			const parsed = spaceProjectSchema.safeParse(
-				source.projects.get(projectId),
-			);
-			const entry = parsed.success ? parsed.data : projectEntry(row);
-			const clones = projectClones(source, projectId);
-			await destination.change(() => {
-				destination.projects.set(projectId, {
-					...entry,
-					updatedAt: Date.now(),
-				} satisfies SpaceProject);
-				for (const c of clones) {
-					recordClone(destination, {
-						projectId,
-						deviceId: c.deviceId,
-						deviceName: c.deviceName ?? c.deviceId,
-					});
-				}
-			});
-			await source.change(() => {
-				source.projects.delete(projectId);
-				for (const c of clones) {
-					source.clones.delete(cloneKey(projectId, c.deviceId));
-				}
-			});
-			await log.append({
-				type: "ProjectMoved",
-				payload: { projectId, from, to },
-			});
 		},
 
 		/** Reads the remote of every project here that has none. A folder that is gone is skipped. */

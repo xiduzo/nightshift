@@ -4,22 +4,17 @@ import type { Database } from "@nightshift/db";
 import { hostSpace, run } from "@nightshift/db/schema";
 import {
 	type Engine,
-	type FlowDocument,
 	type FlowDocuments,
 	type SpaceDocuments,
-	spaceMoveBatch,
 	spaceProjectRows,
-	spaceRunIds,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq } from "drizzle-orm";
-import type { BatchItem } from "drizzle-orm/batch";
 import type { SplitResult, SplitState } from "../contract";
 import type { HostLinks, HostSpaces } from "../links";
 import { backupDatabase } from "./backup";
 import { mergeRows } from "./merge-rows";
-import { type MergeMove, NOT_DONE } from "./personal-merge";
-import { runCommandMoves } from "./run-commands";
+import { NOT_DONE } from "./personal-merge";
 import { type SplitRow, splitRows } from "./split-rows";
 
 /**
@@ -55,20 +50,15 @@ import { type SplitRow, splitRows } from "./split-rows";
  *    One split at a time in this process.
  * 2. `planned`: a copy of the whole database in the data directory
  *    (`VACUUM INTO`), before any change.
- * 3. `moved`: no run starts in the Space from the last check for runs
- *    this computer walks through the batch (`Engine.holdStarts`). One
- *    `db.batch` makes the new Space the Person's personal
- *    Space (`splitPersonalSpaceBatch`), moves the rows (`spaceMoveBatch`
- *    with this computer's runs only), names the Host's Space "Personal
- *    on <Host>", moves the commands of the moved runs (`run_command`),
- *    adds what the composition root moves of the same runs
- *    (`moveStatements`), ends a merge that is not done, and sets this
- *    state with the count of the schedules to pause. Then the engine
- *    reads the moved runs again.
- * 4. `done`: the schedules that name another Device name none and are
- *    paused, and the
- *    new Space's document takes its Projects and Clones from the rows, as
- *    a new document does on its first open.
+ * 3. `moved`: one Space move (`Engine.moveProjects`) of this
+ *    computer's runs only. No run becomes active in the Space from the
+ *    last check for runs this computer walks through its batch. The
+ *    schedules that name another Device name none and are paused first.
+ *    The batch makes the new Space the Person's personal Space
+ *    (`splitPersonalSpaceBatch`), moves the rows, names the Host's Space
+ *    "Personal on <Host>", ends a merge that is not done, and sets this
+ *    state with the count of the paused schedules.
+ * 4. `done`: the new Space's document has its Projects and Clones.
  *
  * A split that stopped goes on from its state, by itself
  * (`keepFinishing`).
@@ -84,7 +74,7 @@ export const SPLIT_WORDS = {
 
 export type PersonalSplitDeps = {
 	db: Database;
-	engine: Pick<Engine, "space" | "reindex" | "holdStarts"> & {
+	engine: Pick<Engine, "space" | "moveProjects"> & {
 		hostSpaces: Pick<HostSpaces, "hostOf">;
 	};
 	hostLinks: Pick<HostLinks, "get">;
@@ -95,8 +85,6 @@ export type PersonalSplitDeps = {
 	/** The Person who owns this computer. */
 	ownerId: string;
 	dataDir: string;
-	/** What the composition root moves of the same runs, in the same batch. */
-	moveStatements?(moves: readonly MergeMove[]): BatchItem<"sqlite">[];
 	now?: () => number;
 };
 
@@ -184,49 +172,6 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 			.map((p) => p.id);
 	}
 
-	/** The schedules of a flow document that name a Device other than this computer. */
-	function pinnedElsewhere(document: FlowDocument): string[] {
-		return [...document.schedules.entries()].flatMap(([key, value]) => {
-			const device = (value as { device?: unknown } | null)?.device;
-			return typeof device === "string" && device !== self.name ? [key] : [];
-		});
-	}
-
-	/** How many schedules of the Projects name a Device other than this computer. */
-	async function countPinnedElsewhere(
-		projects: readonly string[],
-	): Promise<number> {
-		let count = 0;
-		for (const id of projects) {
-			count += pinnedElsewhere(await deps.flows.open(id)).length;
-		}
-		return count;
-	}
-
-	/**
-	 * The schedules of the Projects that name another Device are paused
-	 * and name none: the Host fires them there still, and turned on they
-	 * fire here. A schedule's Person goes with its Device: it names who
-	 * the runs on that Device ran for. Runs again safely.
-	 */
-	async function pauseElsewhere(projects: readonly string[]): Promise<void> {
-		for (const id of projects) {
-			const document = await deps.flows.open(id);
-			const keys = pinnedElsewhere(document);
-			if (keys.length === 0) continue;
-			await document.current.change(() => {
-				for (const key of keys) {
-					const {
-						device: _device,
-						person: _person,
-						...rest
-					} = document.schedules.get(key) as Record<string, unknown>;
-					document.schedules.set(key, { ...rest, enabled: false });
-				}
-			});
-		}
-	}
-
 	/** Goes on from the split's state, to its end. */
 	async function resume(row: SplitRow): Promise<SplitResult> {
 		const { fromSpace: from, toSpace: to } = row;
@@ -236,58 +181,59 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		let unpinned = row.unpinned;
 
 		if (state === "planned") {
-			// No run starts in the Space from its last check through the batch.
-			const release = await engine.holdStarts(from);
-			try {
-				await noRunsNotDone(from);
-				projects = await projectsHere(from);
-				const runIds = await spaceRunIds(db, from, projects, self.id);
-				runs = runIds.length;
-				unpinned = await countPinnedElsewhere(projects);
-				const fromName = `Personal on ${row.hostName}`;
-				const statements: BatchItem<"sqlite">[] = [
+			const fromName = `Personal on ${row.hostName}`;
+			const moved = await engine.moveProjects({
+				from,
+				plan: async () => {
+					await noRunsNotDone(from);
+					const ids = await projectsHere(from);
+					return {
+						projects: Object.fromEntries(
+							ids.map((id) => [id, { spaceId: to, projectId: id }]),
+						),
+						personMap: { [row.hostPersonId]: row.personId },
+						ownRunsOnly: true,
+						// The Host fires a schedule that names another Device there
+						// still. Turned on, it fires here. Its Person goes with its
+						// Device: it names who the runs there ran for.
+						schedule: (schedule) => {
+							if (
+								schedule.device === undefined ||
+								schedule.device === self.name
+							) {
+								return schedule;
+							}
+							const { device: _device, person: _person, ...rest } = schedule;
+							return { ...rest, enabled: false };
+						},
+					};
+				},
+				statements: async (done) => [
 					...(await splitPersonalSpaceBatch(db, {
 						personId: row.personId,
 						from,
 						to,
 						fromName,
 					})),
-				];
-				if (projects.length > 0) {
-					statements.push(
-						...(await spaceMoveBatch(db, {
-							from,
-							to,
-							projectMap: Object.fromEntries(projects.map((id) => [id, id])),
-							personMap: { [row.hostPersonId]: row.personId },
-							runsOf: self.id,
-						})),
-					);
-				}
-				statements.push(
 					db
 						.update(hostSpace)
 						.set({ name: fromName, updatedAt: new Date() })
 						.where(eq(hostSpace.spaceId, from)),
-					...runCommandMoves(db, [{ from, to, runIds }], {
-						[row.hostPersonId]: row.personId,
-					}),
-					...(deps.moveStatements?.([{ from, to, runIds }]) ?? []),
 					merges.abandon(),
-					rows.moved(to, { projects, runs, unpinned }),
-				);
-				await db.batch(
-					statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
-				);
-				engine.reindex(runIds);
-			} finally {
-				release();
-			}
+					rows.moved(to, {
+						projects: done.projects,
+						runs: done.runIds.length,
+						unpinned: done.schedules,
+					}),
+				],
+			});
+			projects = moved.projects;
+			runs = moved.runIds.length;
+			unpinned = moved.schedules;
 			state = "moved";
 		}
 
 		if (state === "moved") {
-			await pauseElsewhere(projects);
 			// Its first open takes the Projects and Clones from the rows.
 			await deps.spaces.open(to);
 			await rows.done(to);

@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { runCommand } from "@nightshift/db/schema";
 import type {
+	MoveRows,
 	RunCommandInput,
 	RunCommandKind,
 	SpaceEngine,
 } from "@nightshift/engine";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { RunCommand } from "../contract";
 
 /**
@@ -26,6 +27,43 @@ export const COMMAND_PERMISSION = {
 	"run.stop": { run: ["stop"] },
 	"run.move": { run: ["move"] },
 } as const satisfies Record<RunCommandKind, Record<string, string[]>>;
+
+/**
+ * The Commands of the runs a Space move takes along (`MoveRows`, the
+ * engine's port): they take the Space their runs go to, so a Command
+ * never names a Space its run left. The Person who asked takes their id
+ * in that Space (`personMap`), as the runs' `started_by` does.
+ */
+export function commandMoves(db: Database): MoveRows {
+	return async ({ from, to, runIds, personMap }) => {
+		const persons = Object.entries(personMap).filter(
+			([local, there]) => local !== there,
+		);
+		return [
+			db
+				.update(runCommand)
+				.set({
+					spaceId: to,
+					...(persons.length > 0
+						? {
+								personId: sql`case ${runCommand.personId} ${sql.join(
+									persons.map(
+										([local, there]) => sql`when ${local} then ${there}`,
+									),
+									sql` `,
+								)} else ${runCommand.personId} end`,
+							}
+						: {}),
+				})
+				.where(
+					and(
+						eq(runCommand.spaceId, from),
+						inArray(runCommand.runId, [...runIds]),
+					),
+				),
+		];
+	};
+}
 
 export type RunCommands = ReturnType<typeof createRunCommands>;
 

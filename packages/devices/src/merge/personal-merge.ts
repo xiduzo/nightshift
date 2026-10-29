@@ -15,14 +15,11 @@ import {
 	mergeFlowDocuments,
 	planFlowMerge,
 	type SpaceDocuments,
-	spaceMoveBatch,
 	spaceProjectRows,
-	spaceRunIds,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import { and, eq, isNull, notExists, or } from "drizzle-orm";
-import type { BatchItem } from "drizzle-orm/batch";
 import type {
 	PersonalMerge as HostAnswer,
 	MergePending,
@@ -41,7 +38,6 @@ import {
 } from "../links";
 import { backupDatabase } from "./backup";
 import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
-import { runCommandMoves } from "./run-commands";
 
 /**
  * The merge of this computer's own personal Space ("Personal") into its
@@ -64,15 +60,13 @@ import { runCommandMoves } from "./run-commands";
  *    again. The schedules that name no device are pinned to this
  *    computer, so their runs keep running where they ran: the Host
  *    fires them from now on, and starts their runs here.
- * 4. `moved`: no run starts in Personal from the last check for runs
- *    that are not done through the batch (`Engine.holdStarts`). One
- *    `db.batch` moves every row (`spaceMoveBatch`, with this
- *    computer's events numbered after its latest), makes the Host's
- *    Space this computer's personal Space named "Personal"
- *    (`adoptPersonalSpaceBatch`), moves the commands of the moved runs
- *    (`run_command`), adds what the composition root moves of the same
- *    runs (`moveStatements`: the notifier's deliveries), and sets this
- *    state. Then the engine reads the moved runs again.
+ * 4. `moved`: one Space move (`Engine.moveProjects`), with this
+ *    computer's events numbered after its latest. No run becomes active
+ *    in Personal from the last check for runs that are not done through
+ *    its batch. The schedules that name no device are pinned to this
+ *    computer first. The batch moves every row of the Projects and their
+ *    runs, makes the Host's Space this computer's personal Space named
+ *    "Personal" (`adoptPersonalSpaceBatch`), and sets this state.
  * 5. What the old Space leaves goes once nothing names it: its Space
  *    document and its facts of no run (a Member that joined). The flow
  *    documents of a Project that joins another merge into it, once the
@@ -84,9 +78,6 @@ import { runCommandMoves } from "./run-commands";
  * `moved` by itself (`finish`), before it only when the person asks again.
  */
 export type PersonalSpaceMerge = ReturnType<typeof createPersonalMerge>;
-
-/** What the composition root adds to the batch that moves the rows: one entry per Space the runs go to. */
-export type MergeMove = { from: string; to: string; runIds: readonly string[] };
 
 /** Why a merge cannot start now. */
 export const MERGE_WORDS = {
@@ -111,7 +102,7 @@ export const NOT_DONE = ["running", "waiting", "sleeping"] as const;
 
 export type PersonalMergeDeps = {
 	db: Database;
-	engine: Pick<Engine, "space" | "reindex" | "holdStarts"> & {
+	engine: Pick<Engine, "space" | "moveProjects"> & {
 		exchange: Pick<RunHistoryExchange, "rowsAfter" | "cursorsWith">;
 		hostSpaces: Pick<HostSpaces, "listed">;
 	};
@@ -124,8 +115,6 @@ export type PersonalMergeDeps = {
 	/** The Person who owns this computer. */
 	ownerId: string;
 	dataDir: string;
-	/** What the composition root moves of the same runs, in the same batch. */
-	moveStatements?(moves: readonly MergeMove[]): BatchItem<"sqlite">[];
 	now?: () => number;
 	/** How long a merge waits for the Host's copy of a flow document. Default 30 s. */
 	syncWaitMs?: number;
@@ -375,66 +364,33 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		if (to === null) throw new Error("A mapped merge has no Space to go to.");
 
 		if (state === "mapped") {
-			// No run starts in Personal from its last check through the batch.
-			const release = await engine.holdStarts(from);
-			try {
-				await noRunsNotDone(from);
-				// The Host fires the schedules from now on; their runs keep
-				// running where they ran: on this computer.
-				for (const source of Object.keys(projectMap)) {
-					const document = await deps.flows.open(source);
-					const keys = unpinned(document);
-					if (keys.length === 0) continue;
-					await document.current.change(() => {
-						for (const key of keys) {
-							const value = document.schedules.get(key) as Record<
-								string,
-								unknown
-							>;
-							document.schedules.set(key, { ...value, device: self.name });
-						}
-					});
-				}
-				const bySpace = new Map<string, Record<string, string>>();
-				for (const [source, target] of Object.entries(projectMap)) {
-					bySpace.set(target.spaceId, {
-						...bySpace.get(target.spaceId),
-						[source]: target.projectId,
-					});
-				}
-				const statements: BatchItem<"sqlite">[] = [];
-				const moves: MergeMove[] = [];
-				for (const [space, map] of bySpace) {
-					const ids = await spaceRunIds(db, from, Object.keys(map));
-					runIds.push(...ids);
-					moves.push({ from, to: space, runIds: ids });
-					statements.push(
-						...(await spaceMoveBatch(db, {
-							from,
-							to: space,
-							projectMap: map,
-							personMap,
-							walkerId: self.id,
-						})),
-					);
-				}
-				statements.push(
+			const targets = projectMap;
+			const moved = await engine.moveProjects({
+				from,
+				plan: async () => {
+					await noRunsNotDone(from);
+					return {
+						projects: targets,
+						personMap,
+						renumber: true,
+						// The Host fires the schedules from now on; their runs keep
+						// running where they ran: on this computer.
+						schedule: (schedule) =>
+							schedule.device === undefined
+								? { ...schedule, device: self.name }
+								: schedule,
+					};
+				},
+				statements: async () => [
 					...(await adoptPersonalSpaceBatch(db, {
 						personId: row.personId,
 						from,
 						to,
 					})),
-					...runCommandMoves(db, moves, personMap),
-					...(deps.moveStatements?.(moves) ?? []),
 					rows.moved(from),
-				);
-				await db.batch(
-					statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
-				);
-				engine.reindex(runIds);
-			} finally {
-				release();
-			}
+				],
+			});
+			runIds.push(...moved.runIds);
 			state = "moved";
 		}
 
@@ -500,20 +456,8 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		projectMap: Record<string, MergeTarget>,
 		personMap: Record<string, string>,
 	) {
-		if (!(await cleanUp(from))) {
-			// A Project the Host did not take stays: the old Space keeps it.
-			const old = await deps.spaces.open(from);
-			const moved = Object.keys(projectMap);
-			const stale = [...old.clones.keys()].filter((key) =>
-				moved.some((id) => key.startsWith(`${id}/`)),
-			);
-			if (moved.some((id) => old.projects.has(id)) || stale.length > 0) {
-				await old.change(() => {
-					for (const id of moved) old.projects.delete(id);
-					for (const key of stale) old.clones.delete(key);
-				});
-			}
-		}
+		// A Project the Host did not take stays: the old Space keeps it.
+		await cleanUp(from);
 
 		const pairs = Object.entries(projectMap).filter(
 			([source, target]) => source !== target.projectId,

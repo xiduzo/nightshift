@@ -3,7 +3,7 @@ import {
 	type Engine,
 	type EngineOptions,
 } from "@nightshift/engine";
-import type { RunHistoryExchange } from "../exchange";
+import { commandMoves, type RunHistoryExchange } from "../exchange";
 import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
@@ -75,6 +75,9 @@ export function createPeerEngine(
 		{
 			...engineOptions,
 			directory: deviceDirectory(options.db),
+			// A Space move takes the Commands of its runs along, beside the
+			// rows of the packages above (the notifier's deliveries).
+			moveRows: [commandMoves(options.db), ...(options.moveRows ?? [])],
 			peers: (context) => {
 				built = createPeers(context, {
 					...(relay ? { relay } : {}),

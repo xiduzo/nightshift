@@ -52,7 +52,7 @@ import {
 	systemGitInstaller,
 	upgradedSources,
 } from "@nightshift/engine";
-import { moveDeliveriesBatch } from "@nightshift/notifications";
+import { deliveryMoves } from "@nightshift/notifications";
 
 import { createAssistant } from "./assistant";
 import {
@@ -74,7 +74,11 @@ import {
 	engineRunSource,
 	systemSleepLock,
 } from "./keep-awake";
-import { type DesktopScreen, wireNotifications } from "./notifications";
+import {
+	type DesktopScreen,
+	sendsPushesFor,
+	wireNotifications,
+} from "./notifications";
 import {
 	boundedStop,
 	canChooseFolder,
@@ -413,12 +417,9 @@ export async function createDaemon(
 			hot.nightshiftSync?.disconnect(
 				(context) => context.deviceId === deviceId,
 			),
-		// A merge of Personal into the home Host's moves the notifier's log
-		// of the moved runs too. The Host notifies for them from then on.
-		moveStatements: (moves) =>
-			moves.flatMap((move) =>
-				moveDeliveriesBatch(db, { ...move, sends: false }),
-			),
+		// A Space move takes the notifier's log of the moved runs along.
+		// Their new Space's sender notifies for them from then on.
+		moveRows: [deliveryMoves(db, sendsPushesFor(db, settings, person))],
 		kept: hot,
 	});
 	const { engine } = devices;

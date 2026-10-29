@@ -6,6 +6,7 @@ import {
 	type DeviceDocument,
 	type FlowDocuments,
 	type KeyStoreKind,
+	type MoveRows,
 	memberRole,
 	type ProfileStore,
 	profileChoice,
@@ -13,7 +14,6 @@ import {
 	type SpaceDocuments,
 	storedDeviceCopy,
 } from "@nightshift/engine";
-import type { BatchItem } from "drizzle-orm/batch";
 import type * as Y from "yjs";
 import {
 	type AppliedCommands,
@@ -34,11 +34,7 @@ import {
 	deviceKeyStore,
 	type LinkOptions,
 } from "./links";
-import {
-	createPersonalMerge,
-	createPersonalSplit,
-	type MergeMove,
-} from "./merge";
+import { createPersonalMerge, createPersonalSplit } from "./merge";
 import {
 	createOffers,
 	createOfferUse,
@@ -166,11 +162,11 @@ export type DevicesDeps = {
 	/** Ends the relay connections of a Device whose access was removed. */
 	disconnect(deviceId: string): void;
 	/**
-	 * What a merge of Personal into the home Host's moves beside the rows
-	 * of `devices` and the engine, in the same batch: the notifier's
-	 * deliveries of the moved runs, which this package does not import.
+	 * What a Space move moves beside the rows of the engine and of
+	 * `devices`, in the same batch: the notifier's deliveries of the moved
+	 * runs, which this package does not import.
 	 */
-	moveStatements?(moves: readonly MergeMove[]): BatchItem<"sqlite">[];
+	moveRows?: readonly MoveRows[];
 	/** Kept across `bun --hot` reloads: what the runtime before this one hands over. */
 	kept: KeptDevices;
 	/** Knobs for tests only. */
@@ -249,6 +245,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			profiles: deps.profiles,
 			scheduler: deps.scheduler,
 			...(deps.secret ? { secret: deps.secret } : {}),
+			...(deps.moveRows ? { moveRows: deps.moveRows } : {}),
 			// The hub for the Spaces this computer keeps; its Hosts for the others.
 			work: createWorkRelay({
 				hub: handover.hub,
@@ -331,7 +328,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		self,
 		ownerId,
 		dataDir: deps.dataDir,
-		...(deps.moveStatements ? { moveStatements: deps.moveStatements } : {}),
 	});
 
 	/** This computer's links to the Hosts it paired with. */
@@ -407,7 +403,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		self,
 		ownerId,
 		dataDir: deps.dataDir,
-		...(deps.moveStatements ? { moveStatements: deps.moveStatements } : {}),
 	});
 	// A merge that moved its rows finishes when its Host answers. A split
 	// starts once this computer left its Host, and finishes by itself.

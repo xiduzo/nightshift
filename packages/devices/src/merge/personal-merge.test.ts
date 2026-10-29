@@ -15,11 +15,7 @@ import {
 	user,
 	ydoc,
 } from "@nightshift/db/schema";
-import {
-	createFlowDocuments,
-	START_HOLD_WORDS,
-	spaceDocumentName,
-} from "@nightshift/engine";
+import { createFlowDocuments, spaceDocumentName } from "@nightshift/engine";
 import {
 	createSandbox,
 	mustGit,
@@ -153,6 +149,21 @@ function merger(
 		pollMs: 20,
 		...extra,
 	});
+}
+
+/** B's engine, with `before` called as a Space move puts its batch together. */
+function beforeBatch(before: () => void): PersonalMergeDeps["engine"] {
+	return {
+		...paired.device,
+		moveProjects: (move) =>
+			paired.device.moveProjects({
+				...move,
+				statements: async (moved) => {
+					before();
+					return (await move.statements?.(moved)) ?? [];
+				},
+			}),
+	};
 }
 
 /** Waits until the link answers. */
@@ -442,10 +453,9 @@ describe("the merge of Personal", () => {
 		const seen: string[][] = [];
 
 		await merger(link, {
-			moveStatements: () => {
+			engine: beforeBatch(() => {
 				seen.push(readdirSync(join(b.dataDir, "backups")));
-				return [];
-			},
+			}),
 		}).run();
 		const backups = await readdir(join(b.dataDir, "backups"));
 
@@ -489,9 +499,9 @@ describe("the merge of Personal", () => {
 		// mapped: the batch is never made.
 		await expect(
 			merger(flaky, {
-				moveStatements: () => {
+				engine: beforeBatch(() => {
 					throw new Error("Stopped before the batch.");
-				},
+				}),
 			}).run(),
 		).rejects.toThrow("Stopped before the batch.");
 		expect(await state()).toBe("mapped");
@@ -607,72 +617,6 @@ describe("the merge of Personal", () => {
 		).toEqual([]);
 	});
 
-	test("no run starts in Personal from the merge's last check through its batch; after a failure, runs start again", async () => {
-		const { projectId } = await projectWithRun();
-		const { link } = online();
-		await ready(link);
-		const steps: string[] = [];
-		const engine: PersonalMergeDeps["engine"] = {
-			...paired.device,
-			space: (spaceId, actor) => {
-				const space = paired.device.space(spaceId, actor);
-				return {
-					...space,
-					projectRuns: () => {
-						steps.push("check");
-						return space.projectRuns();
-					},
-				};
-			},
-			holdStarts: async (spaceId) => {
-				const release = await paired.device.holdStarts(spaceId);
-				steps.push(`hold ${spaceId === b.spaceId ? "Personal" : spaceId}`);
-				return () => {
-					steps.push("release");
-					release();
-				};
-			},
-		};
-		/** A person's start in Personal while the merge pins the schedules. */
-		let started: unknown = null;
-		const space = paired.device.space(b.spaceId);
-
-		await expect(
-			merger(link, {
-				engine,
-				flows: {
-					open: async (id) => {
-						started ??= await space
-							.startRun({ projectId, flow: quickFlow })
-							.then(
-								() => "started",
-								(error: unknown) => error,
-							);
-						return paired.flows.open(id);
-					},
-				},
-				moveStatements: () => {
-					steps.push("batch");
-					throw new Error("Stopped before the batch.");
-				},
-			}).run(),
-		).rejects.toThrow("Stopped before the batch.");
-
-		expect(steps.slice(steps.indexOf("hold Personal"))).toEqual([
-			"hold Personal",
-			"check",
-			"batch",
-			"release",
-		]);
-		expect(started).toBeInstanceOf(Refusal);
-		expect((started as Refusal).message).toBe(START_HOLD_WORDS.held);
-		const after = await space.startRun({ projectId, flow: quickFlow });
-		await waitFor(
-			async () => (await space.getRun(after.id)).status === "finished",
-			{ label: "the run after the failed merge finished", timeoutMs: 10_000 },
-		);
-	});
-
 	test("a computer that is a Host with paired devices keeps its Personal", async () => {
 		await b.db.insert(device).values({
 			id: "phone-ish",
@@ -735,7 +679,7 @@ describe("the merge of Personal", () => {
 			walkerId: b.deviceId,
 			walkerSeq: 1_000,
 		});
-		paired.device.reindex([runId]);
+		paired.deviceLog.forget([runId]);
 		expect((await paired.device.space(b.spaceId).getRun(runId)).status).toBe(
 			"interrupted",
 		);

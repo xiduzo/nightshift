@@ -17,6 +17,7 @@ import { START_HOLD_WORDS } from "../run/start-holds";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
+	holdSpace,
 	type Sandbox,
 	type TestEngineOptions,
 	waitFor,
@@ -464,7 +465,7 @@ describe("the scheduler", () => {
 		const { engine, root } = startDaemon();
 		const project = await setup(engine, [nightly()]);
 		await settle();
-		const release = await root.holdStarts(sandbox.spaceId);
+		const release = await holdSpace(root, sandbox.spaceId);
 
 		clock = at(16, 22, 0, 20);
 		await settle();
@@ -479,7 +480,7 @@ describe("the scheduler", () => {
 		await expect(refused).rejects.toThrow(START_HOLD_WORDS.held);
 
 		clock = at(16, 22, 2);
-		release();
+		await release();
 		const [fired] = await waitForFacts(1);
 		expect(fired?.payload).toMatchObject({
 			scheduleId: "nightly",

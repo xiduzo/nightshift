@@ -29,6 +29,7 @@ import type { ScheduleFiles } from "../schedules";
 import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
 import type { PlacementPort, WithPaths } from "./peers";
+import type { MovedProjects, ProjectsMove } from "./projects-move";
 import { HostUnreachableError, type RunRelay } from "./relay";
 import type { SpaceEngine } from "./space-engine";
 
@@ -84,6 +85,8 @@ export type SpacesDeps = {
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	hostOf(spaceId: string): Promise<string | null>;
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
+	/** A Space move (`projects-move.ts`). */
+	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
 	/** Hides the worktree paths of runs on Devices the actor does not own. */
 	pathsFor(
 		spaceId: string,
@@ -209,8 +212,21 @@ export function createSpaces(deps: SpacesDeps) {
 			async moveProject(projectId, toSpaceId) {
 				await ready;
 				await projects.find(projectId, spaceId);
-				await noActiveRun(projectId, "move the project");
-				await projects.move(projectId, spaceId, toSpaceId);
+				if (toSpaceId === spaceId) return;
+				await projects.refuseMove(projectId, spaceId, toSpaceId);
+				await deps.moveProjects({
+					from: spaceId,
+					plan: async () => {
+						await noActiveRun(projectId, "move the project");
+						return {
+							projects: { [projectId]: { spaceId: toSpaceId, projectId } },
+						};
+					},
+				});
+				await log.append({
+					type: "ProjectMoved",
+					payload: { projectId, from: spaceId, to: toSpaceId },
+				});
 			},
 
 			async removeProject(projectId) {

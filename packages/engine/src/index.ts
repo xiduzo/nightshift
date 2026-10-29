@@ -174,16 +174,14 @@ export {
 	type ProjectCopies,
 	type ProjectCopy,
 	type ProjectReadiness,
+	type ProjectTarget,
 	projectClones,
 	projectRowsOf,
 	recordClone,
 	type SpaceDocuments,
-	type SpaceMove,
 	setUpGit,
 	spaceDocumentName,
-	spaceMoveBatch,
 	spaceProjectRows,
-	spaceRunIds,
 	systemGitInstaller,
 	worktreeLocation,
 } from "./projects";
@@ -209,12 +207,17 @@ export {
 export type {
 	Engine,
 	EngineOptions,
+	MovedProjects,
+	MovedRuns,
+	MoveRows,
 	OfferedPlacement,
 	PeerContext,
 	Peers,
 	PlacedDevice,
 	PlanInput,
 	PlannedRun,
+	ProjectsMove,
+	ProjectsMovePlan,
 	SpaceEngine,
 } from "./run";
 export {
@@ -224,7 +227,6 @@ export {
 	HostUnreachableError,
 	type PlanDevices,
 	planNodes,
-	START_HOLD_WORDS,
 	UNREACHABLE_DEVICE,
 } from "./run";
 export type { ScheduleList, WebhookAnswer } from "./schedules";

@@ -188,6 +188,21 @@ function splitter(extra: Partial<PersonalSplitDeps> = {}) {
 	});
 }
 
+/** B's engine, with `before` called as a Space move puts its batch together. */
+function beforeBatch(before: () => void): PersonalSplitDeps["engine"] {
+	return {
+		...paired.device,
+		moveProjects: (move) =>
+			paired.device.moveProjects({
+				...move,
+				statements: async (moved) => {
+					before();
+					return (await move.statements?.(moved)) ?? [];
+				},
+			}),
+	};
+}
+
 async function runOf(sandbox: Sandbox, runId: string) {
 	const [row] = await sandbox.db
 		.select({
@@ -461,54 +476,6 @@ describe("leaving the home Host keeps a copy", () => {
 		]);
 	});
 
-	test("no run starts in the Space from the split's last check through its batch, also when the batch fails", async () => {
-		await mergedIntoA();
-		await revoke();
-		const steps: string[] = [];
-		const engine: PersonalSplitDeps["engine"] = {
-			...paired.device,
-			space: (spaceId, actor) => {
-				const space = paired.device.space(spaceId, actor);
-				return {
-					...space,
-					listRuns: (options) => {
-						steps.push("check");
-						return space.listRuns(options);
-					},
-				};
-			},
-			holdStarts: async (spaceId) => {
-				const release = await paired.device.holdStarts(spaceId);
-				steps.push(`hold ${spaceId === a.spaceId ? "A" : spaceId}`);
-				return () => {
-					steps.push("release");
-					release();
-				};
-			},
-		};
-		const failing = splitter({
-			engine,
-			moveStatements: () => {
-				steps.push("batch");
-				throw new Error("Stopped before the batch.");
-			},
-		});
-
-		await expect(failing.run()).rejects.toThrow("Stopped before the batch.");
-		expect(steps).toEqual(["check", "hold A", "check", "batch", "release"]);
-
-		steps.length = 0;
-		const done = await splitter({
-			engine,
-			moveStatements: () => {
-				steps.push("batch");
-				return [];
-			},
-		}).run();
-		expect(done?.state).toBe("done");
-		expect(steps).toEqual(["hold A", "check", "batch", "release"]);
-	});
-
 	test("a split that is done does not run again", async () => {
 		await mergedIntoA();
 		await revoke();
@@ -558,9 +525,9 @@ describe("leaving the home Host keeps a copy", () => {
 		// planned: the batch is never made.
 		await expect(
 			splitter({
-				moveStatements: () => {
+				engine: beforeBatch(() => {
 					throw new Error("Stopped before the batch.");
-				},
+				}),
 			}).run(),
 		).rejects.toThrow("Stopped before the batch.");
 		expect(await state()).toBe("planned");

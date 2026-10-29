@@ -38,6 +38,25 @@ export type NotificationsWiring = {
 };
 
 /**
+ * Whether this daemon sends the pushes of a Space (`oneSenderPerSpace`):
+ * of the Spaces it keeps as a Host, else of its owner's personal Space
+ * only. The notifier asks it, and so does a Space move about the Space
+ * its runs go to.
+ */
+export function sendsPushesFor(
+	db: Database,
+	settings: SettingsStore,
+	owner: { spaceId: string },
+): (spaceId: string) => Promise<boolean> {
+	const directory = deviceDirectory(db);
+	return oneSenderPerSpace({
+		isHost: () => settings.current().host,
+		hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
+		ownPersonalSpaceId: async () => owner.spaceId,
+	});
+}
+
+/**
  * The notifier of one daemon, started: it reads the run events and tells
  * each Member of a Space about a new Gate, a finished run and a failed
  * run, on every screen. It sends for the Spaces this computer keeps as a
@@ -56,7 +75,6 @@ export async function wireNotifications(
 	hot.nightshiftInApp ??= createInAppChannel();
 	hot.nightshiftNotifications?.stop();
 	const inApp = hot.nightshiftInApp;
-	const directory = deviceDirectory(db);
 	const desktop = desktopScreen(wiring.desktop, env);
 	const desktopChannel = desktop
 		? createDesktopChannel({
@@ -70,11 +88,7 @@ export async function wireNotifications(
 	const notifications = createNotifications({
 		db,
 		events: engineRunEvents(wiring.engine),
-		sendsFor: oneSenderPerSpace({
-			isHost: () => settings.current().host,
-			hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
-			ownPersonalSpaceId: async () => owner.spaceId,
-		}),
+		sendsFor: sendsPushesFor(db, settings, owner),
 		inApp,
 		webPush: { subject: webPushSubject(env) },
 		push: {

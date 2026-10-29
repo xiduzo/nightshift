@@ -6,6 +6,7 @@ import type { ProfileStore, RunSettings } from "../device-config";
 import type { FlowDocuments } from "../flows";
 import type { Git, SpaceDocuments } from "../projects";
 import type { PeersFactory } from "./peers";
+import type { MoveRows } from "./projects-move";
 
 /** What `createEngine` takes: the database, this computer as a Device, and the hooks of the daemon. */
 export type EngineOptions = {
@@ -88,4 +89,11 @@ export type EngineOptions = {
 	 * environment). Default: the environment.
 	 */
 	secret?: (name: string) => Promise<string | undefined>;
+	/**
+	 * The rows of the packages above the engine that move with the runs of
+	 * a Space move (`Engine.moveProjects`), in its batch: the Commands of
+	 * the moved runs (`@nightshift/devices`), the notifier's deliveries
+	 * (`@nightshift/notifications`).
+	 */
+	moveRows?: readonly MoveRows[];
 };

@@ -6,6 +6,7 @@ import {
 	createSpaceDocuments,
 	type FlowDocuments,
 	HostUnreachableError,
+	type RunLog,
 	type SpaceDocuments,
 } from "@nightshift/engine";
 import {
@@ -28,6 +29,8 @@ import { withPeers } from "./peers";
 export type PairedDevice = {
 	/** The Device's engine: a Device of A's owner, paired with A. */
 	engine: PeerEngine;
+	/** Its engine's run log: a test that writes events by hand tells it to read them. */
+	log: RunLog;
 	/** Its Device key on A. */
 	key: DeviceKeyAccess;
 	/** Its Space documents: its read-only copies of A's Spaces. */
@@ -51,6 +54,8 @@ export type PairedReplicas = {
 	host: PeerEngine;
 	/** B's engine: a Device of A's owner, paired with A. */
 	device: PeerEngine;
+	/** B's run log (`PairedDevice.log`). */
+	deviceLog: RunLog;
 	/** A's exchange, as its API serves it. */
 	hostExchange: HostExchange;
 	/** A's procedures in memory: `memory.client(key)` is what B calls. */
@@ -184,6 +189,7 @@ export async function pairedReplicas(
 			directory: deviceDirectory(sandbox.db),
 		});
 		const flows = createFlowDocuments({ db: sandbox.db });
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		const engine: PeerEngine = createPeerEngine(
 			withPeers({
 				db: sandbox.db,
@@ -203,7 +209,7 @@ export async function pairedReplicas(
 					options.hostWalks ?? false,
 				),
 			}),
-			{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+			{ runLog: log },
 		);
 
 		// The Device keeps A's Spaces, as its link does with the Host's answer.
@@ -239,6 +245,7 @@ export async function pairedReplicas(
 
 		return {
 			engine,
+			log,
 			key,
 			documents,
 			flows,
@@ -265,6 +272,7 @@ export async function pairedReplicas(
 	return {
 		host,
 		device: paired.engine,
+		deviceLog: paired.log,
 		hostExchange,
 		memory,
 		key: paired.key,

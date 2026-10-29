@@ -10,7 +10,6 @@ export { leaveHomeHost } from "./leave";
 export { mergeOnJoin } from "./on-join";
 export {
 	createPersonalMerge,
-	type MergeMove,
 	type PersonalSpaceMerge,
 } from "./personal-merge";
 export { createPersonalSplit, type PersonalSpaceSplit } from "./split";

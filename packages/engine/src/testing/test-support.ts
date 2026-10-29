@@ -23,6 +23,7 @@ import type { RunLog } from "../log/run-log";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
 import type { RunDetail } from "../read/views";
+import type { Engine } from "../run/engine";
 import type { EngineOptions } from "../run/engine-options";
 import type { PeersFactory } from "../run/peers";
 import type { SpaceEngine } from "../run/space-engine";
@@ -391,4 +392,36 @@ export async function expectRunLogsInSync(
 		}
 		await Bun.sleep(10);
 	}
+}
+
+/**
+ * Holds the Space as a Space move does from its plan through its batch:
+ * a move of no Projects whose plan waits. Resolves once the hold is in
+ * place, with the release, which resolves once the move is done.
+ */
+export async function holdSpace(
+	engine: Pick<Engine, "moveProjects">,
+	spaceId: string,
+): Promise<() => Promise<void>> {
+	let inside = () => {};
+	const held = new Promise<void>((resolve) => {
+		inside = resolve;
+	});
+	let release = () => {};
+	const released = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const moving = engine.moveProjects({
+		from: spaceId,
+		plan: async () => {
+			inside();
+			await released;
+			return { projects: {} };
+		},
+	});
+	await Promise.race([held, moving]);
+	return async () => {
+		release();
+		await moving;
+	};
 }

@@ -4,7 +4,7 @@ import { notificationDelivery } from "@nightshift/db/schema";
 import { asc } from "drizzle-orm";
 import { testDatabase } from "../testing/database";
 import { createDeliveryLog, type DeliveryStatus } from "./deliveries";
-import { moveDeliveriesBatch } from "./moved";
+import { deliveryMoves } from "./moved";
 
 let db: Database;
 let cleanup: () => void;
@@ -15,6 +15,15 @@ afterEach(() => cleanup());
 
 const FROM = "own-personal";
 const TO = "personal-on-host";
+
+/** Moves the entries of `runIds` from FROM to TO, as a Space move's batch does. */
+async function move(runIds: string[], sends: boolean) {
+	const [first, ...rest] = await deliveryMoves(db, async (spaceId) => {
+		expect(spaceId).toBe(TO);
+		return sends;
+	})({ from: FROM, to: TO, runIds, personMap: {} });
+	if (first) await db.batch([first, ...rest]);
+}
 
 /** One entry per run and status: `<run>:<status>`. */
 async function seed(runs: string[], spaceId = FROM) {
@@ -54,12 +63,10 @@ const entries = () =>
 		.from(notificationDelivery)
 		.orderBy(asc(notificationDelivery.key));
 
-describe("moveDeliveriesBatch", () => {
+describe("deliveryMoves", () => {
 	test("for a Space its Host notifies for, what waits is dropped and what went out stays", async () => {
 		await seed(["r1"]);
-		await db.batch(
-			moveDeliveriesBatch(db, { from: FROM, to: TO, sends: false }),
-		);
+		await move(["r1"], false);
 
 		expect(await entries()).toEqual([
 			{ key: "r1:held", spaceId: TO, status: "dropped" },
@@ -75,9 +82,7 @@ describe("moveDeliveriesBatch", () => {
 
 	test("for a Space this daemon still notifies for, every entry keeps its status", async () => {
 		await seed(["r1"]);
-		await db.batch(
-			moveDeliveriesBatch(db, { from: FROM, to: TO, sends: true }),
-		);
+		await move(["r1"], true);
 
 		const moved = await entries();
 		expect(new Set(moved.map((e) => e.spaceId))).toEqual(new Set([TO]));
@@ -93,14 +98,7 @@ describe("moveDeliveriesBatch", () => {
 	test("only the entries of the moved runs move, and those of another Space stay", async () => {
 		await seed(["r1", "r2"]);
 		await seed(["r3"], "team");
-		await db.batch(
-			moveDeliveriesBatch(db, {
-				from: FROM,
-				to: TO,
-				runIds: ["r1"],
-				sends: false,
-			}),
-		);
+		await move(["r1"], false);
 
 		const bySpace = (await entries()).reduce<Record<string, string[]>>(
 			(spaces, entry) => {

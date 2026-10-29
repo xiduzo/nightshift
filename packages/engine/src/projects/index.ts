@@ -5,6 +5,7 @@ export { systemGit, systemGitInstaller } from "./git";
 export type { GitHubAccess, GitHubRepo } from "./github";
 export type { GitHubClone, GitHubClones } from "./github-clone";
 export { createGitHubClones } from "./github-clone";
+export { moveSpaceEntries, type ProjectTarget } from "./moved-entries";
 export {
 	createProjectCopies,
 	type ProjectCopies,
@@ -40,7 +41,6 @@ export {
 export {
 	type MovingProject,
 	projectRowsOf,
-	type SpaceMove,
 	spaceMoveBatch,
 	spaceProjectRows,
 	spaceRunIds,
