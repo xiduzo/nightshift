@@ -14,8 +14,8 @@ const FACTS_EVERY_MS = 10 * 60_000;
  * The facts this computer reports in its document (its name, where each
  * harness CLI and each program is): written at start and every ten
  * minutes after, in the background (listing the programs reads every PATH
- * directory). The timer of the daemon before a `bun --hot` reload stops
- * first.
+ * directory). Returns the timer: the daemon replaces it on a `bun --hot`
+ * reload.
  */
 export function reportDeviceFacts(deps: {
 	db: Database;
@@ -24,8 +24,7 @@ export function reportDeviceFacts(deps: {
 	/** This computer's Device name. */
 	name: string;
 	settings: Pick<SettingsStore, "current">;
-	kept: { nightshiftFacts?: Timer };
-}): void {
+}): Timer {
 	const { db, document, deviceId, name, settings } = deps;
 	const refresh = () => {
 		refreshDeviceFacts({
@@ -48,8 +47,8 @@ export function reportDeviceFacts(deps: {
 			console.error("This computer's facts were not updated:", error);
 		});
 	};
-	if (deps.kept.nightshiftFacts) clearInterval(deps.kept.nightshiftFacts);
 	refresh();
-	deps.kept.nightshiftFacts = setInterval(refresh, FACTS_EVERY_MS);
-	deps.kept.nightshiftFacts.unref();
+	const timer = setInterval(refresh, FACTS_EVERY_MS);
+	timer.unref();
+	return timer;
 }

@@ -14,7 +14,12 @@ import {
 	systemDesktopNotifier,
 } from "@nightshift/notifications";
 
-import { type DaemonEnv, hot, webPushSubject } from "../runtime";
+import {
+	type DaemonEnv,
+	type HotRegistry,
+	type HotSlots,
+	webPushSubject,
+} from "../runtime";
 
 /** This computer's desktop, as the app that runs the daemon shows it. */
 export type DesktopScreen = {
@@ -35,6 +40,8 @@ export type NotificationsWiring = {
 	owner: { userId: string; spaceId: string };
 	/** How this computer shows its desktop notifications (`DaemonOptions.desktop`). */
 	desktop: DesktopScreen | "system" | undefined;
+	/** The daemon's slots: the in-app channel is kept across reloads, the notifier replaced. */
+	slots: Pick<HotSlots<HotRegistry>, "keep" | "replace">;
 };
 
 /**
@@ -72,9 +79,7 @@ export async function wireNotifications(
 	wiring: NotificationsWiring,
 ): Promise<{ notifications: Notifications; settings: SettingsStore }> {
 	const { db, env, settings, device, owner } = wiring;
-	hot.nightshiftInApp ??= createInAppChannel();
-	hot.nightshiftNotifications?.stop();
-	const inApp = hot.nightshiftInApp;
+	const inApp = await wiring.slots.keep("nightshiftInApp", createInAppChannel);
 	const desktop = desktopScreen(wiring.desktop, env);
 	const desktopChannel = desktop
 		? createDesktopChannel({
@@ -85,25 +90,29 @@ export async function wireNotifications(
 				streamHere: (personId) => inApp.isActiveHere(personId),
 			})
 		: null;
-	const notifications = createNotifications({
-		db,
-		events: engineRunEvents(wiring.engine),
-		sendsFor: sendsPushesFor(db, settings, owner),
-		inApp,
-		webPush: { subject: webPushSubject(env) },
-		push: {
-			...(desktopChannel ? { desktop: desktopChannel } : {}),
-			// The phone app registers with a Host, so only a Host has phones
-			// to reach; `sendsFor` keeps every push to the Spaces this
-			// computer sends for. EXPO_ACCESS_TOKEN is optional.
-			expo: createExpoChannel({
-				...(env.EXPO_ACCESS_TOKEN?.trim()
-					? { accessToken: env.EXPO_ACCESS_TOKEN.trim() }
-					: {}),
+	const notifications = await wiring.slots.replace(
+		"nightshiftNotifications",
+		() =>
+			createNotifications({
+				db,
+				events: engineRunEvents(wiring.engine),
+				sendsFor: sendsPushesFor(db, settings, owner),
+				inApp,
+				webPush: { subject: webPushSubject(env) },
+				push: {
+					...(desktopChannel ? { desktop: desktopChannel } : {}),
+					// The phone app registers with a Host, so only a Host has phones
+					// to reach; `sendsFor` keeps every push to the Spaces this
+					// computer sends for. EXPO_ACCESS_TOKEN is optional.
+					expo: createExpoChannel({
+						...(env.EXPO_ACCESS_TOKEN?.trim()
+							? { accessToken: env.EXPO_ACCESS_TOKEN.trim() }
+							: {}),
+					}),
+				},
 			}),
-		},
-	});
-	hot.nightshiftNotifications = notifications;
+		(before) => before.stop(),
+	);
 	// Listens at once: the engine already recovers runs and wakes timers,
 	// and an event that lands before the notifier listens is lost. Not
 	// awaited: it reads every Space's open Gates first, and pushes the ones

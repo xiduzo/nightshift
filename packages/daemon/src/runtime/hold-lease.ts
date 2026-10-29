@@ -1,6 +1,5 @@
 import type { Database } from "@nightshift/db";
 
-import { hot } from "./hot";
 import {
 	acquireLease,
 	LEASE_HEARTBEAT_MS,
@@ -15,15 +14,11 @@ import {
  * later (its machine slept past the stale window and another daemon
  * started) fences itself: it exits with code 3 and writes nothing more.
  *
- * `bun --hot` evaluates the daemon again on each reload, in the same
- * process: this keeps the lease the process holds.
+ * Its heartbeat stops when the lease is released. `bun --hot` evaluates
+ * the daemon again on each reload, in the same process: the daemon keeps
+ * the lease the process holds (`nightshiftLease`).
  */
 export async function holdLease(db: Database): Promise<Lease> {
-	hot.nightshiftLease ??= await takeLease(db);
-	return hot.nightshiftLease;
-}
-
-async function takeLease(db: Database): Promise<Lease> {
 	let lease: Lease;
 	try {
 		lease = await acquireLease({
@@ -40,12 +35,16 @@ async function takeLease(db: Database): Promise<Lease> {
 		console.error(error.message);
 		process.exit(1);
 	}
-	setInterval(() => {
+	const heartbeat = setInterval(() => {
 		lease.heartbeat().catch((error) => {
 			// A failed write is not a lost lease: the next heartbeat tries again.
 			console.error("The lease heartbeat failed:", error);
 		});
-	}, LEASE_HEARTBEAT_MS).unref();
+	}, LEASE_HEARTBEAT_MS);
+	heartbeat.unref();
+	lease.signal.addEventListener("abort", () => clearInterval(heartbeat), {
+		once: true,
+	});
 	console.log(
 		`Holding the database lease: epoch ${lease.epoch}, pid ${lease.pid} on ${lease.host}.`,
 	);

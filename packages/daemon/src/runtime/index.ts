@@ -15,7 +15,7 @@ export {
 	readHeartbeat,
 } from "./health";
 export { holdLease } from "./hold-lease";
-export { hot } from "./hot";
+export { type HotRegistry, type HotSlots, hot, hotSlots } from "./hot";
 export { DEFAULT_PORT, DESKTOP_PORT, daemonPort } from "./port";
 export { guardProcess } from "./process-guard";
 export { boundedStop, stopOnSignals } from "./signals";

@@ -1,9 +1,5 @@
 import { join } from "node:path";
-import {
-	cliHelp,
-	startPriceUpdates,
-	tanstackDecider,
-} from "@nightshift/agents";
+import { startPriceUpdates, tanstackDecider } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
 import {
 	createAuth,
@@ -32,21 +28,17 @@ import {
 	checkProjectFolder,
 	clonePathOf,
 	createArtifactStore,
-	createCliToolStore,
-	createConnectionStore,
 	createFlowDocuments,
 	createFlowMigrations,
 	createGitHubClones,
-	createProfileStore,
 	createProjectCopies,
-	createSettingsStore,
 	createSpaceDocuments,
 	createToolLaunchers,
 	documentRows,
 	documentSpace,
 	localDevice,
+	openConfigStores,
 	openDeviceDocument,
-	programOf,
 	secretStore,
 	setUpGit,
 	systemGitInstaller,
@@ -72,6 +64,7 @@ import {
 import {
 	createKeepAwake,
 	engineRunSource,
+	type SleepLock,
 	systemSleepLock,
 } from "./keep-awake";
 import {
@@ -88,6 +81,7 @@ import {
 	guardProcess,
 	holdLease,
 	hot,
+	hotSlots,
 	processDatabase,
 	secretFiles,
 	secretsDir,
@@ -109,6 +103,16 @@ export type DaemonOptions = {
 	 * off. Default: none.
 	 */
 	desktop?: DesktopScreen | "system";
+	/** What the daemon reaches outside this process at start. A test gives its own. */
+	outside?: DaemonOutside;
+};
+
+/** The network and the OS, as a daemon reaches them by itself (`DaemonOptions.outside`). */
+export type DaemonOutside = {
+	/** Fetches the newer price list once a day. Default: `fetch`. */
+	fetch?: (url: string, init?: RequestInit) => Promise<Response>;
+	/** The OS's sleep lock, or null for none. Default: `systemSleepLock`. */
+	sleepLock?: SleepLock | null;
 };
 
 /** Facts about this daemon that change only on a restart. */
@@ -126,9 +130,9 @@ export type Daemon = DaemonServe & {
 	/** Whether the Person who owns this computer has a sign-in for a browser elsewhere. */
 	ownerHasLogin(): Promise<boolean>;
 	/**
-	 * A clean stop: writes what the Device and Space documents still have
-	 * pending, and gives the lease up, so the next daemon starts at once.
-	 * Bounded at 2 s. Never throws.
+	 * A clean stop: stops the work of this daemon, writes what the Device,
+	 * Space and flow documents still have pending, and gives the lease up,
+	 * so the next daemon starts at once. Bounded at 2 s. Never throws.
 	 */
 	stop(): Promise<void>;
 };
@@ -138,8 +142,8 @@ export type Daemon = DaemonServe & {
  * holds the database lease, opens the documents, starts the devices with
  * the engine (`startDevices`) and the timers, and returns what Bun
  * serves. It does not listen: `startDaemon` does. One per process: `bun
- * --hot` calls it again on each reload, and the hot-reload registry
- * (`runtime/hot.ts`) keeps what must have one owner.
+ * --hot` calls it again on each reload, and each piece that must have one
+ * owner names its slot and lifecycle here (`hotSlots`, `runtime/hot.ts`).
  */
 export async function createDaemon(
 	env: DaemonEnv,
@@ -149,6 +153,7 @@ export async function createDaemon(
 	// heartbeat, the scheduler). `nightshift serve` also exits on one.
 	guardProcess();
 	const port = options.port ?? daemonPort();
+	const outside = options.outside ?? {};
 
 	/** The database, the transcripts and the command logs, together. */
 	const dev = env.NIGHTSHIFT_DEV === "true";
@@ -176,39 +181,36 @@ export async function createDaemon(
 	const db = processDatabase(url);
 	await migrateDb(db, { migrationsFolder: options.migrationsFolder });
 
-	const lease = await holdLease(db);
-	const stop = () =>
-		boundedStop(() =>
-			Promise.all([
-				hot.nightshiftDocument?.flush(),
-				hot.nightshiftSpaces?.flush(),
-				hot.nightshiftFlows?.flush(),
-				hot.nightshiftNotifications?.stop(),
-				hot.nightshiftKeepAwake?.stop(),
-				hot.nightshiftProjectCopies?.stop(),
-				lease.release(),
-			]),
-		);
+	const slots = hotSlots(hot);
+	const stop = () => boundedStop(() => slots.stop());
 	stopOnSignals(stop);
+	const lease = await slots.keep(
+		"nightshiftLease",
+		() => holdLease(db),
+		(held) => held.release(),
+	);
 
 	/**
 	 * The Space documents: each Space's Projects, Clones (existence only) and
 	 * Members. The engine defines Projects in them, the relay serves them to
 	 * Members, and the auth hooks keep their Members in step.
 	 */
-	hot.nightshiftSpaces ??= createSpaceDocuments({
-		db,
-		directory: deviceDirectory(db),
-	});
-	const spaces = hot.nightshiftSpaces;
+	const spaces = await slots.keep(
+		"nightshiftSpaces",
+		() => createSpaceDocuments({ db, directory: deviceDirectory(db) }),
+		(kept) => kept.flush(),
+	);
 
 	/**
 	 * The flow documents: each Project's flows and schedules, and their
 	 * revisions (ADR 2). Every Device keeps a copy, and the relay serves
 	 * them to the Devices of the Space.
 	 */
-	hot.nightshiftFlows ??= createFlowDocuments({ db });
-	const flows = hot.nightshiftFlows;
+	const flows = await slots.keep(
+		"nightshiftFlows",
+		() => createFlowDocuments({ db }),
+		(kept) => kept.flush(),
+	);
 
 	const trustedOrigins = trustedOriginsOf(env, port);
 	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
@@ -239,11 +241,11 @@ export async function createDaemon(
 	 * and facts. The stores below are views of it; the relay (`/sync`) serves
 	 * it to this computer's clients, and their edits land in the same stores.
 	 */
-	hot.nightshiftDocument ??= await openDeviceDocument({
-		db,
-		deviceId: device.id,
-	});
-	const document = hot.nightshiftDocument;
+	const document = await slots.keep(
+		"nightshiftDocument",
+		() => openDeviceDocument({ db, deviceId: device.id }),
+		(kept) => kept.flush(),
+	);
 
 	/** The Person who owns this computer, and their personal Space. */
 	const person = await localPerson(db, {
@@ -276,14 +278,13 @@ export async function createDaemon(
 	const keyStore =
 		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
-	const settings = createSettingsStore({ document, env: fallbacks });
-	hostSettings = () => settings.current();
-	const connections = createConnectionStore({
+	const config = await openConfigStores({
 		document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
 	});
-	const cliTools = createCliToolStore({ document });
+	const { settings, connections, cliTools, profiles } = config;
+	hostSettings = () => settings.current();
 	// Each CLI tool with a login runs through a launcher of its step. A
 	// login's own folder is in the data folder, so it outlives a restart.
 	const toolLaunchers = createToolLaunchers({
@@ -292,31 +293,27 @@ export async function createDaemon(
 		dataDir,
 		env: { ...process.env, ...env },
 	});
-	/** The program a CLI tool runs, by the tool's name. A name no tool has is a program. */
-	const programNamed = (name: string) =>
-		programOf(cliTools.get(name) ?? { name, program: null });
-	const profiles = createProfileStore({ document });
-	await Promise.all([
-		settings.load(),
-		connections.load(),
-		cliTools.load(),
-		profiles.load(),
-	]);
 
-	reportDeviceFacts({
-		db,
-		document,
-		deviceId: device.id,
-		name: device.name,
-		settings,
-		kept: hot,
-	});
+	await slots.replace(
+		"nightshiftFacts",
+		() =>
+			reportDeviceFacts({
+				db,
+				document,
+				deviceId: device.id,
+				name: device.name,
+				settings,
+			}),
+		(timer) => clearInterval(timer),
+	);
 
 	// Only the newest engine may start scheduled runs: the one before stops
 	// its scheduler.
-	hot.nightshiftScheduler?.abort();
-	const scheduler = new AbortController();
-	hot.nightshiftScheduler = scheduler;
+	const scheduler = await slots.replace(
+		"nightshiftScheduler",
+		() => new AbortController(),
+		(before) => before.abort(),
+	);
 
 	const harnesses = localHarnesses({
 		settings,
@@ -344,32 +341,16 @@ export async function createDaemon(
 		secretEnv: (names) => connections.secretEnv(names),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),
-		findCli: (name) => Bun.which(programNamed(name)),
-		cliToolsFor: (names) =>
-			Promise.all(
-				names.map(async (name) => {
-					const tool = cliTools.get(name);
-					return {
-						name,
-						...(tool?.program ? { program: tool.program } : {}),
-						...(tool?.login ? { login: true } : {}),
-						description: tool?.description ?? null,
-						help: await cliHelp(programNamed(name)),
-					};
-				}),
-			),
+		findCli: (name) => Bun.which(cliTools.program(name)),
+		cliToolsFor: (names) => cliTools.guides(names),
 		toolLaunchers,
 		clonePath,
 		// The flows another Device asks this one for: the flow documents, a
 		// flow of format 6 as the Device that saved it named its profiles.
 		flows: async (projectId) =>
 			upgradedSources(await flows.open(projectId), flowMigrations, device.id),
-		// Its profiles, for a run placed here from another Device. A flow
-		// names a profile by its id. A Walker of an older Night Shift asks
-		// by the name, which an old profile's id is, else finds it here.
-		profileFor: (id) =>
-			profiles.settingsFor(id) ??
-			profiles.settingsFor(profiles.byName(id)?.id ?? ""),
+		// Its profiles, for a run placed here from another Device.
+		profileFor: (ref) => profiles.settingsFor(ref),
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
 	});
@@ -379,10 +360,19 @@ export async function createDaemon(
 	 * bundled one, then a newer one fetched once a day into the data folder.
 	 * Not awaited: the daemon starts on the bundled list, never on the network.
 	 */
-	void startPriceUpdates({
-		file: join(dataDir, "prices.json"),
-		onError: (error) => console.warn("The price list was not updated:", error),
-	});
+	void slots
+		.replace(
+			"nightshiftPrices",
+			() =>
+				startPriceUpdates({
+					file: join(dataDir, "prices.json"),
+					...(outside.fetch ? { fetch: outside.fetch } : {}),
+					onError: (error) =>
+						console.warn("The price list was not updated:", error),
+				}),
+			(before) => before.stop(),
+		)
+		.catch((error) => console.warn("The price list was not updated:", error));
 
 	/**
 	 * This computer among Devices: the engine with its peers, the Host it
@@ -392,6 +382,7 @@ export async function createDaemon(
 	 * hands over to this one: its engine lets go of its runs first, and the
 	 * work of placed steps goes on.
 	 */
+	slots.handOver("nightshiftDevices", (handover) => handover.release());
 	const devices = await startDevices({
 		auth,
 		db,
@@ -429,7 +420,7 @@ export async function createDaemon(
 	 * document here. Kept across `bun --hot` reloads with its connections,
 	 * like the document, and bound to this daemon's closures.
 	 */
-	const sync = keepSync(hot, {
+	const sync = await keepSync(slots, {
 		document: async (name) =>
 			name === document.name
 				? document.doc
@@ -463,6 +454,7 @@ export async function createDaemon(
 			device,
 			owner: person,
 			desktop: options.desktop,
+			slots,
 		},
 	);
 
@@ -470,37 +462,48 @@ export async function createDaemon(
 	 * "Keep this computer awake" (this computer's
 	 * setting): the OS's sleep lock while a run here needs it.
 	 */
-	hot.nightshiftKeepAwake?.stop();
-	const keepAwake = createKeepAwake({
-		enabled: () => settings.current().keepAwake,
-		runs: engineRunSource(engine, () => spaceIds(db)),
-		lock: systemSleepLock(),
-	});
-	hot.nightshiftKeepAwake = keepAwake;
+	const keepAwake = await slots.replace(
+		"nightshiftKeepAwake",
+		() =>
+			createKeepAwake({
+				enabled: () => settings.current().keepAwake,
+				runs: engineRunSource(engine, () => spaceIds(db)),
+				lock:
+					outside.sleepLock !== undefined
+						? outside.sleepLock
+						: systemSleepLock(),
+			}),
+		(before) => before.stop(),
+	);
 	// Not awaited: it reads the runs that have not ended.
 	void keepAwake.start();
 
 	const gitInstaller = systemGitInstaller();
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
-	hot.nightshiftGitHubClones ??= createGitHubClones({ dataDir });
-	const gitHubClones = hot.nightshiftGitHubClones;
+	const gitHubClones = await slots.keep("nightshiftGitHubClones", () =>
+		createGitHubClones({ dataDir }),
+	);
 	/**
 	 * "Copy every project": a Host copies each project of its Spaces it has
 	 * no Clone of. New on each reload, so it adds Clones through this
 	 * engine. A clone it started goes on in `gitHubClones`.
 	 */
-	hot.nightshiftProjectCopies?.stop();
-	const projectCopies = createProjectCopies({
-		gitHub: gitHubClones,
-		spaceIds: () => spaceIds(db),
-		space: (spaceId) => engine.space(spaceId),
-		enabled: () => {
-			const current = settings.current();
-			return current.host && current.copyProjects;
-		},
-	});
-	hot.nightshiftProjectCopies = projectCopies;
+	const projectCopies = await slots.replace(
+		"nightshiftProjectCopies",
+		() =>
+			createProjectCopies({
+				gitHub: gitHubClones,
+				spaceIds: () => spaceIds(db),
+				space: (spaceId) => engine.space(spaceId),
+				enabled: () => {
+					const current = settings.current();
+					return current.host && current.copyProjects;
+				},
+			}),
+		(before) => before.stop(),
+	);
 	projectCopies.start();
+
 	const info: DaemonInfo = {
 		dataDir,
 		device: { ...device, ownerId: person.userId },
@@ -516,6 +519,7 @@ export async function createDaemon(
 	};
 
 	const http = createHttp({
+		...config,
 		auth,
 		db,
 		dataDir,
@@ -529,10 +533,7 @@ export async function createDaemon(
 		engine,
 		settings: computerSettings,
 		notifications,
-		connections,
-		cliTools,
 		toolLaunchers,
-		profiles,
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the
 		// project's flows and runs as the Person sees them in the Space.

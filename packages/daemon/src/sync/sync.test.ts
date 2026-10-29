@@ -42,6 +42,7 @@ import {
 import type { Server } from "bun";
 import * as Y from "yjs";
 import { isThisComputer } from "../http";
+import { hotSlots } from "../runtime";
 import {
 	createSync,
 	type KeptSync,
@@ -609,7 +610,7 @@ describe("the relay across a bun --hot reload", () => {
 		const keptState = new Y.Doc();
 		keptState.getMap("facts").set("platform", "linux");
 		const asked: string[] = [];
-		const next = keepSync(kept, {
+		const next = await keepSync(hotSlots(kept), {
 			document: (name) =>
 				name === document.name ? document.doc : name === "fresh" ? fresh : null,
 			kept: {
@@ -640,10 +641,10 @@ describe("the relay across a bun --hot reload", () => {
 		expect(asked.sort()).toEqual(["device:kept-by-next", "fresh"]);
 	});
 
-	test("a relay of an older version, which cannot be bound again, is kept as it is", () => {
+	test("a relay of an older version, which cannot be bound again, is kept as it is", async () => {
 		const { rebind: _, ...older } = sync;
 		const kept = { nightshiftSync: older } as KeptSync;
-		const next = keepSync(kept, {
+		const next = await keepSync(hotSlots(kept), {
 			document: () => null,
 			authorize: async () => false as const,
 		});

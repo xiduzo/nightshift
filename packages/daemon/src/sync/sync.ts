@@ -79,19 +79,34 @@ const BRIDGE = Symbol("sync-bridge");
 /** What `bun --hot` keeps of the relay. */
 export type KeptSync = { nightshiftSync?: Sync };
 
+/** The daemon's kept slot of the relay (`hotSlots` of `runtime/hot.ts`). */
+export type SyncSlot = {
+	keep(
+		name: "nightshiftSync",
+		make: () => Sync,
+		close: (sync: Sync) => unknown,
+	): Promise<Sync>;
+};
+
 /**
  * The relay of this process: the one the daemon before kept, bound to
  * `options` now, else a new one. A client's connection outlives the
  * reload, and each new request meets the newest daemon's database, auth,
- * Device keys and registry.
+ * Device keys and registry. The daemon's stop closes the connections.
  */
-export function keepSync(kept: KeptSync, options: SyncOptions): Sync {
-	const before = kept.nightshiftSync;
+export async function keepSync(
+	slots: SyncSlot,
+	options: SyncOptions,
+): Promise<Sync> {
+	const sync = await slots.keep(
+		"nightshiftSync",
+		() => createSync(options),
+		(kept) => kept.close(),
+	);
 	// A relay of an older version cannot be bound again: it stays as it is
 	// until the next restart.
-	if (typeof before?.rebind === "function") before.rebind(options);
-	kept.nightshiftSync ??= createSync(options);
-	return kept.nightshiftSync;
+	if (typeof sync.rebind === "function") sync.rebind(options);
+	return sync;
 }
 
 export function createSync(first: SyncOptions): Sync {

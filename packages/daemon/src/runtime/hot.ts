@@ -1,3 +1,4 @@
+import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
 import type {
@@ -16,24 +17,21 @@ import type { Lease } from "./lease";
 /**
  * What one daemon process keeps across `bun --hot` reloads. `bun --hot`
  * evaluates every module again on each reload, in the same process, and
- * keeps `globalThis`. `createDaemon` reads and writes these, so each piece
- * that must have one owner per process keeps it:
+ * keeps `globalThis`. Each piece that must have one owner per process has
+ * a slot here, and the daemon names its lifecycle once (`hotSlots`):
  *
- * - kept as it is: the database client (one per database, so a reload
- *   leaks none), the lease, the Device, Space and flow documents (one writer
- *   each), the in-app channel (an open notification stream outlives a
- *   reload), the listeners (Bun reloads a server of the same `id` in
- *   place);
- * - kept and bound to the newest daemon: the relay (`keepSync`: its
- *   connections stay, and a new request meets the newest daemon's
- *   database, auth and Device keys);
- * - handed over: the devices (`startDevices` keeps one slot,
- *   `nightshiftDevices`: its engine lets go of its runs, and the work hub,
- *   the applied commands, the calls served for a Host, the Devices online
- *   and the pairings in progress go on);
- * - replaced, the old one stopped first: the notifier (`stop`), the
- *   keep-awake (`stop`), the scheduler (`abort`), the timers
- *   (`clearInterval`).
+ * - kept: the database client (one per database, so a reload leaks none),
+ *   the lease, the Device, Space and flow documents (one writer each), the
+ *   in-app channel (an open notification stream outlives a reload), the
+ *   clones from GitHub, and the relay (`keepSync`: its connections stay,
+ *   and it is bound to the newest daemon's closures). Bun reloads a
+ *   listener of the same `id` in place;
+ * - replaced, the one before stopped first: the notifier, the keep-awake,
+ *   the project copies, the scheduler, the price list and the facts timer;
+ * - handed over: the devices (`startDevices` fills `nightshiftDevices`
+ *   itself: its engine lets go of its runs, and the work hub, the applied
+ *   commands, the calls served for a Host, the Devices online and the
+ *   pairings in progress go on).
  *
  * The names stay as they are: a running dev daemon reloads into new code
  * with the same names.
@@ -57,9 +55,104 @@ export type HotRegistry = KeptDevices &
 		/** The clones from GitHub that run, and how the last ones ended. */
 		nightshiftGitHubClones?: GitHubClones;
 		nightshiftProjectCopies?: ProjectCopies;
+		/** The daily update of the price list. */
+		nightshiftPrices?: PriceUpdates;
 		nightshiftFacts?: Timer;
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;
 	};
 
 export const hot = globalThis as HotRegistry;
+
+type Value<R, K extends keyof R> = NonNullable<R[K]>;
+
+/**
+ * The slots one daemon uses, each with its lifecycle across `bun --hot`
+ * reloads. Every daemon names its slots again, so the newest daemon's
+ * `stop` knows them all.
+ */
+export type HotSlots<R extends object> = {
+	/**
+	 * Kept as it is: made on the first start of the process, the same on
+	 * every reload. `close` runs when the daemon stops.
+	 */
+	keep<K extends keyof R>(
+		name: K,
+		make: () => Value<R, K> | Promise<Value<R, K>>,
+		close?: (value: Value<R, K>) => unknown,
+	): Promise<Value<R, K>>;
+	/**
+	 * Replaced on each start: the one before stops first, then `make`
+	 * makes this one. `stop` also runs when the daemon stops.
+	 */
+	replace<K extends keyof R>(
+		name: K,
+		make: () => Value<R, K> | Promise<Value<R, K>>,
+		stop: (value: Value<R, K>) => unknown,
+	): Promise<Value<R, K>>;
+	/**
+	 * Filled by the module it belongs to, which hands it over on a reload
+	 * itself (`startDevices`). `release` runs when the daemon stops.
+	 */
+	handOver<K extends keyof R>(
+		name: K,
+		release: (value: Value<R, K>) => unknown,
+	): void;
+	/**
+	 * Stops the slots, then empties them: a next start in this process
+	 * begins fresh. First the replaced slots stop, so nothing new starts or
+	 * writes. Then the kept slots close (the documents write what they
+	 * still have pending, the lease goes) while the handed-over slots let
+	 * go: an engine that waits for its writes in flight does not hold the
+	 * documents up. Never throws.
+	 */
+	stop(): Promise<void>;
+};
+
+/** The lifecycle of each slot of `store`: in the daemon, the registry (`hot`). */
+export function hotSlots<R extends object>(store: R): HotSlots<R> {
+	type Ending = { name: keyof R; end: (value: never) => unknown };
+	const kept: Ending[] = [];
+	const replaced: Ending[] = [];
+	const handedOver: Ending[] = [];
+	const slots = store as Record<keyof R, unknown>;
+
+	/** Ends the slots of `endings` that hold a value, and empties them. */
+	const end = (endings: readonly Ending[]) =>
+		Promise.all(
+			endings.map(async ({ name, end }) => {
+				const value = slots[name];
+				slots[name] = undefined;
+				if (value === undefined || value === null) return;
+				try {
+					await end(value as never);
+				} catch (error) {
+					console.error(`${String(name)} did not stop cleanly:`, error);
+				}
+			}),
+		);
+
+	return {
+		async keep(name, make, close) {
+			if (close) kept.push({ name, end: close });
+			slots[name] ??= await make();
+			return slots[name] as Value<R, typeof name>;
+		},
+		async replace(name, make, stop) {
+			replaced.push({ name, end: stop });
+			const before = slots[name] as Value<R, typeof name> | undefined;
+			slots[name] = undefined;
+			if (before !== undefined && before !== null) await stop(before);
+			const value = await make();
+			slots[name] = value;
+			return value;
+		},
+		handOver(name, release) {
+			handedOver.push({ name, end: release });
+		},
+		async stop() {
+			await end(replaced);
+			await Promise.all([end(kept), end(handedOver)]);
+		},
+	};
+}
