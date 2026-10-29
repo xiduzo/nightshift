@@ -2,7 +2,6 @@ import {
 	type CopyStamp,
 	type FeedStep,
 	HostUnreachableError,
-	type LoggedEvent,
 	type WalkFile,
 	type WalkRef,
 } from "@nightshift/engine";
@@ -59,18 +58,4 @@ export function createRunArchive(deps: RunArchiveDeps) {
 	}
 
 	return { keepWalk, archived };
-}
-
-/** The runs that new events moved to this computer (`WalkerMoved` to one of its ids). */
-export function runsMovedHere(
-	added: readonly LoggedEvent[],
-	here: readonly string[],
-): string[] {
-	const runIds: string[] = [];
-	for (const e of added) {
-		if (e.type !== "WalkerMoved" || !e.runId) continue;
-		if (!here.includes(e.payload.to)) continue;
-		runIds.push(e.runId);
-	}
-	return runIds;
 }
