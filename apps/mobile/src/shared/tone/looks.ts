@@ -4,6 +4,7 @@ import {
 	runStatusLabel,
 	type StepState,
 	type StepSummary,
+	stepOutcomeLabel,
 } from "@nightshift/client";
 import { DECISION_LABEL, NODE_TYPE_LABEL } from "@nightshift/flows";
 
@@ -46,6 +47,7 @@ export type StatusIconName =
 	| "circle-dot"
 	| "circle-dashed"
 	| "message-question"
+	| "triangle-alert"
 	| "hand";
 
 /** A status, ready to show: tone, icon and word. */
@@ -161,32 +163,29 @@ export function gateLook(gate: {
 	return NEEDS_YOU;
 }
 
-/** The outcomes with a fixed look. Any other outcome is a Decision label or a Gate choice. */
-const OUTCOME: Record<string, Look> = {
-	pass: { tone: "pass", icon: "circle-check", label: "Pass" },
-	fail: { tone: "fail", icon: "circle-x", label: "Fail" },
-	"needs-input": {
-		tone: "needs-input",
-		icon: "message-question",
-		label: "Needs input",
-	},
-	interrupted: {
-		tone: "interrupted",
-		icon: "circle-alert",
-		label: "Interrupted",
-	},
-	stopped: { tone: "stopped", icon: "circle-stop", label: "Stopped" },
+/**
+ * The outcomes with a look of their own. Any other outcome takes the label
+ * look: "done", a Decision label or a Gate choice. The words come from
+ * `stepOutcomeLabel` of `@nightshift/client`.
+ */
+const OUTCOME: Record<string, Omit<Look, "label">> = {
+	pass: { tone: "pass", icon: "circle-check" },
+	fail: { tone: "fail", icon: "circle-x" },
+	"needs-input": { tone: "needs-input", icon: "message-question" },
+	error: { tone: "failed", icon: "triangle-alert" },
+	interrupted: { tone: "interrupted", icon: "circle-alert" },
+	stopped: { tone: "stopped", icon: "circle-stop" },
 };
 
-/** The outcome a step ended on: pass, fail, needs input, or its own name ("approve"). */
+/** The outcome a step ended on: pass, fail, needs input, error, or its own name ("approve"). */
 export function outcomeLook(outcome: string): Look {
-	return (
-		(Object.hasOwn(OUTCOME, outcome) ? OUTCOME[outcome] : undefined) ?? {
-			tone: "label",
-			icon: "circle-dot",
-			label: outcome,
-		}
-	);
+	const look = (Object.hasOwn(OUTCOME, outcome)
+		? OUTCOME[outcome]
+		: undefined) ?? {
+		tone: "label",
+		icon: "circle-dot",
+	};
+	return { ...look, label: stepOutcomeLabel(outcome) };
 }
 
 /**

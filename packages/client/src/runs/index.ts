@@ -10,6 +10,7 @@ export {
 	type KnownCost,
 	runEndLine,
 	runStatusLabel,
+	stepOutcomeLabel,
 	whenLabel,
 } from "./format";
 export {

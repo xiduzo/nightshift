@@ -114,6 +114,7 @@ export {
 } from "./draft";
 export {
 	type BranchPlace,
+	type BuiltInOutcome,
 	branchPlaces,
 	DECISION_LABEL,
 	DEFAULT_POLICY,

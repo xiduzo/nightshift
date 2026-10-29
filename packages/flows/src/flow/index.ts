@@ -41,6 +41,7 @@ export {
 	migrateToolSets,
 } from "./migrate";
 export {
+	type BuiltInOutcome,
 	DECISION_LABEL,
 	jsonOutputFields,
 	NODE_TYPE_LABEL,

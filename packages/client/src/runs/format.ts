@@ -1,4 +1,6 @@
-import type { RunResult, RunSummary } from "./types";
+import type { BuiltInOutcome } from "@nightshift/flows";
+
+import type { RunResult, RunSummary, StepOutcome } from "./types";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -106,6 +108,29 @@ const STATUS_LABELS: Record<RunSummary["status"], string> = {
 /** A run's status in words, as every screen shows it: "Running", "Waiting for you". */
 export function runStatusLabel(status: RunSummary["status"]): string {
 	return STATUS_LABELS[status];
+}
+
+const OUTCOME_LABELS: Record<BuiltInOutcome, string> = {
+	pass: "Pass",
+	fail: "Fail",
+	"needs-input": "Needs input",
+	done: "Done",
+	halted: "Halted",
+	timeout: "Timed out",
+	error: "Error",
+	stopped: "Stopped",
+	interrupted: "Interrupted",
+};
+
+/**
+ * The outcome a step ended on, in words, as every screen shows it: "Pass",
+ * "Needs input", "Error". An outcome the flow names itself (an agent
+ * outcome, a command exit, a Gate choice) shows its own name: "approve".
+ */
+export function stepOutcomeLabel(outcome: StepOutcome): string {
+	return Object.hasOwn(OUTCOME_LABELS, outcome)
+		? OUTCOME_LABELS[outcome as BuiltInOutcome]
+		: outcome;
 }
 
 const RESULT_LABELS: Record<RunResult, string> = {

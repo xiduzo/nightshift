@@ -5,6 +5,7 @@ import {
 	costLabel,
 	formatCost,
 	formatKnownCost,
+	stepOutcomeLabel,
 	whenLabel,
 } from "./format";
 
@@ -94,5 +95,21 @@ describe("one way to write a cost, on every screen", () => {
 		const run = { costUsd: 0.04123, costMissing: 0, costCalls: 2 };
 		expect(costLabel(run)).toBe("$0.0412");
 		expect(costLabel(run)).toBe(formatKnownCost(run));
+	});
+});
+
+describe("an outcome in words, on every screen", () => {
+	test("each outcome Night Shift names has a word", () => {
+		expect(stepOutcomeLabel("pass")).toBe("Pass");
+		expect(stepOutcomeLabel("needs-input")).toBe("Needs input");
+		expect(stepOutcomeLabel("error")).toBe("Error");
+		expect(stepOutcomeLabel("timeout")).toBe("Timed out");
+		expect(stepOutcomeLabel("interrupted")).toBe("Interrupted");
+	});
+
+	test("an outcome the flow names shows its own name", () => {
+		expect(stepOutcomeLabel("approve")).toBe("approve");
+		// Not a key of Object.prototype either.
+		expect(stepOutcomeLabel("constructor")).toBe("constructor");
 	});
 });

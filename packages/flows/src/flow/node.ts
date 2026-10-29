@@ -48,6 +48,24 @@ export const DECISION_LABEL = {
 	model: "Decision",
 } as const satisfies Record<DecidedBy, string>;
 
+/**
+ * The outcomes Night Shift names itself: the ones a node ends on when the
+ * flow names none (`nodeOutcomes`), and the ones the engine ends a step on
+ * when its work did not finish (`error`, `stopped`, `interrupted`). Any
+ * other outcome is a name the flow gives: an agent outcome, a command exit,
+ * a Decision option. Each screen gives these a word of their own.
+ */
+export type BuiltInOutcome =
+	| "pass"
+	| "fail"
+	| "needs-input"
+	| "done"
+	| "halted"
+	| "timeout"
+	| "error"
+	| "stopped"
+	| "interrupted";
+
 /** Whether the node is a Call node that runs its flow once per element. */
 export function runsEach(node: FlowNode): node is CallEachNode {
 	return node.type === "call" && node.each !== undefined;
@@ -59,7 +77,7 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 		case "agent": {
 			const outcomes = node.outcomes
 				? node.outcomes.map((o) => o.name)
-				: ["pass", "fail", "needs-input"];
+				: (["pass", "fail", "needs-input"] satisfies BuiltInOutcome[]);
 			// An agent that asks a person never ends on needs-input.
 			return node.ask === "person"
 				? outcomes.filter((name) => name !== "needs-input")
@@ -71,19 +89,19 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return node.options.map((option) => option.name);
 		case "call":
 			return node.each
-				? ["done", "halted", "stopped"]
-				: ["pass", "fail", "stopped"];
+				? (["done", "halted", "stopped"] satisfies BuiltInOutcome[])
+				: (["pass", "fail", "stopped"] satisfies BuiltInOutcome[]);
 		case "value":
-			return ["pass", "fail"];
+			return ["pass", "fail"] satisfies BuiltInOutcome[];
 		case "wait":
-			return ["done", "timeout"];
+			return ["done", "timeout"] satisfies BuiltInOutcome[];
 		case "tool":
-			return ["pass", "fail"];
+			return ["pass", "fail"] satisfies BuiltInOutcome[];
 		case "end":
 			// No edge leaves an End node: the run ends there.
 			return [];
 		case "join":
-			return ["done"];
+			return ["done"] satisfies BuiltInOutcome[];
 	}
 }
 

@@ -61,6 +61,22 @@ describe("outcomeLook", () => {
 		expect(outcomeLook("needs-input").label).toBe("Needs input");
 	});
 
+	test("an error is a failure: its own icon, the failed tone and a word", () => {
+		expect(outcomeLook("error")).toEqual({
+			tone: "failed",
+			icon: "triangle-alert",
+			label: "Error",
+		});
+	});
+
+	test("an outcome Night Shift names without a look of its own reads as a word", () => {
+		expect(outcomeLook("timeout")).toEqual({
+			tone: "label",
+			icon: "circle-dot",
+			label: "Timed out",
+		});
+	});
+
 	test("any other outcome shows its own name", () => {
 		expect(outcomeLook("approve")).toEqual({
 			tone: "label",
@@ -106,6 +122,7 @@ describe("stepLook", () => {
 			"interrupted",
 		);
 		expect(stepLook({ state: "done", outcome: "pass" }).label).toBe("Pass");
+		expect(stepLook({ state: "done", outcome: "error" }).label).toBe("Error");
 		expect(stepLook({ state: "done", outcome: "ship" }).label).toBe("ship");
 		expect(stepLook({ state: "done", outcome: null }).label).toBe("Done");
 	});

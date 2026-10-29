@@ -7,8 +7,9 @@
  * each item reads again, the notices it shows), the view types derived from
  * the API, the push contract, the glances (the widget and the run on the
  * lock screen), and the words and rules both apps show for one thing (a
- * Gate's deadline, the Flow health window, whether a flow can start). No
- * DOM, no React Native, no Node or Bun: `platform-free.test.ts` checks it.
+ * Gate's deadline, a step's outcome, the Flow health window, whether a flow
+ * can start). No DOM, no React Native, no Node or Bun: `platform-free.test.ts`
+ * checks it.
  */
 
 export {
@@ -168,6 +169,7 @@ export {
 	type StepState,
 	type StepSummary,
 	stepName,
+	stepOutcomeLabel,
 	stepState,
 	type TranscriptEntry,
 	useNow,

@@ -1,3 +1,4 @@
+import { runStatusLabel, stepOutcomeLabel } from "@nightshift/client";
 import type { OutcomeColor } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
@@ -42,24 +43,24 @@ type Style = {
 	color: string;
 };
 
-/** The states with a fixed look. Any other outcome is a Decision label or a Gate choice. */
+/**
+ * The states with a fixed look. Any other outcome is a Decision label or a
+ * Gate choice. The words come from `@nightshift/client`.
+ */
 const KNOWN_STATES = {
 	pass: {
-		label: "Pass",
 		icon: CircleCheckIcon,
 		badge: "border-outcome-pass/40 bg-outcome-pass/10 text-outcome-pass",
 		text: "text-outcome-pass",
 		color: "var(--outcome-pass)",
 	},
 	fail: {
-		label: "Fail",
 		icon: CircleXIcon,
 		badge: "border-outcome-fail/40 bg-outcome-fail/10 text-outcome-fail",
 		text: "text-outcome-fail",
 		color: "var(--outcome-fail)",
 	},
 	"needs-input": {
-		label: "Needs input",
 		icon: MessageCircleQuestionIcon,
 		badge:
 			"border-outcome-needs-input/40 bg-outcome-needs-input/10 text-outcome-needs-input",
@@ -67,21 +68,18 @@ const KNOWN_STATES = {
 		color: "var(--outcome-needs-input)",
 	},
 	error: {
-		label: "Error",
 		icon: TriangleAlertIcon,
 		badge: "border-status-failed/40 bg-status-failed/10 text-status-failed",
 		text: "text-status-failed",
 		color: "var(--status-failed)",
 	},
 	stopped: {
-		label: "Stopped",
 		icon: CircleStopIcon,
 		badge: "border-status-stopped/40 bg-status-stopped/10 text-status-stopped",
 		text: "text-status-stopped",
 		color: "var(--status-stopped)",
 	},
 	interrupted: {
-		label: "Interrupted",
 		icon: CircleAlertIcon,
 		badge:
 			"border-status-interrupted/40 bg-status-interrupted/10 text-status-interrupted",
@@ -89,7 +87,6 @@ const KNOWN_STATES = {
 		color: "var(--status-interrupted)",
 	},
 	running: {
-		label: "Running",
 		icon: LoaderCircleIcon,
 		badge:
 			"border-status-running/40 bg-status-running/10 text-status-running [&>svg]:animate-spin motion-reduce:[&>svg]:animate-none",
@@ -97,21 +94,21 @@ const KNOWN_STATES = {
 		color: "var(--status-running)",
 	},
 	waiting: {
-		label: "Waiting for you",
 		icon: HourglassIcon,
 		badge: "border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
 		text: "text-status-waiting",
 		color: "var(--status-waiting)",
 	},
 	sleeping: {
-		label: "Sleeping",
 		icon: MoonIcon,
 		badge:
 			"border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping",
 		text: "text-status-sleeping",
 		color: "var(--status-sleeping)",
 	},
-} satisfies Record<string, Style>;
+} satisfies Record<string, Look>;
+
+type Look = Omit<Style, "label">;
 
 type ColorStyle = Pick<Style, "badge" | "text" | "color">;
 
@@ -279,21 +276,28 @@ function isKnown(state: string): state is keyof typeof KNOWN_STATES {
  * badge matches the output it left by.
  */
 export function stepStateStyle(state: StepState, color?: OutcomeColor): Style {
+	const label = stepStateLabel(state);
 	if (isKnown(state)) {
 		const known = KNOWN_STATES[state];
-		return color ? { ...known, ...OUTCOME_COLOR_STYLE[color] } : known;
+		return color
+			? { ...known, ...OUTCOME_COLOR_STYLE[color], label }
+			: { ...known, label };
 	}
-	return { ...outcomeStyle(state, color), label: state };
+	return { ...outcomeStyle(state, color), label };
+}
+
+/** A step state in words: a run status word while it has not ended, else its outcome's. */
+function stepStateLabel(state: StepState): string {
+	return state === "running" || state === "waiting" || state === "sleeping"
+		? runStatusLabel(state)
+		: stepOutcomeLabel(state);
 }
 
 /**
  * The look of an outcome, for handles, edges and arrowheads: the colour its
  * node gives it, else one from its name.
  */
-export function outcomeStyle(
-	outcome: Outcome,
-	color?: OutcomeColor,
-): Omit<Style, "label"> {
+export function outcomeStyle(outcome: Outcome, color?: OutcomeColor): Look {
 	return {
 		icon: outcomeIcon(outcome),
 		...OUTCOME_COLOR_STYLE[resolveOutcomeColor(outcome, color)],
@@ -319,7 +323,7 @@ export function stepState(
 
 /** The outcome of an edge, shown as its label. */
 export function outcomeLabel(outcome: Outcome): string {
-	return isKnown(outcome) ? KNOWN_STATES[outcome].label.toLowerCase() : outcome;
+	return stepOutcomeLabel(outcome).toLowerCase();
 }
 
 export function OutcomeBadge({
@@ -359,7 +363,7 @@ const ITEM_STATES: Record<ItemState, Style> = {
 		text: "text-status-interrupted",
 		color: "var(--status-interrupted)",
 	},
-	running: KNOWN_STATES.running,
+	running: { ...KNOWN_STATES.running, label: runStatusLabel("running") },
 };
 
 export function itemStateStyle(state: ItemState): Style {

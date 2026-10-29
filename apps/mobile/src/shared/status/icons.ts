@@ -18,6 +18,7 @@ import {
 	Split,
 	SquareFunction,
 	SquareTerminal,
+	TriangleAlert,
 	Variable,
 } from "lucide-react-native";
 
@@ -34,6 +35,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	"circle-dot": CircleDot,
 	"circle-dashed": CircleDashed,
 	"message-question": MessageCircleQuestion,
+	"triangle-alert": TriangleAlert,
 	hand: Hand,
 	bot: Bot,
 	terminal: SquareTerminal,
