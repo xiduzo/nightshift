@@ -13,9 +13,8 @@ import { and, eq } from "drizzle-orm";
 import type { SplitResult, SplitState } from "../contract";
 import type { HostLinks, HostSpaces } from "../links";
 import { backupDatabase } from "./backup";
-import { mergeRows } from "./merge-rows";
-import { NOT_DONE } from "./personal-merge";
-import { type SplitRow, splitRows } from "./split-rows";
+import { NOT_DONE } from "./merge";
+import type { MembershipRecord, SplitRow } from "./record";
 
 /**
  * The split of a personal Space off the one this computer's home Host
@@ -47,7 +46,6 @@ import { type SplitRow, splitRows } from "./split-rows";
  * 1. Checks: the Person's personal Space is one a Host keeps, and this
  *    computer has no link with access to that Host (it left, or its
  *    access was removed). No run this computer walks there is not done.
- *    One split at a time in this process.
  * 2. `planned`: a copy of the whole database in the data directory
  *    (`VACUUM INTO`), before any change.
  * 3. `moved`: one Space move (`Engine.moveProjects`) of this
@@ -60,11 +58,9 @@ import { type SplitRow, splitRows } from "./split-rows";
  *    state with the count of the paused schedules.
  * 4. `done`: the new Space's document has its Projects and Clones.
  *
- * A split that stopped goes on from its state, by itself
- * (`keepFinishing`).
+ * A split that stopped goes on from its state, by itself. The
+ * membership runs each step (`HomeMembership`).
  */
-export type PersonalSpaceSplit = ReturnType<typeof createPersonalSplit>;
-
 export const SPLIT_WORDS = {
 	notDone: (count: number) =>
 		count === 1
@@ -72,7 +68,7 @@ export const SPLIT_WORDS = {
 			: `${count} runs on this computer are not done yet. Let them finish or stop them, then leave.`,
 } as const;
 
-export type PersonalSplitDeps = {
+export type SplitDeps = {
 	db: Database;
 	engine: Pick<Engine, "space" | "moveProjects"> & {
 		hostSpaces: Pick<HostSpaces, "hostOf">;
@@ -96,33 +92,12 @@ type Left = {
 	hostPersonId: string;
 };
 
-export function createPersonalSplit(deps: PersonalSplitDeps) {
+/** The steps of a split, for the membership: it runs one at a time. */
+export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	const { db, engine, self } = deps;
 	const now = deps.now ?? Date.now;
-	const rows = splitRows(db);
-	const merges = mergeRows(db);
-	/**
-	 * The split under way in this process: one at a time, and the next
-	 * waits for it. The revoke hook, `nightshift leave` and the timer may
-	 * ask at once.
-	 */
-	let last: Promise<unknown> = Promise.resolve();
-	let busy = false;
-
-	function serial<T>(work: () => Promise<T>): Promise<T> {
-		const task = last
-			.catch(() => {})
-			.then(async () => {
-				busy = true;
-				try {
-					return await work();
-				} finally {
-					busy = false;
-				}
-			});
-		last = task;
-		return task;
-	}
+	const rows = deps.record.splits;
+	const merges = deps.record.merges;
 
 	/**
 	 * The Person's personal Space when a Host keeps it and this computer
@@ -249,19 +224,19 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		};
 	}
 
-	/** Splits Personal off when this computer left its Host, or goes on with a split that stopped. */
-	async function split(): Promise<SplitResult | null> {
-		const started = await rows.unfinished();
+	/**
+	 * Splits Personal off when this computer left its Host, or goes on
+	 * with the split that stopped (`started`). Null: nothing to split,
+	 * because Personal is this computer's own or the Host still has this
+	 * computer. Refuses while a run this computer walks there is not
+	 * done: it waits for the person.
+	 */
+	async function splitOff(
+		started: SplitRow | null,
+	): Promise<SplitResult | null> {
 		if (started) return resume(started);
 		const leaving = await left();
-		if (!leaving) {
-			// A merge that never moved a row cannot go on without its Host.
-			const merge = await merges.unfinished();
-			if (merge && !(await linkedTo(merge.hostId))) {
-				await db.batch([merges.abandon()]);
-			}
-			return null;
-		}
+		if (!leaving) return null;
 		await noRunsNotDone(leaving.from);
 		const backup = await backupDatabase(
 			db,
@@ -281,21 +256,8 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 		return resume(row);
 	}
 
-	async function linkedTo(hostId: string): Promise<boolean> {
-		const link = await deps.hostLinks.get(hostId);
-		return link !== null && link.revokedAt === null;
-	}
-
 	return {
-		/**
-		 * Splits Personal off the Space of the Host this computer left, or
-		 * goes on with a split that stopped. Null: nothing to split, because
-		 * Personal is this computer's own. Refuses while a run this computer
-		 * walks there is not done: it waits for the person.
-		 */
-		run(): Promise<SplitResult | null> {
-			return serial(split);
-		},
+		splitOff,
 
 		/**
 		 * The Space that splits off when this computer leaves its home Host
@@ -325,37 +287,5 @@ export function createPersonalSplit(deps: PersonalSplitDeps) {
 					}
 				: null;
 		},
-
-		/**
-		 * Splits Personal off now, and again every `everyMs`, until it is
-		 * done or `signal` aborts: a split waits for the runs this computer
-		 * walks, and a split cut short goes on. Its failures wait for the
-		 * next try.
-		 */
-		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
-			const attempt = () => {
-				if (busy || signal.aborted) return;
-				serial(split).catch((error) => {
-					if (!(error instanceof Refusal)) {
-						console.error("[devices] the split of Personal failed:", error);
-					}
-				});
-			};
-			const first = setTimeout(attempt, 0);
-			const timer = setInterval(attempt, everyMs);
-			first.unref?.();
-			timer.unref?.();
-			signal.addEventListener(
-				"abort",
-				() => {
-					clearTimeout(first);
-					clearInterval(timer);
-				},
-				{ once: true },
-			);
-		},
-
-		/** The split that started and is not done, if any. */
-		unfinished: () => rows.unfinished(),
 	};
 }

@@ -29,17 +29,17 @@ import { createDeviceExchange } from "../exchange";
 import { createHostLinks, type Link } from "../links";
 import { httpsLink } from "../links/link";
 import { type PairedReplicas, pairedReplicas } from "../testing";
-import { LEAVE_WORDS, leaveHomeHost } from "./leave";
-import { createPersonalMerge } from "./personal-merge";
 import {
-	createPersonalSplit,
-	type PersonalSplitDeps,
-	SPLIT_WORDS,
-} from "./split";
+	createHomeMembership,
+	type HomeMembershipDeps,
+	LEAVE_WORDS,
+} from "./membership";
+import { SPLIT_WORDS } from "./split";
 
 /**
- * Leaving keeps a copy (ADR 1): B (the Device) merged its Personal into
- * A's (its home Host), then leaves A. B gets a personal Space of its own
+ * Leaving keeps a copy (ADR 1), through B's membership of A
+ * (`HomeMembership`): B (the Device) merged its Personal into A's (its
+ * home Host), then leaves A. B gets a personal Space of its own
  * again with what it worked on; A keeps everything. A and B have their
  * own Persons, as the author's laptop and Host do.
  */
@@ -174,22 +174,43 @@ async function ready(link: Link) {
 	});
 }
 
-function splitter(extra: Partial<PersonalSplitDeps> = {}) {
-	return createPersonalSplit({
+/** B's membership of A, with `link` as its link to A. */
+function membershipOf(
+	link: Link | undefined,
+	extra: Partial<HomeMembershipDeps> = {},
+) {
+	return createHomeMembership({
 		db: b.db,
 		engine: paired.device,
+		links: {
+			get: (hostId) => (hostId === paired.hostId ? link : undefined),
+			add: async () => {},
+		},
 		hostLinks: createHostLinks(b.db),
+		keys: { delete: async () => {} },
+		copies: { keep: async () => [] },
 		spaces: paired.documents,
 		flows: paired.flows,
 		self: { id: b.deviceId, name: "B" },
 		ownerId: localPerson,
 		dataDir: b.dataDir,
+		syncWaitMs: 500,
+		pushWaitMs: 5_000,
+		pollMs: 20,
 		...extra,
 	});
 }
 
+/** B's membership without a link to A: A removed its access. */
+function splitter(extra: Partial<HomeMembershipDeps> = {}) {
+	return membershipOf(undefined, extra);
+}
+
+/** The link that A removed: B's home Host. */
+const home = { role: "home" } as const;
+
 /** B's engine, with `before` called as a Space move puts its batch together. */
-function beforeBatch(before: () => void): PersonalSplitDeps["engine"] {
+function beforeBatch(before: () => void): HomeMembershipDeps["engine"] {
 	return {
 		...paired.device,
 		moveProjects: (move) =>
@@ -246,20 +267,7 @@ async function mergedIntoA() {
 	);
 	const { link } = linkToA();
 	await ready(link);
-	const merged = await createPersonalMerge({
-		db: b.db,
-		engine: paired.device,
-		links: { get: (hostId) => (hostId === paired.hostId ? link : undefined) },
-		hostLinks: createHostLinks(b.db),
-		spaces: paired.documents,
-		flows: paired.flows,
-		self: { id: b.deviceId, name: "B" },
-		ownerId: localPerson,
-		dataDir: b.dataDir,
-		syncWaitMs: 500,
-		pushWaitMs: 5_000,
-		pollMs: 20,
-	}).run();
+	const merged = await membershipOf(link).merge();
 	expect(merged.state).toBe("pushed");
 	expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
 	return { projectId: added.id, runId: started.id };
@@ -318,7 +326,7 @@ describe("leaving the home Host keeps a copy", () => {
 		await paired.projectOnDevice(onlyOnA.id);
 		await revoke();
 
-		const result = await splitter().run();
+		const result = await splitter().revoked(home);
 
 		expect(result).toMatchObject({
 			state: "done",
@@ -407,7 +415,7 @@ describe("leaving the home Host keeps a copy", () => {
 		});
 		await revoke();
 
-		const result = await splitter().run();
+		const result = await splitter().revoked(home);
 
 		expect(result).toMatchObject({ state: "done", unpinned: 1 });
 		const own = result?.spaceId as string;
@@ -424,7 +432,7 @@ describe("leaving the home Host keeps a copy", () => {
 		});
 		expect(byId.get("on-c")?.device).toBeUndefined();
 		expect(byId.get("on-c")?.person).toBeUndefined();
-		expect(await splitter().of(a.spaceId)).toMatchObject({ unpinned: 1 });
+		expect((await b.db.select().from(spaceSplit))[0]?.unpinned).toBe(1);
 
 		await flows.current.change(() => {
 			const value = flows.schedules.get("on-c") as Record<string, unknown>;
@@ -456,7 +464,7 @@ describe("leaving the home Host keeps a copy", () => {
 			]);
 		await revoke();
 
-		const result = await splitter().run();
+		const result = await splitter().revoked(home);
 
 		const commands = await b.db
 			.select({
@@ -479,9 +487,9 @@ describe("leaving the home Host keeps a copy", () => {
 	test("a split that is done does not run again", async () => {
 		await mergedIntoA();
 		await revoke();
-		const first = await splitter().run();
+		const first = await splitter().revoked(home);
 
-		expect(await splitter().run()).toBeNull();
+		expect(await splitter().revoked(home)).toBeNull();
 		expect(await b.db.select().from(spaceSplit)).toHaveLength(1);
 		expect(await personalSpaceId(b.db, localPerson)).toBe(
 			first?.spaceId ?? "none",
@@ -493,18 +501,22 @@ describe("leaving the home Host keeps a copy", () => {
 		await revoke();
 		const split = splitter();
 
-		const [first, second] = await Promise.all([split.run(), split.run()]);
+		const [first, second] = await Promise.all([
+			split.revoked(home),
+			split.revoked(home),
+		]);
 
 		expect(first?.state).toBe("done");
 		expect(second).toBeNull();
-		expect(await split.of(a.spaceId)).toEqual(first);
+		const [row] = await b.db.select().from(spaceSplit);
+		expect(row?.toSpace).toBe(first?.spaceId as string);
 		expect(await b.db.select().from(spaceSplit)).toHaveLength(1);
 	});
 
 	test("nothing splits while B still has access to A", async () => {
 		await mergedIntoA();
 
-		expect(await splitter().run()).toBeNull();
+		expect(await splitter().revoked(home)).toBeNull();
 		expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
 		expect(await b.db.select().from(spaceSplit)).toEqual([]);
 	});
@@ -512,7 +524,7 @@ describe("leaving the home Host keeps a copy", () => {
 	test("a Personal of B's own, never merged, stays as it is", async () => {
 		await revoke();
 
-		expect(await splitter().run()).toBeNull();
+		expect(await splitter().revoked(home)).toBeNull();
 		expect(await personalSpaceId(b.db, localPerson)).toBe(b.spaceId);
 	});
 
@@ -528,7 +540,7 @@ describe("leaving the home Host keeps a copy", () => {
 				engine: beforeBatch(() => {
 					throw new Error("Stopped before the batch.");
 				}),
-			}).run(),
+			}).revoked(home),
 		).rejects.toThrow("Stopped before the batch.");
 		expect(await state()).toBe("planned");
 		expect(await runOf(b, runId)).toMatchObject({ spaceId: a.spaceId });
@@ -545,15 +557,16 @@ describe("leaving the home Host keeps a copy", () => {
 							return Promise.reject(new Error("Stopped after the batch."));
 						return documents.open(spaceId);
 					},
+					remove: (spaceId) => documents.remove(spaceId),
 				},
-			}).run(),
+			}).revoked(home),
 		).rejects.toThrow("Stopped after the batch.");
 		expect(await state()).toBe("moved");
 		const [row] = await b.db.select().from(spaceSplit);
 		expect(await runOf(b, runId)).toMatchObject({ spaceId: row?.toSpace });
 
 		fail = false;
-		const done = await splitter().run();
+		const done = await splitter().revoked(home);
 		expect(done).toMatchObject({
 			state: "done",
 			spaceId: row?.toSpace,
@@ -582,10 +595,9 @@ describe("leaving the home Host keeps a copy", () => {
 		);
 		await revoke();
 
-		const refused = splitter().run();
+		const refused = splitter().revoked(home);
 		await expect(refused).rejects.toBeInstanceOf(Refusal);
 		await expect(refused).rejects.toThrow(SPLIT_WORDS.notDone(1));
-		await expect(splitter().check()).rejects.toThrow(SPLIT_WORDS.notDone(1));
 		expect(await b.db.select().from(spaceSplit)).toEqual([]);
 
 		await space.stopRun(waiting.id);
@@ -593,7 +605,7 @@ describe("leaving the home Host keeps a copy", () => {
 			async () => (await space.getRun(waiting.id)).status !== "waiting",
 			{ label: "B's run stopped", timeoutMs: 10_000 },
 		);
-		const result = await splitter().run();
+		const result = await splitter().revoked(home);
 		expect(result?.runs).toBe(2);
 	});
 
@@ -607,7 +619,7 @@ describe("leaving the home Host keeps a copy", () => {
 		});
 		await revoke();
 
-		expect(await splitter().run()).toBeNull();
+		expect(await splitter().revoked(home)).toBeNull();
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
 	});
 
@@ -626,7 +638,7 @@ describe("leaving the home Host keeps a copy", () => {
 				// What B's links do when A refuses the key (`createDeviceLinks`, `startDevices`).
 				onRevoked: () => {
 					learned.push(
-						hostLinks.revoked(paired.hostId).then(() => split.run()),
+						hostLinks.revoked(paired.hostId).then(() => split.revoked(home)),
 					);
 				},
 			});
@@ -682,7 +694,7 @@ describe("nightshift leave", () => {
 		const deleted: string[] = [];
 		const kept: unknown[][] = [];
 		const stopped: string[] = [];
-		const result = await leaveHomeHost({
+		const result = await membershipOf(link, {
 			hostLinks,
 			links: {
 				get: () => link,
@@ -701,8 +713,7 @@ describe("nightshift leave", () => {
 					return [];
 				},
 			},
-			split: splitter(),
-		});
+		}).leave();
 		return { result, deleted, kept, stopped };
 	}
 

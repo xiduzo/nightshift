@@ -34,7 +34,7 @@ import {
 	deviceKeyStore,
 	type LinkOptions,
 } from "./links";
-import { createPersonalMerge, createPersonalSplit } from "./merge";
+import { createHomeMembership } from "./membership";
 import {
 	createOffers,
 	createOfferUse,
@@ -315,21 +315,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			engine.admission.withdrawn(spaceId, profile),
 	});
 
-	/**
-	 * The split of a personal Space of this computer's own off its home
-	 * Host's, when this computer leaves it (ADR 1).
-	 */
-	const split = createPersonalSplit({
-		db,
-		engine,
-		hostLinks,
-		spaces: deps.spaces,
-		flows: deps.flows,
-		self,
-		ownerId,
-		dataDir: deps.dataDir,
-	});
-
 	/** This computer's links to the Hosts it paired with. */
 	const links = createDeviceLinks({
 		links: hostLinks,
@@ -357,9 +342,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		// Without its home Host this computer learns nothing of the others,
 		// and its Personal splits off the Host's: it keeps a copy.
 		revoked: async (link) => {
-			if (link.role !== "home") return;
-			await copies.keep([]);
-			await split.run().catch(() => {
+			await membership.revoked(link).catch(() => {
 				// It waits for the runs this computer walks: `keepFinishing` tries again.
 			});
 		},
@@ -392,12 +375,17 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		...(deps.internals?.links ? { linkOptions: deps.internals.links } : {}),
 	});
 
-	/** The merge of this computer's Personal into its home Host's (ADR 1). */
-	const merge = createPersonalMerge({
+	/**
+	 * This computer's membership of its home Host (ADR 1): the merge of its
+	 * Personal into the Host's, and the split when it leaves.
+	 */
+	const membership = createHomeMembership({
 		db,
 		engine,
 		links,
 		hostLinks,
+		keys: keyStore,
+		copies,
 		spaces: deps.spaces,
 		flows: deps.flows,
 		self,
@@ -407,8 +395,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	// A merge that moved its rows finishes when its Host answers. A split
 	// starts once this computer left its Host, and finishes by itself.
 	const finishing = new AbortController();
-	merge.keepFinishing(finishing.signal);
-	split.keepFinishing(finishing.signal);
+	membership.keepFinishing(finishing.signal);
 
 	const presence = setInterval(() => {
 		engine.devices.sweep(OFFLINE_AFTER_MS).catch((error) => {
@@ -453,8 +440,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		fingerprint,
 		copies,
 		keptDocument: (deviceId) => storedDeviceCopy(db, deviceId),
-		merge,
-		split,
+		membership,
 	});
 
 	return {

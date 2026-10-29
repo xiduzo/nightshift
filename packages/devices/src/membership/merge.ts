@@ -32,12 +32,11 @@ import type { RunHistoryExchange } from "../exchange";
 import {
 	type DeviceLinks,
 	fromHost,
-	type HostLinks,
 	type HostSpaces,
 	type Link,
 } from "../links";
 import { backupDatabase } from "./backup";
-import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
+import type { MembershipRecord, MergeRow, MergeTarget } from "./record";
 
 /**
  * The merge of this computer's own personal Space ("Personal") into its
@@ -49,24 +48,24 @@ import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
  * It rewrites this computer's database, so it goes in states that a
  * crash cannot leave half done (`space_merge`):
  *
- * 1. Checks: a home Host that answers now, a personal Space on it, no
- *    run in Personal that is not done, and this computer is not a Host
- *    with paired Devices (its Personal stays as it is). One merge at a
- *    time in this process.
+ * 1. Checks (`checks`, the one list): a home Host, this computer is not
+ *    a Host with paired Devices (its Personal stays as it is), Personal
+ *    is not merged yet, the Host answers now and lists a personal Space,
+ *    and no run in Personal is not done.
  * 2. `planned`: a copy of the whole database in the data directory
  *    (`VACUUM INTO`), before any change.
  * 3. `mapped`: the Host takes the Projects (`sync.mergePersonal`) and
  *    says where each one goes. It answers the same when it is asked
- *    again. The schedules that name no device are pinned to this
- *    computer, so their runs keep running where they ran: the Host
- *    fires them from now on, and starts their runs here.
+ *    again.
  * 4. `moved`: one Space move (`Engine.moveProjects`), with this
  *    computer's events numbered after its latest. No run becomes active
  *    in Personal from the last check for runs that are not done through
  *    its batch. The schedules that name no device are pinned to this
- *    computer first. The batch moves every row of the Projects and their
- *    runs, makes the Host's Space this computer's personal Space named
- *    "Personal" (`adoptPersonalSpaceBatch`), and sets this state.
+ *    computer first, so their runs keep running where they ran: the Host
+ *    fires them from now on, and starts their runs here. The batch moves
+ *    every row of the Projects and their runs, makes the Host's Space
+ *    this computer's personal Space named "Personal"
+ *    (`adoptPersonalSpaceBatch`), and sets this state.
  * 5. What the old Space leaves goes once nothing names it: its Space
  *    document and its facts of no run (a Member that joined). The flow
  *    documents of a Project that joins another merge into it, once the
@@ -75,9 +74,9 @@ import { type MergeRow, type MergeTarget, mergeRows } from "./merge-rows";
  *
  * `preview` answers what a merge would do and changes nothing: the Host
  * answers a dry run. A merge that stopped goes on from its state: after
- * `moved` by itself (`finish`), before it only when the person asks again.
+ * `moved` by itself, before it only when the person asks again. The
+ * membership runs each step (`HomeMembership`).
  */
-export type PersonalSpaceMerge = ReturnType<typeof createPersonalMerge>;
 
 /** Why a merge cannot start now. */
 export const MERGE_WORDS = {
@@ -90,7 +89,7 @@ export const MERGE_WORDS = {
 		"Other devices use this computer as their Host. Its Personal stays as it is.",
 	olderHost:
 		"Your home Host runs an older version of Night Shift. Update it, then merge.",
-	busy: "Night Shift merges your Personal already. Wait until it is done.",
+	busy: "Night Shift moves your Personal now. Wait until it is done.",
 } as const;
 
 /**
@@ -100,14 +99,30 @@ export const MERGE_WORDS = {
  */
 export const NOT_DONE = ["running", "waiting", "sleeping"] as const;
 
-export type PersonalMergeDeps = {
+/** The check of a merge that failed: why it does not go on now. */
+export type MergeHeld = {
+	held: "noHome" | "isHost" | "merged" | "offline" | "notListed" | "notDone";
+	refusal: Refusal;
+};
+
+/** Every check of a merge passed: whom it merges, and how. */
+type MergeReady = {
+	held: null;
+	host: { id: string; name: string };
+	link: Link;
+	from: string;
+	to: string;
+	/** How many runs Personal has. */
+	runs: number;
+};
+
+export type MergeDeps = {
 	db: Database;
 	engine: Pick<Engine, "space" | "moveProjects"> & {
 		exchange: Pick<RunHistoryExchange, "rowsAfter" | "cursorsWith">;
 		hostSpaces: Pick<HostSpaces, "listed">;
 	};
 	links: Pick<DeviceLinks, "get">;
-	hostLinks: Pick<HostLinks, "list">;
 	spaces: Pick<SpaceDocuments, "open" | "remove">;
 	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
@@ -124,40 +139,35 @@ export type PersonalMergeDeps = {
 	pollMs?: number;
 };
 
-export function createPersonalMerge(deps: PersonalMergeDeps) {
+/** The steps of a merge, for the membership: it runs one at a time. */
+export function mergeSteps(
+	deps: MergeDeps & {
+		record: MembershipRecord;
+		/** The home Host's link with access, if any. */
+		home(): Promise<{ hostId: string; name: string } | null>;
+	},
+) {
 	const { db, engine, self } = deps;
 	const now = deps.now ?? Date.now;
-	const rows = mergeRows(db);
+	const rows = deps.record.merges;
 	const pollMs = deps.pollMs ?? 250;
-	/** The merge under way in this process: one at a time. */
-	let running: Promise<unknown> | null = null;
 
-	async function locked<T>(work: () => Promise<T>): Promise<T> {
-		if (running) throw new Refusal("conflict", MERGE_WORDS.busy);
-		const task = work();
-		running = task;
-		try {
-			return await task;
-		} finally {
-			running = null;
-		}
+	function held(why: MergeHeld["held"], words?: string): MergeHeld {
+		const kind =
+			why === "offline" || why === "notListed" ? "unavailable" : "conflict";
+		return {
+			held: why,
+			refusal: new Refusal(
+				kind,
+				words ?? MERGE_WORDS[why as keyof typeof MERGE_WORDS],
+			),
+		};
 	}
 
-	/** The home Host, and its link when it answers now. */
-	async function home(): Promise<{ id: string; name: string }> {
-		const link = (await deps.hostLinks.list()).find(
-			(l) => l.role === "home" && l.revokedAt === null,
-		);
-		if (!link) throw new Refusal("conflict", MERGE_WORDS.noHome);
-		return { id: link.hostId, name: link.name };
-	}
-
-	function online(hostId: string): Link {
+	/** The link to the Host when it answers now. */
+	function online(hostId: string): Link | null {
 		const link = deps.links.get(hostId);
-		if (!link || link.state().status !== "online") {
-			throw new Refusal("unavailable", MERGE_WORDS.offline);
-		}
-		return link;
+		return link?.state().status === "online" ? link : null;
 	}
 
 	/** This computer keeps Devices of its own as a Host. */
@@ -170,41 +180,68 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		return paired !== undefined;
 	}
 
-	/** Refuses while a run of Personal is not done. */
-	async function noRunsNotDone(spaceId: string): Promise<number> {
+	/** The runs of Personal, and how many of them are not done. */
+	async function runsOf(spaceId: string) {
 		let total = 0;
 		let notDone = 0;
 		for (const runs of (await engine.space(spaceId).projectRuns()).values()) {
 			total += runs.total;
 			for (const status of NOT_DONE) notDone += runs.statuses[status] ?? 0;
 		}
-		if (notDone > 0) {
-			throw new Refusal(
-				"conflict",
-				notDone === 1
-					? "A run in Personal is not done yet. Let it finish or stop it, then merge."
-					: `${notDone} runs in Personal are not done yet. Let them finish or stop them, then merge.`,
-			);
-		}
-		return total;
+		return { total, notDone };
 	}
 
-	/** Every check before a new merge: the Spaces it merges and the Host. */
-	async function check() {
-		const host = await home();
-		if (await hostsDevices()) {
-			throw new Refusal("conflict", MERGE_WORDS.isHost);
-		}
-		const from = await personalSpaceId(db, deps.ownerId);
-		const listed = await engine.hostSpaces.listed(host.id);
-		const to = listed.find((space) => space.personal);
-		if (from === null || listed.some((space) => space.id === from)) {
-			throw new Refusal("conflict", MERGE_WORDS.merged);
+	function notDoneHeld(notDone: number): MergeHeld {
+		return held(
+			"notDone",
+			notDone === 1
+				? "A run in Personal is not done yet. Let it finish or stop it, then merge."
+				: `${notDone} runs in Personal are not done yet. Let them finish or stop them, then merge.`,
+		);
+	}
+
+	/**
+	 * Every check of a merge, in order: the first that fails holds it. A
+	 * merge that started (`started`) has its Host and Spaces: it checks
+	 * from the Host's answer on.
+	 */
+	async function checks(started?: MergeRow): Promise<MergeReady | MergeHeld> {
+		const home = await deps.home();
+		let host: { id: string; name: string };
+		let from: string;
+		let listed: { id: string; personal: boolean }[] | null = null;
+		if (started) {
+			host = {
+				id: started.hostId,
+				name: home?.hostId === started.hostId ? home.name : "",
+			};
+			from = started.fromSpace;
+		} else {
+			if (!home) return held("noHome");
+			if (await hostsDevices()) return held("isHost");
+			host = { id: home.hostId, name: home.name };
+			const personal = await personalSpaceId(db, deps.ownerId);
+			listed = await engine.hostSpaces.listed(host.id);
+			if (personal === null || listed.some((space) => space.id === personal)) {
+				return held("merged");
+			}
+			from = personal;
 		}
 		const link = online(host.id);
-		if (!to) throw new Refusal("unavailable", MERGE_WORDS.notListed);
-		const runs = await noRunsNotDone(from);
-		return { host, link, from, to: to.id, runs };
+		if (!link) return held("offline");
+		listed ??= await engine.hostSpaces.listed(host.id);
+		const to = listed.find((space) => space.personal);
+		if (!to) return held("notListed");
+		const runs = await runsOf(from);
+		if (runs.notDone > 0) return notDoneHeld(runs.notDone);
+		return { held: null, host, link, from, to: to.id, runs: runs.total };
+	}
+
+	/** The checks, or the refusal of the first that fails. */
+	async function ready(started?: MergeRow): Promise<MergeReady> {
+		const checked = await checks(started);
+		if (checked.held !== null) throw checked.refusal;
+		return checked;
 	}
 
 	/** The Host's answer for the Projects of `from`: a dry run changes nothing there. */
@@ -277,8 +314,10 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		});
 	}
 
-	async function preview(input: { join?: readonly string[] } = {}) {
-		const { host, link, from, to, runs } = await check();
+	async function preview(
+		input: { join?: readonly string[] } = {},
+	): Promise<MergePreview> {
+		const { host, link, from, to, runs } = await ready();
 		const answer = await ask(link, from, input.join ?? [], true);
 		const targets = targetsOf(answer, to);
 		const projects = await spaceProjectRows(db, from, self.id);
@@ -321,14 +360,14 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 				schedules: unpinned(source).length,
 			});
 		}
-		return { host, projects: views, runs } satisfies MergePreview;
+		return { host, projects: views, runs };
 	}
 
-	/** Waits until `ready` says yes, up to `ms`. */
-	async function until(ready: () => Promise<boolean>, ms: number) {
+	/** Waits until `done` says yes, up to `ms`. */
+	async function until(done: () => Promise<boolean>, ms: number) {
 		const end = now() + ms;
 		while (true) {
-			if (await ready()) return true;
+			if (await done()) return true;
 			if (now() >= end) return false;
 			await Bun.sleep(pollMs);
 		}
@@ -344,15 +383,11 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		const runIds: string[] = [];
 
 		if (state === "planned") {
-			const link = online(row.hostId);
-			await noRunsNotDone(from);
-			const listed = await engine.hostSpaces.listed(row.hostId);
-			const personal = listed.find((space) => space.personal);
-			if (!personal) throw new Refusal("unavailable", MERGE_WORDS.notListed);
+			const { link, to: personal } = await ready(row);
 			const answer = await ask(link, from, row.joined, false);
-			if (answer.spaceId !== personal.id) {
+			if (answer.spaceId !== personal) {
 				throw new Error(
-					`The Host answered with the Space ${answer.spaceId}, not ${personal.id}.`,
+					`The Host answered with the Space ${answer.spaceId}, not ${personal}.`,
 				);
 			}
 			to = answer.spaceId;
@@ -368,7 +403,9 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 			const moved = await engine.moveProjects({
 				from,
 				plan: async () => {
-					await noRunsNotDone(from);
+					// The last check of the runs, under the hold.
+					const { notDone } = await runsOf(from);
+					if (notDone > 0) throw notDoneHeld(notDone).refusal;
 					return {
 						projects: targets,
 						personMap,
@@ -464,6 +501,7 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		);
 		if (pairs.length === 0) return;
 		const link = online(hostId);
+		if (!link) throw held("offline").refusal;
 		// The Host's copies of the documents they join come over the link.
 		link.check();
 		for (const [source, target] of pairs) {
@@ -507,103 +545,60 @@ export function createPersonalMerge(deps: PersonalMergeDeps) {
 		}, deps.pushWaitMs ?? 20_000);
 	}
 
-	/**
-	 * Whether this computer's Personal waits to merge, for a Device that
-	 * joined its home Host before the merge existed, or a merge that
-	 * stopped. Never merges by itself: the person confirms it. `blocked`:
-	 * why it cannot run now. Cheap: no call to the Host.
-	 */
-	async function pending(): Promise<MergePending> {
-		const started = await rows.unfinished();
-		const host = await home().catch(() => null);
-		if (started) {
-			const link = deps.links.get(started.hostId);
+	return {
+		checks,
+		preview,
+		resume,
+
+		/** A new merge after its checks: the copy of the database, then its states. */
+		async start(input: { join?: readonly string[] }): Promise<MergeResult> {
+			const { host, from } = await ready();
+			const backup = await backupDatabase(db, deps.dataDir, now());
+			const row = await rows.plan({
+				fromSpace: from,
+				hostId: host.id,
+				personId: deps.ownerId,
+				joined: input.join ?? [],
+				backup,
+			});
+			return resume(row);
+		},
+
+		/**
+		 * Whether Personal waits to merge, and why it cannot run now
+		 * (`blocked`). `started`: the merge that started and is not done.
+		 */
+		async pending(started: MergeRow | null): Promise<MergePending> {
+			if (started) {
+				const link = deps.links.get(started.hostId);
+				return {
+					pending: true,
+					state: started.state,
+					hostName: (await deps.home())?.name ?? null,
+					blocked:
+						link?.state().status === "online" ? null : MERGE_WORDS.offline,
+				};
+			}
+			const checked = await checks();
+			if (
+				checked.held === "noHome" ||
+				checked.held === "isHost" ||
+				checked.held === "merged"
+			) {
+				return { pending: false, state: null, hostName: null, blocked: null };
+			}
 			return {
 				pending: true,
-				state: started.state,
-				hostName: host?.name ?? null,
-				blocked: link?.state().status === "online" ? null : MERGE_WORDS.offline,
+				state: null,
+				hostName: (await deps.home())?.name ?? null,
+				blocked: checked.held === null ? null : checked.refusal.message,
 			};
-		}
-		const none = { pending: false, state: null, hostName: null, blocked: null };
-		if (!host || (await hostsDevices())) return none;
-		const from = await personalSpaceId(db, deps.ownerId);
-		const listed = await engine.hostSpaces.listed(host.id);
-		if (from === null || listed.some((space) => space.id === from)) {
-			return none;
-		}
-		let blocked: string | null = null;
-		try {
-			online(host.id);
-			if (!listed.some((space) => space.personal)) {
-				throw new Refusal("unavailable", MERGE_WORDS.notListed);
-			}
-			await noRunsNotDone(from);
-		} catch (error) {
-			if (!(error instanceof Refusal)) throw error;
-			blocked = error.message;
-		}
-		return { pending: true, state: null, hostName: host.name, blocked };
-	}
-
-	return {
-		/** What a merge would do now. Refuses when it cannot run now. Changes nothing. */
-		preview,
-
-		pending,
-
-		/**
-		 * Merges Personal into the home Host's, or goes on with a merge that
-		 * stopped. `join`: the Projects to move into the Project of a shared
-		 * Space with their remote. Resolves with how far it came: `moved`
-		 * when the Host does not have the runs yet (they follow).
-		 */
-		run(input: { join?: readonly string[] } = {}): Promise<MergeResult> {
-			return locked(async () => {
-				const started = await rows.unfinished();
-				if (started) return resume(started);
-				const { host, from } = await check();
-				const backup = await backupDatabase(db, deps.dataDir, now());
-				const row = await rows.plan({
-					fromSpace: from,
-					hostId: host.id,
-					personId: deps.ownerId,
-					joined: input.join ?? [],
-					backup,
-				});
-				return resume(row);
-			});
 		},
 
-		/**
-		 * Goes on with a merge that moved its rows every `everyMs`, until it
-		 * is done or `signal` aborts: its runs reach the Host when it
-		 * answers. Its failures wait for the next try. Once at start, it
-		 * removes what a merge that is done left of the old Space: a merge
-		 * of an older version did not.
-		 */
-		keepFinishing(signal: AbortSignal, everyMs = 30_000): void {
-			void (async () => {
-				const latest = await rows.latest();
-				if (latest?.state === "pushed") await cleanUp(latest.fromSpace);
-			})().catch((error) => {
-				console.error("[devices] the old Personal was not removed:", error);
-			});
-			const timer = setInterval(() => {
-				if (running) return;
-				void (async () => {
-					const started = await rows.unfinished();
-					if (started?.state !== "moved") return;
-					await locked(() => resume(started));
-				})().catch(() => {});
-			}, everyMs);
-			timer.unref?.();
-			signal.addEventListener("abort", () => clearInterval(timer), {
-				once: true,
-			});
+		/** Removes what a merge that is done left of the old Space: a merge of an older version did not. */
+		async cleanUpDone(): Promise<void> {
+			const latest = await rows.latest();
+			if (latest?.state === "pushed") await cleanUp(latest.fromSpace);
 		},
-
-		/** The merge that started and is not done, if any. */
-		unfinished: () => rows.unfinished(),
 	};
 }

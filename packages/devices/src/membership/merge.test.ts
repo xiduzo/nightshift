@@ -30,18 +30,17 @@ import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import type { HostClient } from "../contract";
 import { createDeviceExchange } from "../exchange";
+import type { JoinProgress } from "../links";
 import { createHostLinks, type Link } from "../links";
 import { httpsLink } from "../links/link";
 import { type PairedReplicas, pairedReplicas } from "../testing";
-import {
-	createPersonalMerge,
-	MERGE_WORDS,
-	type PersonalMergeDeps,
-} from "./personal-merge";
+import { createHomeMembership, type HomeMembershipDeps } from "./membership";
+import { MERGE_WORDS } from "./merge";
 
 /**
  * The merge of a Device's own Personal into its Person's Personal on its
- * home Host, end to end in one process: B (the Device) merges into A
+ * home Host, through its membership (`HomeMembership`), end to end in one
+ * process: B (the Device) merges into A
  * (the Host), over a real link to A in memory, with B's real exchange
  * pushing the moved runs. A and B have their own Persons and Spaces, as
  * the author's laptop and Host do.
@@ -130,15 +129,17 @@ function online(options: { push?: boolean; synced?: () => boolean } = {}) {
 	return period;
 }
 
-function merger(
-	link: Link,
-	extra: Partial<PersonalMergeDeps> = {},
-): ReturnType<typeof createPersonalMerge> {
-	return createPersonalMerge({
+function merger(link: Link, extra: Partial<HomeMembershipDeps> = {}) {
+	return createHomeMembership({
 		db: b.db,
 		engine: paired.device,
-		links: { get: (hostId) => (hostId === paired.hostId ? link : undefined) },
+		links: {
+			get: (hostId) => (hostId === paired.hostId ? link : undefined),
+			add: async () => {},
+		},
 		hostLinks: createHostLinks(b.db),
+		keys: { delete: async () => {} },
+		copies: { keep: async () => [] },
 		spaces: paired.documents,
 		flows: paired.flows,
 		self: { id: b.deviceId, name: "B" },
@@ -152,7 +153,7 @@ function merger(
 }
 
 /** B's engine, with `before` called as a Space move puts its batch together. */
-function beforeBatch(before: () => void): PersonalMergeDeps["engine"] {
+function beforeBatch(before: () => void): HomeMembershipDeps["engine"] {
 	return {
 		...paired.device,
 		moveProjects: (move) =>
@@ -234,7 +235,7 @@ describe("the merge of Personal", () => {
 		const { link } = online();
 		await ready(link);
 
-		const result = await merger(link).run();
+		const result = await merger(link).merge();
 
 		expect(result).toMatchObject({ state: "pushed", projects: 1, runs: 1 });
 		expect(existsSync(result.backup)).toBe(true);
@@ -287,7 +288,7 @@ describe("the merge of Personal", () => {
 		const { link } = online();
 		await ready(link);
 
-		await merger(link).run();
+		await merger(link).merge();
 
 		const commands = await b.db
 			.select({
@@ -338,7 +339,7 @@ describe("the merge of Personal", () => {
 			["dimpact-zaakafhandelcomponent", "new", 1],
 			["rpgdotexe", "new", 1],
 		]);
-		const result = await merger(link).run();
+		const result = await merger(link).merge();
 
 		expect(result.state).toBe("pushed");
 		const onA = await paired.host.space(a.spaceId).listProjects();
@@ -401,7 +402,7 @@ describe("the merge of Personal", () => {
 			into: "same-remote",
 			renamedFlows: [{ from: "hello", to: "hello-2" }],
 		});
-		const result = await merger(link).run();
+		const result = await merger(link).merge();
 
 		expect(result.state).toBe("pushed");
 		// One project on B, with A's id: B's runs are under it.
@@ -456,7 +457,7 @@ describe("the merge of Personal", () => {
 			engine: beforeBatch(() => {
 				seen.push(readdirSync(join(b.dataDir, "backups")));
 			}),
-		}).run();
+		}).merge();
 		const backups = await readdir(join(b.dataDir, "backups"));
 
 		expect(seen).toEqual([backups]);
@@ -491,7 +492,7 @@ describe("the merge of Personal", () => {
 				return link.call(use);
 			},
 		};
-		await expect(merger(flaky).run()).rejects.toThrow();
+		await expect(merger(flaky).merge()).rejects.toThrow();
 		const state = async () =>
 			(await b.db.select().from(spaceMerge))[0]?.state ?? null;
 		expect(await state()).toBe("planned");
@@ -502,13 +503,13 @@ describe("the merge of Personal", () => {
 				engine: beforeBatch(() => {
 					throw new Error("Stopped before the batch.");
 				}),
-			}).run(),
+			}).merge(),
 		).rejects.toThrow("Stopped before the batch.");
 		expect(await state()).toBe("mapped");
 		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
 
 		// moved: the runs do not reach the Host yet (no push).
-		const moved = await merger(flaky, { pushWaitMs: 100 }).run();
+		const moved = await merger(flaky, { pushWaitMs: 100 }).merge();
 		expect(moved.state).toBe("moved");
 		expect(await state()).toBe("moved");
 		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: a.spaceId });
@@ -517,7 +518,7 @@ describe("the merge of Personal", () => {
 		// The exchange is back: the merge ends.
 		const pushing = online();
 		await ready(pushing.link);
-		const done = await merger(pushing.link).run();
+		const done = await merger(pushing.link).merge();
 		expect(done.state).toBe("pushed");
 		expect(await spaceOfRun(a, runId)).toMatchObject({ spaceId: a.spaceId });
 		// One copy of the database: the merge made it once.
@@ -534,10 +535,10 @@ describe("the merge of Personal", () => {
 		const { link } = online({ synced: () => synced });
 		await ready(link);
 
-		await expect(merger(link).run()).rejects.toBeInstanceOf(Refusal);
+		await expect(merger(link).merge()).rejects.toBeInstanceOf(Refusal);
 		expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("moved");
 		synced = true;
-		const done = await merger(link).run();
+		const done = await merger(link).merge();
 
 		expect(done.state).toBe("pushed");
 		const flows = await paired.device.space(a.spaceId).listFlows(onA.id);
@@ -548,9 +549,9 @@ describe("the merge of Personal", () => {
 		await projectWithRun();
 		const { link } = online();
 		await ready(link);
-		await merger(link).run();
+		await merger(link).merge();
 
-		await expect(merger(link).run()).rejects.toThrow(MERGE_WORDS.merged);
+		await expect(merger(link).merge()).rejects.toThrow(MERGE_WORDS.merged);
 		await expect(merger(link).preview()).rejects.toThrow(MERGE_WORDS.merged);
 		expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
 	});
@@ -568,7 +569,7 @@ describe("the merge of Personal", () => {
 		await ready(link);
 		await (await paired.documents.open(b.spaceId)).flush();
 
-		await merger(link).run();
+		await merger(link).merge();
 
 		expect(
 			await b.db.select().from(event).where(eq(event.spaceId, b.spaceId)),
@@ -585,7 +586,7 @@ describe("the merge of Personal", () => {
 		await projectWithRun();
 		const { link } = online();
 		await ready(link);
-		await merger(link).run();
+		await merger(link).merge();
 		// What a merge of an older version left.
 		await b.db.insert(event).values({
 			spaceId: b.spaceId,
@@ -629,7 +630,7 @@ describe("the merge of Personal", () => {
 		await ready(link);
 
 		await expect(merger(link).preview()).rejects.toThrow(MERGE_WORDS.isHost);
-		await expect(merger(link).run()).rejects.toThrow(MERGE_WORDS.isHost);
+		await expect(merger(link).merge()).rejects.toThrow(MERGE_WORDS.isHost);
 		expect(await personalSpaceId(b.db, localPerson)).toBe(b.spaceId);
 	});
 
@@ -659,7 +660,7 @@ describe("the merge of Personal", () => {
 		const { link } = online();
 		await ready(link);
 
-		await expect(merger(link).run()).rejects.toThrow(
+		await expect(merger(link).merge()).rejects.toThrow(
 			"A run in Personal is not done yet.",
 		);
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
@@ -686,7 +687,7 @@ describe("the merge of Personal", () => {
 		const { link } = online();
 		await ready(link);
 
-		expect(await merger(link).run()).toMatchObject({ runs: 1 });
+		expect(await merger(link).merge()).toMatchObject({ runs: 1 });
 		expect((await spaceOfRun(b, runId))?.spaceId).toBe(a.spaceId);
 	});
 
@@ -712,7 +713,7 @@ describe("the merge of Personal", () => {
 			state: () => ({ status: "offline", address: null, since: 0 }),
 		};
 
-		await expect(merger(offline).run()).rejects.toThrow(MERGE_WORDS.offline);
+		await expect(merger(offline).merge()).rejects.toThrow(MERGE_WORDS.offline);
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
 		expect(existsSync(join(b.dataDir, "backups"))).toBe(false);
 	});
@@ -732,7 +733,7 @@ describe("the merge of Personal", () => {
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
 		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
 
-		await merge.run();
+		await merge.merge();
 		expect((await merge.pending()).pending).toBe(false);
 	});
 
@@ -753,5 +754,81 @@ describe("the merge of Personal", () => {
 	test("the Host's personal Space keeps the name the Host gives it before a merge", async () => {
 		const rows = await b.db.select().from(hostSpace);
 		expect(rows.map((r) => r.name)).toEqual(["Personal on A"]);
+	});
+});
+
+describe("one step of the membership at a time", () => {
+	test("a second merge while one runs is refused, and the first goes on", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		const membership = merger(link);
+
+		const [first, second] = await Promise.allSettled([
+			membership.merge(),
+			membership.merge(),
+		]);
+
+		expect(first).toMatchObject({
+			status: "fulfilled",
+			value: { state: "pushed" },
+		});
+		expect(second.status).toBe("rejected");
+		expect((second as PromiseRejectedResult).reason).toBeInstanceOf(Refusal);
+		expect((second as PromiseRejectedResult).reason.message).toBe(
+			MERGE_WORDS.busy,
+		);
+		expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+	});
+});
+
+describe("the merge on join", () => {
+	/** What the join shows after B joined A as its home Host. */
+	async function joinSteps(link: Link): Promise<JoinProgress[]> {
+		const seen: JoinProgress[] = [];
+		for await (const step of merger(link, { listedWaitMs: 100 }).joined(
+			paired.hostId,
+		)) {
+			seen.push(step);
+		}
+		return seen;
+	}
+
+	test("shows what the merge does, then how it went", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+
+		const steps = await joinSteps(link);
+
+		expect(steps.map((step) => step.kind)).toEqual(["merge-preview", "merged"]);
+		expect(steps[1]).toMatchObject({ result: { state: "pushed", runs: 1 } });
+		expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
+	});
+
+	test("a merge that cannot run now says why, and the join stands", async () => {
+		await b.db.insert(device).values({
+			id: "phone-ish",
+			name: "C",
+			platform: "test",
+			ownerId: localPerson,
+			homeHost: "https://b.invalid",
+		});
+		const { link } = online();
+		await ready(link);
+
+		expect(await joinSteps(link)).toEqual([
+			{ kind: "merge-skipped", reason: MERGE_WORDS.isHost },
+		]);
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+	});
+
+	test("nothing to merge: nothing more", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+
+		expect(await joinSteps(link)).toEqual([]);
 	});
 });

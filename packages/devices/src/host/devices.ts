@@ -13,12 +13,7 @@ import {
 	type HostSpaces,
 	joinHost,
 } from "../links";
-import {
-	leaveHomeHost,
-	mergeOnJoin,
-	type PersonalSpaceMerge,
-	type PersonalSpaceSplit,
-} from "../merge";
+import type { HomeMembership } from "../membership";
 import { type Reach, reachFor } from "../reach";
 import type { Host } from "./host";
 import type { Devices, DevicesOverview, OtherDeviceView } from "./types";
@@ -41,13 +36,14 @@ export function createDevices(deps: {
 	/** The SHA-256 fingerprint of the certificate this daemon serves itself. */
 	fingerprint: string | null;
 	/** The copies of the owner's other Devices' documents, from the home Host. */
-	copies: Pick<DeviceCopies, "list" | "keep">;
+	copies: Pick<DeviceCopies, "list">;
 	/** On a Host: the Device document it keeps for a paired Device, read. */
 	keptDocument(deviceId: string): Promise<DeviceCopy | null>;
-	/** The merge of this computer's Personal into its home Host's. */
-	merge: Pick<PersonalSpaceMerge, "preview" | "run" | "pending">;
-	/** The split of this computer's Personal off its home Host's, when it leaves. */
-	split: Pick<PersonalSpaceSplit, "check" | "run" | "of">;
+	/** This computer's membership of its home Host: the merge on join, the split on leave. */
+	membership: Pick<
+		HomeMembership,
+		"pending" | "preview" | "merge" | "joined" | "leave"
+	>;
 	/** The clock, in milliseconds. Default: `Date.now`. */
 	now?: () => number;
 }): Devices {
@@ -172,28 +168,13 @@ export function createDevices(deps: {
 				yield step;
 				// Merge on join: Personal becomes one with the home Host's.
 				if (step.kind === "joined" && step.role === "home") {
-					yield* mergeOnJoin(
-						{
-							merge: deps.merge,
-							links: deps.links,
-							hostSpaces: deps.hostSpaces,
-						},
-						step.hostId,
-						signal,
-					);
+					yield* deps.membership.joined(step.hostId, signal);
 				}
 			}
 		},
-		mergePending: () => deps.merge.pending(),
-		mergePreview: (input) => deps.merge.preview(input),
-		merge: (input) => deps.merge.run(input),
-		leave: () =>
-			leaveHomeHost({
-				hostLinks: deps.hostLinks,
-				links: deps.links,
-				keys: deps.keys,
-				copies: deps.copies,
-				split: deps.split,
-			}),
+		mergePending: () => deps.membership.pending(),
+		mergePreview: (input) => deps.membership.preview(input),
+		merge: (input) => deps.membership.merge(input),
+		leave: () => deps.membership.leave(),
 	};
 }
