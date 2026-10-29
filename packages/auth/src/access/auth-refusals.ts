@@ -1,5 +1,7 @@
 import { Refusal, type RefusalKind } from "@nightshift/refusal";
 
+import { ROLE_REFUSAL } from "./space-access";
+
 /**
  * What Better Auth refuses for a Person's request (an invitation, a role,
  * a Space), as a `Refusal` in Night Shift's words. Better Auth's own words
@@ -62,9 +64,6 @@ const KNOWN: Record<string, { kind: RefusalKind; message: string }> = {
 	},
 };
 
-/** What Night Shift says to any other refusal of a role that does not allow the request. */
-const NOT_ALLOWED = "Your role in this Space does not allow this.";
-
 /** The shape of a Better Auth error that matters here. */
 type AuthError = {
 	status?: unknown;
@@ -79,8 +78,9 @@ export function refusalOf(error: unknown): unknown {
 	if (cause instanceof Refusal) return cause;
 	const known = typeof body?.code === "string" ? KNOWN[body.code] : undefined;
 	if (known) return new Refusal(known.kind, known.message, { cause: error });
+	// Any other refusal of a role that does not allow the request.
 	if (status === "FORBIDDEN") {
-		return new Refusal("forbidden", NOT_ALLOWED, { cause: error });
+		return new Refusal("forbidden", ROLE_REFUSAL.message, { cause: error });
 	}
 	return error;
 }

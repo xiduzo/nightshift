@@ -14,3 +14,9 @@ export {
 	type RequestAccess,
 	requestAccess,
 } from "./request";
+export {
+	type AccessRefusal,
+	ROLE_REFUSAL,
+	type SpaceAccess,
+	spaceAccess,
+} from "./space-access";

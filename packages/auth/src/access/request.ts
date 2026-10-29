@@ -19,6 +19,7 @@ import {
 	spacesOf,
 } from "../spaces";
 import { refuse } from "./auth-refusals";
+import { SIGNED_OUT } from "./space-access";
 
 /**
  * Who a request is, in which Space, and what they may do there. It reads
@@ -109,7 +110,7 @@ export async function requestAccess(
 		: null;
 	const inSpace = () => {
 		if (!spaceId) {
-			throw new Refusal("signed-out", "Sign in to use Night Shift.");
+			throw new Refusal("signed-out", SIGNED_OUT.message);
 		}
 		return spaceId;
 	};

@@ -2,15 +2,19 @@
 // composition root of the package) and the verticals' barrels.
 
 export {
+	type AccessRefusal,
 	authEndpointAccess,
 	type DocumentSpace,
 	documentAccess,
 	type RequestAccess,
+	ROLE_REFUSAL,
 	requestAccess,
+	type SpaceAccess,
 	type SyncAccess,
 	type SyncAuthorize,
 	type SyncDeviceKey,
 	type SyncGrant,
+	spaceAccess,
 } from "./access";
 export {
 	type Auth,

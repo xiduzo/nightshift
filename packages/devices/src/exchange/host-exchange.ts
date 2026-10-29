@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
+import { ROLE_REFUSAL, roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
@@ -289,7 +289,7 @@ export function createHostExchange(deps: {
 			}
 			const role = await roleIn(db, key.personId, owner.spaceId);
 			if (!role || !roleAllows(role, COMMAND_PERMISSION[input.kind])) {
-				forbidden("Your role in this Space does not allow this.");
+				forbidden(ROLE_REFUSAL.message);
 			}
 			if (owner.walkerId === deps.selfId) {
 				// This Host walks the run: the action is a local one.
@@ -319,7 +319,7 @@ export function createHostExchange(deps: {
 			await admit(key);
 			const role = await roleIn(db, key.personId, input.spaceId);
 			if (!role || !roleAllows(role, { project: ["add"] })) {
-				forbidden("Your role in this Space does not allow this.");
+				forbidden(ROLE_REFUSAL.message);
 			}
 			const document = await deps.documents.open(input.spaceId);
 			if (document.hostedElsewhere || !document.projects.has(input.projectId)) {
@@ -523,7 +523,7 @@ export function createHostExchange(deps: {
 	async function mayStart(key: DeviceKeyAccess, spaceId: string) {
 		const role = await roleIn(db, key.personId, spaceId);
 		if (!role || !roleAllows(role, { run: ["start"] })) {
-			forbidden("Your role in this Space does not allow this.");
+			forbidden(ROLE_REFUSAL.message);
 		}
 	}
 
