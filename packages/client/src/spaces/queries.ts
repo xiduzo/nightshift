@@ -14,16 +14,3 @@ export function createSpaceQueries(orpc: ApiQueryUtils) {
 			orpc.invitations.get.queryOptions({ input: { invitationId } }),
 	};
 }
-
-/** The mutation options of Spaces, their Members and invitations. */
-export function createSpaceMutations(orpc: ApiQueryUtils) {
-	return {
-		create: orpc.spaces.create.mutationOptions,
-		switch: orpc.spaces.switch.mutationOptions,
-		invite: orpc.members.invite.mutationOptions,
-		setRole: orpc.members.setRole.mutationOptions,
-		removeMember: orpc.members.remove.mutationOptions,
-		cancelInvitation: orpc.members.cancelInvitation.mutationOptions,
-		acceptInvitation: orpc.invitations.accept.mutationOptions,
-	};
-}

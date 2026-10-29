@@ -1,7 +1,8 @@
 /**
  * @nightshift/client: the client logic that the web app and the phone app
- * share. The typed client of a Night Shift, the query and mutation options
- * of each vertical (with their polling rules), the live cache (the one
+ * share. The typed client of a Night Shift, the query options of each
+ * vertical (with their polling rules; a mutation is the app's `orpc` one as
+ * it is, but for the answer to a Gate), the live cache (the one
  * follower of a Host: its notifications stream and one run's stream, what
  * each item reads again, the notices it shows), the view types derived from
  * the API, the push contract, the glances (the widget and the run on the
@@ -37,9 +38,7 @@ export {
 	type Spread,
 } from "./dashboard";
 export {
-	createDeviceMutations,
 	createDeviceQueries,
-	createOfferMutations,
 	createOfferQueries,
 	type DevicesOverview,
 	type LinkedHost,
@@ -53,7 +52,6 @@ export {
 } from "./devices";
 export {
 	canStart,
-	createFlowMutations,
 	createFlowQueries,
 	type FlowListItem,
 	type FlowRevisionItem,
@@ -109,7 +107,6 @@ export {
 } from "./live";
 export {
 	applySettingsPatch,
-	createNotificationMutations,
 	createNotificationQueries,
 	gateKey,
 	type NotificationItem,
@@ -132,7 +129,6 @@ export {
 	withdrawKeyOf,
 } from "./notifications";
 export {
-	createProjectMutations,
 	createProjectQueries,
 	type GitInstall,
 	type Project,
@@ -147,7 +143,6 @@ export {
 	agoLabel,
 	applyAgentMessages,
 	costLabel,
-	createRunMutations,
 	createRunQueries,
 	defaultPlacement,
 	flowLabel,
@@ -191,14 +186,12 @@ export {
 	workedSoFar,
 } from "./runs";
 export {
-	createScheduleMutations,
 	createScheduleQueries,
 	type ScheduleIssue,
 	type ScheduleResult,
 	type ScheduleSummary,
 } from "./schedules";
 export {
-	createSpaceMutations,
 	createSpaceQueries,
 	type InvitationView,
 	type MembersOverview,

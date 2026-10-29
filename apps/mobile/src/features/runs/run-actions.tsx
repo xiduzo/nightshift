@@ -1,8 +1,4 @@
-import {
-	type RunActions as Allowed,
-	createRunMutations,
-	useRunActed,
-} from "@nightshift/client";
+import { type RunActions as Allowed, useRunActed } from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -29,7 +25,7 @@ import { useMutation } from "@tanstack/react-query";
 import { CircleStop, type LucideIcon, Play } from "lucide-react-native";
 import { View } from "react-native";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
 
 /**
@@ -44,11 +40,15 @@ export function RunActions({
 	runId: string;
 	allows: Pick<Allowed, "stop" | "resume">;
 }) {
-	const runMutations = useHostQueries(createRunMutations);
-	const runActed = useRunActed(useSignedIn().host);
+	const { host } = useSignedIn();
+	const runActed = useRunActed(host);
 	const refetch = () => runActed(runId);
-	const stop = useMutation(runMutations.stop({ onSuccess: refetch }));
-	const resume = useMutation(runMutations.resume({ onSuccess: refetch }));
+	const stop = useMutation(
+		host.orpc.runs.stop.mutationOptions({ onSuccess: refetch }),
+	);
+	const resume = useMutation(
+		host.orpc.runs.resume.mutationOptions({ onSuccess: refetch }),
+	);
 
 	const { stop: canStop, resume: canResume } = allows;
 	const failure = stop.error

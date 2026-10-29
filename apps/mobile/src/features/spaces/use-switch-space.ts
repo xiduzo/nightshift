@@ -1,8 +1,8 @@
-import { createSpaceMutations, spaceChanged } from "@nightshift/client";
+import { spaceChanged } from "@nightshift/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert } from "react-native";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/host";
 import { saveSpaceChoice } from "./space-choice";
 
 /**
@@ -12,10 +12,9 @@ import { saveSpaceChoice } from "./space-choice";
  */
 export function useSwitchSpace() {
 	const { host } = useSignedIn();
-	const spaceMutations = useHostQueries(createSpaceMutations);
 	const queryClient = useQueryClient();
 	return useMutation(
-		spaceMutations.switch({
+		host.orpc.spaces.switch.mutationOptions({
 			onSuccess: async (_done, { spaceId }) => {
 				await saveSpaceChoice(host.address, spaceId).catch(() => undefined);
 				await spaceChanged(queryClient);

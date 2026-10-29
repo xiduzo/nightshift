@@ -2,7 +2,6 @@ import {
 	canStart,
 	createFlowQueries,
 	createProjectQueries,
-	createRunMutations,
 	createRunQueries,
 	defaultPlacement,
 	filledInputs,
@@ -129,8 +128,8 @@ function NewRun({
 }) {
 	const flowQueries = useHostQueries(createFlowQueries);
 	const runQueries = useHostQueries(createRunQueries);
-	const runMutations = useHostQueries(createRunMutations);
-	const runActed = useRunActed(useSignedIn().host);
+	const { host } = useSignedIn();
+	const runActed = useRunActed(host);
 	const projectId = project?.id ?? "";
 	const [flowName, setFlowName] = useState<string | null>(null);
 	const [values, setValues] = useState<InputTexts>({});
@@ -173,7 +172,7 @@ function NewRun({
 	});
 
 	const start = useMutation(
-		runMutations.start({
+		host.orpc.runs.start.mutationOptions({
 			onSuccess: (run) => {
 				runActed(run.id);
 				if (followOnLockScreen) void followAfterStart(run.id);

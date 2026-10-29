@@ -57,16 +57,3 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 			orpc.flows.kept.queryOptions({ input: { projectId, name } }),
 	};
 }
-
-/** The mutation options of flows. */
-export function createFlowMutations(orpc: ApiQueryUtils) {
-	return {
-		save: orpc.flows.save.mutationOptions,
-		remove: orpc.flows.remove.mutationOptions,
-		dismissNotice: orpc.flows.dismissNotice.mutationOptions,
-		restore: orpc.flows.restore.mutationOptions,
-		import: orpc.flows.import.mutationOptions,
-		copy: orpc.flows.copy.mutationOptions,
-		resetKept: orpc.flows.resetKept.mutationOptions,
-	};
-}

@@ -53,20 +53,3 @@ const CLONE_POLL_MS = 1_000;
 /** How often the copies of projects are asked about while one runs, and else. */
 const COPY_POLL_MS = 2_000;
 const COPIES_POLL_MS = 30_000;
-
-/** The mutation options of projects. */
-export function createProjectMutations(orpc: ApiQueryUtils) {
-	return {
-		add: orpc.projects.add.mutationOptions,
-		remove: orpc.projects.remove.mutationOptions,
-		rename: orpc.projects.rename.mutationOptions,
-		move: orpc.projects.move.mutationOptions,
-		chooseFolder: orpc.projects.chooseFolder.mutationOptions,
-		cloneFromGitHub: orpc.projects.cloneFromGitHub.mutationOptions,
-		copyHere: orpc.projects.copyHere.mutationOptions,
-		installGit: orpc.projects.installGit.mutationOptions,
-		setUpGit: orpc.projects.setUpGit.mutationOptions,
-		removeRunCopy: orpc.projects.removeRunCopy.mutationOptions,
-		deleteRunBranches: orpc.projects.deleteRunBranches.mutationOptions,
-	};
-}

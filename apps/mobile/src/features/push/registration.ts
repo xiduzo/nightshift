@@ -1,11 +1,10 @@
-import { createNotificationMutations } from "@nightshift/client";
 import { useMutation } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
-import { type Host, useHostQueries, useSignedIn } from "@/features/host";
+import { type Host, useSignedIn } from "@/features/host";
 import { keptStore } from "@/shared/api";
 import { usePushPermission } from "./permission";
 import { targetKeyOf, withRetry } from "./retry";
@@ -51,8 +50,9 @@ async function pushToken(): Promise<string> {
 export function usePushRegistration(): void {
 	const { host } = useSignedIn();
 	const permission = usePushPermission();
-	const mutations = useHostQueries(createNotificationMutations);
-	const register = useMutation(mutations.registerScreen());
+	const register = useMutation(
+		host.orpc.notifications.targets.register.mutationOptions(),
+	);
 	const { mutateAsync } = register;
 	/** A new token from the phone: register again. */
 	const [tokenChanges, setTokenChanges] = useState(0);

@@ -1,6 +1,6 @@
 /**
- * The query and mutation options of Devices, pairing and Offers, and how
- * often they poll (`@nightshift/client`, on this app's client).
+ * The query options of Devices, pairing and Offers, and how often they
+ * poll (`@nightshift/client`, on this app's client), and their mutations.
  *
  * The Agents page makes and withdraws Offers. The agents vertical sits
  * below devices, so it imports this file through a peer port
@@ -11,9 +11,7 @@
  */
 
 import {
-	createDeviceMutations,
 	createDeviceQueries,
-	createOfferMutations,
 	createOfferQueries,
 	createRunQueries,
 } from "@nightshift/client";
@@ -22,11 +20,20 @@ import { orpc } from "@/shared/api";
 
 export const deviceQueries = createDeviceQueries(orpc);
 
-export const deviceMutations = createDeviceMutations(orpc);
+export const deviceMutations = {
+	review: orpc.devices.review.mutationOptions,
+	approve: orpc.devices.approve.mutationOptions,
+	deny: orpc.devices.deny.mutationOptions,
+	revoke: orpc.devices.revoke.mutationOptions,
+	removePhone: orpc.devices.removePhone.mutationOptions,
+};
 
 export const offerQueries = createOfferQueries(orpc);
 
-export const offerMutations = createOfferMutations(orpc);
+export const offerMutations = {
+	make: orpc.offers.make.mutationOptions,
+	withdraw: orpc.offers.withdraw.mutationOptions,
+};
 
 /** The Space's runs, to show what runs on each computer now. */
 export const runQueries = createRunQueries(orpc);

@@ -28,10 +28,3 @@ export function createScheduleQueries(orpc: ApiQueryUtils) {
 			orpc.schedules.preview.queryOptions({ input: { cron } }),
 	};
 }
-
-/** The mutation options of schedules. */
-export function createScheduleMutations(orpc: ApiQueryUtils) {
-	return {
-		save: orpc.schedules.save.mutationOptions,
-	};
-}

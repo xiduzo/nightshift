@@ -35,15 +35,3 @@ export function createNotificationQueries(orpc: ApiQueryUtils) {
 		}),
 	};
 }
-
-/**
- * The mutation options of the notification settings and screens. Removing
- * a phone also signs it out.
- */
-export function createNotificationMutations(orpc: ApiQueryUtils) {
-	return {
-		saveSettings: orpc.notifications.settings.save.mutationOptions,
-		registerScreen: orpc.notifications.targets.register.mutationOptions,
-		removeScreen: orpc.notifications.targets.remove.mutationOptions,
-	};
-}

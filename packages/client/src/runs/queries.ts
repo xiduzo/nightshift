@@ -132,16 +132,3 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			orpc.runs.placements.queryOptions({ input: { projectId } }),
 	};
 }
-
-/** The mutation options of runs. */
-export function createRunMutations(orpc: ApiQueryUtils) {
-	return {
-		start: orpc.runs.start.mutationOptions,
-		stop: orpc.runs.stop.mutationOptions,
-		resume: orpc.runs.resume.mutationOptions,
-		signal: orpc.runs.signal.mutationOptions,
-		restartStep: orpc.runs.restartStep.mutationOptions,
-		rerun: orpc.runs.rerun.mutationOptions,
-		move: orpc.runs.move.mutationOptions,
-	};
-}

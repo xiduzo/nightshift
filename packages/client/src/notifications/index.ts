@@ -22,7 +22,6 @@ export {
 } from "./push";
 export {
 	applySettingsPatch,
-	createNotificationMutations,
 	createNotificationQueries,
 } from "./queries";
 export { describeNotice } from "./rules";

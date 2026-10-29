@@ -37,17 +37,6 @@ export function createDeviceQueries(orpc: ApiQueryUtils) {
 	};
 }
 
-/** The mutation options of Devices and pairing. */
-export function createDeviceMutations(orpc: ApiQueryUtils) {
-	return {
-		review: orpc.devices.review.mutationOptions,
-		approve: orpc.devices.approve.mutationOptions,
-		deny: orpc.devices.deny.mutationOptions,
-		revoke: orpc.devices.revoke.mutationOptions,
-		removePhone: orpc.devices.removePhone.mutationOptions,
-	};
-}
-
 /** The query options of Offers, and how often they poll. */
 export function createOfferQueries(orpc: ApiQueryUtils) {
 	return {
@@ -61,13 +50,5 @@ export function createOfferQueries(orpc: ApiQueryUtils) {
 			refetchInterval: OFFERS_POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
-	};
-}
-
-/** The mutation options of Offers. */
-export function createOfferMutations(orpc: ApiQueryUtils) {
-	return {
-		make: orpc.offers.make.mutationOptions,
-		withdraw: orpc.offers.withdraw.mutationOptions,
 	};
 }

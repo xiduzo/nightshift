@@ -2,9 +2,7 @@
 
 export { platformName } from "./platform";
 export {
-	createDeviceMutations,
 	createDeviceQueries,
-	createOfferMutations,
 	createOfferQueries,
 } from "./queries";
 export type {

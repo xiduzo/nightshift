@@ -1,9 +1,17 @@
-/** The query and mutation options of flows (`@nightshift/client`, on this app's client). */
+/** The query options of flows (`@nightshift/client`, on this app's client), and their mutations. */
 
-import { createFlowMutations, createFlowQueries } from "@nightshift/client";
+import { createFlowQueries } from "@nightshift/client";
 
 import { orpc } from "@/shared/api";
 
 export const flowQueries = createFlowQueries(orpc);
 
-export const flowMutations = createFlowMutations(orpc);
+export const flowMutations = {
+	save: orpc.flows.save.mutationOptions,
+	remove: orpc.flows.remove.mutationOptions,
+	dismissNotice: orpc.flows.dismissNotice.mutationOptions,
+	restore: orpc.flows.restore.mutationOptions,
+	import: orpc.flows.import.mutationOptions,
+	copy: orpc.flows.copy.mutationOptions,
+	resetKept: orpc.flows.resetKept.mutationOptions,
+};

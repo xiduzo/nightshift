@@ -1,6 +1,5 @@
 import {
 	applySettingsPatch,
-	createNotificationMutations,
 	createNotificationQueries,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
@@ -22,7 +21,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert as NativeAlert, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
 import { HOURS, phoneTimeZone } from "./notification-choices";
@@ -37,13 +36,13 @@ const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
  */
 export function NotificationsCard() {
 	const queries = useHostQueries(createNotificationQueries);
-	const mutations = useHostQueries(createNotificationMutations);
+	const { host } = useSignedIn();
 	const queryClient = useQueryClient();
 	const settings = useQuery(queries.settings());
 	const key = queries.settings().queryKey;
 
 	const save = useMutation(
-		mutations.saveSettings({
+		host.orpc.notifications.settings.save.mutationOptions({
 			onMutate: async (patch: NotificationSettingsPatch) => {
 				await queryClient.cancelQueries({ queryKey: key });
 				const before = queryClient.getQueryData<NotificationSettings>(key);

@@ -6,7 +6,7 @@ export {
 	jsonProblem,
 	missingInputs,
 } from "./inputs";
-export { createFlowMutations, createFlowQueries } from "./queries";
+export { createFlowQueries } from "./queries";
 export { canStart } from "./start";
 export type {
 	FlowListItem,
