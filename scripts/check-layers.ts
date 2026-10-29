@@ -144,6 +144,10 @@ export const LIGHT_ENTRIES: Record<string, string> = {
 		"the barrel of device-config serves the engine's other verticals too",
 	"@nightshift/engine/projects":
 		"the barrel of projects serves the engine's other verticals too",
+	// The barrel of devices' test helpers serves its own tests; the entry
+	// carries only what tests of other workspaces use.
+	"@nightshift/devices/testing":
+		"the barrel of devices' test helpers serves its own tests too",
 };
 
 export type Options = {
