@@ -1,5 +1,6 @@
 /** The exchange of run history: rows by cursor, the ingest and what follows from it, Commands, live transcripts, the Device's half and the Host's half. */
 
+export type { RunCommands } from "./commands";
 export { commandMoves } from "./commands";
 export {
 	type AppliedCommands,

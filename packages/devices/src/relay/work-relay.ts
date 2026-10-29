@@ -1,8 +1,7 @@
 import { HOST_UNREACHABLE } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { WorkRelay } from "../contract";
-import { type DeviceLinks, fromHost } from "../links";
-import type { PeerEngine } from "../peers";
+import { type DeviceLinks, fromHost, type HostSpaces } from "../links";
 import type { WorkHub } from "../work";
 import { createSpaceRoutes } from "./route";
 
@@ -22,7 +21,7 @@ import { createSpaceRoutes } from "./route";
 export function createWorkRelay(deps: {
 	hub: Pick<WorkHub, "call" | "online">;
 	/** Lazy: the engine is made with this relay. */
-	engine(): { hostSpaces: Pick<PeerEngine["hostSpaces"], "hostOf"> };
+	engine(): { hostSpaces: Pick<HostSpaces, "hostOf"> };
 	links(): Pick<DeviceLinks, "get">;
 }): WorkRelay {
 	const { route } = createSpaceRoutes({

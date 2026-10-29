@@ -1,8 +1,8 @@
 import { type FlowDocuments, HostUnreachableError } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay } from "../contract";
-import { type DeviceLinks, fromHost } from "../links";
-import type { PeerEngine } from "../peers";
+import type { RunCommands } from "../exchange";
+import { type DeviceLinks, fromHost, type HostSpaces } from "../links";
 import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
 
@@ -29,8 +29,8 @@ const FLOW_SYNC_POLL_MS = 100;
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
 	engine(): {
-		hostSpaces: Pick<PeerEngine["hostSpaces"], "hostOf">;
-		exchange: { commands: Pick<PeerEngine["exchange"]["commands"], "enqueue"> };
+		hostSpaces: Pick<HostSpaces, "hostOf">;
+		exchange: { commands: Pick<RunCommands, "enqueue"> };
 	};
 	registry(): Pick<DeviceRegistry, "get">;
 	links(): Pick<DeviceLinks, "get">;
