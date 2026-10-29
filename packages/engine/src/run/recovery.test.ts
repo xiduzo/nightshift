@@ -343,6 +343,7 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 			calledFlowsOf: (row) => JSON.parse(row.bodyFlows),
 			runner,
 			resumeGraceMs: 0,
+			holds: { start: (_spaceId, work) => work() },
 		});
 		await recovery.recoverInterruptedWork();
 		return runLog.events(RUN_ID);

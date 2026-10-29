@@ -20,6 +20,7 @@ import {
 	type RunLog,
 	type RunRow,
 	runsArriving,
+	spaceOfRun,
 } from "../log";
 import {
 	awaitsWorktree,
@@ -28,6 +29,7 @@ import {
 	deriveStopAt,
 	runWorktree,
 } from "../read";
+import type { StartHolds } from "./start-holds";
 
 /**
  * Startup recovery: what a new daemon does about the runs the last one
@@ -140,6 +142,8 @@ export type RecoveryDeps = ResumeBlockDeps & {
 	resumeGraceMs: number;
 	/** Aborting it drops the queued resumes and the grace timer: the daemon dies. */
 	signal?: AbortSignal;
+	/** The daemon's resume makes a run active: it waits while the run's Space's Projects move. */
+	holds: Pick<StartHolds, "start">;
 };
 
 export type Recovery = ReturnType<typeof createRecovery>;
@@ -262,32 +266,42 @@ export function createRecovery(deps: RecoveryDeps) {
 
 	/**
 	 * Resumes a run that startup recovery interrupted, in the same Turn as a
-	 * person's resume. Checks again first: a person may have resumed it,
-	 * or the stop time came meanwhile. A full run cap queues it: a freed
-	 * slot asks again from the top.
+	 * person's resume. While the Projects of its Space move, it waits for
+	 * the move, as a schedule that came due does. Checks again first: a
+	 * person may have resumed it, or the stop time came meanwhile. A full
+	 * run cap queues it: a freed slot asks again from the top.
 	 */
 	async function resumeAfterRestart(runId: string): Promise<void> {
 		if (disposed) return;
 		try {
 			await recovered;
-			const events = await log.events(runId);
-			if (
-				runner.isActive(runId) ||
-				deriveRunState(events).status !== "interrupted"
-			) {
-				return;
-			}
-			const why = await daemonResumeBlock(runId, events, deps);
-			if (why) {
-				console.warn(
-					`[engine] run ${runId} did not continue on its own: ${why}`,
-				);
-				return;
-			}
-			await runner.take(
-				runId,
-				{ kind: "resume", by: "daemon" },
-				{ whenFull: "queue", retry: () => void resumeAfterRestart(runId) },
+			const spaceId = await spaceOfRun(db, runId);
+			if (spaceId === null) return;
+			await deps.holds.start(
+				spaceId,
+				async () => {
+					if (disposed) return;
+					const events = await log.events(runId);
+					if (
+						runner.isActive(runId) ||
+						deriveRunState(events).status !== "interrupted"
+					) {
+						return;
+					}
+					const why = await daemonResumeBlock(runId, events, deps);
+					if (why) {
+						console.warn(
+							`[engine] run ${runId} did not continue on its own: ${why}`,
+						);
+						return;
+					}
+					await runner.take(
+						runId,
+						{ kind: "resume", by: "daemon" },
+						{ whenFull: "queue", retry: () => void resumeAfterRestart(runId) },
+					);
+				},
+				"wait",
 			);
 		} catch (error) {
 			console.error(`[engine] could not resume run ${runId}`, error);

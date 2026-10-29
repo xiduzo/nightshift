@@ -46,6 +46,7 @@ import { GateClosedError } from "./actions";
 import type { Engine } from "./engine";
 import { createEngine, type EngineInternals } from "./engine";
 import type { SpaceEngine } from "./space-engine";
+import { START_HOLD_WORDS } from "./start-holds";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */
@@ -1802,6 +1803,40 @@ const settingsWith = (patch: Partial<RunSettings>) => (): RunSettings => ({
 	...patch,
 });
 
+describe("a Space whose Projects move", () => {
+	test("a person's resume, restart and run again are refused as a start is, until the release", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const daemon = makeDaemon(harness);
+		const engine = daemon.space(sandbox.spaceId);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", "Go")]),
+		});
+		await waitFor(() => sessions[0]);
+		await engine.stopRun(run.id);
+		expect(await statusOf(engine, run.id)).toBe("stopped");
+
+		const release = await daemon.holdStarts(sandbox.spaceId);
+		for (const act of [
+			() => engine.resumeRun(run.id),
+			() => engine.restartStep(run.id),
+			() => engine.rerunFrom(run.id, { nodeId: "worker" }),
+		]) {
+			await expect(act()).rejects.toMatchObject({
+				kind: "unavailable",
+				message: START_HOLD_WORDS.held,
+			});
+		}
+		expect(sessions).toHaveLength(1);
+		expect(await statusOf(engine, run.id)).toBe("stopped");
+
+		release();
+		await engine.resumeRun(run.id);
+		(await waitFor(() => sessions[1], { label: "the resume" })).finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+	});
+});
+
 describe("recovery", () => {
 	test("with automatic resume off, work the daemon lost is interrupted and waits for a person", async () => {
 		// The first daemon's harness never ends: the daemon "dies" mid-step.
@@ -2136,6 +2171,28 @@ describe("automatic resume after a restart", () => {
 		const detail = await second.engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
 		expect(detail.resumes).toEqual([]);
+	});
+
+	test("while its Space's Projects move, an interrupted run waits, and continues on its own after", async () => {
+		const { run } = await dieMidStep();
+		const { harness, sessions } = scriptedHarness({
+			harnessSessionId: () => "harness-0",
+		});
+		const daemon = makeDaemon(harness, {}, { resumeGraceMs: 30 });
+		const release = await daemon.holdStarts(sandbox.spaceId);
+		const engine = daemon.space(sandbox.spaceId);
+		expect(await statusOf(engine, run.id)).toBe("interrupted");
+		await Bun.sleep(120);
+		expect(sessions).toHaveLength(0);
+		expect(await statusOf(engine, run.id)).toBe("interrupted");
+
+		release();
+		const resumed = await waitFor(() => sessions[0], { label: "the resume" });
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect((await engine.getRun(run.id)).resumes.map((r) => r.by)).toEqual([
+			"daemon",
+		]);
 	});
 
 	test("after three automatic resumes in a row, a run waits for a person", async () => {

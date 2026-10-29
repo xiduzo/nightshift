@@ -65,4 +65,27 @@ describe("the start holds", () => {
 		second();
 		expect(await holds.start("space-a", async () => "run")).toBe("run");
 	});
+
+	test("a start that waits begins once the last hold is released, and no hold waits for it", async () => {
+		const holds = createStartHolds();
+		const first = await holds.hold("space-a");
+		let began = false;
+		const waiting = holds.start(
+			"space-a",
+			async () => {
+				began = true;
+				return "resumed";
+			},
+			"wait",
+		);
+		// A second hold does not wait for a start that has not begun.
+		const second = await holds.hold("space-a");
+		first();
+		await Bun.sleep(0);
+		expect(began).toBe(false);
+
+		second();
+		expect(await waiting).toBe("resumed");
+		expect(began).toBe(true);
+	});
 });

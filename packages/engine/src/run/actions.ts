@@ -21,6 +21,7 @@ import {
 import { RunRefusal, refuseUnless, whyNot } from "../run-status";
 import type { PlacementPort, RunsPort } from "./peers";
 import type { RunRelay } from "./relay";
+import type { StartHolds } from "./start-holds";
 
 /**
  * What a person does to a run: stop it, answer its Gate, send its Signal,
@@ -78,6 +79,8 @@ export type RunActionsDeps = {
 	 * online), and the Person's Devices to offer for it (`devicesFor`).
 	 */
 	placement: Pick<PlacementPort, "moveTo" | "devicesFor">;
+	/** A resume, a restart and a run again make the run active: refused while its Space's Projects move. */
+	holds: Pick<StartHolds, "start">;
 };
 
 /**
@@ -287,7 +290,11 @@ export function createRunActions(deps: RunActionsDeps) {
 		});
 	}
 
-	/** An action on a run this computer walks: a Turn of the runner. */
+	/**
+	 * An action on a run this computer walks: a Turn of the runner. One
+	 * that makes the run active (a resume, a restart, a run again) is a
+	 * start: refused, as a new run is, while its Space's Projects move.
+	 */
 	async function here(
 		row: RunRow,
 		actor: Actor | undefined,
@@ -324,32 +331,40 @@ export function createRunActions(deps: RunActionsDeps) {
 				return move(row, actor, request.to);
 			case "resume":
 				// `RunResumed` before the thread moves; a sleeping run wakes.
-				await runner.take(
-					runId,
-					{
-						kind: "resume",
-						by: "person",
-						...(request.prompt !== undefined ? { prompt: request.prompt } : {}),
-					},
-					{
-						check: (events) => {
-							const { status, result } = deriveRunState(events);
-							refuseUnless("resume", status, true, result);
+				await deps.holds.start(row.spaceId, () =>
+					runner.take(
+						runId,
+						{
+							kind: "resume",
+							by: "person",
+							...(request.prompt !== undefined
+								? { prompt: request.prompt }
+								: {}),
 						},
-					},
+						{
+							check: (events) => {
+								const { status, result } = deriveRunState(events);
+								refuseUnless("resume", status, true, result);
+							},
+						},
+					),
 				);
 				return;
 			case "restart":
 				// A stop now and a resume in one Turn: nothing comes in between,
 				// and the run keeps its slot.
-				await runner.take(
-					runId,
-					{
-						kind: "restart",
-						by: "person",
-						...(request.prompt !== undefined ? { prompt: request.prompt } : {}),
-					},
-					{ check: (events) => refuseRestart(events, request.stepId) },
+				await deps.holds.start(row.spaceId, () =>
+					runner.take(
+						runId,
+						{
+							kind: "restart",
+							by: "person",
+							...(request.prompt !== undefined
+								? { prompt: request.prompt }
+								: {}),
+						},
+						{ check: (events) => refuseRestart(events, request.stepId) },
+					),
 				);
 				return;
 			case "rerun": {
@@ -357,13 +372,15 @@ export function createRunActions(deps: RunActionsDeps) {
 				const refusal = rerunNodeRefusal(deps.flowOf(row), request.nodeId);
 				if (refusal) throw new RunRefusal("unknown-node", refusal);
 				const { kind: _, ...rerun } = request;
-				await runner.take(
-					runId,
-					{ kind: "rerun", by: "person", ...rerun },
-					{
-						check: (events) =>
-							refuseUnless("rerun", deriveRunState(events).status, true),
-					},
+				await deps.holds.start(row.spaceId, () =>
+					runner.take(
+						runId,
+						{ kind: "rerun", by: "person", ...rerun },
+						{
+							check: (events) =>
+								refuseUnless("rerun", deriveRunState(events).status, true),
+						},
+					),
 				);
 				return;
 			}

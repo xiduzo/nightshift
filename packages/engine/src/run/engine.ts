@@ -155,8 +155,9 @@ export interface Engine {
 	 * Holds the start of new runs while a merge of Spaces moves the rows
 	 * of `spaceId`: from its last check for runs that are not done
 	 * through its batch. No schedule fires anywhere, a webhook's run or a
-	 * person's run in that Space is refused, and the starts under way
-	 * end first. A schedule that came due meanwhile fires after the
+	 * person's run, resume, restart or run again in that Space is refused,
+	 * the daemon's own resume of an interrupted run waits, and the starts
+	 * under way end first. A schedule that came due meanwhile fires after the
 	 * release, within its grace. Always release it, on success or failure.
 	 */
 	holdStarts(spaceId: string): Promise<() => void>;
@@ -377,6 +378,9 @@ export function createEngine(
 			: {}),
 	});
 
+	/** The Spaces whose runs do not become active while their Projects move. */
+	const startHolds = createStartHolds();
+
 	const recovery = createRecovery({
 		db,
 		log: runLog,
@@ -390,6 +394,7 @@ export function createEngine(
 		placedElsewhere: (row) => !placedHere(row),
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
 		signal,
+		holds: startHolds,
 	});
 
 	const ready = recovery
@@ -502,9 +507,6 @@ export function createEngine(
 		);
 	}
 
-	/** The Spaces whose new runs wait for a merge of Spaces. */
-	const startHolds = createStartHolds();
-
 	async function startRunWith(
 		input: StartRunInput,
 		trigger: RunTrigger,
@@ -550,6 +552,7 @@ export function createEngine(
 		runRow: (runId) => getRunRow(db, runId),
 		flowOf: parseRunFlow,
 		placement,
+		holds: startHolds,
 	});
 
 	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */
