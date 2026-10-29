@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { LandedFact } from "@nightshift/engine";
 
 import { createGateTracker } from "./gate-tracker";
-import type { OpenGateRef, RunEvent } from "./sources";
+import type { OpenGateRef } from "./sources";
 
 const SPACE = "space-1";
 
@@ -22,29 +23,37 @@ function engine(initial: OpenGateRef[] = []) {
 	};
 }
 
-const event = (
-	runId: string,
-	type: string,
-	stepId: string | null = null,
-): RunEvent => ({ spaceId: SPACE, runId, stepId, type, seq: 1, payload: {} });
+const base = (runId: string) => ({
+	spaceId: SPACE,
+	runId,
+	seq: 1,
+	changes: "summary" as const,
+});
+const gateOpened = (runId: string, stepId: string): LandedFact => ({
+	...base(runId),
+	kind: "gate-opened",
+	stepId,
+});
+const stepEnded = (runId: string, stepId = "step"): LandedFact => ({
+	...base(runId),
+	kind: "step-ended",
+	stepId,
+});
 
 describe("the gate tracker", () => {
 	test("a Gate that opens in the batch opens, with what the engine says of it", async () => {
 		const { tracker, set } = engine();
 		const review = { runId: "r1", stepId: "review", lockScreen: true };
 		set([review]);
-		expect(
-			await tracker.apply(SPACE, [event("r1", "GateOpened", "review")]),
-		).toEqual({
+		expect(await tracker.apply(SPACE, [gateOpened("r1", "review")])).toEqual({
 			opened: [{ key: "r1:review", runId: "r1", stepId: "review" }],
 			closed: [],
 		});
 		expect(tracker.isOpen(SPACE, "r1:review")).toBe(true);
 		expect(tracker.factsOf(SPACE, "r1:review")).toEqual(review);
-		// The same event again opens nothing new.
+		// The same fact again opens nothing new.
 		expect(
-			(await tracker.apply(SPACE, [event("r1", "GateOpened", "review")]))
-				.opened,
+			(await tracker.apply(SPACE, [gateOpened("r1", "review")])).opened,
 		).toEqual([]);
 	});
 
@@ -52,36 +61,34 @@ describe("the gate tracker", () => {
 		const { tracker, set } = engine([{ runId: "r1", stepId: "review" }]);
 		await tracker.baseline([SPACE]);
 		set([]);
-		expect(await tracker.apply(SPACE, [event("r1", "StepEnded")])).toEqual({
+		expect(await tracker.apply(SPACE, [stepEnded("r1")])).toEqual({
 			opened: [],
 			closed: ["r1:review"],
 		});
 		expect(tracker.isOpen(SPACE, "r1:review")).toBe(false);
 	});
 
-	test("an event of a run without a known Gate, and no GateOpened, reads nothing", async () => {
+	test("a fact of a run without a known Gate, and no Gate that opened, reads nothing", async () => {
 		const { tracker, reads } = engine([{ runId: "r1", stepId: "review" }]);
 		await tracker.baseline([SPACE]);
 		expect(reads()).toBe(1);
-		expect(await tracker.apply(SPACE, [event("r2", "StepEnded")])).toEqual({
+		expect(await tracker.apply(SPACE, [stepEnded("r2")])).toEqual({
 			opened: [],
 			closed: [],
 		});
 		expect(reads()).toBe(1);
 	});
 
-	test("a Gate a read shows before its GateOpened is told when the event comes", async () => {
+	test("a Gate a read shows before its fact is told when the fact comes", async () => {
 		const { tracker, set } = engine([{ runId: "r1", stepId: "review" }]);
 		await tracker.baseline([SPACE]);
 		set([
 			{ runId: "r1", stepId: "review" },
 			{ runId: "r2", stepId: "ship" },
 		]);
+		expect((await tracker.apply(SPACE, [stepEnded("r1")])).opened).toEqual([]);
 		expect(
-			(await tracker.apply(SPACE, [event("r1", "StepEnded")])).opened,
-		).toEqual([]);
-		expect(
-			(await tracker.apply(SPACE, [event("r2", "GateOpened", "ship")])).opened,
+			(await tracker.apply(SPACE, [gateOpened("r2", "ship")])).opened,
 		).toEqual([{ key: "r2:ship", runId: "r2", stepId: "ship" }]);
 	});
 

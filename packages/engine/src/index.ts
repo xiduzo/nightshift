@@ -134,8 +134,6 @@ export type {
 	CopyStamp,
 	HistoryCursors,
 	HistoryRows,
-	LandedRunEvent,
-	LandedRunListener,
 	LandedScope,
 	LoggedEvent,
 	OwnStepFiles,
@@ -191,6 +189,8 @@ export {
 } from "./projects";
 export type {
 	FeedStep,
+	LandedChange,
+	LandedFact,
 	OpenGate,
 	ProjectRuns,
 	RunDetail,
@@ -202,6 +202,7 @@ export type {
 } from "./read";
 export {
 	exportRun,
+	landedFacts,
 	openRunBundle,
 	type RunBundleSummary,
 } from "./read";

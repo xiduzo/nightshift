@@ -1,4 +1,4 @@
-/** The read model: the pure projections of the event log, the run views, cost, the Persons a run names, and the run bundle. */
+/** The read model: the pure projections of the event log, the landed facts, the run views, cost, the Persons a run names, and the run bundle. */
 
 export {
 	awaitsWorktree,
@@ -35,6 +35,11 @@ export {
 	lastHarnessSessionOfNode,
 	withEnclosing,
 } from "./derive-steps";
+export {
+	type LandedChange,
+	type LandedFact,
+	landedFacts,
+} from "./landed-facts";
 export { gitAuthorOf, namesOf } from "./people";
 export type { ReadModel, RunHere } from "./read-model";
 export {

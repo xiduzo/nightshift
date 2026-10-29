@@ -1,3 +1,5 @@
+import type { LandedFact } from "@nightshift/engine";
+
 import type {
 	NotificationChannel,
 	NotificationMessage,
@@ -7,12 +9,7 @@ import type {
 } from "../channels";
 // What a push service gets: only the fake reads it, past the barrel.
 import type { WebPushPayload, WebPushRequest } from "../channels/web-push";
-import type {
-	OpenGateRef,
-	RunEvent,
-	RunEventSource,
-	RunRef,
-} from "../notifier/sources";
+import type { OpenGateRef, RunEventSource, RunRef } from "../notifier/sources";
 import type { PushTarget } from "../targets";
 
 /** What a fake channel got, in order. */
@@ -57,15 +54,15 @@ export type FakeRunEvents = {
 	setOpen(spaceId: string, gates: OpenGateRef[]): void;
 	/** Sets a run, as the engine would read it now. */
 	setRun(runId: string, run: RunRef): void;
-	/** Lands run events, as the engine's log would. */
-	land(events: readonly RunEvent[]): void;
+	/** Lands the facts of run events, as the engine's landed feed would. */
+	land(facts: readonly LandedFact[]): void;
 };
 
 /** Run events and open Gates that a test sets. */
 export function fakeRunEvents(): FakeRunEvents {
 	const open = new Map<string, OpenGateRef[]>();
 	const runs = new Map<string, RunRef>();
-	const listeners = new Set<(events: readonly RunEvent[]) => void>();
+	const listeners = new Set<(facts: readonly LandedFact[]) => void>();
 	return {
 		source: {
 			subscribe(listener) {
@@ -77,8 +74,8 @@ export function fakeRunEvents(): FakeRunEvents {
 		},
 		setOpen: (spaceId, gates) => open.set(spaceId, gates),
 		setRun: (runId, run) => runs.set(runId, run),
-		land(events) {
-			for (const listener of [...listeners]) listener(events);
+		land(facts) {
+			for (const listener of [...listeners]) listener(facts);
 		},
 	};
 }

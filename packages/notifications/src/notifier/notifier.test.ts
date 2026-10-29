@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
+import type { LandedChange, LandedFact } from "@nightshift/engine";
 
 import {
 	createInAppChannel,
@@ -14,7 +15,7 @@ import { type FakeRunEvents, fakeRunEvents } from "../testing";
 import { testDatabase } from "../testing/database";
 import { type FakeChannel, fakeChannel } from "../testing/fakes";
 import { createNotifier, type Notifier } from "./notifier";
-import { type OpenGateRef, oneSenderPerSpace, type RunEvent } from "./sources";
+import { type OpenGateRef, oneSenderPerSpace } from "./sources";
 
 /**
  * The rules of the notifier, on a real database with fake run events and
@@ -119,16 +120,18 @@ async function closeScreens(): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+/** What a landed fact says beyond its run: by default it changes what a list of runs shows. */
+type What<F = LandedFact> = F extends unknown
+	? Omit<F, "spaceId" | "runId" | "seq" | "changes"> & {
+			changes?: LandedChange;
+		}
+	: never;
+
 let seq = 0;
-function event(
-	type: string,
-	runId: string,
-	stepId: string | null = null,
-	payload: unknown = {},
-	spaceId = SPACE,
-): RunEvent {
+/** A run event that landed, as the engine's landed feed tells it. */
+function landed(runId: string, what: What, spaceId = SPACE): LandedFact {
 	seq += 1;
-	return { spaceId, runId, stepId, type, seq, payload };
+	return { spaceId, runId, seq, changes: "summary", ...what } as LandedFact;
 }
 
 /** A Gate opens: the engine reads it open from now on, and its event lands. */
@@ -142,7 +145,7 @@ async function openGate(
 		...(await events.source.openGates(spaceId)),
 		{ runId, stepId, ...facts },
 	]);
-	events.land([event("GateOpened", runId, stepId, {}, spaceId)]);
+	events.land([landed(runId, { kind: "gate-opened", stepId }, spaceId)]);
 	await notifier.idle();
 }
 
@@ -154,12 +157,15 @@ async function answerGate(runId: string, stepId: string, spaceId = SPACE) {
 			(g) => !(g.runId === runId && g.stepId === stepId),
 		),
 	);
-	events.land([event("StepEnded", runId, stepId, {}, spaceId)]);
+	events.land([landed(runId, { kind: "step-ended", stepId }, spaceId)]);
 	await notifier.idle();
 }
 
-async function endRun(runId: string, status: string) {
-	events.land([event("RunEnded", runId, null, { status, reason: null })]);
+async function endRun(
+	runId: string,
+	status: Extract<LandedFact, { kind: "run-ended" }>["status"],
+) {
+	events.land([landed(runId, { kind: "run-ended", status })]);
 	await notifier.idle();
 }
 
@@ -648,16 +654,17 @@ describe("the open screens hear when a run changes", () => {
 		const ada = openScreen("ada");
 		const cy = openScreen("cy");
 
-		for (const type of [
-			"RunStarted",
-			"StepStarted",
-			"WaitStarted",
-			"WaitEnded",
-			"WalkerMoved",
-			"StopRequested",
-			"StepEnded",
-		]) {
-			events.land([event(type, "run-1", "step-1")]);
+		// It starts, a step starts, sleeps, wakes, moves, a stop waits, the step ends.
+		for (const what of [
+			{ kind: "other" },
+			{ kind: "other" },
+			{ kind: "wait-started", stepId: "step-1", reason: "usage-limit" },
+			{ kind: "wait-ended", stepId: "step-1" },
+			{ kind: "other" },
+			{ kind: "other" },
+			{ kind: "step-ended", stepId: "step-1" },
+		] as What[]) {
+			events.land([landed("run-1", what)]);
 			await notifier.idle();
 		}
 		await endRun("run-1", "stopped");
@@ -682,13 +689,13 @@ describe("the open screens hear when a run changes", () => {
 		events.setOpen(SPACE, [{ runId: "run-2", stepId: "gate" }]);
 
 		events.land([
-			event("StepStarted", "run-1", "a"),
-			event("StepEnded", "run-1", "a"),
-			event("StepStarted", "run-1", "b"),
-			event("StepStarted", "run-2", "gate"),
-			event("GateOpened", "run-2", "gate"),
-			event("StepEnded", "run-3", "c"),
-			event("RunEnded", "run-3", null, { status: "finished", reason: null }),
+			landed("run-1", { kind: "other" }),
+			landed("run-1", { kind: "step-ended", stepId: "a" }),
+			landed("run-1", { kind: "other" }),
+			landed("run-2", { kind: "other" }),
+			landed("run-2", { kind: "gate-opened", stepId: "gate" }),
+			landed("run-3", { kind: "step-ended", stepId: "c" }),
+			landed("run-3", { kind: "run-ended", status: "finished" }),
 		]);
 		await notifier.idle();
 
@@ -704,9 +711,9 @@ describe("the open screens hear when a run changes", () => {
 		const ada = openScreen("ada");
 
 		events.land([
-			event("SessionUsage", "run-1", "a"),
-			event("EdgeTaken", "run-1", "a"),
-			event("VariablesSet", "run-1", "a"),
+			landed("run-1", { kind: "other", changes: "spend" }),
+			landed("run-1", { kind: "other", changes: "detail" }),
+			landed("run-1", { kind: "other", changes: "detail" }),
 		]);
 		await notifier.idle();
 
@@ -760,7 +767,7 @@ describe("answer once, clear everywhere", () => {
 		await register("ada", "web");
 		await openGate("run-1", "step-1");
 
-		events.land([event("StepStarted", "run-2", "step-9")]);
+		events.land([landed("run-2", { kind: "other" })]);
 		await notifier.idle();
 
 		expect(web.withdrawn()).toEqual([]);
@@ -773,7 +780,7 @@ describe("once per key", () => {
 		await register("ada", "web");
 
 		await openGate("run-1", "step-1");
-		events.land([event("GateOpened", "run-1", "step-1")]);
+		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
 		await notifier.idle();
 
 		expect(web.sent()).toHaveLength(1);
@@ -802,7 +809,7 @@ describe("once per key", () => {
 		notifier = makeNotifier();
 		const screen = openScreen("ada");
 		await notifier.start();
-		events.land([event("StepStarted", "run-1", "step-2")]);
+		events.land([landed("run-1", { kind: "other" })]);
 		await notifier.idle();
 
 		expect(web.sent()).toHaveLength(1);
@@ -833,7 +840,7 @@ describe("once per key", () => {
 		});
 		await notifier.start();
 		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		events.land([event("GateOpened", "run-1", "step-1")]);
+		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
 		await waitForClaim("run-1:step-1");
 		notifier.stop();
 
@@ -860,7 +867,7 @@ describe("once per key", () => {
 		});
 		await notifier.start();
 		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		events.land([event("GateOpened", "run-1", "step-1")]);
+		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
 		await waitForClaim("run-1:step-1");
 
 		const next = makeNotifier();
@@ -878,7 +885,7 @@ describe("once per key", () => {
 		});
 		await notifier.start();
 		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		events.land([event("GateOpened", "run-1", "step-1")]);
+		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
 		await waitForClaim("run-1:step-1");
 		notifier.stop();
 
@@ -985,11 +992,15 @@ describe("a step that waits for a device", () => {
 	});
 
 	/** The step sleeps because its Device is offline: the first sleep, or a look again a minute later. */
-	async function sleepFor(stepId = "step-1", deviceName = "studio-mac") {
+	async function sleepFor(
+		stepId = "step-1",
+		deviceName: string | null = "studio-mac",
+	) {
 		events.land([
-			event("WaitStarted", "run-1", stepId, {
+			landed("run-1", {
+				kind: "wait-started",
+				stepId,
 				reason: "device-offline",
-				deviceId: "device-2",
 				deviceName,
 			}),
 		]);
@@ -997,7 +1008,7 @@ describe("a step that waits for a device", () => {
 	}
 
 	async function wake(stepId = "step-1") {
-		events.land([event("WaitEnded", "run-1", stepId, { early: false })]);
+		events.land([landed("run-1", { kind: "wait-ended", stepId })]);
 		await notifier.idle();
 	}
 
@@ -1075,7 +1086,7 @@ describe("a step that waits for a device", () => {
 		await sleepFor("step-1");
 		await sleepFor("step-2");
 
-		events.land([event("StepEnded", "run-1", "step-1")]);
+		events.land([landed("run-1", { kind: "step-ended", stepId: "step-1" })]);
 		await notifier.idle();
 		expect(web.withdrawn()).toEqual(["run-1:wait:step-1"]);
 
@@ -1093,7 +1104,7 @@ describe("a step that waits for a device", () => {
 		await notifier.start();
 		await register("ada", "web");
 
-		await sleepFor("step-1", "");
+		await sleepFor("step-1", null);
 
 		expect(web.sent()[0]).toMatchObject({
 			title: "Nightly triage waits for a device",
@@ -1181,7 +1192,7 @@ describe("a step that waits for a device", () => {
 		await notifier.start();
 		expect(web.withdrawn()).toEqual([]);
 
-		events.land([event("StepEnded", "run-1", "step-1")]);
+		events.land([landed("run-1", { kind: "step-ended", stepId: "step-1" })]);
 		await notifier.idle();
 		expect(web.withdrawn()).toEqual(["run-1:wait:step-1"]);
 	});

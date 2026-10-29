@@ -99,7 +99,7 @@ const engine: Context["engine"] = {
 		}),
 	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
 	logMemberChange: async () => {},
-	onRunEvents: () => () => {},
+	onLandedFacts: () => () => {},
 	reindex: () => {},
 	holdStarts: async () => () => {},
 	runHere: async () => null,

@@ -5,6 +5,7 @@ import {
 	type Engine,
 	type LandedScope,
 	type LoggedEvent,
+	landedFacts,
 	memberRole,
 	type PeerContext,
 	parseTranscript,
@@ -37,14 +38,6 @@ const MOVED_ON = "The run moved to another device before this reached it.";
 const ENDED_ELSEWHERE = "The run ended before this reached it.";
 /** Why a Command is not applied: its run is of another Space here. */
 const NOT_HERE = "This device does not run this run.";
-
-/**
- * Events that do not wake the exchange. A session's spend so far lands
- * every few seconds while an agent works, more than half of all events,
- * and only its latest counts: it goes with the next event that wakes the
- * exchange, or at the next look when nothing else lands.
- */
-const QUIET: ReadonlySet<string> = new Set(["SessionUsage"]);
 
 /**
  * Run history between this Replica and its Hosts: the one module both
@@ -297,8 +290,12 @@ export function createRunHistoryExchange(deps: {
 				resolve();
 			};
 			const timer = setTimeout(done, timeoutMs);
+			// A session's spend so far lands every few seconds while an agent
+			// works, more than half of all events, and only its latest counts:
+			// it goes with the next event that wakes the exchange, or at the
+			// next look when nothing else lands.
 			const off = history.landed.subscribe((events) => {
-				if (events.some((e) => !QUIET.has(e.type))) done();
+				if (landedFacts(events).some((f) => f.changes !== "spend")) done();
 			}, scope);
 			signal?.addEventListener("abort", done, { once: true });
 		});

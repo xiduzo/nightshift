@@ -21,8 +21,6 @@ import {
 	createRunHistory,
 	createRunLog,
 	getRunRow,
-	type LandedRunListener,
-	type LandedScope,
 	lastRunDevice,
 	logMemberChange,
 	planOf,
@@ -42,6 +40,8 @@ import {
 } from "../projects";
 import {
 	createReadModel,
+	type LandedFact,
+	landedFacts,
 	namesOf,
 	parseCalledFlows,
 	parseRunFlow,
@@ -137,13 +137,13 @@ export interface Engine {
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
 	/**
-	 * Calls `listener` with the run events that land in this Replica from
-	 * now on: appended here, or brought by the exchange from another
-	 * Walker. Each carries its Space and Walker, with no query (the landed
-	 * feed). `scope`: of these Spaces and Walkers only. The notifier reads
-	 * Gates and run endings from it. Returns the unsubscribe.
+	 * Calls `listener` with what each run event that lands in this Replica
+	 * from now on means (the landed facts): appended here, or brought by
+	 * the exchange from another Walker. Each carries its Space, with no
+	 * query (the landed feed). The notifier reads Gates, device waits and
+	 * run endings from it. Returns the unsubscribe.
 	 */
-	onRunEvents(listener: LandedRunListener, scope?: LandedScope): () => void;
+	onLandedFacts(listener: (facts: readonly LandedFact[]) => void): () => void;
 	/**
 	 * The rows of these runs changed in the database under the engine, in
 	 * one batch that logged no `ProjectMoved` (a merge of Spaces): their
@@ -631,7 +631,8 @@ export function createEngine(
 			return spaceOfRun(db, runId);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
-		onRunEvents: (listener, scope) => history.landed.subscribe(listener, scope),
+		onLandedFacts: (listener) =>
+			history.landed.subscribe((events) => listener(landedFacts(events))),
 		reindex(runIds) {
 			runLog.forget(runIds);
 			history.landed.reread();

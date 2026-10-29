@@ -28,7 +28,6 @@ export {
 export {
 	engineRunEvents,
 	oneSenderPerSpace,
-	type RunEvent,
 	type RunEventSource,
 	type SenderFacts,
 } from "./notifier";

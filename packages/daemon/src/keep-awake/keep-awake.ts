@@ -67,15 +67,15 @@ async function runFactsOf(
 
 /** The engine's runs, in every Space of this Replica. */
 export function engineRunSource(
-	engine: Pick<Engine, "onRunEvents" | "runHere" | "space">,
+	engine: Pick<Engine, "onLandedFacts" | "runHere" | "space">,
 	spaces: () => Promise<string[]>,
 ): RunSource {
 	return {
 		subscribe: (listener) =>
-			engine.onRunEvents((events) => {
+			engine.onLandedFacts((facts) => {
 				// A spend so far changes no run's status.
 				const runIds = new Set(
-					events.filter((e) => e.type !== "SessionUsage").map((e) => e.runId),
+					facts.filter((f) => f.changes !== "spend").map((f) => f.runId),
 				);
 				if (runIds.size > 0) listener([...runIds]);
 			}),

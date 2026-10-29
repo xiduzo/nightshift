@@ -39,7 +39,6 @@ export {
 } from "./history";
 export type {
 	LandedRunEvent,
-	LandedRunListener,
 	LandedScope,
 } from "./landed";
 export { logMemberChange } from "./member-events";

@@ -4,7 +4,6 @@ export { createNotifier } from "./notifier";
 export {
 	engineRunEvents,
 	oneSenderPerSpace,
-	type RunEvent,
 	type RunEventSource,
 	type SenderFacts,
 	spaceAudience,

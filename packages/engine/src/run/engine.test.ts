@@ -28,6 +28,7 @@ import {
 import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
+import type { LandedFact } from "../read/landed-facts";
 import type { RunDetail, RunStreamItem } from "../read/views";
 import { seedFlowFolder } from "../testing/seed-flows";
 import {
@@ -2773,22 +2774,20 @@ describe("gates", () => {
 		).toEqual(["gate-open", "gate-resolved"]);
 	});
 
-	test("onRunEvents tells of each run event that lands, with its Space", async () => {
+	test("onLandedFacts tells what each run event that lands means, with its Space", async () => {
 		const daemon = makeDaemon(fakeHarness());
 		const engine = daemon.space(sandbox.spaceId);
-		const landed: { type: string; spaceId: string; runId: string }[] = [];
-		const off = daemon.onRunEvents((events) => {
-			for (const e of events) {
-				landed.push({ type: e.type, spaceId: e.spaceId, runId: e.runId });
-			}
+		const landed: LandedFact[] = [];
+		const off = daemon.onLandedFacts((facts) => {
+			landed.push(...facts);
 		});
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: gateFlow(),
 		});
 		const open = await openGateOf(engine, run.id);
-		await waitFor(async () => landed.find((e) => e.type === "GateOpened"), {
-			label: "the Gate's event",
+		await waitFor(async () => landed.find((f) => f.kind === "gate-opened"), {
+			label: "the Gate's fact",
 		});
 		off();
 		await engine.resolveGate({
@@ -2798,13 +2797,18 @@ describe("gates", () => {
 		});
 		await waitForEnd(engine, run.id);
 
-		expect(landed[0]).toEqual({
-			type: "RunStarted",
+		expect(landed[0]).toMatchObject({
+			kind: "other",
+			changes: "summary",
 			spaceId: sandbox.spaceId,
 			runId: run.id,
 		});
+		expect(landed.find((f) => f.kind === "gate-opened")).toMatchObject({
+			stepId: open.stepId,
+			changes: "summary",
+		});
 		// Nothing after the unsubscribe.
-		expect(landed.map((e) => e.type)).not.toContain("RunEnded");
+		expect(landed.map((f) => f.kind)).not.toContain("run-ended");
 	});
 
 	test("resolveGate rejects a wrong step, a wrong choice and a run that does not wait", async () => {

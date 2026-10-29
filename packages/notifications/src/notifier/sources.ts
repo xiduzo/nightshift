@@ -1,23 +1,14 @@
 import { spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine } from "@nightshift/engine";
+import type { Engine, LandedFact } from "@nightshift/engine";
 
 /**
- * What the notifier reads, as ports: the run events of this Replica, the
+ * What the notifier reads, as ports: the run events of this Replica (as
+ * the engine's landed facts: what each means, not its payload), the
  * open Gates of a Space, who may see a Space's runs, and which Spaces
  * this daemon sends for. The engine and auth implement them here; the
  * tests use fakes (`./testing`).
  */
-
-/** One run event, as the notifier reads it. */
-export type RunEvent = {
-	spaceId: string;
-	runId: string;
-	stepId: string | null;
-	type: string;
-	seq: number;
-	payload: unknown;
-};
 
 /**
  * An open Gate, by its run and step, and what a lock-screen notification
@@ -45,8 +36,8 @@ export type RunRef = {
 };
 
 export type RunEventSource = {
-	/** Calls `listener` with the run events that land from now on. Returns the unsubscribe. */
-	subscribe(listener: (events: readonly RunEvent[]) => void): () => void;
+	/** Calls `listener` with the facts of the run events that land from now on. Returns the unsubscribe. */
+	subscribe(listener: (facts: readonly LandedFact[]) => void): () => void;
 	/** The open Gates of the Space's runs. */
 	openGates(spaceId: string): Promise<OpenGateRef[]>;
 	/** One run of the Space. Null: this Replica has no such run. */
@@ -55,10 +46,10 @@ export type RunEventSource = {
 
 /** The engine's run events and open Gates. */
 export function engineRunEvents(
-	engine: Pick<Engine, "onRunEvents" | "space">,
+	engine: Pick<Engine, "onLandedFacts" | "space">,
 ): RunEventSource {
 	return {
-		subscribe: (listener) => engine.onRunEvents(listener),
+		subscribe: (listener) => engine.onLandedFacts(listener),
 		async openGates(spaceId) {
 			const gates = await engine.space(spaceId).listGates();
 			return gates.map((g) => ({

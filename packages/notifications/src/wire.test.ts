@@ -89,9 +89,9 @@ test("a new Gate goes to the Person's browser, and its answer sends no push that
 			spaceId,
 			runId: "run-1",
 			stepId: "review",
-			type: "GateOpened",
+			kind: "gate-opened",
 			seq: 1,
-			payload: {},
+			changes: "summary",
 		},
 	]);
 	await waitFor(() => sender.requests.length === 1);
@@ -113,9 +113,9 @@ test("a new Gate goes to the Person's browser, and its answer sends no push that
 			spaceId,
 			runId: "run-1",
 			stepId: "review",
-			type: "GateResolved",
+			kind: "step-ended",
 			seq: 2,
-			payload: {},
+			changes: "summary",
 		},
 	]);
 	// The open page closes the notification: no push goes to the browser.
@@ -150,9 +150,9 @@ test("a browser the push service lost is forgotten", async () => {
 			spaceId,
 			runId: "run-1",
 			stepId: "review",
-			type: "GateOpened",
+			kind: "gate-opened",
 			seq: 1,
-			payload: {},
+			changes: "summary",
 		},
 	]);
 	await waitFor(() => sender.requests.length === 1);

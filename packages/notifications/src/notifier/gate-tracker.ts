@@ -1,7 +1,9 @@
-import { gateKey, parseGateKey } from "../contract";
-import type { OpenGateRef, RunEvent } from "./sources";
+import type { LandedFact } from "@nightshift/engine";
 
-/** What a batch of run events did to the Gates of one Space. */
+import { gateKey, parseGateKey } from "../contract";
+import type { OpenGateRef } from "./sources";
+
+/** What a landing did to the Gates of one Space. */
 export type GateChanges = {
 	/** Gates that opened and are still open: tell them. */
 	opened: { key: string; runId: string; stepId: string }[];
@@ -12,18 +14,18 @@ export type GateChanges = {
 /**
  * The open Gates the notifier knows, by Space, and what the engine last
  * said of each. A Gate is known once it was told or found at the baseline:
- * a Gate that a read shows before its `GateOpened` arrives is told when
- * that event comes.
+ * a Gate that a read shows before its fact arrives is told when that
+ * fact comes.
  */
 export type GateTracker = {
 	/** Reads the open Gates of each Space: they are the baseline. */
 	baseline(spaceIds: readonly string[]): Promise<void>;
 	/**
-	 * What the events of one Space opened and closed. It reads the open
-	 * Gates only when a Gate opened, or when an event is of a run with a
-	 * known Gate: other events cannot change them.
+	 * What the facts of one Space opened and closed. It reads the open
+	 * Gates only when a Gate opened, or when a fact is of a run with a
+	 * known Gate: other facts cannot change them.
 	 */
-	apply(spaceId: string, events: readonly RunEvent[]): Promise<GateChanges>;
+	apply(spaceId: string, facts: readonly LandedFact[]): Promise<GateChanges>;
 	/** Whether the notifier knows the Gate of the key as open. */
 	isOpen(spaceId: string, key: string): boolean;
 	/** What the engine last said of an open Gate: its lock-screen mark and options. */
@@ -55,18 +57,16 @@ export function createGateTracker(
 			}
 		},
 
-		async apply(spaceId, events) {
+		async apply(spaceId, facts) {
 			const keys = known.get(spaceId) ?? new Set<string>();
 			known.set(spaceId, keys);
 			const asked = new Set(
-				events
-					.filter((e) => e.type === "GateOpened" && e.stepId !== null)
-					.map((e) => gateKey({ runId: e.runId, stepId: e.stepId as string })),
+				facts.flatMap((f) => (f.kind === "gate-opened" ? [gateKey(f)] : [])),
 			);
 			const runsWithGates = new Set(
 				[...keys].map((key) => parseGateKey(key)?.runId),
 			);
-			if (asked.size === 0 && !events.some((e) => runsWithGates.has(e.runId))) {
+			if (asked.size === 0 && !facts.some((f) => runsWithGates.has(f.runId))) {
 				return { opened: [], closed: [] };
 			}
 			const now = await read(spaceId);

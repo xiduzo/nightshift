@@ -1,3 +1,5 @@
+import type { LandedFact } from "@nightshift/engine";
+
 import {
 	deviceWaitWords,
 	type GateFacts,
@@ -17,7 +19,7 @@ import {
 } from "../settings";
 import type { PushTarget, TargetStore } from "../targets";
 import { createGateTracker } from "./gate-tracker";
-import type { RunEvent, RunEventSource } from "./sources";
+import type { RunEventSource } from "./sources";
 import { createWaitTracker, type StartedWait } from "./wait-tracker";
 
 /**
@@ -121,27 +123,6 @@ const LOST_AFTER_MS = 60_000;
  * sender of a push. Its channel reaches no other computer.
  */
 const LOCAL_KINDS: ReadonlySet<PushTarget["kind"]> = new Set(["desktop"]);
-
-/**
- * The run events that change what a list of runs shows: the status, the
- * step that runs, the Walker, a stop that waits. A Gate and a run's end
- * have items of their own. Cost and transcript events do not count.
- */
-const RUN_CHANGES: ReadonlySet<string> = new Set([
-	"RunStarted",
-	"RunResumed",
-	"RunEnded",
-	"StepStarted",
-	"StepReopened",
-	"StepEnded",
-	"WaitStarted",
-	"WaitEnded",
-	"WalkerMoved",
-	"HandedOff",
-	"StopRequested",
-	"StopAfterStepRequested",
-	"StopAfterStepCancelled",
-]);
 
 export function createNotifier(deps: NotifierDeps): Notifier {
 	const now = deps.now ?? Date.now;
@@ -404,12 +385,12 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		}
 	}
 
-	async function handle(events: readonly RunEvent[]): Promise<void> {
-		const bySpace = new Map<string, RunEvent[]>();
-		for (const event of events) {
-			const list = bySpace.get(event.spaceId) ?? [];
-			list.push(event);
-			bySpace.set(event.spaceId, list);
+	async function handle(facts: readonly LandedFact[]): Promise<void> {
+		const bySpace = new Map<string, LandedFact[]>();
+		for (const fact of facts) {
+			const list = bySpace.get(fact.spaceId) ?? [];
+			list.push(fact);
+			bySpace.set(fact.spaceId, list);
 		}
 		for (const [spaceId, list] of bySpace) {
 			/** The runs of this landing an item already tells of: a screen reads them again. */
@@ -428,31 +409,39 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			const { started, ended } = waits.apply(spaceId, list, now());
 			for (const key of ended) await close(spaceId, key);
 			for (const wait of started) await tellWait(spaceId, wait);
-			for (const event of list) {
-				if (event.type !== "RunEnded") continue;
-				const status = (event.payload as { status?: string }).status;
-				if (status !== "finished" && status !== "failed") continue;
+			for (const fact of list) {
+				if (fact.kind !== "run-ended") continue;
+				if (fact.status !== "finished" && fact.status !== "failed") continue;
 				await tell(
-					status === "finished" ? "run-finished" : "run-failed",
-					runEndKey(event.runId, event.seq),
-					{ spaceId, runId: event.runId, stepId: null },
+					fact.status === "finished" ? "run-finished" : "run-failed",
+					runEndKey(fact.runId, fact.seq),
+					{ spaceId, runId: fact.runId, stepId: null },
 				);
-				told.add(event.runId);
+				told.add(fact.runId);
 			}
 			await runsChanged(spaceId, list, told);
 		}
 	}
 
-	/** Tells the open screens of the Space's audience, once per run, that a run changed. */
+	/**
+	 * Tells the open screens of the Space's audience, once per run, that
+	 * what a list of runs shows of it changed. A Gate has an item of its
+	 * own. A spend so far, or what only the run's page shows, does not count.
+	 */
 	async function runsChanged(
 		spaceId: string,
-		events: readonly RunEvent[],
+		facts: readonly LandedFact[],
 		told: ReadonlySet<string>,
 	): Promise<void> {
 		const runs = new Set(
-			events
-				.filter((e) => RUN_CHANGES.has(e.type) && !told.has(e.runId))
-				.map((e) => e.runId),
+			facts
+				.filter(
+					(f) =>
+						f.changes === "summary" &&
+						f.kind !== "gate-opened" &&
+						!told.has(f.runId),
+				)
+				.map((f) => f.runId),
 		);
 		if (runs.size === 0) return;
 		const audience = await deps.audience(spaceId);
@@ -627,9 +616,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		start() {
 			stopped = false;
 			const ready = enqueue("The open Gates were not read.", baseline);
-			unsubscribe = deps.events.subscribe((events) => {
+			unsubscribe = deps.events.subscribe((facts) => {
 				if (stopped) return;
-				void enqueue("A run event was not handled.", () => handle(events));
+				void enqueue("A run event was not handled.", () => handle(facts));
 			});
 			timer = setInterval(() => {
 				if (!stopped) void enqueue("Held pushes were not sent.", tick);
