@@ -28,6 +28,5 @@ export {
 	memberName,
 	memberRole,
 } from "./space-document";
-export { spaceProjectRows } from "./space-rows";
 export type { Branches } from "./worktrees";
 export { worktreeLocation } from "./worktrees";

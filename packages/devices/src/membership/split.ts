@@ -5,11 +5,8 @@ import {
 	splitPersonalSpaceBatch,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine, FlowDocuments } from "@nightshift/engine";
-import {
-	type SpaceDocuments,
-	spaceProjectRows,
-} from "@nightshift/engine/projects";
+import type { Engine, FlowDocuments, PeerProjects } from "@nightshift/engine";
+import type { SpaceDocuments } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import type { SplitResult, SplitState } from "../contract";
 import type { HostSpaces } from "../links";
@@ -73,6 +70,7 @@ export type SplitDeps = {
 	db: Database;
 	engine: Pick<Engine, "space" | "moveProjects"> & {
 		hostSpaces: Pick<HostSpaces, "hostOf" | "keeper" | "named">;
+		projects: Pick<PeerProjects, "ofSpace">;
 	};
 	spaces: Pick<SpaceDocuments, "open">;
 	flows: Pick<FlowDocuments, "open">;
@@ -134,7 +132,7 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 
 	/** The Projects that come along: a Clone here, or a run this computer walked. */
 	async function projectsHere(from: string): Promise<string[]> {
-		return (await spaceProjectRows(db, from, self.id))
+		return (await engine.projects.ofSpace(from))
 			.filter((p) => p.clone || p.walked)
 			.map((p) => p.id);
 	}

@@ -9,8 +9,8 @@ import {
 	type Engine,
 	type FlowDocuments,
 	HostUnreachableError,
+	type PeerProjects,
 } from "@nightshift/engine";
-import { spaceProjectRows } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import { and, eq, isNull } from "drizzle-orm";
@@ -116,6 +116,7 @@ export type MergeDeps = {
 	engine: Pick<Engine, "space" | "moveProjects" | "flows" | "forgetSpace"> & {
 		exchange: Pick<RunHistoryExchange, "pushed">;
 		hostSpaces: Pick<HostSpaces, "listed">;
+		projects: Pick<PeerProjects, "ofSpace">;
 	};
 	links: Pick<DeviceLinks, "get">;
 	/** The home Host this computer merges into (`HostLinks.home`). */
@@ -242,7 +243,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		joined: readonly string[],
 		dryRun: boolean,
 	): Promise<HostAnswer> {
-		const projects = await spaceProjectRows(db, from, self.id);
+		const projects = await engine.projects.ofSpace(from);
 		try {
 			return await link.call((client) =>
 				client.sync.mergePersonal({
@@ -310,7 +311,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		const { host, link, from, to, runs } = await ready();
 		const answer = await ask(link, from, input.join ?? [], true);
 		const targets = targetsOf(answer, to);
-		const projects = await spaceProjectRows(db, from, self.id);
+		const projects = await engine.projects.ofSpace(from);
 		const projectRuns = await engine.space(from).projectRuns();
 		const elsewhere = new Map(answer.elsewhere.map((e) => [e.projectId, e]));
 		const views: MergeProjectView[] = [];

@@ -8,7 +8,6 @@ import {
 	type ProfileStore,
 	profileChoice,
 	type SettingsStore,
-	storedDeviceCopy,
 } from "@nightshift/engine/device-config";
 import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
 import type * as Y from "yjs";
@@ -439,7 +438,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		reach,
 		fingerprint,
 		copies,
-		keptDocument: (deviceId) => storedDeviceCopy(db, deviceId),
+		keptDocument: (deviceId) => engine.keptDevice(deviceId),
 		membership,
 	});
 
