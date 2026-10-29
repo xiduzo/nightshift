@@ -10,8 +10,9 @@
  * (L2) Every declared workspace dependency is used: a file of the
  *      workspace imports it (a .ts, .tsx, .js, .mjs, .cjs or .css file), or
  *      its tsconfig extends it.
- * (L3) Every entry in `exports` has an importer in another workspace. Tests
- *      count. A wildcard entry (the shadcn layout) is not checked.
+ * (L3) Every entry in `exports` has an importer in another workspace: a
+ *      production file. A test counts only for a `./testing` entry. A
+ *      wildcard entry (the shadcn layout) is not checked.
  * (L4) An entry points at the root `src/index.ts`, a file directly in
  *      `src/`, or a barrel one folder down (`src/<vertical>/index.ts`,
  *      `src/testing/index.ts`). A deeper file is a LIGHT_ENTRIES item, with
@@ -125,12 +126,7 @@ export type EntryException = { entry: string; why: string };
  * 8 of STRUCTURE.md with the change that removes it. The check fails once
  * another workspace imports the entry.
  */
-export const ENTRY_EXCEPTIONS: EntryException[] = [
-	{
-		entry: "@nightshift/devices/testing",
-		why: "only the tests of devices use its fakes today",
-	},
-];
+export const ENTRY_EXCEPTIONS: EntryException[] = [];
 
 /**
  * Entries that point past a vertical's barrel (L4), with the reason. One
@@ -176,6 +172,8 @@ type Workspace = {
 	exports: Record<string, string>;
 	/** The bare specifiers its files import, and what its tsconfig extends. */
 	specifiers: Set<string>;
+	/** The same, from its production files only: no test imports them (L3). */
+	productionSpecifiers: Set<string>;
 };
 
 /** Folders that hold no source, anywhere: installs and build output. */
@@ -205,17 +203,41 @@ function sourceFiles(dir: string, out: string[], top = false): void {
 	}
 }
 
-/** The bare specifiers of a workspace's files and its tsconfig `extends`. */
-function specifiersOf(dir: string): Set<string> {
+/** A test, by its path in the workspace (`src/runs/run.test.ts`, `test/x.ts`). */
+export function isTest(path: string): boolean {
+	return (
+		/\.test\.tsx?$/.test(path) ||
+		/(^|[\\/])test-support\.tsx?$/.test(path) ||
+		/(^|[\\/])(testing|fixtures)[\\/]/.test(path) ||
+		/^test[\\/]/.test(path)
+	);
+}
+
+/** A package's `./testing` entry: its fakes and fixtures, for tests. */
+export const isTestingEntry = (entry: string): boolean =>
+	entry.endsWith("/testing");
+
+/**
+ * The bare specifiers of a workspace's files and its tsconfig `extends`,
+ * and those of its production files alone.
+ */
+function specifiersOf(dir: string): {
+	all: Set<string>;
+	production: Set<string>;
+} {
 	const found = new Set<string>();
+	const production = new Set<string>();
 	const files: string[] = [];
 	sourceFiles(dir, files, true);
 	for (const file of files) {
 		const text = readFileSync(file, "utf8");
+		const test = isTest(relative(dir, file));
 		for (const pattern of SPECIFIERS) {
 			for (const match of text.matchAll(pattern)) {
 				const specifier = match[1] as string;
-				if (!specifier.startsWith(".")) found.add(specifier);
+				if (specifier.startsWith(".")) continue;
+				found.add(specifier);
+				if (!test) production.add(specifier);
 			}
 		}
 	}
@@ -223,10 +245,12 @@ function specifiersOf(dir: string): Set<string> {
 		if (!/^tsconfig.*\.json$/.test(name)) continue;
 		const text = readFileSync(join(dir, name), "utf8");
 		const extend = /"extends"\s*:\s*(\[[^\]]*\]|"[^"]*")/.exec(text)?.[1];
-		for (const match of (extend ?? "").matchAll(/"([^"]+)"/g))
+		for (const match of (extend ?? "").matchAll(/"([^"]+)"/g)) {
 			found.add(match[1] as string);
+			production.add(match[1] as string);
+		}
 	}
-	return found;
+	return { all: found, production };
 }
 
 /** `@scope/name/sub/path` → `@scope/name`, `name/sub` → `name`. */
@@ -275,13 +299,15 @@ function workspacesOf(root: string): Workspace[] {
 					if (typeof target === "string") exports[key] = target;
 				}
 			}
+			const specifiers = specifiersOf(dir);
 			found.push({
 				name: pkg.name,
 				dir,
 				file: relative(root, file).split(sep).join("/"),
 				deps: [...deps],
 				exports,
-				specifiers: specifiersOf(dir),
+				specifiers: specifiers.all,
+				productionSpecifiers: specifiers.production,
 			});
 		}
 	}
@@ -415,8 +441,8 @@ export function checkLayers(root: string, options: Options = {}): Result {
 		}
 	}
 
-	// (L3) Every entry has an importer in another workspace, and (L4) it
-	// points at an allowed file.
+	// (L3) Every entry has an importer in another workspace (a production
+	// file, or a test for `./testing`), and (L4) it points at an allowed file.
 	const entries = new Set<string>();
 	const seenLight = new Set<string>();
 	for (const ws of all) {
@@ -424,8 +450,11 @@ export function checkLayers(root: string, options: Options = {}): Result {
 			const entry = entryName(ws.name, key);
 			entries.add(entry);
 			if (key.includes("*")) continue;
+			const testing = isTestingEntry(entry);
 			const importers = all.filter(
-				(other) => other !== ws && other.specifiers.has(entry),
+				(other) =>
+					other !== ws &&
+					(testing ? other.specifiers : other.productionSpecifiers).has(entry),
 			);
 			const exception = entryExceptions.find((e) => e.entry === entry);
 			if (exception) {
@@ -435,8 +464,13 @@ export function checkLayers(root: string, options: Options = {}): Result {
 					);
 				} else used.add(exception);
 			} else if (!importers.length) {
+				const tested = all.some(
+					(other) => other !== ws && other.specifiers.has(entry),
+				);
 				problems.push(
-					`${ws.file}: no other workspace imports the entry "${entry}". Remove it from exports.`,
+					tested
+						? `${ws.file}: only tests of other workspaces import the entry "${entry}". Move what they use to "${ws.name}/testing", or remove the entry from exports.`
+						: `${ws.file}: no other workspace imports the entry "${entry}". Remove it from exports.`,
 				);
 			}
 			if (SHADCN.has(ws.name)) continue;

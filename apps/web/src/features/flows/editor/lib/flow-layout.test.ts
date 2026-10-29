@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
-	commandNode,
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
 	nodeOutcomes,
 	nodesWithin,
 } from "@nightshift/flows";
+import { commandNode } from "@nightshift/flows/testing";
 import type { ElkNode } from "elkjs/lib/elk-api.js";
 
 import { groupEdges } from "../../canvas/edge-groups";

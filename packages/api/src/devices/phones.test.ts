@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { OPEN_HOST, requestAccess } from "@nightshift/auth";
-import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
+import { requestAccess } from "@nightshift/auth";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+	OPEN_HOST,
+} from "@nightshift/auth/testing";
 import type { PhoneView } from "@nightshift/devices";
 import {
 	createInAppChannel,

@@ -37,7 +37,6 @@ export {
 	uniqueOutputName,
 } from "./names";
 export {
-	commandNode,
 	defaultEach,
 	emptySource,
 	emptyUntil,

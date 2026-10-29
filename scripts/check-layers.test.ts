@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { checkLayers, type Options, type Rule } from "./check-layers";
+import { checkLayers, isTest, type Options, type Rule } from "./check-layers";
 
 const roots: string[] = [];
 
@@ -222,6 +222,33 @@ describe("every entry has an importer (L3)", () => {
 		).toEqual([]);
 	});
 
+	test("a test counts only for a ./testing entry", () => {
+		const withFiles = {
+			...files,
+			...workspace("packages/base", "@demo/base", [], {
+				".": "./src/index.ts",
+				"./files": "./src/files.ts",
+				"./testing": "./src/testing/index.ts",
+			}),
+			"packages/base/src/files.ts": "export const read = 1;\n",
+			"packages/core/src/core.test.ts":
+				'import "@demo/base/files";\nimport "@demo/base/testing";\n',
+		};
+		expect(checkLayers(repo(withFiles), OPTIONS).problems).toEqual([
+			'packages/base/package.json: only tests of other workspaces import the entry "@demo/base/files". Move what they use to "@demo/base/testing", or remove the entry from exports.',
+		]);
+		expect(
+			checkLayers(
+				repo({
+					...withFiles,
+					"packages/core/src/read.ts":
+						'export { read } from "@demo/base/files";\n',
+				}),
+				OPTIONS,
+			).problems,
+		).toEqual([]);
+	});
+
 	test("an exception allows one entry, and fails once another workspace imports it", () => {
 		const exception = { entry: "@demo/base/testing", why: "a test" };
 		const options = { ...OPTIONS, entryExceptions: [exception] };
@@ -350,4 +377,16 @@ describe("the command", () => {
 		expect(result.stderr.toString()).toBe("");
 		expect(result.exitCode).toBe(0);
 	}, 60_000);
+});
+
+describe("tests", () => {
+	test("are told apart from production files", () => {
+		expect(isTest("features/runs/run-list.test.tsx")).toBe(true);
+		expect(isTest("test-support.ts")).toBe(true);
+		expect(isTest("testing/fake.ts")).toBe(true);
+		expect(isTest("graph/fixtures/flow.ts")).toBe(true);
+		expect(isTest("test/devices/two-devices.ts")).toBe(true);
+		expect(isTest("features/runs/run-list.tsx")).toBe(false);
+		expect(isTest("src/features/test/run.ts")).toBe(false);
+	});
 });

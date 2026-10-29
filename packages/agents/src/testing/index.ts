@@ -1,9 +1,12 @@
 /**
  * Test helpers of `@nightshift/agents`: a fake harness and a fake decider
- * that follow a script, and the fake programs in `fixtures/`. Only tests
- * import this entry.
+ * that follow a script, the fake programs in `fixtures/`, and the model a
+ * decider starts a node on (`defaultDeciderModel`), for a test's own
+ * decider. Only tests import this entry.
  */
 import { join } from "node:path";
+
+export { defaultDeciderModel } from "../decider/decider";
 
 export {
 	type FakeHarness,

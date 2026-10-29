@@ -50,7 +50,6 @@ export {
 	addNode,
 	addSection,
 	checkDraft,
-	commandNode,
 	copyNodes,
 	type DraftCheckOptions,
 	type DraftMessages,
@@ -317,7 +316,6 @@ export {
 	TEMPLATE_REF,
 	type TemplateContext,
 	type TemplateRef,
-	templateEnvName,
 	type VariableResult,
 } from "./template";
 export {

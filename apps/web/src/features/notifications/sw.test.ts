@@ -1,13 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-	gateKey,
-	type PushData,
-	routeOf,
-	staleGates,
-	webPathOf,
-} from "@nightshift/client";
+import { type PushData, routeOf, webPathOf } from "@nightshift/client";
+import { gateKey, staleGates } from "@nightshift/client/testing";
 
 /**
  * The service worker (`public/sw.js`) is plain JavaScript and cannot import

@@ -3,8 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
-import { TWO_FACTOR_REQUIRED } from "@nightshift/auth";
-import { codeNow, secretOf } from "@nightshift/auth/testing";
+import {
+	codeNow,
+	secretOf,
+	TWO_FACTOR_REQUIRED,
+} from "@nightshift/auth/testing";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 

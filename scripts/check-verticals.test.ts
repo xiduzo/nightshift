@@ -12,7 +12,6 @@ import {
 	checkEntries,
 	checkWorkspace,
 	checkWorkspaces,
-	isTest,
 	type Options,
 	workspacesOf,
 } from "./check-verticals";
@@ -924,13 +923,43 @@ describe("every value name on an entry has an importer (m)", () => {
 		]);
 	});
 
-	test("a test in another workspace counts, a namespace import uses every name", () => {
+	test("a test in another workspace counts only for a ./testing entry", () => {
+		const testing = {
+			"packages/demo/package.json": JSON.stringify({
+				name: "@demo/pkg",
+				exports: {
+					".": "./src/index.ts",
+					"./migrate": "./src/migrate/index.ts",
+					"./testing": "./src/testing/index.ts",
+				},
+			}),
+			"packages/demo/src/testing/index.ts":
+				'export { fakeRun } from "./fake";\n',
+			"packages/demo/src/testing/fake.ts": "export const fakeRun = 1;\n",
+			...userImports(
+				'import { run } from "@demo/pkg";\nimport * as migrate from "@demo/pkg/migrate";\n[run, migrate];\n',
+			),
+		};
 		expect(
 			entries({
+				...testing,
 				"apps/user/src/main.test.ts":
-					'import * as demo from "@demo/pkg";\nimport { migrationsFolder } from "@demo/pkg/migrate";\n[demo, migrationsFolder];\n',
+					'import { walk } from "@demo/pkg";\nimport { fakeRun } from "@demo/pkg/testing";\n[walk, fakeRun];\n',
 			}),
-		).toEqual([]);
+		).toEqual([
+			'packages/demo/src/index.ts: no other workspace imports "migrate" from "@demo/pkg". Take it off the entry.',
+			'packages/demo/src/index.ts: only tests of other workspaces import "walk" from "@demo/pkg". Move it to "@demo/pkg/testing", or take it off the entry.',
+		]);
+		expect(
+			entries({
+				...testing,
+				"apps/user/src/main.test.ts":
+					'import * as demo from "@demo/pkg";\n[demo];\n',
+			}),
+		).toEqual([
+			'packages/demo/src/index.ts: no other workspace imports "migrate", "walk" from "@demo/pkg". Take them off the entry.',
+			'packages/demo/src/testing/index.ts: no other workspace imports "fakeRun" from "@demo/pkg/testing". Take it off the entry.',
+		]);
 	});
 
 	test("a root re-export carries the use of its name through to the barrel", () => {
@@ -1030,16 +1059,6 @@ describe("barrels hold only imports and exports (j)", () => {
 });
 
 describe("the command", () => {
-	test("tests are told apart from production files", () => {
-		expect(isTest("features/runs/run-list.test.tsx")).toBe(true);
-		expect(isTest("test-support.ts")).toBe(true);
-		expect(isTest("testing/fake.ts")).toBe(true);
-		expect(isTest("graph/fixtures/flow.ts")).toBe(true);
-		expect(isTest("test/devices/two-devices.ts")).toBe(true);
-		expect(isTest("features/runs/run-list.tsx")).toBe(false);
-		expect(isTest("src/features/test/run.ts")).toBe(false);
-	});
-
 	// The two runs on the whole repository get the time a busy computer
 	// needs: the default 5 s is wall time, and other processes count there.
 	test("it passes on this repository", () => {

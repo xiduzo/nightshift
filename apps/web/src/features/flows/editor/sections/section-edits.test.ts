@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-	commandNode,
-	FLOW_VERSION,
-	type Flow,
-	removeSection,
-} from "@nightshift/flows";
+import { FLOW_VERSION, type Flow, removeSection } from "@nightshift/flows";
+import { commandNode } from "@nightshift/flows/testing";
 import { restoreSection, undoSubflow } from "./section-edits";
 
 const flow: Flow = {

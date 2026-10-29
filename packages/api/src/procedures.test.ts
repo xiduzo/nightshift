@@ -10,15 +10,15 @@ import {
 } from "bun:test";
 import {
 	type HostPolicy,
-	OPEN_HOST,
 	personalSpaceId,
 	requestAccess,
 	TRUSTED_BROWSER_DAYS,
-	TWO_FACTOR_REQUIRED,
 } from "@nightshift/auth";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
+	OPEN_HOST,
+	TWO_FACTOR_REQUIRED,
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
 import {

@@ -26,7 +26,6 @@ export {
 	type DeciderModels,
 	type DeciderView,
 	deciderViews,
-	defaultDeciderModel,
 	type TanstackDeciderOptions,
 	tanstackDecider,
 	type ValueAdapter,

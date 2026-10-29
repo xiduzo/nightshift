@@ -107,7 +107,6 @@ export {
 export {
 	applySettingsPatch,
 	createNotificationQueries,
-	gateKey,
 	type NotificationItem,
 	type NotificationScreen,
 	type NotificationSettings,
@@ -123,7 +122,6 @@ export {
 	pushDataOf,
 	routeOf,
 	type ShownNotification,
-	staleGates,
 	webPathOf,
 	withdrawKeyOf,
 } from "./notifications";

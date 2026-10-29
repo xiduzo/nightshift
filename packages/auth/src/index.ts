@@ -35,8 +35,6 @@ export {
 	type HostAccess,
 	type HostPolicy,
 	hostPolicyFromEnv,
-	OPEN_HOST,
-	TWO_FACTOR_REQUIRED,
 } from "./host-access";
 export { createLocalSession, type LocalSession } from "./local-session";
 export { endSession, hasLogin, liveSessionIds, setLogin } from "./login";

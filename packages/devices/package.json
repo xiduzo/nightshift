@@ -2,8 +2,7 @@
 	"name": "@nightshift/devices",
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts",
-		"./testing": "./src/testing/index.ts"
+		".": "./src/index.ts"
 	},
 	"scripts": {
 		"build": "tsc -b",

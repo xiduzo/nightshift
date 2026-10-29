@@ -6,9 +6,8 @@
  * Device. The API serves it (`Devices`, `HostExchange`, `Offers`). The
  * daemon starts it with one call (`startDevices`): the engine and every
  * devices piece, handed over on a `bun --hot` reload. The peer protocol
- * is here too: the Host's procedures as one oRPC contract
- * (`hostContract`), implemented once (`hostRouter`), which the API mounts
- * at its paths.
+ * is here too: the Host's procedures as one oRPC contract, implemented
+ * once (`hostRouter`), which the API mounts at its paths.
  */
 
 export {
@@ -17,7 +16,6 @@ export {
 	type HostClient,
 	type HostHello,
 	type HostProcedureMeta,
-	hostContract,
 	type LeaveResult,
 	type ListedSpace,
 	type MergePending,

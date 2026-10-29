@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-	commandNode,
-	FLOW_VERSION,
-	type Flow,
-	type FlowSection,
-} from "@nightshift/flows";
+import { FLOW_VERSION, type Flow, type FlowSection } from "@nightshift/flows";
+import { commandNode } from "@nightshift/flows/testing";
 import {
 	boxPosition,
 	membersBounds,

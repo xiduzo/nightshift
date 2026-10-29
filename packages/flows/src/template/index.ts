@@ -26,7 +26,6 @@ export {
 	renderTemplate,
 	renderValue,
 	TEMPLATE_REF,
-	templateEnvName,
 	templateRefs,
 } from "./template";
 export {

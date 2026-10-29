@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
-import { defaultDeciderModel } from "@nightshift/agents";
-import { fakeDecider } from "@nightshift/agents/testing";
+import { defaultDeciderModel, fakeDecider } from "@nightshift/agents/testing";
 import type {
 	Decider,
 	DecisionInput,

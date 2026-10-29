@@ -37,7 +37,8 @@
  *     not part of a cycle, nor is a test. KNOWN_CYCLES lists the ones that
  *     wait for their fix
  * And across the workspaces it checks:
- * (m) a value name on a package entry that no other workspace imports
+ * (m) a value name on a package entry that no production file of another
+ *     workspace imports. A test counts only for a `./testing` entry
  *     (`checkEntries`: types are exempt, PENDING_NAMES wait for their
  *     importer)
  *
@@ -64,7 +65,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import ts from "typescript";
 
-import { ENTRY_EXCEPTIONS } from "./check-layers";
+import { ENTRY_EXCEPTIONS, isTest, isTestingEntry } from "./check-layers";
 
 /**
  * The workspaces that section 4 does not cover: `ui` and `ui-native` (React
@@ -264,16 +265,6 @@ type SourceFile = {
 	/** Each imported name by its local name (`*` for a namespace). */
 	bindings: Map<string, { specifier: string; imported: string }>;
 };
-
-/** A test, by its path in the workspace (`src/runs/run.test.ts`, `test/x.ts`). */
-export function isTest(path: string): boolean {
-	return (
-		/\.test\.tsx?$/.test(path) ||
-		/(^|[\\/])test-support\.tsx?$/.test(path) ||
-		/(^|[\\/])(testing|fixtures)[\\/]/.test(path) ||
-		/^test[\\/]/.test(path)
-	);
-}
 
 /**
  * The files to check under `dir` (a workspace when `top`), in name order on
@@ -1118,6 +1109,8 @@ export const PENDING_NAMES: Record<string, string[]> = {};
 type Entry = {
 	/** How another workspace imports it: `@nightshift/db/migrate`. */
 	specifier: string;
+	/** The name of its package: `@nightshift/db`. */
+	pkg: string;
 	file: string;
 	workspace: string;
 	/** The vertical folder of the file, or the file itself at the top of src/. */
@@ -1125,11 +1118,13 @@ type Entry = {
 };
 
 /**
- * (m) Every value name on a package entry has an importer: a file of
- * another workspace imports or re-exports it, tests too. A file of the
- * entry's own package outside the entry's vertical counts as well, but an
- * entry file (the root index that re-exports a vertical's barrel) counts
- * only for the names it passes on that are used in turn.
+ * (m) Every value name on a package entry has an importer: a production
+ * file of another workspace imports or re-exports it. A test counts only
+ * for a `./testing` entry, so a name that only tests use goes to the
+ * package's `./testing`. A production file of the entry's own package
+ * outside the entry's vertical counts as well, but an entry file (the root
+ * index that re-exports a vertical's barrel) counts only for the names it
+ * passes on that are used in turn.
  *
  * Types are exempt: a type that the emitted declaration of another package
  * names must stay on an entry (TS2883). So are the names that `export *`
@@ -1173,6 +1168,7 @@ export function checkEntries(
 			const top = relative(src, file).split(sep);
 			const entry: Entry = {
 				specifier: key === "." ? name : `${name}/${key.replace(/^\.\//, "")}`,
+				pkg: name,
 				file,
 				workspace,
 				home: top.length > 1 ? join(src, top[0] as string) : file,
@@ -1184,6 +1180,8 @@ export function checkEntries(
 	}
 
 	const uses = new Map<string, Set<string> | "all">();
+	/** The names that only tests of another workspace import, per entry file. */
+	const tested = new Map<string, Set<string>>();
 	/** Adds the names to the uses of an entry file. True when it grew. */
 	const mark = (file: string, names: string[] | "all"): boolean => {
 		const current = uses.get(file);
@@ -1199,8 +1197,9 @@ export function checkEntries(
 		return set.size > before;
 	};
 
-	// Another workspace's imports and re-exports, tests too. And the
-	// imports of an entry file inside its own package, kept for below.
+	// Another workspace's imports and re-exports: its production files, and
+	// its tests for a `./testing` entry. And the imports of an entry file
+	// inside its own package, kept for below.
 	const inPackage: {
 		entry: Entry;
 		file: SourceFile;
@@ -1218,7 +1217,14 @@ export function checkEntries(
 			for (const imported of file.imports) {
 				const entry = bySpecifier.get(imported.specifier);
 				if (entry) {
-					if (entry.workspace !== workspace) mark(entry.file, imported.names);
+					if (entry.workspace === workspace) continue;
+					if (!file.test || isTestingEntry(entry.specifier))
+						mark(entry.file, imported.names);
+					else if (imported.names !== "all") {
+						const set = tested.get(entry.file) ?? new Set<string>();
+						for (const name of imported.names) set.add(name);
+						tested.set(entry.file, set);
+					}
 					continue;
 				}
 				if (file.test) continue;
@@ -1291,9 +1297,17 @@ export function checkEntries(
 		const unused = [...values]
 			.filter((name) => !used?.has(name) && !waiting.includes(name))
 			.sort();
-		if (unused.length) {
+		const list = (names: string[]) => names.map((n) => `"${n}"`).join(", ");
+		const onlyTests = unused.filter((n) => tested.get(entry.file)?.has(n));
+		const none = unused.filter((n) => !onlyTests.includes(n));
+		if (none.length) {
 			problems.push(
-				`${rel(entry.file)}: no other workspace imports ${unused.map((n) => `"${n}"`).join(", ")} from "${entry.specifier}". Take ${unused.length === 1 ? "it" : "them"} off the entry.`,
+				`${rel(entry.file)}: no other workspace imports ${list(none)} from "${entry.specifier}". Take ${none.length === 1 ? "it" : "them"} off the entry.`,
+			);
+		}
+		if (onlyTests.length) {
+			problems.push(
+				`${rel(entry.file)}: only tests of other workspaces import ${list(onlyTests)} from "${entry.specifier}". Move ${onlyTests.length === 1 ? "it" : "them"} to "${entry.pkg}/testing", or take ${onlyTests.length === 1 ? "it" : "them"} off the entry.`,
 			);
 		}
 	}

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { OPEN_HOST, personalSpaceId, requestAccess } from "@nightshift/auth";
-import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
+import { personalSpaceId, requestAccess } from "@nightshift/auth";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+	OPEN_HOST,
+} from "@nightshift/auth/testing";
 import type { RunSummary, SpaceEngine, SpaceFlows } from "@nightshift/engine";
 import type { Project } from "@nightshift/engine/projects";
 import type { FlowListItem } from "@nightshift/flows";

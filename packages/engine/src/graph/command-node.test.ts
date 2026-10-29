@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
-import { templateEnvName } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read/derive-steps";
@@ -93,7 +92,7 @@ describe("the Command node", () => {
 		]);
 
 		// The value went in as an environment variable, never as shell text.
-		const env = templateEnvName("task", []);
+		const env = "NS_TASK";
 		const transcript = await readTranscriptFile(
 			derived?.transcriptPath as string,
 		);
