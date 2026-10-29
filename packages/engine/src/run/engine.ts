@@ -7,6 +7,7 @@ import {
 	defaultRunSettings,
 	lastKnownProfiles,
 	type RunSettings,
+	storedDeviceCopy,
 	storedDeviceProfiles,
 } from "../device-config";
 import {
@@ -314,12 +315,23 @@ export function createEngine(
 		now,
 		documents,
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
+		// Made below: the Projects record a Clone through the peers' relay.
+		projects: {
+			find: (projectId, spaceId) => projects.find(projectId, spaceId),
+			ofSpace: (spaceId) => projects.ofSpace(spaceId),
+			matching: (input) => projects.matching(input),
+			clones: (spaceId, projectId) => projects.clones(spaceId, projectId),
+			clonePath: (projectId, spaceId) => projects.clonePath(projectId, spaceId),
+			recordClone: (spaceId, record) => projects.recordClone(spaceId, record),
+			take: (spaceId, taken) => projects.take(spaceId, taken),
+		},
 		flows: (projectId) => projectFlows.flows(projectId),
 		profiles: {
 			here: options.profileFor ?? (() => null),
 			stored: (deviceId) => storedDeviceProfiles(db, deviceId),
 			lastKnown: (deviceId) => lastKnownProfiles(db, deviceId),
 		},
+		keptDevice: (deviceId) => storedDeviceCopy(db, deviceId),
 		history: {
 			...history,
 			onLanded: (listener, scope) =>

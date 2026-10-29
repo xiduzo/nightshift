@@ -19,7 +19,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 	const { device } = context;
 
 	async function here(spaceId: string, projectId: string): Promise<OwnDevice> {
-		const project = await context.project(projectId, spaceId);
+		const project = await context.projects.find(projectId, spaceId);
 		return {
 			deviceId: await context.walkerId(),
 			name: device.name,

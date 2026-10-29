@@ -8,7 +8,12 @@ export type {
 	SecretEnv,
 	SecretView,
 } from "./connections";
-export { lastKnownProfiles, storedDevices } from "./device-copies";
+export {
+	type DeviceCopy,
+	lastKnownProfiles,
+	storedDeviceCopy,
+	storedDevices,
+} from "./device-copies";
 export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { storedDeviceProfiles } from "./profiles";

@@ -18,6 +18,11 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 } from "./space-document";
+import {
+	type MovingProject,
+	projectRowsOf,
+	spaceProjectRows,
+} from "./space-rows";
 import { createWorktrees } from "./worktrees";
 
 /**
@@ -42,6 +47,10 @@ import { createWorktrees } from "./worktrees";
  * - In a Space a Host keeps, the document is the Host's: a Clone here is
  *   recorded there through the Host (`relay.addClone`), and the Projects
  *   themselves change on the Host only.
+ * - On a Host, the peers record another Device's Clone (`recordClone`)
+ *   and take the Projects of a Device's personal Space (`take`) in the
+ *   Space documents it keeps. They read the Projects through this module
+ *   too (`ofSpace`, `matching`, `clones`, `clonePath`): never its rows.
  */
 
 /** A call that needs the project's folder on this computer, for a project without one. */
@@ -108,6 +117,24 @@ export type ProjectsDeps = {
 };
 
 export type Projects = ReturnType<typeof createProjects>;
+
+/** A Device's Clone of a Project, as a Space document records it. */
+export type CloneRecord = {
+	projectId: string;
+	deviceId: string;
+	/** The Device's name, as the document shows it. */
+	deviceName: string;
+};
+
+/** What a Host takes into a Space's document at once (`Projects.take`). */
+export type TakenProjects = {
+	/** Projects new to the Space: each written only where the document has no entry of it. */
+	define?: readonly Omit<MovingProject, "spaceId">[];
+	/** Projects a person removed, by id: they come back. */
+	restore?: readonly string[];
+	/** The Clones of a Device. */
+	clones?: readonly CloneRecord[];
+};
 
 /**
  * The engine's Project: the row, with the Devices that have a Clone of it
@@ -447,6 +474,101 @@ export function createProjects(deps: ProjectsDeps) {
 			if (row.spaceId !== from) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
+		},
+
+		/**
+		 * The Projects of a Space, removed ones too, oldest first, with
+		 * whether this computer has a Clone of each and walked a run of it
+		 * in the Space: what a Device asks its home Host to take when its
+		 * own personal Space merges into the Host's, and what a split takes
+		 * along.
+		 */
+		async ofSpace(
+			spaceId: string,
+		): Promise<(MovingProject & { clone: boolean; walked: boolean })[]> {
+			return spaceProjectRows(db, spaceId, await deps.deviceId());
+		},
+
+		/**
+		 * The Projects of this Replica with one of `ids` or one of
+		 * `remotes`, in any Space, removed ones too: what a Host reads
+		 * before it takes the Projects of a Device's personal Space (one
+		 * Project per remote on a Replica).
+		 */
+		matching(input: {
+			ids?: readonly string[];
+			remotes?: readonly string[];
+		}): Promise<MovingProject[]> {
+			return projectRowsOf(db, input);
+		},
+
+		/** The Devices with a Clone of the Project, as its Space document says, oldest Clone first. */
+		async clones(
+			spaceId: string,
+			projectId: string,
+		): Promise<{ deviceId: string; deviceName: string | null }[]> {
+			return projectClones(await documents.open(spaceId), projectId);
+		},
+
+		/**
+		 * The folder of the Project's Clone on this computer, or null: none
+		 * here, a Project a person removed, or a Project of another Space.
+		 */
+		async clonePath(
+			projectId: string,
+			spaceId: string,
+		): Promise<string | null> {
+			return clonePathOf(db, deps.deviceId)(projectId, spaceId);
+		},
+
+		/**
+		 * Records another Device's Clone of a Project in the Space's
+		 * document: on the Host that keeps the Space. Refused as not found
+		 * when this Replica does not keep the Space, or its document has no
+		 * entry of the Project.
+		 */
+		async recordClone(spaceId: string, record: CloneRecord): Promise<void> {
+			const document = await documents.open(spaceId);
+			if (
+				document.hostedElsewhere ||
+				!document.projects.has(record.projectId)
+			) {
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
+			}
+			await document.change(() => recordClone(document, record));
+		},
+
+		/**
+		 * Takes Projects into the Space's document, in one change: new
+		 * entries, removed Projects back, and a Device's Clones. A Space a
+		 * Host keeps is left alone: only that Host changes it.
+		 */
+		async take(spaceId: string, taken: TakenProjects): Promise<void> {
+			const document = await documents.open(spaceId);
+			if (document.hostedElsewhere) return;
+			await document.change(() => {
+				const now = Date.now();
+				for (const { id, ...entry } of taken.define ?? []) {
+					if (document.projects.has(id)) continue;
+					document.projects.set(id, {
+						...entry,
+						updatedAt: now,
+					} satisfies SpaceProject);
+				}
+				for (const id of taken.restore ?? []) {
+					const entry = document.projects.get(id);
+					if (!entry || typeof entry !== "object") continue;
+					// A field of a newer version stays as it is.
+					document.projects.set(id, {
+						...(entry as Record<string, unknown>),
+						removedAt: null,
+						updatedAt: now,
+					});
+				}
+				for (const record of taken.clones ?? []) {
+					recordClone(document, record);
+				}
+			});
 		},
 
 		/** Reads the remote of every project here that has none. A folder that is gone is skipped. */

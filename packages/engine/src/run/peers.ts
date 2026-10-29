@@ -17,6 +17,7 @@ import type {
 	StartRunInput,
 } from "../contract";
 import type { Device } from "../device";
+import type { DeviceCopy } from "../device-config";
 import type { WalkFile, WalkFiles, WalkRef } from "../graph";
 import type {
 	CopyStamp,
@@ -28,7 +29,7 @@ import type {
 	RunPlan,
 	TranscriptEntry,
 } from "../log";
-import type { ListedProject, SpaceDocuments } from "../projects";
+import type { ListedProject, Projects, SpaceDocuments } from "../projects";
 import type { FeedStep, PendingCommand, RunWalker } from "../read";
 
 /**
@@ -67,9 +68,10 @@ export type Peers = {
 /**
  * What `createEngine` offers the port, made before it: capabilities in
  * the words of runs, Projects and profiles. The engine owns the tables of
- * runs, events, Projects and walk state: the peers never get its
- * database, its run log or its bus. Their own rows (`@nightshift/devices`'
- * tables) they keep in their own database handle.
+ * runs, events, Projects, Clones, walk state and the Device documents:
+ * the peers never get its database, its run log or its bus. Their own
+ * rows (`@nightshift/devices`' tables) they keep in their own database
+ * handle.
  */
 export type PeerContext = {
 	/** This computer as a Device. */
@@ -84,10 +86,18 @@ export type PeerContext = {
 	documents: SpaceDocuments;
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
+	/** The Projects and their Clones, as the peers read and record them. */
+	projects: PeerProjects;
 	/** The project's flows, from this Replica's flow document: what a run starts from. */
 	flows(projectId: string): Promise<FlowSources>;
 	/** The profiles of this computer, and of the Devices whose documents this Replica keeps. */
 	profiles: PeerProfiles;
+	/**
+	 * What the Device document this Replica keeps of another Device says
+	 * of it (a Host keeps those of the Devices whose home Host it is):
+	 * its name, its profiles, its secret names. Null when it keeps none.
+	 */
+	keptDevice(deviceId: string): Promise<DeviceCopy | null>;
 	/**
 	 * The run history of this Replica, as the exchange reads and adds to
 	 * it: rows by cursor, the ingest, a run's owners and events, the files
@@ -120,6 +130,24 @@ export type PeerFact = {
 		payload: EnginePayloads[T];
 	};
 }[PeerFactType];
+
+/**
+ * The Projects as the peers get them (`PeerContext.projects`): a project
+ * a person has not removed (`find`), the Projects of a Space and those of
+ * a Device's personal Space (`ofSpace`, `matching`), the Clones
+ * (`clones`, `clonePath`), and on a Host, a Device's Clone and the
+ * Projects it takes (`recordClone`, `take`).
+ */
+export type PeerProjects = Pick<
+	Projects,
+	| "find"
+	| "ofSpace"
+	| "matching"
+	| "clones"
+	| "clonePath"
+	| "recordClone"
+	| "take"
+>;
 
 /** The profiles a run's steps may use, as this Replica knows them (`PeerContext.profiles`). */
 export type PeerProfiles = {

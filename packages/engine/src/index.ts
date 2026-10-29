@@ -115,6 +115,7 @@ export type {
 	OfferedPlacement,
 	PeerContext,
 	PeerProfiles,
+	PeerProjects,
 	Peers,
 	PlacedDevice,
 	PlanInput,

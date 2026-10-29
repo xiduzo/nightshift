@@ -5,8 +5,13 @@ import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { createRunLog } from "../log/run-log";
 import { aloneDirectory } from "../testing/alone-directory";
-import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
-import { createProjects } from "./projects";
+import {
+	createSandbox,
+	mustGit,
+	otherSpace,
+	type Sandbox,
+} from "../testing/test-support";
+import { createProjects, PROJECT_NOT_FOUND } from "./projects";
 import { normaliseRemote } from "./remote";
 import { createSpaceDocuments, type SpaceDocuments } from "./space-document";
 
@@ -24,12 +29,12 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const projectsOf = () =>
+const projectsOf = (over: SpaceDocuments = documents) =>
 	createProjects({
 		db: sandbox.db,
 		log: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
 		deviceId: async () => sandbox.deviceId,
-		documents,
+		documents: over,
 		directory: aloneDirectory(sandbox.db),
 	});
 
@@ -219,5 +224,177 @@ describe("projects by remote", () => {
 			{ id: "p1", remote: "github.com/acme/app" },
 			{ id: "p2", remote: null },
 		]);
+	});
+});
+
+describe("what the peers ask of the Projects", () => {
+	/** The Space documents of a Replica whose Space `spaceId` a Host keeps. */
+	function keptElsewhere(spaceId: string): SpaceDocuments {
+		return createSpaceDocuments({
+			db: sandbox.db,
+			directory: {
+				...aloneDirectory(sandbox.db),
+				hostedElsewhere: async (id) => id === spaceId,
+			},
+		});
+	}
+
+	test("recordClone records another Device's Clone, and refuses a Project the document lacks and a Space a Host keeps", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app") },
+			sandbox.spaceId,
+		);
+		await projects.recordClone(sandbox.spaceId, {
+			projectId: app.id,
+			deviceId: "studio",
+			deviceName: "Studio",
+		});
+		expect(await projects.clones(sandbox.spaceId, app.id)).toEqual([
+			{ deviceId: sandbox.deviceId, deviceName: expect.any(String) },
+			{ deviceId: "studio", deviceName: "Studio" },
+		]);
+
+		await expect(
+			projects.recordClone(sandbox.spaceId, {
+				projectId: "unknown",
+				deviceId: "studio",
+				deviceName: "Studio",
+			}),
+		).rejects.toThrow(PROJECT_NOT_FOUND);
+
+		const team = await otherSpace(sandbox.db, "Team");
+		const tools = await projects.add({ repoPath: await repo("tools") }, team);
+		const replica = keptElsewhere(team);
+		try {
+			await expect(
+				projectsOf(replica).recordClone(team, {
+					projectId: tools.id,
+					deviceId: "studio",
+					deviceName: "Studio",
+				}),
+			).rejects.toThrow(PROJECT_NOT_FOUND);
+			expect(
+				(await projectsOf(replica).clones(team, tools.id)).map(
+					(c) => c.deviceId,
+				),
+			).toEqual([sandbox.deviceId]);
+		} finally {
+			await replica.close();
+		}
+	});
+
+	test("take writes an entry only where none is, brings a removed Project back and records Clones, in one change", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app") },
+			sandbox.spaceId,
+		);
+		await projects.remove(app.id);
+		const document = await documents.open(sandbox.spaceId);
+		const before = document.revision(document.projects);
+
+		await projects.take(sandbox.spaceId, {
+			define: [
+				{
+					id: app.id,
+					name: "not this name",
+					remote: null,
+					createdAt: 1,
+					removedAt: null,
+				},
+				{ id: "lib", name: "lib", remote: null, createdAt: 2, removedAt: null },
+			],
+			restore: [app.id],
+			clones: [{ projectId: "lib", deviceId: "studio", deviceName: "Studio" }],
+		});
+
+		expect(document.revision(document.projects)).toBe(before + 1);
+		// The rows follow the document.
+		expect(await projects.find(app.id, sandbox.spaceId)).toMatchObject({
+			name: "app",
+			removedAt: null,
+		});
+		expect(await projects.find("lib", sandbox.spaceId)).toMatchObject({
+			name: "lib",
+			repoPath: null,
+		});
+		expect(await projects.clones(sandbox.spaceId, "lib")).toEqual([
+			{ deviceId: "studio", deviceName: "Studio" },
+		]);
+	});
+
+	test("take leaves a Space a Host keeps alone", async () => {
+		const team = await otherSpace(sandbox.db, "Team");
+		const replica = keptElsewhere(team);
+		try {
+			await projectsOf(replica).take(team, {
+				define: [
+					{
+						id: "lib",
+						name: "lib",
+						remote: null,
+						createdAt: 2,
+						removedAt: null,
+					},
+				],
+				clones: [
+					{ projectId: "lib", deviceId: "studio", deviceName: "Studio" },
+				],
+			});
+			const kept = await replica.open(team);
+			expect([...kept.projects.keys()]).toEqual([]);
+			expect([...kept.clones.keys()]).toEqual([]);
+		} finally {
+			await replica.close();
+		}
+	});
+
+	test("clonePath is the folder here: null for another Space and for a removed Project", async () => {
+		const projects = projectsOf();
+		const path = await repo("app");
+		const app = await projects.add({ repoPath: path }, sandbox.spaceId);
+		const team = await otherSpace(sandbox.db, "Team");
+
+		expect(await projects.clonePath(app.id, sandbox.spaceId)).toBe(path);
+		expect(await projects.clonePath(app.id, team)).toBeNull();
+		await projects.remove(app.id);
+		expect(await projects.clonePath(app.id, sandbox.spaceId)).toBeNull();
+	});
+
+	test("ofSpace marks this computer's Clones, matching finds by id or remote in any Space", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app", "git@github.com:acme/app.git") },
+			sandbox.spaceId,
+		);
+		await projects.take(sandbox.spaceId, {
+			define: [
+				{ id: "lib", name: "lib", remote: null, createdAt: 2, removedAt: null },
+			],
+		});
+
+		// Oldest first: lib is older.
+		expect(
+			(await projects.ofSpace(sandbox.spaceId)).map((p) => [
+				p.id,
+				p.clone,
+				p.walked,
+			]),
+		).toEqual([
+			["lib", false, false],
+			[app.id, true, false],
+		]);
+		expect(
+			(
+				await projects.matching({
+					ids: ["lib"],
+					remotes: ["github.com/acme/app"],
+				})
+			)
+				.map((p) => p.id)
+				.sort(),
+		).toEqual([app.id, "lib"].sort());
+		expect(await projects.matching({})).toEqual([]);
 	});
 });
