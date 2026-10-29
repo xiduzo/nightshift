@@ -148,6 +148,7 @@ export {
 	planOf,
 	RUN_NOT_FOUND,
 	stampHolds,
+	withoutPrivatePaths,
 } from "./log";
 export type { ListedProject, Project, SpaceDocument } from "./projects";
 export {

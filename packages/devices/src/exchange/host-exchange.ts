@@ -7,6 +7,7 @@ import {
 	RUN_NOT_FOUND,
 	recordClone,
 	type SpaceDocuments,
+	withoutPrivatePaths,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
@@ -26,7 +27,6 @@ import {
 	isEmpty,
 	MissingProjectError,
 	mergeCursors,
-	withoutPrivatePaths,
 } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
 import type { HostExchange } from "./types";

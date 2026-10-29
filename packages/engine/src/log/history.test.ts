@@ -10,6 +10,7 @@ import {
 	MissingProjectError,
 	type RunHistory,
 } from "./history";
+import { withoutPrivatePaths } from "./private-paths";
 import { createRunLog, type RunLog } from "./run-log";
 
 /**
@@ -274,5 +275,55 @@ describe("a Command applied", () => {
 		);
 		expect(await a.history.applied(command)).toBe(true);
 		expect(await a.history.applied({ id: "c2", runId: "r1" })).toBe(false);
+	});
+});
+
+describe("a Walker's paths", () => {
+	test("leave the rows for another Person, with the rows' shape kept", async () => {
+		await walkOnA("r1");
+		await a.log.append({
+			type: "WorktreeCreated",
+			runId: "r1",
+			payload: { worktreePath: "/work/r1", branch: "b", baseRef: "main" },
+		});
+		await a.log.append({
+			type: "StepStarted",
+			runId: "r1",
+			stepId: "r1-s",
+			payload: {
+				nodeId: "c",
+				nodeType: "command",
+				visit: 1,
+				transcriptPath: "/logs/c.ndjson",
+				logPath: "/logs/c.log",
+			},
+		});
+		const { rows } = await a.history.rowsAfter({
+			spaces: [spaceId],
+			cursors: {},
+		});
+		const payloads = (r: HistoryRows, type: string) =>
+			r.events
+				.filter((e) => e.type === type)
+				.map((e) => JSON.parse(e.payload) as Record<string, unknown>);
+
+		const stripped = withoutPrivatePaths(rows);
+		expect(stripped.runs[0]?.worktreePath).toBe("");
+		expect(stripped.steps.every((s) => s.transcriptPath === "")).toBe(true);
+		expect(payloads(stripped, "WorktreeCreated")).toEqual([
+			{ worktreePath: "", branch: "b", baseRef: "main" },
+		]);
+		// A step without a command log still says so.
+		expect(payloads(stripped, "StepStarted")).toEqual([
+			expect.objectContaining({ transcriptPath: "", logPath: null }),
+			expect.objectContaining({ transcriptPath: "", logPath: "" }),
+		]);
+		expect(stripped.events.map((e) => [e.walkerSeq, e.type])).toEqual(
+			rows.events.map((e) => [e.walkerSeq, e.type]),
+		);
+		// Nothing at all for a Walker whose owner keeps them.
+		expect(withoutPrivatePaths(rows, (w) => w === a.sandbox.deviceId)).toEqual(
+			rows,
+		);
 	});
 });

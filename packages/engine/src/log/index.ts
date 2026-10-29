@@ -1,4 +1,4 @@
-/** The event log of each run: the event payloads, append and parse, the run log in memory, the landed feed, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, the stamps of the copies of a step's files, the worktrees removed on this computer, and the fields of each event that name a Person. */
+/** The event log of each run: the event payloads, append and parse, the run log in memory, the landed feed, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, the stamps of the copies of a step's files, the worktrees removed on this computer, the fields of each event that name a Person, and those that name a path on the Walker's disk. */
 
 export type { RunBus } from "./bus";
 export { createRunBus } from "./bus";
@@ -43,6 +43,7 @@ export type {
 } from "./landed";
 export { logMemberChange } from "./member-events";
 export { personFieldTypes } from "./person-fields";
+export { withoutPrivatePaths } from "./private-paths";
 export type { Derive, RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
 export type { PlannedDevice, RunPlan, RunRow } from "./run-row";
