@@ -12,6 +12,7 @@ import {
 } from "@nightshift/engine/device-config";
 import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
 import type * as Y from "yjs";
+import type { HostClient } from "./contract";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
@@ -166,6 +167,12 @@ export type DevicesDeps = {
 	moveRows?: readonly MoveRows[];
 	/** Kept across `bun --hot` reloads: what the runtime before this one hands over. */
 	kept: KeptDevices;
+	/**
+	 * The Host at an address, as this computer's Links call it. Default:
+	 * over HTTPS, with the Link's key and its pinned certificate. A test
+	 * gives a Host in memory.
+	 */
+	hostClient?(address: string): HostClient;
 	/** Knobs for tests only. */
 	internals?: {
 		engine?: Parameters<typeof createPeerEngine>[1];
@@ -365,6 +372,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				for (const stop of stops) stop();
 			};
 		},
+		...(deps.hostClient ? { hostClient: deps.hostClient } : {}),
 		...(deps.internals?.links ? { linkOptions: deps.internals.links } : {}),
 	});
 

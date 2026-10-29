@@ -105,9 +105,9 @@ async function startB(
 		scheduler: false,
 		disconnect: () => {},
 		kept,
+		hostClient: counting(options.clientFor ?? toA),
 		internals: {
 			links: {
-				clientFor: counting(options.clientFor ?? toA),
 				heartbeatMs: 50,
 				firstBackoffMs: 10,
 				maxBackoffMs: 50,

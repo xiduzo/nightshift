@@ -1,5 +1,5 @@
 import type * as Y from "yjs";
-import type { HostHello } from "../contract";
+import type { HostClient, HostHello } from "../contract";
 import {
 	type DeviceKeyStore,
 	type HostLink,
@@ -35,7 +35,6 @@ export type LinkOptions = Pick<
 	| "maxBackoffMs"
 	| "answerTimeoutMs"
 	| "streamBackoff"
-	| "clientFor"
 >;
 
 export function createDeviceLinks(deps: {
@@ -64,7 +63,12 @@ export function createDeviceLinks(deps: {
 	 * The function it returns is called when the link stops.
 	 */
 	attach?(hostLink: HostLink, link: Link): () => void;
-	/** For tests: shorter heartbeats and backoffs, and the Host at an address. */
+	/**
+	 * The Host at an address, as a link calls it. Default: over HTTPS,
+	 * with the link's key and its pinned certificate (`hostClient`).
+	 */
+	hostClient?(address: string): HostClient;
+	/** For tests: shorter heartbeats and backoffs. */
 	linkOptions?: LinkOptions;
 }): DeviceLinks {
 	const running = new Map<string, Link>();
@@ -90,6 +94,7 @@ export function createDeviceLinks(deps: {
 		}
 		const started = httpsLink({
 			...deps.linkOptions,
+			...(deps.hostClient ? { clientFor: deps.hostClient } : {}),
 			link,
 			key: secret,
 			document: deps.document,

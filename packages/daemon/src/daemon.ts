@@ -19,6 +19,7 @@ import {
 import { migrateDb } from "@nightshift/db/migrate";
 import {
 	deviceDirectory,
+	type HostClient,
 	selfDevice,
 	selfOwnerId,
 	setSelfOwner,
@@ -115,6 +116,11 @@ export type DaemonOutside = {
 	fetch?: (url: string, init?: RequestInit) => Promise<Response>;
 	/** The OS's sleep lock, or null for none. Default: `systemSleepLock`. */
 	sleepLock?: SleepLock | null;
+	/**
+	 * The Host at an address, as this computer's Links call it. Default:
+	 * over HTTPS, with the Link's key and its pinned certificate.
+	 */
+	hosts?: (address: string) => HostClient;
 };
 
 /** Facts about this daemon that change only on a restart. */
@@ -408,6 +414,7 @@ export async function createDaemon(
 		// Their new Space's sender notifies for them from then on.
 		moveRows: [deliveryMoves(db, sendsPushesFor(db, settings, person))],
 		kept: hot,
+		...(outside.hosts ? { hostClient: outside.hosts } : {}),
 	});
 	const { engine } = devices;
 

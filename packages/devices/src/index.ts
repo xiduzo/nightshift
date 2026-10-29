@@ -13,6 +13,7 @@
 export {
 	type ArchiveRef,
 	type FollowWant,
+	type HostClient,
 	type HostHello,
 	type HostProcedureMeta,
 	type LeaveResult,
