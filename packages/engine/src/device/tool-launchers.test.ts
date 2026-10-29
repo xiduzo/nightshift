@@ -327,3 +327,70 @@ test("guarded: the secrets that logins read", () => {
 	);
 	expect(set.guarded()).toEqual(["ACLI_TOKEN", "GH_ME"]);
 });
+
+describe("forCommand", () => {
+	test("every tool with a login gets a launcher; one that cannot run is left out", async () => {
+		const prepared = await launchers(
+			[
+				tool("gh", { login: { env: { GH_TOKEN: "${GH_ME}" } } }),
+				tool("gh-plain", { program: "gh" }),
+				tool("gh-work", {
+					program: "gh",
+					login: { env: { GH_TOKEN: "${GH_WORK}" } },
+				}),
+				tool("glab", { login: { env: { GITLAB_TOKEN: "${GL}" } } }),
+			],
+			{ GH_ME: "tok-me", GL: "tok-gl" },
+		).forCommand();
+		const folder = prepared.toolsPath ?? "";
+		expect(await readdir(folder)).toEqual(["gh"]);
+		expect(
+			run(join(folder, "gh"), ["api"], { PATH: `${folder}:/usr/bin:/bin` }),
+		).toBe("tok-me||api");
+		expect(prepared.values).toEqual(["tok-me"]);
+		await prepared.cleanup();
+	});
+
+	test("a failed sign-in leaves the tool out", async () => {
+		const prepared = await launchers(
+			[
+				tool("acli-dimpact", {
+					program: "acli",
+					login: {
+						env: {},
+						folder: "HOME",
+						signIn: { command: "acli login", input: "bad" },
+					},
+				}),
+			],
+			{},
+		).forCommand();
+		expect(prepared).toMatchObject({ toolsPath: null, env: {}, values: [] });
+	});
+
+	test("two tools for one host: git keeps its own settings there", async () => {
+		const git = { host: "github.com", helper: "auth git-credential" };
+		const prepared = await launchers(
+			[
+				tool("gh", { login: { env: { GH_TOKEN: "${GH_ME}" } }, git }),
+				tool("gh-work", {
+					program: "gh",
+					login: { env: { GH_TOKEN: "${GH_WORK}" } },
+					git,
+				}),
+			],
+			{ GH_ME: "tok-me", GH_WORK: "tok-work" },
+		).forCommand();
+		expect((await readdir(prepared.toolsPath ?? "")).sort()).toEqual([
+			"gh",
+			"gh-work",
+		]);
+		expect(prepared.env).toEqual({});
+		await prepared.cleanup();
+	});
+
+	test("no tool with a login: nothing to prepare", async () => {
+		const prepared = await launchers([tool("gh")], {}).forCommand();
+		expect(prepared).toMatchObject({ toolsPath: null, env: {}, values: [] });
+	});
+});

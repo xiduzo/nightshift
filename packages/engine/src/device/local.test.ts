@@ -37,6 +37,13 @@ function device(deps: Partial<LocalDeviceDeps> = {}): Device {
 	return localDevice({ id: "d1", name: "studio", harnesses: {}, ...deps });
 }
 
+const noTools = {
+	toolsPath: null,
+	env: {},
+	values: [],
+	cleanup: async () => {},
+};
+
 async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
 	const items: T[] = [];
 	for await (const item of stream) items.push(item);
@@ -211,6 +218,7 @@ describe("session", () => {
 		const d = device({
 			harnesses: { "claude-code": harness },
 			toolLaunchers: {
+				forCommand: async () => noTools,
 				prepare: async (names) => {
 					prepared.push([...names]);
 					return {
@@ -248,6 +256,7 @@ describe("session", () => {
 		const d = device({
 			harnesses: { "claude-code": harness },
 			toolLaunchers: {
+				forCommand: async () => noTools,
 				prepare: async () => {
 					prepares += 1;
 					return { ok: false, message: "The CLI tool gh-work needs GH_WORK." };
@@ -413,6 +422,7 @@ describe("exec", () => {
 				...secrets({ NIGHTSHIFT_TEST_LOGIN: "from-env" }),
 				toolLaunchers: {
 					prepare: async () => ({ ok: false, message: "unused" }),
+					forCommand: async () => noTools,
 					guarded: () => ["NIGHTSHIFT_TEST_LOGIN"],
 				},
 			});
@@ -435,6 +445,40 @@ describe("exec", () => {
 			if (previous === undefined) delete process.env.NIGHTSHIFT_TEST_LOGIN;
 			else process.env.NIGHTSHIFT_TEST_LOGIN = previous;
 		}
+	});
+
+	test("a CLI tool with a login runs as that tool, its values come back as •••, and its launchers go after", async () => {
+		const folder = join(sandbox.repoPath, "launchers");
+		await Bun.write(
+			join(folder, "gh"),
+			'#!/bin/sh\nprintf "%s|%s" "$1" "tok-me"\n',
+		);
+		await Bun.$`chmod 755 ${join(folder, "gh")}`;
+		let cleaned = false;
+		const events = await collect(
+			device({
+				toolLaunchers: {
+					prepare: async () => ({ ok: false, message: "unused" }),
+					forCommand: async () => ({
+						toolsPath: folder,
+						env: { GIT_CONFIG_COUNT: "0" },
+						values: ["tok-me"],
+						cleanup: async () => {
+							cleaned = true;
+						},
+					}),
+					guarded: () => [],
+				},
+			}).exec({
+				command: 'gh api; printf " %s" "$GIT_CONFIG_COUNT"',
+				cwd: sandbox.repoPath,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(
+			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join(""),
+		).toBe("api|••• 0");
+		expect(cleaned).toBe(true);
 	});
 
 	test("a secret this computer does not have refuses the command before it starts", async () => {
