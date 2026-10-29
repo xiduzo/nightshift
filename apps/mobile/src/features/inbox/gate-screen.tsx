@@ -5,6 +5,7 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	createSpaceQueries,
+	deadlineText,
 	type GateChoice,
 	type GateLink,
 	gateParts,
@@ -83,7 +84,6 @@ import { type Look, NEEDS_YOU } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { CHECK_COPY } from "./answer-check";
 import { ChoiceCards } from "./choice-cards";
-import { deadlineText } from "./gate-deadline";
 import {
 	confirmText,
 	isDestructive,

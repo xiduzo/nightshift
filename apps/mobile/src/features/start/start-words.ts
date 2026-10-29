@@ -1,4 +1,5 @@
 import {
+	canStart,
 	type FlowListItem,
 	hostOwnerHint,
 	type PlacementChoice,
@@ -6,13 +7,6 @@ import {
 import type { FlowInputDef } from "@nightshift/flows";
 
 /** What New run says, without React Native: the flow rows, the computers and why Start run waits. */
-
-/** A flow file that is not valid cannot start. */
-export function canRun(
-	flow: Pick<FlowListItem, "nodeCount" | "errorCount">,
-): boolean {
-	return flow.nodeCount !== null && flow.errorCount === 0;
-}
 
 /** The chosen flow as far as New run needs it: what it asks for, and whether it can start. */
 export type ChosenFlow = { inputs: FlowInputDef[]; valid: boolean };
@@ -28,7 +22,8 @@ export function chosenFlow(
 ): ChosenFlow | null {
 	// An older Host leaves `inputs` out of the list.
 	const inputs = listed?.inputs as FlowInputDef[] | undefined;
-	if (listed && inputs !== undefined) return { inputs, valid: canRun(listed) };
+	if (listed && inputs !== undefined)
+		return { inputs, valid: canStart(listed) };
 	if (!file) return null;
 	return { inputs: file.flow?.inputs ?? [], valid: file.flow !== null };
 }
@@ -44,7 +39,7 @@ export function readsFlowFile(
 export function flowCaption(
 	flow: Pick<FlowListItem, "nodeCount" | "errorCount" | "description">,
 ): string | undefined {
-	if (!canRun(flow)) {
+	if (!canStart(flow)) {
 		return "Not valid. Fix it in Night Shift on your computer.";
 	}
 	return flow.description || undefined;

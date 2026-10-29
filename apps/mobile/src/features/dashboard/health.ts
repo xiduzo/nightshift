@@ -1,11 +1,9 @@
 import {
 	type DashboardSummary,
 	formatCost,
+	HEALTH_NIGHTS,
 	type RunStatus,
 } from "@nightshift/client";
-
-/** The nights the health rows cover, as the web dashboard's default range. */
-export const HEALTH_NIGHTS = 30;
 
 /** One row of the health list: a flow, or a project over every Space. */
 export type HealthRow = {

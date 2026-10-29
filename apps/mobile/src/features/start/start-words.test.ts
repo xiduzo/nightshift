@@ -2,7 +2,6 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-	canRun,
 	chosenFlow,
 	flowCaption,
 	placementHint,
@@ -11,12 +10,6 @@ import {
 } from "./start-words";
 
 describe("the flow rows", () => {
-	test("a flow that is not valid cannot start", () => {
-		expect(canRun({ nodeCount: 4, errorCount: 0 })).toBe(true);
-		expect(canRun({ nodeCount: null, errorCount: 0 })).toBe(false);
-		expect(canRun({ nodeCount: 4, errorCount: 2 })).toBe(false);
-	});
-
 	test("the caption is the description, or why the flow cannot start", () => {
 		expect(
 			flowCaption({ nodeCount: 4, errorCount: 0, description: "Ships it" }),

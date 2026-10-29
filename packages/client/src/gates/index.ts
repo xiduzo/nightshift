@@ -1,4 +1,4 @@
-/** Gates that wait for a person: the inbox query, the answer, the inbox order and wait time, what a question shows (and as plain text), where each choice leads, and their view types. */
+/** Gates that wait for a person: the inbox query, the answer, the inbox order and wait time, the words of a deadline, what a question shows (and as plain text), where each choice leads, and their view types. */
 
 export {
 	answerGate,
@@ -9,6 +9,7 @@ export {
 	leavesInbox,
 	unreachableAnswerText,
 } from "./answer";
+export { deadlineText, deadlineWhen } from "./deadline";
 export {
 	gateRun,
 	inboxOrder,

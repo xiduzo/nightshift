@@ -1,3 +1,4 @@
+import { canStart } from "@nightshift/client";
 import { type FlowInputDef, flowNameSchema, newFlow } from "@nightshift/flows";
 import {
 	AlertDialog,
@@ -169,11 +170,11 @@ export function FlowList({ projectId }: { projectId: string }) {
 							inputs={flow.inputs}
 							callers={flow.callers}
 							runBlockedBy={
-								flow.nodeCount === null
-									? "This flow does not load. Open it to see why."
-									: flow.errorCount > 0
-										? "Fix the errors in the editor first."
-										: null
+								canStart(flow)
+									? null
+									: flow.nodeCount === null
+										? "This flow does not load. Open it to see why."
+										: "Fix the errors in the editor first."
 							}
 							onRun={() => setStarting({ name: flow.name, open: true })}
 							onDelete={() => setToDelete(flow)}

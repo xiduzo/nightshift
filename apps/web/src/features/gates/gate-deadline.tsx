@@ -1,12 +1,14 @@
+import { deadlineWhen } from "@nightshift/client";
 import { cn } from "@nightshift/ui/lib/utils";
 import { AlarmClockIcon } from "lucide-react";
 import { outcomeLabel } from "@/features/flows";
 import type { OpenGate } from "@/shared/api";
-import { dayWord, formatDateTime, formatTime } from "@/shared/format";
+import { formatDateTime } from "@/shared/format";
 
 /**
  * What happens to a Gate with a deadline when nobody answers: "Night Shift
- * picks keep at 07:00 tomorrow". Nothing for a Gate without one.
+ * picks keep at 07:00 tomorrow". The time and day read as on the phone
+ * (deadlineWhen of @nightshift/client). Nothing for a Gate without one.
  */
 export function GateDeadline({
 	deadline,
@@ -16,7 +18,7 @@ export function GateDeadline({
 	className?: string;
 }) {
 	if (!deadline) return null;
-	const day = dayWord(deadline.at);
+	const { time, day } = deadlineWhen(deadline.at, Date.now());
 	return (
 		<p
 			className={cn(
@@ -36,9 +38,9 @@ export function GateDeadline({
 					title={formatDateTime(deadline.at)}
 					className="font-medium text-foreground tabular-nums"
 				>
-					{formatTime(deadline.at)}
+					{time}
 				</time>
-				{day === "today" ? "" : ` ${day}`}.
+				{day}.
 			</span>
 		</p>
 	);

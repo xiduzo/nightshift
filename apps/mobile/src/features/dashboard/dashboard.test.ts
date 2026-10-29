@@ -1,8 +1,8 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import type { DashboardSummary } from "@nightshift/client";
+import { type DashboardSummary, HEALTH_NIGHTS } from "@nightshift/client";
 
-import { HEALTH_NIGHTS, healthOf, hiddenText } from "./health";
+import { healthOf, hiddenText } from "./health";
 
 type Nights = DashboardSummary["nights"][number];
 type FlowHealth = NonNullable<DashboardSummary["flowHealth"]>;

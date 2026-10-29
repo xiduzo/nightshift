@@ -1,3 +1,4 @@
+import { canStart } from "@nightshift/client";
 import {
 	cronError,
 	cronToTimeAndDays,
@@ -253,7 +254,7 @@ function ScheduleForm({
 	// Until the person picks one: the first flow that runs.
 	const chosen =
 		(flow === NO_FLOW ? "" : flow) ||
-		list.data?.find((item) => item.errorCount === 0)?.name ||
+		list.data?.find(canStart)?.name ||
 		flowNames[0] ||
 		"";
 	const [values, setValues] = useState<InputTexts>(() =>
@@ -420,7 +421,7 @@ function ScheduleForm({
 
 				<Field
 					data-invalid={
-						(chosenItem !== undefined && chosenItem.errorCount > 0) || undefined
+						(chosenItem !== undefined && !canStart(chosenItem)) || undefined
 					}
 				>
 					<FieldLabel htmlFor={`${id}-flow`}>Flow</FieldLabel>
@@ -437,7 +438,7 @@ function ScheduleForm({
 						{(list.data ?? []).map((item) => (
 							<NativeSelectOption key={item.name} value={item.name}>
 								{item.name}
-								{item.errorCount > 0 ? " (has errors)" : ""}
+								{canStart(item) ? "" : " (has errors)"}
 							</NativeSelectOption>
 						))}
 						{trigger === "webhook" ? (
@@ -446,7 +447,7 @@ function ScheduleForm({
 							</NativeSelectOption>
 						) : null}
 					</NativeSelect>
-					{chosenItem && chosenItem.errorCount > 0 ? (
+					{chosenItem && !canStart(chosenItem) ? (
 						<FieldError>
 							This flow has errors. Fix them, or the schedule cannot start it.
 						</FieldError>

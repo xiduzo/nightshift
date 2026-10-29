@@ -4,9 +4,10 @@
  * of each vertical (with their polling rules), the live cache (the one
  * follower of a Host: its notifications stream and one run's stream, what
  * each item reads again, the notices it shows), the view types derived from
- * the API, the push contract, and the glances (the widget and the run on
- * the lock screen). No DOM, no React Native, no Node or Bun:
- * `platform-free.test.ts` checks it.
+ * the API, the push contract, the glances (the widget and the run on the
+ * lock screen), and the words and rules both apps show for one thing (a
+ * Gate's deadline, the Flow health window, whether a flow can start). No
+ * DOM, no React Native, no Node or Bun: `platform-free.test.ts` checks it.
  */
 
 export {
@@ -29,6 +30,7 @@ export {
 	type FlowRange,
 	type FlowRun,
 	type GateState,
+	HEALTH_NIGHTS,
 	type HourRange,
 	type NightRange,
 	type NightsRange,
@@ -50,6 +52,7 @@ export {
 	type ThisComputer,
 } from "./devices";
 export {
+	canStart,
 	createFlowMutations,
 	createFlowQueries,
 	type FlowListItem,
@@ -66,6 +69,8 @@ export {
 	type ContextItem,
 	choiceRoutes,
 	createGateQueries,
+	deadlineText,
+	deadlineWhen,
 	type GateChoice,
 	type GateLink,
 	type GateRefusal,

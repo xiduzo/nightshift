@@ -1,4 +1,4 @@
-/** Flows: their query options and view types. */
+/** Flows: their query options, whether one can start, and view types. */
 
 export {
 	filledInputs,
@@ -7,6 +7,7 @@ export {
 	missingInputs,
 } from "./inputs";
 export { createFlowMutations, createFlowQueries } from "./queries";
+export { canStart } from "./start";
 export type {
 	FlowListItem,
 	FlowRevisionItem,

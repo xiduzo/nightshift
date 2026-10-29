@@ -1,4 +1,5 @@
 import {
+	canStart,
 	createFlowQueries,
 	createProjectQueries,
 	createRunMutations,
@@ -33,7 +34,6 @@ import { ChoiceSelect } from "./choice-select";
 import { FlowInputFields } from "./flow-input-fields";
 import { PlacementField } from "./placement-field";
 import {
-	canRun,
 	chosenFlow,
 	flowCaption,
 	readsFlowFile,
@@ -249,7 +249,7 @@ function NewRun({
 										title={item.name}
 										caption={flowCaption(item)}
 										selected={item.name === flowName}
-										disabled={!canRun(item)}
+										disabled={!canStart(item)}
 										onPress={() => {
 											setFlowName(item.name);
 											setValues({});
