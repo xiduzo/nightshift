@@ -29,19 +29,13 @@ export type FlowSource =
 /** Every flow of a project by name (valid names only, sorted). */
 export type FlowSources = Record<string, FlowSource>;
 
-/** Where a flow of the sources is (`FlowFile.path`). */
-export type FlowPathOf = (name: string) => string;
-
 /** Every flow of the sources, with its errors and the flows that call it, sorted by name. */
-export function listFlowSources(
-	sources: FlowSources,
-	pathOf: FlowPathOf,
-): FlowListItem[] {
+export function listFlowSources(sources: FlowSources): FlowListItem[] {
 	const files = sorted(sources);
 	const flows = flowsOf(files);
 	const items: FlowListItem[] = [];
 	for (const [name, file] of files) {
-		const loaded = loadedFlow(pathOf(name), name, file, flows);
+		const loaded = loadedFlow(name, file, flows);
 		items.push({
 			name: loaded.name,
 			path: loaded.path,
@@ -62,17 +56,13 @@ export function listFlowSources(
  * null. Called flows are checked against the other sources. Fails when
  * there is no such flow.
  */
-export function loadFlowSource(
-	sources: FlowSources,
-	name: string,
-	pathOf: FlowPathOf,
-): LoadedFlow {
+export function loadFlowSource(sources: FlowSources, name: string): LoadedFlow {
 	const files = sorted(sources);
 	const file = files.get(name);
 	if (file === undefined) {
 		throw new Refusal("not-found", `The flow "${name}" does not exist.`);
 	}
-	return loadedFlow(pathOf(name), name, file, flowsOf(files));
+	return loadedFlow(name, file, flowsOf(files));
 }
 
 /** Every source as a flow, null when it does not parse (`ValidateOptions.flows`). */
@@ -207,8 +197,8 @@ function flowsOf(
 	return flows;
 }
 
+/** A flow is no file (ADR 2): where it is, `path`, is its name. */
 function loadedFlow(
-	path: string,
 	name: string,
 	file: FlowSource,
 	flows: Readonly<Record<string, Flow | null>>,
@@ -216,12 +206,12 @@ function loadedFlow(
 	if (!("json" in file)) {
 		return {
 			name,
-			path,
+			path: name,
 			flow: null,
 			issues: [
 				{ severity: "error", message: `Not valid JSON: ${file.jsonError}` },
 			],
 		};
 	}
-	return { name, path, ...parseFlow(file.json, { flows, name }) };
+	return { name, path: name, ...parseFlow(file.json, { flows, name }) };
 }

@@ -20,7 +20,6 @@ export type {
 export {
 	callersOf,
 	canonicalFlowJson,
-	type FlowPathOf,
 	type FlowSource,
 	type FlowSources,
 	flowNameOfFile,

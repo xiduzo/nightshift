@@ -191,7 +191,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 	): Promise<readonly FlowInputDef[]> {
 		try {
 			const sources = await deps.flows.flows(projectId);
-			return loadFlowSource(sources, flow, (name) => name).flow?.inputs ?? [];
+			return loadFlowSource(sources, flow).flow?.inputs ?? [];
 		} catch {
 			return [];
 		}

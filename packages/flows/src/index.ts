@@ -318,7 +318,6 @@ export {
 	type FlowFile,
 	type FlowIssue,
 	type FlowListItem,
-	type FlowPathOf,
 	type FlowSource,
 	type FlowSources,
 	flowNameOfFile,

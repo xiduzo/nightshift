@@ -56,14 +56,12 @@ const sources = (): FlowSources => ({
 	alpha: { json: unbounded() },
 });
 
-const pathOf = (name: string) => `/repo/${name}.json`;
-
 describe("listFlowSources", () => {
 	test("lists every flow sorted by name, with its errors, inputs and callers", () => {
-		expect(listFlowSources(sources(), pathOf)).toEqual([
+		expect(listFlowSources(sources())).toEqual([
 			{
 				name: "alpha",
-				path: "/repo/alpha.json",
+				path: "alpha",
 				description: "A quick fix",
 				nodeCount: 1,
 				errorCount: 1,
@@ -73,7 +71,7 @@ describe("listFlowSources", () => {
 			},
 			{
 				name: "broken",
-				path: "/repo/broken.json",
+				path: "broken",
 				description: null,
 				nodeCount: null,
 				errorCount: 1,
@@ -83,7 +81,7 @@ describe("listFlowSources", () => {
 			},
 			{
 				name: "quick",
-				path: "/repo/quick.json",
+				path: "quick",
 				description: "A quick fix",
 				nodeCount: 1,
 				errorCount: 0,
@@ -93,7 +91,7 @@ describe("listFlowSources", () => {
 			},
 			{
 				name: "zeta",
-				path: "/repo/zeta.json",
+				path: "zeta",
 				description: "Calls quick",
 				nodeCount: 1,
 				errorCount: 0,
@@ -105,16 +103,16 @@ describe("listFlowSources", () => {
 	});
 
 	test("no sources is an empty list", () => {
-		expect(listFlowSources({}, pathOf)).toEqual([]);
+		expect(listFlowSources({})).toEqual([]);
 	});
 });
 
 describe("loadFlowSource", () => {
 	test("loads one flow and checks its calls against the other sources", () => {
-		const loaded = loadFlowSource(sources(), "zeta", pathOf);
+		const loaded = loadFlowSource(sources(), "zeta");
 		expect(loaded).toMatchObject({
 			name: "zeta",
-			path: "/repo/zeta.json",
+			path: "zeta",
 			flow: caller(),
 		});
 		expect(loaded.issues.filter((i) => i.severity === "error")).toEqual([]);
@@ -122,16 +120,16 @@ describe("loadFlowSource", () => {
 
 	test("a call of a flow that is not in the sources is an error", () => {
 		const { quick: _gone, ...rest } = sources();
-		const loaded = loadFlowSource(rest, "zeta", pathOf);
+		const loaded = loadFlowSource(rest, "zeta");
 		expect(loaded.issues.filter((i) => i.severity === "error")).toEqual([
 			expect.objectContaining({ nodeId: "call" }),
 		]);
 	});
 
 	test("a source that is not JSON loads with flow null and one issue", () => {
-		expect(loadFlowSource(sources(), "broken", pathOf)).toEqual({
+		expect(loadFlowSource(sources(), "broken")).toEqual({
 			name: "broken",
-			path: "/repo/broken.json",
+			path: "broken",
 			flow: null,
 			issues: [
 				{ severity: "error", message: "Not valid JSON: Unexpected token" },
@@ -142,7 +140,7 @@ describe("loadFlowSource", () => {
 	test("refuses a missing flow as not found, in words for people", () => {
 		let error: unknown;
 		try {
-			loadFlowSource(sources(), "missing", pathOf);
+			loadFlowSource(sources(), "missing");
 		} catch (caught) {
 			error = caught;
 		}

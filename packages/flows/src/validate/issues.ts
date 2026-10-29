@@ -28,10 +28,10 @@ export type ValidateOptions = {
 export type At = Pick<FlowIssue, "nodeId" | "edgeId" | "sectionId">;
 export type Report = (message: string, at: At) => void;
 
-/** A flow file in a project. */
+/** A flow in a project. */
 export type FlowFile = {
 	name: string;
-	/** Absolute path of the JSON file. */
+	/** Where the flow is: its name, since flows are no files (ADR 2). */
 	path: string;
 };
 

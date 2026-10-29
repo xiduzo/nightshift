@@ -149,9 +149,6 @@ export type SpaceFlows = {
 
 const NO_NAMES = async () => new Map<string, string>();
 
-/** Where a flow is: its name, since flows are no files (ADR 2). */
-const byName = (name: string) => name;
-
 /** A revision's flow as the schema reads it, or null. */
 function revisionFlow(revision: FlowRevision): Flow | null {
 	const parsed = flowSchema.safeParse(migrateFlow(revision.flow));
@@ -208,13 +205,13 @@ export function createSpaceFlows(
 					before && after ? flowDiffSummary(diffFlows(before, after)) : null,
 			};
 		});
-		const currentFlow = loadFlowSource(sources, name, byName).flow;
+		const currentFlow = loadFlowSource(sources, name).flow;
 		return { items, flows: parsed, currentFlow };
 	}
 
 	/** The flow of that name, or a refusal when it does not read as a flow. */
 	async function validFlow(projectId: string, name: string): Promise<Flow> {
-		const loaded = loadFlowSource(await flows.flows(projectId), name, byName);
+		const loaded = loadFlowSource(await flows.flows(projectId), name);
 		if (loaded.flow === null) {
 			throw new Refusal(
 				"invalid",
@@ -234,12 +231,12 @@ export function createSpaceFlows(
 		return {
 			async list(projectId) {
 				await inSpace(projectId);
-				return listFlowSources(await flows.flows(projectId), byName);
+				return listFlowSources(await flows.flows(projectId));
 			},
 
 			async get(projectId, name) {
 				await inSpace(projectId);
-				return loadFlowSource(await flows.flows(projectId), name, byName);
+				return loadFlowSource(await flows.flows(projectId), name);
 			},
 
 			async map(projectId) {
