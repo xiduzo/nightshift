@@ -5,9 +5,9 @@ import {
 	type CommandNode,
 	type Flow,
 	type FlowEdge,
-	type FlowInput,
 	flowSchema,
 } from "@nightshift/flows";
+import type { FlowInput } from "@nightshift/flows/testing";
 import { eq } from "drizzle-orm";
 import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";

@@ -893,7 +893,7 @@ describe("every value name on an entry has an importer (m)", () => {
 			"packages/demo/src/runs/index.ts":
 				'export { run, walk } from "./run";\nexport type { Run } from "./run";\n',
 			"packages/demo/src/runs/run.ts":
-				"export const run = 1;\nexport const walk = 2;\nexport type Run = number;\n",
+				"export type Run = number;\nexport const run: Run = 1;\nexport const walk = 2;\n",
 			"packages/demo/src/index.ts":
 				'export { run, walk, type Run } from "./runs";\nexport { migrate } from "./migrate";\n',
 			"apps/user/package.json": JSON.stringify({ name: "user" }),
@@ -911,15 +911,50 @@ describe("every value name on an entry has an importer (m)", () => {
 	};
 	const userImports = (text: string) => ({ "apps/user/src/main.ts": text });
 
-	test("a value name that no other workspace imports fails, a type does not", () => {
+	test("a name that no other workspace imports fails, a type too", () => {
 		expect(
 			entries(
 				userImports(
-					'import { run } from "@demo/pkg";\nimport { migrate, migrationsFolder } from "@demo/pkg/migrate";\n[run, migrate, migrationsFolder];\n',
+					'import { walk } from "@demo/pkg";\nimport { migrate, migrationsFolder } from "@demo/pkg/migrate";\n[walk, migrate, migrationsFolder];\n',
 				),
 			),
 		).toEqual([
-			'packages/demo/src/index.ts: no other workspace imports "migrate", "walk" from "@demo/pkg". Take them off the entry.',
+			'packages/demo/src/index.ts: no other workspace imports "Run", "migrate", "run" from "@demo/pkg". Take them off the entry.',
+		]);
+	});
+
+	test("a type stays when the declaration of a used name writes it, in turn", () => {
+		const use = userImports(
+			'import { run, walk } from "@demo/pkg";\nimport * as m from "@demo/pkg/migrate";\n[run, walk, m];\n',
+		);
+		const root = (runTs: string) => ({
+			...use,
+			"packages/demo/src/runs/index.ts":
+				'export { run, walk } from "./run";\nexport type { Run, Step } from "./run";\n',
+			"packages/demo/src/runs/run.ts": runTs,
+			"packages/demo/src/index.ts":
+				'export { run, walk, type Run, type Step } from "./runs";\nexport { migrate } from "./migrate";\n',
+		});
+		// run writes Run, Run writes Step: both stay.
+		expect(
+			entries(
+				root(
+					"export type Step = number;\nexport type Run = { steps: Step[] };\nexport function run(r: Run): number {\n\treturn r.steps.length;\n}\nexport const walk = 2;\n",
+				),
+			),
+		).toEqual([
+			'packages/demo/src/index.ts: no other workspace imports "migrate" from "@demo/pkg". Take it off the entry.',
+		]);
+		// Without a return type the body gives the type, so it counts. With
+		// one, only the signature does.
+		expect(
+			entries(
+				root(
+					"export type Step = number;\nexport type Run = number;\nexport function run() {\n\treturn [] as Step[];\n}\nexport function walk(): number {\n\treturn 1 as Run;\n}\n",
+				),
+			),
+		).toEqual([
+			'packages/demo/src/index.ts: no other workspace imports "Run", "migrate" from "@demo/pkg". Take them off the entry.',
 		]);
 	});
 

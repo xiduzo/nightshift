@@ -15,9 +15,9 @@ import type {
 	CommandNode,
 	Flow,
 	FlowEdge,
-	FlowInput,
 } from "@nightshift/flows";
 import { parseFlow } from "@nightshift/flows";
+import type { FlowInput } from "@nightshift/flows/testing";
 import { saverFor } from "../graph/checkpointer";
 import { appendEvent } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";

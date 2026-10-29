@@ -13,11 +13,9 @@
 export {
 	type ArchiveRef,
 	type FollowWant,
-	type HostClient,
 	type HostHello,
 	type HostProcedureMeta,
 	type LeaveResult,
-	type ListedSpace,
 	type MergePending,
 	type MergePreview,
 	type MergeResult,

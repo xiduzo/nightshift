@@ -37,10 +37,10 @@
  *     not part of a cycle, nor is a test. KNOWN_CYCLES lists the ones that
  *     wait for their fix
  * And across the workspaces it checks:
- * (m) a value name on a package entry that no production file of another
- *     workspace imports. A test counts only for a `./testing` entry
- *     (`checkEntries`: types are exempt, PENDING_NAMES wait for their
- *     importer)
+ * (m) a name on a package entry that no production file of another
+ *     workspace imports. A test counts only for a `./testing` entry. A
+ *     type may stay when a used name's declaration writes it, in turn
+ *     (`checkEntries`. PENDING_NAMES wait for their importer)
  *
  * It reads every file of the workspace, not only `src/`. A file outside
  * `src/` (a config file, a script) belongs to no vertical: it imports a
@@ -1117,20 +1117,133 @@ type Entry = {
 	home: string;
 };
 
+const declarations = new Map<string, ts.SourceFile>();
+
 /**
- * (m) Every value name on a package entry has an importer: a production
- * file of another workspace imports or re-exports it. A test counts only
- * for a `./testing` entry, so a name that only tests use goes to the
- * package's `./testing`. A production file of the entry's own package
- * outside the entry's vertical counts as well, but an entry file (the root
- * index that re-exports a vertical's barrel) counts only for the names it
- * passes on that are used in turn.
+ * The names that the declarations of `names`, exported from `file`, write,
+ * in turn: a type's text, a function's parameters and return type (its
+ * body too when it writes no return type, because then the body gives the
+ * type), a constant's type, or its value when it writes no type. A name
+ * that such a declaration writes and its file declares or imports from the
+ * package is read in turn. A name from another package ends the walk.
+ */
+function namesWritten(file: string, names: Iterable<string>): Set<string> {
+	const found = new Set<string>();
+	const seen = new Set<string>();
+	const sourceOf = (path: string): ts.SourceFile => {
+		let source = declarations.get(path);
+		if (!source) {
+			source = ts.createSourceFile(
+				path,
+				readFileSync(path, "utf8"),
+				ts.ScriptTarget.Latest,
+				true,
+				path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+			);
+			declarations.set(path, source);
+		}
+		return source;
+	};
+	const visit = (path: string, name: string): void => {
+		const key = `${path}\0${name}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		const source = sourceOf(path);
+		const follow = (specifier: string, imported: string) => {
+			if (!specifier.startsWith(".")) return;
+			const target = resolveFile(resolve(dirname(path), specifier));
+			if (target) visit(target, imported);
+		};
+		const written: string[] = [];
+		const collect = (node: ts.Node): void => {
+			if (ts.isIdentifier(node)) written.push(node.text);
+			const typed =
+				(ts.isFunctionLike(node) && "body" in node && node.body && node.type) ||
+				(ts.isVariableDeclaration(node) && node.type);
+			if (typed) {
+				const skip = ts.isVariableDeclaration(node)
+					? node.initializer
+					: (node as ts.FunctionLikeDeclaration).body;
+				ts.forEachChild(node, (child) => {
+					if (child !== skip) collect(child);
+				});
+				return;
+			}
+			ts.forEachChild(node, collect);
+		};
+		for (const statement of source.statements) {
+			if (ts.isExportDeclaration(statement)) {
+				const clause = statement.exportClause;
+				if (!clause || !ts.isNamedExports(clause)) continue;
+				for (const element of clause.elements) {
+					if (element.name.text !== name) continue;
+					const imported = (element.propertyName ?? element.name).text;
+					if (
+						statement.moduleSpecifier &&
+						ts.isStringLiteral(statement.moduleSpecifier)
+					)
+						follow(statement.moduleSpecifier.text, imported);
+					else if (imported !== name) visit(path, imported);
+				}
+			} else if (
+				ts.isImportDeclaration(statement) &&
+				ts.isStringLiteral(statement.moduleSpecifier)
+			) {
+				const named = statement.importClause?.namedBindings;
+				if (named && ts.isNamedImports(named))
+					for (const element of named.elements)
+						if (element.name.text === name)
+							follow(
+								statement.moduleSpecifier.text,
+								(element.propertyName ?? element.name).text,
+							);
+			} else if (ts.isVariableStatement(statement)) {
+				for (const declaration of statement.declarationList.declarations)
+					if (
+						ts.isIdentifier(declaration.name) &&
+						declaration.name.text === name
+					)
+						collect(declaration);
+			} else if (
+				(ts.isFunctionDeclaration(statement) ||
+					ts.isClassDeclaration(statement) ||
+					ts.isInterfaceDeclaration(statement) ||
+					ts.isTypeAliasDeclaration(statement) ||
+					ts.isEnumDeclaration(statement) ||
+					ts.isModuleDeclaration(statement)) &&
+				statement.name?.text === name
+			) {
+				collect(statement);
+			}
+		}
+		for (const id of written) {
+			if (id === name) continue;
+			found.add(id);
+			visit(path, id);
+		}
+	};
+	for (const name of names) visit(file, name);
+	return found;
+}
+
+/**
+ * (m) Every name on a package entry has an importer: a production file of
+ * another workspace imports or re-exports it. A test counts only for a
+ * `./testing` entry, so a name that only tests use goes to the package's
+ * `./testing`. A production file of the entry's own package outside the
+ * entry's vertical counts as well, but an entry file (the root index that
+ * re-exports a vertical's barrel) counts only for the names it passes on
+ * that are used in turn.
  *
- * Types are exempt: a type that the emitted declaration of another package
- * names must stay on an entry (TS2883). So are the names that `export *`
- * passes on (only the drizzle schema has it). A wildcard entry, an entry of
- * NOT_CHECKED, and an entry in ENTRY_EXCEPTIONS of check-layers are not
- * checked.
+ * A type without an importer may stay when the declaration of a used name
+ * on the same entry writes it (`namesWritten`), in turn: another package's
+ * emitted declaration can name it without importing it (TS2883). The check
+ * reads what the declarations write, not what TypeScript infers. When
+ * `tsc` needs a type that no declaration writes, write it (a return type).
+ * The names that `export *` passes on are not checked (only the drizzle
+ * schema has it).
+ * A wildcard entry, an entry of NOT_CHECKED, and an entry in
+ * ENTRY_EXCEPTIONS of check-layers are not checked.
  *
  * `workspaces` are the workspaces whose entries it checks. The files of
  * every workspace count as importers.
@@ -1284,7 +1397,7 @@ export function checkEntries(
 		if (NOT_CHECKED.has(entry.workspace)) continue;
 		if (exceptions.includes(entry.specifier)) continue;
 		const used = uses.get(entry.file);
-		const values = parse(entry.file).values;
+		const { values, exports } = parse(entry.file);
 		const waiting = pending[entry.specifier] ?? [];
 		for (const name of waiting) {
 			if (!values.has(name) || used === "all" || used?.has(name)) {
@@ -1294,8 +1407,18 @@ export function checkEntries(
 			}
 		}
 		if (used === "all") continue;
-		const unused = [...values]
-			.filter((name) => !used?.has(name) && !waiting.includes(name))
+		// The types that the declarations of the used names write, in turn.
+		const reached = namesWritten(
+			entry.file,
+			exports.names.filter((name) => used?.has(name)),
+		);
+		const unused = [...new Set(exports.names)]
+			.filter(
+				(name) =>
+					!used?.has(name) &&
+					!waiting.includes(name) &&
+					(values.has(name) || !reached.has(name)),
+			)
 			.sort();
 		const list = (names: string[]) => names.map((n) => `"${n}"`).join(", ");
 		const onlyTests = unused.filter((n) => tested.get(entry.file)?.has(n));

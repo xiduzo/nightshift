@@ -18,8 +18,8 @@ import type {
 	DecisionNode,
 	Flow,
 	FlowEdge,
-	FlowInput,
 } from "@nightshift/flows";
+import type { FlowInput } from "@nightshift/flows/testing";
 import { asc, eq } from "drizzle-orm";
 import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";

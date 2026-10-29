@@ -240,7 +240,7 @@ describe("the check itself", () => {
 	test("lets through types of the API, the flows root, and member names", () => {
 		const source = [
 			'import type { AppRouterClient } from "@nightshift/api/client";',
-			'import { type AppRouter } from "@nightshift/api/client";',
+			'import { type AppRouterClient as Api } from "@nightshift/api/client";',
 			'import { checkDraft } from "@nightshift/flows";',
 			'import { useQuery } from "@tanstack/react-query";',
 			'import { RPCLink } from "@orpc/client/fetch";',

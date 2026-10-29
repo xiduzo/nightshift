@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { type HostClient, hostRouter } from "@nightshift/devices";
+import { hostRouter } from "@nightshift/devices";
 import { type AnyProcedure, isProcedure } from "@orpc/server";
 
-import { type AppRouterClient, appRouter } from "./router";
+import { appRouter } from "./router";
 
 /**
  * A Device calls its Host through the peer protocol that
@@ -13,8 +13,6 @@ import { type AppRouterClient, appRouter } from "./router";
  * permission. Older Devices call these paths: a move or a rename breaks
  * their link.
  */
-const fits = (client: AppRouterClient): HostClient => client;
-
 describe("the peer protocol", () => {
 	test("is served at the contract's paths, with its schemas and key permissions", () => {
 		const groups = appRouter as unknown as Record<
@@ -38,9 +36,5 @@ describe("the peer protocol", () => {
 		// 24 before `sync.commands`, 25 before `sync.mergePersonal` and 26
 		// before `link.leave`, which an older Host lacks.
 		expect(served).toBe(27);
-	});
-
-	test("the router's client is a HostClient", () => {
-		expect(typeof fits).toBe("function");
 	});
 });

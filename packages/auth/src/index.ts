@@ -42,7 +42,6 @@ export {
 	approvePairing,
 	denyPairing,
 	normalizeUserCode,
-	type PairingPlugin,
 	redeemPairing,
 	reviewPairing,
 	startPairing,

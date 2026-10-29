@@ -121,7 +121,6 @@ export {
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
-	type FlowInput,
 	type FlowInputDef,
 	type FlowMigration,
 	type FlowNode,
@@ -270,9 +269,7 @@ export {
 	nextTimeOfDay,
 	type Schedule,
 	type ScheduleFlowInfo,
-	type ScheduleInput,
 	type ScheduleIssue,
-	type SchedulesFile,
 	scheduleSchema,
 	type TimeAndDays,
 	timeAndDaysToCron,
@@ -290,8 +287,6 @@ export {
 	nodesWithin,
 	parentSection,
 	type SectionBoundary,
-	type SectionCheck,
-	type SectionCheckOptions,
 	type SectionExit,
 	type SectionProblem,
 	sectionBoundary,
@@ -301,7 +296,6 @@ export {
 } from "./sections";
 export {
 	applyVariableWrites,
-	type Coerced,
 	chooseByRule,
 	evaluateRule,
 	initialVariables,
@@ -315,7 +309,6 @@ export {
 	type SchemaCheck,
 	TEMPLATE_REF,
 	type TemplateContext,
-	type TemplateRef,
 	type VariableResult,
 } from "./template";
 export {

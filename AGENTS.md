@@ -18,8 +18,10 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
   included.
 - **Import only public entries.** Use a package's name and an entry listed in its
   `exports`. Never a deep path into its `src/`. Fakes and fixtures come from `./testing`.
-  Every package entry, and every value name on it, needs an importer in another
-  workspace. No `export *`.
+  Every package entry, and every name on it, needs an importer in the production
+  code of another workspace. Tests count only for `./testing`: a name that only
+  tests use goes there. A type may also stay when a used name's declaration
+  writes it (TS2883). No `export *`.
 - **Apps wire, packages decide.** Domain logic goes in a package, not in `apps/*`.
   Routes in `apps/web` stay thin. Each web vertical owns its `queries.ts`.
 - **Run the checks.** `bun scripts/check-layers.ts` and

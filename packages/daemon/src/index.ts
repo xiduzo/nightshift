@@ -5,7 +5,6 @@
  */
 
 export type {
-	DesktopNotice,
 	DesktopNotifier,
 	DesktopWindow,
 	DesktopWindowState,

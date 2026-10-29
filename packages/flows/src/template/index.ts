@@ -30,7 +30,6 @@ export {
 } from "./template";
 export {
 	applyVariableWrites,
-	type Coerced,
 	coerceVariable,
 	initialVariables,
 	type SchemaCheck,

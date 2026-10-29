@@ -12,10 +12,10 @@ import type {
 	AgentProfileSettings,
 	ChatEvent,
 	ChatRequest,
-	FlowInput,
 	SuggestionEvent,
 	SuggestionRequest,
 } from "@nightshift/flows";
+import type { FlowInput } from "@nightshift/flows/testing";
 import { call } from "@orpc/server";
 
 import {

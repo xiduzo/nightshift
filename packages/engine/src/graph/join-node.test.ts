@@ -3,7 +3,8 @@ import { existsSync, writeFileSync } from "node:fs";
 import { join as joinPath } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
-import type { FlowEdge, FlowInput, JoinNode } from "@nightshift/flows";
+import type { FlowEdge, JoinNode } from "@nightshift/flows";
+import type { FlowInput } from "@nightshift/flows/testing";
 import { getRunRow } from "../log/run-row";
 import { deriveOpenGate, deriveRunState, deriveSteps } from "../read";
 import {

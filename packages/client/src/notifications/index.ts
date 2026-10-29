@@ -11,7 +11,6 @@ export {
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
 	type PushData,
-	type PushMessageKind,
 	type PushRoute,
 	pushDataOf,
 	routeOf,

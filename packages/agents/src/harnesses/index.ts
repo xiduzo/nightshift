@@ -18,7 +18,6 @@ export {
 } from "./claude-code";
 export {
 	type CodexHarnessOptions,
-	type CodexPolicy,
 	codexHarness,
 } from "./codex";
 export { harnessFacts } from "./facts";
@@ -27,7 +26,6 @@ export {
 	type GrokBuildHarnessOptions,
 	grokBuildHarness,
 } from "./grok-build";
-export type { HarnessAdapter } from "./harness-record";
 export {
 	type OpencodeHarnessOptions,
 	opencodeHarness,

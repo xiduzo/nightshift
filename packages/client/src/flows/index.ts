@@ -11,5 +11,4 @@ export { canStart } from "./start";
 export type {
 	FlowListItem,
 	FlowRevisionItem,
-	FlowRevisionView,
 } from "./types";

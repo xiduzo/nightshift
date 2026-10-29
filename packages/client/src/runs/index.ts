@@ -24,7 +24,6 @@ export {
 	hasEnded,
 	markdownPreview,
 	nodeLabels,
-	type RunGroup,
 	runningSteps,
 	type StepState,
 	stepName,

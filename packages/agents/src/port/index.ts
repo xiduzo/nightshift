@@ -13,7 +13,6 @@ export type {
 	AgentUsage,
 	BridgedTool,
 	CostSource,
-	CustomHarnessName,
 	Decider,
 	DeciderName,
 	DecisionInput,

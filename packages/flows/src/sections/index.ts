@@ -7,8 +7,6 @@
 export {
 	canMakeSection,
 	type SectionBoundary,
-	type SectionCheck,
-	type SectionCheckOptions,
 	type SectionExit,
 	type SectionProblem,
 	sectionBoundary,

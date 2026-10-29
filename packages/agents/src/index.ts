@@ -22,13 +22,10 @@ export {
 	terminalTools,
 } from "./assistant";
 export {
-	type DeciderAdapter,
-	type DeciderModels,
 	type DeciderView,
 	deciderViews,
 	type TanstackDeciderOptions,
 	tanstackDecider,
-	type ValueAdapter,
 } from "./decider";
 export { type CliCheck, checkCustomAgent } from "./doctor";
 export {
@@ -39,14 +36,12 @@ export {
 	type ClaudeCodeHarnessOptions,
 	type ClaudeCodeProcessOptions,
 	type CodexHarnessOptions,
-	type CodexPolicy,
 	checkHarness,
 	claudeCodeHarness,
 	codexHarness,
 	customAcpHarness,
 	type GrokBuildHarnessOptions,
 	grokBuildHarness,
-	type HarnessAdapter,
 	type HarnessModels,
 	type HarnessView,
 	harnessFacts,
@@ -63,7 +58,6 @@ export type {
 	AgentHarnessName,
 	AgentSessionInput,
 	AgentUsage,
-	CustomHarnessName,
 	Decider,
 	DeciderName,
 	DecisionInput,
@@ -80,7 +74,6 @@ export type {
 export {
 	type CostSource,
 	type PriceUpdates,
-	type SettledCost,
 	startPriceUpdates,
 } from "./pricing";
 export {
@@ -91,7 +84,6 @@ export {
 	type CliToolCheck,
 	checkCli,
 	type McpTestResult,
-	type McpToolCall,
 	type McpToolInfo,
 	pathPrograms,
 	testMcpServer,

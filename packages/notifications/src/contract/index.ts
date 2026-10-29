@@ -9,7 +9,6 @@ export {
 	deviceWaitKey,
 	gateKey,
 	isGateKey,
-	type NotificationKey,
 	parseDeviceWaitKey,
 	parseGateKey,
 	runEndKey,
