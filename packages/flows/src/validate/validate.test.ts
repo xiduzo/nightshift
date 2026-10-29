@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Flow, FlowEdge, FlowNode } from "../document";
-import { flowSchema, nodeOutcomes, outputFieldsByType } from "../document";
+import type { Flow, FlowEdge, FlowNode } from "../flow";
+import { flowSchema, nodeOutcomes, outputFieldsByType } from "../flow";
 import type {
 	AgentNode,
 	CallEach,

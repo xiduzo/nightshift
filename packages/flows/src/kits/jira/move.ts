@@ -1,4 +1,4 @@
-import type { FlowInput } from "../../document";
+import type { FlowInput } from "../../flow";
 
 /** `kit:jira/move`: moves a Jira work item to another status, with the Atlassian CLI (`acli`). */
 export const jiraMoveKit: FlowInput = {

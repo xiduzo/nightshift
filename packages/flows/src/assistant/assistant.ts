@@ -23,7 +23,7 @@ import {
 	flowInputSchema,
 	flowSchema,
 	flowVariableSchema,
-} from "../document";
+} from "../flow";
 import {
 	agentNodeSchema,
 	flowNameSchema,

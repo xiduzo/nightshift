@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import {
-	FLOW_VERSION,
-	type Flow,
-	flowSchema,
-	singleAgentFlow,
-} from "../document";
+import { FLOW_VERSION, type Flow, flowSchema, singleAgentFlow } from "../flow";
 import { flowNameSchema } from "../nodes";
 import {
 	callersOf,

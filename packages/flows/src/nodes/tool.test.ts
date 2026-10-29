@@ -4,7 +4,7 @@ import {
 	flowSchema,
 	nodeOutcomes,
 	outputFieldsByType,
-} from "../document";
+} from "../flow";
 import { parseFlow, validateFlow } from "../validate";
 import type { CommandNode } from "./command";
 import type { ToolNode } from "./tool";

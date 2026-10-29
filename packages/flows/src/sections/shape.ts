@@ -4,8 +4,8 @@
  * part of the flow with one entry (decision 2 of the canvas research), so
  * it shows as one box with one way in.
  */
-import type { Flow, FlowEdge, FlowSection } from "../document";
-import { nodeOutcomes } from "../document";
+import type { Flow, FlowEdge, FlowSection } from "../flow";
+import { nodeOutcomes } from "../flow";
 import { findSection, nodesWithin, sectionPath } from "./tree";
 
 /**

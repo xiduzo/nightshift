@@ -56,7 +56,7 @@ export const flowEdgeSchema = z.object({
 	 * engine takes the first one (in file order) that has not hit its max,
 	 * and one edge without a max after them is the way on when all did.
 	 * Several edges without a max on one outcome run all at once: a fan-out,
-	 * whose branches meet at a Join (`document/branches.ts`).
+	 * whose branches meet at a Join (`flow/branches.ts`).
 	 */
 	max: z.number().int().positive().optional(),
 });

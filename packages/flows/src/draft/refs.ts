@@ -1,5 +1,5 @@
 /** Renames in templates, rules and expressions. */
-import type { Flow, FlowNode } from "../document";
+import type { Flow, FlowNode } from "../flow";
 import type { ListSource } from "../nodes";
 import type { TemplateRef } from "../template";
 import { templateRefs } from "../template";

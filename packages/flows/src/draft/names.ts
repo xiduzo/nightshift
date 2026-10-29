@@ -1,5 +1,5 @@
 /** Free names for new nodes, inputs, outputs and edges, and the clash of a new name. */
-import type { Flow } from "../document";
+import type { Flow } from "../flow";
 import { reservedNames } from "../nodes";
 
 /**

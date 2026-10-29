@@ -33,7 +33,7 @@ function jsonSchemas(schema: z.ZodType) {
 }
 
 describe("published schemas", () => {
-	test("the flow document is one of them", () => {
+	test("the flow format is one of them", () => {
 		expect(schemas.map(([name]) => name)).toContain("flowSchema");
 		expect(flows.flowSchema).toBe(declared.get("flowSchema") as never);
 	});

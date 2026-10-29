@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * The parts every node type shares: names, labels, deciders, the Device a
  * step runs on, variable writes and the base fields of a node. A leaf: it
- * imports no other node file, so each node file and the flow document can
+ * imports no other node file, so each node file and the flow format can
  * import it without a cycle.
  */
 

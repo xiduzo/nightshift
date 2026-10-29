@@ -1,6 +1,6 @@
 /** New nodes and flows, and edits of one node. */
 
-import { FLOW_VERSION, type Flow, type FlowNode } from "../document";
+import { FLOW_VERSION, type Flow, type FlowNode } from "../flow";
 import {
 	type AgentNode,
 	type CallEach,

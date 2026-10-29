@@ -1,4 +1,4 @@
-import type { FlowInput } from "../../document";
+import type { FlowInput } from "../../flow";
 
 /** The data the finish commands write: the pull request as it is now. */
 const VIEW = `gh pr view "$pr" --json number,url,state,isDraft --jq '{number, url, state: (.state | ascii_downcase), draft: .isDraft}' > "$NS_OUTPUT"`;

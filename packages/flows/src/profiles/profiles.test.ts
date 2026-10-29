@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema } from "../document";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import {
 	type AgentNode,
 	agentHarnessSchema,

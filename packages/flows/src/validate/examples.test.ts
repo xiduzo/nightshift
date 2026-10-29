@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { FLOW_VERSION, type Flow, type FlowMigration } from "../document";
+import { FLOW_VERSION, type Flow, type FlowMigration } from "../flow";
 import { parseFlow, validateFlow } from "./flow";
 
 /**

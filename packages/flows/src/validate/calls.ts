@@ -1,4 +1,4 @@
-import { type Flow, NODE_TYPE_LABEL, runsEach } from "../document";
+import { type Flow, NODE_TYPE_LABEL, runsEach } from "../flow";
 import { isKitName, kitFlow } from "../kits";
 import type { CallNode } from "../nodes";
 import type { ProjectFlowMap, Report, ValidateOptions } from "./issues";

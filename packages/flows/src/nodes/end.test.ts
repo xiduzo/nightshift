@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema } from "../document";
 import { addNode, planSubflowFromSection } from "../draft";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
 import { endMessage } from "./end";
 

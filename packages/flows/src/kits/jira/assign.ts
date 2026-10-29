@@ -1,4 +1,4 @@
-import type { FlowInput } from "../../document";
+import type { FlowInput } from "../../flow";
 
 /** `kit:jira/assign`: assigns a Jira work item, with the Atlassian CLI (`acli`). */
 export const jiraAssignKit: FlowInput = {

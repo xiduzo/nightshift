@@ -1,7 +1,8 @@
 /**
- * The flow document: the schema that puts the node types together, the
+ * The flow format: the schema that puts the node types together, the
  * flow's own parts, migration of older files, and the walk from node to
- * node.
+ * node. Not the flow document: that is how the engine keeps a
+ * Project's flows (ADR 2).
  */
 
 export {

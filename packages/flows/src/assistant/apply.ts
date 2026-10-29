@@ -3,13 +3,7 @@
  * preview a person reads before they apply it. Pure: the editor applies the
  * result to its draft, and the person saves.
  */
-import {
-	type Flow,
-	type FlowInputDef,
-	type FlowNode,
-	type FlowVariableDef,
-	nodeOutcomes,
-} from "../document";
+
 import {
 	type NodeOption,
 	setInputs,
@@ -18,6 +12,13 @@ import {
 	withOptions,
 	withWrites,
 } from "../draft";
+import {
+	type Flow,
+	type FlowInputDef,
+	type FlowNode,
+	type FlowVariableDef,
+	nodeOutcomes,
+} from "../flow";
 import type { VariableWrite } from "../nodes";
 import type {
 	SuggestedOutcome,

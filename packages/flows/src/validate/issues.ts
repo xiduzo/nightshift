@@ -1,4 +1,4 @@
-import type { Flow, FlowInputDef } from "../document";
+import type { Flow, FlowInputDef } from "../flow";
 
 /** One problem in a flow. A flow with any `error` cannot run. */
 export type FlowIssue = {

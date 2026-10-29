@@ -9,7 +9,7 @@ import type {
 	FlowVariableDef,
 	Outcome,
 	Policy,
-} from "../document";
+} from "../flow";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import {
 	agentNode,

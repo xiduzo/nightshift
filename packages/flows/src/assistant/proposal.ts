@@ -3,13 +3,9 @@
  * `propose_flow` tool and the web both ask this one function, so the agent
  * and the person see the same issues.
  */
-import {
-	FLOW_VERSION,
-	type Flow,
-	type FlowNode,
-	flowSchema,
-} from "../document";
+
 import { checkDraft, type DraftMessages } from "../draft";
+import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";

@@ -6,7 +6,7 @@ import {
 	type FlowNodeType,
 	flowSchema,
 	outputFieldsByType,
-} from "../document";
+} from "../flow";
 import { reservedOutcomes } from "../nodes";
 import { validateFlow } from "../validate";
 import {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow } from "../document";
 import { commandNode } from "../draft/nodes";
+import { FLOW_VERSION, type Flow } from "../flow";
 import { validateFlow } from "../validate";
 import { reservedOutcomes } from "./base";
 import {

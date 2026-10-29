@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type FlowInput, flowSchema } from "../document";
+import { type FlowInput, flowSchema } from "../flow";
 import { kitList } from "../kits";
 import { parseFlow, validateFlow } from "./flow";
 

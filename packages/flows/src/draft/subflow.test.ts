@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Flow, type FlowInput, flowSchema } from "../document";
+import { type Flow, type FlowInput, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
 import {
 	planSubflowFromSection,

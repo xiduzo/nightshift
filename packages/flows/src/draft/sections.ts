@@ -1,5 +1,5 @@
 /** Edits of the flow's Sections: add, change and remove, and keep them in step with the nodes. */
-import type { Flow, FlowSection } from "../document";
+import type { Flow, FlowSection } from "../flow";
 import {
 	canMakeSection,
 	parentSection,

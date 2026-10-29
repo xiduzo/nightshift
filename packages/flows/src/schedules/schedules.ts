@@ -1,7 +1,7 @@
 import { Cron } from "croner";
 import { z } from "zod";
 
-import type { FlowInputDef } from "../document";
+import type { FlowInputDef } from "../flow";
 import { deviceNameSchema, flowNameSchema, labelSchema } from "../nodes";
 import { ruleProblem, templateRefs } from "../template";
 

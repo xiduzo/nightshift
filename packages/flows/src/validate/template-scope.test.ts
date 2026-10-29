@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type Flow,
-	type FlowInput,
-	flowSchema,
-} from "../document";
+import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
 import { validateFlow } from "./flow";
 import type { ProjectFlowMap } from "./issues";
 import {

@@ -1,5 +1,5 @@
 /** The checks of a flow's Sections. The engine does not read them, so every issue is a warning. */
-import type { Flow, FlowSection } from "../document";
+import type { Flow, FlowSection } from "../flow";
 import { canMakeSection, type SectionProblem } from "../sections";
 import type { Report } from "./issues";
 

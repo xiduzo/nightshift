@@ -6,7 +6,7 @@ import {
 	flowSchema,
 	migrateFlow,
 	nodeOutcomes,
-} from "../document";
+} from "../flow";
 import { isKitName } from "../kits";
 import { reservedNames } from "../nodes";
 import { checkBranches } from "./branches";

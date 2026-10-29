@@ -1,4 +1,4 @@
-import type { FlowInput } from "../../document";
+import type { FlowInput } from "../../flow";
 
 /**
  * The jq (`gh api --jq`) that sums up the check runs of one commit: the

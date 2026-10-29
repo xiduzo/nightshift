@@ -1,8 +1,8 @@
-import { type FanOut, type Flow, type FlowNode, fanOutsOf } from "../document";
+import { type FanOut, type Flow, type FlowNode, fanOutsOf } from "../flow";
 import type { Report } from "./issues";
 
 /**
- * The checks of parallel branches (`document/branches.ts`): every fan-out
+ * The checks of parallel branches (`flow/branches.ts`): every fan-out
  * has edges without a max only, its branches each reach the same one Join
  * and share no node, no branch leads back to the node that fans out or
  * fans out again, and only the branches of one fan-out reach a Join. A

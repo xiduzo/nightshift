@@ -3,7 +3,7 @@ import {
 	type FlowNode,
 	nodeOutcomes,
 	outputFieldsByType,
-} from "../document";
+} from "../flow";
 import { nameSchema, reservedNames } from "../nodes";
 import { coerceVariable, templateRefs } from "../template";
 import type { Report } from "./issues";

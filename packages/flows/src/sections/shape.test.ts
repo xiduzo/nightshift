@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Flow, flowSchema, migrateFlow } from "../document";
+import { type Flow, flowSchema, migrateFlow } from "../flow";
 import { canMakeSection, sectionBoundary, sectionOf } from "./shape";
 
 /** The 20-node flow of the canvas research, as a person wrote it. */

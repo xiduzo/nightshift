@@ -17,7 +17,7 @@ import type {
 	FlowOutputDef,
 	FlowSection,
 	FlowVariableDef,
-} from "../document";
+} from "../flow";
 
 /** A node that is in both versions with other fields. */
 export type NodeChange = {

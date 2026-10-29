@@ -39,7 +39,7 @@ import {
 	jsonOutputFields,
 	nodeOutcomes,
 	outcomeColor,
-} from "../document";
+} from "../flow";
 import {
 	type CallNode,
 	type DecisionNode,

@@ -802,7 +802,7 @@ script, not in the repo):
   - `apps/web/src/features/flows/editor/lib/flow-layout.ts`, `editor-canvas.tsx`, `flow-editor.tsx`
   - `apps/web/src/features/flows/canvas/outcome-edge.tsx`, `flow-node.tsx`, `open-flow-context.ts`
   - `apps/web/src/features/runs/components/run-focus.tsx`
-  - `packages/flows/src/document/flow.ts`, `document/node.ts`, `nodes/call.ts`
+  - `packages/flows/src/flow/flow.ts`, `flow/node.ts`, `nodes/call.ts`
   - `packages/engine/src/graph/compile.ts`, `graph/nodes/call.ts`
   - `docs/glossary.md`, `docs/research/variables.md`
 - Wybrow, Marriott, Stuckey. Orthogonal Connector Routing. GD 2009, LNCS 5849, 219–231. [DOI](https://doi.org/10.1007/978-3-642-11805-0_22), [PDF](https://people.eng.unimelb.edu.au/pstuckey/papers/gd09.pdf)

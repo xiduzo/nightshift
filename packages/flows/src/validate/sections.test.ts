@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, type FlowSection, flowSchema } from "../document";
+import { type Flow, type FlowSection, flowSchema } from "../flow";
 import { parseFlow, validateFlow } from "./flow";
 
 const command = (id: string) => ({

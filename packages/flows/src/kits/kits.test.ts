@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Flow } from "../document";
+import type { Flow } from "../flow";
 import {
 	type CommandNode,
 	dataExitFor,

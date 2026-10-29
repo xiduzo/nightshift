@@ -1,5 +1,5 @@
 /** Copy and paste of nodes: within one flow, or from one flow into another. */
-import type { Flow, FlowEdge, FlowNode, FlowSection } from "../document";
+import type { Flow, FlowEdge, FlowNode, FlowSection } from "../flow";
 import { nodesWithin } from "../sections";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import type { Position } from "./nodes";

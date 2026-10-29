@@ -1,4 +1,4 @@
-import { type Flow, type FlowInput, flowSchema } from "../document";
+import { type Flow, type FlowInput, flowSchema } from "../flow";
 import { kitNameSchema } from "../nodes";
 import { createBranchKit } from "./github/create-branch";
 import { finishPrKit } from "./github/finish-pr";

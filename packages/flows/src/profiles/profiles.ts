@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Flow, FlowNode } from "../document";
+import type { Flow, FlowNode } from "../flow";
 import {
 	type AgentHarnessName,
 	type AgentNode,

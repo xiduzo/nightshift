@@ -4,7 +4,7 @@
  * Section that holds it, and only there. These helpers read the nesting;
  * they never loop, also when a file lists a Section inside itself.
  */
-import type { Flow, FlowSection } from "../document";
+import type { Flow, FlowSection } from "../flow";
 
 type Sections = Pick<Flow, "sections">;
 

@@ -1,4 +1,4 @@
-import type { Flow, FlowNode } from "../document";
+import type { Flow, FlowNode } from "../flow";
 import {
 	ruleNames,
 	ruleProblem,

@@ -1,4 +1,4 @@
-import type { FlowNode } from "../document";
+import type { FlowNode } from "../flow";
 import {
 	checkAgentNode,
 	checkCallNode,

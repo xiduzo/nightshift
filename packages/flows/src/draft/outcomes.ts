@@ -6,7 +6,7 @@ import {
 	type FlowNode,
 	nodeOutcomes,
 	type Outcome,
-} from "../document";
+} from "../flow";
 import {
 	type AgentNode,
 	type CallEach,

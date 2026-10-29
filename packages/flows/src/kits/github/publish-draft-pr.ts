@@ -1,4 +1,4 @@
-import type { FlowInput } from "../../document";
+import type { FlowInput } from "../../flow";
 import { JSON_STRING_FUNCTION } from "../shell";
 
 /**

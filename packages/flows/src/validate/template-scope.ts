@@ -4,7 +4,7 @@ import {
 	jsonOutputFields,
 	nodeOutputFields,
 	runsEach,
-} from "../document";
+} from "../flow";
 import { isKitName, kitFlow } from "../kits";
 import { commandHasData } from "../nodes";
 import { runFields } from "../template";

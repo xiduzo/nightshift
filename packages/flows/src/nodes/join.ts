@@ -5,7 +5,7 @@ import { nodeBase } from "./base";
  * The Join node: where the parallel branches of a fan-out meet again.
  *
  * Several edges that leave one node on one outcome without a `max` run all
- * at once (a fan-out, `document/branches.ts`). Every branch ends at the
+ * at once (a fan-out, `flow/branches.ts`). Every branch ends at the
  * same Join. `all` (the default) goes on once every branch arrived; `first`
  * goes on with the first branch that arrives and stops the others. A Join
  * ends `done`.

@@ -1,5 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
-import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../document";
+import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../flow";
 import { flowNameSchema, isProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { ScheduleFlowInfo } from "../schedules";

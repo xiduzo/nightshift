@@ -18,7 +18,7 @@ import {
 	outputFieldsByType,
 	sectionColors,
 	variableTypeSchema,
-} from "../document";
+} from "../flow";
 import { type Kit, kitList } from "../kits";
 import {
 	callEachOutputFields,

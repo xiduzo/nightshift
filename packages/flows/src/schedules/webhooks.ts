@@ -1,5 +1,5 @@
 import jsonata from "jsonata";
-import type { FlowInputDef } from "../document";
+import type { FlowInputDef } from "../flow";
 import type { JsonValue } from "../nodes";
 import {
 	isTruthy,

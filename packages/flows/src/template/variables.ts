@@ -1,9 +1,4 @@
-import type {
-	Flow,
-	FlowNode,
-	FlowVariableDef,
-	VariableType,
-} from "../document";
+import type { Flow, FlowNode, FlowVariableDef, VariableType } from "../flow";
 import type { JsonValue, VariableWrite } from "../nodes";
 import type { TemplateContext } from "./context";
 import { evaluateRule, ruleMessage } from "./rule";

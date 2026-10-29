@@ -898,7 +898,7 @@ holds every fact for every kind as a table.
 
 1. `packages/flows/src/nodes/<kind>.ts`: the node schema, its checks and
    its output fields. Add it to the `flowNodeSchema` union and the
-   per-type switches in `packages/flows/src/document/`, and its check to
+   per-type switches in `packages/flows/src/flow/`, and its check to
    `packages/flows/src/validate/nodes.ts`. Bump the flow version when old
    flows must migrate.
 2. `packages/engine/src/graph/nodes/<kind>.ts`: the factory (`runStep` with
