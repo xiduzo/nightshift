@@ -53,8 +53,12 @@ of the other Devices and Hosts: where a step runs (Placement), the Offer
 rules, the Host that keeps a Space, and the runs walked elsewhere (their
 commands, transcripts and the archive of a moved run). `@nightshift/devices`
 implements it (`createPeerEngine`). `createEngine` calls the factory in
-`EngineOptions.peers` once, with its own parts (`PeerContext`: the database,
-the run log, the bus, the documents, and how to take over or stop a run).
+`EngineOptions.peers` once, with what it offers the peers (`PeerContext`):
+this computer, Projects and their flows, profiles, the run history (rows by
+cursor, the ingest, a run's owners and events, what lands), the runs walked
+here (walk files, stamps, take over, stop) and `logFact` for the Device and
+Offer facts. Never its database, run log or bus: the peers keep their own
+rows on their own handle.
 The engine's own tests walk with `alonePeers` (`./testing`): a computer
 without other Devices. The engine reads the Device rows (`device`,
 `host_space`) only through `DeviceDirectory` (`contract/directory.ts`):

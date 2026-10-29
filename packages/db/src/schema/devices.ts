@@ -15,7 +15,7 @@ import { createdAt, spaceId, updatedAt } from "./columns";
 // `setSelfOwner`, which the daemon gives `localPerson()`), the links to
 // Hosts and their Spaces (`links/`), the exchange of run history and
 // commands with them (`exchange/`), and the merge of this computer's own
-// personal Space into its home Host's (`merge/`). The engine reads these rows through its
+// personal Space into its home Host's and its split (`membership/`). The engine reads these rows through its
 // `DeviceDirectory` port (`deviceDirectory`, in `peers/`).
 
 /**
