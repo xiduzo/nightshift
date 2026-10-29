@@ -1451,6 +1451,42 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		expect(requests.length).toBeGreaterThan(0);
 		for (const request of requests) expect(request.personId).toBe(personId);
 	}, 30_000);
+
+	test("a schedule that names no Device runs where a person's start would: on B, when A has no Clone", async () => {
+		// A Device saved the schedule; A's own folder of the project went since.
+		await a.db.insert(clone).values({
+			id: "clone-a",
+			spaceId: a.spaceId,
+			projectId,
+			deviceId: a.deviceId,
+			path: a.repoPath,
+		});
+		await seedFlows(
+			engine.space(a.spaceId),
+			projectId,
+			{ night: flow([command("hello", "echo from B")]) },
+			[
+				{
+					id: "nightly",
+					flow: "night",
+					inputs: {},
+					cron: "0 22 * * *",
+					enabled: true,
+				},
+			],
+		);
+		await a.db.delete(clone).where(eq(clone.id, "clone-a"));
+		await Bun.sleep(TICK_MS * 4);
+		clock = at(16, 22, 0, 20);
+		const scheduled = await waitFor(
+			async () => (await engine.space(a.spaceId).listRuns())[0],
+			{ label: "the scheduled run", timeoutMs: 10_000 },
+		);
+		expect(scheduled.trigger.kind).toBe("schedule");
+		expect(scheduled.device).toMatchObject({ id: B, thisDevice: false });
+		const run = await until(scheduled.id, "finished");
+		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe("from B");
+	}, 30_000);
 });
 
 describe("a run in the Personal of another Person whose home Host this is", () => {

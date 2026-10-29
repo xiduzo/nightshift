@@ -227,8 +227,8 @@ export function createProjects(deps: ProjectsDeps) {
 
 	return {
 		/**
-		 * The projects a person has not removed, oldest first: the Space's,
-		 * or without a Space every Space's (the scheduler's).
+		 * The projects with a Clone here a person has not removed, oldest
+		 * first: the Space's, or without a Space every Space's.
 		 */
 		list(spaceId?: string): Promise<ProjectRow[]> {
 			return withClone(and(isNull(project.removedAt), inSpace(spaceId)));
@@ -237,9 +237,11 @@ export function createProjects(deps: ProjectsDeps) {
 		/**
 		 * Every project of the Space a person has not removed, oldest first,
 		 * also those without a Clone on this computer (`repoPath` null): a
-		 * run of one can be walked by another Device.
+		 * run of one can be walked by another Device. Without a Space, every
+		 * Space's: the scheduler's, which fires the schedules of a project
+		 * whose runs run on another Device too.
 		 */
-		async listInSpace(spaceId: string): Promise<ListedProject[]> {
+		async listInSpace(spaceId?: string): Promise<ListedProject[]> {
 			const deviceId = await deps.deviceId();
 			return db
 				.select({ ...getColumns(project), repoPath: clone.path })
@@ -248,7 +250,7 @@ export function createProjects(deps: ProjectsDeps) {
 					clone,
 					and(eq(clone.projectId, project.id), eq(clone.deviceId, deviceId)),
 				)
-				.where(and(isNull(project.removedAt), eq(project.spaceId, spaceId)))
+				.where(and(isNull(project.removedAt), inSpace(spaceId)))
 				.orderBy(asc(project.createdAt));
 		},
 

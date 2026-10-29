@@ -478,9 +478,10 @@ export function createEngine(
 
 	// The Replica that keeps the Space fires every schedule of it (its Host,
 	// or the one Device of a Space without one), so one that is always on
-	// starts them. The Device a schedule names runs the run (`deviceName`),
-	// else the default Device of a person's start (`start-place.ts`). A
-	// webhook schedule's webhooks go to the same Replica.
+	// starts them, with a Clone of the project or not. The Device a schedule
+	// names runs the run (`deviceName`), else the default Device of a
+	// person's start (`start-place.ts`). A webhook schedule's webhooks go
+	// to the same Replica.
 	const firesHere = async (projectId: string, _schedule: Schedule) => {
 		const row = await projects.find(projectId);
 		return (await hostOf(row.spaceId)) === null;
@@ -492,7 +493,8 @@ export function createEngine(
 		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
 		startRun: startForSchedule,
 		log: runLog,
-		projects: projects.list,
+		// Also a project without a Clone here: its runs run on another Device.
+		projects: () => projects.listInSpace(),
 		flows: projectFlows,
 		enabled: () => runSettings().scheduler,
 		firesHere,
