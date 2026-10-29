@@ -365,7 +365,7 @@ describe("a run placed on another Device", () => {
 			hello: flow([command("hi", "echo hi")]),
 		});
 		expect(await space().listPlacements(projectId)).toEqual([
-			{ deviceId: B, name: "studio-b", thisDevice: false },
+			{ deviceId: B, name: "studio-b", thisDevice: false, default: true },
 		]);
 		expect((await space().listFlows(projectId)).map((f) => f.name)).toEqual([
 			"hello",

@@ -71,6 +71,7 @@ import { createSignals } from "./signals";
 import { createSpaces } from "./space";
 import type { SpaceEngine } from "./space-engine";
 import { createStartHolds } from "./start-holds";
+import { createStartPlaces } from "./start-place";
 import { takeOver } from "./take-over";
 import { wakeOfflineSleeps } from "./wake";
 
@@ -83,6 +84,8 @@ import { wakeOfflineSleeps } from "./wake";
  *
  * - `run-start.ts`: `startRun` validates, checks what this daemon has,
  *   writes `RunStarted` and hands the thread to the runner.
+ * - `start-place.ts`: who walks a new run and its Run's Device, one rule
+ *   for a person's, a schedule's and a webhook's start.
  * - `recovery.ts`: startup recovery and the daemon's automatic resume.
  * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
  *   `space-engine.ts`).
@@ -475,8 +478,9 @@ export function createEngine(
 
 	// The Replica that keeps the Space fires every schedule of it (its Host,
 	// or the one Device of a Space without one), so one that is always on
-	// starts them. The Device a schedule names runs the run (`deviceName`).
-	// A webhook schedule's webhooks go to the same Replica.
+	// starts them. The Device a schedule names runs the run (`deviceName`),
+	// else the default Device of a person's start (`start-place.ts`). A
+	// webhook schedule's webhooks go to the same Replica.
 	const firesHere = async (projectId: string, _schedule: Schedule) => {
 		const row = await projects.find(projectId);
 		return (await hostOf(row.spaceId)) === null;
@@ -486,7 +490,7 @@ export function createEngine(
 		db,
 		now,
 		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
-		startRun: startRunWith,
+		startRun: startForSchedule,
 		log: runLog,
 		projects: projects.list,
 		flows: projectFlows,
@@ -507,13 +511,48 @@ export function createEngine(
 		);
 	}
 
+	/** Who walks a run and its Run's Device, for every start (`start-place.ts`). */
+	const places = createStartPlaces({
+		hostOf,
+		hostReachable: async (spaceId) =>
+			hosts ? hosts.reachable(spaceId) : false,
+		walkerId: () => runLog.walkerId(),
+		placements: placement.placements,
+		lastRunDevice: (projectId) => lastRunDevice(db, projectId),
+	});
+
+	/**
+	 * Starts a run, for the Person it runs for, where its start place says:
+	 * the Host that keeps the Space walks it, or this computer does, on
+	 * the Run's Device the start names or the default one.
+	 */
 	async function startRunWith(
 		input: StartRunInput,
 		trigger: RunTrigger,
+		personId: string | null,
 	): Promise<RunSummary> {
 		await ready;
 		const { spaceId } = await projects.find(input.projectId);
-		return startHolds.start(spaceId, () => runStart.start(input, trigger));
+		const place = await places.place(spaceId, input, personId);
+		if (place.walker === "host") {
+			return relay.startOnHost({ ...input, deviceId: place.deviceId }, spaceId);
+		}
+		const placed =
+			place.deviceId === undefined
+				? input
+				: { ...input, deviceId: place.deviceId };
+		return startHolds.start(spaceId, () => runStart.start(placed, trigger));
+	}
+
+	/**
+	 * A schedule's or a webhook's start: for the schedule's Person, else
+	 * this computer's owner, with the same default as a person's start.
+	 */
+	function startForSchedule(
+		input: StartRunInput,
+		trigger: RunTrigger,
+	): Promise<RunSummary> {
+		return startRunWith(input, trigger, input.startedBy ?? ownerId);
 	}
 
 	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
@@ -528,7 +567,7 @@ export function createEngine(
 		firesHere,
 		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
 		enabled: () => options.scheduler !== false && runSettings().scheduler,
-		startRun: startRunWith,
+		startRun: startForSchedule,
 		signal: (projectId, signal) => signals.send(projectId, signal),
 	});
 
@@ -605,11 +644,11 @@ export function createEngine(
 		projects,
 		documents,
 		runIdsOfProject: (projectId) => runIdsOfProject(db, projectId),
-		lastRunDevice: (projectId) => lastRunDevice(db, projectId),
 		runRow: (runId) => getRunRow(db, runId),
 		listBranches,
 		runCopies,
 		placement,
+		placements: places.placements,
 		flowFiles: createFlowFiles({
 			flows: projectFlows,
 			personNames: (ids) => namesOf(db, ids),
@@ -638,8 +677,6 @@ export function createEngine(
 		reads,
 		artifacts: createArtifactStore(dataDir),
 		actions,
-		relay,
-		hostOf,
 		startRun: startRunWith,
 		moveProjects,
 		pathsFor: peers.pathsFor,

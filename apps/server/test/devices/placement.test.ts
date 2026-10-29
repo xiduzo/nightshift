@@ -169,11 +169,21 @@ describe("a run placed on another Device", () => {
 			(list) => list.length > 0,
 		);
 		expect(placements).toEqual([
-			{ deviceId: bId, name: expect.any(String), thisDevice: false },
+			{
+				deviceId: bId,
+				name: expect.any(String),
+				thisDevice: false,
+				default: true,
+			},
 		]);
 		// B asks its Host: B itself, the only Device with a Clone.
 		expect(await b.client.runs.placements({ projectId })).toEqual([
-			{ deviceId: bId, name: expect.any(String), thisDevice: true },
+			{
+				deviceId: bId,
+				name: expect.any(String),
+				thisDevice: true,
+				default: true,
+			},
 		]);
 
 		await saveFlow(

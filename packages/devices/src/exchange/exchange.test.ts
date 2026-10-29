@@ -378,6 +378,7 @@ describe("a batch and what follows from it", () => {
 		return {
 			command: async () => {},
 			addClone: async () => {},
+			reachable: async () => false,
 			archive,
 			archivePut: async () => {},
 			startRun: async () => {
@@ -718,6 +719,7 @@ describe("a run walked elsewhere", () => {
 				sent.push(command);
 			},
 			addClone: async () => {},
+			reachable: async () => false,
 			archive: async () => null,
 			archivePut: async () => {},
 			startRun: async () => {
@@ -794,6 +796,7 @@ describe("a run walked elsewhere", () => {
 		const relay: Relay = {
 			command: async () => {},
 			addClone: async () => {},
+			reachable: async () => false,
 			archive: async (ref) => {
 				fetched.push(ref.kind === "checkpoint" ? ref.kind : ref.stepId);
 				return ref.kind === "transcript"

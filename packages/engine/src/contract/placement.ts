@@ -24,6 +24,11 @@ export type Placement = {
 	 * this computer has no Clone of the project. Absent on the others.
 	 */
 	lastRun?: boolean;
+	/**
+	 * Where a run goes when the person names no Device (`start-place.ts`):
+	 * one Device of the list carries it. Absent on the others.
+	 */
+	default?: boolean;
 };
 
 /**
@@ -44,7 +49,7 @@ export type DeviceProfile = {
 };
 
 /** One of a Person's Devices, as placement sees it. */
-export type OwnDevice = Omit<Placement, "lastRun"> & {
+export type OwnDevice = Omit<Placement, "lastRun" | "default"> & {
 	/** It takes work now. */
 	online: boolean;
 	/** It has a Clone of the project. */

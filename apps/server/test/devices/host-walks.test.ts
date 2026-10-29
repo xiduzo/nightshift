@@ -225,6 +225,7 @@ describe("a run started on the Host, from a phone or a browser", () => {
 				name: expect.any(String),
 				thisDevice: false,
 				lastRun: true,
+				default: true,
 			},
 		]);
 		const started = await a.client.runs.start({

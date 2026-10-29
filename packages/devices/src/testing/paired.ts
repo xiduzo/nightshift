@@ -285,11 +285,17 @@ export async function pairedReplicas(
 	};
 }
 
-/** A Device's relay, whose run starts reach the Host only when it walks them. */
+/**
+ * A Device's relay, whose run starts reach the Host only when it walks
+ * them: else the Host is out of reach for a start, and the Device walks it.
+ */
 function startsOnHost(relay: HostRelay, hostWalks: boolean): HostRelay {
 	if (hostWalks) return relay;
 	return {
 		...relay,
+		async reachable() {
+			return false;
+		},
 		async startRun() {
 			throw new HostUnreachableError();
 		},

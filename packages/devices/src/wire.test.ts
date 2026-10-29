@@ -19,7 +19,6 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
-import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import { deviceKeyStore } from "./links";
@@ -441,18 +440,25 @@ describe("the devices runtime across a reload", () => {
 
 	test("a Command B is applying is applied once: the next runtime reports its result", async () => {
 		const projectId = await projectOnBoth();
+		// B's Link comes online only once B started the run: B walks it itself.
+		let linked = false;
 		// A never hears from the first runtime: its Link ends with the reload.
 		const first = await startB({
 			clientFor: (address) => {
 				const client = toA(address);
 				return {
 					...client,
+					link: {
+						...client.link,
+						hello: async (...args: Parameters<typeof client.link.hello>) => {
+							if (!linked) {
+								throw new TypeError("The network connection was lost.");
+							}
+							return client.link.hello(...args);
+						},
+					},
 					sync: {
 						...client.sync,
-						// A takes no run start here: B walks the run itself.
-						startRun: async () => {
-							throw new ORPCError("HOST_UNREACHABLE");
-						},
 						commandDone: async () => {
 							throw new TypeError("The network connection was lost.");
 						},
@@ -463,6 +469,8 @@ describe("the devices runtime across a reload", () => {
 		const run = await first.engine
 			.space(a.spaceId)
 			.startRun({ projectId, flow: gateFlow });
+		expect(run.walker).toMatchObject({ id: b.deviceId, thisDevice: true });
+		linked = true;
 		await untilStatus(paired.host, run.id, "waiting");
 
 		// B's checks of the Command go on only once the reload began.

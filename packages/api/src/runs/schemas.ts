@@ -444,12 +444,13 @@ export const placementSchema = exact<Placement>()(
 		offers: z.array(z.string()).optional(),
 		ownerName: z.string().optional(),
 		lastRun: z.boolean().optional(),
+		default: z.boolean().optional(),
 	}),
 );
 
 /** One of the Person's Devices, with whether it is online and has a Clone. */
 export const ownDeviceSchema = exact<OwnDevice>()(
-	placementSchema.omit({ lastRun: true }).extend({
+	placementSchema.omit({ lastRun: true, default: true }).extend({
 		online: z.boolean(),
 		hasClone: z.boolean(),
 		profiles: z.array(deviceProfileSchema).optional(),

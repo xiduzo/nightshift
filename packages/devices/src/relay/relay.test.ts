@@ -315,6 +315,19 @@ describe("the Space route", () => {
 	});
 });
 
+describe("whether the Host of a Space can be reached, for a run start", () => {
+	test("only a Space a Host keeps, over an online Link", async () => {
+		const { relay } = relayWith();
+		expect(
+			await Promise.all(
+				["space-team", "space-own", "space-gone", "space-off"].map((id) =>
+					relay.reachable(id),
+				),
+			),
+		).toEqual([true, false, false, false]);
+	});
+});
+
 describe("the relay, while the Host of the Space cannot be reached", () => {
 	for (const spaceId of ["space-gone", "space-off"]) {
 		test(`every action refuses with one message (${spaceId})`, async () => {

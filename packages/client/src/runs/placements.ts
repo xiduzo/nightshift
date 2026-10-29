@@ -16,6 +16,8 @@ export type PlacementChoice = {
 	online: boolean;
 	/** The project's latest run ran on it. */
 	lastRun?: boolean;
+	/** Where a run goes when the person chooses none, as Night Shift decides it. */
+	default?: boolean;
 };
 
 /**
@@ -34,6 +36,7 @@ export function placementChoices(
 		...(placement.offers !== undefined ? { offers: placement.offers } : {}),
 		...(placement.ownerName ? { ownerName: placement.ownerName } : {}),
 		...(placement.lastRun ? { lastRun: true } : {}),
+		...(placement.default ? { default: true } : {}),
 		online: true,
 	}));
 	const known = new Set(online.map((choice) => choice.deviceId));
@@ -70,18 +73,11 @@ export function hostOwnerHint(
 		: `This Host belongs to ${owner}. ${owner} offers ${choice.offers.join(", ")} to this Space.`;
 }
 
-/** One of your Devices, or another person's that offers you something. */
-function usable(choice: Pick<PlacementChoice, "offers">): boolean {
-	return choice.offers === undefined || choice.offers.length > 0;
-}
-
 /**
  * The place a run goes when the person does not choose: the one they
- * chose while it is still online, else this computer, else the one the
- * project's latest run ran on, else one of their own, else the first.
- * This computer and the latest run's Device count only when they are the
- * person's own or offer them something: a Host another person owns that
- * offers nothing is no default.
+ * chose while it is still online, else the one `runs.placements` marks as
+ * the default (the engine's one rule for every start), else the first.
+ * A Host of an older version marks none.
  */
 export function defaultPlacement(
 	choices: readonly PlacementChoice[],
@@ -90,9 +86,7 @@ export function defaultPlacement(
 	const online = choices.filter((choice) => choice.online);
 	return (
 		online.find((choice) => choice.deviceId === chosen) ??
-		online.find((choice) => choice.thisDevice && usable(choice)) ??
-		online.find((choice) => choice.lastRun && usable(choice)) ??
-		online.find((choice) => choice.offers === undefined) ??
+		online.find((choice) => choice.default) ??
 		online[0] ??
 		null
 	);

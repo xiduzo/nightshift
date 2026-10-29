@@ -46,43 +46,26 @@ describe("where a run can go", () => {
 		]);
 	});
 
-	test("goes where the person chose, else this computer, else the first", () => {
-		const choices = placementChoices([laptop, host], [device("pc", false)]);
-		expect(defaultPlacement(choices, "laptop")?.deviceId).toBe("laptop");
-		expect(defaultPlacement(choices, null)?.deviceId).toBe("host");
-		expect(defaultPlacement(choices, "pc")?.deviceId).toBe("host");
-		expect(defaultPlacement(placementChoices([laptop]), null)?.deviceId).toBe(
-			"laptop",
-		);
-		expect(defaultPlacement(choices.slice(2), null)).toBeNull();
-	});
-
-	test("on a Host without the project, goes where the project's latest run ran", () => {
+	test("goes where the person chose, else where Night Shift marks the default, else the first", () => {
 		const desktop = { deviceId: "desktop", name: "Desktop", thisDevice: false };
-		const choices = placementChoices([laptop, { ...desktop, lastRun: true }]);
-		expect(choices.map((c) => c.lastRun ?? false)).toEqual([false, true]);
-		expect(defaultPlacement(choices, null)?.deviceId).toBe("desktop");
-		expect(defaultPlacement(choices, "laptop")?.deviceId).toBe("laptop");
-		// This computer has the project: it goes first.
-		const withHost = placementChoices([host, { ...desktop, lastRun: true }]);
-		expect(defaultPlacement(withHost, null)?.deviceId).toBe("host");
-	});
-
-	test("on a Host another person owns that offers you nothing, goes to one of your own Devices", () => {
-		const theirs = { ...host, offers: [] };
-		const choices = placementChoices([theirs, laptop]);
-		expect(defaultPlacement(choices, null)?.deviceId).toBe("laptop");
-		// Not to the latest run's Device either, when it is that Host.
-		const last = placementChoices([{ ...theirs, lastRun: true }, laptop]);
-		expect(defaultPlacement(last, null)?.deviceId).toBe("laptop");
-		// The person can still choose it.
-		expect(defaultPlacement(choices, "host")?.deviceId).toBe("host");
-		// When it offers a profile, it stays the default.
-		const offering = placementChoices([
-			{ ...host, offers: ["claude"] },
-			laptop,
+		const choices = placementChoices(
+			[host, { ...desktop, lastRun: true, default: true }],
+			[device("pc", false)],
+		);
+		expect(choices.map((c) => c.default ?? false)).toEqual([
+			false,
+			true,
+			false,
 		]);
-		expect(defaultPlacement(offering, null)?.deviceId).toBe("host");
+		expect(defaultPlacement(choices, null)?.deviceId).toBe("desktop");
+		expect(defaultPlacement(choices, "host")?.deviceId).toBe("host");
+		// An offline choice is not where a run goes.
+		expect(defaultPlacement(choices, "pc")?.deviceId).toBe("desktop");
+		// A Host of an older version marks no default.
+		expect(
+			defaultPlacement(placementChoices([laptop, host]), null)?.deviceId,
+		).toBe("laptop");
+		expect(defaultPlacement(choices.slice(2), null)).toBeNull();
 	});
 });
 

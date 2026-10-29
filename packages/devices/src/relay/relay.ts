@@ -130,6 +130,10 @@ export function createRelay(deps: {
 			);
 		},
 
+		async reachable(spaceId) {
+			return (await route(spaceId)).at === "host";
+		},
+
 		async startRun(input) {
 			// The Host starts it in the name of the key's Person.
 			const { startedBy: _person, ...start } = input;

@@ -27,6 +27,12 @@ export type Relay = {
 		deviceName: string;
 	}): Promise<void>;
 	/**
+	 * Whether this computer reaches the Host that keeps the Space now: it
+	 * has an online Link to it. False for a Space this Replica keeps. A
+	 * start asks it to choose the run's Walker (`start-place.ts`).
+	 */
+	reachable(spaceId: string): Promise<boolean>;
+	/**
 	 * Starts a run placed on another Device through the Host that keeps
 	 * the Space: the Host walks it. Returns the run's id; its rows follow
 	 * by the exchange.

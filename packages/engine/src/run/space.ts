@@ -2,7 +2,7 @@ import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService } from "../cleanup";
-import type { Actor, Placement, StartRunInput } from "../contract";
+import type { Actor, StartRunInput } from "../contract";
 import { type FlowFiles, type FlowNotice, flowUse } from "../flows";
 import type { Runner } from "../graph";
 import {
@@ -30,8 +30,8 @@ import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
 import type { PlacementPort, WithPaths } from "./peers";
 import type { MovedProjects, ProjectsMove } from "./projects-move";
-import { HostUnreachableError, type RunRelay } from "./relay";
 import type { SpaceEngine } from "./space-engine";
+import type { StartPlaces } from "./start-place";
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and
@@ -51,8 +51,6 @@ export type SpacesDeps = {
 	documents: SpaceDocuments;
 	/** The ids of the project's runs. */
 	runIdsOfProject(projectId: string): Promise<string[]>;
-	/** The Device the project's latest run ran on, or null (`lastRunDevice`). */
-	lastRunDevice(projectId: string): Promise<string | null>;
 	/** The run's row, or "not found". */
 	runRow(runId: string): Promise<RunRow>;
 	listBranches(repoPath: string): Promise<Branches>;
@@ -61,7 +59,9 @@ export type SpacesDeps = {
 		RunCopiesService,
 		"list" | "removeRunCopy" | "deleteRunBranches"
 	>;
-	placement: Pick<PlacementPort, "devicesFor" | "placements">;
+	placement: Pick<PlacementPort, "devicesFor">;
+	/** The Devices a run of the project can run on, the default marked (`start-place.ts`). */
+	placements: StartPlaces["placements"];
 	flowFiles: FlowFiles;
 	/** The notices of a project's flow document. */
 	flowNotices: {
@@ -81,10 +81,15 @@ export type SpacesDeps = {
 	artifacts: Pick<ArtifactStore, "list" | "file">;
 	/** Stop, answer, signal, move, resume, restart and run again (`actions.ts`). */
 	actions: RunActions;
-	relay: Pick<RunRelay, "startOnHost">;
-	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
-	hostOf(spaceId: string): Promise<string | null>;
-	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
+	/**
+	 * Starts a run where its start place says (`start-place.ts`), for the
+	 * Person it runs for: here, or on the Host that keeps the Space.
+	 */
+	startRun(
+		input: StartRunInput,
+		trigger: RunTrigger,
+		personId: string | null,
+	): Promise<RunSummary>;
 	/** A Space move (`projects-move.ts`). */
 	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
 	/** Hides the worktree paths of runs on Devices the actor does not own. */
@@ -109,47 +114,6 @@ export function createSpaces(deps: SpacesDeps) {
 		const document = await documents.open(spaceId);
 		const deviceId = await log.walkerId();
 		return rows.map((row) => toProject(row, document, deviceId));
-	}
-
-	/** The Devices a run of the project can run on, the one of its latest run marked. */
-	async function placementsOf(
-		spaceId: string,
-		personId: string,
-		projectId: string,
-	): Promise<Placement[]> {
-		const list = await deps.placement.placements(spaceId, personId, projectId);
-		const last = await deps.lastRunDevice(projectId);
-		return list.map((p) => (p.deviceId === last ? { ...p, lastRun: true } : p));
-	}
-
-	/**
-	 * Where a run goes when the person names no Device: this computer, or,
-	 * when it has no Clone of the project (a Host without one), the Device
-	 * of the project's latest run, else the first of the person's own. A
-	 * Host that another Person owns and that offers this person nothing
-	 * in the Space is no default: one of the person's own Devices is.
-	 */
-	async function runDevice(
-		spaceId: string,
-		input: StartRunInput,
-		actor: Actor | undefined,
-	): Promise<string | undefined> {
-		if (input.deviceId !== undefined || !actor) return input.deviceId;
-		const project = await projects.find(input.projectId, spaceId);
-		// In a Space a Host keeps, this computer's own Person starts here.
-		if (project.repoPath !== null && (await deps.hostOf(spaceId)) !== null) {
-			return undefined;
-		}
-		const list = await placementsOf(spaceId, actor.personId, input.projectId);
-		const usable = (p: Placement) =>
-			p.offers === undefined || p.offers.length > 0;
-		const here = list.find((p) => p.thisDevice);
-		if (project.repoPath !== null && (!here || usable(here))) return undefined;
-		const pick =
-			list.find((p) => p.lastRun && usable(p)) ??
-			list.find((p) => p.offers === undefined) ??
-			list[0];
-		return pick && !pick.thisDevice ? pick.deviceId : undefined;
 	}
 
 	/** Refuses while a run of the project runs a step. */
@@ -289,7 +253,7 @@ export function createSpaces(deps: SpacesDeps) {
 			async listPlacements(projectId) {
 				await ready;
 				if (!actor) throw new Refusal("signed-out", "Sign in to start a run.");
-				return placementsOf(spaceId, actor.personId, projectId);
+				return deps.placements(spaceId, actor.personId, projectId);
 			},
 
 			async listFlows(projectId) {
@@ -450,28 +414,11 @@ export function createSpaces(deps: SpacesDeps) {
 			async startRun(input: StartRunInput) {
 				await ready;
 				await projects.find(input.projectId, spaceId);
-				if ((await deps.hostOf(spaceId)) !== null) {
-					// The Space's Host walks the run (ADR 1, decision 9). Its
-					// unplaced steps run on the Device that started it.
-					const deviceId = input.deviceId ?? (await log.walkerId());
-					try {
-						return await deps.relay.startOnHost(
-							{ ...input, deviceId },
-							spaceId,
-						);
-					} catch (error) {
-						// A Device that cannot reach its Host walks the run itself:
-						// the exchange sends it to the Host later (decision 10).
-						if (!(error instanceof HostUnreachableError)) throw error;
-					}
-				}
-				// A run started here, from a browser or a phone: its steps run
-				// here, or where the project's runs ran when it has no Clone here.
-				const deviceId = await runDevice(spaceId, input, actor);
 				return (await deps.pathsFor(spaceId, actor))(
 					await deps.startRun(
-						deviceId === undefined ? input : { ...input, deviceId },
+						input,
 						{ kind: "manual" },
+						actor?.personId ?? null,
 					),
 				);
 			},
