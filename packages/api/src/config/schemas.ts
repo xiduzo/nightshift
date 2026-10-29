@@ -8,20 +8,18 @@ import type {
 	McpTestResult,
 	McpToolInfo,
 } from "@nightshift/agents";
+import type { DeviceProfile, FlowRef, SignInResult } from "@nightshift/engine";
 import {
 	type CliTool,
 	type Connection,
 	cliToolGitSchema,
-	type DeviceProfile,
-	type FlowRef,
 	type ProfileView,
 	type SecretSource,
 	type SecretView,
 	type SettingField,
 	type SettingKey,
-	type SignInResult,
 	settingsSchema,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 import {
 	agentHarnessSchema,
 	agentProfileSchema,

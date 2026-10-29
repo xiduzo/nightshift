@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { SettingsStore } from "@nightshift/engine";
+import type { SettingsStore } from "@nightshift/engine/device-config";
 import type { Notifications } from "@nightshift/notifications";
 
 import { adoptingSwitches } from "./wire";

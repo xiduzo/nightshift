@@ -13,17 +13,21 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import {
-	createSpaceDocuments,
+	HostUnreachableError,
+	type OwnDevice,
+	type PeerProfiles,
+} from "@nightshift/engine";
+import {
 	deviceDocumentName,
 	documentRows,
-	HostUnreachableError,
-	type ListedProject,
-	type OwnDevice,
 	openDeviceDocument,
-	type PeerProfiles,
+} from "@nightshift/engine/device-config";
+import {
+	createSpaceDocuments,
+	type ListedProject,
 	recordClone,
 	type SpaceDocuments,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createProfileStore,

@@ -9,18 +9,19 @@ import type {
 import type { DeviceKeyAccess, RequestAccess } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
+import type { Engine, ToolLaunchers } from "@nightshift/engine";
 import type {
 	CliToolStore,
 	ConnectionStore,
-	Engine,
+	ProfileStore,
+	SettingsStore,
+} from "@nightshift/engine/device-config";
+import type {
 	GitHubClones,
 	GitInstall,
-	ProfileStore,
 	ProjectCopies,
 	ProjectReadiness,
-	SettingsStore,
-	ToolLaunchers,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import type { AssistantService } from "@nightshift/flows";
 import type { Notifications } from "@nightshift/notifications";
 

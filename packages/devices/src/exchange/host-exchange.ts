@@ -3,12 +3,14 @@ import { ROLE_REFUSAL, roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
-	PROJECT_NOT_FOUND,
 	RUN_NOT_FOUND,
-	recordClone,
-	type SpaceDocuments,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
+import {
+	PROJECT_NOT_FOUND,
+	recordClone,
+	type SpaceDocuments,
+} from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import {

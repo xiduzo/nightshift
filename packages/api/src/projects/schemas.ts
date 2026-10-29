@@ -1,3 +1,4 @@
+import type { ProjectRuns, RunCopies } from "@nightshift/engine";
 import type {
 	Branches,
 	GitHubAccess,
@@ -7,9 +8,7 @@ import type {
 	Project,
 	ProjectCopy,
 	ProjectReadiness,
-	ProjectRuns,
-	RunCopies,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import { z } from "zod";
 
 import { exact } from "../output";

@@ -1,13 +1,13 @@
 import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
+import type { FlowDocuments } from "@nightshift/engine";
+import type { DeviceDocument } from "@nightshift/engine/device-config";
 import type {
-	DeviceDocument,
-	FlowDocuments,
 	GitHubClones,
 	ProjectCopies,
 	SpaceDocuments,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 
 import type { KeepAwake } from "../keep-awake";

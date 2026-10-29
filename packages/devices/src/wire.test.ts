@@ -5,11 +5,11 @@ import { event, hostLink, runCommand, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
 	type Device,
-	type DeviceDocument,
 	type FlowDocuments,
 	type SessionInput,
-	worktreeLocation,
 } from "@nightshift/engine";
+import type { DeviceDocument } from "@nightshift/engine/device-config";
+import { worktreeLocation } from "@nightshift/engine/projects";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createProfileStore,

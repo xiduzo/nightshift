@@ -4,11 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { Database } from "@nightshift/db";
-import {
-	type ConnectionStore,
-	exportRun,
-	type RunBundleSummary,
-} from "@nightshift/engine";
+import { exportRun, type RunBundleSummary } from "@nightshift/engine";
+import type { ConnectionStore } from "@nightshift/engine/device-config";
 
 /**
  * `GET /api/runs/:id/export`: the run of the Space `spaceId` as one SQLite

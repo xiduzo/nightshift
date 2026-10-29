@@ -5,7 +5,7 @@ import {
 	createSpaceDocuments,
 	type SpaceDocuments,
 	worktreeLocation,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import {
 	createSandbox,
 	parseEventRow,

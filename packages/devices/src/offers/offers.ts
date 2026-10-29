@@ -1,11 +1,10 @@
+import type { NodeToPlace, OfferedPlacement } from "@nightshift/engine";
 import type {
 	DeviceDocument,
-	NodeToPlace,
-	OfferedPlacement,
 	ProfileStore,
 	ProfileView,
-	SpaceDocument,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
+import type { SpaceDocument } from "@nightshift/engine/projects";
 import {
 	type AgentNode,
 	type FlowNode,

@@ -14,7 +14,7 @@ import {
 	startPairing,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { SettingsStore } from "@nightshift/engine";
+import type { SettingsStore } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
 import {
 	type HostHello,

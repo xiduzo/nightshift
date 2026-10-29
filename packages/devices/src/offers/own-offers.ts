@@ -5,7 +5,11 @@ import {
 	spacesOf,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { DeviceDocument, Engine, ProfileStore } from "@nightshift/engine";
+import type { Engine } from "@nightshift/engine";
+import type {
+	DeviceDocument,
+	ProfileStore,
+} from "@nightshift/engine/device-config";
 import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { createHostSpaces, personInSpace } from "../links";

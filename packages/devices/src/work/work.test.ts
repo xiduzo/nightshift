@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { clone, hostLink, project, user } from "@nightshift/db/schema";
+import type { Device, SessionInput } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
-	type Device,
-	type SessionInput,
 	type SpaceDocuments,
 	worktreeLocation,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import type { WorkReply, WorkRequest } from "../contract";
 import { httpsLink } from "../links/link";

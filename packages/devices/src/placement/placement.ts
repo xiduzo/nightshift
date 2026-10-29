@@ -3,11 +3,8 @@ import type { Database } from "@nightshift/db";
 import {
 	type Actor,
 	type Device,
-	type DeviceCopies,
 	type DeviceProfile,
-	deviceNameIn,
 	HostUnreachableError,
-	type ListedProject,
 	type NodeToPlace,
 	type OfferedPlacement,
 	type OwnDevice,
@@ -19,10 +16,15 @@ import {
 	type PlanInput,
 	type PlannedRun,
 	planNodes,
-	projectClones,
-	type SpaceDocuments,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
+import type { DeviceCopies } from "@nightshift/engine/device-config";
+import {
+	deviceNameIn,
+	type ListedProject,
+	projectClones,
+	type SpaceDocuments,
+} from "@nightshift/engine/projects";
 import {
 	type FlowNode,
 	type FlowSources,

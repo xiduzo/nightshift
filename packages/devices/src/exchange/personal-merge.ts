@@ -11,7 +11,7 @@ import {
 	recordClone,
 	type SpaceDocument,
 	type SpaceDocuments,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import type {
 	ElsewhereProject,

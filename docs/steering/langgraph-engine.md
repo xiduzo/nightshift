@@ -31,10 +31,10 @@ below it, from the bottom up:
 | --- | --- |
 | `contract/` | What the engine shares with its callers and the Devices: who acts (`Actor`), a change of Members (`MemberChange`), a run start and its schema (`StartRunInput`, `startRunInputSchema`), where a run can be placed (`Placement`, `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`) and the Offer rule of a schedule (`OffersPort`). It imports no other vertical. |
 | `run-status/` | A run's status and which actions it allows (`runActions`, `whyNot`), with the refusal they share (`RunRefusal`, one named rule each). It imports nothing: the package entry `@nightshift/engine/run-status` gives it to `@nightshift/client` for the apps. |
-| `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. |
+| `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. Its `entry.ts` is the package entry `@nightshift/engine/device-config`: what `devices`, the API and the daemon use of it. |
 | `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run and step rows (`run-row.ts`), the member events, the transcript files and the transcript event types (`step-events.ts`). |
 | `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
-| `projects/` | Projects, the Space document that defines them, the git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), the git setup of a project folder, and run worktrees (`createWorktrees(git)`). |
+| `projects/` | Projects, the Space document that defines them, the git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), the git setup of a project folder, and run worktrees (`createWorktrees(git)`). Its `entry.ts` is the package entry `@nightshift/engine/projects`: what `devices`, the API and the daemon use of it. |
 | `flows/` | The flows of the projects in their flow documents (`project-flows.ts`), what a person does with them in a Space (`space-flows.ts`), and the flows a run starts from (`run-flows.ts`). |
 | `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |

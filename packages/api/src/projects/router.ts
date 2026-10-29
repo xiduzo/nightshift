@@ -1,4 +1,5 @@
-import { PROJECT_NOT_FOUND, type ProjectRuns } from "@nightshift/engine";
+import type { ProjectRuns } from "@nightshift/engine";
+import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";

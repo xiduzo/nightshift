@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { secretStore } from "@nightshift/engine";
+import { secretStore } from "@nightshift/engine/device-config";
 import { deviceKeyStore } from "./host-links";
 
 const dir = () => mkdtempSync(join(tmpdir(), "nightshift-keychain-"));

@@ -141,6 +141,13 @@ export const LIGHT_ENTRIES: Record<string, string> = {
 	// a harness: the barrel of harnesses imports every harness adapter.
 	"@nightshift/agents/harness-facts":
 		"the barrel of harnesses loads every harness",
+	// The barrels of these engine verticals also serve the engine's other
+	// verticals (the Space move's batch, the run worktrees, the stores'
+	// own parts). Their entries carry only what other workspaces use.
+	"@nightshift/engine/device-config":
+		"the barrel of device-config serves the engine's other verticals too",
+	"@nightshift/engine/projects":
+		"the barrel of projects serves the engine's other verticals too",
 };
 
 export type Options = {

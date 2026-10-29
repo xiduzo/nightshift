@@ -1,64 +1,18 @@
 /** This computer's configuration in its Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. */
 
 export type { CliTool, CliToolGuide, CliToolStore } from "./cli-tools";
-export {
-	cliToolGitSchema,
-	cliToolInputSchema,
-	cliToolsInstruction,
-	programOf,
-} from "./cli-tools";
-export { openConfigStores } from "./config-stores";
+export { cliToolsInstruction, programOf } from "./cli-tools";
 export type {
 	Connection,
 	ConnectionStore,
 	SecretEnv,
-	SecretSource,
 	SecretView,
 } from "./connections";
-export { connectionInputSchema, secretStore } from "./connections";
-export {
-	createDeviceCopies,
-	type DeviceCopies,
-	type DeviceCopy,
-	lastKnownProfiles,
-	storedDeviceCopy,
-	storedDevices,
-} from "./device-copies";
-export type { DeviceDocument } from "./device-document";
-export {
-	deviceDocumentName,
-	documentRows,
-	openDeviceDocument,
-	refreshDeviceFacts,
-} from "./device-document";
-export {
-	addHarness,
-	customAgentOf,
-	removeCliTool,
-	removeConnection,
-	removeHarness,
-	saveConnection,
-	saveCustomAgent,
-	saveProfile,
-} from "./edits";
-export type { KeyStoreKind } from "./keychain";
-export { valueStore } from "./keychain";
+export { lastKnownProfiles, storedDevices } from "./device-copies";
 export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
-export { profileChoice, storedDeviceProfiles } from "./profiles";
-export type {
-	RunSettings,
-	SettingField,
-	SettingKey,
-	SettingsStore,
-} from "./settings";
-export {
-	defaultRunSettings,
-	HARNESS_BIN,
-	isHostAddress,
-	isLoopbackHost,
-	settingsPatchSchema,
-	settingsSchema,
-} from "./settings";
+export { storedDeviceProfiles } from "./profiles";
+export type { RunSettings } from "./settings";
+export { defaultRunSettings } from "./settings";
 export type { PersistedDocument } from "./ydoc";
 export { openPersistedDocument } from "./ydoc";

@@ -1,9 +1,6 @@
 import type { Database } from "@nightshift/db";
-import {
-	deviceNameIn,
-	type RunWalker,
-	type SpaceDocuments,
-} from "@nightshift/engine";
+import type { RunWalker } from "@nightshift/engine";
+import { deviceNameIn, type SpaceDocuments } from "@nightshift/engine/projects";
 import { deviceNamesOf } from "../registry";
 
 /**

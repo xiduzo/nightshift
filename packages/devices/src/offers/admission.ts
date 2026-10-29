@@ -1,15 +1,17 @@
 import { roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type {
+	Device,
+	OfferedSessionInput,
+	PlacedRun,
+	SessionInput,
+} from "@nightshift/engine";
 import {
 	clonePathOf,
-	type Device,
 	memberRole,
-	type OfferedSessionInput,
-	type PlacedRun,
-	type SessionInput,
 	type SpaceDocuments,
 	worktreeLocation,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import {
 	type AgentProfileSettings,
 	isAgentProfile,

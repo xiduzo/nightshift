@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
 import { user } from "@nightshift/db/schema";
-import type { SettingsStore } from "@nightshift/engine";
+import type { SettingsStore } from "@nightshift/engine/device-config";
 import {
 	createRunBus,
 	createRunHistory,

@@ -1,9 +1,9 @@
-import {
-	type DeviceCopies,
-	type DeviceCopy,
-	HostUnreachableError,
-	type SettingsStore,
-} from "@nightshift/engine";
+import { HostUnreachableError } from "@nightshift/engine";
+import type {
+	DeviceCopies,
+	DeviceCopy,
+	SettingsStore,
+} from "@nightshift/engine/device-config";
 import type { HostClient, PhoneView } from "../contract";
 import {
 	type DeviceKeyStore,

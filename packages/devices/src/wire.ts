@@ -1,19 +1,16 @@
 import { type Auth, roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type { Device, FlowDocuments, MoveRows } from "@nightshift/engine";
 import {
 	createDeviceCopies,
-	type Device,
 	type DeviceDocument,
-	type FlowDocuments,
 	type KeyStoreKind,
-	type MoveRows,
-	memberRole,
 	type ProfileStore,
 	profileChoice,
 	type SettingsStore,
-	type SpaceDocuments,
 	storedDeviceCopy,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
+import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
 import type * as Y from "yjs";
 import {
 	type AppliedCommands,

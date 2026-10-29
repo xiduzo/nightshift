@@ -5,7 +5,7 @@ import {
 	HARNESS_BIN,
 	refreshDeviceFacts,
 	type SettingsStore,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 
 /** How often this computer reports its facts again. */
 const FACTS_EVERY_MS = 10 * 60_000;

@@ -11,13 +11,15 @@ import type {
 	AuthoringRunStep,
 } from "@nightshift/agents";
 import type {
-	CliToolStore,
-	ConnectionStore,
-	ProfileStore,
 	SpaceEngine,
 	SpaceFlows,
 	TranscriptEntry,
 } from "@nightshift/engine";
+import type {
+	CliToolStore,
+	ConnectionStore,
+	ProfileStore,
+} from "@nightshift/engine/device-config";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 
 /** What the port reads in the Space. */

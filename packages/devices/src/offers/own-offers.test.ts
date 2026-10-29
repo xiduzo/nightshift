@@ -6,7 +6,8 @@ import {
 	organization,
 	user,
 } from "@nightshift/db/schema";
-import { HostUnreachableError, type SpaceDocument } from "@nightshift/engine";
+import { HostUnreachableError } from "@nightshift/engine";
+import type { SpaceDocument } from "@nightshift/engine/projects";
 import {
 	createProfileStore,
 	createSandbox,

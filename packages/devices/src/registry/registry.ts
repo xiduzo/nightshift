@@ -1,7 +1,8 @@
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
-import { deviceDocumentName, type PeerContext } from "@nightshift/engine";
+import type { PeerContext } from "@nightshift/engine";
+import { deviceDocumentName } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 

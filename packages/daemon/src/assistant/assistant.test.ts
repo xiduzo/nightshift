@@ -3,7 +3,10 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { appRouter } from "@nightshift/api";
 import type { Context } from "@nightshift/api/context";
 import { accessAs, testContext } from "@nightshift/api/testing";
-import type { ProfileStore, SettingsStore } from "@nightshift/engine";
+import type {
+	ProfileStore,
+	SettingsStore,
+} from "@nightshift/engine/device-config";
 import type {
 	AgentHarnessName,
 	AgentProfileSettings,

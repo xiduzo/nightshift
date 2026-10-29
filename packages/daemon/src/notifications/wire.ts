@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { deviceDirectory } from "@nightshift/devices";
-import type { SettingsStore } from "@nightshift/engine";
+import type { SettingsStore } from "@nightshift/engine/device-config";
 import {
 	createDesktopChannel,
 	createExpoChannel,

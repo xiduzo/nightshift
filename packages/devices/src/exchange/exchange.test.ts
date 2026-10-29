@@ -9,11 +9,11 @@ import {
 	run as runTable,
 	user,
 } from "@nightshift/db/schema";
+import type { WalkRef } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
-	type WalkRef,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createRunLog,

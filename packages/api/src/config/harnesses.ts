@@ -11,7 +11,7 @@ import {
 	type SettingField,
 	type SettingKey,
 	saveCustomAgent,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 import {
 	agentHarnessSchema,
 	customAgentSchema,

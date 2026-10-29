@@ -1,8 +1,8 @@
+import { cliToolsInUse } from "@nightshift/engine";
 import {
 	cliToolInputSchema,
-	cliToolsInUse,
 	removeCliTool,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 import { z } from "zod";
 
 import { output } from "../output";

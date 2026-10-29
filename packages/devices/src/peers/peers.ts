@@ -1,12 +1,7 @@
 import type { Database } from "@nightshift/db";
-import {
-	type DeviceCopies,
-	type DeviceProfile,
-	memberName,
-	memberRole,
-	type PeerContext,
-	type Peers,
-} from "@nightshift/engine";
+import type { DeviceProfile, PeerContext, Peers } from "@nightshift/engine";
+import type { DeviceCopies } from "@nightshift/engine/device-config";
+import { memberName, memberRole } from "@nightshift/engine/projects";
 import { createRunArchive } from "../archive";
 import type { HostRelay, RunCommand, WorkRelay } from "../contract";
 import { createRunHistoryExchange, type RunHistoryExchange } from "../exchange";

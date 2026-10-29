@@ -1,4 +1,4 @@
-import type { DeviceCopies } from "@nightshift/engine";
+import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import type {

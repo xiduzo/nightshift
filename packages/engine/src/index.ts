@@ -1,8 +1,11 @@
 /**
- * The public surface of the engine: what `@nightshift/devices`, the API, the
- * daemon and their tests import. A type is also here when the API's router type names it,
- * because the router declaration must be able to name it. Remove a name
- * that nothing outside the engine imports.
+ * The engine's door: the Engine and the Space engine with their ports, what
+ * `@nightshift/devices` exchanges with them, and the views the API and the
+ * daemon read. This computer's Device document has its own entry
+ * (`./device-config`), and so do the Projects and their Clones
+ * (`./projects`). Test helpers are on `./testing`. A type is also here when
+ * the API's router type names it, because the router declaration must be
+ * able to name it. Remove a name that no other workspace's code imports.
  */
 
 export {
@@ -51,49 +54,6 @@ export {
 	type SignInResult,
 	type ToolLaunchers,
 } from "./device";
-export {
-	addHarness,
-	type CliTool,
-	type CliToolStore,
-	type Connection,
-	type ConnectionStore,
-	cliToolGitSchema,
-	cliToolInputSchema,
-	connectionInputSchema,
-	createDeviceCopies,
-	customAgentOf,
-	type DeviceCopies,
-	type DeviceCopy,
-	type DeviceDocument,
-	deviceDocumentName,
-	documentRows,
-	HARNESS_BIN,
-	isHostAddress,
-	isLoopbackHost,
-	type KeyStoreKind,
-	openConfigStores,
-	openDeviceDocument,
-	type ProfileStore,
-	type ProfileView,
-	profileChoice,
-	refreshDeviceFacts,
-	removeCliTool,
-	removeConnection,
-	removeHarness,
-	type SecretSource,
-	type SecretView,
-	type SettingField,
-	type SettingKey,
-	type SettingsStore,
-	saveConnection,
-	saveCustomAgent,
-	saveProfile,
-	secretStore,
-	settingsPatchSchema,
-	settingsSchema,
-	storedDeviceCopy,
-	valueStore,
-} from "./device-config";
 export type {
 	FlowDocuments,
 	FlowExport,
@@ -129,35 +89,6 @@ export {
 	stampHolds,
 	withoutPrivatePaths,
 } from "./log";
-export type { ListedProject, Project, SpaceDocument } from "./projects";
-export {
-	type Branches,
-	checkProjectFolder,
-	clonePathOf,
-	createGitHubClones,
-	createProjectCopies,
-	createSpaceDocuments,
-	deviceNameIn,
-	type GitHubAccess,
-	type GitHubClone,
-	type GitHubClones,
-	type GitHubRepo,
-	type GitInstall,
-	memberName,
-	memberRole,
-	PROJECT_NOT_FOUND,
-	type ProjectCopies,
-	type ProjectCopy,
-	type ProjectReadiness,
-	projectClones,
-	projectRowsOf,
-	recordClone,
-	type SpaceDocuments,
-	setUpGit,
-	spaceProjectRows,
-	systemGitInstaller,
-	worktreeLocation,
-} from "./projects";
 export type {
 	FeedStep,
 	InboxGate,

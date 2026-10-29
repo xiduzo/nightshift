@@ -1,4 +1,5 @@
-import { profilesInUse, saveProfile } from "@nightshift/engine";
+import { profilesInUse } from "@nightshift/engine";
+import { saveProfile } from "@nightshift/engine/device-config";
 import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";

@@ -16,12 +16,12 @@ import {
 	testMcpServer,
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
+import type { localDevice } from "@nightshift/engine";
 import {
 	type ConnectionStore,
 	HARNESS_BIN,
-	type localDevice,
 	type SettingsStore,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 import { type AgentHarnessName, isCustomHarness } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 

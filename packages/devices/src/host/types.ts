@@ -1,5 +1,8 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import type { DeviceCopy, KeyStoreKind } from "@nightshift/engine";
+import type {
+	DeviceCopy,
+	KeyStoreKind,
+} from "@nightshift/engine/device-config";
 import type {
 	HostHello,
 	LeaveResult,

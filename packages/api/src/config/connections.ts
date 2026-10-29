@@ -1,11 +1,11 @@
+import { connectionsInUse } from "@nightshift/engine";
 import {
 	connectionInputSchema,
-	connectionsInUse,
 	customAgentOf,
 	HARNESS_BIN,
 	removeConnection,
 	saveConnection,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 import {
 	customHarnessSchema,
 	harnessNameSchema,

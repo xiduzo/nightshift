@@ -1,4 +1,4 @@
-import { settingsPatchSchema } from "@nightshift/engine";
+import { settingsPatchSchema } from "@nightshift/engine/device-config";
 
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";

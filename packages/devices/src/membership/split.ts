@@ -5,12 +5,11 @@ import {
 	splitPersonalSpaceBatch,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type { Engine, FlowDocuments } from "@nightshift/engine";
 import {
-	type Engine,
-	type FlowDocuments,
 	type SpaceDocuments,
 	spaceProjectRows,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import type { SplitResult, SplitState } from "../contract";
 import type { HostSpaces } from "../links";

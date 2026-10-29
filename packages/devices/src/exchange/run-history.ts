@@ -5,11 +5,11 @@ import {
 	type CopyStamp,
 	type Engine,
 	type LoggedEvent,
-	memberRole,
 	type PeerContext,
 	parseTranscript,
 	type WalkFile,
 } from "@nightshift/engine";
+import { memberRole } from "@nightshift/engine/projects";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
 import { dropArchive, readCopy, writeArchive } from "../archive";

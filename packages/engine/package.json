@@ -3,6 +3,8 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
+		"./device-config": "./src/device-config/entry.ts",
+		"./projects": "./src/projects/entry.ts",
 		"./run-status": "./src/run-status/index.ts",
 		"./testing": "./src/testing/index.ts"
 	},

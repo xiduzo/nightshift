@@ -1,8 +1,5 @@
-import {
-	HostUnreachableError,
-	type PeerContext,
-	type SpaceDocuments,
-} from "@nightshift/engine";
+import { HostUnreachableError, type PeerContext } from "@nightshift/engine";
+import type { SpaceDocuments } from "@nightshift/engine/projects";
 import type { HostRelay, OfferCaps, WorkRelay } from "../contract";
 import {
 	publishOffer,

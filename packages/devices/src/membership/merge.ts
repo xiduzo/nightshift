@@ -9,8 +9,8 @@ import {
 	type Engine,
 	type FlowDocuments,
 	HostUnreachableError,
-	spaceProjectRows,
 } from "@nightshift/engine";
+import { spaceProjectRows } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import { and, eq, isNull } from "drizzle-orm";

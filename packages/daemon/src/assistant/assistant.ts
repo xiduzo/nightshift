@@ -12,7 +12,7 @@ import type {
 	ConnectionStore,
 	ProfileStore,
 	SettingsStore,
-} from "@nightshift/engine";
+} from "@nightshift/engine/device-config";
 import {
 	type AgentHarnessName,
 	type AssistantAgent,

@@ -25,23 +25,27 @@ import {
 	startDevices,
 } from "@nightshift/devices";
 import {
-	checkProjectFolder,
-	clonePathOf,
 	createArtifactStore,
 	createFlowDocuments,
-	createGitHubClones,
-	createProjectCopies,
-	createSpaceDocuments,
 	createToolLaunchers,
-	documentRows,
 	documentSpace,
 	localDevice,
+} from "@nightshift/engine";
+import {
+	documentRows,
 	openConfigStores,
 	openDeviceDocument,
 	secretStore,
+} from "@nightshift/engine/device-config";
+import {
+	checkProjectFolder,
+	clonePathOf,
+	createGitHubClones,
+	createProjectCopies,
+	createSpaceDocuments,
 	setUpGit,
 	systemGitInstaller,
-} from "@nightshift/engine";
+} from "@nightshift/engine/projects";
 import { deliveryMoves } from "@nightshift/notifications";
 
 import { createAssistant } from "./assistant";

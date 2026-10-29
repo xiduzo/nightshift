@@ -9,7 +9,10 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
-import { createSpaceDocuments, type SpaceDocuments } from "@nightshift/engine";
+import {
+	createSpaceDocuments,
+	type SpaceDocuments,
+} from "@nightshift/engine/projects";
 import {
 	createRunLog,
 	createSandbox,
