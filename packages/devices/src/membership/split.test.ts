@@ -568,7 +568,6 @@ describe("leaving the home Host keeps a copy", () => {
 							return Promise.reject(new Error("Stopped after the batch."));
 						return documents.open(spaceId);
 					},
-					remove: (spaceId) => documents.remove(spaceId),
 				},
 			}).revoked(home),
 		).rejects.toThrow("Stopped after the batch.");

@@ -1,22 +1,19 @@
-import { adoptPersonalSpaceBatch, personalSpaceId } from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
 import {
-	device,
-	event,
-	organization,
-	project,
-	run,
-} from "@nightshift/db/schema";
+	adoptPersonalSpaceBatch,
+	personalSpaceId,
+	spaceExists,
+} from "@nightshift/auth";
+import type { Database } from "@nightshift/db";
+import { device } from "@nightshift/db/schema";
 import {
 	type Engine,
 	type FlowDocuments,
 	HostUnreachableError,
-	type SpaceDocuments,
 	spaceProjectRows,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
-import { and, eq, isNull, notExists, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type {
 	PersonalMerge as HostAnswer,
 	MergePending,
@@ -116,14 +113,13 @@ type MergeReady = {
 
 export type MergeDeps = {
 	db: Database;
-	engine: Pick<Engine, "space" | "moveProjects" | "flows"> & {
-		exchange: Pick<RunHistoryExchange, "rowsAfter" | "cursorsWith">;
+	engine: Pick<Engine, "space" | "moveProjects" | "flows" | "forgetSpace"> & {
+		exchange: Pick<RunHistoryExchange, "pushed">;
 		hostSpaces: Pick<HostSpaces, "listed">;
 	};
 	links: Pick<DeviceLinks, "get">;
 	/** The home Host this computer merges into (`HostLinks.home`). */
 	hostLinks: Pick<HostLinks, "home">;
-	spaces: Pick<SpaceDocuments, "open" | "remove">;
 	/** The flow documents, to wait until the Host's copies arrived. */
 	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
@@ -437,48 +433,14 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		return { state, projects, runs: runIds.length, backup: row.backup };
 	}
 
-	/** Whether this Replica still has the old Space, or a Project or run of it. */
-	async function stillHere(from: string): Promise<boolean> {
-		const [left] = await db
-			.select({ id: organization.id })
-			.from(organization)
-			.where(eq(organization.id, from))
-			.union(
-				db
-					.select({ id: project.id })
-					.from(project)
-					.where(eq(project.spaceId, from)),
-			)
-			.union(db.select({ id: run.id }).from(run).where(eq(run.spaceId, from)))
-			.limit(1);
-		return left !== undefined;
-	}
-
 	/**
-	 * Removes what the old Space left once nothing names it: its document,
-	 * and its events that belong to no run here (a Member that joined).
-	 * Runs again safely.
+	 * Removes what the old Space left once nothing names it: its Space
+	 * row is gone, then the engine forgets it (`Engine.forgetSpace`: its
+	 * facts of no run here, its document). Runs again safely.
 	 */
 	async function cleanUp(from: string): Promise<boolean> {
-		if (await stillHere(from)) return false;
-		await db
-			.delete(event)
-			.where(
-				and(
-					eq(event.spaceId, from),
-					or(
-						isNull(event.runId),
-						notExists(
-							db
-								.select({ id: run.id })
-								.from(run)
-								.where(eq(run.id, event.runId)),
-						),
-					),
-				),
-			);
-		await deps.spaces.remove(from);
-		return true;
+		if (await spaceExists(db, from)) return false;
+		return engine.forgetSpace(from);
 	}
 
 	/** What follows the batch: the old Space, the flow documents. Runs again safely. */
@@ -527,16 +489,10 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		const spaces = [
 			...new Set(Object.values(projectMap).map((t) => t.spaceId)),
 		];
-		if (spaces.length === 0) return true;
-		return until(async () => {
-			const { rows: rest } = await engine.exchange.rowsAfter({
-				spaces,
-				cursors: await engine.exchange.cursorsWith(hostId),
-				only: self.id,
-				limit: 1,
-			});
-			return rest.events.length === 0;
-		}, deps.pushWaitMs ?? 20_000);
+		return until(
+			() => engine.exchange.pushed(hostId, spaces, self.id),
+			deps.pushWaitMs ?? 20_000,
+		);
 	}
 
 	return {

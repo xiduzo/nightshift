@@ -90,6 +90,15 @@ export type RunHistoryExchange = {
 	/** Moves this Replica's cursors with a Host forward (never back). */
 	advance(hostId: string, cursors: SyncCursors): Promise<void>;
 	/**
+	 * Whether a Host has every row of `walker` in `spaces` that this
+	 * Replica has: none lands here after this Replica's cursors with it.
+	 */
+	pushed(
+		hostId: string,
+		spaces: readonly string[],
+		walker: string,
+	): Promise<boolean>;
+	/**
 	 * Resolves when a run event lands in this Replica (appended or
 	 * ingested) of `scope`'s Spaces and Walkers, after `timeoutMs`, or when
 	 * `signal` aborts: whichever comes first. A spend so far
@@ -268,6 +277,22 @@ export function createRunHistoryExchange(deps: {
 		return "on-its-way";
 	}
 
+	/** This Replica's cursors with a Host (`sync_cursor`). */
+	async function cursorsWith(hostId: string): Promise<SyncCursors> {
+		const rows = await db
+			.select()
+			.from(syncCursor)
+			.where(eq(syncCursor.hostId, hostId));
+		const cursors: SyncCursors = {};
+		for (const row of rows) {
+			cursors[row.spaceId] = {
+				...cursors[row.spaceId],
+				[row.walkerId]: row.walkerSeq,
+			};
+		}
+		return cursors;
+	}
+
 	function landedWithin(
 		timeoutMs: number,
 		signal?: AbortSignal,
@@ -305,20 +330,7 @@ export function createRunHistoryExchange(deps: {
 			return added;
 		},
 
-		async cursorsWith(hostId) {
-			const rows = await db
-				.select()
-				.from(syncCursor)
-				.where(eq(syncCursor.hostId, hostId));
-			const cursors: SyncCursors = {};
-			for (const row of rows) {
-				cursors[row.spaceId] = {
-					...cursors[row.spaceId],
-					[row.walkerId]: row.walkerSeq,
-				};
-			}
-			return cursors;
-		},
+		cursorsWith,
 
 		async advance(hostId, cursors) {
 			for (const [spaceId, walkers] of Object.entries(cursors)) {
@@ -339,6 +351,17 @@ export function createRunHistoryExchange(deps: {
 						});
 				}
 			}
+		},
+
+		async pushed(hostId, spaces, walker) {
+			if (spaces.length === 0) return true;
+			const { rows } = await history.rowsAfter({
+				spaces,
+				cursors: await cursorsWith(hostId),
+				only: walker,
+				limit: 1,
+			});
+			return rows.events.length === 0;
 		},
 
 		landed: (signal, timeoutMs, scope) =>

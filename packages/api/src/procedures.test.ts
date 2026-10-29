@@ -112,6 +112,7 @@ const engine: Context["engine"] = {
 	logMemberChange: async () => {},
 	onLandedFacts: () => () => {},
 	moveProjects: async () => ({ projects: [], runIds: [], schedules: 0 }),
+	forgetSpace: async () => false,
 	flows: {
 		flows: async () => ({}),
 		schedules: async () => ({ path: "schedules", schedules: [], issues: [] }),

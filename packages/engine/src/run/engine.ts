@@ -40,6 +40,7 @@ import {
 	createRunBranches,
 	createSpaceDocuments,
 	createWorktrees,
+	forgetSpaceRows,
 	memberName,
 	systemGit,
 } from "../projects";
@@ -170,6 +171,13 @@ export interface Engine {
 	 * Host's and its split off it all go through it.
 	 */
 	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
+	/**
+	 * Forgets a Space a move emptied: its facts of no run here (a Member
+	 * that joined) and its Space document. False, and nothing removed,
+	 * while a Project or a run of it is still here. The Space's own row
+	 * is the caller's to check (`@nightshift/auth`). Runs again safely.
+	 */
+	forgetSpace(spaceId: string): Promise<boolean>;
 	/**
 	 * The flows of every Project of this Replica, by Project, whatever its
 	 * Space (`ProjectFlows`): what another Device's older Walker asks this
@@ -724,6 +732,12 @@ export function createEngine(
 		onLandedFacts: (listener) =>
 			landed.subscribe((events) => listener(landedFacts(events))),
 		moveProjects,
+		async forgetSpace(spaceId) {
+			await ready;
+			if (!(await forgetSpaceRows(db, spaceId))) return false;
+			await documents.remove(spaceId);
+			return true;
+		},
 		flows: projectFlows,
 		async runHere(runId) {
 			await ready;

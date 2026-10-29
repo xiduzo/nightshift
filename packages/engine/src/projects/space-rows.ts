@@ -18,6 +18,7 @@ import {
 	isNull,
 	lt,
 	lte,
+	notExists,
 	or,
 	type SQL,
 	sql,
@@ -449,17 +450,30 @@ export async function projectRowsOf(
 }
 
 /**
- * The Projects of a Space, removed ones too, oldest first, and whether
- * `deviceId` has a Clone of each: what a Device asks its home Host to
- * take when its own personal Space merges into the Host's.
+ * The Projects of a Space, removed ones too, oldest first, whether
+ * `deviceId` has a Clone of each, and whether it walked a run of it in
+ * the Space: what a Device asks its home Host to take when its own
+ * personal Space merges into the Host's, and what a split takes along.
  */
 export async function spaceProjectRows(
 	db: Database,
 	spaceId: string,
 	deviceId: string,
-): Promise<(MovingProject & { clone: boolean })[]> {
+): Promise<(MovingProject & { clone: boolean; walked: boolean })[]> {
+	const walked = exists(
+		db
+			.select({ id: run.id })
+			.from(run)
+			.where(
+				and(
+					eq(run.projectId, project.id),
+					eq(run.spaceId, spaceId),
+					eq(run.walkerId, deviceId),
+				),
+			),
+	);
 	const rows = await db
-		.select({ ...movingColumns, cloneId: clone.id })
+		.select({ ...movingColumns, cloneId: clone.id, walked })
 		.from(project)
 		.leftJoin(
 			clone,
@@ -467,10 +481,43 @@ export async function spaceProjectRows(
 		)
 		.where(eq(project.spaceId, spaceId))
 		.orderBy(project.createdAt, project.id);
-	return rows.map(({ cloneId, ...row }) => ({
+	return rows.map(({ cloneId, walked, ...row }) => ({
 		...moving(row),
 		clone: cloneId !== null,
+		walked: Boolean(walked),
 	}));
+}
+
+/**
+ * Removes the events a Space left on this Replica that belong to no run
+ * here (a Member that joined), once no Project and no run of it is here.
+ * False, and nothing removed, while one is. Runs again safely.
+ */
+export async function forgetSpaceRows(
+	db: Database,
+	spaceId: string,
+): Promise<boolean> {
+	const [left] = await db
+		.select({ id: project.id })
+		.from(project)
+		.where(eq(project.spaceId, spaceId))
+		.union(db.select({ id: run.id }).from(run).where(eq(run.spaceId, spaceId)))
+		.limit(1);
+	if (left) return false;
+	await db
+		.delete(event)
+		.where(
+			and(
+				eq(event.spaceId, spaceId),
+				or(
+					isNull(event.runId),
+					notExists(
+						db.select({ id: run.id }).from(run).where(eq(run.id, event.runId)),
+					),
+				),
+			),
+		);
+	return true;
 }
 
 /**

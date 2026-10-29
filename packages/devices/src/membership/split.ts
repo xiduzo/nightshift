@@ -5,7 +5,6 @@ import {
 	splitPersonalSpaceBatch,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { run } from "@nightshift/db/schema";
 import {
 	type Engine,
 	type FlowDocuments,
@@ -13,7 +12,6 @@ import {
 	spaceProjectRows,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import { and, eq } from "drizzle-orm";
 import type { SplitResult, SplitState } from "../contract";
 import type { HostSpaces } from "../links";
 import { backupDatabase } from "./backup";
@@ -137,16 +135,8 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 
 	/** The Projects that come along: a Clone here, or a run this computer walked. */
 	async function projectsHere(from: string): Promise<string[]> {
-		const walked = new Set(
-			(
-				await db
-					.selectDistinct({ projectId: run.projectId })
-					.from(run)
-					.where(and(eq(run.spaceId, from), eq(run.walkerId, self.id)))
-			).map((r) => r.projectId),
-		);
 		return (await spaceProjectRows(db, from, self.id))
-			.filter((p) => p.clone || walked.has(p.id))
+			.filter((p) => p.clone || p.walked)
 			.map((p) => p.id);
 	}
 

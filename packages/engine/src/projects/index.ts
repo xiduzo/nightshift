@@ -39,6 +39,7 @@ export {
 	spaceIdOf,
 } from "./space-document";
 export {
+	forgetSpaceRows,
 	type MovingProject,
 	projectRowsOf,
 	spaceMoveBatch,
