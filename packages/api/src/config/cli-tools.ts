@@ -1,7 +1,6 @@
 import {
 	cliToolInputSchema,
 	cliToolsInUse,
-	programOf,
 	removeCliTool,
 } from "@nightshift/engine";
 import { z } from "zod";
@@ -43,10 +42,9 @@ export const cliTools = {
 		})
 		.output(output(cliToolCheckSchema))
 		.input(z.object({ name: cliToolInputSchema.shape.name }))
-		.handler(({ context, input }) => {
-			const tool = context.cliTools.get(input.name);
-			return context.checks.cli(tool ? programOf(tool) : input.name);
-		}),
+		.handler(({ context, input }) =>
+			context.checks.cli(context.cliTools.program(input.name)),
+		),
 	/** Adds a CLI tool, or changes it. */
 	save: ownerProcedure
 		.route({

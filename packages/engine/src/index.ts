@@ -82,7 +82,6 @@ export {
 	type ProfileStore,
 	type ProfileView,
 	profileChoice,
-	programOf,
 	refreshDeviceFacts,
 	removeCliTool,
 	removeConnection,
