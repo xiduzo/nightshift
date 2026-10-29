@@ -1,6 +1,6 @@
 import type { RunSummary } from "../read";
 import { DAY_MS, HOUR_MS, lastHours, nightOf } from "./clock";
-import { flowHealthRows } from "./flow-health";
+import { FLOW_HEALTH_NIGHTS, flowHealthRows } from "./flow-health";
 import { askedGates, nightsRange, type PlacedRun } from "./nights";
 import { isOpen, sumKnownCost, toDashboardRun, topRows } from "./stats";
 import {
@@ -344,6 +344,7 @@ export function summarizeDashboard(
 		nights: NIGHT_RANGES.map((range) =>
 			nightsRange(range, placed, gates, now, timeZone),
 		),
+		healthNights: FLOW_HEALTH_NIGHTS,
 		lastNight: lastNightOf(placed),
 		upNext: upNextOf(runs, now),
 		flowHealth:

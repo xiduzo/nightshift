@@ -1,7 +1,7 @@
 import {
 	type DashboardSummary,
 	formatCost,
-	HEALTH_NIGHTS,
+	type NightRange,
 	type RunStatus,
 } from "@nightshift/client";
 
@@ -40,12 +40,14 @@ function parts(list: readonly (string | null)[]): string | null {
  * over all of them, with their names. Null when there is nothing to show.
  */
 export function healthOf(summary: DashboardSummary): Health | null {
+	// An older Host does not say the window: it counted over 30 nights.
+	const healthNights = (summary.healthNights as NightRange | undefined) ?? 30;
 	const flows = summary.flowHealth;
 	if (flows) {
 		if (flows.count === 0) return null;
 		return {
 			title: "Flow health",
-			description: `The busiest flows of the last ${HEALTH_NIGHTS} nights. The bar shows how many of their ended runs finished.`,
+			description: `The busiest flows of the last ${healthNights} nights. The bar shows how many of their ended runs finished.`,
 			rows: flows.rows.map((row) => ({
 				key: row.name,
 				label: row.name,
@@ -72,14 +74,12 @@ export function healthOf(summary: DashboardSummary): Health | null {
 			hidden: flows.count - flows.rows.length,
 		};
 	}
-	const range = summary.nights.find(
-		(nights) => nights.nights === HEALTH_NIGHTS,
-	);
+	const range = summary.nights.find((nights) => nights.nights === healthNights);
 	const groups = range?.runs.groups;
 	if (!groups || groups.count === 0) return null;
 	return {
 		title: "Runs per project",
-		description: `The busiest projects of the last ${HEALTH_NIGHTS} nights, over every Space you are in. The bar shows how many of their runs finished.`,
+		description: `The busiest projects of the last ${healthNights} nights, over every Space you are in. The bar shows how many of their runs finished.`,
 		rows: groups.rows.map((row) => ({
 			key: row.label,
 			label: row.label,

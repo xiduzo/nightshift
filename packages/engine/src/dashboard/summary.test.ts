@@ -375,6 +375,20 @@ describe("the dashboard of Spaces and of one project", () => {
 		expect(summary.cards.lastDay.runs).toBe(1);
 		expect(summary.flowHealth?.rows.map((row) => row.name)).toContain("fix");
 	});
+
+	test("says the nights Flow health covers: one of its night ranges", async () => {
+		const space = aSpace([aRun({ projectId: "p1" })], { p1: "website" });
+		const read = { now: NOW, timeZone: "UTC" };
+		for (const summary of [
+			await projectDashboard(space, "p1", read),
+			await spacesDashboard([space], read),
+		]) {
+			expect(summary.healthNights).toBe(30);
+			expect(summary.nights.map((range) => range.nights)).toContain(
+				summary.healthNights,
+			);
+		}
+	});
 });
 
 describe("runs over a night range", () => {

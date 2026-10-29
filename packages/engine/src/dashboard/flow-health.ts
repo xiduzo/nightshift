@@ -23,7 +23,7 @@ import {
 } from "./types";
 
 /** The nights a Flow health row covers. */
-export const FLOW_HEALTH_NIGHTS = 30;
+export const FLOW_HEALTH_NIGHTS: NightRange = 30;
 
 /** A run of a flow with its warnings and the night it started in. */
 type PlacedFlowRun = Omit<FlowRun, "warnings"> & {

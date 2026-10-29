@@ -215,6 +215,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 			}),
 		),
 		nights: z.array(nightsRangeSchema),
+		healthNights: nightRangeSchema,
 		lastNight: z
 			.object({
 				night: z.number(),

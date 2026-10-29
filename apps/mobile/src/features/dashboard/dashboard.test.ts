@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import { type DashboardSummary, HEALTH_NIGHTS } from "@nightshift/client";
+import type { DashboardSummary } from "@nightshift/client";
 
 import { healthOf, hiddenText } from "./health";
 
@@ -75,6 +75,7 @@ function summary(over: Partial<DashboardSummary> = {}): DashboardSummary {
 		open: { rows: [], count: 0, running: 0, nextWakeAt: null },
 		activity: [],
 		nights: [],
+		healthNights: 30,
 		lastNight: null,
 		upNext: [],
 		flowHealth: null,
@@ -88,7 +89,7 @@ describe("healthOf", () => {
 			summary({
 				nights: [
 					nights(7, { rows: [], count: 0 }),
-					nights(HEALTH_NIGHTS, {
+					nights(30, {
 						rows: [
 							{ label: "nightshift", runs: 4, finished: 3, failed: 1 },
 							{ label: "zac", runs: 3, finished: 0, failed: 3 },
@@ -181,6 +182,39 @@ describe("healthOf", () => {
 			},
 		]);
 		expect(health?.hidden).toBe(0);
+	});
+
+	test("covers the nights the Host says, in its words and its range", () => {
+		const groups = {
+			rows: [{ label: "nightshift", runs: 2, finished: 2, failed: 0 }],
+			count: 1,
+		};
+		const health = healthOf(
+			summary({
+				healthNights: 90,
+				nights: [nights(30, { rows: [], count: 0 }), nights(90, groups)],
+			}),
+		);
+		expect(health?.description).toContain("of the last 90 nights");
+		expect(health?.rows.map((row) => row.key)).toEqual(["nightshift"]);
+		const flows = healthOf(
+			summary({ healthNights: 7, flowHealth: { rows: [], count: 1 } }),
+		);
+		expect(flows?.description).toContain("of the last 7 nights");
+	});
+
+	test("an older Host, which does not say the window, counted over 30 nights", () => {
+		const { healthNights: _, ...older } = summary({
+			nights: [
+				nights(30, {
+					rows: [{ label: "zac", runs: 1, finished: 1, failed: 0 }],
+					count: 1,
+				}),
+			],
+		});
+		const health = healthOf(older as DashboardSummary);
+		expect(health?.description).toContain("of the last 30 nights");
+		expect(health?.rows.map((row) => row.key)).toEqual(["zac"]);
 	});
 
 	test("has nothing to show without runs", () => {

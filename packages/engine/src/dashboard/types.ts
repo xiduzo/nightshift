@@ -296,6 +296,12 @@ export type DashboardSummary = {
 	open: TopRows<DashboardRun> & { running: number; nextWakeAt: number | null };
 	activity: ActivityRange[];
 	nights: NightsRange[];
+	/**
+	 * The nights Flow health covers (`flowHealth`). It is one of the ranges
+	 * of `nights`: a screen that shows how the projects did over the same
+	 * window picks that range.
+	 */
+	healthNights: NightRange;
 	/** Null without runs. */
 	lastNight: NightOutput | null;
 	/** The soonest wake-ups and stop times. */

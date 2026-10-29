@@ -1,4 +1,3 @@
-import { HEALTH_NIGHTS } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import { Progress } from "@nightshift/ui/components/progress";
@@ -30,7 +29,7 @@ import { FlowHealthDialog } from "./flow-health-dialog";
 import { OVERVIEW_ROWS } from "./overview";
 
 /**
- * Each flow over the last 30 nights: its last run, how often it finished, and
+ * Each flow over the nights Flow health covers: its last run, how often it finished, and
  * what a finished run costs. A stopped run did not finish, so it counts
  * against it. A flow a Subflow node ran counts too, inside the run that
  * called it. A row opens the details of its flow.
@@ -53,7 +52,11 @@ export function FlowHealth({
 	return (
 		<PageSection
 			title="Flow health"
-			description={`The ${OVERVIEW_ROWS} busiest flows over the last ${HEALTH_NIGHTS} nights, on their own or as a subflow.`}
+			description={
+				summary
+					? `The ${OVERVIEW_ROWS} busiest flows over the last ${summary.healthNights} nights, on their own or as a subflow.`
+					: `The ${OVERVIEW_ROWS} busiest flows, on their own or as a subflow.`
+			}
 			actions={
 				<Button
 					variant="outline"
