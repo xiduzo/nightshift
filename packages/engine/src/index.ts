@@ -49,7 +49,6 @@ export type {
 export {
 	createToolLaunchers,
 	localDevice,
-	loginReferences,
 	type SignInResult,
 	type ToolLaunchers,
 } from "./device";
@@ -117,6 +116,8 @@ export type {
 	SavedFlow,
 } from "./flows";
 export {
+	cliToolsInUse,
+	connectionsInUse,
 	createFlowDocuments,
 	createFlowMigrations,
 	documentProjectFlows,
@@ -125,7 +126,7 @@ export {
 	flowsForRun,
 	mergeFlowDocuments,
 	planFlowMerge,
-	profileUseKey,
+	profilesInUse,
 	revisionKinds,
 	upgradedSources,
 } from "./flows";

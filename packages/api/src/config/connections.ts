@@ -1,15 +1,14 @@
 import {
 	connectionInputSchema,
+	connectionsInUse,
 	customAgentOf,
 	HARNESS_BIN,
-	loginReferences,
 	removeConnection,
 	saveConnection,
 } from "@nightshift/engine";
 import {
 	customHarnessSchema,
 	harnessNameSchema,
-	isAgentProfile,
 	isCustomHarness,
 	secretNameSchema,
 } from "@nightshift/flows";
@@ -36,37 +35,9 @@ export const connections = {
 				"Lists the connections (MCP servers) and secrets of this computer, with what uses them.",
 		})
 		.output(output(connectionListSchema))
-		.handler(async ({ context }) => {
-			const use = await context.space.flowUse();
-			const toolsBySecret = new Map<string, string[]>();
-			for (const tool of context.cliTools.list()) {
-				for (const name of tool.login ? loginReferences(tool.login) : []) {
-					toolsBySecret.set(name, [
-						...(toolsBySecret.get(name) ?? []),
-						tool.name,
-					]);
-				}
-			}
-			return {
-				connections: context.connections.list().map((c) => ({
-					...c,
-					usedBy: use.connections.get(c.name) ?? [],
-					profiles: context.profiles
-						.list()
-						.filter((p) => isAgentProfile(p) && p.connections.includes(c.name))
-						.map((p) => p.name),
-				})),
-				// A secret only a Command node or a CLI tool's login names is
-				// listed too: saved or not.
-				secrets: context.connections
-					.secrets([...use.secrets.keys(), ...toolsBySecret.keys()])
-					.map((secret) => ({
-						...secret,
-						flows: use.secrets.get(secret.name) ?? [],
-						tools: toolsBySecret.get(secret.name) ?? [],
-					})),
-			};
-		}),
+		.handler(async ({ context }) =>
+			connectionsInUse(context, await context.space.flowUse()),
+		),
 	/** Runs `--version` and the login check of one CLI. Read-only. */
 	check: ownerProcedure
 		.route({

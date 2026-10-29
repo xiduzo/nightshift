@@ -1,9 +1,9 @@
 import {
 	cliToolInputSchema,
+	cliToolsInUse,
 	programOf,
 	removeCliTool,
 } from "@nightshift/engine";
-import { isAgentProfile } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -27,22 +27,9 @@ export const cliTools = {
 				"Lists the CLI tools the agents may run, with the flows and profiles that name each.",
 		})
 		.output(output(cliToolListSchema))
-		.handler(async ({ context }) => {
-			const use = (await context.space.flowUse()).clis;
-			return Promise.all(
-				context.cliTools.list().map(async (tool) => ({
-					...tool,
-					usedBy: use.get(tool.name) ?? [],
-					profiles: context.profiles
-						.list()
-						.filter((p) => isAgentProfile(p) && p.clis.includes(tool.name))
-						.map((p) => p.name),
-					signedInAt: tool.login?.signIn
-						? await context.toolLaunchers.signedInAt(tool.name)
-						: null,
-				})),
-			);
-		}),
+		.handler(async ({ context }) =>
+			cliToolsInUse(context, await context.space.flowUse()),
+		),
 	/** The programs this computer can run by name, to pick one from. */
 	programs: ownerProcedure
 		.route({ summary: "Lists the programs this computer can run by name." })

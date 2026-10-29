@@ -1,4 +1,4 @@
-import { profileUseKey, saveProfile } from "@nightshift/engine";
+import { profilesInUse, saveProfile } from "@nightshift/engine";
 import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -27,14 +27,13 @@ export const profiles = {
 				"Lists the profiles of this computer, with the nodes that use each.",
 		})
 		.output(output(profileListSchema))
-		.handler(async ({ context }) => {
-			const use = await context.space.flowUse();
-			const self = context.daemon.device.id;
-			return context.profiles.list().map((p) => ({
-				...p,
-				usedBy: use.profiles.get(profileUseKey(self, p.id)) ?? [],
-			}));
-		}),
+		.handler(async ({ context }) =>
+			profilesInUse(
+				context,
+				await context.space.flowUse(),
+				context.daemon.device.id,
+			),
+		),
 	save: ownerProcedure
 		.route({ summary: "Adds a profile, or changes or renames one." })
 		.output(output(profileViewSchema))
