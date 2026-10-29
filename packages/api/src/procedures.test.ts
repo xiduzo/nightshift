@@ -1086,14 +1086,13 @@ function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
 }
 
 describe("the Needs-you inbox", () => {
-	test("lists the open Gates of every Space the Person is in, oldest first, with each Space's name", async () => {
-		const { ada, cy, spaceId } = await platform();
+	// The inbox rule (which Spaces, the order, who may answer) is the
+	// engine's `inboxOf`, tested there. This is the session's Person.
+	test("lists the inbox of the session's Person, not only their active Space", async () => {
+		const { ada, spaceId } = await platform();
 		const personal = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
-		const dee = await sandbox.signUp("Dee");
-		const deesOwn = (await personalSpaceId(sandbox.db, dee.userId)) ?? "";
 		gatesIn.set(spaceId, [openGate(spaceId, "platform-run", 20)]);
 		gatesIn.set(personal, [openGate(personal, "ada-run", 10)]);
-		gatesIn.set(deesOwn, [openGate(deesOwn, "dee-run", 5)]);
 
 		// Ada works in Platform; her inbox has her personal Space's Gate too.
 		const context = await contextFor(ada.headers);
@@ -1104,15 +1103,6 @@ describe("the Needs-you inbox", () => {
 		).toEqual([
 			["ada-run", personal, "Personal", true],
 			["platform-run", spaceId, "Platform", true],
-		]);
-
-		// A viewer sees the Gate of Platform, and may not answer it.
-		const viewer = await contextFor(cy.headers);
-		const seen = await call(appRouter.gates.list, undefined, {
-			context: viewer,
-		});
-		expect(seen.map((g) => [g.runId, g.canAnswer])).toEqual([
-			["platform-run", false],
 		]);
 	});
 
@@ -1199,17 +1189,8 @@ describe("the Needs-you inbox", () => {
 			defined: true,
 			message: "Open this Gate in Night Shift to answer it.",
 		});
-		// A choice the Gate does not have needs the app too.
-		expect(
-			await errorOf(
-				call(
-					appRouter.gates.resolve,
-					{ ...fromLockScreen("marked-run"), choice: "approve-deploy" },
-					{ context },
-				),
-			),
-		).toBe("NEEDS_APP");
-		// A Gate that is no longer open is closed.
+		// A Gate that is no longer open is closed. Which answers the lock
+		// screen takes is the engine's `lockScreenRefusal`, tested there.
 		runSpaces.set("closed-run", spaceId);
 		expect(
 			await refusalOf(
@@ -1222,23 +1203,6 @@ describe("the Needs-you inbox", () => {
 			defined: true,
 			message: "This Gate does not wait anymore.",
 		});
-		// So is one with an answer on its way.
-		runSpaces.set("pending-run", spaceId);
-		gatesIn.set(spaceId, [
-			{
-				...openGate(spaceId, "pending-run", 3),
-				lockScreen: true,
-				answerPending: true,
-			},
-			openGate(spaceId, "plain-run", 2),
-		]);
-		expect(
-			await errorOf(
-				call(appRouter.gates.resolve, fromLockScreen("pending-run"), {
-					context,
-				}),
-			),
-		).toBe("GATE_CLOSED");
 		expect(
 			calls.filter((c) => c.method === "resolveGate").map((c) => c.space),
 		).toEqual([spaceId]);

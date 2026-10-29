@@ -1,4 +1,4 @@
-/** The read model: the pure projections of the event log, the landed facts, the run views, cost, the Persons a run names, and the run bundle. */
+/** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, the run views, cost, the Persons a run names, and the run bundle. */
 
 export {
 	awaitsWorktree,
@@ -35,6 +35,7 @@ export {
 	lastHarnessSessionOfNode,
 	withEnclosing,
 } from "./derive-steps";
+export { type InboxGate, inboxOf, lockScreenRefusal } from "./inbox";
 export {
 	type LandedChange,
 	type LandedFact,

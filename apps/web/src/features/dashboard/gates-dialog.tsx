@@ -92,11 +92,12 @@ export function GatesDialog({
 }
 
 function GatesDetails({
-	gates,
+	gates: waiting,
 	summary,
 	project,
 	onNavigate,
 }: {
+	/** Oldest first: the Host sends them in the inbox order. */
 	gates: OpenGate[];
 	summary: DashboardSummary;
 	project?: Project;
@@ -105,7 +106,6 @@ function GatesDetails({
 	const now = useNow(60_000);
 	const [range, setRange] = useState<NightRange>(30);
 	const [tab, setTab] = useState<Tab>("overview");
-	const waiting = gates.slice().sort((a, b) => a.openedAt - b.openedAt);
 	const oldest = waiting[0];
 	const asked = nightsOf(summary, range).gates;
 	const { answerTime, runsAsking, groups } = asked;

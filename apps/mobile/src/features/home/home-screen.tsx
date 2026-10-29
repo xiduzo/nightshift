@@ -1,7 +1,6 @@
 import {
 	createDashboardQueries,
 	createGateQueries,
-	inboxOrder,
 	type OpenGate,
 	waitingForYou,
 } from "@nightshift/client";
@@ -59,10 +58,7 @@ export function HomeScreen() {
 	const dashboard = useHostQueries(createDashboardQueries);
 	const gateQueries = useHostQueries(createGateQueries);
 	const summary = useQuery(dashboard.summary({ everySpace: true }));
-	const gates = useQuery({
-		...gateQueries.open(),
-		select: inboxOrder,
-	});
+	const gates = useQuery(gateQueries.open());
 	const refresh = useScreenRefresh([summary.refetch, gates.refetch]);
 
 	const now = Date.now();

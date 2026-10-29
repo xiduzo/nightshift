@@ -1,4 +1,4 @@
-import type { OpenGate } from "@nightshift/engine";
+import type { InboxGate, OpenGate } from "@nightshift/engine";
 import { z } from "zod";
 
 import { exact } from "../output";
@@ -36,11 +36,13 @@ export const openGateSchema = exact<OpenGate>()(
 );
 
 /** One Gate of the Needs-you inbox: an open Gate, its Space's name, and whether you may answer it. */
-export const inboxGateSchema = openGateSchema.extend({
-	spaceName: z.string(),
-	/** Your role in the Gate's Space allows `gate.resolve`. */
-	canAnswer: z.boolean(),
-});
+export const inboxGateSchema = exact<InboxGate>()(
+	openGateSchema.extend({
+		spaceName: z.string(),
+		/** Your role in the Gate's Space allows `gate.resolve`. */
+		canAnswer: z.boolean(),
+	}),
+);
 
 /** The answer to one open Gate, bound to its run and step. */
 export const gateAnswerSchema = z.object({

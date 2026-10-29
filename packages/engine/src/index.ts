@@ -187,6 +187,7 @@ export {
 } from "./projects";
 export type {
 	FeedStep,
+	InboxGate,
 	LandedChange,
 	LandedFact,
 	OpenGate,
@@ -200,7 +201,9 @@ export type {
 } from "./read";
 export {
 	exportRun,
+	inboxOf,
 	landedFacts,
+	lockScreenRefusal,
 	openRunBundle,
 	type RunBundleSummary,
 } from "./read";

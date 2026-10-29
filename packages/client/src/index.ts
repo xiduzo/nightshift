@@ -75,7 +75,6 @@ export {
 	gateParts,
 	gateRefusalText,
 	gateRun,
-	inboxOrder,
 	type OpenGate,
 	parseGateQuestion,
 	plainText,

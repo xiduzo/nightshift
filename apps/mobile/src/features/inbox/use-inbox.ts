@@ -1,8 +1,4 @@
-import {
-	createGateQueries,
-	inboxOrder,
-	waitingForYou,
-} from "@nightshift/client";
+import { createGateQueries, waitingForYou } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 
 import { useHostQueries } from "@/features/host";
@@ -13,10 +9,7 @@ import { useHostQueries } from "@/features/host";
  */
 export function useInbox() {
 	const queries = useHostQueries(createGateQueries);
-	return useQuery({
-		...queries.open(),
-		select: inboxOrder,
-	});
+	return useQuery(queries.open());
 }
 
 /** How many Gates wait for you: the ones you may answer. For the tab badge. */

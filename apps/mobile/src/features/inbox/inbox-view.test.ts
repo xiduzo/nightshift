@@ -59,7 +59,7 @@ const d = gate({
 
 describe("inboxGroups", () => {
 	test("groups by project, the longest wait first", () => {
-		const groups = inboxGroups([c, b, a], ALL_GATES, false);
+		const groups = inboxGroups([a, b, c], ALL_GATES, false);
 		expect(groups.map((group) => group.title)).toEqual(["website", "api"]);
 		expect(groups[0]?.gates.map((one) => one.runId)).toEqual(["a", "c"]);
 	});
@@ -232,7 +232,7 @@ describe("nextGate", () => {
 	test("the oldest other Gate you may answer", () => {
 		const readOnly = gate({ runId: "x", openedAt: 0, canAnswer: false });
 		const pending = gate({ runId: "y", openedAt: 0, answerPending: true });
-		expect(nextGate([c, readOnly, pending, a, b], a)?.runId).toBe("b");
+		expect(nextGate([readOnly, pending, a, b, c], a)?.runId).toBe("b");
 		expect(nextGate([a], a)).toBeNull();
 	});
 });

@@ -11,6 +11,7 @@ export function createGateQueries(orpc: ApiQueryUtils) {
 		/**
 		 * The open Gates of every Space the person is in, oldest first, each
 		 * with its Space and whether they may answer it: the Needs-you inbox.
+		 * The Host sends them in the inbox order: no screen sorts them again.
 		 * It does not change with the active Space. The live cache reads it
 		 * again on each item of the notifications stream, and once a minute
 		 * while that stream is down. Refetches when the window gets focus. A

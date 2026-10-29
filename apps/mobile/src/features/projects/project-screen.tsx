@@ -4,7 +4,6 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	gateRun,
-	inboxOrder,
 	type OpenGate,
 	type Project,
 } from "@nightshift/client";
@@ -52,8 +51,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 	const flowQueries = useHostQueries(createFlowQueries);
 	const projects = useQuery(projectQueries.list());
 	const ofProject = useCallback(
-		(open: OpenGate[]) =>
-			inboxOrder(open.filter((gate) => gate.projectId === projectId)),
+		(open: OpenGate[]) => open.filter((gate) => gate.projectId === projectId),
 		[projectId],
 	);
 	const gates = useQuery({ ...gateQueries.open(), select: ofProject });

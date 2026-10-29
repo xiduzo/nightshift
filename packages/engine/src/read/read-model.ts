@@ -43,6 +43,7 @@ import {
 	lastHarnessSession,
 	sumCost,
 } from "./derive-steps";
+import { inboxOrder } from "./inbox";
 import { type MemberName, namesOf, runPerson } from "./people";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
 import type {
@@ -771,7 +772,7 @@ export function createReadModel(deps: ReadModelDeps) {
 		};
 	}
 
-	/** The open Gates of the Space's runs of projects a person has not removed, oldest first. */
+	/** The open Gates of the Space's runs of projects a person has not removed, in the inbox order. */
 	async function listGates(spaceId: string): Promise<OpenGate[]> {
 		const rows = await db
 			.select({ run, projectName: project.name })
@@ -826,7 +827,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				answerPending,
 			});
 		}
-		return gates.sort((a, b) => a.openedAt - b.openedAt);
+		return inboxOrder(gates);
 	}
 
 	/**

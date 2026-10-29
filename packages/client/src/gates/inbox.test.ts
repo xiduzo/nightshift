@@ -1,43 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { gateRun, inboxOrder, waitedText, waitingForYou } from "./inbox";
+import { gateRun, waitedText, waitingForYou } from "./inbox";
 
 const MINUTE = 60_000;
-
-describe("inboxOrder", () => {
-	test("the Gate that has waited longest comes first", () => {
-		const gates = [
-			{ runId: "r2", stepId: "a", openedAt: 300 },
-			{ runId: "r1", stepId: "a", openedAt: 100 },
-			{ runId: "r3", stepId: "a", openedAt: 200 },
-		];
-		expect(inboxOrder(gates).map((gate) => gate.runId)).toEqual([
-			"r1",
-			"r3",
-			"r2",
-		]);
-	});
-
-	test("Gates of the same moment keep one order, by run and step", () => {
-		const gates = [
-			{ runId: "r2", stepId: "a", openedAt: 100 },
-			{ runId: "r1", stepId: "b", openedAt: 100 },
-			{ runId: "r1", stepId: "a", openedAt: 100 },
-		];
-		expect(
-			inboxOrder(gates).map((gate) => `${gate.runId}:${gate.stepId}`),
-		).toEqual(["r1:a", "r1:b", "r2:a"]);
-	});
-
-	test("leaves the list it gets as it is", () => {
-		const gates = [
-			{ runId: "r2", stepId: "a", openedAt: 2 },
-			{ runId: "r1", stepId: "a", openedAt: 1 },
-		];
-		inboxOrder(gates);
-		expect(gates[0]?.runId).toBe("r2");
-	});
-});
 
 describe("waitingForYou", () => {
 	test("counts only the Gates you may answer", () => {

@@ -1,7 +1,6 @@
 import {
 	gateParts,
 	gateRun,
-	inboxOrder,
 	type OpenGate,
 	plainText,
 	waitedText,
@@ -75,16 +74,17 @@ export type InboxGroup<G> = {
 };
 
 /**
- * The Gates of a view, grouped by project. The groups and the Gates in
- * them keep the sort: oldest first puts the project whose Gate waited
- * longest on top. `manySpaces` puts the Space before each project.
+ * The Gates of a view, grouped by project. `gates` comes in the inbox
+ * order (the Host's). The groups and the Gates in them keep the sort:
+ * oldest first puts the project whose Gate waited longest on top.
+ * `manySpaces` puts the Space before each project.
  */
 export function inboxGroups<G extends Placed>(
 	gates: readonly G[],
 	view: InboxView,
 	manySpaces: boolean,
 ): InboxGroup<G>[] {
-	const ordered = inboxOrder(gates.filter((gate) => inPlace(gate, view.place)));
+	const ordered = gates.filter((gate) => inPlace(gate, view.place));
 	if (view.sort === "newest") ordered.reverse();
 	const groups = new Map<string, InboxGroup<G>>();
 	for (const gate of ordered) {
@@ -254,7 +254,8 @@ export function gateRowText(
 
 /**
  * The Gate to answer after this one: the next one you may answer, in
- * inbox order (oldest first). Null when nothing else waits for you.
+ * inbox order (oldest first, as the Host sends `gates`). Null when
+ * nothing else waits for you.
  */
 export function nextGate<
 	G extends Pick<
@@ -263,7 +264,7 @@ export function nextGate<
 	>,
 >(gates: readonly G[], current: Pick<OpenGate, "runId" | "stepId">): G | null {
 	return (
-		inboxOrder(gates).find(
+		gates.find(
 			(gate) =>
 				gate.canAnswer &&
 				!gate.answerPending &&

@@ -1,9 +1,10 @@
+import { inboxOf } from "@nightshift/engine";
 import { z } from "zod";
 
 import { output } from "../output";
 import { protectedProcedure } from "../procedures";
 import { runProcedure } from "../runs";
-import { answerGate, answerRefusals, inboxOf } from "./inbox";
+import { answerGate, answerRefusals } from "./answer";
 import { gateAnswerSchema, inboxGateSchema } from "./schemas";
 
 /**
@@ -17,7 +18,7 @@ export const gates = {
 				"Lists the open Gates of every Space the Person is in, oldest first: the Needs-you inbox.",
 		})
 		.output(output(z.array(inboxGateSchema)))
-		.handler(({ context }) => inboxOf(context)),
+		.handler(({ context }) => inboxOf(context, context.session.user.id)),
 	resolve: runProcedure(gateAnswerSchema, { gate: ["resolve"] })
 		.errors(answerRefusals)
 		.route({
