@@ -2,7 +2,9 @@ import {
 	createEngine,
 	type Engine,
 	type EngineOptions,
+	type PeerProjects,
 } from "@nightshift/engine";
+import type { DeviceCopy } from "@nightshift/engine/device-config";
 import { commandMoves, type RunHistoryExchange } from "../exchange";
 import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
@@ -41,6 +43,14 @@ export type PeerEngine = Engine & {
 	 * through it.
 	 */
 	readonly admission: OfferAdmission;
+	/**
+	 * The Projects and their Clones, as the peers read and record them:
+	 * the Host's exchange records a Device's Clone and takes the Projects
+	 * of its personal Space, the membership reads a Space's Projects.
+	 */
+	readonly projects: PeerProjects;
+	/** What the Device document this Replica keeps of another Device says: its name, profiles, secret names. */
+	keptDevice(deviceId: string): Promise<DeviceCopy | null>;
 };
 
 /**
@@ -109,5 +119,7 @@ export function createPeerEngine(
 		devices: built.registry,
 		offers: built.offers,
 		admission: built.admission,
+		projects: built.projects,
+		keptDevice: built.keptDevice,
 	};
 }

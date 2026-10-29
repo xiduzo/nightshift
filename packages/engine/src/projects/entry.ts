@@ -27,7 +27,6 @@ export {
 	deviceNameIn,
 	memberName,
 	memberRole,
-	projectClones,
 	recordClone,
 } from "./space-document";
 export { projectRowsOf, spaceProjectRows } from "./space-rows";

@@ -82,15 +82,6 @@ export function defaultSelfDeviceHost(
 	};
 }
 
-/** This computer's Device id, or null when the database has none yet. It makes nothing. */
-export async function selfDeviceId(db: Database): Promise<string | null> {
-	const [row] = await db
-		.select({ id: device.id })
-		.from(device)
-		.where(eq(device.self, true));
-	return row?.id ?? null;
-}
-
 /** The Person who owns this computer's Device, or null before one does. */
 export async function selfOwnerId(db: Database): Promise<string | null> {
 	const [row] = await db

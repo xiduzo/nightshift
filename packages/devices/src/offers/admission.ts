@@ -3,11 +3,11 @@ import type { Database } from "@nightshift/db";
 import type {
 	Device,
 	OfferedSessionInput,
+	PeerProjects,
 	PlacedRun,
 	SessionInput,
 } from "@nightshift/engine";
 import {
-	clonePathOf,
 	memberRole,
 	type SpaceDocuments,
 	worktreeLocation,
@@ -20,7 +20,7 @@ import {
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { WorkCall, WorkRelay, WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces, personInSpace, personOnHost } from "../links";
-import { selfDeviceId, selfOwnerId } from "../registry";
+import { selfOwnerId } from "../registry";
 import { remoteDevice, serveWork } from "../work";
 import type { OfferedSessions } from "./engine-offers";
 import {
@@ -114,6 +114,8 @@ export function createOfferAdmission(deps: {
 	/** This computer as a Device: it serves every admitted call. */
 	device: Device;
 	documents: SpaceDocuments;
+	/** The folder of a project's Clone on this computer: a call that works in it needs one. */
+	projects: Pick<PeerProjects, "clonePath">;
 	/**
 	 * This computer's own Offers (its Device document), with the names
 	 * their profiles have now. Without it, none.
@@ -193,10 +195,7 @@ export function createOfferAdmission(deps: {
 			if (refusal !== null) return refuse(refusal);
 		}
 		if (!NEEDS_CLONE.has(call.kind)) return { offers };
-		const repoPath = await clonePathOf(db, () => selfDeviceId(db))(
-			projectId,
-			spaceId,
-		);
+		const repoPath = await deps.projects.clonePath(projectId, spaceId);
 		if (repoPath === null) {
 			return refuse(
 				"This device does not have this project. Add its folder there first.",

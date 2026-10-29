@@ -1,5 +1,10 @@
 import type { Database } from "@nightshift/db";
-import type { DeviceProfile, PeerContext, Peers } from "@nightshift/engine";
+import type {
+	DeviceProfile,
+	PeerContext,
+	PeerProjects,
+	Peers,
+} from "@nightshift/engine";
 import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { memberName, memberRole } from "@nightshift/engine/projects";
 import { createRunArchive } from "../archive";
@@ -91,6 +96,10 @@ export type BuiltPeers = {
 	offers: EngineOffers;
 	/** This computer's admission of the calls of runs: every Offer check, one slot map per Offer. */
 	admission: OfferAdmission;
+	/** The Projects and their Clones, as the engine gives them to the peers. */
+	projects: PeerProjects;
+	/** What the Device documents this Replica keeps say of those Devices. */
+	keptDevice: PeerContext["keptDevice"];
 };
 
 /**
@@ -127,6 +136,7 @@ export function createPeers(
 		db,
 		device,
 		documents,
+		projects: context.projects,
 		...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
 		profileFor: context.profiles.here,
 		...(options.offerUse ? { use: options.offerUse } : {}),
@@ -141,8 +151,9 @@ export function createPeers(
 		registry,
 		documents,
 		hostSpaces,
-		project: context.project,
+		projects: context.projects,
 		profiles: context.profiles,
+		keptDevice: context.keptDevice,
 		flows: context.flows,
 		...(work ? { work } : {}),
 		...(relay ? { relay } : {}),
@@ -247,5 +258,7 @@ export function createPeers(
 		members,
 		offers,
 		admission,
+		projects: context.projects,
+		keptDevice: context.keptDevice,
 	};
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { clone, hostLink, project, user } from "@nightshift/db/schema";
+import { hostLink, user } from "@nightshift/db/schema";
 import type { Device, PlacedRun, SessionInput } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
@@ -141,22 +141,16 @@ beforeEach(async () => {
 		colleague: "member",
 		carol: "member",
 	});
-	// Its Clone of the Space's project.
-	await sandbox.db
-		.insert(project)
-		.values({ id: "p1", spaceId: SPACE, name: "app" });
-	await sandbox.db.insert(clone).values({
-		id: "c1",
-		spaceId: SPACE,
-		projectId: "p1",
-		deviceId: sandbox.deviceId,
-		path: sandbox.repoPath,
-	});
 	worktree = worktreeLocation(sandbox.repoPath, RUN.slice(0, 8)).worktreePath;
 	admission = createOfferAdmission({
 		db: sandbox.db,
 		device,
 		documents,
+		// Its Clone of the Space's project.
+		projects: {
+			clonePath: async (projectId, spaceId) =>
+				projectId === "p1" && spaceId === SPACE ? sandbox.repoPath : null,
+		},
 		ownOffers: () => own,
 		// "coder", and "builder" that a test renames to "coder": by id.
 		profileFor: (id) =>

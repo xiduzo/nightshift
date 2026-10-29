@@ -25,7 +25,6 @@ import {
 import {
 	createSpaceDocuments,
 	type ListedProject,
-	recordClone,
 	type SpaceDocuments,
 } from "@nightshift/engine/projects";
 import type { RunStatus } from "@nightshift/engine/run-status";
@@ -57,10 +56,17 @@ import { serveWork } from "../work/remote";
 import { createPlacement, deviceNamed } from "./placement";
 
 /** No profile of this computer, and no Device document kept here. */
-const NO_PROFILES: PeerProfiles = {
+const NO_PROFILES: Pick<PeerProfiles, "here" | "lastKnown"> = {
 	here: () => null,
-	stored: async () => null,
 	lastKnown: async () => null,
+};
+
+/** No project here: a module that reads only the plan never asks. */
+const NO_PROJECTS = {
+	find: async () => {
+		throw new Error("No project here.");
+	},
+	clones: async () => [],
 };
 
 /**
@@ -162,10 +168,11 @@ beforeEach(async () => {
 		await engine.space(a.spaceId).addProject({ repoPath: a.repoPath })
 	).id;
 	await a.db.delete(clone).where(and(eq(clone.projectId, projectId)));
-	const document = await documents.open(a.spaceId);
-	await document.change(() =>
-		recordClone(document, { projectId, deviceId: B, deviceName: "studio-b" }),
-	);
+	await engine.projects.recordClone(a.spaceId, {
+		projectId,
+		deviceId: B,
+		deviceName: "studio-b",
+	});
 	await engine.devices.join({
 		id: B,
 		name: "studio-b",
@@ -311,10 +318,11 @@ describe("a run placed on another Device", () => {
 			ownerId: personId,
 			homeHost: null,
 		});
-		const document = await documents.open(a.spaceId);
-		await document.change(() =>
-			recordClone(document, { projectId, deviceId: C, deviceName: "studio-c" }),
-		);
+		await engine.projects.recordClone(a.spaceId, {
+			projectId,
+			deviceId: C,
+			deviceName: "studio-c",
+		});
 		online.add(C);
 		const hello = flow([command("hello", "echo hello")]);
 		// The last run goes to the Device that is not first in the list.
@@ -1116,23 +1124,23 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			db: b.db,
 			directory: deviceDirectory(b.db),
 		});
-		const document = await spaceDocuments.open(SPACE);
-		await document.change(() => {
-			recordClone(document, {
-				projectId: "p-shared",
-				deviceId: "laptop",
-				deviceName: "laptop.local",
-			});
-		});
 		const placement = createPlacement({
 			db: b.db,
 			device: testDevice({ harnesses: {} }, b.deviceId),
 			walkerId: async () => b.deviceId,
 			profiles: NO_PROFILES,
+			keptDevice: async () => null,
 			registry: {} as never,
 			documents: spaceDocuments,
 			hostSpaces: createHostSpaces(b.db),
-			project: async () => ({ repoPath: null }) as ListedProject,
+			// The laptop has a Clone, as the Space document B keeps says.
+			projects: {
+				find: async () => ({ repoPath: null }) as ListedProject,
+				clones: async (_spaceId, projectId) =>
+					projectId === "p-shared"
+						? [{ deviceId: "laptop", deviceName: "laptop.local" }]
+						: [],
+			},
 			flows: async () => ({}),
 			relay: {
 				devices: async () => {
@@ -1269,12 +1277,11 @@ describe("the walk, from the plan alone", () => {
 			device: testDevice({ harnesses: {} }, a.deviceId),
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
+			keptDevice: async () => null,
 			registry: {} as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
-			project: async () => {
-				throw new Error("No project here.");
-			},
+			projects: NO_PROJECTS,
 			flows: async () => ({}),
 			work,
 		});
@@ -1369,12 +1376,11 @@ describe("a run with no starter", () => {
 			device: testDevice({ harnesses: {} }, a.deviceId),
 			walkerId: async () => a.deviceId,
 			profiles: NO_PROFILES,
+			keptDevice: async () => null,
 			registry: {} as never,
 			documents,
 			hostSpaces: createHostSpaces(a.db),
-			project: async () => {
-				throw new Error("No project here.");
-			},
+			projects: NO_PROJECTS,
 			flows: async () => ({}),
 			work,
 		});
@@ -1656,14 +1662,11 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 	});
 
 	test("started without a Device, it goes to Ada's own laptop with the project, not the Host that offers her nothing", async () => {
-		const document = await documents.open(ADA_SPACE);
-		await document.change(() =>
-			recordClone(document, {
-				projectId: adaProject,
-				deviceId: "ada-laptop",
-				deviceName: "ada-laptop",
-			}),
-		);
+		await engine.projects.recordClone(ADA_SPACE, {
+			projectId: adaProject,
+			deviceId: "ada-laptop",
+			deviceName: "ada-laptop",
+		});
 		online.add("ada-laptop");
 		// B's fake serves the laptop's calls, from Ada's folder.
 		projectId = adaProject;

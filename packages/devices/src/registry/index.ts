@@ -11,7 +11,6 @@ export {
 } from "./registry";
 export {
 	selfDevice,
-	selfDeviceId,
 	selfOwnerId,
 	setSelfOwner,
 } from "./self-device";

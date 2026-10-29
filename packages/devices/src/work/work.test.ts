@@ -217,6 +217,7 @@ describe("the work server", () => {
 			db: sandbox.db,
 			device,
 			documents,
+			projects: engine.projects,
 			ownOffers: () => own,
 			profileFor: (name) =>
 				name === "coder"
