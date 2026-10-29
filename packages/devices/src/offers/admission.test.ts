@@ -4,6 +4,7 @@ import { clone, hostLink, project, user } from "@nightshift/db/schema";
 import {
 	createSpaceDocuments,
 	type Device,
+	type PlacedRun,
 	type SessionInput,
 	type SpaceDocuments,
 	worktreeLocation,
@@ -218,6 +219,12 @@ async function listed(profile: string, sessionCap = 1) {
 	});
 }
 
+/** A run's plan as the walk reads it: only its Person counts here. */
+function planBy(personId: string | null): PlacedRun["plan"] {
+	const device = { id: DEVICE.id, name: DEVICE.name };
+	return { device, named: {}, devices: { [device.id]: device }, personId };
+}
+
 function request(overrides: Partial<WorkRequest> = {}): WorkRequest {
 	return {
 		spaceId: SPACE,
@@ -261,7 +268,7 @@ const walkedHere: Path = (request, signal) =>
 			id: request.runId ?? "",
 			spaceId: request.spaceId,
 			projectId: request.projectId,
-			startedBy: request.personId || null,
+			plan: planBy(request.personId || null),
 		}),
 		request,
 		signal,
@@ -622,7 +629,7 @@ describe("Offer admission, its owner's run", () => {
 			id: RUN,
 			spaceId: SPACE,
 			projectId: "p1",
-			startedBy: ME,
+			plan: planBy(ME),
 		});
 		const replies: WorkReply[] = [];
 		for await (const reply of serveWork(

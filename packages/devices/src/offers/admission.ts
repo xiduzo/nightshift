@@ -5,7 +5,7 @@ import {
 	type Device,
 	memberRole,
 	type OfferedSessionInput,
-	type RunRow,
+	type PlacedRun,
 	type SessionInput,
 	type SpaceDocuments,
 	worktreeLocation,
@@ -99,7 +99,7 @@ export type OfferAdmission = {
 	 * call through the admission, as if it came over the wire.
 	 */
 	deviceFor(
-		row: Pick<RunRow, "id" | "spaceId" | "projectId" | "startedBy">,
+		run: Pick<PlacedRun, "id" | "spaceId" | "projectId" | "plan">,
 	): Device;
 	/** This computer's Offers into a Space that are in force. */
 	inForce(spaceId: string): Promise<DeviceOffer[]>;
@@ -320,18 +320,18 @@ export function createOfferAdmission(deps: {
 		inForce: offersHere,
 		withdrawn: (spaceId, profile) => calls.withdrawn(spaceId, profile),
 
-		deviceFor(row) {
+		deviceFor(run) {
+			const { personId } = run.plan;
 			const admitted = remoteDevice(local, device, {
-				spaceId: row.spaceId,
-				projectId: row.projectId,
+				spaceId: run.spaceId,
+				projectId: run.projectId,
 				// No starter: refused in this process, never sent.
-				personId: row.startedBy ?? "",
-				runId: row.id,
+				personId: personId ?? "",
+				runId: run.id,
 			});
 			/** The Device of one call: as is for its owner's run, else admitted call by call. */
 			const pick = async (): Promise<Device> =>
-				row.startedBy !== null &&
-				row.startedBy === (await ownerHere(row.spaceId))
+				personId !== null && personId === (await ownerHere(run.spaceId))
 					? device
 					: admitted;
 			return {

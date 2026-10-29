@@ -62,19 +62,68 @@ import {
  *   (`MissingProjectError`), and comes again.
  */
 
-/** A run's row, as a batch of the exchange carries it. */
-export type HistoryRun = Omit<typeof run.$inferSelect, "createdAt"> & {
+/**
+ * A run's row, as a batch of the exchange carries it: its columns, with
+ * its time in epoch ms. The plan's columns are as `planColumns` keeps them.
+ */
+export type HistoryRun = {
+	id: string;
+	spaceId: string;
+	projectId: string;
+	flowName: string | null;
+	flow: string;
+	bodyFlows: string;
+	flowRevision: string | null;
+	bodyFlowRevisions: string;
+	title: string;
+	worktreePath: string;
+	branch: string;
+	baseRef: string;
+	walkerId: string;
+	deviceId: string | null;
+	placements: string | null;
+	deviceNames: string | null;
+	startedBy: string | null;
 	createdAt: number;
 };
 /** A step's row, as a batch of the exchange carries it. */
-export type HistoryStep = Omit<typeof step.$inferSelect, "createdAt"> & {
+export type HistoryStep = {
+	id: string;
+	spaceId: string;
+	runId: string;
+	nodeId: string;
+	nodeType: string;
+	visit: number;
+	transcriptPath: string;
+	deviceId: string | null;
 	createdAt: number;
 };
 /** An agent session's row, as a batch of the exchange carries it. */
-export type HistorySession = Omit<
-	typeof agentSession.$inferSelect,
-	"createdAt"
-> & { createdAt: number };
+export type HistorySession = {
+	id: string;
+	spaceId: string;
+	runId: string;
+	stepId: string;
+	harnessSessionId: string | null;
+	prompt: string;
+	createdAt: number;
+};
+
+/** Whether `A` and `B` are the same type. */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+/** A table's row as a batch carries it. */
+type Carried<R extends { createdAt: Date }> = Omit<R, "createdAt"> & {
+	createdAt: number;
+};
+// The rows a batch carries are the tables' rows: a column added to one
+// fails the build here until the batch carries it (and the wire schema
+// of `@nightshift/devices` follows).
+const carriesTheRows: [
+	Same<HistoryRun, Carried<typeof run.$inferSelect>>,
+	Same<HistoryStep, Carried<typeof step.$inferSelect>>,
+	Same<HistorySession, Carried<typeof agentSession.$inferSelect>>,
+] = [true, true, true];
+void carriesTheRows;
 
 /** Rows of runs, as one batch of the exchange carries them. */
 export type HistoryRows = {

@@ -20,11 +20,11 @@ import type { Device } from "../device";
 import type { WalkFile, WalkFiles, WalkRef } from "../graph";
 import type {
 	CopyStamp,
+	PlacedRun,
 	RunBus,
 	RunHistory,
 	RunLog,
 	RunPlan,
-	RunRow,
 	TranscriptEntry,
 } from "../log";
 import type { ListedProject, SpaceDocuments } from "../projects";
@@ -124,10 +124,10 @@ export type PlacementPort = {
 	 * only reads it (`deviceFor`).
 	 */
 	plan(input: PlanInput): Promise<PlannedRun>;
-	/** The Device a step of `node` runs on, as the run's plan says (`planOf`). */
-	deviceFor(node: FlowNode, row: RunRow): Device;
+	/** The Device a step of `node` runs on, as the run's plan says. */
+	deviceFor(node: FlowNode, run: PlacedRun): Device;
 	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
-	deviceById(id: string, row: RunRow): Device;
+	deviceById(id: string, run: PlacedRun): Device;
 	/**
 	 * The Device a run's walk moves to (`to`): one of the Person's own
 	 * Devices, not this computer, online. Null when it is not one of
@@ -135,7 +135,7 @@ export type PlacementPort = {
 	 * each node's Device and the run's Person stay, only the Walker changes.
 	 */
 	moveTo(
-		row: RunRow,
+		run: PlacedRun,
 		actor: Actor,
 		to: string,
 	): Promise<{ id: string; name: string } | null>;

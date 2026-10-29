@@ -94,6 +94,29 @@ export function planOf(
 }
 
 /**
+ * A run as the peers place its steps (`PlacementPort`): its ids, its
+ * Walker, and its plan, read from its row.
+ */
+export type PlacedRun = {
+	id: string;
+	spaceId: string;
+	projectId: string;
+	walkerId: string;
+	plan: RunPlan;
+};
+
+/** The run's row as the peers place its steps. */
+export function placedRun(row: RunRow): PlacedRun {
+	return {
+		id: row.id,
+		spaceId: row.spaceId,
+		projectId: row.projectId,
+		walkerId: row.walkerId,
+		plan: planOf(row),
+	};
+}
+
+/**
  * The columns of a run's row that keep its plan. `placements` keeps its
  * shape (name to id), so a Replica of a version before the plan reads it.
  * `device_names` keeps the name of every Device of the plan, by its id.

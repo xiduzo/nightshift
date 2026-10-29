@@ -13,15 +13,14 @@ import {
 	type OfferedPlacement,
 	type OwnDevice,
 	type PlacedDevice,
+	type PlacedRun,
 	type Placement,
 	type PlanDevices,
 	type PlanInput,
 	type PlannedRun,
 	planNodes,
-	planOf,
 	projectClones,
 	type RunLog,
-	type RunRow,
 	type SpaceDocuments,
 	storedDeviceProfiles,
 	UNREACHABLE_DEVICE,
@@ -63,8 +62,8 @@ import { remoteDevice } from "../work";
  *   time. The run's Device makes the run's worktree when it is back. On the Replica that keeps the Space the registry
  *   answers; on a Device in a Host's Space the Host does
  *   (`HostRelay.devices`). Run start keeps the plan on the run's row.
- * - While the run walks (`deviceFor`): the plan, read from the row
- *   (`planOf`), and nothing decided again. Another Device is a
+ * - While the run walks (`deviceFor`): the plan, as the engine reads it
+ *   from the row (`PlacedRun`), and nothing decided again. Another Device is a
  *   `remoteDevice` over the work relay, named as the plan names it. A
  *   node with a profile runs on the Device of the id its profile names.
  *
@@ -94,7 +93,7 @@ export type PlacementDeps = {
 	 * run, itself through its Offer admission (`OfferAdmission.deviceFor`).
 	 * Default: itself.
 	 */
-	localFor?(row: RunRow): Device;
+	localFor?(run: PlacedRun): Device;
 	/** This computer's own Offers into a Space that are in force. Default: none. */
 	offersHere?(spaceId: string): Promise<DeviceOffer[]>;
 	/** This computer's profiles, for its owner. Default: unknown. */
@@ -179,31 +178,31 @@ export function createPlacement(deps: PlacementDeps) {
 	 * The Device a step of `node` runs on, as the run's plan says: its
 	 * profile's Device by id, else the Device it names, else the run's.
 	 */
-	function deviceFor(node: FlowNode, row: RunRow): Device {
+	function deviceFor(node: FlowNode, run: PlacedRun): Device {
 		const ref = profileOf(node);
-		if (isProfileRef(ref)) return deviceById(ref.device, row);
-		const plan = planOf(row);
+		if (isProfileRef(ref)) return deviceById(ref.device, run);
+		const { plan } = run;
 		const name = nodeDevice(node);
 		const at =
 			(name !== undefined ? plan.named[name] : undefined) ?? plan.device;
-		return deviceById(at.id, row, at.name ?? name);
+		return deviceById(at.id, run, at.name ?? name);
 	}
 
 	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
-	function deviceById(id: string, row: RunRow, named?: string): Device {
-		if (id === device.id || id === row.walkerId) {
-			return deps.localFor?.(row) ?? device;
+	function deviceById(id: string, run: PlacedRun, named?: string): Device {
+		if (id === device.id || id === run.walkerId) {
+			return deps.localFor?.(run) ?? device;
 		}
-		const plan = planOf(row);
+		const { plan } = run;
 		const name = plan.devices[id]?.name ?? named;
 		return remoteDevice(
 			plan.personId === null ? NO_STARTER_RELAY : work,
 			{ id, name: name ?? "The device of this step" },
 			{
-				spaceId: row.spaceId,
-				projectId: row.projectId,
+				spaceId: run.spaceId,
+				projectId: run.projectId,
 				personId: plan.personId ?? "",
-				runId: row.id,
+				runId: run.id,
 			},
 		);
 	}
@@ -658,13 +657,13 @@ export function createPlacement(deps: PlacementDeps) {
 	 * each node's Device and the Person stay, only the Walker changes.
 	 */
 	async function moveTo(
-		row: RunRow,
+		run: PlacedRun,
 		actor: Actor,
 		to: string,
 	): Promise<{ id: string; name: string } | null> {
-		const personId = await personInSpace(db, row.spaceId, actor.personId);
+		const personId = await personInSpace(db, run.spaceId, actor.personId);
 		const target = (
-			await ownDevices(row.spaceId, personId, row.projectId)
+			await ownDevices(run.spaceId, personId, run.projectId)
 		).find((d) => d.deviceId === to);
 		if (!target || target.thisDevice) return null;
 		if (!target.online) {
@@ -679,7 +678,7 @@ export function createPlacement(deps: PlacementDeps) {
 	return {
 		plan,
 		deviceFor,
-		deviceById: (id: string, row: RunRow) => deviceById(id, row),
+		deviceById: (id: string, run: PlacedRun) => deviceById(id, run),
 		moveTo,
 		devicesFor,
 		namesFor,

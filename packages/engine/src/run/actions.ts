@@ -6,6 +6,7 @@ import { type Runner, type RunWalks, rerunNodeRefusal } from "../graph";
 import {
 	applyWalkerMoves,
 	type LoggedEvent,
+	placedRun,
 	RUN_NOT_FOUND,
 	type RunBus,
 	type RunLog,
@@ -272,7 +273,7 @@ export function createRunActions(deps: RunActionsDeps) {
 			refuseUnless("move", active ? "running" : status, true, result);
 			// The plan stays: only the Walker changes. A Device that is
 			// offline is the planner's refusal.
-			if (!(await deps.placement.moveTo(row, actor, to))) {
+			if (!(await deps.placement.moveTo(placedRun(row), actor, to))) {
 				throw new RunRefusal(
 					"not-your-device",
 					"That device is not one of yours.",

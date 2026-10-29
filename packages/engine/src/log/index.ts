@@ -46,12 +46,13 @@ export { personFieldTypes } from "./person-fields";
 export { withoutPrivatePaths } from "./private-paths";
 export type { Derive, RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
-export type { PlannedDevice, RunPlan, RunRow } from "./run-row";
+export type { PlacedRun, PlannedDevice, RunPlan, RunRow } from "./run-row";
 export {
 	applyWalkerMoves,
 	getRunRow,
 	hasRunRow,
 	lastRunDevice,
+	placedRun,
 	planColumns,
 	planOf,
 	RUN_NOT_FOUND,

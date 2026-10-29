@@ -21,7 +21,7 @@ import {
 	type ListedProject,
 	type OwnDevice,
 	openDeviceDocument,
-	planOf,
+	placedRun,
 	type RunStatus,
 	recordClone,
 	type SpaceDocuments,
@@ -875,7 +875,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			.from(runTable)
 			.where(eq(runTable.id, started.id));
 		if (!row) throw new Error("No run row.");
-		const plan = planOf(row);
+		const { plan } = placedRun(row);
 		expect(plan.named).toEqual({});
 		expect(plan.devices[B]).toEqual({ id: B, name: "studio-b" });
 	});
@@ -940,7 +940,7 @@ describe("a run's plan", () => {
 			startedBy: personId,
 		});
 		const row = await rowOf(started.id);
-		expect(planOf(row)).toEqual({
+		expect(placedRun(row).plan).toEqual({
 			device: { id: started.device.id, name: "test" },
 			named: { "studio-b": { id: B, name: "studio-b" } },
 			devices: {
@@ -1265,7 +1265,7 @@ describe("the walk, from the plan alone", () => {
 			work,
 		});
 	const row = (fields: object) =>
-		({
+		placedRun({
 			id: "a-run",
 			spaceId: a.spaceId,
 			projectId,
@@ -1275,7 +1275,7 @@ describe("the walk, from the plan alone", () => {
 			deviceNames: JSON.stringify({ [B]: "studio-b", "device-h": "hetzner-1" }),
 			startedBy: personId,
 			...fields,
-		}) as Parameters<ReturnType<typeof createPlacement>["deviceFor"]>[1];
+		} as Parameters<typeof placedRun>[0]);
 
 	test("names each Device as the plan does, with no warm-up", () => {
 		const placement = placementOfA();
@@ -1364,14 +1364,17 @@ describe("a run with no starter", () => {
 			work,
 		});
 		// A run from before every run had a starter, moved here.
-		const there = placement.deviceById(B, {
-			id: "older-run",
-			spaceId: a.spaceId,
-			projectId,
-			walkerId: a.deviceId,
-			deviceId: B,
-			startedBy: null,
-		} as Parameters<typeof placement.deviceById>[1]);
+		const there = placement.deviceById(
+			B,
+			placedRun({
+				id: "older-run",
+				spaceId: a.spaceId,
+				projectId,
+				walkerId: a.deviceId,
+				deviceId: B,
+				startedBy: null,
+			} as Parameters<typeof placedRun>[0]),
+		);
 		const events = [];
 		for await (const event of there.exec({
 			command: "true",
