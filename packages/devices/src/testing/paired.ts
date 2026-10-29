@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import { clone, member, project, user } from "@nightshift/db/schema";
+import { member, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
 	type FlowDocuments,
@@ -11,8 +11,10 @@ import {
 } from "@nightshift/engine/projects";
 import {
 	createRunLog,
+	mustGit,
 	type RunLog,
 	type Sandbox,
+	syncSpaceDocument,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
@@ -23,6 +25,11 @@ import { createRelay } from "../relay";
 import { hostInMemory, linksTo } from "./host-in-memory";
 import type { MemoryHost } from "./in-memory-host";
 import { withPeers } from "./peers";
+
+/** The `origin` of A's repository and of each paired Device's copy of it. */
+const PAIRED_ORIGIN = "https://github.com/nightshift-test/paired.git";
+/** That `origin` as a Project's remote. */
+const PAIRED_REMOTE = "github.com/nightshift-test/paired";
 
 /** A Device paired with A: its engine, its key on A, and its copies of A's Spaces. */
 export type PairedDevice = {
@@ -37,8 +44,10 @@ export type PairedDevice = {
 	/** Its flow documents: the engine's. */
 	flows: FlowDocuments;
 	/**
-	 * Brings a project of A to the Device, as the Space document does.
-	 * With `clone`, the Device has a folder of it too, so it can walk its
+	 * Brings a project of A to the Device, as its Link does: A's Space
+	 * document (every project of the Space) syncs to it, and its rows
+	 * follow. With `clone`, the Device adds its folder of the repository
+	 * too (A records the Clone), so it can walk its
 	 * runs.
 	 */
 	projectOnDevice(
@@ -102,6 +111,8 @@ export async function pairedReplicas(
 	options: PairedOptions = {},
 ): Promise<PairedReplicas> {
 	const harnesses = options.harnesses ?? {};
+	// A's repository, and each Device's copy of it: one remote.
+	await mustGit(a.repoPath, ["remote", "add", "origin", PAIRED_ORIGIN]);
 	const replica = await hostInMemory(a, {
 		harnesses,
 		...(options.hostWork ? { hostWork: options.hostWork } : {}),
@@ -109,6 +120,7 @@ export async function pairedReplicas(
 	const { host, hostExchange, memory, hostId, personId, hello } = replica;
 
 	async function pair(sandbox: Sandbox, name: string): Promise<PairedDevice> {
+		await mustGit(sandbox.repoPath, ["remote", "add", "origin", PAIRED_ORIGIN]);
 		const key = await replica.join(sandbox.deviceId, name);
 		const documents = createSpaceDocuments({
 			db: sandbox.db,
@@ -169,20 +181,15 @@ export async function pairedReplicas(
 			documents,
 			flows,
 			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
-				const [row] = await a.db
-					.select()
-					.from(project)
-					.where(eq(project.id, projectId));
-				if (!row) throw new Error(`A has no project ${projectId}.`);
-				await sandbox.db.insert(project).values(row);
+				const { spaceId, remote } = await host.projects.find(projectId);
+				await syncSpaceDocument(replica.documents, documents, spaceId);
 				if (!withClone) return;
-				await sandbox.db.insert(clone).values({
-					id: `clone-${projectId}`,
-					spaceId: row.spaceId,
-					projectId,
-					deviceId: sandbox.deviceId,
-					path: sandbox.repoPath,
-				});
+				if (remote !== PAIRED_REMOTE) {
+					throw new Error(
+						`A's project ${projectId} is not of A's repository: the Device has no folder of it.`,
+					);
+				}
+				await engine.space(spaceId).addProject({ repoPath: sandbox.repoPath });
 			},
 		};
 	}

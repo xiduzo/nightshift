@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readdir } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { personalSpaceId, spacesOf } from "@nightshift/auth";
 import {
@@ -17,6 +17,7 @@ import {
 import {
 	createProjectFlows,
 	createSandbox,
+	mustGit,
 	type Sandbox,
 	seedFlows,
 	waitFor,
@@ -321,9 +322,13 @@ describe("leaving the home Host keeps a copy", () => {
 			runId,
 			stepId: "hello",
 		});
+		// Another repository, of A only: B's folder is a copy of A's own.
+		const lab = join(a.root, "lab");
+		await mkdir(lab, { recursive: true });
+		await mustGit(lab, ["init", "-q", "-b", "main"]);
 		const onlyOnA = await paired.host
 			.space(a.spaceId)
-			.addProject({ repoPath: a.repoPath, name: "Only on A" });
+			.addProject({ repoPath: lab, name: "Only on A" });
 		await paired.projectOnDevice(onlyOnA.id);
 		await revoke();
 
