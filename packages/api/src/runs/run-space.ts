@@ -1,4 +1,12 @@
-import { type Permissions, type Role, roleAllows } from "@nightshift/auth";
+import {
+	type AccessRefusal,
+	type Permissions,
+	type RequestAccess,
+	ROLE_REFUSAL,
+	roleAllows,
+	type SpaceAccess,
+	spaceAccess,
+} from "@nightshift/auth";
 import type { Engine } from "@nightshift/engine";
 import type { z } from "zod";
 
@@ -16,9 +24,9 @@ import { protectedProcedure } from "../procedures";
  * What finds the run's Space and the Person's role in it: the role from
  * the memberships the request read already (`RequestAccess.roleIn`).
  */
-export type RunSpaceDeps = {
+type RunSpaceDeps = {
 	engine: Pick<Engine, "spaceOfRun">;
-	roleIn(spaceId: string): Promise<Role | null>;
+	access: Pick<RequestAccess, "roleIn">;
 };
 
 /**
@@ -27,18 +35,16 @@ export type RunSpaceDeps = {
  *   Space. One answer for both, so it does not tell that the run exists.
  * - `forbidden`: their role in the run's Space does not allow `permissions`.
  */
-export type RunSpace =
-	| { spaceId: string }
-	| { refused: "not-found" | "forbidden" };
+type RunSpace = { spaceId: string } | { refused: "not-found" | "forbidden" };
 
 /** The Space of the run for the Person, with their role there checked against `permissions`. */
-export async function runSpaceFor(
+async function runSpaceFor(
 	deps: RunSpaceDeps,
 	runId: string,
 	permissions?: Permissions,
 ): Promise<RunSpace> {
 	const spaceId = await deps.engine.spaceOfRun(runId);
-	const role = spaceId ? await deps.roleIn(spaceId) : null;
+	const role = spaceId ? await deps.access.roleIn(spaceId) : null;
 	if (!spaceId || !role) return { refused: "not-found" };
 	if (permissions && !roleAllows(role, permissions)) {
 		return { refused: "forbidden" };
@@ -52,11 +58,36 @@ export async function runSpaceFor(
  */
 export const runRefusals = {
 	NOT_FOUND: { status: 404, message: "This run is not in one of your Spaces." },
-	FORBIDDEN: {
-		status: 403,
-		message: "Your role in this Space does not allow this.",
-	},
+	FORBIDDEN: { status: ROLE_REFUSAL.status, message: ROLE_REFUSAL.message },
 } as const;
+
+/** A run the Person may not see. */
+const RUN_NOT_FOUND: AccessRefusal = {
+	allowed: false,
+	code: "NOT_FOUND",
+	...runRefusals.NOT_FOUND,
+};
+
+/**
+ * The whole access ladder of a request keyed by a run id, outside a
+ * procedure (the daemon's run file routes): a session in a Space that the
+ * Host lets in (`spaceAccess`), then the run's own Space with the Person's
+ * role there checked against `permissions`. It answers with the run's
+ * Space, or the refusal a procedure gives in the same case.
+ */
+export async function runAccess(
+	deps: { access: RequestAccess; engine: Pick<Engine, "spaceOfRun"> },
+	runId: string,
+	permissions?: Permissions,
+): Promise<SpaceAccess> {
+	const access = spaceAccess(deps.access);
+	if (!access.allowed) return access;
+	const found = await runSpaceFor(deps, runId, permissions);
+	if ("refused" in found) {
+		return found.refused === "forbidden" ? ROLE_REFUSAL : RUN_NOT_FOUND;
+	}
+	return { ...access, spaceId: found.spaceId };
+}
 
 /**
  * A procedure keyed by the run id of its `input`. Its handler gets `space`

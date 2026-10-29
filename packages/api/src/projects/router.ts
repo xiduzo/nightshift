@@ -269,7 +269,7 @@ export const projects = {
 		.output(output(z.void()))
 		.input(z.object({ projectId: z.string(), spaceId: z.string().min(1) }))
 		.handler(async ({ context, input }) => {
-			if (!(await context.can({ project: ["move"] }, input.spaceId))) {
+			if (!(await context.access.can({ project: ["move"] }, input.spaceId))) {
 				throw new ORPCError("FORBIDDEN", {
 					message: "Your role in that Space does not allow this.",
 				});

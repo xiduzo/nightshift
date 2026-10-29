@@ -6,13 +6,7 @@ import type {
 	McpServerConfig,
 	McpTestResult,
 } from "@nightshift/agents";
-import type {
-	DeviceKeyAccess,
-	HostAccess,
-	Permissions,
-	RequestAccess,
-	Session,
-} from "@nightshift/auth";
+import type { DeviceKeyAccess, RequestAccess } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
@@ -30,31 +24,22 @@ import type {
 import type { AssistantService } from "@nightshift/flows";
 import type { Notifications } from "@nightshift/notifications";
 
-export type Context = {
-	/** The request's session. On this computer, the local Person's when the request has none. */
-	session: Session | null;
-	/** The Space the session works in: its active Space, else the Person's personal Space. Null without a session. */
-	spaceId: string | null;
+/** What a procedure gets: the request, and the daemon's services. */
+export type Context = Services & {
 	/**
-	 * Whether the session's Person may do `permissions` in that Space (or
-	 * in `inSpace`): the organization plugin's check of their role, on the
-	 * server.
+	 * Who the request is, in which Space, and what they may do there: one
+	 * value from auth, read once when the request starts. On this computer,
+	 * the local Person's session when the request has none. A procedure
+	 * that works in a Space checks it first (`spaceAccess`).
 	 */
-	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
-	/** The session's Person's role in a Space, null when they are not a member. */
-	roleIn: RequestAccess["roleIn"];
-	/** Makes a Space of the Person the session's active one. */
-	setActiveSpace(spaceId: string): Promise<void>;
-	/** The request's headers, with the local session when it got one: for Better Auth's own checks. */
-	headers: Headers;
+	access: RequestAccess;
 	/** The request came from this computer itself, not through a proxy or from elsewhere (`isThisComputer`). */
 	fromThisComputer: boolean;
 	/**
-	 * Whether the session may use the Host (`@nightshift/auth/host-access`).
-	 * Refused: a session from another computer on a Host that requires
-	 * two-factor sign-in, whose Person has not turned it on.
+	 * The Device key the request carries (`Authorization: Bearer`), resolved.
+	 * A request with a key has no session: it is a Device, not a Person.
 	 */
-	hostAccess: HostAccess;
+	deviceKey: DeviceKeyAccess | null;
 	/** The Host requires two-factor sign-in for sessions from other computers. */
 	requireTwoFactor: boolean;
 	/** Sets a Person's email and password (`@nightshift/auth/login`). */
@@ -67,21 +52,20 @@ export type Context = {
 			resetTwoFactor?: boolean;
 		},
 	): Promise<{ email: string }>;
-	/**
-	 * The Device key the request carries (`Authorization: Bearer`), resolved.
-	 * A request with a key has no session: it is a Device, not a Person.
-	 */
-	deviceKey: DeviceKeyAccess | null;
+};
+
+/**
+ * What the procedures use besides the request: the daemon's services. Its
+ * composition root (`createDaemon`) fills them once. A new service goes
+ * here, and in the composition root.
+ */
+export type Services = {
 	/** This computer's Devices: as a Host (pairing, presence) and its links to Hosts. */
 	devices: Devices;
 	/** This computer as a Host of run history: what paired Devices pull, push and archive. */
 	exchange: HostExchange;
 	/** This computer's Offers, and the Devices of a Space as its Members see them. */
 	offers: Offers;
-	/** A new Space, its creator the owner, and the session's active one. */
-	createSpace(name: string): Promise<{ id: string }>;
-	/** The Members and invitations of the session's Space (the organization plugin). */
-	members: RequestAccess["members"];
 	db: Database;
 	/** The engine of this Device. Procedures use the view of the session's Space. */
 	engine: Engine;

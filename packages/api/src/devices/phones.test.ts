@@ -16,6 +16,7 @@ import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "../context";
 import { appRouter } from "../router";
+import { testContext } from "../testing";
 
 /**
  * A Person's phones belong to a Host: the phone app signs in to a Host
@@ -83,24 +84,17 @@ async function contextFor(
 		null,
 		OPEN_HOST,
 	);
-	return {
-		session: access.session,
-		spaceId: options.spaceId ?? access.spaceId,
-		can: access.can,
-		hostAccess: access.hostAccess,
-		requireTwoFactor: false,
-		fromThisComputer: false,
+	return testContext({
+		access: { ...access, spaceId: options.spaceId ?? access.spaceId },
 		db: sandbox.db,
-		engine: { space: () => ({}) },
 		notifications,
 		devices: options.devices,
-		daemon: { device: { ownerId: options.ownerId } },
-	} as unknown as Context;
+		daemon: { device: { id: "d", name: "test", ownerId: options.ownerId } },
+	});
 }
 
 function keyContext(personId: string): Context {
-	return {
-		session: null,
+	return testContext({
 		deviceKey: {
 			keyId: "k",
 			deviceId: "d",
@@ -108,7 +102,7 @@ function keyContext(personId: string): Context {
 			permissions: { sync: ["read", "write"] },
 		},
 		notifications,
-	} as unknown as Context;
+	});
 }
 
 async function errorOf(promise: Promise<unknown>): Promise<string> {
@@ -263,7 +257,7 @@ describe("a Host's phones over a Device's link", () => {
 	});
 
 	test("need a Device key", async () => {
-		const context = { session: null, deviceKey: null } as unknown as Context;
+		const context = testContext();
 		expect(
 			await errorOf(call(appRouter.link.phones, undefined, { context })),
 		).toBe("UNAUTHORIZED");

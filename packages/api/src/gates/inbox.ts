@@ -1,4 +1,4 @@
-import { roleAllows, spacesOf } from "@nightshift/auth";
+import { roleAllows, type Session, spacesOf } from "@nightshift/auth";
 import { GateClosedError, type SpaceEngine } from "@nightshift/engine";
 import type { ORPCErrorConstructorMap } from "@orpc/server";
 import type { z } from "zod";
@@ -8,7 +8,7 @@ import type { gateAnswerSchema, inboxGateSchema } from "./schemas";
 
 /** The parts of a request the inbox needs: who asks, and this computer's engine and database. */
 type InboxContext = Pick<Context, "db" | "engine"> & {
-	session: NonNullable<Context["session"]>;
+	session: Session;
 };
 
 type InboxGate = z.output<typeof inboxGateSchema>;

@@ -1,6 +1,6 @@
 /** Runs: start, read, watch and steer them. */
 export { runs } from "./router";
-export { runProcedure, runSpaceFor } from "./run-space";
+export { runAccess, runProcedure } from "./run-space";
 export {
 	gateChoiceSchema,
 	gateDeadlineSchema,

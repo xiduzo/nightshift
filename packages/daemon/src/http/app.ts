@@ -1,5 +1,9 @@
-import { appRouter, runSpaceFor } from "@nightshift/api";
-import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
+import { appRouter, runAccess } from "@nightshift/api";
+import {
+	type AccessRefusal,
+	authEndpointAllowed,
+	PEER_ADDRESS_HEADER,
+} from "@nightshift/auth";
 import { READS, READS_HEADER } from "@nightshift/devices";
 import { WEBHOOK_PATH } from "@nightshift/flows";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
@@ -8,13 +12,13 @@ import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { BatchHandlerPlugin } from "@orpc/server/plugins";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { Hono } from "hono";
+import { Hono, type Context as HonoContext } from "hono";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { leaseHealth, readHeartbeat } from "../runtime";
 import type { Sync } from "../sync";
-import { artifactFileResponse } from "./artifact-file";
+import { artifactFileResponse, artifactNotFound } from "./artifact-file";
 import { type HttpServices, requestContexts } from "./context";
 import { desktopOrigins } from "./origins";
 import { decodedRequest, UnreadableBody } from "./request-encoding";
@@ -56,8 +60,17 @@ export function createHttp(
 		logRequests?: boolean;
 	},
 ): DaemonServe {
-	const { auth, db, connections, sync } = services;
-	const { access, authAccess, createContext } = requestContexts(services);
+	const {
+		corsOrigin,
+		dataDir,
+		leaseOwner,
+		sync,
+		serve,
+		logRequests,
+		...httpServices
+	} = services;
+	const { auth, db, connections, engine } = httpServices;
+	const { access, authAccess, createContext } = requestContexts(httpServices);
 	const app = new Hono();
 
 	// For watchdogs and health checks, before the logger: they ask often. 200
@@ -67,7 +80,7 @@ export function createHttp(
 	app.get("/health", async (c) => {
 		try {
 			const health = leaseHealth(await readHeartbeat(db), {
-				owner: services.leaseOwner,
+				owner: leaseOwner,
 			});
 			return c.json(
 				{ status: health.status, heartbeatAgeMs: health.heartbeatAgeMs },
@@ -79,12 +92,12 @@ export function createHttp(
 	});
 
 	// Each poll is a request: only a developer reads a line for each.
-	if (services.logRequests) app.use(logger());
+	if (logRequests) app.use(logger());
 
 	// A webhook for a schedule: the one call anyone may make without a
 	// session. The schedule's secret is its check (`webhook.ts`).
 	app.post(`${WEBHOOK_PATH}/:projectId/:scheduleId`, (c) =>
-		webhookResponse(services.engine, c.req.raw, {
+		webhookResponse(engine, c.req.raw, {
 			projectId: c.req.param("projectId"),
 			scheduleId: c.req.param("scheduleId"),
 		}),
@@ -92,7 +105,7 @@ export function createHttp(
 	app.use(
 		"/*",
 		cors({
-			origin: [services.corsOrigin, ...desktopOrigins],
+			origin: [corsOrigin, ...desktopOrigins],
 			allowMethods: ["GET", "POST", "OPTIONS"],
 			// x-orpc-batch: the web app on another address (the desktop
 			// app, `bun run dev`) sends its calls together in one batch.
@@ -128,62 +141,38 @@ export function createHttp(
 		return auth.handler(new Request(c.req.raw, { headers: forwarded }));
 	});
 
+	/** An access refusal, as the procedures give it: its status, code and words. */
+	const refused = (c: HonoContext, refusal: AccessRefusal) =>
+		c.json({ code: refusal.code, message: refusal.message }, refusal.status);
+
 	// A file download, not an oRPC call: a run of any of the Person's
-	// Spaces, for a role that may export runs there (`runSpaceFor`).
+	// Spaces, for a role that may export runs there (`runAccess`).
 	app.get("/api/runs/:id/export", async (c) => {
-		const { session, spaceId, hostAccess, roleIn } = await access(c);
-		if (!session || !spaceId) {
-			return c.json({ message: "Sign in to use Night Shift." }, 401);
-		}
-		if (!hostAccess.allowed) {
-			return c.json(
-				{ code: hostAccess.code, message: hostAccess.message },
-				403,
-			);
-		}
 		const runId = c.req.param("id");
-		const found = await runSpaceFor(
-			{ engine: services.engine, roleIn },
-			runId,
-			{
-				run: ["export"],
-			},
-		);
-		if ("refused" in found) {
-			return found.refused === "forbidden"
-				? c.json(
-						{ message: "Your role in this Space does not allow this." },
-						403,
-					)
-				: c.json({ message: "This run is not in one of your Spaces." }, 404);
-		}
+		const found = await runAccess({ access: await access(c), engine }, runId, {
+			run: ["export"],
+		});
+		if (!found.allowed) return refused(c, found);
 		return runExportResponse(
-			{ db, dataDir: services.dataDir, connections },
+			{ db, dataDir, connections },
 			runId,
 			found.spaceId,
 		);
 	});
 
 	// A file, not an oRPC call: one artifact of a run of any of the Person's
-	// Spaces (`runSpaceFor`), for an <img>, a <video> or a download.
+	// Spaces (`runAccess`), for an <img>, a <video> or a download. A run the
+	// Person may not see has no artifact for them.
 	app.get("/api/runs/:id/artifacts/:artifactId", async (c) => {
-		const { session, spaceId, hostAccess, roleIn } = await access(c);
-		if (!session || !spaceId) {
-			return c.json({ message: "Sign in to use Night Shift." }, 401);
-		}
-		if (!hostAccess.allowed) {
-			return c.json(
-				{ code: hostAccess.code, message: hostAccess.message },
-				403,
-			);
-		}
 		const runId = c.req.param("id");
-		const found = await runSpaceFor({ engine: services.engine, roleIn }, runId);
-		if ("refused" in found) {
-			return c.json({ message: "Artifact not found." }, 404);
+		const found = await runAccess({ access: await access(c), engine }, runId);
+		if (!found.allowed) {
+			return found.code === "NOT_FOUND"
+				? artifactNotFound()
+				: refused(c, found);
 		}
 		return artifactFileResponse(
-			services.engine.space(found.spaceId, { personId: session.user.id }),
+			engine.space(found.spaceId, { personId: found.session.user.id }),
 			c.req.raw,
 			runId,
 			c.req.param("artifactId"),
@@ -258,7 +247,7 @@ export function createHttp(
 
 	return {
 		// This computer only, until it is a Host with an https:// address.
-		...services.serve,
+		...serve,
 		fetch(request, server) {
 			if (new URL(request.url).pathname === SYNC_PATH) {
 				return sync.upgrade(request, server);

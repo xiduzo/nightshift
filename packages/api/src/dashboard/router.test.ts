@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OPEN_HOST, personalSpaceId, requestAccess } from "@nightshift/auth";
 import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
-import type { RunSummary, SpaceEngine } from "@nightshift/engine";
+import type { Project, RunSummary, SpaceEngine } from "@nightshift/engine";
+import type { FlowListItem } from "@nightshift/flows";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "../context";
 import { appRouter } from "../router";
+import { stub, testContext } from "../testing/context";
 
 /**
  * The dashboard procedures: they read the runs of the session's Space (or
@@ -67,43 +69,42 @@ type SpaceData = {
 /** An engine whose Spaces hold `data`, and the Spaces it was asked for. */
 function engineOf(data: Record<string, SpaceData>) {
 	const asked: string[] = [];
-	const engine = {
+	const engine: Partial<Context["engine"]> = {
 		space: (spaceId: string) => {
 			asked.push(spaceId);
 			const space = data[spaceId] ?? { projects: [], runs: [], flows: [] };
-			return {
-				listProjects: async () => space.projects,
-				listRuns: async (input?: { projectId?: string }) =>
+			return stub<SpaceEngine>("space", {
+				listProjects: async () =>
+					space.projects.map((project) => stub<Project>("project", project)),
+				listRuns: async (input) =>
 					space.runs.filter(
 						(run) =>
 							input?.projectId === undefined ||
 							run.projectId === input.projectId,
 					),
-				listFlows: async () => space.flows.map((name) => ({ name })),
-			} as unknown as SpaceEngine;
+				listFlows: async () =>
+					space.flows.map((name) => stub<FlowListItem>("flow", { name })),
+			});
 		},
-	} as unknown as Context["engine"];
+	};
 	return { engine, asked };
 }
 
 async function contextFor(
 	headers: Headers,
-	engine: Context["engine"],
+	engine: Partial<Context["engine"]>,
 ): Promise<Context> {
-	const access = await requestAccess(
-		sandbox.auth,
-		sandbox.db,
-		headers,
-		null,
-		OPEN_HOST,
-	);
-	return {
-		...access,
-		requireTwoFactor: false,
-		fromThisComputer: false,
+	return testContext({
+		access: await requestAccess(
+			sandbox.auth,
+			sandbox.db,
+			headers,
+			null,
+			OPEN_HOST,
+		),
 		db: sandbox.db,
 		engine,
-	} as unknown as Context;
+	});
 }
 
 /** Ada with her personal Space and the Space Platform, which she works in. */

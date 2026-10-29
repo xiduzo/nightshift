@@ -24,7 +24,7 @@ export const account = {
 		})
 		.output(output(accountStatusSchema))
 		.handler(async ({ context }) => {
-			const session = context.session;
+			const session = context.access.session;
 			const required = context.requireTwoFactor && !context.fromThisComputer;
 			if (!session) {
 				return {
@@ -48,7 +48,7 @@ export const account = {
 				twoFactor: {
 					enabled: session.user.twoFactorEnabled === true,
 					required,
-					setUpNeeded: !context.hostAccess.allowed,
+					setUpNeeded: !context.access.hostAccess.allowed,
 					trustedBrowserDays: TRUSTED_BROWSER_DAYS,
 				},
 			};

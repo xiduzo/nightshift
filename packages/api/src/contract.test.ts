@@ -32,6 +32,7 @@ import { notificationItemSchema } from "./notifications/schemas";
 import { type OutputMismatch, onOutputMismatch, output } from "./output";
 import { appRouter } from "./router";
 import { runStreamItemSchema } from "./runs/schemas";
+import { accessAs, testContext } from "./testing";
 
 /**
  * The router as a contract: every procedure says what it does and what it
@@ -162,23 +163,9 @@ describe("replies of a real engine", () => {
 			inApp,
 		});
 		await notifications.start();
-		context = {
-			session: {
-				user: {
-					id: personId,
-					name: "Ada",
-					email: "ada@example.com",
-					twoFactorEnabled: false,
-				},
-			},
-			spaceId: sandbox.spaceId,
-			can: async () => true,
-			roleIn: async () => "owner",
-			setActiveSpace: async () => {},
-			headers: new Headers(),
+		context = testContext({
+			access: accessAs({ personId, spaceId: sandbox.spaceId, role: "owner" }),
 			fromThisComputer: true,
-			hostAccess: { allowed: true },
-			requireTwoFactor: false,
 			db: sandbox.db,
 			engine,
 			settings,
@@ -196,7 +183,7 @@ describe("replies of a real engine", () => {
 				device: { id: sandbox.deviceId, name: "test", ownerId: personId },
 				lease: { host: "test", pid: 1, epoch: 1, since: 0 },
 			},
-		} as unknown as Context;
+		});
 	});
 
 	afterAll(async () => {
@@ -431,7 +418,7 @@ describe("replies of a real engine", () => {
 				}
 			}
 		})();
-		const me = (context.session as { user: { id: string } }).user.id;
+		const me = context.access.session?.user.id ?? "";
 		while (!inApp.isActive(me)) await Bun.sleep(5);
 
 		const started = (await reply(appRouter.runs.start, {

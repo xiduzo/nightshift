@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { appRouter } from "@nightshift/api";
 import type { Context } from "@nightshift/api/context";
+import { accessAs, testContext } from "@nightshift/api/testing";
 import type { ProfileStore, SettingsStore } from "@nightshift/engine";
 import type {
 	AgentHarnessName,
@@ -148,14 +149,11 @@ const flow: FlowInput = {
 
 /** The owner of this computer, signed in. */
 function context(assistant: Context["assistant"]): Context {
-	return {
-		session: { user: { id: "owner" } },
-		spaceId: "space",
-		hostAccess: { allowed: true },
-		engine: { space: () => ({}) },
+	return testContext({
+		access: accessAs({ personId: "owner", spaceId: "space", role: "owner" }),
 		daemon: { device: { id: "d", name: "test", ownerId: "owner" } },
 		assistant,
-	} as unknown as Context;
+	});
 }
 
 async function suggest(

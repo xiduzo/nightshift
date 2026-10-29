@@ -40,6 +40,8 @@ import type { Context } from "./context";
 import { onOutputMismatch } from "./output";
 import { readable } from "./procedures";
 import { appRouter } from "./router";
+import { runAccess } from "./runs";
+import { type TestContextFields, testContext } from "./testing";
 
 /**
  * Sessions and roles on the procedures: a call needs a session, works in
@@ -111,42 +113,36 @@ const engine: Context["engine"] = {
 	dispose: async () => {},
 };
 
-/** A request from another computer, with these headers, on a Host with this policy. */
+/**
+ * A request from another computer, with these headers (none: signed out),
+ * on a Host with `policy`, on a computer `ownerId` owns, with the fake
+ * engine and the test's own `fields`.
+ */
 async function contextFor(
 	headers: Headers | null,
-	policy: HostPolicy = OPEN_HOST,
+	options: TestContextFields & { policy?: HostPolicy; ownerId?: string } = {},
 ): Promise<Context> {
-	const access = headers
-		? await requestAccess(sandbox.auth, sandbox.db, headers, null, policy)
-		: {
-				session: null,
-				spaceId: null,
-				can: async () => false,
-				roleIn: async () => null,
-				setActiveSpace: async () => {},
-				createSpace: async () => ({ id: "none" }),
-				members: {} as Context["members"],
-				hostAccess: { allowed: true } as const,
-			};
-	return {
-		session: access.session,
-		spaceId: access.spaceId,
-		hostAccess: access.hostAccess,
-		requireTwoFactor: policy.requireTwoFactor,
-		fromThisComputer: false,
-		can: access.can,
-		roleIn: access.roleIn,
-		setActiveSpace: access.setActiveSpace,
-		createSpace: access.createSpace,
-		members: access.members,
+	const { policy = OPEN_HOST, ownerId = "the-owner", ...fields } = options;
+	return testContext({
 		db: sandbox.db,
 		engine,
 		daemon: {
 			dataDir: "/tmp",
-			device: { id: "device", name: "test", ownerId: "the-owner" },
+			device: { id: "device", name: "test", ownerId },
 			lease: { host: "test", pid: 1, epoch: 1, since: 0 },
 		},
-	} as Context;
+		requireTwoFactor: policy.requireTwoFactor,
+		...(headers && {
+			access: await requestAccess(
+				sandbox.auth,
+				sandbox.db,
+				headers,
+				null,
+				policy,
+			),
+		}),
+		...fields,
+	});
 }
 
 async function errorOf(promise: Promise<unknown>): Promise<string> {
@@ -224,7 +220,7 @@ describe("procedures", () => {
 		const { bob, cy, spaceId } = await platform();
 
 		const viewer = await contextFor(cy.headers);
-		expect(viewer.spaceId).toBe(spaceId);
+		expect(viewer.access.spaceId).toBe(spaceId);
 		runSpaces.set("r", spaceId);
 		expect(
 			await errorOf(call(appRouter.runs.start, start, { context: viewer })),
@@ -324,7 +320,7 @@ describe("procedures", () => {
 		});
 
 		const context = await contextFor(dee.headers);
-		expect(context.spaceId).toBe(own);
+		expect(context.access.spaceId).toBe(own);
 		await call(appRouter.runs.list, undefined, { context });
 		await call(appRouter.gates.list, undefined, { context });
 		expect(calls.map((c) => c.space)).toEqual([own, own]);
@@ -344,14 +340,14 @@ describe("procedures", () => {
 		const personal = listed.spaces[0]?.id ?? "";
 		await call(appRouter.spaces.switch, { spaceId: personal }, { context });
 		context = await contextFor(ada.headers);
-		expect(context.spaceId).toBe(personal);
+		expect(context.access.spaceId).toBe(personal);
 
 		// Not a Space of Dee's.
 		const theirs = await contextFor(dee.headers);
 		await expect(
 			call(appRouter.spaces.switch, { spaceId }, { context: theirs }),
 		).rejects.toThrow();
-		expect((await contextFor(dee.headers)).spaceId).not.toBe(spaceId);
+		expect((await contextFor(dee.headers)).access.spaceId).not.toBe(spaceId);
 	});
 
 	test("this computer's configuration is its owner's", async () => {
@@ -378,29 +374,24 @@ describe("procedures", () => {
 				checkedAt: 2,
 			},
 		];
-		const base = await contextFor(ada.headers);
 		const asked: string[] = [];
 		const devices = {
 			others: async (ownerId: string) => {
 				asked.push(ownerId);
 				return others;
 			},
-		} as unknown as Context["devices"];
+		};
 		expect(
 			await errorOf(
 				call(appRouter.devices.others, undefined, {
-					context: { ...base, devices },
+					context: await contextFor(ada.headers, { devices }),
 				}),
 			),
 		).toBe("FORBIDDEN");
-		const owner = {
-			...base,
-			daemon: {
-				...base.daemon,
-				device: { ...base.daemon.device, ownerId: ada.userId },
-			},
+		const owner = await contextFor(ada.headers, {
 			devices,
-		} as Context;
+			ownerId: ada.userId,
+		});
 		expect(
 			await call(appRouter.devices.others, undefined, { context: owner }),
 		).toEqual(others);
@@ -416,7 +407,7 @@ describe("procedures", () => {
 			{ context },
 		);
 		context = await contextFor(ada.headers);
-		expect(context.spaceId).toBe(id);
+		expect(context.access.spaceId).toBe(id);
 		const listed = await call(appRouter.spaces.list, undefined, { context });
 		expect(listed.spaces.find((s) => s.id === id)).toEqual({
 			id,
@@ -615,7 +606,7 @@ describe("Members", () => {
 			),
 		).toEqual({ spaceId });
 		const joined = await contextFor(carol);
-		expect(joined.spaceId).toBe(spaceId);
+		expect(joined.access.spaceId).toBe(spaceId);
 		const after = await call(appRouter.members.list, undefined, {
 			context: joined,
 		});
@@ -689,9 +680,9 @@ describe("Members", () => {
 			{ context: owner },
 		);
 		const removed = await contextFor(bob.headers);
-		expect(removed.spaceId).not.toBe(spaceId);
+		expect(removed.access.spaceId).not.toBe(spaceId);
 		await call(appRouter.runs.list, undefined, { context: removed });
-		expect(calls.at(-1)?.space).toBe(removed.spaceId ?? "");
+		expect(calls.at(-1)?.space).toBe(removed.access.spaceId ?? "");
 	});
 });
 
@@ -701,15 +692,14 @@ describe("Members", () => {
  */
 describe("Device keys on the procedures", () => {
 	test("a Device key is not a Person: no Space, no runs, no settings", async () => {
-		const context: Context = {
-			...(await contextFor(null)),
+		const context = await contextFor(null, {
 			deviceKey: {
 				keyId: "k",
 				deviceId: "device-b",
 				personId: "ada",
 				permissions: { sync: ["pull", "push"] },
 			},
-		};
+		});
 		expect(
 			await errorOf(call(appRouter.runs.list, undefined, { context })),
 		).toBe("UNAUTHORIZED");
@@ -725,7 +715,7 @@ describe("a Host that requires two-factor sign-in", () => {
 
 	test("a session without it may only read how it signs in, until it turns two-factor on", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const refused = await contextFor(ada.headers, REQUIRED);
+		const refused = await contextFor(ada.headers, { policy: REQUIRED });
 		for (const procedure of [
 			call(appRouter.runs.list, undefined, { context: refused }),
 			call(appRouter.spaces.list, undefined, { context: refused }),
@@ -761,7 +751,7 @@ describe("a Host that requires two-factor sign-in", () => {
 		).toBe("OK");
 
 		const { headers } = await turnOnTwoFactor(sandbox.auth, ada.headers);
-		const allowed = await contextFor(headers, REQUIRED);
+		const allowed = await contextFor(headers, { policy: REQUIRED });
 		expect(
 			await call(appRouter.runs.list, undefined, { context: allowed }),
 		).toEqual([]);
@@ -773,18 +763,23 @@ describe("a Host that requires two-factor sign-in", () => {
 	});
 
 	test("a Device key is not affected", async () => {
-		const context: Context = {
-			...(await contextFor(null, REQUIRED)),
+		const context = await contextFor(null, {
+			policy: REQUIRED,
 			devices: {
-				hello: async () => ({ deviceId: "device-b" }),
-			} as unknown as Context["devices"],
+				hello: async () => ({
+					host: { id: "host", name: "Host", addresses: [] },
+					deviceId: "device-b",
+					personId: "ada",
+					spaces: [],
+				}),
+			},
 			deviceKey: {
 				keyId: "k",
 				deviceId: "device-b",
 				personId: "ada",
 				permissions: { sync: ["pull"] },
 			},
-		};
+		});
 		expect(
 			await call(appRouter.link.hello, undefined, { context }),
 		).toMatchObject({ deviceId: "device-b" });
@@ -793,7 +788,7 @@ describe("a Host that requires two-factor sign-in", () => {
 	test("without a session, status says so", async () => {
 		expect(
 			await call(appRouter.account.status, undefined, {
-				context: await contextFor(null, REQUIRED),
+				context: await contextFor(null, { policy: REQUIRED }),
 			}),
 		).toMatchObject({ signedIn: false, twoFactor: { required: true } });
 	});
@@ -805,13 +800,8 @@ describe("a streaming procedure", () => {
 		thrown: Error,
 	): Promise<ORPCError<string, unknown>> {
 		const ada = await sandbox.signUp("Ada");
-		const base = await contextFor(ada.headers);
-		const context = {
-			...base,
-			daemon: {
-				...base.daemon,
-				device: { ...base.daemon.device, ownerId: ada.userId },
-			},
+		const context = await contextFor(ada.headers, {
+			ownerId: ada.userId,
 			devices: {
 				async *join() {
 					yield {
@@ -826,7 +816,7 @@ describe("a streaming procedure", () => {
 					throw thrown;
 				},
 			},
-		} as unknown as Context;
+		});
 		const progress = await call(
 			appRouter.devices.join,
 			{ url: "https://studio.example.com", role: "guest" },
@@ -872,30 +862,27 @@ describe("the owner's own sign-in", () => {
 	test("is set on this computer only", async () => {
 		const ada = await sandbox.signUp("Ada");
 		const set: string[] = [];
-		const base = await contextFor(ada.headers);
 		const context = (fromThisComputer: boolean) =>
-			({
-				...base,
+			contextFor(ada.headers, {
 				fromThisComputer,
-				daemon: {
-					...base.daemon,
-					device: { ...base.daemon.device, ownerId: ada.userId },
-				},
-				setLogin: async (personId: string, input: { email: string }) => {
+				ownerId: ada.userId,
+				setLogin: async (personId, input) => {
 					set.push(personId);
 					return { email: input.email };
 				},
-			}) as unknown as Context;
+			});
 		const input = { email: "ada@example.com", password: "a-long-password" };
 		expect(
 			await errorOf(
-				call(appRouter.account.setLogin, input, { context: context(false) }),
+				call(appRouter.account.setLogin, input, {
+					context: await context(false),
+				}),
 			),
 		).toBe("FORBIDDEN");
 		expect(set).toEqual([]);
 		expect(
 			await call(appRouter.account.setLogin, input, {
-				context: context(true),
+				context: await context(true),
 			}),
 		).toEqual({ email: "ada@example.com" });
 		expect(set).toEqual([ada.userId]);
@@ -931,7 +918,7 @@ describe("a run opened by its id", () => {
 	test("reads, follows and stops a run of another of the Person's Spaces, without a switch", async () => {
 		const { bob, spaceId } = await aRunOfPlatform();
 		const context = await contextFor(bob.headers);
-		const own = context.spaceId ?? "";
+		const own = context.access.spaceId ?? "";
 		expect(own).not.toBe(spaceId);
 
 		await readFollowStop(context, "platform-run");
@@ -948,7 +935,7 @@ describe("a run opened by its id", () => {
 			{ space: spaceId, method: "listMoveTargets" },
 		]);
 		// The session still works in its own Space, and lists stay there.
-		expect((await contextFor(bob.headers)).spaceId).toBe(own);
+		expect((await contextFor(bob.headers)).access.spaceId).toBe(own);
 		await call(appRouter.runs.list, undefined, { context });
 		expect(calls.at(-1)).toEqual({ space: own, method: "listRuns" });
 	});
@@ -1009,18 +996,58 @@ describe("a run opened by its id", () => {
 		expect(calls).toEqual([{ space: spaceId, method: "getRun" }]);
 	});
 
+	test("outside a procedure (a run's file), refuses with the same code, status and words", async () => {
+		const { bob, cy, dee, spaceId } = await aRunOfPlatform();
+		/** The run's export for a request with these headers, on a Host with `policy`. */
+		const exportFor = async (headers: Headers | null, policy = OPEN_HOST) =>
+			runAccess(
+				{ access: (await contextFor(headers, { policy })).access, engine },
+				"platform-run",
+				{ run: ["export"] },
+			);
+		// The words of a procedure's refusal in the same case.
+		const procedureSays = async (headers: Headers) =>
+			(
+				await refusalOf(
+					call(
+						appRouter.runs.stop,
+						{ runId: "platform-run" },
+						{ context: await contextFor(headers) },
+					),
+				)
+			).message;
+
+		expect(await exportFor(null)).toEqual({
+			allowed: false,
+			code: "UNAUTHORIZED",
+			status: 401,
+			message: "Sign in to use Night Shift.",
+		});
+		expect(
+			await exportFor(bob.headers, { requireTwoFactor: true }),
+		).toMatchObject({ allowed: false, code: TWO_FACTOR_REQUIRED, status: 403 });
+		expect(await exportFor(dee.headers)).toEqual({
+			allowed: false,
+			code: "NOT_FOUND",
+			status: 404,
+			message: await procedureSays(dee.headers),
+		});
+		expect(await exportFor(cy.headers)).toEqual({
+			allowed: false,
+			code: "FORBIDDEN",
+			status: 403,
+			message: await procedureSays(cy.headers),
+		});
+		expect(await exportFor(bob.headers)).toMatchObject({
+			allowed: true,
+			spaceId,
+		});
+	});
+
 	test("removes what a run of another Space left on this computer, for its owner only", async () => {
 		const { bob, cy, spaceId } = await aRunOfPlatform();
-		const asOwner = async (person: { headers: Headers; userId: string }) => {
-			const base = await contextFor(person.headers);
-			return {
-				...base,
-				daemon: {
-					...base.daemon,
-					device: { ...base.daemon.device, ownerId: person.userId },
-				},
-			} as Context;
-		};
+		const asOwner = (person: { headers: Headers; userId: string }) =>
+			contextFor(person.headers, { ownerId: person.userId });
 		const copy = { runId: "platform-run" };
 		await call(appRouter.projects.removeRunCopy, copy, {
 			context: await asOwner(bob),
@@ -1071,7 +1098,7 @@ describe("the Needs-you inbox", () => {
 
 		// Ada works in Platform; her inbox has her personal Space's Gate too.
 		const context = await contextFor(ada.headers);
-		expect(context.spaceId).toBe(spaceId);
+		expect(context.access.spaceId).toBe(spaceId);
 		const listed = await call(appRouter.gates.list, undefined, { context });
 		expect(
 			listed.map((g) => [g.runId, g.spaceId, g.spaceName, g.canAnswer]),
@@ -1095,7 +1122,7 @@ describe("the Needs-you inbox", () => {
 		const personal = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
 		runSpaces.set("ada-run", personal);
 		const context = await contextFor(ada.headers);
-		expect(context.spaceId).toBe(spaceId);
+		expect(context.access.spaceId).toBe(spaceId);
 
 		const answer = { runId: "ada-run", stepId: "step-1", choice: "yes" };
 		await call(appRouter.gates.resolve, answer, { context });
@@ -1103,7 +1130,7 @@ describe("the Needs-you inbox", () => {
 		// Bound to its run and step.
 		expect(inputs.at(-1)).toEqual(answer);
 		// The session still works in Platform.
-		expect((await contextFor(ada.headers)).spaceId).toBe(spaceId);
+		expect((await contextFor(ada.headers)).access.spaceId).toBe(spaceId);
 	});
 
 	test("refuses an answer outside the Person's Spaces, or that their role does not allow", async () => {

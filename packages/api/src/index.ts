@@ -3,4 +3,4 @@ export {
 	type AppRouterClient,
 	appRouter,
 } from "./router";
-export { runSpaceFor } from "./runs";
+export { runAccess } from "./runs";

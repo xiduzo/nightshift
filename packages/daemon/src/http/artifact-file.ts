@@ -1,5 +1,10 @@
 import type { SpaceEngine } from "@nightshift/engine";
 
+/** The answer for an artifact that is not there, or of a run the Person may not see. */
+export function artifactNotFound(): Response {
+	return Response.json({ message: "Artifact not found." }, { status: 404 });
+}
+
 /**
  * `GET /api/runs/:id/artifacts/:artifactId`: one file a run's agent kept,
  * for a Member of the run's Space (a run of another Space is not found).
@@ -24,7 +29,7 @@ export async function artifactFileResponse(
 	}
 	const file = found ? Bun.file(found.path) : null;
 	if (!found || !file || !(await file.exists())) {
-		return Response.json({ message: "Artifact not found." }, { status: 404 });
+		return artifactNotFound();
 	}
 	const { artifact } = found;
 	const download = new URL(request.url).searchParams.has("download");

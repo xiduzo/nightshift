@@ -70,7 +70,7 @@ export const profiles = {
 		.output(output(profileCatalogSchema))
 		.input(z.object({ spaceId: z.string().min(1), projectId: z.string() }))
 		.handler(async ({ context, input }) => {
-			if ((await context.roleIn(input.spaceId)) === null) {
+			if ((await context.access.roleIn(input.spaceId)) === null) {
 				throw new ORPCError("NOT_FOUND", {
 					message: "That Space does not exist.",
 				});

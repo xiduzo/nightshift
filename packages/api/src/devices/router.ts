@@ -76,7 +76,7 @@ export const devices = {
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
 			context.devices.review(
-				context.headers,
+				context.access.headers,
 				input.userCode,
 				context.session.user.id,
 			),
@@ -88,14 +88,14 @@ export const devices = {
 		.output(output(z.void()))
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
-			context.devices.approve(context.headers, input.userCode),
+			context.devices.approve(context.access.headers, input.userCode),
 		),
 	deny: protectedProcedure
 		.route({ summary: "Denies a pairing code." })
 		.output(output(z.void()))
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
-			context.devices.deny(context.headers, input.userCode),
+			context.devices.deny(context.access.headers, input.userCode),
 		),
 	/** Removes a Device's access to this computer. */
 	revoke: protectedProcedure

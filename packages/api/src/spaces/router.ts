@@ -33,7 +33,7 @@ export const spaces = {
 		.output(output(z.void()))
 		.input(z.object({ spaceId: z.string().min(1) }))
 		.handler(async ({ context, input }) => {
-			await context.setActiveSpace(input.spaceId);
+			await context.access.setActiveSpace(input.spaceId);
 		}),
 	/** A new Space with the Person as its owner. Later calls work in it. */
 	create: protectedProcedure
@@ -42,7 +42,7 @@ export const spaces = {
 		})
 		.output(output(z.object({ id: z.string() })))
 		.input(z.object({ name: z.string().trim().min(1).max(60) }))
-		.handler(({ context, input }) => context.createSpace(input.name)),
+		.handler(({ context, input }) => context.access.createSpace(input.name)),
 };
 
 const role = roleSchema;
@@ -64,9 +64,9 @@ export const members = {
 			const [listed, spaces, invite, remove, changeRole] = await Promise.all([
 				membersOf(context.db, context.spaceId),
 				spacesOf(context.db, context.session.user.id),
-				context.can({ member: ["invite"] }),
-				context.can({ member: ["remove"] }),
-				context.can({ member: ["role"] }),
+				context.access.can({ member: ["invite"] }),
+				context.access.can({ member: ["remove"] }),
+				context.access.can({ member: ["role"] }),
 			]);
 			const space = spaces.find((s) => s.id === context.spaceId);
 			return {
@@ -92,27 +92,29 @@ export const members = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.members.invite(input.email.toLowerCase(), input.role),
+			context.access.members.invite(input.email.toLowerCase(), input.role),
 		),
 	cancelInvitation: permitted({ member: ["invite"] })
 		.route({ summary: "Cancels a pending invitation." })
 		.output(output(z.void()))
 		.input(z.object({ invitationId: z.string().min(1) }))
 		.handler(({ context, input }) =>
-			context.members.cancelInvitation(input.invitationId),
+			context.access.members.cancelInvitation(input.invitationId),
 		),
 	setRole: permitted({ member: ["role"] })
 		.route({ summary: "Gives a Member another role in the Space." })
 		.output(output(z.void()))
 		.input(z.object({ memberId: z.string().min(1), role }))
 		.handler(({ context, input }) =>
-			context.members.setRole(input.memberId, input.role),
+			context.access.members.setRole(input.memberId, input.role),
 		),
 	remove: permitted({ member: ["remove"] })
 		.route({ summary: "Removes a Member from the Space." })
 		.output(output(z.void()))
 		.input(z.object({ memberId: z.string().min(1) }))
-		.handler(({ context, input }) => context.members.remove(input.memberId)),
+		.handler(({ context, input }) =>
+			context.access.members.remove(input.memberId),
+		),
 };
 
 /**
@@ -146,6 +148,6 @@ export const invitations = {
 		.output(output(z.object({ spaceId: z.string() })))
 		.input(z.object({ invitationId: z.string().min(1).max(128) }))
 		.handler(({ context, input }) =>
-			context.members.accept(input.invitationId),
+			context.access.members.accept(input.invitationId),
 		),
 };

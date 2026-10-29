@@ -16,6 +16,7 @@ import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "../context";
 import { appRouter } from "../router";
+import { testContext } from "../testing";
 
 /**
  * The notification procedures are each Person's own: a call needs a
@@ -46,26 +47,21 @@ afterEach(() => {
 	sandbox.cleanup();
 });
 
+/** A request from another computer, with these headers (none: signed out). */
 async function contextFor(headers: Headers | null): Promise<Context> {
-	const access = headers
-		? await requestAccess(sandbox.auth, sandbox.db, headers, null, OPEN_HOST)
-		: {
-				session: null,
-				spaceId: null,
-				can: async () => false,
-				hostAccess: { allowed: true } as const,
-			};
-	return {
-		session: access.session,
-		spaceId: access.spaceId,
-		can: access.can,
-		hostAccess: access.hostAccess,
-		requireTwoFactor: false,
-		fromThisComputer: false,
+	return testContext({
+		...(headers && {
+			access: await requestAccess(
+				sandbox.auth,
+				sandbox.db,
+				headers,
+				null,
+				OPEN_HOST,
+			),
+		}),
 		db: sandbox.db,
-		engine: { space: () => ({}) },
 		notifications,
-	} as unknown as Context;
+	});
 }
 
 async function errorOf(promise: Promise<unknown>): Promise<string> {
@@ -141,7 +137,7 @@ describe("notifications", () => {
 		expect(
 			await sandbox.auth.api.getSession({ headers: adaPerson.headers }),
 		).not.toBeNull();
-		expect((await contextFor(phoneHeaders)).session).toBeNull();
+		expect((await contextFor(phoneHeaders)).access.session).toBeNull();
 	});
 
 	test("settings are each Person's own", async () => {

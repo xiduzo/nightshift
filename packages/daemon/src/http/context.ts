@@ -1,4 +1,7 @@
-import type { Context as ApiContext } from "@nightshift/api/context";
+import type {
+	Context as ApiContext,
+	Services as ApiServices,
+} from "@nightshift/api/context";
 import {
 	type Auth,
 	authEndpointAccess,
@@ -7,35 +10,18 @@ import {
 	requestAccess,
 	setLogin,
 } from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
 import type { Context as HonoContext } from "hono";
 
 import { fromThisComputer } from "./this-computer";
 
 /**
- * What the procedures get besides the request: the daemon's services. The
- * daemon's composition root (`createDaemon`) fills it.
+ * What the procedures get besides the request (the API's `Services`), and
+ * what reads a request's access. The daemon's composition root
+ * (`createDaemon`) fills it. The services pass to every request as they
+ * are: a new one needs no change here.
  */
-export type HttpServices = Pick<
-	ApiContext,
-	| "devices"
-	| "exchange"
-	| "offers"
-	| "db"
-	| "engine"
-	| "settings"
-	| "notifications"
-	| "connections"
-	| "cliTools"
-	| "toolLaunchers"
-	| "profiles"
-	| "assistant"
-	| "checks"
-	| "projectSetup"
-	| "daemon"
-> & {
+export type HttpServices = ApiServices & {
 	auth: Auth;
-	db: Database;
 	localSession: LocalSession;
 	hostPolicy: HostPolicy;
 	/** Pages that may call this daemon (`origins.ts`). */
@@ -69,7 +55,15 @@ export type RequestContexts = {
 };
 
 export function requestContexts(services: HttpServices): RequestContexts {
-	const { auth, db, localSession, hostPolicy, trustedOrigins } = services;
+	const {
+		auth,
+		localSession,
+		hostPolicy,
+		trustedOrigins,
+		deviceKeyOf,
+		...apiServices
+	} = services;
+	const { db } = apiServices;
 
 	/** From this computer, and no Device: a Device is never this computer's Person. */
 	const isLocal = (context: HonoContext): boolean =>
@@ -97,50 +91,17 @@ export function requestContexts(services: HttpServices): RequestContexts {
 		async createContext(context, options = {}) {
 			const deviceKey = options.signedOut
 				? null
-				: await services.deviceKeyOf(context.req.raw.headers);
-			const {
-				session,
-				spaceId,
-				can,
-				roleIn,
-				setActiveSpace,
-				createSpace,
-				members,
-				headers,
-				hostAccess,
-			} =
-				deviceKey || options.signedOut
-					? await requestAccess(auth, db, new Headers(), null)
-					: await access(context);
+				: await deviceKeyOf(context.req.raw.headers);
+			const signedOut = deviceKey !== null || options.signedOut === true;
 			return {
-				session,
-				spaceId,
-				can,
-				roleIn,
-				setActiveSpace,
-				headers,
-				hostAccess,
-				requireTwoFactor: hostPolicy.requireTwoFactor,
-				fromThisComputer: !deviceKey && !options.signedOut && isLocal(context),
-				setLogin: (personId, input) => setLogin(auth, personId, input),
+				...apiServices,
+				access: signedOut
+					? await requestAccess(auth, db, new Headers(), null)
+					: await access(context),
 				deviceKey,
-				devices: services.devices,
-				exchange: services.exchange,
-				offers: services.offers,
-				createSpace,
-				members,
-				db,
-				engine: services.engine,
-				settings: services.settings,
-				notifications: services.notifications,
-				connections: services.connections,
-				cliTools: services.cliTools,
-				toolLaunchers: services.toolLaunchers,
-				profiles: services.profiles,
-				assistant: services.assistant,
-				checks: services.checks,
-				projectSetup: services.projectSetup,
-				daemon: services.daemon,
+				fromThisComputer: !signedOut && isLocal(context),
+				requireTwoFactor: hostPolicy.requireTwoFactor,
+				setLogin: (personId, input) => setLogin(auth, personId, input),
 			};
 		},
 	};

@@ -1,4 +1,9 @@
-import type { HostAccess, Permissions } from "@nightshift/auth";
+import {
+	type AccessRefusal,
+	type Permissions,
+	ROLE_REFUSAL,
+	spaceAccess,
+} from "@nightshift/auth";
 import { HostUnreachableError } from "@nightshift/engine";
 import {
 	FAILURE_MESSAGE,
@@ -77,13 +82,17 @@ export function readable(
 export const publicProcedure = o.use(readableErrors);
 
 /**
- * The refusal of a session the Host does not let in (two-factor required,
- * not on), with the code the web UI looks for.
+ * An access refusal (`AccessRefusal`) as the error of a procedure: its
+ * code (the one the web UI looks for, such as `TWO_FACTOR_REQUIRED`), its
+ * status and its words.
  */
-export function hostRefusal(
-	access: Extract<HostAccess, { allowed: false }>,
+export function refusalError(
+	refusal: AccessRefusal,
 ): ORPCError<string, unknown> {
-	return new ORPCError(access.code, { status: 403, message: access.message });
+	return new ORPCError(refusal.code, {
+		status: refusal.status,
+		message: refusal.message,
+	});
 }
 
 /**
@@ -92,18 +101,14 @@ export function hostRefusal(
  * another Space.
  */
 const requireSpace = o.middleware(async ({ context, next }) => {
-	if (!context.session?.user || !context.spaceId) {
-		throw new ORPCError("UNAUTHORIZED", {
-			message: "Sign in to use Night Shift.",
-		});
-	}
-	if (!context.hostAccess.allowed) throw hostRefusal(context.hostAccess);
+	const access = spaceAccess(context.access);
+	if (!access.allowed) throw refusalError(access);
 	return next({
 		context: {
-			session: context.session,
-			spaceId: context.spaceId,
-			space: context.engine.space(context.spaceId, {
-				personId: context.session.user.id,
+			session: access.session,
+			spaceId: access.spaceId,
+			space: context.engine.space(access.spaceId, {
+				personId: access.session.user.id,
 			}),
 		},
 	});
@@ -117,10 +122,8 @@ export const protectedProcedure = publicProcedure.use(requireSpace);
  */
 export function permitted(permissions: Permissions) {
 	return protectedProcedure.use(async ({ context, next }) => {
-		if (!(await context.can(permissions))) {
-			throw new ORPCError("FORBIDDEN", {
-				message: "Your role in this Space does not allow this.",
-			});
+		if (!(await context.access.can(permissions))) {
+			throw refusalError(ROLE_REFUSAL);
 		}
 		return next();
 	});
@@ -128,7 +131,7 @@ export function permitted(permissions: Permissions) {
 
 /** Lets only the Person who owns this computer through. */
 export const ownerOnly = o.middleware(async ({ context, next }) => {
-	if (context.session?.user.id !== context.daemon.device.ownerId) {
+	if (context.access.session?.user.id !== context.daemon.device.ownerId) {
 		throw new ORPCError("FORBIDDEN", {
 			message: "Only the owner of this computer can see or change this.",
 		});
