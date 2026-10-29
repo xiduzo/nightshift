@@ -20,11 +20,7 @@ export {
 	runWorktree,
 	type SleepFact,
 } from "./derive-run";
-export type {
-	DerivedItem,
-	DerivedSession,
-	DerivedStep,
-} from "./derive-steps";
+export type { DerivedItem, DerivedSession, DerivedStep } from "./derive-steps";
 export {
 	countVisits,
 	deriveNodeOutputs,
@@ -36,11 +32,7 @@ export {
 	withEnclosing,
 } from "./derive-steps";
 export { type InboxGate, inboxOf, lockScreenRefusal } from "./inbox";
-export {
-	type LandedChange,
-	type LandedFact,
-	landedFacts,
-} from "./landed-facts";
+export { type LandedFact, landedFacts } from "./landed-facts";
 export { gitAuthorOf, namesOf } from "./people";
 export type { ReadModel, RunHere } from "./read-model";
 export {
@@ -51,7 +43,7 @@ export {
 	toSummary,
 } from "./read-model";
 export type { RunBundleSummary } from "./run-bundle";
-export { exportRun, openRunBundle } from "./run-bundle";
+export { exportRun } from "./run-bundle";
 export type { FeedStep } from "./run-transcript";
 export type {
 	OpenGate,

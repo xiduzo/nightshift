@@ -7,10 +7,9 @@
 
 export {
 	type Artifact,
-	type ArtifactStore,
 	createArtifactStore,
 } from "./artifacts";
-export type { RunCopies, RunCopy } from "./cleanup";
+export type { RunCopies } from "./cleanup";
 export type {
 	Actor,
 	DeviceDirectory,
@@ -61,11 +60,7 @@ export {
 	cliToolGitSchema,
 	cliToolInputSchema,
 	connectionInputSchema,
-	createCliToolStore,
-	createConnectionStore,
 	createDeviceCopies,
-	createProfileStore,
-	createSettingsStore,
 	customAgentOf,
 	type DeviceCopies,
 	type DeviceCopy,
@@ -89,7 +84,6 @@ export {
 	type SecretView,
 	type SettingField,
 	type SettingKey,
-	type Settings,
 	type SettingsStore,
 	saveConnection,
 	saveCustomAgent,
@@ -107,9 +101,6 @@ export type {
 	FlowRef,
 	FlowRevisionItem,
 	FlowRevisionView,
-	FlowUse,
-	RevisionKind,
-	RevisionName,
 	SavedFlow,
 	SpaceFlows,
 } from "./flows";
@@ -117,25 +108,16 @@ export {
 	cliToolsInUse,
 	connectionsInUse,
 	createFlowDocuments,
-	createProjectFlows,
 	documentSpace,
 	flowsForRun,
 	profilesInUse,
 	revisionKinds,
 } from "./flows";
-export type { WalkFile, WalkFiles, WalkRef } from "./graph";
+export type { WalkFile, WalkRef } from "./graph";
 export type {
 	CopyStamp,
-	HistoryCursors,
-	HistoryRows,
-	LandedScope,
 	LoggedEvent,
-	OwnStepFiles,
 	PlacedRun,
-	RunBus,
-	RunHistory,
-	RunLog,
-	RunStatus,
 	TranscriptEntry,
 } from "./log";
 export {
@@ -143,7 +125,6 @@ export {
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
-	placedRun,
 	RUN_NOT_FOUND,
 	stampHolds,
 	withoutPrivatePaths,
@@ -162,20 +143,17 @@ export {
 	type GitHubClones,
 	type GitHubRepo,
 	type GitInstall,
-	type MovingProject,
 	memberName,
 	memberRole,
 	PROJECT_NOT_FOUND,
 	type ProjectCopies,
 	type ProjectCopy,
 	type ProjectReadiness,
-	type ProjectTarget,
 	projectClones,
 	projectRowsOf,
 	recordClone,
 	type SpaceDocuments,
 	setUpGit,
-	spaceDocumentName,
 	spaceProjectRows,
 	systemGitInstaller,
 	worktreeLocation,
@@ -183,7 +161,6 @@ export {
 export type {
 	FeedStep,
 	InboxGate,
-	LandedChange,
 	LandedFact,
 	OpenGate,
 	ProjectRuns,
@@ -198,14 +175,11 @@ export {
 	exportRun,
 	inboxOf,
 	lockScreenRefusal,
-	openRunBundle,
 	type RunBundleSummary,
 } from "./read";
 export type {
 	Engine,
 	EngineOptions,
-	MovedProjects,
-	MovedRuns,
 	MoveRows,
 	OfferedPlacement,
 	PeerContext,
@@ -214,8 +188,6 @@ export type {
 	PlacedDevice,
 	PlanInput,
 	PlannedRun,
-	ProjectsMove,
-	ProjectsMovePlan,
 	SpaceEngine,
 } from "./run";
 export {

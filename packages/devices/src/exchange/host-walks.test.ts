@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { event, keptVariable, user } from "@nightshift/db/schema";
-import type { RunStatus } from "@nightshift/engine";
+import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createSandbox,
 	type Sandbox,

@@ -32,10 +32,7 @@ export { followOwnStep, waker } from "./follow";
 export {
 	createRunHistory,
 	ForeignRowsError,
-	type HistoryCursors,
-	type HistoryRows,
 	MissingProjectError,
-	type OwnStepFiles,
 	type RunHistory,
 } from "./history";
 export {

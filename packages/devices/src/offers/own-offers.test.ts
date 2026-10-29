@@ -6,12 +6,12 @@ import {
 	organization,
 	user,
 } from "@nightshift/db/schema";
+import { HostUnreachableError, type SpaceDocument } from "@nightshift/engine";
 import {
 	createProfileStore,
-	HostUnreachableError,
-	type SpaceDocument,
-} from "@nightshift/engine";
-import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+	createSandbox,
+	type Sandbox,
+} from "@nightshift/engine/testing";
 import type { AgentProfile } from "@nightshift/flows";
 import { selfOwnerId } from "../registry";
 import { createEngineOffers } from "./engine-offers";

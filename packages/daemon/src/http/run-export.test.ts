@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { event, project, run, step } from "@nightshift/db/schema";
-import { openRunBundle } from "@nightshift/engine";
 import {
 	createSandbox,
+	openRunBundle,
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";

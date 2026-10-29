@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
-import type { LandedChange, LandedFact } from "@nightshift/engine";
+import type { LandedFact } from "@nightshift/engine";
+import type { LandedChange } from "@nightshift/engine/testing";
 
 import {
 	createInAppChannel,

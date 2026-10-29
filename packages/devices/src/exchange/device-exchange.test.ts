@@ -10,7 +10,8 @@ import {
 	run as runTable,
 	user,
 } from "@nightshift/db/schema";
-import type { RunStatus, RunStreamItem } from "@nightshift/engine";
+import type { RunStreamItem } from "@nightshift/engine";
+import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createRunLog,
 	createSandbox,

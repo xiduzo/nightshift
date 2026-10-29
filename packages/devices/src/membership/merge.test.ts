@@ -15,12 +15,13 @@ import {
 	user,
 	ydoc,
 } from "@nightshift/db/schema";
-import { createFlowDocuments, spaceDocumentName } from "@nightshift/engine";
+import { createFlowDocuments } from "@nightshift/engine";
 import {
 	createSandbox,
 	mustGit,
 	type Sandbox,
 	seedFlows,
+	spaceDocumentName,
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";

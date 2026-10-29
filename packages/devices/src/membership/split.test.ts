@@ -14,8 +14,8 @@ import {
 	spaceSplit,
 	user,
 } from "@nightshift/db/schema";
-import { createProjectFlows } from "@nightshift/engine";
 import {
+	createProjectFlows,
 	createSandbox,
 	type Sandbox,
 	seedFlows,

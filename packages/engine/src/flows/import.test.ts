@@ -10,7 +10,8 @@ import {
 	type Schedule,
 } from "@nightshift/flows";
 import * as Y from "yjs";
-import { createProfileStore, type ProfileStore } from "../device-config";
+import type { ProfileStore } from "../device-config";
+import { createProfileStore } from "../device-config/profiles";
 import { systemGit } from "../projects";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import {

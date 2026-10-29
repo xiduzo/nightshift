@@ -1,16 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { membersOf } from "@nightshift/auth";
+import { createEngine, type Engine } from "@nightshift/engine";
 import {
 	createCliToolStore,
 	createConnectionStore,
-	createEngine,
 	createProfileStore,
-	createSettingsStore,
-	type Engine,
-} from "@nightshift/engine";
-import {
 	createSandbox,
+	createSettingsStore,
 	type Sandbox,
 	waitFor,
 	withDevice,

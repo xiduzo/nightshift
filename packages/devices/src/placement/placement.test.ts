@@ -13,7 +13,6 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import {
-	createProfileStore,
 	createSpaceDocuments,
 	deviceDocumentName,
 	documentRows,
@@ -22,14 +21,15 @@ import {
 	type OwnDevice,
 	openDeviceDocument,
 	type PeerProfiles,
-	placedRun,
-	type RunStatus,
 	recordClone,
 	type SpaceDocuments,
 } from "@nightshift/engine";
+import type { RunStatus } from "@nightshift/engine/run-status";
 import {
+	createProfileStore,
 	createSandbox,
 	mustGit,
+	placedRun,
 	type Sandbox,
 	seedFlows,
 	sleepClock,

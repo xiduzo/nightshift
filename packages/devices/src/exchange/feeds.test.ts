@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { RunBus, TranscriptEntry } from "@nightshift/engine";
-import { createRunBus } from "@nightshift/engine/testing";
+import type { TranscriptEntry } from "@nightshift/engine";
+import { createRunBus, type RunBus } from "@nightshift/engine/testing";
 import {
 	createTranscriptFeeds,
 	type FollowPumps,

@@ -35,20 +35,14 @@ export {
 	memberRole,
 	projectClones,
 	recordClone,
-	spaceDocumentName,
 	spaceIdOf,
 } from "./space-document";
 export {
 	forgetSpaceRows,
-	type MovingProject,
 	projectRowsOf,
 	spaceMoveBatch,
 	spaceProjectRows,
 	spaceRunIds,
 } from "./space-rows";
 export type { Branches } from "./worktrees";
-export {
-	createWorktrees,
-	itemBranchName,
-	worktreeLocation,
-} from "./worktrees";
+export { createWorktrees, itemBranchName, worktreeLocation } from "./worktrees";

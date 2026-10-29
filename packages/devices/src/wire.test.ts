@@ -4,17 +4,17 @@ import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, hostLink, runCommand, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
-	createProfileStore,
-	createSettingsStore,
 	type Device,
 	type DeviceDocument,
 	type FlowDocuments,
-	type RunStatus,
 	type SessionInput,
 	worktreeLocation,
 } from "@nightshift/engine";
+import type { RunStatus } from "@nightshift/engine/run-status";
 import {
+	createProfileStore,
 	createSandbox,
+	createSettingsStore,
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
