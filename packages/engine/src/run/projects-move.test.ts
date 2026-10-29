@@ -2,7 +2,18 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
-import { organization, project, run, runCommand } from "@nightshift/db/schema";
+import {
+	agentSession,
+	clone,
+	event,
+	keptVariable,
+	organization,
+	project,
+	run,
+	runCommand,
+	step,
+	ydoc,
+} from "@nightshift/db/schema";
 import type { DecisionNode, Flow, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray } from "drizzle-orm";
@@ -11,6 +22,7 @@ import {
 	createSpaceDocuments,
 	recordClone,
 	type SpaceDocuments,
+	spaceDocumentName,
 	spaceProjects,
 } from "../projects/space-document";
 import { aloneDirectory } from "../testing/alone-directory";
@@ -34,7 +46,8 @@ import { START_HOLD_WORDS } from "./start-holds";
  * merge of Personal into the home Host's (several target Spaces, the
  * Persons' ids there, schedules pinned, the caller's own rows), and the
  * split of a Personal of its own (this computer's runs only, schedules
- * paused, counted for the caller's row).
+ * paused, counted for the caller's row). Then forgetting the Space a move
+ * emptied (`Engine.forgetSpace`), which deletes what it left.
  */
 
 let sandbox: Sandbox;
@@ -117,8 +130,12 @@ const flow: Flow = {
 };
 
 /** A run of the project that a person stopped at its Gate. */
-async function stoppedRun(engine: Engine, projectId: string): Promise<string> {
-	const space = engine.space(sandbox.spaceId);
+async function stoppedRun(
+	engine: Engine,
+	projectId: string,
+	spaceId: string = sandbox.spaceId,
+): Promise<string> {
+	const space = engine.space(spaceId);
 	const { id } = await space.startRun({ projectId, flow });
 	await waitFor(async () => (await space.getRun(id)).status === "waiting", {
 		label: "the Gate",
@@ -339,5 +356,159 @@ describe("a Space move", () => {
 		const taken = await documents.open(copy);
 		expect([...spaceProjects(taken).keys()]).toEqual([app.id]);
 		expect([...taken.clones.keys()]).toEqual([`${app.id}/${sandbox.deviceId}`]);
+	});
+});
+
+describe("forgetting a Space a move emptied", () => {
+	/** What of the Space is on this Replica: the rows of each engine table that name it, and its document. */
+	async function whatIsLeft(spaceId: string) {
+		const count = async (
+			table:
+				| typeof project
+				| typeof clone
+				| typeof run
+				| typeof step
+				| typeof agentSession
+				| typeof event
+				| typeof keptVariable,
+		) =>
+			(await sandbox.db.select().from(table).where(eq(table.spaceId, spaceId)))
+				.length;
+		const [document] = await sandbox.db
+			.select({ name: ydoc.name })
+			.from(ydoc)
+			.where(eq(ydoc.name, spaceDocumentName(spaceId)));
+		return {
+			projects: await count(project),
+			clones: await count(clone),
+			runs: await count(run),
+			steps: await count(step),
+			sessions: await count(agentSession),
+			events: await count(event),
+			keptValues: await count(keptVariable),
+			document: document !== undefined,
+		};
+	}
+
+	/**
+	 * Two Spaces, each with a Project, a stopped run, a Member that joined
+	 * (a fact of no run) and its document.
+	 */
+	async function twoSpaces(engine: Engine) {
+		const team = await otherSpace(sandbox.db, "Team");
+		const kept = await otherSpace(sandbox.db, "Kept");
+		const app = await engine
+			.space(team)
+			.addProject({ repoPath: sandbox.repoPath });
+		const tools = await engine
+			.space(kept)
+			.addProject({ repoPath: await otherRepo() });
+		const teamRun = await stoppedRun(engine, app.id, team);
+		const keptRun = await stoppedRun(engine, tools.id, kept);
+		for (const spaceId of [team, kept]) {
+			await engine.logMemberChange({
+				kind: "joined",
+				spaceId,
+				personId: "ada",
+				role: "member",
+				by: null,
+			});
+		}
+		await documents.flush();
+		return { team, kept, app, tools, teamRun, keptRun };
+	}
+
+	test("is refused while a Project or a run of it is here: nothing goes", async () => {
+		const engine = makeEngine();
+		const { team, app } = await twoSpaces(engine);
+		const before = await whatIsLeft(team);
+		expect(before).toMatchObject({ projects: 1, runs: 1, document: true });
+
+		expect(await engine.forgetSpace(team)).toBe(false);
+		expect(await whatIsLeft(team)).toEqual(before);
+
+		// A split takes this computer's runs: a run another Device walked stays.
+		await sandbox.db.insert(run).values({
+			id: "theirs",
+			spaceId: team,
+			projectId: app.id,
+			flow: JSON.stringify(flow),
+			title: "theirs",
+			worktreePath: "/w/theirs",
+			branch: "theirs",
+			baseRef: "main",
+			walkerId: "studio",
+			startedBy: "someone",
+		});
+		const copy = await otherSpace(sandbox.db, "Copy");
+		await engine.moveProjects({
+			from: team,
+			plan: async () => ({
+				projects: { [app.id]: { spaceId: copy, projectId: app.id } },
+				ownRunsOnly: true,
+			}),
+		});
+		await sandbox.db.delete(organization).where(eq(organization.id, team));
+		const left = await whatIsLeft(team);
+		expect(left).toMatchObject({ projects: 0, runs: 1, document: true });
+
+		expect(await engine.forgetSpace(team)).toBe(false);
+		expect(await whatIsLeft(team)).toEqual(left);
+	});
+
+	test("once a move emptied it, its facts of no run and its document go; the Space its runs went to and another Space keep everything", async () => {
+		const engine = makeEngine();
+		const { team, kept, app, tools, teamRun, keptRun } =
+			await twoSpaces(engine);
+		const platform = await otherSpace(sandbox.db, "Platform");
+		await engine.moveProjects({
+			from: team,
+			plan: async () => ({
+				projects: { [app.id]: { spaceId: platform, projectId: app.id } },
+			}),
+		});
+		// Its own row goes first: the caller's (`@nightshift/auth`).
+		await sandbox.db.delete(organization).where(eq(organization.id, team));
+		const keptBefore = await whatIsLeft(kept);
+		const platformBefore = await whatIsLeft(platform);
+		expect(await whatIsLeft(team)).toMatchObject({
+			projects: 0,
+			runs: 0,
+			events: 1,
+			document: true,
+		});
+
+		expect(await engine.forgetSpace(team)).toBe(true);
+
+		const nothing = {
+			projects: 0,
+			clones: 0,
+			runs: 0,
+			steps: 0,
+			sessions: 0,
+			events: 0,
+			keptValues: 0,
+			document: false,
+		};
+		expect(await whatIsLeft(team)).toEqual(nothing);
+		// Where its runs went, they stay whole.
+		expect(await whatIsLeft(platform)).toEqual(platformBefore);
+		expect(platformBefore).toMatchObject({ projects: 1, runs: 1 });
+		expect((await engine.space(platform).getRun(teamRun)).status).toBe(
+			"stopped",
+		);
+		const onPlatform = await documents.open(platform);
+		expect([...spaceProjects(onPlatform).keys()]).toEqual([app.id]);
+		// Another Space keeps its Project, its run, its Member and its document.
+		expect(await whatIsLeft(kept)).toEqual(keptBefore);
+		expect(keptBefore).toMatchObject({ projects: 1, runs: 1, document: true });
+		expect((await engine.space(kept).getRun(keptRun)).status).toBe("stopped");
+		const inKept = await documents.open(kept);
+		expect([...spaceProjects(inKept).keys()]).toEqual([tools.id]);
+
+		// Again: nothing more to forget, and nothing else goes.
+		expect(await engine.forgetSpace(team)).toBe(true);
+		expect(await whatIsLeft(team)).toEqual(nothing);
+		expect(await whatIsLeft(kept)).toEqual(keptBefore);
 	});
 });
