@@ -22,6 +22,29 @@ function onGitHub(project: Pick<Project, "remote">): boolean {
 }
 
 /**
+ * How the copy of a project to this computer goes, while it runs or after
+ * it failed. Null when none runs or failed. A copy that ends refreshes the
+ * projects: it is a Clone here now, or a problem.
+ */
+export function useProjectCopy(project: Pick<Project, "id" | "repoPath">) {
+	const queryClient = useQueryClient();
+	const copies = useQuery({
+		...projectQueries.copies(),
+		enabled: project.repoPath === null,
+	});
+	const copy = copies.data?.find((c) => c.projectId === project.id) ?? null;
+	const copying = copy?.state === "copying";
+	const wasCopying = useRef(false);
+	useEffect(() => {
+		if (wasCopying.current && !copying) {
+			void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
+		}
+		wasCopying.current = copying;
+	}, [copying, queryClient]);
+	return copy;
+}
+
+/**
  * A project that is not on this computer yet: how its copy from GitHub
  * goes, and a button to copy it now or try again. A Host copies each
  * project on its own. Nothing when the project is here.
@@ -34,11 +57,7 @@ export function CopyProjectHere({
 	className?: string;
 }) {
 	const queryClient = useQueryClient();
-	const copies = useQuery({
-		...projectQueries.copies(),
-		enabled: project.repoPath === null,
-	});
-	const copy = copies.data?.find((c) => c.projectId === project.id) ?? null;
+	const copy = useProjectCopy(project);
 	const start = useMutation(
 		projectMutations.copyHere({
 			onSuccess: () =>
@@ -49,18 +68,8 @@ export function CopyProjectHere({
 		}),
 	);
 
-	// A copy that ends is a Clone here, or a problem: the projects show which.
-	const copying = copy?.state === "copying";
-	const wasCopying = useRef(false);
-	useEffect(() => {
-		if (wasCopying.current && !copying) {
-			void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
-		}
-		wasCopying.current = copying;
-	}, [copying, queryClient]);
-
 	if (project.repoPath !== null) return null;
-	const busy = copying || start.isPending;
+	const busy = copy?.state === "copying" || start.isPending;
 	const canCopy = onGitHub(project);
 
 	return (
