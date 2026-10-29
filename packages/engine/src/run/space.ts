@@ -319,50 +319,14 @@ export function createSpaces(deps: SpacesDeps) {
 				);
 			},
 
-			async stopRun(runId, stopOptions) {
+			async act(runId, request) {
 				await ready;
-				await actions.act(spaceId, actor, runId, {
-					kind: "stop",
-					...(stopOptions?.when ? { when: stopOptions.when } : {}),
-				});
-			},
-
-			async moveRun(runId, to) {
-				await ready;
-				await actions.act(spaceId, actor, runId, { kind: "move", to });
+				await actions.act(spaceId, actor, runId, request);
 			},
 
 			async listMoveTargets(runId) {
 				await ready;
 				return actions.moveTargets(spaceId, actor, runId);
-			},
-
-			async resumeRun(runId, prompt) {
-				await ready;
-				await actions.act(spaceId, actor, runId, {
-					kind: "resume",
-					...(prompt !== undefined ? { prompt } : {}),
-				});
-			},
-
-			async restartStep(runId, options) {
-				await ready;
-				await actions.act(spaceId, actor, runId, {
-					kind: "restart",
-					...(options?.prompt !== undefined ? { prompt: options.prompt } : {}),
-					...(options?.stepId !== undefined ? { stepId: options.stepId } : {}),
-				});
-			},
-
-			async rerunFrom(runId, options) {
-				await ready;
-				await actions.act(spaceId, actor, runId, {
-					kind: "rerun",
-					nodeId: options.nodeId,
-					...(options.stepId !== undefined ? { stepId: options.stepId } : {}),
-					...(options.prompt !== undefined ? { prompt: options.prompt } : {}),
-					...(options.fresh ? { fresh: true } : {}),
-				});
 			},
 
 			async listGates() {
@@ -381,21 +345,6 @@ export function createSpaces(deps: SpacesDeps) {
 				// A project without a Clone here is refused before the Offers check.
 				await projects.get(projectId, spaceId);
 				return deps.scheduleFiles.save(spaceId, projectId, actor, schedules);
-			},
-
-			async resolveGate({ runId, stepId, choice, note }) {
-				await ready;
-				await actions.act(spaceId, actor, runId, {
-					kind: "answer",
-					stepId,
-					choice,
-					...(note !== undefined ? { note } : {}),
-				});
-			},
-
-			async signalRun(runId, name) {
-				await ready;
-				await actions.act(spaceId, actor, runId, { kind: "signal", name });
 			},
 
 			watchRun(runId, { signal: watching, afterSeq }) {

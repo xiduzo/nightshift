@@ -564,7 +564,7 @@ describe("runs", () => {
 
 		// A resume re-enters the thread on that checkpoint at the last step,
 		// continuing its harness session with the person's prompt.
-		await engine.resumeRun(run.id, "Once more.");
+		await engine.act(run.id, { kind: "resume", prompt: "Once more." });
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		expect(harness.calls).toHaveLength(2);
 		expect(harness.calls[1]).toMatchObject({
@@ -893,9 +893,9 @@ describe("runs", () => {
 		);
 		expect(await engine.listRuns()).toHaveLength(1);
 
-		await engine.stopRun(first.id);
+		await engine.act(first.id, { kind: "stop" });
 		const second = await engine.startRun(input);
-		await expect(engine.resumeRun(first.id)).rejects.toThrow(
+		await expect(engine.act(first.id, { kind: "resume" })).rejects.toThrow(
 			"The run cap is reached",
 		);
 		(await waitFor(() => sessions[1])).finish();
@@ -915,7 +915,8 @@ describe("runs", () => {
 			engine.startRun(input),
 		]);
 		expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-		for (const run of await engine.listRuns()) await engine.stopRun(run.id);
+		for (const run of await engine.listRuns())
+			await engine.act(run.id, { kind: "stop" });
 	});
 });
 
@@ -947,10 +948,10 @@ describe("stop and resume", () => {
 		);
 		expect(await statusOf(engine, run.id)).toBe("running");
 
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(await statusOf(engine, run.id)).toBe("stopped");
 		// It goes on as any stopped run does.
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 	});
 
@@ -968,7 +969,7 @@ describe("stop and resume", () => {
 		const first = await waitFor(() => sessions[0]);
 		first.text("working");
 
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(first.input.signal.aborted).toBe(true);
 		let detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
@@ -977,14 +978,16 @@ describe("stop and resume", () => {
 		expect(detail.steps[0]?.sessions[0]?.outcome).toBe("stopped");
 		expect(await loggedTypes()).toContain("StopRequested");
 		// Stopping a run that does not run is a no-op.
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		const second = await waitFor(() => sessions[1], { label: "resume" });
 		expect(second.input.resumeSessionId).toBe("harness-0");
 		expect(second.input.prompt).toBe("Continue where you left off.");
 		expect(second.input.cwd).toBe(run.worktreePath);
-		await expect(engine.resumeRun(run.id)).rejects.toThrow("still running");
+		await expect(engine.act(run.id, { kind: "resume" })).rejects.toThrow(
+			"still running",
+		);
 		second.text("more");
 		second.finish(0.5);
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
@@ -1040,7 +1043,7 @@ describe("stop and resume", () => {
 		});
 		const hung = await waitFor(() => sessions[0]);
 
-		await withFrozenTimers(() => engine.stopRun(run.id));
+		await withFrozenTimers(() => engine.act(run.id, { kind: "stop" }));
 		expect(hung.input.signal.aborted).toBe(true);
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
@@ -1077,13 +1080,15 @@ describe("stop and resume", () => {
 			),
 		});
 		const hung = await waitFor(() => sessions[0]);
-		await withFrozenTimers(() => engine.stopRun(run.id));
+		await withFrozenTimers(() => engine.act(run.id, { kind: "stop" }));
 
 		// The stopped drive holds no slot: the cap of one lets the resume in.
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		const second = await waitFor(() => sessions[1], { label: "resume" });
 		expect(second.input.signal.aborted).toBe(false);
-		await expect(engine.resumeRun(run.id)).rejects.toThrow("still running");
+		await expect(engine.act(run.id, { kind: "resume" })).rejects.toThrow(
+			"still running",
+		);
 
 		// The old drive wakes while the new one runs: it writes nothing, and
 		// it does not touch the new drive's thread.
@@ -1112,12 +1117,13 @@ describe("stop and resume", () => {
 	test.each([
 		[
 			"a resume",
-			(engine: SpaceEngine, runId: string) => engine.resumeRun(runId),
+			(engine: SpaceEngine, runId: string) =>
+				engine.act(runId, { kind: "resume" }),
 		],
 		[
 			"a rerun",
 			(engine: SpaceEngine, runId: string) =>
-				engine.rerunFrom(runId, { nodeId: "worker" }),
+				engine.act(runId, { kind: "rerun", nodeId: "worker" }),
 		],
 	])(
 		"a stop that comes while %s begins is not lost: it stops the new walk",
@@ -1150,11 +1156,11 @@ describe("stop and resume", () => {
 				),
 			});
 			await waitFor(() => sessions[0]);
-			await engine.stopRun(run.id);
+			await engine.act(run.id, { kind: "stop" });
 
 			const reentering = reenter(engine, run.id);
 			await waitFor(() => held !== null);
-			const stopping = engine.stopRun(run.id);
+			const stopping = engine.act(run.id, { kind: "stop" });
 			await Bun.sleep(20);
 			release();
 			await reentering;
@@ -1181,15 +1187,15 @@ describe("stop and resume", () => {
 		);
 		await Bun.sleep(50);
 		const started = Date.now();
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(Date.now() - started).toBeLessThan(2_000);
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
 		expect(detail.steps[0]?.outcome).toBe("stopped");
 
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		await waitFor(async () => (await engine.getRun(run.id)).steps.length === 2);
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(
 			(await engine.getRun(run.id)).steps.map((s) => [s.nodeId, s.visit]),
 		).toEqual([
@@ -1209,7 +1215,7 @@ describe("stop and resume", () => {
 		expect(detail.traversals).toEqual({ e1: 2, e2: 1 });
 		expect(detail.reason).toContain("max 1");
 
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		detail = await engine.getRun(run.id);
 		expect(detail.reason).toBeNull();
@@ -1246,7 +1252,10 @@ describe("restart a step", () => {
 		);
 
 		// The run cap of one: the restart keeps the run's slot.
-		await engine.restartStep(run.id, { prompt: "Report your result now." });
+		await engine.act(run.id, {
+			kind: "restart",
+			prompt: "Report your result now.",
+		});
 		expect(hung.input.signal.aborted).toBe(true);
 		const second = await waitFor(() => sessions[1], { label: "restart" });
 		expect(second.input.resumeSessionId).toBe("harness-0");
@@ -1301,7 +1310,7 @@ describe("restart a step", () => {
 			flow: flowOf([agent("worker", "Build it")]),
 		});
 		const hung = await waitFor(() => sessions[0]);
-		await engine.restartStep(run.id);
+		await engine.act(run.id, { kind: "restart" });
 		expect(hung.input.signal.aborted).toBe(true);
 		const second = await waitFor(() => sessions[1], { label: "restart" });
 		// The harness never named its session: nothing to continue.
@@ -1329,7 +1338,7 @@ describe("restart a step", () => {
 				? true
 				: null,
 		);
-		await other.restartStep(run2.id);
+		await other.act(run2.id, { kind: "restart" });
 		const again = await waitFor(() => s2[1], { label: "restart" });
 		expect(again.input.prompt).toBe("Continue where you left off.");
 		expect(again.input.resumeSessionId).toBe("harness-0");
@@ -1353,7 +1362,7 @@ describe("restart a step", () => {
 			);
 			first.finish(0.5);
 			if (delay >= 0) await Bun.sleep(delay);
-			const restarted = await engine.restartStep(run.id).then(
+			const restarted = await engine.act(run.id, { kind: "restart" }).then(
 				() => true,
 				(error: Error) => error.message,
 			);
@@ -1407,7 +1416,7 @@ describe("restart a step", () => {
 		const second = await waitFor(() => sessions[1]);
 		const workerStep = (await engine.getRun(run.id)).steps[0];
 		await expect(
-			engine.restartStep(run.id, { stepId: workerStep?.id ?? "" }),
+			engine.act(run.id, { kind: "restart", stepId: workerStep?.id ?? "" }),
 		).rejects.toThrow("That step has ended");
 		expect(second.input.signal.aborted).toBe(false);
 		expect(await statusOf(engine, run.id)).toBe("running");
@@ -1425,11 +1434,11 @@ describe("restart a step", () => {
 			flow: gateFlow(),
 		});
 		await openGateOf(engine, walked.id);
-		await expect(engine.restartStep(walked.id)).rejects.toThrow(
+		await expect(engine.act(walked.id, { kind: "restart" })).rejects.toThrow(
 			"This run waits at a Gate",
 		);
-		await engine.stopRun(walked.id);
-		await expect(engine.restartStep(walked.id)).rejects.toThrow(
+		await engine.act(walked.id, { kind: "stop" });
+		await expect(engine.act(walked.id, { kind: "restart" })).rejects.toThrow(
 			"This run has ended",
 		);
 		const before = await loggedTypes();
@@ -1440,9 +1449,9 @@ describe("restart a step", () => {
 			.where(eq(run.id, walked.id));
 		// One rule, one refusal: only the Walker resumes, restarts or reruns.
 		for (const act of [
-			() => engine.resumeRun(walked.id),
-			() => engine.restartStep(walked.id),
-			() => engine.rerunFrom(walked.id, { nodeId: "worker" }),
+			() => engine.act(walked.id, { kind: "resume" }),
+			() => engine.act(walked.id, { kind: "restart" }),
+			() => engine.act(walked.id, { kind: "rerun", nodeId: "worker" }),
 		]) {
 			await expect(act()).rejects.toThrow(
 				"Another device runs this run. Try again on that device.",
@@ -1465,7 +1474,8 @@ describe("run again from a step", () => {
 		});
 		expect(await waitForEnd(engine, run.id)).toBe("failed");
 
-		await engine.rerunFrom(run.id, {
+		await engine.act(run.id, {
+			kind: "rerun",
 			nodeId: "worker",
 			prompt: "The check failed. Fix it.",
 		});
@@ -1510,7 +1520,8 @@ describe("run again from a step", () => {
 			),
 		});
 		expect(await waitForEnd(engine, run.id)).toBe("failed");
-		await engine.rerunFrom(run.id, {
+		await engine.act(run.id, {
+			kind: "rerun",
 			nodeId: "worker",
 			prompt: "ignored",
 			fresh: true,
@@ -1536,7 +1547,7 @@ describe("run again from a step", () => {
 		});
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 
-		await engine.rerunFrom(run.id, { nodeId: "prepare" });
+		await engine.act(run.id, { kind: "rerun", nodeId: "prepare" });
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		// The agent after it runs as its node says: a fresh session.
 		expect(
@@ -1576,9 +1587,9 @@ describe("run again from a step", () => {
 			),
 		});
 		await waitFor(() => sessions[0]);
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 
-		await engine.rerunFrom(run.id, { nodeId: "prepare" });
+		await engine.act(run.id, { kind: "rerun", nodeId: "prepare" });
 		const second = await waitFor(() => sessions[1], { label: "the rerun" });
 		// A new visit with a fresh session: the stopped one stays stopped.
 		expect(second.input.resumeSessionId).toBeUndefined();
@@ -1609,9 +1620,13 @@ describe("run again from a step", () => {
 			flow: gateFlow(),
 		});
 		await openGateOf(engine, run.id);
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 
-		await engine.rerunFrom(run.id, { nodeId: "worker", prompt: "Again." });
+		await engine.act(run.id, {
+			kind: "rerun",
+			nodeId: "worker",
+			prompt: "Again.",
+		});
 		await waitForStatus(engine, run.id, "waiting");
 		expect(harness.calls[1]).toMatchObject({
 			prompt: "Again.",
@@ -1644,9 +1659,9 @@ describe("run again from a step", () => {
 		});
 		(await waitFor(() => sessions[0])).finish();
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
-		await expect(engine.rerunFrom(run.id, { nodeId: "inner" })).rejects.toThrow(
-			`This run's flow has no node "inner"`,
-		);
+		await expect(
+			engine.act(run.id, { kind: "rerun", nodeId: "inner" }),
+		).rejects.toThrow(`This run's flow has no node "inner"`);
 		expect(sessions).toHaveLength(1);
 		expect(await statusOf(engine, run.id)).toBe("finished");
 	});
@@ -1668,13 +1683,15 @@ describe("run again from a step", () => {
 		]);
 		const [firstWorker, firstCheck] = steps;
 		await expect(
-			engine.rerunFrom(run.id, {
+			engine.act(run.id, {
+				kind: "rerun",
 				nodeId: "worker",
 				stepId: firstCheck?.id ?? "",
 			}),
 		).rejects.toThrow(`That step is not a step of "worker"`);
 
-		await engine.rerunFrom(run.id, {
+		await engine.act(run.id, {
+			kind: "rerun",
 			nodeId: "worker",
 			stepId: firstWorker?.id ?? "",
 		});
@@ -1814,14 +1831,14 @@ describe("a Space whose Projects move", () => {
 			flow: flowOf([agent("worker", "Go")]),
 		});
 		await waitFor(() => sessions[0]);
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(await statusOf(engine, run.id)).toBe("stopped");
 
 		const release = await holdSpace(daemon, sandbox.spaceId);
 		for (const act of [
-			() => engine.resumeRun(run.id),
-			() => engine.restartStep(run.id),
-			() => engine.rerunFrom(run.id, { nodeId: "worker" }),
+			() => engine.act(run.id, { kind: "resume" }),
+			() => engine.act(run.id, { kind: "restart" }),
+			() => engine.act(run.id, { kind: "rerun", nodeId: "worker" }),
 		]) {
 			await expect(act()).rejects.toMatchObject({
 				kind: "unavailable",
@@ -1832,7 +1849,7 @@ describe("a Space whose Projects move", () => {
 		expect(await statusOf(engine, run.id)).toBe("stopped");
 
 		await release();
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		(await waitFor(() => sessions[1], { label: "the resume" })).finish();
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 	});
@@ -1871,7 +1888,7 @@ describe("recovery", () => {
 		await Bun.sleep(30);
 		expect(sessions).toHaveLength(0);
 
-		await second.resumeRun(run.id);
+		await second.act(run.id, { kind: "resume" });
 		const resumed = await waitFor(() => sessions[0]);
 		expect(resumed.input.resumeSessionId).toBe("harness-0");
 		resumed.finish();
@@ -1937,7 +1954,7 @@ describe("recovery prunes", () => {
 		expect(await statusOf(second, run.id)).toBe("interrupted");
 		expect(await checkpoints()).toBe(1);
 
-		await second.resumeRun(run.id);
+		await second.act(run.id, { kind: "resume" });
 		(await waitFor(() => sessions[0], { label: "the resume" })).finish();
 		expect(await waitForEnd(second, run.id)).toBe("finished");
 		expect(
@@ -2163,7 +2180,7 @@ describe("automatic resume after a restart", () => {
 			flow: flowOf([agent("worker", "Go")]),
 		});
 		await waitFor(() => sessions[0]);
-		await first.stopRun(run.id);
+		await first.act(run.id, { kind: "stop" });
 		expect(await statusOf(first, run.id)).toBe("stopped");
 
 		const second = restart();
@@ -2214,7 +2231,7 @@ describe("automatic resume after a restart", () => {
 		);
 
 		// A person's resume counts from zero again.
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		const resumed = await waitFor(() => sessions[0]);
 		expect(resumed.input.prompt).toBe("Continue where you left off.");
 		resumed.finish();
@@ -2659,7 +2676,7 @@ describe("decisions", () => {
 			flow: flowOf([decision("decide", "Go?", ["yes", "no"])]),
 		});
 		await waitFor(() => calls[0]);
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(calls[0]?.signal.aborted).toBe(true);
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
@@ -2707,7 +2724,7 @@ describe("gates", () => {
 			flowName: "ship",
 			runTitle: "ship",
 		});
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 	});
 
 	test("a gate waits without a slot, and its answer continues the walk", async () => {
@@ -2751,8 +2768,8 @@ describe("gates", () => {
 		});
 		expect(await waitForEnd(engine, other.id)).toBe("finished");
 
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open?.stepId ?? "",
 			choice: "approve",
 			note: "LGTM, merge after CI.",
@@ -2804,8 +2821,8 @@ describe("gates", () => {
 			),
 		);
 		const open = await openGateOf(engine, run.id);
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "approve",
 		});
@@ -2848,8 +2865,8 @@ describe("gates", () => {
 			label: "the Gate's fact",
 		});
 		off();
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "approve",
 		});
@@ -2869,7 +2886,7 @@ describe("gates", () => {
 		expect(landed.map((f) => f.kind)).not.toContain("run-ended");
 	});
 
-	test("resolveGate rejects a wrong step, a wrong choice and a run that does not wait", async () => {
+	test("an answer rejects a wrong step, a wrong choice and a run that does not wait", async () => {
 		const engine = makeEngine(fakeHarness());
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
@@ -2879,43 +2896,49 @@ describe("gates", () => {
 		const workerStep = (await engine.getRun(run.id)).steps[0]?.id ?? "";
 
 		await expect(
-			engine.resolveGate({ runId: run.id, stepId: open.stepId, choice: "yes" }),
+			engine.act(run.id, {
+				kind: "answer",
+				stepId: open.stepId,
+				choice: "yes",
+			}),
 		).rejects.toThrow(
 			'"yes" is not an option of this node. Choose one of: approve, reject.',
 		);
 		await expect(
-			engine.resolveGate({
-				runId: run.id,
+			engine.act(run.id, {
+				kind: "answer",
 				stepId: workerStep,
 				choice: "approve",
 			}),
 		).rejects.toBeInstanceOf(GateClosedError);
 		await expect(
-			engine.resolveGate({
-				runId: "missing",
+			engine.act("missing", {
+				kind: "answer",
 				stepId: open.stepId,
 				choice: "approve",
 			}),
 		).rejects.toThrow("Night Shift cannot find this run.");
-		await expect(engine.resumeRun(run.id)).rejects.toThrow("waits at a Gate");
+		await expect(engine.act(run.id, { kind: "resume" })).rejects.toThrow(
+			"waits at a Gate",
+		);
 		expect(await statusOf(engine, run.id)).toBe("waiting");
 
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "approve",
 		});
 		await expect(
-			engine.resolveGate({
-				runId: run.id,
+			engine.act(run.id, {
+				kind: "answer",
 				stepId: open.stepId,
 				choice: "approve",
 			}),
 		).rejects.toBeInstanceOf(GateClosedError);
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		await expect(
-			engine.resolveGate({
-				runId: run.id,
+			engine.act(run.id, {
+				kind: "answer",
 				stepId: open.stepId,
 				choice: "reject",
 			}),
@@ -2946,8 +2969,8 @@ describe("gates", () => {
 		});
 		expect(await statusOf(engine, run.id)).toBe("waiting");
 		await expect(
-			engine.resolveGate({
-				runId: run.id,
+			engine.act(run.id, {
+				kind: "answer",
 				stepId: open.stepId,
 				choice: "answer",
 				note: " ",
@@ -2955,8 +2978,8 @@ describe("gates", () => {
 		).rejects.toThrow('Write a note to choose "answer"');
 
 		// The answer returns once the Gate closed, not when the session ends.
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "answer",
 			note: "Postgres.",
@@ -2996,15 +3019,15 @@ describe("gates", () => {
 		await waitFor(() => sessions[0]);
 
 		await expect(
-			engine.resolveGate({ runId: run.id, stepId: open.stepId, choice: "go" }),
+			engine.act(run.id, { kind: "answer", stepId: open.stepId, choice: "go" }),
 		).rejects.toThrow("The run cap is reached: 1 of 1");
 		expect(await statusOf(engine, run.id)).toBe("waiting");
 		expect(await engine.listGates()).toHaveLength(1);
 
 		sessions[0]?.finish();
 		await waitForStatus(engine, busy.id, "finished");
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "go",
 		});
@@ -3026,8 +3049,8 @@ describe("gates", () => {
 		expect(detail.steps.at(-1)?.outcome).toBeNull();
 		expect(await loggedTypes()).not.toContain("RunEnded");
 
-		await second.resolveGate({
-			runId: run.id,
+		await second.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "reject",
 			note: "Add tests.",
@@ -3058,8 +3081,8 @@ describe("gates", () => {
 		expect(await engine.listRuns()).toEqual(await fresh().listRuns());
 		expect(await engine.listGates()).toEqual(await fresh().listGates());
 
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "approve",
 		});
@@ -3076,7 +3099,7 @@ describe("gates", () => {
 		const run = await engine.startRun({ projectId: id, flow: gateFlow() });
 		await openGateOf(engine, run.id);
 		await expect(engine.removeProject(id)).rejects.toThrow("waits at a Gate");
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		await engine.removeProject(id);
 		expect(await engine.listGates()).toEqual([]);
 	});
@@ -3092,7 +3115,7 @@ describe("gates", () => {
 		});
 		const open = await openGateOf(engine, run.id);
 
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		let detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
 		expect(detail.reason).toBeNull();
@@ -3104,16 +3127,16 @@ describe("gates", () => {
 		expect(await engine.listGates()).toEqual([]);
 		expect(await loggedTypes()).toContain("StopRequested");
 		await expect(
-			engine.resolveGate({
-				runId: run.id,
+			engine.act(run.id, {
+				kind: "answer",
 				stepId: open.stepId,
 				choice: "approve",
 			}),
 		).rejects.toThrow("does not wait at a Gate");
 		// Stopping again is a no-op.
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		const reopened = await openGateOf(engine, run.id);
 		expect(reopened.stepId).not.toBe(open.stepId);
 		expect(reopened.question).toBe(open.question);
@@ -3124,8 +3147,8 @@ describe("gates", () => {
 			["gate", 1, "stopped"],
 			["gate", 2, null],
 		]);
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: reopened.stepId,
 			choice: "approve",
 		});
@@ -3178,8 +3201,8 @@ describe("a full flow", () => {
 
 		const first = await openGateOf(engine, run.id);
 		expect(first.question).toBe("attempt 2 (call 2). Ship it?");
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: first.stepId,
 			choice: "rework",
 			note: "Add tests.",
@@ -3192,8 +3215,8 @@ describe("a full flow", () => {
 		expect(second.question).toBe("attempt 3 (call 3). Ship it?");
 
 		// The rework edge has a max of 1: a second rework fails the run.
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: second.stepId,
 			choice: "rework",
 		});
@@ -3203,10 +3226,10 @@ describe("a full flow", () => {
 		expect(detail.reason).toContain("max 1");
 
 		// Resume asks the gate again; this time it ships.
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		const third = await openGateOf(engine, run.id);
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: third.stepId,
 			choice: "approve",
 			note: "ok",
@@ -3305,15 +3328,15 @@ describe("wait nodes", () => {
 		expect(sleeping.wakeAt).toBeNull();
 		expect(sleeping.signal).toBe("deployed");
 
-		await expect(engine.signalRun(run.id, "tested")).rejects.toThrow(
-			"This run does not wait for that signal.",
-		);
-		await expect(engine.signalRun("missing", "deployed")).rejects.toThrow(
-			"Night Shift cannot find this run.",
-		);
+		await expect(
+			engine.act(run.id, { kind: "signal", name: "tested" }),
+		).rejects.toThrow("This run does not wait for that signal.");
+		await expect(
+			engine.act("missing", { kind: "signal", name: "deployed" }),
+		).rejects.toThrow("Night Shift cannot find this run.");
 		expect(await statusOf(engine, run.id)).toBe("sleeping");
 
-		await engine.signalRun(run.id, "deployed");
+		await engine.act(run.id, { kind: "signal", name: "deployed" });
 		await waitForStatus(engine, run.id, "finished");
 		const detail = await engine.getRun(run.id);
 		expect(detail.steps[0]).toMatchObject({
@@ -3321,9 +3344,9 @@ describe("wait nodes", () => {
 			outcome: "done",
 			outputs: { outcome: "done", waited_minutes: 0, visit: 1 },
 		});
-		await expect(engine.signalRun(run.id, "deployed")).rejects.toThrow(
-			"This run does not wait for that signal.",
-		);
+		await expect(
+			engine.act(run.id, { kind: "signal", name: "deployed" }),
+		).rejects.toThrow("This run does not wait for that signal.");
 		// The transcript says what woke it.
 		const items = await collect(engine, run.id, (_item, all) =>
 			entriesOf(all).some((e) => e.event.type === "wake"),
@@ -3391,7 +3414,7 @@ describe("wait nodes", () => {
 
 		// The signal wait survived the restart and still answers to its signal.
 		expect((await second.getRun(signalled.id)).signal).toBe("deployed");
-		await second.signalRun(signalled.id, "deployed");
+		await second.act(signalled.id, { kind: "signal", name: "deployed" });
 		await waitForStatus(second, signalled.id, "finished");
 	});
 
@@ -3402,10 +3425,10 @@ describe("wait nodes", () => {
 			flow: flowOf([wait("deploy", { kind: "signal", name: "deployed" })]),
 		});
 		await waitForStatus(engine, run.id, "sleeping");
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		expect(await statusOf(engine, run.id)).toBe("stopped");
 		expect((await engine.getRun(run.id)).steps[0]?.outcome).toBe("stopped");
-		await engine.resumeRun(run.id);
+		await engine.act(run.id, { kind: "resume" });
 		await waitForStatus(engine, run.id, "sleeping");
 		expect(
 			(await engine.getRun(run.id)).steps.map((s) => [s.visit, s.outcome]),
@@ -3413,7 +3436,7 @@ describe("wait nodes", () => {
 			[1, "stopped"],
 			[2, null],
 		]);
-		await engine.signalRun(run.id, "deployed");
+		await engine.act(run.id, { kind: "signal", name: "deployed" });
 		await waitForStatus(engine, run.id, "finished");
 	});
 });

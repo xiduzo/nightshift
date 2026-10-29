@@ -190,8 +190,8 @@ describe("the run history exchange", () => {
 
 		// A answers; the rest comes after the cursor only.
 		const gate = (await engineA.space(a.spaceId).listGates())[0];
-		await engineA.space(a.spaceId).resolveGate({
-			runId: run.id,
+		await engineA.space(a.spaceId).act(run.id, {
+			kind: "answer",
 			stepId: gate?.stepId as string,
 			choice: "approve",
 		});
@@ -390,7 +390,7 @@ describe("a batch and what follows from it", () => {
 	}
 
 	/**
-	 * A moves its run to B, as `moveRun` does: its walk state into the
+	 * A moves its run to B, as a move (`act`) does: its walk state into the
 	 * archive (returned, by kind and step), then `WalkerMoved` as its last
 	 * event.
 	 */
@@ -638,8 +638,8 @@ describe("a batch and what follows from it", () => {
 		const gate = (await engineA.space(a.spaceId).listGates()).find(
 			(g) => g.runId === ended.id,
 		);
-		await engineA.space(a.spaceId).resolveGate({
-			runId: ended.id,
+		await engineA.space(a.spaceId).act(ended.id, {
+			kind: "answer",
 			stepId: gate?.stepId as string,
 			choice: "approve",
 		});
@@ -731,8 +731,8 @@ describe("a run walked elsewhere", () => {
 		const { engineB, run, stepId } = await waitingOnB(relay);
 		const space = engineB.space(a.spaceId, { personId: "person-a" });
 
-		await space.resolveGate({ runId: run.id, stepId, choice: "approve" });
-		await space.stopRun(run.id, { when: "after-step" });
+		await space.act(run.id, { kind: "answer", stepId, choice: "approve" });
+		await space.act(run.id, { kind: "stop", when: "after-step" });
 		expect(sent).toEqual([
 			{
 				kind: "gate.resolve",
@@ -755,22 +755,22 @@ describe("a run walked elsewhere", () => {
 		expect(await statusOf(engineB, a.spaceId, run.id)).toBe("waiting");
 		// A wrong answer is refused here, before it travels.
 		expect(
-			space.resolveGate({ runId: run.id, stepId, choice: "maybe" }),
+			space.act(run.id, { kind: "answer", stepId, choice: "maybe" }),
 		).rejects.toThrow();
-		expect(space.signalRun(run.id, "go")).rejects.toThrow(
+		expect(space.act(run.id, { kind: "signal", name: "go" })).rejects.toThrow(
 			"does not wait for that signal",
 		);
 	});
 
 	test("it is never resumed or recovered here, and without a relay it is read-only", async () => {
 		const { engineB, run, stepId } = await waitingOnB();
-		expect(engineB.space(a.spaceId).resumeRun(run.id)).rejects.toThrow(
-			"Another device",
-		);
+		expect(
+			engineB.space(a.spaceId).act(run.id, { kind: "resume" }),
+		).rejects.toThrow("Another device");
 		expect(
 			engineB
 				.space(a.spaceId, { personId: "p" })
-				.resolveGate({ runId: run.id, stepId, choice: "approve" }),
+				.act(run.id, { kind: "answer", stepId, choice: "approve" }),
 		).rejects.toThrow("cannot reach");
 
 		// A new daemon on B's Replica leaves A's open run alone.

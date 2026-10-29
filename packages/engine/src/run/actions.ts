@@ -42,17 +42,58 @@ import type { StartHolds } from "./start-holds";
  * a move travel to it. Only the Walker resumes, restarts or reruns.
  */
 
-/** One action a person asks of a run. */
+/** One action a person asks of a run (`SpaceEngine.act`). */
 export type RunActionRequest =
-	/** Now (the default), after its running step, or take a stop after the step back. */
+	/**
+	 * `now` (default): aborts the running step, closes an open Gate or ends
+	 * a sleep, and ends the run as `stopped`. `after-step`: lets the running
+	 * step finish, then ends the run as `stopped` before the next step.
+	 * `cancel-after-step`: withdraws an `after-step` stop. No-op when
+	 * nothing runs, waits or sleeps.
+	 */
 	| { kind: "stop"; when?: "now" | "after-step" | "cancel-after-step" }
+	/**
+	 * Answers an open Gate with one of its choices and continues the walk
+	 * on that outcome. Fails when the step is not an open Gate or the
+	 * choice is not one of its choices.
+	 */
 	| { kind: "answer"; stepId: string; choice: string; note?: string }
+	/**
+	 * A signal to a run whose Wait node waits for it: the step ends `done`
+	 * and the walk goes on. Fails when the run does not wait for a signal
+	 * of that name.
+	 */
 	| { kind: "signal"; name: string }
-	/** Another of the Person's Devices walks the run from here on. */
+	/**
+	 * Moves the run's Walk to another of the actor's Devices
+	 * (`WalkerMoved`): this computer archives the run's checkpoint and
+	 * files and stops walking it; the new Walker resumes from the archive.
+	 * Only a run that is not in the middle of a step.
+	 */
 	| { kind: "move"; to: string }
+	/**
+	 * Continues a stopped, failed or interrupted run at its last step's
+	 * node (inside a Call with `each`, at the same item). A finished run
+	 * reopens its last step. A sleeping run wakes at once. An Agent node
+	 * with a harness session continues that session with the prompt
+	 * (default "Continue where you left off."). Any other node runs again.
+	 * Edge counts carry over. Fails while the run is running.
+	 */
 	| { kind: "resume"; prompt?: string }
-	/** With `stepId`, only while that step runs. */
+	/**
+	 * Stops the running step and continues it at once, as a stop now and a
+	 * resume would, with nothing in between. Only while a step runs; with
+	 * `stepId`, only while that step runs.
+	 */
 	| { kind: "restart"; stepId?: string; prompt?: string }
+	/**
+	 * Walks a run that is not going (failed, stopped, interrupted or
+	 * finished) again from `nodeId`, a node of the run's own flow, with a
+	 * new visit of it; the steps after it follow as the flow routes.
+	 * Inputs, outputs and edge counts carry over. An Agent node continues
+	 * the session of its step `stepId` (default: its latest) with the
+	 * prompt, or with `fresh` starts a new session with its own prompt.
+	 */
 	| {
 			kind: "rerun";
 			nodeId: string;

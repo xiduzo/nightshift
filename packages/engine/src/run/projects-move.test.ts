@@ -123,7 +123,7 @@ async function stoppedRun(engine: Engine, projectId: string): Promise<string> {
 	await waitFor(async () => (await space.getRun(id)).status === "waiting", {
 		label: "the Gate",
 	});
-	await space.stopRun(id);
+	await space.act(id, { kind: "stop" });
 	return id;
 }
 

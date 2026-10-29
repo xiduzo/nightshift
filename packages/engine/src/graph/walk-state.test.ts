@@ -178,7 +178,7 @@ describe("the walk state of a run", () => {
 		expect(
 			kinds(await a.context.runs.exportWalk(detail.id, { steps: [] })),
 		).toEqual([["checkpoint", null]]);
-		await a.space.stopRun(detail.id);
+		await a.space.act(detail.id, { kind: "stop" });
 	});
 
 	test("stamps each step's files with the end they hold, as the log says", async () => {
@@ -212,7 +212,7 @@ describe("the walk state of a run", () => {
 			ended: false,
 		});
 		expect(await a.context.runs.stepStamp(step("no-such-step"))).toBeNull();
-		await a.space.stopRun(detail.id);
+		await a.space.act(detail.id, { kind: "stop" });
 	});
 
 	test("of a run walked elsewhere is empty, and so is each of its files", async () => {
@@ -266,7 +266,7 @@ describe("the walk state of a run", () => {
 				stepId: other?.id as string,
 			}),
 		).toBeNull();
-		await a.space.stopRun(first.id);
+		await a.space.act(first.id, { kind: "stop" });
 	});
 
 	test("imports on another Replica as the latest checkpoint rows, byte for byte, once", async () => {
@@ -295,7 +295,7 @@ describe("the walk state of a run", () => {
 		// A second import changes nothing, and rows B has are kept.
 		await walks.importWalk(detail.id, checkpoint);
 		expect(await checkpointRows(b, detail.id)).toEqual(onB);
-		await a.space.stopRun(detail.id);
+		await a.space.act(detail.id, { kind: "stop" });
 	});
 
 	test("takes a step's transcript from its old Walker into the step's own file, and never over one that goes as far", async () => {
@@ -326,7 +326,7 @@ describe("the walk state of a run", () => {
 		// A copy that goes further (the run comes back): it replaces the file.
 		await walks.importTranscript(detail.id, gateStep, fromBefore);
 		expect(await readFile(path, "utf8")).toBe(fromBefore);
-		await a.space.stopRun(detail.id);
+		await a.space.act(detail.id, { kind: "stop" });
 	});
 
 	test("refuses a Checkpoint with a row of another run, and writes nothing", async () => {
@@ -374,6 +374,6 @@ describe("the walk state of a run", () => {
 			(await b.db.select().from(lgCheckpoint)).length +
 				(await b.db.select().from(lgWrite)).length,
 		).toBe(0);
-		await a.space.stopRun(detail.id);
+		await a.space.act(detail.id, { kind: "stop" });
 	});
 });

@@ -459,8 +459,8 @@ describe("the Device's exchange with its Host", () => {
 
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -492,8 +492,8 @@ describe("the Device's exchange with its Host", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -582,8 +582,8 @@ describe("the Device's exchange with its Host", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -658,8 +658,8 @@ describe("the Device's exchange with its Host", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -727,8 +727,8 @@ describe("the Device's exchange with its Host", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -774,8 +774,8 @@ describe("the Device's exchange with its Host", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -870,8 +870,8 @@ describe("the Device's exchange with its Host", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
@@ -1153,7 +1153,7 @@ describe("live transcripts over the exchange", () => {
 				).includes("first part"),
 			{ label: "the first part on A" },
 		);
-		await onA.stopRun(run.id);
+		await onA.act(run.id, { kind: "stop" });
 		await untilStatus(paired.host, run.id, "stopped");
 		online();
 		await untilStatus(paired.device, run.id, "stopped");
@@ -1173,7 +1173,7 @@ describe("live transcripts over the exchange", () => {
 		expect(await paired.device.exchange.archive.read(ref)).not.toBeNull();
 
 		// A resume reopens the step: its session goes on, and the run ends.
-		await onA.resumeRun(run.id);
+		await onA.act(run.id, { kind: "resume" });
 		await untilStatus(paired.host, run.id, "finished");
 		await untilStatus(paired.device, run.id, "finished");
 		expect((await onA.getRun(run.id)).steps.map((s) => s.id)).toEqual([step]);
@@ -1232,7 +1232,7 @@ describe("live transcripts over the exchange", () => {
 				).includes("first part"),
 			{ label: "the first part on B" },
 		);
-		await onB.stopRun(run.id);
+		await onB.act(run.id, { kind: "stop" });
 		await untilStatus(paired.host, run.id, "stopped");
 		await waitFor(
 			async () =>
@@ -1244,7 +1244,7 @@ describe("live transcripts over the exchange", () => {
 
 		// The step ends again. Its rows reach A, its copy does not yet.
 		held = true;
-		await onB.resumeRun(run.id);
+		await onB.act(run.id, { kind: "resume" });
 		/** The step ended after its reopen, as `engine` knows it. */
 		const endedAgain = (engine: PeerEngine) =>
 			waitFor(

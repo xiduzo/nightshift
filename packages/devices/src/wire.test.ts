@@ -485,8 +485,8 @@ describe("the devices runtime across a reload", () => {
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
-			.resolveGate({
-				runId: run.id,
+			.act(run.id, {
+				kind: "answer",
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});

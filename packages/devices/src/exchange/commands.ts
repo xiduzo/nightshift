@@ -168,21 +168,15 @@ export async function applyRunCommand(
 	space: SpaceEngine,
 	command: RunCommandInput & { runId: string },
 ): Promise<void> {
+	const { runId } = command;
 	switch (command.kind) {
 		case "gate.resolve":
-			await space.resolveGate({ runId: command.runId, ...command.payload });
-			return;
+			return space.act(runId, { kind: "answer", ...command.payload });
 		case "signal.send":
-			await space.signalRun(command.runId, command.payload.name);
-			return;
+			return space.act(runId, { kind: "signal", ...command.payload });
 		case "run.stop":
-			await space.stopRun(
-				command.runId,
-				command.payload.when ? { when: command.payload.when } : undefined,
-			);
-			return;
+			return space.act(runId, { kind: "stop", ...command.payload });
 		case "run.move":
-			await space.moveRun(command.runId, command.payload.to);
-			return;
+			return space.act(runId, { kind: "move", ...command.payload });
 	}
 }

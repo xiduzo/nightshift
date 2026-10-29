@@ -367,7 +367,7 @@ describe("a run placed on another Device", () => {
 			deviceId: B,
 		});
 		await waitFor(() => running > 0, { label: "the command on B" });
-		await space().stopRun(started.id);
+		await space().act(started.id, { kind: "stop" });
 		await until(started.id, "stopped");
 		await waitFor(() => running === 0, { label: "B's command to end" });
 	});
@@ -963,7 +963,7 @@ describe("a run's plan", () => {
 		});
 		// A Replica of a version before the plan reads the same Devices.
 		expect(JSON.parse(row.placements ?? "{}")).toEqual({ "studio-b": B });
-		await space().stopRun(started.id);
+		await space().act(started.id, { kind: "stop" });
 	});
 
 	test("the walk reads it: after a restart, with no list of Devices here, a step runs on the run's Device by its planned name", async () => {
@@ -984,7 +984,7 @@ describe("a run's plan", () => {
 		await engine.dispose();
 		engine = peerEngine();
 		online.delete(B);
-		await space().resolveGate({ runId: started.id, stepId, choice: "yes" });
+		await space().act(started.id, { kind: "answer", stepId, choice: "yes" });
 		await until(started.id, "sleeping");
 		const waited = (await a.db.select().from(event)).find(
 			(e) => e.type === "WaitStarted",
@@ -1013,7 +1013,7 @@ describe("a run's plan", () => {
 			.update(runTable)
 			.set({ deviceNames: null })
 			.where(eq(runTable.id, started.id));
-		await space().resolveGate({ runId: started.id, stepId, choice: "yes" });
+		await space().act(started.id, { kind: "answer", stepId, choice: "yes" });
 		const run = await until(started.id, "finished");
 		expect(run.steps.map((s) => [s.nodeId, s.outcome, s.device?.id])).toEqual([
 			["gate", "yes", expect.any(String)],
@@ -1030,14 +1030,14 @@ describe("a run's plan", () => {
 			startedBy: personId,
 		});
 		await openGate(started.id);
-		await expect(space().moveRun(started.id, "device-c")).rejects.toThrow(
-			"That device is not one of yours.",
-		);
+		await expect(
+			space().act(started.id, { kind: "move", to: "device-c" }),
+		).rejects.toThrow("That device is not one of yours.");
 		online.delete(B);
-		await expect(space().moveRun(started.id, B)).rejects.toThrow(
-			"studio-b is offline. Move the run when it is online.",
-		);
-		await space().stopRun(started.id);
+		await expect(
+			space().act(started.id, { kind: "move", to: B }),
+		).rejects.toThrow("studio-b is offline. Move the run when it is online.");
+		await space().act(started.id, { kind: "stop" });
 	});
 });
 

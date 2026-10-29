@@ -610,7 +610,7 @@ describe("leaving the home Host keeps a copy", () => {
 		await expect(refused).rejects.toThrow(SPLIT_WORDS.notDone(1));
 		expect(await b.db.select().from(spaceSplit)).toEqual([]);
 
-		await space.stopRun(waiting.id);
+		await space.act(waiting.id, { kind: "stop" });
 		await waitFor(
 			async () => (await space.getRun(waiting.id)).status !== "waiting",
 			{ label: "B's run stopped", timeoutMs: 10_000 },

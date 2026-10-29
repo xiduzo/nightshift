@@ -44,7 +44,7 @@ type AnswerRefusals = ORPCErrorConstructorMap<typeof answerRefusals>;
  * says so as `GATE_CLOSED`.
  */
 export async function answerGate(
-	space: Pick<SpaceEngine, "listGates" | "resolveGate">,
+	space: Pick<SpaceEngine, "listGates" | "act">,
 	input: z.output<typeof gateAnswerSchema>,
 	errors: AnswerRefusals,
 ): Promise<void> {
@@ -55,7 +55,8 @@ export async function answerGate(
 		if (refusal === "needs-app") throw errors.NEEDS_APP();
 	}
 	try {
-		await space.resolveGate(answer);
+		const { runId, ...choice } = answer;
+		await space.act(runId, { kind: "answer", ...choice });
 	} catch (error) {
 		if (error instanceof GateClosedError) {
 			throw errors.GATE_CLOSED({ cause: error });

@@ -450,7 +450,7 @@ describe("the scheduler", () => {
 		expect(listed?.last).toMatchObject({ kind: "skipped", runId });
 
 		// Once the run ends, the next time fires again.
-		await engine.stopRun(runId);
+		await engine.act(runId, { kind: "stop" });
 		clock = at(16, 24, 0, 30);
 		const later = await waitForFacts(3);
 		expect(later[2]).toMatchObject({
@@ -458,7 +458,7 @@ describe("the scheduler", () => {
 			payload: { at: at(16, 24), error: null },
 		});
 		const next = firedRunId(later[2]);
-		await engine.stopRun(next);
+		await engine.act(next, { kind: "stop" });
 	});
 
 	test("a schedule due while a merge holds the starts fires after the release, within its grace", async () => {
@@ -634,7 +634,7 @@ describe("the scheduler", () => {
 				error: expect.stringContaining("The run cap is reached"),
 			},
 		});
-		await engine.stopRun(busy.id);
+		await engine.act(busy.id, { kind: "stop" });
 	});
 
 	test("scheduler: false starts nothing", async () => {

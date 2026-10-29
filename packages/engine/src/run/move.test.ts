@@ -212,7 +212,7 @@ describe("a run that moves to another Device", () => {
 		const before = await spaceOf(a, a).getRun(runId);
 		const [build, open] = before.steps.map((s) => s.id) as [string, string];
 
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		const space = a.sandbox.spaceId;
 		// Each step's files, then the Checkpoint.
 		const kept = [...archive.keys()];
@@ -239,7 +239,7 @@ describe("a run that moves to another Device", () => {
 			walker: { id: b.sandbox.deviceId, thisDevice: true },
 		});
 
-		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await onB.act(runId, { kind: "answer", stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
@@ -259,7 +259,7 @@ describe("a run that moves to another Device", () => {
 		const [build, open] = (await spaceOf(a, a).getRun(runId)).steps.map(
 			(s) => s.id,
 		) as [string, string];
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		const transcript = (stepId: string): WalkRef => ({
 			kind: "transcript",
 			spaceId: a.sandbox.spaceId,
@@ -287,7 +287,11 @@ describe("a run that moves to another Device", () => {
 		expect(await onB(build)).toEqual(stamps.get(keyOf(transcript(build))));
 		expect(await onB(open)).toEqual(stamps.get(keyOf(transcript(open))));
 
-		await spaceOf(b, a).resolveGate({ runId, stepId: open, choice: "approve" });
+		await spaceOf(b, a).act(runId, {
+			kind: "answer",
+			stepId: open,
+			choice: "approve",
+		});
 		await waitFor(
 			async () => (await spaceOf(b, a).getRun(runId)).status === "finished",
 			{ label: "the run to end on B" },
@@ -300,7 +304,7 @@ describe("a run that moves to another Device", () => {
 		const { runId, projectId } = await waitingOn(a);
 		const steps = (await spaceOf(a, a).getRun(runId)).steps;
 		const open = steps[1]?.id as string;
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		// B is another computer: the files A wrote are not on its disk.
 		await rm(join(a.sandbox.dataDir, "transcripts"), {
 			recursive: true,
@@ -310,7 +314,7 @@ describe("a run that moves to another Device", () => {
 		await b.context.runs.takeOver(runId);
 
 		const onB = spaceOf(b, a);
-		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await onB.act(runId, { kind: "answer", stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
@@ -343,7 +347,7 @@ describe("a run that moves to another Device", () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a);
 		const open = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		const ref = {
 			kind: "transcript" as const,
 			spaceId: a.sandbox.spaceId,
@@ -361,7 +365,7 @@ describe("a run that moves to another Device", () => {
 		await b.context.runs.takeOver(runId);
 
 		const onB = spaceOf(b, a);
-		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await onB.act(runId, { kind: "answer", stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
@@ -400,12 +404,12 @@ describe("a run that moves to another Device", () => {
 		const onA = transcriptPath(a.sandbox.dataDir, runId, open);
 		const fromA = await readTranscriptFile(onA);
 		expect(fromA.length).toBeGreaterThan(0);
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		await copyRows(a, b, projectId);
 		await b.context.runs.takeOver(runId);
 
 		const onB = spaceOf(b, a);
-		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await onB.act(runId, { kind: "answer", stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
@@ -433,11 +437,11 @@ describe("a run that moves to another Device", () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a, twoGates);
 		const first = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		await copyRows(a, b, projectId);
 		await b.context.runs.takeOver(runId);
 		const onB = spaceOf(b, a);
-		await onB.resolveGate({ runId, stepId: first, choice: "approve" });
+		await onB.act(runId, { kind: "answer", stepId: first, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).steps.length === 3, {
 			label: "the second Gate on B",
 		});
@@ -448,7 +452,7 @@ describe("a run that moves to another Device", () => {
 			transcriptPath(b.sandbox.dataDir, runId, first),
 		);
 
-		await onB.moveRun(runId, a.sandbox.deviceId);
+		await onB.act(runId, { kind: "move", to: a.sandbox.deviceId });
 		await copyRows(b, a, projectId, a.sandbox.spaceId);
 		await a.context.runs.takeOver(runId);
 		// A's own file of the step had only A's part: now it has B's too.
@@ -456,8 +460,8 @@ describe("a run that moves to another Device", () => {
 			await readTranscriptFile(transcriptPath(a.sandbox.dataDir, runId, first)),
 		).toEqual(onBFile);
 		const second = (await spaceOf(a, a).getRun(runId)).steps[2]?.id as string;
-		await spaceOf(a, a).resolveGate({
-			runId,
+		await spaceOf(a, a).act(runId, {
+			kind: "answer",
 			stepId: second,
 			choice: "reject",
 		});
@@ -471,12 +475,12 @@ describe("a run that moves to another Device", () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a);
 		const open = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		await copyRows(a, b, projectId);
 		await b.context.runs.takeOver(runId);
 		await b.context.runs.takeOver(runId);
 		const onB = spaceOf(b, a);
-		await onB.resolveGate({ runId, stepId: open, choice: "reject" });
+		await onB.act(runId, { kind: "answer", stepId: open, choice: "reject" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
@@ -495,23 +499,27 @@ describe("a run that moves to another Device", () => {
 		await waitFor(async () => (await space.getRun(slow.id)).steps.length > 0, {
 			label: "the slow step to start",
 		});
-		await expect(space.moveRun(slow.id, b.sandbox.deviceId)).rejects.toThrow(
+		await expect(
+			space.act(slow.id, { kind: "move", to: b.sandbox.deviceId }),
+		).rejects.toThrow(
 			"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
 		);
-		await space.stopRun(slow.id);
+		await space.act(slow.id, { kind: "stop" });
 
 		const { runId } = await waitingOn(a);
-		await expect(space.moveRun(runId, a.sandbox.deviceId)).rejects.toThrow(
-			"This computer walks the run already.",
-		);
-		await expect(space.moveRun(runId, "no-such-device")).rejects.toThrow(
-			"That device is not one of yours.",
-		);
 		await expect(
-			a.engine.space(a.sandbox.spaceId).moveRun(runId, b.sandbox.deviceId),
+			space.act(runId, { kind: "move", to: a.sandbox.deviceId }),
+		).rejects.toThrow("This computer walks the run already.");
+		await expect(
+			space.act(runId, { kind: "move", to: "no-such-device" }),
+		).rejects.toThrow("That device is not one of yours.");
+		await expect(
+			a.engine
+				.space(a.sandbox.spaceId)
+				.act(runId, { kind: "move", to: b.sandbox.deviceId }),
 		).rejects.toThrow("Sign in to act on this run.");
 		expect(archive.size).toBe(0);
-		await space.stopRun(runId);
+		await space.act(runId, { kind: "stop" });
 	});
 
 	test("can go to the owner's other Devices that are online, never to its own Walker", async () => {
@@ -522,7 +530,7 @@ describe("a run that moves to another Device", () => {
 		expect(await targets()).toEqual([b.sandbox.deviceId]);
 
 		// B walks it now: it can come back to this computer.
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		expect(await targets()).toEqual([a.sandbox.deviceId]);
 		// A run of another Space is not found there.
 		await expect(
@@ -534,17 +542,17 @@ describe("a run that moves to another Device", () => {
 		const { a } = await pair(false);
 		const { runId } = await waitingOn(a);
 		expect(await spaceOf(a, a).listMoveTargets(runId)).toEqual([]);
-		await spaceOf(a, a).stopRun(runId);
+		await spaceOf(a, a).act(runId, { kind: "stop" });
 	});
 
 	test("is refused when the planner refuses its Device, and keeps nothing", async () => {
 		const { a, b } = await pair(false);
 		const { runId } = await waitingOn(a);
 		await expect(
-			spaceOf(a, a).moveRun(runId, b.sandbox.deviceId),
+			spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId }),
 		).rejects.toThrow("The planner refuses it.");
 		expect(archive.size).toBe(0);
-		await spaceOf(a, a).stopRun(runId);
+		await spaceOf(a, a).act(runId, { kind: "stop" });
 	});
 
 	test("a sleeping run that arrived gets its timer back after a restart of its new Walker", async () => {
@@ -567,7 +575,7 @@ describe("a run that moves to another Device", () => {
 			async () => (await space.getRun(runId)).status === "sleeping",
 			{ label: "the run to sleep" },
 		);
-		await space.moveRun(runId, b.sandbox.deviceId);
+		await space.act(runId, { kind: "move", to: b.sandbox.deviceId });
 		await copyRows(a, b, projectId);
 		await b.context.runs.takeOver(runId);
 		// B restarts before the wake: the next engine's recovery sets the timer.
@@ -584,7 +592,7 @@ describe("a run that moves to another Device", () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a);
 		const open = (await spaceOf(a, a).getRun(runId)).steps.at(-1)?.id ?? "";
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		await copyRows(a, b, projectId);
 		const onB = spaceOf(b, a);
 		const before = await b.context.history.events(runId);
@@ -593,16 +601,16 @@ describe("a run that moves to another Device", () => {
 		const arriving =
 			"This run is still on its way to this computer. Try again in a moment.";
 		await expect(
-			onB.resolveGate({ runId, stepId: open, choice: "approve" }),
+			onB.act(runId, { kind: "answer", stepId: open, choice: "approve" }),
 		).rejects.toThrow(arriving);
-		await expect(onB.resumeRun(runId)).rejects.toThrow(arriving);
-		await expect(onB.stopRun(runId, { when: "after-step" })).rejects.toThrow(
-			arriving,
-		);
+		await expect(onB.act(runId, { kind: "resume" })).rejects.toThrow(arriving);
+		await expect(
+			onB.act(runId, { kind: "stop", when: "after-step" }),
+		).rejects.toThrow(arriving);
 		expect(await b.context.history.events(runId)).toEqual(before);
 
 		await b.context.runs.takeOver(runId);
-		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await onB.act(runId, { kind: "answer", stepId: open, choice: "approve" });
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
@@ -611,7 +619,7 @@ describe("a run that moves to another Device", () => {
 	test("cannot be taken over without its Checkpoint in the archive, and arrives once it is there", async () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a);
-		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
 		const kept = new Map(archive);
 		archive.clear();
 		await copyRows(a, b, projectId);

@@ -20,6 +20,7 @@ import type {
 } from "../read";
 import type { ScheduleList } from "../schedules";
 import type { KeptValue } from "../variables";
+import type { RunActionRequest } from "./actions";
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {
@@ -126,24 +127,6 @@ export interface SpaceEngine {
 		schedules: readonly Schedule[],
 	): Promise<ScheduleIssue[]>;
 	/**
-	 * Answers an open Gate with one of its choices and continues the walk on
-	 * that outcome. Fails when the step is not an open Gate or the choice is
-	 * not one of its choices.
-	 */
-	resolveGate(input: {
-		runId: string;
-		stepId: string;
-		choice: string;
-		note?: string;
-	}): Promise<void>;
-	/**
-	 * Sends a signal to a run whose Wait node waits for it: the step ends
-	 * `done` and the walk goes on. Fails when the run does not wait for a
-	 * signal of that name.
-	 */
-	signalRun(runId: string, name: string): Promise<void>;
-
-	/**
 	 * The Space's runs (of one project), newest first. With `limit`, a page
 	 * of them, after the run of `cursor`.
 	 */
@@ -171,70 +154,15 @@ export interface SpaceEngine {
 	 */
 	startRun(input: StartRunInput): Promise<RunSummary>;
 
-	// The run actions (`run/actions.ts`). Each one refuses what the run does
-	// not allow now (`run-status/`, the rule the screens read too) with a
-	// `RunRefusal`. On a run another Device walks, a stop, an answer, a
-	// signal and a move travel to its Walker; the rest are refused.
-
 	/**
-	 * `now` (default): aborts the running step, closes an open Gate or ends a
-	 * sleep, and ends the run as `stopped`. `after-step`: lets the running
-	 * step finish, then ends the run as `stopped` before the next step.
-	 * `cancel-after-step`: withdraws an `after-step` stop.
-	 * No-op when nothing runs, waits or sleeps.
+	 * What the person asks of a run (`run/actions.ts`): stop it, answer its
+	 * Gate, send its signal, move its Walk, resume it, restart its step or
+	 * walk it again from a node. Each action refuses what the run does not
+	 * allow now (`run-status/`, the rule the screens read too) with a
+	 * `RunRefusal`. On a run another Device walks, a stop, an answer, a
+	 * signal and a move travel to its Walker; the rest are refused.
 	 */
-	stopRun(
-		runId: string,
-		options?: { when?: "now" | "after-step" | "cancel-after-step" },
-	): Promise<void>;
-	/**
-	 * Continues a stopped, failed or interrupted run at its last step's node
-	 * (inside a Call with `each`, at the same item). A finished run reopens
-	 * its last step. A sleeping run wakes at once.
-	 * An Agent node with a harness session continues that session with the
-	 * prompt (default "Continue where you left off."). Any other node runs
-	 * again. Edge counts carry over. Fails while the run is running.
-	 */
-	resumeRun(runId: string, prompt?: string): Promise<void>;
-	/**
-	 * Stops the running step and continues it at once, in one action: as a
-	 * stop now and a resume would, with nothing in between. An Agent step
-	 * with a harness session continues it with the prompt (default
-	 * "Continue where you left off."); any other step runs again. Only
-	 * while a step runs; with `stepId`, only while that step runs. A run
-	 * another Device walks is refused.
-	 */
-	restartStep(
-		runId: string,
-		options?: { prompt?: string; stepId?: string },
-	): Promise<void>;
-	/**
-	 * Walks a run that is not going (failed, stopped, interrupted or
-	 * finished) again from `nodeId`, a node of the run's own flow, with a
-	 * new visit of it; the steps after it follow as the flow routes. Inputs,
-	 * outputs and edge counts carry over. An Agent node continues the
-	 * session of its step `stepId` (default: its latest) with the prompt
-	 * (default "Continue where you left off."), or with `fresh` starts a
-	 * new session with its own prompt. A run another Device walks is
-	 * refused.
-	 */
-	rerunFrom(
-		runId: string,
-		options: {
-			nodeId: string;
-			stepId?: string;
-			prompt?: string;
-			fresh?: boolean;
-		},
-	): Promise<void>;
-	/**
-	 * Moves the run's Walk to another of the actor's Devices (`WalkerMoved`):
-	 * this computer archives the run's checkpoint and files and stops
-	 * walking it; the new Walker resumes from the archive. Only a run that
-	 * is not in the middle of a step. A run walked elsewhere: its Walker
-	 * moves it.
-	 */
-	moveRun(runId: string, toDeviceId: string): Promise<void>;
+	act(runId: string, request: RunActionRequest): Promise<void>;
 	/**
 	 * The actor's own Devices the run can move to now: online, and not its
 	 * Walker. From the run's own Space, whichever Space the person works in.

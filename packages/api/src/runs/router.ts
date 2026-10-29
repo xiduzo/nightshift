@@ -116,7 +116,7 @@ export const runs = {
 		.route({ summary: "Stops a run now, or after its running step." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.stopRun(input.runId, { when: input.when }),
+			context.space.act(input.runId, { kind: "stop", when: input.when }),
 		),
 	/**
 	 * Another of the Person's Devices walks the run from here on: from its
@@ -131,7 +131,7 @@ export const runs = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.moveRun(input.runId, input.deviceId),
+			context.space.act(input.runId, { kind: "move", to: input.deviceId }),
 		),
 	/** The Person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
 	moveTargets: runProcedure(z.object({ runId: z.string() }))
@@ -174,7 +174,7 @@ export const runs = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.resumeRun(input.runId, input.prompt),
+			context.space.act(input.runId, { kind: "resume", prompt: input.prompt }),
 		),
 	/**
 	 * Stops the running step and continues it at once, with an optional
@@ -193,7 +193,8 @@ export const runs = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.restartStep(input.runId, {
+			context.space.act(input.runId, {
+				kind: "restart",
 				...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
 				...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
 			}),
@@ -217,7 +218,8 @@ export const runs = {
 		.route({ summary: "Runs a run again from one node of its own flow." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.rerunFrom(input.runId, {
+			context.space.act(input.runId, {
+				kind: "rerun",
 				nodeId: input.nodeId,
 				...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
 				...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
@@ -254,6 +256,6 @@ export const runs = {
 		.route({ summary: "Sends a signal to a run whose Wait node waits for it." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.signalRun(input.runId, input.name),
+			context.space.act(input.runId, { kind: "signal", name: input.name }),
 		),
 };

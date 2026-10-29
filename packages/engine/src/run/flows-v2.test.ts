@@ -525,8 +525,8 @@ describe("Call", () => {
 		const gate = await waitFor(async () => (await engine.listGates())[0]);
 		expect(gate.question).toBe("Ship it?");
 		expect((await engine.getRun(run.id)).status).toBe("waiting");
-		await engine.resolveGate({
-			runId: run.id,
+		await engine.act(run.id, {
+			kind: "answer",
 			stepId: gate.stepId,
 			choice: "yes",
 			note: "go",
@@ -559,7 +559,7 @@ describe("Call", () => {
 		});
 		await waitFor(() => sessions[0]);
 		expect(sessions[0]?.input.prompt).toBe("Work on trees");
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		const stopped = await engine.getRun(run.id);
 		expect(stopped.status).toBe("stopped");
 		expect(stepOf(stopped, "call").outcome).toBe("stopped");
@@ -568,7 +568,7 @@ describe("Call", () => {
 			["work", "stopped"],
 		]);
 
-		await engine.resumeRun(run.id, "Go on.");
+		await engine.act(run.id, { kind: "resume", prompt: "Go on." });
 		await waitFor(() => sessions[1]);
 		expect(sessions[1]?.input.resumeSessionId).toBe("harness-0");
 		sessions[1]?.text("done with trees");
@@ -611,7 +611,7 @@ describe("Call", () => {
 		(await waitFor(() => sessions[0])).finish();
 		// check fails and e3 leads back to plan, whose second visit is stopped.
 		await waitFor(() => sessions[1]);
-		await engine.stopRun(run.id);
+		await engine.act(run.id, { kind: "stop" });
 		const stopped = await engine.getRun(run.id);
 		expect(stopped.status).toBe("stopped");
 		expect(
@@ -628,7 +628,7 @@ describe("Call", () => {
 		// The previous engine walked this run: its thread has no checkpoint.
 		await saverFor(sandbox.db).deleteThread(run.id);
 
-		await engine.resumeRun(run.id, "Go on.");
+		await engine.act(run.id, { kind: "resume", prompt: "Go on." });
 		const resumed = await waitFor(() => sessions[2]);
 		expect(resumed.input.resumeSessionId).toBe("harness-1");
 		expect(resumed.input.prompt).toBe("Go on.");
@@ -1281,7 +1281,7 @@ describe("flow format 1", () => {
 			itemId: "12",
 		});
 
-		await engine.resumeRun(runId);
+		await engine.act(runId, { kind: "resume" });
 		const detail = await waitForEnd(engine, runId);
 		expect(detail.status).toBe("finished");
 		expect(logOf(detail, "work")).toBe("first #12 of #7 on main");
@@ -1412,7 +1412,7 @@ describe("flow format 1", () => {
 				["prepare", "pass"],
 				["worker", null],
 			]);
-			await engine.stopRun(run.id);
+			await engine.act(run.id, { kind: "stop" });
 			expect((await engine.getRun(run.id)).status).toBe("stopped");
 		} finally {
 			process.env.PATH = path;

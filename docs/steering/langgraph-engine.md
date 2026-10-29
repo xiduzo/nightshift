@@ -322,7 +322,7 @@ packages/engine/src/
    pass its signal to harnesses and commands. An aborted step ends
    `stopped` and parks. A stop while parked (wait or Gate) appends
    `StepEnded stopped` and `RunEnded stopped` from the runner; the thread
-   stays at its interrupt. `stopRun({ when: "after-step" })` appends
+   stays at its interrupt. A stop with `when: "after-step"` appends
    `StopAfterStepRequested`; every step node checks it (and `stopAt`, and
    the step cap) on entry before `StepStarted`, and parks `stopped` with the
    same reasons as before. The stop time is the state's: the start input
@@ -348,8 +348,8 @@ packages/engine/src/
    deadline, the four kinds are `WaitReason`s next to the policy's two, a
    wait with no time (a signal with no timeout) has `until: null` and no
    timer, and a signal is `Command({ resume: { kind: "signal", name } })`
-   through the same wake Turn (`Engine.signalRun`).
-9. **Resume mapping** (`Engine.resumeRun`): stopped or failed → the thread
+   through the same wake Turn (`act` with `kind: "signal"`).
+9. **Resume mapping** (`act` with `kind: "resume"`): stopped or failed → the thread
    is parked → `resume: { kind: "resume", prompt }`. Interrupted (daemon
    died) → the last checkpoint is before the node → `invoke(null)` re-runs
    it (rule 5). Sleeping → wake early. Stopped while at a Gate →
@@ -370,7 +370,7 @@ packages/engine/src/
     of each namespace, and drops the namespaces below an older one, at
     every put. An interrupted run (the daemon died) prunes when
     its next drive ends. The history was the walk's bookkeeping and the event
-    log is the record; the final state is what `resumeRun` of a finished
+    log is the record; the final state is what a resume of a finished
     run re-enters on: `Command({ goto, update: { ended: null, pending:
     null } })` with the last step's visit taken back, so its node reopens
     the step (rule 9).
@@ -418,8 +418,8 @@ Decisions taken while implementing, from the code and its comments:
   `choosers/rule.ts` (JSONata rules) or `choosers/model.ts` (the decider).
   Every chooser ends its step with `{ outcome, note, visit }`. The option
   check is one function in `packages/flows` (`optionProblem`), shared by
-  the choosers, `resolveGate` and the decider's `decide` tool. The inbox,
-  run status `waiting`, `listGates` and `resolveGate` key on the Gate the
+  the choosers, an answer to a Gate and the decider's `decide` tool. The inbox,
+  run status `waiting`, `listGates` and an answer key on the Gate the
   step opened (`GateOpened`), not on a node type.
 - **A Gate is two graph nodes** (`choosers/person.ts`, `compile.ts`). The
   node opens the Gate (`StepStarted`, `GateOpened`, the transcript
@@ -478,7 +478,7 @@ Decisions taken while implementing, from the code and its comments:
   not the signal (a timer at the deadline, a person's "wake now") sleeps on.
   `done` without an edge is a chosen end, `timeout` a failure. A parked or
   interrupted Wait step starts a new visit, as a Command does.
-- **`resumeRun` of a thread that ended or never ran re-enters with a
+- **A resume of a thread that ended or never ran re-enters with a
   `Command({ goto, update })`** (`planReentry`, the runner's re-entry Turn). A finished run (rule
   10) or a run from before this engine has no checkpoint at an interrupt,
   so the engine jumps to the top-level node the log points at instead of
@@ -518,7 +518,7 @@ Decisions taken while implementing, from the code and its comments:
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
   on the bus; transcript entries reach the bus from the recorder already.
-- **`resolveGate` waits for the step to end** (`run/actions.ts`). It reserves a
+- **An answer to a Gate waits for the step to end** (`run/actions.ts`). It reserves a
   slot, resumes the thread with `{ kind: "gate", choice, note }` and
   returns once the log has the step's `StepEnded`, so the run no longer
   waits when the caller looks again. A full run cap leaves the Gate open.

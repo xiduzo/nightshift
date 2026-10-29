@@ -132,15 +132,17 @@ describe("Spaces", () => {
 			kind: "not-found",
 			message: notFound,
 		});
-		await expect(other.stopRun(started.id)).rejects.toThrow(notFound);
-		await expect(other.resumeRun(started.id)).rejects.toThrow(notFound);
-		await expect(other.signalRun(started.id, "go")).rejects.toThrow(notFound);
+		await expect(other.act(started.id, { kind: "stop" })).rejects.toThrow(
+			notFound,
+		);
+		await expect(other.act(started.id, { kind: "resume" })).rejects.toThrow(
+			notFound,
+		);
 		await expect(
-			other.resolveGate({
-				runId: started.id,
-				stepId: "any",
-				choice: "yes",
-			}),
+			other.act(started.id, { kind: "signal", name: "go" }),
+		).rejects.toThrow(notFound);
+		await expect(
+			other.act(started.id, { kind: "answer", stepId: "any", choice: "yes" }),
 		).rejects.toThrow(notFound);
 		const watching = other.watchRun(started.id, {
 			signal: new AbortController().signal,
@@ -165,7 +167,7 @@ describe("Spaces", () => {
 
 		// The run still waits in its own Space.
 		expect((await mine.getRun(started.id)).status).toBe("waiting");
-		await mine.stopRun(started.id);
+		await mine.act(started.id, { kind: "stop" });
 	});
 
 	test("each Space lists its own open Gates, and a run names its Space", async () => {
@@ -200,21 +202,21 @@ describe("Spaces", () => {
 		// The answer is bound to its run and step, and refused once the Gate is closed.
 		const [open] = await theirs.listGates();
 		if (!open) throw new Error("no Gate");
-		await theirs.resolveGate({
-			runId: second.id,
+		await theirs.act(second.id, {
+			kind: "answer",
 			stepId: open.stepId,
 			choice: "no",
 		});
 		expect(await theirs.listGates()).toEqual([]);
 		await expect(
-			theirs.resolveGate({
-				runId: second.id,
+			theirs.act(second.id, {
+				kind: "answer",
 				stepId: open.stepId,
 				choice: "yes",
 			}),
 		).rejects.toBeInstanceOf(GateClosedError);
 		expect(await gatesOf(mine)).toEqual([[sandbox.spaceId, first.id]]);
-		await mine.stopRun(first.id);
+		await mine.act(first.id, { kind: "stop" });
 	});
 
 	test("every row a run writes carries its project's Space", async () => {
@@ -225,7 +227,7 @@ describe("Spaces", () => {
 			async () => (await mine.getRun(started.id)).status === "waiting",
 			{ label: "the Gate" },
 		);
-		await mine.stopRun(started.id);
+		await mine.act(started.id, { kind: "stop" });
 
 		const spaces = async (
 			table:
@@ -300,7 +302,7 @@ describe("Spaces", () => {
 			`${added.id}/${sandbox.deviceId}`,
 		]);
 
-		await theirs.stopRun(started.id);
+		await theirs.act(started.id, { kind: "stop" });
 	});
 
 	test("a move to a Space that does not exist is refused", async () => {

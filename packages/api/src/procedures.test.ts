@@ -59,7 +59,7 @@ let args: unknown[][];
 let gatesIn: Map<string, OpenGate[]>;
 /** The Space of each run the fake engine keeps. */
 let runSpaces: Map<string, string>;
-/** What the fake engine's `resolveGate` does after it records the call. */
+/** What the fake engine's answer to a Gate (`act.answer`) does after it records the call. */
 let onResolve: () => void;
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
@@ -80,10 +80,15 @@ beforeAll(() => {
 });
 afterAll(() => quiet());
 
-/** A method of a Space's engine that records its Space and name (`flows.save` for a verb of its flows). */
+/**
+ * A method of a Space's engine that records its Space and name (`flows.save`
+ * for a verb of its flows, `act.stop` for an action on a run).
+ */
 const recorder =
-	(space: string, method: string) =>
+	(space: string, name: string) =>
 	(input: unknown, ...rest: unknown[]) => {
+		const method =
+			name === "act" ? `act.${(rest[0] as { kind: string }).kind}` : name;
 		calls.push({ space, method });
 		inputs.push(input);
 		args.push([input, ...rest]);
@@ -91,7 +96,7 @@ const recorder =
 		if (method === "watchRun") return (async function* () {})();
 		return (async () => {
 			if (method === "listGates") return gatesIn.get(space) ?? [];
-			if (method === "resolveGate") return onResolve();
+			if (method === "act.answer") return onResolve();
 			return method === "listRuns" ? [] : { id: "run-1" };
 		})();
 	};
@@ -487,20 +492,23 @@ describe("procedures", () => {
 			{ runId: "r", stepId: "s", prompt: "Report now." },
 			{ context: member },
 		);
-		expect(calls.at(-1)).toEqual({ space: spaceId, method: "restartStep" });
-		expect(args.at(-1)).toEqual(["r", { stepId: "s", prompt: "Report now." }]);
+		expect(calls.at(-1)).toEqual({ space: spaceId, method: "act.restart" });
+		expect(args.at(-1)).toEqual([
+			"r",
+			{ kind: "restart", stepId: "s", prompt: "Report now." },
+		]);
 		await call(appRouter.runs.restartStep, { runId: "r" }, { context: member });
-		expect(args.at(-1)).toEqual(["r", {}]);
+		expect(args.at(-1)).toEqual(["r", { kind: "restart" }]);
 
 		await call(
 			appRouter.runs.rerun,
 			{ runId: "r", nodeId: "worker", prompt: "Again.", fresh: true },
 			{ context: member },
 		);
-		expect(calls.at(-1)).toEqual({ space: spaceId, method: "rerunFrom" });
+		expect(calls.at(-1)).toEqual({ space: spaceId, method: "act.rerun" });
 		expect(args.at(-1)).toEqual([
 			"r",
-			{ nodeId: "worker", prompt: "Again.", fresh: true },
+			{ kind: "rerun", nodeId: "worker", prompt: "Again.", fresh: true },
 		]);
 
 		const viewer = await contextFor(cy.headers);
@@ -946,7 +954,7 @@ describe("a run opened by its id", () => {
 		expect(calls).toEqual([
 			{ space: spaceId, method: "getRun" },
 			{ space: spaceId, method: "watchRun" },
-			{ space: spaceId, method: "stopRun" },
+			{ space: spaceId, method: "act.stop" },
 			{ space: spaceId, method: "listMoveTargets" },
 		]);
 		// The session still works in its own Space, and lists stay there.
@@ -1131,9 +1139,12 @@ describe("the Needs-you inbox", () => {
 
 		const answer = { runId: "ada-run", stepId: "step-1", choice: "yes" };
 		await call(appRouter.gates.resolve, answer, { context });
-		expect(calls).toEqual([{ space: personal, method: "resolveGate" }]);
+		expect(calls).toEqual([{ space: personal, method: "act.answer" }]);
 		// Bound to its run and step.
-		expect(inputs.at(-1)).toEqual(answer);
+		expect(args.at(-1)).toEqual([
+			"ada-run",
+			{ kind: "answer", stepId: "step-1", choice: "yes" },
+		]);
 		// The session still works in Platform.
 		expect((await contextFor(ada.headers)).access.spaceId).toBe(spaceId);
 	});
@@ -1188,11 +1199,10 @@ describe("the Needs-you inbox", () => {
 		await call(appRouter.gates.resolve, fromLockScreen("marked-run"), {
 			context,
 		});
-		expect(inputs.at(-1)).toEqual({
-			runId: "marked-run",
-			stepId: "step-marked-run",
-			choice: "yes",
-		});
+		expect(args.at(-1)).toEqual([
+			"marked-run",
+			{ kind: "answer", stepId: "step-marked-run", choice: "yes" },
+		]);
 
 		expect(
 			await refusalOf(
@@ -1220,13 +1230,16 @@ describe("the Needs-you inbox", () => {
 			message: "This Gate does not wait anymore.",
 		});
 		expect(
-			calls.filter((c) => c.method === "resolveGate").map((c) => c.space),
+			calls.filter((c) => c.method === "act.answer").map((c) => c.space),
 		).toEqual([spaceId]);
 
 		// From the app, the same Gate takes the answer.
 		const { via: _via, ...inApp } = fromLockScreen("plain-run");
 		await call(appRouter.gates.resolve, inApp, { context });
-		expect(inputs.at(-1)).toEqual(inApp);
+		expect(args.at(-1)).toEqual([
+			"plain-run",
+			{ kind: "answer", stepId: "step-plain-run", choice: "yes" },
+		]);
 	});
 
 	test("refuses an answer once the Gate is closed, without the step's id", async () => {

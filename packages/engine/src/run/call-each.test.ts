@@ -770,7 +770,7 @@ describe("Call with each", () => {
 			]),
 		});
 		await waitFor(() => sessions[0]);
-		await engine.stopRun(started.id);
+		await engine.act(started.id, { kind: "stop" });
 		const stopped = await engine.getRun(started.id);
 		expect(stopped.status).toBe("stopped");
 		const loopStopped = callEachStep(stopped);
@@ -782,7 +782,7 @@ describe("Call with each", () => {
 			["1", "failed", "The run stopped during this item.", loopStopped.endedAt],
 		]);
 
-		await engine.resumeRun(started.id);
+		await engine.act(started.id, { kind: "resume" });
 		const resumed = await waitFor(() => sessions[1]);
 		const running = callEachStep(await engine.getRun(started.id));
 		expect(running.items.map((i) => [i.id, i.state, i.reason])).toEqual([
@@ -839,8 +839,8 @@ describe("Call with each", () => {
 		await waitForStatus(engine, started.id, "waiting");
 		const [first] = await engine.listGates();
 		expect(first?.question).toBe("Ship a?");
-		await engine.resolveGate({
-			runId: started.id,
+		await engine.act(started.id, {
+			kind: "answer",
 			stepId: first?.stepId ?? "",
 			choice: "yes",
 		});
@@ -848,8 +848,8 @@ describe("Call with each", () => {
 			const gates = await engine.listGates();
 			return gates[0]?.question === "Ship b?" ? gates[0] : null;
 		});
-		await engine.resolveGate({
-			runId: started.id,
+		await engine.act(started.id, {
+			kind: "answer",
 			stepId: second.stepId,
 			choice: "halt",
 		});
@@ -1115,7 +1115,7 @@ describe("run policy", () => {
 			flow: flowOf([agent("worker", "Go")]),
 		});
 		await waitForStatus(engine, a.id, "sleeping");
-		await engine.stopRun(a.id);
+		await engine.act(a.id, { kind: "stop" });
 		const stopped = await engine.getRun(a.id);
 		expect(stopped.status).toBe("stopped");
 		expect(stopped.wakeAt).toBeNull();
@@ -1127,7 +1127,7 @@ describe("run policy", () => {
 			flow: flowOf([agent("worker", "Go")]),
 		});
 		await waitForStatus(engine, b.id, "sleeping");
-		await engine.resumeRun(b.id, "Go on now.");
+		await engine.act(b.id, { kind: "resume", prompt: "Go on now." });
 		const detail = await waitForEnd(engine, b.id);
 		expect(detail.status).toBe("finished");
 		const resumed = harness.calls[before + 1];
@@ -1167,7 +1167,7 @@ describe("stop modes", () => {
 			),
 		});
 		const session = await waitFor(() => sessions[0]);
-		await engine.stopRun(started.id, { when: "after-step" });
+		await engine.act(started.id, { kind: "stop", when: "after-step" });
 		const asked = await engine.getRun(started.id);
 		expect(asked.status).toBe("running");
 		expect(asked.stopAfterStep).toBe(true);
@@ -1181,7 +1181,7 @@ describe("stop modes", () => {
 		]);
 
 		// Resume continues where it stopped, without the old request.
-		await engine.resumeRun(started.id);
+		await engine.act(started.id, { kind: "resume" });
 		expect((await waitForEnd(engine, started.id)).status).toBe("finished");
 	});
 
@@ -1204,7 +1204,7 @@ describe("stop modes", () => {
 			]),
 		});
 		const session = await waitFor(() => sessions[0]);
-		await engine.stopRun(started.id, { when: "after-step" });
+		await engine.act(started.id, { kind: "stop", when: "after-step" });
 		session.finish();
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("stopped");
@@ -1237,7 +1237,7 @@ describe("stop modes", () => {
 			]),
 		});
 		const session = await waitFor(() => sessions[0]);
-		await engine.stopRun(started.id, { when: "after-step" });
+		await engine.act(started.id, { kind: "stop", when: "after-step" });
 		session.finish();
 		const stopped = await waitForEnd(engine, started.id);
 		expect(stopped.status).toBe("stopped");
@@ -1248,7 +1248,7 @@ describe("stop modes", () => {
 			["1", "failed", "The run stopped during this item."],
 		]);
 
-		await engine.resumeRun(started.id);
+		await engine.act(started.id, { kind: "resume" });
 		const second = await waitFor(() => sessions[1]);
 		expect(second.input.prompt).toBe("Build b");
 		second.finish();
@@ -1296,7 +1296,7 @@ describe("stop modes", () => {
 		]);
 
 		// A person resumes past the stop time: it no longer applies.
-		await engine.resumeRun(started.id);
+		await engine.act(started.id, { kind: "resume" });
 		const resumed = await waitForEnd(engine, started.id);
 		expect(resumed.status).toBe("finished");
 		expect(resumed.stopAt).toBeNull();
@@ -1335,7 +1335,7 @@ describe("stop modes", () => {
 		const logged = await loggedEvents(started.id);
 		expect(logged.some((e) => e.type === "WaitStarted")).toBe(false);
 
-		await engine.resumeRun(started.id);
+		await engine.act(started.id, { kind: "resume" });
 		const resumed = await waitForEnd(engine, started.id);
 		expect(resumed.status).toBe("finished");
 		expect(harness.calls).toHaveLength(2);
@@ -1359,7 +1359,7 @@ describe("stop modes", () => {
 		});
 		const sleeping = await waitForStatus(engine, started.id, "sleeping");
 		expect(sleeping.wakeAt).toBe(clock + 2 * 60_000);
-		await engine.stopRun(started.id);
+		await engine.act(started.id, { kind: "stop" });
 		await waitForEnd(engine, started.id);
 	});
 
