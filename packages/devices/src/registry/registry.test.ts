@@ -182,14 +182,10 @@ describe("the links of a joining Device", () => {
 		keyStore: "file" as const,
 	};
 
-	test("a home link sets this Device's home Host; a second home is refused", async () => {
+	test("a home link is this Device's home Host; a second home is refused", async () => {
 		const links = createHostLinks(sandbox.db);
 		await links.save(link);
-		const [self] = await sandbox.db
-			.select({ homeHost: device.homeHost })
-			.from(device)
-			.where(eq(device.self, true));
-		expect(self?.homeHost).toBe("https://studio.local");
+		expect((await links.home())?.hostId).toBe("host-a");
 
 		await expect(
 			links.save({ ...link, hostId: "host-c", name: "other" }),
@@ -206,14 +202,7 @@ describe("the links of a joining Device", () => {
 		await links.save(link);
 		await links.revoked("host-a");
 		expect((await links.get("host-a"))?.revokedAt).not.toBeNull();
-		const homeHost = async () =>
-			(
-				await sandbox.db
-					.select({ homeHost: device.homeHost })
-					.from(device)
-					.where(eq(device.self, true))
-			)[0]?.homeHost;
-		expect(await homeHost()).toBeNull();
+		expect(await links.home()).toBeNull();
 
 		await links.save({
 			...link,
@@ -221,7 +210,9 @@ describe("the links of a joining Device", () => {
 			addresses: ["https://new.example.com"],
 		});
 		expect(await links.get("host-a")).toBeNull();
-		expect(await homeHost()).toBe("https://new.example.com");
+		expect((await links.home())?.addresses).toEqual([
+			"https://new.example.com",
+		]);
 	});
 
 	test("a key kept in a file is readable by its owner only", async () => {

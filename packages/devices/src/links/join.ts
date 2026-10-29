@@ -23,7 +23,7 @@ import type { JoinProgress } from "./types";
  */
 export type JoinDeps = {
 	self: { id: string; name: string; platform: string };
-	links: HostLinks;
+	links: Pick<HostLinks, "home" | "save">;
 	keys: DeviceKeyStore;
 	/** The pairing is done: start the link. */
 	started(link: HostLink, key: string): void | Promise<void>;
@@ -38,9 +38,7 @@ export async function* joinHost(
 ): AsyncGenerator<JoinProgress> {
 	const address = hostOrigin(input.url);
 	if (input.role === "home") {
-		const home = (await deps.links.list()).find(
-			(l) => l.role === "home" && !l.revokedAt,
-		);
+		const home = await deps.links.home();
 		if (home && !home.addresses.includes(address)) {
 			throw new Refusal("conflict", SECOND_HOME);
 		}

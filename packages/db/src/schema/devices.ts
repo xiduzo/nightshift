@@ -33,7 +33,11 @@ export const device = sqliteTable(
 		name: text("name").notNull(),
 		/** `process.platform`: darwin, linux, win32. */
 		platform: text("platform").notNull(),
-		/** The address of the Host that keeps its private configuration. Null: none yet. */
+		/**
+		 * On a Host, for a paired Device: the address it joined by when this
+		 * Host is its home Host. Null: a guest Host. Not written on the self
+		 * row: `host_link` records this computer's own home Host.
+		 */
 		homeHost: text("home_host"),
 		lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
 		/**

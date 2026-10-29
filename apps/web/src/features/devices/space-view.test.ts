@@ -26,6 +26,7 @@ const linked = (spaces: string[]): LinkedHost => ({
 	hostId: "host-1",
 	name: "infonl-studio",
 	role: "guest",
+	homeHost: false,
 	addresses: ["https://studio.example.com"],
 	address: null,
 	status: "online",

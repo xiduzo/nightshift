@@ -85,9 +85,7 @@ export async function leaveCommand(argv: string[], program: string) {
 	const client = await daemonClient(options.daemon);
 	try {
 		const { thisComputer } = await client.devices.list();
-		const home = thisComputer?.hosts.find(
-			(host) => host.role === "home" && host.status !== "revoked",
-		);
+		const home = thisComputer?.hosts.find((host) => host.homeHost);
 		if (!home) {
 			console.log("This computer has no home Host.");
 			return;

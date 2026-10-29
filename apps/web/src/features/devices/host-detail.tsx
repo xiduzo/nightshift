@@ -131,7 +131,7 @@ function LinkedHostDetail({
 					))}
 				</div>
 			</DetailSection>
-			{home && host.status !== "revoked" ? (
+			{host.homeHost ? (
 				<DetailSection
 					title="Leave"
 					description={`${host.name} keeps everything. This computer keeps its own Personal.`}

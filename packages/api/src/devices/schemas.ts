@@ -29,6 +29,8 @@ const linkedHostSchema = z.object({
 	hostId: z.string(),
 	name: z.string(),
 	role: hostRoleSchema,
+	/** This computer's home Host now: its home link, with access. */
+	homeHost: z.boolean(),
 	/** In the order Devices try them. */
 	addresses: z.array(z.string()),
 	/** The address that answers now. */

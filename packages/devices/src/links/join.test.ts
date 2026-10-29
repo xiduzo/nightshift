@@ -152,9 +152,9 @@ function pairingHost(joined: Joined) {
 /** Joins the Host at `url` as `role`, and returns every step it yields. */
 async function joinSteps(url: string, role: "home" | "guest") {
 	const links = {
-		list: async () => [],
+		home: async () => null,
 		save: async (link) => ({ ...link, createdAt: 0, revokedAt: null }),
-	} as Pick<HostLinks, "list" | "save"> as HostLinks;
+	} satisfies Pick<HostLinks, "home" | "save">;
 	const steps = [];
 	for await (const step of joinHost(
 		{

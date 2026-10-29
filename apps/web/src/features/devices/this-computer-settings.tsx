@@ -351,9 +351,7 @@ function isHostAddress(value: string): boolean {
 function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 	const [joining, setJoining] = useState(false);
 	const activeSpace = useQuery(spaceQueries.list()).data?.active;
-	const hasHome = hosts.some(
-		(host) => host.role === "home" && host.status !== "revoked",
-	);
+	const hasHome = hosts.some((host) => host.homeHost);
 	return (
 		<Card>
 			<CardContent className="flex flex-col gap-3">
@@ -398,7 +396,7 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 												: "Keeps no Space of yours yet."}
 									</ItemDescription>
 								</ItemContent>
-								{host.role === "home" && host.status !== "revoked" ? (
+								{host.homeHost ? (
 									<ItemActions>
 										<LeaveHostButton hostName={host.name} />
 									</ItemActions>

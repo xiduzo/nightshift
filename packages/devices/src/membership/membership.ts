@@ -30,7 +30,7 @@ const LISTED_WAIT_MS = 30_000;
 export type HomeMembershipDeps = MergeDeps &
 	SplitDeps & {
 		links: Pick<DeviceLinks, "get" | "add">;
-		hostLinks: Pick<HostLinks, "list" | "get" | "revoked">;
+		hostLinks: Pick<HostLinks, "home" | "get" | "revoked">;
 		keys: Pick<DeviceKeyStore, "delete">;
 		/** The copies of the Person's other Devices, which only the home Host gives. */
 		copies: Pick<DeviceCopies, "keep">;
@@ -62,16 +62,7 @@ export type HomeMembership = ReturnType<typeof createHomeMembership>;
 export function createHomeMembership(deps: HomeMembershipDeps) {
 	const record = membershipRecord(deps.db);
 
-	/** The home Host this computer has access to, if any. */
-	async function home() {
-		return (
-			(await deps.hostLinks.list()).find(
-				(link) => link.role === "home" && link.revokedAt === null,
-			) ?? null
-		);
-	}
-
-	const merges = mergeSteps({ ...deps, record, home });
+	const merges = mergeSteps({ ...deps, record });
 	const splits = splitSteps({ ...deps, record });
 
 	/** The steps queued or under way. */
@@ -216,7 +207,7 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 		 */
 		leave(): Promise<LeaveResult> {
 			return exclusive(async () => {
-				const link = await home();
+				const link = await deps.hostLinks.home();
 				if (!link) throw new Refusal("conflict", LEAVE_WORDS.noHome);
 				const from = await splits.check();
 

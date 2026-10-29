@@ -10,6 +10,8 @@ export type LinkedHost = {
 	hostId: string;
 	name: string;
 	role: HostRole;
+	/** This computer's home Host now: its home link, with access (`HostLinks.home`). */
+	homeHost: boolean;
 	addresses: string[];
 	/** The address that answers now. */
 	address: string | null;

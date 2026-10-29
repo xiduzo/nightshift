@@ -1139,7 +1139,9 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      is), its key in the keychain (`Bun.secrets`, service
      `nightshift-device-keys`), else in `<data dir>/device-keys/<host>`
      with mode 0600 (`NIGHTSHIFT_KEY_STORE=file` forces it). One home
-     Host at most; a home link sets the self row's `home_host`.
+     Host at most: the home link with access is the one record of it
+     (`HostLinks.home`). Nothing writes the self row's `home_host`: only a
+     Host fills that column, for the Devices whose home it is.
    - **The Link** (`packages/devices/src/links/link.ts`): `httpsLink` tries
      the addresses in order (a refusal is an answer, a network error
      falls through), keeps the first that answers, learns the Host's

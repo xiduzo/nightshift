@@ -32,6 +32,7 @@ import type { RunHistoryExchange } from "../exchange";
 import {
 	type DeviceLinks,
 	fromHost,
+	type HostLinks,
 	type HostSpaces,
 	type Link,
 } from "../links";
@@ -123,6 +124,8 @@ export type MergeDeps = {
 		hostSpaces: Pick<HostSpaces, "listed">;
 	};
 	links: Pick<DeviceLinks, "get">;
+	/** The home Host this computer merges into (`HostLinks.home`). */
+	hostLinks: Pick<HostLinks, "home">;
 	spaces: Pick<SpaceDocuments, "open" | "remove">;
 	flows: Pick<FlowDocuments, "open">;
 	/** This computer's Device. */
@@ -140,13 +143,7 @@ export type MergeDeps = {
 };
 
 /** The steps of a merge, for the membership: it runs one at a time. */
-export function mergeSteps(
-	deps: MergeDeps & {
-		record: MembershipRecord;
-		/** The home Host's link with access, if any. */
-		home(): Promise<{ hostId: string; name: string } | null>;
-	},
-) {
+export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	const { db, engine, self } = deps;
 	const now = deps.now ?? Date.now;
 	const rows = deps.record.merges;
@@ -206,7 +203,7 @@ export function mergeSteps(
 	 * from the Host's answer on.
 	 */
 	async function checks(started?: MergeRow): Promise<MergeReady | MergeHeld> {
-		const home = await deps.home();
+		const home = await deps.hostLinks.home();
 		let host: { id: string; name: string };
 		let from: string;
 		let listed: { id: string; personal: boolean }[] | null = null;
@@ -574,7 +571,7 @@ export function mergeSteps(
 				return {
 					pending: true,
 					state: started.state,
-					hostName: (await deps.home())?.name ?? null,
+					hostName: (await deps.hostLinks.home())?.name ?? null,
 					blocked:
 						link?.state().status === "online" ? null : MERGE_WORDS.offline,
 				};
@@ -590,7 +587,7 @@ export function mergeSteps(
 			return {
 				pending: true,
 				state: null,
-				hostName: (await deps.home())?.name ?? null,
+				hostName: (await deps.hostLinks.home())?.name ?? null,
 				blocked: checked.held === null ? null : checked.refusal.message,
 			};
 		},

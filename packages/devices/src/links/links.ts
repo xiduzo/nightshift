@@ -1,6 +1,11 @@
 import type * as Y from "yjs";
 import type { HostHello } from "../contract";
-import type { DeviceKeyStore, HostLink, HostLinks } from "./host-links";
+import {
+	type DeviceKeyStore,
+	type HostLink,
+	type HostLinks,
+	isHomeHost,
+} from "./host-links";
 import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
 import type { LinkedHost } from "./types";
 
@@ -128,6 +133,7 @@ export function createDeviceLinks(deps: {
 					hostId: link.hostId,
 					name: link.name,
 					role: link.role,
+					homeHost: isHomeHost(link),
 					addresses: link.addresses,
 					address: state?.address ?? null,
 					status: link.revokedAt ? "revoked" : (state?.status ?? "offline"),

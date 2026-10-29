@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
-import { device, hostLink } from "@nightshift/db/schema";
+import { hostLink } from "@nightshift/db/schema";
 import { type KeyStoreKind, valueStore } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
@@ -11,7 +11,8 @@ export type { KeyStoreKind } from "@nightshift/engine";
  * This computer's links to the Hosts it paired with: one home Host at
  * most (it keeps this Device's document), and any number of guest Hosts
  * (shared Spaces only). A link is this Device's own fact, kept in its
- * Replica; the Device key is kept apart, in a `DeviceKeyStore`.
+ * Replica; the Device key is kept apart, in a `DeviceKeyStore`. The
+ * links are the one record of this computer's home Host (`home`).
  */
 
 export type HostRole = "home" | "guest";
@@ -37,10 +38,12 @@ export type HostLink = {
 export type HostLinks = {
 	list(): Promise<HostLink[]>;
 	get(hostId: string): Promise<HostLink | null>;
+	/** This computer's home Host: its home link with access (`isHomeHost`), if any. */
+	home(): Promise<HostLink | null>;
 	/**
 	 * Saves the link of a pairing that just ended, replacing an earlier one
-	 * to the same Host. A home link also sets this Device's home Host. A
-	 * second home Host is refused while the first still has access.
+	 * to the same Host. A second home Host is refused while the first still
+	 * has access: a home link without access is replaced.
 	 */
 	save(link: Omit<HostLink, "createdAt" | "revokedAt">): Promise<HostLink>;
 	/** The Host's addresses as it lists them now. */
@@ -76,31 +79,27 @@ export function createHostLinks(db: Database): HostLinks {
 		return row ? toLink(row) : null;
 	}
 
+	async function list() {
+		const rows = await db
+			.select()
+			.from(hostLink)
+			.orderBy(asc(hostLink.role), asc(hostLink.createdAt));
+		return rows.map(toLink);
+	}
+
+	async function home() {
+		return (await list()).find(isHomeHost) ?? null;
+	}
+
 	return {
-		async list() {
-			const rows = await db
-				.select()
-				.from(hostLink)
-				.orderBy(asc(hostLink.role), asc(hostLink.createdAt));
-			return rows.map(toLink);
-		},
+		list,
 		get,
+		home,
 		async save(link) {
 			// The check reads before the batch writes: a pairing is one at a
 			// time, and the batch replaces only a home link without access.
-			const [other] =
-				link.role === "home"
-					? await db
-							.select()
-							.from(hostLink)
-							.where(
-								and(
-									eq(hostLink.role, "home"),
-									ne(hostLink.hostId, link.hostId),
-								),
-							)
-					: [];
-			if (other && !other.revokedAt) {
+			const other = link.role === "home" ? await home() : null;
+			if (other && other.hostId !== link.hostId) {
 				throw new Refusal("conflict", SECOND_HOME);
 			}
 			const values = {
@@ -129,10 +128,6 @@ export function createHostLinks(db: Database): HostLinks {
 							),
 						),
 					upsert,
-					db
-						.update(device)
-						.set({ homeHost: link.addresses[0] ?? null })
-						.where(eq(device.self, true)),
 				]);
 			} else {
 				await upsert;
@@ -149,28 +144,21 @@ export function createHostLinks(db: Database): HostLinks {
 				.update(hostLink)
 				.set({ addresses: JSON.stringify(addresses) })
 				.where(eq(hostLink.hostId, hostId));
-			if (link.role === "home") {
-				await db
-					.update(device)
-					.set({ homeHost: addresses[0] ?? null })
-					.where(eq(device.self, true));
-			}
 		},
 		async revoked(hostId) {
-			const link = await get(hostId);
-			if (!link || link.revokedAt) return;
 			await db
 				.update(hostLink)
 				.set({ revokedAt: new Date() })
 				.where(and(eq(hostLink.hostId, hostId), isNull(hostLink.revokedAt)));
-			if (link.role === "home") {
-				await db
-					.update(device)
-					.set({ homeHost: null })
-					.where(eq(device.self, true));
-			}
 		},
 	};
+}
+
+/** Whether the link is to this computer's home Host now: a home link with access. */
+export function isHomeHost(
+	link: Pick<HostLink, "role" | "revokedAt">,
+): boolean {
+	return link.role === "home" && link.revokedAt === null;
 }
 
 function parseAddresses(text: string): string[] {

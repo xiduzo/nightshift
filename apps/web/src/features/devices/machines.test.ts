@@ -25,6 +25,7 @@ const host = (status: LinkedHost["status"] = "online"): LinkedHost => ({
 	hostId: "host-1",
 	name: "hetzner-1",
 	role: "home",
+	homeHost: status !== "revoked",
 	addresses: ["https://host.example.com"],
 	address: null,
 	status,
