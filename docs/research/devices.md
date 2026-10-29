@@ -210,7 +210,7 @@ flowchart LR
 ### One Personal: the merge on join
 
 When a Device joins its Home Host, its own Personal merges into the
-Person's Personal on that Host (ADR 1, `devices/src/merge/`). The merge
+Person's Personal on that Host (ADR 1, `devices/src/membership/`). The merge
 rewrites the Device's database, so it is careful:
 
 1. **Checks.** The Home Host answers now and lists the Person's personal
@@ -282,7 +282,7 @@ Personal and says to update the Host.
 ### Leaving keeps a copy
 
 When a Device leaves its Home Host, its Personal splits off the Host's
-again (ADR 1 decision 6, `devices/src/merge/split.ts`). It leaves when
+again (ADR 1 decision 6, `devices/src/membership/split.ts`). It leaves when
 the Host removes its access (the link learns it at its next answer, also
 after a time offline) or when its person leaves. The split is the
 reverse of the merge, and as careful:
