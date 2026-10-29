@@ -40,7 +40,9 @@ export {
 	migrateToolSets,
 } from "./migrate";
 export {
+	DECISION_LABEL,
 	jsonOutputFields,
+	NODE_TYPE_LABEL,
 	nodeOutcomes,
 	nodeOutputFields,
 	outcomeColor,

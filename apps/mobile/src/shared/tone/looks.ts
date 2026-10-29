@@ -5,6 +5,7 @@ import {
 	type StepState,
 	type StepSummary,
 } from "@nightshift/client";
+import { DECISION_LABEL, NODE_TYPE_LABEL } from "@nightshift/flows";
 
 /**
  * What a status means on screen, without React Native: its tone (the
@@ -230,19 +231,19 @@ export type StepKindIconName =
 	| "flag"
 	| "merge";
 
-/** What kind of step it is, as the web's flow editor names it: its word and icon. */
+/** What kind of step it is: its name (the one of `@nightshift/flows`) and icon. */
 export type StepKind = { label: string; icon: StepKindIconName };
 
-const NODE_KIND: Record<StepSummary["nodeType"], StepKind> = {
-	agent: { label: "Agent", icon: "bot" },
-	command: { label: "Command", icon: "terminal" },
-	decision: { label: "Decision", icon: "split" },
-	call: { label: "Subflow", icon: "function" },
-	value: { label: "Value", icon: "variable" },
-	wait: { label: "Wait", icon: "hourglass" },
-	tool: { label: "Tool", icon: "plug" },
-	end: { label: "End", icon: "flag" },
-	join: { label: "Join", icon: "merge" },
+const NODE_ICON: Record<StepSummary["nodeType"], StepKindIconName> = {
+	agent: "bot",
+	command: "terminal",
+	decision: "split",
+	call: "function",
+	value: "variable",
+	wait: "hourglass",
+	tool: "plug",
+	end: "flag",
+	join: "merge",
 };
 
 /** The kind of a step. A Decision that asks a person is a Gate. */
@@ -250,7 +251,10 @@ export function stepKind(
 	step: Pick<StepSummary, "nodeType" | "gate">,
 ): StepKind {
 	if (step.nodeType === "decision" && step.gate !== null) {
-		return { label: "Gate", icon: "hand" };
+		return { label: DECISION_LABEL.person, icon: "hand" };
 	}
-	return NODE_KIND[step.nodeType];
+	return {
+		label: NODE_TYPE_LABEL[step.nodeType],
+		icon: NODE_ICON[step.nodeType],
+	};
 }

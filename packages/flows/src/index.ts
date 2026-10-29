@@ -48,6 +48,7 @@ export {
 export {
 	type BranchPlace,
 	branchPlaces,
+	DECISION_LABEL,
 	DEFAULT_POLICY,
 	type FanOut,
 	FLOW_VERSION,
@@ -66,6 +67,7 @@ export {
 	migrateToolSets,
 	type NextEdge,
 	type NextEdgeInput,
+	NODE_TYPE_LABEL,
 	nextEdge,
 	nodeOutcomes,
 	type Outcome,
@@ -312,6 +314,7 @@ export {
 	renderTemplate,
 	renderValue,
 	type SchemaCheck,
+	TEMPLATE_REF,
 	type TemplateContext,
 	type TemplateRef,
 	templateEnvName,

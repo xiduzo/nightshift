@@ -39,6 +39,12 @@ describe("templateParts", () => {
 		]);
 	});
 
+	test("braces that hold no reference stay plain text", () => {
+		expect(templateParts("Keep {{ Not One }} as it is")).toEqual([
+			{ text: "Keep {{ Not One }} as it is", ref: false },
+		]);
+	});
+
 	test("a line without references is one plain part", () => {
 		expect(templateParts("plain")).toEqual([{ text: "plain", ref: false }]);
 	});

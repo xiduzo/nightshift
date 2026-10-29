@@ -8,8 +8,8 @@ import {
 	type AgentProfileSettings,
 	type AssistantUsage,
 	applySuggestion,
-	type FlowNode,
 	isFlowSuggestion,
+	NODE_TYPE_LABEL,
 	nodeOutcomes,
 	proposalIssues,
 	type Suggestion,
@@ -82,7 +82,7 @@ export function cannotSuggest(
 		return `The flow has no step "${request.nodeId ?? ""}". Save or reload the flow, then try again.`;
 	}
 	if (!takesSuggestion(node, request.kind)) {
-		return `A ${nodeLabel(node)} node has no ${NODE_FIELD[request.kind]} to suggest.`;
+		return `A ${NODE_TYPE_LABEL[node.type]} node has no ${NODE_FIELD[request.kind]} to suggest.`;
 	}
 	return null;
 }
@@ -162,12 +162,6 @@ function argumentProblems(
 							`The tool takes no argument \`${name}\`. Use one of ${properties.map((n) => `\`${n}\``).join(", ")}.`,
 					)),
 	];
-}
-
-function nodeLabel(node: FlowNode): string {
-	return node.type === "call"
-		? "Subflow"
-		: node.type[0]?.toUpperCase() + node.type.slice(1);
 }
 
 /** `nodes.0.prompt` from a zod path. */

@@ -12,8 +12,14 @@ import type { TemplateContext, TemplateRef } from "./context";
  * a number or boolean with String(), an object or array as JSON.
  */
 
-/** One reference, with the braces: name, then `.key` per path key. */
-const REF = /\{\{\s*([a-z][a-z0-9_]*)((?:\.[A-Za-z0-9_-]+)*)\s*\}\}/g;
+/**
+ * One reference, with the braces: name, then `.key` per path key. Global:
+ * read it with `matchAll` (which copies it), never with `test` or `exec`.
+ * The web editor marks what it matches, so a marked reference is exactly
+ * one that a run fills in.
+ */
+export const TEMPLATE_REF =
+	/\{\{\s*([a-z][a-z0-9_]*)((?:\.[A-Za-z0-9_-]+)*)\s*\}\}/g;
 
 /** A template that is exactly one reference, whitespace around it allowed. */
 const ONLY_REF =
@@ -26,7 +32,7 @@ function toRef(raw: string, name: string, keys: string): TemplateRef {
 /** Every reference in the text, in order. */
 export function templateRefs(text: string): TemplateRef[] {
 	const refs: TemplateRef[] = [];
-	for (const [raw, name, keys] of text.matchAll(REF)) {
+	for (const [raw, name, keys] of text.matchAll(TEMPLATE_REF)) {
 		if (name !== undefined) refs.push(toRef(raw, name, keys ?? ""));
 	}
 	return refs;
@@ -71,7 +77,7 @@ function asText(value: JsonValue | undefined): string {
 
 /** Replaces each reference with its value as text. */
 export function renderTemplate(text: string, context: TemplateContext): string {
-	return text.replace(REF, (raw: string, name: string, keys: string) =>
+	return text.replace(TEMPLATE_REF, (raw: string, name: string, keys: string) =>
 		asText(lookupRef(context, toRef(raw, name, keys))),
 	);
 }
@@ -124,7 +130,7 @@ export function renderCommand(
 	/** Env name by reference key (name and path). */
 	const names = new Map<string, string>();
 	const command = text.replace(
-		REF,
+		TEMPLATE_REF,
 		(raw: string, name: string, keys: string) => {
 			const ref = toRef(raw, name, keys);
 			const key = [ref.name, ...ref.path].join(".");

@@ -5,6 +5,7 @@ import {
 	callOutputFields,
 	commandExits,
 	commandOutputFields,
+	type DecidedBy,
 	decisionOutputFields,
 	endOutputFields,
 	joinOutputFields,
@@ -19,6 +20,33 @@ import type { Flow, FlowNode, FlowNodeType, Outcome } from "./flow";
  * What any node of a flow ends with and gives later nodes. Each node type
  * keeps its own part in `nodes/`. These pick the part by the node's type.
  */
+
+/**
+ * What a person calls each node type, on every screen: a Call node is a
+ * Subflow. A Decision has a name of its own by who decides it:
+ * `DECISION_LABEL`.
+ */
+export const NODE_TYPE_LABEL = {
+	agent: "Agent",
+	command: "Command",
+	decision: "Decision",
+	call: "Subflow",
+	value: "Value",
+	wait: "Wait",
+	tool: "Tool",
+	end: "End",
+	join: "Join",
+} as const satisfies Record<FlowNodeType, string>;
+
+/**
+ * What a person calls a Decision, by who decides it. You decide a Gate, a
+ * rule decides a Branch. A Decision by a model keeps the plain name.
+ */
+export const DECISION_LABEL = {
+	person: "Gate",
+	rule: "Branch",
+	model: "Decision",
+} as const satisfies Record<DecidedBy, string>;
 
 /** Whether the node is a Call node that runs its flow once per element. */
 export function runsEach(node: FlowNode): node is CallEachNode {

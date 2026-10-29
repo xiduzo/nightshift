@@ -1,4 +1,4 @@
-import { type Flow, runsEach } from "../document";
+import { type Flow, NODE_TYPE_LABEL, runsEach } from "../document";
 import { isKitName, kitFlow } from "../kits";
 import type { CallNode } from "../nodes";
 import type { ProjectFlowMap, Report, ValidateOptions } from "./issues";
@@ -31,7 +31,7 @@ export function checkCall(
 	errorsOf: ErrorsOf,
 ): void {
 	const at = { nodeId: node.id };
-	const kind = "Subflow";
+	const kind = NODE_TYPE_LABEL.call;
 	const kit = isKitName(node.flow);
 	const runs = `${kind} node "${node.id}" runs ${kit ? "the kit" : "flow"} "${node.flow}"`;
 	const called = kit

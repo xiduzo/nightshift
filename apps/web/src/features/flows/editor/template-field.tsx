@@ -1,4 +1,4 @@
-import type { Flow } from "@nightshift/flows";
+import { type Flow, TEMPLATE_REF } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Collapsible,
@@ -172,7 +172,7 @@ export function TemplateField({
 				value={value}
 				placeholder={placeholder}
 				language={shown}
-				marks={TEMPLATE}
+				marks={TEMPLATE_REF}
 				className={cn(
 					"min-h-28 font-mono text-xs leading-relaxed",
 					large ? LARGER_FIELD : "max-h-80 pr-9",
@@ -302,9 +302,6 @@ export function TemplateField({
 function labelOf(language: CodeLanguage): string {
 	return CODE_LANGUAGES.find((entry) => entry.value === language)?.label ?? "";
 }
-
-/** A `{{name.path}}` template in a field's text. */
-const TEMPLATE = /\{\{[^{}]*\}\}/g;
 
 /** The variables a field can use, grouped by name; a click inserts one. */
 function TemplateVariables({

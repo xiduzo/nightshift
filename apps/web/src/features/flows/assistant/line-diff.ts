@@ -1,3 +1,5 @@
+import { TEMPLATE_REF } from "@nightshift/flows";
+
 /** One line of a before/after view: kept, added or removed. */
 export type DiffLine = { kind: "same" | "added" | "removed"; text: string };
 
@@ -47,10 +49,20 @@ export function lineDiff(before: string, after: string): DiffLine[] {
 	return lines;
 }
 
-/** A line cut into plain text and `{{references}}`, to show the references apart. */
+/**
+ * A line cut into plain text and `{{references}}`, to show the references
+ * apart: the ones a run fills in (`TEMPLATE_REF`).
+ */
 export function templateParts(line: string): { text: string; ref: boolean }[] {
-	return line
-		.split(/(\{\{[^{}]*\}\})/)
-		.filter((part) => part !== "")
-		.map((part) => ({ text: part, ref: /^\{\{[^{}]*\}\}$/.test(part) }));
+	const parts: { text: string; ref: boolean }[] = [];
+	let at = 0;
+	for (const match of line.matchAll(TEMPLATE_REF)) {
+		if (match.index > at) {
+			parts.push({ text: line.slice(at, match.index), ref: false });
+		}
+		parts.push({ text: match[0], ref: true });
+		at = match.index + match[0].length;
+	}
+	if (at < line.length) parts.push({ text: line.slice(at), ref: false });
+	return parts;
 }

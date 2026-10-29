@@ -1,10 +1,12 @@
-import type {
-	DecidedBy,
-	EndStatus,
-	FlowNode,
-	FlowNodeType,
-	NewNodeKind,
-	ValueBy,
+import {
+	DECISION_LABEL,
+	type DecidedBy,
+	type EndStatus,
+	type FlowNode,
+	type FlowNodeType,
+	type NewNodeKind,
+	NODE_TYPE_LABEL,
+	type ValueBy,
 } from "@nightshift/flows";
 import {
 	BotIcon,
@@ -25,50 +27,50 @@ import {
 
 type NodeMeta = { label: string; icon: LucideIcon; blurb: string };
 
-/** How each node type shows in the editor, the run graph and the step list. */
+/** How each node type shows in the editor, the run graph and the step list: its name (the one of `@nightshift/flows`), icon and blurb. */
 export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 	agent: {
-		label: "Agent",
+		label: NODE_TYPE_LABEL.agent,
 		icon: BotIcon,
 		blurb: "A coding agent works on a task.",
 	},
 	command: {
-		label: "Command",
+		label: NODE_TYPE_LABEL.command,
 		icon: SquareTerminalIcon,
 		blurb: "Runs a shell command.",
 	},
 	decision: {
-		label: "Decision",
+		label: NODE_TYPE_LABEL.decision,
 		icon: SplitIcon,
 		blurb: "Picks one of its options: you, a rule, or a model.",
 	},
 	call: {
-		label: "Subflow",
+		label: NODE_TYPE_LABEL.call,
 		icon: SquareFunctionIcon,
 		blurb: "Runs another flow once, or once per item in a list.",
 	},
 	value: {
-		label: "Value",
+		label: NODE_TYPE_LABEL.value,
 		icon: VariableIcon,
 		blurb: "Makes a value from a rule or a model.",
 	},
 	wait: {
-		label: "Wait",
+		label: NODE_TYPE_LABEL.wait,
 		icon: HourglassIcon,
 		blurb: "Waits for a time, a command to pass, or a signal.",
 	},
 	tool: {
-		label: "Tool",
+		label: NODE_TYPE_LABEL.tool,
 		icon: PlugIcon,
 		blurb: "Calls one tool of a connection.",
 	},
 	end: {
-		label: "End",
+		label: NODE_TYPE_LABEL.end,
 		icon: FlagIcon,
 		blurb: "Ends the run with a result and one line for you.",
 	},
 	join: {
-		label: "Join",
+		label: NODE_TYPE_LABEL.join,
 		icon: MergeIcon,
 		blurb: "Waits for branches that run at once, then goes on.",
 	},
@@ -80,17 +82,17 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
  */
 export const DECISION_KIND: Record<DecidedBy, NodeMeta> = {
 	person: {
-		label: "Gate",
+		label: DECISION_LABEL.person,
 		icon: HandIcon,
 		blurb: "Waits for you to pick one of its options.",
 	},
 	rule: {
-		label: "Branch",
+		label: DECISION_LABEL.rule,
 		icon: SplitIcon,
 		blurb: "Takes the first option whose rule holds.",
 	},
 	model: {
-		label: "Decision",
+		label: DECISION_LABEL.model,
 		icon: SparklesIcon,
 		blurb: "A model picks one of its options.",
 	},

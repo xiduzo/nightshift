@@ -220,7 +220,11 @@ const MESSAGES: DraftMessages = {
 /** A `{{` the cursor is in: where it starts, and the name typed after it so far. */
 export type OpenTemplate = { start: number; query: string };
 
-/** The `{{` just before the cursor that is not closed yet, or null. `{{plan` gives `plan`. */
+/**
+ * The `{{` just before the cursor that is not closed yet, or null. `{{plan`
+ * gives `plan`. Its own pattern: `TEMPLATE_REF` of `@nightshift/flows` only
+ * matches a reference with its closing braces.
+ */
 export function openTemplate(
 	text: string,
 	cursor: number,
