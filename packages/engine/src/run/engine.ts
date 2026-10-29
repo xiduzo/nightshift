@@ -423,8 +423,9 @@ export function createEngine(
 	ready.catch(() => {});
 	ready.then(...settleReady);
 
-	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
-	const hostOf = peers.hostOf;
+	/** Whether a Host keeps the Space, not this Replica. */
+	const hostedElsewhere = (spaceId: string) =>
+		directory.hostedElsewhere(spaceId);
 
 	/**
 	 * Brings the flows of format 6 of every Project whose Space this
@@ -436,7 +437,7 @@ export function createEngine(
 			const self = await runLog.walkerId();
 			for (const document of await flowDocuments.openAll()) {
 				const row = await projects.find(document.projectId).catch(() => null);
-				if (!row || (await hostOf(row.spaceId)) !== null) continue;
+				if (!row || (await hostedElsewhere(row.spaceId))) continue;
 				await upgradeFlows(document, { migrations, deviceId: self, at: now() });
 			}
 		} catch (error) {
@@ -484,7 +485,7 @@ export function createEngine(
 	// to the same Replica.
 	const firesHere = async (projectId: string, _schedule: Schedule) => {
 		const row = await projects.find(projectId);
-		return (await hostOf(row.spaceId)) === null;
+		return !(await hostedElsewhere(row.spaceId));
 	};
 
 	const scheduler = createScheduler({
@@ -515,7 +516,7 @@ export function createEngine(
 
 	/** Who walks a run and its Run's Device, for every start (`start-place.ts`). */
 	const places = createStartPlaces({
-		hostOf,
+		hostedElsewhere,
 		hostReachable: async (spaceId) =>
 			hosts ? hosts.reachable(spaceId) : false,
 		walkerId: () => runLog.walkerId(),

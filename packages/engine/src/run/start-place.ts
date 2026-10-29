@@ -58,8 +58,8 @@ function defaultOf(list: readonly Placement[]): Placement | null {
  * default, so Start run shows where a run goes without a rule of its own.
  */
 export function createStartPlaces(deps: {
-	/** The Host that keeps the Space, or null for one this Replica keeps. */
-	hostOf(spaceId: string): Promise<string | null>;
+	/** Whether a Host keeps the Space, not this Replica (`DeviceDirectory`). */
+	hostedElsewhere(spaceId: string): Promise<boolean>;
 	/** Whether this computer reaches the Host that keeps the Space now (`Relay.reachable`). */
 	hostReachable(spaceId: string): Promise<boolean>;
 	/** This computer's id as the Walker of its runs. */
@@ -96,7 +96,7 @@ export function createStartPlaces(deps: {
 		personId: string | null,
 	): Promise<StartPlace> {
 		if (
-			(await deps.hostOf(spaceId)) !== null &&
+			(await deps.hostedElsewhere(spaceId)) &&
 			(await deps.hostReachable(spaceId))
 		) {
 			return {

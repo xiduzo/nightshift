@@ -87,7 +87,6 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 				return schedules.map(({ person: _old, ...rest }) => rest);
 			},
 		},
-		hostOf: async () => null,
 		runs: {
 			async walkers(_spaceId, ids) {
 				const self = await log.walkerId();

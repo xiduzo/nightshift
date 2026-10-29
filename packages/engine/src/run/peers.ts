@@ -34,18 +34,18 @@ import type { FeedStep, PendingCommand, RunWalker } from "../read";
  * The port of the other Devices and Hosts (`Peers`). The run engine walks
  * runs on this computer and reads its own Replica. Everything that needs
  * another Device or a Host goes through this port: where a step runs
- * (Placement), Offers, the Host that keeps a Space, and the runs walked
- * elsewhere. `@nightshift/devices` implements it. The daemon gives its
- * factory to `createEngine` (`EngineOptions.peers`), which calls it once
- * with the engine's own parts (`PeerContext`).
+ * (Placement), Offers, and the runs walked elsewhere. `@nightshift/devices`
+ * implements it. The daemon gives its factory to `createEngine`
+ * (`EngineOptions.peers`), which calls it once with the engine's own
+ * parts (`PeerContext`). Whether a Host keeps a Space is not here: the
+ * `DeviceDirectory` answers it (`hostedElsewhere`), for the Space
+ * documents too.
  */
 export type Peers = {
 	/** A run's plan, made once at its start, and the Devices a Person may use. */
 	placement: PlacementPort;
 	/** The Offer rule of a schedule on another Person's Device. */
 	offers: OffersPort;
-	/** The Host that keeps the Space, or null when this Replica keeps it. */
-	hostOf(spaceId: string): Promise<string | null>;
 	/** The runs walked elsewhere, and the runs that move between Walkers. */
 	runs: RunsPort;
 	/**

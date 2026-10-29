@@ -203,7 +203,6 @@ export function createPeers(
 				...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
 			}),
 		},
-		hostOf,
 		runs: {
 			walkers: createWalkers({ db, log, device, documents }),
 			pendingCommands: async (runIds) => {

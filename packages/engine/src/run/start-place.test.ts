@@ -36,7 +36,7 @@ function places(
 ) {
 	const asked: string[] = [];
 	const starts = createStartPlaces({
-		hostOf: async (spaceId) => (spaceId === "space-host" ? "host-1" : null),
+		hostedElsewhere: async (spaceId) => spaceId === "space-host",
 		hostReachable: async () => options.reachable ?? true,
 		walkerId: async () => HERE,
 		placements: async (_spaceId, personId) => {
