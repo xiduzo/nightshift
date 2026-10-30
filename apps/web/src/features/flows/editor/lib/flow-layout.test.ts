@@ -126,9 +126,9 @@ describe("flowGraph", () => {
 				],
 			),
 		);
-		// Command nodes show success, failure and other.
+		// Command nodes show success, failure and other next to their handles.
 		expect(graph.edges.map((e) => [e.id, e.label?.text])).toEqual([
-			["a->b", "success · failure"],
+			["a->b", undefined],
 			["b->c", undefined],
 			["c->a", "failure ×2"],
 			["c->b", "gone"],
