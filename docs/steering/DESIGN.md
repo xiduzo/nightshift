@@ -6,9 +6,9 @@ Last updated: 2026-10-30
 
 ## Design Principles
 
-1. **Show the facts, not a mood** — Every status on screen is derived from a fact the user can open: an event, a pull request, a check. No spinner without a session behind it.
-2. **The gate is the product** — The "Needs you" inbox is the most important screen. It lists the open gates of every Space you are in on the left, grouped by project. The open gate shows what happened on the left, and its links, choices and note on the right. The right side stays in place while you read. Resolving one takes two actions: pick a choice, then send. Nothing goes out by accident.
-3. **Calm by default** — An unattended run is quiet. The UI surfaces only changes that need a person. Noise goes to the transcript. A notification goes out only for a gate, a finished run, a failed run or a step that waits for an offline device, on the screens the person chose, outside their quiet hours.
+1. **Show the facts, not a mood** — Every status on screen comes from a fact the user can open: an event, a pull request, a check. No spinner without a session behind it.
+2. **The gate is the product** — The "Needs you" inbox is the most important screen. On the left, it lists the open gates of every Space you are in, grouped by project. The open gate shows what happened on the left, and its links, choices and note on the right. The right side stays in place while you read. To resolve a gate takes two actions: pick a choice, then send. Nothing goes out by accident.
+3. **Calm by default** — An unattended run is quiet. The UI shows only changes that need a person. Noise goes to the transcript. A notification goes out only for a gate, a finished run, a failed run or a step that waits for an offline device. It goes only to the screens the person chose, outside their quiet hours.
 4. **Same words as the method** — The spec tree uses the method's own terms (Epic, Feature, Trace for WTF). The pipeline uses Night Shift terms (Flow, Step, Gate). Never mix the two on one card.
 5. **Readable for a Product Owner** — No terminal metaphors. A session is a transcript. A takeover is a button that copies a command.
 
@@ -35,7 +35,7 @@ Tokens live in `packages/ui/src/styles/globals.css` as CSS custom properties in 
 | `--chart-1` … `--chart-5` | blue scale | Cost and run history charts |
 | `--sidebar-*` | mirrors the page set | Project navigation |
 
-The palette is neutral. Status colors (running, blocked, needs you, verified) are not yet defined. Add them as tokens before any screen hardcodes a color.
+The palette is neutral. Status colors (running, blocked, needs you, verified) are not yet defined. Add them as tokens before a screen hardcodes a color.
 
 ### Typography
 
@@ -62,11 +62,11 @@ The palette is neutral. Status colors (running, blocked, needs you, verified) ar
 | Feedback | `sonner.tsx`, `tooltip.tsx`, `skeleton.tsx`, `empty.tsx` | Toasts for events, skeletons while facts load, empty states with a next step |
 | A change to the person's data they did not start (the merge of Personal) | `alert.tsx` banner, `dialog.tsx` | The banner offers it, or says why it cannot run now. The dialog shows what changes, then one confirm button. It never runs by itself |
 
-Pipeline board and spec tree components do not exist yet. Build them in `packages/ui` from the primitives above.
+The pipeline board and spec tree components do not exist yet. Build them in `packages/ui` from the primitives above.
 
 ### Overview lists
 
-An overview shows **at most 5 rows** in a list or table. This covers the Failed lane on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
+An overview shows **at most 5 rows** in a list or table: the Failed lane on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
 
 - One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
@@ -78,9 +78,9 @@ An overview shows **at most 5 rows** in a list or table. This covers the Failed 
 A project's page reads like the Performance page of Search Console. Keep its shape:
 
 - One range for the whole page, on top: 7, 30 or 90 nights, in the URL (`?range=30`). No section has a range of its own.
-- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile switches its line on the chart on or off. A tile that is on fills with a light shade of its line's color, with a dark shade of it for the text (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same nights just before. That is not a choice.
+- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile turns its line on the chart on or off. A tile that is on fills with a light shade of its line's color, and its text is a dark shade (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same nights just before. That is not a choice.
 - One line chart of the tiles that are on, with the nights before as a dashed line. The tooltip puts the number before in brackets after each number, not on a row of its own.
-- While the nights before had no runs, there is nothing to compare: the tiles and the chart say so, and the chart draws no dashed lines.
+- When the nights before had no runs, there is nothing to compare. The tiles and the chart say so, and the chart draws no dashed lines.
 - One card with tabs under the chart. Each tab is an overview list (see Overview lists).
 - What runs or waits now shows in one slim line, only when there is something.
 - **Details** on a tile opens the details dialog of that number at the page's range.
@@ -91,14 +91,14 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 Home answers "what needs me" over every project. The heading says how many Gates wait and how many runs failed in the range. Keep its shape:
 
 - The same range as a project's page, on top: 7, 30 or 90 nights, in the URL (`?range=30`).
-- The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per night, with the nights before dashed, and says how it moved against them. A number opens its details dialog.
+- The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per night, with the nights before dashed. Each says how it moved against them. A number opens its details dialog.
 - Three lanes of equal height, in the order you act on them: Running now, Waiting for you, Failed. Each lane has a count, scrolls inside, and shows an empty state when it has nothing.
 - Every row opens its place: a run its run page, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
 - Under the lanes, the projects, each with the status of its last runs. A project opens its page at the same range.
 
 ### Setup pages (Agents, Secrets, Settings)
 
-What you set up once reads like the Settings page:
+What you configure once reads like the Settings page:
 
 - One column, `max-w-4xl`, a `PageHeading`, then one `PageSection` per kind. A section's add button sits in its header.
 - A list is an `ItemGroup` of outline `Item`s. A row that opens something is a link (`render={<Link />}`), so it hovers and opens in a new tab.
@@ -111,9 +111,9 @@ What you set up once reads like the Settings page:
 The Devices page shows the Space you work in, around its Host:
 
 - The Space's name as the heading. "Pair a device" sits on the right, only where this computer keeps the Space as its Host.
-- One "Next step" card on top: the first step left to make the Space work across devices. In your personal Space: Be a Host, another computer, your phone. In a shared Space: invite a member, offer a profile, your phone. "Not now" moves on to the next step. The card goes once every step is done.
-- The Host as a card, with your phones on it as chips. A Host this computer cannot reach turns the card red and says since when, with "Check the connection".
-- The computers as a grid of cards: status, up to two runs on their way, then "and N more", and how many projects and Offers each has. A card has at most one action of its own ("Be a Host", "Offer a profile", "Pair again").
+- One "Next step" card on top: the first open step to make the Space work across devices. In your personal Space: Be a Host, another computer, your phone. In a shared Space: invite a member, offer a profile, your phone. "Not now" moves on to the next step. The card goes once every step is done.
+- The Host as a card, with your phones on it as chips. When this computer cannot reach the Host, the card turns red and says since when, with "Check the connection".
+- The computers as a grid of cards: status, up to two active runs, then "and N more", and how many projects and Offers each has. A card has at most one action of its own ("Be a Host", "Offer a profile", "Pair again").
 - A pick opens its detail in a Sheet over the page (`?device=`), so the page stays in view.
 - While it loads, a skeleton in the shape of the page. An error says what to check and has "Try again".
 
@@ -172,26 +172,26 @@ to do, drop it.
 ## UI States Required
 
 - **Default** — the base state
-- **Loading** — async operation in progress
-- **Error** — something went wrong (inline, not modal, unless data is lost)
+- **Loading** — an async operation runs
+- **Error** — something failed (inline, not modal, unless data is lost)
 - **Empty** — no data to show, with the next action
-- **Disabled** — action not available in context
-- **Focus** — keyboard navigation active (must be visible)
-- **Stale** — the cached index is older than the poll interval; show the age
+- **Disabled** — the action is not available here
+- **Focus** — keyboard navigation is active (must be visible)
+- **Stale** — the cached index is older than the poll interval. Show the age
 
 ## Accessibility Standards
 
 - Minimum contrast ratio: 4.5:1 for body text, 3:1 for large text and UI components
-- All interactive elements keyboard-navigable with visible focus indicator
-- All images have descriptive `alt` text; decorative images use `alt=""`
+- Every interactive element works from the keyboard, with a visible focus indicator
+- Every image has descriptive `alt` text. Decorative images use `alt=""`
 - Color is never the sole means of conveying information. A status always has a label.
-- Form inputs have associated `<label>` elements (not just placeholder text)
+- Every form input has a `<label>` element, not only placeholder text
 - Live regions announce a new gate and a finished run.
 - Light and dark both ship. Every token has a value in both sets.
 
 ## Responsive Behavior
 
-The product is a desktop app first. The web UI must still work in a narrow window. The phone app is a second screen for the inbox, runs and Start run. It is built from React Native Reusables, not from the web UI (see `docs/research/mobile.md`).
+The product is a desktop app first. The web UI must still work in a narrow window. The phone app is a second screen for the inbox, runs and Start run. It uses React Native Reusables, not the web UI (see `docs/research/mobile.md`).
 
 | Breakpoint | Width | Layout behavior |
 | --- | --- | --- |

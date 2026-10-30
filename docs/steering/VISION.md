@@ -6,22 +6,22 @@ Last updated: 2026-10-21
 
 ## Product Purpose
 
-A developer who works with coding agents runs the same pipeline every night: build, check, retry, rescue, open a pull request, review. Today that pipeline is a script. Nobody can see it, and a change to it is a code change. Night Shift turns the pipeline into a flow that you draw. Each step is an agent session with a prompt and/or a skill, a command, a decision, or a gate. The engine owns the order, the retries, and the run policy. You step in only at a gate.
+A developer with coding agents runs the same pipeline every night: build, check, retry, rescue, open a pull request, review. Today that pipeline is a script. Nobody can see it, and each change to it is a code change. Night Shift makes the pipeline a flow that you draw. Each step is an agent session with a prompt and/or a skill, a command, a decision, or a gate. The engine owns the order, the retries and the run policy. You act only at a gate.
 
-Night Shift is for its author first. It runs on the author's machine with the author's own credentials. It grows to more people only after it runs every night without help.
+Night Shift is for its author first. It runs on the author's machine with the author's own credentials. It goes to more people only after it runs every night without help.
 
 ## Target Users
 
 | Actor | Context | Primary goals |
 | --- | --- | --- |
-| Developer | The author. Owns a clone of the repo and the coding-agent CLIs. Draws flows, starts runs, and resolves gates, at the desk or on the phone. | Draw a flow, hand it an Epic, wake up to a stack of pull requests, take over a session when it needs a person. Answer a Gate away from the desk. |
+| Developer | The author. Owns a clone of the repo and the coding-agent CLIs. Draws flows, starts runs, and resolves gates, at the desk or on the phone. | Draw a flow, give it an Epic, find a stack of pull requests in the morning. Take over a session when it needs a person. Answer a Gate away from the desk. |
 
 ## Core Principles
 
-1. **The engine decides, the model advises** — Order, retries, loop limits, and gates are code. A Decision node picks one of its options, and a model's pick is checked against them. A Decision decided by a rule is deterministic: an expression over the run's values, no model at all. A model never adds a node or changes the graph.
-2. **Local first, your credentials** — Every session, worktree, and token stays on the user's own computers. A secret never leaves the Device it is on. A step that sends data off the machine says so in its node.
-3. **The flow is the method** — Night Shift has no built-in opinion on how a spec is written. A WTF night is one flow. Another method is another flow.
-4. **Durable facts, derived status** — The database stores what happened. Status is computed from facts. Every change appends to an event log. No late hook can overwrite a state.
+1. **The engine decides, the model advises** — Order, retries, loop limits and gates are code. A Decision node picks one of its options. The engine checks a model's pick against them. A Decision by rule is deterministic: an expression over the run's values, with no model. A model never adds a node or changes the graph.
+2. **Local first, your credentials** — Every session, worktree and token stays on the user's own computers. A secret never leaves the Device it is on. A step that sends data off the machine says so in its node.
+3. **The flow is the method** — Night Shift has no built-in opinion on how to write a spec. A WTF night is one flow. Another method is another flow.
+4. **Durable facts, derived status** — The database stores what happened. Night Shift computes status from facts. Every change appends to an event log. No late hook can overwrite a state.
 5. **People at gates only** — An unattended run never blocks on a person. A step that needs input ends with a report, and the gate waits in an inbox.
 
 ## Strategic Goals
@@ -38,7 +38,7 @@ Night Shift is for its author first. It runs on the author's machine with the au
 | Context | Responsibility | Key domain objects |
 | --- | --- | --- |
 | Flow | What a flow is: nodes, edges, outcomes, loop limits, the schema, the validator. | Flow, Node, Edge, Outcome, Agent Profile |
-| Run | Executing a flow: graph walk, run policy, item ordering of a Call with `each`, gates, decisions. | Run, Step Run, Gate, Decision, Run Policy |
+| Run | How a flow runs: graph walk, run policy, item order of a Call with `each`, gates, decisions. | Run, Step Run, Gate, Decision, Run Policy |
 | Session | One harness session: transcript, tool calls, needs-input, resume. | Session, Transcript, Step Report, Needs Input |
 | Tools | What an agent can call outside its harness: CLI tools such as `gh` and `acli`, and MCP connections. The engine knows no tracker. | CLI Tool, Connection, Profile |
 | Workspace | Projects, repos, and local settings. | Workspace, Project, Repo Binding |
