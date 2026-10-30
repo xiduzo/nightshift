@@ -43,6 +43,12 @@ export {
 	waitFor,
 } from "./stream";
 export { runTime, workedSoFar } from "./time";
+export {
+	groupToolCalls,
+	type ToolKind,
+	toolCallsSummary,
+	toolKind,
+} from "./tool-calls";
 export type {
 	AgentErrorKind,
 	AgentUsage,
