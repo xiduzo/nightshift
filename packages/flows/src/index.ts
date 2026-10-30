@@ -164,11 +164,20 @@ export {
 export {
 	isKitName,
 	type Kit,
+	KNOWLEDGE_SOURCE_KINDS,
+	type KnowledgeSource,
+	type KnowledgeSourceKind,
 	kitCopyName,
 	kitFlow,
 	kitList,
+	knowledgeFoldersOf,
 	knowledgeKitsOf,
+	knowledgeSourceKind,
+	knowledgeSourceOf,
+	knowledgeSourceSchema,
 	REVIEW_LEARNINGS_KIT,
+	saveKnowledgeSource,
+	withKnowledgeSourceSchedule,
 } from "./kits";
 export {
 	blockersFirst,

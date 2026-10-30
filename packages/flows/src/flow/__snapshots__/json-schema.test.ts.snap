@@ -4084,6 +4084,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
   "jsonSourceSchema": "a3a5fddca4b7a01134d1e5ae0b6af454545831c5d63dd9272c4506e020eb8b1a",
   "kitNameSchema": "b795a5a52f3d60ab22b7095a475d8f781dc8e3f319d67d03fde0e62fb1e2b9a9",
+  "knowledgeSourceSchema": "35d4f3af87133efd99b0209a5efb561c2e3f0e31143a430673b807c558af711a",
   "labelSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "listSourceSchema": "bd777218a3c3b14d1c54cb33fe527fe2e9e6055bcac39c002184e8a17fd9665e",
   "loginSchema": "23ccb4d365d96d062435a2ef12ff312587d07237ee383dfa9c7330e9db6ad64d",
