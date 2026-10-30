@@ -57,6 +57,10 @@ export type DerivedSession = {
 	harnessSessionId: string | null;
 	startedAt: number;
 	startSeq: number;
+	/** When it ended (its first `SessionEnded`). Null while it runs, or when it never ended. */
+	endedAt: number | null;
+	/** When the log last heard of it: its latest event. */
+	lastAt: number;
 	/** The first end wins: a late duplicate never rewrites history. */
 	ending: EnginePayloads["SessionEnded"] | null;
 	/** The last running total (`SessionUsage`), or null. */
@@ -80,6 +84,8 @@ export function deriveSessions(
 				harnessSessionId: null,
 				startedAt: e.at,
 				startSeq: e.seq,
+				endedAt: null,
+				lastAt: e.at,
 				ending: null,
 				spent: null,
 			});
@@ -87,12 +93,14 @@ export function deriveSessions(
 		}
 		const session = sessions.get(e.sessionId);
 		if (!session) continue;
+		if (session.endedAt === null) session.lastAt = e.at;
 		if (e.type === "HarnessSessionAssigned") {
 			session.harnessSessionId ??= e.payload.harnessSessionId;
 		} else if (e.type === "SessionUsage") {
 			session.spent = e.payload;
-		} else if (e.type === "SessionEnded") {
-			session.ending ??= e.payload;
+		} else if (e.type === "SessionEnded" && session.ending === null) {
+			session.ending = e.payload;
+			session.endedAt = e.at;
 		}
 	}
 	return [...sessions.values()];
@@ -160,6 +168,12 @@ export type DerivedStep = {
 	} | null;
 	/** When the step slept (a Wait node, a usage limit, the network), oldest first. `to` is null while it sleeps. */
 	sleeps: StepSleep[];
+	/**
+	 * When a Gate of the step waited for a person, oldest first: from its
+	 * `GateOpened` to the answer (`StepEnded`, or `StepReopened` for an
+	 * Agent that asked). `to` is null while it waits.
+	 */
+	gateWaits: StepSleep[];
 	/** Call steps with `each` only: its items in the order they started or were blocked. */
 	items: DerivedItem[];
 	/** Call steps (once) only: the call, once its inputs were bound. */
@@ -196,10 +210,12 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			e.type === "RunResumed" ||
 			e.type === "RunEnded"
 		) {
-			// A stop ends the sleep, and a resume goes on awake.
+			// A stop ends the sleep and the Gate's wait, and a resume goes on awake.
 			for (const step of steps.values()) {
 				const sleep = step.sleeps.at(-1);
 				if (sleep && sleep.to === null) sleep.to = e.at;
+				const wait = step.gateWaits.at(-1);
+				if (wait && wait.to === null) wait.to = e.at;
 			}
 		}
 		if (!e.stepId) continue;
@@ -224,6 +240,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				cost: NO_COST,
 				gate: null,
 				sleeps: [],
+				gateWaits: [],
 				items: [],
 				call: null,
 			});
@@ -241,10 +258,19 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 		) {
 			sleep.to = e.at;
 		}
+		const asking = step.gateWaits.at(-1);
+		if (
+			asking &&
+			asking.to === null &&
+			(e.type === "StepEnded" || e.type === "StepReopened")
+		) {
+			asking.to = e.at;
+		}
 		if (e.type === "WaitStarted") {
 			// A wait logged again in the same sleep (a new daemon) goes on with it.
 			if (!asleep) step.sleeps.push({ from: e.at, to: null });
 		} else if (e.type === "GateOpened") {
+			if (asking?.to !== null) step.gateWaits.push({ from: e.at, to: null });
 			step.gate = {
 				question: e.payload.question,
 				choices: e.payload.choices,

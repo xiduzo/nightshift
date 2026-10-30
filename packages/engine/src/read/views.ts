@@ -20,6 +20,7 @@ import type {
 	TranscriptEntry,
 } from "../log";
 import type { VariableChange } from "./derive-steps";
+import type { RunMetrics } from "./run-metrics";
 
 /**
  * The run views the engine returns: a run, its steps, sessions and items,
@@ -97,6 +98,8 @@ export type StepSummary = {
 	 * first. `to` is null while it sleeps. Older Hosts send none.
 	 */
 	sleeps?: { from: number; to: number | null }[];
+	/** How long the step took, its agents' time and tokens, its Gate's wait. Older Hosts send none. */
+	metrics?: RunMetrics;
 };
 
 /**
@@ -213,6 +216,12 @@ export type RunSummary = {
 	 * first. `to` is null while it sleeps. Older Hosts send none.
 	 */
 	sleeps?: { from: number; to: number | null }[];
+	/**
+	 * How long the run took, its agents' time and tokens, how long its
+	 * Gates waited, how sure its cost is, and the pull request it opened.
+	 * Older Hosts send none.
+	 */
+	metrics?: RunMetrics;
 };
 
 /** How the runs of one project stand: what a project's row and the sidebar show. */

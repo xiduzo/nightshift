@@ -28,6 +28,7 @@ import {
 	deriveResumes,
 	deriveRunState,
 	deriveSleep,
+	deriveStartedAt,
 	deriveStopAfterStep,
 	deriveStopAt,
 	deriveTraversals,
@@ -45,6 +46,7 @@ import {
 } from "./derive-steps";
 import { inboxOrder } from "./inbox";
 import { type MemberName, namesOf, runPerson } from "./people";
+import { runMetrics, stepMetrics } from "./run-metrics";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
 import type {
 	ItemSummary,
@@ -143,6 +145,8 @@ export function runFacts(events: readonly LoggedEvent[]) {
 	const state = deriveRunState(events, steps);
 	const open = isOpenStatus(state.status);
 	const sleep = state.status === "sleeping" ? deriveSleep(events, steps) : null;
+	const cost = sumCost(events, steps);
+	const endedAt = deriveEndedAt(events);
 	return {
 		status: state.status,
 		reason: state.reason,
@@ -154,9 +158,9 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		inputs: deriveInputs(events),
 		stopAt: deriveStopAt(events),
 		stopAfterStep: open && deriveStopAfterStep(events),
-		...costFields(sumCost(events, steps)),
+		...costFields(cost),
 		warnings: runWarnings(events, steps),
-		endedAt: deriveEndedAt(events),
+		endedAt,
 		trigger: deriveTrigger(events),
 		calls: deriveCalls(steps),
 		gates: deriveGateWaits(events),
@@ -165,6 +169,7 @@ export function runFacts(events: readonly LoggedEvent[]) {
 			.sort((a, b) => a.from - b.from),
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: deriveWorktree(events),
+		metrics: runMetrics(steps, cost, deriveStartedAt(events), endedAt),
 	};
 }
 
@@ -460,6 +465,7 @@ export function toStepSummary(
 				}
 			: null,
 		sleeps: derived.sleeps.map(({ from, to }) => ({ from, to })),
+		metrics: stepMetrics(derived),
 	};
 }
 

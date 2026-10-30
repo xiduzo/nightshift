@@ -116,6 +116,11 @@ export function isOpenStatus(status: RunStatus): boolean {
 	return status === "running" || status === "waiting" || status === "sleeping";
 }
 
+/** When the run started (its `RunStarted`), or null for a log without one. */
+export function deriveStartedAt(events: readonly LoggedEvent[]): number | null {
+	return events.find((e) => e.type === "RunStarted")?.at ?? null;
+}
+
 /** When the run ended: the time of its `RunEnded`, or null while it is open again or never ended. */
 export function deriveEndedAt(events: readonly LoggedEvent[]): number | null {
 	const latest = latestRunEvent(events);
