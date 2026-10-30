@@ -15,7 +15,8 @@ import { GatesDialog } from "../gates-dialog";
 import type { Metric } from "../metrics";
 import { RunsDialog } from "../runs-dialog";
 
-type LastFlowRun = FlowHealthRow["lastRuns"][number];
+/** A last run, and the flow it ran. */
+export type LastRun = FlowHealthRow["lastRuns"][number] & { flow?: string };
 
 import { SpendDialog } from "../spend-dialog";
 
@@ -23,10 +24,12 @@ import { SpendDialog } from "../spend-dialog";
 export function lastRunsOf(
 	nights: NightsRange | undefined,
 	count = 10,
-): LastFlowRun[] {
+): LastRun[] {
 	const seen = new Set<string>();
 	return (nights?.flows?.rows ?? [])
-		.flatMap((flow) => flow.lastRuns)
+		.flatMap((flow) =>
+			flow.lastRuns.map((run) => ({ ...run, flow: flow.name })),
+		)
 		.sort((a, b) => b.startedAt - a.startedAt)
 		.filter((run) => !seen.has(run.runId) && seen.add(run.runId))
 		.slice(0, count);
@@ -38,7 +41,7 @@ export function LastRunsStrip({
 	now,
 	oneLine = false,
 }: {
-	runs: LastFlowRun[];
+	runs: LastRun[];
 	now: number;
 	oneLine?: boolean;
 }) {
@@ -61,7 +64,13 @@ export function LastRunsStrip({
 						onClick={(event) => event.stopPropagation()}
 						className="rounded-sm p-0.5 hover:bg-muted"
 					>
-						<RunStatusIcon status={run.status} />
+						<RunStatusIcon
+							status={run.status}
+							context={{
+								before: run.flow,
+								after: formatRelative(run.startedAt, now),
+							}}
+						/>
 					</Link>
 				))}
 			</div>

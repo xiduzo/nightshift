@@ -10,9 +10,12 @@ import { useEffect } from "react";
 export function PrototypeSwitcher({
 	variants,
 	current,
+	children,
 }: {
 	variants: readonly { key: string; name: string }[];
 	current: string;
+	/** More controls for the bar, such as a sample data switch. */
+	children?: React.ReactNode;
 }) {
 	const navigate = useNavigate();
 	const index = Math.max(
@@ -77,6 +80,7 @@ export function PrototypeSwitcher({
 			>
 				<ChevronRightIcon />
 			</Button>
+			{children}
 		</div>
 	);
 }
