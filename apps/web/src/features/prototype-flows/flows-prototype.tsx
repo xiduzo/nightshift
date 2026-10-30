@@ -1,8 +1,9 @@
 /**
  * PROTOTYPE, throw away. The project's Flows page, four ways, switchable
  * through `?variant=` on the existing `/projects/$projectId/flows` route:
- * A a table like Runs and Schedules, B grouped by how each flow starts,
- * C a list with the chosen flow's details beside it, D today's cards.
+ * A a table like Runs and Schedules, B today's cards worked out further,
+ * C a list of Items between the two, D today's cards. Round 1 also had a
+ * page grouped by how flows start and a list with details (ef98015a).
  */
 
 import {
@@ -35,14 +36,14 @@ import { useNow } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
 import { PrototypeSwitcher } from "@/shared/prototype-switcher";
 import { type FlowRow, useFlowRows } from "./flows-data";
-import { VariantByStart } from "./variant-by-start";
-import { VariantDetails } from "./variant-details";
+import { VariantCards } from "./variant-cards";
+import { VariantItems } from "./variant-items";
 import { VariantTable } from "./variant-table";
 
 const VARIANTS = [
 	{ key: "A", name: "Table, like Runs and Schedules" },
-	{ key: "B", name: "Grouped by how it starts" },
-	{ key: "C", name: "List and details" },
+	{ key: "B", name: "Cards, worked out" },
+	{ key: "C", name: "Items, between cards and table" },
 	{ key: "D", name: "Today: cards" },
 ] as const;
 
@@ -149,9 +150,9 @@ function FlowsPage({
 			<FlowNotices projectId={projectId} />
 
 			{variant === "B" ? (
-				<VariantByStart {...props} />
+				<VariantCards {...props} />
 			) : variant === "C" ? (
-				<VariantDetails {...props} />
+				<VariantItems {...props} />
 			) : (
 				<VariantTable {...props} />
 			)}

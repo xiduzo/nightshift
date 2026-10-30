@@ -1,11 +1,13 @@
 /**
  * PROTOTYPE, throw away. One row per flow for the Flows page variants: the
- * flow file, how its runs went (the dashboard's Flow health) and the
- * schedules that start it.
+ * flow file, what is in it, how its runs went (the dashboard's Flow
+ * health) and everything that starts it. A flow can start in several ways
+ * at once: you can always run it, schedules and webhooks can start it, and
+ * Subflow nodes in other flows can run it.
  */
 
 import { createDashboardQueries } from "@nightshift/client";
-import { describeCron } from "@nightshift/flows";
+import { describeCron, type Flow, type FlowNodeType } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { flowQueries } from "@/features/flows";
 import { scheduleQueries } from "@/features/schedules";
@@ -18,19 +20,30 @@ import {
 
 const dashboardQueries = createDashboardQueries(orpc);
 
-/** How a flow starts: what the page groups and filters by. */
-export type StartKind = "schedule" | "webhook" | "subflow" | "manual";
+/** One way a flow starts besides you running it. */
+export type Trigger =
+	| { kind: "schedule"; schedule: ScheduleSummary }
+	| { kind: "webhook"; schedule: ScheduleSummary }
+	| { kind: "subflow"; caller: string };
 
 export type FlowRow = {
 	name: string;
 	flow: FlowListItem;
 	/** Undefined while the numbers load, or when the flow never ran. */
 	health: FlowHealthRow | undefined;
-	/** The schedules that start this flow. */
-	schedules: ScheduleSummary[];
-	start: StartKind;
+	/**
+	 * Everything that starts it, besides you: the schedules and webhooks
+	 * that are on (soonest first), the paused ones, then the calling flows.
+	 */
+	triggers: Trigger[];
 	/** The schedule that starts it next, if one does. */
 	next: ScheduleSummary | null;
+	/** How many nodes of each type it has, most first. Empty until the flows load. */
+	steps: { type: FlowNodeType; count: number }[];
+	/** Gates a person decides: the run waits for you there. */
+	gates: number;
+	/** The flows its Subflow nodes run. */
+	calls: string[];
 	/** What blocks or worries this flow, in a few words. Null when all is well. */
 	problem: { text: string; kind: "broken" | "failing" } | null;
 };
@@ -41,6 +54,7 @@ export function useFlowRows(projectId: string): {
 	error: Error | null;
 } {
 	const list = useQuery(flowQueries.list(projectId));
+	const map = useQuery(flowQueries.map(projectId));
 	const summary = useQuery(dashboardQueries.summary({ projectId }));
 	const schedules = useQuery(scheduleQueries.listLive(projectId));
 
@@ -52,29 +66,34 @@ export function useFlowRows(projectId: string): {
 	);
 	const all = schedules.data?.schedules ?? [];
 	const rows = list.data.map((flow): FlowRow => {
-		const own = all.filter((schedule) => schedule.flow === flow.name);
-		const on = own.filter((schedule) => schedule.enabled);
+		const own = all
+			.filter((schedule) => schedule.flow === flow.name)
+			.sort(
+				(a, b) =>
+					Number(b.enabled) - Number(a.enabled) ||
+					(a.nextAt ?? Number.POSITIVE_INFINITY) -
+						(b.nextAt ?? Number.POSITIVE_INFINITY),
+			);
 		const next =
-			on
-				.filter((schedule) => schedule.nextAt !== null)
-				.sort((a, b) => (a.nextAt ?? 0) - (b.nextAt ?? 0))[0] ??
-			on[0] ??
+			own.find((schedule) => schedule.enabled && schedule.nextAt !== null) ??
 			null;
-		const start: StartKind = on.some((schedule) => schedule.cron)
-			? "schedule"
-			: on.some((schedule) => schedule.webhook)
-				? "webhook"
-				: flow.callers.length > 0
-					? "subflow"
-					: "manual";
+		const triggers: Trigger[] = [
+			...own.map(
+				(schedule): Trigger =>
+					schedule.webhook
+						? { kind: "webhook", schedule }
+						: { kind: "schedule", schedule },
+			),
+			...flow.callers.map((caller): Trigger => ({ kind: "subflow", caller })),
+		];
 		const row = health.get(flow.name);
 		return {
 			name: flow.name,
 			flow,
 			health: row,
-			schedules: own,
-			start,
+			triggers,
 			next,
+			...contentsOf(map.data?.[flow.name] ?? null),
 			problem: problemOf(flow, row),
 		};
 	});
@@ -83,6 +102,25 @@ export function useFlowRows(projectId: string): {
 		healthNights: summary.data?.healthNights,
 		error: null,
 	};
+}
+
+function contentsOf(
+	flow: Flow | null,
+): Pick<FlowRow, "steps" | "gates" | "calls"> {
+	if (!flow) return { steps: [], gates: 0, calls: [] };
+	const counts = new Map<FlowNodeType, number>();
+	let gates = 0;
+	const calls = new Set<string>();
+	for (const node of flow.nodes) {
+		counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
+		if (node.type === "decision" && node.by === "person") gates += 1;
+		if (node.type === "call") calls.add(node.flow);
+	}
+	const steps = [...counts]
+		.filter(([type]) => type !== "end")
+		.map(([type, count]) => ({ type, count }))
+		.sort((a, b) => b.count - a.count);
+	return { steps, gates, calls: [...calls] };
 }
 
 function problemOf(
@@ -111,9 +149,9 @@ export function scheduleText(schedule: ScheduleSummary): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export const START_LABEL: Record<StartKind, string> = {
-	schedule: "On a schedule",
-	webhook: "On a webhook",
-	subflow: "Inside other flows",
-	manual: "When you start it",
-};
+/** Starts on its own: a schedule or webhook that is on. */
+export function startsOnItsOwn(row: FlowRow): boolean {
+	return row.triggers.some(
+		(trigger) => trigger.kind !== "subflow" && trigger.schedule.enabled,
+	);
+}
