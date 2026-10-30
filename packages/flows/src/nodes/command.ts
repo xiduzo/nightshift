@@ -285,7 +285,7 @@ function checkExits(node: CommandNode, check: NodeCheck): void {
 		);
 	} else if (catchAll.length === 0) {
 		check.warning(
-			`Command node "${node.id}" has no exit for other codes: the step fails on any code that is not listed.`,
+			`Command node "${node.id}" has no exit for other codes: the step fails on any other code.`,
 		);
 	}
 }

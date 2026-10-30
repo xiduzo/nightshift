@@ -169,12 +169,12 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 	);
 	if (node.lockScreen === true && node.by !== "person") {
 		check.error(
-			`Decision node "${node.id}" is decided by ${node.by === "rule" ? "a rule" : "a model"}. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.`,
+			`${node.by === "rule" ? "A rule" : "A model"} decides Decision node "${node.id}". Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.`,
 		);
 	} else if (node.lockScreen === true && node.options.length !== 2) {
 		// The phone's buttons have fixed titles: Approve, Reject.
 		check.error(
-			`Decision node "${node.id}" can be answered from the lock screen, but it has ${node.options.length} ${node.options.length === 1 ? "option" : "options"}. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or turn off "Can be answered from the lock screen".`,
+			`You can answer Decision node "${node.id}" from the lock screen, but it has ${node.options.length} ${node.options.length === 1 ? "option" : "options"}. The lock screen shows only Approve and Reject, for the first and the second option. Give it two options, or turn off "Can be answered from the lock screen".`,
 		);
 	}
 	if (node.by !== "rule") {
@@ -199,7 +199,7 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 		);
 	} else if (defaults.length === 1 && node.options.at(-1) !== defaults[0]) {
 		check.warning(
-			`Decision node "${node.id}": the option "${defaults[0]?.name}" has no rule, so it always matches. Put it last, or the options after it are never picked.`,
+			`Decision node "${node.id}": the option "${defaults[0]?.name}" has no rule, so it always matches. Put it last, or the run never picks the options after it.`,
 		);
 	}
 	for (const option of ruled) {

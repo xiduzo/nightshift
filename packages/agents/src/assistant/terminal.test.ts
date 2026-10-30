@@ -414,7 +414,7 @@ describe("the run tools of nightshift mcp", () => {
 			option: "Merge",
 		});
 		expect(done).toEqual({
-			text: 'Answered "merge" to the Gate of "existing · login". The run goes on. Follow it at http://localhost:9/runs/run-1?step=step-1',
+			text: 'Answered "merge" to the Gate of "existing · login". The run continues. Follow it at http://localhost:9/runs/run-1?step=step-1',
 			isError: false,
 		});
 		const noNote = await call("answer_gate", {
