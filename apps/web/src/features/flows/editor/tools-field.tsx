@@ -321,9 +321,8 @@ export function NodeProgramsField({
 			</div>
 			{error ? <FieldError className="text-xs">{error}</FieldError> : null}
 			<FieldDescription id={`${id}-hint`} className="text-xs">
-				Programs on this computer that are not under Agents → Tools. The name
-				only, for example jq. The run does not start when this computer cannot
-				find it.
+				Programs on this computer that are not under Agents → Tools. The run
+				does not start when this computer cannot find one.
 			</FieldDescription>
 		</FieldSet>
 	);

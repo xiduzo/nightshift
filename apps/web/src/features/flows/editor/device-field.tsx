@@ -89,7 +89,7 @@ export function DeviceField({
 			id={id}
 			label="Device"
 			optional
-			hint="Pick one of your devices, or a device another person offers this node's profile on."
+			hint="Pick one of your devices, or a device that someone offers for this profile."
 		>
 			<Select
 				items={items}

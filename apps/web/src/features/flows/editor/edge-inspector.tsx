@@ -181,8 +181,8 @@ export function EdgeInspector({
 					optional={!loopsBack}
 					hint={
 						loopsBack
-							? "This edge is part of a loop. Every loop needs a max on one of its edges, or the flow cannot run."
-							: "When the max is hit, the run takes the next edge on this outcome, or fails."
+							? "This edge is in a loop. Give one edge of each loop a max, or the flow cannot run."
+							: "After this many times, the run takes the next edge on this outcome, or fails."
 					}
 				>
 					<PositiveIntInput

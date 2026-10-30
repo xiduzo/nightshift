@@ -92,7 +92,7 @@ export function IssuesPopover({
 									className="mt-px size-3.5 shrink-0"
 									aria-hidden="true"
 								/>
-								Some checks could not run, so this list may be incomplete:{" "}
+								Some checks did not run. This list can miss issues:{" "}
 								{check.validatorError}
 							</p>
 						) : null}

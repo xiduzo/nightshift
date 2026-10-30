@@ -148,10 +148,10 @@ export function SecretsField({
 				</FieldError>
 			))}
 			<FieldDescription id={`${id}-hint`} className="text-xs">
-				The command can read these as{" "}
+				The command reads these as{" "}
 				<span className="font-mono">${"{NAME}"}</span>. Night Shift hides their
-				values in the log. A tool with a login under Agents → Tools needs none
-				of its secrets here.
+				values in the log. A tool with a login under Agents → Tools does not
+				need its secrets here.
 			</FieldDescription>
 		</FieldSet>
 	);

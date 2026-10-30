@@ -97,8 +97,7 @@ export function RevisionsSheet({
 				<SheetHeader className="border-b">
 					<SheetTitle>Revisions</SheetTitle>
 					<SheetDescription>
-						Each save of this flow, newest first. Open one to see what it
-						changed, or to restore it.
+						Newest first. Open one to see what it changed, or to restore it.
 					</SheetDescription>
 				</SheetHeader>
 				<ScrollArea className="min-h-0 flex-1">
@@ -119,7 +118,7 @@ export function RevisionsSheet({
 									<EmptyDescription>
 										{revisions.error
 											? revisions.error.message
-											: "Each save of this flow adds a revision. Save the flow to add the first one."}
+											: "Each save adds a revision. Save the flow to add the first one."}
 									</EmptyDescription>
 								</EmptyHeader>
 							</Empty>
@@ -250,7 +249,7 @@ function RevisionDetail({
 				<p className="text-destructive">{view.error.message}</p>
 			) : flow === null ? (
 				<p className="text-muted-foreground">
-					This revision is not a valid flow, so you cannot show or restore it.
+					This revision is not a valid flow. You cannot show or restore it.
 				</p>
 			) : previous === null ? (
 				<p className="text-muted-foreground">The first save of this flow.</p>
@@ -357,7 +356,7 @@ function RestoreDialog({
 					<AlertDialogTitle>Restore the revision of {when}?</AlertDialogTitle>
 					<AlertDialogDescription>
 						The flow becomes this revision again. Night Shift saves it as a new
-						revision, so you can go back.
+						revision, so you lose nothing.
 						{dirty ? " Your unsaved changes are lost." : ""}
 					</AlertDialogDescription>
 				</AlertDialogHeader>

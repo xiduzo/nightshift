@@ -115,7 +115,7 @@ export function subflowChangeText(
 		case "exit-added":
 			return {
 				title: `Outcome "${change.label}"`,
-				description: `When "${change.from}" ends on "${change.outcome}", the new flow ends on "${change.label}". This flow goes on to ${quotedList(change.to)}.`,
+				description: `When "${change.from}" ends on "${change.outcome}", the new flow ends on "${change.label}". This flow continues to ${quotedList(change.to)}.`,
 			};
 		case "decision-added":
 			return {
@@ -145,7 +145,7 @@ export function subflowChangeText(
 			const read = [...new Set(change.reads.map((r) => r.reads))];
 			return {
 				title: "Values of an earlier pass are gone",
-				description: `When the run comes back to this part, its steps start fresh. ${joined(
+				description: `When the run returns to this part, its steps start fresh. ${joined(
 					change.reads.map((r) => `"${r.node}" reads "${r.reads}"`),
 					"and",
 				)}. ${quotedList(read)} may not have run yet in that pass.`,
@@ -215,14 +215,14 @@ export function subflowBlockerText(
 			const many = blocker.nodes.length > 1;
 			return {
 				title: "An End node",
-				description: `${quotedList(blocker.nodes)} ${many ? "end" : "ends"} the run. In a Subflow, ${many ? "they end" : "it ends"} only the Subflow, and the run goes on. Move ${many ? "them" : "it"} out of the Section.`,
+				description: `${quotedList(blocker.nodes)} ${many ? "end" : "ends"} the run. In a Subflow, ${many ? "they end" : "it ends"} only the Subflow, and the run continues. Move ${many ? "them" : "it"} out of the Section.`,
 			};
 		}
 		case "stopped-edge": {
 			const many = blocker.nodes.length > 1;
 			return {
 				title: "An edge on stopped",
-				description: `${quotedList(blocker.nodes)} ${many ? "go" : "goes"} on along a "stopped" edge. In a Subflow, the run stops at the Subflow instead. Remove the edge, or move ${many ? "them" : "it"} out of the Section.`,
+				description: `${quotedList(blocker.nodes)} ${many ? "continue" : "continues"} along a "stopped" edge. In a Subflow, the run stops at the Subflow instead. Remove the edge, or move ${many ? "them" : "it"} out of the Section.`,
 			};
 		}
 		case "calls-new-flow":
