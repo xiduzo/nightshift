@@ -1,11 +1,15 @@
 /** The advanced section of an Agent node. */
 import { type AgentNode, withConnections } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@nightshift/ui/components/native-select";
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { cliToolQueries } from "@/features/agents";
 import type { DaemonConnection } from "../connections-field";
-import { InspectorSection, Note } from "../fields";
+import { Field, InspectorSection, Note } from "../fields";
 import { OutputSchemaField } from "../output-schema-field";
 import { NodeProgramsField, ToolsField } from "../tools-field";
 import { useProfile } from "./agent-fields";
@@ -16,7 +20,31 @@ function withClis(node: AgentNode, clis: string[]): AgentNode {
 	return clis.length > 0 ? { ...rest, clis } : rest;
 }
 
-/** An Agent node's output data and tools. */
+/** The node's knowledge choice, as the select shows it. */
+type KnowledgeChoice = "auto" | "always" | "never";
+
+const KNOWLEDGE_HINTS: Record<KnowledgeChoice, string> = {
+	auto: "The agent reads the project's knowledge when there is some.",
+	always:
+		"The agent is told where the project's knowledge is, also when there is none yet.",
+	never: "The agent works from the project and its task only.",
+};
+
+function knowledgeChoice(node: AgentNode): KnowledgeChoice {
+	return node.knowledge === true
+		? "always"
+		: node.knowledge === false
+			? "never"
+			: "auto";
+}
+
+/** The node with this choice: no `knowledge` field for the default. */
+function withKnowledge(node: AgentNode, choice: KnowledgeChoice): AgentNode {
+	const { knowledge: _, ...rest } = node;
+	return choice === "auto" ? rest : { ...rest, knowledge: choice === "always" };
+}
+
+/** An Agent node's output data, tools and knowledge. */
 export function AgentAdvanced({
 	projectId,
 	node,
@@ -124,6 +152,34 @@ export function AgentAdvanced({
 						}
 					/>
 				) : null}
+			</InspectorSection>
+
+			<InspectorSection
+				title="Knowledge"
+				tab="setup"
+				defaultOpen={node.knowledge !== undefined}
+			>
+				<Field
+					id={`${id}-knowledge`}
+					label="Project knowledge"
+					hint={KNOWLEDGE_HINTS[knowledgeChoice(node)]}
+				>
+					<NativeSelect
+						id={`${id}-knowledge`}
+						value={knowledgeChoice(node)}
+						aria-describedby={`${id}-knowledge-hint`}
+						onChange={(event) => {
+							const choice = event.target.value as KnowledgeChoice;
+							onChange((current) => withKnowledge(current, choice));
+						}}
+					>
+						<NativeSelectOption value="auto">
+							When there is some
+						</NativeSelectOption>
+						<NativeSelectOption value="always">Always</NativeSelectOption>
+						<NativeSelectOption value="never">Never</NativeSelectOption>
+					</NativeSelect>
+				</Field>
 			</InspectorSection>
 		</>
 	);
