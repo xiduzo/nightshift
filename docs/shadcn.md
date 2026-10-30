@@ -109,8 +109,8 @@ CLI when you need them.
 | Component | What it is for |
 | --- | --- |
 | ✓ [Avatar](https://ui.shadcn.com/docs/components/avatar) | A person or harness picture with fallback initials. |
-| ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
-| ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, schedules, events). |
+| ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow and schedule cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
+| ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
 | ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (sidebar), a sparkline in every stat card on Home, the metrics chart of a project's page, and the history chart in each details dialog. Recharts keeps a 5px margin by default; set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars; give it a hidden `YAxis` with a domain of at least 1. |
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |

@@ -1,5 +1,5 @@
-import { waitedText } from "@nightshift/client";
-import { describeCron, type Schedule } from "@nightshift/flows";
+import { scheduleLastRuns } from "@nightshift/client";
+import type { Schedule } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
 	AlertDialog,
@@ -23,51 +23,31 @@ import {
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { Switch } from "@nightshift/ui/components/switch";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@nightshift/ui/components/tooltip";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	CalendarClockIcon,
 	CircleAlertIcon,
-	PencilIcon,
 	PlusIcon,
 	PowerOffIcon,
-	Trash2Icon,
-	WebhookIcon,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
 	type Machine,
-	MachineBadge,
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
 import { flowQueries } from "@/features/flows";
-import { RunStatusBadge } from "@/features/runs";
+import { runQueries } from "@/features/runs";
 import { settingsQueries } from "@/features/settings";
-import type {
-	ScheduleIssue,
-	ScheduleResult,
-	ScheduleSummary,
-} from "@/shared/api";
-import { DataTable, dataTableColumns } from "@/shared/data-table";
-import {
-	dayWord,
-	formatDateTime,
-	formatDayTime,
-	formatTime,
-	useNow,
-} from "@/shared/format";
+import type { ScheduleSummary } from "@/shared/api";
+import { useNow } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
 import { scheduleMutations, scheduleQueries } from "./queries";
+import { IssueLines, nameOf, ScheduleCard, whenText } from "./schedule-card";
 import { ScheduleDialog } from "./schedule-dialog";
-import { LastDelivery, WebhookDialog } from "./webhook-deliveries";
+import { WebhookDialog } from "./webhook-deliveries";
 
 /** The schedule as the file holds it, without what the engine derived. */
 function plain(summary: ScheduleSummary): Schedule {
@@ -81,20 +61,24 @@ function plain(summary: ScheduleSummary): Schedule {
 	return schedule;
 }
 
-/** What a schedule starts, for its name in the list: its flow, else its signal. */
-function nameOf(schedule: Schedule): string {
-	return schedule.flow ?? schedule.signal?.name ?? schedule.id;
-}
+/** How many runs of each schedule its card shows. */
+const LAST_RUNS = 10;
+/** The project's newest runs, to find each schedule's last runs in. */
+const RECENT_RUNS = 200;
 
-/** When it starts, in words: its cron line, or a webhook. */
-function whenText(schedule: Schedule): string {
-	if (schedule.webhook) return "When a webhook arrives";
-	return schedule.cron ? describeCron(schedule.cron) : "Never";
+/** The schedules that are on first, each by its next start. */
+function byNextStart(schedules: readonly ScheduleSummary[]): ScheduleSummary[] {
+	return [...schedules].sort(
+		(a, b) =>
+			Number(b.enabled) - Number(a.enabled) ||
+			(a.nextAt ?? Number.POSITIVE_INFINITY) -
+				(b.nextAt ?? Number.POSITIVE_INFINITY),
+	);
 }
 
 /**
- * The project's schedules: what starts when,
- * the next start, and how the last start went. Pause, edit, add, remove.
+ * The project's schedules, one card each: what starts when, the next
+ * start, and how its last runs went. Pause, edit, add, remove.
  */
 export function ScheduleList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
@@ -112,6 +96,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	const schedulerLock = settings.data?.fields.scheduler.locked;
 	const machines = useSpaceMachines();
 	const flows = useQuery(flowQueries.list(projectId));
+	const runs = useQuery(runQueries.ofProject(projectId, RECENT_RUNS));
 	/** The computers each schedule's run needs. Empty while they load. */
 	const needs = (schedule: ScheduleSummary): Machine[] =>
 		machines
@@ -178,47 +163,41 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					</Button>
 				}
 			/>
-			<Card className="py-0">
-				<CardContent className="px-0">
-					{list.data && list.data.issues.length > 0 ? (
-						<div className="px-6 pt-4 pb-2">
-							<Alert>
-								<CircleAlertIcon aria-hidden="true" />
-								<AlertDescription>
-									<IssueLines issues={list.data.issues} />
-								</AlertDescription>
-							</Alert>
-						</div>
-					) : null}
+			{list.data && list.data.issues.length > 0 ? (
+				<Alert>
+					<CircleAlertIcon aria-hidden="true" />
+					<AlertDescription>
+						<IssueLines issues={list.data.issues} />
+					</AlertDescription>
+				</Alert>
+			) : null}
 
-					{schedulerOff && schedules.length > 0 ? (
-						<div className="px-6 pt-4 pb-2">
-							<Alert>
-								<PowerOffIcon aria-hidden="true" />
-								<AlertDescription>
-									{schedulerLock ?? (
-										<>
-											Schedules are paused, so no flow starts on its own. Turn
-											them on in{" "}
-											<Link
-												to="/settings"
-												className="underline underline-offset-4"
-											>
-												Settings
-											</Link>
-											.
-										</>
-									)}
-								</AlertDescription>
-							</Alert>
-						</div>
-					) : null}
+			{schedulerOff && schedules.length > 0 ? (
+				<Alert>
+					<PowerOffIcon aria-hidden="true" />
+					<AlertDescription>
+						{schedulerLock ?? (
+							<>
+								Schedules are paused, so no flow starts on its own. Turn them on
+								in{" "}
+								<Link to="/settings" className="underline underline-offset-4">
+									Settings
+								</Link>
+								.
+							</>
+						)}
+					</AlertDescription>
+				</Alert>
+			) : null}
 
-					{list.isLoading ? (
-						<div className="flex flex-col gap-2 px-6 py-4">
-							<Skeleton className="h-10 w-full" />
-						</div>
-					) : schedules.length === 0 ? (
+			{list.isLoading ? (
+				<div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+					<Skeleton className="h-64 w-full" />
+					<Skeleton className="h-64 w-full" />
+				</div>
+			) : schedules.length === 0 ? (
+				<Card>
+					<CardContent>
 						<Empty>
 							<EmptyHeader>
 								<EmptyMedia variant="icon">
@@ -240,34 +219,42 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 								</EmptyContent>
 							)}
 						</Empty>
-					) : (
-						<DataTable
-							columns={scheduleColumns({
-								now,
-								busy: save.isPending,
-								schedulerOff,
-								needs,
-								onToggle: (schedule, enabled) =>
-									saveAll(
-										schedules.map((s) =>
-											s.id === schedule.id
-												? { ...plain(s), enabled }
-												: plain(s),
-										),
-									),
-								onEdit: (schedule) => setEditing({ schedule: plain(schedule) }),
-								onDelete: setToDelete,
-								onWebhook: (schedule) => setHookOf(schedule.id),
-							})}
-							data={schedules}
-							getRowId={(schedule) => schedule.id}
-							rowClassName={(schedule) =>
-								schedule.enabled ? undefined : "text-muted-foreground"
+					</CardContent>
+				</Card>
+			) : (
+				<div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+					{byNextStart(schedules).map((schedule) => (
+						<ScheduleCard
+							key={schedule.id}
+							projectId={projectId}
+							schedule={schedule}
+							description={
+								flows.data?.find((flow) => flow.name === schedule.flow)
+									?.description ?? null
 							}
+							lastRuns={scheduleLastRuns(
+								runs.data ?? [],
+								schedule.id,
+								LAST_RUNS,
+							)}
+							needs={needs(schedule)}
+							now={now}
+							schedulerOff={schedulerOff}
+							busy={save.isPending}
+							onToggle={(enabled) =>
+								saveAll(
+									schedules.map((s) =>
+										s.id === schedule.id ? { ...plain(s), enabled } : plain(s),
+									),
+								)
+							}
+							onEdit={() => setEditing({ schedule: plain(schedule) })}
+							onDelete={() => setToDelete(schedule)}
+							onWebhook={() => setHookOf(schedule.id)}
 						/>
-					)}
-				</CardContent>
-			</Card>
+					))}
+				</div>
+			)}
 
 			<ScheduleDialog
 				open={editing !== null}
@@ -329,374 +316,5 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 				</AlertDialogContent>
 			</AlertDialog>
 		</section>
-	);
-}
-
-const column = dataTableColumns<ScheduleSummary>();
-
-/**
- * When a schedule starts next, or why it does not. `stacked` puts the
- * countdown on its own line, as the table column shows it.
- */
-function nextStart(
-	schedule: ScheduleSummary,
-	now: number,
-	schedulerOff: boolean,
-	stacked = false,
-): ReactNode {
-	if (!schedule.enabled) return "Paused";
-	if (schedulerOff) return "Schedules paused";
-	if (schedule.webhook) return "On each webhook";
-	if (schedule.nextAt === null) return "No next start";
-	if (schedule.nextAt <= now) return "Starts now";
-	const time = (
-		<time
-			dateTime={new Date(schedule.nextAt).toISOString()}
-			title={formatDateTime(schedule.nextAt)}
-			className="text-foreground"
-		>
-			{dayWord(schedule.nextAt, now)}, {formatDayTime(schedule.nextAt)}
-		</time>
-	);
-	const wait = waitedText(schedule.nextAt - now);
-	if (stacked) {
-		return (
-			<div className="flex flex-col gap-0.5">
-				{time}
-				<span className="text-xs tabular-nums">in {wait}</span>
-			</div>
-		);
-	}
-	return (
-		<>
-			{time} <span className="tabular-nums">(in {wait})</span>
-		</>
-	);
-}
-
-function When({ schedule }: { schedule: ScheduleSummary }) {
-	return (
-		<>
-			{whenText(schedule)}
-			{schedule.stopAt ? `, stops ${schedule.stopAt}` : ""}
-		</>
-	);
-}
-
-function scheduleColumns({
-	now,
-	busy,
-	schedulerOff,
-	needs,
-	onToggle,
-	onEdit,
-	onDelete,
-	onWebhook,
-}: {
-	now: number;
-	busy: boolean;
-	/** The daemon's scheduler is off: nothing starts, whatever the cron says. */
-	schedulerOff: boolean;
-	/** The computers a schedule's run needs: the one it runs on first. */
-	needs: (schedule: ScheduleSummary) => Machine[];
-	onToggle: (schedule: ScheduleSummary, enabled: boolean) => void;
-	onEdit: (schedule: ScheduleSummary) => void;
-	onDelete: (schedule: ScheduleSummary) => void;
-	/** Shows a webhook schedule's address, secret and latest webhooks. */
-	onWebhook: (schedule: ScheduleSummary) => void;
-}) {
-	return column.columns([
-		column.accessor("flow", {
-			header: "Flow",
-			cell: ({ row: { original: schedule } }) => {
-				const errors = schedule.issues.filter(
-					(issue) => issue.severity === "error",
-				);
-				return (
-					<div className="flex min-w-0 flex-col gap-0.5">
-						<span className="truncate font-medium font-mono">
-							{nameOf(schedule)}
-						</span>
-						<InputsLine inputs={schedule.inputs} baseRef={schedule.baseRef} />
-						{schedule.signal ? (
-							<p className="truncate text-muted-foreground text-xs">
-								Wakes the runs that wait for{" "}
-								<span className="font-mono">{schedule.signal.name}</span>
-							</p>
-						) : null}
-						{/* The hidden columns, as lines, on narrow screens. */}
-						<span className="text-xs md:hidden">
-							<When schedule={schedule} />
-						</span>
-						<span className="text-muted-foreground text-xs lg:hidden">
-							{schedule.enabled && !schedulerOff && schedule.nextAt !== null
-								? "Next "
-								: null}
-							{nextStart(schedule, now, schedulerOff)}
-						</span>
-						<div className="lg:hidden">
-							<RunsOn machines={needs(schedule)} />
-						</div>
-						<div className="xl:hidden">
-							<Latest schedule={schedule} />
-						</div>
-						{errors.length > 0 ? <IssueLines issues={errors} /> : null}
-					</div>
-				);
-			},
-			meta: {
-				headClassName: "pl-6",
-				cellClassName: "w-2/5 max-w-0 whitespace-normal py-3 pl-6 align-top",
-			},
-		}),
-		column.accessor("cron", {
-			header: "When",
-			cell: ({ row: { original: schedule } }) => (
-				<div className="flex flex-col gap-0.5">
-					<span>
-						<When schedule={schedule} />
-					</span>
-					<span className="font-mono text-muted-foreground text-xs">
-						{schedule.webhook ? schedule.webhook.when : schedule.cron}
-					</span>
-				</div>
-			),
-			meta: {
-				headClassName: "hidden md:table-cell",
-				cellClassName: "hidden py-3 align-top md:table-cell",
-			},
-		}),
-		column.accessor("device", {
-			header: "Runs on",
-			cell: ({ row }) => <RunsOn machines={needs(row.original)} />,
-			meta: {
-				headClassName: "hidden lg:table-cell",
-				cellClassName: "hidden py-3 align-top lg:table-cell",
-			},
-		}),
-		column.accessor("nextAt", {
-			header: "Next start",
-			cell: ({ row }) => nextStart(row.original, now, schedulerOff, true),
-			meta: {
-				headClassName: "hidden lg:table-cell",
-				cellClassName:
-					"hidden py-3 align-top text-muted-foreground lg:table-cell",
-			},
-		}),
-		column.accessor("last", {
-			header: "Last start",
-			cell: ({ row }) => <Latest schedule={row.original} />,
-			meta: {
-				headClassName: "hidden xl:table-cell",
-				cellClassName: "hidden py-3 align-top xl:table-cell",
-			},
-		}),
-		column.accessor("enabled", {
-			header: "On",
-			cell: ({ row: { original: schedule } }) => (
-				<Switch
-					checked={schedule.enabled}
-					disabled={busy}
-					aria-label={`Schedule of ${nameOf(schedule)} on`}
-					onCheckedChange={(checked) => onToggle(schedule, checked === true)}
-					className="mt-0.5"
-				/>
-			),
-			meta: { headClassName: "w-0", cellClassName: "w-0 py-3 align-top" },
-		}),
-		column.display({
-			id: "actions",
-			header: () => <span className="sr-only">Actions</span>,
-			cell: ({ row: { original: schedule } }) => (
-				<div className="-my-1 flex items-center gap-0.5">
-					{schedule.webhook ? (
-						<Tooltip>
-							<TooltipTrigger
-								render={
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label={`The webhook of ${nameOf(schedule)}`}
-										onClick={() => onWebhook(schedule)}
-									/>
-								}
-							>
-								<WebhookIcon />
-							</TooltipTrigger>
-							<TooltipContent>Address and recent webhooks</TooltipContent>
-						</Tooltip>
-					) : null}
-					<Tooltip>
-						<TooltipTrigger
-							render={
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									aria-label={`Edit the schedule of ${nameOf(schedule)}`}
-									onClick={() => onEdit(schedule)}
-								/>
-							}
-						>
-							<PencilIcon />
-						</TooltipTrigger>
-						<TooltipContent>Edit schedule</TooltipContent>
-					</Tooltip>
-					<Tooltip>
-						<TooltipTrigger
-							render={
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									aria-label={`Remove the schedule of ${nameOf(schedule)}`}
-									onClick={() => onDelete(schedule)}
-								/>
-							}
-						>
-							<Trash2Icon />
-						</TooltipTrigger>
-						<TooltipContent>Remove schedule</TooltipContent>
-					</Tooltip>
-				</div>
-			),
-			meta: {
-				headClassName: "w-0 pr-6",
-				cellClassName: "w-0 py-3 pr-6 align-top",
-			},
-		}),
-	]);
-}
-
-/**
- * The computers a run needs, each with a dot for whether it is online,
- * and a line for each one that is offline now.
- */
-function RunsOn({ machines }: { machines: Machine[] }) {
-	if (machines.length === 0) return null;
-	const [runsOn, ...more] = machines;
-	const offline = machines.filter((machine) => machine.online === false);
-	return (
-		<div className="flex flex-col gap-1">
-			<div className="flex flex-wrap gap-1">
-				{runsOn ? (
-					<MachineBadge machine={runsOn} label="The run runs here." />
-				) : null}
-				{more.map((machine) => (
-					<MachineBadge
-						key={machine.name}
-						machine={machine}
-						label="Steps of the flow run here."
-					/>
-				))}
-			</div>
-			{offline.map((machine) => (
-				<p
-					key={machine.name}
-					className="whitespace-normal text-destructive text-xs"
-				>
-					{machine.name} is offline now. Its steps cannot run until it is back.
-				</p>
-			))}
-		</div>
-	);
-}
-
-/** How the last start went: the cron time's result, or the latest webhook. */
-function Latest({ schedule }: { schedule: ScheduleSummary }) {
-	if (schedule.webhook) {
-		const [latest] = schedule.deliveries;
-		return latest ? <LastDelivery delivery={latest} /> : "—";
-	}
-	return schedule.last ? <LastResult result={schedule.last} /> : "—";
-}
-
-function InputsLine({
-	inputs,
-	baseRef,
-}: {
-	inputs: ScheduleSummary["inputs"];
-	baseRef: string | undefined;
-}) {
-	const parts = Object.entries(inputs).map(
-		([name, value]) =>
-			`${name}=${typeof value === "string" ? value : JSON.stringify(value)}`,
-	);
-	if (parts.length === 0 && !baseRef) return null;
-	return (
-		<p className="truncate font-mono text-muted-foreground text-xs">
-			{parts.join(" ")}
-			{baseRef ? `${parts.length > 0 ? " · " : ""}from ${baseRef}` : ""}
-		</p>
-	);
-}
-
-function LastResult({ result }: { result: ScheduleResult }) {
-	const when = (
-		<time
-			dateTime={new Date(result.at).toISOString()}
-			title={formatDateTime(result.at)}
-		>
-			{formatDayTime(result.at)}
-		</time>
-	);
-	if (result.kind === "fired") {
-		return (
-			<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-muted-foreground text-xs">
-				<span>{when}</span>
-				<Link
-					to="/runs/$runId"
-					params={{ runId: result.runId }}
-					className="flex items-center gap-1.5 rounded-4xl underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-				>
-					{result.runStatus ? (
-						<RunStatusBadge status={result.runStatus} />
-					) : (
-						"the run"
-					)}
-				</Link>
-			</p>
-		);
-	}
-	if (result.kind === "failed") {
-		return (
-			<p className="whitespace-normal text-destructive text-xs">
-				{when}: did not start. {result.error}
-			</p>
-		);
-	}
-	return (
-		<p className="whitespace-normal text-muted-foreground text-xs">
-			Skipped {formatTime(result.at)}: {result.reason}
-			{result.runId ? (
-				<>
-					{" "}
-					<Link
-						to="/runs/$runId"
-						params={{ runId: result.runId }}
-						className="underline underline-offset-2"
-					>
-						Open that run
-					</Link>
-				</>
-			) : null}
-		</p>
-	);
-}
-
-function IssueLines({ issues }: { issues: readonly ScheduleIssue[] }) {
-	return (
-		<ul className="flex flex-col gap-0.5">
-			{issues.map((issue) => (
-				<li
-					key={`${issue.scheduleId ?? ""}:${issue.message}`}
-					className={
-						issue.severity === "error"
-							? "whitespace-normal text-destructive text-xs"
-							: "whitespace-normal text-muted-foreground text-xs"
-					}
-				>
-					{issue.message}
-				</li>
-			))}
-		</ul>
 	);
 }

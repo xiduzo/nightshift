@@ -186,8 +186,10 @@ export {
 export {
 	createScheduleQueries,
 	type ScheduleIssue,
+	type ScheduleLastRuns,
 	type ScheduleResult,
 	type ScheduleSummary,
+	scheduleLastRuns,
 } from "./schedules";
 export {
 	createSpaceQueries,
