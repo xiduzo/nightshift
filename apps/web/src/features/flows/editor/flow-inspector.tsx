@@ -18,11 +18,15 @@ import { InputsEditor } from "./io/inputs-editor";
 import { OutputsEditor } from "./io/outputs-editor";
 import { VariablesEditor } from "./io/variables-editor";
 
+/** An amount in dollars with its cents: "2.50". */
+const dollars = (value: number) => value.toFixed(2);
+
 const POLICY_FIELDS: {
 	key: Exclude<keyof Policy, "resumeInterruptedRuns">;
 	label: string;
 	hint: string;
 	whole?: boolean;
+	format?: (value: number) => string;
 }[] = [
 	{
 		key: "usageLimitFirstWaitMinutes",
@@ -49,6 +53,7 @@ const POLICY_FIELDS: {
 		key: "budgetUsd",
 		label: "Budget (USD)",
 		hint: "The run stops when it has spent this much. Resume it to spend as much again.",
+		format: dollars,
 	},
 	{
 		key: "maxTurns",
@@ -216,24 +221,24 @@ export function FlowInspector({
 				defaultOpen={policySet}
 				description="These apply when you run this flow itself, not when another flow calls it. Leave a field empty to use Settings."
 			>
-				{POLICY_FIELDS.map(({ key, label, hint, whole }) => (
-					<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
-						<PositiveIntInput
-							id={`${id}-${key}`}
-							decimal={!whole}
-							value={flow.policy?.[key]}
-							placeholder={
-								policyDefaults
-									? `${policyDefaults[key] ?? "No limit"} (from Settings)`
-									: `${DEFAULT_POLICY[key] ?? "No limit"} (default)`
-							}
-							describedBy={`${id}-${key}-hint`}
-							onChange={(value) =>
-								onChange((current) => setPolicyValue(current, key, value))
-							}
-						/>
-					</Field>
-				))}
+				{POLICY_FIELDS.map(({ key, label, hint, whole, format = String }) => {
+					const fallback = (policyDefaults ?? DEFAULT_POLICY)[key];
+					return (
+						<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
+							<PositiveIntInput
+								id={`${id}-${key}`}
+								decimal={!whole}
+								format={format}
+								value={flow.policy?.[key]}
+								placeholder={`${fallback === undefined || fallback === null ? "No limit" : format(fallback)} (${policyDefaults ? "from Settings" : "default"})`}
+								describedBy={`${id}-${key}-hint`}
+								onChange={(value) =>
+									onChange((current) => setPolicyValue(current, key, value))
+								}
+							/>
+						</Field>
+					);
+				})}
 				<Field
 					id={`${id}-resume`}
 					label="After Night Shift restarts"

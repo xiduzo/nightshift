@@ -125,6 +125,15 @@ export function useToggleSetting() {
 	);
 }
 
+/** A setting's value as its field shows it: dollars with cents ("2.50"). */
+function shown(key: SettingKey, value: unknown): string {
+	if (value === null || value === undefined) return "";
+	if (KINDS[key]?.type === "dollars" && typeof value === "number") {
+		return value.toFixed(2);
+	}
+	return String(value);
+}
+
 /**
  * The drafts of one card's fields. A field with no draft shows the saved
  * value. Save sends the fields that changed; Reset forgets a saved value.
@@ -138,8 +147,7 @@ export function useSettingsForm(
 	const reset = useSaveSettings();
 
 	// A setting with no value (no budget) shows an empty field.
-	const current = (key: SettingKey) =>
-		data.values[key] === null ? "" : String(data.values[key]);
+	const current = (key: SettingKey) => shown(key, data.values[key]);
 	const value = (key: SettingKey) => drafts[key] ?? current(key);
 	const changed = keys.filter(
 		(key) => drafts[key] !== undefined && drafts[key] !== current(key),
@@ -201,7 +209,7 @@ export function useSettingsForm(
 						return rest;
 					});
 					toast.success(
-						`${label} reset to ${next.values[key] === null ? "no limit" : String(next.values[key])}`,
+						`${label} reset to ${next.values[key] === null ? "no limit" : shown(key, next.values[key])}`,
 					);
 				},
 				onError: (resetError) => toast.error(resetError.message),

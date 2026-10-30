@@ -267,6 +267,7 @@ export function PositiveIntInput({
 	placeholder,
 	describedBy,
 	decimal = false,
+	format = String,
 }: {
 	id: string;
 	value: number | undefined;
@@ -274,18 +275,24 @@ export function PositiveIntInput({
 	placeholder?: string;
 	describedBy?: string;
 	decimal?: boolean;
+	/** How a saved value shows, for example dollars with cents. */
+	format?: (value: number) => string;
 }) {
 	const parsePositiveInt = (input: string) => parsePositive(input, decimal);
-	const [text, setText] = useState(value?.toString() ?? "");
+	const [text, setText] = useState(value === undefined ? "" : format(value));
 
 	// Follow outside changes, but keep a half-typed value that means the same.
 	useEffect(() => {
 		setText((current) => {
 			const parsed =
 				current.trim() === "" ? undefined : parsePositive(current, decimal);
-			return parsed === value ? current : (value?.toString() ?? "");
+			return parsed === value
+				? current
+				: value === undefined
+					? ""
+					: format(value);
 		});
-	}, [value, decimal]);
+	}, [value, decimal, format]);
 
 	const invalid = text.trim() !== "" && parsePositiveInt(text) === null;
 
