@@ -74,6 +74,7 @@ export {
 	revisionKinds,
 } from "./flows";
 export type { WalkFile, WalkRef } from "./graph";
+export { createKnowledgeFolders } from "./knowledge";
 export type {
 	CopyStamp,
 	LoggedEvent,

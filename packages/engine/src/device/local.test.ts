@@ -9,6 +9,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 
+import { createKnowledgeFolders } from "../knowledge";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";
 import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
@@ -321,6 +322,53 @@ describe("session", () => {
 			},
 		]);
 		expect(plain?.saveArtifact).toBeUndefined();
+	});
+});
+
+describe("the project's knowledge", () => {
+	test("a session gets the folder when it has files, or when the node asks; never when it is off", async () => {
+		const harness = fakeHarness();
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const d = device({ harnesses: { "claude-code": harness }, knowledge });
+		const folder = knowledge.folder("p1");
+		await collect(d.session(sessionInput({ knowledge: { projectId: "p1" } })));
+		await collect(
+			d.session(sessionInput({ knowledge: { projectId: "p1", always: true } })),
+		);
+		await Bun.write(join(folder, "a.md"), "# A\n");
+		await collect(d.session(sessionInput({ knowledge: { projectId: "p1" } })));
+		await collect(d.session(sessionInput()));
+		const [empty, asked, filled, off] = harness.calls;
+		expect(empty?.env).toEqual({ NS_KNOWLEDGE: folder });
+		expect(empty?.addDirs).toBeUndefined();
+		expect(empty?.instructions).toBeUndefined();
+		expect(asked?.addDirs).toEqual([folder]);
+		expect(filled?.addDirs).toEqual([folder]);
+		expect(filled?.instructions).toStartWith(
+			`Project knowledge is in ${folder}.`,
+		);
+		// The step's own prompt stays as it is.
+		expect(filled?.prompt).toBe("Work.");
+		expect(existsSync(join(folder, "INDEX.md"))).toBe(true);
+		expect(off?.env).toBeUndefined();
+		expect(off && "knowledge" in off).toBe(false);
+	});
+
+	test("a command gets the folder in NS_KNOWLEDGE, made for it", async () => {
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const events = await collect(
+			device({ knowledge }).exec({
+				command: 'test -d "$NS_KNOWLEDGE" && printf "%s" "$NS_KNOWLEDGE"',
+				cwd: sandbox.repoPath,
+				knowledge: { projectId: "p1" },
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(events[0]).toEqual({
+			type: "output",
+			stream: "stdout",
+			text: knowledge.folder("p1"),
+		});
 	});
 });
 

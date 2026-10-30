@@ -394,6 +394,15 @@ async function runSession(
 		resumeSessionId: resumeSessionId ?? undefined,
 		stepReport: stepReportOf(node),
 		artifacts: { runId: ctx.run.id, stepId: step.stepId },
+		// The project's knowledge folder on the Device that runs the step.
+		...(node.knowledge !== false
+			? {
+					knowledge: {
+						projectId: ctx.run.projectId,
+						...(node.knowledge === true ? { always: true } : {}),
+					},
+				}
+			: {}),
 		signal,
 		...(maxTurns !== null ? { maxTurns } : {}),
 		...(budgetUsd !== null ? { maxBudgetUsd: budgetUsd - spentBefore } : {}),

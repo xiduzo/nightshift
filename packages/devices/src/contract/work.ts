@@ -166,6 +166,10 @@ const sessionFields = {
 	resumeSessionId: z.string().optional(),
 	stepReport: stepReportSchema.optional(),
 	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
+	/** The project whose knowledge folder the session gets on the Device. */
+	knowledge: z
+		.object({ projectId: z.string(), always: z.boolean().optional() })
+		.optional(),
 	/** The step's turn limit, and what is left of the run's budget. */
 	maxTurns: z.number().int().positive().optional(),
 	maxBudgetUsd: z.number().positive().optional(),
@@ -252,6 +256,8 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			secrets: z.array(z.string()).optional(),
 			/** A Command step: a new file for its data, named in `NS_OUTPUT`. */
 			outputFile: z.boolean().optional(),
+			/** The project whose knowledge folder goes in `NS_KNOWLEDGE`. */
+			knowledge: z.object({ projectId: z.string() }).optional(),
 		}),
 	}),
 	z.object({

@@ -28,6 +28,7 @@ import {
 import {
 	createArtifactStore,
 	createFlowDocuments,
+	createKnowledgeFolders,
 	createToolLaunchers,
 	documentSpace,
 	localDevice,
@@ -343,6 +344,8 @@ export async function createDaemon(
 	/** The project's folder here: where its runs' worktrees branch from. */
 	const clonePath = clonePathOf(db, async () => device.id);
 
+	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
+	const knowledge = createKnowledgeFolders(dataDir);
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
 		id: device.id,
@@ -367,6 +370,8 @@ export async function createDaemon(
 		profileFor: (ref) => profiles.settingsFor(ref),
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
+		// The projects' knowledge, outside every repository.
+		knowledge,
 		// What each step changed in the run's copy of the project, also by commands.
 		snapshots: true,
 	});

@@ -30,6 +30,11 @@ import {
 	type SecretEnv,
 } from "../device-config";
 import {
+	commandKnowledge,
+	type KnowledgeFolders,
+	sessionKnowledge,
+} from "../knowledge";
+import {
 	checkProjectFolder,
 	createWorktreeSnapshots,
 	createWorktrees,
@@ -132,6 +137,11 @@ export type LocalDeviceDeps = {
 	profileFor?: (id: string) => ProfileSettings | null;
 	/** Where a session keeps its artifacts. Without it, sessions keep none. */
 	artifacts?: Pick<ArtifactStore, "save">;
+	/**
+	 * The projects' knowledge folders on this computer. Without it, a step
+	 * gets none.
+	 */
+	knowledge?: KnowledgeFolders;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -237,7 +247,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			};
 			return;
 		}
-		const { harness: name, connections, clis, artifacts, ...rest } = input;
+		const {
+			harness: name,
+			connections,
+			clis,
+			artifacts,
+			knowledge,
+			...rest
+		} = input;
 		const harness = harnessFor(name);
 		if (!harness) {
 			yield {
@@ -274,6 +291,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					? cliToolsInstruction(await deps.cliToolsFor(clis))
 					: "";
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
+			const known =
+				knowledge && deps.knowledge
+					? await sessionKnowledge(deps.knowledge, knowledge).catch((error) => {
+							console.warn("The knowledge folder was left out:", error);
+							return null;
+						})
+					: null;
+			const env = { ...known?.env, ...tools?.env };
 			yield { type: "ready", harness: name };
 			const events = harness.run({
 				...rest,
@@ -288,9 +313,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 						}
 					: {}),
 				...(tools?.toolsPath ? { toolsPath: tools.toolsPath } : {}),
-				...(tools && Object.keys(tools.env).length > 0
-					? { env: tools.env }
-					: {}),
+				...(Object.keys(env).length > 0 ? { env } : {}),
+				...(known?.addDirs ? { addDirs: known.addDirs } : {}),
+				...(known?.instructions ? { instructions: known.instructions } : {}),
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
 			});
 			yield* tools && tools.values.length > 0
@@ -323,7 +348,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	 * to the launcher only, and come back as `•••` too.
 	 */
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
-		const { secrets = [], ...command } = input;
+		const { secrets = [], knowledge, ...command } = input;
 		// The secrets of the CLI tools' logins go to their launchers only. A
 		// command that names one in `secrets` gets it below.
 		const scrub = (deps.toolLaunchers?.guarded() ?? []).filter(
@@ -337,9 +362,15 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "refused", message: missingSecretsMessage(found.missing) };
 			return;
 		}
+		// The sync flows write here. A folder that cannot be made is left out.
+		const known =
+			knowledge && deps.knowledge
+				? await commandKnowledge(deps.knowledge, knowledge).catch(() => ({}))
+				: {};
 		const tools = (await deps.toolLaunchers?.forCommand()) ?? null;
 		try {
 			const env: Record<string, string> = {
+				...known,
 				...command.env,
 				...tools?.env,
 				...found.env,

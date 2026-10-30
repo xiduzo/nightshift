@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
+import { createKnowledgeFolders } from "../knowledge";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read/derive-steps";
 import { drive, flowOf, held, payloads, startRun } from "../testing/graph";
@@ -374,6 +375,25 @@ describe("the Command node", () => {
 		await drive(h, { inputs: {} });
 		const [ended] = payloads(await h.events(), "StepEnded");
 		expect(ended?.outputs).not.toHaveProperty("data");
+	});
+
+	test("the command gets the project's knowledge folder in NS_KNOWLEDGE", async () => {
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "sync",
+				nodes: [
+					command("sync", 'printf "# Home\\n" > "$NS_KNOWLEDGE/home.md"'),
+				],
+				edges: [],
+			}),
+			{ knowledge },
+		);
+		await drive(h, { inputs: {} });
+		expect(
+			await readFile(join(knowledge.folder("project-1"), "home.md"), "utf8"),
+		).toBe("# Home\n");
 	});
 
 	describe("secrets", () => {

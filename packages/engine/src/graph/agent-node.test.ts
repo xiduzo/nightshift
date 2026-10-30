@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import {
 	failingScript,
@@ -11,6 +13,7 @@ import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import { createKnowledgeFolders } from "../knowledge";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveOpenGate } from "../read/derive-run";
 import { deriveSteps } from "../read/derive-steps";
@@ -72,6 +75,30 @@ describe("the Agent node", () => {
 		const cost = deriveSteps(logged)[0]?.cost;
 		expect(cost?.usd).toBeCloseTo(4.5, 6);
 		expect(cost).toMatchObject({ estimated: true, missing: 0 });
+	});
+
+	test("the agent gets the project's knowledge when the folder has files, unless the node says no", async () => {
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		await mkdir(knowledge.folder("project-1"), { recursive: true });
+		await writeFile(join(knowledge.folder("project-1"), "a.md"), "# A\n");
+		const harness = fakeHarness(reportingScript("pass"));
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "reader",
+				nodes: [agent("reader"), agent("blind", { knowledge: false })],
+				edges: [{ id: "e1", from: "reader", outcome: "pass", to: "blind" }],
+			}),
+			{ harness, knowledge },
+		);
+		await drive(h, { inputs: {} });
+		const [reader, blind] = harness.calls;
+		expect(reader?.addDirs).toEqual([knowledge.folder("project-1")]);
+		expect(reader?.instructions).toContain(knowledge.folder("project-1"));
+		expect(reader?.env?.NS_KNOWLEDGE).toBe(knowledge.folder("project-1"));
+		expect(blind?.addDirs).toBeUndefined();
+		expect(blind?.instructions).toBeUndefined();
+		expect(blind?.env?.NS_KNOWLEDGE).toBeUndefined();
 	});
 
 	test("the spend so far goes to the log, not to the transcript", async () => {

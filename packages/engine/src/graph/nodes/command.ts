@@ -105,6 +105,8 @@ async function runShell(
 			? { secrets: node.secrets }
 			: {}),
 		outputFile: true,
+		// A sync flow writes the project's knowledge: `NS_KNOWLEDGE`.
+		knowledge: { projectId: ctx.run.projectId },
 		logPath: commandLogPath(ctx.dataDir, ctx.run.id, stepId),
 		signal,
 		onOutput: (stream, text) => {

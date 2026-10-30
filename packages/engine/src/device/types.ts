@@ -13,6 +13,7 @@ import type {
 	JsonValue,
 	ProfileSettings,
 } from "@nightshift/flows";
+import type { KnowledgeRequest } from "../knowledge";
 import type { WorktreeChanges } from "../log";
 
 /**
@@ -176,6 +177,9 @@ export type SessionInput = Omit<
 	// The assistant's, not a run step's: it runs on this computer only.
 	| "tools"
 	| "readOnly"
+	// The Device adds the knowledge folder itself (`knowledge`).
+	| "addDirs"
+	| "instructions"
 > & {
 	harness: AgentHarnessName;
 	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
@@ -192,6 +196,13 @@ export type SessionInput = Omit<
 	 * `save_artifact`. The Device that runs the session keeps them.
 	 */
 	artifacts?: { runId: string; stepId: string };
+	/**
+	 * The project whose knowledge folder the session gets on the Device
+	 * that runs it: in `NS_KNOWLEDGE`, and to read with a line that says
+	 * where, when it has files or `always` (`knowledge/handoff.ts`).
+	 * Absent: the node turned it off (`knowledge: false`).
+	 */
+	knowledge?: KnowledgeRequest;
 };
 
 /**
@@ -234,6 +245,12 @@ export type ExecInput = {
 	 * hands back what the command wrote there, and the file goes.
 	 */
 	outputFile?: boolean;
+	/**
+	 * The project whose knowledge folder the command gets in
+	 * `NS_KNOWLEDGE`, made on the Device when it is not there yet: a sync
+	 * flow writes into it.
+	 */
+	knowledge?: { projectId: string };
 	/** Aborting kills the whole process group (SIGTERM, then SIGKILL). */
 	signal: AbortSignal;
 };

@@ -172,6 +172,8 @@ export type StartOptions = {
 	branch?: string;
 	/** The flow file the run starts from; default none, as a quick run. */
 	flowName?: string;
+	/** The projects' knowledge folders on the Device; default none. */
+	knowledge?: TestDeviceDeps["knowledge"];
 };
 
 let runs = 0;
@@ -225,6 +227,7 @@ export async function startRun(
 		...(options.decider ? { decider: options.decider } : {}),
 		mcpServersFor:
 			options.mcpServersFor ?? (async () => ({ ok: true, servers: {} })),
+		...(options.knowledge ? { knowledge: options.knowledge } : {}),
 	};
 	const device = () =>
 		localDevice({ id: TEST_DEVICE_ID, name: "test", ...local });
