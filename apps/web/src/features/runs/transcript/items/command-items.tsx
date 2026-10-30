@@ -1,11 +1,4 @@
-/** The items of a Command step: its log lines and its exit. */
-import {
-	CodeBlock,
-	CodeBlockActions,
-	CodeBlockContent,
-	CodeBlockCopyButton,
-	CodeBlockLine,
-} from "@nightshift/ui/components/code-block";
+/** The items of a Command step: the command as a terminal, with its output and its exit. */
 import {
 	Marker,
 	MarkerContent,
@@ -13,36 +6,57 @@ import {
 } from "@nightshift/ui/components/marker";
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { formatTime } from "@/shared/format";
-import type { ExitItem, LogItem } from "../transcript-items";
+import type { CommandItem, ExitItem, LogItem } from "../transcript-items";
+import { Terminal, type TerminalState } from "./terminal";
+import { TerminalOutput } from "./terminal-output";
 
-/** A command's output as it streamed; stderr in the destructive colour. */
-export function CommandLog({ item }: { item: LogItem }) {
+/** All a command wrote, in order. */
+function logText(log: LogItem): string {
+	return log.chunks.map((chunk) => chunk.text).join("");
+}
+
+/**
+ * A Command step's command as a terminal, open from the start: the command,
+ * then what it wrote as it streamed, then how it ended.
+ */
+export function CommandRun({
+	command,
+	log,
+	exit,
+	running,
+}: {
+	command: CommandItem;
+	log?: LogItem;
+	exit?: ExitItem;
+	/** The step still runs. */
+	running: boolean;
+}) {
+	const state: TerminalState = exit
+		? exit.exitCode === 0
+			? { kind: "done" }
+			: exit.exitCode === null
+				? { kind: "failed" }
+				: { kind: "failed", exitCode: exit.exitCode }
+		: running
+			? { kind: "running" }
+			: { kind: "unfinished" };
 	return (
-		<CodeBlock size="sm">
-			<CodeBlockActions>
-				<CodeBlockCopyButton
-					value={item.chunks.map((chunk) => chunk.text).join("")}
-				/>
-			</CodeBlockActions>
-			<CodeBlockContent wrap className="max-h-[36rem]">
-				<CodeBlockLine className="wrap-anywhere">
-					{item.chunks.map((chunk, index) => (
-						<span
-							// Chunks only grow at the end, so the index is stable.
-							key={index}
-							className={
-								chunk.stream === "stderr" ? "text-destructive" : undefined
-							}
-						>
-							{chunk.text}
-						</span>
-					))}
-				</CodeBlockLine>
-			</CodeBlockContent>
-		</CodeBlock>
+		<Terminal
+			command={command.command}
+			state={state}
+			output={log ? logText(log) : undefined}
+			defaultOpen
+			outputClassName="max-h-[36rem]"
+		/>
 	);
 }
 
+/** Output with no command before it. */
+export function CommandLog({ item }: { item: LogItem }) {
+	return <TerminalOutput output={logText(item)} command="Output" />;
+}
+
+/** An exit with no command before it. */
 export function CommandExit({ item }: { item: ExitItem }) {
 	const passed = item.exitCode === 0;
 	return (

@@ -31,14 +31,13 @@ import {
 	MessagesSquareIcon,
 	SendIcon,
 } from "lucide-react";
-import { memo, type ReactNode, useState } from "react";
+import { memo, type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { GateAnswer, GateQuestion as GateQuestionText } from "@/features/gates";
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
-import { CodeView } from "@/shared/code";
 import { SectionTitle } from "../components/step-console";
 import { useOpenedStep } from "../hooks/use-opened-step";
-import { CommandExit, CommandLog } from "./items/command-items";
+import { CommandExit, CommandLog, CommandRun } from "./items/command-items";
 import {
 	DecisionAsk,
 	DecisionCard,
@@ -58,10 +57,16 @@ import {
 	SessionFinished,
 } from "./items/session-items";
 import { ToolCallRow } from "./items/tool-call-row";
+import { ToolCallsGroup } from "./items/tool-calls-group";
 import { WaitCard, WakeMarker } from "./items/wait-items";
 import type { TranscriptState } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 import { markdownContext, transcriptToMarkdown } from "./transcript-markdown";
+import {
+	rowItems,
+	type TranscriptRow,
+	transcriptRows,
+} from "./transcript-rows";
 
 /**
  * The transcript of one step. An agent step reads as a conversation: session
@@ -132,19 +137,25 @@ export function StepTranscript({
 		),
 	]);
 
-	// Select mode: a checkbox per part, to copy only some of them.
+	// Select mode: a checkbox per part, to copy only some of them. While
+	// selecting, tool calls are not grouped, so each call can be picked.
 	const [selecting, setSelecting] = useState(false);
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [anchor, setAnchor] = useState<number | null>(null);
-	const keys = transcript.items.map((item) => item.key);
+	const rows = useMemo(
+		() => transcriptRows(transcript.items, { groupTools: !selecting }),
+		[transcript.items, selecting],
+	);
 	const select = (index: number, checked: boolean, range: boolean) => {
 		const from = range && anchor !== null ? Math.min(anchor, index) : index;
 		const to = range && anchor !== null ? Math.max(anchor, index) : index;
 		setSelected((current) => {
 			const next = new Set(current);
-			for (const key of keys.slice(from, to + 1)) {
-				if (checked) next.add(key);
-				else next.delete(key);
+			for (const row of rows.slice(from, to + 1)) {
+				for (const item of rowItems(row)) {
+					if (checked) next.add(item.key);
+					else next.delete(item.key);
+				}
 			}
 			return next;
 		});
@@ -259,55 +270,69 @@ export function StepTranscript({
 							aria-live="off"
 							className="mx-auto w-full max-w-3xl gap-4 px-4 py-5 md:px-6"
 						>
-							{transcript.items.map((item, index) => (
-								<MessageScrollerItem key={item.key} messageId={item.key}>
-									<Selectable
-										on={selecting}
-										checked={selected.has(item.key)}
-										onCheckedChange={(checked, range) =>
-											select(index, checked, range)
-										}
-									>
-										{item.kind === "gate-open" ? (
-											<GateQuestion
-												item={item}
-												answer={
-													gateOpen ? (
-														<GateAnswer
-															runId={runId}
-															stepId={step.id}
-															nodeId={step.nodeId}
-															choices={item.choices}
-															deadline={item.deadline ?? null}
-														/>
-													) : null
-												}
-											/>
-										) : (
-											<TranscriptItemView
-												item={item}
-												node={node}
-												itemTitle={
-													item.kind === "item-end"
-														? itemTitles.get(item.itemId)
-														: undefined
-												}
-												running={running}
-												session={
-													item.sessionId
-														? sessionsById.get(item.sessionId)
-														: undefined
-												}
-												sessionNumber={
-													item.sessionId
-														? sessionNumbers.get(item.sessionId)
-														: undefined
-												}
-											/>
-										)}
-									</Selectable>
-								</MessageScrollerItem>
-							))}
+							{rows.map((row, index) => {
+								const key = rowKey(row);
+								return (
+									<MessageScrollerItem key={key} messageId={key}>
+										<Selectable
+											on={selecting}
+											checked={rowItems(row).every((item) =>
+												selected.has(item.key),
+											)}
+											onCheckedChange={(checked, range) =>
+												select(index, checked, range)
+											}
+										>
+											{row.kind === "tool-calls" ? (
+												<ToolCallsGroup items={row.items} running={running} />
+											) : row.kind === "command" ? (
+												<CommandRun
+													command={row.command}
+													{...(row.log ? { log: row.log } : {})}
+													{...(row.exit ? { exit: row.exit } : {})}
+													running={running}
+												/>
+											) : row.item.kind === "gate-open" ? (
+												<GateQuestion
+													item={row.item}
+													answer={
+														gateOpen ? (
+															<GateAnswer
+																runId={runId}
+																stepId={step.id}
+																nodeId={step.nodeId}
+																choices={row.item.choices}
+																deadline={row.item.deadline ?? null}
+															/>
+														) : null
+													}
+												/>
+											) : (
+												<TranscriptItemView
+													item={row.item}
+													node={node}
+													itemTitle={
+														row.item.kind === "item-end"
+															? itemTitles.get(row.item.itemId)
+															: undefined
+													}
+													running={running}
+													session={
+														row.item.sessionId
+															? sessionsById.get(row.item.sessionId)
+															: undefined
+													}
+													sessionNumber={
+														row.item.sessionId
+															? sessionNumbers.get(row.item.sessionId)
+															: undefined
+													}
+												/>
+											)}
+										</Selectable>
+									</MessageScrollerItem>
+								);
+							})}
 							{pendingSessions.map((session) => (
 								<MessageScrollerItem
 									key={`pending:${session.id}`}
@@ -392,6 +417,15 @@ function Selectable({
 	);
 }
 
+/** A row's key: its first item's, which stays while calls join a group. */
+function rowKey(row: TranscriptRow): string {
+	return row.kind === "item"
+		? row.item.key
+		: row.kind === "command"
+			? row.command.key
+			: (row.items[0]?.key ?? "tool-calls");
+}
+
 const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	agent: "The agent is working…",
 	command: "The command is running…",
@@ -441,7 +475,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 		case "error":
 			return <SessionError item={item} />;
 		case "command":
-			return <CodeView code={item.command} language="bash" title="Command" />;
+			return <CommandRun command={item} running={running} />;
 		case "log":
 			return <CommandLog item={item} />;
 		case "exit":
