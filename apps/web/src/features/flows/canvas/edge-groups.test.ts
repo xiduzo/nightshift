@@ -91,10 +91,14 @@ describe("labels", () => {
 	test("hides a label the node row already shows", () => {
 		expect(labelAtRest([segment({})])).toBe(false);
 		expect(labelAtRest([segment({ traversals: 0 })])).toBe(false);
+		// Each outcome of a merged edge draws its own line from its row.
+		expect(labelAtRest([segment({}), segment({ outcome: "fail" })])).toBe(
+			false,
+		);
 	});
 
-	test("shows merged edges, a max, run counts, errors and unknown outcomes", () => {
-		expect(labelAtRest([segment({}), segment({ outcome: "fail" })])).toBe(true);
+	test("shows a max, run counts, errors and unknown outcomes", () => {
+		expect(labelAtRest([segment({}), segment({ max: 2 })])).toBe(true);
 		expect(labelAtRest([segment({ max: 2 })])).toBe(true);
 		expect(labelAtRest([segment({ traversals: 1 })])).toBe(true);
 		expect(labelAtRest([segment({ hasError: true })])).toBe(true);
