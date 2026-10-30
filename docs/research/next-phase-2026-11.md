@@ -21,7 +21,7 @@ worktree and lands on main between nights.
 
 | Topic | Decision |
 | --- | --- |
-| Scope | No new node types, no devices or mobile features, no assistant features until sprint 4 ends. Bug fixes only there. |
+| Scope | Lifted on 2026-10-30. A new node type, a Devices feature or an assistant feature is fine when a sprint item needs it. Prefer a kit when existing nodes can do the job. |
 | Foundational | Integrations stay on files, git, shell CLIs, cron, webhooks and MCP connections a person brings. No vendor nodes. |
 | Local first | Monitoring and knowledge work with no account and no network. Export to a third party is opt-in, one setting, off by default. |
 | Harness | The Agent node keeps spawning the unmodified `claude` binary with the person's own login. No Agent SDK, no `claude-agent-acp`, for subscription profiles. |
@@ -450,7 +450,6 @@ done-when of sprints 1 to 3 is checked and written down.
 
 ## 6. Parked, on purpose
 
-- Devices, Offers, the phone app and the assistant: bug fixes only.
 - Import of Claude Code dynamic workflow scripts: a demo for after the pitch.
 - gh-aw lock file export, ACP registry listing: an afternoon each, after sprint 3.
 - LangSmith as a native sink, Langfuse self-host recipes. Vectors moved to
