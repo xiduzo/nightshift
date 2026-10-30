@@ -58,7 +58,7 @@ A flow is a directed graph of nodes and edges. Night Shift keeps it in the proje
 - `inputs`: `{ name, type: "text" | "json", label?, description?, default?, required? }`. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
 - `variables`: `{ name, type, initial?, schema?, description?, keep? }`, `type` one of `text`, `number`, `boolean`, `json`.
-- `policy`: optional. `maxSteps` caps the steps of a run.
+- `policy`: optional. `maxSteps` caps the steps of a run. `budgetUsd` stops the run when its cost passes it. `maxTurns` and `idleMinutes` (default 15) limit each Agent step. A node may set its own.
 - `sections`: frames in the editor only, see below.
 
 Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting with a letter, at most 40 characters. Node ids and inputs share one namespace. Do not use `run`, `vars`. Outcomes and option names: lowercase letters, digits and `-`. Do not use `error`, `stopped`, `interrupted`, `waiting`: those are the engine's.
@@ -69,7 +69,7 @@ The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`,
 
 ### agent
 
-A coding-agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`). Name a `profile`, or set `harness` (claude-code, opencode, codex, grok-build, copilot, gemini, cursor, pi, or `acp:<slug>`), `model` and `permissionMode` (default, acceptEdits, auto, bypassPermissions, plan) yourself. A profile is better. Optional: `effort`, `session` (`fresh`, or `resume` to continue its last session on a later visit), `clis` (programs it may run, for example `gh`), `connections`, `idleMinutes`, `output` (a JSON Schema for an object: the agent must report `data` that matches it), `outcomes` (its own outcomes, each `{ name, description }`; replaces the default ones), `ask: "person"`. With `ask: "person"`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step `fail`. Do not draw a `needs-input` edge then, and do not build that loop with a Gate yourself.
+A coding-agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`). Name a `profile`, or set `harness` (claude-code, opencode, codex, grok-build, copilot, gemini, cursor, pi, or `acp:<slug>`), `model` and `permissionMode` (default, acceptEdits, auto, bypassPermissions, plan) yourself. A profile is better. Optional: `effort`, `session` (`fresh`, or `resume` to continue its last session on a later visit), `clis` (programs it may run, for example `gh`), `connections`, `idleMinutes`, `maxTurns`, `output` (a JSON Schema for an object: the agent must report `data` that matches it), `outcomes` (its own outcomes, each `{ name, description }`; replaces the default ones), `ask: "person"`. With `ask: "person"`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step `fail`. Do not draw a `needs-input` edge then, and do not build that loop with a Gate yourself.
 
 Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outcome`, `output`, `summary`, `data`, `note`, `visit`, `session_id`.
 
