@@ -13,6 +13,15 @@ const cost = (costUsd: number, costMissing = 0) => ({
 	costMissing,
 });
 
+const noTotals: Nights["totals"] = {
+	runs: 0,
+	ended: 0,
+	finished: 0,
+	costUsd: 0,
+	gates: 0,
+	perNight: [],
+};
+
 function nights(
 	range: Nights["nights"],
 	groups: Nights["runs"]["groups"],
@@ -49,6 +58,9 @@ function nights(
 			groups: { rows: [], count: 0 },
 			latest: [],
 		},
+		totals: noTotals,
+		before: noTotals,
+		flows: null,
 	};
 }
 
@@ -127,6 +139,7 @@ describe("healthOf", () => {
 		const row: FlowHealth["rows"][number] = {
 			name: "nightly",
 			last: { runId: "r1", status: "failed", startedAt: 9 },
+			lastRuns: [{ runId: "r1", status: "failed", startedAt: 9 }],
 			runs: 4,
 			finished: 2,
 			ended: 3,

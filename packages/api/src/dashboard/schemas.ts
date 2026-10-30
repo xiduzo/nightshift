@@ -68,6 +68,39 @@ const dashboardRunSchema = z.object({
 
 const gateStateSchema = z.enum(["answered", "unanswered", "waiting"]);
 
+const lastFlowRunSchema = z.object({
+	runId: z.string(),
+	status: runStatusSchema,
+	startedAt: z.number(),
+});
+
+const flowHealthRowSchema = z.object({
+	name: z.string(),
+	last: lastFlowRunSchema.nullable(),
+	lastRuns: z.array(lastFlowRunSchema),
+	runs: z.number(),
+	finished: z.number(),
+	ended: z.number(),
+	rate: z.number().nullable(),
+	cost: spreadSchema.nullable(),
+	unfinished: z.object({ count: z.number(), costUsd: z.number() }),
+	unknownCost: z.number(),
+	freeRuns: z.number(),
+});
+
+const nightTotalsSchema = z.object({
+	night: z.number(),
+	runs: z.number(),
+	ended: z.number(),
+	finished: z.number(),
+	costUsd: z.number(),
+	gates: z.number(),
+});
+
+const periodTotalsSchema = nightTotalsSchema.omit({ night: true }).extend({
+	perNight: z.array(nightTotalsSchema),
+});
+
 const nightsRangeSchema = z.object({
 	nights: nightRangeSchema,
 	spend: z.object({
@@ -133,25 +166,9 @@ const nightsRangeSchema = z.object({
 			}),
 		),
 	}),
-});
-
-const flowHealthRowSchema = z.object({
-	name: z.string(),
-	last: z
-		.object({
-			runId: z.string(),
-			status: runStatusSchema,
-			startedAt: z.number(),
-		})
-		.nullable(),
-	runs: z.number(),
-	finished: z.number(),
-	ended: z.number(),
-	rate: z.number().nullable(),
-	cost: spreadSchema.nullable(),
-	unfinished: z.object({ count: z.number(), costUsd: z.number() }),
-	unknownCost: z.number(),
-	freeRuns: z.number(),
+	totals: periodTotalsSchema,
+	before: periodTotalsSchema,
+	flows: topRows(flowHealthRowSchema).nullable(),
 });
 
 /** The dashboard of the Space, of one project, or of every Space. */
@@ -221,7 +238,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				night: z.number(),
 				runs: z.number(),
 				cost: knownCostSchema,
-				latest: z.array(dashboardRunSchema),
+				latest: z.array(runSummarySchema.extend({ group: z.string() })),
 			})
 			.nullable(),
 		upNext: z.array(

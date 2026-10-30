@@ -282,7 +282,7 @@ function lastNightOf(runs: readonly PlacedRun[]): NightOutput | null {
 		cost: sumKnownCost(ofNight.map(({ run }) => run)),
 		latest: ofNight
 			.slice(0, OVERVIEW_ROWS)
-			.map(({ run, group }) => toDashboardRun(run, group)),
+			.map(({ run, group }) => ({ ...run, group })),
 	};
 }
 
@@ -341,9 +341,13 @@ export function summarizeDashboard(
 		activity: HOUR_RANGES.map((range) =>
 			activityOf(range, placed, now, timeZone),
 		),
-		nights: NIGHT_RANGES.map((range) =>
-			nightsRange(range, placed, gates, now, timeZone),
-		),
+		nights: NIGHT_RANGES.map((range) => ({
+			...nightsRange(range, placed, gates, now, timeZone),
+			flows:
+				scope.kind === "project"
+					? flowHealthRows(scope.flows, runs, now, timeZone, range)
+					: null,
+		})),
 		healthNights: FLOW_HEALTH_NIGHTS,
 		lastNight: lastNightOf(placed),
 		upNext: upNextOf(runs, now),

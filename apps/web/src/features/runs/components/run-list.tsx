@@ -39,10 +39,10 @@ import { RunStatusIcon } from "./run-status-badge";
 /**
  * Runs as a table, newest first. Each row: a status icon, the title (a link
  * to the run) and its outcome under it; icons for the trigger, the device,
- * the cost and the branch, with how long ago it started under them. What every run shares (one
- * project) does not repeat on each row. Narrow screens drop the icons. With
- * `pageSize`, the runs show in pages. With `more`, a button under the list
- * loads the next runs.
+ * the cost and the branch, with how long ago it started under them, or the
+ * time with `clockTimes`. What every run shares (one project) does not repeat
+ * on each row. Narrow screens drop the icons. With `pageSize`, the runs show
+ * in pages. With `more`, a button under the list loads the next runs.
  */
 export function RunList({
 	runs,
@@ -52,6 +52,7 @@ export function RunList({
 	emptyAction,
 	pageSize,
 	more,
+	clockTimes = false,
 }: {
 	runs: RunSummary[] | undefined;
 	/** Pass to show the project of each run. */
@@ -64,6 +65,8 @@ export function RunList({
 	pageSize?: number;
 	/** There are more runs than the list holds: load them. */
 	more?: { load: () => void; loading: boolean };
+	/** Show when each run started ("10:37 PM"), for the runs of one night. */
+	clockTimes?: boolean;
 }) {
 	if (isLoading) {
 		return (
@@ -99,7 +102,7 @@ export function RunList({
 	return (
 		<>
 			<DataTable
-				columns={runColumns(projectNames)}
+				columns={runColumns(projectNames, clockTimes)}
 				data={runs}
 				getRowId={(run) => run.id}
 				initialSorting={[{ id: "started", desc: true }]}
@@ -125,8 +128,14 @@ export function RunList({
 
 const column = dataTableColumns<RunSummary>();
 
-/** The columns of a run list; with `projectNames`, each title names its project. */
-function runColumns(projectNames: Map<string, string> | undefined) {
+/**
+ * The columns of a run list; with `projectNames`, each title names its
+ * project. With `clockTimes`, a run's start shows as a time of day.
+ */
+function runColumns(
+	projectNames: Map<string, string> | undefined,
+	clockTimes: boolean,
+) {
 	const projectOf = (run: RunSummary) =>
 		projectNames
 			? (projectNames.get(run.projectId) ?? "Unknown project")
@@ -151,7 +160,7 @@ function runColumns(projectNames: Map<string, string> | undefined) {
 				<>
 					<RunFacts run={row.original} />
 					<p className="mt-0.5 whitespace-nowrap text-right text-muted-foreground text-xs">
-						<Started at={row.original.createdAt} />
+						<Started at={row.original.createdAt} clock={clockTimes} />
 					</p>
 				</>
 			),
@@ -323,10 +332,10 @@ function Fact({
 	);
 }
 
-function Started({ at }: { at: number }) {
+function Started({ at, clock }: { at: number; clock: boolean }) {
 	return (
 		<time dateTime={new Date(at).toISOString()} title={formatDateTime(at)}>
-			{formatRelative(at)}
+			{clock ? formatTime(at) : formatRelative(at)}
 		</time>
 	);
 }

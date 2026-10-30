@@ -56,12 +56,18 @@ export function RunsDialog({
 	onOpenChange,
 	summary,
 	project,
+	initialRange,
+	initialTab,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
+	/** The range it opens at: the page's. Default 30 nights. */
+	initialRange?: NightRange;
+	/** The tab it opens at. Default Overview. */
+	initialTab?: Tab;
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
@@ -69,6 +75,8 @@ export function RunsDialog({
 				summary={summary}
 				project={project}
 				onNavigate={() => onOpenChange(false)}
+				initialRange={initialRange}
+				initialTab={initialTab}
 			/>
 		</DetailsDialog>
 	);
@@ -78,14 +86,18 @@ function RunsDetails({
 	summary,
 	project,
 	onNavigate,
+	initialRange = 30,
+	initialTab = "overview",
 }: {
 	summary: DashboardSummary;
 	project?: Project;
 	onNavigate: () => void;
+	initialRange?: NightRange;
+	initialTab?: Tab;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<NightRange>(30);
-	const [tab, setTab] = useState<Tab>("overview");
+	const [range, setRange] = useState<NightRange>(initialRange);
+	const [tab, setTab] = useState<Tab>(initialTab);
 	const lastDay = summary.cards.lastDay;
 	const inRange: NightsRange["runs"] = nightsOf(summary, range).runs;
 	const { ended, finished, nightsWithRuns, groups, failed } = inRange;

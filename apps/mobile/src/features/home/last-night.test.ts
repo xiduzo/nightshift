@@ -51,8 +51,14 @@ function run(id: string, over: Partial<NightRun> = {}): NightRun {
 	};
 }
 
+/** The night's runs are whole runs: the phone reads only their NightRun part. */
 function lastNight(latest: NightRun[], runs = latest.length): LastNight {
-	return { night: NIGHT, runs, cost: cost(1.5), latest };
+	return {
+		night: NIGHT,
+		runs,
+		cost: cost(1.5),
+		latest: latest as LastNight["latest"],
+	};
 }
 
 function nights(range: Nights["nights"], perNight: Nights["runs"]["perNight"]) {

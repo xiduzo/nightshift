@@ -70,6 +70,8 @@ export function GatesDialog({
 	gates,
 	summary,
 	project,
+	initialRange,
+	initialTab,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -78,6 +80,10 @@ export function GatesDialog({
 	/** The numbers of `project` when given: the Gates its runs asked. */
 	summary: DashboardSummary;
 	project?: Project;
+	/** The range it opens at: the page's. Default 30 nights. */
+	initialRange?: NightRange;
+	/** The tab it opens at. Default Overview. */
+	initialTab?: Tab;
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
@@ -86,6 +92,8 @@ export function GatesDialog({
 				summary={summary}
 				project={project}
 				onNavigate={() => onOpenChange(false)}
+				initialRange={initialRange}
+				initialTab={initialTab}
 			/>
 		</DetailsDialog>
 	);
@@ -96,16 +104,20 @@ function GatesDetails({
 	summary,
 	project,
 	onNavigate,
+	initialRange = 30,
+	initialTab = "overview",
 }: {
 	/** Oldest first: the Host sends them in the inbox order. */
 	gates: OpenGate[];
 	summary: DashboardSummary;
 	project?: Project;
 	onNavigate: () => void;
+	initialRange?: NightRange;
+	initialTab?: Tab;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<NightRange>(30);
-	const [tab, setTab] = useState<Tab>("overview");
+	const [range, setRange] = useState<NightRange>(initialRange);
+	const [tab, setTab] = useState<Tab>(initialTab);
 	const oldest = waiting[0];
 	const asked = nightsOf(summary, range).gates;
 	const { answerTime, runsAsking, groups } = asked;
