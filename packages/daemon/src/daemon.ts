@@ -94,6 +94,7 @@ import {
 	stopOnSignals,
 } from "./runtime";
 import { keepSync } from "./sync";
+import { wireTelemetry } from "./telemetry";
 
 export type DaemonOptions = {
 	/** The port the daemon listens on: its own addresses may call it. Default: PORT, else DEFAULT_PORT. */
@@ -345,6 +346,16 @@ export async function createDaemon(
 	/** The project's folder here: where its runs' worktrees branch from. */
 	const clonePath = clonePathOf(db, async () => device.id);
 
+	/**
+	 * What a run step's harness session adds to its environment: the
+	 * export to monitoring's, once it exists below. Nothing before.
+	 */
+	let sessionEnv = (_session: {
+		harness: string;
+		runId: string;
+		stepId: string;
+	}): Record<string, string> => ({});
+
 	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
 	const knowledge = createKnowledgeFolders(dataDir);
 	/**
@@ -384,6 +395,8 @@ export async function createDaemon(
 		knowledge,
 		// What each step changed in the run's copy of the project, also by commands.
 		snapshots: true,
+		// A Claude Code session sends its own telemetry while the export is on.
+		sessionEnv: (session) => sessionEnv(session),
 	});
 
 	/**
@@ -510,6 +523,29 @@ export async function createDaemon(
 	// Not awaited: it reads the runs that have not ended.
 	void keepAwake.start();
 
+	/**
+	 * "Send runs to your monitoring" (this computer's setting, off by
+	 * default): the runs it walks as OpenTelemetry spans and metrics, and
+	 * its Claude Code sessions' own telemetry to the same endpoint.
+	 */
+	const telemetry = await slots.replace(
+		"nightshiftTelemetry",
+		async () => {
+			const wired = wireTelemetry({
+				engine,
+				deviceId: device.id,
+				settings,
+				document,
+				dataDir,
+				keyStore,
+			});
+			await wired.start();
+			return wired;
+		},
+		(before) => before.stop(),
+	);
+	sessionEnv = (session) => telemetry.sessionEnv(session);
+
 	const gitInstaller = systemGitInstaller();
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
 	const gitHubClones = await slots.keep("nightshiftGitHubClones", () =>
@@ -565,6 +601,7 @@ export async function createDaemon(
 		engine,
 		settings: computerSettings,
 		notifications,
+		telemetry,
 		toolLaunchers,
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the

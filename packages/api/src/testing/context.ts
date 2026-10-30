@@ -26,6 +26,7 @@ const SERVICES: Record<keyof Services, true> = {
 	engine: true,
 	settings: true,
 	notifications: true,
+	telemetry: true,
 	connections: true,
 	cliTools: true,
 	toolLaunchers: true,

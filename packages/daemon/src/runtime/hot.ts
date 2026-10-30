@@ -9,6 +9,7 @@ import type {
 	SpaceDocuments,
 } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
+import type { Telemetry } from "@nightshift/telemetry";
 
 import type { KeepAwake } from "../keep-awake";
 import type { KeptSync } from "../sync";
@@ -27,7 +28,8 @@ import type { Lease } from "./lease";
  *   and it is bound to the newest daemon's closures). Bun reloads a
  *   listener of the same `id` in place;
  * - replaced, the one before stopped first: the notifier, the keep-awake,
- *   the project copies, the scheduler, the price list and the facts timer;
+ *   the export to monitoring, the project copies, the scheduler, the price
+ *   list and the facts timer;
  * - handed over: the devices (`startDevices` fills `nightshiftDevices`
  *   itself: its engine lets go of its runs, and the work hub, the applied
  *   commands, the calls served for a Host, the Devices online and the
@@ -51,6 +53,8 @@ export type HotRegistry = KeptDevices &
 		nightshiftInApp?: InAppChannel;
 		nightshiftNotifications?: Notifications;
 		nightshiftKeepAwake?: KeepAwake;
+		/** The export to monitoring: its providers stop with it. */
+		nightshiftTelemetry?: Telemetry;
 		nightshiftScheduler?: AbortController;
 		/** The clones from GitHub that run, and how the last ones ended. */
 		nightshiftGitHubClones?: GitHubClones;
