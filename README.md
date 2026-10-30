@@ -56,7 +56,7 @@ Steps are nodes. Each node type does one job:
 | Node | Does |
 | --- | --- |
 | **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and go on with your answer. |
-| **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. |
+| **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. `$NS_KNOWLEDGE` is the project's [knowledge](docs/knowledge.md) folder. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
 | **Decision** | Picks one of its options. Who picks is up to you: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. |
 | **Value** | Makes data that matches a JSON schema, from a rule or a model. |
@@ -209,6 +209,7 @@ The concept, the decisions, and the delivery order are in [docs/PLAN.md](docs/PL
 | Document | What is in it |
 | --- | --- |
 | [docs/PLAN.md](docs/PLAN.md) | The concept, the settled decisions, the architecture, and the setup. |
+| [docs/knowledge.md](docs/knowledge.md) | What agents read besides the code, and the kits that fill it. |
 | [docs/glossary.md](docs/glossary.md) | One name for one thing: flow, run, step, node, gate, and more. |
 | [docs/steering/](docs/steering/) | The vision, and the technical, QA, and design rules every change follows. |
 | [docs/adr/](docs/adr/) | The architecture decisions, one record each. |
