@@ -45,6 +45,14 @@ const HARNESS_TAKE_OVER: Record<
 > = byHarness((facts) => facts.takeOver);
 
 /**
+ * Whether the harness ends a session at its turn limit itself (Claude
+ * Code). For any other, the engine counts the turns. A custom agent does not.
+ */
+export function harnessLimitsTurns(name: AgentHarnessName): boolean {
+	return !isCustomHarness(name) && HARNESS_FACTS[name].limitsTurns === true;
+}
+
+/**
  * The display name of a harness, for a message about one: its label, or a
  * custom agent's slug (its label lives on the computer that added it).
  */

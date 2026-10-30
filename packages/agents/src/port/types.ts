@@ -108,6 +108,20 @@ export type AgentSessionInput = {
 	 * and drops `clis`, `toolsPath` and `saveArtifact`.
 	 */
 	readOnly?: boolean;
+	/**
+	 * The most turns (model replies) the session may take. A harness that
+	 * enforces it itself (`limitsTurns` in its facts: Claude Code's
+	 * `--max-turns`) ends with `finished` and `limit: "turns"`; for any
+	 * other harness the engine counts the turns and aborts the session.
+	 */
+	maxTurns?: number;
+	/**
+	 * The most the session may spend, in USD: what is left of the run's
+	 * budget. Claude Code takes it as `--max-budget-usd` and ends with
+	 * `finished` and `limit: "budget"`; other harnesses ignore it, and the
+	 * engine stops the session on its usage events.
+	 */
+	maxBudgetUsd?: number;
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
 };
@@ -156,6 +170,9 @@ export type StepReportSpec = {
  */
 export type AgentErrorKind = "aborted" | "usage-limit" | "network" | "harness";
 
+/** A limit of the session input that the harness stopped the session at. */
+export type SessionLimit = "turns" | "budget";
+
 /**
  * One normalized event of a harness session. Every stream emits exactly one
  * `session` event first (as soon as the harness reports its id) and ends with
@@ -187,7 +204,12 @@ export type AgentEvent =
 	 * OpenCode, ACP agents that send `usage_update`). `finished` has the total.
 	 */
 	| { type: "usage"; usage: AgentUsage }
-	| { type: "finished"; usage?: AgentUsage }
+	| {
+			type: "finished";
+			usage?: AgentUsage;
+			/** The harness stopped the session at a limit the input set (`maxTurns`, `maxBudgetUsd`). */
+			limit?: SessionLimit;
+	  }
 	| {
 			type: "error";
 			kind: AgentErrorKind;

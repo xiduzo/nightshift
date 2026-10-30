@@ -361,7 +361,7 @@ describe("createTranslator", () => {
 		});
 	});
 
-	test("max turns is a normal finish", () => {
+	test("max turns is a normal finish, at the turn limit", () => {
 		const translator = newTranslator();
 		translator.observeSdk({
 			type: "result",
@@ -372,7 +372,30 @@ describe("createTranslator", () => {
 			session,
 			{ ...runFinished, finishReason: "length" },
 		]);
-		expect(events.at(-1)?.type).toBe("finished");
+		expect(events.at(-1)).toMatchObject({ type: "finished", limit: "turns" });
+	});
+
+	test("the budget the session set is a normal finish, at the budget", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "result",
+			subtype: "error_max_budget_usd",
+			is_error: true,
+			total_cost_usd: 1.02,
+			usage: { input_tokens: 10, output_tokens: 5 },
+		});
+		const events = feed(translator, [
+			session,
+			{
+				type: "RUN_ERROR",
+				message: "Claude Code run failed: error_max_budget_usd",
+			},
+		]);
+		expect(events.at(-1)).toMatchObject({
+			type: "finished",
+			limit: "budget",
+			usage: { costUsd: 1.02 },
+		});
 	});
 
 	test("maps an assistant usage-limit error with its reset time", () => {

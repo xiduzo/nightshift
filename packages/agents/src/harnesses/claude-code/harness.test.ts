@@ -187,6 +187,15 @@ describe("claudeCodeHarness read only", () => {
 			"claude --strict-mcp-config",
 		);
 	});
+
+	test("the budget left goes to --max-budget-usd, in cents, rounded down", () => {
+		expect(claudeCommand("claude", undefined, false, 1.239)).toBe(
+			"claude --max-budget-usd 1.23",
+		);
+		expect(claudeCommand("claude", undefined, false, 0.001)).toBe(
+			"claude --max-budget-usd 0.01",
+		);
+	});
 });
 
 describe("claudeAllowedTools", () => {
@@ -255,6 +264,39 @@ describe("claudeCodeHarness with CLI tools", () => {
 		const argv: string[] = run.argv;
 		const allowed = argv[argv.indexOf("--allowedTools") + 1]?.split(",");
 		expect(allowed).toEqual([REPORT_TOOL_ID, "Bash(gh:*)"]);
+	});
+});
+
+describe("claudeCodeHarness with limits", () => {
+	test("the turn limit and the budget left reach the command line", async () => {
+		const claudeLog = join(dir, "claude.jsonl");
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_LOG: claudeLog,
+		});
+		for await (const _ of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input({ maxTurns: 12, maxBudgetUsd: 2.5 }))) {
+			// Drain the session.
+		}
+		const run = JSON.parse((await readFile(claudeLog, "utf8")).trim());
+		const argv: string[] = run.argv;
+		expect(argv[argv.indexOf("--max-turns") + 1]).toBe("12");
+		expect(argv[argv.indexOf("--max-budget-usd") + 1]).toBe("2.50");
+	});
+
+	test("a session without limits gets neither flag", async () => {
+		const claudeLog = join(dir, "claude.jsonl");
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_LOG: claudeLog,
+		});
+		for await (const _ of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input())) {
+			// Drain the session.
+		}
+		const run = JSON.parse((await readFile(claudeLog, "utf8")).trim());
+		expect(run.argv).not.toContain("--max-turns");
+		expect(run.argv).not.toContain("--max-budget-usd");
 	});
 });
 

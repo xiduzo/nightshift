@@ -162,6 +162,9 @@ const sessionFields = {
 	resumeSessionId: z.string().optional(),
 	stepReport: stepReportSchema.optional(),
 	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
+	/** The step's turn limit, and what is left of the run's budget. */
+	maxTurns: z.number().int().positive().optional(),
+	maxBudgetUsd: z.number().positive().optional(),
 };
 
 /** A session the Walker resolved: its harness, model, tools and connections. */

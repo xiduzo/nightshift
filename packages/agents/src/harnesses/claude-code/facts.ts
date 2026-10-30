@@ -11,4 +11,5 @@ export const CLAUDE_CODE_FACTS: HarnessFacts = {
 	listing: null,
 	takeOver: (id) => `claude --resume ${id}`,
 	skillDirs: [".claude/skills"],
+	limitsTurns: true,
 };

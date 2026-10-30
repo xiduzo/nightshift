@@ -162,13 +162,18 @@ export function observeSdkMessage(
 			...(resultUsage ? { resultUsage } : {}),
 			...(resultText !== undefined ? { resultText } : {}),
 		};
-		// Max turns is a normal stop for the run policy, not a harness failure.
-		const failed =
+		// The turn limit and the budget the session set are normal stops for
+		// the run policy, not harness failures.
+		const limit =
 			message.subtype === "error_max_turns"
-				? false
-				: message.is_error === true ||
-					(typeof message.subtype === "string" &&
-						message.subtype !== "success");
+				? "turns"
+				: message.subtype === "error_max_budget_usd"
+					? "budget"
+					: undefined;
+		if (limit) return { ...next, limit };
+		const failed =
+			message.is_error === true ||
+			(typeof message.subtype === "string" && message.subtype !== "success");
 		if (!failed) return next;
 		const errors = Array.isArray(message.errors)
 			? message.errors.filter((e): e is string => typeof e === "string")

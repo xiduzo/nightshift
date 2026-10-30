@@ -35,6 +35,11 @@ export type HarnessFacts = HarnessCatalogEntry & {
 	 * folder. `.agents/skills` is the shared folder that most of them read.
 	 */
 	skillDirs: readonly string[];
+	/**
+	 * The CLI ends a session at its turn limit itself (Claude Code's
+	 * `--max-turns`). Unset: the engine counts the turns.
+	 */
+	limitsTurns?: true;
 };
 
 /** A harness adapter: the TanStack AI package that drives one coding-agent CLI. */

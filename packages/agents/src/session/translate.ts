@@ -48,6 +48,7 @@ import type {
 	AgentErrorKind,
 	AgentEvent,
 	AgentUsage,
+	SessionLimit,
 	StepReportSpec,
 } from "../port";
 import {
@@ -76,6 +77,12 @@ export type SdkSignals = {
 	resultError?: string;
 	/** Usage from the result message, a fallback for RUN_FINISHED usage. */
 	resultUsage?: AgentUsage;
+	/**
+	 * The harness stopped the session at a limit the session set: its turn
+	 * limit, or its budget (Claude Code's `error_max_turns` and
+	 * `error_max_budget_usd`). The session finishes with that limit.
+	 */
+	limit?: SessionLimit;
 	/** What the session has used so far, while it runs: a running total. */
 	liveUsage?: AgentUsage;
 	/** The `result` text of the result message: the final assistant text. */
@@ -544,6 +551,16 @@ export function createTranslator(options: {
 
 	function terminal({ aborted, thrown }: FinishInput): AgentEvent {
 		if (aborted) return errorEvent("aborted", "The session was aborted");
+
+		// A limit the session set is a normal stop: the engine decides what it means.
+		if (signals.limit) {
+			const usage = finishedUsage(runFinished?.usage, signals.resultUsage);
+			return {
+				type: "finished",
+				...(usage ? { usage } : {}),
+				limit: signals.limit,
+			};
+		}
 
 		// The harness's own report of a failure is its words. A throw is not:
 		// its text only sorts the failure, and the person sees plain words.

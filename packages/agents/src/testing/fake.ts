@@ -9,6 +9,7 @@ import type {
 	Decider,
 	DecisionInput,
 	DecisionResult,
+	SessionLimit,
 	StepReportOutcome,
 	ValueInput,
 	ValueResult,
@@ -42,7 +43,12 @@ export type FakeStep =
 	| { type: "usage"; usage: AgentUsage };
 
 export type FakeOutcome =
-	| { type: "finished"; usage?: AgentUsage }
+	| {
+			type: "finished";
+			usage?: AgentUsage;
+			/** The harness stopped at a limit of the input, as Claude Code does at `--max-turns`. */
+			limit?: SessionLimit;
+	  }
 	| {
 			type: "error";
 			kind: Exclude<AgentErrorKind, "aborted">;
@@ -270,7 +276,11 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 			return;
 		}
 		yield outcome.type === "finished"
-			? { type: "finished", ...(outcome.usage ? { usage: outcome.usage } : {}) }
+			? {
+					type: "finished",
+					...(outcome.usage ? { usage: outcome.usage } : {}),
+					...(outcome.limit ? { limit: outcome.limit } : {}),
+				}
 			: {
 					type: "error",
 					kind: outcome.kind,

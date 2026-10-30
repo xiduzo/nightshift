@@ -84,13 +84,24 @@ export function claudeCommand(
 	executable: string | undefined,
 	mcpConfigPath?: string,
 	strictMcp = false,
+	maxBudgetUsd?: number,
 ): string {
 	return [
 		executable ?? "claude",
 		...(mcpConfigPath !== undefined ? ["--mcp-config", mcpConfigPath] : []),
 		// Only the servers of `--mcp-config` load: the session's and the bridge.
 		...(strictMcp ? ["--strict-mcp-config"] : []),
+		// The adapter has no option for it. Claude Code stops the session
+		// past it with `error_max_budget_usd`.
+		...(maxBudgetUsd !== undefined
+			? ["--max-budget-usd", budgetArg(maxBudgetUsd)]
+			: []),
 	].join(" ");
+}
+
+/** A budget in dollars as `--max-budget-usd` takes it: cents, rounded down, never 0. */
+function budgetArg(usd: number): string {
+	return Math.max(0.01, Math.floor(usd * 100) / 100).toFixed(2);
 }
 
 /**
@@ -236,7 +247,11 @@ async function claudeCodeAdapter(
 			options.claudeExecutable,
 			mcp.path,
 			input.readOnly === true,
+			input.maxBudgetUsd,
 		),
+		// The adapter passes it as `--max-turns`; Claude Code ends with
+		// `error_max_turns` (`limit: "turns"`).
+		...(input.maxTurns !== undefined ? { maxTurns: input.maxTurns } : {}),
 		env: {
 			...effortEnv(input.model, input.effort, (model) =>
 				KNOWN_REASONING_MODELS.has(model),

@@ -21,6 +21,7 @@ export type {
 	HarnessName,
 	McpServerConfig,
 	PermissionMode,
+	SessionLimit,
 	StepReportOutcome,
 	StepReportSpec,
 	ValueInput,
