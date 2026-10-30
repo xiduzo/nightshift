@@ -10,6 +10,7 @@ import {
 	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import { Textarea } from "@nightshift/ui/components/textarea";
 import { LargerTextarea } from "@/shared/larger-window";
 
 /** What the person typed per input: text, or JSON text for a `json` input. */
@@ -78,7 +79,8 @@ export function missingInputs(
 /**
  * One field per input of a flow: text, or JSON for a `json` input. With
  * `templates`, a value may read a webhook (`{{event.body.number}}`): its
- * JSON is read when the webhook arrives, not here.
+ * JSON is read when the webhook arrives, not here. The text inputs named in
+ * `lines` take one value per line.
  */
 export function FlowInputFields({
 	idPrefix,
@@ -86,12 +88,14 @@ export function FlowInputFields({
 	values,
 	onChange,
 	templates = false,
+	lines = [],
 }: {
 	idPrefix: string;
 	inputs: readonly FlowInputDef[];
 	values: InputTexts;
 	onChange: (values: InputTexts) => void;
 	templates?: boolean;
+	lines?: readonly string[];
 }) {
 	if (inputs.length === 0) return null;
 	return (
@@ -140,6 +144,18 @@ export function FlowInputFields({
 									spellCheck={false}
 									aria-required={input.required === true}
 									aria-invalid={problem !== null}
+									aria-describedby={hint ? `${fieldId}-hint` : undefined}
+									onChange={(event) => set(event.target.value)}
+								/>
+							) : lines.includes(input.name) ? (
+								<Textarea
+									id={fieldId}
+									value={value}
+									placeholder={input.default}
+									rows={3}
+									className="min-h-20"
+									spellCheck={false}
+									aria-required={input.required === true}
 									aria-describedby={hint ? `${fieldId}-hint` : undefined}
 									onChange={(event) => set(event.target.value)}
 								/>

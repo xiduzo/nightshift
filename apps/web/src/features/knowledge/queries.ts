@@ -1,4 +1,4 @@
-/** The query options of a project's knowledge. */
+/** The query options of a project's knowledge, and its mutations. */
 
 import { orpc } from "@/shared/api";
 
@@ -14,4 +14,13 @@ export const knowledgeQueries = {
 	/** One file, by its path in the knowledge. */
 	read: (projectId: string, path: string) =>
 		orpc.knowledge.read.queryOptions({ input: { projectId, path } }),
+};
+
+export const knowledgeMutations = {
+	/** Adds a source, or changes one: its flow and its schedule. */
+	saveSource: orpc.knowledge.saveSource.mutationOptions,
+	/** Removes a source, and its files if asked. */
+	removeSource: orpc.knowledge.removeSource.mutationOptions,
+	/** Runs a source now: a run of its flow. */
+	sync: orpc.runs.start.mutationOptions,
 };

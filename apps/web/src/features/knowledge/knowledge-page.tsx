@@ -15,14 +15,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
 	Tooltip,
@@ -30,61 +22,92 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import {
 	BookOpenIcon,
 	CircleAlertIcon,
 	LightbulbIcon,
-	RefreshCwIcon,
+	PlusIcon,
 	TriangleAlertIcon,
-	UsersIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { flowQueries, StartRunDialog } from "@/features/flows";
+import { StartRunDialog } from "@/features/flows";
 import { ProjectPage } from "@/features/projects";
-import type { Knowledge, KnowledgeFile } from "@/shared/api";
+import type { KnowledgeFile } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, formatSize } from "@/shared/format";
 import { PageHeading, PageSection } from "@/shared/page";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
-
-/** What each knowledge kit fills the folder from, for a person. */
-const KIT_LABELS: Record<string, string> = {
-	"kit:knowledge/files": "Project files",
-	"kit:knowledge/github-wiki": "GitHub wiki",
-	"kit:knowledge/web": "Web pages",
-	"kit:knowledge/jira": "Jira",
-	"kit:knowledge/confluence": "Confluence",
-};
+import { type EditedSource, SourceDialog } from "./source-dialog";
+import { Sources } from "./sources";
 
 /**
- * A project's Knowledge page: the files its agents read on this computer,
- * when each changed and its size, and the flows that fill them, each with
- * a button that runs it now.
+ * A project's Knowledge page: the files its agents read, when each changed
+ * and its size, and the sources that fill them: add one, edit or remove
+ * it, or sync it now.
  */
 export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
 	return (
 		<ProjectPage projectId={projectId} section="Knowledge">
-			{(project) => (
-				<section
-					aria-labelledby="knowledge-heading"
-					className="flex flex-col gap-6"
-				>
-					<PageHeading
-						id="knowledge-heading"
-						title="Knowledge"
-						description="Files your agents read before they work. Every computer in this Space gets the same files."
-					/>
-					<KnowledgeView projectId={project.id} />
-				</section>
-			)}
+			{(project) => <KnowledgeSection projectId={project.id} />}
 		</ProjectPage>
 	);
 }
 
-function KnowledgeView({ projectId }: { projectId: string }) {
+/** The page's heading with Add source, the view, and the source dialog. */
+function KnowledgeSection({ projectId }: { projectId: string }) {
+	const knowledge = useQuery(knowledgeQueries.get(projectId));
+	// Null: closed. "new": a new source. Else the source to edit.
+	const [dialog, setDialog] = useState<EditedSource | "new" | null>(null);
+	const [shown, setShown] = useState<EditedSource | null>(null);
+	const open = (source: EditedSource | "new") => {
+		setShown(source === "new" ? null : source);
+		setDialog(source);
+	};
+	return (
+		<section
+			aria-labelledby="knowledge-heading"
+			className="flex flex-col gap-6"
+		>
+			<PageHeading
+				id="knowledge-heading"
+				title="Knowledge"
+				description="Files your agents read before they work. Every computer in this Space gets the same files."
+				actions={
+					<Button onClick={() => open("new")}>
+						<PlusIcon data-icon="inline-start" />
+						Add source
+					</Button>
+				}
+			/>
+			<KnowledgeView
+				projectId={projectId}
+				onAdd={() => open("new")}
+				onEdit={open}
+			/>
+			<SourceDialog
+				open={dialog !== null}
+				onOpenChange={(next) => {
+					if (!next) setDialog(null);
+				}}
+				projectId={projectId}
+				edited={shown}
+				shared={knowledge.data?.shared ?? false}
+			/>
+		</section>
+	);
+}
+
+function KnowledgeView({
+	projectId,
+	onAdd,
+	onEdit,
+}: {
+	projectId: string;
+	onAdd: () => void;
+	onEdit: (source: EditedSource) => void;
+}) {
 	const knowledge = useQuery(knowledgeQueries.get(projectId));
 	const [open, setOpen] = useState<string | null>(null);
 	const columns = useMemo(() => fileColumns(setOpen), []);
@@ -108,7 +131,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 	}
 	const { files, syncs, tooLarge, proposed, reviews, shared } = knowledge.data;
 	if (files.length === 0 && syncs.length === 0 && proposed === 0) {
-		return <NoKnowledge projectId={projectId} />;
+		return <NoKnowledge onAdd={onAdd} />;
 	}
 	return (
 		<>
@@ -119,7 +142,27 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 					reviews={reviews}
 				/>
 			) : null}
-			<Syncs projectId={projectId} syncs={syncs} shared={shared} />
+			{syncs.length > 0 ? (
+				<Sources
+					projectId={projectId}
+					syncs={syncs}
+					shared={shared}
+					onEdit={onEdit}
+				/>
+			) : (
+				<Alert>
+					<BookOpenIcon />
+					<AlertTitle>Nothing adds files to this knowledge</AlertTitle>
+					<AlertDescription>
+						Add a source, such as a folder or web pages, to keep it up to date.
+					</AlertDescription>
+					<AlertAction>
+						<Button size="sm" variant="outline" onClick={onAdd}>
+							Add source
+						</Button>
+					</AlertAction>
+				</Alert>
+			)}
 			{files.length > 0 ? <KnowledgeSearch projectId={projectId} /> : null}
 			<PageSection
 				title="Files"
@@ -142,7 +185,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 								<EmptyHeader>
 									<EmptyTitle>No files yet</EmptyTitle>
 									<EmptyDescription>
-										Choose Sync now above to add files.
+										Choose Sync now on a source above to add its files.
 									</EmptyDescription>
 								</EmptyHeader>
 							</Empty>
@@ -167,7 +210,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 }
 
 /** Nothing yet: what knowledge is, and how to start. */
-function NoKnowledge({ projectId }: { projectId: string }) {
+function NoKnowledge({ onAdd }: { onAdd: () => void }) {
 	return (
 		<Empty className="border">
 			<EmptyHeader>
@@ -176,17 +219,14 @@ function NoKnowledge({ projectId }: { projectId: string }) {
 				</EmptyMedia>
 				<EmptyTitle>No knowledge yet</EmptyTitle>
 				<EmptyDescription>
-					Knowledge is what your agents read besides the code, such as a wiki or
-					web pages. Add a flow with a knowledge kit, then run it.
+					Knowledge is what your agents read besides the code. Add a folder of
+					notes, web pages or a wiki, and Night Shift keeps a copy here.
 				</EmptyDescription>
 			</EmptyHeader>
 			<EmptyContent>
-				<Button
-					render={
-						<Link to="/projects/$projectId/flows" params={{ projectId }} />
-					}
-				>
-					Go to flows
+				<Button onClick={onAdd}>
+					<PlusIcon data-icon="inline-start" />
+					Add source
 				</Button>
 			</EmptyContent>
 		</Empty>
@@ -232,107 +272,6 @@ function Learnings({
 				</AlertAction>
 			) : null}
 		</Alert>
-	);
-}
-
-/**
- * The flows that fill the knowledge, each with a button that runs it now.
- * In a shared Space, a note that every Member reads what they sync.
- */
-function Syncs({
-	projectId,
-	syncs,
-	shared,
-}: {
-	projectId: string;
-	syncs: Knowledge["syncs"];
-	shared: boolean;
-}) {
-	const flows = useQuery({
-		...flowQueries.list(projectId),
-		meta: { quietErrors: true },
-	});
-	const [starting, setStarting] = useState<{
-		name: string;
-		open: boolean;
-	} | null>(null);
-
-	return (
-		<PageSection
-			title="Syncs"
-			description="The flows that add files. Schedule one, or run it now."
-		>
-			{shared ? (
-				<Alert>
-					<UsersIcon />
-					<AlertTitle>
-						Every Member of this Space can read this knowledge
-					</AlertTitle>
-					<AlertDescription>
-						Before you sync work items or pages here, make sure that each Member
-						may see them.
-					</AlertDescription>
-				</Alert>
-			) : null}
-			{syncs.length === 0 ? (
-				<Alert>
-					<BookOpenIcon />
-					<AlertTitle>No flow fills this knowledge</AlertTitle>
-					<AlertDescription>
-						Add a flow with a knowledge kit, then run it.
-					</AlertDescription>
-				</Alert>
-			) : (
-				<ItemGroup className="gap-2">
-					{syncs.map((sync) => (
-						<Item key={sync.flow} variant="outline">
-							<ItemContent>
-								<ItemTitle>
-									<Link
-										to="/projects/$projectId/flows/$name"
-										params={{ projectId, name: sync.flow }}
-										className="hover:underline"
-									>
-										{sync.flow}
-									</Link>
-								</ItemTitle>
-								<ItemDescription className="flex flex-wrap gap-1">
-									{sync.kits.map((kit) => (
-										<Badge key={kit} variant="secondary">
-											{KIT_LABELS[kit] ?? kit}
-										</Badge>
-									))}
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setStarting({ name: sync.flow, open: true })}
-								>
-									<RefreshCwIcon aria-hidden="true" />
-									Sync now
-								</Button>
-							</ItemActions>
-						</Item>
-					))}
-				</ItemGroup>
-			)}
-			{starting ? (
-				<StartRunDialog
-					open={starting.open}
-					onOpenChange={(open) =>
-						setStarting((current) => (current ? { ...current, open } : null))
-					}
-					projectId={projectId}
-					flowName={starting.name}
-					inputs={
-						flows.data?.find((flow) => flow.name === starting.name)?.inputs ??
-						[]
-					}
-				/>
-			) : null}
-		</PageSection>
 	);
 }
 
