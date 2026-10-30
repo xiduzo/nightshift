@@ -18,7 +18,13 @@ import {
 	type JsonValue,
 } from "../nodes";
 import { chooseByRule, renderCommand, runFields } from "../template";
-import { isKitName, kitCopyName, kitFlow, kitList } from "./kits";
+import {
+	isKitName,
+	kitCopyName,
+	kitFlow,
+	kitList,
+	knowledgeKitsOf,
+} from "./kits";
 
 /**
  * The kits' commands, run as a Command step runs them: `sh -c` in a real
@@ -210,6 +216,30 @@ describe("the kit registry", () => {
 		);
 		expect(kitCopyName("github")).toBeNull();
 		expect(kitList().length).toBeGreaterThan(0);
+	});
+
+	test("finds the knowledge kits a flow calls", () => {
+		const call = (id: string, flow: string) => ({
+			id,
+			type: "call" as const,
+			position: { x: 0, y: 0 },
+			flow,
+			inputs: {},
+		});
+		const flow = {
+			...kit("kit:jira/move"),
+			nodes: [
+				call("a", "kit:knowledge/web"),
+				call("b", "kit:github/finish-pr"),
+				call("c", "kit:knowledge/files"),
+				call("d", "kit:knowledge/web"),
+			],
+		} as Flow;
+		expect(knowledgeKitsOf(flow)).toEqual([
+			"kit:knowledge/files",
+			"kit:knowledge/web",
+		]);
+		expect(knowledgeKitsOf(kit("kit:jira/move"))).toEqual([]);
 	});
 });
 

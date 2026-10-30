@@ -569,6 +569,7 @@ export async function createDaemon(
 			connections,
 		}),
 		checks: programChecks(),
+		knowledge,
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),
 			setUpGit: (input) => setUpGit(input),

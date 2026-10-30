@@ -167,6 +167,7 @@ export {
 	kitCopyName,
 	kitFlow,
 	kitList,
+	knowledgeKitsOf,
 } from "./kits";
 export {
 	blockersFirst,

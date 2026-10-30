@@ -30,6 +30,7 @@ const SERVICES: Record<keyof Services, true> = {
 	cliTools: true,
 	toolLaunchers: true,
 	profiles: true,
+	knowledge: true,
 	assistant: true,
 	checks: true,
 	projectSetup: true,

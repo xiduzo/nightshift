@@ -82,3 +82,20 @@ export function kitCopyName(name: string): string | null {
 	if (!kitNameSchema.safeParse(name).success) return null;
 	return name.slice(KIT_PREFIX.length).replace("/", "-");
 }
+
+/** What the knowledge kits' names start with. */
+const KNOWLEDGE_KITS = `${KIT_PREFIX}knowledge/`;
+
+/**
+ * The knowledge kits a flow calls, by name, sorted: a flow with one fills
+ * the project's knowledge, and the Knowledge page offers to run it.
+ */
+export function knowledgeKitsOf(flow: Flow): string[] {
+	const names = new Set<string>();
+	for (const node of flow.nodes) {
+		if (node.type === "call" && node.flow.startsWith(KNOWLEDGE_KITS)) {
+			names.add(node.flow);
+		}
+	}
+	return [...names].sort();
+}

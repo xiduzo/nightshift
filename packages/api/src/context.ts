@@ -9,7 +9,11 @@ import type {
 import type { DeviceKeyAccess, RequestAccess } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
-import type { Engine, ToolLaunchers } from "@nightshift/engine";
+import type {
+	Engine,
+	KnowledgeFolders,
+	ToolLaunchers,
+} from "@nightshift/engine";
 import type {
 	CliToolStore,
 	ConnectionStore,
@@ -81,6 +85,8 @@ export type Services = {
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
+	/** The projects' knowledge folders on this computer, with their index. */
+	knowledge: Pick<KnowledgeFolders, "index">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */

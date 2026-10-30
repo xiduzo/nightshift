@@ -6,4 +6,5 @@ export {
 	kitCopyName,
 	kitFlow,
 	kitList,
+	knowledgeKitsOf,
 } from "./kits";

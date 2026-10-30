@@ -14,6 +14,7 @@ import { dashboard } from "./dashboard";
 import { account, devices, hostPeer, offers } from "./devices";
 import { flows } from "./flows";
 import { gates } from "./gates";
+import { knowledge } from "./knowledge";
 import { notifications } from "./notifications";
 import { output } from "./output";
 import { publicProcedure } from "./procedures";
@@ -46,6 +47,7 @@ export const appRouter = {
 	members,
 	invitations,
 	projects,
+	knowledge,
 	flows,
 	gates,
 	assistant,

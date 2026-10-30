@@ -39,6 +39,12 @@ export type KnowledgeFile = {
 	changedAt: number;
 };
 
+/**
+ * Past this many files, the folder is too large to read well: the
+ * Knowledge page warns, and a search index (phase 2) would pay off.
+ */
+export const KNOWLEDGE_FILES_WARNING = 2000;
+
 /** The file Night Shift writes at the top of the folder. */
 export const INDEX_FILE = "INDEX.md";
 /** The proposals that wait for a person: never in the index. */
