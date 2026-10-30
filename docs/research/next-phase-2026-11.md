@@ -348,21 +348,37 @@ only where a measurement says keyword search misses.
 Behind the same `createKnowledgeSearch` port, so the API, the MCP tools,
 the agent tools and the page do not change.
 
-- **Chunks:** `@langchain/textsplitters` cuts markdown by heading. Keyword
-  search uses the same chunks, so a hit points at a section, not a page.
-- **Embeddings:** `@langchain/ollama` with a small local model the spike
-  picks. It must handle Dutch. No Ollama on a Device: keyword search only,
-  and the page says how to turn it on.
-- **Incremental index:** the LangChain.js indexing API with a record
-  manager keyed on the sha256 that the `knowledge:<projectId>` document
-  already holds. Only changed files embed again. Removed files leave the
-  index.
-- **Store:** the vector store the spike proves inside `bun build --compile`
-  on macOS and on the Host's Linux image.
-- **Hybrid:** reciprocal rank fusion over keyword and vector results
-  (`EnsembleRetriever`, or the same formula in our code if the retriever
-  does not fit the port).
-- A Settings switch, off by default. The model name is part of the index
+The spike ([knowledge-vectors.md](knowledge-vectors.md)) chose the pieces.
+On this repo's docs, vector recall at 5 was 23 of 26 against 19 for
+keyword search, and 11 of 13 against 7 on paraphrases.
+
+- **Chunks:** `@langchain/textsplitters` cuts markdown by heading (1 200
+  characters, 150 overlap). Keyword search uses the same chunks, so a hit
+  points at a section, not a page.
+- **Embeddings:** `@langchain/ollama` with `qwen3-embedding:0.6b` (1024
+  dimensions, `num_ctx` 2048: it loads in about 1 GB instead of 4.8 GB). It
+  handles Dutch. No Ollama on a Device: keyword search only, and the page
+  says how to turn it on. Embedding runs in the background.
+- **Incremental index:** `index()` from `@langchain/core/indexing`, keyed
+  on the sha256 that the `knowledge:<projectId>` document already holds.
+  LangChain's own record managers and stores do not work on Bun for this
+  (`better-sqlite3` crashes Bun, `LibSQLVectorStore` never deletes old
+  chunks), so a record manager and a store of about 40 lines each sit on
+  bun:sqlite. The record manager's clock must strictly increase, and
+  removed files need `cleanup: "full"`.
+- **Store:** float32 BLOBs in a `chunks` table of the same `.search.sqlite`,
+  searched by an exact scan (52 ms over 20 000 chunks). No extension, no
+  native addon: `bun build --compile` is unaffected. sqlite-vec fails on
+  macOS. libSQL vectors are the next step for very large projects.
+- **Hybrid:** reciprocal rank fusion (c = 60) in `search.ts`, keyed by path.
+  `EnsembleRetriever` moved to `@langchain/classic` and drops scores and
+  snippets, so it does not fit the port.
+- **Turn on per project** from the 5.1 measurement: offer vectors when
+  keyword recall at 5 is under 80 % on at least 20 marked questions. Keep
+  them only when hybrid beats keyword by at least 10 points.
+- Before it lands: run the Linux binary in the Host image, and measure
+  embedding speed on the Host's CPU.
+- The model name is part of the index
   version, so a new model rebuilds the index.
 - Open question for an ADR 4 amendment: share embeddings by content hash
   through the Host archive, so ten Devices do not embed the same file ten
