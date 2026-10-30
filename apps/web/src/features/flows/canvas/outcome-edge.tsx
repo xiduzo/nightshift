@@ -27,8 +27,8 @@ import {
 	type EdgeGroup,
 	type EdgeSegment,
 	groupSegments,
-	labelAtRest,
 	SEGMENT_SEPARATOR,
+	segmentAtRest,
 	segmentText,
 } from "./edge-groups";
 import {
@@ -327,27 +327,51 @@ const OutcomeEdge = memo(function OutcomeEdge({
 		? routedPaths(data.route, from, to, stemStarts)
 		: stepPaths(from, to, sourcePosition, targetPosition, stemStarts);
 
-	// In a run, the label names only the outcomes it took.
+	// In a run, the label names only the outcomes it took. At rest it names
+	// only what the node's rows do not show.
 	const taken = segments.some((segment) => (segment.traversals ?? 0) > 0);
-	const shown = taken ? lead : segments;
-	const colors = new Set(
-		(lead.length > 0 ? lead : segments).map((segment) =>
-			resolveOutcomeColor(segment.outcome, segment.color),
-		),
+	const open = hover.hovered || Boolean(selected);
+	const shown = (taken ? lead : segments).filter(
+		(segment) => open || segmentAtRest(segment),
 	);
-	const single = colors.size === 1 ? [...colors][0] : undefined;
-	const color = single ? OUTCOME_COLOR_STYLE[single].color : MIXED_COLOR;
+	const colorOf = (list: readonly EdgeSegment[]) => {
+		const colors = new Set(
+			list.map((segment) =>
+				resolveOutcomeColor(segment.outcome, segment.color),
+			),
+		);
+		return colors.size === 1 ? [...colors][0] : undefined;
+	};
+	// Each line keeps the colour of the whole edge, but a lead outcome (the
+	// selected one, or one a run took) draws in its own.
+	const single = colorOf(segments);
+	const toneOf = (segment: EdgeSegment | undefined) =>
+		segment && lead.includes(segment) ? colorOf([segment]) : single;
+	const colorFor = (segment: EdgeSegment | undefined) => {
+		const tone = toneOf(segment);
+		return tone ? OUTCOME_COLOR_STYLE[tone].color : MIXED_COLOR;
+	};
+	const labelColor = colorOf(shown);
+	const color = labelColor
+		? OUTCOME_COLOR_STYLE[labelColor].color
+		: MIXED_COLOR;
 	const untaken = (segment: EdgeSegment) => segment.traversals === 0;
 	const hasError = segments.some((segment) => segment.hasError);
 	// A proposed change on view: new edges in the success colour, removed ones faded.
 	const added = segments.some((segment) => segment.change === "added");
 	const removed = (segment: EdgeSegment) => segment.change === "removed";
 	const merged = shown.length > 1;
+	// Many outcomes stack, one per row, so the label stays narrow.
+	const stacked = shown.length > 2;
 	const only = shown[0] ?? first;
-	const showLabel = labelAtRest(segments) || hover.hovered || Boolean(selected);
-	const stroke = (dimmed: boolean, gone = false) => ({
-		stroke: added && !gone ? "var(--status-finished)" : color,
-		strokeWidth: selected || (added && !gone) ? 2.5 : 1.5,
+	const showLabel = shown.length > 0;
+	const stroke = (
+		segment: EdgeSegment | undefined,
+		dimmed: boolean,
+		gone = false,
+	) => ({
+		stroke: added && !gone ? "var(--status-finished)" : colorFor(segment),
+		strokeWidth: (selected && segment === main) || (added && !gone) ? 2.5 : 1.5,
 		strokeDasharray: hasError || gone ? "5 4" : undefined,
 		opacity: dimmed || gone ? 0.35 : 1,
 	});
@@ -358,8 +382,9 @@ const OutcomeEdge = memo(function OutcomeEdge({
 				<BaseEdge
 					id={id}
 					path={paths.main}
-					markerEnd={`url(#${markerId(single ?? "mixed")})`}
+					markerEnd={`url(#${markerId(toneOf(main) ?? "mixed")})`}
 					style={stroke(
+						main,
 						main ? untaken(main) : true,
 						main ? removed(main) : false,
 					)}
@@ -371,7 +396,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 							key={segment.id}
 							path={path}
 							interactionWidth={12}
-							style={stroke(untaken(segment), removed(segment))}
+							style={stroke(segment, untaken(segment), removed(segment))}
 						/>
 					) : null;
 				})}
@@ -396,6 +421,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 						onPointerLeave={hover.leave}
 						className={cn(
 							"nodrag nopan pointer-events-auto absolute h-5 bg-card font-mono text-[11px] shadow-xs disabled:cursor-default",
+							stacked && "h-auto flex-col items-start gap-0.5 rounded-md py-1",
 							!merged && outcomeStyle(only.outcome, only.color).text,
 							selected && "ring-2 ring-ring",
 							hasError && "border-destructive border-dashed",
@@ -416,7 +442,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 						{merged
 							? shown.map((segment, index) => (
 									<Fragment key={segment.id}>
-										{index > 0 ? (
+										{index > 0 && !stacked ? (
 											<span
 												aria-hidden="true"
 												className="text-muted-foreground"

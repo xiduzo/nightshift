@@ -122,23 +122,25 @@ export function labelText(segments: readonly EdgeSegment[]): string {
 }
 
 /**
- * Whether the label shows while the edge is neither hovered nor selected.
- * The node already shows each outcome next to its handle, so a label shows
- * only what the node does not: several outcomes on one line, a max, how
- * often a run took it, an outcome the node does not have, or an error.
+ * Whether a segment shows while the edge is neither hovered nor selected.
+ * The node already shows each outcome next to its handle, and each outcome
+ * draws its own line from there, so a segment shows only what the node does
+ * not: a max, how often a run took it, an outcome the node does not have,
+ * or an error.
  */
-export function labelAtRest(segments: readonly EdgeSegment[]): boolean {
+export function segmentAtRest(segment: EdgeSegment): boolean {
 	return (
-		segments.length > 1 ||
-		segments.some(
-			(segment) =>
-				segment.max !== undefined ||
-				segment.parallel ||
-				!segment.onNode ||
-				segment.hasError ||
-				(segment.traversals ?? 0) > 0,
-		)
+		segment.max !== undefined ||
+		Boolean(segment.parallel) ||
+		!segment.onNode ||
+		Boolean(segment.hasError) ||
+		(segment.traversals ?? 0) > 0
 	);
+}
+
+/** Whether the label shows while the edge is neither hovered nor selected. */
+export function labelAtRest(segments: readonly EdgeSegment[]): boolean {
+	return segments.some(segmentAtRest);
 }
 
 /**
