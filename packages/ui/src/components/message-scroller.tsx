@@ -40,8 +40,10 @@ function MessageScrollerViewport({
 	return (
 		<MessageScrollerPrimitive.Viewport
 			data-slot="message-scroller-viewport"
+			// Night Shift: fade the bottom only while more waits below. The plain
+			// scroll-fade-b relies on a scroll timeline that stays faded at the end.
 			className={cn(
-				"scroll-fade-b scrollbar-thin scrollbar-gutter-stable data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain contain-content data-pending-scroll:invisible",
+				"data-[scrollable~=end]:scroll-fade-b scrollbar-thin scrollbar-gutter-stable data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain contain-content data-pending-scroll:invisible",
 				className,
 			)}
 			{...props}
