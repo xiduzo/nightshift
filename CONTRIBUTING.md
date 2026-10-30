@@ -15,7 +15,11 @@ bun install
 bun lefthook install   # git hooks: format, lint, the layer and vertical checks on commit
 bun run db:push        # the dev database in .nightshift-dev/
 bun run dev            # web UI and API with hot reload
+bun run dev:mobile     # the phone app, in Expo
+bun run dev:desktop    # the desktop app
 ```
+
+`bun run dev` keeps its data in `.nightshift-dev/`, apart from the Night Shift you use for real work. If you also run real nights from this checkout, work on Night Shift in a separate git worktree. A code change then never reloads a run in the middle of the night.
 
 ## Check your change
 
@@ -40,7 +44,7 @@ Durable docs use plain, short sentences in the active voice (ASD-STE100 style).
 
 ## Pull requests
 
-- Keep one change per pull request. When work builds in layers, open a stack of small pull requests.
+- Keep one change per pull request. When work builds in layers, open a stack of small pull requests with [`gh stack`](https://github.com/github/gh-stack).
 - Fill in the pull request template: why the change exists, what changed, and how you tested it.
 - Use [Conventional Commits](https://www.conventionalcommits.org): `feat(web): …`, `fix(engine): …`, `docs: …`.
 

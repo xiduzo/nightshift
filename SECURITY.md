@@ -23,3 +23,6 @@ For example:
 - A flow file, a template value, or an agent's output that runs shell code it should not.
 - A secret or a token that leaves the computer it belongs to, or shows in the UI or a log.
 - A Host that lets someone in without an invitation, or lets a person read another Space.
+- A run that uses another person's agent profile without an Offer, or in a wider permission mode than the Offer allows.
+- A webhook that starts a run or wakes a Wait without the schedule's secret.
+- A paired computer or a phone that acts for a person it does not belong to.
