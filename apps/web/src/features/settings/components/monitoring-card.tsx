@@ -28,7 +28,7 @@ import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import { settingsMutations, settingsQueries } from "../queries";
 import {
 	CardForm,
-	FormFooter,
+	ResetSection,
 	SaveError,
 	SelectSetting,
 	TextSetting,
@@ -43,8 +43,8 @@ const FORMATS = [
 
 /** "Send runs to your monitoring": off by default, an address, a format and headers. */
 export function MonitoringCard({ data }: { data: SettingsView }) {
-	const form = useSettingsForm(data, MONITORING_KEYS);
-	const toggle = useToggleSetting();
+	const form = useSettingsForm(data, MONITORING_KEYS, { title: "Monitoring" });
+	const toggle = useToggleSetting("Monitoring");
 	const id = useId();
 	const on = data.values.telemetry;
 	const noAddress = on && data.values.telemetryEndpoint.trim() === "";
@@ -53,6 +53,7 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 		<PageSection
 			title="Monitoring"
 			description="Send your runs to a monitoring tool you choose, such as Grafana. Nothing leaves this computer until you turn it on."
+			actions={<ResetSection form={form} />}
 		>
 			<Card>
 				<CardForm form={form}>
@@ -83,7 +84,7 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 									<InfoIcon />
 									<AlertTitle>Add an address</AlertTitle>
 									<AlertDescription>
-										Night Shift starts to send your runs when you save the
+										Night Shift starts to send your runs when you add the
 										address of your monitoring tool.
 									</AlertDescription>
 								</Alert>
@@ -92,7 +93,6 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 							<div className="grid gap-6 sm:grid-cols-2">
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="telemetryEndpoint"
 									label="Address"
 									placeholder="http://localhost:4318"
@@ -101,7 +101,6 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 								/>
 								<SelectSetting
 									form={form}
-									data={data}
 									settingKey="telemetryProtocol"
 									label="Format"
 									description="Use protobuf unless your tool asks for JSON."
@@ -111,7 +110,6 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 							<SaveError error={form.saveError} />
 						</FieldGroup>
 					</CardContent>
-					<FormFooter form={form} label="Save monitoring" />
 				</CardForm>
 			</Card>
 			<HeadersCard />
