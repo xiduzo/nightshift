@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowInputDef } from "@nightshift/flows";
 
-import { filledInputs, jsonProblem, missingInputs } from "./inputs";
+import {
+	filledInputs,
+	inputProblem,
+	isOptional,
+	missingInputs,
+} from "./inputs";
 
 const text = (name: string, extra: Partial<FlowInputDef> = {}) =>
 	({ name, type: "text", ...extra }) as FlowInputDef;
@@ -23,10 +28,10 @@ describe("the inputs of a flow at its start", () => {
 	});
 
 	test("JSON that is not valid has a problem, empty JSON does not", () => {
-		expect(jsonProblem(json("item"), "{")).not.toBeNull();
-		expect(jsonProblem(json("item"), '{"a": 1}')).toBeNull();
-		expect(jsonProblem(json("item"), "  ")).toBeNull();
-		expect(jsonProblem(text("note"), "{")).toBeNull();
+		expect(inputProblem(json("item"), "{")).not.toBeNull();
+		expect(inputProblem(json("item"), '{"a": 1}')).toBeNull();
+		expect(inputProblem(json("item"), "  ")).toBeNull();
+		expect(inputProblem(text("note"), "{")).toBeNull();
 	});
 
 	test("sends only what was filled in: text trimmed, JSON parsed", () => {
@@ -37,5 +42,40 @@ describe("the inputs of a flow at its start", () => {
 				note: "",
 			}),
 		).toEqual({ ticket: "NS-1", item: { title: "Fix" } });
+	});
+
+	test("a number that is not valid has a problem", () => {
+		const minutes = { name: "minutes", type: "number" } as FlowInputDef;
+		expect(inputProblem(minutes, "soon")).not.toBeNull();
+		expect(inputProblem(minutes, " 45 ")).toBeNull();
+	});
+
+	test("sends numbers, booleans and choices as their type", () => {
+		const inputs = [
+			{ name: "minutes", type: "number" },
+			{ name: "check", type: "boolean" },
+			{ name: "tour", type: "choice", options: ["money"] },
+		] as FlowInputDef[];
+		expect(
+			filledInputs(inputs, { minutes: "45", check: "false", tour: "money" }),
+		).toEqual({ minutes: 45, check: false, tour: "money" });
+	});
+
+	test("an input is optional without required, or with a default", () => {
+		expect(isOptional(text("note"))).toBe(true);
+		expect(isOptional(text("ticket", { required: true }))).toBe(false);
+		expect(
+			isOptional(text("branch", { required: true, default: "main" })),
+		).toBe(true);
+		expect(isOptional({ type: "boolean" })).toBe(false);
+	});
+
+	test("a boolean is never missing", () => {
+		const check = {
+			name: "check",
+			type: "boolean",
+			required: true,
+		} as FlowInputDef;
+		expect(missingInputs([check], {})).toEqual([]);
 	});
 });

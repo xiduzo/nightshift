@@ -522,7 +522,7 @@ const inputsKind: KindPrompt<{ flow: Flow }> = {
 		return [
 			"Write the flow's inputs: the values a person gives when they start a run, or a calling flow passes in. `inputs` replaces the flow's inputs.",
 			"",
-			'Each input: `{ name, type: "text" | "json", label?, description?, default?, required? }`.',
+			'Each input: `{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }`. `choice` needs `options`, a list of text. Pick the type that fits: `boolean` for yes/no, `number` for counts, `choice` for a fixed list.',
 			"- `name`: lowercase letters, digits and `_`, starting with a letter. Templates read it as `{{name}}`.",
 			"- `type`: `json` for a value with fields, read with a path (`{{issue.title}}`). Else `text`.",
 			"- `description`: one sentence on what to give, with an example. Always give one.",

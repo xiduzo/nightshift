@@ -3,7 +3,8 @@
 export {
 	filledInputs,
 	type InputTexts,
-	jsonProblem,
+	inputProblem,
+	isOptional,
 	missingInputs,
 } from "./inputs";
 export {

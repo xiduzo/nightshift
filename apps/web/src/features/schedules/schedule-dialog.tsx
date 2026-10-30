@@ -1,4 +1,10 @@
-import { canStart } from "@nightshift/client";
+import {
+	canStart,
+	filledInputs,
+	type InputTexts,
+	inputProblem,
+	missingInputs,
+} from "@nightshift/client";
 import {
 	cronError,
 	cronToTimeAndDays,
@@ -51,11 +57,7 @@ import { type Machine, useSpaceMachines } from "@/features/devices";
 import {
 	BaseRefCombobox,
 	FlowInputFields,
-	filledInputs,
 	flowQueries,
-	type InputTexts,
-	jsonProblem,
-	missingInputs,
 } from "@/features/flows";
 import { CopyProjectHere, projectQueries } from "@/features/projects";
 import { formatDayTime } from "@/shared/format";
@@ -74,20 +76,19 @@ const isTemplate = (text: string) => text.includes("{{");
 
 /**
  * A webhook schedule's values: a template stays text, to render when the
- * webhook arrives; other JSON text is parsed. Only the ones filled in.
+ * webhook arrives; the others are read as their type. Only the ones filled in.
  */
 function webhookInputs(
 	inputs: readonly FlowInputDef[],
 	values: InputTexts,
 ): Record<string, JsonValue> {
-	const filled: Record<string, JsonValue> = {};
+	const filled = filledInputs(
+		inputs.filter((input) => !isTemplate(values[input.name] ?? "")),
+		values,
+	);
 	for (const input of inputs) {
 		const text = values[input.name]?.trim() ?? "";
-		if (text === "") continue;
-		filled[input.name] =
-			input.type === "json" && !isTemplate(text)
-				? (JSON.parse(text) as JsonValue)
-				: text;
+		if (isTemplate(text)) filled[input.name] = text;
 	}
 	return filled;
 }
@@ -304,10 +305,10 @@ function ScheduleForm({
 		enabled: cron !== null && cronProblem === null,
 	});
 	const missing = missingInputs(inputs, values);
-	const badJson = inputs.filter((input) => {
+	const badInputs = inputs.filter((input) => {
 		const text = values[input.name];
 		if (trigger === "webhook" && text && isTemplate(text)) return false;
-		return jsonProblem(input, text) !== null;
+		return inputProblem(input, text) !== null;
 	});
 	const stopInvalid = stop.on && !/^([01]\d|2[0-3]):[0-5]\d$/.test(stop.time);
 	const whenProblem =
@@ -326,8 +327,8 @@ function ScheduleForm({
 			: (whenProblem ??
 				(missing.length > 0
 					? `Fill in ${missing.map((input) => input.label || input.name).join(", ")}.`
-					: badJson.length > 0
-						? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")}.`
+					: badInputs.length > 0
+						? `Check the format of ${badInputs.map((input) => input.label || input.name).join(", ")}.`
 						: stopInvalid
 							? "Enter a stop time, for example 07:00."
 							: null));

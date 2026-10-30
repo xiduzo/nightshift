@@ -59,7 +59,8 @@ export {
 	filledInputs,
 	flowOverviews,
 	type InputTexts,
-	jsonProblem,
+	inputProblem,
+	isOptional,
 	missingInputs,
 } from "./flows";
 export {

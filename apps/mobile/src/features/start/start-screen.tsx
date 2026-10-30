@@ -6,7 +6,7 @@ import {
 	defaultPlacement,
 	filledInputs,
 	type InputTexts,
-	jsonProblem,
+	inputProblem,
 	missingInputs,
 	type Project,
 	placementChoices,
@@ -161,7 +161,7 @@ function NewRun({
 	const choices = placementChoices(placements.data ?? [], devices.data ?? []);
 	const place = defaultPlacement(choices, chosenDevice);
 	const badJson = inputs.filter(
-		(input) => jsonProblem(input, values[input.name]) !== null,
+		(input) => inputProblem(input, values[input.name]) !== null,
 	);
 	const blocker = startBlocker({
 		flowChosen: flowName !== null,
