@@ -103,7 +103,7 @@ What you set up once reads like the Settings page:
 - One column, `max-w-4xl`, a `PageHeading`, then one `PageSection` per kind. A section's add button sits in its header.
 - A list is an `ItemGroup` of outline `Item`s. A row that opens something is a link (`render={<Link />}`), so it hovers and opens in a new tab.
 - A pick opens its detail in place. The breadcrumb leads back ("Agents › builder"). No list beside the detail.
-- What this computer has but is not set up yet sits at the end of the list it joins, as a dashed row with one action. Not in a banner on top.
+- What this computer has but does not use yet sits at the end of the list it joins, as a dashed row with one action ("Add profile", "Add tool"). Not in a banner on top.
 - Secrets have their own page in the main menu: Command nodes use them too, not only agents.
 
 ### Details dialogs

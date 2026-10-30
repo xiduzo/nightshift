@@ -77,7 +77,7 @@ export function useFoundPrograms(
 	};
 }
 
-/** A program that is here but not set up: a dashed row with one action. */
+/** A program that is here but not used yet: a dashed row with one action. */
 function FoundItem({
 	program,
 	pending,
@@ -93,7 +93,11 @@ function FoundItem({
 		<Item variant="outline" size="sm" className="border-dashed">
 			<ItemContent>
 				<ItemTitle className="text-muted-foreground">{program.label}</ItemTitle>
-				<ItemDescription>On this computer, not set up yet</ItemDescription>
+				<ItemDescription>
+					{program.kind === "agent"
+						? "On this computer, no profile uses it yet"
+						: "On this computer, not added yet"}
+				</ItemDescription>
 			</ItemContent>
 			<ItemActions>
 				<Button
@@ -107,7 +111,7 @@ function FoundItem({
 					) : (
 						<PlusIcon data-icon="inline-start" />
 					)}
-					Set up
+					{program.kind === "agent" ? "Add profile" : "Add tool"}
 				</Button>
 			</ItemActions>
 		</Item>
