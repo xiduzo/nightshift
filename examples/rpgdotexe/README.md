@@ -2,7 +2,7 @@
 
 These three flows rebuild `tools/night-shift/night-shift.py` of the rpgdotexe repo as Night Shift flows. They build the Features and the Traces of one Epic while nobody is present, and leave a stack of pull requests for the morning.
 
-Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs and outputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its Call node reads the Epic's sub-issues with `gh` and runs `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`), the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`), and what a called flow returned from the Call node's `results`. The files are format version 4.
+Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs and outputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its Call node reads the Epic's sub-issues with `gh` and runs `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`), the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`), and what a called flow returned from the Call node's `results`. The files are format version 6. Night Shift brings them to the current format, version 7, when you import them.
 
 | Flow | Inputs | Outputs | Does |
 | --- | --- | --- | --- |

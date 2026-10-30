@@ -1,6 +1,6 @@
 # Starter flows
 
-Small, self-contained flows (format version 6) to save into a project and change. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+Small, self-contained flows to save into a project and change. The files are format version 6. Night Shift brings them to the current format, version 7, when you import them. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
 
 | Flow | Inputs | Does |
 | --- | --- | --- |
