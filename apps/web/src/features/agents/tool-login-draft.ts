@@ -72,10 +72,10 @@ export function loginProblem(draft: LoginDraft): string | null {
 		(row) => row.key.trim() !== "" && !VARIABLE.test(row.key.trim()),
 	);
 	if (bad) {
-		return `${bad.key.trim()} is not a variable name. Use letters, digits and _, starting with a letter or _.`;
+		return `${bad.key.trim()} is not a variable name. Start with a letter or _. Use letters, digits and _.`;
 	}
 	if (draft.ownFolder && !VARIABLE.test(draft.folder.trim())) {
-		return "Give the variable that points the program at its folder, for example HOME.";
+		return "Give the folder variable, for example HOME.";
 	}
 	return null;
 }

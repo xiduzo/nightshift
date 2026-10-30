@@ -274,12 +274,12 @@ export function ProfileDetail({
 						/>
 						{nameInvalid ? (
 							<FieldError id={`${id}-name-hint`}>
-								Use lowercase letters, digits and _, starting with a letter. Up
-								to 40 characters.
+								Start with a letter. Use lowercase letters, digits and _, up to
+								40 characters.
 							</FieldError>
 						) : nameTaken ? (
 							<FieldError id={`${id}-name-hint`}>
-								A profile named {name} exists.
+								A profile named {name} already exists. Pick another name.
 							</FieldError>
 						) : usedBy.length > 0 ? (
 							<FieldDescription id={`${id}-name-hint`}>
@@ -381,7 +381,7 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Permissions"
-				description="What the agent may do without asking. Nobody is awake to answer at night."
+				description="What the agent can do without asking you. At night, nobody is there to answer."
 			>
 				<Field>
 					<FieldLabel htmlFor={`${id}-perm`} className="sr-only">
@@ -411,7 +411,7 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Tools"
-				description="What the agents can use. They run the CLI tools without asking. The permission mode decides about all other commands."
+				description="The agent runs these CLI tools without asking. The permission mode decides about all other commands."
 			>
 				<div className="grid gap-2">
 					{cliTools.map((t) => (

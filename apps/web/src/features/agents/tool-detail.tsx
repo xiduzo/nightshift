@@ -120,7 +120,7 @@ export function ToolDetail({
 				title="Server"
 				description={
 					remote
-						? "A server that is already running. Night Shift connects to it when an agent needs its tools."
+						? "Night Shift connects to this server when an agent needs its tools."
 						: "Night Shift starts it on this computer when an agent needs its tools."
 				}
 			>
@@ -230,10 +230,10 @@ export function ToolDetail({
 						<AlertDialogDescription>
 							{[
 								connection.profiles.length > 0
-									? `It is taken off the profiles ${connection.profiles.join(", ")}.`
+									? `Night Shift removes it from the profiles ${connection.profiles.join(", ")}.`
 									: null,
 								connection.usedBy.length > 0
-									? `Flows that use it (${connection.usedBy.map((u) => u.flowName).join(", ")}) cannot run until you take it out of their nodes.`
+									? `Flows that use it (${connection.usedBy.map((u) => u.flowName).join(", ")}) cannot run until you remove it from their nodes.`
 									: null,
 							]
 								.filter(Boolean)
@@ -266,10 +266,7 @@ export function UsedBySection({
 	onOpenProfile: (name: string) => void;
 }) {
 	return (
-		<DetailSection
-			title="Used by"
-			description="The profiles and flows that use it."
-		>
+		<DetailSection title="Used by">
 			{profiles.length === 0 && flows.length === 0 ? (
 				<p className="text-muted-foreground text-sm">Nothing uses it yet.</p>
 			) : (

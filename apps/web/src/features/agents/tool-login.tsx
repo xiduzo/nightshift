@@ -72,7 +72,7 @@ export function LoginFields({
 						onClick={() => set(preset)}
 					>
 						<WandSparklesIcon data-icon="inline-start" />
-						Fill in the usual login for {program}
+						Use the usual login for {program}
 					</Button>
 				) : null}
 				<KeyValueRows
@@ -87,8 +87,7 @@ export function LoginFields({
 					<FieldContent>
 						<FieldLabel htmlFor={`${id}-own`}>Keep its own sign-in</FieldLabel>
 						<FieldDescription>
-							For a program that keeps its sign-in in a file, such as acli.
-							Night Shift keeps a folder for this tool.
+							For a program that saves its sign-in in a file, such as acli.
 						</FieldDescription>
 					</FieldContent>
 					<Switch
@@ -178,8 +177,8 @@ export function LoginFields({
 					spellCheck={false}
 				/>
 				<FieldDescription>
-					In steps with this tool, git signs in to this host with its login.
-					Works with programs that sign git in, such as gh. Example:{" "}
+					In steps with this tool, git uses its login for this host. This works
+					with programs that can sign in git, such as gh. Example:{" "}
 					<span className="font-mono">github.com</span>
 				</FieldDescription>
 			</Field>
@@ -214,7 +213,7 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 			description={
 				login
 					? "Only this tool gets these values. Agents and other tools do not see them."
-					: "This tool uses the sign-in of this computer. Edit it to give it a login of its own."
+					: "This tool uses the sign-in of this computer. Edit the tool to give it its own login."
 			}
 		>
 			<div className="flex flex-col gap-4">

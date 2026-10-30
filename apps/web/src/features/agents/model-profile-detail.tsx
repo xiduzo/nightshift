@@ -190,7 +190,7 @@ export function ModelProfileDetail({
 
 			<DetailSection
 				title="Name"
-				description="Decision and Value nodes that a model decides pick the profile by this name."
+				description="Decision and Value nodes pick the profile by this name."
 			>
 				<FieldGroup>
 					<Field data-invalid={nameInvalid || nameTaken || undefined}>
@@ -212,12 +212,12 @@ export function ModelProfileDetail({
 						/>
 						{nameInvalid ? (
 							<FieldError id={`${id}-name-hint`}>
-								Use lowercase letters, digits and _, starting with a letter. Up
-								to 40 characters.
+								Start with a letter. Use lowercase letters, digits and _, up to
+								40 characters.
 							</FieldError>
 						) : nameTaken ? (
 							<FieldError id={`${id}-name-hint`}>
-								A profile named {name} exists.
+								A profile named {name} already exists. Pick another name.
 							</FieldError>
 						) : usedBy.length > 0 ? (
 							<FieldDescription id={`${id}-name-hint`}>
@@ -279,8 +279,8 @@ export function ModelProfileDetail({
 						<Alert>
 							<CircleAlertIcon />
 							<AlertDescription>
-								Add the secret {decider.apiKey} under Secrets, or nodes on this
-								profile cannot decide.
+								Nodes on this profile cannot decide without the secret{" "}
+								{decider.apiKey}. Add it under Secrets.
 							</AlertDescription>
 						</Alert>
 					) : null}

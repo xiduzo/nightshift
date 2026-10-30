@@ -57,7 +57,7 @@ describe("the login draft", () => {
 		).toStartWith("GH TOKEN is not a variable name.");
 		expect(
 			loginProblem({ ...loginDraftOf(null), ownFolder: true, folder: "" }),
-		).toStartWith("Give the variable");
+		).toStartWith("Give the folder variable");
 		expect(loginProblem(loginDraftOf(null))).toBeNull();
 	});
 });

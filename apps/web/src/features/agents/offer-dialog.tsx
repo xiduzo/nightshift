@@ -141,8 +141,8 @@ function OfferForm({
 				<AlertTitle>The agent runs with your login and your tools</AlertTitle>
 				<AlertDescription>
 					A <code>gh pr create</code> in a flow a colleague wrote uses your{" "}
-					<code>gh</code>. Offer a profile only if you would hand its tools to
-					the people in that Space.
+					<code>gh</code>. Offer a profile only if you trust the people in that
+					Space with its tools.
 				</AlertDescription>
 			</Alert>
 			<FieldGroup>

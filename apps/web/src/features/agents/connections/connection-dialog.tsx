@@ -242,12 +242,12 @@ function ConnectionForm({
 					/>
 					{nameInvalid ? (
 						<FieldError id={`${id}-name-hint`}>
-							Use lowercase letters, digits and _, starting with a letter. Up to
-							40 characters.
+							Start with a letter. Use lowercase letters, digits and _, up to 40
+							characters.
 						</FieldError>
 					) : nameTaken ? (
 						<FieldError id={`${id}-name-hint`}>
-							A connection named {name} already exists.
+							An MCP server named {name} already exists. Pick another name.
 						</FieldError>
 					) : (
 						<FieldDescription id={`${id}-name-hint`}>
@@ -370,8 +370,7 @@ function ConnectionForm({
 								<FieldError>Use an http or https URL.</FieldError>
 							) : (
 								<FieldDescription>
-									The address of the MCP server. Your agents send their tool
-									calls there.
+									Your agents send their tool calls to this address.
 								</FieldDescription>
 							)}
 						</Field>

@@ -71,14 +71,14 @@ export function AgentsOverview({
 			<div className="mx-auto w-full max-w-4xl">
 				<PageHeading
 					title="Agents"
-					description="Give Agent nodes a harness, a model and tools under one name. Change a profile here and every flow that uses it follows."
+					description="Give Agent nodes a harness, a model and tools under one name. When you change a profile, every flow that uses it changes too."
 				/>
 			</div>
 
 			<div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
 				<PageSection
 					title="Profiles"
-					description="Agent nodes pick one by its name."
+					description="Agent nodes pick a profile by its name."
 					actions={
 						<AddButton onClick={() => onSelect({ kind: "new-profile" })}>
 							Add profile
@@ -93,7 +93,7 @@ export function AgentsOverview({
 								</EmptyMedia>
 								<EmptyTitle>No profiles yet</EmptyTitle>
 								<EmptyDescription>
-									Add a profile, or set up an agent this computer has under
+									Add a profile, or add an agent from this computer under
 									Harnesses.
 								</EmptyDescription>
 							</EmptyHeader>
@@ -115,7 +115,7 @@ export function AgentsOverview({
 
 				<PageSection
 					title="Model profiles"
-					description="Decision and Value nodes that a model decides pick one by its name."
+					description="Decision and Value nodes pick one when a model decides."
 					actions={
 						<AddButton onClick={() => onSelect({ kind: "new-model-profile" })}>
 							Add model profile
@@ -209,7 +209,7 @@ export function AgentsOverview({
 				{otherDevices.length > 0 ? (
 					<PageSection
 						title="On your other devices"
-						description="Their profiles, read-only. You change them on that device."
+						description="You can only look at these. Change them on that device."
 					>
 						<ItemGroup className="gap-2">
 							{otherDevices.map((device) => (
