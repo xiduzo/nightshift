@@ -151,7 +151,7 @@ The first nights showed two things: the dev server reloads under a running night
 - For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob). A fourth source, `github` (sub-issues), went on 2026-10-16: it is a `command` recipe on `gh` now, and old files migrate on load. Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input; `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
 - Start from a branch: the start dialog takes a base ref, so a night can continue on an open stack.
 - The rpgdotexe flows move to version 2.
-- 2026-10-17, flow format version 4: the Subflow and For Each nodes became one Subflow node, with `each` optional (`docs/research/foundational-nodes.md` §3.1). A Command node takes `output: "json"` (§3.5). Version 3 files migrate on load.
+- 2026-10-17, flow format version 4: the Subflow and For Each nodes became one node, `call` (shown as Subflow), with `each` optional (`docs/research/foundational-nodes.md` §3.1). A Command node takes `output: "json"` (§3.5). Version 3 files migrate on load.
 
 Proves: any flow can call any flow, and a list can come from anywhere.
 
