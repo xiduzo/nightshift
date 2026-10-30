@@ -33,8 +33,12 @@ import type {
 	MessageItem,
 	ReportItem,
 } from "../transcript-items";
-import { Divider, PromptBubble, ResultCard } from "./parts";
+import { PromptBubble, ResultCard } from "./parts";
 
+/**
+ * Where a session starts, as a checkpoint: a line across the transcript
+ * with the session's number, when it started and its model, then its prompt.
+ */
 export function SessionBoundary({
 	number,
 	at,
@@ -47,13 +51,24 @@ export function SessionBoundary({
 	prompt: string;
 }) {
 	const resumed = number !== undefined && number > 1;
+	const details = [resumed ? "resumed" : null, formatTime(at), model].filter(
+		Boolean,
+	);
 	return (
 		<div className="flex flex-col gap-3 pt-2">
-			<Divider
-				title={number === undefined ? "Session" : `Session ${number}`}
-				at={at}
-				details={[resumed ? "resumed" : null, formatTime(at), model]}
-			/>
+			<Marker variant="separator" className="text-xs">
+				<MarkerContent className="inline-flex items-center gap-2">
+					<h3 className="font-medium text-foreground">
+						{number === undefined ? "Session" : `Session ${number}`}
+					</h3>
+					<time
+						dateTime={new Date(at).toISOString()}
+						title={formatDateTime(at)}
+					>
+						{details.join(" · ")}
+					</time>
+				</MarkerContent>
+			</Marker>
 			<PromptBubble
 				label={resumed ? "Follow-up prompt" : "Prompt"}
 				prompt={prompt}
