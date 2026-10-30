@@ -113,7 +113,7 @@ function SecretNames({ device, now }: { device: OtherDevice; now: number }) {
 			<NothingYet
 				icon={<KeyRoundIcon />}
 				title="No secrets"
-				description={`No secrets are saved on ${device.name}.`}
+				description={`${device.name} has no secrets yet.`}
 			/>
 		);
 	}

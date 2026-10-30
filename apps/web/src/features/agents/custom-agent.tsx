@@ -222,11 +222,7 @@ function CustomAgentForm({
 						className="font-mono"
 						autoComplete="off"
 						spellCheck={false}
-						aria-describedby={`${id}-command-hint`}
 					/>
-					<FieldDescription id={`${id}-command-hint`}>
-						For example: goose acp
-					</FieldDescription>
 				</Field>
 
 				<FieldSet className="gap-3">
@@ -432,7 +428,7 @@ export function CustomAgentDetail({
 
 			<DetailSection
 				title="Profiles on it"
-				description="A custom agent with profiles cannot be removed."
+				description="You cannot remove a custom agent that has profiles."
 			>
 				{harness.profiles.length === 0 ? (
 					<p className="text-muted-foreground text-sm">None yet.</p>
@@ -459,12 +455,12 @@ export function CustomAgentDetail({
 					<AlertDialogHeader>
 						<AlertDialogTitle>
 							{harness.profiles.length > 0
-								? "Profiles run on it"
+								? `${agent.label} has profiles`
 								: `Remove ${agent.label}?`}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
 							{harness.profiles.length > 0
-								? `Move ${harness.profiles.join(", ")} to another harness first.`
+								? `Move ${harness.profiles.join(", ")} to another harness. Then you can remove ${agent.label}.`
 								: `Agent nodes that use ${agent.label} cannot run until you add it again.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>

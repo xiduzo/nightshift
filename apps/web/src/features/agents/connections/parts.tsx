@@ -63,7 +63,7 @@ export function OffMachineNote({ children }: { children: ReactNode }) {
 		<Alert className="border-border bg-muted/40 px-3 py-2.5">
 			<SendIcon className="text-status-waiting" aria-hidden />
 			<AlertDescription className="text-foreground/80">
-				<span className="sr-only">Leaves this machine: </span>
+				<span className="sr-only">Leaves this computer: </span>
 				{children}
 			</AlertDescription>
 		</Alert>
@@ -129,7 +129,7 @@ export function KindBadge({ kind }: { kind: "command" | "url" }) {
 
 /** What "Outside Night Shift" means, for its tooltip. */
 export const OUTSIDE_HINT =
-	"Set where Night Shift starts, for example in Docker or in your shell. A value you save here takes its place.";
+	"Set where Night Shift starts, for example in Docker or in your shell. A value you save here replaces it.";
 
 const SOURCE_LABEL: Record<SecretSource, string> = {
 	keychain: "Saved",
@@ -170,7 +170,7 @@ export function VariableBadge({
 			<TooltipContent className="max-w-64">
 				{source === "env"
 					? OUTSIDE_HINT
-					: "No value yet. Save one under Secrets below."}
+					: "No value yet. Save one under Secrets."}
 			</TooltipContent>
 		</Tooltip>
 	);

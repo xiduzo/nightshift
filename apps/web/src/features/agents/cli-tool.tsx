@@ -140,9 +140,9 @@ export function CliToolDetail({
 				description={
 					<>
 						Agents with this tool run{" "}
-						<span className="font-mono">{tool.name}</span> with any arguments,
-						without asking. Only Claude Code and OpenCode keep a list of allowed
-						programs. On other harnesses, the permission mode decides.
+						<span className="font-mono">{tool.name}</span> with any arguments
+						and do not ask. This works on Claude Code and OpenCode. On other
+						harnesses, the permission mode decides.
 					</>
 				}
 			>
@@ -214,7 +214,7 @@ export function CliToolDetail({
 			{data?.path ? (
 				<DetailSection
 					title="Help for agents"
-					description="Agents with this tool read this help and its description when a step starts. Write a description that says when to use it."
+					description="Agents read this help and the description when a step starts. Say in the description when to use the tool."
 				>
 					{data.help ? (
 						<CodeView
@@ -245,10 +245,10 @@ export function CliToolDetail({
 						<AlertDialogDescription>
 							{[
 								tool.profiles.length > 0
-									? `It comes off the profiles ${tool.profiles.join(", ")}.`
+									? `Night Shift removes it from the profiles ${tool.profiles.join(", ")}.`
 									: null,
 								tool.usedBy.length > 0
-									? `Flows that name it (${tool.usedBy.map((u) => u.flowName).join(", ")}) do not start until you take it off.`
+									? `Flows that name it (${tool.usedBy.map((u) => u.flowName).join(", ")}) do not start until you remove it from them.`
 									: null,
 							]
 								.filter(Boolean)
@@ -482,8 +482,8 @@ function CliToolForm({
 						</FieldError>
 					) : (
 						<FieldDescription id={`${id}-name-hint`}>
-							Agents type this name to run it. Profiles and Agent nodes name it
-							like this.
+							Agents type this name to run the program. Profiles and Agent nodes
+							use this name too.
 						</FieldDescription>
 					)}
 				</Field>
@@ -504,9 +504,8 @@ function CliToolForm({
 						autoFocus={tool !== null}
 					/>
 					<FieldDescription>
-						Agents read this before the help text of the program. Say which
-						account it is. Example: "GitHub as work-org. Use it for repositories
-						under work-org/."
+						Say which account it is and when to use it. Example: "GitHub as
+						work-org. Use it for repositories under work-org/."
 					</FieldDescription>
 				</Field>
 

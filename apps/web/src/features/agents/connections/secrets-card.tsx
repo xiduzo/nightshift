@@ -279,8 +279,8 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 								<EmptyTitle>No secrets yet</EmptyTitle>
 								<EmptyDescription>
 									Add a secret, or write{" "}
-									<span className="font-mono">${"{NAME}"}</span> in a tool's
-									settings and it shows up here.
+									<span className="font-mono">${"{NAME}"}</span> in the settings
+									of a tool. It then shows here.
 								</EmptyDescription>
 							</EmptyHeader>
 						</Empty>
@@ -416,7 +416,7 @@ function SecretForm({
 						/>
 						{nameInvalid ? (
 							<FieldError>
-								Use letters, digits and _, starting with a letter or _.
+								Start with a letter or _. Use letters, digits and _.
 							</FieldError>
 						) : (
 							<FieldDescription>

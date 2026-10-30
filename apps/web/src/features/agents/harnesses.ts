@@ -75,7 +75,7 @@ export function customAgentInfo(
 		initials: label.slice(0, 2).toUpperCase(),
 		note: agent
 			? `Model default uses the model ${label} is set to. You can type another model it offers.`
-			: "This custom agent is not added on this computer. Add it under Agents, or pick another harness.",
+			: "This computer does not have this custom agent. Add it under Agents, or pick another harness.",
 		defaultModel: "default",
 		models: ["default"],
 		setting: null,

@@ -97,8 +97,8 @@ export function HarnessDetail({
 				title="Models"
 				description={
 					harness.listing
-						? `The models Night Shift knows, plus the ones ${harness.label} has on this computer. Profiles and Agent nodes pick from these.`
-						: `The models Night Shift knows. ${harness.label} also takes any other model it supports.`
+						? `Known models and the ones ${harness.label} has on this computer. Profiles and Agent nodes pick from these.`
+						: `Profiles and Agent nodes pick from these. ${harness.label} also takes any other model it supports.`
 				}
 			>
 				<div className="flex flex-col gap-3">
@@ -132,7 +132,7 @@ export function HarnessDetail({
 
 			<DetailSection
 				title="Profiles on it"
-				description="A harness with profiles cannot be removed."
+				description="You cannot remove a harness that has profiles."
 			>
 				{harness.profiles.length === 0 ? (
 					<p className="text-muted-foreground text-sm">None yet.</p>
@@ -159,12 +159,12 @@ export function HarnessDetail({
 					<AlertDialogHeader>
 						<AlertDialogTitle>
 							{harness.profiles.length > 0
-								? "Profiles run on it"
+								? `${harness.label} has profiles`
 								: `Remove ${harness.label}?`}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
 							{harness.profiles.length > 0
-								? `Move ${harness.profiles.join(", ")} to another harness first.`
+								? `Move ${harness.profiles.join(", ")} to another harness. Then you can remove ${harness.label}.`
 								: `Agent nodes that use ${harness.label} cannot run until you add it again.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>

@@ -116,8 +116,8 @@ export function Detail({
 							</EmptyMedia>
 							<EmptyTitle>Add a harness first</EmptyTitle>
 							<EmptyDescription>
-								A profile runs on a harness, such as Claude Code or Codex. Add
-								one with + next to Harnesses.
+								A profile runs on a harness, such as Claude Code or Codex. Go
+								back to Agents and choose Add harness.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
