@@ -59,9 +59,29 @@ The kits do the common syncs. Call one from a Subflow node:
 | `kit:knowledge/jira` | Jira work items, one markdown file each. | A CLI tool for `acli`, signed in, and jq |
 | `kit:knowledge/confluence` | Confluence pages by id, one markdown file each. | The secret `CONFLUENCE_API_TOKEN`, curl and jq |
 
+`kit:knowledge/review-learnings` is not a sync: see Learnings below.
+
 Each kit writes into its own folder in the knowledge (`folder`, for
 example `wiki`) and reports how many files it has. `files` and
 `github-wiki` replace what their folder had.
+
+## Learnings
+
+An agent that reads the knowledge may add `learnings` to its step report:
+a list of short notes about the project that would help the next agent.
+Its report instructions say so in one sentence, and the field is
+optional, so an agent with nothing to say reports as before.
+
+The computer that ran the step keeps them in
+`learnings/proposed/<run id>.md`. They wait for you there: the index does
+not list them, and no agent reads them.
+
+The `review-learnings` starter flow calls `kit:knowledge/review-learnings`.
+It opens a Gate with the proposals. **Keep** moves them to
+`learnings/accepted/`, where the index lists them and agents read them.
+**Delete** removes them. A proposal that comes in while the Gate waits
+stays for the next review. The Knowledge page says how many wait, with a
+button that runs the review.
 
 ## Size
 
