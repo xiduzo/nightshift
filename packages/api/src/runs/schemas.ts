@@ -79,6 +79,26 @@ const costFields = {
 /** A time a step slept; `to` is null while it sleeps. Older Hosts send no sleeps. */
 const sleepSchema = z.object({ from: z.number(), to: z.number().nullable() });
 
+/**
+ * How long a run or a step took, its agents' time and tokens, its Gates'
+ * wait, how sure its cost is, and the pull request it opened. Older Hosts
+ * send none.
+ */
+const metricsSchema = z.object({
+	wallMs: z.number().nullable(),
+	agentMs: z.number(),
+	gateWaitMs: z.number(),
+	tokens: z.object({
+		input: z.number(),
+		output: z.number(),
+		cacheRead: z.number(),
+		cacheWrite: z.number(),
+	}),
+	/** `billed`: every cost was reported. `estimated`: part is priced from tokens. `unknown`: part is not known. */
+	costBasis: z.enum(["billed", "estimated", "unknown"]),
+	prUrl: z.string().nullable(),
+});
+
 export const runSummarySchema = exact<RunSummary>()(
 	z.object({
 		id: z.string(),
@@ -127,6 +147,7 @@ export const runSummarySchema = exact<RunSummary>()(
 			z.object({ openedAt: z.number(), closedAt: z.number().nullable() }),
 		),
 		sleeps: z.array(sleepSchema).optional(),
+		metrics: metricsSchema.optional(),
 	}),
 );
 
@@ -196,6 +217,7 @@ const stepSummarySchema = z.object({
 		})
 		.nullable(),
 	sleeps: z.array(sleepSchema).optional(),
+	metrics: metricsSchema.optional(),
 });
 
 /** One step with the prompt of each session and the element of each item. */

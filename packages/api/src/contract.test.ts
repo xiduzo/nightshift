@@ -439,16 +439,30 @@ describe("replies of a real engine", () => {
 			projectId,
 			limit: 1,
 			statuses: ["finished", "failed"],
-		})) as { id: string }[];
+		})) as { id: string; endedAt: number | null; metrics?: unknown }[];
 		expect(page.map((r) => r.id)).toEqual([started.id]);
+		// The run list carries the run's metrics: the digest and the Runs table read them.
+		expect(page[0]?.metrics).toEqual({
+			wallMs: expect.any(Number),
+			agentMs: expect.any(Number),
+			gateWaitMs: 0,
+			tokens: expect.objectContaining({ input: expect.any(Number) }),
+			costBasis: expect.stringMatching(/^(billed|estimated|unknown)$/),
+			prUrl: null,
+		});
 		const listed = (await read(appRouter.projects.list)) as {
 			id: string;
 			runs?: { total: number };
 		}[];
 		expect(listed.find((p) => p.id === projectId)?.runs?.total).toBe(1);
 		const detail = (await read(appRouter.runs.get, { runId: started.id })) as {
-			steps: { id: string }[];
+			steps: { id: string; metrics?: { wallMs: number | null } }[];
 		};
+		// Each step carries its own metrics, for the run's per-node rows.
+		expect(detail.steps.length).toBeGreaterThan(0);
+		for (const step of detail.steps) {
+			expect(step.metrics?.wallMs).toBeNumber();
+		}
 		for (const step of detail.steps) {
 			await read(appRouter.runs.step, { runId: started.id, stepId: step.id });
 		}
