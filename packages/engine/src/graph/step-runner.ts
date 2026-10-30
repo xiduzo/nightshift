@@ -74,6 +74,7 @@ import {
 	type WaitRequest,
 } from "./sleep";
 import type { PendingGate, RunStateUpdate, RunStateValues } from "./state";
+import { type ChangesWatch, watchChanges } from "./step-changes";
 
 /**
  * The step runner: one deep module that owns the lifecycle every step node
@@ -84,7 +85,8 @@ import type { PendingGate, RunStateUpdate, RunStateValues } from "./state";
  * row and the step's log events, opens the transcript and the timers,
  * translates an abort into the step's outcome, catches what the body
  * throws, hands a wait to the sleep module (`sleep()`, called from here
- * only) and routes on the end (`route()`).
+ * only), records what the step changed in the worktree (`step-changes.ts`)
+ * and routes on the end (`route()`).
  *
  * Before this module every node repeated that skeleton around its own
  * work, and `StepHandle` was as wide as its implementation. Now the seam
@@ -349,9 +351,15 @@ export async function runStep(
 	}
 
 	let result: BodyResult;
+	let changes: ChangesWatch | null = null;
 	try {
-		result =
-			(await readyDevice(ctx, node, step)) ?? (await spec.body(step, entry));
+		const notReady = await readyDevice(ctx, node, step);
+		if (notReady) result = notReady;
+		else {
+			// Once the worktree is there: what the body changes in it.
+			changes = await watchChanges(ctx, node, step);
+			result = await spec.body(step, entry);
+		}
 	} catch (error) {
 		result = {
 			kind: "end",
@@ -359,6 +367,11 @@ export async function runStep(
 			outputs: await blank("error"),
 			error: stepFailure(error, `node "${node.id}" of run ${ctx.run.id}`),
 		};
+	}
+	// What the step changed, before it ends or pauses. A Wait node that
+	// sleeps checks again later; an offline Device cannot tell.
+	if (changes && result.kind !== "sleep" && result.kind !== "offline") {
+		await changes.record();
 	}
 
 	const extraOf = (r: {

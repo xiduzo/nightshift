@@ -304,6 +304,18 @@ const agentUsageSchema = z.object({
 /** The tool call that started the subagent an event comes from. Absent for the session's own agent. */
 const parentToolCallId = z.string().optional();
 
+/** One file a step changed in the run's copy of the project, as git sees it. */
+const worktreeFileChangeSchema = z.object({
+	path: z.string(),
+	oldPath: z.string().optional(),
+	status: z.enum(["added", "modified", "deleted", "renamed"]),
+	added: z.number(),
+	removed: z.number(),
+	binary: z.literal(true).optional(),
+	patch: z.string().optional(),
+	truncated: z.literal(true).optional(),
+});
+
 /** What happened in a step: one line of its transcript. */
 const stepEventSchema = z.discriminatedUnion("type", [
 	z.object({
@@ -460,6 +472,15 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		type: z.literal("end"),
 		status: runResultSchema,
 		message: z.string().nullable(),
+	}),
+	z.object({ type: z.literal("worktree-snapshot"), tree: z.string() }),
+	z.object({
+		type: z.literal("worktree-changes"),
+		from: z.string(),
+		to: z.string(),
+		files: z.array(worktreeFileChangeSchema),
+		omitted: z.number().optional(),
+		overlapped: z.literal(true).optional(),
 	}),
 ]);
 

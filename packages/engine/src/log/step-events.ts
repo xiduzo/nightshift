@@ -155,6 +155,24 @@ export type WorktreeChanges = {
 	omitted?: number;
 };
 
+/**
+ * What a step that works in the run's worktree writes about its files, when
+ * its Device can tell (`Device.snapshotWorktree`): the snapshot it starts
+ * from, then what changed since, before it ends or pauses (the last one
+ * counts). `overlapped`: another step that works in the same worktree ran
+ * meanwhile, so `files` can hold its changes too.
+ */
+export type WorktreeEvent =
+	| { type: "worktree-snapshot"; tree: string }
+	| {
+			type: "worktree-changes";
+			from: string;
+			to: string;
+			files: WorktreeFileChange[];
+			omitted?: number;
+			overlapped?: true;
+	  };
+
 export type StepEvent =
 	| AgentEvent
 	| CommandEvent
@@ -165,7 +183,8 @@ export type StepEvent =
 	| WaitEvent
 	| ValueEvent
 	| ToolEvent
-	| EndEvent;
+	| EndEvent
+	| WorktreeEvent;
 
 /**
  * One line of a step's transcript file. `seq` increases by one per run,

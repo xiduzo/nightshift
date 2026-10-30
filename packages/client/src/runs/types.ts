@@ -56,6 +56,20 @@ export type ToolNodeEvent = Extract<
 	StepEvent,
 	{ type: "tool-call" | "tool-called" }
 >;
+/**
+ * What a step that works in the run's copy of the project writes about its
+ * files: the snapshot it starts from, and what changed since (the last one
+ * counts).
+ */
+export type WorktreeEvent = Extract<
+	StepEvent,
+	{ type: "worktree-snapshot" | "worktree-changes" }
+>;
+/** Every file a step changed in the run's copy of the project, also by commands. */
+export type WorktreeChangesEvent = Extract<
+	StepEvent,
+	{ type: "worktree-changes" }
+>;
 export type AgentEvent = Exclude<
 	StepEvent,
 	| CommandEvent
@@ -66,6 +80,7 @@ export type AgentEvent = Exclude<
 	| ValueEvent
 	| ToolNodeEvent
 	| EndEvent
+	| WorktreeEvent
 >;
 export type AgentUsage = NonNullable<
 	Extract<AgentEvent, { type: "finished" }>["usage"]
