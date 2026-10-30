@@ -110,11 +110,50 @@ the environment variable `$NS_KNOWLEDGE`. A flow that writes markdown
 there is a sync. To keep the knowledge current, schedule the sync. Or run
 it from the Knowledge page with **Sync now**.
 
+### Add a source on the Knowledge page
+
+**Add source** on the Knowledge page fills the knowledge without the
+canvas. Choose the kind (a folder on this computer, project files, web
+pages, a GitHub wiki, Jira or Confluence) and fill in the kit's inputs.
+Night Shift then:
+
+- saves a flow that calls the kit from one Subflow node, with your values
+  (`knowledge-web-pages`, then `knowledge-web-pages-2`). A source is that
+  flow ([ADR 4](adr/0004-knowledge-belongs-to-the-space.md), decision 6):
+  no other store holds it. `knowledge.saveSource` builds it with
+  `saveKnowledgeSource` in `@nightshift/flows`.
+- gives each source its own folder in the knowledge: the kit's folder, or
+  `web-2` when another flow fills `web`. A sync replaces its folder, so two
+  sources never share one. The dialog does not ask for it.
+- with **Keep it up to date**, adds a schedule of the flow at a time of day.
+  Schedules belong to the owner of the computer, as on the Schedules page.
+- with **Sync now** (on by default), starts a run of the flow.
+
+The page lists each source with what it copies, its last sync, its
+schedule and **Sync now**. A source the page made has **Edit** (the same
+dialog) and **Remove**. A sync flow you drew on the canvas shows too, and
+opens in the editor. **Remove** removes the flow and its schedules. If you
+leave **Also remove the files it added** on, Night Shift also removes the
+source's folder from the knowledge, on every computer of the Space
+(`removeFolder`: its entries leave the knowledge document, and each
+computer's next reconcile removes the files). A folder that another flow
+fills stays. Removing files needs a role that may start runs.
+
+A folder exists on one computer only. A Subflow node cannot name a Device, so a
+folder source keeps its runs on the computer where you added it through
+its schedule (`device`) and through **Sync now** on the Knowledge page.
+A run of it started elsewhere, from the Flows page, does not find the
+folder and ends with "No files to copy".
+
+Saving a flow needs a role that may save flows. Who may write to the
+knowledge stays as above: the computer that runs the sync publishes it.
+
 Kits do the common syncs. Call one from a Subflow node:
 
 | Kit | What it copies | Needs |
 | --- | --- | --- |
 | `kit:knowledge/files` | Paths or patterns of the project's own folder, one per line: `docs/private`. Files git ignores too, so private docs become knowledge without a commit. | Nothing |
+| `kit:knowledge/folder` | A folder anywhere on the computer (`~/notes` or a full path), with optional patterns, one per line: `*.md`. Hidden files stay out. At most 5 000 files. | Nothing. Runs on the computer that has the folder |
 | `kit:knowledge/github-wiki` | The wiki of a repository (`owner/name`), or any git address. | git, signed in for a private wiki |
 | `kit:knowledge/web` | Web pages as markdown, through `r.jina.ai`. | curl, no account |
 | `kit:knowledge/jira` | Jira work items, one markdown file each. | A CLI tool for `acli`, signed in, and jq |
@@ -123,7 +162,7 @@ Kits do the common syncs. Call one from a Subflow node:
 `kit:knowledge/review-learnings` is not a sync. See Learnings below.
 
 Each kit writes into its own folder in the knowledge (`folder`, for
-example `wiki`) and reports how many files it has. `files` and
+example `wiki`) and reports how many files it has. `files`, `folder` and
 `github-wiki` replace the old content of their folder.
 
 ## Learnings
