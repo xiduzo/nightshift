@@ -87,5 +87,6 @@ export type {
 	StepSummary,
 	TranscriptEntry,
 	WaitEvent,
+	WorktreeChangesEvent,
 } from "./types";
 export { useNow } from "./use-now";

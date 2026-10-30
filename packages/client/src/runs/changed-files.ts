@@ -6,6 +6,7 @@ import {
 	stringField,
 	toolName,
 } from "./tool-input";
+import type { WorktreeChangesEvent } from "./types";
 
 /**
  * One change an agent made to a file: text it replaced, a whole new
@@ -23,9 +24,33 @@ export type FileChange =
 export type ChangedFile = {
 	/** Relative to the project when the file is inside it. */
 	path: string;
-	status: "added" | "edited" | "deleted";
+	/** Where the file was before the step renamed it. */
+	oldPath?: string;
+	status: "added" | "edited" | "deleted" | "renamed";
+	/**
+	 * The agent's edits, in call order. A file that only a command changed
+	 * has its whole diff here, as one `patch`, when the diff is known.
+	 */
 	changes: FileChange[];
+	/**
+	 * The file's whole diff over the step, from the run's copy of the
+	 * project, when the agent's edits are in `changes`.
+	 */
+	diff?: string;
+	/** Lines added and removed over the step, from the run's copy of the project. */
+	lines?: { added: number; removed: number };
+	binary?: true;
+	/** The diff is cut short, or too long to keep. */
+	cut?: true;
+	/** Changed outside the agent's edit tools: by a command, a formatter, a script. */
+	byCommand?: true;
 };
+
+/**
+ * What the run's copy of the project says the step changed (its last
+ * `worktree-changes`): every file, also those a command changed.
+ */
+export type WorktreeFiles = Pick<WorktreeChangesEvent, "files">;
 
 /** One change to one path, and whether it made the file (undefined: not known). */
 type Touch = { path: string; change: FileChange; creates?: boolean };
@@ -243,21 +268,15 @@ export function addsFiles(call: AgentToolCall): boolean {
 	return touches.length > 0 && touches.every(creates);
 }
 
-/**
- * The files a step's agent changed, by path, from its tool calls: Claude
- * Code's `Edit`, `MultiEdit`, `Write` and `NotebookEdit`, OpenCode's and
- * pi's `edit` and `write`, `apply_patch` patches, and Codex's
- * `file_change`. Failed calls changed nothing. `root` is the project's
- * folder, to show paths relative to it.
- */
-export function changedFiles(
+/** A file as the agent's tool calls changed it. */
+type ToolFile = { changes: FileChange[]; created: boolean; deleted: boolean };
+
+/** The files of the tool calls, by path relative to `root`. */
+function toolFiles(
 	calls: readonly AgentToolCall[],
-	root?: string,
-): ChangedFile[] {
-	const files = new Map<
-		string,
-		{ changes: FileChange[]; created: boolean; deleted: boolean }
-	>();
+	root: string | undefined,
+): Map<string, ToolFile> {
+	const files = new Map<string, ToolFile>();
 	for (const call of calls) {
 		for (const touch of touchesOf(call)) {
 			const path = projectPath(touch.path, root);
@@ -275,17 +294,83 @@ export function changedFiles(
 			known.deleted = touch.change.kind === "delete";
 		}
 	}
-	return [...files]
-		.map(([path, file]) => ({
+	return files;
+}
+
+/** A file's status in the run's copy of the project, in the words of the tool calls. */
+function statusOf(
+	status: WorktreeFiles["files"][number]["status"],
+): ChangedFile["status"] {
+	return status === "modified" ? "edited" : status;
+}
+
+/**
+ * Whether a tool's path names `path` of the project: the same, or an
+ * absolute path that ends with it (a step that ran in another computer's
+ * copy of the project, which `root` does not name).
+ */
+function names(toolPath: string, path: string): boolean {
+	return (
+		toolPath === path ||
+		(toolPath.startsWith("/") && toolPath.endsWith(`/${path}`))
+	);
+}
+
+/**
+ * The files a step changed, by path. From the agent's tool calls: Claude
+ * Code's `Edit`, `MultiEdit`, `Write` and `NotebookEdit`, OpenCode's and
+ * pi's `edit` and `write`, `apply_patch` patches, and Codex's
+ * `file_change`. Failed calls changed nothing. `root` is the project's
+ * folder, to show paths relative to it.
+ *
+ * With `worktree` (what the run's copy of the project says the step
+ * changed), every file it lists is there too, also those a command, a
+ * formatter or an install changed, and those of a Command step. A file
+ * keeps the agent's edits; the copy of the project decides whether it was
+ * added, deleted or renamed, and gives its whole diff. A file no edit tool
+ * changed is `byCommand`, with that diff as its one change. A file the
+ * tools changed that the copy does not list (outside the project, or
+ * changed back) stays as the tools say.
+ */
+export function changedFiles(
+	calls: readonly AgentToolCall[],
+	root?: string,
+	worktree?: WorktreeFiles,
+): ChangedFile[] {
+	const tools = toolFiles(calls, root);
+	const files: ChangedFile[] = [];
+	for (const file of worktree?.files ?? []) {
+		const own = [...tools].filter(
+			([path]) =>
+				names(path, file.path) ||
+				(file.oldPath !== undefined && names(path, file.oldPath)),
+		);
+		for (const [path] of own) tools.delete(path);
+		const edits = own.flatMap(([, tool]) => tool.changes);
+		const whole: FileChange[] =
+			file.patch === undefined ? [] : [{ kind: "patch", diff: file.patch }];
+		// An edit the harness gives no detail of says less than the diff.
+		const told = edits.some((change) => change.kind !== "unknown");
+		files.push({
+			path: file.path,
+			...(file.oldPath !== undefined ? { oldPath: file.oldPath } : {}),
+			status: statusOf(file.status),
+			changes: told ? edits : whole,
+			...(told && file.patch !== undefined ? { diff: file.patch } : {}),
+			lines: { added: file.added, removed: file.removed },
+			...(file.binary ? { binary: true as const } : {}),
+			...(file.truncated ? { cut: true as const } : {}),
+			...(own.length === 0 ? { byCommand: true as const } : {}),
+		});
+	}
+	for (const [path, file] of tools) {
+		files.push({
 			path,
-			status: file.deleted
-				? ("deleted" as const)
-				: file.created
-					? ("added" as const)
-					: ("edited" as const),
+			status: file.deleted ? "deleted" : file.created ? "added" : "edited",
 			changes: file.changes,
-		}))
-		.sort((a, b) => a.path.localeCompare(b.path));
+		});
+	}
+	return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 /** A folder or a file of a file tree. */

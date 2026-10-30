@@ -187,6 +187,215 @@ describe("changedFiles", () => {
 	});
 });
 
+describe("changedFiles with what the run's copy of the project says", () => {
+	const edit = (path: string, before: string, after: string) => ({
+		name: "Edit",
+		input: { file_path: path, old_string: before, new_string: after },
+	});
+
+	test("a Command step: every file git lists, with its whole diff, by a command", () => {
+		expect(
+			changedFiles([], ROOT, {
+				files: [
+					{
+						path: "src/gen.ts",
+						status: "added",
+						added: 1,
+						removed: 0,
+						patch: "@@ -0,0 +1 @@\n+export {};",
+					},
+					{
+						path: "logo.png",
+						status: "modified",
+						added: 0,
+						removed: 0,
+						binary: true,
+					},
+					{
+						path: "bun.lock",
+						status: "modified",
+						added: 40,
+						removed: 2,
+						truncated: true,
+					},
+				],
+			}),
+		).toEqual([
+			{
+				path: "bun.lock",
+				status: "edited",
+				changes: [],
+				lines: { added: 40, removed: 2 },
+				cut: true,
+				byCommand: true,
+			},
+			{
+				path: "logo.png",
+				status: "edited",
+				changes: [],
+				lines: { added: 0, removed: 0 },
+				binary: true,
+				byCommand: true,
+			},
+			{
+				path: "src/gen.ts",
+				status: "added",
+				changes: [{ kind: "patch", diff: "@@ -0,0 +1 @@\n+export {};" }],
+				lines: { added: 1, removed: 0 },
+				byCommand: true,
+			},
+		]);
+	});
+
+	test("a file the agent edited keeps its edits; git decides its status and gives the whole diff", () => {
+		const files = changedFiles(
+			[
+				edit(`${ROOT}/a.ts`, "one", "two"),
+				edit(`${ROOT}/a.ts`, "x", "y"),
+				// Written, then a formatter changed it again: it is still new.
+				{
+					name: "Write",
+					input: { file_path: `${ROOT}/b.ts`, content: "b" },
+					result: "The file has been updated successfully.",
+				},
+			],
+			ROOT,
+			{
+				files: [
+					{
+						path: "a.ts",
+						status: "modified",
+						added: 2,
+						removed: 2,
+						patch: "@@ a",
+					},
+					{
+						path: "b.ts",
+						status: "added",
+						added: 1,
+						removed: 0,
+						patch: "@@ b",
+					},
+					{
+						path: "c.ts",
+						status: "deleted",
+						added: 0,
+						removed: 3,
+						patch: "@@ c",
+					},
+				],
+			},
+		);
+		expect(files).toEqual([
+			{
+				path: "a.ts",
+				status: "edited",
+				changes: [
+					{ kind: "edit", before: "one", after: "two" },
+					{ kind: "edit", before: "x", after: "y" },
+				],
+				diff: "@@ a",
+				lines: { added: 2, removed: 2 },
+			},
+			{
+				path: "b.ts",
+				status: "added",
+				changes: [{ kind: "write", content: "b" }],
+				diff: "@@ b",
+				lines: { added: 1, removed: 0 },
+			},
+			{
+				path: "c.ts",
+				status: "deleted",
+				changes: [{ kind: "patch", diff: "@@ c" }],
+				lines: { added: 0, removed: 3 },
+				byCommand: true,
+			},
+		]);
+	});
+
+	test("a rename joins the edits of the old path; a Codex change that names the file only shows the diff", () => {
+		const files = changedFiles(
+			[
+				edit(`${ROOT}/old.ts`, "a", "b"),
+				{
+					name: "file_change",
+					input: { changes: [{ path: `${ROOT}/codex.ts`, kind: "update" }] },
+				},
+			],
+			ROOT,
+			{
+				files: [
+					{
+						path: "codex.ts",
+						status: "modified",
+						added: 1,
+						removed: 1,
+						patch: "@@ x",
+					},
+					{
+						path: "new.ts",
+						oldPath: "old.ts",
+						status: "renamed",
+						added: 1,
+						removed: 1,
+						patch: "@@ y",
+					},
+				],
+			},
+		);
+		expect(files).toEqual([
+			{
+				path: "codex.ts",
+				status: "edited",
+				changes: [{ kind: "patch", diff: "@@ x" }],
+				lines: { added: 1, removed: 1 },
+			},
+			{
+				path: "new.ts",
+				oldPath: "old.ts",
+				status: "renamed",
+				changes: [{ kind: "edit", before: "a", after: "b" }],
+				diff: "@@ y",
+				lines: { added: 1, removed: 1 },
+			},
+		]);
+	});
+
+	test("an edit outside the project, or one changed back, stays as the tools say", () => {
+		const files = changedFiles(
+			[edit("/tmp/notes.md", "a", "b"), edit(`${ROOT}/back.ts`, "a", "a")],
+			ROOT,
+			{ files: [] },
+		);
+		expect(files.map((file) => [file.path, file.status])).toEqual([
+			["/tmp/notes.md", "edited"],
+			["back.ts", "edited"],
+		]);
+	});
+
+	test("a step on another computer: its absolute paths still meet git's", () => {
+		const files = changedFiles(
+			[edit("/elsewhere/copies/run-1/src/a.ts", "a", "b")],
+			ROOT,
+			{
+				files: [
+					{
+						path: "src/a.ts",
+						status: "modified",
+						added: 1,
+						removed: 1,
+						patch: "@@",
+					},
+				],
+			},
+		);
+		expect(files).toHaveLength(1);
+		expect(files[0]).toMatchObject({ path: "src/a.ts", diff: "@@" });
+		expect(files[0]?.byCommand).toBeUndefined();
+	});
+});
+
 describe("addsFiles", () => {
 	const write = (result?: string) => ({
 		name: "Write",

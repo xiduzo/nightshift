@@ -201,6 +201,7 @@ export {
 	useNow,
 	type Wait,
 	type WaitEvent,
+	type WorktreeChangesEvent,
 	waitFor,
 	whenLabel,
 	whyNot,
