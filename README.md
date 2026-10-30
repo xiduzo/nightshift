@@ -77,7 +77,7 @@ You do not have to draw every node yourself. An agent helps you in the editor, o
 - **Suggest on each field.** A prompt, the outcomes, a rule, a command, or the output fields: one click gives a suggestion that fits the flow.
 - **Ask why.** When a run does not finish, the run page asks an agent why, and the agent reads the run for you.
 
-You choose the agent that answers. An agent in a terminal gets the same help through `nightshift mcp` (see [Flows from a terminal](#flows-from-a-terminal)).
+You choose the agent that answers. An agent in a terminal gets the same help through `nightshift mcp` (see [Drive Night Shift from a terminal or an agent](#drive-night-shift-from-a-terminal-or-an-agent)).
 
 ### Agents on your own logins
 
@@ -151,7 +151,7 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 
 A flow that calls another flow needs that flow in the project too. Import all six. Details are in [examples/starters/](examples/starters/).
 
-### Flows from a terminal
+### Drive Night Shift from a terminal or an agent
 
 A person or an agent in a terminal reads and saves flows through `nightshift`, never as files. Night Shift must run on this computer. Each save is a new revision of the flow, and Night Shift checks it.
 
@@ -164,7 +164,24 @@ nightshift flows import fix-issue.json       # a new flow; a taken name gets a s
 nightshift flows revisions fix-issue         # who saved what, newest first
 ```
 
-The commands work in the project of the folder you run them in. `--project <id, name or folder>` picks another one. For an agent, `nightshift mcp` serves the same reads and saves as MCP tools: `claude mcp add nightshift -- nightshift mcp`.
+The commands work in the project of the folder you run them in. `--project <id, name or folder>` picks another one.
+
+`nightshift mcp` gives an agent (Claude Code, Codex, an orchestrator) the same flows, and the runs of a night, as MCP tools. Add it to Claude Code with `claude mcp add nightshift -- nightshift mcp`.
+
+| Tool | What it does |
+| --- | --- |
+| `list_projects`, `list_flows`, `get_flow` | Read the projects and their flows. |
+| `list_profiles`, `list_tools`, `list_skills` | Look up the names a node may use. |
+| `check_flow`, `save_flow` | Check a flow, and save it when it has no errors. |
+| `start_run` | Start a saved flow with its inputs. |
+| `list_runs` | The newest runs: by status, and since a time. Each with its cost and pull request. |
+| `get_run` | One run: its status, cost, pull request, steps, and why it failed. |
+| `stop_run` | Stop a run now, or after the step that runs now. |
+| `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
+| `answer_gate` | Answer a Gate with one of its options and a note. The run goes on. |
+| `get_digest` | What happened since a time: the runs that ended, and the Gates that wait. |
+
+To start a flow from another tool, such as GitHub Actions, n8n or Zapier, send a webhook to a schedule. See [docs/deploy/triggers.md](docs/deploy/triggers.md).
 
 ## Your computers, a Host, and your phone
 

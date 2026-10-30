@@ -28,7 +28,11 @@ In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. N
 - `list_flows`, `get_flow`, `list_profiles`, `list_tools`, `list_skills`, `check_flow`: as in the editor. Give `check_flow` the `name` you will save under.
 - `save_flow` (`name`, `flow`): checks the flow and saves it. A flow with errors is refused.
 - `start_run` (`flow`, `inputs`): starts a saved flow on this computer, and gives the link where the person follows it.
-- `list_runs`, then `get_run` (`run`): what a run did, and where it failed.
+- `list_runs` (`status`, `since`, `limit`), then `get_run` (`run`): what a run did, its cost and pull request, and where it failed.
+- `stop_run` (`run`, `when`: `now` or `after-step`): stops a run. Stop one only when the person asked you to.
+- `needs_me`: the Gates that wait for a person, in every project, with the question and the options.
+- `answer_gate` (`gate`, `option`, `note`): answers one of them, and the run goes on. Answer only with the option the person chose.
+- `get_digest` (`since`): one line per run that ended since a time, and the Gates that wait. Without `since`: since the last morning digest.
 
 Add the server to Claude Code with `claude mcp add nightshift -- nightshift mcp`. Add `--project <id, name or folder>` to work in another project than the one of your folder.
 

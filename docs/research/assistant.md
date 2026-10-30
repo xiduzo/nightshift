@@ -323,6 +323,12 @@ that changes the folder the server sees.
   on any error, then `flows.save`), `start_run` (`runs.start`, with the
   run's link), `list_runs` and `list_projects`. No new API procedure was
   needed.
+- **The run side** (sprint 2 of `next-phase-2026-11.md`, `terminal-runs.ts`):
+  `list_runs` filters by status and start time and says the cost and the
+  pull request, `get_run` says them too, `stop_run` (`runs.stop`),
+  `needs_me` (`gates.list`, the Needs-you inbox), `answer_gate`
+  (`gates.resolve`) and `get_digest` (`notifications.digest.since`, the one
+  new procedure). A Gate's id for the agent is `<run id>:<step id>`.
 - **The server** (`serveTools` in `packages/agents/src/assistant/mcp.ts`)
   lists any TanStack tool definitions over MCP and turns a thrown error into
   an error result. The subcommand is `apps/server/src/features/cli/mcp.ts`.
