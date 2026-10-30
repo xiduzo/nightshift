@@ -30,9 +30,11 @@ import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	costNote,
 	formatDateTime,
+	formatDuration,
 	formatKnownCost,
 	formatRelative,
 	formatTime,
+	formatTokens,
 } from "@/shared/format";
 import { RunStatusIcon } from "./run-status-badge";
 
@@ -40,7 +42,7 @@ import { RunStatusIcon } from "./run-status-badge";
  * Runs as a table, newest first. Each row: a status icon, the title (a link
  * to the run) and its outcome under it; icons for the trigger, the device,
  * the cost and the branch, with how long ago it started under them, or the
- * time with `clockTimes`. What every run shares (one project) does not repeat
+ * time with `clockTimes`, and how long an ended run took. What every run shares (one project) does not repeat
  * on each row. Narrow screens drop the icons. With `pageSize`, the runs show
  * in pages. With `more`, a button under the list loads the next runs.
  */
@@ -161,6 +163,7 @@ function runColumns(
 					<RunFacts run={row.original} />
 					<p className="mt-0.5 whitespace-nowrap text-right text-muted-foreground text-xs">
 						<Started at={row.original.createdAt} clock={clockTimes} />
+						<Took run={row.original} />
 					</p>
 				</>
 			),
@@ -241,6 +244,16 @@ function RunTitle({
 function RunFacts({ run }: { run: RunSummary }) {
 	const { trigger } = run;
 	const note = costNote(run);
+	const tokens = run.metrics?.tokens;
+	const used = tokens ? tokens.input + tokens.output : 0;
+	const costLabel = [
+		note ?? "What the run cost.",
+		tokens && used > 0
+			? `${formatTokens(used)} tokens: ${formatTokens(tokens.input)} in, ${formatTokens(tokens.output)} out, ${formatTokens(tokens.cacheRead)} of the input from the cache.`
+			: null,
+	]
+		.filter((part) => part !== null)
+		.join(" ");
 	return (
 		<div className="flex h-5 items-center justify-end gap-1 text-muted-foreground max-sm:hidden">
 			{trigger.kind !== "manual" ? (
@@ -265,7 +278,7 @@ function RunFacts({ run }: { run: RunSummary }) {
 			)}
 			{run.costUsd > 0 || note ? (
 				<Fact
-					label={note ?? "What the run cost"}
+					label={costLabel}
 					copy={{ what: "cost", value: formatKnownCost(run) }}
 				>
 					<span
@@ -338,4 +351,13 @@ function Started({ at, clock }: { at: number; clock: boolean }) {
 			{clock ? formatTime(at) : formatRelative(at)}
 		</time>
 	);
+}
+
+/** How long an ended run took, after its start. Nothing while it is open. */
+function Took({ run }: { run: RunSummary }) {
+	const length =
+		run.metrics?.wallMs ??
+		(run.endedAt === null ? null : run.endedAt - run.createdAt);
+	if (length === null) return null;
+	return <span title="How long the run took"> · {formatDuration(length)}</span>;
 }
