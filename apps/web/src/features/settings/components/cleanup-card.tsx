@@ -33,7 +33,7 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 	return (
 		<PageSection
 			title="Cleanup"
-			description="Each run works in its own copy of the project, on its own branch. Night Shift can remove old ones for you."
+			description="Remove what old runs leave on this computer."
 			actions={<ResetSection form={form} />}
 		>
 			<Card>
@@ -46,10 +46,8 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 										Clean up old runs
 									</FieldLabel>
 									<FieldDescription>
-										Night Shift removes the copy and branches of an ended run
-										when its work is merged or pushed. It never deletes a branch
-										on origin. Other runs stay until you remove them on the
-										Branches page of their project.
+										Remove a run once its work is merged or pushed. Branches on
+										origin stay. Remove other runs on the Branches page.
 									</FieldDescription>
 								</FieldContent>
 								<Switch
@@ -68,7 +66,7 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 									settingKey="cleanUpAfterDays"
 									label="Clean up after"
 									unit="days"
-									description="How long after a run ends Night Shift waits before it cleans up."
+									description="Counted from the end of the run."
 									inputMode="numeric"
 								/>
 							</div>

@@ -100,7 +100,7 @@ export function ScreensCard() {
 	return (
 		<PageSection
 			title="Phones and browsers that can notify you"
-			description="Each one gets your notifications. Remove one you no longer use."
+			description="Remove the ones you no longer use."
 		>
 			<Card className="py-0">
 				<CardContent className="px-0">

@@ -36,7 +36,7 @@ export function SettingsPage({ thisComputer }: { thisComputer: ReactNode }) {
 				<div className="mx-auto w-full max-w-4xl">
 					<PageHeading
 						title="Settings"
-						description="Choose how Night Shift runs your flows, what a new Agent node starts with, and when it tells you."
+						description="Choose how flows run and how Night Shift tells you."
 					/>
 				</div>
 

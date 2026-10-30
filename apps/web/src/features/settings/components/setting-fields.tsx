@@ -78,7 +78,7 @@ export function TextSetting({
 	form: SettingsForm;
 	settingKey: SettingKey;
 	label: string;
-	description: ReactNode;
+	description?: ReactNode;
 	unit?: string;
 	inputMode?: "numeric" | "decimal";
 	mono?: boolean;
@@ -88,7 +88,10 @@ export function TextSetting({
 }) {
 	const id = useId();
 	const error = form.error(settingKey);
-	const describedBy = `${id}-description${error ? ` ${id}-error` : ""}`;
+	const describedBy =
+		[description ? `${id}-description` : null, error ? `${id}-error` : null]
+			.filter(Boolean)
+			.join(" ") || undefined;
 	const inputProps = {
 		id,
 		value: form.value(settingKey),
@@ -126,9 +129,11 @@ export function TextSetting({
 				</datalist>
 			) : null}
 			{error ? <FieldError id={`${id}-error`}>{error}</FieldError> : null}
-			<FieldDescription id={`${id}-description`}>
-				{description}
-			</FieldDescription>
+			{description ? (
+				<FieldDescription id={`${id}-description`}>
+					{description}
+				</FieldDescription>
+			) : null}
 		</Field>
 	);
 }
@@ -145,7 +150,7 @@ export function SelectSetting<V extends string>({
 	form: SettingsForm;
 	settingKey: SettingKey;
 	label: string;
-	description: ReactNode;
+	description?: ReactNode;
 	options: readonly { value: V; label: string }[];
 	onPick?: (value: V) => void;
 }) {
@@ -165,7 +170,7 @@ export function SelectSetting<V extends string>({
 				<SelectTrigger
 					id={id}
 					className="w-full"
-					aria-describedby={`${id}-description`}
+					aria-describedby={description ? `${id}-description` : undefined}
 				>
 					<SelectValue />
 				</SelectTrigger>
@@ -179,9 +184,11 @@ export function SelectSetting<V extends string>({
 					</SelectGroup>
 				</SelectContent>
 			</Select>
-			<FieldDescription id={`${id}-description`}>
-				{description}
-			</FieldDescription>
+			{description ? (
+				<FieldDescription id={`${id}-description`}>
+					{description}
+				</FieldDescription>
+			) : null}
 		</Field>
 	);
 }

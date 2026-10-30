@@ -14,20 +14,18 @@ export const PERMISSION_MODES: {
 	{
 		value: "auto",
 		label: "Auto",
-		description:
-			"Claude Code approves safe actions on its own, so nobody needs to be awake. Made for nights.",
+		description: "Claude Code approves safe actions itself. Made for nights.",
 	},
 	{
 		value: "acceptEdits",
 		label: "Accept edits",
-		description:
-			"The agent can edit files. It cannot run commands while nobody is there to approve them.",
+		description: "Edits files. Runs no commands without your approval.",
 	},
 	{
 		value: "default",
 		label: "Ask for each tool",
 		description:
-			"Asks before each tool. At night nobody answers, so the agent cannot use its tools.",
+			"Asks before each tool. At night nobody answers, so the agent stops.",
 	},
 	{
 		value: "plan",
@@ -38,6 +36,6 @@ export const PERMISSION_MODES: {
 		value: "bypassPermissions",
 		label: "Bypass permissions",
 		description:
-			"Runs every tool, shell commands included, without asking. Use it only on a repository you trust.",
+			"Runs every tool and shell command without asking. Use it only on a project you trust.",
 	},
 ];

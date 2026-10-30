@@ -44,7 +44,7 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 	return (
 		<PageSection
 			title="New Agent nodes"
-			description="What a new Agent or Decision node starts with in the flow editor. Nodes you already made keep their own values."
+			description="What a new Agent or Decision node starts with. Existing nodes keep their values."
 			actions={<ResetSection form={form} />}
 		>
 			<Card>
@@ -70,7 +70,7 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="agentModel"
 									label="Model"
-									description={`Any model ${harness.label} supports, for example ${harness.models.slice(0, 3).join(", ")}.`}
+									description={`For example ${harness.models.slice(0, 3).join(", ")}.`}
 									mono
 									suggestions={harness.models}
 								/>
@@ -97,7 +97,7 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="decisionDecider"
 									label="Decider"
-									description="A new Decision node picks its label with this decision model."
+									description="The model a new Decision node uses to choose."
 									options={deciderOptions}
 								/>
 							</div>

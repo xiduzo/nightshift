@@ -45,27 +45,21 @@ import { ScreensCard } from "./screens-card";
 const EVENTS: {
 	key: keyof NotificationSettings["events"];
 	label: string;
-	description: string;
+	description?: string;
 }[] = [
-	{
-		key: "gateOpened",
-		label: "A Gate waits for you",
-		description: "A run waits for your answer.",
-	},
+	{ key: "gateOpened", label: "A Gate waits for you" },
 	{
 		key: "runFinished",
 		label: "A run finished",
-		description: "A run ended with its outcome.",
 	},
 	{
 		key: "runFailed",
 		label: "A run failed",
-		description: "A run stopped on an error.",
 	},
 	{
 		key: "deviceWait",
 		label: "A step waits for a device",
-		description: "A run for you waits until an offline device is back.",
+		description: "A run waits until an offline device is back.",
 	},
 ];
 
@@ -77,7 +71,7 @@ const SCREENS: {
 	{
 		key: "web",
 		label: "Browsers",
-		description: "Each browser where you turned on notifications.",
+		description: "Each browser where you turned them on.",
 	},
 	{
 		key: "desktop",
@@ -87,8 +81,7 @@ const SCREENS: {
 	{
 		key: "expo",
 		label: "Phones",
-		description:
-			"When off, your phones get no notifications. The inbox still shows what waits for you.",
+		description: "The Night Shift app on your phones.",
 	},
 ];
 
@@ -128,7 +121,7 @@ export function NotificationSettingsCard() {
 		<>
 			<PageSection
 				title="Notifications"
-				description="What Night Shift tells you about, when, and where. These settings are the same on every screen you use."
+				description="Choose what Night Shift tells you about, when, and where. This applies on every screen."
 			>
 				{settings.data ? (
 					<SettingsForm data={settings.data} />
@@ -177,8 +170,10 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 								<Field key={key} orientation="horizontal">
 									<FieldContent>
 										<FieldLabel htmlFor={`${id}-${key}`}>{label}</FieldLabel>
-										<FieldDescription>{description}</FieldDescription>
-									</FieldContent>
+										{description ? (
+											<FieldDescription>{description}</FieldDescription>
+										) : null}{" "}
+									</FieldContent>{" "}
 									<Switch
 										id={`${id}-${key}`}
 										checked={data.events[key]}
@@ -197,8 +192,7 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 								<FieldContent>
 									<FieldLabel htmlFor={`${id}-quiet`}>Quiet hours</FieldLabel>
 									<FieldDescription>
-										When quiet hours end, Night Shift tells you what still waits
-										for you.
+										Night Shift stays silent, then tells you what still waits.
 									</FieldDescription>
 								</FieldContent>
 								<Switch
@@ -295,9 +289,8 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 									</SelectContent>
 								</Select>
 								<FieldDescription id={`${id}-hold-description`}>
-									While you use Night Shift on another screen, phones and closed
-									browsers wait this long. A Gate you answer meanwhile does not
-									reach them.
+									While you use another screen, phones and closed browsers wait
+									this long. A Gate you answer in that time does not reach them.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -348,8 +341,8 @@ function DigestField({ data }: { data: NotificationSettings }) {
 						</SelectContent>
 					</Select>
 					<FieldDescription id={`${id}-digest-description`}>
-						Once a day, one notification sums up the runs that ended and the
-						Gates that wait. On a day with nothing to tell, none comes.
+						One notification a day about ended runs and waiting Gates. It skips
+						days with nothing new.
 						{when === "quiet-hours-end" && !data.quietHours
 							? ` You have no quiet hours, so it comes at ${time}.`
 							: null}
@@ -459,7 +452,7 @@ function BrowserField() {
 						Notifications in this browser
 					</FieldLabel>
 					<FieldDescription>
-						Night Shift tells you here, also when no Night Shift page is open.
+						Get notifications here, also when Night Shift is closed.
 					</FieldDescription>
 				</FieldContent>
 				{push.busy || push.state === "loading" ? (
@@ -488,9 +481,9 @@ function BrowserField() {
 					<BellOffIcon />
 					<AlertTitle>This browser blocks notifications</AlertTitle>
 					<AlertDescription>
-						Allow notifications for this site in the browser's site settings
-						(the icon left of the address). On macOS, also allow the browser in
-						System Settings, Notifications.
+						Allow notifications for this site in the site settings of the
+						browser. On macOS, also allow the browser in System Settings,
+						Notifications.
 					</AlertDescription>
 				</Alert>
 			) : push.state === "home-screen" ? (
@@ -508,8 +501,7 @@ function BrowserField() {
 					<BellOffIcon />
 					<AlertTitle>No notifications in this browser</AlertTitle>
 					<AlertDescription>
-						This browser cannot get notifications from this address. Open Night
-						Shift at its secure address, which starts with https.
+						Open Night Shift at its https:// address to get notifications.
 					</AlertDescription>
 				</Alert>
 			) : null}

@@ -31,7 +31,7 @@ export function AssistantCard({ data }: { data: SettingsView }) {
 	return (
 		<PageSection
 			title="Help in the flow editor"
-			description="An agent suggests a prompt, outputs or variables for a node, and changes the flow with you in a chat."
+			description="An agent suggests prompts, outputs and variables, and edits the flow with you in a chat."
 			actions={<ResetSection form={form} />}
 		>
 			<Card>
@@ -41,8 +41,7 @@ export function AssistantCard({ data }: { data: SettingsView }) {
 							<SelectSetting
 								form={form}
 								settingKey="assistantProfile"
-								label="Profile for help"
-								description="Night Shift uses this profile for suggestions and for the chat beside the canvas."
+								label="Profile"
 								options={options}
 							/>
 							<SaveError error={form.saveError} />

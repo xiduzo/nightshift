@@ -50,7 +50,7 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="budgetUsd"
 									label="Budget per run"
-									description="A run stops when it has spent this much. Resume it to spend as much again. Leave it empty for no budget."
+									description="The run stops at this amount. Resume it to spend as much again."
 									unit="USD"
 									inputMode="decimal"
 									placeholder="No budget"
@@ -59,7 +59,7 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="maxTurns"
 									label="Max turns per agent step"
-									description="A turn is one reply of the agent. The step fails when the agent takes more. Leave it empty for no limit."
+									description="A turn is one reply of the agent. The step fails after this many."
 									inputMode="numeric"
 									placeholder="No limit"
 								/>
@@ -67,7 +67,7 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="idleMinutes"
 									label="Idle timeout"
-									description="An agent step fails when the agent shows no activity for this long."
+									description="The step fails when the agent does nothing for this long."
 									unit="min"
 									inputMode="decimal"
 								/>
@@ -75,7 +75,7 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="usageLimitFirstWaitMinutes"
 									label="First usage-limit wait"
-									description="An agent hits its usage limit and gives no reset time. The run waits this long, then tries again."
+									description="When an agent hits its usage limit without a reset time, the run waits this long."
 									unit="min"
 									inputMode="decimal"
 								/>
@@ -83,7 +83,7 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="usageLimitMaxWaitMinutes"
 									label="Longest usage-limit wait"
-									description="Each next wait is twice as long, up to this."
+									description="Each next wait doubles, up to this."
 									unit="min"
 									inputMode="decimal"
 								/>
@@ -91,7 +91,7 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="networkGraceMinutes"
 									label="Network grace"
-									description="The longest total wait for the network to come back. Then the step fails."
+									description="How long a step waits for the network before it fails."
 									unit="min"
 									inputMode="decimal"
 								/>
@@ -114,10 +114,8 @@ function ResumeSetting({ data }: { data: SettingsView }) {
 			<FieldContent>
 				<FieldLabel htmlFor={`${id}-resume`}>Resume after a restart</FieldLabel>
 				<FieldDescription>
-					When Night Shift stops in the middle of a run, the run continues on
-					its own after Night Shift starts again. This works only with schedules
-					on, before the run's stop time, and up to 3 times in a row. Turn it
-					off to resume runs yourself.
+					A run that Night Shift stopped continues when it starts again. This
+					works with schedules on, before the stop time, up to 3 times in a row.
 				</FieldDescription>
 			</FieldContent>
 			<Switch

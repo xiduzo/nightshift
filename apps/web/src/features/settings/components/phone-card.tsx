@@ -69,13 +69,9 @@ export function PhoneCard() {
 								/>
 							</div>
 							<div className="flex min-w-0 flex-col gap-2 text-sm">
-								<p>
-									Scan this code with the Night Shift app on your phone. Then
-									sign in with your email and password.
-								</p>
+								<p>Scan this code with the Night Shift app, then sign in.</p>
 								<p className="text-muted-foreground">
-									The code holds this address only. You can also type it in the
-									app:
+									Or type this address in the app:
 								</p>
 								<p className="break-all font-mono">{address}</p>
 							</div>
@@ -89,7 +85,7 @@ export function PhoneCard() {
 								<ItemTitle>Your phone needs an https:// address</ItemTitle>
 								<ItemDescription className="line-clamp-none">
 									Turn on Be a Host and add an https:// address under This
-									computer below. Then the code for your phone shows here.
+									computer.
 								</ItemDescription>
 							</ItemContent>
 							<ItemActions>

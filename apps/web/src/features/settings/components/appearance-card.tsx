@@ -2,7 +2,6 @@ import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Field,
 	FieldContent,
-	FieldDescription,
 	FieldLabel,
 	FieldTitle,
 } from "@nightshift/ui/components/field";
@@ -18,20 +17,20 @@ import { PageSection } from "@/shared/page";
 const THEMES = [
 	{
 		value: "system",
-		label: "Match the system",
-		description: "Light or dark, as macOS is.",
+		label: "System",
+
 		icon: MonitorIcon,
 	},
 	{
 		value: "dark",
 		label: "Dark",
-		description: "For the night.",
+
 		icon: MoonIcon,
 	},
 	{
 		value: "light",
 		label: "Light",
-		description: "For the morning after.",
+
 		icon: SunIcon,
 	},
 ] as const;
@@ -44,7 +43,7 @@ export function AppearanceCard() {
 	useEffect(() => setMounted(true), []);
 
 	return (
-		<PageSection title="Appearance" description="Saved in this browser only.">
+		<PageSection title="Appearance" description="Applies to this browser only.">
 			<Card>
 				<CardContent>
 					<RadioGroup
@@ -53,7 +52,7 @@ export function AppearanceCard() {
 						onValueChange={(value) => setTheme(String(value))}
 						className="grid gap-3 sm:grid-cols-3"
 					>
-						{THEMES.map(({ value, label, description, icon: Icon }) => (
+						{THEMES.map(({ value, label, icon: Icon }) => (
 							<FieldLabel key={value} htmlFor={`${id}-${value}`}>
 								<Field orientation="horizontal">
 									<FieldContent>
@@ -61,7 +60,6 @@ export function AppearanceCard() {
 											<Icon className="size-4" aria-hidden="true" />
 											{label}
 										</FieldTitle>
-										<FieldDescription>{description}</FieldDescription>
 									</FieldContent>
 									<RadioGroupItem value={value} id={`${id}-${value}`} />
 								</Field>

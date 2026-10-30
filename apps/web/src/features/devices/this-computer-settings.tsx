@@ -72,7 +72,7 @@ export function ThisComputerSettings() {
 		<PageSection
 			className="scroll-mt-4"
 			title={<span id="this-computer">This computer</span>}
-			description="Whether other computers can pair with it, the Hosts it joined, and where it keeps its data."
+			description="Let other computers pair with it, and join Hosts."
 		>
 			{computer ? (
 				<>
@@ -173,8 +173,7 @@ function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 							<ItemTitle>Status</ItemTitle>
 							{lease ? (
 								<ItemDescription className="line-clamp-none">
-									On {lease.host} since {formatDateTime(lease.since)}. Only one
-									Night Shift at a time can use this data.
+									On {lease.host} since {formatDateTime(lease.since)}.
 								</ItemDescription>
 							) : (
 								<Skeleton className="h-4 w-64" />
@@ -279,8 +278,8 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 						<FieldContent>
 							<FieldLabel htmlFor={`${id}-copy`}>Copy every project</FieldLabel>
 							<FieldDescription>
-								When someone adds a project from GitHub, this computer copies it
-								too. Its schedules and chats can then use it here.
+								Copy each GitHub project someone adds, so its schedules and
+								chats can work here.
 							</FieldDescription>
 						</FieldContent>
 						<Switch
@@ -296,8 +295,7 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 						<FieldContent>
 							<FieldLabel htmlFor={`${id}-addresses`}>Addresses</FieldLabel>
 							<FieldDescription>
-								One per line, in the order your devices try them. For example
-								https://studio.local, then https://studio.example.com.
+								One per line. Your devices try them in this order.
 							</FieldDescription>
 						</FieldContent>
 						<LargerTextarea
@@ -386,8 +384,8 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 						<h3 className="font-medium text-sm">Hosts it joined</h3>
 						<p className="text-muted-foreground text-sm">
 							{hosts.length === 0
-								? "This computer keeps its own Spaces. Join a Host to work in a Space another computer keeps: yours, a server, or a colleague's."
-								: "Each Space lives on one Host. Your home Host also keeps the settings of this computer."}
+								? "Join a Host to work in a Space that another computer keeps."
+								: "Your home Host also keeps the settings of this computer."}
 						</p>
 					</div>
 					<Button variant="outline" size="sm" onClick={() => setJoining(true)}>
@@ -414,13 +412,16 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 										</Badge>
 										<HostStatus status={host.status} />
 									</ItemTitle>
-									<ItemDescription className="line-clamp-none">
-										{host.status === "revoked"
-											? "The Host removed the access of this computer. Join it again to sync."
-											: host.spaces.length > 0
-												? "Open a Space to work in it. Each one is also in the Space switcher."
-												: "Keeps no Space of yours yet."}
-									</ItemDescription>
+									{host.status === "revoked" ? (
+										<ItemDescription className="line-clamp-none">
+											The Host removed the access of this computer. Join it
+											again to sync.
+										</ItemDescription>
+									) : host.spaces.length === 0 ? (
+										<ItemDescription>
+											Keeps no Space of yours yet.
+										</ItemDescription>
+									) : null}
 								</ItemContent>
 								{host.homeHost ? (
 									<ItemActions>

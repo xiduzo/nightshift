@@ -43,7 +43,7 @@ export function RunsCard({ data }: { data: SettingsView }) {
 	return (
 		<PageSection
 			title="Runs"
-			description="When runs start and how far one run may go."
+			description="When runs start and how far a run can go."
 			actions={<ResetSection form={form} />}
 		>
 			<Card>
@@ -57,8 +57,8 @@ export function RunsCard({ data }: { data: SettingsView }) {
 								<FieldContent>
 									<FieldLabel htmlFor={`${id}-scheduler`}>Schedules</FieldLabel>
 									<FieldDescription>
-										Night Shift starts flows at the times you schedule. Turn it
-										off to run flows only when you start them.
+										Start flows at their scheduled times. When off, flows run
+										only when you start them.
 									</FieldDescription>
 								</FieldContent>
 								<Switch
@@ -87,9 +87,8 @@ export function RunsCard({ data }: { data: SettingsView }) {
 										Keep this computer awake
 									</FieldLabel>
 									<FieldDescription>
-										This computer does not go to sleep while a run on it works
-										or waits for a timer. A run that waits at a Gate does not
-										keep it awake.
+										Stay awake while a run works or waits for a timer. A run at
+										a Gate lets it sleep.
 									</FieldDescription>
 								</FieldContent>
 								<Switch
@@ -107,21 +106,21 @@ export function RunsCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="maxConcurrentRuns"
 									label="Max concurrent runs"
-									description="How many runs can work at the same time. Extra runs wait their turn."
+									description="More runs wait their turn."
 									inputMode="numeric"
 								/>
 								<TextSetting
 									form={form}
 									settingKey="maxStepsPerRun"
 									label="Max steps per run"
-									description="A safety net for a flow that loops: the run stops after this many steps. You can resume it."
+									description="Stops a flow that loops. You can resume the run."
 									inputMode="numeric"
 								/>
 								<TextSetting
 									form={form}
 									settingKey="offlineWorkMinutes"
 									label="Offline limit"
-									description="A step this computer runs for a run on another computer stops after this long without its Host."
+									description="A step for a run on another computer stops when its Host is gone this long."
 									unit="min"
 									inputMode="decimal"
 								/>
