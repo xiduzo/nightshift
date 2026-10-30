@@ -1,6 +1,7 @@
 /** Code and JSON in a shadcn code block, and code to edit, highlighted by Shiki. */
 
 export { CodeTextarea } from "./code-textarea";
+export { DiffLine, type DiffLineVariant } from "./diff-line";
 export { formatJson } from "./format-json";
 export {
 	CODE_LANGUAGES,

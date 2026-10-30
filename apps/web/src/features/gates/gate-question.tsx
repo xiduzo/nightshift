@@ -5,7 +5,6 @@ import {
 	CodeBlockActions,
 	CodeBlockContent,
 	CodeBlockCopyButton,
-	CodeBlockLine,
 } from "@nightshift/ui/components/code-block";
 import {
 	Collapsible,
@@ -16,7 +15,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { CodeView } from "@/shared/code";
+import { CodeView, DiffLine } from "@/shared/code";
 import { InlineMarkdown, Markdown } from "@/shared/markdown";
 
 /** Context longer than this folds away behind "Show context". */
@@ -131,12 +130,12 @@ function diffLines(value: string): ReactNode[] {
 		const added = line.startsWith("+") && !line.startsWith("+++");
 		const removed = line.startsWith("-") && !line.startsWith("---");
 		return (
-			<CodeBlockLine
+			<DiffLine
 				key={index}
 				variant={added ? "added" : removed ? "removed" : "default"}
 			>
 				{added || removed ? line.slice(1) : line}
-			</CodeBlockLine>
+			</DiffLine>
 		);
 	});
 }

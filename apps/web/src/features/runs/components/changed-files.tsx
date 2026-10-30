@@ -12,7 +12,6 @@ import {
 	CodeBlockContent,
 	CodeBlockCopyButton,
 	CodeBlockHeader,
-	CodeBlockLine,
 	CodeBlockTitle,
 } from "@nightshift/ui/components/code-block";
 import {
@@ -36,7 +35,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-import { CodeView } from "@/shared/code";
+import { CodeView, DiffLine, type DiffLineVariant } from "@/shared/code";
 
 const STATUS_LABEL: Record<ChangedFile["status"], string> = {
 	added: "Added",
@@ -258,7 +257,7 @@ function DiffBlock({
 	copy,
 }: {
 	title?: string;
-	lines: { variant: "added" | "removed" | "default"; text: string }[];
+	lines: { variant: DiffLineVariant; text: string }[];
 	copy: string;
 }) {
 	const actions = (
@@ -278,9 +277,9 @@ function DiffBlock({
 			)}
 			<CodeBlockContent wrap>
 				{lines.map((line, index) => (
-					<CodeBlockLine key={index} variant={line.variant}>
+					<DiffLine key={index} variant={line.variant}>
 						{line.text}
-					</CodeBlockLine>
+					</DiffLine>
 				))}
 			</CodeBlockContent>
 		</CodeBlock>
