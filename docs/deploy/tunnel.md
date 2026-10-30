@@ -1,11 +1,12 @@
 # An outbound tunnel: Cloudflare Tunnel, frp or rathole
 
 The Host stays at home, with no open port. A small program on the Host
-connects out to a server on the internet, which passes requests back
-through that connection. You get a public name on your own domain, and one
+connects to a server on the internet. That server sends requests back
+through the connection. You get a public name on your own domain, and one
 more program on the Host.
 
-Written from the documentation of each tool. Not tested here end to end.
+This guide follows the documentation of each tool. Nobody tested it here
+end to end.
 
 In every case, keep Night Shift on this computer only:
 
@@ -15,7 +16,7 @@ nightshift serve --listen 127.0.0.1 --host-address https://nightshift.example.co
 
 ## Cloudflare Tunnel
 
-Needs a Cloudflare account with your domain on it.
+You need a Cloudflare account with your domain on it.
 
 1. Install `cloudflared` on the Host:
    [Cloudflare's downloads](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
@@ -38,7 +39,7 @@ Needs a Cloudflare account with your domain on it.
      - service: http_status:404
    ```
 
-4. Run it, or install it as a service:
+4. Run the tunnel, or install it as a service:
 
    ```bash
    cloudflared tunnel run nightshift
@@ -53,16 +54,18 @@ nightshift serve --listen 127.0.0.1 --require-two-factor \
   --host-address https://nightshift.example.com
 ```
 
-In Docker, set `NIGHTSHIFT_REQUIRE_TWO_FACTOR=on` and publish the port on
+In Docker, set `NIGHTSHIFT_REQUIRE_TWO_FACTOR=on`. Publish the port on
 `127.0.0.1` only (`-p 127.0.0.1:3000:3000`). Stop the old container before
-you start a new one on the same volume: see
-[Updates](public-server.md#updates-stop-the-old-container-first). Night Shift limits sign-in
-tries per visitor by the `CF-Connecting-IP` header that Cloudflare adds. See
+you start a new one on the same volume (see
+[Updates](public-server.md#updates-stop-the-old-container-first)).
+
+Night Shift limits sign-in tries per visitor by the `CF-Connecting-IP`
+header that Cloudflare adds. See
 [Require two-factor sign-in](README.md#require-two-factor-sign-in).
 
 Cloudflare Access can put a login in front. Your other computers cannot
-pass that login: they use their own access to the Host. Put Access only in
-front of a Host that browsers alone use.
+pass that login, because they use their own access to the Host. Put Access
+only in front of a Host that only browsers use.
 
 ## frp on a VPS
 
@@ -104,7 +107,7 @@ Run `frps -c frps.toml` on the VPS and `frpc -c frpc.toml` on the Host.
 
 ## rathole on a VPS
 
-The same shape as frp, with a smaller program. On the VPS, `server.toml`:
+This works like frp, with a smaller program. On the VPS, `server.toml`:
 
 ```toml
 [server]

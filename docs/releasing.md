@@ -9,9 +9,9 @@ Two workflows publish there:
 | [Nightly](../.github/workflows/nightly.yml) | `main` every night at 03:17 UTC, as the rolling `nightly` prerelease | Nightly |
 
 Both call [Desktop build](../.github/workflows/desktop-build.yml), which
-builds macOS (arm64) and Linux (x64). Electrobun cannot build on
-Intel Macs, so there is no Intel Mac build. A pull request that changes
-`apps/desktop` runs the same build as a check, without a release.
+builds macOS (arm64) and Linux (x64). Electrobun cannot build on Intel Macs,
+so there is no Intel Mac build. A pull request that changes `apps/desktop`
+runs the same build as a check, without a release.
 
 ## Release a version
 
@@ -24,14 +24,14 @@ Do one of these:
 A version with a prerelease part, such as `0.2.0-beta.1`, becomes a GitHub
 prerelease. Apps on the stable feed skip it.
 
-Release notes come from the pull requests since the last tag. Edit them on
-the release page after the workflow ends.
+Release notes come from the pull requests since the last tag. After the
+workflow ends, edit them on the release page.
 
 ## The Docker image
 
 [Docker image](../.github/workflows/docker.yml) builds `deploy/Dockerfile`
 for linux/amd64 and linux/arm64. Release and Nightly call it, so the image
-follows the same versions as the desktop app:
+gets the same versions as the desktop app:
 
 - A release publishes its version (`0.2.0`), the minor version (`0.2`)
   and `latest`. A prerelease publishes its own version only.
@@ -41,8 +41,8 @@ follows the same versions as the desktop app:
 - A pull request that changes the image builds it and starts it, but does
   not publish it.
 
-It publishes to `ghcr.io/xiduzo/nightshift`, and to Docker Hub when these
-are set:
+The workflow publishes to `ghcr.io/xiduzo/nightshift`. When you set these,
+it also publishes to Docker Hub:
 
 | Setting | Kind | Value |
 | --- | --- | --- |
@@ -50,14 +50,16 @@ are set:
 | `DOCKERHUB_TOKEN` | Repository secret | A Docker Hub personal access token with Read & Write access |
 
 The first push makes the `nightshift` repository on Docker Hub. On GitHub,
-make the package public once: open it under the account's Packages, then
-choose **Package settings > Change visibility**.
+make the package public once:
+
+1. Open the package under the account's Packages.
+2. Choose **Package settings > Change visibility**.
 
 ## Nightly builds
 
-The Nightly workflow skips a night without new commits on `main`. Run it from
-the Actions tab to build now. A nightly version is a prerelease of the next
-patch version, for example `0.2.1-nightly.20261020.12`.
+The Nightly workflow skips a night without new commits on `main`. To build
+now, run it from the Actions tab. A nightly version is a prerelease of the
+next patch version, for example `0.2.1-nightly.20261020.12`.
 
 The `nightly` tag moves to the commit of each build. The `nightly` release
 keeps only the files of the last build.
@@ -69,8 +71,8 @@ keeps only the files of the last build.
   It never restarts by itself, because a restart stops the runs in progress.
 - To install, choose **Restart to Install** in the app menu or the menu bar.
 - **Check for Updates…** checks now.
-- **Get Nightly Builds** moves the app to the nightly feed. Turn it off to go
-  back to the latest full release, even when that version is older.
+- **Get Nightly Builds** moves the app to the nightly feed. Turn it off to
+  go back to the latest full release, even when that version is older.
 - A local build (`bun run build:desktop`) follows the stable feed. A dev build
   (`bun run dev:desktop`) never updates.
 
@@ -83,9 +85,12 @@ example `~/Library/Application Support/dev.bettertstack.nightshift.desktop/stabl
 
 ## Sign the macOS app
 
-Without signing, macOS blocks the first open of a downloaded app. Open
-**System Settings > Privacy & Security**, then choose **Open Anyway**. Updates
-after that install without this step.
+Without signing, macOS blocks the first open of a downloaded app:
+
+1. Open **System Settings > Privacy & Security**.
+2. Choose **Open Anyway**.
+
+Later updates install without this step.
 
 To sign and notarize, add these repository secrets. The macOS builds of the
 Release and Nightly workflows then use them. Pull request builds are never
