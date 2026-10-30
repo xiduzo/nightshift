@@ -7,6 +7,7 @@ import {
 	deciders,
 	harnesses,
 	profiles,
+	programs,
 	settings,
 } from "./config";
 import { dashboard } from "./dashboard";
@@ -55,6 +56,7 @@ export const appRouter = {
 	settings,
 	connections,
 	cliTools,
+	programs,
 	harnesses,
 	deciders,
 	profiles,

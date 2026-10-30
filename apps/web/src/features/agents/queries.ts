@@ -100,6 +100,17 @@ export const cliToolMutations = {
 	signIn: orpc.cliTools.signIn.mutationOptions,
 };
 
+export const programQueries = {
+	/** Every query of the programs found on this computer. */
+	all: () => orpc.programs.key(),
+	/** The agent CLIs and the kits' tools on this computer that are not set up yet. */
+	found: () => orpc.programs.found.queryOptions(),
+};
+
+export const programMutations = {
+	setUp: orpc.programs.setUp.mutationOptions,
+};
+
 export const otherDeviceQueries = {
 	/** The owner's other Devices: their profiles and secret names, read-only here. */
 	list: () => orpc.devices.others.queryOptions(),

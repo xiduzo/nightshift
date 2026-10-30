@@ -38,6 +38,12 @@ export {
 	saveCustomAgent,
 	saveProfile,
 } from "./edits";
+export {
+	type FoundProgram,
+	foundPrograms,
+	type SetUpProgram,
+	setUpProgram,
+} from "./found-programs";
 export type { KeyStoreKind } from "./keychain";
 export { valueStore } from "./keychain";
 export type { ProfileStore, ProfileView } from "./profiles";

@@ -42,6 +42,7 @@ import { CliToolCheckBadge, CliToolDialog } from "./cli-tool";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { ConnectionDialog } from "./connections/connection-dialog";
 import { CustomAgentDialog } from "./custom-agent";
+import { FoundPrograms } from "./found-programs";
 import { HarnessPicker } from "./harness-detail";
 import { harnessInfo } from "./harnesses";
 import {
@@ -174,26 +175,29 @@ export function AgentsPage({
 							<Skeleton className="h-40 w-full" />
 						</div>
 					) : (
-						<Detail
-							selection={selection}
-							onSelect={select}
-							onGo={go}
-							onDirtyChange={setDirty}
-							onEditTool={(connection) =>
-								setEditing({ open: true, connection })
-							}
-							onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
-							onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
-							data={{
-								profiles: profiles.data ?? [],
-								harnesses: harnesses.data ?? [],
-								connections,
-								cliTools: cliTools.data ?? [],
-								secrets,
-								settings: settings.data,
-								otherDevices: otherDevices.data ?? [],
-							}}
-						/>
+						<>
+							<FoundPrograms onSetUp={go} />
+							<Detail
+								selection={selection}
+								onSelect={select}
+								onGo={go}
+								onDirtyChange={setDirty}
+								onEditTool={(connection) =>
+									setEditing({ open: true, connection })
+								}
+								onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
+								onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
+								data={{
+									profiles: profiles.data ?? [],
+									harnesses: harnesses.data ?? [],
+									connections,
+									cliTools: cliTools.data ?? [],
+									secrets,
+									settings: settings.data,
+									otherDevices: otherDevices.data ?? [],
+								}}
+							/>
+						</>
 					)}
 				</div>
 

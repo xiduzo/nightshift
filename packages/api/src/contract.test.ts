@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { membersOf } from "@nightshift/auth";
 import { createEngine, type Engine } from "@nightshift/engine";
@@ -542,7 +544,41 @@ describe("replies of a real engine", () => {
 		await read(appRouter.members.list);
 		await read(appRouter.account.status);
 		await read(appRouter.healthCheck);
+		await read(appRouter.programs.found);
 
+		expect(mismatches).toEqual([]);
+	});
+
+	test("a project added with the starters has them as its flows", async () => {
+		const repoPath = join(sandbox.root, "with-starters");
+		await mkdir(repoPath, { recursive: true });
+		for (const args of [
+			["init", "-q", "-b", "main"],
+			[
+				"-c",
+				"user.name=Test",
+				"-c",
+				"user.email=test@example.com",
+				"commit",
+				"-q",
+				"--allow-empty",
+				"-m",
+				"initial",
+			],
+		]) {
+			expect(Bun.spawnSync(["git", ...args], { cwd: repoPath }).exitCode).toBe(
+				0,
+			);
+		}
+		const project = (await reply(appRouter.projects.add, {
+			repoPath,
+			starters: true,
+		})) as { id: string };
+		const flows = (await read(appRouter.flows.list, {
+			projectId: project.id,
+		})) as { name: string }[];
+		expect(flows.map((flow) => flow.name)).toContain("implement-and-check");
+		expect(flows).toHaveLength(6);
 		expect(mismatches).toEqual([]);
 	});
 });

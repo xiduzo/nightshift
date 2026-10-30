@@ -35,6 +35,9 @@ export type CliTool = ApiOutputs["cliTools"]["list"][number];
 export type CheckTarget = ApiInputs["connections"]["check"]["target"];
 export type McpTestResult = ApiOutputs["connections"]["test"];
 
+/** An agent CLI or a kit's tool found on this computer, not set up yet. */
+export type FoundProgram = ApiOutputs["programs"]["found"][number];
+
 /** One of the owner's other Devices: its profiles and secret names, read-only. */
 export type OtherDevice = ApiOutputs["devices"]["others"][number];
 /** What a merge of this computer's Personal into its home Host's does. */

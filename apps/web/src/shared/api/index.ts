@@ -64,6 +64,7 @@ export type {
 	Connection,
 	ConnectionList,
 	Effort,
+	FoundProgram,
 	HarnessRow,
 	HarnessRowName,
 	McpServer,
