@@ -1,4 +1,4 @@
-import { stepTodos } from "@nightshift/client";
+import { changedFiles, stepTodos } from "@nightshift/client";
 import type { OutcomeColor } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -9,6 +9,7 @@ import { type ReactNode, useMemo } from "react";
 
 import type { RunStatus, StepSummary } from "@/shared/api";
 import type { TranscriptItem } from "../transcript/transcript-items";
+import { ChangedFiles } from "./changed-files";
 import { StepFacts, StepLine, StepOutputs, stepGist } from "./step-header";
 import { StepPlan } from "./step-plan";
 
@@ -19,8 +20,8 @@ export const CONSOLE_BAR_PX = 44;
  * The selected step along the bottom of the run page, like a browser's
  * devtools. Closed, it is one line: the step and what it did in a few words.
  * Open, it shows everything at once: the step's facts, summary and outputs
- * on the left, with the agent's to-do list, and its transcript (what the
- * agent ran and said) on the right.
+ * on the left, with the agent's to-do list and the files it changed, and
+ * its transcript (what the agent ran and said) on the right.
  */
 export function StepConsole({
 	step,
@@ -30,6 +31,7 @@ export function StepConsole({
 	summary,
 	transcript,
 	items,
+	projectRoot,
 	empty,
 	outcomeColor,
 	className,
@@ -42,8 +44,10 @@ export function StepConsole({
 	summary: ReactNode;
 	/** The live transcript. */
 	transcript: ReactNode;
-	/** The step's transcript items, for the agent's to-do list. */
+	/** The step's transcript items, for the agent's to-do list and the files it changed. */
 	items: readonly TranscriptItem[];
+	/** The project's folder of the run, to show changed files relative to it. */
+	projectRoot: string;
 	/** Shown in the bar while there is no step. */
 	empty: string;
 	/** The colour the step's node gives its outcome. */
@@ -52,9 +56,14 @@ export function StepConsole({
 }) {
 	const gist = step ? stepGist(step) : undefined;
 	const outputCount = step ? Object.keys(step.outputs).length : 0;
-	const todos = useMemo(
-		() => stepTodos(items.filter((item) => item.kind === "tool")),
+	const calls = useMemo(
+		() => items.filter((item) => item.kind === "tool"),
 		[items],
+	);
+	const todos = useMemo(() => stepTodos(calls), [calls]);
+	const files = useMemo(
+		() => changedFiles(calls, projectRoot),
+		[calls, projectRoot],
 	);
 
 	return (
@@ -116,6 +125,23 @@ export function StepConsole({
 								<StepPlan todos={todos} running={step.outcome === null} />
 							) : null}
 							{summary}
+							{files.length > 0 ? (
+								<ChangedFiles
+									files={files}
+									title={
+										<SectionTitle
+											id="step-files-heading"
+											aside={
+												<Badge variant="secondary" className="tabular-nums">
+													{files.length}
+												</Badge>
+											}
+										>
+											Changed files
+										</SectionTitle>
+									}
+								/>
+							) : null}
 							<section
 								aria-labelledby="step-outputs-heading"
 								className="flex flex-col gap-2"

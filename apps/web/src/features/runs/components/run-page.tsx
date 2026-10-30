@@ -465,6 +465,7 @@ export function RunPage({ runId }: { runId: string }) {
 							.items
 					: emptyTranscript.items
 			}
+			projectRoot={runData.worktreePath}
 			transcript={
 				selectedStep ? (
 					<StepTranscript

@@ -2,6 +2,13 @@
 
 export { type RunActions, runActions, whyNot } from "./actions";
 export {
+	type ChangedFile,
+	changedFiles,
+	type FileChange,
+	type FileTreeNode,
+	fileTree,
+} from "./changed-files";
+export {
 	agoLabel,
 	costLabel,
 	flowLabel,
