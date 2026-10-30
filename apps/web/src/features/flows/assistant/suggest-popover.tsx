@@ -242,6 +242,7 @@ function SuggestBody({
 					{state.status !== "running" ? (
 						<Suggestions
 							items={picks}
+							wrap
 							onPick={(pick) => {
 								setInstruction(pick);
 								send(pick);
