@@ -13,8 +13,7 @@ Thank you for your interest. Night Shift is pre-alpha and built for its author f
 ```bash
 bun install
 bun lefthook install   # git hooks: format, lint, the layer and vertical checks on commit
-bun run db:push        # the dev database in .nightshift-dev/
-bun run dev            # web UI and API with hot reload
+bun run dev            # web UI and API with hot reload, no .env needed
 bun run dev:mobile     # the phone app, in Expo
 bun run dev:desktop    # the desktop app
 ```
