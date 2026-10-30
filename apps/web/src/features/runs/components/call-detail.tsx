@@ -129,7 +129,7 @@ export function CallDetail({
 						{returned.length === 0 ? (
 							<p className="text-muted-foreground text-xs italic">
 								{step.outcome === null
-									? "Not yet. The flow is still running."
+									? "The outputs show when the flow ends."
 									: "No outputs."}
 							</p>
 						) : (

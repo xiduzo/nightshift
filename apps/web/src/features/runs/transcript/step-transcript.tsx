@@ -242,7 +242,7 @@ export function StepTranscript({
 								variant="ghost"
 								size="xs"
 								disabled={transcript.items.length === 0 && !step.error}
-								title="Copy the whole transcript as Markdown, to share it"
+								title="Copy the whole transcript as Markdown"
 								onClick={() => void copy(transcript.items)}
 							>
 								<CopyIcon data-icon="inline-start" />

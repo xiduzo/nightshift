@@ -353,7 +353,7 @@ export function RunPage({
 						variant="ghost"
 						size="xs"
 						className="ml-auto"
-						title="Follow the latest step as the run goes on"
+						title="Follow the latest step"
 						aria-label="Follow latest"
 						onClick={() => setPickedStepId(null)}
 					>

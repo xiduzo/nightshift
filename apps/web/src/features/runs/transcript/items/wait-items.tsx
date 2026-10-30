@@ -52,7 +52,7 @@ export function WaitCard({ item }: { item: WaitItem }) {
 	const next =
 		item.reason === "signal" ? (
 			<>
-				Goes on when the signal{" "}
+				Continues when the signal{" "}
 				<span className="font-mono text-foreground">{item.signal}</span> arrives
 				{at ? <>, or times out at {at}</> : null}.
 			</>
@@ -60,13 +60,13 @@ export function WaitCard({ item }: { item: WaitItem }) {
 			<>Tries the command again{at ? <> at {at}</> : null}.</>
 		) : item.reason === "device-offline" ? (
 			<>
-				Starts when the device is back, and looks again
+				Checks for the device again
 				{at ? <> at {at}</> : null}.
 			</>
 		) : isNodeWait(item.reason) ? (
-			<>Goes on{at ? <> at {at}</> : null}.</>
+			<>Continues{at ? <> at {at}</> : null}.</>
 		) : (
-			<>Continues where it left off{at ? <> at {at}</> : null}.</>
+			<>Continues where it stopped{at ? <> at {at}</> : null}.</>
 		);
 	return (
 		<Alert
@@ -101,7 +101,7 @@ export function WakeMarker({ item }: { item: WakeItem }) {
 						Signal <span className="font-mono">{item.signal}</span> received
 					</>
 				) : (
-					"Woke up"
+					"Woke"
 				)}{" "}
 				· {formatTime(item.at)}
 			</MarkerContent>

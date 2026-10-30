@@ -250,9 +250,9 @@ export function RunActions({
 					<span className="hidden sm:inline">Export</span>
 				</TooltipTrigger>
 				<TooltipContent className="max-w-sm">
-					Downloads the run as one file, with its flow, steps and transcripts.
-					Saved secrets are removed, but a transcript shows everything the
-					agents read or printed. Check it before you share it.
+					Download the run as one file, with its flow, steps and transcripts.
+					The file has no saved secrets. But a transcript shows all that the
+					agents read or wrote. Check it before you share it.
 				</TooltipContent>
 			</Tooltip>
 			<MoveMenu run={run} status={status} />

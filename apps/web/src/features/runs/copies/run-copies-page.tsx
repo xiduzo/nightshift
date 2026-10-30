@@ -40,7 +40,7 @@ export function ProjectRunCopiesPage({ projectId }: { projectId: string }) {
 					<PageHeading
 						id="branches-heading"
 						title="Branches"
-						description="Each run works in its own copy of the project, on its own branch. See what is left on this computer, and remove what you no longer need."
+						description="Each run works in its own copy of the project. Remove the copies and branches you no longer need."
 					/>
 					<RunCopies projectId={project.id} />
 				</section>
@@ -78,8 +78,7 @@ function RunCopies({ projectId }: { projectId: string }) {
 							</EmptyMedia>
 							<EmptyTitle>Nothing left on this computer</EmptyTitle>
 							<EmptyDescription>
-								When a run of this project ends, its copy and branches show up
-								here until they are removed.
+								When a run ends, its copy and branches show here.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
@@ -153,7 +152,7 @@ function RunCell({ copy }: { copy: RunCopy }) {
 			</div>
 			<p className="text-muted-foreground text-xs">
 				{copy.active ? (
-					"Still going. Night Shift leaves it alone until it ends."
+					"The run is not done. Night Shift keeps its copy until it ends."
 				) : (
 					<>
 						{copy.endedAt ? "Ended " : "Started "}

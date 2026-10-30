@@ -130,8 +130,8 @@ export function RunCopyMenu({
 							<AlertTitle>Changes that are not committed are lost</AlertTitle>
 							<AlertDescription>
 								{copy.changes === null
-									? "Night Shift cannot tell if the copy has changes. Removing it deletes any changes for good."
-									: `${changes === 1 ? "1 file has" : `${changes} files have`} changes that are not committed. Removing the copy deletes them for good.`}
+									? "Night Shift cannot see if the copy has changes. If you remove it, you lose them for good."
+									: `${changes === 1 ? "1 file has" : `${changes} files have`} changes that are not committed. If you remove the copy, you lose them for good.`}
 							</AlertDescription>
 						</Alert>
 					) : null}

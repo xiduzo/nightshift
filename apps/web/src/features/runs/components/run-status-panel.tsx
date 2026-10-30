@@ -251,10 +251,10 @@ function noticeOf({
 							Waiting for signal <span className="font-mono">{signal}</span>
 						</>
 					),
-					gist: `Send ${signal} to go on.`,
+					gist: `Send ${signal} to continue.`,
 					body: (
 						<>
-							The flow goes on when the run gets the signal{" "}
+							The flow continues when the run gets the signal{" "}
 							<span className="font-mono text-foreground">{signal}</span>
 							{at ? <>, or times out at {at}</> : null}. Send it here, or from
 							another system through the API.
@@ -275,10 +275,10 @@ function noticeOf({
 						{wait?.reason === "command"
 							? "It tries the command again"
 							: wait?.reason === "device-offline"
-								? "It starts when the device is back, and looks again"
+								? "It checks for the device again"
 								: nodeWait
-									? "It goes on"
-									: "It continues where it left off"}
+									? "It continues"
+									: "It continues where it stopped"}
 						{at ? <> at {at}</> : null}.
 						{wait?.message ? `\n${wait.message}` : null}
 					</>
@@ -322,10 +322,8 @@ function noticeOf({
 				icon: CircleAlertIcon,
 				tone: "text-status-interrupted",
 				title: "The run was interrupted",
-				gist:
-					firstLine(run.reason) ??
-					"Night Shift stopped while this run was going.",
-				body: `${run.reason ?? "Night Shift stopped while this run was going."} ${elsewhere ? resumeHere : "Resume it to continue where it left off."}`,
+				gist: firstLine(run.reason) ?? "Night Shift stopped during this run.",
+				body: `${run.reason ?? "Night Shift stopped during this run."} ${elsewhere ? resumeHere : "Resume it to continue where it stopped."}`,
 				resumable: allows.resume,
 			};
 		case "stopped":
@@ -336,7 +334,7 @@ function noticeOf({
 				gist: firstLine(run.reason) ?? resumeHere,
 				body:
 					run.reason ??
-					`The run stopped before its end. ${elsewhere ? resumeHere : "Resume it to continue where it left off."}`,
+					`The run stopped before its end. ${elsewhere ? resumeHere : "Resume it to continue where it stopped."}`,
 				resumable: allows.resume,
 			};
 		default:
@@ -377,7 +375,7 @@ function SignalButton({ runId, name }: { runId: string; name: string }) {
 	const send = useMutation(
 		runMutations.signal({
 			onSuccess: () => {
-				toast.success(`Sent ${name}. The flow goes on.`);
+				toast.success(`Sent ${name}. The flow continues.`);
 				runActed(runId);
 			},
 			onError: (error) => toast.error(`Could not send: ${error.message}`),

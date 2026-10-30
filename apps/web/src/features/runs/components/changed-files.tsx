@@ -397,8 +397,8 @@ function ChangeView({
 		case "unknown":
 			return (
 				<p className="text-muted-foreground text-sm">
-					The agent changed this file but does not say how. The transcript shows
-					what it did.
+					The changes to this file do not show here. The transcript shows what
+					the agent did.
 				</p>
 			);
 	}

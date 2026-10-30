@@ -47,15 +47,15 @@ export function ResumeComposer({
 
 	const where = lastStep?.scope
 		? lastStep.scope.itemId === null
-			? `Resuming continues at ${lastStep.nodeId}, inside the called flow.`
-			: `Resuming continues at ${lastStep.nodeId}, inside the called flow, with the same item.`
+			? `The run continues at ${lastStep.nodeId}, inside the called flow.`
+			: `The run continues at ${lastStep.nodeId}, inside the called flow, with the same item.`
 		: lastStep
 			? lastStep.nodeType === "agent"
-				? `Resuming continues at ${lastStep.nodeId}: the agent picks up where it left off.`
+				? `The agent at ${lastStep.nodeId} continues where it stopped.`
 				: lastStep.gate !== null
-					? `Resuming opens the gate ${lastStep.nodeId} again and waits for your answer.`
-					: `Resuming runs ${lastStep.nodeId} again.`
-			: "Resuming continues the run where it left off.";
+					? `The gate ${lastStep.nodeId} opens again and waits for your answer.`
+					: `${lastStep.nodeId} runs again.`
+			: "The run continues where it stopped.";
 
 	return (
 		<form
