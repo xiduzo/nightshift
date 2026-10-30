@@ -1,12 +1,10 @@
 /**
- * PROTOTYPE, throw away. Three takes on "Needs you first", to set beside C.
+ * PROTOTYPE, throw away. Two more takes on "Needs you first", to set beside C.
  *
  * - C2 "One feed": all that needs you in one list, newest first, with tabs
  *   to narrow it. Gates stay pinned on top.
  * - C3 "By cause": answer a Gate right there, and failures grouped by why
  *   they failed, so one cause that hits five projects reads as one problem.
- * - C4 "Three lanes": the numbers as a strip on top, then three columns:
- *   waiting, failed, running.
  */
 
 import {
@@ -41,13 +39,10 @@ import { CircleXIcon, HourglassIcon, LoaderCircleIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatRelative, useNow } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
-import { RangeBar } from "../range-bar";
-import { LastRunsStrip } from "./home-parts";
 import type { NeedsYouFailure, NeedsYouRunning } from "./needs-you-data";
 import {
 	FailureItem,
 	GateItem,
-	MetricList,
 	type NeedsYouProps,
 	NumbersRail,
 	ProjectsCard,
@@ -317,93 +312,6 @@ export function VariantByCause(props: NeedsYouProps) {
 					</CardContent>
 				</Card>
 			</WithRail>
-			{details.dialog}
-		</>
-	);
-}
-
-// ----------------------------------------------------------- C4 lanes
-
-export function VariantLanes(props: NeedsYouProps) {
-	const { data, range, onRangeChange } = props;
-	const now = useNow();
-	const details = useMetricDetails(data, range);
-
-	const lane = (
-		icon: ReactNode,
-		title: string,
-		count: number,
-		body: ReactNode,
-	) => (
-		<Card size="sm" className="min-w-0">
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2">
-					{icon}
-					{title}
-					<Badge variant="secondary">{count}</Badge>
-				</CardTitle>
-			</CardHeader>
-			<CardContent className="max-h-[28rem] overflow-y-auto">
-				{body}
-			</CardContent>
-		</Card>
-	);
-
-	return (
-		<>
-			<PageHeading title="Tonight" description={heading(props)} />
-			<RangeBar value={range} onValueChange={onRangeChange} />
-			<MetricList data={data} onDetails={details.open} layout="strip" />
-			<div className="grid items-start gap-4 lg:grid-cols-3">
-				{lane(
-					<HourglassIcon className="size-4 text-status-waiting" />,
-					"Waiting for you",
-					data.gates.length,
-					<ItemGroup className="gap-2">
-						{data.gates.map((gate) => (
-							<GateItem key={gate.key} gate={gate} sample={data.sample} />
-						))}
-					</ItemGroup>,
-				)}
-				{lane(
-					<CircleXIcon className="size-4 text-status-failed" />,
-					"Failed",
-					data.failed.count,
-					<ItemGroup className="gap-0">
-						{data.failed.rows.slice(0, 12).map((run) => (
-							<FailureItem
-								key={run.id}
-								run={run}
-								sample={data.sample}
-								showProject
-							/>
-						))}
-					</ItemGroup>,
-				)}
-				{lane(
-					<LoaderCircleIcon className="size-4 text-status-running" />,
-					"Running now",
-					data.runningCount,
-					data.runningCount === 0 ? (
-						<p className="text-muted-foreground text-sm">Nothing runs now.</p>
-					) : (
-						<RunningList runs={data.running} count={data.runningCount} />
-					),
-				)}
-			</div>
-			<Card size="sm">
-				<CardHeader>
-					<CardTitle>Projects</CardTitle>
-				</CardHeader>
-				<CardContent className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
-					{data.projects.map((project) => (
-						<div key={project.id} className="flex flex-col gap-1">
-							<span className="font-medium text-sm">{project.name}</span>
-							<LastRunsStrip runs={project.lastRuns.slice(0, 8)} now={now} />
-						</div>
-					))}
-				</CardContent>
-			</Card>
 			{details.dialog}
 		</>
 	);

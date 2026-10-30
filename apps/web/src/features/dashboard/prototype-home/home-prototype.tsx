@@ -13,12 +13,9 @@ import { useHomeData } from "./home-data";
 import { needsYouFromHome, sampleNeedsYou } from "./needs-you-data";
 import { VariantByProject } from "./variant-by-project";
 import { VariantConsole } from "./variant-console";
+import { VariantLanes } from "./variant-lanes";
 import { VariantNeedsYou } from "./variant-needs-you";
-import {
-	VariantByCause,
-	VariantFeed,
-	VariantLanes,
-} from "./variant-needs-you-more";
+import { VariantByCause, VariantFeed } from "./variant-needs-you-more";
 import { VariantSideBySide } from "./variant-side-by-side";
 
 export const HOME_VARIANTS = [

@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { Line, LineChart, YAxis } from "recharts";
 import { useOpenGates } from "@/features/gates";
 import { projectQueries } from "@/features/projects";
+import { runQueries } from "@/features/runs";
 import type { NightRange, NightsRange, Project } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { type Metric, type MetricRow, metricsOf } from "../metrics";
@@ -32,6 +33,8 @@ export function useHomeData(range: NightRange) {
 	const summary = useQuery(dashboardQueries.summary());
 	const projects = useQuery(projectQueries.list());
 	const gates = useOpenGates();
+	// What is on its way now: at work, waiting at a Gate, or asleep.
+	const openRuns = useQuery(runQueries.open());
 	const perProject = useQueries({
 		queries: (projects.data ?? []).map((project) =>
 			dashboardQueries.summary({ projectId: project.id }),
@@ -45,6 +48,7 @@ export function useHomeData(range: NightRange) {
 		metrics: nights ? metricsOf(nights) : undefined,
 		projects: projects.data,
 		gates: gates.data ?? [],
+		openRuns: openRuns.data ?? [],
 		perProject: (projects.data ?? []).map((project, index): ProjectNumbers => {
 			const data = perProject[index]?.data;
 			const projectNights = data ? nightsOf(data, range) : undefined;

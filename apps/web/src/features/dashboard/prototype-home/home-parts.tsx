@@ -40,10 +40,13 @@ export function LastRunsStrip({
 	runs,
 	now,
 	oneLine = false,
+	linked = true,
 }: {
 	runs: LastRun[];
 	now: number;
 	oneLine?: boolean;
+	/** False inside a row that links somewhere itself: the icons only show. */
+	linked?: boolean;
 }) {
 	const [last] = runs;
 	if (!last) {
@@ -56,14 +59,8 @@ export function LastRunsStrip({
 			}
 		>
 			<div className="flex items-center gap-0.5">
-				{runs.map((run) => (
-					<Link
-						key={run.runId}
-						to="/runs/$runId"
-						params={{ runId: run.runId }}
-						onClick={(event) => event.stopPropagation()}
-						className="rounded-sm p-0.5 hover:bg-muted"
-					>
+				{runs.map((run) => {
+					const icon = (
 						<RunStatusIcon
 							status={run.status}
 							context={{
@@ -71,8 +68,23 @@ export function LastRunsStrip({
 								after: formatRelative(run.startedAt, now),
 							}}
 						/>
-					</Link>
-				))}
+					);
+					return linked ? (
+						<Link
+							key={run.runId}
+							to="/runs/$runId"
+							params={{ runId: run.runId }}
+							onClick={(event) => event.stopPropagation()}
+							className="rounded-sm p-0.5 hover:bg-muted"
+						>
+							{icon}
+						</Link>
+					) : (
+						<span key={run.runId} className="p-0.5">
+							{icon}
+						</span>
+					);
+				})}
 			</div>
 			<time
 				dateTime={new Date(last.startedAt).toISOString()}

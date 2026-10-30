@@ -17,6 +17,8 @@ export type NeedsYouGate = {
 	projectId: string;
 	projectName: string;
 	runId: string;
+	/** The inbox opens on it with `?gate=`. */
+	stepId: string;
 	runTitle: string;
 	flowName: string | null;
 	openedAt: number;
@@ -37,7 +39,10 @@ export type NeedsYouRunning = {
 	title: string;
 	project: string;
 	startedAt: number;
-	step: string;
+	/** What it does now, when known. */
+	step: string | null;
+	/** Asleep until this time: a usage limit or the network. */
+	wakeAt: number | null;
 };
 
 export type NeedsYouProject = {
@@ -73,6 +78,7 @@ export function needsYouFromHome(
 			projectId: gate.projectId,
 			projectName: gate.projectName,
 			runId: gate.runId,
+			stepId: gate.stepId,
 			runTitle: gate.runTitle,
 			flowName: gate.flowName,
 			openedAt: gate.openedAt,
@@ -89,8 +95,21 @@ export function needsYouFromHome(
 				createdAt: run.createdAt,
 			})),
 		},
-		running: [],
-		runningCount: data.summary?.cards.running ?? 0,
+		running: data.openRuns
+			.filter((run) => run.status === "running" || run.status === "sleeping")
+			.map((run) => ({
+				id: run.id,
+				title: run.title,
+				project:
+					data.projects?.find((project) => project.id === run.projectId)
+						?.name ?? "",
+				startedAt: run.createdAt,
+				step: null,
+				wakeAt: run.status === "sleeping" ? run.wakeAt : null,
+			})),
+		runningCount: data.openRuns.filter(
+			(run) => run.status === "running" || run.status === "sleeping",
+		).length,
 		metrics: data.metrics,
 		projects: data.perProject.map((row) => ({
 			id: row.project.id,
@@ -245,6 +264,7 @@ export function sampleNeedsYou(range: NightRange): NeedsYouData {
 			projectId: `sample-${project}`,
 			projectName: project,
 			runId: `sample-gate-run-${index}`,
+			stepId: `sample-gate-step-${index}`,
 			runTitle: flow,
 			flowName: flow,
 			openedAt: now - (index * 2.5 + 0.3) * HOUR,
@@ -259,6 +279,7 @@ export function sampleNeedsYou(range: NightRange): NeedsYouData {
 		project: pick(PROJECTS),
 		startedAt: now - (index * 25 + 6) * 60_000,
 		step: STEPS[index] ?? "Write the fix",
+		wakeAt: index === 2 ? now + 47 * 60_000 : null,
 	}));
 
 	const statuses: RunStatus[] = [
