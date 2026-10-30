@@ -67,15 +67,17 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 				choice: answer.choice,
 				note,
 			});
-			await scoreGate(ctx, step.stepId, answer);
 			if (answer.choice !== ASK_ANSWER) {
 				const end = await step.end(
 					"fail",
 					{ ...askOutputs(pending), outcome: "fail", note },
 					null,
 				);
+				// After the end, so the StepEnded carries the answering Command.
+				await scoreGate(ctx, step.stepId, answer);
 				return route(ctx, state, node, end, config);
 			}
+			await scoreGate(ctx, step.stepId, answer);
 			step.leaveOpen();
 			const asked: PendingGate = {
 				...pending,

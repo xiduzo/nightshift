@@ -310,13 +310,13 @@ async function resolve(
 		note,
 		...(answer.byDeadline ? { byDeadline: true as const } : {}),
 	});
+	const end = await step.end(
+		choice,
+		decisionOutputs(choice, note, step.visit),
+		null,
+	);
+	// After the end: an answer's first event is its StepEnded, which carries
+	// the Command that answered (`stampedAppend`).
 	await scoreGate(ctx, step.stepId, answer);
-	return {
-		kind: "ended",
-		end: await step.end(
-			choice,
-			decisionOutputs(choice, note, step.visit),
-			null,
-		),
-	};
+	return { kind: "ended", end };
 }
