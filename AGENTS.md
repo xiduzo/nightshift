@@ -108,6 +108,24 @@ Use the `ux-copy` and `ste-writing` skills.
   The result is plain and friendly, not robot text.
   `docs/steering/DESIGN.md` ("Copy") has the checklist and examples.
 
+# Docs: the same voice, for the reader who builds or runs it
+
+The README, CONTRIBUTING, SECURITY, `docs/` and the GitHub templates follow
+the same rules as the UI copy, in STE-flavored mode (`ste-writing` skill).
+
+- **Write plainly.** One idea per sentence, max 25 words. Active voice,
+  simple present. No semicolons, no contractions, no phrasal verbs, no
+  filler ("Note that", "In order to", "basically").
+- **Procedures are numbered steps.** One action per step, imperative. A
+  condition comes before its command.
+- **Internals may stay.** Docs for developers and operators name the daemon,
+  worktrees, paths and env vars. Commands and code blocks stay exact.
+- **Shorter, never weaker.** A steering doc rule keeps its meaning and its
+  section number. Use the glossary words and the copy conventions
+  ("continues", "the Secrets page").
+- **Records stay as written.** `docs/research/` and `docs/adr/` record past
+  decisions. Do not rewrite them.
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know
