@@ -54,5 +54,10 @@ describe("nightshift mcp", () => {
 			"Night Shift is not running on this computer. Start it, then try again.",
 		);
 		expect(port.runLink("r1")).toBe(`${url}/runs/r1`);
+		// A Gate opens at its step.
+		expect(port.runLink("r1", "s 1")).toBe(`${url}/runs/r1?step=s%201`);
+		await expect(port.gates()).rejects.toThrow(
+			"Night Shift is not running on this computer. Start it, then try again.",
+		);
 	});
 });

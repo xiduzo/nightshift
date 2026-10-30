@@ -15,8 +15,10 @@ import { defaultDaemonUrl } from "./join";
 /**
  * `nightshift mcp [--project <id, name or folder>]`: an MCP server on
  * stdio for an agent in a terminal (Claude Code, Codex, …), with the
- * authoring tools of the chat in the flow editor: draw, check and save a
- * flow, start a run, read a run. Add it to Claude Code with
+ * authoring tools of the chat in the flow editor (draw, check and save a
+ * flow, start a run) and the run side of a night: list, read and stop
+ * runs, the Gates that wait and their answers, and the digest. Add it to
+ * Claude Code with
  * `claude mcp add nightshift -- nightshift mcp`.
  *
  * It talks to Night Shift that runs on this computer, over its API, as
@@ -34,7 +36,7 @@ const NOT_RUNNING =
 	"Night Shift is not running on this computer. Start it, then try again.";
 
 const INSTRUCTIONS =
-	"Night Shift's flow tools. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. To change a flow, start from get_flow and keep the positions and Sections of what you do not change. Group a flow of more than about six nodes into Sections, one per phase. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. The tools work in the project of the folder you work in, or the one you name in `project` (list_projects).";
+	"Night Shift's tools: build flows, and drive the runs of a night. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. To change a flow, start from get_flow and keep the positions and Sections of what you do not change. Group a flow of more than about six nodes into Sections, one per phase. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. Follow runs with list_runs and get_run, and stop one with stop_run. A Gate waits for a person: needs_me lists the Gates that wait, with their questions and options. Answer one with answer_gate only with the option the person chose. get_digest says what happened since a time. The tools work in the project of the folder you work in, or the one you name in `project` (list_projects).";
 
 export type McpOptions = {
 	daemon: string;
@@ -198,26 +200,30 @@ export function apiPort(
 				const run = await client.runs.start({ projectId, flowName, inputs });
 				return { id: run.id, status: run.status };
 			}),
-		runs: (projectId, limit) =>
+		runs: (projectId, { limit, statuses }) =>
 			g(async () =>
-				(await client.runs.list({ projectId, limit })).map((run) => ({
+				(await client.runs.list({ projectId, limit, statuses })).map((run) => ({
 					id: run.id,
 					flowName: run.flowName,
 					title: run.title,
 					status: run.status,
 					reason: run.reason,
 					createdAt: run.createdAt,
+					endedAt: run.endedAt,
+					cost: costOf(run),
+					prUrl: run.metrics?.prUrl ?? null,
 				})),
 			),
 		run: (projectId, runId) =>
 			g(async () => {
-				let flowName: string | null = null;
+				const seen: {
+					detail?: Awaited<ReturnType<AppRouterClient["runs"]["get"]>>;
+				} = {};
 				const space: ChatSpace = {
 					flows: { map: (id) => client.flows.map({ projectId: id }) },
 					getRun: async (id) => {
-						const detail = await client.runs.get({ runId: id });
-						flowName = detail.flowName;
-						return detail;
+						seen.detail = await client.runs.get({ runId: id });
+						return seen.detail;
 					},
 					watchRun: (id, watch) =>
 						streamOf(() =>
@@ -227,11 +233,45 @@ export function apiPort(
 				const run = await chatRun(space, projectId, runId, {
 					signal: AbortSignal.timeout(15_000),
 				});
-				return run ? { run, flowName } : null;
+				const { detail } = seen;
+				if (!run || !detail) return null;
+				return {
+					run,
+					flowName: detail.flowName,
+					cost: costOf(detail),
+					prUrl: detail.metrics?.prUrl ?? null,
+				};
 			}),
-		runLink: (runId) => `${options.ui}/runs/${encodeURIComponent(runId)}`,
+		stopRun: (runId, when) => g(() => client.runs.stop({ runId, when })),
+		gates: () => g(() => client.gates.list()),
+		answerGate: (answer) => g(() => client.gates.resolve(answer)),
+		digest: (since) =>
+			g(() =>
+				client.notifications.digest.since(
+					since === undefined ? undefined : { since },
+				),
+			),
+		runLink: (runId, stepId) =>
+			`${options.ui}/runs/${encodeURIComponent(runId)}${stepId ? `?step=${encodeURIComponent(stepId)}` : ""}`,
 		flowLink: (projectId, name) =>
 			`${options.ui}/projects/${encodeURIComponent(projectId)}/flows/${encodeURIComponent(name)}`,
+	};
+}
+
+/** A run's cost fields, as the run tools read them. */
+function costOf(run: {
+	costUsd: number;
+	costEstimated: boolean;
+	costMissing: number;
+	costCalls: number;
+	metrics?: { costBasis: "billed" | "estimated" | "unknown" };
+}) {
+	return {
+		usd: run.costUsd,
+		estimated: run.costEstimated,
+		missing: run.costMissing,
+		calls: run.costCalls,
+		basis: run.metrics?.costBasis ?? null,
 	};
 }
 
@@ -246,7 +286,7 @@ export async function mcpCommand(argv: string[], program: string) {
 	const options = mcpOptions(argv, process.env, process.cwd());
 	if (!options) {
 		console.error(
-			`Usage: ${program} [--project <id, name or folder>] [--daemon <address>] [--ui <address>]\nServes Night Shift's flow tools to an agent in a terminal, over MCP on stdio.\nAdd it to Claude Code: claude mcp add nightshift -- ${program}`,
+			`Usage: ${program} [--project <id, name or folder>] [--daemon <address>] [--ui <address>]\nServes Night Shift's flow and run tools to an agent in a terminal, over MCP on stdio.\nAdd it to Claude Code: claude mcp add nightshift -- ${program}`,
 		);
 		process.exit(2);
 	}

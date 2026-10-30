@@ -3,8 +3,10 @@
  * same reads and checks as the chat in the editor, with the same names.
  * In a terminal nobody watches a proposal and no editor holds a draft, so
  * instead of `get_draft` and `propose_flow` the agent saves a checked flow
- * (`save_flow`) and starts a run (`start_run`). The tools read and write
- * through a `TerminalPort`: Night Shift on this computer, over its API.
+ * (`save_flow`) and starts a run (`start_run`). The run tools
+ * (`terminal-runs.ts`) follow, stop and report on runs and answer Gates.
+ * The tools read and write through a `TerminalPort`: Night Shift on this
+ * computer, over its API.
  *
  * Every tool but `list_projects` works in one project: the `project`
  * argument (an id, a name or a folder), else the one the server started
@@ -27,11 +29,11 @@ import {
 	projectOfFolder,
 	type TerminalProject,
 } from "./terminal-project";
+import { type TerminalRunPort, terminalRunTools } from "./terminal-runs";
 import {
 	AUTHORING_TOOLS,
 	type AuthoringCliTool,
 	type AuthoringProfile,
-	type AuthoringRun,
 	type AuthoringSkill,
 	type AuthoringToolInfo,
 	errorsOf,
@@ -39,22 +41,10 @@ import {
 	flowRows,
 	issueLines,
 	profileRefs,
-	runReport,
 } from "./tools";
 
-/** A run in the list of `list_runs`. */
-export type TerminalRunSummary = {
-	id: string;
-	flowName: string | null;
-	title: string;
-	status: string;
-	reason: string | null;
-	/** Epoch ms. */
-	createdAt: number;
-};
-
 /** What the terminal tools read and write: Night Shift on this computer. */
-export type TerminalPort = {
+export type TerminalPort = TerminalRunPort & {
 	projects(): Promise<TerminalProject[]>;
 	flows(projectId: string): Promise<ProjectFlowMap>;
 	/** The profiles a node of the project may name, each on its Device. */
@@ -71,15 +61,6 @@ export type TerminalPort = {
 		flowName: string,
 		inputs: Record<string, JsonValue>,
 	): Promise<{ id: string; status: string }>;
-	/** The newest runs of the project first. */
-	runs(projectId: string, limit: number): Promise<TerminalRunSummary[]>;
-	/** One run of the project, or null when it has no run of that id. */
-	run(
-		projectId: string,
-		runId: string,
-	): Promise<{ run: AuthoringRun; flowName: string | null } | null>;
-	/** Where a person opens the run in Night Shift. */
-	runLink(runId: string): string;
 	/** Where a person opens the flow in Night Shift. */
 	flowLink(projectId: string, name: string): string;
 };
@@ -89,6 +70,8 @@ export type TerminalToolOptions = {
 	project?: string | null;
 	/** The folder the agent works in: the project whose Clone holds it is the default. */
 	folder?: string | null;
+	/** The clock a `since` counts back from. */
+	now?: () => number;
 };
 
 /** The names of the tools only the terminal has. */
@@ -96,11 +79,7 @@ export const TERMINAL_TOOLS = {
 	listProjects: "list_projects",
 	saveFlow: "save_flow",
 	startRun: "start_run",
-	listRuns: "list_runs",
 } as const;
-
-const RUNS_DEFAULT = 10;
-const RUNS_MAX = 50;
 
 const projectProperty = {
 	type: "string",
@@ -376,69 +355,6 @@ export function terminalTools(
 			const run = await port.startRun(project.id, flow, inputs);
 			return `Started run ${run.id} of "${flow}" (${run.status}). Follow it at ${port.runLink(run.id)}`;
 		}),
-		toolDefinition({
-			name: TERMINAL_TOOLS.listRuns,
-			description:
-				"The newest runs of the project: id, flow, title, status and why it ended.",
-			inputSchema: {
-				type: "object",
-				properties: {
-					project: projectProperty,
-					limit: {
-						type: "number",
-						description: `At most this many runs. Default ${RUNS_DEFAULT}, at most ${RUNS_MAX}.`,
-					},
-				},
-			},
-		}).server(async (args: unknown) => {
-			const limit = field(args, "limit");
-			const count =
-				typeof limit === "number" && Number.isInteger(limit) && limit > 0
-					? Math.min(limit, RUNS_MAX)
-					: RUNS_DEFAULT;
-			const project = await projectOf(args);
-			const runs = await port.runs(project.id, count);
-			return runs.length > 0
-				? JSON.stringify(
-						runs.map((run) => ({
-							...run,
-							createdAt: new Date(run.createdAt).toISOString(),
-						})),
-						null,
-						2,
-					)
-				: `The project "${project.name}" has no runs yet.`;
-		}),
-		toolDefinition({
-			name: AUTHORING_TOOLS.getRun,
-			description:
-				"One run of the project: its status, why it ended, its steps with their outcomes and notes, and the end of the failed step's transcript.",
-			inputSchema: {
-				type: "object",
-				properties: {
-					project: projectProperty,
-					run: {
-						type: "string",
-						description: "The run's id, from list_runs.",
-					},
-				},
-				required: ["run"],
-			},
-		}).server(async (args: unknown) => {
-			const runId = field(args, "run");
-			if (typeof runId !== "string" || runId.trim() === "") {
-				throw new Error("Give the run's id in `run`.");
-			}
-			const project = await projectOf(args);
-			const found = await port.run(project.id, runId.trim());
-			if (!found) {
-				return `The project "${project.name}" has no run ${runId}. Call ${TERMINAL_TOOLS.listRuns} for the ids.`;
-			}
-			const flows = found.flowName ? await port.flows(project.id) : {};
-			const now = found.flowName ? flows[found.flowName] : null;
-			return now
-				? runReport(found.run, now, `The saved flow "${found.flowName}"`)
-				: runReport(found.run, found.run.flow, "The run's own flow");
-		}),
+		...terminalRunTools(port, projectOf, options.now),
 	];
 }

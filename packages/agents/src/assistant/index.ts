@@ -16,7 +16,6 @@ export type { ChatExchange } from "./prompts";
 export { type SuggestFieldInput, suggestField } from "./suggest";
 export {
 	type TerminalPort,
-	type TerminalRunSummary,
 	terminalTools,
 } from "./terminal";
 export { chooseProject, type TerminalProject } from "./terminal-project";
