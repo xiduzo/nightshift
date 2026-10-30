@@ -4,10 +4,11 @@
  * the assistant `error` field and the result's `is_error`. This profile
  * reads them from the raw stream-json messages, and adds up the usage so
  * far over the model calls. It also names the report and artifact tools as
- * Claude Code sees them, for `--allowedTools`.
+ * Claude Code sees them, for `--allowedTools`, and reads a subagent's
+ * messages, which the AG-UI translation drops too.
  */
 import type { BRIDGED_MCP_SERVER_NAME as ADAPTER_BRIDGE_NAME } from "@tanstack/ai-claude-code";
-import type { AgentUsage } from "../../port";
+import type { AgentEvent, AgentUsage } from "../../port";
 import {
 	ARTIFACT_TOOL_NAME,
 	asNumber,
@@ -254,10 +255,103 @@ export function createClaudeCodeObserver(): (
 	};
 }
 
+/** The text of a tool result: a string, or the text of its blocks. */
+function resultText(content: unknown): string {
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return JSON.stringify(content ?? "");
+	return content
+		.map((block) =>
+			isRecord(block) && block.type === "text"
+				? (asString(block.text) ?? "")
+				: "",
+		)
+		.join("\n");
+}
+
+/** A bridged tool's name without the bridge prefix, as the adapter names it. */
+function toolNameOf(name: string): string {
+	const prefix = `mcp__${BRIDGED_MCP_SERVER_NAME}__`;
+	return name.startsWith(prefix) ? name.slice(prefix.length) : name;
+}
+
+/**
+ * Claude Code's subagent reader. A subagent (started by the Task or Agent
+ * tool) writes whole `assistant` and `user` messages with
+ * `parent_tool_use_id` set; the adapter drops them. This turns their text,
+ * thinking, tool calls and tool results into events. Its partial
+ * `stream_event` messages repeat the whole ones and are skipped. Redacted
+ * thinking (`redacted_thinking`) and empty thinking are skipped.
+ */
+export function createClaudeCodeSubagentReader(): (
+	message: unknown,
+) => AgentEvent[] {
+	/** Text and thinking blocks so far: one message id per block. */
+	let blocks = 0;
+	return (message) => {
+		if (!isRecord(message)) return [];
+		const parentToolCallId = asString(message.parent_tool_use_id);
+		if (!parentToolCallId) return [];
+		const inner = message.message;
+		if (!isRecord(inner) || !Array.isArray(inner.content)) return [];
+		const events: AgentEvent[] = [];
+		if (message.type === "assistant") {
+			const id = asString(inner.id) ?? parentToolCallId;
+			for (const block of inner.content) {
+				if (!isRecord(block)) continue;
+				const text =
+					block.type === "text"
+						? asString(block.text)
+						: block.type === "thinking"
+							? asString(block.thinking)
+							: undefined;
+				if (text) {
+					blocks += 1;
+					events.push({
+						type: block.type === "text" ? "text" : "thinking",
+						messageId: `${id}:${blocks}`,
+						delta: text,
+						parentToolCallId,
+					});
+					continue;
+				}
+				const toolCallId = asString(block.id);
+				const name = asString(block.name);
+				if (block.type !== "tool_use" || !toolCallId || !name) continue;
+				const tool = toolNameOf(name);
+				events.push(
+					{ type: "tool-start", toolCallId, name: tool, parentToolCallId },
+					{
+						type: "tool-end",
+						toolCallId,
+						name: tool,
+						input: block.input ?? {},
+						parentToolCallId,
+					},
+				);
+			}
+		} else if (message.type === "user") {
+			for (const block of inner.content) {
+				if (!isRecord(block) || block.type !== "tool_result") continue;
+				const toolCallId = asString(block.tool_use_id);
+				if (!toolCallId) continue;
+				events.push({
+					type: "tool-result",
+					toolCallId,
+					content: resultText(block.content),
+					...(block.is_error === true ? { isError: true as const } : {}),
+					parentToolCallId,
+				});
+			}
+		}
+		return events;
+	};
+}
+
 export const CLAUDE_CODE_PROFILE: HarnessProfile = {
 	label: "Claude Code",
 	sessionEvent: SESSION_ID_EVENT,
 	createObserver: createClaudeCodeObserver,
+	createSubagentReader: createClaudeCodeSubagentReader,
 	reportToolId: REPORT_TOOL_ID,
 	artifactToolId: ARTIFACT_TOOL_ID,
 	bridgedToolId: (name) => `mcp__${BRIDGED_MCP_SERVER_NAME}__${name}`,

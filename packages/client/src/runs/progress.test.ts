@@ -141,6 +141,23 @@ describe("the latest agent message of each step", () => {
 		expect(messages.get("review")?.text).toBe("Looks good");
 	});
 
+	test("a subagent's text is not the step's message", () => {
+		const sub = {
+			...text("build", "s1", "Searching."),
+			event: {
+				type: "text",
+				messageId: "s1",
+				delta: "Searching.",
+				parentToolCallId: "task-1",
+			},
+		} as TranscriptEntry;
+		const messages = applyAgentMessages(new Map(), [
+			text("build", "m1", "Asking a helper."),
+			sub,
+		]);
+		expect(messages.get("build")?.text).toBe("Asking a helper.");
+	});
+
 	test("keeps the same map when no entry is a message", () => {
 		const before = applyAgentMessages(new Map(), [text("a", "m", "x")]);
 		expect(applyAgentMessages(before, [other("a"), report("a", " ")])).toBe(

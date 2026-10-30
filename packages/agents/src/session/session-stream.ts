@@ -2,6 +2,7 @@ import type { AgentEvent } from "../port";
 import type { Translator } from "./translate";
 
 const ABORTED = Symbol("aborted");
+const QUEUED = Symbol("queued");
 
 function abortPromise(signal: AbortSignal): {
 	promise: Promise<typeof ABORTED>;
@@ -58,12 +59,26 @@ export async function* streamSession(options: {
 	try {
 		try {
 			iterator = options.chunks[Symbol.asyncIterator]();
+			// Both stay pending over many turns of the loop, so a race adds no
+			// new waiter each turn.
+			let next: Promise<IteratorResult<unknown>> | undefined;
+			let queued: Promise<typeof QUEUED> | undefined;
 			while (!signal.aborted) {
-				const next = iterator.next();
-				// The race may drop this promise; keep a late rejection handled.
-				next.catch(() => {});
-				const result = await Promise.race([next, abort.promise]);
+				if (!next) {
+					next = iterator.next();
+					// The race may drop this promise; keep a late rejection handled.
+					next.catch(() => {});
+				}
+				queued ??= translator.whenQueued().then(() => QUEUED);
+				const result = await Promise.race([next, abort.promise, queued]);
 				if (result === ABORTED) break;
+				// Events from the raw messages (a subagent's) while the chunks are quiet.
+				if (result === QUEUED) {
+					queued = undefined;
+					for (const event of translator.drain()) yield event;
+					continue;
+				}
+				next = undefined;
 				if (result.done) {
 					sourceDone = true;
 					break;

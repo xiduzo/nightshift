@@ -38,6 +38,18 @@
  *   streamed text.
  * Both channels are read in every mode; the last report counts.
  *
+ * Thinking: every adapter turns the model's visible thinking into
+ * REASONING_MESSAGE_CONTENT chunks (Claude Code's thinking blocks, Codex's
+ * reasoning items, OpenCode's reasoning parts, ACP's `agent_thought_chunk`).
+ * Each becomes a `thinking` event. Redacted thinking never reaches a chunk,
+ * and REASONING_ENCRYPTED_VALUE chunks are dropped: no ciphertext goes out.
+ *
+ * Subagents: the adapters drop a subagent's messages from the chunks. A
+ * profile that can read them from the raw messages (`createSubagentReader`)
+ * turns them into events with `parentToolCallId`. They arrive while the
+ * chunk stream is quiet, so the translator queues them: `push` and
+ * `finish` send them first, and `drain` sends them in between (`whenQueued`).
+ *
  * Over 600 lines on purpose: the translator is one state machine over one
  * stream, and the failure texts it sorts belong with it. What one harness
  * reads in its raw messages is in that harness's profile.
@@ -363,6 +375,12 @@ export type HarnessProfile = {
 	/** The same for the artifact tool (`mcp__tanstack__save_artifact`). */
 	artifactToolId?: string;
 	/**
+	 * A fresh reader of the raw messages for subagent events, one per
+	 * session. It returns the events of a subagent's message (each with
+	 * `parentToolCallId`), and none for any other message.
+	 */
+	createSubagentReader?: () => (message: unknown) => AgentEvent[];
+	/**
 	 * The name of any other bridged tool in the harness's allow rules, when
 	 * the harness asks before it runs one (Claude Code: `mcp__tanstack__<name>`).
 	 */
@@ -374,6 +392,10 @@ export type Translator = {
 	push(chunk: unknown): AgentEvent[];
 	/** Record one raw harness message (Claude Code: a stream-json message). */
 	observeSdk(message: unknown): void;
+	/** The events the raw messages queued since the last call (subagent events). */
+	drain(): AgentEvent[];
+	/** Resolves once `drain` has events to return. */
+	whenQueued(): Promise<void>;
 	/** End the stream. Returns the remaining events, the terminal one last. */
 	finish(input: FinishInput): AgentEvent[];
 	/** The raw messages say the turn is over (`done`): no need to wait for more chunks. */
@@ -399,6 +421,11 @@ export function createTranslator(options: {
 	const rules = reportRules(options.stepReport);
 	const profile = options.profile;
 	const observe = profile.createObserver();
+	const readSubagent = profile.createSubagentReader?.();
+	/** Subagent events from the raw messages, waiting for `push`, `drain` or `finish`. */
+	const queued: AgentEvent[] = [];
+	/** Resolves the pending `whenQueued` promises. */
+	const waiting: (() => void)[] = [];
 	let sessionEmitted = false;
 	let finished = false;
 	/** Events that arrived before the session id; flushed after it. */
@@ -449,6 +476,12 @@ export function createTranslator(options: {
 				if (!delta || !messageId) return [];
 				if (signals.hiddenTextIds?.has(messageId)) return [];
 				return emit([{ type: "text", messageId, delta }]);
+			}
+			case "REASONING_MESSAGE_CONTENT": {
+				const delta = asString(chunk.delta);
+				const messageId = asString(chunk.messageId);
+				if (!delta || !messageId) return [];
+				return emit([{ type: "thinking", messageId, delta }]);
 			}
 			case "TOOL_CALL_START": {
 				const toolCallId = asString(chunk.toolCallId);
@@ -645,7 +678,10 @@ export function createTranslator(options: {
 	function startKnownSession(): AgentEvent[] {
 		if (sessionEmitted || options.knownSessionId === undefined) return [];
 		sessionEmitted = true;
-		return [{ type: "session", sessionId: options.knownSessionId }];
+		return [
+			{ type: "session", sessionId: options.knownSessionId },
+			...pending.splice(0),
+		];
 	}
 
 	return {
@@ -655,12 +691,23 @@ export function createTranslator(options: {
 			}
 			return [
 				...startKnownSession(),
+				...queued.splice(0),
 				...translate(chunk as AgUiChunk),
 				...liveUsage(),
 			];
 		},
 		observeSdk(message) {
 			signals = observe(signals, message);
+			if (finished || !readSubagent) return;
+			queued.push(...emit(readSubagent(message)));
+			if (queued.length > 0) for (const resolve of waiting.splice(0)) resolve();
+		},
+		drain() {
+			return queued.splice(0);
+		},
+		whenQueued() {
+			if (queued.length > 0) return Promise.resolve();
+			return new Promise((resolve) => waiting.push(resolve));
 		},
 		finish(input) {
 			if (finished) return [];
@@ -687,6 +734,7 @@ export function createTranslator(options: {
 					: undefined;
 			return [
 				...head,
+				...queued.splice(0),
 				...ends,
 				...(textReport ? [{ type: "report" as const, ...textReport }] : []),
 				terminal(input),

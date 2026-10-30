@@ -129,6 +129,39 @@ describe("streamSession", () => {
 		}
 	});
 
+	test("a subagent's events go out while the chunks are quiet", async () => {
+		const t = translator();
+		const { source } = hangingSource([session]);
+		const controller = new AbortController();
+		const events: AgentEvent[] = [];
+		for await (const event of streamSession({
+			chunks: source,
+			translator: t,
+			signal: controller.signal,
+			abortGraceMs: 50,
+		})) {
+			events.push(event);
+			if (event.type === "session") {
+				// The Task tool's subagent works; the session agent waits.
+				setTimeout(() =>
+					t.observeSdk({
+						type: "assistant",
+						parent_tool_use_id: "task-1",
+						message: { id: "m", content: [{ type: "text", text: "Reading" }] },
+					}),
+				);
+			}
+			if (event.type === "text") controller.abort();
+		}
+		expect(events.map((e) => e.type)).toEqual(["session", "text", "error"]);
+		expect(events[1]).toEqual({
+			type: "text",
+			messageId: "m:1",
+			delta: "Reading",
+			parentToolCallId: "task-1",
+		});
+	});
+
 	test("stopping early closes the source", async () => {
 		const { source, state } = hangingSource([
 			session,

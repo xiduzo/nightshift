@@ -4,7 +4,8 @@
  * It appends `{ argv, prompt, tools, mcpConfigs }` as one JSON line to
  * `$FAKE_CLAUDE_LOG` (`tools`: the bridge's `tools/list`, when there is a
  * bridge; `mcpConfigs`: every `--mcp-config` file, parsed), then
- * prints a stream-json session: an init message; for each entry of the JSON
+ * prints a stream-json session: an init message; each message of the JSON
+ * array `$FAKE_CLAUDE_MESSAGES` as it is; for each entry of the JSON
  * array `$FAKE_CLAUDE_CALLS`, a call of that bridged tool over the real MCP
  * bridge from `--mcp-config` (as an assistant `tool_use` plus a user
  * `tool_result`); an optional pause of `$FAKE_CLAUDE_SLEEP_MS`; and a
@@ -118,6 +119,12 @@ async function callTool(
 		.join("");
 	return { text, isError: message.result?.isError === true };
 }
+
+// Recorded stream-json messages (thinking, a subagent's work), printed as they are.
+const messages: unknown[] = JSON.parse(
+	process.env.FAKE_CLAUDE_MESSAGES ?? "[]",
+);
+for (const message of messages) print(message);
 
 const calls: Call[] = JSON.parse(process.env.FAKE_CLAUDE_CALLS ?? "[]");
 let id = 0;

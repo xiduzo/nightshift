@@ -125,3 +125,27 @@ describe("the turn limit", () => {
 		expect(trips(many, 1)).toHaveLength(1);
 	});
 });
+
+describe("a subagent's events", () => {
+	const sub = (event: AgentEvent): AgentEvent =>
+		({ ...event, parentToolCallId: "task-1" }) as AgentEvent;
+
+	test("count for neither guard", () => {
+		const events: AgentEvent[] = [
+			...call("Task", { prompt: "Look." }).slice(0, 2),
+			...[1, 2, 3, 4].flatMap(() =>
+				[text("Again."), ...call("Read", { path: "a.ts" })].map(sub),
+			),
+		];
+		expect(trips(events, 1)).toEqual([]);
+	});
+
+	test("thinking starts no turn", () => {
+		const thinking: AgentEvent = {
+			type: "thinking",
+			messageId: "r1",
+			delta: "Hmm.",
+		};
+		expect(trips([thinking, text("One."), thinking], 1)).toEqual([]);
+	});
+});

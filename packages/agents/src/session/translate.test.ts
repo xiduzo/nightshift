@@ -97,6 +97,97 @@ describe("createTranslator", () => {
 		]);
 	});
 
+	test("visible thinking becomes thinking events; encrypted thinking goes nowhere", () => {
+		const events = feed(newTranslator(), [
+			session,
+			{ type: "REASONING_START", messageId: "r1" },
+			{ type: "REASONING_MESSAGE_START", messageId: "r1", role: "reasoning" },
+			{ type: "REASONING_MESSAGE_CONTENT", messageId: "r1", delta: "Read " },
+			{ type: "REASONING_MESSAGE_CONTENT", messageId: "r1", delta: "it." },
+			{ type: "REASONING_MESSAGE_CONTENT", messageId: "r1", delta: "" },
+			{
+				type: "REASONING_ENCRYPTED_VALUE",
+				subtype: "message",
+				entityId: "r1",
+				encryptedValue: "EqQBCkYIBxgCKkCipher",
+			},
+			{ type: "REASONING_MESSAGE_END", messageId: "r1" },
+			{ type: "REASONING_END", messageId: "r1" },
+			{ type: "TEXT_MESSAGE_CONTENT", messageId: "m1", delta: "Done" },
+			runFinished,
+		]);
+		expect(events.slice(0, 4)).toEqual([
+			{ type: "session", sessionId: "s-1", model: "claude-haiku-4-5" },
+			{ type: "thinking", messageId: "r1", delta: "Read " },
+			{ type: "thinking", messageId: "r1", delta: "it." },
+			{ type: "text", messageId: "m1", delta: "Done" },
+		]);
+		expect(JSON.stringify(events)).not.toContain("Cipher");
+	});
+
+	test("a subagent's events from the raw messages wait for the session, then go first", () => {
+		const t = newTranslator();
+		const subagent = {
+			type: "assistant",
+			parent_tool_use_id: "task-1",
+			message: { id: "msg-s", content: [{ type: "text", text: "Looking" }] },
+		};
+		t.observeSdk(subagent);
+		expect(t.drain()).toEqual([]);
+		expect(t.push(session)).toEqual([
+			{ type: "session", sessionId: "s-1", model: "claude-haiku-4-5" },
+			{
+				type: "text",
+				messageId: "msg-s:1",
+				delta: "Looking",
+				parentToolCallId: "task-1",
+			},
+		]);
+		t.observeSdk(subagent);
+		expect(t.drain()).toEqual([
+			{
+				type: "text",
+				messageId: "msg-s:2",
+				delta: "Looking",
+				parentToolCallId: "task-1",
+			},
+		]);
+		expect(t.drain()).toEqual([]);
+	});
+
+	test("whenQueued resolves once a subagent's event is queued", async () => {
+		const t = newTranslator();
+		t.push(session);
+		let woke = false;
+		const waiting = t.whenQueued().then(() => {
+			woke = true;
+		});
+		t.observeSdk({
+			type: "assistant",
+			parent_tool_use_id: null,
+			message: { content: [] },
+		});
+		await Bun.sleep(0);
+		expect(woke).toBe(false);
+		t.observeSdk({
+			type: "user",
+			parent_tool_use_id: "task-1",
+			message: {
+				role: "user",
+				content: [{ type: "tool_result", tool_use_id: "s-c1", content: "ok" }],
+			},
+		});
+		await waiting;
+		expect(t.drain()).toEqual([
+			{
+				type: "tool-result",
+				toolCallId: "s-c1",
+				content: "ok",
+				parentToolCallId: "task-1",
+			},
+		]);
+	});
+
 	test("reads tool input from the chunk itself and falls back to toolName", () => {
 		const events = feed(newTranslator(), [
 			session,

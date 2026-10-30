@@ -38,6 +38,10 @@ export type FakeStep =
 			summary: string;
 			data?: unknown;
 	  }
+	/** What the model thinks: `thinking` events, like `text`. */
+	| { type: "thinking"; text: string; chunkSize?: number }
+	/** One event as it is, for a shape no other step makes (a subagent's). */
+	| { type: "event"; event: AgentEvent }
 	| { type: "wait"; ms: number }
 	/** What the session has used so far: one `usage` event. */
 	| { type: "usage"; usage: AgentUsage };
@@ -217,10 +221,12 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 						summary: step.summary,
 						...(step.data !== undefined ? { data: step.data } : {}),
 					};
-				} else if (step.type === "text") {
+				} else if (step.type === "event") {
+					yield step.event;
+				} else if (step.type === "text" || step.type === "thinking") {
 					const messageId = `fake-message-${++ids}`;
 					for (const delta of chunksOf(step.text, step.chunkSize ?? 8)) {
-						yield { type: "text", messageId, delta };
+						yield { type: step.type, messageId, delta };
 					}
 				} else {
 					const toolCallId = `fake-tool-${++ids}`;

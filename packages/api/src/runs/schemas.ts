@@ -301,6 +301,9 @@ const agentUsageSchema = z.object({
 	costUsd: z.number().optional(),
 });
 
+/** The tool call that started the subagent an event comes from. Absent for the session's own agent. */
+const parentToolCallId = z.string().optional();
+
 /** What happened in a step: one line of its transcript. */
 const stepEventSchema = z.discriminatedUnion("type", [
 	z.object({
@@ -312,23 +315,33 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		type: z.literal("text"),
 		messageId: z.string(),
 		delta: z.string(),
+		parentToolCallId,
+	}),
+	z.object({
+		type: z.literal("thinking"),
+		messageId: z.string(),
+		delta: z.string(),
+		parentToolCallId,
 	}),
 	z.object({
 		type: z.literal("tool-start"),
 		toolCallId: z.string(),
 		name: z.string(),
+		parentToolCallId,
 	}),
 	z.object({
 		type: z.literal("tool-end"),
 		toolCallId: z.string(),
 		name: z.string(),
 		input: z.unknown(),
+		parentToolCallId,
 	}),
 	z.object({
 		type: z.literal("tool-result"),
 		toolCallId: z.string(),
 		content: z.string(),
 		isError: z.literal(true).optional(),
+		parentToolCallId,
 	}),
 	z.object({
 		type: z.literal("report"),

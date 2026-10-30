@@ -148,4 +148,51 @@ describe("redactSession", () => {
 		});
 		expect(events.at(-1)).toEqual({ type: "finished" });
 	});
+
+	test("thinking is masked like text, and a subagent's deltas keep their call", async () => {
+		const events = await collectAll(
+			redactSession(
+				from([
+					{ type: "thinking", messageId: "m1", delta: "use tok-" },
+					{ type: "thinking", messageId: "m1", delta: "work now" },
+					{ type: "text", messageId: "m1", delta: "Done" },
+					{
+						type: "text",
+						messageId: "s1",
+						delta: "has tok-wo",
+						parentToolCallId: "task-1",
+					},
+					{ type: "finished" },
+				]),
+				["tok-work"],
+			),
+		);
+		const joined = (type: string, id: string) =>
+			events
+				.flatMap((e) =>
+					e.type === type && "messageId" in e && e.messageId === id
+						? [e.delta]
+						: [],
+				)
+				.join("");
+		expect(joined("thinking", "m1")).toBe("use ••• now");
+		expect(joined("text", "m1")).toBe("Done");
+		// The held end of the subagent's text keeps its call when it is flushed.
+		expect(
+			events.filter((e) => e.type === "text" && "parentToolCallId" in e),
+		).toEqual([
+			{
+				type: "text",
+				messageId: "s1",
+				delta: "has ",
+				parentToolCallId: "task-1",
+			},
+			{
+				type: "text",
+				messageId: "s1",
+				delta: "tok-wo",
+				parentToolCallId: "task-1",
+			},
+		]);
+	});
 });

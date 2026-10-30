@@ -113,6 +113,48 @@ describe("the Agent node", () => {
 		expect(transcript.some((e) => e.event.type === "usage")).toBe(false);
 	});
 
+	test("thinking and a subagent's work go to the transcript; the subagent's text is not the output", async () => {
+		const harness = fakeHarness({
+			...reportingScript("pass"),
+			steps: [
+				{ type: "thinking", text: "Plan the work." },
+				{ type: "text", text: "Working." },
+				{
+					type: "event",
+					event: {
+						type: "text",
+						messageId: "sub-1",
+						delta: "The subagent says this.",
+						parentToolCallId: "task-1",
+					},
+				},
+				{ type: "report", outcome: "pass", summary: "Done." },
+			],
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		await drive(h, { inputs: {} });
+		const logged = await h.events();
+		expect(payloads(logged, "StepEnded")[0]?.outputs).toMatchObject({
+			output: "Working.",
+		});
+		const [started] = payloads(logged, "StepStarted");
+		const transcript = await readTranscriptFile(
+			started?.transcriptPath as string,
+		);
+		const types = transcript.map((e) => e.event.type);
+		expect(types).toContain("thinking");
+		expect(transcript.map((e) => e.event)).toContainEqual({
+			type: "text",
+			messageId: "sub-1",
+			delta: "The subagent says this.",
+			parentToolCallId: "task-1",
+		});
+	});
+
 	test("a session that fails keeps what it spent so far", async () => {
 		const harness = fakeHarness({
 			...failingScript(),

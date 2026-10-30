@@ -147,7 +147,8 @@ export function applyAgentMessages(
 		next.set(stepId, message);
 	};
 	for (const { stepId, seq, event } of entries) {
-		if (event.type === "text") {
+		// A subagent's text is not the step's message.
+		if (event.type === "text" && !event.parentToolCallId) {
 			const known = read(stepId);
 			write(
 				stepId,

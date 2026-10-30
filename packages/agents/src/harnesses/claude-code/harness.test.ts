@@ -400,3 +400,114 @@ describe("claudeCodeHarness with a step report spec", () => {
 		]);
 	});
 });
+
+describe("claudeCodeHarness with thinking and a subagent", () => {
+	/** Recorded stream-json shapes of Claude Code 2.x, cut down. */
+	const assistant = (
+		parent: string | null,
+		id: string,
+		content: unknown[],
+	) => ({
+		type: "assistant",
+		session_id: "fake-claude-session",
+		parent_tool_use_id: parent,
+		message: { id, role: "assistant", content },
+	});
+	const toolResult = (
+		parent: string | null,
+		toolUseId: string,
+		text: string,
+	) => ({
+		type: "user",
+		session_id: "fake-claude-session",
+		parent_tool_use_id: parent,
+		message: {
+			role: "user",
+			content: [{ type: "tool_result", tool_use_id: toolUseId, content: text }],
+		},
+	});
+
+	test("thinking and the subagent's work reach the events; redacted thinking does not", async () => {
+		const task = {
+			subagent_type: "Explore",
+			description: "Find the tests",
+			prompt: "Find the tests of the parser.",
+		};
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_MESSAGES: JSON.stringify([
+				assistant(null, "msg_1", [
+					{ type: "thinking", thinking: "I need the tests.", signature: "s" },
+				]),
+				assistant(null, "msg_1", [
+					{ type: "redacted_thinking", data: "EqQBCipherText" },
+				]),
+				assistant(null, "msg_1", [
+					{ type: "tool_use", id: "toolu_task", name: "Task", input: task },
+				]),
+				assistant("toolu_task", "msg_s1", [
+					{ type: "text", text: "Searching." },
+				]),
+				assistant("toolu_task", "msg_s1", [
+					{
+						type: "tool_use",
+						id: "toolu_s1",
+						name: "Grep",
+						input: { pattern: "parse" },
+					},
+				]),
+				toolResult("toolu_task", "toolu_s1", "parser.test.ts"),
+				toolResult(null, "toolu_task", "The tests are in parser.test.ts."),
+			]),
+		});
+		const events: AgentEvent[] = [];
+		for await (const event of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input())) {
+			events.push(event);
+		}
+		expect(JSON.stringify(events)).not.toContain("Cipher");
+		const shown = events.filter(
+			(e) => e.type !== "session" && e.type !== "usage",
+		);
+		expect(shown).toEqual([
+			{
+				type: "thinking",
+				messageId: expect.any(String),
+				delta: "I need the tests.",
+			},
+			{ type: "tool-start", toolCallId: "toolu_task", name: "Task" },
+			{ type: "tool-end", toolCallId: "toolu_task", name: "Task", input: task },
+			{
+				type: "text",
+				messageId: "msg_s1:1",
+				delta: "Searching.",
+				parentToolCallId: "toolu_task",
+			},
+			{
+				type: "tool-start",
+				toolCallId: "toolu_s1",
+				name: "Grep",
+				parentToolCallId: "toolu_task",
+			},
+			{
+				type: "tool-end",
+				toolCallId: "toolu_s1",
+				name: "Grep",
+				input: { pattern: "parse" },
+				parentToolCallId: "toolu_task",
+			},
+			{
+				type: "tool-result",
+				toolCallId: "toolu_s1",
+				content: "parser.test.ts",
+				parentToolCallId: "toolu_task",
+			},
+			{
+				type: "tool-result",
+				toolCallId: "toolu_task",
+				content: "The tests are in parser.test.ts.",
+			},
+			expect.objectContaining({ type: "finished" }),
+		]);
+	});
+});

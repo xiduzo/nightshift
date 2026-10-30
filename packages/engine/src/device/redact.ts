@@ -72,34 +72,38 @@ function redactDeep(value: unknown, values: readonly string[]): unknown {
 
 /**
  * A session's events with the secret values in `values` as `•••`: its
- * tool calls and their results, and its text. The text of a message
- * comes in deltas, so a value split over two deltas is still found: a
- * delta's end that could start a value waits for the next delta of that
- * message, or for the next event.
+ * tool calls and their results, its text and its thinking. The text of a
+ * message comes in deltas, so a value split over two deltas is still
+ * found: a delta's end that could start a value waits for the next delta
+ * of that message, or for the next event. Thinking goes the same way.
  */
 export async function* redactSession<E extends { type: string }>(
 	events: AsyncIterable<E>,
 	values: readonly string[],
 ): AsyncGenerator<E> {
-	const texts = new Map<string, ReturnType<typeof streamRedactor>>();
+	/** The open streams by kind and message id, with the event that opened them. */
+	const streams = new Map<
+		string,
+		{ event: E & Streamed; redactor: ReturnType<typeof streamRedactor> }
+	>();
 	function* flush(except?: string): Generator<E> {
-		for (const [messageId, redactor] of texts) {
-			if (messageId === except) continue;
-			texts.delete(messageId);
+		for (const [key, { event, redactor }] of streams) {
+			if (key === except) continue;
+			streams.delete(key);
 			const delta = redactor.flush();
-			if (delta !== "")
-				yield { type: "text", messageId, delta } as unknown as E;
+			if (delta !== "") yield { ...event, delta };
 		}
 	}
 	for await (const event of events) {
-		if (isText(event)) {
-			yield* flush(event.messageId);
-			let redactor = texts.get(event.messageId);
-			if (!redactor) {
-				redactor = streamRedactor(values);
-				texts.set(event.messageId, redactor);
+		if (isStreamed(event)) {
+			const key = `${event.type}\u0000${event.messageId}`;
+			yield* flush(key);
+			let stream = streams.get(key);
+			if (!stream) {
+				stream = { event, redactor: streamRedactor(values) };
+				streams.set(key, stream);
 			}
-			const delta = redactor.push(event.delta);
+			const delta = stream.redactor.push(event.delta);
 			if (delta !== "") yield { ...event, delta };
 			continue;
 		}
@@ -109,11 +113,14 @@ export async function* redactSession<E extends { type: string }>(
 	yield* flush();
 }
 
-function isText(event: {
-	type: string;
-}): event is { type: "text"; messageId: string; delta: string } {
+/** An event whose words come in deltas: an agent's text or thinking. */
+type Streamed = { type: "text" | "thinking"; messageId: string; delta: string };
+
+function isStreamed<E extends { type: string }>(
+	event: E,
+): event is E & Streamed {
 	return (
-		event.type === "text" &&
+		(event.type === "text" || event.type === "thinking") &&
 		"messageId" in event &&
 		typeof event.messageId === "string" &&
 		"delta" in event &&

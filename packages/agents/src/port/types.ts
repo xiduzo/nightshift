@@ -174,22 +174,40 @@ export type AgentErrorKind = "aborted" | "usage-limit" | "network" | "harness";
 export type SessionLimit = "turns" | "budget";
 
 /**
+ * Marks an event of a subagent: the session's agent started it with a tool
+ * call (Claude Code's Task or Agent tool), and this is that call's id. Absent
+ * for the session's own agent. Only Claude Code sends subagent events.
+ */
+export type SubagentPart = { parentToolCallId?: string };
+
+/**
  * One normalized event of a harness session. Every stream emits exactly one
  * `session` event first (as soon as the harness reports its id) and ends with
  * exactly one `finished` or `error` event.
  */
 export type AgentEvent =
 	| { type: "session"; sessionId: string; model?: string }
-	| { type: "text"; messageId: string; delta: string }
-	| { type: "tool-start"; toolCallId: string; name: string }
-	| { type: "tool-end"; toolCallId: string; name: string; input: unknown }
-	| {
+	| ({ type: "text"; messageId: string; delta: string } & SubagentPart)
+	/**
+	 * What the model thinks before it answers or calls a tool, in deltas per
+	 * thought. Only harnesses that show the thinking send it. Hidden thinking
+	 * (redacted or encrypted) is never sent. Logs from before it have none.
+	 */
+	| ({ type: "thinking"; messageId: string; delta: string } & SubagentPart)
+	| ({ type: "tool-start"; toolCallId: string; name: string } & SubagentPart)
+	| ({
+			type: "tool-end";
+			toolCallId: string;
+			name: string;
+			input: unknown;
+	  } & SubagentPart)
+	| ({
 			type: "tool-result";
 			toolCallId: string;
 			content: string;
 			/** The harness marked the result as an error. Absent otherwise. */
 			isError?: true;
-	  }
+	  } & SubagentPart)
 	/** The agent's step report. When the agent reports twice, the last one counts. */
 	| {
 			type: "report";

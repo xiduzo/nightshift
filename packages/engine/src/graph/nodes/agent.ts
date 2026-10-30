@@ -503,6 +503,8 @@ async function runSession(
 		step.record(sessionId, agentEvent);
 		const trip = guards.see(agentEvent);
 		if (trip) step.halt(trip.kind, guardMessage(trip));
+		// A subagent's events go to the transcript only: its text is not the step's output.
+		if ("parentToolCallId" in agentEvent && agentEvent.parentToolCallId) return;
 		switch (agentEvent.type) {
 			case "session":
 				harnessSessionId = agentEvent.sessionId;

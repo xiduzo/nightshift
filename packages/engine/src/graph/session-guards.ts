@@ -10,6 +10,7 @@ import type { AgentEvent } from "@nightshift/agents/types";
  * call after a tool's result (or at the start of the session). Parallel
  * tool calls of one reply are one turn. A step report ends a turn like a
  * tool's result: the harness sends it when the report tool answered.
+ * A subagent's events (`parentToolCallId`) count for neither guard.
  */
 
 /** How many identical tool calls in a row mean the agent loops. */
@@ -47,6 +48,8 @@ export function sessionGuards(options: {
 	return {
 		see(event) {
 			if (tripped) return null;
+			// A subagent's turns and calls are its own, not the session agent's.
+			if ("parentToolCallId" in event && event.parentToolCallId) return null;
 			switch (event.type) {
 				case "text":
 				case "tool-start":

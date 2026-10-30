@@ -172,6 +172,8 @@ export async function* runAssistantSession(
 					yield { type: "session", sessionId: event.sessionId };
 					break;
 				case "text": {
+					// A subagent's text is its own work, not the answer.
+					if (event.parentToolCallId) break;
 					// A new message after a tool call starts a new paragraph.
 					const gap =
 						lastMessage !== null && lastMessage !== event.messageId && text
