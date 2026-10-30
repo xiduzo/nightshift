@@ -85,7 +85,14 @@ type PanelHandle = NonNullable<
  * console along the bottom: one line, or open on its summary, transcript and
  * outputs. The run's facts open from the header.
  */
-export function RunPage({ runId }: { runId: string }) {
+export function RunPage({
+	runId,
+	stepId,
+}: {
+	runId: string;
+	/** The step to open the run at, with its console open. */
+	stepId?: string;
+}) {
 	const run = useQuery(runQueries.get(runId));
 	const projects = useQuery(projectQueries.list());
 	// This computer, for its owner only: the assistant is the owner's.
@@ -93,10 +100,12 @@ export function RunPage({ runId }: { runId: string }) {
 	const stream = useRunStream(runId);
 	const desktop = useMediaQuery(DESKTOP);
 	/** Null follows the latest step as the run walks. */
-	const [pickedStepId, setPickedStepId] = useState<string | null>(null);
+	const [pickedStepId, setPickedStepId] = useState<string | null>(
+		stepId ?? null,
+	);
 	/** The call in focus (a Call step, or one of its elements): the steps and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
-	const [consoleOpen, setConsoleOpen] = useState(false);
+	const [consoleOpen, setConsoleOpen] = useState(stepId !== undefined);
 	const [tab, setTab] = useState<RunTab>("steps");
 	const consolePanel = useRef<PanelHandle>(null);
 	/** The height the console last had open, to open it at again. */
@@ -540,7 +549,9 @@ export function RunPage({ runId }: { runId: string }) {
 							collapsible
 							collapsedSize={CONSOLE_CLOSED_PX}
 							minSize={220}
-							defaultSize={CONSOLE_CLOSED_PX}
+							defaultSize={
+								consoleOpen ? consoleSize.current : CONSOLE_CLOSED_PX
+							}
 							className="min-h-0 px-4 pt-2 pb-4"
 							onResize={(size) => {
 								const open = size.inPixels > CONSOLE_CLOSED_PX + 1;

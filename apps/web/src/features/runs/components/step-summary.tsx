@@ -10,9 +10,9 @@ import type { ReactNode } from "react";
 import type { RunDetail, StepSummary as Step } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { type ItemScope, stepRunsEach } from "../lib/run-steps";
+import { stepProse } from "../lib/step-gist";
 import { CallDetail } from "./call-detail";
 import { ItemList } from "./item-list";
-import { stepProse } from "./step-header";
 
 /**
  * What a step did, without the transcript: why it failed, what it said it

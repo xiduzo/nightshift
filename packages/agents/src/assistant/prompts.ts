@@ -181,6 +181,8 @@ function runTask(runId: string): string[] {
 		"",
 		"Do not guess. When the transcript does not show the cause, say what you checked and what the person can look at.",
 		"",
+		"Cite each step you name with its link from `get_run`, copied as it is written there, such as [critic](#step-<step id>). The person sees it as the step and opens the step from it. Cite only the steps of this run, and never make a link up.",
+		"",
 	];
 }
 

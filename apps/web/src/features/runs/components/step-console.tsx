@@ -8,9 +8,10 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 
 import type { RunStatus, StepSummary } from "@/shared/api";
+import { stepGist } from "../lib/step-gist";
 import type { TranscriptItem } from "../transcript/transcript-items";
 import { ChangedFiles } from "./changed-files";
-import { StepFacts, StepLine, StepOutputs, stepGist } from "./step-header";
+import { StepFacts, StepLine, StepOutputs } from "./step-header";
 import { StepPlan } from "./step-plan";
 
 /** The height of the closed console: its bar alone. */

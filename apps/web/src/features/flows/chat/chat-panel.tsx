@@ -1,5 +1,5 @@
 import { runStatusLabel } from "@nightshift/client";
-import type { Flow } from "@nightshift/flows";
+import { citedStepId, type Flow } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -52,10 +52,10 @@ import {
 	SquarePenIcon,
 	XIcon,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
-import type { RunStatus } from "@/shared/api";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
+import type { RunStatus, StepSummary } from "@/shared/api";
 import { formatCost } from "@/shared/format";
-import { Markdown } from "@/shared/markdown";
+import { type LinkView, Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
 import { AgentMenus } from "../assistant/agent-picker";
 import { PromptInput } from "../assistant/prompt-input";
@@ -70,6 +70,7 @@ import {
 import { proposalCanvas } from "./proposal-canvas";
 import { ProposalCard } from "./proposal-card";
 import { STARTERS } from "./starters";
+import { StepCitation } from "./step-citation";
 
 type Props = {
 	thread: ChatThread;
@@ -82,8 +83,13 @@ type Props = {
 	sendBlockedBy: string | null;
 	/** The flow has nothing in it yet: the chat offers ideas to start with. */
 	blank: boolean;
-	/** The run the chat is about, with its status once it loads. Null: the chat is about the flow. */
-	run: { id: string; status?: RunStatus; title?: string } | null;
+	/** The run the chat is about, with its status and steps once it loads. Null: the chat is about the flow. */
+	run: {
+		id: string;
+		status?: RunStatus;
+		title?: string;
+		steps?: StepSummary[];
+	} | null;
 	/** The message whose proposal the canvas shows. */
 	shownId: string | null;
 	onSend: (text: string) => void;
@@ -355,6 +361,7 @@ function AgentAnswer({
 	message,
 	answering,
 	activity,
+	run,
 	draft,
 	shownId,
 	onToggleShown,
@@ -365,7 +372,7 @@ function AgentAnswer({
 	return (
 		<Message>
 			<MessageContent>
-				{message.text ? <AnswerText text={message.text} /> : null}
+				{message.text ? <AnswerText text={message.text} run={run} /> : null}
 				{answering ? (
 					<TraceLine status="running" aria-live="polite" className="text-xs">
 						<TraceTitle>{activity ?? "The agent is working…"}</TraceTitle>
@@ -405,9 +412,29 @@ function AgentAnswer({
 	);
 }
 
-/** The answer's Markdown: the one place the chat renders what the agent wrote. */
-function AnswerText({ text }: { text: string }) {
-	return <Markdown text={text} />;
+/**
+ * The answer's Markdown: the one place the chat renders what the agent
+ * wrote. In a chat about a run, a link to a step of the run is a citation.
+ */
+function AnswerText({ text, run }: { text: string; run: Props["run"] }) {
+	const link = useCallback<LinkView>(
+		({ href, children }) => {
+			const stepId = citedStepId(href);
+			if (stepId === undefined) return undefined;
+			if (!run) return children;
+			return (
+				<StepCitation
+					runId={run.id}
+					runStatus={run.status}
+					step={run.steps?.find((step) => step.id === stepId)}
+				>
+					{children}
+				</StepCitation>
+			);
+		},
+		[run],
+	);
+	return <Markdown text={text} link={link} />;
 }
 
 function ProposalMessage({

@@ -39,6 +39,7 @@ export {
 	suggestionSchema,
 	type TextRange,
 } from "./assistant";
+export { citedStepId, stepCitation } from "./citation";
 export {
 	diffFlows,
 	type FlowDiff,

@@ -72,31 +72,6 @@ export function StepLine({
 	);
 }
 
-/** The output that says in words what a step did, by node type. */
-const PROSE_OUTPUT: Partial<Record<StepSummary["nodeType"], string>> = {
-	agent: "summary",
-	decision: "note",
-};
-
-/** What the step did, in its own words: an Agent's summary, or a Decision's note. */
-export function stepProse(step: StepSummary): string | undefined {
-	const field = PROSE_OUTPUT[step.nodeType];
-	const value = field ? step.outputs[field] : undefined;
-	return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-/** One line on what the step did, for a collapsed view: its error, else the first line of its prose or log. */
-export function stepGist(step: StepSummary): string | undefined {
-	if (step.error) return step.error.split("\n")[0];
-	const prose = stepProse(step);
-	if (prose) return prose.split("\n")[0];
-	const logTail = step.outputs.log_tail;
-	if (typeof logTail === "string" && logTail.trim()) {
-		return logTail.trim().split("\n").at(-1);
-	}
-	return undefined;
-}
-
 /** The step's facts in a grid of small label-over-value cells: when, how long, how long it waited or slept, cost, visit, exit code, sessions. */
 export function StepFacts({ step }: { step: StepSummary }) {
 	const exit = step.outputs.exit_code;

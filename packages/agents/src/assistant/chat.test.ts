@@ -278,6 +278,16 @@ describe("runReport", () => {
 		expect(report).not.toContain("line 10\n");
 	});
 
+	test("with cite, each step is the link the chat shows as a citation", () => {
+		const report = runReport(run, draft, "The draft", { cite: true });
+		expect(report).toContain("- [build](#step-s1) (agent): pass");
+		expect(report).toContain(
+			'- [test](#step-s2) in the called flow "build-task" (command): fail',
+		);
+		expect(report).toContain("The step that failed: [test](#step-s2)");
+		expect(runReport(run, draft)).not.toContain("#step-");
+	});
+
 	test("many long steps stay within the limit", () => {
 		const long = "x".repeat(5000);
 		const report = runReport(
@@ -382,6 +392,7 @@ describe("chatTurn", () => {
 		expect(input?.resumeSessionId).toBe("s-1");
 		expect(input?.prompt).toStartWith("The person's next message.");
 		expect(input?.prompt).toContain("This chat is about run r1");
+		expect(input?.prompt).toContain("(#step-<step id>)");
 		expect(input?.prompt).not.toContain("# Writing Night Shift flows");
 		expect(input?.tools?.map((t) => t.name)).toContain("get_run");
 	});

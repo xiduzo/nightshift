@@ -18,6 +18,7 @@ import {
 	flowSchema,
 	type ProjectFlowMap,
 	proposalIssues,
+	stepCitation,
 } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../port";
@@ -225,13 +226,17 @@ async function check(port: AuthoringPort, flow: unknown) {
 
 /**
  * One run as Markdown for the agent, at most `RUN_REPORT_LIMIT` characters.
- * `draft` is the flow as it is now, which `what` names.
+ * `draft` is the flow as it is now, which `what` names. With `cite`, each
+ * step is the link the chat shows as a citation of it (`stepCitation`).
  */
 export function runReport(
 	run: AuthoringRun,
 	draft: Flow,
 	what = "The draft",
+	{ cite = false }: { cite?: boolean } = {},
 ): string {
+	const name = (step: AuthoringRunStep) =>
+		cite ? stepCitation(step.nodeId, step.id) : `\`${step.nodeId}\``;
 	const lines: string[] = [
 		`# Run ${run.id}`,
 		"",
@@ -246,6 +251,11 @@ export function runReport(
 			: `${what} changed since this run: ${diff.added} steps added, ${diff.removed} removed, ${diff.changed} changed, ${diff.edges} edges changed.`,
 	);
 	lines.push("", "## Steps, in the order they ran");
+	if (cite) {
+		lines.push(
+			"(Each step is a link. To cite a step in your answer, copy its link as written here.)",
+		);
+	}
 	const steps = run.steps.slice(-STEP_LIMIT);
 	if (steps.length < run.steps.length) {
 		lines.push(`(the last ${steps.length} of ${run.steps.length})`);
@@ -254,7 +264,7 @@ export function runReport(
 		step.flow ? ` in the called flow "${step.flow}"` : "";
 	for (const step of steps) {
 		const parts = [
-			`- \`${step.nodeId}\`${where(step)} (${step.nodeType}${step.visit > 1 ? `, visit ${step.visit}` : ""}): ${step.outcome ?? "running"}`,
+			`- ${name(step)}${where(step)} (${step.nodeType}${step.visit > 1 ? `, visit ${step.visit}` : ""}): ${step.outcome ?? "running"}`,
 		];
 		if (step.error) parts.push(`error: ${cut(step.error, NOTE_LIMIT)}`);
 		if (step.note) parts.push(`note: ${cut(step.note, NOTE_LIMIT)}`);
@@ -264,7 +274,7 @@ export function runReport(
 	if (failed) {
 		lines.push(
 			"",
-			`The step that failed: \`${failed.nodeId}\`${
+			`The step that failed: ${name(failed)}${
 				failed.flow
 					? ` in the called flow "${failed.flow}". Read it with get_flow: a fix may belong there, or in the Subflow node that calls it`
 					: ""
@@ -436,7 +446,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 			}).server(async () => {
 				const [found, draft] = await Promise.all([run(), port.draft()]);
 				return found
-					? runReport(found, draft.flow)
+					? runReport(found, draft.flow, "The draft", { cite: true })
 					: "This run is not one of this flow's runs on this computer.";
 			}),
 		);

@@ -1,3 +1,3 @@
 /** Text an agent or a flow wrote, shown as Markdown. */
 
-export { InlineMarkdown, Markdown } from "./markdown";
+export { InlineMarkdown, type LinkView, Markdown } from "./markdown";

@@ -102,7 +102,12 @@ export function useChatPanel(
 		draft,
 		blank: isBlankFlow(draft),
 		run: runId
-			? { id: runId, status: run.data?.status, title: run.data?.title }
+			? {
+					id: runId,
+					status: run.data?.status,
+					title: run.data?.title,
+					steps: run.data?.steps,
+				}
 			: null,
 		sendBlockedBy: isSavable(draft) ? null : SEND_BLOCKED,
 		shownId: shown ? shownId : null,

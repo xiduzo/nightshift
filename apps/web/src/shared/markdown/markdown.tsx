@@ -7,8 +7,32 @@ import {
 	TableRow,
 } from "@nightshift/ui/components/table";
 import { cn } from "@nightshift/ui/lib/utils";
+import { type ReactNode, useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+/** A link in the text: it opens in a new tab. */
+function TextLink({ href, children }: { href?: string; children?: ReactNode }) {
+	return (
+		<a
+			href={href}
+			target="_blank"
+			rel="noreferrer"
+			className="break-all text-primary underline underline-offset-3"
+		>
+			{children}
+		</a>
+	);
+}
+
+/**
+ * How a caller shows some links itself: its own node for the link, or
+ * undefined to show it as a link that opens in a new tab.
+ */
+export type LinkView = (link: {
+	href: string | undefined;
+	children: ReactNode;
+}) => ReactNode | undefined;
 
 /** Every heading in the text sits below the title of the block that shows it. */
 function Heading({ children }: { children?: React.ReactNode }) {
@@ -29,16 +53,7 @@ const COMPONENTS: Components = {
 	ol: ({ children }) => (
 		<ol className="flex list-decimal flex-col gap-1 pl-5">{children}</ol>
 	),
-	a: ({ href, children }) => (
-		<a
-			href={href}
-			target="_blank"
-			rel="noreferrer"
-			className="break-all text-primary underline underline-offset-3"
-		>
-			{children}
-		</a>
-	),
+	a: ({ href, children }) => <TextLink href={href}>{children}</TextLink>,
 	code: ({ children }) => (
 		<code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">
 			{children}
@@ -68,11 +83,27 @@ const COMPONENTS: Components = {
  */
 export function Markdown({
 	text,
+	link,
 	className,
 }: {
 	text: string;
+	/** Shows some links in another way, such as a citation. */
+	link?: LinkView;
 	className?: string;
 }) {
+	const components = useMemo<Components>(
+		() =>
+			link
+				? {
+						...COMPONENTS,
+						a: ({ href, children }) =>
+							link({ href, children }) ?? (
+								<TextLink href={href}>{children}</TextLink>
+							),
+					}
+				: COMPONENTS,
+		[link],
+	);
 	return (
 		<div
 			className={cn(
@@ -80,7 +111,7 @@ export function Markdown({
 				className,
 			)}
 		>
-			<ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
+			<ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
 				{text}
 			</ReactMarkdown>
 		</div>
