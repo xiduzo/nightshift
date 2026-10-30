@@ -1,4 +1,4 @@
-import { isSavable } from "@nightshift/flows";
+import { type Flow, isSavable } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import {
 	type ComponentProps,
@@ -7,11 +7,12 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { toast } from "sonner";
 import { runQueries } from "@/features/runs/flows-port";
 import { type FlowAssistant, replaceDraft } from "../assistant/flow-assistant";
 import type { ChatLink } from "./chat-link";
 import type { FlowChatPanel } from "./chat-panel";
-import { ASK_WHY_MESSAGE } from "./chat-thread";
+import { ASK_WHY_MESSAGE, restorePoint } from "./chat-thread";
 import { type ProposalCanvas, proposalCanvas } from "./proposal-canvas";
 import { isBlankFlow } from "./starters";
 import { useFlowChat } from "./use-flow-chat";
@@ -20,7 +21,7 @@ const SEND_BLOCKED = "Fix the fields marked in the issues first.";
 
 /**
  * The editor's side of the chat: whether the panel is open, the proposal
- * the canvas shows, and Apply, Undo and Discard on the draft. A new, blank
+ * the canvas shows, and Apply, Undo, Discard and Restore on the draft. A new, blank
  * flow opens with the panel. A `link` opens the panel too: a link about a
  * run starts a chat about that run, with its first message sent.
  * `onLinkUsed` then drops the link, so a reload does not ask again.
@@ -128,6 +129,30 @@ export function useChatPanel(
 		onDiscard: (id) => {
 			setShownId(null);
 			chat.markProposal(id, "discarded");
+		},
+		onRestore: (id) => {
+			const point = restorePoint(chat.thread, id);
+			if (!point) return;
+			let before: Flow;
+			try {
+				before = JSON.parse(point.baseJson) as Flow;
+			} catch {
+				toast.error("This point of the chat cannot be restored.");
+				return;
+			}
+			setShownId(null);
+			// The proposals leave the flow: their choice is open again.
+			for (const applied of point.applied) chat.markProposal(applied, "open");
+			// The same path as Apply: one step of the editor's undo history.
+			replaceDraft(
+				assistant,
+				before,
+				"Flow restored. Save the flow to keep it.",
+				() => {
+					for (const applied of point.applied)
+						chat.markProposal(applied, "applied");
+				},
+			);
 		},
 	};
 

@@ -3,11 +3,13 @@ import { FLOW_VERSION, type FlowProposal, flowSchema } from "@nightshift/flows";
 import {
 	aboutRun,
 	applyChatEvent,
+	type ChatThread,
 	chatRequest,
 	EMPTY_THREAD,
 	endAnswer,
 	openProposal,
 	readThread,
+	restorePoint,
 	setProposalStatus,
 	startAnswer,
 	threadKey,
@@ -168,5 +170,48 @@ describe("Undo after Apply", () => {
 		expect(openProposal(applied)).toBeUndefined();
 		const undone = setProposalStatus(applied, "1:agent", "open");
 		expect(openProposal(undone)?.id).toBe("1:agent");
+	});
+});
+
+describe("a restore point", () => {
+	/** Three answers with a proposal each, made from drafts A, B and C. */
+	function threeProposals(): ChatThread {
+		let thread: ChatThread = EMPTY_THREAD;
+		for (const [n, base] of ["A", "B", "C"].entries()) {
+			thread = startAnswer(thread, `Change ${n}`, {
+				person: `${n}:person`,
+				agent: `${n}:agent`,
+			});
+			thread = applyChatEvent(thread, { type: "proposal", proposal }, base);
+		}
+		return thread;
+	}
+
+	test("only an applied proposal has one", () => {
+		const thread = threeProposals();
+		expect(restorePoint(thread, "0:agent")).toBeUndefined();
+		expect(restorePoint(thread, "0:person")).toBeUndefined();
+		expect(restorePoint(thread, "nope")).toBeUndefined();
+	});
+
+	test("goes back to the draft sent with the message", () => {
+		const thread = setProposalStatus(threeProposals(), "1:agent", "applied");
+		expect(restorePoint(thread, "1:agent")).toEqual({
+			baseJson: "B",
+			applied: ["1:agent"],
+		});
+	});
+
+	test("takes out each applied proposal after it, not the ones before", () => {
+		let thread = threeProposals();
+		for (const id of ["0:agent", "1:agent", "2:agent"])
+			thread = setProposalStatus(thread, id, "applied");
+		thread = setProposalStatus(thread, "2:agent", "discarded");
+		expect(restorePoint(thread, "1:agent")?.applied).toEqual(["1:agent"]);
+		thread = setProposalStatus(thread, "2:agent", "applied");
+		expect(restorePoint(thread, "0:agent")).toEqual({
+			baseJson: "A",
+			applied: ["0:agent", "1:agent", "2:agent"],
+		});
 	});
 });

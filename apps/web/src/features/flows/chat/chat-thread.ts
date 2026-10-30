@@ -175,6 +175,29 @@ export function openProposal(
 	return undefined;
 }
 
+/**
+ * What a restore to before the proposal in message `id` does: the draft
+ * goes back to `baseJson`, the draft sent with the message, and the
+ * proposals in `applied` leave the flow (that one, and each applied one
+ * after it). Undefined when `id` holds no applied proposal.
+ */
+export function restorePoint(
+	thread: ChatThread,
+	id: string,
+): { baseJson: string; applied: string[] } | undefined {
+	const at = thread.messages.findIndex((message) => message.id === id);
+	const message = thread.messages[at];
+	if (message?.role !== "agent" || message.proposal?.status !== "applied")
+		return undefined;
+	const applied = thread.messages
+		.slice(at)
+		.filter(
+			(later) => later.role === "agent" && later.proposal?.status === "applied",
+		)
+		.map((later) => later.id);
+	return { baseJson: message.proposal.baseJson, applied };
+}
+
 /** Where this browser keeps the chat of one flow, for a reload. */
 export function threadKey(projectId: string, flowName: string): string {
 	return `nightshift:flow-chat:${projectId}/${flowName}`;

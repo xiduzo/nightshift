@@ -5,6 +5,16 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Bubble, BubbleContent } from "@nightshift/ui/components/bubble";
 import { Button } from "@nightshift/ui/components/button";
@@ -17,6 +27,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
+import { Marker, MarkerContent } from "@nightshift/ui/components/marker";
 import {
 	Message,
 	MessageContent,
@@ -36,6 +47,7 @@ import { Link } from "@tanstack/react-router";
 import {
 	CircleAlertIcon,
 	HistoryIcon,
+	RotateCcwIcon,
 	SparklesIcon,
 	SquarePenIcon,
 	XIcon,
@@ -53,6 +65,7 @@ import {
 	ASK_WHY_MESSAGE,
 	type ChatProposal,
 	type ChatThread,
+	restorePoint,
 } from "./chat-thread";
 import { proposalCanvas } from "./proposal-canvas";
 import { ProposalCard } from "./proposal-card";
@@ -80,6 +93,8 @@ type Props = {
 	onToggleShown: (messageId: string) => void;
 	onApply: (messageId: string, proposal: ChatProposal) => void;
 	onDiscard: (messageId: string) => void;
+	/** Puts the draft back as it was before the applied proposal in `messageId`. */
+	onRestore: (messageId: string) => void;
 	/** Above the message box: why the agent cannot read the project here yet, and how to fix it. */
 	notice?: ReactNode;
 	className?: string;
@@ -224,24 +239,35 @@ function ChatMessages(props: Props) {
 			<MessageScroller className="min-h-0 flex-1">
 				<MessageScrollerViewport aria-label="Chat with the agent">
 					<MessageScrollerContent className="gap-4 p-3">
-						{thread.messages.map((message) => (
-							<MessageScrollerItem key={message.id} messageId={message.id}>
+						{thread.messages.map((message, index) => (
+							<MessageScrollerItem
+								key={message.id}
+								messageId={message.id}
+								className="flex flex-col gap-4"
+							>
 								{message.role === "person" ? (
-									<Message align="end">
-										<MessageContent>
-											<Bubble
-												variant="muted"
-												align="end"
-												className="max-w-[92%]"
-											>
-												<BubbleContent>
-													<p className="whitespace-pre-wrap break-words">
-														{message.text}
-													</p>
-												</BubbleContent>
-											</Bubble>
-										</MessageContent>
-									</Message>
+									<>
+										<RestoreCheckpoint
+											thread={thread}
+											answer={thread.messages[index + 1]}
+											onRestore={props.onRestore}
+										/>
+										<Message align="end">
+											<MessageContent>
+												<Bubble
+													variant="muted"
+													align="end"
+													className="max-w-[92%]"
+												>
+													<BubbleContent>
+														<p className="whitespace-pre-wrap break-words">
+															{message.text}
+														</p>
+													</BubbleContent>
+												</Bubble>
+											</MessageContent>
+										</Message>
+									</>
 								) : (
 									<AgentAnswer
 										{...props}
@@ -257,6 +283,71 @@ function ChatMessages(props: Props) {
 				<MessageScrollerButton />
 			</MessageScroller>
 		</MessageScrollerProvider>
+	);
+}
+
+/**
+ * Above a message whose answer you applied (the AI Elements Checkpoint):
+ * the way back to the flow as it was when you sent the message. It asks
+ * first when later applied changes leave the flow too.
+ */
+function RestoreCheckpoint({
+	thread,
+	answer,
+	onRestore,
+}: {
+	thread: ChatThread;
+	/** The message after the person's: the agent's answer, if any. */
+	answer: ChatThread["messages"][number] | undefined;
+	onRestore: (messageId: string) => void;
+}) {
+	const [confirming, setConfirming] = useState(false);
+	const point = answer ? restorePoint(thread, answer.id) : undefined;
+	if (!answer || !point) return null;
+	const later = point.applied.length - 1;
+	return (
+		<>
+			<Marker variant="separator">
+				<MarkerContent className="inline-flex items-center gap-2">
+					<Button
+						variant="outline"
+						size="xs"
+						title="Put the flow back as it was when you sent this message"
+						onClick={() =>
+							later > 0 ? setConfirming(true) : onRestore(answer.id)
+						}
+					>
+						<RotateCcwIcon data-icon="inline-start" />
+						Restore the flow to here
+					</Button>
+				</MarkerContent>
+			</Marker>
+			<AlertDialog open={confirming} onOpenChange={setConfirming}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Restore the flow to here?</AlertDialogTitle>
+						<AlertDialogDescription>
+							{later === 1
+								? "You applied 1 more change after this point. The restore takes it out of the flow too."
+								: `You applied ${later} more changes after this point. The restore takes them out of the flow too.`}{" "}
+							You can undo the restore.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							onClick={() => {
+								setConfirming(false);
+								onRestore(answer.id);
+							}}
+						>
+							Restore the flow
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</>
 	);
 }
 
