@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+	appendFile,
 	lstat,
 	mkdir,
 	open,
@@ -56,12 +57,12 @@ const HEAD_BYTES = 4096;
 /** The files whose text the index reads. Any other file shows its name only. */
 const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
 
-/** A project id as one folder name: nothing that could leave the folder. */
-function folderName(projectId: string): string {
-	if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(projectId)) {
-		throw new Error(`"${projectId}" is not a project id.`);
+/** An id as one file or folder name: nothing that could leave the folder. */
+function folderName(id: string): string {
+	if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id)) {
+		throw new Error(`"${id}" is not an id.`);
 	}
-	return projectId;
+	return id;
 }
 
 /** The knowledge folders of the projects on this computer. */
@@ -81,6 +82,46 @@ export function createKnowledgeFolders(dataDir: string) {
 	return {
 		folder,
 		ensure,
+		/**
+		 * Adds what an agent of the run proposes to learn to
+		 * `learnings/proposed/<runId>.md`, one note per line, for a person
+		 * to accept or reject (`kit:knowledge/review-learnings`).
+		 */
+		async propose(
+			projectId: string,
+			runId: string,
+			notes: readonly string[],
+		): Promise<void> {
+			const lines = notes
+				.map((note) => note.replace(/\s+/g, " ").trim())
+				.filter((note) => note !== "");
+			if (lines.length === 0) return;
+			const dir = join(folder(projectId), PROPOSED_DIR);
+			await mkdir(dir, { recursive: true });
+			const file = join(dir, `${folderName(runId)}.md`);
+			const isNew = (await stat(file).catch(() => null)) === null;
+			const head = isNew
+				? `# Learnings of run ${runId.slice(0, 8)}\n\nWhat the agents of run ${runId} proposed to learn about this project.\n\n`
+				: "";
+			await appendFile(
+				file,
+				`${head}${lines.map((line) => `- ${line}`).join("\n")}\n`,
+			);
+		},
+		/** How many notes wait for a person in `learnings/proposed/`. */
+		async proposed(projectId: string): Promise<number> {
+			const dir = join(folder(projectId), PROPOSED_DIR);
+			const names = await readdir(dir).catch(() => [] as string[]);
+			let count = 0;
+			for (const name of names) {
+				if (!name.endsWith(".md")) continue;
+				const text = await readFile(join(dir, name), "utf8").catch(() => "");
+				count += text
+					.split("\n")
+					.filter((line) => line.startsWith("- ")).length;
+			}
+			return count;
+		},
 		/** The files of the folder, the index left out, by path. None when it is not there. */
 		files: async (projectId: string) => (await walk(folder(projectId))).files,
 		/**

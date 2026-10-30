@@ -354,6 +354,49 @@ describe("the project's knowledge", () => {
 		expect(off && "knowledge" in off).toBe(false);
 	});
 
+	test("an agent that reads the knowledge may propose learnings: they wait for a person", async () => {
+		const learned = {
+			type: "event" as const,
+			event: {
+				type: "report" as const,
+				outcome: "pass",
+				summary: "Done.",
+				learnings: ["The tests need a database."],
+			},
+		};
+		const harness = fakeHarness({ steps: [learned] });
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		await Bun.write(join(knowledge.folder("p1"), "a.md"), "# A\n");
+		const d = device({ harnesses: { "claude-code": harness }, knowledge });
+		const forStep = {
+			knowledge: { projectId: "p1" },
+			artifacts: { runId: "run-1", stepId: "s1" },
+			stepReport: true as const,
+		};
+		await collect(d.session(sessionInput(forStep)));
+		await collect(d.session(sessionInput(forStep)));
+		// Without the knowledge, no learnings are asked for or kept.
+		await collect(
+			d.session(sessionInput({ ...forStep, knowledge: undefined })),
+		);
+		const [first, , off] = harness.calls;
+		expect(first?.stepReport).toEqual({ learnings: true });
+		expect(off?.stepReport).toBe(true);
+		const proposed = await Bun.file(
+			join(knowledge.folder("p1"), "learnings/proposed/run-1.md"),
+		).text();
+		expect(proposed).toStartWith("# Learnings of run run-1\n");
+		expect(
+			proposed.split("\n").filter((line) => line.startsWith("- ")),
+		).toEqual(["- The tests need a database.", "- The tests need a database."]);
+		expect(await knowledge.proposed("p1")).toBe(2);
+		// The index lists accepted learnings only.
+		await knowledge.index("p1");
+		expect(
+			await Bun.file(join(knowledge.folder("p1"), "INDEX.md")).text(),
+		).not.toContain("learnings/proposed");
+	});
+
 	test("a command gets the folder in NS_KNOWLEDGE, made for it", async () => {
 		const knowledge = createKnowledgeFolders(sandbox.dataDir);
 		const events = await collect(

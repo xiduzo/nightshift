@@ -9,5 +9,7 @@ export {
 export {
 	commandKnowledge,
 	type KnowledgeRequest,
+	keepLearnings,
 	sessionKnowledge,
+	withLearnings,
 } from "./handoff";

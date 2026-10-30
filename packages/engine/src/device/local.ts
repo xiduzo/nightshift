@@ -32,7 +32,9 @@ import {
 import {
 	commandKnowledge,
 	type KnowledgeFolders,
+	keepLearnings,
 	sessionKnowledge,
+	withLearnings,
 } from "../knowledge";
 import {
 	checkProjectFolder,
@@ -299,9 +301,15 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 						})
 					: null;
 			const env = { ...known?.env, ...tools?.env };
+			// An agent that reads the knowledge may propose to add to it.
+			const learn =
+				known?.addDirs && knowledge && artifacts && deps.knowledge
+					? { projectId: knowledge.projectId, runId: artifacts.runId }
+					: null;
 			yield { type: "ready", harness: name };
-			const events = harness.run({
+			const run = harness.run({
 				...rest,
+				...(learn ? { stepReport: withLearnings(rest.stepReport) } : {}),
 				prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,
 				...(clis && clis.length > 0 ? { clis } : {}),
 				...(Object.keys(mcp.servers).length > 0
@@ -318,6 +326,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...(known?.instructions ? { instructions: known.instructions } : {}),
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
 			});
+			const events =
+				learn && deps.knowledge
+					? keepLearnings(run, deps.knowledge, learn)
+					: run;
 			yield* tools && tools.values.length > 0
 				? redactSession(events, tools.values)
 				: events;

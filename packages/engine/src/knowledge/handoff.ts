@@ -1,3 +1,4 @@
+import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
 import { INDEX_FILE, type KnowledgeFolders } from "./folder";
 
 /**
@@ -53,4 +54,39 @@ export async function sessionKnowledge(
 	if (files.length === 0 && !request.always) return { env };
 	await folders.index(request.projectId);
 	return { env, addDirs: [path], instructions: knowledgeLine(path) };
+}
+
+/**
+ * The step report of an agent that reads the knowledge: it may add
+ * `learnings`. A session without a report stays without one.
+ */
+export function withLearnings(
+	stepReport: AgentSessionInput["stepReport"],
+): AgentSessionInput["stepReport"] {
+	if (!stepReport) return stepReport;
+	return stepReport === true
+		? { learnings: true }
+		: { ...stepReport, learnings: true };
+}
+
+/**
+ * The session's events as they are, with the learnings of its reports
+ * kept as proposals of the run, for a person to review. A note that cannot
+ * be kept is left out: the step goes on.
+ */
+export async function* keepLearnings(
+	events: AsyncIterable<AgentEvent>,
+	folders: KnowledgeFolders,
+	at: { projectId: string; runId: string },
+): AsyncGenerator<AgentEvent> {
+	for await (const event of events) {
+		if (event.type === "report" && event.learnings?.length) {
+			await folders
+				.propose(at.projectId, at.runId, event.learnings)
+				.catch((error) =>
+					console.warn("The learnings of a step were not kept:", error),
+				);
+		}
+		yield event;
+	}
 }
