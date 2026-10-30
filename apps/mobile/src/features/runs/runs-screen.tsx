@@ -156,7 +156,7 @@ export function RunsScreen() {
 				<EmptyState
 					icon={History}
 					title="No runs yet"
-					description="The runs of this Space show up here, newest first. Start a flow to make the first one."
+					description="Start a flow to make the first run."
 				>
 					<Button
 						size="lg"
@@ -222,7 +222,7 @@ export function RunsScreen() {
 				<EmptyState
 					icon={History}
 					title="No runs in this project"
-					description="The runs of this project show up here. Show every project to see the other runs."
+					description="Show every project to see the other runs."
 				>
 					<Button
 						size="lg"

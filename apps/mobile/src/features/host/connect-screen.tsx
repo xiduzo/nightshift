@@ -82,7 +82,7 @@ export function ConnectScreen() {
 				summary={
 					step === "code"
 						? "Your Host asks for a second code before you sign in."
-						: "Sign in to the Host that runs your flows. Then you answer Gates and follow runs from this phone."
+						: "Sign in to the Host that runs your flows. Then answer Gates and follow runs from this phone."
 				}
 			/>
 			{step === "scan" ? (
@@ -105,10 +105,7 @@ export function ConnectScreen() {
 							accessibilityHint="Opens the camera to read the Host address"
 						/>
 					</ListGroup>
-					<SectionHead
-						title="Or sign in by hand"
-						hint="Type the Host address, your email and your password."
-					/>
+					<SectionHead title="Or sign in by hand" />
 					<Card className="py-4">
 						<CardContent className="gap-5 px-4">
 							<Field
@@ -165,7 +162,7 @@ export function ConnectScreen() {
 							hint={
 								codeKind === "app"
 									? "Enter the 6-digit code from your authenticator app."
-									: "Enter one of the backup codes you saved when you turned on two-factor sign-in. Each code works once."
+									: "Enter one of the backup codes you saved. Each code works once."
 							}
 						>
 							<Input

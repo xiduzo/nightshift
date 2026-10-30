@@ -61,7 +61,7 @@ export function InboxScreen() {
 						<EmptyState
 							icon={Inbox}
 							title="Nothing needs you"
-							description="When a run waits for your answer at a Gate, it shows up here. This inbox holds the Gates of every Space you are in."
+							description="When a run waits for your answer, it shows here. This covers every Space you are in."
 						>
 							<Button
 								size="lg"

@@ -62,7 +62,7 @@ export function NotificationsCard() {
 		<View className="gap-3">
 			<SectionHead
 				title="Notifications"
-				hint="What Night Shift tells you about, on every screen where you use it."
+				hint="Choose what Night Shift tells you about. This applies on every screen."
 			/>
 			{settings.data ? (
 				<NotificationFields
@@ -118,7 +118,7 @@ function NotificationFields({
 			<ListGroup>
 				<SwitchRow
 					title="Phones"
-					caption="When off, your phones get no notifications. The inbox still shows what waits for you."
+					caption="When off, your phones get no notifications. The inbox still shows what waits."
 					checked={value.screens.expo}
 					onChange={(on) => onChange({ screens: { expo: on } })}
 				/>
@@ -129,7 +129,7 @@ function NotificationFields({
 					caption={
 						quiet
 							? `No notifications in these hours. Times are in ${value.timeZone}.`
-							: "Choose hours without notifications, for example at night."
+							: "Night Shift stays silent, then tells you what still waits."
 					}
 					checked={quiet !== null}
 					onChange={(on) =>
@@ -234,8 +234,8 @@ function DelaySelect({
 				</SelectContent>
 			</Select>
 			<Text variant="muted" className="text-muted-foreground">
-				While you use Night Shift on another screen, your phones wait this long.
-				A Gate you answer in that time does not reach your phones.
+				While you use another screen, your phones wait this long. A Gate you
+				answer in that time does not reach them.
 			</Text>
 		</View>
 	);

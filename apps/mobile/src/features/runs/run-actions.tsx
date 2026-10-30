@@ -83,7 +83,7 @@ export function RunActions({
 						icon={Play}
 						busy={resume.isPending}
 						title="Resume this run?"
-						description="The run goes on at its last step."
+						description="The run continues at its last step."
 						confirm="Resume run"
 						onConfirm={() => {
 							stop.reset();

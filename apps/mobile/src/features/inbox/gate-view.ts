@@ -79,7 +79,7 @@ export function needsConfirm(
 	);
 }
 
-/** What happens once the answer went: "Fix the bug goes on at Build". */
+/** What happens once the answer went: "Fix the bug continues at Build". */
 export function sentText(
 	route: ChoiceRoute | undefined,
 	runTitle: string,
@@ -89,8 +89,8 @@ export function sentText(
 	if (route?.kind === "limit") return "The run stops.";
 	const goesOn =
 		route?.kind === "node"
-			? `${runTitle} goes on at ${route.label}`
-			: `${runTitle} goes on`;
+			? `${runTitle} continues at ${route.label}`
+			: `${runTitle} continues`;
 	if (walkerElsewhere) return `${goesOn} when ${walkerElsewhere} is online.`;
 	// A step label may end in its own mark: "Announce it?".
 	return /[.?!]$/.test(goesOn) ? goesOn : `${goesOn}.`;

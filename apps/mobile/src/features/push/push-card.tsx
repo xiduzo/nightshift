@@ -58,8 +58,7 @@ export function PushCard() {
 					<CardHeader>
 						<CardTitle>Notifications are off</CardTitle>
 						<CardDescription>
-							To get a notification when a Gate waits for you, allow
-							notifications for Night Shift in the Settings app of your phone.
+							Allow them for Night Shift in the Settings app of your phone.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -96,8 +95,8 @@ export function PushCard() {
 				<CardHeader>
 					<CardTitle>Get a notification when a Gate waits for you</CardTitle>
 					<CardDescription>
-						Your phone tells you when a run needs your answer, also when Night
-						Shift is closed. Some Gates you can answer from the notification.
+						Your phone tells you, also when Night Shift is closed. You can
+						answer some Gates from the notification.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>

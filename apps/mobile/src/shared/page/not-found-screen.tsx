@@ -12,7 +12,7 @@ export function NotFoundScreen() {
 			<EmptyState
 				icon={SearchX}
 				title="This page does not exist"
-				description="The link may be old. Go back to your inbox to see what needs you."
+				description="The link may be old."
 			>
 				<Link href="/inbox" dismissTo asChild>
 					<Button size="lg" className="h-auto min-h-11 py-2">
