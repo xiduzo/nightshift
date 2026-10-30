@@ -18,6 +18,7 @@ export const knowledgeJiraKit: FlowInput = {
 	inputs: [
 		{
 			name: "keys",
+			label: "Work items",
 			type: "text",
 			description:
 				"The work items, separated by spaces, commas or lines, for example PROJ-1, PROJ-2.",
@@ -25,6 +26,7 @@ export const knowledgeJiraKit: FlowInput = {
 		},
 		{
 			name: "tool",
+			label: "CLI tool",
 			type: "text",
 			description:
 				"The CLI tool that runs acli signed in, for example acli-work. Each CLI tool with a login is one account.",

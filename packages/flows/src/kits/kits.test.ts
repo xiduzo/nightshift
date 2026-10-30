@@ -3,6 +3,7 @@ import {
 	chmod,
 	mkdir,
 	mkdtemp,
+	readdir,
 	readFile,
 	realpath,
 	rm,
@@ -631,6 +632,63 @@ describe("the knowledge kits", () => {
 		});
 		expect(one.data).toEqual({ files: 1 });
 		await expect(read("files/notes.md")).rejects.toThrow();
+	});
+
+	test("folder: copies a folder anywhere on the computer, hidden files left out", async () => {
+		const notes = join(root, "notes");
+		await mkdir(join(notes, "specs"), { recursive: true });
+		await mkdir(join(notes, ".obsidian"), { recursive: true });
+		await writeFile(join(notes, "a.md"), "# A\n");
+		await writeFile(join(notes, "specs", "b.md"), "# B\n");
+		await writeFile(join(notes, "c.txt"), "c");
+		await writeFile(join(notes, ".obsidian", "app.json"), "{}");
+
+		const all = await step(kit("kit:knowledge/folder"), "sync", {
+			path: notes,
+		});
+		expect(all.outcome).toBe("synced");
+		expect(all.data).toEqual({ files: 3 });
+		expect(await read("folder/specs/b.md")).toBe("# B\n");
+
+		// Patterns pick the files, also in folders below. A sync replaces the folder.
+		const md = await step(kit("kit:knowledge/folder"), "sync", {
+			path: notes,
+			patterns: "*.md\nspecs",
+			folder: "folder",
+		});
+		expect(md.data).toEqual({ files: 2 });
+		await expect(read("folder/c.txt")).rejects.toThrow();
+
+		// ~ is the home folder.
+		const home = await step(
+			kit("kit:knowledge/folder"),
+			"sync",
+			{ path: "~/notes", patterns: "c.txt" },
+			{},
+			{ env: { HOME: root } },
+		);
+		expect(home.data).toEqual({ files: 1 });
+		expect(await read("folder/c.txt")).toBe("c");
+	});
+
+	test("folder: nothing to copy, or not a full path, leaves the folder as it was", async () => {
+		await mkdir(join(knowledge, "folder"), { recursive: true });
+		await writeFile(join(knowledge, "folder", "kept.md"), "kept");
+		const missing = await step(kit("kit:knowledge/folder"), "sync", {
+			path: join(root, "nope"),
+		});
+		expect(missing.outcome).toBe("nothing");
+		const none = await step(kit("kit:knowledge/folder"), "sync", {
+			path: repo,
+			patterns: "*.pdf",
+		});
+		expect(none.outcome).toBe("nothing");
+		const relative = await step(kit("kit:knowledge/folder"), "sync", {
+			path: "notes",
+		});
+		expect(relative.outcome).toBe("fail");
+		expect(await read("folder/kept.md")).toBe("kept");
+		expect(await readdir(knowledge)).toEqual(["folder"]);
 	});
 
 	test("github-wiki: clones the wiki, then takes the newest pages", async () => {

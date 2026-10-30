@@ -190,6 +190,7 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. 
 - `kit:jira/move` (key*, status*, tool): Moves a Jira work item to another status, for example In Progress.
 - `kit:knowledge/confluence` (site*, email*, pages*, folder) → files: Copies Confluence pages into the project's knowledge as markdown, one file each.
 - `kit:knowledge/files` (from*, folder) → files: Copies files of the project into its knowledge, also files that git ignores, such as private notes.
+- `kit:knowledge/folder` (path*, patterns, folder) → files: Copies a folder of this computer into the project's knowledge, such as notes outside the project.
 - `kit:knowledge/github-wiki` (repo*, folder) → files: Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync.
 - `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
 - `kit:knowledge/review-learnings` (): Shows what agents proposed to learn about the project, and asks you to keep or delete it.

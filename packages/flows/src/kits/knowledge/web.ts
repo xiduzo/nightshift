@@ -12,6 +12,7 @@ export const knowledgeWebKit: FlowInput = {
 	inputs: [
 		{
 			name: "urls",
+			label: "Pages",
 			type: "text",
 			description:
 				"The pages, one address per line, for example https://example.com/docs.",

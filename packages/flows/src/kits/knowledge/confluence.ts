@@ -22,18 +22,21 @@ export const knowledgeConfluenceKit: FlowInput = {
 	inputs: [
 		{
 			name: "site",
+			label: "Site",
 			type: "text",
 			description: "Your Confluence site, for example your-team.atlassian.net.",
 			required: true,
 		},
 		{
 			name: "email",
+			label: "Email",
 			type: "text",
 			description: "The email address of the account the API token is of.",
 			required: true,
 		},
 		{
 			name: "pages",
+			label: "Pages",
 			type: "text",
 			description:
 				"The page ids, separated by spaces, commas or lines. The id is the number in the address of the page.",

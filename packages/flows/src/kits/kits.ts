@@ -8,6 +8,7 @@ import { jiraAssignKit } from "./jira/assign";
 import { jiraMoveKit } from "./jira/move";
 import { knowledgeConfluenceKit } from "./knowledge/confluence";
 import { knowledgeFilesKit } from "./knowledge/files";
+import { knowledgeFolderKit } from "./knowledge/folder";
 import { knowledgeGithubWikiKit } from "./knowledge/github-wiki";
 import { knowledgeJiraKit } from "./knowledge/jira";
 import { knowledgeReviewLearningsKit } from "./knowledge/review-learnings";
@@ -36,6 +37,7 @@ const SOURCES: Readonly<Record<string, FlowInput>> = {
 	"kit:jira/move": jiraMoveKit,
 	"kit:knowledge/confluence": knowledgeConfluenceKit,
 	"kit:knowledge/files": knowledgeFilesKit,
+	"kit:knowledge/folder": knowledgeFolderKit,
 	"kit:knowledge/github-wiki": knowledgeGithubWikiKit,
 	"kit:knowledge/jira": knowledgeJiraKit,
 	"kit:knowledge/review-learnings": knowledgeReviewLearningsKit,

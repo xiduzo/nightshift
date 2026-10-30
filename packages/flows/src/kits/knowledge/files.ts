@@ -14,6 +14,7 @@ export const knowledgeFilesKit: FlowInput = {
 	inputs: [
 		{
 			name: "from",
+			label: "What to copy",
 			type: "text",
 			description:
 				"What to copy, one path or pattern per line, in the project's folder: docs/private or notes/*.md.",

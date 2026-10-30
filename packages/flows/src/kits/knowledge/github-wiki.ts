@@ -13,6 +13,7 @@ export const knowledgeGithubWikiKit: FlowInput = {
 	inputs: [
 		{
 			name: "repo",
+			label: "Repository",
 			type: "text",
 			description:
 				"The repository, for example owner/name. Or the git address of any wiki.",

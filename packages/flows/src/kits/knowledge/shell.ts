@@ -27,6 +27,7 @@ export function folderInput(
 ): NonNullable<FlowInput["inputs"]>[number] {
 	return {
 		name: "folder",
+		label: "Folder in the knowledge",
 		type: "text",
 		description: `The folder in the project's knowledge that this sync fills, for example ${name}. Give each sync its own folder.`,
 		default: name,
