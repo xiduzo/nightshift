@@ -302,7 +302,10 @@ describe("take: a drive's time and a thread that cannot move", () => {
 	test("overdue: within its budget the step goes on; past budget plus grace it ends as its timer would", async () => {
 		let now = Date.now();
 		const { h, runner, sessions } = await setup(
-			flowOf([agent("worker", "Build it", { timeoutMinutes: 60 })]),
+			// An idle limit past the time budget: the budget is what runs out.
+			flowOf([
+				agent("worker", "Build it", { timeoutMinutes: 60, idleMinutes: 600 }),
+			]),
 			2,
 			{ now: () => now },
 		);

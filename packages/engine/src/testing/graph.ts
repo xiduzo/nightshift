@@ -1,4 +1,8 @@
-import type { AgentHarness, Decider } from "@nightshift/agents/types";
+import type {
+	AgentHarness,
+	Decider,
+	HarnessName,
+} from "@nightshift/agents/types";
 import { project, run } from "@nightshift/db/schema";
 import {
 	type AgentNode,
@@ -13,6 +17,7 @@ import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
 import { createRecorders, type StepContext } from "../graph/context";
+import { resolvePolicy } from "../graph/policy";
 import { createRunner, type Runner, type RunnerDeps } from "../graph/runner";
 import {
 	heldOf,
@@ -151,6 +156,8 @@ export type Harness = {
 export type StartOptions = {
 	/** The `claude-code` harness; without one, the Device has none. */
 	harness?: AgentHarness;
+	/** The name the Device adds `harness` under. Default `claude-code`. */
+	harnessName?: HarnessName;
 	decider?: Decider;
 	/** The Device's connections; default: none, and no node servers. */
 	mcpServersFor?: TestDeviceDeps["mcpServersFor"];
@@ -212,7 +219,9 @@ export async function startRun(
 	const [row] = await db.select().from(run).where(eq(run.id, runId));
 	if (!row) throw new Error("no run row");
 	const local: TestDeviceDeps = {
-		harnesses: options.harness ? { "claude-code": options.harness } : {},
+		harnesses: options.harness
+			? { [options.harnessName ?? "claude-code"]: options.harness }
+			: {},
 		...(options.decider ? { decider: options.decider } : {}),
 		mcpServersFor:
 			options.mcpServersFor ?? (async () => ({ ok: true, servers: {} })),
@@ -232,11 +241,8 @@ export async function startRun(
 		deviceById: device,
 		flowOf: () => flow,
 		calledFlowsOf: () => flows,
-		policyFor: () => ({
-			usageLimitFirstWaitMinutes: 5,
-			usageLimitMaxWaitMinutes: 60,
-			networkGraceMinutes: 240,
-		}),
+		// The flow's own numbers, else the built-in settings: as the engine does.
+		policyFor: (f) => resolvePolicy(f.policy, defaultRunSettings().policy),
 	};
 	const thread = openThread(row, deps);
 	const { ctx, saver } = thread;

@@ -1,6 +1,6 @@
 import { type LoggedEvent, lastEntryAt, transcriptToRead } from "../log";
 import { deriveStepClocks } from "../read";
-import { type AbortReason, budgetError } from "./step-runner";
+import { budgetError } from "./step-runner";
 
 /**
  * Deadlines that hold when the timers do not. A step's time budget and
@@ -22,7 +22,7 @@ import { type AbortReason, budgetError } from "./step-runner";
 export type Overdue = {
 	stepId: string;
 	nodeId: string;
-	reason: Exclude<AbortReason, "stopped">;
+	reason: "timeout" | "idle";
 	/** The step's error, as its timer gives it. */
 	error: string;
 };

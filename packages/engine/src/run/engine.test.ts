@@ -2285,7 +2285,10 @@ describe("automatic resume after a restart", () => {
 		);
 
 	test("a step past its time budget ends as its timer would, and the run does not continue", async () => {
-		const { run } = await dieMidStep(budgeted({ timeoutMinutes: 60 }));
+		// An idle limit past the time budget: the budget is what runs out.
+		const { run } = await dieMidStep(
+			budgeted({ timeoutMinutes: 60, idleMinutes: 600 }),
+		);
 		// The new daemon starts two hours later: the budget ran out meanwhile.
 		const { engine, sessions } = restart(
 			{},
@@ -2313,8 +2316,9 @@ describe("automatic resume after a restart", () => {
 		expect(detail.status).toBe("failed");
 		expect(detail.steps[0]).toMatchObject({
 			outcome: "error",
-			error: "No activity for 30 min.",
+			error: "The agent showed no activity for 30 min, so the step stopped.",
 		});
+		expect(detail.warnings.map((w) => w.kind)).toEqual(["stalled"]);
 		await Bun.sleep(60);
 		expect(sessions).toHaveLength(0);
 	});
@@ -2344,7 +2348,11 @@ describe("automatic resume after a restart", () => {
 			.from(event)
 			.where(eq(event.type, "StepStarted"));
 		if (!started) throw new Error("No StepStarted");
-		const { timeoutMs, ...payload } = JSON.parse(started.payload);
+		const {
+			timeoutMs,
+			idleMs: _idleMs,
+			...payload
+		} = JSON.parse(started.payload);
 		expect(timeoutMs).toBe(HOUR);
 		await sandbox.db
 			.update(event)

@@ -30,6 +30,17 @@ export const runStatusSchema = z.enum([
 	"interrupted",
 ]);
 
+/**
+ * What a run warning is about: a cost that is not known, or a guard of the
+ * run policy (the budget or a turn limit, no activity, a loop).
+ */
+const runWarningKindSchema = z.enum([
+	"cost-unknown",
+	"budget",
+	"stalled",
+	"looping",
+]);
+
 /** How the End node that ended a run says it came out. */
 export const runResultSchema = z.enum(["done", "nothing-to-do", "failed"]);
 
@@ -127,7 +138,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		...costFields,
 		warnings: z.array(
 			z.object({
-				kind: z.literal("cost-unknown"),
+				kind: runWarningKindSchema,
 				message: z.string(),
 				stepId: z.string().nullable(),
 				nodeId: z.string().nullable(),
@@ -326,7 +337,11 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		data: z.unknown().optional(),
 	}),
 	z.object({ type: z.literal("usage"), usage: agentUsageSchema }),
-	z.object({ type: z.literal("finished"), usage: agentUsageSchema.optional() }),
+	z.object({
+		type: z.literal("finished"),
+		usage: agentUsageSchema.optional(),
+		limit: z.enum(["turns", "budget"]).optional(),
+	}),
 	z.object({
 		type: z.literal("error"),
 		kind: z.enum(["harness", "aborted", "usage-limit", "network"]),

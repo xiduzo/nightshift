@@ -823,7 +823,8 @@ describe("the Agent node", () => {
 		]);
 		const logged = await h.events();
 		expect(payloads(logged, "StepReopened")).toEqual([
-			{ prompt: "Also add tests" },
+			// Every Agent step has the run policy's idle limit.
+			{ prompt: "Also add tests", idleMs: 15 * MINUTE },
 		]);
 		expect(logged.find((e) => e.type === "StepReopened")?.stepId).toBe(stepId);
 		expect(payloads(logged, "SessionStarted")[1]).toEqual({
@@ -1113,7 +1114,8 @@ describe("an Agent that asks a person", () => {
 		const after = await h.events();
 		expect(deriveSteps(after)).toHaveLength(1);
 		expect(payloads(after, "StepReopened")).toEqual([
-			{ prompt: "Use Postgres." },
+			// Every Agent step has the run policy's idle limit.
+			{ prompt: "Use Postgres.", idleMs: 15 * MINUTE },
 		]);
 		expect(deriveOpenGate(after)).toBeNull();
 		expect(payloads(after, "StepEnded")).toEqual([
@@ -1232,7 +1234,8 @@ describe("an Agent that asks a person", () => {
 			resumeSessionId: "fake-session-1",
 		});
 		expect(payloads(await h.events(), "StepReopened")).toEqual([
-			{ prompt: "Pick one yourself." },
+			// Every Agent step has the run policy's idle limit.
+			{ prompt: "Pick one yourself.", idleMs: 15 * MINUTE },
 		]);
 	});
 });

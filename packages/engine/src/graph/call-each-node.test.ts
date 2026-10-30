@@ -22,6 +22,7 @@ import {
 	flowOf,
 	type Harness,
 	held,
+	MINUTE,
 	payloads,
 	startRun,
 } from "../testing/graph";
@@ -987,7 +988,10 @@ describe("the Call node with each", () => {
 				.map((e) => [e.stepId, e.payload]),
 		).toEqual([
 			[loopStopped.id, { prompt: null }],
-			[worker?.id as string, { prompt: DEFAULT_RESUME_PROMPT }],
+			[
+				worker?.id as string,
+				{ prompt: DEFAULT_RESUME_PROMPT, idleMs: 15 * MINUTE },
+			],
 		]);
 		const loop = loopStep(deriveSteps(logged));
 		expect(loop.id).toBe(loopStopped.id);

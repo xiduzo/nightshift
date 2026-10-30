@@ -14,7 +14,10 @@ export function resolvePolicy(
 			own?.usageLimitMaxWaitMinutes ?? defaults.usageLimitMaxWaitMinutes,
 		networkGraceMinutes:
 			own?.networkGraceMinutes ?? defaults.networkGraceMinutes,
+		idleMinutes: own?.idleMinutes ?? defaults.idleMinutes,
 		...(own?.maxSteps !== undefined ? { maxSteps: own.maxSteps } : {}),
+		...(own?.budgetUsd !== undefined ? { budgetUsd: own.budgetUsd } : {}),
+		...(own?.maxTurns !== undefined ? { maxTurns: own.maxTurns } : {}),
 	};
 }
 

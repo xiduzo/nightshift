@@ -4,6 +4,7 @@ export {
 	awaitsWorktree,
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
+	deriveBudgetSpend,
 	deriveInputs,
 	deriveOpenGate,
 	deriveRunState,

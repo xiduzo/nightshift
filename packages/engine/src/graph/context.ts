@@ -223,8 +223,12 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	endedLabel(node: N, outcome: Outcome): string;
 	/** Whether a step of this node writes a command log (`StepStarted.logPath`). */
 	logsCommandOutput(node: N): boolean;
-	/** The step's timers (`beginStep`), and the idle minutes an abort names. */
-	timeBudget(node: N): TimeBudget;
+	/**
+	 * The step's timers (`beginStep`), and the idle minutes an abort names.
+	 * `policy`: the run's, for a limit the node leaves to it (an Agent's
+	 * idle limit).
+	 */
+	timeBudget(node: N, policy: Pick<ResolvedPolicy, "idleMinutes">): TimeBudget;
 	/**
 	 * The outputs an open step of this node ends with when its work is cut
 	 * short (`closeOpenWork`): a stop, a missed deadline, or a daemon that

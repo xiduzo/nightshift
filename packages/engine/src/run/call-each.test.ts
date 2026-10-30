@@ -1139,7 +1139,7 @@ describe("run policy", () => {
 		expect(wakes.map((w) => w.payload.early)).toEqual([true]);
 	});
 
-	test("an Agent step with no activity for idleMinutes errors", async () => {
+	test("an Agent step with no activity for idleMinutes ends fail, and the run warns it stalled", async () => {
 		// Silent until the idle limit stops it, however late its timer fires.
 		const harness = fakeHarness({
 			steps: [{ type: "wait", ms: 60_000 }],
@@ -1151,7 +1151,13 @@ describe("run policy", () => {
 		});
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("failed");
-		expect(detail.steps[0]?.error).toBe("No activity for 2 min.");
+		expect(detail.steps[0]).toMatchObject({
+			outcome: "fail",
+			error: "The agent showed no activity for 2 min, so the step stopped.",
+		});
+		expect(detail.warnings).toMatchObject([
+			{ kind: "stalled", nodeId: "worker" },
+		]);
 	});
 });
 

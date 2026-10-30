@@ -14,6 +14,7 @@ import {
 	awaitsWorktree,
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
+	deriveBudgetSpend,
 	deriveCalledTraversals,
 	deriveGateWaits,
 	deriveOpenGate,
@@ -925,6 +926,40 @@ describe("automatic resume", () => {
 		expect(countDaemonResumes(l.events)).toBe(0);
 		daemon();
 		expect(countDaemonResumes(l.events)).toBe(1);
+	});
+});
+
+describe("the run budget", () => {
+	test("deriveBudgetSpend counts sessions and deciders since the start or a person's resume, not the daemon's", () => {
+		const l = log()
+			.runStarted()
+			.stepStarted("s1", "worker")
+			.sessionStarted("s1", "a")
+			.sessionEnded("s1", "a", "finished", 1.5)
+			.stepEnded("s1", "pass")
+			.stepStarted("s2", "decide")
+			.stepEnded("s2", "pass", {}, 0.25);
+		expect(deriveBudgetSpend(l.events).usd).toBeCloseTo(1.75, 9);
+		// After a restart the daemon resumed the run: the spend stays.
+		l.push("RunResumed", {
+			nodeId: "worker",
+			stepId: null,
+			prompt: null,
+			by: "daemon",
+		});
+		expect(deriveBudgetSpend(l.events).usd).toBeCloseTo(1.75, 9);
+		// A person resumed it: a budget of its own again.
+		l.resumed("worker");
+		expect(deriveBudgetSpend(l.events).usd).toBe(0);
+		l.stepStarted("s3", "worker", 2)
+			.sessionStarted("s3", "b")
+			.push(
+				"SessionUsage",
+				{ usage: { inputTokens: 1, outputTokens: 1 }, costUsd: 0.5 },
+				{ stepId: "s3", sessionId: "b" },
+			);
+		// A running session counts with its spend so far.
+		expect(deriveBudgetSpend(l.events).usd).toBe(0.5);
 	});
 });
 

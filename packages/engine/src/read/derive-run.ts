@@ -13,8 +13,16 @@ import {
 	type WaitReason,
 } from "../log";
 import {
+	addCost,
+	type CostTally,
+	NO_COST,
+	sessionCost,
+	stepEndCost,
+} from "./cost";
+import {
 	bySeq,
 	type DerivedStep,
+	deriveSessions,
 	deriveSteps,
 	type EventOf,
 	ofType,
@@ -354,6 +362,31 @@ export function countStepsSinceWalkBegan(
 ): number {
 	const began = walkBeganSeq(events);
 	return events.filter((e) => e.type === "StepStarted" && e.seq > began).length;
+}
+
+/**
+ * What the run spent against its budget (`policy.budgetUsd`): the cost of
+ * the sessions that started, and of the steps that ended (a decider),
+ * since the run started or a person last resumed it. A resume gives the
+ * run its budget again, like the step cap; a resume of the daemon after a
+ * restart does not. A running session counts with its spend so far.
+ */
+export function deriveBudgetSpend(events: readonly LoggedEvent[]): CostTally {
+	let began = -1;
+	for (const e of events) {
+		const resets =
+			e.type === "RunStarted" ||
+			(e.type === "RunResumed" && e.payload.by !== "daemon");
+		if (resets && e.seq > began) began = e.seq;
+	}
+	let total = NO_COST;
+	for (const session of deriveSessions(events)) {
+		if (session.startSeq > began) total = addCost(total, sessionCost(session));
+	}
+	for (const e of ofType(events, "StepEnded")) {
+		if (e.seq > began) total = addCost(total, stepEndCost(e.payload));
+	}
+	return total;
 }
 
 export type OpenGateFact = {

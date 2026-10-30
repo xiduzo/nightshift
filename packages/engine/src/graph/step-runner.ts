@@ -26,6 +26,7 @@ import {
 import {
 	countStepsSinceWalkBegan,
 	type DerivedStep,
+	deriveBudgetSpend,
 	deriveSteps,
 	deriveStopAfterStep,
 	deriveWorktrees,
@@ -33,6 +34,7 @@ import {
 } from "../read";
 import { keptNames, saveKeptValues } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
+import { budgetPassed, runBudget } from "./budget";
 import {
 	emit,
 	keptFlowOf,
@@ -55,6 +57,7 @@ import {
 import {
 	askNodeId,
 	parkCommand,
+	parkFailed,
 	parkStopped,
 	route,
 	routeDone,
@@ -102,8 +105,30 @@ import type { PendingGate, RunStateUpdate, RunStateValues } from "./state";
  * A cut would spread that lifecycle over the nodes again.
  */
 
-/** Why a step's signal aborted. `outrun`: another branch reached a `first` Join (`branches.ts`). */
-export type AbortReason = "stopped" | "timeout" | "idle" | "outrun";
+/**
+ * Why a step's signal aborted. `outrun`: another branch reached a `first`
+ * Join (`branches.ts`). `idle`: the Agent showed no activity for its idle
+ * limit (the stall guard). The guards a body trips (`StepHandle.halt`):
+ * `budget` (the run passed its budget), `turns` (a session passed its turn
+ * limit), `looping` (the same tool call three times in a row).
+ */
+export type AbortReason =
+	| "stopped"
+	| "timeout"
+	| "idle"
+	| "outrun"
+	| GuardReason;
+
+/** A guard of the run policy that a body trips. */
+export type GuardReason = "budget" | "turns" | "looping";
+
+/** The run warning each guard lands, and the stall guard's (`idle`). */
+const GUARD_WARNINGS = {
+	budget: "budget",
+	turns: "budget",
+	looping: "looping",
+	idle: "stalled",
+} as const satisfies Record<GuardReason | "idle", RunWarningKind>;
 
 /**
  * How a node enters: a new visit (the default), or an existing step of the
@@ -160,6 +185,14 @@ export type StepHandle = {
 	session(start: EnginePayloads["SessionStarted"]): Promise<SessionRecord>;
 	/** Logs a warning about this step (`RunWarned`): it did not fail, but a person should know. */
 	warn(kind: RunWarningKind, message: string): Promise<void>;
+	/**
+	 * Trips a guard of the run policy: aborts the step's signal with the
+	 * guard as its reason, so the session stops. The body then returns
+	 * `aborted`; the runner ends the step `fail` with `message` and lands
+	 * the guard's warning, or for `budget` stops the run `failed`. The
+	 * first reason wins.
+	 */
+	halt(reason: GuardReason, message: string): void;
 };
 
 /**
@@ -351,6 +384,28 @@ export async function runStep(
 		}
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
+			const reason = step.signal.reason as AbortReason | undefined;
+			const guard =
+				reason === "idle" ||
+				reason === "budget" ||
+				reason === "turns" ||
+				reason === "looping"
+					? reason
+					: null;
+			if (guard && aborted.error) {
+				await step.warn(GUARD_WARNINGS[guard], aborted.error);
+			}
+			// The run's budget stops the run, not just the step: a resume
+			// reopens the step with its session and a budget of its own.
+			if (reason === "budget") {
+				const end = await step.end(
+					"stopped",
+					{ ...result.outputs, outcome: "stopped" },
+					aborted.error,
+					extraOf(result),
+				);
+				return parkFailed(node, end, aborted.error ?? "", extra);
+			}
 			const end = await step.end(
 				aborted.outcome,
 				aborted.outputs,
@@ -435,19 +490,21 @@ async function askPerson(
 
 /** Why a step ran out of time: its end's error. `minutes` is the limit it ran past. */
 export function budgetError(
-	reason: Exclude<AbortReason, "stopped">,
+	reason: "timeout" | "idle",
 	minutes: number | undefined,
 ): string {
 	return reason === "timeout"
 		? `The step ran past its time budget of ${minutes} min.`
-		: `No activity for ${minutes} min.`;
+		: `The agent showed no activity for ${minutes} min, so the step stopped.`;
 }
 
 /**
  * The end an aborted step has, from its signal's reason: `error` with why
- * for the node's time budget or no activity, else `stopped` (a person
- * stopped the run, or another branch outran this one, which the error
- * says). The outputs the body had so far are kept.
+ * for the node's time budget; `fail` with why for a guard of the run
+ * policy (no activity, a turn limit, a loop, the budget: `halted` has its
+ * message); else `stopped` (a person stopped the run, or another branch
+ * outran this one, which the error says). The outputs the body had so far
+ * are kept.
  */
 export function abortEnd(
 	ctx: StepContext,
@@ -456,15 +513,26 @@ export function abortEnd(
 	outputs: StepOutputs,
 ): Pick<StepEnd, "outcome" | "outputs" | "error"> {
 	const reason = signal.reason as AbortReason | undefined;
-	if (reason === "timeout" || reason === "idle") {
-		const budget = ctx.kindOf(node).timeBudget(node);
+	const budget = () => ctx.kindOf(node).timeBudget(node, ctx.policy());
+	if (reason === "timeout") {
 		return {
 			outcome: "error",
 			outputs: { ...outputs, outcome: "error" },
-			error: budgetError(
-				reason,
-				reason === "timeout" ? budget.timeoutMinutes : budget.idleMinutes,
-			),
+			error: budgetError(reason, budget().timeoutMinutes),
+		};
+	}
+	if (reason === "idle") {
+		return {
+			outcome: "fail",
+			outputs: { ...outputs, outcome: "fail" },
+			error: budgetError(reason, budget().idleMinutes),
+		};
+	}
+	if (reason === "budget" || reason === "turns" || reason === "looping") {
+		return {
+			outcome: "fail",
+			outputs: { ...outputs, outcome: "fail" },
+			error: haltMessages.get(signal) ?? null,
 		};
 	}
 	return {
@@ -474,12 +542,16 @@ export function abortEnd(
 	};
 }
 
+/** The message of the guard each halted step's signal aborted for (`StepHandle.halt`). */
+const haltMessages = new WeakMap<AbortSignal, string>();
+
 /**
  * Opens a step of `node` and returns what the node needs. For a new visit
  * it first runs the walk's entry checks, in this order, and parks the run
  * when one fires: a stop of the run (stopped, no reason), a stop after the
  * running step, the stop time (both stopped, with today's reasons), and the
- * step cap (failed, with today's reason). A continued or reopened step skips
+ * step cap and the run's budget (failed, with why; the budget also lands a
+ * `budget` warning). A continued or reopened step skips
  * them all: it is already in the log, and a stop must end it there (the old
  * walk had no entry check for one). It then writes the `step` row and
  * `StepStarted` (with the transcript path, the command log path, the
@@ -507,9 +579,12 @@ export async function beginStep(
 	const logged = events ?? (await ctx.log.events(runId));
 	// The kind says which timers a step has: a Gate waits as long as it
 	// must, a Wait node keeps its own deadline across its sleeps, and only an
-	// Agent step has an idle clock. The log keeps the same limits, so they
-	// hold when the timers do not (`deriveStepClocks`).
-	const { timeoutMinutes, idleMinutes } = ctx.kindOf(node).timeBudget(node);
+	// Agent step has an idle clock (its own, else the policy's). The log
+	// keeps the same limits, so they hold when the timers do not
+	// (`deriveStepClocks`).
+	const { timeoutMinutes, idleMinutes } = ctx
+		.kindOf(node)
+		.timeBudget(node, ctx.policy());
 	const budget: StepBudget = {
 		...(timeoutMinutes ? { timeoutMs: timeoutMinutes * ctx.minuteMs } : {}),
 		...(idleMinutes !== undefined
@@ -554,6 +629,19 @@ export async function beginStep(
 				"failed",
 				`The run reached the limit of ${limit} steps before node "${node.id}". Resume it to continue.`,
 			);
+		}
+		const budgetUsd = runBudget(ctx);
+		if (budgetUsd !== null) {
+			const spent = deriveBudgetSpend(logged).usd;
+			if (spent >= budgetUsd) {
+				const reason = budgetPassed(budgetUsd, spent, node.id);
+				await ctx.log.append({
+					type: "RunWarned",
+					runId,
+					payload: { kind: "budget", message: reason },
+				});
+				return parked("failed", reason);
+			}
 		}
 		stepId = randomUUID();
 		path = transcriptPath(ctx.dataDir, runId, stepId);
@@ -680,6 +768,11 @@ export async function beginStep(
 			emit(config, { type: "transcript", entry });
 		},
 		touch,
+		halt(reason, message) {
+			if (stepController.signal.aborted) return;
+			haltMessages.set(stepController.signal, message);
+			stepController.abort(reason satisfies AbortReason);
+		},
 		async warn(kind, message) {
 			await ctx.log.append({
 				type: "RunWarned",

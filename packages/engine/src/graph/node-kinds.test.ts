@@ -320,16 +320,16 @@ describe("logsCommandOutput: which steps get a command log path", () => {
 });
 
 describe("timeBudget: the step's timers", () => {
-	const budget = (n: FlowNode) => kindOf(n).timeBudget(n);
+	const budget = (n: FlowNode) => kindOf(n).timeBudget(n, { idleMinutes: 15 });
 
-	test("an Agent has the step timer and the idle clock", () => {
+	test("an Agent has the step timer and the idle clock: its own, else the policy's", () => {
 		expect(budget(agent({ timeoutMinutes: 30, idleMinutes: 5 }))).toEqual({
 			timeoutMinutes: 30,
 			idleMinutes: 5,
 		});
 		expect(budget(agent())).toEqual({
 			timeoutMinutes: undefined,
-			idleMinutes: undefined,
+			idleMinutes: 15,
 		});
 	});
 

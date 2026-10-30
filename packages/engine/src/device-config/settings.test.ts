@@ -61,6 +61,9 @@ describe("precedence", () => {
 			networkGraceMinutes: fields.networkGraceMinutes.default,
 			maxSteps: fields.maxStepsPerRun.default,
 			resumeInterruptedRuns: fields.resumeInterruptedRuns.default,
+			budgetUsd: fields.budgetUsd.default,
+			maxTurns: fields.maxTurns.default,
+			idleMinutes: fields.idleMinutes.default,
 		}).toEqual(DEFAULT_POLICY);
 	});
 
@@ -276,6 +279,7 @@ describe("save", () => {
 			usageLimitFirstWaitMinutes: 90,
 			usageLimitMaxWaitMinutes: 120,
 			networkGraceMinutes: 240,
+			idleMinutes: 15,
 		});
 		expect(await savedKeys()).toEqual([
 			"usageLimitFirstWaitMinutes",
@@ -348,12 +352,16 @@ test("run() is the engine's part of the current values", async () => {
 	await s.save({
 		maxStepsPerRun: 50,
 		networkGraceMinutes: 10,
+		budgetUsd: 4.5,
+		idleMinutes: 20,
 		scheduler: false,
 	});
 	expect(s.run()).toEqual({
 		scheduler: false,
 		maxConcurrentRuns: 3,
 		maxStepsPerRun: 50,
+		budgetUsd: 4.5,
+		maxTurns: null,
 		resumeInterruptedRuns: true,
 		cleanUpRuns: true,
 		cleanUpAfterDays: 14,
@@ -361,6 +369,10 @@ test("run() is the engine's part of the current values", async () => {
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,
 			networkGraceMinutes: 10,
+			idleMinutes: 20,
 		},
 	});
+	// Null forgets the budget: back to none.
+	await s.save({ budgetUsd: null });
+	expect(s.run().budgetUsd).toBeNull();
 });

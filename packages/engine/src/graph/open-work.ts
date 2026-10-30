@@ -99,6 +99,11 @@ export type ClosingEvent =
 			stepId: string;
 			payload: EnginePayloads["StepEnded"];
 	  }
+	| {
+			type: "RunWarned";
+			stepId: string;
+			payload: EnginePayloads["RunWarned"];
+	  }
 	| { type: "RunEnded"; payload: EnginePayloads["RunEnded"] };
 
 /** The run's flow snapshot and the flows its Call nodes call. */
@@ -153,7 +158,8 @@ const CUTS = {
  *
  * - `stopped`: no error, no reason.
  * - `overdue`: the overdue step gets its timer's error; the steps around it
- *   and the run fail with the reason a failed step gives (`route`).
+ *   and the run fail with the reason a failed step gives (`route`). A step
+ *   with no activity for its idle limit also lands a `stalled` warning.
  * - `interrupted`: every step gets "Night Shift stopped while this ran.";
  *   the run gets `cut.reason`.
  *
@@ -201,6 +207,18 @@ export function closingEvents(
 				error: stepError(step),
 			},
 		});
+		// No activity: the stall guard's warning, as the step's timer lands it.
+		if (
+			cut.kind === "overdue" &&
+			cut.reason === "idle" &&
+			step.id === cut.stepId
+		) {
+			closing.push({
+				type: "RunWarned",
+				stepId: step.id,
+				payload: { kind: "stalled", message: cut.error },
+			});
+		}
 	}
 	if (open.endsRun) {
 		closing.push({

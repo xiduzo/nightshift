@@ -120,6 +120,21 @@ const DEFS = {
 		schema: positiveMinutes,
 		default: DEFAULT_POLICY.networkGraceMinutes,
 	} satisfies Def<number>,
+	/** The most a run may spend, in USD, unless its flow sets its own. Null: no budget. */
+	budgetUsd: {
+		schema: z.number().positive().max(100_000).nullable(),
+		default: DEFAULT_POLICY.budgetUsd,
+	} satisfies Def<number | null>,
+	/** The most turns one Agent session may take, unless the flow or the node sets its own. Null: no limit. */
+	maxTurns: {
+		schema: z.number().int().min(1).max(100_000).nullable(),
+		default: DEFAULT_POLICY.maxTurns,
+	} satisfies Def<number | null>,
+	/** An Agent step with no activity for this long ends `fail`, unless the flow or the node sets its own. */
+	idleMinutes: {
+		schema: positiveMinutes,
+		default: DEFAULT_POLICY.idleMinutes,
+	} satisfies Def<number>,
 	resumeInterruptedRuns: {
 		schema: z.boolean(),
 		default: DEFAULT_POLICY.resumeInterruptedRuns,
@@ -371,10 +386,17 @@ export type RunSettings = Pick<
 	| "scheduler"
 	| "maxConcurrentRuns"
 	| "maxStepsPerRun"
+	| "budgetUsd"
+	| "maxTurns"
 	| "resumeInterruptedRuns"
 	| "cleanUpRuns"
 	| "cleanUpAfterDays"
-> & { policy: Omit<ResolvedPolicy, "maxSteps" | "resumeInterruptedRuns"> };
+> & {
+	policy: Omit<
+		ResolvedPolicy,
+		"maxSteps" | "resumeInterruptedRuns" | "budgetUsd" | "maxTurns"
+	>;
+};
 
 export type SettingsStore = {
 	/** Reads the saved values. Call once before `current`. */
@@ -497,6 +519,8 @@ export function createSettingsStore(options: {
 				scheduler: s.scheduler,
 				maxConcurrentRuns: s.maxConcurrentRuns,
 				maxStepsPerRun: s.maxStepsPerRun,
+				budgetUsd: s.budgetUsd,
+				maxTurns: s.maxTurns,
 				resumeInterruptedRuns: s.resumeInterruptedRuns,
 				cleanUpRuns: s.cleanUpRuns,
 				cleanUpAfterDays: s.cleanUpAfterDays,
@@ -504,6 +528,7 @@ export function createSettingsStore(options: {
 					usageLimitFirstWaitMinutes: s.usageLimitFirstWaitMinutes,
 					usageLimitMaxWaitMinutes: s.usageLimitMaxWaitMinutes,
 					networkGraceMinutes: s.networkGraceMinutes,
+					idleMinutes: s.idleMinutes,
 				},
 			};
 		},
@@ -516,6 +541,8 @@ export function defaultRunSettings(): RunSettings {
 		scheduler: DEFS.scheduler.default,
 		maxConcurrentRuns: DEFS.maxConcurrentRuns.default,
 		maxStepsPerRun: DEFS.maxStepsPerRun.default,
+		budgetUsd: DEFS.budgetUsd.default,
+		maxTurns: DEFS.maxTurns.default,
 		resumeInterruptedRuns: DEFS.resumeInterruptedRuns.default,
 		cleanUpRuns: DEFS.cleanUpRuns.default,
 		cleanUpAfterDays: DEFS.cleanUpAfterDays.default,
@@ -523,6 +550,7 @@ export function defaultRunSettings(): RunSettings {
 			usageLimitFirstWaitMinutes: DEFS.usageLimitFirstWaitMinutes.default,
 			usageLimitMaxWaitMinutes: DEFS.usageLimitMaxWaitMinutes.default,
 			networkGraceMinutes: DEFS.networkGraceMinutes.default,
+			idleMinutes: DEFS.idleMinutes.default,
 		},
 	};
 }

@@ -409,7 +409,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		);
 		expect(resumed.state.ended).toMatchObject({ status: "finished" });
 		expect(payloads(await h.events(), "StepReopened")).toEqual([
-			{ prompt: "Go on." },
+			{ prompt: "Go on.", idleMs: 15 * MINUTE },
 		]);
 		expect(payloads(await h.events(), "SessionStarted")[1]).toMatchObject({
 			prompt: "Go on.",

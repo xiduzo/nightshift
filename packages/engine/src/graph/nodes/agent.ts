@@ -1,5 +1,8 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { harnessNoun } from "@nightshift/agents/harness-facts";
+import {
+	harnessLimitsTurns,
+	harnessNoun,
+} from "@nightshift/agents/harness-facts";
 import { settleCost } from "@nightshift/agents/pricing";
 import type {
 	AgentHarnessName,
@@ -24,7 +27,8 @@ import {
 	type StepOutputs,
 	scopeKey,
 } from "../../log";
-import { lastHarnessSessionOfNode } from "../../read";
+import { deriveBudgetSpend, lastHarnessSessionOfNode } from "../../read";
+import { budgetPassed, guardMessage, runBudget, turnLimit } from "../budget";
 import { consumeStream } from "../consume";
 import {
 	harnessLabel,
@@ -43,6 +47,7 @@ import { checkOutputData, normalizeOutputData } from "../output-schema";
 import { RESUME_RULES, rerunEntryOf, type StepEntry } from "../resume-point";
 import { scopeOf } from "../route";
 import { heldStep } from "../run-position";
+import { sessionGuards } from "../session-guards";
 import type { RunStateValues } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 import { ASK_CHOICES, agentAskNode } from "./agent-ask";
@@ -207,9 +212,10 @@ export const AGENT: NodeKind<AgentNode> = {
 		outcome === "pass" || isOwnAgentLabel(node, outcome),
 	endedLabel: (node, outcome) =>
 		isOwnAgentLabel(node, outcome) ? outcome : "",
-	timeBudget: (node) => ({
+	// Every Agent step has an idle clock: its own, else the run policy's.
+	timeBudget: (node, policy) => ({
 		timeoutMinutes: node.timeoutMinutes,
-		idleMinutes: node.idleMinutes,
+		idleMinutes: node.idleMinutes ?? policy.idleMinutes,
 	}),
 	connections: (node) => node.connections ?? [],
 	programs: programsOf,
@@ -363,6 +369,25 @@ async function runSession(
 	// prompt only, like the report instruction the harness adds; a new
 	// session learns its CLI tools from the Device after the prompt.
 	const clis = [...new Set(programsOf(node))];
+	// The run's budget: what the run spent since it started or a person
+	// resumed it. Nothing left: the session does not start.
+	const budgetUsd = runBudget(ctx);
+	const spentBefore =
+		budgetUsd === null ? 0 : deriveBudgetSpend(step.events).usd;
+	if (budgetUsd !== null && spentBefore >= budgetUsd) {
+		step.halt("budget", budgetPassed(budgetUsd, spentBefore));
+		return {
+			kind: "aborted",
+			outputs: {
+				visit,
+				output: "",
+				summary: "",
+				session_id: resumeSessionId ?? "",
+			},
+			harnessSessionId: resumeSessionId,
+		};
+	}
+	const maxTurns = turnLimit(ctx, node);
 	const common = {
 		cwd: step.worktree,
 		prompt,
@@ -370,6 +395,8 @@ async function runSession(
 		stepReport: stepReportOf(node),
 		artifacts: { runId: ctx.run.id, stepId: step.stepId },
 		signal,
+		...(maxTurns !== null ? { maxTurns } : {}),
+		...(budgetUsd !== null ? { maxBudgetUsd: budgetUsd - spentBefore } : {}),
 	};
 	const stream = step.device
 		.session(
@@ -418,6 +445,18 @@ async function runSession(
 		harness,
 	});
 	const sessionId = session.id;
+	// The engine counts turns for a harness that does not stop at its limit itself.
+	const guards = sessionGuards({
+		maxTurns: harnessLimitsTurns(harness) ? null : maxTurns,
+	});
+	/** Stops the run when the session's spend so far takes it past its budget. */
+	const checkBudget = (usage: AgentUsage | undefined) => {
+		if (budgetUsd === null || !usage) return;
+		const { costUsd } = settleCost(usage, sessionModel);
+		if (costUsd !== null && spentBefore + costUsd > budgetUsd) {
+			step.halt("budget", budgetPassed(budgetUsd, spentBefore + costUsd));
+		}
+	};
 
 	let harnessSessionId: string | null = resumeSessionId;
 	/** The model the harness says it runs, else the one the node asked for: the price list prices it. */
@@ -458,9 +497,12 @@ async function runSession(
 		// The spend so far is not part of the transcript.
 		if (agentEvent.type === "usage") {
 			spendSoFar(agentEvent.usage);
+			checkBudget(agentEvent.usage);
 			return;
 		}
 		step.record(sessionId, agentEvent);
+		const trip = guards.see(agentEvent);
+		if (trip) step.halt(trip.kind, guardMessage(trip));
 		switch (agentEvent.type) {
 			case "session":
 				harnessSessionId = agentEvent.sessionId;
@@ -499,6 +541,15 @@ async function runSession(
 					...settleCost(agentEvent.usage, sessionModel),
 					resetAt: null,
 				};
+				// The harness stopped at a limit the session set (Claude Code).
+				if (agentEvent.limit === "turns" && maxTurns !== null) {
+					step.halt("turns", guardMessage({ kind: "turns", limit: maxTurns }));
+				} else if (agentEvent.limit === "budget" && budgetUsd !== null) {
+					step.halt(
+						"budget",
+						budgetPassed(budgetUsd, spentBefore + (ending.costUsd ?? 0)),
+					);
+				}
 				break;
 			case "error":
 				ending = {

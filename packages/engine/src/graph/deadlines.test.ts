@@ -112,7 +112,7 @@ describe("findOverdue", () => {
 			stepId: "talker",
 			nodeId: "talker",
 			reason: "idle",
-			error: "No activity for 3 min.",
+			error: "The agent showed no activity for 3 min, so the step stopped.",
 		});
 	});
 

@@ -13,6 +13,7 @@ import {
 	edge,
 	flowOf,
 	held,
+	MINUTE,
 	payloads,
 	startRun,
 } from "../testing/graph";
@@ -420,7 +421,7 @@ describe("the Call node", () => {
 		const reopened = logged.filter((e) => e.type === "StepReopened");
 		expect(reopened.map((e) => [e.stepId, e.payload])).toEqual([
 			[call?.id as string, { prompt: null }],
-			[worker?.id as string, { prompt: "Go on" }],
+			[worker?.id as string, { prompt: "Go on", idleMs: 15 * MINUTE }],
 		]);
 		// One Subflow step, one FlowCalled, one body step with two sessions.
 		expect(payloads(logged, "FlowCalled")).toHaveLength(1);

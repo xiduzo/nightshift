@@ -109,6 +109,30 @@ export function parkStopped(
 }
 
 /**
+ * Parks the run as failed on a step that a guard of the run policy ended
+ * (the budget), with the step's outputs and visit in the state: a resume
+ * reopens the step.
+ */
+export function parkFailed(
+	node: FlowNode,
+	end: StepEnd,
+	reason: string,
+	update?: RunStateUpdate,
+): Command {
+	return parkCommand({
+		node,
+		status: "failed",
+		reason,
+		step: end,
+		update: {
+			...update,
+			nodes: { [node.id]: end.outputs },
+			...commitVisit(node, end.visit),
+		},
+	});
+}
+
+/**
  * Records the ended step's outputs in the state, commits its visit
  * (`commitVisit`) and jumps along
  * the edge the outcome picks, with `EdgeTaken` in the log; or ends the flow

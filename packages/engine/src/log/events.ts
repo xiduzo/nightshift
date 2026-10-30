@@ -534,8 +534,15 @@ export type StepBudget = {
 
 export type EngineEventType = keyof EnginePayloads;
 
-/** What a run warning is about. `cost-unknown`: a step ended without a cost. */
-export type RunWarningKind = "cost-unknown";
+/**
+ * What a run warning is about. `cost-unknown`: a step ended without a cost.
+ * The guards of the run policy: `budget` (the run passed its budget, or a
+ * session its turn limit), `stalled` (an Agent step showed no activity for
+ * its idle limit), `looping` (an agent made the same tool call with the
+ * same input three times in a row). A reader treats the kinds as an open
+ * list: a later build may add one.
+ */
+export type RunWarningKind = "cost-unknown" | "budget" | "stalled" | "looping";
 
 /**
  * One event as this Replica's log has it. Any payload may also carry
