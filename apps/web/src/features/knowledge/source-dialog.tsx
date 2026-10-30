@@ -53,12 +53,13 @@ import { knowledgeMutations } from "./queries";
 
 /** What each kind of source is, in one line, for the choice. */
 const KIND_HINTS: Record<KnowledgeSourceKind["kit"], string> = {
-	"kit:knowledge/folder": "Notes or documents in a folder on this computer.",
-	"kit:knowledge/files": "Files of this project, also private notes.",
-	"kit:knowledge/web": "Web pages, saved as text.",
-	"kit:knowledge/github-wiki": "The wiki of a GitHub repository.",
-	"kit:knowledge/jira": "Work items from Jira.",
-	"kit:knowledge/confluence": "Pages from Confluence.",
+	"kit:knowledge/folder": "Notes or documents outside this project.",
+	"kit:knowledge/files": "Files of this project, also ones that git ignores.",
+	"kit:knowledge/web": "Any public page, as text. No account needed.",
+	"kit:knowledge/github-wiki": "The wiki of a repository, also a private one.",
+	"kit:knowledge/jira": "Work items, through your signed-in Jira CLI tool.",
+	"kit:knowledge/confluence":
+		"Pages by id, with an API token you save as a secret.",
 };
 
 /** The input every knowledge kit has: Night Shift picks it, so the dialog does not ask. */

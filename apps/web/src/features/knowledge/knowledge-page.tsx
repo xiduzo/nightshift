@@ -1,3 +1,4 @@
+import { hasEnded } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -41,6 +42,9 @@ import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
 import { type EditedSource, SourceDialog } from "./source-dialog";
 import { Sources } from "./sources";
+
+/** How often the page reads the knowledge again while a source syncs. */
+const SYNCING_POLL_MS = 3_000;
 
 /**
  * A project's Knowledge page: the files its agents read, when each changed
@@ -108,7 +112,16 @@ function KnowledgeView({
 	onAdd: () => void;
 	onEdit: (source: EditedSource) => void;
 }) {
-	const knowledge = useQuery(knowledgeQueries.get(projectId));
+	const knowledge = useQuery({
+		...knowledgeQueries.get(projectId),
+		// While a source syncs: its files and its last sync come in.
+		refetchInterval: (query) =>
+			query.state.data?.syncs.some(
+				(sync) => sync.lastRun !== null && !hasEnded(sync.lastRun.status),
+			)
+				? SYNCING_POLL_MS
+				: false,
+	});
 	const [open, setOpen] = useState<string | null>(null);
 	const columns = useMemo(() => fileColumns(setOpen), []);
 

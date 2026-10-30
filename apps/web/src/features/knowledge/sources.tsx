@@ -355,7 +355,9 @@ function RemoveSourceDialog({
 				<AlertDialogHeader>
 					<AlertDialogTitle>Remove {label}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						Night Shift stops syncing this source. Its flow and its schedule go.
+						{sync?.schedule
+							? "Night Shift stops syncing this source and removes its schedule."
+							: "Night Shift stops syncing this source."}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<Field orientation="horizontal">
