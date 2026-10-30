@@ -14,9 +14,9 @@ import {
 	formatDuration,
 	formatStepCost,
 	formatTime,
-	formatTokens,
 	noCostYet,
 } from "@/shared/format";
+import { UsageContext } from "@/shared/usage";
 import { jsonOutput } from "../lib/run-steps";
 import { CostText } from "./cost-text";
 import { useWorkTime } from "./elapsed";
@@ -124,23 +124,32 @@ export function StepFacts({ step }: { step: StepSummary }) {
 			value: formatDuration(metrics.agentMs),
 		});
 	}
+	const cost = hasCost(step) ? (
+		noCostYet(step) ? (
+			"—"
+		) : (
+			<CostText cost={step} />
+		)
+	) : undefined;
 	if (metrics && metrics.tokens.input + metrics.tokens.output > 0) {
-		const { input, output } = metrics.tokens;
+		const { input, output, cacheRead, cacheWrite } = metrics.tokens;
 		facts.push({
 			label: "Tokens",
 			value: (
-				<span title={`${formatTokens(input)} in, ${formatTokens(output)} out`}>
-					{formatTokens(input + output)}
-				</span>
+				<UsageContext
+					size="xs"
+					usage={{
+						inputTokens: input,
+						outputTokens: output,
+						cacheReadTokens: cacheRead,
+						cacheWriteTokens: cacheWrite,
+					}}
+					cost={cost}
+				/>
 			),
 		});
 	}
-	if (hasCost(step)) {
-		facts.push({
-			label: "Cost",
-			value: noCostYet(step) ? "—" : <CostText cost={step} />,
-		});
-	}
+	if (cost !== undefined) facts.push({ label: "Cost", value: cost });
 	if (step.visit > 1) facts.push({ label: "Visit", value: step.visit });
 	if (exit !== undefined && exit !== "") {
 		facts.push({ label: "Exit code", value: String(exit) });
