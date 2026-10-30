@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -14,6 +15,7 @@ import {
 	AUTH_SECRET_FILE,
 	authSecret,
 	type DaemonEnv,
+	daemonAuthSecret,
 	prepareDaemonEnv,
 	secretFiles,
 	secretsDir,
@@ -71,6 +73,51 @@ describe("the environment of a daemon without varlock", () => {
 		expect(() =>
 			authSecret({ BETTER_AUTH_SECRET_FILE: given }, dataDir),
 		).toThrow("too short");
+	});
+});
+
+describe("the auth secret of a daemon that varlock started", () => {
+	test("BETTER_AUTH_SECRET wins, and nothing is logged", () => {
+		const lines: string[] = [];
+		const dataDir = dir();
+		expect(
+			daemonAuthSecret(
+				{ NODE_ENV: "production", BETTER_AUTH_SECRET: SECRET },
+				dataDir,
+				(line) => lines.push(line),
+			),
+		).toBe(SECRET);
+		expect(lines).toEqual([]);
+		expect(existsSync(join(dataDir, AUTH_SECRET_FILE))).toBe(false);
+	});
+
+	test("production refuses to start without one", () => {
+		const dataDir = dir();
+		expect(() =>
+			daemonAuthSecret({ NODE_ENV: "production" }, dataDir, () => {}),
+		).toThrow("BETTER_AUTH_SECRET is not set");
+		expect(() =>
+			daemonAuthSecret(
+				{ NODE_ENV: "production", BETTER_AUTH_SECRET: "  " },
+				dataDir,
+				() => {},
+			),
+		).toThrow("BETTER_AUTH_SECRET is not set");
+		expect(existsSync(join(dataDir, AUTH_SECRET_FILE))).toBe(false);
+	});
+
+	test("development uses the dev default, kept, and says so once", () => {
+		const lines: string[] = [];
+		const dataDir = dir();
+		const first = daemonAuthSecret(
+			{ NODE_ENV: "development" },
+			dataDir,
+			(line) => lines.push(line),
+		);
+		expect(first.length).toBe(64);
+		expect(daemonAuthSecret({}, dataDir, () => {})).toBe(first);
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toContain("dev default");
 	});
 });
 

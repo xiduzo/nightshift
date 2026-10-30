@@ -114,6 +114,14 @@ const echoFlow = {
 } as unknown as Flow;
 
 describe("the daemon, wired in one process", () => {
+	test("refuses to start in production without an auth secret", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const { BETTER_AUTH_SECRET: _, ...env } = envIn(dir);
+		await expect(start({ ...env, NODE_ENV: "production" })).rejects.toThrow(
+			"BETTER_AUTH_SECRET is not set",
+		);
+	});
+
 	test("answers its health check and a procedure for this computer's Person", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const daemon = await start(envIn(dir));

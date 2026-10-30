@@ -80,6 +80,7 @@ import {
 	canChooseFolder,
 	chooseFolder,
 	type DaemonEnv,
+	daemonAuthSecret,
 	daemonPort,
 	guardProcess,
 	holdLease,
@@ -171,6 +172,8 @@ export async function createDaemon(
 			NIGHTSHIFT_DEV: dev,
 		}),
 	);
+	// Before anything else: production refuses to start without a secret.
+	const authSecret = daemonAuthSecret(env, dataDir);
 
 	// Run history from before the data directory is never moved for you.
 	const legacy = legacyData({
@@ -224,16 +227,25 @@ export async function createDaemon(
 	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
 	let hostSettings: () => { host: boolean; hostAddresses: readonly string[] } =
 		() => ({ host: false, hostAddresses: [] });
-	const auth = createAuth(env, db, authOriginsOf(port), {
-		onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
-		// The audit of Members, in the Space's event log. Called on requests,
-		// long after the engine below is made.
-		onMemberChange: (change) => engine.logMemberChange(change),
-		// A browser may sign in at any of the Host's addresses, the phone app
-		// only at a Host. Read per request; Better Auth also asks once now,
-		// before the settings exist.
-		trustedOrigins: () => hostAuthOrigins(hostSettings()),
-	});
+	const auth = createAuth(
+		{
+			BETTER_AUTH_URL: env.BETTER_AUTH_URL,
+			BETTER_AUTH_SECRET: authSecret,
+			CORS_ORIGIN: env.CORS_ORIGIN,
+		},
+		db,
+		authOriginsOf(port),
+		{
+			onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
+			// The audit of Members, in the Space's event log. Called on requests,
+			// long after the engine below is made.
+			onMemberChange: (change) => engine.logMemberChange(change),
+			// A browser may sign in at any of the Host's addresses, the phone app
+			// only at a Host. Read per request; Better Auth also asks once now,
+			// before the settings exist.
+			trustedOrigins: () => hostAuthOrigins(hostSettings()),
+		},
+	);
 
 	/**
 	 * The Host's rules for sessions from other computers: two-factor sign-in

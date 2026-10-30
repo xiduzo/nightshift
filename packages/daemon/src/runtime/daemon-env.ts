@@ -10,7 +10,12 @@ import { ensureDataDir, resolveDataDir } from "@nightshift/db/data-dir";
  * every value. `bun run dev` gives varlock's ENV. `nightshift serve` and
  * the desktop app give `process.env`, after `prepareDaemonEnv`.
  */
-export type DaemonEnv = AuthConfig & {
+export type DaemonEnv = Omit<AuthConfig, "BETTER_AUTH_SECRET"> & {
+	/**
+	 * Required in production. Without it a dev daemon uses the dev default:
+	 * see `daemonAuthSecret`.
+	 */
+	readonly BETTER_AUTH_SECRET?: string;
 	readonly NODE_ENV?: string;
 	readonly DATABASE_URL?: string;
 	readonly NIGHTSHIFT_DATA_DIR?: string;
@@ -94,6 +99,33 @@ export function authSecret(env: Env, dataDir: string): string {
 	}
 	const secret = randomBytes(32).toString("hex");
 	writeFileSync(file, secret, { mode: 0o600 });
+	return secret;
+}
+
+/**
+ * The auth secret this daemon signs sessions with. BETTER_AUTH_SECRET when
+ * it is set. Without it, production refuses to start. Any other NODE_ENV
+ * uses the dev default: `authSecret`, made once in the data directory, so a
+ * new clone runs `bun run dev` without a `.env`. One log line says so.
+ * `nightshift serve` and the desktop app never get here without a secret:
+ * `prepareDaemonEnv` sets one first.
+ */
+export function daemonAuthSecret(
+	env: Env,
+	dataDir: string,
+	log: (line: string) => void = console.warn,
+): string {
+	const set = env.BETTER_AUTH_SECRET?.trim();
+	if (set) return set;
+	if (env.NODE_ENV === "production") {
+		throw new Error(
+			"BETTER_AUTH_SECRET is not set. Night Shift needs a secret of at least 32 characters in production.",
+		);
+	}
+	const secret = authSecret(env, dataDir);
+	log(
+		`BETTER_AUTH_SECRET is not set: this ${env.NODE_ENV ?? "development"} daemon uses the dev default in ${join(dataDir, AUTH_SECRET_FILE)}. Set BETTER_AUTH_SECRET in production.`,
+	);
 	return secret;
 }
 
