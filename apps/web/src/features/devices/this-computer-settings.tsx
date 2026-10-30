@@ -26,7 +26,6 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -40,7 +39,7 @@ import {
 	RotateCwIcon,
 	ShieldCheckIcon,
 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	settingsMutations,
@@ -211,12 +210,45 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 		}),
 	);
 
-	const addresses = draft
-		.split(/\s+/)
-		.map((line) => line.trim())
-		.filter(Boolean);
-	const wrong = addresses.find((address) => !isHostAddress(address));
-	const changed = addresses.join("\n") !== saved;
+	const parse = (text: string) => {
+		const addresses = text
+			.split(/\s+/)
+			.map((line) => line.trim())
+			.filter(Boolean);
+		return {
+			addresses,
+			wrong: addresses.find((address) => !isHostAddress(address)),
+		};
+	};
+	const { wrong } = parse(draft);
+
+	// The addresses save themselves after a short pause, or when the field
+	// loses focus. The timer reads the newest draft and saved addresses.
+	const latest = useRef({ draft, saved });
+	latest.current = { draft, saved };
+	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const saveAddresses = () => {
+		clearTimeout(timer.current);
+		timer.current = undefined;
+		const { draft: text, saved: before } = latest.current;
+		const { addresses, wrong: bad } = parse(text);
+		if (bad || addresses.join("\n") === before) return;
+		const undo = before === "" ? [] : before.split("\n");
+		save.mutate(
+			{ hostAddresses: addresses },
+			{
+				onSuccess: () =>
+					toast.success("Addresses saved", {
+						action: {
+							label: "Undo",
+							onClick: () => save.mutate({ hostAddresses: undo }),
+						},
+					}),
+			},
+		);
+	};
+	// biome-ignore lint/correctness/useExhaustiveDependencies: saves a change that still waits when the section goes
+	useEffect(() => saveAddresses, []);
 
 	return (
 		<>
@@ -275,7 +307,12 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 							rows={3}
 							value={draft}
 							placeholder="https://studio.example.com"
-							onChange={(event) => setDraft(event.target.value)}
+							onChange={(event) => {
+								setDraft(event.target.value);
+								clearTimeout(timer.current);
+								timer.current = setTimeout(saveAddresses, 800);
+							}}
+							onBlur={saveAddresses}
 						/>
 						{wrong ? (
 							<FieldError>
@@ -283,22 +320,11 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 							</FieldError>
 						) : null}
 					</Field>
-					<div className="flex items-center gap-3">
-						<Button
-							size="sm"
-							variant="outline"
-							disabled={!changed || Boolean(wrong) || save.isPending}
-							onClick={() => save.mutate({ hostAddresses: addresses })}
-						>
-							{save.isPending ? <Spinner data-icon="inline-start" /> : null}
-							Save addresses
-						</Button>
-						<span className="text-muted-foreground text-sm">
-							{host.reachable === "network"
-								? "Your other computers can connect now."
-								: "Only this computer can connect now."}
-						</span>
-					</div>
+					<FieldDescription>
+						{host.reachable === "network"
+							? "Your other computers can connect now."
+							: "Only this computer can connect now."}
+					</FieldDescription>
 					{host.restartNeeded ? (
 						<Alert>
 							<RotateCwIcon />

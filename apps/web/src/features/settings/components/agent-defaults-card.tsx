@@ -14,7 +14,7 @@ import { useSettingsForm } from "../hooks/use-settings-form";
 import { PERMISSION_MODES } from "../permission-modes";
 import {
 	CardForm,
-	FormFooter,
+	ResetSection,
 	SaveError,
 	SelectSetting,
 	TextSetting,
@@ -28,7 +28,9 @@ const AGENT_KEYS = [
 ] as const;
 
 export function AgentDefaultsCard({ data }: { data: SettingsView }) {
-	const form = useSettingsForm(data, AGENT_KEYS);
+	const form = useSettingsForm(data, AGENT_KEYS, {
+		title: "New Agent nodes",
+	});
 	const harness = harnessInfo(form.value("agentHarness") as HarnessName);
 	const mode = PERMISSION_MODES.find(
 		(option) => option.value === form.value("agentPermissionMode"),
@@ -43,6 +45,7 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 		<PageSection
 			title="New Agent nodes"
 			description="What a new Agent or Decision node starts with in the flow editor. Nodes you already made keep their own values."
+			actions={<ResetSection form={form} />}
 		>
 			<Card>
 				<CardForm form={form}>
@@ -51,7 +54,6 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 							<div className="grid gap-6 sm:grid-cols-2">
 								<SelectSetting
 									form={form}
-									data={data}
 									settingKey="agentHarness"
 									label="Harness"
 									description={harness.note}
@@ -66,7 +68,6 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 								/>
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="agentModel"
 									label="Model"
 									description={`Any model ${harness.label} supports, for example ${harness.models.slice(0, 3).join(", ")}.`}
@@ -75,7 +76,6 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 								/>
 								<SelectSetting
 									form={form}
-									data={data}
 									settingKey="agentPermissionMode"
 									label="Permission mode"
 									description={
@@ -95,7 +95,6 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 								/>
 								<SelectSetting
 									form={form}
-									data={data}
 									settingKey="decisionDecider"
 									label="Decider"
 									description="A new Decision node picks its label with this decision model."
@@ -105,7 +104,6 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 							<SaveError error={form.saveError} />
 						</FieldGroup>
 					</CardContent>
-					<FormFooter form={form} label="Save defaults" />
 				</CardForm>
 			</Card>
 		</PageSection>

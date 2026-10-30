@@ -7,7 +7,7 @@ import { PageSection } from "@/shared/page";
 import { useSettingsForm } from "../hooks/use-settings-form";
 import {
 	CardForm,
-	FormFooter,
+	ResetSection,
 	SaveError,
 	SelectSetting,
 } from "./setting-fields";
@@ -18,7 +18,9 @@ const ASSISTANT_KEYS = ["assistantProfile"] as const;
 const ANY = { value: "", label: "The first profile that works" };
 
 export function AssistantCard({ data }: { data: SettingsView }) {
-	const form = useSettingsForm(data, ASSISTANT_KEYS);
+	const form = useSettingsForm(data, ASSISTANT_KEYS, {
+		title: "Help in the flow editor",
+	});
 	const profiles = useQuery(profileQueries.agents());
 	const saved = data.values.assistantProfile;
 	const names = (profiles.data ?? []).map((profile) => profile.name);
@@ -30,6 +32,7 @@ export function AssistantCard({ data }: { data: SettingsView }) {
 		<PageSection
 			title="Help in the flow editor"
 			description="An agent suggests a prompt, outputs or variables for a node, and changes the flow with you in a chat."
+			actions={<ResetSection form={form} />}
 		>
 			<Card>
 				<CardForm form={form}>
@@ -37,7 +40,6 @@ export function AssistantCard({ data }: { data: SettingsView }) {
 						<FieldGroup>
 							<SelectSetting
 								form={form}
-								data={data}
 								settingKey="assistantProfile"
 								label="Profile for help"
 								description="Night Shift uses this profile for suggestions and for the chat beside the canvas."
@@ -46,7 +48,6 @@ export function AssistantCard({ data }: { data: SettingsView }) {
 							<SaveError error={form.saveError} />
 						</FieldGroup>
 					</CardContent>
-					<FormFooter form={form} label="Save" />
 				</CardForm>
 			</Card>
 		</PageSection>

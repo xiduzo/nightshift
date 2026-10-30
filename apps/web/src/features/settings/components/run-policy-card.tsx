@@ -14,9 +14,8 @@ import { PageSection } from "@/shared/page";
 import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import {
 	CardForm,
-	FormFooter,
+	ResetSection,
 	SaveError,
-	SettingSource,
 	TextSetting,
 } from "./setting-fields";
 
@@ -29,16 +28,16 @@ const POLICY_KEYS = [
 	"networkGraceMinutes",
 ] as const;
 
-/** A limit that may be off: no value is "no limit". */
-const orNoLimit = (value: unknown) =>
-	value === null ? "no limit" : String(value);
-
 export function RunPolicyCard({ data }: { data: SettingsView }) {
-	const form = useSettingsForm(data, POLICY_KEYS);
+	const form = useSettingsForm(data, POLICY_KEYS, {
+		title: "Run policy",
+		switches: ["resumeInterruptedRuns"],
+	});
 	return (
 		<PageSection
 			title="Run policy"
 			description="Defaults for flows that do not set their own."
+			actions={<ResetSection form={form} />}
 		>
 			<Card>
 				<CardForm form={form}>
@@ -49,28 +48,23 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 							<div className="grid gap-6 sm:grid-cols-2">
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="budgetUsd"
 									label="Budget per run"
 									description="A run stops when it has spent this much. Resume it to spend as much again. Leave it empty for no budget."
 									unit="USD"
 									inputMode="decimal"
 									placeholder="No budget"
-									format={orNoLimit}
 								/>
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="maxTurns"
 									label="Max turns per agent step"
 									description="A turn is one reply of the agent. The step fails when the agent takes more. Leave it empty for no limit."
 									inputMode="numeric"
 									placeholder="No limit"
-									format={orNoLimit}
 								/>
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="idleMinutes"
 									label="Idle timeout"
 									description="An agent step fails when the agent shows no activity for this long."
@@ -79,7 +73,6 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 								/>
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="usageLimitFirstWaitMinutes"
 									label="First usage-limit wait"
 									description="An agent hits its usage limit and gives no reset time. The run waits this long, then tries again."
@@ -88,7 +81,6 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 								/>
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="usageLimitMaxWaitMinutes"
 									label="Longest usage-limit wait"
 									description="Each next wait is twice as long, up to this."
@@ -97,7 +89,6 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 								/>
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="networkGraceMinutes"
 									label="Network grace"
 									description="The longest total wait for the network to come back. Then the step fails."
@@ -108,7 +99,6 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 							<SaveError error={form.saveError} />
 						</FieldGroup>
 					</CardContent>
-					<FormFooter form={form} label="Save run policy" />
 				</CardForm>
 			</Card>
 		</PageSection>
@@ -118,27 +108,17 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 /** Whether a run the daemon stopped mid-step continues on its own. Saves at once. */
 function ResumeSetting({ data }: { data: SettingsView }) {
 	const id = useId();
-	const toggle = useToggleSetting();
-	const label = "Resume after a restart";
+	const toggle = useToggleSetting("Run policy");
 	return (
 		<Field orientation="horizontal">
 			<FieldContent>
-				<FieldLabel htmlFor={`${id}-resume`}>{label}</FieldLabel>
+				<FieldLabel htmlFor={`${id}-resume`}>Resume after a restart</FieldLabel>
 				<FieldDescription>
 					When Night Shift stops in the middle of a run, the run continues on
 					its own after Night Shift starts again. This works only with schedules
 					on, before the run's stop time, and up to 3 times in a row. Turn it
 					off to resume runs yourself.
 				</FieldDescription>
-				<SettingSource
-					field={data.fields.resumeInterruptedRuns}
-					label={label}
-					format={(value) => (value ? "on" : "off")}
-					resetting={
-						toggle.isPending && toggle.variables?.resumeInterruptedRuns === null
-					}
-					onReset={() => toggle.mutate({ resumeInterruptedRuns: null })}
-				/>
 			</FieldContent>
 			<Switch
 				id={`${id}-resume`}

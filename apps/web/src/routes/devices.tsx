@@ -6,7 +6,7 @@ export const Route = createFileRoute("/devices")({
 	// Polls from the browser; nothing to render on the server.
 	ssr: false,
 	/**
-	 * `device`: what is open, "host" or a computer's id.
+	 * `device`: the device whose detail is open: "host", "phone:<id>" or a computer's id.
 	 * `pair`: a code from the link a device printed; opens "Pair a device" with it.
 	 */
 	validateSearch: (

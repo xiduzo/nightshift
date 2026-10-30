@@ -167,9 +167,10 @@ const DEFS = {
 		env: "NIGHTSHIFT_CLEAN_UP_RUNS",
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
+	// 90 days keeps every run that the overviews and their graphs look back on.
 	cleanUpAfterDays: {
 		schema: z.number().int().min(1).max(365),
-		default: 14,
+		default: 90,
 	} satisfies Def<number>,
 	claudeBin: {
 		schema: z.string().trim().min(1),
