@@ -98,6 +98,15 @@ Use the `ux-copy` and `ste-writing` skills.
   A description that only repeats its label goes.
 - **Patterns.** Empty state: what this is, and how to start. Error: what
   happened, and how to fix it. Button: verb and object ("Add schedule").
+- **Say less.** Cut before you rewrite. A description gets 1–2 sentences,
+  a hint gets 1. Drop what the label, placeholder, unit or example already
+  says, and drop decoration ("For the night."). Keep only the facts the
+  person needs to decide or to fix something: limits, risks, what is lost.
+  A field needs no description: make the prop optional, do not fill it.
+- **Balance.** UX copy decides what to say (the action, the result, what
+  happens next). STE decides how to say it (short words, active voice).
+  The result is plain and friendly, not robot text.
+  `docs/steering/DESIGN.md` ("Copy") has the checklist and examples.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

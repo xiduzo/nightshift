@@ -127,6 +127,48 @@ A stat card or a table row can open a details dialog (`apps/web/src/features/das
 - Overview: 4 `Stat` cards, then one chart. Other tabs: one list or table, at most 5 rows (see Overview lists).
 - Each tab has its own empty state. A footer links to the full page.
 
+## Copy
+
+The rules are in `AGENTS.md` ("UI copy"). This is how to apply them. The
+Settings page (bbc8b651) set the bar. A copy pass over the whole web app
+followed on 2026-10-30.
+
+**Balance.** UX copy decides what to say: lead with the action or the
+result, and say what happens next. STE (ASD-STE100, relaxed dictionary)
+decides how to say it: short common words, active voice, simple present,
+one idea per sentence. Aim for plain and friendly. A sentence that obeys
+STE but no longer speaks to "you" went too far.
+
+**Cut first, rewrite second.** Check each string in this order:
+
+1. Does it repeat the label or the title? Delete it.
+2. Does it explain how Night Shift works inside? Delete it.
+3. Does the placeholder, unit, example or icon already say it? Delete it.
+4. Is it decoration or a joke? Delete it.
+5. What stays: a description in 1–2 sentences, a hint in 1, max 20 words a
+   sentence. Keep limits, risks and what is lost.
+
+**Before and after** (from the Settings page):
+
+| Before | After |
+| --- | --- |
+| "How many runs can work at the same time. Extra runs wait their turn." (Max concurrent runs) | "More runs wait their turn." |
+| "A run stops when it has spent this much. Resume it to spend as much again. Leave it empty for no budget." (placeholder: "No budget") | "The run stops at this amount. Resume it to spend as much again." |
+| "This computer does not go to sleep while a run on it works or waits for a timer. A run that waits at a Gate does not keep it awake." | "Stay awake while a run works or waits for a timer. A run at a Gate lets it sleep." |
+| "Each run works in its own copy of the project, on its own branch. Night Shift can remove old ones for you." | "Remove what old runs leave on this computer." |
+| "A run waits for your answer." (under "A Gate waits for you") | (none) |
+| "Light or dark, as macOS is." / "For the night." / "For the morning after." | (none) |
+
+**In code.** A field component takes an optional `description` and renders
+nothing without it (`apps/web/src/features/settings/components/setting-fields.tsx`).
+No empty `FieldDescription` or `ItemDescription` in the DOM. Copy that
+comes from a package (harness notes, run end reasons, flow issues) follows
+the same rules: fix it at its source, not in the app.
+
+**Review.** In a pull request that adds or changes UI text, read every new
+string aloud. If you can drop a sentence and the person still knows what
+to do, drop it.
+
 ## UI States Required
 
 - **Default** — the base state
