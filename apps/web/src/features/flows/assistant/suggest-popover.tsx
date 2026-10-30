@@ -15,12 +15,12 @@ import {
 	PopoverTrigger,
 } from "@nightshift/ui/components/popover";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
+import { TraceLine, TraceTitle } from "@nightshift/ui/components/trace";
 import { CircleAlertIcon } from "lucide-react";
 import {
 	type ReactElement,
@@ -224,15 +224,11 @@ function SuggestBody({
 
 			{state.status === "running" ? (
 				<div className="flex flex-col gap-3">
-					<p
-						className="flex items-center gap-2 text-muted-foreground text-xs"
-						aria-live="polite"
-					>
-						<Spinner className="size-3.5" />
-						<span className="truncate">
+					<TraceLine status="running" aria-live="polite" className="text-xs">
+						<TraceTitle>
 							{state.activity ?? "The agent reads the flow"}
-						</span>
-					</p>
+						</TraceTitle>
+					</TraceLine>
 					<div className="flex flex-col gap-1.5">
 						<Skeleton className="h-3 w-full" />
 						<Skeleton className="h-3 w-4/5" />

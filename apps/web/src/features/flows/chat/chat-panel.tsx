@@ -30,7 +30,7 @@ import {
 	MessageScrollerProvider,
 	MessageScrollerViewport,
 } from "@nightshift/ui/components/message-scroller";
-import { Spinner } from "@nightshift/ui/components/spinner";
+import { TraceLine, TraceTitle } from "@nightshift/ui/components/trace";
 import { cn } from "@nightshift/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -274,15 +274,11 @@ function AgentAnswer({
 	return (
 		<Message>
 			<MessageContent>
-				{message.text ? <Markdown text={message.text} /> : null}
+				{message.text ? <AnswerText text={message.text} /> : null}
 				{answering ? (
-					<p
-						aria-live="polite"
-						className="flex items-center gap-2 text-muted-foreground text-xs"
-					>
-						<Spinner />
-						{activity ?? "The agent is working…"}
-					</p>
+					<TraceLine status="running" aria-live="polite" className="text-xs">
+						<TraceTitle>{activity ?? "The agent is working…"}</TraceTitle>
+					</TraceLine>
 				) : null}
 				{message.proposal ? (
 					<ProposalMessage
@@ -316,6 +312,11 @@ function AgentAnswer({
 			</MessageContent>
 		</Message>
 	);
+}
+
+/** The answer's Markdown: the one place the chat renders what the agent wrote. */
+function AnswerText({ text }: { text: string }) {
+	return <Markdown text={text} />;
 }
 
 function ProposalMessage({
