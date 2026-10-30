@@ -4,7 +4,7 @@
  * and the person see the same issues.
  */
 
-import { checkDraft, type DraftMessages } from "../draft";
+import { type CliToolRef, checkDraft, type DraftMessages } from "../draft";
 import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
@@ -19,6 +19,8 @@ export type ProposalCheckOptions = {
 	profiles?: readonly ProfileRef[];
 	/** The names of this computer's connections. Leave it out to skip the check. */
 	connections?: readonly string[];
+	/** This computer's CLI tools, to warn about a program called without its login. */
+	cliTools?: readonly CliToolRef[];
 };
 
 /**
@@ -71,6 +73,7 @@ export function proposalIssues(
 		name: options.name,
 		profiles,
 		connections,
+		cliTools: options.cliTools,
 	});
 	if (validatorError !== null) {
 		issues.push({
@@ -88,6 +91,8 @@ const messages: DraftMessages = {
 		`This computer has no connection "${name}". Use one it has, or leave it out.`,
 	missingProfile: (profile) =>
 		`There is no profile "${profile.profile}" on the device "${profile.device}". Use a device and a profile from list_profiles.`,
+	programWithoutLogin: (program, tools) =>
+		`The command calls ${program}, which runs without a login. Call ${tools.join(" or ")} instead: ${tools.length === 1 ? "that CLI tool runs" : "those CLI tools run"} ${program} signed in. list_tools names them.`,
 };
 
 /** A schema issue, on its node or edge when it has one: `Node "build": prompt: …`. */

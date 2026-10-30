@@ -29,6 +29,7 @@ import {
 } from "./terminal-project";
 import {
 	AUTHORING_TOOLS,
+	type AuthoringCliTool,
 	type AuthoringProfile,
 	type AuthoringRun,
 	type AuthoringSkill,
@@ -59,7 +60,7 @@ export type TerminalPort = {
 	/** The profiles a node of the project may name, each on its Device. */
 	profiles(projectId: string): Promise<AuthoringProfile[]>;
 	tools(): Promise<{
-		clis: AuthoringToolInfo[];
+		clis: AuthoringCliTool[];
 		connections: AuthoringToolInfo[];
 	}>;
 	skills(projectId: string): Promise<AuthoringSkill[]>;
@@ -141,6 +142,7 @@ async function checkIn(
 		name,
 		profiles: profileRefs(profiles),
 		connections: tools.connections.map((c) => c.name),
+		cliTools: tools.clis,
 	});
 }
 
@@ -261,7 +263,7 @@ export function terminalTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.listTools,
 			description:
-				"The CLI tools (an Agent node's `clis`) and connections (its `connections`, a Tool node's `connection`) of this computer.",
+				"The CLI tools (an Agent node's `clis`) and connections (its `connections`, a Tool node's `connection`) of this computer. A command calls a CLI tool with a login (`signsIn`) by its name, such as acli-dimpact, to run its program signed in.",
 			inputSchema: { type: "object", properties: {} },
 		}).server(async () => JSON.stringify(await port.tools(), null, 2)),
 		toolDefinition({

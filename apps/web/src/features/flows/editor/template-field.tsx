@@ -57,6 +57,7 @@ import {
 	type VariableGroup,
 } from "../flow-draft";
 
+import type { DaemonCliTool } from "./cli-tools-field";
 import { Field, Note, Optional } from "./fields";
 import { useProjectFlowMap } from "./project-flows-context";
 
@@ -70,7 +71,8 @@ import { useProjectFlowMap } from "./project-flows-context";
  * gets the prompt helper: "Suggest prompt" under the field, or Cmd/Ctrl+I.
  * A multi-line field marks its templates and highlights its `language`, or
  * the language its text looks like. It stays below a set height and opens
- * in a larger window, where the person can pick another language.
+ * in a larger window, where the person can pick another language. A command
+ * also lists the CLI tools it can call (`tools`): a click inserts the name.
  */
 export function TemplateField({
 	id,
@@ -89,6 +91,8 @@ export function TemplateField({
 	assist,
 	action,
 	language,
+	error,
+	tools,
 }: {
 	id: string;
 	label: ReactNode;
@@ -113,6 +117,10 @@ export function TemplateField({
 	/** The code in a multi-line field, such as `bash`, to highlight. */
 	/** The language of the field, such as `bash`. Without it, a guess. */
 	language?: CodeLanguage;
+	/** A problem with the value, under the field. */
+	error?: string | null;
+	/** For a command: the CLI tools it can call by name. */
+	tools?: readonly DaemonCliTool[];
 }) {
 	const {
 		ref,
@@ -140,14 +148,16 @@ export function TemplateField({
 		});
 	};
 
-	const insert = (variable: TemplateVariable) => {
+	const insertText = (text: string, back = 0) => {
 		const field = ref.current;
 		const start = field?.selectionStart ?? value.length;
 		const end = field?.selectionEnd ?? value.length;
-		onChange(value.slice(0, start) + variable.text + value.slice(end));
-		// A JSON value: the cursor waits before `}}` for a `.path`.
-		moveCursor(field, start + variable.text.length - (variable.json ? 2 : 0));
+		onChange(value.slice(0, start) + text + value.slice(end));
+		moveCursor(field, start + text.length - back);
 	};
+	// A JSON value: the cursor waits before `}}` for a `.path`.
+	const insert = (variable: TemplateVariable) =>
+		insertText(variable.text, variable.json ? 2 : 0);
 
 	const suggest = useTemplateSuggestions(value, groups);
 	const complete = (variable: TemplateVariable) => {
@@ -162,7 +172,7 @@ export function TemplateField({
 		moveCursor(ref.current, next.cursor);
 	};
 
-	const describedBy = hint ? `${id}-hint` : undefined;
+	const describedBy = hint || error ? `${id}-hint` : undefined;
 
 	const editor = multiline ? (
 		<div className="relative">
@@ -179,7 +189,7 @@ export function TemplateField({
 					className,
 				)}
 				spellCheck={shown === "markdown" || shown === "text"}
-				aria-invalid={invalid}
+				aria-invalid={invalid || Boolean(error)}
 				aria-required={required}
 				aria-describedby={describedBy}
 				aria-keyshortcuts={helperNode !== null ? "Meta+I Control+I" : undefined}
@@ -207,7 +217,7 @@ export function TemplateField({
 			placeholder={placeholder}
 			className={cn("font-mono text-xs", className)}
 			spellCheck={false}
-			aria-invalid={invalid}
+			aria-invalid={invalid || Boolean(error)}
 			aria-required={required}
 			aria-describedby={describedBy}
 			{...suggest.fieldProps}
@@ -237,7 +247,12 @@ export function TemplateField({
 	const extras = (
 		<>
 			<TemplateSuggestions anchor={ref} suggest={suggest} onPick={complete} />
-			<TemplateVariables groups={groups} onInsert={insert} />
+			<TemplateVariables
+				groups={groups}
+				tools={tools}
+				onInsert={insert}
+				onInsertTool={(name) => insertText(name)}
+			/>
 		</>
 	);
 
@@ -256,6 +271,7 @@ export function TemplateField({
 					)
 				}
 				hint={hint}
+				error={error}
 			>
 				{large ? null : (
 					<>
@@ -303,14 +319,22 @@ function labelOf(language: CodeLanguage): string {
 	return CODE_LANGUAGES.find((entry) => entry.value === language)?.label ?? "";
 }
 
-/** The variables a field can use, grouped by name; a click inserts one. */
+/**
+ * The variables a field can use, grouped by name, and the CLI tools a
+ * command can call; a click inserts one.
+ */
 function TemplateVariables({
 	groups,
+	tools,
 	onInsert,
+	onInsertTool,
 }: {
 	groups: readonly VariableGroup[];
+	tools: readonly DaemonCliTool[] | undefined;
 	onInsert: (variable: TemplateVariable) => void;
+	onInsertTool: (name: string) => void;
 }) {
+	const withTools = tools !== undefined && tools.length > 0;
 	return (
 		<Collapsible className="rounded-lg border border-dashed">
 			<CollapsibleTrigger
@@ -327,7 +351,9 @@ function TemplateVariables({
 					aria-hidden="true"
 				/>
 				<BracesIcon aria-hidden="true" />
-				Template variables · click to insert
+				{withTools
+					? "Template variables and CLI tools · click to insert"
+					: "Template variables · click to insert"}
 			</CollapsibleTrigger>
 			<CollapsibleContent className="flex flex-col gap-3 border-t border-dashed px-2.5 py-2.5">
 				<dl className="flex flex-col gap-2.5">
@@ -363,6 +389,30 @@ function TemplateVariables({
 							</dd>
 						</div>
 					))}
+					{withTools ? (
+						<div className="flex flex-col gap-1.5">
+							<dt className="text-[11px] text-muted-foreground">CLI tools</dt>
+							<dd className="flex flex-wrap gap-1">
+								{tools.map((tool) => (
+									<Button
+										key={tool.name}
+										variant="outline"
+										size="xs"
+										className="h-6 px-1.5 font-mono font-normal text-[11px]"
+										onClick={() => onInsertTool(tool.name)}
+										title={[
+											`Insert ${tool.name}. It runs ${tool.program ?? tool.name} signed in.`,
+											tool.description,
+										]
+											.filter(Boolean)
+											.join("\n")}
+									>
+										{tool.name}
+									</Button>
+								))}
+							</dd>
+						</div>
+					) : null}
 				</dl>
 				<Note>
 					A value marked <code>.…</code> holds JSON: add a path, such as{" "}

@@ -24,6 +24,7 @@ import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useRef } from "react";
 import { CommandSuggest } from "../../assistant/field-helpers";
 import { SOURCE_KINDS } from "../../flow-draft";
+import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { OptionsEditor } from "../options-editor";
 import { TemplateField } from "../template-field";
@@ -314,6 +315,7 @@ function SourceFields({
 	onChange: (source: ListSource) => void;
 }) {
 	const id = useId();
+	const commandTools = useCommandToolField(node);
 	const { source } = each;
 	switch (source.kind) {
 		case "json":
@@ -348,6 +350,8 @@ function SourceFields({
 					nodeId={node.id}
 					value={source.command}
 					invalid={source.command.trim() === ""}
+					error={commandTools.error}
+					tools={commandTools.tools}
 					className="min-h-16"
 					placeholder="cat tasks.json"
 					action={<CommandSuggest node={node} />}

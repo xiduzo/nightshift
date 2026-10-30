@@ -154,7 +154,12 @@ export function apiPort(
 					client.connections.list(),
 				]);
 				return {
-					clis: clis.map((t) => ({ name: t.name, description: t.description })),
+					clis: clis.map((t) => ({
+						name: t.name,
+						description: t.description,
+						program: t.program,
+						signsIn: t.login !== null,
+					})),
 					connections: connections.connections.map((c) => ({
 						name: c.name,
 						description: c.description,

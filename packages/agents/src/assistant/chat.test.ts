@@ -79,7 +79,9 @@ function port(over: Partial<AuthoringPort> = {}): AuthoringPort & {
 			},
 		],
 		tools: async () => ({
-			clis: [{ name: "gh", description: "GitHub" }],
+			clis: [
+				{ name: "gh", description: "GitHub", program: null, signsIn: false },
+			],
 			connections: [{ name: "linear", description: null }],
 		}),
 		skills: async () => [

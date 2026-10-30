@@ -12,6 +12,11 @@ export {
 	type FlowCheck,
 	isSavable,
 } from "./check";
+export {
+	type CliToolRef,
+	commandOf,
+	programsWithoutLogin,
+} from "./cli-programs";
 export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
 export {
 	addEdge,

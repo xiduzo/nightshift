@@ -54,6 +54,12 @@ export function profileRefs(
 /** A CLI tool or a connection, by name. */
 export type AuthoringToolInfo = { name: string; description: string | null };
 
+/** A CLI tool: the program it runs (null: the one of its name), and whether it has a login. */
+export type AuthoringCliTool = AuthoringToolInfo & {
+	program: string | null;
+	signsIn: boolean;
+};
+
 export type AuthoringSkill = {
 	name: string;
 	description: string | null;
@@ -107,7 +113,7 @@ export type AuthoringPort = {
 	profiles(): Promise<AuthoringProfile[]>;
 	/** The CLI tools and connections an Agent node may name. */
 	tools(): Promise<{
-		clis: AuthoringToolInfo[];
+		clis: AuthoringCliTool[];
 		connections: AuthoringToolInfo[];
 	}>;
 	/** The skills an Agent node may run. */
@@ -212,6 +218,7 @@ async function check(port: AuthoringPort, flow: unknown) {
 		name: draft.name,
 		profiles: profileRefs(profiles),
 		connections: tools.connections.map((c) => c.name),
+		cliTools: tools.clis,
 	});
 	return { draft, issues };
 }
@@ -341,7 +348,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.listTools,
 			description:
-				"The CLI tools (an Agent node's `clis`) and connections (its `connections`, a Tool node's `connection`) of this computer.",
+				"The CLI tools (an Agent node's `clis`) and connections (its `connections`, a Tool node's `connection`) of this computer. A command calls a CLI tool with a login (`signsIn`) by its name, such as acli-dimpact, to run its program signed in.",
 			inputSchema: noInput,
 		}).server(async () => JSON.stringify(await port.tools(), null, 2)),
 		toolDefinition({

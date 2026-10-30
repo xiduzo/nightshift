@@ -4,7 +4,7 @@ import type { FlowInput } from "../../flow";
 export const jiraMoveKit: FlowInput = {
 	version: 7,
 	description:
-		"Moves a Jira work item to another status, for example In Progress. Needs the Atlassian CLI, signed in.",
+		"Moves a Jira work item to another status, for example In Progress. Needs a CLI tool that runs the Atlassian CLI signed in.",
 	inputs: [
 		{
 			name: "key",
@@ -18,6 +18,13 @@ export const jiraMoveKit: FlowInput = {
 			description: "The status to move it to, as Jira names it: In Progress.",
 			required: true,
 		},
+		{
+			name: "tool",
+			type: "text",
+			description:
+				"The CLI tool that runs acli signed in, for example acli-dimpact. Each CLI tool with a login is one account.",
+			default: "acli",
+		},
 	],
 	outputs: [],
 	start: "move",
@@ -27,7 +34,7 @@ export const jiraMoveKit: FlowInput = {
 			type: "command",
 			label: "Move the work item",
 			position: { x: 0, y: 0 },
-			command: `acli jira workitem transition --key "{{key}}" --status "{{status}}" --yes`,
+			command: `"{{tool}}" jira workitem transition --key "{{key}}" --status "{{status}}" --yes`,
 			exits: [
 				{ name: "moved", code: 0, color: "green" },
 				{ name: "fail", color: "red" },

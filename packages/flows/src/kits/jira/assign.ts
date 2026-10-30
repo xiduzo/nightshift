@@ -4,7 +4,7 @@ import type { FlowInput } from "../../flow";
 export const jiraAssignKit: FlowInput = {
 	version: 7,
 	description:
-		"Assigns a Jira work item to a person, or to you. Needs the Atlassian CLI, signed in.",
+		"Assigns a Jira work item to a person, or to you. Needs a CLI tool that runs the Atlassian CLI signed in.",
 	inputs: [
 		{
 			name: "key",
@@ -19,6 +19,13 @@ export const jiraAssignKit: FlowInput = {
 				"An email address or account ID. @me: you. default: the project's default assignee.",
 			default: "@me",
 		},
+		{
+			name: "tool",
+			type: "text",
+			description:
+				"The CLI tool that runs acli signed in, for example acli-dimpact. Each CLI tool with a login is one account.",
+			default: "acli",
+		},
 	],
 	outputs: [],
 	start: "assign",
@@ -28,7 +35,7 @@ export const jiraAssignKit: FlowInput = {
 			type: "command",
 			label: "Assign the work item",
 			position: { x: 0, y: 0 },
-			command: `acli jira workitem assign --key "{{key}}" --assignee "{{assignee}}" --yes`,
+			command: `"{{tool}}" jira workitem assign --key "{{key}}" --assignee "{{assignee}}" --yes`,
 			exits: [
 				{ name: "assigned", code: 0, color: "green" },
 				{ name: "fail", color: "red" },

@@ -1,9 +1,10 @@
-/** Checks a draft: the schema, the connections and profiles it names, and `validateFlow`. */
+/** Checks a draft: the schema, the connections, profiles and CLI programs it names, and `validateFlow`. */
 import { type Flow, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 import { validateFlow } from "../validate";
+import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 import { missingConnections } from "./nodes";
 
 export type FlowCheck = {
@@ -26,6 +27,8 @@ export type DraftMessages = {
 	missingConnection: (name: string) => string;
 	/** A profile the node names that its Device does not have, as far as this computer knows. */
 	missingProfile: (profile: ProfileRef) => string;
+	/** A program a command calls by its own name, such as `acli`, that only `tools` sign in to. */
+	programWithoutLogin: (program: string, tools: readonly string[]) => string;
 };
 
 export type DraftCheckOptions = {
@@ -42,6 +45,8 @@ export type DraftCheckOptions = {
 	profiles?: readonly ProfileRef[];
 	/** The Devices whose profiles this computer cannot tell: a profile on one is not checked. */
 	untoldDevices?: readonly string[];
+	/** The CLI tools, to find a command that calls a program without its login. Leave it out while they load. */
+	cliTools?: readonly CliToolRef[];
 };
 
 /**
@@ -53,7 +58,14 @@ export type DraftCheckOptions = {
 export function checkDraft(
 	flow: Flow,
 	messages: DraftMessages,
-	{ flows, name, connections, profiles, untoldDevices }: DraftCheckOptions = {},
+	{
+		flows,
+		name,
+		connections,
+		profiles,
+		untoldDevices,
+		cliTools,
+	}: DraftCheckOptions = {},
 ): FlowCheck {
 	const issues: FlowIssue[] = [];
 	const parsed = flowSchema.safeParse(flow);
@@ -103,6 +115,19 @@ export function checkDraft(
 				message: messages.missingProfile(profile),
 				nodeId: node.id,
 			});
+		}
+	}
+
+	if (cliTools) {
+		// A warning: the program may be signed in on its own on this computer.
+		for (const node of flow.nodes) {
+			for (const { program, tools } of programsWithoutLogin(node, cliTools)) {
+				issues.push({
+					severity: "warning",
+					message: messages.programWithoutLogin(program, tools),
+					nodeId: node.id,
+				});
+			}
 		}
 	}
 

@@ -4,6 +4,7 @@
  * `@nightshift/flows` (the draft vertical).
  */
 import {
+	type CliToolRef,
 	checkDraft,
 	type DraftMessages,
 	type Flow,
@@ -48,6 +49,15 @@ export function missingConnectionMessage(name: string): string {
 /** What the editor says about a profile that its device does not have. */
 export function missingProfileMessage(_profile: ProfileRef): string {
 	return "Its device no longer has this profile. The flow cannot run until you pick another profile.";
+}
+
+/** What the editor says about a command that calls a program without the login of its CLI tool. */
+export function programWithoutLoginMessage(
+	program: string,
+	tools: readonly string[],
+): string {
+	const each = tools.length === 1 ? "it runs" : "each runs";
+	return `${program} runs without a login in a command. Use ${tools.join(" or ")} instead: ${each} ${program} signed in.`;
 }
 
 /** One `{{…}}` a template can use. */
@@ -215,6 +225,7 @@ const MESSAGES: DraftMessages = {
 	},
 	missingConnection: missingConnectionMessage,
 	missingProfile: missingProfileMessage,
+	programWithoutLogin: programWithoutLoginMessage,
 };
 
 /** A `{{` the cursor is in: where it starts, and the name typed after it so far. */
@@ -276,8 +287,8 @@ export function completeTemplate(
  * call; leave it out while they load. `name` is the draft's own file name.
  * `connections` holds the names of the daemon's connections, and
  * `profiles` the profiles a node may name, each on its device, with the
- * devices whose profiles this computer cannot tell; leave them out while
- * they load.
+ * devices whose profiles this computer cannot tell, and `cliTools` the CLI
+ * tools; leave them out while they load.
  */
 export function checkFlow(
 	flow: Flow,
@@ -288,11 +299,13 @@ export function checkFlow(
 		known: readonly ProfileRef[];
 		untoldDevices: readonly string[];
 	},
+	cliTools?: readonly CliToolRef[],
 ): FlowCheck {
 	return checkDraft(flow, MESSAGES, {
 		flows,
 		name,
 		connections,
+		cliTools,
 		...(profiles
 			? { profiles: profiles.known, untoldDevices: profiles.untoldDevices }
 			: {}),

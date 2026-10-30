@@ -29,6 +29,7 @@ import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { useId } from "react";
 import { connectionQueries } from "@/features/agents";
 import { CommandSuggest } from "../../assistant/field-helpers";
+import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note } from "../fields";
 import { SecretsField } from "../secrets-field";
 import { TemplateField } from "../template-field";
@@ -54,6 +55,7 @@ export function CommandFields({
 	onRemoveOutcome: (index: number) => void;
 }) {
 	const id = useId();
+	const commandTools = useCommandToolField(node);
 	// The secrets of this computer, to pick from.
 	const secrets = useQuery(connectionQueries.list()).data?.secrets;
 	const named = node.secrets ?? [];
@@ -104,6 +106,8 @@ export function CommandFields({
 					language="bash"
 					className="min-h-20"
 					invalid={node.command.trim() === ""}
+					error={commandTools.error}
+					tools={commandTools.tools}
 					onChange={(command) =>
 						onChange((current) => ({ ...current, command }))
 					}

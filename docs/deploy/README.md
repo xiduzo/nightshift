@@ -137,6 +137,9 @@ Agents page, then the tool, then Edit:
 - **Several accounts of one program.** Add one tool per account: `gh` and
   `gh-work` both run the program `gh`, each with its own token. The agent
   types the tool's name. Say which account it is in the description.
+  A command types the tool's name too: `acli-dimpact jira ...`, not
+  `acli jira ...`, which runs without the login. The flow editor warns
+  about a command that does, and lists the tools you can insert.
 - **A program that keeps its sign-in in a file**, such as acli: turn on
   "Keep its own sign-in". Night Shift keeps a folder for the tool in the
   data folder, `/data/tools/<name>`, and points the program at it with a

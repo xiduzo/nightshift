@@ -5,6 +5,7 @@
  */
 
 import {
+	commandOf,
 	type NodeOption,
 	setInputs,
 	setVariables,
@@ -83,21 +84,6 @@ export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
 		case "inputs":
 			return false;
 	}
-}
-
-/**
- * The command a `command` suggestion rewrites: a Command's, the one a Wait
- * runs until it passes, or the one that prints a Call node's list.
- */
-export function commandOf(node: FlowNode): string | undefined {
-	if (node.type === "command") return node.command;
-	if (node.type === "wait" && node.until.kind === "command") {
-		return node.until.command;
-	}
-	if (node.type === "call" && node.each?.source.kind === "command") {
-		return node.each.source.command;
-	}
-	return undefined;
 }
 
 /**

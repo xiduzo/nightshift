@@ -5,11 +5,13 @@ import { connectionQueries } from "@/features/agents";
 import { runQueries } from "@/features/runs/queries";
 import { settingsQueries } from "@/features/settings/queries";
 import { useProjectFlows } from "../use-project-flows";
+import { useCommandTools } from "./cli-tools-field";
 
 /**
  * What the editor reads besides the draft: the project's other flows, the
  * settings (new-node defaults, run policy), the connections and each
- * Device's profiles a node may name. Each part is undefined while it loads. A node's Device field
+ * Device's profiles a node may name, and the CLI tools commands call. Each
+ * part is undefined while it loads. A node's Device field
  * asks for the devices that node may name itself.
  */
 export function useEditorData(projectId: string, name: string) {
@@ -48,6 +50,7 @@ export function useEditorData(projectId: string, name: string) {
 			},
 		[devices.data],
 	);
+	const cliTools = useCommandTools().refs;
 	return {
 		projectFlows,
 		nodeDefaults,
@@ -55,5 +58,6 @@ export function useEditorData(projectId: string, name: string) {
 		connections,
 		connectionNames,
 		profileRefs,
+		cliTools,
 	};
 }

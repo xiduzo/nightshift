@@ -8,6 +8,7 @@ import {
 import { useId, useRef } from "react";
 import { CommandSuggest } from "../../assistant/field-helpers";
 import { WAIT_KINDS } from "../../flow-draft";
+import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { TemplateField } from "../template-field";
 
@@ -37,6 +38,7 @@ export function WaitFields({
 	onChange: (change: (node: WaitNode) => WaitNode) => void;
 }) {
 	const id = useId();
+	const commandTools = useCommandToolField(node);
 	// Switching the kind back and forth keeps what was typed.
 	const lastUntil = useRef<Partial<Record<WaitUntil["kind"], WaitUntil>>>({});
 	const setUntil = (until: WaitUntil) =>
@@ -110,6 +112,8 @@ export function WaitFields({
 						value={until.command}
 						placeholder="gh pr checks 42"
 						invalid={until.command.trim() === ""}
+						error={commandTools.error}
+						tools={commandTools.tools}
 						action={<CommandSuggest node={node} />}
 						onChange={(command) => setUntil({ ...until, command })}
 					/>

@@ -218,11 +218,19 @@ function Editor({
 		connections,
 		connectionNames,
 		profileRefs,
+		cliTools,
 	} = useEditorData(projectId, name);
 	const check = useMemo(
 		() =>
-			checkFlow(draft, projectFlows.flows, name, connectionNames, profileRefs),
-		[draft, projectFlows.flows, name, connectionNames, profileRefs],
+			checkFlow(
+				draft,
+				projectFlows.flows,
+				name,
+				connectionNames,
+				profileRefs,
+				cliTools,
+			),
+		[draft, projectFlows.flows, name, connectionNames, profileRefs, cliTools],
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
@@ -593,8 +601,9 @@ function Editor({
 				name,
 				connectionNames,
 				profileRefs,
+				cliTools,
 			),
-		[preview, projectFlows.flows, name, connectionNames, profileRefs],
+		[preview, projectFlows.flows, name, connectionNames, profileRefs, cliTools],
 	);
 
 	const inspector = selectedNode ? (

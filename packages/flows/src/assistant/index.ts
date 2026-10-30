@@ -8,7 +8,6 @@ export {
 	applySuggestion,
 	argumentChanges,
 	type Change,
-	commandOf,
 	inputChanges,
 	type NamedChange,
 	newVariables,

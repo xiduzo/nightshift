@@ -7,6 +7,8 @@ const messages: DraftMessages = {
 	schemaIssue: (_flow, issue) => `schema ${issue.path.map(String).join(".")}`,
 	missingConnection: (name) => `connection ${name}`,
 	missingProfile: (profile) => `profile ${profile.profile}`,
+	programWithoutLogin: (program, tools) =>
+		`${program} without ${tools.join(",")}`,
 };
 
 const flow: Flow = {
@@ -83,5 +85,34 @@ describe("checkDraft", () => {
 			).issues.map((i) => i.message);
 		expect(check("model")).toContain("profile small");
 		expect(check("person")).not.toContain("profile small");
+	});
+	test("a command that calls a program without its login: a warning on its node", () => {
+		const draft: Flow = {
+			...flow,
+			nodes: [
+				{
+					...commandNode("list", { x: 0, y: 0 }),
+					command: "list=$(acli jira workitem search --json | jq .)",
+				},
+			],
+			start: "list",
+		};
+		const cliTools = [
+			{ name: "acli-dimpact", program: "acli", signsIn: true },
+			{ name: "gh", program: null, signsIn: true },
+		];
+		const loading = checkDraft(draft, messages).issues;
+		expect(loading.some((i) => i.message.includes("without"))).toBe(false);
+		expect(
+			checkDraft(draft, messages, { cliTools }).issues.filter((i) =>
+				i.message.includes("without"),
+			),
+		).toEqual([
+			{
+				severity: "warning",
+				message: "acli without acli-dimpact",
+				nodeId: "list",
+			},
+		]);
 	});
 });

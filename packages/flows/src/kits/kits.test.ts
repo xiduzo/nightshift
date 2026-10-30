@@ -96,7 +96,7 @@ beforeEach(async () => {
 	await mkdir(bin);
 	await mkdir(fixtures);
 	await writeFile(log, "");
-	for (const name of ["gh", "acli"]) {
+	for (const name of ["gh", "acli", "acli-dimpact"]) {
 		await writeFile(join(bin, name), STUB);
 		await chmod(join(bin, name), 0o755);
 	}
@@ -520,5 +520,21 @@ describe("kit:jira", () => {
 		expect(
 			(await step(flow, "move", { key: "PROJ-1", status: "Done" })).outcome,
 		).toBe("fail");
+	});
+
+	test("runs the CLI tool it is given, as that tool's account", async () => {
+		await step(kit("kit:jira/assign"), "assign", {
+			key: "PROJ-1",
+			tool: "acli-dimpact",
+		});
+		await step(kit("kit:jira/move"), "move", {
+			key: "PROJ-1",
+			status: "Done",
+			tool: "acli-dimpact",
+		});
+		expect(await calls()).toEqual([
+			"acli-dimpact jira workitem assign --key PROJ-1 --assignee @me --yes",
+			"acli-dimpact jira workitem transition --key PROJ-1 --status Done --yes",
+		]);
 	});
 });

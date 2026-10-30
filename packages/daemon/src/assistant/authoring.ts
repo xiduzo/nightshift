@@ -86,9 +86,12 @@ export function authoringPort(
 			);
 		},
 		tools: async () => ({
-			clis: deps.cliTools
-				.list()
-				.map((tool) => ({ name: tool.name, description: tool.description })),
+			clis: deps.cliTools.list().map((tool) => ({
+				name: tool.name,
+				description: tool.description,
+				program: tool.program,
+				signsIn: tool.login !== null,
+			})),
 			connections: deps.connections.list().map((connection) => ({
 				name: connection.name,
 				description: connection.description,
