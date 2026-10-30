@@ -178,8 +178,8 @@ export function PromptSuggest({
 				}
 				description={
 					selection
-						? "The agent knows the flow's inputs, the other nodes and the variables, and uses the ones this part needs."
-						: "The agent knows the flow's inputs, the other nodes and the variables. Select a part first to rewrite only that part."
+						? "The agent rewrites only this part. It uses the inputs, nodes and variables that the part needs."
+						: "The agent knows the inputs, nodes and variables of the flow. To rewrite only a part, select it first."
 				}
 				picks={
 					selection
@@ -229,7 +229,7 @@ export function OutputSuggest({
 				label: "Suggest fields",
 				title: "Suggest output fields",
 				description:
-					"The agent proposes the fields of this node's data, from its prompt and from what later nodes read.",
+					"The agent proposes the data fields from the prompt and from what later nodes read.",
 				picks: [
 					"Fields the prompt asks for",
 					"What later nodes read",
@@ -257,7 +257,7 @@ export function SetSuggest({ node }: { node: FlowNode }) {
 				label: "Suggest variables",
 				title: "Suggest variables",
 				description:
-					"The agent proposes the variables this node sets when its step ends. Apply adds the ones the flow does not have yet.",
+					"The agent proposes the variables that this node sets. Apply adds the new ones to the flow.",
 				picks: [
 					"Keep what later nodes need",
 					"Count the tries",
@@ -295,7 +295,7 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 							label: "Suggest options",
 							title: "Suggest options",
 							description:
-								"The agent proposes the options from the question and from where the flow goes next. Edges move with a renamed option.",
+								"The agent proposes the options from the question and from where the flow goes next. A renamed option keeps its edges.",
 							picks: ["Fit the next steps", "Yes or no", "Add a way to stop"],
 							placeholder:
 								"What can be picked? For example: merge, ask for changes, or close.",
@@ -304,7 +304,7 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 							label: "Suggest outcomes",
 							title: "Suggest outcomes",
 							description:
-								"The agent proposes outcomes from this node's prompt and from where the flow goes next. Edges move with a renamed outcome.",
+								"The agent proposes outcomes from this node's prompt and from where the flow goes next. A renamed outcome keeps its edges.",
 							picks: [
 								"Fit the next steps",
 								"Approved or changes requested",
@@ -366,7 +366,7 @@ export function ExpressionSuggest({ node }: { node: ValueNode }) {
 				label: "Suggest expression",
 				title: "Suggest an expression",
 				description:
-					"The agent writes an expression from earlier values that fits the output data of this node.",
+					"The agent writes an expression from earlier values. Its result fits the output data of this node.",
 				picks: [
 					"Fit the output data",
 					"Take fields from the step before",
@@ -403,7 +403,7 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 							label: "Suggest command",
 							title: "Suggest a list command",
 							description:
-								"The agent reads the project and proposes a command that lists the items, one run of the flow per item.",
+								"The agent reads the project and proposes a command that lists the items. The flow runs once for each item.",
 							picks: [
 								"Sub-issues of an issue",
 								"Open issues with a label",
@@ -417,7 +417,7 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 								label: "Suggest command",
 								title: "Suggest a command",
 								description:
-									"The agent reads the project and proposes a command that succeeds once the wait is over.",
+									"The agent reads the project and proposes a command that passes when the wait is over.",
 								picks: [
 									"Wait for the checks to pass",
 									"Wait for a deploy",
@@ -467,7 +467,7 @@ export function ArgumentsSuggest({
 				label: "Suggest arguments",
 				title: "Suggest arguments",
 				description:
-					"The agent fills in the tool's arguments from the flow's inputs and earlier steps.",
+					"The agent writes the arguments of the tool from the flow inputs and earlier steps.",
 				picks: [
 					"Fill the required ones",
 					"Use the inputs",

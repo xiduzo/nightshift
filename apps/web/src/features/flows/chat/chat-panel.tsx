@@ -335,8 +335,8 @@ function RestoreCheckpoint({
 						<AlertDialogTitle>Restore the flow to here?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{later === 1
-								? "You applied 1 more change after this point. The restore takes it out of the flow too."
-								: `You applied ${later} more changes after this point. The restore takes them out of the flow too.`}{" "}
+								? "This also removes the 1 change you applied after this point."
+								: `This also removes the ${later} changes you applied after this point.`}{" "}
 							You can undo the restore.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

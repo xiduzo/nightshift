@@ -448,8 +448,8 @@ export function OpenSectionBar({
 					</TooltipTrigger>
 					<TooltipContent side="top">
 						{up === null
-							? "Back to the whole flow. Or zoom out."
-							: "Back to the Section around it. Or zoom out."}
+							? "Back to the whole flow. You can also zoom out."
+							: "Back to the Section around it. You can also zoom out."}
 						<Kbd>U</Kbd>
 					</TooltipContent>
 				</Tooltip>

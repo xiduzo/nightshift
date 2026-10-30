@@ -101,7 +101,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 			<PageHeading
 				id="flows-heading"
 				title="Flows"
-				description="Each flow is a set of steps that Night Shift runs for you. Run one, or open it to edit."
+				description="Night Shift runs the steps of a flow for you. Run a flow, or open it to edit."
 				actions={
 					<>
 						<ImportFlowButton projectId={projectId} />
@@ -210,10 +210,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete {toDelete?.name}?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This removes the flow from the project. Its past runs stay as they
-							are.
-						</AlertDialogDescription>
+						<AlertDialogDescription>Its past runs stay.</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>

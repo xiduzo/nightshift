@@ -30,7 +30,7 @@ describe("the Device field of Start run", () => {
 			"Another person's device. The run can use only the profiles it offers to this Space.",
 		);
 		expect(placementDescription({ thisDevice: false }, false)).toBe(
-			"Where the steps run: your devices that are online and have this project, and devices other people offer to this Space.",
+			"Pick one of your online devices with this project, or a device that others offer to this Space.",
 		);
 		expect(placementDescription(undefined, true)).toBe(
 			"None of your devices with this project is online. Start the run when one is.",
