@@ -421,6 +421,9 @@ const OutcomeEdge = memo(function OutcomeEdge({
 						onPointerLeave={hover.leave}
 						className={cn(
 							"nodrag nopan pointer-events-auto absolute h-5 bg-card font-mono text-[11px] shadow-xs disabled:cursor-default",
+							// The layout makes room only for a label at rest: a label that
+							// opens on hover or selection lies over the nodes, even a selected one.
+							open && "z-[1001]",
 							stacked && "h-auto flex-col items-start gap-0.5 rounded-md py-1",
 							!merged && outcomeStyle(only.outcome, only.color).text,
 							selected && "ring-2 ring-ring",
