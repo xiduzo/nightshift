@@ -185,7 +185,9 @@ The **phone app** connects to your Host. Start a flow with its inputs, follow a 
 
 Night Shift is **pre-alpha**. It is built in public, for its author first, and it changes fast. Expect breaking changes to the flow format and the database.
 
-- [ ] One flow runs a full Epic overnight and replaces the script it grew from.
+Night Shift has run a real project every night since 2026-10-16.
+
+- [x] One flow runs a full Epic overnight and replaces the script it grew from.
 - [ ] Night Shift builds Night Shift: its own work runs through its own flows.
 - [ ] One person runs Night Shift on several computers: a laptop and a server pair, and each step runs where you place it.
 

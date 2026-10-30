@@ -43,7 +43,9 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Platforms | macOS first. |
 | License | Apache-2.0. Built in public. |
 
-Dropped from the earlier plan: method packages and `method.json`, the OpenSpec method, Jira, server mode with remote runners, the NDJSON runner protocol, the stateless orchestrator as a separate concept (it is now a Decision node), and the project chat.
+Dropped from the earlier plan: method packages and `method.json`, the OpenSpec method, server mode with remote runners, the NDJSON runner protocol, the stateless orchestrator as a separate concept (it is now a Decision node), and the project chat.
+
+Jira is a kit on `acli`, not an engine concept.
 
 ## 3. Node types
 
@@ -105,9 +107,15 @@ The packages are in the order of their layers, from the bottom. The layer map an
 
 ## 5. Delivery
 
-Status (2026-10-16): Slices 1 to 8 are built. Slices 1 to 4 run real nights: the night runs as flows in `examples/rpgdotexe/`. Slices 5 to 8 are tested with fake harnesses, fake CLIs and a fake clock; no night has run on them yet. `night-shift.py` retires after a flow runs a full Epic.
+Status (2026-10-30): Slices 1 to 8 are built, and Night Shift has run a real project every night since 2026-10-16. Slices 5 to 8 and the LangGraph engine run real nights: Calls with `each` over a command's list, Agent outcomes, schedules that start runs without a person, Waits on CI, and Gates. A flow ran an Epic overnight to its end on 2026-10-25, the condition to retire `night-shift.py`.
 
-Done (2026-10-16): the engine's hand-rolled walk, resume points and wait bookkeeping were replaced by LangGraph (`docs/steering/langgraph-engine.md`, after `docs/research/langgraph-spike.md`). A run is one LangGraph thread, checkpointed after every node in the daemon's database; waits, Gates and parked steps are interrupts, so a resume lands at the same node at any depth. The `Engine` interface, the event log, the API and the web app did not change; the engine test suites pass on it. No night has run on the new engine yet.
+Not yet done for real:
+
+- ~~A usage limit at night.~~ Done: on 2026-10-19 and 2026-10-25 a step hit the session limit at night, waited for the reset, and went on to `pass`.
+- A Codex or OpenCode step. Every Agent step of a real run so far ran on Claude Code.
+- A planner that feeds a Call with `each`. Every real Call with `each` reads its list from a command (`gh`).
+
+Done (2026-10-16): the engine's hand-rolled walk, resume points and wait bookkeeping were replaced by LangGraph (`docs/steering/langgraph-engine.md`, after `docs/research/langgraph-spike.md`). A run is one LangGraph thread, checkpointed after every node in the daemon's database; waits, Gates and parked steps are interrupts, so a resume lands at the same node at any depth. The `Engine` interface, the event log, the API and the web app did not change; the engine test suites pass on it. Every real night since 2026-10-18 ran on it.
 
 ### Slice 1 — One agent node, live
 
@@ -147,7 +155,7 @@ The first nights showed two things: the dev server reloads under a running night
 
 Proves: any flow can call any flow, and a list can come from anywhere.
 
-Status: built. Tested with fakes; the rpgdotexe flows pass the validator and the migration tests. Not yet run in a real night. 2026-10-17: the rpgdotexe flows were rebuilt on format version 4 with the seven node types and three Agent Profiles (`examples/rpgdotexe/README.md`): Decisions by rule, Values by rule over Call results, a Wait on CI, and JSON output from Commands replace the files and the shell checks the script passed between steps.
+Status: built, and in real nights since 2026-10-18: a Call with `each` runs a flow per Feature and per Trace of an Epic. 2026-10-17: the rpgdotexe flows were rebuilt on format version 4 with the seven node types and three Agent Profiles (`examples/rpgdotexe/README.md`): Decisions by rule, Values by rule over Call results, a Wait on CI, and JSON output from Commands replace the files and the shell checks the script passed between steps.
 
 ### Slice 6 — Agents that answer in shape
 
@@ -158,7 +166,7 @@ Status: built. Tested with fakes; the rpgdotexe flows pass the validator and the
 
 Proves: a planner agent can decide what the night does.
 
-Status: built. Tested with fakes. The starters validate; none has run against a real harness yet.
+Status: built. Agent outcomes run in real nights. The starters validate; none has run against a real harness yet. No planner has fed a Call with `each` for real yet.
 
 ### Slice 7 — Triggers
 
@@ -166,7 +174,7 @@ Status: built. Tested with fakes. The starters validate; none has run against a 
 
 Proves: a night starts without a person.
 
-Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes. Not yet used for a real night.
+Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes. Schedules start real nights since 2026-10-20. The Host of a Space fires its schedules.
 
 ### Slice 8 — More harnesses and tools
 
@@ -175,7 +183,7 @@ Status: built. Tested with a fake clock: no double fires, no overlap with a run 
 
 Proves: a flow can mix harnesses.
 
-Status: built. An Agent node runs on the harness it names; a flow that names a harness the daemon does not have refuses to start. MCP servers read `${NAME}` from the daemon's environment. "Take over" gives the resume command of the harness that ran the last session. The OpenCode harness is tested against a fake `opencode` that replays what a live OpenCode 1.19 server sent. The Codex harness is tested against a fake `codex` only. The engine is tested with fake harnesses under each name.
+Status: built. An Agent node runs on the harness it names; a flow that names a harness the daemon does not have refuses to start. MCP servers read `${NAME}` from the daemon's environment. "Take over" gives the resume command of the harness that ran the last session. The OpenCode harness is tested against a fake `opencode` that replays what a live OpenCode 1.19 server sent. The Codex harness is tested against a fake `codex` only. The engine is tested with fake harnesses under each name. Real nights so far run on Claude Code only.
 
 ### Then
 
