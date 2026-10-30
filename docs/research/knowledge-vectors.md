@@ -198,6 +198,9 @@ recall.
 - A hit is a right file in the top 5. MRR@10 is the mean of 1 / rank of the
   first right file.
 - Ollama 0.40.13 on an M4 Max (GPU).
+- Five repeat runs gave the same vector numbers. The hybrid rows moved by
+  one question, and FTS5 MRR by 0.02, because ties in BM25 and in RRF
+  can sort either way.
 
 ### 3.2 Recall@5
 
@@ -209,7 +212,7 @@ recall.
 | FTS5, keyword form | 19 | 10 | 7 | 2 | 0.62 |
 | Vector, the question | **23** | 9 | **11** | 3 | 0.71 |
 | Hybrid, the question for both | 20 | 9 | 8 | 3 | 0.58 |
-| Hybrid, keyword form for FTS5 | 22 | 9 | 10 | 3 | **0.76** |
+| Hybrid, keyword form for FTS5 | 22 to 23 | 9 | 10 to 11 | 3 | **0.76 to 0.79** |
 
 Other runs, vector and best hybrid only:
 
@@ -225,7 +228,7 @@ What it says:
 - An agent that types keywords gets much more from FTS5 (19) than one
   that types the question (16). The "every word, else any word" rule
   makes a whole question noisy.
-- Hybrid does not beat vectors here. A noisy keyword list pulls good vector
+- Hybrid at best ties vectors here. A noisy keyword list pulls good vector
   hits down. Hybrid has the best first rank (MRR) when the keyword side gets
   keywords. Agents type keywords, so hybrid is the right default.
 - Hybrid keeps exact words that vectors miss: "Is Windows supported?" was
@@ -303,7 +306,8 @@ result each time. It runs on every Device, with no account.
    keyword recall@5 (2 questions of 20). Otherwise say that vectors did
    not help, and turn them off.
 
-On this repo's docs: keyword 73 % (keyword form), hybrid 85 %, vector 88 %.
+On this repo's docs: keyword 73 % (keyword form), hybrid 85 to 88 %, vector
+88 %.
 Vectors would turn on.
 
 ## 5. What changes in `search.ts`
