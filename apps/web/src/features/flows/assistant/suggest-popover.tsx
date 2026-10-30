@@ -5,12 +5,6 @@ import {
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	InputGroup,
-	InputGroupAddon,
-	InputGroupButton,
-	InputGroupTextarea,
-} from "@nightshift/ui/components/input-group";
 import { Kbd } from "@nightshift/ui/components/kbd";
 import {
 	Popover,
@@ -27,12 +21,11 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { ArrowUpIcon, CircleAlertIcon } from "lucide-react";
+import { CircleAlertIcon } from "lucide-react";
 import {
 	type ReactElement,
 	type ReactNode,
 	type RefObject,
-	useId,
 	useRef,
 	useState,
 } from "react";
@@ -43,6 +36,7 @@ import {
 	type FlowAssistant,
 	INSPECTOR_SELECTOR,
 } from "./flow-assistant";
+import { PromptInput } from "./prompt-input";
 import { useSuggestion } from "./use-suggestion";
 
 /**
@@ -188,7 +182,6 @@ function SuggestBody({
 	renderPreview: (suggestion: Suggestion) => ReactNode;
 	onClose: () => void;
 }) {
-	const id = useId();
 	const { state, start, stop } = useSuggestion();
 	const [instruction, setInstruction] = useState("");
 	const sent = useRef("");
@@ -221,72 +214,12 @@ function SuggestBody({
 				<AgentPicker purpose="suggest" className="-ml-2 self-start" />
 			</PopoverHeader>
 
-			{state.status === "idle" || state.status === "failed" ? (
-				<>
-					{state.status === "failed" ? (
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>No suggestion</AlertTitle>
-							<AlertDescription>{state.message}</AlertDescription>
-						</Alert>
-					) : null}
-					<div className="flex flex-wrap gap-1">
-						{picks.map((pick) => (
-							<Button
-								key={pick}
-								variant="outline"
-								size="xs"
-								className="font-normal"
-								onClick={() => {
-									setInstruction(pick);
-									send(pick);
-								}}
-							>
-								{pick}
-							</Button>
-						))}
-					</div>
-					<form
-						onSubmit={(event) => {
-							event.preventDefault();
-							send(instruction);
-						}}
-					>
-						<label htmlFor={`${id}-instruction`} className="sr-only">
-							What should it do?
-						</label>
-						<InputGroup>
-							<InputGroupTextarea
-								id={`${id}-instruction`}
-								autoFocus
-								value={instruction}
-								placeholder={placeholder}
-								className="min-h-16 text-sm"
-								onChange={(event) => setInstruction(event.target.value)}
-								onKeyDown={(event) => {
-									if (event.key === "Enter" && !event.shiftKey) {
-										event.preventDefault();
-										send(instruction);
-									}
-								}}
-							/>
-							<InputGroupAddon align="block-end">
-								<span className="text-muted-foreground text-xs">
-									Leave it empty to let the agent choose.
-								</span>
-								<InputGroupButton
-									type="submit"
-									variant="default"
-									size="xs"
-									className="ml-auto"
-								>
-									{state.status === "failed" ? "Try again" : "Suggest"}
-									<ArrowUpIcon data-icon="inline-end" />
-								</InputGroupButton>
-							</InputGroupAddon>
-						</InputGroup>
-					</form>
-				</>
+			{state.status === "failed" ? (
+				<Alert variant="destructive">
+					<CircleAlertIcon />
+					<AlertTitle>No suggestion</AlertTitle>
+					<AlertDescription>{state.message}</AlertDescription>
+				</Alert>
 			) : null}
 
 			{state.status === "running" ? (
@@ -305,15 +238,43 @@ function SuggestBody({
 						<Skeleton className="h-3 w-4/5" />
 						<Skeleton className="h-3 w-3/5" />
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						className="self-start"
-						onClick={stop}
-					>
-						Stop
-					</Button>
 				</div>
+			) : null}
+
+			{state.status !== "ready" ? (
+				<>
+					{state.status !== "running" ? (
+						<div className="flex flex-wrap gap-1">
+							{picks.map((pick) => (
+								<Button
+									key={pick}
+									variant="outline"
+									size="xs"
+									className="font-normal"
+									onClick={() => {
+										setInstruction(pick);
+										send(pick);
+									}}
+								>
+									{pick}
+								</Button>
+							))}
+						</div>
+					) : null}
+					<PromptInput
+						label="What should it do?"
+						autoFocus
+						allowEmpty
+						value={instruction}
+						onValueChange={setInstruction}
+						onSubmit={send}
+						placeholder={placeholder}
+						hint="Leave it empty to let the agent choose."
+						submitLabel={state.status === "failed" ? "Try again" : "Suggest"}
+						answering={state.status === "running"}
+						onStop={stop}
+					/>
+				</>
 			) : null}
 
 			{state.status === "ready" ? (

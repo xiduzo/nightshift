@@ -18,13 +18,6 @@ import {
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import {
-	InputGroup,
-	InputGroupAddon,
-	InputGroupButton,
-	InputGroupText,
-	InputGroupTextarea,
-} from "@nightshift/ui/components/input-group";
-import {
 	Message,
 	MessageContent,
 	MessageFooter,
@@ -41,26 +34,19 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
-	ArrowUpIcon,
 	CircleAlertIcon,
 	HistoryIcon,
 	SparklesIcon,
-	SquareIcon,
 	SquarePenIcon,
 	XIcon,
 } from "lucide-react";
-import {
-	type FormEvent,
-	type KeyboardEvent,
-	type ReactNode,
-	useMemo,
-	useState,
-} from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import type { RunStatus } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
 import { AgentPicker } from "../assistant/agent-picker";
+import { PromptInput } from "../assistant/prompt-input";
 import {
 	type AgentMessage,
 	ASK_WHY_MESSAGE,
@@ -385,65 +371,20 @@ function ProposalMessage({
 
 function Composer({ streaming, sendBlockedBy, onSend, onStop }: Props) {
 	const [text, setText] = useState("");
-	const canSend = !streaming && sendBlockedBy === null && text.trim() !== "";
-	const submit = (event?: FormEvent) => {
-		event?.preventDefault();
-		if (!canSend) return;
-		onSend(text);
-		setText("");
-	};
-	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-		// Enter sends, Shift+Enter starts a new line. Not while an IME composes.
-		if (
-			event.key !== "Enter" ||
-			event.shiftKey ||
-			event.nativeEvent.isComposing
-		)
-			return;
-		event.preventDefault();
-		submit();
-	};
 	return (
-		<form onSubmit={submit} className="shrink-0 border-t p-3">
-			<InputGroup>
-				<InputGroupTextarea
-					aria-label="Message to the agent"
-					placeholder="Example: Run the tests after the build, and ask me before you open a pull request."
-					className="max-h-40 min-h-16"
-					value={text}
-					onChange={(event) => setText(event.target.value)}
-					onKeyDown={onKeyDown}
-				/>
-				<InputGroupAddon align="block-end">
-					<InputGroupText className="min-w-0 truncate text-xs">
-						{sendBlockedBy ?? "Shift + Enter for a new line"}
-					</InputGroupText>
-					{streaming ? (
-						<InputGroupButton
-							variant="outline"
-							size="icon-xs"
-							className="ml-auto"
-							aria-label="Stop"
-							title="Stop the answer"
-							onClick={onStop}
-						>
-							<SquareIcon />
-						</InputGroupButton>
-					) : (
-						<InputGroupButton
-							type="submit"
-							variant="default"
-							size="icon-xs"
-							className="ml-auto"
-							aria-label="Send"
-							title="Send (Enter)"
-							disabled={!canSend}
-						>
-							<ArrowUpIcon />
-						</InputGroupButton>
-					)}
-				</InputGroupAddon>
-			</InputGroup>
-		</form>
+		<PromptInput
+			className="shrink-0 border-t p-3"
+			label="Message to the agent"
+			placeholder="Example: Run the tests after the build, and ask me before you open a pull request."
+			value={text}
+			onValueChange={setText}
+			onSubmit={(value) => {
+				onSend(value);
+				setText("");
+			}}
+			blockedBy={sendBlockedBy}
+			answering={streaming}
+			onStop={onStop}
+		/>
 	);
 }
