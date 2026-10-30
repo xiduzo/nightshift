@@ -1,6 +1,8 @@
 # Next phase: doors, guards, eyes and knowledge
 
-**Status:** Sprint 1 in progress (2026-10-30). Follows the product and market
+**Status:** Sprints 1 and 2 on main, sprint 3 in progress (2026-10-30).
+Sprint 3 changed after sprint 2: knowledge moves into the Space
+([ADR 4](../adr/0004-knowledge-belongs-to-the-space.md)) before search. Follows the product and market
 review of 2026-10-30 (items 08 "What to integrate" and 09 "Next 90 days").
 
 Night Shift has run a real project every night since about 2026-10-16 and
@@ -22,7 +24,7 @@ worktree and lands on main between nights.
 | Foundational | Integrations stay on files, git, shell CLIs, cron, webhooks and MCP connections a person brings. No vendor nodes. |
 | Local first | Monitoring and knowledge work with no account and no network. Export to a third party is opt-in, one setting, off by default. |
 | Harness | The Agent node keeps spawning the unmodified `claude` binary with the person's own login. No Agent SDK, no `claude-agent-acp`, for subscription profiles. |
-| Where it lives | Guards go in the engine. Metrics are a read model over the event log. Export is a layer-3 vertical beside `notifications`. Knowledge is engine data per project, never a file in the repo. |
+| Where it lives | Guards go in the engine. Metrics are a read model over the event log. Export is a layer-3 vertical beside `notifications`. Knowledge is engine data per project, never a file in the repo. Since ADR 4 it belongs to the Project's Space, like flows. |
 
 ## 2. Sprint 1: record and guard (weeks 1 and 2)
 
@@ -166,10 +168,45 @@ Done when: an agent in Claude Code answers a Gate through the MCP server, a
 real night reads the knowledge folder, and a new clone runs a starter in
 fifteen minutes.
 
-## 4. Sprint 3: export and search (weeks 5 and 6)
+## 4. Sprint 3: shared knowledge, export and search (weeks 5 and 6)
 
-Goal: a person who wants dashboards gets them with one setting, and a big
-knowledge folder is searchable.
+Goal: every Device of a Space works on the same knowledge, a big knowledge
+folder is searchable, and a person who wants dashboards gets them with one
+setting.
+
+Sprint 2 kept a knowledge folder on each Device. A run on the Host did not
+see what the Mac synced, and a learning stayed on the Device whose agent
+proposed it. [ADR 4](../adr/0004-knowledge-belongs-to-the-space.md) moves
+knowledge into the Space. This is the one Devices feature in this plan: the
+Scope row of section 1 allows it because search needs it.
+
+Three lanes run at the same time: shared knowledge (4.0), search (4.3), and
+export with scores (4.1, 4.2). Search builds its index from the folder on
+each Device, so it does not wait for 4.0. The pitch (4.4) comes last, when
+the rest is on main.
+
+### 4.0 Knowledge in the Space (engine + devices + auth + web, 5 days)
+
+- A `knowledge:<projectId>` Yjs document per Project, beside `flows:<id>`:
+  one entry per file (path, sha256, size, changedAt, deviceId, `local` for a
+  file over 10 MB). The relay serves it. `documentAccess` gives a Member
+  read access, and a Device of a Member who may start runs write access.
+- A content store per Device, by hash. The Device copies new content to
+  the Space's Host and fetches what it lacks from there, over the run-state
+  archive exchange (a new archive kind).
+- `reconcile(projectId)` in `packages/engine/src/knowledge/`: before and
+  after each step that gets the folder, and when the Knowledge page reads
+  it. It compares the folder, a hidden state file of the last reconcile, and
+  the document, then publishes local changes and writes remote ones. When
+  both changed a path, the later change wins.
+- The first start after the upgrade publishes each Device's folder.
+- The Knowledge page lists the document, so it works on the Host and for
+  every Member. Opening a file fetches its content. Where you add a source
+  in a shared Space, the page says that every Member can read it.
+- The learnings count on the page reads the document.
+
+Done when: a sync on the Mac shows up in a run on the Host, and a learning
+proposed on one Device is kept through the Gate on another.
 
 ### 4.1 OpenTelemetry export, opt-in (new vertical `packages/telemetry`, 5 days)
 
@@ -222,16 +259,18 @@ answered, write a `Scored` event on the run (`pr_merged`, `gate_decision`,
 `reverted_within_7d`). The metrics read model and the OTel counters pick it
 up. This is the loop that later tells which prompt version merges.
 
-### 4.3 Knowledge search, phase 2 (engine + MCP, 4 days)
+### 4.3 Knowledge search, phase 2 (engine + MCP + web, 4 days)
 
-When a project's folder passes about 2 000 pages or a person asks, an FTS5
-table in the existing libsql over the folder's markdown, refreshed by the
-sync kits. The nightshift MCP server gains `search_knowledge` (BM25, top k
-with snippets) and `read_doc`, and lists the files as MCP resources with
-`priority`. A node attaches it as a Connection named "Night Shift knowledge"
-the way it attaches any connection. No embeddings yet: the measured gain of
-keyword search as a tool is most of the gain of a vector index, at none of
-the cost.
+An FTS5 table in the Replica (libsql) over the working copy's markdown and
+text files. Each Device builds its own index after each reconcile, and
+updates only the files whose hash changed. The index never syncs (ADR 4,
+decision 7). The nightshift MCP server gains `search_knowledge` (BM25, top k
+with snippets) and `read_knowledge` (one file), and lists the files as MCP
+resources. The API gains `knowledge.search`, and the Knowledge page gets a
+search field. An agent that reads the folder keeps using grep. A node that
+wants search attaches the nightshift MCP server as a Connection. No
+embeddings yet: as a tool, keyword search gives most of what a vector index
+gives, at almost no cost.
 
 Phase 3, not scheduled: `libsql_vector_idx` with Ollama embeddings
 (`bge-m3` or `qwen3-embedding`) and hybrid ranking, only after an evaluation
@@ -245,8 +284,9 @@ from your phone, mix any agent. The canvas is shown as the run view. A signed
 DMG goes with it (`ELECTROBUN_DEVELOPER_ID`).
 
 Done when: a night shows up in Grafana with Claude's own cost under the step
-span, a Gate answer becomes a score, and `search_knowledge` answers from a
-Confluence export.
+span, a Gate answer becomes a score, `search_knowledge` answers from a
+Confluence export, and that export, synced on one Device, is found by a run
+on another.
 
 ## 5. Parked, on purpose
 
