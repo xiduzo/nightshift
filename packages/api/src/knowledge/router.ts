@@ -4,7 +4,7 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output } from "../output";
-import { ownerProcedure } from "../procedures";
+import { protectedProcedure } from "../procedures";
 import {
 	type KnowledgeView,
 	knowledgeHitSchema,
@@ -28,25 +28,30 @@ async function knownProject(
 	}
 }
 
+/**
+ * A project's knowledge belongs to its Space (ADR 4): every Member of the
+ * Space reads it, on any of its Devices and on its Host. A browser changes
+ * it only through flows (the syncs) and the review of learnings.
+ */
 export const knowledge = {
 	/**
-	 * The project's knowledge folder on this computer, with a fresh index,
-	 * the flows that fill it, and the learnings that wait for a person. The owner's: it is this computer's disk.
+	 * The files of the project's knowledge, as its Space lists them (after
+	 * a reconcile of this computer's folder), the flows that fill it, and
+	 * the learnings that wait for a person.
 	 */
-	get: ownerProcedure
+	get: protectedProcedure
 		.route({
 			summary:
-				"Lists the files of a project's knowledge on this computer, and the flows of the project that fill it.",
+				"Lists the files of a project's knowledge in its Space, and the flows of the project that fill it.",
 		})
 		.output(output(knowledgeSchema))
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }): Promise<KnowledgeView> => {
 			// The project is the Space's: an unknown one refuses here.
 			const flows = await context.space.flows.map(input.projectId);
-			const [files, proposed] = await Promise.all([
-				context.knowledge.index(input.projectId),
-				context.knowledge.proposed(input.projectId),
-			]);
+			const { files, proposed, shared } = await context.knowledge.listing(
+				input.projectId,
+			);
 			const used = Object.entries(flows)
 				.map(([flow, parsed]) => ({
 					flow,
@@ -64,6 +69,7 @@ export const knowledge = {
 				reviews: used
 					.filter(({ kits }) => kits.includes(REVIEW_LEARNINGS_KIT))
 					.map(({ flow }) => flow),
+				shared,
 			};
 		}),
 	/**
@@ -72,7 +78,7 @@ export const knowledge = {
 	 * every word must match, else some of them. "a phrase" in quotes keeps
 	 * its words together, and a word ending in `*` matches as a prefix.
 	 */
-	search: ownerProcedure
+	search: protectedProcedure
 		.route({
 			summary:
 				"Searches the files of a project's knowledge on this computer by keyword, best match first.",
@@ -91,11 +97,14 @@ export const knowledge = {
 				...(input.limit !== undefined ? { limit: input.limit } : {}),
 			});
 		}),
-	/** One file of a project's knowledge on this computer, by its path. Null: no such file. */
-	read: ownerProcedure
+	/**
+	 * One file of a project's knowledge, by its path: this computer's copy,
+	 * else its content by hash from the Space (its Host). Null: no such file.
+	 */
+	read: protectedProcedure
 		.route({
 			summary:
-				"Reads one file of a project's knowledge on this computer, by its path in the knowledge.",
+				"Reads one file of a project's knowledge, by its path in the knowledge.",
 		})
 		.output(output(knowledgeTextSchema.nullable()))
 		.input(
@@ -107,8 +116,15 @@ export const knowledge = {
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			return context.knowledgeSearch.read(input.projectId, input.path, {
-				maxBytes: input.maxBytes ?? READ_MAX_BYTES,
-			});
+			const options = { maxBytes: input.maxBytes ?? READ_MAX_BYTES };
+			// This computer's folder first: it may not have the file yet.
+			return (
+				(await context.knowledgeSearch.read(
+					input.projectId,
+					input.path,
+					options,
+				)) ??
+				(await context.knowledge.read(input.projectId, input.path, options))
+			);
 		}),
 };

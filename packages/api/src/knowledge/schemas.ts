@@ -16,10 +16,12 @@ const knowledgeFileSchema = exact<KnowledgeFile>()(
 		size: z.number(),
 		/** Epoch ms. */
 		changedAt: z.number(),
+		/** Larger than 10 MB: it stays on the computer that synced it. */
+		local: z.literal(true).optional(),
 	}),
 );
 
-/** A project's knowledge on this computer, and the flows that fill it. */
+/** A project's knowledge in its Space, and the flows that fill it. */
 export const knowledgeSchema = z.object({
 	/** Every file but the index, by path. */
 	files: z.array(knowledgeFileSchema),
@@ -31,6 +33,8 @@ export const knowledgeSchema = z.object({
 	proposed: z.number(),
 	/** The flows of the project that review the learnings, by name. */
 	reviews: z.array(z.string()),
+	/** The project's Space is not a personal one: each of its Members reads the knowledge. */
+	shared: z.boolean(),
 });
 export type KnowledgeView = z.infer<typeof knowledgeSchema>;
 

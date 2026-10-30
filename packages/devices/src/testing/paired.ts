@@ -4,6 +4,7 @@ import {
 	createFlowDocuments,
 	type FlowDocuments,
 	HostUnreachableError,
+	type KnowledgeHost,
 } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
@@ -18,6 +19,7 @@ import {
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
+import { createKnowledgeArchive } from "../archive";
 import type { HostRelay, WorkRelay } from "../contract";
 import type { HostExchange } from "../exchange";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
@@ -43,6 +45,8 @@ export type PairedDevice = {
 	documents: SpaceDocuments;
 	/** Its flow documents: the engine's. */
 	flows: FlowDocuments;
+	/** A's archive of knowledge content, as the Device reaches it over its relay. */
+	knowledge: KnowledgeHost;
 	/**
 	 * Brings a project of A to the Device, as its Link does: A's Space
 	 * document (every project of the Space) syncs to it, and its rows
@@ -78,6 +82,8 @@ export type PairedReplicas = {
 	documents: SpaceDocuments;
 	/** B's flow documents: its engine's. */
 	flows: FlowDocuments;
+	/** A's archive of knowledge content, as B reaches it (`PairedDevice.knowledge`). */
+	knowledge: KnowledgeHost;
 	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
 	projectOnDevice: PairedDevice["projectOnDevice"];
 	/** Pairs one more Device of A's owner with A, as B is: a third Replica. */
@@ -128,6 +134,12 @@ export async function pairedReplicas(
 		});
 		const flows = createFlowDocuments({ db: sandbox.db });
 		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const relay = createRelay({
+			engine: () => engine,
+			registry: () => engine.devices,
+			links: () => linksTo(new Map([[hostId, memory.client(key)]])),
+			flows,
+		});
 		const engine: PeerEngine = createPeerEngine(
 			withPeers({
 				db: sandbox.db,
@@ -137,15 +149,7 @@ export async function pairedReplicas(
 				scheduler: false,
 				spaceDocuments: documents,
 				flowDocuments: flows,
-				relay: startsOnHost(
-					createRelay({
-						engine: () => engine,
-						registry: () => engine.devices,
-						links: () => linksTo(new Map([[hostId, memory.client(key)]])),
-						flows,
-					}),
-					options.hostWalks ?? false,
-				),
+				relay: startsOnHost(relay, options.hostWalks ?? false),
 			}),
 			{ runLog: log },
 		);
@@ -180,6 +184,7 @@ export async function pairedReplicas(
 			key,
 			documents,
 			flows,
+			knowledge: createKnowledgeArchive({ relay }),
 			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
 				const { spaceId, remote } = await host.projects.find(projectId);
 				await syncSpaceDocument(replica.documents, documents, spaceId);
@@ -206,6 +211,7 @@ export async function pairedReplicas(
 		personId,
 		documents: paired.documents,
 		flows: paired.flows,
+		knowledge: paired.knowledge,
 		projectOnDevice: paired.projectOnDevice,
 		pair,
 	};

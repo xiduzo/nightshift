@@ -18,8 +18,10 @@ import { project } from "@nightshift/db/schema";
 import { deviceDirectory } from "@nightshift/devices";
 import {
 	createFlowDocuments,
+	createKnowledgeDocuments,
 	documentSpace,
 	type FlowDocuments,
+	type KnowledgeDocuments,
 } from "@nightshift/engine";
 import type { DeviceDocument } from "@nightshift/engine/device-config";
 import {
@@ -67,6 +69,8 @@ let document: DeviceDocument;
 let spaces: SpaceDocuments;
 /** The flow documents of this Host's Projects. */
 let flows: FlowDocuments;
+/** The knowledge documents of this Host's Projects. */
+let knowledge: KnowledgeDocuments;
 let sync: Sync;
 let server: Server<SocketData>;
 const providers: HocuspocusProvider[] = [];
@@ -96,11 +100,15 @@ beforeEach(async () => {
 		directory: deviceDirectory(people.db),
 	});
 	flows = createFlowDocuments({ db: people.db });
+	knowledge = createKnowledgeDocuments({ db: people.db });
 	sync = createSync({
 		document: async (name) =>
 			name === document.name
 				? document.doc
-				: (spaces.byName(name)?.doc ?? (await flows.find(name))?.doc ?? null),
+				: (spaces.byName(name)?.doc ??
+					(await flows.find(name))?.doc ??
+					(await knowledge.find(name))?.doc ??
+					null),
 		kept: {
 			has: (name) => keptOwners.has(name),
 			fetch: async (name) => keptRows.get(name) ?? null,
@@ -138,6 +146,7 @@ afterEach(async () => {
 	await document.close();
 	await spaces.close();
 	await flows.close();
+	await knowledge.close();
 	await sandbox.cleanup();
 	people.cleanup();
 });
@@ -862,5 +871,102 @@ describe("documentAccess: a flow document", () => {
 		} finally {
 			await device.documents.close();
 		}
+	});
+});
+
+describe("documentAccess: a knowledge document", () => {
+	const PROJECT = "project-wiki";
+	const name = `knowledge:${PROJECT}`;
+	const entry = {
+		sha256: "a".repeat(64),
+		size: 7,
+		changedAt: 1,
+		deviceId: "device-bob",
+	};
+
+	/**
+	 * Platform with one Project: Ada owns it, Bob is a member, Cy a viewer.
+	 * Bob and Cy each have a Device with a key of this Host.
+	 */
+	async function platform() {
+		const ada = await people.signUp("Ada");
+		const bob = await people.signUp("Bob");
+		const cy = await people.signUp("Cy");
+		const space = await people.auth.api.createOrganization({
+			headers: ada.headers,
+			body: { name: "Platform", slug: "platform" },
+		});
+		if (!space) throw new Error("no space");
+		for (const [person, role] of [
+			[bob, "member"],
+			[cy, "viewer"],
+		] as const) {
+			await people.auth.api.addMember({
+				body: { userId: person.userId, role, organizationId: space.id },
+			});
+		}
+		await people.db.insert(project).values({
+			id: PROJECT,
+			spaceId: space.id,
+			name: "Wiki",
+			createdAt: new Date(),
+		});
+		for (const [token, person] of [
+			["nsd_bob", bob],
+			["nsd_cy", cy],
+		] as const) {
+			deviceKeys.set(token, {
+				deviceId: `device-${person.userId}`,
+				personId: person.userId,
+				home: false,
+			});
+		}
+		return { bob: bob.headers.get("cookie") ?? "" };
+	}
+
+	const onHost = async () =>
+		(await knowledge.open(PROJECT)).doc.getMap("files");
+
+	test("a Member reads it in a browser, and does not change it through the relay", async () => {
+		const { bob } = await platform();
+		const member = connect(name, { origin: ORIGIN, cookie: bob });
+		await waitFor(() => member.provider.isSynced);
+		member.doc.getMap("files").set("wiki/Home.md", entry);
+		await Bun.sleep(100);
+		expect((await onHost()).size).toBe(0);
+	});
+
+	test("a Device of a Member who may start runs publishes into it; a viewer's Device only reads", async () => {
+		await platform();
+		const device = connect(name, { token: "nsd_bob" });
+		await waitFor(() => device.provider.isSynced);
+		device.doc.getMap("files").set("wiki/Home.md", entry);
+		await waitFor(async () => (await onHost()).has("wiki/Home.md"));
+
+		const viewer = connect(name, { token: "nsd_cy" });
+		await waitFor(
+			() =>
+				viewer.provider.isSynced &&
+				viewer.doc.getMap("files").has("wiki/Home.md"),
+		);
+		viewer.doc.getMap("files").set("wiki/Other.md", entry);
+		await Bun.sleep(100);
+		expect((await onHost()).has("wiki/Other.md")).toBe(false);
+	});
+
+	test("a Person outside the Space, and a Project this Host does not have, are refused", async () => {
+		await platform();
+		const dee = (await people.signUp("Dee2")).userId;
+		deviceKeys.set("nsd_dee", {
+			deviceId: "device-dee",
+			personId: dee,
+			home: true,
+		});
+		const outsider = connect(name, { token: "nsd_dee" });
+		const unknown = connect("knowledge:no-such-project", { token: "nsd_bob" });
+		await waitFor(
+			() => outsider.failed.length > 0 && unknown.failed.length > 0,
+		);
+		expect(outsider.provider.isSynced).toBe(false);
 	});
 });

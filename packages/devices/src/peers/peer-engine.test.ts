@@ -209,6 +209,9 @@ describe("a disposed engine", () => {
 			reachable: async () => false,
 			archive: async (ref) => files().get(fileKey(ref)) ?? null,
 			archivePut: async () => {},
+			knowledgePut: async () => {},
+			knowledge: async () => null,
+			inStep: async () => true,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},

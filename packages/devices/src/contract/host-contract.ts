@@ -8,7 +8,12 @@ import { labelSchema, nameSchema } from "@nightshift/flows";
 import type { RefusalKind } from "@nightshift/refusal";
 import { type ContractRouterClient, oc } from "@orpc/contract";
 import { z } from "zod";
-import { archiveRefSchema, copyStampSchema } from "./archive";
+import {
+	archiveRefSchema,
+	copyStampSchema,
+	KNOWLEDGE_CONTENT_MAX,
+	knowledgeRefSchema,
+} from "./archive";
 import { described, describedStream, exact } from "./described";
 import {
 	hostHelloSchema,
@@ -391,6 +396,31 @@ export const hostContract = {
 					"Reads a file of a run in the archive. Null when there is none.",
 			})
 			.input(z.object({ ref: archiveRefSchema }))
+			.output(described(z.string().nullable())),
+		/**
+		 * A Device keeps the content of a knowledge file here, by its hash
+		 * (ADR 4), before its entry goes into the knowledge document. Needs
+		 * a role that may start runs in the Space.
+		 */
+		knowledgePut: archive
+			.route({
+				summary:
+					"Keeps the content of a file of a project's knowledge, by its hash.",
+			})
+			.input(
+				knowledgeRefSchema.extend({
+					/** The content, in base64. */
+					content: z.string().max(KNOWLEDGE_CONTENT_MAX),
+				}),
+			)
+			.output(described(z.void())),
+		/** The content of a knowledge file of a Space the Device's owner is in, in base64. Null when there is none. */
+		knowledgeGet: archive
+			.route({
+				summary:
+					"Reads the content of a file of a project's knowledge, by its hash. Null when there is none.",
+			})
+			.input(knowledgeRefSchema)
 			.output(described(z.string().nullable())),
 		/**
 		 * A step's live transcript, for a Member of its run's Space: its

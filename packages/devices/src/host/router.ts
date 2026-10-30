@@ -155,6 +155,12 @@ export const hostRouter = os.router({
 		get: keyed.archive.get.handler(({ context, input }) =>
 			context.exchange.archiveGet(context.key, input.ref),
 		),
+		knowledgePut: keyed.archive.knowledgePut.handler(({ context, input }) =>
+			context.exchange.knowledgePut(context.key, input),
+		),
+		knowledgeGet: keyed.archive.knowledgeGet.handler(({ context, input }) =>
+			context.exchange.knowledgeGet(context.key, input),
+		),
 		follow: keyed.archive.follow.handler(async function* ({
 			context,
 			input,

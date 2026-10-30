@@ -1,7 +1,11 @@
 import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
-import type { FlowDocuments, KnowledgeSearch } from "@nightshift/engine";
+import type {
+	FlowDocuments,
+	KnowledgeDocuments,
+	KnowledgeSearch,
+} from "@nightshift/engine";
 import type { DeviceDocument } from "@nightshift/engine/device-config";
 import type {
 	GitHubClones,
@@ -22,14 +26,14 @@ import type { Lease } from "./lease";
  * a slot here, and the daemon names its lifecycle once (`hotSlots`):
  *
  * - kept: the database client (one per database, so a reload leaks none),
- *   the lease, the Device, Space and flow documents (one writer each), the
+ *   the lease, the Device, Space, flow and knowledge documents (one writer each), the
  *   in-app channel (an open notification stream outlives a reload), the
  *   clones from GitHub, and the relay (`keepSync`: its connections stay,
  *   and it is bound to the newest daemon's closures). Bun reloads a
  *   listener of the same `id` in place;
  * - replaced, the one before stopped first: the notifier, the keep-awake,
  *   the export to monitoring, the project copies, the scheduler, the price
- *   list and the facts timer;
+ *   list, the facts timer and the knowledge timers;
  * - handed over: the devices (`startDevices` fills `nightshiftDevices`
  *   itself: its engine lets go of its runs, and the work hub, the applied
  *   commands, the calls served for a Host, the Devices online and the
@@ -50,6 +54,7 @@ export type HotRegistry = KeptDevices &
 		nightshiftDocument?: DeviceDocument;
 		nightshiftSpaces?: SpaceDocuments;
 		nightshiftFlows?: FlowDocuments;
+		nightshiftKnowledgeDocuments?: KnowledgeDocuments;
 		nightshiftInApp?: InAppChannel;
 		nightshiftNotifications?: Notifications;
 		nightshiftKeepAwake?: KeepAwake;
@@ -63,6 +68,8 @@ export type HotRegistry = KeptDevices &
 		/** The daily update of the price list. */
 		nightshiftPrices?: PriceUpdates;
 		nightshiftFacts?: Timer;
+		/** The first reconcile of every knowledge folder, and the retry of what waits for a Host. */
+		nightshiftKnowledgeTimers?: { first: Timer; retry: Timer };
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;
 	};

@@ -75,14 +75,23 @@ export {
 } from "./flows";
 export type { WalkFile, WalkRef } from "./graph";
 export {
+	createKnowledgeDocuments,
 	createKnowledgeFolders,
 	createKnowledgeSearch,
+	createKnowledgeStore,
+	createKnowledgeSync,
 	KNOWLEDGE_FILES_WARNING,
+	type KnowledgeDocuments,
 	type KnowledgeFile,
 	type KnowledgeFolders,
 	type KnowledgeHit,
+	type KnowledgeHost,
+	type KnowledgeListing,
 	type KnowledgeSearch,
+	type KnowledgeStore,
+	type KnowledgeSync,
 	type KnowledgeText,
+	LOCAL_ONLY_BYTES,
 } from "./knowledge";
 export type {
 	CopyStamp,

@@ -1,6 +1,13 @@
 import { type Auth, roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Device, FlowDocuments, MoveRows } from "@nightshift/engine";
+import {
+	createKnowledgeStore,
+	type Device,
+	type FlowDocuments,
+	type KnowledgeDocuments,
+	type KnowledgeHost,
+	type MoveRows,
+} from "@nightshift/engine";
 import {
 	createDeviceCopies,
 	type DeviceDocument,
@@ -11,6 +18,7 @@ import {
 } from "@nightshift/engine/device-config";
 import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
 import type * as Y from "yjs";
+import { createKnowledgeArchive } from "./archive";
 import type { HostClient } from "./contract";
 import {
 	type AppliedCommands,
@@ -70,6 +78,8 @@ export type DevicesRuntime = {
 	reach: Reach;
 	/** How Bun serves this daemon: the hostname of its reach, and its own TLS. */
 	serve: { hostname: string; tls?: { cert: string; key: string } };
+	/** The Hosts of the Spaces, as the knowledge reconcile copies content to them and fetches it (ADR 4). */
+	knowledge: KnowledgeHost;
 };
 
 /**
@@ -143,6 +153,8 @@ export type DevicesDeps = {
 	spaces: SpaceDocuments;
 	/** The flow documents of the Projects: this Device keeps a copy of each. */
 	flows: FlowDocuments;
+	/** The knowledge documents of the Projects: this Device keeps a copy of each (ADR 4). */
+	knowledge: Pick<KnowledgeDocuments, "open">;
 	/** This computer's Device. */
 	self: { id: string; name: string };
 	/** The Person who owns this computer. */
@@ -228,8 +240,16 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	 */
 	const copies = createDeviceCopies({ db, selfId: self.id });
 
-	// The engine takes the relays, and the relays reach the engine and the
-	// Links: they read both when they are called, after this function.
+	// The actions on rows another Device owns, carried over the Links. The
+	// relays reach the engine and the Links: they read both when they are
+	// called, after this function.
+	const relay = createRelay({
+		engine: () => engine,
+		registry: () => engine.devices,
+		links: () => links,
+		flows: deps.flows,
+	});
+
 	const engine = createPeerEngine(
 		{
 			db,
@@ -251,13 +271,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				engine: () => engine,
 				links: () => links,
 			}),
-			// The actions on rows another Device owns, carried over the Links.
-			relay: createRelay({
-				engine: () => engine,
-				registry: () => engine.devices,
-				links: () => links,
-				flows: deps.flows,
-			}),
+			relay,
 			// This computer's own Offers, the sessions and calls under them,
 			// and who may use Offers in a Space.
 			ownOffers: () =>
@@ -299,6 +313,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		ownerId,
 		isHost: host.isHost,
 		work: handover.hub,
+		// The knowledge content its Devices copy here, by hash.
+		knowledge: createKnowledgeStore(deps.dataDir),
 	});
 
 	/** This computer's Offers into Spaces, as its owner makes and withdraws them. */
@@ -320,8 +336,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		document: deps.document,
 		// The Spaces the Host lists: kept here as the Host's, their documents
 		// synced read-only, before run rows that name their projects arrive.
-		// The flow documents of their Projects sync both ways. A Project the
-		// Host adds later syncs from its next answer.
+		// The flow and knowledge documents of their Projects sync both ways.
+		// A Project the Host adds later syncs from its next answer.
 		spaceDocuments: async (link, hello) => {
 			const { hostSpaces } = engine;
 			await hostSpaces.update(
@@ -449,6 +465,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		hostExchange,
 		offers,
 		reach,
+		knowledge: createKnowledgeArchive({ relay }),
 		serve: {
 			hostname: listenHostname(reach, deps.env.NIGHTSHIFT_LISTEN),
 			...(certificate
@@ -512,13 +529,15 @@ async function letGo(engine: { dispose(): Promise<void> }): Promise<void> {
 
 /**
  * What a Device syncs of the Spaces a Host keeps: each Space document,
- * which it only receives, and the flow documents of each Project in it,
- * which it keeps a copy of and changes too (ADR 2).
+ * which it only receives, and the flow documents (ADR 2) and the
+ * knowledge document (ADR 4) of each Project in it, which it keeps a copy
+ * of and changes too.
  */
 export async function hostSpaceDocuments(
 	documents: {
 		spaces: Pick<SpaceDocuments, "open">;
 		flows: Pick<FlowDocuments, "open">;
+		knowledge: Pick<KnowledgeDocuments, "open">;
 	},
 	spaceIds: readonly string[],
 ): Promise<{ name: string; doc: Y.Doc }[]> {
@@ -528,9 +547,11 @@ export async function hostSpaceDocuments(
 		synced.push({ name: space.name, doc: space.doc });
 		for (const projectId of [...space.projects.keys()].sort()) {
 			const { current, history } = await documents.flows.open(projectId);
+			const knowledge = await documents.knowledge.open(projectId);
 			synced.push(
 				{ name: current.name, doc: current.doc },
 				{ name: history.name, doc: history.doc },
+				{ name: knowledge.name, doc: knowledge.doc },
 			);
 		}
 	}

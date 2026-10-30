@@ -380,6 +380,9 @@ describe("a batch and what follows from it", () => {
 			reachable: async () => false,
 			archive,
 			archivePut: async () => {},
+			knowledgePut: async () => {},
+			knowledge: async () => null,
+			inStep: async () => true,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},
@@ -721,6 +724,9 @@ describe("a run walked elsewhere", () => {
 			reachable: async () => false,
 			archive: async () => null,
 			archivePut: async () => {},
+			knowledgePut: async () => {},
+			knowledge: async () => null,
+			inStep: async () => true,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},
@@ -803,6 +809,9 @@ describe("a run walked elsewhere", () => {
 					: null;
 			},
 			archivePut: async () => {},
+			knowledgePut: async () => {},
+			knowledge: async () => null,
+			inStep: async () => true,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},

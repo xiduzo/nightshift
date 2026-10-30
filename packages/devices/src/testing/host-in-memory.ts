@@ -1,7 +1,7 @@
 import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, user } from "@nightshift/db/schema";
-import { createFlowDocuments } from "@nightshift/engine";
+import { createFlowDocuments, createKnowledgeStore } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -120,6 +120,7 @@ export async function hostInMemory(
 		ownerId: personId,
 		isHost: asHost.isHost,
 		work: createWorkHub(),
+		knowledge: createKnowledgeStore(a.dataDir),
 	});
 	const memory = inMemoryHost({
 		exchange: hostExchange,

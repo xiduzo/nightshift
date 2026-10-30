@@ -10,6 +10,7 @@ import type {
 import type {
 	ArchiveRef,
 	CommandBatch,
+	KnowledgeRef,
 	OfferCaps,
 	PersonalMerge,
 	PersonalMergeInput,
@@ -102,6 +103,19 @@ export type HostExchange = {
 	 * log says. Null when there is none.
 	 */
 	archiveGet(key: DeviceKeyAccess, ref: ArchiveRef): Promise<string | null>;
+	/**
+	 * Keeps the content of a knowledge file of a Space this Host keeps, by
+	 * its hash (base64). Needs a role that may start runs there.
+	 */
+	knowledgePut(
+		key: DeviceKeyAccess,
+		input: KnowledgeRef & { content: string },
+	): Promise<void>;
+	/**
+	 * The content of a knowledge file of a Space this Host keeps and the
+	 * key's Person is a Member of, in base64. Null when there is none.
+	 */
+	knowledgeGet(key: DeviceKeyAccess, ref: KnowledgeRef): Promise<string | null>;
 	/**
 	 * A step's live transcript, for a Member of its run's Space: its
 	 * entries after `afterSeq`, then each new one, until the step ends or

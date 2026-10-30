@@ -6,7 +6,7 @@
  * may name these types without a cycle.
  */
 
-export type { ArchiveRef } from "./archive";
+export type { ArchiveRef, KnowledgeRef } from "./archive";
 export {
 	type HostClient,
 	type HostProcedureMeta,

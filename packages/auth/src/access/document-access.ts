@@ -35,10 +35,14 @@ export type SyncAuthorize = (request: {
 
 /**
  * The Space a synced document belongs to, and its kind: the Space
- * document, or a flow document of one of the Space's Projects (its flows
- * and schedules, or their revisions).
+ * document, a flow document of one of the Space's Projects (its flows
+ * and schedules, or their revisions), or a Project's knowledge document
+ * (its files by hash, ADR 4).
  */
-export type DocumentSpace = { spaceId: string; kind: "space" | "flows" };
+export type DocumentSpace = {
+	spaceId: string;
+	kind: "space" | "flows" | "knowledge";
+};
 
 /** A Device key as the relay needs it. */
 export type SyncDeviceKey = {
@@ -66,11 +70,15 @@ export type SyncDeviceKey = {
  *   procedures. A Device of a Member whose role may save and remove flows
  *   and save schedules changes them: it keeps a copy, and its edits
  *   merge (ADR 2). The daemon that saves checks the flow.
+ * - `knowledge:<project id>`: a Member of the Project's Space, read-only.
+ *   A Device of a Member whose role may start runs changes it: it runs
+ *   the steps that change the knowledge, and publishes their files (ADR
+ *   4). A browser changes knowledge only through the procedures.
  *
  * A token that is a Device key (`deviceKey`) is a Device, never a session:
  * it opens its own Device document, only on its home Host (to change it),
  * the Space documents of the Spaces its owner is a Member of (to read),
- * and the flow documents of their Projects. On its home Host it also reads
+ * and the flow and knowledge documents of their Projects. On its home Host it also reads
  * the Device documents of its owner's other Devices: the ones the Host
  * keeps for them, and the Host's own when its owner owns the Host (ADR 1,
  * decision 2). A Device document holds secret names, never their values.
@@ -79,6 +87,16 @@ export type SyncDeviceKey = {
 const FLOW_WRITE: Permissions = {
 	flow: ["save", "remove"],
 	schedule: ["save"],
+};
+
+/** What a role needs to change a knowledge document over sync: its steps change the knowledge. */
+const KNOWLEDGE_WRITE: Permissions = { run: ["start"] };
+
+/** What a Device's role needs to change a document of each kind. Null: no Device changes it. */
+const DEVICE_WRITE: Record<DocumentSpace["kind"], Permissions | null> = {
+	space: null,
+	flows: FLOW_WRITE,
+	knowledge: KNOWLEDGE_WRITE,
 };
 
 export function documentAccess(options: {
@@ -110,6 +128,7 @@ export function documentAccess(options: {
 	/**
 	 * A document of a Space: read-only for a Member of that Space. A
 	 * Device (`device`) of a Member who may change flows writes a flow
+	 * document, and one of a Member who may start runs writes a knowledge
 	 * document.
 	 */
 	const spaceAccess = async (
@@ -121,9 +140,8 @@ export function documentAccess(options: {
 		if (!space) return false;
 		const role = await roleIn(options.db, personId, space.spaceId);
 		if (role === null) return false;
-		return device && space.kind === "flows" && roleAllows(role, FLOW_WRITE)
-			? "write"
-			: "read";
+		const needs = DEVICE_WRITE[space.kind];
+		return device && needs && roleAllows(role, needs) ? "write" : "read";
 	};
 
 	return async ({ documentName, token, request, peer }) => {

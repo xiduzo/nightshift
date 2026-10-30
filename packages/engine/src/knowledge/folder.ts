@@ -15,7 +15,9 @@ import { dirname, extname, join } from "node:path";
 /**
  * The knowledge folder of a project: markdown (and any other files) that
  * an agent may read, kept outside the repository and outside every
- * worktree: `<dataDir>/knowledge/<projectId>/`. Each Device has its own.
+ * worktree: `<dataDir>/knowledge/<projectId>/`. Each Device has a working
+ * copy of the Project's knowledge there, which `createKnowledgeSync` keeps
+ * in step with the Space (ADR 4).
  *
  * Sync flows fill it with Commands (the `knowledge/*` kits), through the
  * folder the step gets in `NS_KNOWLEDGE`. Night Shift writes `INDEX.md`
@@ -30,7 +32,7 @@ import { dirname, extname, join } from "node:path";
  * `learnings/accepted/`. The index lists the accepted ones only.
  */
 
-/** One file of the folder, as the index and the Knowledge page list it. */
+/** One file of the knowledge, as the index and the Knowledge page list it. */
 export type KnowledgeFile = {
 	/** Relative to the folder, with `/` between its parts. */
 	path: string;
@@ -38,6 +40,8 @@ export type KnowledgeFile = {
 	size: number;
 	/** Epoch ms. */
 	changedAt: number;
+	/** Larger than 10 MB: it stays on the Device that has it. */
+	local?: true;
 };
 
 /**
@@ -49,7 +53,7 @@ export const KNOWLEDGE_FILES_WARNING = 2000;
 /** The file Night Shift writes at the top of the folder. */
 export const INDEX_FILE = "INDEX.md";
 /** The proposals that wait for a person: never in the index. */
-const PROPOSED_DIR = "learnings/proposed";
+export const PROPOSED_DIR = "learnings/proposed";
 /** The most files the index lists: a folder past it is far too large to read. */
 const MAX_FILES = 20_000;
 /** What the index reads of a file for its title and first sentence. */
@@ -57,9 +61,12 @@ const HEAD_BYTES = 4096;
 /** The files whose text the index reads. Any other file shows its name only. */
 export const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
 
+/** Whether an id is one file or folder name: nothing that could leave the folder. */
+const isId = (id: string) => /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
+
 /** An id as one file or folder name: nothing that could leave the folder. */
 function folderName(id: string): string {
-	if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id)) {
+	if (!isId(id)) {
 		throw new Error(`"${id}" is not an id.`);
 	}
 	return id;
@@ -82,6 +89,16 @@ export function createKnowledgeFolders(dataDir: string) {
 	return {
 		folder,
 		ensure,
+		/** The projects that have a folder on this computer, by id. */
+		async known(): Promise<string[]> {
+			const names = await readdir(root, { withFileTypes: true }).catch(
+				() => [],
+			);
+			return names
+				.filter((entry) => entry.isDirectory() && isId(entry.name))
+				.map((entry) => entry.name)
+				.sort();
+		},
 		/**
 		 * Adds what an agent of the run proposes to learn to
 		 * `learnings/proposed/<runId>.md`, one note per line, for a person

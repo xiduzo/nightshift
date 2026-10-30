@@ -11,8 +11,8 @@ import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	Engine,
-	KnowledgeFolders,
 	KnowledgeSearch,
+	KnowledgeSync,
 	ToolLaunchers,
 } from "@nightshift/engine";
 import type {
@@ -89,9 +89,13 @@ export type Services = {
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
-	/** The projects' knowledge folders on this computer, with their index. */
-	knowledge: Pick<KnowledgeFolders, "index" | "proposed">;
-	/** Keyword search over the projects' knowledge on this computer, and reading one file. */
+	/**
+	 * The projects' knowledge in their Spaces (ADR 4): the files the
+	 * knowledge document lists, and one file's content by its hash for a
+	 * computer whose folder lacks it.
+	 */
+	knowledge: Pick<KnowledgeSync, "listing" | "read">;
+	/** Keyword search over the projects' knowledge on this computer, and reading one file of its folder. */
 	knowledgeSearch: Pick<KnowledgeSearch, "search" | "read">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;

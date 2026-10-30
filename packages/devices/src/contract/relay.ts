@@ -5,7 +5,7 @@ import type {
 	Relay,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import type { ArchiveRef } from "./archive";
+import type { ArchiveRef, KnowledgeRef } from "./archive";
 import type { OfferCaps } from "./offers";
 
 /**
@@ -48,6 +48,25 @@ export type HostRelay = Relay & {
 		content: string,
 		stamp?: CopyStamp,
 	): Promise<void>;
+	/**
+	 * Keeps knowledge content (base64) in the archive of the Host that
+	 * keeps the Space. Nothing for a Space this Replica keeps. Throws when
+	 * that Host cannot be reached.
+	 */
+	knowledgePut(ref: KnowledgeRef, content: string): Promise<void>;
+	/**
+	 * Knowledge content (base64) from the Host that keeps the Space. Null
+	 * for a Space this Replica keeps, and when that Host has none. Throws
+	 * when that Host cannot be reached.
+	 */
+	knowledge(ref: KnowledgeRef): Promise<string | null>;
+	/**
+	 * Whether this Replica's copy of a document of the Space and its Host's
+	 * are in step (`Link.synced`), asking the Host now when they are not.
+	 * True for a Space this Replica keeps. Null while that Host cannot be
+	 * reached.
+	 */
+	inStep(spaceId: string, documentName: string): Promise<boolean | null>;
 	/**
 	 * The actor's Devices, as the Host that keeps the Space knows them:
 	 * whether each is online and has a Clone of the project.
