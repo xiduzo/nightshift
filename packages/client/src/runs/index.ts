@@ -13,6 +13,7 @@ export {
 	stepOutcomeLabel,
 	whenLabel,
 } from "./format";
+export { metricsByNode, type NodeMetrics } from "./node-metrics";
 export {
 	defaultPlacement,
 	hostOwnerHint,

@@ -148,6 +148,8 @@ export {
 	type KnownCost,
 	markdownPreview,
 	mergeSteps,
+	metricsByNode,
+	type NodeMetrics,
 	nodeLabels,
 	type PlacementChoice,
 	placementChoices,
