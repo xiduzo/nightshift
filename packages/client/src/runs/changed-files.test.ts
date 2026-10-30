@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { changedFiles, fileTree } from "./changed-files";
+import { addsFiles, changedFiles, fileTree } from "./changed-files";
 
 const ROOT = "/work/copies/run-1";
 
@@ -184,6 +184,53 @@ describe("changedFiles", () => {
 				changes: [{ kind: "write", content: "new" }],
 			},
 		]);
+	});
+});
+
+describe("addsFiles", () => {
+	const write = (result?: string) => ({
+		name: "Write",
+		input: { file_path: `${ROOT}/src/a.kt`, content: "hello" },
+		...(result === undefined ? {} : { result }),
+	});
+
+	test("reads Claude Code's answer to Write, as Changed files does", () => {
+		const made = write(`File created successfully at: ${ROOT}/src/a.kt`);
+		expect(addsFiles(made)).toBe(true);
+		expect(changedFiles([made], ROOT)[0]?.status).toBe("added");
+		const updated = write(`The file ${ROOT}/src/a.kt has been updated.`);
+		expect(addsFiles(updated)).toBe(false);
+		expect(changedFiles([updated], ROOT)[0]?.status).toBe("edited");
+	});
+
+	test("takes a write the harness says nothing more of as a new file", () => {
+		expect(addsFiles(write())).toBe(true);
+	});
+
+	test("is false for an edit, a failed write and a read", () => {
+		expect(
+			addsFiles({
+				name: "Edit",
+				input: { file_path: "a.kt", old_string: "a", new_string: "b" },
+			}),
+		).toBe(false);
+		expect(addsFiles({ ...write(), failed: true })).toBe(false);
+		expect(addsFiles({ name: "Read", input: { file_path: "a.kt" } })).toBe(
+			false,
+		);
+	});
+
+	test("is true for a patch that only adds files", () => {
+		const patch = (body: string) => ({
+			name: "apply_patch",
+			input: { patch: `*** Begin Patch\n${body}\n*** End Patch` },
+		});
+		expect(addsFiles(patch("*** Add File: a.kt\n+hello"))).toBe(true);
+		expect(
+			addsFiles(
+				patch("*** Add File: a.kt\n+hello\n*** Update File: b.kt\n-x\n+y"),
+			),
+		).toBe(false);
 	});
 });
 

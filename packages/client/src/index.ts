@@ -136,6 +136,7 @@ export {
 	type AgentMessages,
 	type AgentUsage,
 	type Artifact,
+	addsFiles,
 	agoLabel,
 	applyAgentMessages,
 	type ChangedFile,

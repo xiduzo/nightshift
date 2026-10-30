@@ -1,4 +1,4 @@
-import { type ToolKind, toolKind } from "@nightshift/client";
+import { addsFiles, type ToolKind, toolKind } from "@nightshift/client";
 import {
 	Trace,
 	TraceCollapsible,
@@ -57,6 +57,13 @@ const KIND_VERBS: Record<
 	search: ["Searching for", "Searched for", "Failed to search for"],
 	web: ["Opening", "Opened", "Failed to open"],
 };
+
+/** An edit that made a new file reads as Changed files lists it: added. */
+const ADD_VERBS: [running: string, done: string, failed: string] = [
+	"Adding",
+	"Added",
+	"Failed to add",
+];
 
 /** The command a shell tool ran, when its input has one. */
 function commandOf(input: unknown): string | null {
@@ -153,7 +160,12 @@ function ToolLine({
 	const name = item.connection
 		? `${item.connection} › ${item.name}`
 		: item.name;
-	const verbs = kind === "other" ? KIND_VERBS.command : KIND_VERBS[kind];
+	const verbs =
+		kind === "other"
+			? KIND_VERBS.command
+			: kind === "edit" && addsFiles(item)
+				? ADD_VERBS
+				: KIND_VERBS[kind];
 	const verb =
 		state.kind === "running"
 			? verbs[0]

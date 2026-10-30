@@ -2,6 +2,7 @@
 
 export { type RunActions, runActions, whyNot } from "./actions";
 export {
+	addsFiles,
 	type ChangedFile,
 	changedFiles,
 	type FileChange,

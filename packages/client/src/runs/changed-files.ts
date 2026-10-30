@@ -227,6 +227,22 @@ function touchesOf(call: AgentToolCall): Touch[] {
 	return [];
 }
 
+/** A change made the file: the harness says so, or a write it says nothing more of. */
+function creates(touch: Touch): boolean {
+	return touch.creates ?? touch.change.kind === "write";
+}
+
+/**
+ * The call added every file it wrote, by the rule that marks a file
+ * "added" in `changedFiles`: Claude Code's `Write` that answers "created",
+ * an `apply_patch` that adds files, a write the harness says nothing more
+ * of. False for a failed call and for a call that changed nothing.
+ */
+export function addsFiles(call: AgentToolCall): boolean {
+	const touches = touchesOf(call);
+	return touches.length > 0 && touches.every(creates);
+}
+
 /**
  * The files a step's agent changed, by path, from its tool calls: Claude
  * Code's `Edit`, `MultiEdit`, `Write` and `NotebookEdit`, OpenCode's and
@@ -250,8 +266,7 @@ export function changedFiles(
 			if (!known) {
 				files.set(path, {
 					changes: [touch.change],
-					// A first write the harness says nothing more of made the file.
-					created: touch.creates ?? touch.change.kind === "write",
+					created: creates(touch),
 					deleted: touch.change.kind === "delete",
 				});
 				continue;
