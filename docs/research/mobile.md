@@ -280,10 +280,10 @@ key, so a second push of one key replaces the first. The `data`:
 
 | Field | Value |
 | --- | --- |
-| `kind` | `gate-opened`, `run-finished`, `run-failed`, `device-wait` or `gates-waiting` |
-| `key` | `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `runId:wait:<stepId>` for a step that waits for a Device, `waiting:<ms>` for `gates-waiting` |
-| `spaceId`, `runId` | The run and its Space. Null for `gates-waiting`, which spans Spaces |
-| `stepId` | The Gate's step, or the step that waits. Null for a run and for `gates-waiting` |
+| `kind` | `gate-opened`, `run-finished`, `run-failed`, `device-wait`, `gates-waiting` or `digest` |
+| `key` | `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `runId:wait:<stepId>` for a step that waits for a Device, `waiting:<ms>` for `gates-waiting`, `digest:<YYYY-MM-DD>` for the morning digest |
+| `spaceId`, `runId` | The run and its Space. Null for `gates-waiting` and `digest`, which span Spaces |
+| `stepId` | The Gate's step, or the step that waits. Null for a run, `gates-waiting` and `digest` |
 | `count` | `gates-waiting` only: how many Gates wait |
 | `options` | `gate-decide` only: `[{ id, label }, { id, label }]`, the two options in the author's order |
 
@@ -293,7 +293,7 @@ key, so a second push of one key replaces the first. The `data`:
 | `categoryId` | When | Actions | A tap |
 | --- | --- | --- | --- |
 | `gate-decide` | A Gate the author marked (`lockScreen: true`) with exactly two options, sent to a person whose role allows an answer | `approve` and `reject`, both `isAuthenticationRequired: false` and `opensAppToForeground: false`: the author marked the Gate, so the answer needs no unlock | Opens the Gate |
-| `gate-open` | Every other Gate, and `gates-waiting` | none | Opens the Gate, or the inbox when `runId` is null. A biometric check comes before the answer |
+| `gate-open` | Every other Gate, `gates-waiting` and `digest` | none | Opens the Gate, or the inbox when `runId` is null. A biometric check comes before the answer. The inbox shows the last digest on top (`notifications.digest.latest`) |
 | `run` | A run that finished or failed, or a step that waits for a Device (to the Person the run runs for only) | none | Opens the run |
 
 The action `approve` answers `options[0].id`, `reject` answers
@@ -312,7 +312,7 @@ answer was not sent" for any other refusal or error.
 **Priority.** Gates and `gates-waiting`: `priority: "high"`,
 `interruptionLevel: "time-sensitive"` (the app needs the Time Sensitive
 Notifications capability), Android `channelId: "gates"` (high importance).
-Runs: `priority: "normal"`, `interruptionLevel: "active"`, Android
+Runs and the digest: `priority: "normal"`, `interruptionLevel: "active"`, Android
 `channelId: "runs"` (default importance). The app defines both Android
 channels at start.
 
