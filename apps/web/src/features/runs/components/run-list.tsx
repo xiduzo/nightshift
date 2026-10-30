@@ -282,7 +282,8 @@ function RunFacts({ run }: { run: RunSummary }) {
 
 /**
  * One fact of RunFacts: its words on hover and for screen readers. A click
- * copies its value. It sits above the row's link, so the click stays here.
+ * copies its value, which the copy cursor hints. It sits above the row's
+ * link, so the click stays here.
  */
 function Fact({
 	label,
@@ -308,7 +309,7 @@ function Fact({
 					<button
 						type="button"
 						onClick={onClick}
-						className="relative z-10 flex cursor-pointer items-center rounded-sm p-0.5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&>svg]:size-3.5"
+						className="relative z-10 flex cursor-copy items-center rounded-sm p-0.5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&>svg]:size-3.5"
 					/>
 				}
 			>
@@ -317,10 +318,7 @@ function Fact({
 					{label}. Copy the {copy.what}.
 				</span>
 			</TooltipTrigger>
-			<TooltipContent>
-				<p>{label}</p>
-				<p className="opacity-70">Click to copy the {copy.what}.</p>
-			</TooltipContent>
+			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	);
 }
