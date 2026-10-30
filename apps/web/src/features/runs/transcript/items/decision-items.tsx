@@ -1,13 +1,28 @@
 /** The items of a Decision or Value step: the question to a model, the rule, the Gate, the result. */
+import { parseGateQuestion, plainText } from "@nightshift/client";
 import type { JsonValue } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
+import {
+	Marker,
+	MarkerContent,
+	MarkerIcon,
+} from "@nightshift/ui/components/marker";
+import {
+	Trace,
+	TraceCollapsible,
+	TraceCollapsibleContent,
+	TraceCollapsibleTrigger,
+	TraceDescription,
+	TraceIcon,
+	TraceLine,
+	TraceTitle,
+} from "@nightshift/ui/components/trace";
 import { cn } from "@nightshift/ui/lib/utils";
 import { AlarmClockIcon, BracesIcon, HandIcon, SplitIcon } from "lucide-react";
-import type { ReactNode } from "react";
 import { outcomeLabel, outcomeStyle, stepStateStyle } from "@/features/flows";
+import { GateQuestion as GateQuestionText } from "@/features/gates";
 import { JsonBlock } from "@/shared/code";
-import { formatDateTime, formatRelative, formatTime } from "@/shared/format";
-import { Markdown } from "@/shared/markdown";
+import { formatDateTime, formatTime } from "@/shared/format";
 import type {
 	DecisionAskItem,
 	DecisionItem,
@@ -155,49 +170,70 @@ function ruleResultText(result: JsonValue): string {
 	return typeof result === "string" ? result : JSON.stringify(result);
 }
 
-/** The question a Gate asks. While the gate is open, the answer form follows. */
-export function GateQuestion({
-	item,
-	answer,
-}: {
-	item: GateOpenItem;
-	answer: ReactNode;
-}) {
+/**
+ * The question of a Gate that is no longer open, as a quiet line: what it
+ * asked. It opens on the whole question and its choices. An open Gate is
+ * a GateConfirmation (from the gates vertical) in its place.
+ */
+export function GateQuestion({ item }: { item: GateOpenItem }) {
+	const { headline } = parseGateQuestion(item.question);
 	return (
-		<ResultCard
-			icon={HandIcon}
-			value={answer ? "Waiting for you" : "Gate"}
-			tone="text-status-waiting"
-			className={cn(answer && "ring-status-waiting/50")}
-			extra={
-				<span className="text-muted-foreground">
-					· opened{" "}
-					<time
-						dateTime={new Date(item.at).toISOString()}
-						title={formatDateTime(item.at)}
-					>
-						{formatRelative(item.at)}
-					</time>
-				</span>
-			}
-		>
-			<Markdown text={item.question} />
-			{answer}
-		</ResultCard>
+		<Trace>
+			<TraceCollapsible>
+				<TraceCollapsibleTrigger>
+					<TraceLine className="text-xs">
+						<TraceIcon>
+							<HandIcon className="size-3.5" />
+						</TraceIcon>
+						<TraceTitle>Asked: {plainText(headline)}</TraceTitle>
+						<TraceDescription>
+							<time
+								dateTime={new Date(item.at).toISOString()}
+								title={formatDateTime(item.at)}
+							>
+								{formatTime(item.at)}
+							</time>
+						</TraceDescription>
+					</TraceLine>
+				</TraceCollapsibleTrigger>
+				<TraceCollapsibleContent className="flex flex-col gap-3 text-xs">
+					<GateQuestionText question={item.question} />
+					<p className="flex flex-wrap items-center gap-1">
+						Choices
+						{item.choices.map((choice) => (
+							<Badge
+								key={choice.name}
+								variant="outline"
+								className={cn(
+									"font-mono",
+									outcomeStyle(choice.name, choice.color).badge,
+								)}
+							>
+								{outcomeLabel(choice.name)}
+							</Badge>
+						))}
+					</p>
+				</TraceCollapsibleContent>
+			</TraceCollapsible>
+		</Trace>
 	);
 }
 
-/** The answer a person gave and their note, or the option the deadline chose. */
+/** The answer a person gave and their note, or the option the deadline chose, as a quiet line. */
 export function GateResolved({ item }: { item: GateResolvedItem }) {
 	const { text } = outcomeStyle(item.choice, item.color);
+	const Icon = item.byDeadline ? AlarmClockIcon : HandIcon;
 	return (
-		<ResultCard
-			icon={item.byDeadline ? AlarmClockIcon : HandIcon}
-			kicker={item.byDeadline ? "Picked at the deadline ·" : "Answered ·"}
-			value={<span className="font-mono">{outcomeLabel(item.choice)}</span>}
-			tone={text}
-			extra={
-				<span className="text-muted-foreground">
+		<div className="flex flex-col gap-1">
+			<Marker className="text-xs">
+				<MarkerIcon>
+					<Icon className={cn("size-3.5", text)} />
+				</MarkerIcon>
+				<MarkerContent>
+					{item.byDeadline ? "Nobody answered in time. Picked " : "Answered "}
+					<span className={cn("font-medium font-mono", text)}>
+						{outcomeLabel(item.choice)}
+					</span>{" "}
 					·{" "}
 					<time
 						dateTime={new Date(item.at).toISOString()}
@@ -205,16 +241,13 @@ export function GateResolved({ item }: { item: GateResolvedItem }) {
 					>
 						{formatTime(item.at)}
 					</time>
-				</span>
-			}
-		>
+				</MarkerContent>
+			</Marker>
 			{item.note.trim() ? (
-				<p className="whitespace-pre-wrap break-words leading-relaxed">
+				<p className="ml-6 whitespace-pre-wrap break-words border-l-2 pl-3 text-muted-foreground text-xs leading-relaxed">
 					{item.note}
 				</p>
-			) : (
-				<p className="text-muted-foreground italic">No note.</p>
-			)}
-		</ResultCard>
+			) : null}
+		</div>
 	);
 }

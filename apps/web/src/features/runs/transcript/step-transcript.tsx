@@ -33,7 +33,11 @@ import {
 } from "lucide-react";
 import { memo, type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { GateAnswer, GateQuestion as GateQuestionText } from "@/features/gates";
+import {
+	GateAnswer,
+	GateConfirmation,
+	GateQuestion as GateQuestionText,
+} from "@/features/gates";
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
 import { SectionTitle } from "../components/step-console";
 import { useOpenedStep } from "../hooks/use-opened-step";
@@ -111,6 +115,10 @@ export function StepTranscript({
 		!transcript.items.some((i) => i.kind === "gate-open")
 			? step.gate
 			: null;
+	// The Gate that waits now is the last one this step opened.
+	const openGateKey = gateOpen
+		? transcript.items.filter((item) => item.kind === "gate-open").at(-1)?.key
+		: undefined;
 	const sessionNumbers = new Map(
 		step.sessions.map((session, position) => [session.id, position + 1]),
 	);
@@ -292,20 +300,16 @@ export function StepTranscript({
 													{...(row.exit ? { exit: row.exit } : {})}
 													running={running}
 												/>
-											) : row.item.kind === "gate-open" ? (
-												<GateQuestion
-													item={row.item}
-													answer={
-														gateOpen ? (
-															<GateAnswer
-																runId={runId}
-																stepId={step.id}
-																nodeId={step.nodeId}
-																choices={row.item.choices}
-																deadline={row.item.deadline ?? null}
-															/>
-														) : null
-													}
+											) : row.item.kind === "gate-open" &&
+												row.item.key === openGateKey ? (
+												<GateConfirmation
+													runId={runId}
+													stepId={step.id}
+													question={row.item.question}
+													choices={row.item.choices}
+													deadline={row.item.deadline ?? null}
+													openedAt={row.item.at}
+													{...(elsewhere ? { walkerName: elsewhere } : {})}
 												/>
 											) : (
 												<TranscriptItemView
@@ -487,7 +491,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 		case "rule":
 			return <RuleCard item={item} />;
 		case "gate-open":
-			return <GateQuestion item={item} answer={null} />;
+			return <GateQuestion item={item} />;
 		case "gate-resolved":
 			return <GateResolved item={item} />;
 		case "items-read":
