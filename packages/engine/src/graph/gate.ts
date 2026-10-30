@@ -43,3 +43,26 @@ export async function openGate(
 	step.record(null, { type: "gate-open", question, choices, ...due });
 	ctx.bus.publish(ctx.run.id, { kind: "step-changed", stepId });
 }
+
+/**
+ * Scores a Gate's answer (`Scored`, `gate_decision`, on the Gate's step):
+ * the option it took, and whether a person or the deadline chose it. Both
+ * nodes that ask a person score it the same way.
+ */
+export async function scoreGate(
+	ctx: Pick<StepContext, "log" | "run">,
+	stepId: string,
+	answer: { choice: string; byDeadline?: boolean },
+): Promise<void> {
+	await ctx.log.append({
+		type: "Scored",
+		runId: ctx.run.id,
+		stepId,
+		payload: {
+			score: "gate_decision",
+			value: 1,
+			label: answer.choice,
+			by: answer.byDeadline ? "deadline" : "person",
+		},
+	});
+}

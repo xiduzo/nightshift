@@ -130,6 +130,7 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 	StopAfterStepCancelled: {},
 	RunEnded: { status: "finished", reason: null },
 	RunWarned: { kind: "cost-unknown", message: "Unknown cost" },
+	Scored: { score: "gate_decision", value: 1, label: "approve", by: "person" },
 	ScheduleFired: {
 		projectId: "p1",
 		scheduleId: "nightly",

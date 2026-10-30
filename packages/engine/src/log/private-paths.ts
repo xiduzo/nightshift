@@ -74,6 +74,7 @@ export const PATH_FIELDS = {
 	StopAfterStepCancelled: [],
 	RunEnded: [],
 	RunWarned: [],
+	Scored: [],
 	ScheduleFired: [],
 	ScheduleSkipped: [],
 	WebhookReceived: [],

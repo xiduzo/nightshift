@@ -7,6 +7,7 @@ import {
 	type NodeAction,
 	type StepContext,
 } from "../context";
+import { scoreGate } from "../gate";
 import { interruptNode } from "../interrupt";
 import { resumePromptOf, sessionOf } from "../resume-point";
 import { parkCommand, route, type StepEnd } from "../route";
@@ -66,6 +67,7 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 				choice: answer.choice,
 				note,
 			});
+			await scoreGate(ctx, step.stepId, answer);
 			if (answer.choice !== ASK_ANSWER) {
 				const end = await step.end(
 					"fail",

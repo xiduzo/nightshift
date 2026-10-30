@@ -108,6 +108,23 @@ const metricsSchema = z.object({
 	/** `billed`: every cost was reported. `estimated`: part is priced from tokens. `unknown`: part is not known. */
 	costBasis: z.enum(["billed", "estimated", "unknown"]),
 	prUrl: z.string().nullable(),
+	/** The feedback on a run: each Gate answered, and what became of its pull request. Older Hosts send none. */
+	scores: z
+		.array(
+			z.object({
+				score: z.enum([
+					"gate_decision",
+					"pr_merged",
+					"pr_closed",
+					"reverted_within_7d",
+				]),
+				value: z.number(),
+				label: z.string().nullable(),
+				stepId: z.string().nullable(),
+				at: z.number(),
+			}),
+		)
+		.optional(),
 });
 
 export const runSummarySchema = exact<RunSummary>()(

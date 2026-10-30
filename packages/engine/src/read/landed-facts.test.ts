@@ -41,6 +41,25 @@ const wait = (
 });
 
 describe("landedFacts", () => {
+	test("a score says what it scores, its value and its label", () => {
+		const [fact] = landedFacts([
+			landed("Scored", {
+				score: "gate_decision",
+				value: 1,
+				label: "approve",
+				by: "person",
+			}),
+		]);
+		expect(fact).toMatchObject({
+			kind: "scored",
+			stepId: "s1",
+			score: "gate_decision",
+			value: 1,
+			label: "approve",
+			changes: "detail",
+		});
+	});
+
 	test("a wait for a Device names the Device, or nothing", () => {
 		const [named, unnamed, empty] = landedFacts([
 			landed("WaitStarted", wait({ deviceName: "Laptop" })),
