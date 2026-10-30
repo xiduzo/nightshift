@@ -1,4 +1,4 @@
-/** What the Agents page shows on the right, and its `item` in the URL. */
+/** What the Agents page shows in detail, and its `item` in the URL. */
 import type { HarnessRowName } from "@/shared/api";
 import { isHarnessName } from "./harnesses";
 
@@ -10,7 +10,6 @@ export type Selection =
 	| { kind: "harness"; name: HarnessRowName }
 	| { kind: "tool"; name: string }
 	| { kind: "cli"; name: string }
-	| { kind: "secrets" }
 	| { kind: "device"; id: string };
 
 export function parseItem(item: string | undefined): Selection | null {
@@ -30,7 +29,6 @@ export function parseItem(item: string | undefined): Selection | null {
 			return name ? { kind, name } : null;
 		case "new-profile":
 		case "new-model-profile":
-		case "secrets":
 			return { kind };
 		default:
 			return null;

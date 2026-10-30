@@ -1,20 +1,13 @@
-/** The right side of the Agents page: the profile, harness, connection or tool you picked. */
+/** The detail of the Agents page: the profile, harness, tool or device you picked. */
 import type { CustomAgent } from "@nightshift/flows";
-import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
-	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
-import {
-	BotIcon,
-	CircleHelpIcon,
-	PlusIcon,
-	SquareTerminalIcon,
-} from "lucide-react";
+import { CircleHelpIcon, SquareTerminalIcon } from "lucide-react";
 import type {
 	CliTool,
 	Connection,
@@ -22,19 +15,17 @@ import type {
 	HarnessRow,
 	OtherDevice,
 	ProfileRow,
-	SecretView,
 	SettingsView,
 } from "@/shared/api";
 import { itemOf, type Selection } from "./agents-selection";
 import { CliToolDetail } from "./cli-tool";
-import { SecretsCard } from "./connections/secrets-card";
 import { CustomAgentDetail } from "./custom-agent";
 import { HarnessDetail } from "./harness-detail";
 import {
 	ModelProfileDetail,
 	newModelProfileDraft,
 } from "./model-profile-detail";
-import { OtherDeviceDetail, OtherDevicesSecrets } from "./other-device";
+import { OtherDeviceDetail } from "./other-device";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
 import { ToolDetail } from "./tool-detail";
 
@@ -43,7 +34,6 @@ type PageData = {
 	harnesses: HarnessRow[];
 	connections: ConnectionList["connections"];
 	cliTools: CliTool[];
-	secrets: SecretView[];
 	settings: SettingsView | undefined;
 	/** Your other devices, read-only here. */
 	otherDevices: OtherDevice[];
@@ -57,9 +47,10 @@ export function Detail({
 	onEditTool,
 	onEditCliTool,
 	onEditAgent,
+	onOpenSecrets,
 	data,
 }: {
-	selection: Selection | null;
+	selection: Selection;
 	/** Asks first when the profile form has unsaved changes. */
 	onSelect: (selection: Selection | null) => void;
 	/** Goes at once: after a save, a delete or a cancel. */
@@ -68,6 +59,7 @@ export function Detail({
 	onEditTool: (connection: Connection) => void;
 	onEditCliTool: (tool: CliTool) => void;
 	onEditAgent: (agent: CustomAgent) => void;
+	onOpenSecrets: () => void;
 	data: PageData;
 }) {
 	const added = data.harnesses.filter((h) => h.added);
@@ -76,38 +68,6 @@ export function Detail({
 		const found = data.profiles.find((p) => p.name === name);
 		if (found) onSelect({ kind: "profile", id: found.id });
 	};
-
-	if (!selection) {
-		return (
-			<Empty className="h-full">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<BotIcon />
-					</EmptyMedia>
-					<EmptyTitle>No profiles yet</EmptyTitle>
-					<EmptyDescription>
-						A profile gives a harness, a model and tools one name for Agent
-						nodes. A model profile picks the model for Decision and Value nodes.
-						One change here reaches every flow.
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent className="flex-row justify-center">
-					<Button size="sm" onClick={() => onSelect({ kind: "new-profile" })}>
-						<PlusIcon data-icon="inline-start" />
-						Add a profile
-					</Button>
-					<Button
-						size="sm"
-						variant="outline"
-						onClick={() => onSelect({ kind: "new-model-profile" })}
-					>
-						<PlusIcon data-icon="inline-start" />
-						Add a model profile
-					</Button>
-				</EmptyContent>
-			</Empty>
-		);
-	}
 
 	switch (selection.kind) {
 		case "new-model-profile":
@@ -219,7 +179,7 @@ export function Detail({
 					connection={connection}
 					onEdit={() => onEditTool(connection)}
 					onOpenProfile={openProfile}
-					onOpenSecrets={() => onSelect({ kind: "secrets" })}
+					onOpenSecrets={onOpenSecrets}
 					onRemoved={() => onGo(null)}
 				/>
 			);
@@ -237,13 +197,6 @@ export function Detail({
 				/>
 			);
 		}
-		case "secrets":
-			return (
-				<div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-8 md:px-8">
-					<SecretsCard secrets={data.secrets} />
-					<OtherDevicesSecrets devices={data.otherDevices} />
-				</div>
-			);
 		case "device": {
 			const device = data.otherDevices.find((d) => d.id === selection.id);
 			if (!device) return <Gone what="device" />;
@@ -261,7 +214,7 @@ function Gone({ what }: { what: string }) {
 				</EmptyMedia>
 				<EmptyTitle>No such {what}</EmptyTitle>
 				<EmptyDescription>
-					It was removed or renamed. Pick another one on the left.
+					It was removed or renamed. Go back to Agents and pick another one.
 				</EmptyDescription>
 			</EmptyHeader>
 		</Empty>

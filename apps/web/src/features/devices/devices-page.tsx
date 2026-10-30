@@ -45,7 +45,7 @@ const PHONE = "phone:";
 /**
  * The Devices page shows the Space you work in: the Host that keeps it,
  * your computers in it, and the computers of its other members. The list
- * sits in a card on the right, like the Agents page. The one you pick
+ * sits in a card on the right. The one you pick
  * opens on the left. This computer's own settings are on the Settings page.
  *
  * `selected` is "host", "phone:<id>" or a computer's id: nothing chosen

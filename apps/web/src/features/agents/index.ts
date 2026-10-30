@@ -18,3 +18,4 @@ export {
 	harnessQueries,
 	profileQueries,
 } from "./queries";
+export { SecretsPage } from "./secrets-page";

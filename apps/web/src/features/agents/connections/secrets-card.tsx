@@ -253,7 +253,7 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 
 	return (
 		<PageSection
-			title="Secrets"
+			title="On this computer"
 			description={
 				<>
 					Tokens and passwords your tools and commands use, written as{" "}
