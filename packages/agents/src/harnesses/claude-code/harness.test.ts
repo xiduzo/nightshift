@@ -52,6 +52,44 @@ describe("claudeCommand", () => {
 			"/tmp/m.json",
 		]);
 	});
+
+	test("asks for the thinking only when told to", () => {
+		expect(claudeCommand("claude", undefined, false, undefined, true)).toBe(
+			"claude --thinking-display summarized",
+		);
+		expect(claudeCommand("claude", undefined, false, undefined, false)).toBe(
+			"claude",
+		);
+	});
+});
+
+describe("claudeCodeHarness thinking and subagent text", () => {
+	async function firstRun(version: string) {
+		const claudeLog = join(dir, "claude.jsonl");
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_LOG: claudeLog,
+			FAKE_CLAUDE_VERSION: version,
+		});
+		for await (const _ of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input())) {
+			// Drain the session.
+		}
+		return JSON.parse((await readFile(claudeLog, "utf8")).trim());
+	}
+
+	test("a Claude Code that knows the flag shows its thinking", async () => {
+		const run = await firstRun("2.1.314 (Claude Code)");
+		const argv: string[] = run.argv;
+		expect(argv[argv.indexOf("--thinking-display") + 1]).toBe("summarized");
+		expect(run.forwardSubagentText).toBe("1");
+	});
+
+	test("an older Claude Code runs without the flag", async () => {
+		const run = await firstRun("2.1.93 (Claude Code)");
+		expect(run.argv).not.toContain("--thinking-display");
+		expect(run.forwardSubagentText).toBe("1");
+	});
 });
 
 describe("claudeMcpConfig", () => {

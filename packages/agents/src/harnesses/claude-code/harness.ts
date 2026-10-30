@@ -3,7 +3,8 @@
  * `@tanstack/ai-claude-code` on the shared harness session
  * (`session/adapter-session.ts`). This file holds what is Claude Code's own: the
  * effort env for models the adapter does not know, the `--allowedTools`
- * rules for CLI tools and MCP servers, and the `--mcp-config` temp file.
+ * rules for CLI tools and MCP servers, the `--mcp-config` temp file, and the
+ * flag and env that bring out its thinking and its subagents' text.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,6 +25,7 @@ import {
 } from "../../session";
 import { harnessFacts } from "../facts";
 import { CLAUDE_CODE_PROFILE } from "./profile";
+import { claudeKnowsThinkingDisplay } from "./version";
 
 /** How a `claude` process is started. Shared by the harness and the decider. */
 export type ClaudeCodeProcessOptions = {
@@ -79,15 +81,21 @@ const KNOWN_REASONING_MODELS = new Set([
  * `mcpConfigPath` adds the session's own MCP servers with `--mcp-config`.
  * The adapter passes its bridge with a second `--mcp-config`; the flag is
  * variadic, and Claude Code loads the servers of both.
+ *
+ * `showThinking` asks for the thinking as summaries: `claude -p` sends it
+ * empty without the flag. Only Claude Code 2.1.94 and later know it (see
+ * `version.ts`).
  */
 export function claudeCommand(
 	executable: string | undefined,
 	mcpConfigPath?: string,
 	strictMcp = false,
 	maxBudgetUsd?: number,
+	showThinking = false,
 ): string {
 	return [
 		executable ?? "claude",
+		...(showThinking ? ["--thinking-display", "summarized"] : []),
 		...(mcpConfigPath !== undefined ? ["--mcp-config", mcpConfigPath] : []),
 		// Only the servers of `--mcp-config` load: the session's and the bridge.
 		...(strictMcp ? ["--strict-mcp-config"] : []),
@@ -228,6 +236,8 @@ async function claudeCodeAdapter(
 	report: SessionReport,
 ): Promise<AdapterSetup> {
 	const { claudeCodeText } = await import("@tanstack/ai-claude-code");
+	const executable = options.claudeExecutable ?? "claude";
+	const showThinking = await claudeKnowsThinkingDisplay(executable);
 	const mcp = await writeMcpConfig(input.mcpServers);
 	const allowedTools = claudeAllowedTools(input, report.allowedTools);
 	const disallowedTools = claudeDisallowedTools(input, options.disallowedTools);
@@ -244,10 +254,11 @@ async function claudeCodeAdapter(
 		...(allowedTools ? { allowedTools } : {}),
 		...(disallowedTools ? { disallowedTools } : {}),
 		claudeExecutable: claudeCommand(
-			options.claudeExecutable,
+			executable,
 			mcp.path,
 			input.readOnly === true,
 			input.maxBudgetUsd,
+			showThinking,
 		),
 		// The adapter passes it as `--max-turns`; Claude Code ends with
 		// `error_max_turns` (`limit: "turns"`).
@@ -256,6 +267,9 @@ async function claudeCodeAdapter(
 			...effortEnv(input.model, input.effort, (model) =>
 				KNOWN_REASONING_MODELS.has(model),
 			),
+			// A subagent's text and thinking reach the stream too (Claude Code
+			// 2.1.211 and later; older ones ignore it). The profile reads them.
+			CLAUDE_CODE_FORWARD_SUBAGENT_TEXT: "1",
 			...options.env,
 		},
 	});

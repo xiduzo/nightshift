@@ -1,9 +1,12 @@
 /**
  * A fake `claude` for tests. Never talks to Anthropic.
  *
- * It appends `{ argv, prompt, tools, mcpConfigs }` as one JSON line to
- * `$FAKE_CLAUDE_LOG` (`tools`: the bridge's `tools/list`, when there is a
- * bridge; `mcpConfigs`: every `--mcp-config` file, parsed), then
+ * `--version` prints `$FAKE_CLAUDE_VERSION` (default `2.1.314 (Claude Code)`)
+ * and nothing else. Any other call appends
+ * `{ argv, prompt, tools, mcpConfigs, forwardSubagentText }` as one JSON
+ * line to `$FAKE_CLAUDE_LOG` (`tools`: the bridge's `tools/list`, when there
+ * is a bridge; `mcpConfigs`: every `--mcp-config` file, parsed;
+ * `forwardSubagentText`: `$CLAUDE_CODE_FORWARD_SUBAGENT_TEXT`), then
  * prints a stream-json session: an init message; each message of the JSON
  * array `$FAKE_CLAUDE_MESSAGES` as it is; for each entry of the JSON
  * array `$FAKE_CLAUDE_CALLS`, a call of that bridged tool over the real MCP
@@ -18,6 +21,12 @@ import { appendFileSync, readFileSync } from "node:fs";
 type Call = { name: string; arguments: unknown };
 
 const argv = process.argv.slice(2);
+if (argv.includes("--version")) {
+	process.stdout.write(
+		`${process.env.FAKE_CLAUDE_VERSION ?? "2.1.314 (Claude Code)"}\n`,
+	);
+	process.exit(0);
+}
 const prompt = await Bun.stdin.text();
 
 const sessionId = "fake-claude-session";
@@ -100,7 +109,14 @@ const log = process.env.FAKE_CLAUDE_LOG;
 if (log) {
 	appendFileSync(
 		log,
-		`${JSON.stringify({ argv, prompt, tools, mcpConfigs: configs })}\n`,
+		`${JSON.stringify({
+			argv,
+			prompt,
+			tools,
+			mcpConfigs: configs,
+			forwardSubagentText:
+				process.env.CLAUDE_CODE_FORWARD_SUBAGENT_TEXT ?? null,
+		})}\n`,
 	);
 }
 

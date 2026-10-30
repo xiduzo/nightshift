@@ -112,6 +112,14 @@ describe("the Claude Code subagent reader", () => {
 			}),
 		).toEqual([]);
 		expect(read({ type: "result", subtype: "success" })).toEqual([]);
+		// The subagent's prompt, forwarded as a user message, is the call's input.
+		expect(
+			read({
+				type: "user",
+				parent_tool_use_id: "task-1",
+				message: { role: "user", content: [{ type: "text", text: "Do x." }] },
+			}),
+		).toEqual([]);
 	});
 });
 
