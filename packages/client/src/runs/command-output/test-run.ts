@@ -6,7 +6,7 @@
  */
 
 import { plainLines } from "./plain-lines";
-import type { TestRun } from "./test-run-builder";
+import type { TestCounts, TestRun } from "./test-run-builder";
 import { parseBun, parseJest, parseVitest } from "./test-run-js";
 import { parseGradle, parseMaven } from "./test-run-jvm";
 import { parseCargo, parseGo } from "./test-run-native";
@@ -50,4 +50,14 @@ export function parseTestRun(output: string): TestRun | null {
 		if (run) return run;
 	}
 	return null;
+}
+
+/** "2 failed, 10 passed, 1 skipped", without the zeros; "No tests ran" when all are. */
+export function testCountsText(counts: TestCounts): string {
+	const parts = [
+		counts.failed > 0 ? `${counts.failed} failed` : "",
+		counts.passed > 0 ? `${counts.passed} passed` : "",
+		counts.skipped > 0 ? `${counts.skipped} skipped` : "",
+	].filter(Boolean);
+	return parts.length > 0 ? parts.join(", ") : "No tests ran";
 }

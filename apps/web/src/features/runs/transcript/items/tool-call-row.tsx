@@ -31,7 +31,10 @@ import {
 	PREVIEW_CHARS,
 	PREVIEW_LINES,
 } from "./output-sheet";
+import { useStackTrace } from "./parsed-output";
+import { StackTraceView } from "./stack-trace";
 import { Terminal, type TerminalState } from "./terminal";
+import { OutputViews } from "./terminal-output";
 
 /** A recognisable icon for each kind of tool. */
 const KIND_ICON: Record<ToolKind, LucideIcon> = {
@@ -187,7 +190,11 @@ function ToolLine({
 									: "No result."}
 							</p>
 						) : (
-							<ToolResult content={item.result} title={known ? target : name} />
+							<ToolResult
+								content={item.result}
+								title={known ? target : name}
+								failed={state.kind === "failed"}
+							/>
 						)}
 					</section>
 				</TraceCollapsibleContent>
@@ -196,8 +203,20 @@ function ToolLine({
 	);
 }
 
-/** A call's result: its start in the transcript, and all of it in a sheet when it is long. */
-function ToolResult({ content, title }: { content: string; title: string }) {
+/**
+ * A call's result: its start in the transcript, and all of it in a sheet
+ * when it is long. A failed call with a stack trace shows that error first.
+ */
+function ToolResult({
+	content,
+	title,
+	failed,
+}: {
+	content: string;
+	title: string;
+	failed: boolean;
+}) {
+	const trace = useStackTrace(failed ? content : undefined);
 	if (content.trim() === "") {
 		return <p>Empty.</p>;
 	}
@@ -208,12 +227,19 @@ function ToolResult({ content, title }: { content: string; title: string }) {
 				PREVIEW_CHARS,
 			)
 		: content;
-	return (
+	const plain = (
 		<div className="flex flex-col items-start gap-1">
 			<CodeView code={shown} language="text" className="w-full" />
 			{long ? (
 				<OutputSheet title={title} content={content} language="text" />
 			) : null}
 		</div>
+	);
+	return trace ? (
+		<OutputViews read="Error" plain={plain}>
+			<StackTraceView trace={trace} />
+		</OutputViews>
+	) : (
+		plain
 	);
 }

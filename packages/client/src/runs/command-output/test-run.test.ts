@@ -25,7 +25,21 @@ import {
 	PYTEST_RUN,
 	PYTEST_VERBOSE,
 } from "./fixtures/other-runs";
-import { parseTestRun, type TestRun } from "./test-run";
+import { parseTestRun, type TestRun, testCountsText } from "./test-run";
+
+describe("the counts in words", () => {
+	test("failed first, without the zeros", () => {
+		expect(testCountsText({ passed: 10, failed: 2, skipped: 1 })).toBe(
+			"2 failed, 10 passed, 1 skipped",
+		);
+		expect(testCountsText({ passed: 12, failed: 0, skipped: 0 })).toBe(
+			"12 passed",
+		);
+		expect(testCountsText({ passed: 0, failed: 0, skipped: 0 })).toBe(
+			"No tests ran",
+		);
+	});
+});
 
 /** The run, failing the test when the output did not parse. */
 function parsed(output: string): TestRun {

@@ -9,6 +9,18 @@ export {
 	fileTree,
 } from "./changed-files";
 export {
+	parseStackTrace,
+	type StackFrame,
+	type StackTrace,
+} from "./command-output/stack-trace";
+export {
+	parseTestRun,
+	type TestCase,
+	type TestRun,
+	type TestSuite,
+	testCountsText,
+} from "./command-output/test-run";
+export {
 	agoLabel,
 	costLabel,
 	flowLabel,
