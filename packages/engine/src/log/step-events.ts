@@ -126,6 +126,35 @@ export type ToolEvent =
 			data: JsonValue | null;
 	  };
 
+/**
+ * One file a step changed in the run's worktree, as git sees it between two
+ * snapshots: the path from the worktree's top, the lines added and removed,
+ * and the diff's hunks (from the first `@@`). A binary file, a lockfile and
+ * a diff past the limits keep their counts only; `truncated` marks a diff
+ * that is cut short or left out.
+ */
+export type WorktreeFileChange = {
+	path: string;
+	/** Where a renamed file was. */
+	oldPath?: string;
+	status: "added" | "modified" | "deleted" | "renamed";
+	added: number;
+	removed: number;
+	binary?: true;
+	patch?: string;
+	truncated?: true;
+};
+
+/** What changed in a worktree since a snapshot (`Device.worktreeChanges`). */
+export type WorktreeChanges = {
+	/** The snapshot of the worktree now. */
+	tree: string;
+	/** By path. At most the step's limit of files. */
+	files: WorktreeFileChange[];
+	/** How many more files changed than `files` lists. */
+	omitted?: number;
+};
+
 export type StepEvent =
 	| AgentEvent
 	| CommandEvent

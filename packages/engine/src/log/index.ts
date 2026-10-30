@@ -61,7 +61,12 @@ export {
 	spaceOfRun,
 	stepIdsOfRun,
 } from "./run-row";
-export type { StepEvent, TranscriptEntry } from "./step-events";
+export type {
+	StepEvent,
+	TranscriptEntry,
+	WorktreeChanges,
+	WorktreeFileChange,
+} from "./step-events";
 export {
 	commandLogPath,
 	lastEntryAt,

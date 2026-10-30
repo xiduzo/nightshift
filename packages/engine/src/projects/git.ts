@@ -15,6 +15,8 @@ export type GitResult = {
 	stderr: string;
 	/** The command ran past its `timeoutMs` and was stopped. */
 	timedOut?: boolean;
+	/** The output reached `maxOutputBytes`: `stdout` ends there, and the command was stopped. */
+	cut?: boolean;
 };
 
 /** How to run one git command. */
@@ -23,6 +25,8 @@ export type GitRunOptions = {
 	env?: Record<string, string>;
 	/** Stops the command after this many milliseconds. Default: no limit. */
 	timeoutMs?: number;
+	/** Keeps at most this many bytes of the output, then stops the command. Default: no limit. */
+	maxOutputBytes?: number;
 };
 
 /**
@@ -128,6 +132,8 @@ async function runGit(
 /**
  * Runs a program (an argv array, never a shell) in `cwd` and gives back its
  * output. `timeoutMs` stops it, and then `timedOut` is true.
+ * `maxOutputBytes` stops it once its output reaches that size, and then
+ * `cut` is true.
  */
 export async function runProcess(
 	argv: string[],
@@ -142,18 +148,50 @@ export async function runProcess(
 		stderr: "pipe",
 		...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
 	});
-	const [stdout, stderr, exitCode] = await Promise.all([
-		new Response(proc.stdout).text(),
+	const [out, stderr, exitCode] = await Promise.all([
+		readUpTo(proc.stdout, options.maxOutputBytes, () => proc.kill()),
 		new Response(proc.stderr).text(),
 		proc.exited,
 	]);
-	const timedOut = Boolean(options.timeoutMs) && proc.signalCode !== null;
+	const timedOut =
+		Boolean(options.timeoutMs) && proc.signalCode !== null && !out.cut;
 	return {
 		exitCode,
-		stdout: stdout.trim(),
+		stdout: out.text.trim(),
 		stderr: stderr.trim(),
 		...(timedOut ? { timedOut: true } : {}),
+		...(out.cut ? { cut: true } : {}),
 	};
+}
+
+/** A stream as text, up to `max` bytes; `stop` runs once when it reaches them. */
+async function readUpTo(
+	stream: ReadableStream<Uint8Array>,
+	max: number | undefined,
+	stop: () => void,
+): Promise<{ text: string; cut: boolean }> {
+	if (max === undefined) {
+		return { text: await new Response(stream).text(), cut: false };
+	}
+	const reader = stream.getReader();
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		if (size + value.length > max) {
+			chunks.push(value.subarray(0, max - size));
+			stop();
+			await reader.cancel().catch(() => {});
+			return {
+				text: new TextDecoder().decode(Buffer.concat(chunks)),
+				cut: true,
+			};
+		}
+		chunks.push(value);
+		size += value.length;
+	}
+	return { text: new TextDecoder().decode(Buffer.concat(chunks)), cut: false };
 }
 
 /** The pauses between the tries of `git --version` in the probe. Null: the last try. */
