@@ -7,4 +7,5 @@ export {
 	kitFlow,
 	kitList,
 	knowledgeKitsOf,
+	REVIEW_LEARNINGS_KIT,
 } from "./kits";

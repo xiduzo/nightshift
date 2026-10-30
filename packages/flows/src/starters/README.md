@@ -10,10 +10,11 @@ Small, self-contained flows that ship with Night Shift, to change in a project. 
 | `review-pr` | `pr` (number or URL) | An agent with the CLI tool `gh` reviews the pull request: `approve` or `request-changes`, a summary, and comments per line. A Gate asks you before `gh pr review` posts it. |
 | `per-file` | `glob` (default `src/**/*.ts`), `instruction` | Runs `edit-file` once per file that matches the glob, all on one branch, then commits once. |
 | `edit-file` | `item` (a file), `instruction` | The body of `per-file`: one agent applies the instruction to `{{item.path}}` and does not commit. |
+| `review-learnings` | none | A Gate shows what agents proposed to learn about the project. What you keep goes into its [knowledge](../../../../docs/knowledge.md), and agents read it in later runs. |
 
 ## Use them
 
-1. Add the project in Night Shift. Leave "Add the starter flows" checked: Night Shift saves all six into the project. A flow the project has already keeps its own version.
+1. Add the project in Night Shift. Leave "Add the starter flows" checked: Night Shift saves all seven into the project. A flow the project has already keeps its own version.
 2. To add them later, choose Import in the project's flow list for each file in this folder's `flows/`, or run `nightshift flows import <file>` for each one in the project's folder. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`.
 3. Open a flow in the editor, and change the prompts, models, and `check` to fit the project.
 4. Start a run: the start dialog asks for the flow's inputs.

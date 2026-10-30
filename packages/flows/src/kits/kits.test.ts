@@ -746,3 +746,53 @@ describe("the knowledge kits", () => {
 		]);
 	});
 });
+
+describe("kit:knowledge/review-learnings", () => {
+	const flow = () => kit("kit:knowledge/review-learnings");
+	const proposed = () => join(knowledge, "learnings", "proposed");
+
+	test("nothing proposed: nothing to review", async () => {
+		const ran = await step(flow(), "list", {});
+		expect(ran.outcome).toBe("none");
+	});
+
+	test("lists the proposals as text, then keeps only those it showed", async () => {
+		await mkdir(proposed(), { recursive: true });
+		await writeFile(
+			join(proposed(), "run-1.md"),
+			'# Learnings of run run-1\n\n- Use "bun test", not npm.\n- Paths use \\ on Windows.\n',
+		);
+		const listed = await step(flow(), "list", {});
+		expect(listed.outcome).toBe("review");
+		expect(listed.data).toEqual({
+			files: " run-1.md",
+			text: '# Learnings of run run-1\n\n- Use "bun test", not npm.\n- Paths use \\ on Windows.\n',
+		});
+		// A proposal that came in while the Gate waited stays.
+		await writeFile(join(proposed(), "run-2.md"), "- Later.\n");
+		const kept = await step(
+			flow(),
+			"keep",
+			{},
+			{ list: { data: listed.data } },
+		);
+		expect(kept.outcome).toBe("pass");
+		expect(
+			await readFile(join(knowledge, "learnings/accepted/run-1.md"), "utf8"),
+		).toContain("- Use");
+		await expect(readFile(join(proposed(), "run-1.md"))).rejects.toThrow();
+		expect(await readFile(join(proposed(), "run-2.md"), "utf8")).toBe(
+			"- Later.\n",
+		);
+
+		const again = await step(flow(), "list", {});
+		const deleted = await step(
+			flow(),
+			"delete",
+			{},
+			{ list: { data: again.data } },
+		);
+		expect(deleted.outcome).toBe("pass");
+		await expect(readFile(join(proposed(), "run-2.md"))).rejects.toThrow();
+	});
+});

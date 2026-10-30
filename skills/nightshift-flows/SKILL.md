@@ -190,6 +190,7 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. 
 - `kit:knowledge/files` (from*, folder) → files: Copies files of the project into its knowledge, also files that git ignores, such as private notes.
 - `kit:knowledge/github-wiki` (repo*, folder) → files: Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync.
 - `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
+- `kit:knowledge/review-learnings` (): Shows what agents proposed to learn about the project, and asks you to keep or delete it.
 - `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.
 
 A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`.

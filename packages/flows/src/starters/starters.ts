@@ -3,6 +3,7 @@ import editFile from "./flows/edit-file.json";
 import implementAndCheck from "./flows/implement-and-check.json";
 import perFile from "./flows/per-file.json";
 import planAndBuild from "./flows/plan-and-build.json";
+import reviewLearnings from "./flows/review-learnings.json";
 import reviewPr from "./flows/review-pr.json";
 
 /**
@@ -22,6 +23,7 @@ const STARTERS: readonly Starter[] = [
 	{ name: "plan-and-build", source: planAndBuild },
 	{ name: "review-pr", source: reviewPr },
 	{ name: "edit-file", source: editFile },
+	{ name: "review-learnings", source: reviewLearnings },
 	{ name: "per-file", source: perFile },
 ];
 

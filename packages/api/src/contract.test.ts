@@ -578,7 +578,7 @@ describe("replies of a real engine", () => {
 			projectId: project.id,
 		})) as { name: string }[];
 		expect(flows.map((flow) => flow.name)).toContain("implement-and-check");
-		expect(flows).toHaveLength(6);
+		expect(flows).toHaveLength(7);
 		expect(mismatches).toEqual([]);
 	});
 });

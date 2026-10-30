@@ -118,7 +118,7 @@ bun run dev            # web UI on :3001, API on :3000, with hot reload
 
 No `.env` file is needed to start: outside production, Night Shift makes its own auth secret once and says so in its log. Then, in the web UI at http://localhost:3001:
 
-1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked: the six [starter flows](packages/flows/src/starters/) arrive in the project. Night Shift keeps flows itself, so nothing is written into your repository.
+1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked: the seven [starter flows](packages/flows/src/starters/) arrive in the project. Night Shift keeps flows itself, so nothing is written into your repository.
 2. **Set up your agents.** The Agents page shows the agent CLIs and tools it finds on this computer (`claude`, `codex`, `opencode`, `pi`, `gh`, `acli`). Choose Add profile or Add tool for each one you want.
 3. **Run a starter.** Open `implement-and-check`, set the check to your project's test command, and start a run with a small task.
 
@@ -143,7 +143,7 @@ No `.env` file is needed to start: outside production, Night Shift makes its own
 | `per-file` | Applies one instruction to every file that matches a glob. |
 | `edit-file` | Edits one file of `per-file`. |
 
-Night Shift saves all six into a project when you add it. A flow that calls another flow needs that flow in the project too. Details are in [packages/flows/src/starters/](packages/flows/src/starters/).
+Night Shift saves all seven into a project when you add it. A flow that calls another flow needs that flow in the project too. Details are in [packages/flows/src/starters/](packages/flows/src/starters/).
 
 ### Drive Night Shift from a terminal or an agent
 

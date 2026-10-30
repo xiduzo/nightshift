@@ -10,6 +10,7 @@ import { knowledgeConfluenceKit } from "./knowledge/confluence";
 import { knowledgeFilesKit } from "./knowledge/files";
 import { knowledgeGithubWikiKit } from "./knowledge/github-wiki";
 import { knowledgeJiraKit } from "./knowledge/jira";
+import { knowledgeReviewLearningsKit } from "./knowledge/review-learnings";
 import { knowledgeWebKit } from "./knowledge/web";
 
 /**
@@ -37,6 +38,7 @@ const SOURCES: Readonly<Record<string, FlowInput>> = {
 	"kit:knowledge/files": knowledgeFilesKit,
 	"kit:knowledge/github-wiki": knowledgeGithubWikiKit,
 	"kit:knowledge/jira": knowledgeJiraKit,
+	"kit:knowledge/review-learnings": knowledgeReviewLearningsKit,
 	"kit:knowledge/web": knowledgeWebKit,
 };
 
@@ -86,9 +88,13 @@ export function kitCopyName(name: string): string | null {
 /** What the knowledge kits' names start with. */
 const KNOWLEDGE_KITS = `${KIT_PREFIX}knowledge/`;
 
+/** The kit that asks a person about the learnings agents proposed. */
+export const REVIEW_LEARNINGS_KIT = `${KNOWLEDGE_KITS}review-learnings`;
+
 /**
  * The knowledge kits a flow calls, by name, sorted: a flow with one fills
- * the project's knowledge, and the Knowledge page offers to run it.
+ * the project's knowledge (or reviews its learnings,
+ * `REVIEW_LEARNINGS_KIT`), and the Knowledge page offers to run it.
  */
 export function knowledgeKitsOf(flow: Flow): string[] {
 	const names = new Set<string>();

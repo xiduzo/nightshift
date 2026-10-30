@@ -41,6 +41,7 @@ describe("kits", () => {
 			"kit:knowledge/files",
 			"kit:knowledge/github-wiki",
 			"kit:knowledge/jira",
+			"kit:knowledge/review-learnings",
 			"kit:knowledge/web",
 		]);
 		for (const kit of kits) {

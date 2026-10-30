@@ -1,0 +1,21 @@
+{
+	"version": 6,
+	"description": "Asks you about what agents proposed to learn about the project. What you keep goes into its knowledge, and agents read it in later runs. Schedule it, or run it from the Knowledge page.",
+	"inputs": [],
+	"outputs": [],
+	"start": "review",
+	"nodes": [
+		{
+			"id": "review",
+			"label": "Review the learnings",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "call",
+			"flow": "kit:knowledge/review-learnings",
+			"inputs": {}
+		}
+	],
+	"edges": []
+}
