@@ -12,10 +12,10 @@ import { EllipsisIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
- * The detail pane of a list-and-detail page (Agents, Devices): a header,
- * settings-style sections (what it is on the left, the fields on the
- * right), and a save bar that shows only while there are unsaved changes.
- * The pane scrolls on its own; the list beside it stays put.
+ * The detail of one thing (an Agents item, a device in the Devices sheet):
+ * a header, settings-style sections (what it is on the left, the fields on
+ * the right), and a save bar that shows only while there are unsaved
+ * changes.
  */
 export function DetailShell({
 	icon,

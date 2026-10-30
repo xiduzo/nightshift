@@ -106,6 +106,17 @@ What you set up once reads like the Settings page:
 - What this computer has but does not use yet sits at the end of the list it joins, as a dashed row with one action ("Add profile", "Add tool"). Not in a banner on top.
 - Secrets have their own page in the main menu: Command nodes use them too, not only agents.
 
+### Devices
+
+The Devices page shows the Space you work in, around its Host:
+
+- The Space's name as the heading. "Pair a device" sits on the right, only where this computer keeps the Space as its Host.
+- One "Next step" card on top: the first step left to make the Space work across devices. In your personal Space: Be a Host, another computer, your phone. In a shared Space: invite a member, offer a profile, your phone. "Not now" moves on to the next step. The card goes once every step is done.
+- The Host as a card, with your phones on it as chips. A Host this computer cannot reach turns the card red and says since when, with "Check the connection".
+- The computers as a grid of cards: status, up to two runs on their way, then "and N more", and how many projects and Offers each has. A card has at most one action of its own ("Be a Host", "Offer a profile", "Pair again").
+- A pick opens its detail in a Sheet over the page (`?device=`), so the page stays in view.
+- While it loads, a skeleton in the shape of the page. An error says what to check and has "Try again".
+
 ### Details dialogs
 
 A stat card or a table row can open a details dialog (`apps/web/src/features/dashboard/details.tsx`). Flow health set the shape. Every details dialog follows it:

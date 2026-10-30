@@ -1,9 +1,10 @@
 import { Badge } from "@nightshift/ui/components/badge";
+import { cn } from "@nightshift/ui/lib/utils";
 import type { LinkedHost } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import type { SpaceComputer } from "./space-view";
 
-const ONLINE =
+export const ONLINE =
 	"border-status-finished/40 bg-status-finished/10 text-status-finished";
 
 /** Online, Offline or Access removed. Nothing when this computer cannot tell. */
@@ -53,4 +54,26 @@ export function HostStatus({ status }: { status: LinkedHost["status"] }) {
 				</Badge>
 			);
 	}
+}
+
+/** A green dot for online, grey for offline, an open ring when this computer cannot tell. */
+export function OnlineDot({
+	online,
+	className,
+}: {
+	online: boolean | null;
+	className?: string;
+}) {
+	return (
+		<span
+			aria-hidden
+			className={cn(
+				"inline-block size-2 shrink-0 rounded-full",
+				online === true && "bg-status-finished",
+				online === false && "bg-muted-foreground/40",
+				online === null && "ring-1 ring-muted-foreground/40",
+				className,
+			)}
+		/>
+	);
 }

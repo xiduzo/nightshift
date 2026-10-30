@@ -16,10 +16,9 @@ import {
 } from "lucide-react";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
-import { OnlineDot } from "./devices-list";
 import { LeaveHostButton } from "./leave-host";
 import type { SpaceHost } from "./space-view";
-import { HostStatus } from "./status-badges";
+import { HostStatus, OnlineDot } from "./status-badges";
 
 /**
  * The Host that keeps the Space: what it does for the Space, and how this
