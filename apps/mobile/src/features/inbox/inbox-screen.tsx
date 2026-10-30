@@ -18,6 +18,7 @@ import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { DigestCard } from "./digest-card";
 import { GateRow } from "./gate-row";
 import { setInboxView, useInboxView } from "./inbox-filter";
 import {
@@ -31,8 +32,8 @@ import {
 import { useInbox } from "./use-inbox";
 
 /**
- * The Inbox tab: the open Gates of every Space you are in, grouped by
- * project, oldest first. Chips choose a project or Space and the order.
+ * The Inbox tab: your last morning digest, then the open Gates of every
+ * Space you are in, grouped by project, oldest first. Chips choose a project or Space and the order.
  * `/inbox?project=<id>` opens it on one project.
  */
 export function InboxScreen() {
@@ -50,6 +51,7 @@ export function InboxScreen() {
 				summary={gates ? inboxSummary(gates) : undefined}
 				actions={<HeaderButton icon={Search} label="Search" href="/search" />}
 			/>
+			<DigestCard now={now} />
 			{gates && gates.length > 0 ? (
 				<FilterChips gates={gates} view={view} />
 			) : null}
