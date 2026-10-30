@@ -245,12 +245,12 @@ describe("the scheduled cleanup", () => {
 			(c) => c.runId === pushed.id,
 		);
 		expect(copy?.safe).toBe(true);
-		expect(copy?.cleanupAt).toBeGreaterThan(Date.now() + 13 * DAY_MS);
+		expect(copy?.cleanupAt).toBeGreaterThan(Date.now() + 89 * DAY_MS);
 		for (const daemon of daemons) daemon.abort();
 
-		// A restart 15 days later: the first sweep comes once the engine is ready.
+		// A restart 91 days later: the first sweep comes once the engine is ready.
 		const later = startDaemon({
-			now: () => Date.now() + 15 * DAY_MS,
+			now: () => Date.now() + 91 * DAY_MS,
 			cleanupDelayMs: 0,
 		});
 		await waitFor(async () => (await removals()).length === 2, {
@@ -299,9 +299,9 @@ describe("the scheduled cleanup", () => {
 		const run = await runCommand(engine, project.id, "true");
 		for (const daemon of daemons) daemon.abort();
 
-		startDaemon({ now: () => Date.now() + 13 * DAY_MS, cleanupDelayMs: 0 });
+		startDaemon({ now: () => Date.now() + 89 * DAY_MS, cleanupDelayMs: 0 });
 		startDaemon(
-			{ now: () => Date.now() + 30 * DAY_MS, cleanupDelayMs: 0 },
+			{ now: () => Date.now() + 120 * DAY_MS, cleanupDelayMs: 0 },
 			{ ...defaultRunSettings(), cleanUpRuns: false },
 		);
 		await Bun.sleep(500);
