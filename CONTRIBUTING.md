@@ -1,6 +1,6 @@
 # Contributing to Night Shift
 
-Thank you for your interest. Night Shift is pre-alpha and built for its author first, so read this before you start work.
+Thank you for your interest. Night Shift is pre-alpha and built for its author first. Read this before you start work.
 
 ## Before you start
 
@@ -8,7 +8,7 @@ Thank you for your interest. Night Shift is pre-alpha and built for its author f
 - **Read the plan.** [docs/PLAN.md](docs/PLAN.md) holds the settled decisions. To change one, propose it in an issue.
 - **Use the product words** from [docs/glossary.md](docs/glossary.md): flow, run, step, node, gate, and so on. One name for one thing.
 
-## Set up
+## Install and start
 
 ```bash
 bun install
@@ -18,7 +18,7 @@ bun run dev:mobile     # the phone app, in Expo
 bun run dev:desktop    # the desktop app
 ```
 
-`bun run dev` keeps its data in `.nightshift-dev/`, apart from the Night Shift you use for real work. If you also run real nights from this checkout, work on Night Shift in a separate git worktree. A code change then never reloads a run in the middle of the night.
+`bun run dev` keeps its data in `.nightshift-dev/`, apart from the Night Shift you use for real work. If you also run real nights from this checkout, change Night Shift in a separate git worktree. A code change then never reloads a run in the middle of the night.
 
 ## Check your change
 
@@ -44,7 +44,7 @@ Durable docs use plain, short sentences in the active voice (ASD-STE100 style).
 ## Pull requests
 
 - Keep one change per pull request. When work builds in layers, open a stack of small pull requests with [`gh stack`](https://github.com/github/gh-stack).
-- Fill in the pull request template: why the change exists, what changed, and how you tested it.
+- Complete the pull request template: why the change exists, what changed, and how you tested it.
 - Use [Conventional Commits](https://www.conventionalcommits.org): `feat(web): …`, `fix(engine): …`, `docs: …`.
 
 By contributing, you agree that your work is licensed under the [Apache-2.0 license](LICENSE).

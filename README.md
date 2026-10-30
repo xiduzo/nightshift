@@ -24,14 +24,14 @@ You wake up to a stack of pull requests and a short list of decisions that need 
 
 ## Why
 
-If you work with coding agents, you probably run the same pipeline again and again: build, check, retry, rescue, open a pull request, review. Most of the time that pipeline is a script. Nobody can see it, and every change to it is a code change.
+If you work with coding agents, you run the same pipeline again and again: build, check, retry, rescue, open a pull request, review. Most of the time that pipeline is a script. Nobody can see it, and every change to it is a code change.
 
-Night Shift turns the pipeline into a flow that you draw. The engine owns the order, the retries, the loop limits, and the stop time. Agents do the work. You step in only at a gate.
+Night Shift turns the pipeline into a flow that you draw. The engine owns the order, the retries, the loop limits, and the stop time. Agents do the work. You answer only at a gate.
 
 - **Local first.** Every session, branch, and token stays on your own computers. Agents run with your own CLI logins.
 - **The engine decides, the model advises.** A model never adds a node or changes the graph. Every loop has a maximum count.
-- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a revision: you see who changed what, and you can restore an earlier one ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
-- **No built-in method.** Spec-driven, issue-driven, or one file at a time: each method is just another flow.
+- **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a revision. You see who changed what, and you can restore an earlier one ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
+- **No built-in method.** Spec-driven, issue-driven, or one file at a time: each method is another flow.
 
 ## How it works
 
@@ -55,10 +55,10 @@ Steps are nodes. Each node type does one job:
 
 | Node | Does |
 | --- | --- |
-| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and go on with your answer. |
+| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue with your answer. |
 | **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. `$NS_KNOWLEDGE` is the project's [knowledge](docs/knowledge.md) folder. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
-| **Decision** | Picks one of its options. Who picks is up to you: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. |
+| **Decision** | Picks one of its options. You choose who picks: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. |
 | **Value** | Makes data that matches a JSON schema, from a rule or a model. |
 | **Wait** | Waits for a duration, a time, a command that passes, or a signal, for example from a webhook. |
 | **Subflow** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
@@ -116,10 +116,12 @@ bun install
 bun run dev            # web UI on :3001, API on :3000, with hot reload
 ```
 
-No `.env` file is needed to start: outside production, Night Shift makes its own auth secret once and says so in its log. Then, in the web UI at http://localhost:3001:
+You need no `.env` file to start. Outside production, Night Shift makes its own auth secret once and says so in its log.
 
-1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked: the seven [starter flows](packages/flows/src/starters/) arrive in the project. Night Shift keeps flows itself, so nothing is written into your repository.
-2. **Set up your agents.** The Agents page shows the agent CLIs and tools it finds on this computer (`claude`, `codex`, `opencode`, `pi`, `gh`, `acli`). Choose Add profile or Add tool for each one you want.
+Then, in the web UI at http://localhost:3001:
+
+1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked: the seven [starter flows](packages/flows/src/starters/) arrive in the project. Night Shift keeps the flows and writes nothing into your repository.
+2. **Add your agents.** The Agents page shows the agent CLIs and tools that Night Shift finds on this computer (`claude`, `codex`, `opencode`, `pi`, `gh`, `acli`). Choose Add profile or Add tool for each one you want.
 3. **Run a starter.** Open `implement-and-check`, set the check to your project's test command, and start a run with a small task.
 
 | Command | Use it to |
@@ -143,11 +145,11 @@ No `.env` file is needed to start: outside production, Night Shift makes its own
 | `per-file` | Applies one instruction to every file that matches a glob. |
 | `edit-file` | Edits one file of `per-file`. |
 
-Night Shift saves all seven into a project when you add it. A flow that calls another flow needs that flow in the project too. Details are in [packages/flows/src/starters/](packages/flows/src/starters/).
+Night Shift saves all seven into a project when you add it. A flow that calls another flow needs that flow in the project too. See [packages/flows/src/starters/](packages/flows/src/starters/).
 
 ### Drive Night Shift from a terminal or an agent
 
-A person or an agent in a terminal reads and saves flows through `nightshift`, never as files. Night Shift must run on this computer. Each save is a new revision of the flow, and Night Shift checks it.
+A person or an agent in a terminal reads and saves flows through `nightshift`, never as files. Night Shift must run on this computer. Night Shift checks each save and keeps it as a new revision of the flow.
 
 ```bash
 nightshift flows list                        # name, steps, errors, description
@@ -158,7 +160,7 @@ nightshift flows import fix-issue.json       # a new flow; a taken name gets a s
 nightshift flows revisions fix-issue         # who saved what, newest first
 ```
 
-The commands work in the project of the folder you run them in. `--project <id, name or folder>` picks another one.
+The commands use the project of the current folder. `--project <id, name or folder>` picks another one.
 
 `nightshift mcp` gives an agent (Claude Code, Codex, an orchestrator) the same flows, the runs of a night, and a project's knowledge as MCP tools. Add it to Claude Code with `claude mcp add nightshift -- nightshift mcp`.
 

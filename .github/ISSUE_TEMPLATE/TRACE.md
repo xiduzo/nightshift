@@ -12,7 +12,7 @@ assignees: ""
 
 ## Story
 
-<!-- 👤 Copied verbatim from the parent Feature. Do not re-derive it. Do not reword it. -->
+<!-- 👤 Copy it word for word from the parent Feature. Do not derive it again. Do not reword it. -->
 
 - As a **_, I want _** so that \_\_\_
 
@@ -61,7 +61,7 @@ Scenario:
 
 ## Contracts & Interfaces
 
-<!-- 👤 Tech Lead — These are the spec. Implementation must match these exactly. -->
+<!-- 👤 Tech Lead — These are the spec. The code must match them exactly. -->
 
 ### Request
 
@@ -77,7 +77,7 @@ Scenario:
 
 ### Events / Side Effects
 
-<!-- Describe any events emitted, webhooks triggered, or state changes. Write "None" when the Trace emits nothing. -->
+<!-- List the events it emits, the webhooks it triggers, and the state it changes. Write "None" when the Trace emits nothing. -->
 
 - None
 
@@ -102,7 +102,7 @@ Scenario:
 
 ## Observability
 
-<!-- How do we verify this works in production? -->
+<!-- How do we know that this works in production? -->
 
 - Logs:
 - Metrics:

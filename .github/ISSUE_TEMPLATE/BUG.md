@@ -17,11 +17,11 @@ assignees: ""
 
 ## Expected Behavior
 
-<!-- What does the spec (Gherkin / AC / contract) say should happen? -->
+<!-- What must happen, as the spec (Gherkin / AC / contract) says? -->
 
 ## Actual Behavior
 
-<!-- What is happening instead? -->
+<!-- What happens instead? -->
 
 ## Steps to Reproduce
 
@@ -33,7 +33,7 @@ assignees: ""
 
 ## Contracts Violated
 
-<!-- If this is an API/data bug, paste the relevant contract section from the Trace -->
+<!-- For an API or data bug, paste the contract section from the Trace. -->
 
 ```json
 {}
@@ -43,8 +43,8 @@ assignees: ""
 
 ## Suggested Fix
 
-<!-- Optional — leave blank if unknown -->
+<!-- Optional. Leave it empty if you do not know. -->
 
 ## Regression Risk
 
-## <!-- What else could break if we fix this? -->
+<!-- What else can break when we fix this? -->

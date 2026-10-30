@@ -1,14 +1,14 @@
 ## Summary
 
-<!-- Why does this change exist? Reference the Trace's story and the Feature goal it serves. -->
+<!-- Why does this change exist? Name the Trace's story and the Feature goal it serves. -->
 
 ## Changes
 
-<!-- Grouped logical summary of what changed — not a file list. -->
+<!-- What changed, grouped by topic. Not a file list. -->
 
 ## Test plan
 
-<!-- Checklist derived from the claimed scenario names. At minimum one item per observable behavior changed. -->
+<!-- One item for each claimed scenario. At least one item for each behavior that changed. -->
 
 - [ ] 
 

@@ -10,7 +10,7 @@ assignees: ""
 
 ## Stakeholders
 
-<!-- Who is involved and accountable -->
+<!-- Who takes part, and who is accountable. -->
 
 - Product Owner:
 - Lead Designer:
@@ -20,21 +20,21 @@ assignees: ""
 
 ## Bounded Context
 
-## <!-- Which domain context(s) does this initiative live in? If it spans multiple contexts, name each and describe the seam. -->
+<!-- Which domain contexts does this Epic belong to? If it spans more than one, name each and describe the seam. -->
 
 ---
 
 ## Context
 
-<!-- Why does this exist? What problem does it solve? Use domain language — no tech jargon. -->
+<!-- Why does this exist? What problem does it solve? Use domain words, not tech jargon. -->
 
 ## Goal
 
-<!-- What outcome are we driving toward? Be specific enough to know when we're done. -->
+<!-- What outcome do we want? Make it specific enough to know when we are done. -->
 
 ## Success Metrics
 
-<!-- How do we measure that we've achieved the goal? -->
+<!-- How do we measure that we reached the goal? -->
 
 - [ ]
 
@@ -42,18 +42,18 @@ assignees: ""
 
 ## Design Artifacts
 
-## <!-- Link Figma files, prototypes, or research documents -->
+<!-- Link Figma files, prototypes, or research documents. -->
 
 ## Out of Scope
 
-## <!-- Explicitly list what this epic does NOT cover -->
+<!-- List what this Epic does NOT cover. -->
 
 ## Risks
 
-- ***
+-
 
 ## Feature Breakdown
 
-<!-- Child features — link issues as they are created -->
+<!-- Child Features. Link each issue when you create it. -->
 
 - [ ]

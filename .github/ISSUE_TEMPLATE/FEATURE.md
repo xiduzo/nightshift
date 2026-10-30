@@ -54,7 +54,7 @@ Scenario: Edge case
 
 ## Edge Cases
 
-<!-- Explicitly name them here so Deepening Traces can claim scenarios that cover them. Use domain language. -->
+<!-- Name them here, so that Deepening Traces can claim scenarios that cover them. Use domain words. -->
 
 -
 
@@ -82,7 +82,7 @@ Scenario: Edge case
 
 ## Trace Plan
 
-<!-- Ordered checklist — the current aim, not a contract. Item 1 is the Skeleton. Every further story gets one Extension before its Deepenings. Each item names its Spine Position, its story, its Scenario Claim, and what it adds to the Spine. Link Trace issues as they are created. -->
+<!-- Ordered checklist — the current aim, not a contract. Item 1 is the Skeleton. Every further story gets one Extension before its Deepenings. Each item names its Spine Position, its story, its Scenario Claim, and what it adds to the Spine. Link each Trace issue when you create it. -->
 
 1. [ ] ☄️ Skeleton — [primary story]: [what it proves of the Spine] (claims: "[scenario name]")
 2. [ ] ☄️ Extension — [further story]: [what it adds to the Spine] (claims: "[scenario name]")
