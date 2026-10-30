@@ -1,4 +1,5 @@
 /** How far a run is, and what it cost, in its details. */
+import { metricsByNode, type NodeMetrics } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Table,
@@ -11,13 +12,10 @@ import {
 import { useMemo } from "react";
 import { InspectorSection } from "@/features/flows";
 import type { RunDetail, StepSummary } from "@/shared/api";
-import { type KnownCost, sumKnownCost } from "@/shared/format";
+import { formatDuration, formatTokens } from "@/shared/format";
 import { CostText } from "../cost-text";
 import { RunStatusBadge } from "../run-status-badge";
 import { Fact } from "./run-facts";
-
-/** The nodes that spent the most, at most this many. */
-const TOP_NODES = 5;
 
 /** How far the run got: its steps, its Gates, and the flows it called. */
 export function ProgressSection({
@@ -85,7 +83,7 @@ export function ProgressSection({
 	);
 }
 
-/** What the run cost, and the nodes that spent the most of it. */
+/** What the run cost and used, and per node: its visits, time, tokens, cost and Gate wait. */
 export function CostSection({
 	run,
 	steps,
@@ -93,36 +91,61 @@ export function CostSection({
 	run: RunDetail;
 	steps: StepSummary[];
 }) {
-	const byNode = useMemo(() => costByNode(steps), [steps]);
+	const nodes = useMemo(() => metricsByNode(steps), [steps]);
+	const tokens = run.metrics?.tokens;
+	const waited = nodes.some((node) => node.gateWaitMs > 0);
 	return (
-		<InspectorSection title="Cost">
-			<dl>
+		<InspectorSection title="Cost and time">
+			<dl className="grid grid-cols-2 gap-3">
 				<Fact label="Total">
 					<CostText cost={run} className="font-medium tabular-nums" />
 				</Fact>
+				{tokens && tokens.input + tokens.output > 0 ? (
+					<Fact label="Tokens">
+						<span
+							className="tabular-nums"
+							title={`${formatTokens(tokens.input)} in, ${formatTokens(tokens.output)} out`}
+						>
+							{formatTokens(tokens.input + tokens.output)}
+						</span>
+					</Fact>
+				) : null}
+				{run.metrics && run.metrics.agentMs > 0 ? (
+					<Fact label="Agents worked">
+						<span className="tabular-nums">
+							{formatDuration(run.metrics.agentMs)}
+						</span>
+					</Fact>
+				) : null}
+				{run.metrics?.prUrl ? (
+					<Fact label="Pull request">
+						<a
+							href={run.metrics.prUrl}
+							target="_blank"
+							rel="noreferrer"
+							className="truncate underline underline-offset-4"
+						>
+							{pullRequestName(run.metrics.prUrl)}
+						</a>
+					</Fact>
+				) : null}
 			</dl>
-			{byNode.length > 0 ? (
+			{nodes.length > 0 ? (
 				<Table className="text-xs">
 					<TableHeader>
 						<TableRow>
-							<TableHead>Most spent</TableHead>
-							<TableHead className="text-right">Steps</TableHead>
+							<TableHead>Node</TableHead>
+							<TableHead className="text-right">Time</TableHead>
+							<TableHead className="text-right">Tokens</TableHead>
 							<TableHead className="text-right">Cost</TableHead>
+							{waited ? (
+								<TableHead className="text-right">Waited for you</TableHead>
+							) : null}
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{byNode.map((node) => (
-							<TableRow key={node.nodeId}>
-								<TableCell className="max-w-40 truncate font-mono">
-									{node.nodeId}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{node.steps}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									<CostText cost={node.cost} />
-								</TableCell>
-							</TableRow>
+						{nodes.map((node) => (
+							<NodeRow key={node.nodeId} node={node} waited={waited} />
 						))}
 					</TableBody>
 				</Table>
@@ -131,21 +154,49 @@ export function CostSection({
 	);
 }
 
-/** The nodes that spent anything, most first: their steps together, at most `TOP_NODES`. */
-function costByNode(
-	steps: readonly StepSummary[],
-): { nodeId: string; steps: number; cost: KnownCost }[] {
-	const byNode = new Map<string, StepSummary[]>();
-	for (const step of steps) {
-		byNode.set(step.nodeId, [...(byNode.get(step.nodeId) ?? []), step]);
-	}
-	return [...byNode.entries()]
-		.map(([nodeId, nodeSteps]) => ({
-			nodeId,
-			steps: nodeSteps.length,
-			cost: sumKnownCost(nodeSteps),
-		}))
-		.filter((node) => node.cost.costUsd > 0)
-		.sort((a, b) => b.cost.costUsd - a.cost.costUsd)
-		.slice(0, TOP_NODES);
+/** One node of the run: every visit of it together. */
+function NodeRow({ node, waited }: { node: NodeMetrics; waited: boolean }) {
+	const tokens = node.tokens.input + node.tokens.output;
+	return (
+		<TableRow>
+			<TableCell className="max-w-36">
+				<div className="flex min-w-0 items-center gap-1.5">
+					<span className="truncate font-mono">{node.nodeId}</span>
+					{node.visits > 1 ? (
+						<span
+							className="shrink-0 text-muted-foreground"
+							title={`${node.visits} visits`}
+						>
+							×{node.visits}
+						</span>
+					) : null}
+				</div>
+			</TableCell>
+			<TableCell className="text-right tabular-nums">
+				{node.wallMs > 0 || !node.open ? formatDuration(node.wallMs) : null}
+				{node.open ? (
+					<span className="text-muted-foreground">
+						{node.wallMs > 0 ? ", " : ""}running
+					</span>
+				) : null}
+			</TableCell>
+			<TableCell className="text-right tabular-nums">
+				{tokens > 0 ? formatTokens(tokens) : "—"}
+			</TableCell>
+			<TableCell className="text-right tabular-nums">
+				<CostText cost={node.cost} />
+			</TableCell>
+			{waited ? (
+				<TableCell className="text-right tabular-nums">
+					{node.gateWaitMs > 0 ? formatDuration(node.gateWaitMs) : "—"}
+				</TableCell>
+			) : null}
+		</TableRow>
+	);
+}
+
+/** "acme/app#7" for a GitHub pull request's address. */
+function pullRequestName(url: string): string {
+	const match = /github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/.exec(url);
+	return match ? `${match[1]}#${match[2]}` : url;
 }

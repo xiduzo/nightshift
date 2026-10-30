@@ -10,7 +10,7 @@ import { formatDateTime, formatTime } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
 import { useProjectRuns } from "../hooks/use-project-runs";
 import { QuickRunDialog } from "./new-run-form";
-import { RunList } from "./run-list";
+import { RunTable } from "./run-table";
 
 /** The runs the list loads at first, and how many more each "Show older runs" adds. */
 const RUNS_PER_PAGE = 15;
@@ -82,7 +82,7 @@ export function ProjectRunsPage({ projectId }: { projectId: string }) {
 						/>
 						<Card className="py-0">
 							<CardContent className="px-0">
-								<RunList
+								<RunTable
 									runs={runs.runs}
 									isLoading={runs.isLoading}
 									more={

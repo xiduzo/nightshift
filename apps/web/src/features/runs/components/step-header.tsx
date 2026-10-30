@@ -11,8 +11,10 @@ import type { RunStatus, StepSummary } from "@/shared/api";
 import { CodeView, formatJson, JsonBlock } from "@/shared/code";
 import {
 	formatDateTime,
+	formatDuration,
 	formatStepCost,
 	formatTime,
+	formatTokens,
 	noCostYet,
 } from "@/shared/format";
 import { jsonOutput } from "../lib/run-steps";
@@ -115,6 +117,24 @@ export function StepFacts({ step }: { step: StepSummary }) {
 	];
 	if (time.waited) facts.push({ label: "Waited for you", value: time.waited });
 	if (time.slept) facts.push({ label: "Slept", value: time.slept });
+	const metrics = step.metrics;
+	if (metrics && metrics.agentMs >= 1000) {
+		facts.push({
+			label: "Agent worked",
+			value: formatDuration(metrics.agentMs),
+		});
+	}
+	if (metrics && metrics.tokens.input + metrics.tokens.output > 0) {
+		const { input, output } = metrics.tokens;
+		facts.push({
+			label: "Tokens",
+			value: (
+				<span title={`${formatTokens(input)} in, ${formatTokens(output)} out`}>
+					{formatTokens(input + output)}
+				</span>
+			),
+		});
+	}
 	if (hasCost(step)) {
 		facts.push({
 			label: "Cost",
