@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
 import { fakeBin } from "../../testing/fixtures/bin";
+import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
 import {
 	ACP_AGENTS,
 	type AcpAgent,
@@ -171,6 +172,23 @@ describe("acpHarness", () => {
 		expect(prompt).toStartWith(
 			"Project knowledge is in /data/knowledge/p1.\n\nRun the tests",
 		);
+	});
+
+	test("the knowledge tools reach the agent over the bridge, with their word", async () => {
+		const events = await run(fakeKnowledgeTools(), {
+			FAKE_ACP_CALLS: JSON.stringify([
+				{ name: "search_knowledge", arguments: { query: "deploy" } },
+			]),
+		});
+		const lines = await logged();
+		expect(entry(lines, "tools")?.names).toEqual([
+			"report_step",
+			"search_knowledge",
+			"read_knowledge",
+		]);
+		expect(entry(lines, "call")?.text).toContain("We **deploy** at night.");
+		expect(entry(lines, "prompt")?.text).toContain("`search_knowledge`");
+		expect(events.at(-1)?.type).toBe("finished");
 	});
 
 	test("a resumed session loads the session it continues", async () => {
@@ -374,6 +392,16 @@ describe("an agent that takes its model over ACP", () => {
 			summary: "The tests pass.",
 		});
 		expect(entry(await logged(), "session")?.mcp).toEqual([]);
+
+		// pi and other agents without MCP: no knowledge tools, and no word of them.
+		await rm(log, { force: true });
+		await runAgent(noMcp, "options", {
+			model: "default",
+			...fakeKnowledgeTools(),
+		});
+		const prompt = entry(await logged(), "prompt")?.text;
+		expect(prompt).toContain("NIGHTSHIFT-REPORT");
+		expect(prompt).not.toContain("search_knowledge");
 
 		const refused = await runAgent(noMcp, "options", {
 			mcpServers: { linear: { url: "https://mcp.linear.app", headers: {} } },

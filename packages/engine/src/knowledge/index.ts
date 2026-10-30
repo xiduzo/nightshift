@@ -16,6 +16,7 @@ export {
 	type KnowledgeRequest,
 	keepLearnings,
 	sessionKnowledge,
+	sessionKnowledgeTools,
 	withLearnings,
 } from "./handoff";
 export {

@@ -5,7 +5,7 @@
  * instead of `get_draft` and `propose_flow` the agent saves a checked flow
  * (`save_flow`) and starts a run (`start_run`). The run tools
  * (`terminal-runs.ts`) follow, stop and report on runs and answer Gates.
- * The knowledge tools (`terminal-knowledge.ts`) search the project's
+ * The knowledge tools (`tools/knowledge.ts`) search the project's
  * knowledge and read one file of it.
  * The tools read and write through a `TerminalPort`: Night Shift on this
  * computer, over its API.
@@ -25,11 +25,8 @@ import {
 } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../port";
+import { type KnowledgePort, knowledgeTools } from "../tools";
 import { flowJson } from "./prompts";
-import {
-	type TerminalKnowledgePort,
-	terminalKnowledgeTools,
-} from "./terminal-knowledge";
 import {
 	chooseProject,
 	projectOfFolder,
@@ -51,7 +48,7 @@ import {
 
 /** What the terminal tools read and write: Night Shift on this computer. */
 export type TerminalPort = TerminalRunPort &
-	TerminalKnowledgePort & {
+	KnowledgePort & {
 		projects(): Promise<TerminalProject[]>;
 		flows(projectId: string): Promise<ProjectFlowMap>;
 		/** The profiles a node of the project may name, each on its Device. */
@@ -363,6 +360,6 @@ export function terminalTools(
 			return `Started run ${run.id} of "${flow}" (${run.status}). Follow it at ${port.runLink(run.id)}`;
 		}),
 		...terminalRunTools(port, projectOf, options.now),
-		...terminalKnowledgeTools(port, projectOf),
+		...knowledgeTools(port, { projectOf }),
 	];
 }

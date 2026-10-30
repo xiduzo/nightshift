@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
 import { fakeBin } from "../../testing/fixtures/bin";
+import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
 import {
 	codexEffort,
 	codexHarness,
@@ -154,6 +155,23 @@ describe("codexHarness", () => {
 		expect(line?.prompt).toContain("report_step");
 		// The worktree stays clean.
 		expect(await readdir(cwd)).toEqual([]);
+	});
+
+	test("the knowledge tools reach Codex over the bridge, named after the prompt", async () => {
+		const { log, harness } = await fakeCodex({
+			FAKE_CODEX_CALLS: JSON.stringify([
+				{ name: "search_knowledge", arguments: { query: "deploy" } },
+			]),
+		});
+		const events = await collect(
+			harness.run(input({ stepReport: true, ...fakeKnowledgeTools() })),
+		);
+		const result = events.find((e) => e.type === "tool-result");
+		expect(result?.type === "tool-result" && result.content).toContain(
+			"We **deploy** at night.",
+		);
+		const [line] = await readLog(log);
+		expect(line?.prompt).toContain("`search_knowledge`");
 	});
 
 	test("a to-do list shows each update while Codex works", async () => {

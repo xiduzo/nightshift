@@ -127,7 +127,12 @@ export type AdapterSetup = {
 export function sessionReport(
 	input: Pick<
 		AgentSessionInput,
-		"prompt" | "stepReport" | "permissionMode" | "saveArtifact" | "tools"
+		| "prompt"
+		| "stepReport"
+		| "permissionMode"
+		| "saveArtifact"
+		| "tools"
+		| "toolsInstruction"
 	>,
 	spec: Pick<HarnessSpec, "report" | "profile">,
 	allowedTools?: string[],
@@ -141,7 +146,9 @@ export function sessionReport(
 		return id ? [id] : [];
 	});
 	return {
-		prompt: own.prompt,
+		prompt: input.toolsInstruction
+			? `${own.prompt}\n\n${input.toolsInstruction}`
+			: own.prompt,
 		tools: [...own.tools, ...extra],
 		allowedTools:
 			ids.length > 0

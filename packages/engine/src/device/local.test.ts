@@ -9,7 +9,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 
-import { createKnowledgeFolders } from "../knowledge";
+import { createKnowledgeFolders, createKnowledgeSearch } from "../knowledge";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";
 import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
@@ -375,6 +375,54 @@ describe("the project's knowledge", () => {
 		expect(existsSync(join(folder, "INDEX.md"))).toBe(true);
 		expect(off?.env).toBeUndefined();
 		expect(off && "knowledge" in off).toBe(false);
+	});
+
+	test("an agent that reads the knowledge searches it with this computer's index", async () => {
+		const harness = fakeHarness({
+			steps: [
+				{ type: "tool", name: "search_knowledge", input: { query: "quokka" } },
+				{ type: "tool", name: "read_knowledge", input: { path: "wiki/a.md" } },
+			],
+		});
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const knowledgeSearch = createKnowledgeSearch(sandbox.dataDir);
+		try {
+			await Bun.write(
+				join(knowledge.folder("p1"), "wiki/a.md"),
+				"# Animals\n\nThe quokka lives here.\n",
+			);
+			const d = device({
+				harnesses: { "claude-code": harness },
+				knowledge,
+				knowledgeSearch,
+			});
+			const events = await collect(
+				d.session(sessionInput({ knowledge: { projectId: "p1" } })),
+			);
+			// Without the knowledge, no knowledge tools.
+			await collect(d.session(sessionInput()));
+			const [on, off] = harness.calls;
+			expect(on?.tools?.map((tool) => tool.name)).toEqual([
+				"search_knowledge",
+				"read_knowledge",
+			]);
+			expect(on?.toolsInstruction).toContain("search_knowledge");
+			// The tools work in the run's project only: they take no project.
+			const schema = on?.tools?.[0]?.inputSchema as {
+				properties: Record<string, unknown>;
+			};
+			expect(Object.keys(schema.properties)).toEqual(["query", "limit"]);
+			const results = events.flatMap((e) =>
+				e.type === "tool-result" ? [e.content] : [],
+			);
+			expect(results[0]).toContain('"path": "wiki/a.md"');
+			expect(results[0]).toContain("**quokka**");
+			expect(results[1]).toStartWith("wiki/a.md: Animals\n\n# Animals");
+			expect(off?.tools).toBeUndefined();
+			expect(off?.toolsInstruction).toBeUndefined();
+		} finally {
+			knowledgeSearch.close();
+		}
 	});
 
 	test("an agent that reads the knowledge may propose learnings: they wait for a person", async () => {

@@ -13,6 +13,10 @@
  *
  * `FAKE_ACP_PLANS`: a JSON array of plans (each an array of plan entries),
  * sent as `plan` updates after the first text chunk.
+ *
+ * `FAKE_ACP_CALLS`: a JSON array of `{ name, arguments }`, each a call of
+ * the bridged tool of that name before the report. The log gets the tools
+ * the bridge lists and each call's text.
  * Without an MCP server, the agent reports with a text line instead.
  */
 import { appendFileSync } from "node:fs";
@@ -34,6 +38,8 @@ const servers = new Map<string, HttpServer[]>();
 const MODELS = ["fake/default", "ollama/qwen3-coder:latest"];
 const offer = process.env.FAKE_ACP_CONFIG;
 const plans: acp.PlanEntry[][] = JSON.parse(process.env.FAKE_ACP_PLANS ?? "[]");
+const calls: { name: string; arguments: Record<string, unknown> }[] =
+	JSON.parse(process.env.FAKE_ACP_CALLS ?? "[]");
 
 /** What a new or loaded session offers, per `FAKE_ACP_CONFIG`. */
 function offered(): Partial<acp.NewSessionResponse> {
@@ -93,6 +99,19 @@ async function callReport(
 		}),
 	);
 	const tools = await client.listTools();
+	log({ type: "tools", names: tools.tools.map((t) => t.name) });
+	for (const call of calls) {
+		const result = await client.callTool({
+			name: call.name,
+			arguments: call.arguments,
+		});
+		const content = result.content as { text?: string }[];
+		log({
+			type: "call",
+			name: call.name,
+			text: content.map((part) => part.text ?? "").join(""),
+		});
+	}
 	const name = tools.tools.find((t) => t.name.endsWith("report_step"))?.name;
 	if (name) {
 		const result = await client.callTool({ name, arguments: args });

@@ -426,6 +426,8 @@ export async function createDaemon(
 		// The projects' knowledge, outside every repository, in step with the Space.
 		knowledge,
 		knowledgeSync,
+		// Agents that read the knowledge search it with this computer's index.
+		knowledgeSearch,
 		// What each step changed in the run's copy of the project, also by commands.
 		snapshots: true,
 		// A Claude Code session sends its own telemetry while the export is on.

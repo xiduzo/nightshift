@@ -8,6 +8,7 @@ import type {
 	StepReportSpec,
 } from "../../port/types";
 import { fakeBin } from "../../testing/fixtures/bin";
+import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
 import {
 	claudeAllowedTools,
 	claudeCodeHarness,
@@ -114,6 +115,36 @@ describe("claudeCodeHarness with knowledge", () => {
 		);
 		// The prompt stays the step's own.
 		expect(run.prompt).not.toContain("Project knowledge");
+	});
+
+	test("the knowledge tools: bridged, allowed without a prompt, and named after the prompt", async () => {
+		const claudeLog = join(dir, "claude.jsonl");
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_LOG: claudeLog,
+			FAKE_CLAUDE_CALLS: JSON.stringify([
+				{ name: "search_knowledge", arguments: { query: "deploy" } },
+			]),
+		});
+		const events: AgentEvent[] = [];
+		for await (const event of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input({ stepReport: true, ...fakeKnowledgeTools() }))) {
+			events.push(event);
+		}
+		const run = JSON.parse((await readFile(claudeLog, "utf8")).trim());
+		expect((run.tools as { name: string }[]).map((tool) => tool.name)).toEqual([
+			"report_step",
+			"search_knowledge",
+			"read_knowledge",
+		]);
+		const allowed: string = run.argv[run.argv.indexOf("--allowedTools") + 1];
+		expect(allowed).toContain("mcp__tanstack__search_knowledge");
+		expect(allowed).toContain("mcp__tanstack__read_knowledge");
+		expect(run.prompt).toContain("`search_knowledge`");
+		const result = events.find((e) => e.type === "tool-result");
+		expect(result?.type === "tool-result" && result.content).toContain(
+			"We **deploy** at night.",
+		);
 	});
 
 	test("a report with learnings carries them", async () => {

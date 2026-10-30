@@ -109,11 +109,17 @@ export type AgentSessionInput = {
 	saveArtifact?: (file: { path: string; title?: string }) => Promise<string>;
 	/**
 	 * Night Shift's own tools for this session, over the shared tool bridge
-	 * (the assistant's authoring tools). They are allowed without a prompt
-	 * in every mode but plan mode on a harness that runs no tools there
-	 * (Claude Code). A harness without MCP (pi) cannot offer them.
+	 * (the assistant's authoring tools, a step's knowledge tools). They are
+	 * allowed without a prompt in every mode but plan mode on a harness that
+	 * runs no tools there (Claude Code). A harness without MCP (pi, Grok
+	 * Build) cannot offer them.
 	 */
 	tools?: readonly BridgedTool[];
+	/**
+	 * What the agent learns about `tools`: added after the prompt only when
+	 * the session gets them, so an agent is never told of a tool it lacks.
+	 */
+	toolsInstruction?: string;
 	/**
 	 * The session may read `cwd` but never change it: each harness takes
 	 * away its write and shell tools, or runs in its read-only sandbox (see

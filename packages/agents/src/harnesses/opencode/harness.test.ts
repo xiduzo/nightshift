@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
 import type { SdkSignals } from "../../session/translate";
 import { fakeBin } from "../../testing/fixtures/bin";
+import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
 import {
 	createOpencodeObserver,
 	opencodeHarness,
@@ -338,6 +339,28 @@ describe("opencodeHarness", () => {
 		expect(line?.config.permission.bash).toBe("allow");
 		// The worktree stays clean: no marker, no opencode.json.
 		expect(await readdir(cwd)).toEqual([]);
+	});
+
+	test("the knowledge tools reach OpenCode over the bridge, named after the prompt", async () => {
+		const { log, harness } = await fakeOpencode({
+			FAKE_OPENCODE_CALLS: JSON.stringify([
+				{ name: "search_knowledge", arguments: { query: "deploy" } },
+			]),
+		});
+		const events = await collect(
+			harness.run(input({ stepReport: true, ...fakeKnowledgeTools() })),
+		);
+		const [line] = await readLog(log);
+		expect(line?.tools?.map((t) => t.name)).toEqual([
+			"report_step",
+			"search_knowledge",
+			"read_knowledge",
+		]);
+		expect(line?.prompt).toContain("`search_knowledge`");
+		const result = events.find((e) => e.type === "tool-result");
+		expect(result?.type === "tool-result" && result.content).toContain(
+			"We **deploy** at night.",
+		);
 	});
 
 	test("an invalid report shows as a tool call with its real input", async () => {

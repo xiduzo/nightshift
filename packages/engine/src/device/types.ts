@@ -174,8 +174,10 @@ export type SessionInput = Omit<
 	| "toolsPath"
 	| "env"
 	| "scrubEnv"
-	// The assistant's, not a run step's: it runs on this computer only.
+	// The Device adds Night Shift's own (the knowledge tools) itself.
 	| "tools"
+	| "toolsInstruction"
+	// The assistant's, not a run step's: it runs on this computer only.
 	| "readOnly"
 	// The Device adds the knowledge folder itself (`knowledge`).
 	| "addDirs"

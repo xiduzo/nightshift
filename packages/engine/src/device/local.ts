@@ -33,9 +33,11 @@ import {
 	commandKnowledge,
 	type KnowledgeFolders,
 	type KnowledgeRequest,
+	type KnowledgeSearch,
 	type KnowledgeSync,
 	keepLearnings,
 	sessionKnowledge,
+	sessionKnowledgeTools,
 	withLearnings,
 } from "../knowledge";
 import {
@@ -163,6 +165,12 @@ export type LocalDeviceDeps = {
 	 * computer's alone.
 	 */
 	knowledgeSync?: Pick<KnowledgeSync, "reconcile">;
+	/**
+	 * Keyword search over the folders: this Device's own index. With it, an
+	 * agent that gets the folder also gets `search_knowledge` and
+	 * `read_knowledge`, where its harness takes Night Shift's own tools.
+	 */
+	knowledgeSearch?: Pick<KnowledgeSearch, "search" | "read" | "refresh">;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -343,6 +351,20 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...known?.env,
 				...tools?.env,
 			};
+			// An agent that reads the knowledge may search it. The index
+			// starts to catch up with the folder now, not at the first search.
+			const search =
+				known?.addDirs && knowledge && deps.knowledgeSearch
+					? sessionKnowledgeTools(deps.knowledgeSearch, knowledge.projectId)
+					: null;
+			if (search && knowledge) {
+				deps.knowledgeSearch?.refresh(knowledge.projectId).catch((error) => {
+					console.warn(
+						"The knowledge search index was not brought up to date:",
+						error,
+					);
+				});
+			}
 			// An agent that reads the knowledge may propose to add to it.
 			const learn =
 				known?.addDirs && knowledge && artifacts && deps.knowledge
@@ -366,6 +388,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...(Object.keys(env).length > 0 ? { env } : {}),
 				...(known?.addDirs ? { addDirs: known.addDirs } : {}),
 				...(known?.instructions ? { instructions: known.instructions } : {}),
+				...(search ?? {}),
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
 			});
 			const events =

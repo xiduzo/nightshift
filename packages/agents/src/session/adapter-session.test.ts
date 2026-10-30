@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { AnyTextAdapter, TextOptions } from "@tanstack/ai";
 import type { SandboxProvider } from "@tanstack/ai-sandbox";
 import type { AgentEvent, AgentSessionInput } from "../port/types";
+import { knowledgeTools } from "../tools";
 import {
 	type AdapterSetup,
 	type HarnessSpec,
@@ -151,6 +152,59 @@ describe("sessionReport", () => {
 			tools: [],
 			allowedTools: ["Read"],
 		});
+	});
+});
+
+describe("sessionReport: Night Shift's own tools", () => {
+	const tools = knowledgeTools(
+		{ searchKnowledge: async () => [], readKnowledge: async () => null },
+		{ project: { id: "p1" } },
+	);
+	const toolsInstruction = "Call search_knowledge.";
+	const byMode = spec({
+		profile: {
+			label: "Fake",
+			sessionEvent: SESSION_EVENT,
+			createObserver: () => (signals: SdkSignals) => signals,
+			reportToolId: REPORT_TOOL_ID,
+			bridgedToolId: (name) => `mcp__fake__${name}`,
+		},
+	});
+
+	test("where tools run: the tools, what the agent learns of them, and their allow rules", () => {
+		const report = sessionReport(
+			input({ stepReport: true, tools, toolsInstruction }),
+			byMode,
+			["Read"],
+		);
+		expect(report.tools.map((t) => t.name)).toEqual([
+			"report_step",
+			"search_knowledge",
+			"read_knowledge",
+		]);
+		expect(report.prompt).toEndWith(`\n\n${toolsInstruction}`);
+		expect(report.allowedTools).toEqual([
+			"Read",
+			REPORT_TOOL_ID,
+			"mcp__fake__search_knowledge",
+			"mcp__fake__read_knowledge",
+		]);
+	});
+
+	test("plan mode on a by-mode harness and a text harness: no tools, and no word of them", () => {
+		for (const report of [
+			sessionReport(
+				input({ tools, toolsInstruction, permissionMode: "plan" }),
+				byMode,
+			),
+			sessionReport(
+				input({ tools, toolsInstruction }),
+				spec({ report: "text" }),
+			),
+		]) {
+			expect(report.tools).toEqual([]);
+			expect(report.prompt).not.toContain(toolsInstruction);
+		}
 	});
 });
 

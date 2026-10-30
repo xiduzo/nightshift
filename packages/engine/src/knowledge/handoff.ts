@@ -1,12 +1,20 @@
+import {
+	KNOWLEDGE_TOOLS_INSTRUCTION,
+	type KnowledgePort,
+	knowledgeTools,
+} from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
 import { INDEX_FILE, type KnowledgeFolders } from "./folder";
+import type { KnowledgeSearch } from "./search";
 
 /**
  * How a step gets the project's knowledge folder, on the Device that runs
  * it. Every Command and every Agent session gets its path in
  * `NS_KNOWLEDGE`, so a sync kit knows where to write. An agent also gets
  * the folder to read (`addDirs`) and one line that says where it is, when
- * the folder has files or its node asks for it.
+ * the folder has files or its node asks for it. With the folder, an agent
+ * whose harness takes Night Shift's own tools also gets `search_knowledge`
+ * and `read_knowledge` over this Device's index (`sessionKnowledgeTools`).
  */
 
 /** The environment variable with the folder's path. */
@@ -54,6 +62,25 @@ export async function sessionKnowledge(
 	if (files.length === 0 && !request.always) return { env };
 	await folders.index(request.projectId);
 	return { env, addDirs: [path], instructions: knowledgeLine(path) };
+}
+
+/**
+ * The knowledge tools of an Agent step that gets the folder: this
+ * Device's own index, in the run's project only, and what the agent
+ * learns about them. The harness drops both when it cannot take them.
+ */
+export function sessionKnowledgeTools(
+	search: Pick<KnowledgeSearch, "search" | "read">,
+	projectId: string,
+): Required<Pick<AgentSessionInput, "tools" | "toolsInstruction">> {
+	const port: KnowledgePort = {
+		searchKnowledge: (id, query, limit) => search.search(id, query, { limit }),
+		readKnowledge: (id, path, maxBytes) => search.read(id, path, { maxBytes }),
+	};
+	return {
+		tools: knowledgeTools(port, { project: { id: projectId } }),
+		toolsInstruction: KNOWLEDGE_TOOLS_INSTRUCTION,
+	};
 }
 
 /**

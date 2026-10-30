@@ -84,12 +84,21 @@ The agent gets one line next to its prompt, not the files:
 > Project knowledge is in `<folder>`. Read INDEX.md there first, then grep
 > the folder for what you need. Do not change the folder.
 
-| Harness | The folder | The line |
-| --- | --- | --- |
-| Claude Code | `--add-dir` | `--append-system-prompt` |
-| OpenCode | allowed as an outside folder | before the prompt |
-| Codex | reads any folder already (`--add-dir` would let it write) | before the prompt |
-| ACP agents, pi, Grok Build | read any folder already | before the prompt |
+Where the harness takes Night Shift's own tools, the agent also gets
+`search_knowledge` and `read_knowledge` (see [Search](#search)), in the
+run's project only, and one more line after its prompt:
+
+> To find something in the project knowledge, call `search_knowledge` with
+> a few keywords. It finds files by their words, PDF and Word files too.
+> Then read a file it gives with `read_knowledge`.
+
+| Harness | The folder | The line | Search tools |
+| --- | --- | --- | --- |
+| Claude Code | `--add-dir` | `--append-system-prompt` | yes, allowed without a prompt; not in plan mode |
+| OpenCode | allowed as an outside folder | before the prompt | yes |
+| Codex | reads any folder already (`--add-dir` would let it write) | before the prompt | yes |
+| ACP agents (Copilot, Gemini, Cursor, custom agents) | read any folder already | before the prompt | yes |
+| pi, Grok Build | read any folder already | before the prompt | no: no MCP. They grep the folder |
 
 Some versions of Claude Code also load a `CLAUDE.md` in an `--add-dir`
 folder. Only the line works with every version.
@@ -144,13 +153,21 @@ the proposals, and then puts what it kept or deleted back in the Space.
 ## Search
 
 Each computer keeps a keyword index of its knowledge: the text files
-(`.md`, `.markdown`, `.mdx`, `.txt`, `.rst`), not `INDEX.md`, hidden files
-or the learnings that wait. The Knowledge page has a search field, and
-`nightshift mcp` has two tools for an agent:
+(`.md`, `.markdown`, `.mdx`, `.txt`, `.rst`) and the text of PDF and Word
+files (`.pdf`, `.docx`), not `INDEX.md`, hidden files or the learnings that
+wait. A PDF or Word file over 10 MB is found by its path only. The
+Knowledge page has a search field. Every Agent step that gets the folder
+has two tools (where its harness takes them), and so does `nightshift mcp`:
 
 - `search_knowledge` (`query`, `limit`): the best files first, each with
   its path, title and an excerpt with the words found in bold.
-- `read_knowledge` (`path`): one file, at most its first 100 KB.
+- `read_knowledge` (`path`): one file, at most its first 100 KB. For a PDF
+  or Word file, its text.
+
+`unpdf` reads the text of a PDF and `mammoth` the text of a Word file. Both
+are plain JavaScript, so they work in the `nightshift` binary too. A PDF of
+scanned pages has no text to find. `INDEX.md` lists a PDF or Word file
+with the first line of its text as the title, and its first sentence.
 
 Every word must match. When no file has them all, the search returns files
 with some of them. A word in the title counts most, then one in the path,
@@ -166,8 +183,9 @@ index stays correct, whoever changes the folder. For 2 000 files the first
 search takes about half a second, and a later one about 50 ms. It reads
 the first 1 MB of a file.
 
-An agent that gets the folder still reads `INDEX.md` and greps the folder.
-To give a node search, add the `nightshift` MCP server as a connection.
+An agent that gets the folder can still read `INDEX.md` and grep the
+folder. In `nightshift mcp` the tools take a `project` too. In a step they
+work in the run's project only.
 
 ## Size
 
