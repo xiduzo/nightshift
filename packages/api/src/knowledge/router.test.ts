@@ -84,3 +84,97 @@ describe("knowledge.get", () => {
 		).rejects.toBeInstanceOf(ORPCError);
 	});
 });
+
+function searchContext(personId: string) {
+	const asked: unknown[] = [];
+	const ctx = testContext({
+		access: accessAs({ personId, spaceId: "s1", role: "owner" }),
+		daemon: { device: { id: "d1", name: "studio", ownerId: "owner" } },
+		knowledgeSearch: {
+			search: async (projectId, query, options) => {
+				asked.push({ projectId, query, options });
+				return [
+					{
+						path: "wiki/deploy.md",
+						title: "Deploy",
+						snippet: [
+							{ text: "How we ", match: false },
+							{ text: "deploy", match: true },
+						],
+						score: 1.5,
+					},
+				];
+			},
+			read: async (projectId, path, options) => {
+				asked.push({ projectId, path, options });
+				return path === "wiki/deploy.md"
+					? {
+							path,
+							title: "Deploy",
+							text: "# Deploy",
+							size: 8,
+							truncated: false,
+						}
+					: null;
+			},
+		},
+		engine: {
+			space: () =>
+				stub<SpaceEngine>("Space view", {
+					listProjects: async () =>
+						[{ id: "p1" }] as Awaited<ReturnType<SpaceEngine["listProjects"]>>,
+				}),
+		},
+	});
+	return { ctx, asked };
+}
+
+describe("knowledge.search and knowledge.read", () => {
+	test("search passes the words and the limit, and returns the hits", async () => {
+		const { ctx, asked } = searchContext("owner");
+		const hits = await call(
+			appRouter.knowledge.search,
+			{ projectId: "p1", query: "deploy", limit: 5 },
+			{ context: ctx },
+		);
+		expect(hits.map((h) => h.path)).toEqual(["wiki/deploy.md"]);
+		expect(asked).toEqual([
+			{ projectId: "p1", query: "deploy", options: { limit: 5 } },
+		]);
+	});
+
+	test("read gives one file, or null when there is none", async () => {
+		const { ctx } = searchContext("owner");
+		const file = await call(
+			appRouter.knowledge.read,
+			{ projectId: "p1", path: "wiki/deploy.md" },
+			{ context: ctx },
+		);
+		expect(file?.text).toBe("# Deploy");
+		expect(
+			await call(
+				appRouter.knowledge.read,
+				{ projectId: "p1", path: "nope.md" },
+				{ context: ctx },
+			),
+		).toBeNull();
+	});
+
+	test("refuses a project the Space does not have, and anyone but the owner", async () => {
+		const { ctx } = searchContext("owner");
+		await expect(
+			call(
+				appRouter.knowledge.search,
+				{ projectId: "p9", query: "x" },
+				{ context: ctx },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+		await expect(
+			call(
+				appRouter.knowledge.search,
+				{ projectId: "p1", query: "x" },
+				{ context: searchContext("member").ctx },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+	});
+});

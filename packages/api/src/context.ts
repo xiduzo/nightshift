@@ -12,6 +12,7 @@ import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	Engine,
 	KnowledgeFolders,
+	KnowledgeSearch,
 	ToolLaunchers,
 } from "@nightshift/engine";
 import type {
@@ -87,6 +88,8 @@ export type Services = {
 	profiles: ProfileStore;
 	/** The projects' knowledge folders on this computer, with their index. */
 	knowledge: Pick<KnowledgeFolders, "index" | "proposed">;
+	/** Keyword search over the projects' knowledge on this computer, and reading one file. */
+	knowledgeSearch: Pick<KnowledgeSearch, "search" | "read">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */

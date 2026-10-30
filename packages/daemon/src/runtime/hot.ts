@@ -1,7 +1,7 @@
 import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
-import type { FlowDocuments } from "@nightshift/engine";
+import type { FlowDocuments, KnowledgeSearch } from "@nightshift/engine";
 import type { DeviceDocument } from "@nightshift/engine/device-config";
 import type {
 	GitHubClones,
@@ -54,6 +54,7 @@ export type HotRegistry = KeptDevices &
 		nightshiftScheduler?: AbortController;
 		/** The clones from GitHub that run, and how the last ones ended. */
 		nightshiftGitHubClones?: GitHubClones;
+		nightshiftKnowledgeSearch?: KnowledgeSearch;
 		nightshiftProjectCopies?: ProjectCopies;
 		/** The daily update of the price list. */
 		nightshiftPrices?: PriceUpdates;

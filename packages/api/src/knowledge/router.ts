@@ -1,10 +1,32 @@
 import { KNOWLEDGE_FILES_WARNING } from "@nightshift/engine";
 import { knowledgeKitsOf, REVIEW_LEARNINGS_KIT } from "@nightshift/flows";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
-import { type KnowledgeView, knowledgeSchema } from "./schemas";
+import {
+	type KnowledgeView,
+	knowledgeHitSchema,
+	knowledgeSchema,
+	knowledgeTextSchema,
+} from "./schemas";
+
+/** The most of one file `knowledge.read` returns. */
+const READ_MAX_BYTES = 1024 * 1024;
+
+/** Refuses a project the Space does not have: cheap, for a search on each key. */
+async function knownProject(
+	space: { listProjects(): Promise<{ id: string }[]> },
+	projectId: string,
+): Promise<void> {
+	const projects = await space.listProjects();
+	if (!projects.some((project) => project.id === projectId)) {
+		throw new ORPCError("NOT_FOUND", {
+			message: "This Space has no such project.",
+		});
+	}
+}
 
 export const knowledge = {
 	/**
@@ -43,5 +65,50 @@ export const knowledge = {
 					.filter(({ kits }) => kits.includes(REVIEW_LEARNINGS_KIT))
 					.map(({ flow }) => flow),
 			};
+		}),
+	/**
+	 * The files of a project's knowledge on this computer that best match
+	 * the words, best first, each with an excerpt. Keyword search (BM25):
+	 * every word must match, else some of them. "a phrase" in quotes keeps
+	 * its words together, and a word ending in `*` matches as a prefix.
+	 */
+	search: ownerProcedure
+		.route({
+			summary:
+				"Searches the files of a project's knowledge on this computer by keyword, best match first.",
+		})
+		.output(output(z.array(knowledgeHitSchema)))
+		.input(
+			z.object({
+				projectId: z.string(),
+				query: z.string().max(1000),
+				limit: z.number().int().min(1).max(50).optional(),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return context.knowledgeSearch.search(input.projectId, input.query, {
+				...(input.limit !== undefined ? { limit: input.limit } : {}),
+			});
+		}),
+	/** One file of a project's knowledge on this computer, by its path. Null: no such file. */
+	read: ownerProcedure
+		.route({
+			summary:
+				"Reads one file of a project's knowledge on this computer, by its path in the knowledge.",
+		})
+		.output(output(knowledgeTextSchema.nullable()))
+		.input(
+			z.object({
+				projectId: z.string(),
+				path: z.string().min(1).max(1000),
+				maxBytes: z.number().int().min(1).max(READ_MAX_BYTES).optional(),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return context.knowledgeSearch.read(input.projectId, input.path, {
+				maxBytes: input.maxBytes ?? READ_MAX_BYTES,
+			});
 		}),
 };

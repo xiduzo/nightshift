@@ -29,6 +29,7 @@ import {
 	createArtifactStore,
 	createFlowDocuments,
 	createKnowledgeFolders,
+	createKnowledgeSearch,
 	createToolLaunchers,
 	documentSpace,
 	localDevice,
@@ -346,6 +347,15 @@ export async function createDaemon(
 
 	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
 	const knowledge = createKnowledgeFolders(dataDir);
+	/**
+	 * Keyword search over them: this computer's own index, built from the
+	 * folders and never synced. One open index file across reloads.
+	 */
+	const knowledgeSearch = await slots.keep(
+		"nightshiftKnowledgeSearch",
+		() => createKnowledgeSearch(dataDir),
+		(kept) => kept.close(),
+	);
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
 		id: device.id,
@@ -570,6 +580,7 @@ export async function createDaemon(
 		}),
 		checks: programChecks(),
 		knowledge,
+		knowledgeSearch,
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),
 			setUpGit: (input) => setUpGit(input),
