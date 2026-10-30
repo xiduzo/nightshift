@@ -9,7 +9,12 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createKnowledgeFolders, describeText } from "./folder";
+import { tinyDocx, tinyPdf } from "../testing/documents";
+import {
+	createKnowledgeFolders,
+	describeDocumentText,
+	describeText,
+} from "./folder";
 import { KNOWLEDGE_ENV, sessionKnowledge } from "./handoff";
 
 let dataDir: string;
@@ -104,6 +109,56 @@ describe("the knowledge folder", () => {
 		expect(
 			await readFile(join(folders.folder("p1"), "INDEX.md"), "utf8"),
 		).toContain("No files yet.");
+	});
+});
+
+describe("PDF and Word files in the index", () => {
+	test("show the title and first sentence of their text", async () => {
+		const folders = createKnowledgeFolders(dataDir);
+		const dir = await folders.ensure("p1");
+		await writeFile(
+			join(dir, "release.pdf"),
+			tinyPdf(["Release checklist", "We ship on Fridays. Then we rest."]),
+		);
+		await writeFile(
+			join(dir, "guide.docx"),
+			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
+		);
+		await folders.index("p1");
+		const index = await readFile(join(dir, "INDEX.md"), "utf8");
+		expect(index).toContain(
+			"- `guide.docx`: Onboarding guide. Every new teammate meets the wombat",
+		);
+		expect(index).toContain(
+			"- `release.pdf`: Release checklist. We ship on Fridays (",
+		);
+	});
+
+	test("an index of an older Night Shift is written again", async () => {
+		const folders = createKnowledgeFolders(dataDir);
+		const dir = await folders.ensure("p1");
+		await put(dir, "a.md", "# A\n");
+		await folders.index("p1");
+		await writeFile(
+			join(dir, "INDEX.md"),
+			"# Knowledge index\n\n- `a.md`: A\n",
+		);
+		await folders.index("p1");
+		expect(await readFile(join(dir, "INDEX.md"), "utf8")).toContain(
+			"PDF and Word files too",
+		);
+	});
+
+	test("the first short line without a stop is the title, else the file name", () => {
+		expect(describeDocumentText("Plan\nWe go. Later more.", "f")).toEqual({
+			title: "Plan",
+			sentence: "We go",
+		});
+		expect(describeDocumentText("This is a sentence.\nMore.", "f")).toEqual({
+			title: "f",
+			sentence: "This is a sentence",
+		});
+		expect(describeDocumentText("", "f")).toEqual({ title: "f", sentence: "" });
 	});
 });
 

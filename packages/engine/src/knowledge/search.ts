@@ -2,13 +2,16 @@ import { Database } from "bun:sqlite";
 import { rmSync } from "node:fs";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { documentText, isDocument } from "./documents";
 import {
 	createKnowledgeFolders,
+	describeDocumentText,
 	describeText,
 	INDEX_FILE,
 	type KnowledgeFile,
 	TEXT_FILES,
 } from "./folder";
+import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
  * Full-text search over a project's knowledge folder, on this Device.
@@ -25,8 +28,10 @@ import {
  * ones that went. So it stays right whoever changes the folder: a sync
  * kit, a person, or the Space's knowledge as it arrives.
  *
- * It indexes the text files (`TEXT_FILES`) the index lists: not `INDEX.md`,
- * hidden files or the learnings that wait for a person.
+ * It indexes the text files (`TEXT_FILES`) the index lists, and the text
+ * of PDF and Word files (`documents.ts`): not `INDEX.md`, hidden files or
+ * the learnings that wait for a person. A document over 10 MB is found by
+ * its path only.
  */
 
 /** A part of a hit's excerpt: `match` parts are the words the query found. */
@@ -49,7 +54,7 @@ export type KnowledgeText = {
 	title: string;
 	/** The text, cut at the size asked for. */
 	text: string;
-	/** Bytes of the whole file. */
+	/** Bytes of the whole file. For a PDF or Word file: of its whole text. */
 	size: number;
 	/** The text stops before the file ends. */
 	truncated: boolean;
@@ -67,8 +72,8 @@ export type KnowledgeRefresh = {
 
 /** The index file, hidden so no project id can name it. */
 export const SEARCH_FILE = ".search.sqlite";
-/** Bump to build every index again. */
-const SCHEMA_VERSION = 1;
+/** Bump to build every index again. 2: PDF and Word files. */
+const SCHEMA_VERSION = 2;
 /** What the index reads of a file: past this, the end of a very large file is not found. */
 const MAX_BODY_BYTES = 1024 * 1024;
 /** Files read at once while indexing. */
@@ -87,6 +92,20 @@ const OPEN = "\u0002";
 const CLOSE = "\u0003";
 
 const isText = (path: string) => TEXT_FILES.has(extname(path).toLowerCase());
+/** The files the index reads: text files and documents. */
+const isIndexed = (path: string) => isText(path) || isDocument(path);
+
+/** The first `bytes` of a text, cut at a character. */
+function cutText(text: string, bytes: number): { text: string; size: number } {
+	const buffer = Buffer.from(text, "utf8");
+	if (buffer.length <= bytes) return { text, size: buffer.length };
+	// A cut inside a character drops that character.
+	const cut = buffer
+		.subarray(0, bytes)
+		.toString("utf8")
+		.replace(/\uFFFD$/, "");
+	return { text: cut, size: buffer.length };
+}
 
 /**
  * The FTS5 query for what a person or an agent typed, or null when it has
@@ -263,7 +282,7 @@ export function createKnowledgeSearch(dataDir: string) {
 	async function update(projectId: string): Promise<KnowledgeRefresh> {
 		const dir = folders.folder(projectId);
 		const files = (await folders.files(projectId)).filter((f) =>
-			isText(f.path),
+			isIndexed(f.path),
 		);
 		const sqlite = await database();
 		const known = new Map(
@@ -319,16 +338,25 @@ export function createKnowledgeSearch(dataDir: string) {
 		for (let at = 0; at < changed.length; at += BATCH) {
 			const batch = await Promise.all(
 				changed.slice(at, at + BATCH).map(async (f) => {
-					const read = await readStart(
-						join(dir, ...f.path.split("/")),
-						MAX_BODY_BYTES,
-					);
+					const abs = join(dir, ...f.path.split("/"));
 					const name = f.path.split("/").at(-1) ?? f.path;
-					const fallback = name.slice(0, name.length - extname(name).length);
+					const fallback =
+						name.slice(0, name.length - extname(name).length) || name;
+					if (isDocument(f.path)) {
+						const text = await documentText(abs);
+						if (text === null) return { file: f, title: name, body: "" };
+						const body = cutText(text, MAX_BODY_BYTES).text;
+						return {
+							file: f,
+							title: describeDocumentText(body.slice(0, 4096), fallback).title,
+							body,
+						};
+					}
+					const read = await readStart(abs, MAX_BODY_BYTES);
 					const body = read?.text ?? "";
 					return {
 						file: f,
-						title: describeText(body.slice(0, 4096), fallback || name).title,
+						title: describeText(body.slice(0, 4096), fallback).title,
 						body,
 					};
 				}),
@@ -447,13 +475,33 @@ export function createKnowledgeSearch(dataDir: string) {
 			]);
 			if (base === "" || !real.startsWith(`${base}/`)) return null;
 			const bytes = Math.max(1, options.maxBytes ?? READ_DEFAULT_BYTES);
+			const name = clean.split("/").at(-1) ?? clean;
+			const fallback = name.slice(0, name.length - extname(name).length);
+			if (isDocument(clean)) {
+				if (info.size > LOCAL_ONLY_BYTES) {
+					throw new Error(
+						`"${clean}" is larger than 10 MB. Night Shift does not read its text.`,
+					);
+				}
+				const text = await documentText(abs);
+				if (text === null) {
+					throw new Error(`Night Shift cannot read the text of "${clean}".`);
+				}
+				const cut = cutText(text, bytes);
+				return {
+					path: clean,
+					title: describeDocumentText(text.slice(0, 4096), fallback || name)
+						.title,
+					text: cut.text,
+					size: cut.size,
+					truncated: cut.size > bytes,
+				};
+			}
 			const read = await readStart(abs, bytes);
 			if (!read) return null;
 			if (read.text.includes("\u0000")) {
 				throw new Error(`"${clean}" is not a text file.`);
 			}
-			const name = clean.split("/").at(-1) ?? clean;
-			const fallback = name.slice(0, name.length - extname(name).length);
 			const title =
 				isText(clean) && clean !== INDEX_FILE
 					? describeText(read.text.slice(0, 4096), fallback || name).title

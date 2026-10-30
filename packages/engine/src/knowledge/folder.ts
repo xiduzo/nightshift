@@ -11,6 +11,7 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
+import { documentText, isDocument } from "./documents";
 
 /**
  * The knowledge folder of a project: markdown (and any other files) that
@@ -25,7 +26,8 @@ import { dirname, extname, join } from "node:path";
  * sentence and when it last changed. It writes it again when it is stale
  * (a file is newer than it, or a file came or went) at the moment an agent
  * gets the folder and when the Knowledge page reads it. Nothing loads the
- * files into a prompt: the agent reads `INDEX.md`, then greps.
+ * files into a prompt: the agent reads `INDEX.md`, then searches or greps.
+ * A PDF or Word file shows with the title and first sentence of its text.
  *
  * `learnings/` is Night Shift's own: what agents proposed to learn wait in
  * `learnings/proposed/` until a person accepts them into
@@ -58,8 +60,11 @@ export const PROPOSED_DIR = "learnings/proposed";
 const MAX_FILES = 20_000;
 /** What the index reads of a file for its title and first sentence. */
 const HEAD_BYTES = 4096;
-/** The files whose text the index reads. Any other file shows its name only. */
+/** The files whose text the index reads, besides PDF and Word files. Any other file shows its name only. */
 export const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
+/** The first line of the index's text: an index without it is written again. */
+const INDEX_INTRO =
+	"Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. PDF and Word files too. Read a file, or grep the folder, for more.";
 
 /** Whether an id is one file or folder name: nothing that could leave the folder. */
 const isId = (id: string) => /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
@@ -150,13 +155,15 @@ export function createKnowledgeFolders(dataDir: string) {
 			const { files, newest } = await walk(path);
 			const indexPath = join(path, INDEX_FILE);
 			const written = await stat(indexPath).catch(() => null);
+			const text =
+				written === null
+					? ""
+					: await readFile(indexPath, "utf8").catch(() => "");
 			const stale =
 				written === null ||
 				newest > written.mtimeMs ||
-				!samePaths(
-					indexedPaths(await readFile(indexPath, "utf8").catch(() => "")),
-					files,
-				);
+				!text.includes(INDEX_INTRO) ||
+				!samePaths(indexedPaths(text), files);
 			if (stale) await writeAtomic(indexPath, await indexText(path, files));
 			return files;
 		},
@@ -224,7 +231,7 @@ async function indexText(
 		files.map(async (file) => {
 			const { title, sentence } = await describe(
 				join(dir, ...file.path.split("/")),
-				file.path,
+				file,
 			);
 			const day = new Date(file.changedAt).toISOString().slice(0, 10);
 			return `- \`${file.path}\`: ${title}${sentence ? `. ${sentence}` : ""} (changed ${day})`;
@@ -233,25 +240,76 @@ async function indexText(
 	return [
 		"# Knowledge index",
 		"",
-		"Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. Read a file, or grep the folder, for more.",
+		INDEX_INTRO,
 		"",
 		...(lines.length > 0 ? lines : ["No files yet."]),
 		"",
 	].join("\n");
 }
 
-/** A file's title and first sentence, from its first bytes. */
+type Description = { title: string; sentence: string };
+
+/**
+ * What the index said of each document, by its path on disk, while its
+ * size and time of change stay: an index written again reads a PDF once.
+ */
+const described = new Map<
+	string,
+	{ size: number; changedAt: number; description: Description }
+>();
+
+/** A file's title and first sentence: from its first bytes, or a document's text. */
 async function describe(
 	abs: string,
-	path: string,
-): Promise<{ title: string; sentence: string }> {
-	const name = path.split("/").at(-1) ?? path;
+	file: KnowledgeFile,
+): Promise<Description> {
+	const name = file.path.split("/").at(-1) ?? file.path;
 	const fallback = name.slice(0, name.length - extname(name).length) || name;
+	if (isDocument(name)) {
+		const kept = described.get(abs);
+		if (kept?.size === file.size && kept.changedAt === file.changedAt) {
+			return kept.description;
+		}
+		const text = await documentText(abs);
+		const description =
+			text === null
+				? { title: name, sentence: "" }
+				: describeDocumentText(text.slice(0, HEAD_BYTES), fallback);
+		if (described.size >= MAX_FILES) described.clear();
+		described.set(abs, {
+			size: file.size,
+			changedAt: file.changedAt,
+			description,
+		});
+		return description;
+	}
 	if (!TEXT_FILES.has(extname(name).toLowerCase())) {
 		return { title: name, sentence: "" };
 	}
 	const head = await readHead(abs);
 	return describeText(head, fallback);
+}
+
+/**
+ * The title and first sentence of a document's text: its first line is
+ * the title when it is short and ends without a stop, else the file name.
+ */
+export function describeDocumentText(
+	text: string,
+	fallback: string,
+): Description {
+	const lines = text
+		.split("\n")
+		.map(oneLine)
+		.filter((line) => line !== "");
+	const first = lines[0] ?? "";
+	const isTitle =
+		first.length > 0 && first.length <= 100 && !/[.!?:;,]$/.test(first);
+	const rest = isTitle ? lines.slice(1) : lines;
+	return {
+		title: isTitle ? first : fallback,
+		sentence: rest.length > 0 ? firstSentence(rest.join(" ")) : "",
+	};
 }
 
 /**

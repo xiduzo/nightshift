@@ -25,6 +25,8 @@
 		"@nightshift/refusal": "workspace:*",
 		"ajv": "^8.20.0",
 		"drizzle-orm": "catalog:",
+		"mammoth": "1.13.0",
+		"unpdf": "2.1.0",
 		"yjs": "catalog:",
 		"zod": "catalog:"
 	},

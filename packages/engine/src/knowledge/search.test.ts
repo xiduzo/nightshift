@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { tinyDocx, tinyPdf } from "../testing/documents";
 import { createKnowledgeFolders } from "./folder";
 import {
 	createKnowledgeSearch,
@@ -256,5 +257,53 @@ describe("reading a file", () => {
 	test("says a binary file is not text", async () => {
 		await writeFile(join(dir, "a.bin"), Buffer.from([0, 1, 2]));
 		await expect(search.read("p1", "a.bin")).rejects.toThrow("not a text file");
+	});
+});
+
+describe("PDF and Word files", () => {
+	const putBytes = async (path: string, bytes: Uint8Array) => {
+		await mkdir(join(dir, path, ".."), { recursive: true });
+		await writeFile(join(dir, path), bytes);
+	};
+
+	test("are found by the words of their text, with a title", async () => {
+		await putBytes(
+			"docs/release.pdf",
+			tinyPdf(["Release checklist", "We ship the quokka service on Fridays."]),
+		);
+		await putBytes(
+			"docs/onboarding.docx",
+			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
+		);
+		const [pdf] = await search.search("p1", "quokka");
+		expect(pdf?.path).toBe("docs/release.pdf");
+		expect(pdf?.title).toBe("Release checklist");
+		expect(snippet(pdf)).toContain("[quokka]");
+		const [docx] = await search.search("p1", "wombat");
+		expect(docx?.path).toBe("docs/onboarding.docx");
+		expect(docx?.title).toBe("Onboarding guide");
+	});
+
+	test("read gives their text, cut at the size asked for", async () => {
+		await putBytes(
+			"guide.docx",
+			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
+		);
+		const read = await search.read("p1", "guide.docx");
+		expect(read?.title).toBe("Onboarding guide");
+		expect(read?.text).toContain("Every new teammate meets the wombat.");
+		expect(read?.truncated).toBe(false);
+		const cut = await search.read("p1", "guide.docx", { maxBytes: 10 });
+		expect(cut?.text).toBe("Onboarding");
+		expect(cut?.truncated).toBe(true);
+		expect(cut?.size).toBe(Buffer.byteLength(read?.text ?? ""));
+	});
+
+	test("one that does not open is found by its path, and read says so", async () => {
+		await putBytes("broken.pdf", new TextEncoder().encode("not a pdf"));
+		expect(paths(await search.search("p1", "broken"))).toEqual(["broken.pdf"]);
+		await expect(search.read("p1", "broken.pdf")).rejects.toThrow(
+			"cannot read the text",
+		);
 	});
 });
