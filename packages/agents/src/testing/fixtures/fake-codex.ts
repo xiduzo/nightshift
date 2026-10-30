@@ -11,6 +11,11 @@
  * `$FAKE_CODEX_SLEEP_MS`, the agent message `$FAKE_CODEX_TEXT` (default
  * `Done.`), and `turn.completed`, or `turn.failed` with the message
  * `$FAKE_CODEX_FAIL` when that is set.
+ *
+ * `$FAKE_CODEX_TODOS`, a JSON array of to-do lists, sends them as Codex
+ * does: the first as `item.started` of a `todo_list` item, each later one as
+ * `item.updated` with the whole list, and the last again as `item.completed`
+ * at the end of the turn.
  */
 import { appendFileSync } from "node:fs";
 
@@ -86,7 +91,20 @@ if (!resumed) print({ type: "thread.started", thread_id: "fake-thread" });
 print({ type: "turn.started" });
 
 const calls: Call[] = JSON.parse(process.env.FAKE_CODEX_CALLS ?? "[]");
+const todos: unknown[][] = JSON.parse(process.env.FAKE_CODEX_TODOS ?? "[]");
 let id = 0;
+const todoId = `item_${++id}`;
+const todoItem = (items: unknown[]) => ({
+	id: todoId,
+	type: "todo_list",
+	items,
+});
+todos.forEach((items, index) => {
+	print({
+		type: index === 0 ? "item.started" : "item.updated",
+		item: todoItem(items),
+	});
+});
 for (const call of calls) {
 	const item = {
 		id: `item_${++id}`,
@@ -116,6 +134,8 @@ const text = process.env.FAKE_CODEX_TEXT ?? "Done.";
 const message = { id: `item_${++id}`, type: "agent_message", text };
 print({ type: "item.started", item: { ...message, text: "" } });
 print({ type: "item.completed", item: message });
+const lastTodos = todos.at(-1);
+if (lastTodos) print({ type: "item.completed", item: todoItem(lastTodos) });
 
 const failure = process.env.FAKE_CODEX_FAIL;
 print(

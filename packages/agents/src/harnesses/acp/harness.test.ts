@@ -43,9 +43,13 @@ function input(overrides: Partial<AgentSessionInput> = {}): AgentSessionInput {
 	};
 }
 
-async function run(overrides: Partial<AgentSessionInput> = {}) {
+async function run(
+	overrides: Partial<AgentSessionInput> = {},
+	env: Record<string, string> = {},
+) {
 	const executable = await fakeBin(dir, "copilot", "fake-acp", {
 		FAKE_ACP_LOG: log,
+		...env,
 	});
 	const events: AgentEvent[] = [];
 	for await (const event of acpHarness("copilot", { executable }).run(
@@ -95,6 +99,49 @@ describe("acpHarness", () => {
 		expect(entry(lines, "report")).toEqual({ type: "report", isError: false });
 		// The sandbox marker does not stay in the worktree.
 		expect(await readdir(cwd)).toEqual([]);
+	});
+
+	test("each plan replaces the agent's to-do list", async () => {
+		const first = [
+			{ content: "Run the tests", priority: "high", status: "in_progress" },
+			{ content: "Fix what fails", priority: "medium", status: "pending" },
+		];
+		const second = [
+			{ content: "Run the tests", priority: "high", status: "completed" },
+			{ content: "Fix what fails", priority: "medium", status: "in_progress" },
+		];
+		const events = await run(
+			{},
+			{ FAKE_ACP_PLANS: JSON.stringify([first, second]) },
+		);
+		const plan = events.filter(
+			(event) => "toolCallId" in event && event.toolCallId === "plan",
+		);
+		expect(plan).toEqual([
+			{ type: "tool-start", toolCallId: "plan", name: "todo_list" },
+			{
+				type: "tool-end",
+				toolCallId: "plan",
+				name: "todo_list",
+				input: { items: first },
+			},
+			{
+				type: "tool-result",
+				toolCallId: "plan",
+				content: JSON.stringify({ items: first }),
+			},
+			{
+				type: "tool-end",
+				toolCallId: "plan",
+				name: "todo_list",
+				input: { items: second },
+			},
+			{
+				type: "tool-result",
+				toolCallId: "plan",
+				content: JSON.stringify({ items: second }),
+			},
+		]);
 	});
 
 	test("acceptEdits refuses a shell command, bypassPermissions allows it", async () => {

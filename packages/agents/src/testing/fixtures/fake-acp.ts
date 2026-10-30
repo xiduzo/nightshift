@@ -10,6 +10,9 @@
  * `FAKE_ACP_CONFIG`: `options` offers the model and a thought level as
  * session config options (as pi-acp and OpenCode 2.x do). A model it does
  * not list is refused.
+ *
+ * `FAKE_ACP_PLANS`: a JSON array of plans (each an array of plan entries),
+ * sent as `plan` updates after the first text chunk.
  * Without an MCP server, the agent reports with a text line instead.
  */
 import { appendFileSync } from "node:fs";
@@ -30,6 +33,7 @@ const servers = new Map<string, HttpServer[]>();
 
 const MODELS = ["fake/default", "ollama/qwen3-coder:latest"];
 const offer = process.env.FAKE_ACP_CONFIG;
+const plans: acp.PlanEntry[][] = JSON.parse(process.env.FAKE_ACP_PLANS ?? "[]");
 
 /** What a new or loaded session offers, per `FAKE_ACP_CONFIG`. */
 function offered(): Partial<acp.NewSessionResponse> {
@@ -172,6 +176,12 @@ class FakeAgent implements acp.Agent {
 				content: { type: "text", text: "Running the tests." },
 			},
 		});
+		for (const entries of plans) {
+			await this.connection.sessionUpdate({
+				sessionId,
+				update: { sessionUpdate: "plan", entries },
+			});
+		}
 		const permission = await this.connection.requestPermission({
 			sessionId,
 			toolCall: { toolCallId: "run_1", title: "npm test", kind: "execute" },

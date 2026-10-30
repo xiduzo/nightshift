@@ -233,6 +233,9 @@ export function observeAcpTextEvent(
 		: { ...next, resultText: (next.resultText ?? "") + text };
 }
 
+/** The adapter's CUSTOM event with the agent's plan: its to-do list. pi sends none. */
+const acpPlanEvent = (name: string) => `${name}.plan`;
+
 /**
  * The session knobs of one ACP agent. Bridged tools are always allowed, so
  * plan mode reports with the tool too. MCP servers reach the agent over ACP
@@ -246,6 +249,7 @@ export function acpSpec(name: string, agent: AcpAgent): HarnessSpec {
 			label: agent.label,
 			// `acpCompatible` emits `<name>.session-id`.
 			sessionEvent: `${name}.session-id`,
+			planEvent: acpPlanEvent(name),
 			createObserver: () => (mcp ? observeAcpEvent : observeAcpTextEvent),
 		},
 		report: mcp ? "tool" : "text",
@@ -347,6 +351,7 @@ async function acpAdapter(
 		authMode: "host",
 		permissionMode: acpPermission(input.permissionMode),
 		refusalMessage: `${agent.label} refused the request.`,
+		planEventName: acpPlanEvent(name),
 		...(Object.keys(env).length > 0 ? { env } : {}),
 	})(input.model);
 	return { adapter, ...(readOnly ? { cleanup: readOnly.cleanup } : {}) };

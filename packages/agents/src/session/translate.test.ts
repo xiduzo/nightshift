@@ -4,6 +4,7 @@ import {
 	CLAUDE_CODE_PROFILE,
 	observeSdkMessage,
 } from "../harnesses/claude-code/profile";
+import { CODEX_PROFILE } from "../harnesses/codex/harness";
 import type { AgentEvent } from "../port/types";
 import {
 	createTranslator,
@@ -1524,6 +1525,172 @@ describe("harness profiles", () => {
 		expect(t.finish({ aborted: true })).toEqual([
 			{ type: "tool-end", toolCallId: "c3", name: "bash", input: {} },
 			{ type: "error", kind: "aborted", message: "The session was aborted" },
+		]);
+	});
+
+	test("a raw tool input wins over the input of TOOL_CALL_END", () => {
+		const t = createTranslator({ fallbackSessionId: "f", profile: profile() });
+		t.push({
+			type: "CUSTOM",
+			name: "other.session-id",
+			value: { sessionId: "s" },
+		});
+		t.observeSdk({ toolInputs: { c1: { items: ["a"] } } });
+		expect(
+			[
+				{ type: "TOOL_CALL_START", toolCallId: "c1", toolCallName: "x" },
+				{
+					type: "TOOL_CALL_END",
+					toolCallId: "c1",
+					toolCallName: "x",
+					input: {},
+				},
+			].flatMap((c) => t.push(c)),
+		).toEqual([
+			{ type: "tool-start", toolCallId: "c1", name: "x" },
+			{
+				type: "tool-end",
+				toolCallId: "c1",
+				name: "x",
+				input: { items: ["a"] },
+			},
+		]);
+	});
+
+	test("each plan replaces the list of one todo_list call", () => {
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			profile: profile({ planEvent: "other.plan" }),
+		});
+		const plan = (status: string) => ({
+			type: "CUSTOM",
+			name: "other.plan",
+			value: { entries: [{ content: "Fix", priority: "high", status }] },
+		});
+		// A plan before the session id waits for it.
+		expect(t.push(plan("pending"))).toEqual([]);
+		const items = (status: string) => ({
+			items: [{ content: "Fix", priority: "high", status }],
+		});
+		expect(
+			t.push({
+				type: "CUSTOM",
+				name: "other.session-id",
+				value: { sessionId: "s" },
+			}),
+		).toEqual([
+			{ type: "session", sessionId: "s" },
+			{ type: "tool-start", toolCallId: "plan", name: "todo_list" },
+			{
+				type: "tool-end",
+				toolCallId: "plan",
+				name: "todo_list",
+				input: items("pending"),
+			},
+			{
+				type: "tool-result",
+				toolCallId: "plan",
+				content: JSON.stringify(items("pending")),
+			},
+		]);
+		expect(t.push(plan("completed"))).toEqual([
+			{
+				type: "tool-end",
+				toolCallId: "plan",
+				name: "todo_list",
+				input: items("completed"),
+			},
+			{
+				type: "tool-result",
+				toolCallId: "plan",
+				content: JSON.stringify(items("completed")),
+			},
+		]);
+		// The same plan again changes nothing.
+		expect(t.push(plan("completed"))).toEqual([]);
+	});
+
+	test("a plan event is nothing for a profile without one", () => {
+		const t = createTranslator({ fallbackSessionId: "f", profile: profile() });
+		t.push({
+			type: "CUSTOM",
+			name: "other.session-id",
+			value: { sessionId: "s" },
+		});
+		expect(
+			t.push({ type: "CUSTOM", name: "other.plan", value: { entries: [] } }),
+		).toEqual([]);
+	});
+
+	test("Codex: the to-do list is live, and its answer closes it", () => {
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			profile: CODEX_PROFILE,
+		});
+		const list = (done: boolean) => [
+			{ text: "Read the code", completed: true },
+			{ text: "Fix the bug", completed: done },
+		];
+		const todo = (type: string, done: boolean) => ({
+			type,
+			item: { id: "item_0", type: "todo_list", items: list(done) },
+		});
+		const events: AgentEvent[] = [];
+		// The adapter logs each raw event before it yields its chunks.
+		const raw = (event: unknown, ...chunks: unknown[]) => {
+			t.observeSdk(event);
+			events.push(...t.drain(), ...chunks.flatMap((c) => t.push(c)));
+		};
+		raw(
+			{ type: "thread.started", thread_id: "th" },
+			{
+				type: "CUSTOM",
+				name: "codex.session-id",
+				value: { sessionId: "th" },
+			},
+		);
+		raw(
+			todo("item.started", false),
+			{
+				type: "TOOL_CALL_START",
+				toolCallId: "item_0",
+				toolCallName: "todo_list",
+			},
+			{
+				type: "TOOL_CALL_END",
+				toolCallId: "item_0",
+				toolCallName: "todo_list",
+				input: {},
+			},
+		);
+		raw(todo("item.updated", true));
+		// The same list again changes nothing.
+		raw(todo("item.updated", true));
+		raw(todo("item.completed", true), {
+			type: "TOOL_CALL_RESULT",
+			toolCallId: "item_0",
+			content: JSON.stringify({ items: list(true) }),
+		});
+		expect(events).toEqual([
+			{ type: "session", sessionId: "th" },
+			{ type: "tool-start", toolCallId: "item_0", name: "todo_list" },
+			{
+				type: "tool-end",
+				toolCallId: "item_0",
+				name: "todo_list",
+				input: { items: list(false) },
+			},
+			{
+				type: "tool-end",
+				toolCallId: "item_0",
+				name: "todo_list",
+				input: { items: list(true) },
+			},
+			{
+				type: "tool-result",
+				toolCallId: "item_0",
+				content: JSON.stringify({ items: list(true) }),
+			},
 		]);
 	});
 

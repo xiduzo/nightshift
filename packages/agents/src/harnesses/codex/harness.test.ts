@@ -156,6 +156,59 @@ describe("codexHarness", () => {
 		expect(await readdir(cwd)).toEqual([]);
 	});
 
+	test("a to-do list shows each update while Codex works", async () => {
+		const first = [
+			{ text: "Read the code", completed: false },
+			{ text: "Fix the bug", completed: false },
+		];
+		const second = [
+			{ text: "Read the code", completed: true },
+			{ text: "Fix the bug", completed: false },
+		];
+		const third = [
+			{ text: "Read the code", completed: true },
+			{ text: "Fix the bug", completed: true },
+		];
+		const { harness } = await fakeCodex({
+			FAKE_CODEX_TODOS: JSON.stringify([first, second, third]),
+		});
+		const events = await collect(harness.run(input()));
+		const todo = events.filter(
+			(event) => "toolCallId" in event && event.toolCallId === "item_1",
+		);
+		expect(todo).toEqual([
+			{ type: "tool-start", toolCallId: "item_1", name: "todo_list" },
+			{
+				type: "tool-end",
+				toolCallId: "item_1",
+				name: "todo_list",
+				input: { items: first },
+			},
+			{
+				type: "tool-end",
+				toolCallId: "item_1",
+				name: "todo_list",
+				input: { items: second },
+			},
+			{
+				type: "tool-end",
+				toolCallId: "item_1",
+				name: "todo_list",
+				input: { items: third },
+			},
+			{
+				type: "tool-result",
+				toolCallId: "item_1",
+				content: JSON.stringify({ items: third }),
+			},
+		]);
+		// The updates come before the answer: the list is live, not only at the end.
+		const lastUpdate = events.findLastIndex((e) => e.type === "tool-end");
+		const text = events.findIndex((e) => e.type === "text");
+		expect(lastUpdate).toBeLessThan(text);
+		expect(events.at(-1)?.type).toBe("finished");
+	});
+
 	test("plan mode: read-only, and still the report tool", async () => {
 		const { log, harness } = await fakeCodex();
 		await collect(

@@ -44,11 +44,16 @@
  * Each becomes a `thinking` event. Redacted thinking never reaches a chunk,
  * and REASONING_ENCRYPTED_VALUE chunks are dropped: no ciphertext goes out.
  *
- * Subagents: the adapters drop a subagent's messages from the chunks. A
- * profile that can read them from the raw messages (`createSubagentReader`)
- * turns them into events with `parentToolCallId`. They arrive while the
- * chunk stream is quiet, so the translator queues them: `push` and
- * `finish` send them first, and `drain` sends them in between (`whenQueued`).
+ * Raw events: the adapters drop some of what the raw messages say from the
+ * chunks: a subagent's messages, the updates of Codex's to-do list. A
+ * profile that can read them (`createEventReader`) turns them into events
+ * (a subagent's with `parentToolCallId`). They arrive while the chunk
+ * stream is quiet, so the translator queues them: `push` and `finish` send
+ * them first, and `drain` sends them in between (`whenQueued`).
+ *
+ * To-do lists the harness keeps itself (Codex's to-do list, an ACP agent's
+ * plan) show as a `todo_list` call: the list as `{items}` in its input
+ * while the agent works, each update a new `tool-end` that replaces it.
  *
  * Over 600 lines on purpose: the translator is one state machine over one
  * stream, and the failure texts it sorts belong with it. What one harness
@@ -105,7 +110,10 @@ export type SdkSignals = {
 	 * adapter's RUN_FINISHED.
 	 */
 	done?: boolean;
-	/** Tool inputs by call id, read from the raw messages (the last one wins). */
+	/**
+	 * Tool inputs by call id, read from the raw messages (the last one wins).
+	 * They win over the input of the adapter's TOOL_CALL_END.
+	 */
 	toolInputs?: Readonly<Record<string, unknown>>;
 	/** Text message ids that are not assistant text (OpenCode echoes the prompt). */
 	hiddenTextIds?: ReadonlySet<string>;
@@ -291,6 +299,12 @@ function isErrorResult(chunk: AgUiChunk): boolean {
 	return tanstack?.state === "output-error";
 }
 
+/** The tool name of a to-do list the harness keeps itself: Codex's, and an ACP agent's plan. */
+export const TODO_LIST = "todo_list";
+
+/** The call id of an agent's plan: one call per session. */
+const PLAN_CALL_ID = "plan";
+
 /** The result the adapter synthesizes for a call the run never resolved. */
 const INTERRUPTED_RESULT = JSON.stringify({ status: "interrupted" });
 
@@ -375,11 +389,18 @@ export type HarnessProfile = {
 	/** The same for the artifact tool (`mcp__tanstack__save_artifact`). */
 	artifactToolId?: string;
 	/**
-	 * A fresh reader of the raw messages for subagent events, one per
-	 * session. It returns the events of a subagent's message (each with
-	 * `parentToolCallId`), and none for any other message.
+	 * A fresh reader of the raw messages for the events the chunks do not
+	 * carry, one per session: a subagent's message (each event with
+	 * `parentToolCallId`), an update of a to-do list. It returns no events
+	 * for any other message.
 	 */
-	createSubagentReader?: () => (message: unknown) => AgentEvent[];
+	createEventReader?: () => (message: unknown) => AgentEvent[];
+	/**
+	 * The name of the adapter's CUSTOM event that carries the agent's plan
+	 * (ACP's `plan` update, `{entries}`). Each plan replaces the whole list:
+	 * it shows as one `todo_list` call per session.
+	 */
+	planEvent?: string;
 	/**
 	 * The name of any other bridged tool in the harness's allow rules, when
 	 * the harness asks before it runs one (Claude Code: `mcp__tanstack__<name>`).
@@ -421,8 +442,8 @@ export function createTranslator(options: {
 	const rules = reportRules(options.stepReport);
 	const profile = options.profile;
 	const observe = profile.createObserver();
-	const readSubagent = profile.createSubagentReader?.();
-	/** Subagent events from the raw messages, waiting for `push`, `drain` or `finish`. */
+	const readEvents = profile.createEventReader?.();
+	/** Events from the raw messages, waiting for `push`, `drain` or `finish`. */
 	const queued: AgentEvent[] = [];
 	/** Resolves the pending `whenQueued` promises. */
 	const waiting: (() => void)[] = [];
@@ -449,6 +470,36 @@ export function createTranslator(options: {
 	const isReportCall = (toolCallId: string, name: string | undefined) =>
 		rules !== undefined &&
 		(reportCalls.has(toolCallId) || isReportTool(name, profile.reportToolId));
+	/** The last plan sent, as JSON. */
+	let lastPlan: string | undefined;
+
+	/**
+	 * The events of one plan: the first opens the session's plan call, each
+	 * one replaces its list. A plan the same as the last sends nothing: the
+	 * loop guard would count it as the same call again.
+	 */
+	function plan(value: unknown): AgentEvent[] {
+		const entries =
+			isRecord(value) && Array.isArray(value.entries) ? value.entries : [];
+		const items = { items: entries };
+		const content = JSON.stringify(items);
+		if (content === lastPlan) return [];
+		const start: AgentEvent[] =
+			lastPlan === undefined
+				? [{ type: "tool-start", toolCallId: PLAN_CALL_ID, name: TODO_LIST }]
+				: [];
+		lastPlan = content;
+		return [
+			...start,
+			{
+				type: "tool-end",
+				toolCallId: PLAN_CALL_ID,
+				name: TODO_LIST,
+				input: items,
+			},
+			{ type: "tool-result", toolCallId: PLAN_CALL_ID, content },
+		];
+	}
 
 	function emit(events: AgentEvent[]): AgentEvent[] {
 		if (sessionEmitted) return events;
@@ -459,6 +510,12 @@ export function createTranslator(options: {
 	function translate(chunk: AgUiChunk): AgentEvent[] {
 		switch (chunk.type) {
 			case "CUSTOM": {
+				if (
+					profile.planEvent !== undefined &&
+					chunk.name === profile.planEvent
+				) {
+					return emit(plan(chunk.value));
+				}
 				if (chunk.name !== profile.sessionEvent || sessionEmitted) return [];
 				const value = isRecord(chunk.value) ? chunk.value : {};
 				const sessionId = asString(value.sessionId);
@@ -511,7 +568,7 @@ export function createTranslator(options: {
 					type: "tool-end",
 					toolCallId,
 					name: toolName(chunk) ?? toolNames.get(toolCallId) ?? "unknown",
-					input: toolInput(chunk),
+					input: rawInput(toolCallId, toolInput(chunk)),
 				};
 				if (profile.toolInputFromSignals) {
 					heldEnds.set(toolCallId, end);
@@ -698,8 +755,8 @@ export function createTranslator(options: {
 		},
 		observeSdk(message) {
 			signals = observe(signals, message);
-			if (finished || !readSubagent) return;
-			queued.push(...emit(readSubagent(message)));
+			if (finished || !readEvents) return;
+			queued.push(...emit(readEvents(message)));
 			if (queued.length > 0) for (const resolve of waiting.splice(0)) resolve();
 		},
 		drain() {

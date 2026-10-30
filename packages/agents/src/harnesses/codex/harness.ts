@@ -16,6 +16,7 @@
  * tested against a fake `codex` that speaks the JSONL the adapter expects.
  */
 import type {
+	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
 	Effort,
@@ -31,6 +32,7 @@ import {
 	harnessSession,
 	readOnlyInput,
 	type SdkSignals,
+	TODO_LIST,
 } from "../../session";
 import { harnessFacts } from "../facts";
 import { CODEX_ADAPTER } from "./record";
@@ -139,10 +141,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * The id and list of a Codex to-do list event (`item.started`,
+ * `item.updated` or `item.completed` with a `todo_list` item). Codex sends
+ * the whole list each time: `{items: [{text, completed}]}`.
+ */
+function todoListOf(
+	raw: Record<string, unknown>,
+): { id: string; input: { items: unknown[] } } | undefined {
+	const item = isRecord(raw.item) ? raw.item : undefined;
+	if (item?.type !== TODO_LIST || typeof item.id !== "string") return undefined;
+	return {
+		id: item.id,
+		input: { items: Array.isArray(item.items) ? item.items : [] },
+	};
+}
+
+/**
  * Read the raw Codex JSONL events: the last agent message (for a text
  * report), the usage of `turn.completed`, the failure of `turn.failed` or a
- * fatal `error`, and a network hint from non-fatal error items (Codex
- * reports its reconnects there).
+ * fatal `error`, a network hint from non-fatal error items (Codex reports
+ * its reconnects there), and the to-do list as the input of its call (the
+ * adapter gives it none).
  */
 export function observeCodexEvent(
 	signals: SdkSignals,
@@ -153,6 +172,13 @@ export function observeCodexEvent(
 		case "item.started":
 		case "item.updated":
 		case "item.completed": {
+			const todo = todoListOf(raw);
+			if (todo) {
+				return {
+					...signals,
+					toolInputs: { ...signals.toolInputs, [todo.id]: todo.input },
+				};
+			}
 			const item = isRecord(raw.item) ? raw.item : {};
 			const text = typeof item.text === "string" ? item.text : undefined;
 			if (item.type === "agent_message" && text !== undefined) {
@@ -199,10 +225,41 @@ export function observeCodexEvent(
 	}
 }
 
+/**
+ * A reader of the raw Codex events for each update of a to-do list: a
+ * `tool-end` with the whole new list. The adapter opens the call on
+ * `item.started` and closes it on `item.completed`, which Codex sends only
+ * at the end of the turn. It drops `item.updated`. A list the same as the
+ * last sends nothing: the loop guard would count it as the same call again.
+ */
+export function createCodexTodoReader(): (raw: unknown) => AgentEvent[] {
+	/** The last list of each call the adapter opened, as JSON. */
+	const lists = new Map<string, string>();
+	return (raw) => {
+		if (!isRecord(raw)) return [];
+		const todo = todoListOf(raw);
+		if (!todo) return [];
+		const list = JSON.stringify(todo.input);
+		if (raw.type === "item.started") lists.set(todo.id, list);
+		if (raw.type !== "item.updated" || !lists.has(todo.id)) return [];
+		if (lists.get(todo.id) === list) return [];
+		lists.set(todo.id, list);
+		return [
+			{
+				type: "tool-end",
+				toolCallId: todo.id,
+				name: TODO_LIST,
+				input: todo.input,
+			},
+		];
+	};
+}
+
 export const CODEX_PROFILE: HarnessProfile = {
 	label: "Codex",
 	sessionEvent: CODEX_SESSION_EVENT,
 	createObserver: () => observeCodexEvent,
+	createEventReader: createCodexTodoReader,
 };
 
 /**
