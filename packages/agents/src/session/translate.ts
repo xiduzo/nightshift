@@ -282,6 +282,16 @@ function isErrorResult(chunk: AgUiChunk): boolean {
 /** The result the adapter synthesizes for a call the run never resolved. */
 const INTERRUPTED_RESULT = JSON.stringify({ status: "interrupted" });
 
+/**
+ * The adapter's report that the harness program itself failed: its exit
+ * code and the tail of its error output. A crash, not the harness's own
+ * words, so it is sorted like a throw.
+ */
+const PROCESS_EXIT = /^Agent process exited with code \d+/;
+
+/** The error output of a program the system could not find or start. */
+const NOT_STARTED = /\bENOENT\b|command not found|No such file or directory/i;
+
 /** The text of an error the chunk stream threw: what the failure checks read, never what a person sees. */
 function thrownText(error: unknown, label: string): string {
 	if (error instanceof Error && error.message) return error.message;
@@ -304,6 +314,9 @@ function thrownWords(
 	console.error(`[agents] the ${label} session failed:`, error);
 	if (kind === "usage-limit") return `${label} reached its usage limit.`;
 	if (kind === "network") return `${label} lost its connection.`;
+	if (error instanceof Error && NOT_STARTED.test(error.message)) {
+		return `${label} did not start. Check that it is installed on this computer.`;
+	}
 	return `${label} stopped with an error. Night Shift saved the details. Try again.`;
 }
 
@@ -564,12 +577,18 @@ export function createTranslator(options: {
 
 		// The harness's own report of a failure is its words. A throw is not:
 		// its text only sorts the failure, and the person sees plain words.
-		const reported = signals.resultError ?? runError;
+		// Neither is a crash of the harness program, which the adapter reports.
+		const crash =
+			runError !== undefined && PROCESS_EXIT.test(runError)
+				? new Error(runError)
+				: undefined;
+		const reported = signals.resultError ?? (crash ? undefined : runError);
+		const raised = thrown ?? crash;
 		const failure =
 			reported ??
-			(thrown !== undefined ? thrownText(thrown, profile.label) : undefined);
+			(raised !== undefined ? thrownText(raised, profile.label) : undefined);
 		const shown = (kind: AgentErrorKind) =>
-			reported ?? thrownWords(thrown, profile.label, kind);
+			reported ?? thrownWords(raised, profile.label, kind);
 
 		if (signals.usageLimit) {
 			const { message, resetAt } = signals.usageLimit;

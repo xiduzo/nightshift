@@ -121,7 +121,7 @@ describe("streamSession", () => {
 				type: "error",
 				kind: "harness",
 				message:
-					"Claude Code stopped with an error. Night Shift saved the details. Try again.",
+					"Claude Code did not start. Check that it is installed on this computer.",
 			});
 			expect(logged).toHaveBeenCalled();
 		} finally {

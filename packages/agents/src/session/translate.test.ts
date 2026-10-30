@@ -275,20 +275,66 @@ describe("createTranslator", () => {
 	});
 
 	test("reports a fallback session when the harness fails before init", () => {
-		const events = feed(newTranslator(), [
-			{
-				type: "RUN_ERROR",
-				message: "Agent process exited with code 1: not found",
-			},
-		]);
-		expect(events).toEqual([
-			{ type: "session", sessionId: "fallback" },
-			{
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const events = feed(newTranslator(), [
+				{
+					type: "RUN_ERROR",
+					message: "Agent process exited with code 1: unknown option",
+				},
+			]);
+			expect(events).toEqual([
+				{ type: "session", sessionId: "fallback" },
+				{
+					type: "error",
+					kind: "harness",
+					message:
+						"Claude Code stopped with an error. Night Shift saved the details. Try again.",
+				},
+			]);
+		} finally {
+			logged.mockRestore();
+		}
+	});
+
+	test("a harness program that does not start says to install it; its output goes to the log", () => {
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const text =
+				"Agent process exited with code 1: Error: spawn /nonexistent/claude ENOENT\n    at ChildProcess._handle.onexit";
+			const events = feed(newTranslator(), [
+				{ type: "RUN_ERROR", message: text },
+			]);
+			expect(events.at(-1)).toEqual({
 				type: "error",
 				kind: "harness",
-				message: "Agent process exited with code 1: not found",
-			},
-		]);
+				message:
+					"Claude Code did not start. Check that it is installed on this computer.",
+			});
+			expect(String(logged.mock.calls[0]?.[1])).toContain("ENOENT");
+		} finally {
+			logged.mockRestore();
+		}
+	});
+
+	test("a crash of the harness program still sorts a usage limit by its output", () => {
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const events = feed(newTranslator(), [
+				{
+					type: "RUN_ERROR",
+					message:
+						"Agent process exited with code 1: Claude AI usage limit reached",
+				},
+			]);
+			expect(events.at(-1)).toMatchObject({
+				type: "error",
+				kind: "usage-limit",
+				message: "Claude Code reached its usage limit.",
+			});
+		} finally {
+			logged.mockRestore();
+		}
 	});
 
 	test("an abort wins over every other outcome", () => {
