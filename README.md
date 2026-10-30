@@ -174,7 +174,7 @@ The commands use the project of the current folder. `--project <id, name or fold
 | `get_run` | One run: its status, cost, pull request, steps, and why it failed. |
 | `stop_run` | Stop a run now, or after the step that runs now. |
 | `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
-| `answer_gate` | Answer a Gate with one of its options and a note. The run goes on. |
+| `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
 | `get_digest` | What happened since a time: the runs that ended, and the Gates that wait. |
 | `search_knowledge` | Search the project's knowledge by keyword: the best files, each with its path and an excerpt. |
 | `read_knowledge` | Read one file of the knowledge by its path. |

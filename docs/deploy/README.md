@@ -60,7 +60,7 @@ nightshift serve --data-dir /var/lib/nightshift \
 - `nightshift serve --help` lists every option. Each option also has an
   environment variable.
 
-Two ready-made setups are in [`deploy/`](../../deploy/):
+Three ready-made setups are in [`deploy/`](../../deploy/):
 
 - [`nightshift.service`](../../deploy/nightshift.service): a systemd unit.
 - [`launchd/`](../../deploy/launchd/): the same for a Mac, as launchd agents.
@@ -248,7 +248,7 @@ A server has no keychain. Night Shift reads secrets from files instead:
   the secrets folder. The secrets folder is `NIGHTSHIFT_SECRETS_DIR` (for
   example `/run/secrets` in Docker), else the credentials folder of systemd
   (`LoadCredential=`).
-- A secret you save on the Connections page, and the access to your Hosts,
+- A secret you save on the Secrets page, and the access to your Hosts,
   go in the data folder, in files only the Night Shift user can read.
 
 ### Sign in to a Host without a screen
