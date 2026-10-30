@@ -15,12 +15,14 @@ import { METRICS, type Metric, type MetricValues } from "./metrics";
 
 /**
  * The four numbers on top, flush in one row. A tile switches its number
- * on the chart on or off and fills with its colour while on. Each says how
- * it moved against the nights before, and opens its details.
+ * on the chart on or off and fills with a light shade of its colour while
+ * on. Each says how it moved against the nights before, and opens its
+ * details.
  */
 export function MetricTiles({
 	values,
 	before,
+	compared,
 	on,
 	onChange,
 	onDetails,
@@ -28,6 +30,8 @@ export function MetricTiles({
 	/** Undefined while they load. */
 	values: MetricValues | undefined;
 	before: MetricValues | undefined;
+	/** False while the nights before had no runs to compare with. */
+	compared: boolean;
 	on: Metric[];
 	onChange: (on: Metric[]) => void;
 	onDetails: (metric: Metric) => void;
@@ -41,12 +45,12 @@ export function MetricTiles({
 					<div
 						key={metric.key}
 						className="relative flex border-r last:border-r-0"
-						// A tile that is on takes its colour, as its line on the chart.
+						// A tile that is on takes the colour of its line on the chart.
 						style={
 							pressed
 								? {
-										backgroundColor: metric.color,
-										color: "var(--background)",
+										backgroundColor: `var(--metric-${metric.key}-tile)`,
+										color: `var(--metric-${metric.key}-tile-foreground)`,
 									}
 								: undefined
 						}
@@ -78,16 +82,16 @@ export function MetricTiles({
 								<Change
 									metric={metric.key}
 									value={value}
-									before={before[metric.key]}
+									before={compared ? before[metric.key] : undefined}
 								/>
 							) : (
 								<Skeleton className="h-4 w-40" />
 							)}
 						</Toggle>
 						<Button
-							variant="ghost"
+							variant="link"
 							size="xs"
-							className="absolute top-3 right-3 text-inherit hover:bg-foreground/10 hover:text-inherit"
+							className="absolute top-3 right-3 text-inherit"
 							onClick={() => onDetails(metric.key)}
 						>
 							Details
@@ -100,7 +104,10 @@ export function MetricTiles({
 	);
 }
 
-/** How a number moved against the same nights just before. */
+/**
+ * How a number moved against the same nights just before. Undefined
+ * `before` means the nights before had no runs at all.
+ */
 function Change({
 	metric,
 	value,
@@ -108,7 +115,7 @@ function Change({
 }: {
 	metric: Metric;
 	value: number | null;
-	before: number | null;
+	before: number | null | undefined;
 }) {
 	const line = (icon: ReactNode, text: string) => (
 		<span className="flex items-center gap-1 text-xs opacity-80">
@@ -116,8 +123,14 @@ function Change({
 			{text}
 		</span>
 	);
-	if (value === null || before === null) {
-		return line(<MinusIcon />, "No runs ended in one of the two periods");
+	if (before === undefined) {
+		return line(<MinusIcon />, "Nothing to compare with yet");
+	}
+	if (value === null) {
+		return line(<MinusIcon />, "No runs ended in these nights");
+	}
+	if (before === null) {
+		return line(<MinusIcon />, "No runs ended in the nights before");
 	}
 	if (before === 0 && value > 0) {
 		return line(<TrendingUpIcon />, "None in the nights before");

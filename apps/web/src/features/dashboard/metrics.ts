@@ -17,6 +17,7 @@ type Totals = NightsRange["totals"];
 export const METRICS: {
 	key: Metric;
 	label: string;
+	/** Its line on the chart. Its tile uses `--metric-<key>-tile`. */
 	color: string;
 	format: (value: number | null) => string;
 	/** The value of a period or a night. Null when it has none. */
@@ -25,28 +26,28 @@ export const METRICS: {
 	{
 		key: "runs",
 		label: "Runs",
-		color: "var(--chart-2)",
+		color: "var(--metric-runs)",
 		format: (value) => String(value ?? 0),
 		of: (totals) => totals.runs,
 	},
 	{
 		key: "finished",
 		label: "Finished",
-		color: "var(--status-finished)",
+		color: "var(--metric-finished)",
 		format: (value) => (value === null ? "—" : `${value}%`),
 		of: finishedShare,
 	},
 	{
 		key: "spend",
 		label: "Spend",
-		color: "var(--status-sleeping)",
+		color: "var(--metric-spend)",
 		format: (value) => formatCost(value ?? 0),
 		of: (totals) => totals.costUsd,
 	},
 	{
 		key: "gates",
 		label: "Gates asked",
-		color: "var(--status-waiting)",
+		color: "var(--metric-gates)",
 		format: (value) => String(value ?? 0),
 		of: (totals) => totals.gates,
 	},
@@ -82,11 +83,16 @@ function valuesOf(totals: Omit<Totals, "perNight">): MetricValues {
 	) as MetricValues;
 }
 
-/** The metrics of a range: per night for the chart, in all, and before. */
+/**
+ * The metrics of a range: per night for the chart, in all, and before.
+ * `compared` is false while the nights before had no runs at all, so there
+ * is nothing to set them against yet.
+ */
 export function metricsOf(range: NightsRange): {
 	rows: MetricRow[];
 	values: MetricValues;
 	before: MetricValues;
+	compared: boolean;
 } {
 	const rows = range.totals.perNight.map((night, index): MetricRow => {
 		const before = range.before.perNight[index];
@@ -108,5 +114,6 @@ export function metricsOf(range: NightsRange): {
 		rows,
 		values: valuesOf(range.totals),
 		before: valuesOf(range.before),
+		compared: range.before.runs > 0,
 	};
 }

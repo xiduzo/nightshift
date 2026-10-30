@@ -78,6 +78,7 @@ export function ProjectDashboardPage({
 					<MetricTiles
 						values={metrics?.values}
 						before={metrics?.before}
+						compared={metrics?.compared ?? false}
 						on={on}
 						onChange={setOn}
 						onDetails={(metric) => setDetails({ metric, open: true })}
@@ -85,7 +86,11 @@ export function ProjectDashboardPage({
 					<Card>
 						<CardContent>
 							{metrics ? (
-								<MetricsChart rows={metrics.rows} on={on} />
+								<MetricsChart
+									rows={metrics.rows}
+									on={on}
+									compared={metrics.compared}
+								/>
 							) : (
 								<Skeleton className="h-72 w-full" />
 							)}

@@ -71,6 +71,40 @@
 	--outcome-gray: var(--color-gray-400);
 }
 
+/*
+ * The four numbers on a project's page: a line on the chart, and a tile that
+ * takes a light shade of the same color with a dark shade for its text.
+ */
+:root {
+	--metric-runs: var(--color-blue-600);
+	--metric-runs-tile: var(--color-blue-200);
+	--metric-runs-tile-foreground: var(--color-blue-800);
+	--metric-finished: var(--color-green-600);
+	--metric-finished-tile: var(--color-green-200);
+	--metric-finished-tile-foreground: var(--color-green-800);
+	--metric-spend: var(--color-violet-600);
+	--metric-spend-tile: var(--color-violet-200);
+	--metric-spend-tile-foreground: var(--color-violet-800);
+	--metric-gates: var(--color-amber-600);
+	--metric-gates-tile: var(--color-amber-200);
+	--metric-gates-tile-foreground: var(--color-amber-800);
+}
+
+.dark {
+	--metric-runs: var(--color-blue-400);
+	--metric-runs-tile: var(--color-blue-400);
+	--metric-runs-tile-foreground: var(--color-blue-900);
+	--metric-finished: var(--color-green-400);
+	--metric-finished-tile: var(--color-green-400);
+	--metric-finished-tile-foreground: var(--color-green-900);
+	--metric-spend: var(--color-violet-400);
+	--metric-spend-tile: var(--color-violet-400);
+	--metric-spend-tile-foreground: var(--color-violet-900);
+	--metric-gates: var(--color-amber-400);
+	--metric-gates-tile: var(--color-amber-400);
+	--metric-gates-tile-foreground: var(--color-amber-900);
+}
+
 @theme inline {
 	--color-status-running: var(--status-running);
 	--color-status-finished: var(--status-finished);

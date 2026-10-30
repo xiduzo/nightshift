@@ -1,5 +1,4 @@
 import { Button } from "@nightshift/ui/components/button";
-import { Progress } from "@nightshift/ui/components/progress";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
 	Tooltip,
@@ -163,15 +162,8 @@ function RunsCell({ row }: { row: FlowHealthRow }) {
 			{row.rate === null ? (
 				<span className="text-muted-foreground text-xs">None ended yet</span>
 			) : (
-				<span className="flex items-center gap-2">
-					<Progress
-						value={row.rate}
-						aria-label={`${row.rate}% finished`}
-						className="w-24"
-					/>
-					<span className="text-muted-foreground text-xs tabular-nums">
-						{row.rate}% finished
-					</span>
+				<span className="text-muted-foreground text-xs tabular-nums">
+					{row.rate}% finished
 				</span>
 			)}
 		</div>

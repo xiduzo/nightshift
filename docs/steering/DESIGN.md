@@ -79,8 +79,9 @@ An overview shows **at most 5 rows** in a list or table. This covers the section
 A project's page reads like the Performance page of Search Console. Keep its shape:
 
 - One range for the whole page, on top: 7, 30 or 90 nights, in the URL (`?range=30`). No section has a range of its own.
-- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile switches its line on the chart on or off. Each tile always says how its number moved against the same nights just before. That is not a choice.
-- One line chart of the tiles that are on, with the nights before as a dashed line.
+- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile switches its line on the chart on or off. A tile that is on fills with a light shade of its line's color, with a dark shade of it for the text (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same nights just before. That is not a choice.
+- One line chart of the tiles that are on, with the nights before as a dashed line. The tooltip puts the number before in brackets after each number, not on a row of its own.
+- While the nights before had no runs, there is nothing to compare: the tiles and the chart say so, and the chart draws no dashed lines.
 - One card with tabs under the chart. Each tab is an overview list (see Overview lists).
 - What runs or waits now shows in one slim line, only when there is something.
 - **Details** on a tile opens the details dialog of that number at the page's range.
