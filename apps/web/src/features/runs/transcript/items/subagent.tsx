@@ -25,20 +25,21 @@ export function isSubagentCall(item: ToolItem): boolean {
 }
 
 /**
- * The subagent's answer and whether it still works. A subagent that runs
- * in the background answers with its last message. Any other answers with
- * the call's result.
+ * The subagent's answer and whether it still works. Once the call has a
+ * result, the subagent's last message is its answer. A subagent that runs
+ * in the background answers only with that message. Any other answers with
+ * the call's result when it sent no message of its own.
  */
 function subagentState(item: ToolItem, running: boolean) {
 	const steps = item.steps ?? [];
 	const last = steps.at(-1);
 	const background = item.result !== undefined && isLaunchNotice(item.result);
 	const answer: MessageItem | undefined =
-		background && last?.kind === "message" ? last : undefined;
+		item.result !== undefined && last?.kind === "message" ? last : undefined;
 	const working =
 		running &&
 		(item.result === undefined || (background && answer === undefined));
-	const result = background ? answer?.text : item.result;
+	const result = answer?.text ?? (background ? undefined : item.result);
 	return {
 		working,
 		result,
