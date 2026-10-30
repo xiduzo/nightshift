@@ -67,7 +67,7 @@ describe("why a run does not allow an action", () => {
 			"This run waits at a Gate. Answer the Gate, or stop the run first.",
 		);
 		expect(whyNot("move", "running", true)).toBe(
-			"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
+			"The run is in the middle of a step. Move it when it waits, sleeps or is stopped.",
 		);
 		expect(whyNot("restart", "finished", true)).toBe(
 			"This run has ended. Run it again from a step instead.",

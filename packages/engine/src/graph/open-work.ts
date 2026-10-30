@@ -114,7 +114,7 @@ const CUTS = {
 	stopped: {
 		session: {
 			outcome: "stopped",
-			error: "The session was aborted.",
+			error: "The step was stopped.",
 			errorKind: "aborted",
 		},
 		step: "stopped",
@@ -124,7 +124,7 @@ const CUTS = {
 		// As the step's timer ends its session: the abort fails it.
 		session: {
 			outcome: "failed",
-			error: "The session was aborted.",
+			error: "The step was stopped.",
 			errorKind: "aborted",
 		},
 		step: "error",

@@ -170,7 +170,7 @@ export function createToolLaunchers(options: {
 					: ["secrets", "they are", "them"];
 			return {
 				ok: false,
-				message: `The CLI tool ${tool.name} needs the ${noun} ${found.missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or change the tool's login.`,
+				message: `The CLI tool ${tool.name} needs the ${noun} ${found.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or change the tool's login.`,
 			};
 		}
 		const out: Record<string, string> = Object.fromEntries(
@@ -409,7 +409,7 @@ export function createToolLaunchers(options: {
 				} else if (strict) {
 					return {
 						ok: false,
-						message: `Two CLI tools of this step sign in to git on ${tool.git.host}: ${other.tool} and ${tool.name}. Take the git host off one of them.`,
+						message: `Two CLI tools of this step sign in to git on ${tool.git.host}: ${other.tool} and ${tool.name}. Remove the git host from one of them.`,
 					};
 				} else {
 					shared.add(tool.git.host);

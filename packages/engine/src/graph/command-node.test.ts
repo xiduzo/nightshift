@@ -499,7 +499,7 @@ describe("the Command node", () => {
 			);
 			const { parked } = await drive(h, { inputs: {} });
 			const reason =
-				"The command needs the secret ZAC_BEHANDELAAR_PASSWORD, but it is not saved. Save it under Agents → Secrets, or remove it from the node.";
+				"The command needs the secret ZAC_BEHANDELAAR_PASSWORD, but it is not saved. Save it on the Secrets page, or remove it from the node.";
 			expect(parked[0]).toMatchObject({
 				status: "failed",
 				reason: `Node "login" failed: ${reason}`,

@@ -52,7 +52,7 @@ export function expandMcpServers(
 					: ["secrets", "they are", "them"];
 			return {
 				ok: false,
-				message: `The MCP server "${name}" needs the ${noun} ${names.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove the reference.`,
+				message: `The MCP server "${name}" needs the ${noun} ${names.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.`,
 			};
 		}
 		expanded[name] = config;

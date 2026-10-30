@@ -211,7 +211,7 @@ describe("createGitHubClones", () => {
 			state: "failed",
 			repo: "acme/secret",
 			problem:
-				"GitHub refused access to acme/secret. Sign in to GitHub on this computer: run gh auth login.",
+				"GitHub refused access to acme/secret. To sign in to GitHub, run gh auth login on this computer.",
 		});
 		expect(await readdir(join(dataDir, "projects", "acme"))).toEqual([]);
 	});

@@ -1046,7 +1046,7 @@ describe("run policy", () => {
 			expect.stringContaining("continues in 2 min"),
 		]);
 		expect(detail.steps[0]?.outcome).toBe("error");
-		expect(detail.steps[0]?.error).toContain("grace of 4 min");
+		expect(detail.steps[0]?.error).toContain("for more than 4 min");
 		expect(detail.reason).toContain("connection refused");
 	});
 

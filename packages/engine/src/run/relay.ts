@@ -91,7 +91,7 @@ export function createRunRelay(deps: {
 			}
 			throw new Refusal(
 				"unavailable",
-				"The run started, but it has not reached this computer yet. It shows in the run list in a moment.",
+				"The run started. It shows in the run list in a moment.",
 			);
 		},
 	};

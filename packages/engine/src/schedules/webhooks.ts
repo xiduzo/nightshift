@@ -296,7 +296,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 					projectId,
 					scheduleId,
 					at,
-					`The secret ${secretName ?? "of this schedule"} has no value on this computer. Add it under Agents, Secrets.`,
+					`The secret ${secretName ?? "of this schedule"} has no value on this computer. Add it on the Secrets page.`,
 				);
 				return { answer: { kind: "not-found" }, done };
 			}
@@ -307,7 +307,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 					at,
 					headers.has("x-hub-signature-256") || headers.has("authorization")
 						? "The secret did not match."
-						: "It came without the secret.",
+						: "The request had no secret.",
 				);
 				return { answer: { kind: "not-found" }, done };
 			}

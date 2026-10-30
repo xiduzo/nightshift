@@ -510,7 +510,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			if (!content) {
 				throw new Refusal(
 					"unavailable",
-					"This file cannot be fetched now. Try again when the computer that keeps this Space is online.",
+					"Night Shift cannot get this file now. Try again when the computer that keeps this Space is online.",
 				);
 			}
 			const start = content.subarray(0, Math.max(1, options.maxBytes));

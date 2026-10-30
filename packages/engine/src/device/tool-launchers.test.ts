@@ -152,7 +152,7 @@ describe("prepare", () => {
 		expect(prepared).toEqual({
 			ok: false,
 			message:
-				"The CLI tool gh-work needs the secret GH_WORK, but it is not saved. Save it under Agents → Secrets, or change the tool's login.",
+				"The CLI tool gh-work needs the secret GH_WORK, but it is not saved. Save it on the Secrets page, or change the tool's login.",
 		});
 	});
 
@@ -287,7 +287,7 @@ describe("git", () => {
 		expect(prepared).toMatchObject({
 			ok: false,
 			message:
-				"Two CLI tools of this step sign in to git on github.com: gh and gh-work. Take the git host off one of them.",
+				"Two CLI tools of this step sign in to git on github.com: gh and gh-work. Remove the git host from one of them.",
 		});
 	});
 

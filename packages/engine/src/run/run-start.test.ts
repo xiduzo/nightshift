@@ -125,7 +125,7 @@ describe("cliToolsInstalled", () => {
 			findCli: (name) => (name === "gh" ? "/gh" : null),
 		});
 		expect(cliToolsInstalled(nodes, daemon)).toBe(
-			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or take it off the flow.',
+			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or remove it from the flow.',
 		);
 	});
 });

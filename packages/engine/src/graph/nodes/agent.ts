@@ -131,7 +131,7 @@ export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
 	return notFound
 		.map((name) =>
 			has.elsewhere === null
-				? `The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or take it off the flow.`
+				? `The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or remove it from the flow.`
 				: `The flow uses the CLI tool "${name}" on ${has.elsewhere}, but that device does not have it. Install ${name} there, or choose another device.`,
 		)
 		.join(" ");
@@ -443,7 +443,7 @@ async function runSession(
 			{ outcome: "error", visit },
 			!first.done && first.value.type === "refused"
 				? first.value.message
-				: "The session could not start.",
+				: "The agent could not start.",
 			null,
 		);
 	}
@@ -582,7 +582,7 @@ async function runSession(
 
 	const endWithoutResult = (message: string): SessionEnding => ({
 		outcome: stoppedByPerson() ? "stopped" : "failed",
-		error: signal.aborted ? "The session was aborted." : message,
+		error: signal.aborted ? "The step was stopped." : message,
 		errorKind: signal.aborted ? "aborted" : "harness",
 		...spentBeforeTheEnd(),
 		resetAt: null,
@@ -592,7 +592,7 @@ async function runSession(
 		// A stop that came in while the session was being recorded.
 		if (signal.aborted) {
 			void Promise.resolve(stream.return?.()).catch(() => {});
-			throw new Error("The session was aborted.");
+			throw new Error("The step was stopped.");
 		}
 		await consumeStream(
 			{ [Symbol.asyncIterator]: () => stream },
@@ -615,7 +615,7 @@ async function runSession(
 		);
 	}
 	const final: SessionEnding =
-		ending ?? endWithoutResult("The harness stream ended without a result.");
+		ending ?? endWithoutResult("The agent stopped without a result.");
 	// The end has the final cost: no running total after it.
 	sessionOver = true;
 	clearTimeout(spentTimer);
@@ -700,7 +700,7 @@ async function runSession(
 	return end(
 		"error",
 		{ ...outputs, outcome: "error" },
-		final.error ?? "The agent session failed.",
+		final.error ?? "The agent failed.",
 		harnessSessionId,
 	);
 }
