@@ -146,7 +146,7 @@ function GateAnswer() {
 		return (
 			<ClosedGate
 				title="This Gate does not wait anymore"
-				description="Someone answered it, or its run ended. Your inbox shows what still waits for you."
+				description="Someone answered it, or its run ended."
 			/>
 		);
 	}
@@ -228,7 +228,7 @@ function OpenGateScreen({
 	const [confirming, setConfirming] = useState(false);
 
 	const chosen = gate.choices.find((choice) => choice.name === answer.choice);
-	// An agent that asks goes on with the note: its answer needs one.
+	// An agent that asks continues with the note: its answer needs one.
 	const answersAgent = gate.choices.some((choice) => choice.needsNote);
 	const noteMissing = chosen?.needsNote === true && answer.note.trim() === "";
 	const chosenRoute = chosen ? routes.get(chosen.name) : undefined;
@@ -397,8 +397,8 @@ function OpenGateScreen({
 							<AlertTitle>Someone already answered this Gate</AlertTitle>
 							<AlertDescription>
 								{elsewhere
-									? `The run goes on when ${elsewhere} is online.`
-									: "The run goes on in a moment."}
+									? `The run continues when ${elsewhere} is online.`
+									: "The run continues in a moment."}
 							</AlertDescription>
 						</Alert>
 					) : !gate.canAnswer ? (
@@ -442,13 +442,13 @@ function OpenGateScreen({
 								/>
 								<Text className="text-muted-foreground text-xs">
 									{answersAgent
-										? "The agent gets your note as its answer, and goes on."
+										? "The agent gets your note as its answer, and continues."
 										: "The next steps of the run get your note."}
 								</Text>
 							</View>
 							{elsewhere ? (
 								<Text className="text-muted-foreground text-xs">
-									{`Your answer goes to ${elsewhere}. The run goes on when ${elsewhere} is online.`}
+									{`Your answer goes to ${elsewhere}. The run continues when ${elsewhere} is online.`}
 								</Text>
 							) : null}
 							{answer.problem ? (

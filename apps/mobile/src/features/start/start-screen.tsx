@@ -91,7 +91,7 @@ export function StartScreen({ projectId }: { projectId?: string }) {
 				<EmptyState
 					icon={FolderGit2}
 					title="No projects in this Space"
-					description="A flow runs on a project. Add a project in Night Shift on your computer, then start its flows here."
+					description="Add a project in Night Shift on your computer. Then start its flows here."
 				/>
 			</Screen>
 		);
@@ -278,7 +278,7 @@ function NewRun({
 							<View className="gap-3">
 								<SectionHead
 									title="Inputs"
-									hint="What the flow works with. An empty field takes its default."
+									hint="An empty field uses its default."
 								/>
 								<Card className="py-4">
 									<CardContent className="px-4">
@@ -294,8 +294,8 @@ function NewRun({
 					) : (
 						<ErrorAlert
 							title="This flow is not valid"
-							message="It cannot start until it is fixed."
-							fix="Fix it in Night Shift on your computer, then pull down to load it again."
+							message="It cannot start like this."
+							fix="Fix it in Night Shift on your computer. Then pull down to load it again."
 						/>
 					)
 				) : flow.isError ? (
@@ -348,7 +348,6 @@ function NewRun({
 				<ListGroup>
 					<SwitchRow
 						title="Follow on the lock screen"
-						caption="The lock screen shows how the run goes."
 						checked={followOnLockScreen}
 						onChange={setFollowOnLockScreen}
 					/>

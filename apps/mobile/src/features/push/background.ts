@@ -81,7 +81,7 @@ async function answerFromButton(
 function tellNotSent(data: PushData): Promise<void> {
 	return tellOpenGate(data, {
 		title: "Your answer was not sent",
-		body: "Night Shift did not send your answer. Open the Gate to answer it there.",
+		body: "Open the Gate to answer it there.",
 	});
 }
 

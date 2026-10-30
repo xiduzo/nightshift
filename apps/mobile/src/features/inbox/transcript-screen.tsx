@@ -78,7 +78,7 @@ export function TranscriptScreen() {
 				<EmptyState
 					icon={SquareTerminal}
 					title="Nothing here yet"
-					description="The steps of this run have not said anything yet. New lines show up here while the run goes on."
+					description="New lines show here while the run works."
 				/>
 			)}
 		</Screen>

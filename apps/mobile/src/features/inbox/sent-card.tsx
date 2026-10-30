@@ -20,7 +20,7 @@ export function SentCard({
 	next,
 }: {
 	answer: SentAnswer;
-	/** "Fix the bug goes on at Build." */
+	/** "Fix the bug continues at Build." */
 	outcome: string;
 	/** The next Gate in inbox order, or null when nothing else waits. */
 	next: OpenGate | null;

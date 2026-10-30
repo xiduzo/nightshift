@@ -43,7 +43,7 @@ export function ThisPhoneCard() {
 		<View className="gap-3">
 			<SectionHead
 				title="This phone"
-				hint={`Remove this phone when you no longer use it for Night Shift. It signs out of ${where} and gets no more notifications.`}
+				hint="Remove it when you no longer use it for Night Shift."
 			/>
 			<ListGroup>
 				<ListRow
@@ -66,8 +66,8 @@ export function ThisPhoneCard() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Remove this phone?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This phone signs out and forgets {where}. To use it again, scan
-							the code or type the Host address.
+							This phone signs out of {where} and gets no more notifications. To
+							use it again, scan the code or type the Host address.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

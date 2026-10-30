@@ -50,7 +50,7 @@ export function FlowHealthScreen({ projectId }: { projectId?: string }) {
 					<EmptyState
 						icon={Workflow}
 						title="No runs yet"
-						description="When your flows have run, you see here how often their runs finish."
+						description="Start a run. Then see here how often each flow finishes."
 					/>
 				)
 			) : summary.isError ? (

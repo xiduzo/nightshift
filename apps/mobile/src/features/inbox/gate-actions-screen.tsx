@@ -52,7 +52,7 @@ export function GateActionsScreen() {
 						icon={Share2}
 						title="Share the take-over command"
 						caption={[{ text: command, mono: true }]}
-						detail="Run it in a terminal on your computer to go on by hand."
+						detail="Run it in a terminal on your computer to continue by hand."
 						chevron={false}
 						onPress={() => void Share.share({ message: command })}
 						accessibilityHint="Opens the share sheet with the command"

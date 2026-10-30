@@ -68,17 +68,17 @@ describe("sentText", () => {
 				"Fix login",
 				null,
 			),
-		).toBe("Fix login goes on at Build.");
-		expect(sentText(undefined, "Fix login", null)).toBe("Fix login goes on.");
+		).toBe("Fix login continues at Build.");
+		expect(sentText(undefined, "Fix login", null)).toBe("Fix login continues.");
 		expect(
 			sentText(
 				{ kind: "node", nodeId: "a", label: "Announce it?" },
 				"Ship",
 				null,
 			),
-		).toBe("Ship goes on at Announce it?");
+		).toBe("Ship continues at Announce it?");
 		expect(sentText(undefined, "Fix login", "Mac mini")).toBe(
-			"Fix login goes on when Mac mini is online.",
+			"Fix login continues when Mac mini is online.",
 		);
 		expect(sentText({ kind: "end" }, "Fix login", null)).toBe("The run ends.");
 		expect(sentText({ kind: "limit" }, "Fix login", null)).toBe(
