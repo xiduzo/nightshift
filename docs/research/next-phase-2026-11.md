@@ -1,6 +1,7 @@
 # Next phase: doors, guards, eyes and knowledge
 
-**Status:** Sprints 1 and 2 on main, sprint 3 in progress (2026-10-30).
+**Status:** Sprints 1 and 2 on main, sprint 3 on main except the pitch and
+PR scores, sprint 4 planned (2026-10-30).
 Sprint 3 changed after sprint 2: knowledge moves into the Space
 ([ADR 4](../adr/0004-knowledge-belongs-to-the-space.md)) before search. Follows the product and market
 review of 2026-10-30 (items 08 "What to integrate" and 09 "Next 90 days").
@@ -12,7 +13,7 @@ work now is to make the first bad night survivable, to open the doors other
 tools walk through, to see what a night costs and does, and to give agents
 more than the repo.
 
-Six weeks, three sprints. Each sprint ends with something a night uses. The
+Eight weeks, four sprints. Each sprint ends with something a night uses. The
 daemon on port 3000 runs real nights, so every change here is built in a git
 worktree and lands on main between nights.
 
@@ -20,7 +21,7 @@ worktree and lands on main between nights.
 
 | Topic | Decision |
 | --- | --- |
-| Scope | No new node types, no devices or mobile features, no assistant features until sprint 3 ends. Bug fixes only there. |
+| Scope | No new node types, no devices or mobile features, no assistant features until sprint 4 ends. Bug fixes only there. |
 | Foundational | Integrations stay on files, git, shell CLIs, cron, webhooks and MCP connections a person brings. No vendor nodes. |
 | Local first | Monitoring and knowledge work with no account and no network. Export to a third party is opt-in, one setting, off by default. |
 | Harness | The Agent node keeps spawning the unmodified `claude` binary with the person's own login. No Agent SDK, no `claude-agent-acp`, for subscription profiles. |
@@ -278,6 +279,8 @@ on the project's own questions shows paraphrase misses.
 
 ### 4.4 The pitch (2 days)
 
+Moved to sprint 4 (5.7), after the proof on real nights.
+
 README, social preview and a one-page site lead with: every loop has a limit,
 flows never touch your repo, your logins and your computers, answer gates
 from your phone, mix any agent. The canvas is shown as the run view. A signed
@@ -288,19 +291,177 @@ span, a Gate answer becomes a score, `search_knowledge` answers from a
 Confluence export, and that export, synced on one Device, is found by a run
 on another.
 
-## 5. Parked, on purpose
+## 5. Sprint 4: find by meaning, and prove it (weeks 7 and 8)
+
+Goal: a person adds knowledge without drawing a flow, agents find it by
+meaning when keywords miss, and each done-when of sprints 1 to 3 is checked
+on a real night.
+
+Sprint 3 left two gaps that a person sees first. You could add knowledge
+only by drawing a flow with a knowledge kit, and an Agent step got search
+only when someone attached the nightshift MCP server. A review on
+2026-10-30 also asked which LangChain products help the knowledge. The
+answer: the retrieval pieces of LangChain.js do (splitters, Ollama
+embeddings, the indexing API, `EnsembleRetriever`). LangSmith helps to
+measure, not to store. The vendor loaders and the LangGraph memory store do
+not fit (see "Not in this sprint").
+
+### 5.0 Landing first (sprint 3 follow-ups, in progress on 2026-10-30)
+
+- **Add source** on the Knowledge page: one Dialog for a folder on this
+  computer, project files, web pages, a GitHub wiki, Jira or Confluence. It
+  takes the kit's own inputs, an optional schedule, and syncs once. It
+  writes an ordinary flow that calls the kit, so ADR 4 holds: a source is a
+  sync flow. The page edits and removes it. A new `kit:knowledge/folder`
+  copies any folder on the computer.
+- **Search in every Agent step:** a step with knowledge on gets
+  `search_knowledge` and `read_knowledge` through the engine's tool bridge,
+  with no Connection to set up.
+- **PDF and Word** files are knowledge: the index extracts their text,
+  `read_knowledge` returns it, `INDEX.md` lists them.
+- **A written spike** on vectors: `docs/research/knowledge-vectors.md`, with
+  recall numbers for keyword, vector and hybrid search on this repo's docs.
+
+### 5.1 Measure retrieval first (engine + web, 2 days)
+
+Vectors cost an Ollama install and an index on every Device. They go on
+only where a measurement says keyword search misses.
+
+- Every `search_knowledge` call becomes an event on the run: the query, the
+  files it returned, the step. The metrics read model and the OTel export
+  pick it up.
+- The Knowledge page gets "Questions agents asked": recent queries and what
+  they found. A person marks the file that answers a question. Marked
+  questions become the project's question set, kept in the knowledge
+  document under a reserved `evals/` path, so it syncs like learnings and is
+  never indexed.
+- An evaluation runs the question set against keyword, vector and hybrid
+  search and reports recall at 5 and the rank of the first right file. It
+  runs from the page and as a kit, so a schedule can repeat it. The
+  `openevals` evaluators or a plain script compute it. LangSmith is an
+  opt-in place to send the results, not a requirement.
+- The threshold that turns vectors on comes from the spike (5.0). Below it,
+  the page says keyword search finds enough.
+
+### 5.2 Find by meaning, phase 3 (engine, 5 days, only after 5.1)
+
+Behind the same `createKnowledgeSearch` port, so the API, the MCP tools,
+the agent tools and the page do not change.
+
+- **Chunks:** `@langchain/textsplitters` cuts markdown by heading. Keyword
+  search uses the same chunks, so a hit points at a section, not a page.
+- **Embeddings:** `@langchain/ollama` with a small local model the spike
+  picks. It must handle Dutch. No Ollama on a Device: keyword search only,
+  and the page says how to turn it on.
+- **Incremental index:** the LangChain.js indexing API with a record
+  manager keyed on the sha256 that the `knowledge:<projectId>` document
+  already holds. Only changed files embed again. Removed files leave the
+  index.
+- **Store:** the vector store the spike proves inside `bun build --compile`
+  on macOS and on the Host's Linux image.
+- **Hybrid:** reciprocal rank fusion over keyword and vector results
+  (`EnsembleRetriever`, or the same formula in our code if the retriever
+  does not fit the port).
+- A Settings switch, off by default. The model name is part of the index
+  version, so a new model rebuilds the index.
+- Open question for an ADR 4 amendment: share embeddings by content hash
+  through the Host archive, so ten Devices do not embed the same file ten
+  times. Decision 7 says the index never syncs. Embeddings are derived data
+  too, so the default stays local until the cost says otherwise.
+
+### 5.3 Sections, citations and use (engine + agents + web, 2 days)
+
+- The nightshift MCP server lists the knowledge files as MCP resources.
+  Sprint 3 promised this (4.3) and did not ship it.
+- The step report gets `sources`: the knowledge files the agent used. The
+  run view shows them under the step.
+- The Knowledge page shows how often each file was searched or cited, and
+  marks files no run used in 30 days. That tells a person what to stop
+  syncing.
+
+### 5.4 Knowledge that stays healthy (engine + devices + web, 2 days)
+
+- Garbage collection of archive content that no document lists any more.
+- A Project whose id changes when a Device joins a Space moves its
+  knowledge to the new id.
+- Two Agent steps of one run that both propose learnings keep both.
+- A Device and the Host compare builds before they exchange knowledge.
+  An older Host gets a plain message, not a failed sync.
+- A source whose last sync failed shows an Alert on the page and a line in
+  the digest. A source that has not synced in a week shows as stale.
+- The Jira and Confluence kits need `jq`. The readiness check names it, and
+  the Host image ships it.
+
+### 5.5 Scores and telemetry, the rest (telemetry + engine, 2 days)
+
+- PR scores: `pr_merged`, `pr_closed` and `reverted_within_7d` from a kit's
+  GitHub webhook. The run metrics already hold the PR address, so the
+  webhook finds its run by that address.
+- Codex spans and cost, as Claude has them.
+- Spans for API requests, through `@orpc/otel`.
+- Commands that a step runs no longer see the OTLP headers in their
+  environment.
+
+### 5.6 Proof on real nights (1 day, spread over the sprint)
+
+Check each open done-when on the project that runs every night, and write
+the result in this plan, true or not:
+
+- Sprint 1: a budget stops a real run on purpose, and the phone gets one
+  morning digest.
+- Sprint 2: a real night reads the knowledge, and a new clone runs a
+  starter in fifteen minutes.
+- Sprint 3: Claude's own cost shows under the step span in Grafana, a Gate
+  answer becomes a score, and a Confluence export synced on one Device is
+  found by a run on another.
+
+### 5.7 The pitch (2 days)
+
+Moved from 4.4, unchanged. It goes last, when the proof of 5.6 is in.
+
+### 5.8 Could, if there is time
+
+- Past runs as knowledge: a run summary written to `runs/` in the
+  knowledge, so later runs can find what earlier ones did (an idea from
+  `delta.md`).
+- Learnings that expire or merge: an accepted learning older than 90 days
+  comes back to a Gate.
+- Learnings in the step console, and the digest in the web inbox.
+- The Agents page shows OpenCode as found while it reports a problem. Fix
+  that.
+- A search snippet shows a score of 0. Fix that.
+- gh-aw lock file export and the ACP registry listing, an afternoon each.
+
+### Not in this sprint
+
+- The LangChain loaders for Confluence, Jira, Notion and GitHub: they are
+  vendor integrations. The CLI kits stay.
+- The LangGraph memory store for learnings: ADR 4 keeps learnings as plain
+  files that sync through the Space.
+- LangMem (Python only), LangGraph Platform and Open Agent Platform
+  (hosted).
+- LangSmith as a native sink: the OTel export already reaches it.
+
+Done when: a person adds a folder and a web page from the Knowledge page,
+and a run on another Device uses both. An evaluation on the real project's
+own questions decides vectors on or off, with numbers. With vectors on, an
+agent on a real night answers a question that keyword search missed. Each
+done-when of sprints 1 to 3 is checked and written down.
+
+## 6. Parked, on purpose
 
 - Devices, Offers, the phone app and the assistant: bug fixes only.
 - Import of Claude Code dynamic workflow scripts: a demo for after the pitch.
 - gh-aw lock file export, ACP registry listing: an afternoon each, after sprint 3.
-- Vectors, LangSmith as a native sink, Langfuse self-host recipes.
+- LangSmith as a native sink, Langfuse self-host recipes. Vectors moved to
+  sprint 4 (5.2), behind a measurement.
 - Delta (Zed) as a run sink or knowledge source: see `delta.md`. A kit
   when a project uses it; take its ideas (past runs as knowledge, changes
   anchored to the call that made them) without the dependency.
 - Per-item `timeoutMinutes` on a Subflow with `each`, run retention, transcript
   deletion: PLAN §7 items that the budgets and metrics make visible first.
 
-## 6. Risks
+## 7. Risks
 
 - Budgets on estimated cost: ACP reports cost only, Grok Build maybe nothing.
   A run on an unknown-cost harness gets a turn budget, never a USD budget, and
@@ -312,10 +473,15 @@ on another.
   `CLAUDE.md` stub is a bonus.
 - OTel on Bun: no auto-instrumentation, `AsyncHooksContextManager` does not
   propagate across awaits. Hand-written spans and `AsyncLocalStorageContextManager` only.
+- Vectors need Ollama on each Device and on the Host image. Without it,
+  search falls back to keywords. A new embedding model means a full
+  re-index.
+- Multilingual knowledge: an English-only embedding model misses Dutch
+  pages. The spike tests a multilingual model.
 - Knowledge folders grow. The size warning and the phase 2 trigger exist for
   that; nothing loads the folder into a prompt.
 
-## 7. Sources
+## 8. Sources
 
 The review of 2026-10-30 and its research notes. Key primary sources:
 Anthropic, Effective context engineering for AI agents; Claude Code docs on
@@ -323,6 +489,7 @@ memory, `--add-dir`, monitoring usage and the CLI reference; the Agent Skills
 specification; MCP resources (spec 2025-11-25); arXiv 2602.23368 (keyword
 search as a tool) and 2605.15184 (grep versus vectors across harnesses);
 Cursor on semantic search; Turso libsql vector docs; LangSmith docs on
-tracing, OpenTelemetry and pricing; the OpenTelemetry GenAI semantic
+tracing, OpenTelemetry, evaluation and pricing; LangChain.js docs on text
+splitters, Ollama embeddings, the indexing API and `EnsembleRetriever`; the OpenTelemetry GenAI semantic
 conventions; `@hono/otel`, `@orpc/otel`; the Symphony SPEC on stall and turn
 limits; Paperclip and Devin budgets.
