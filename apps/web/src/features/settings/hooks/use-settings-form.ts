@@ -11,14 +11,20 @@ export type SettingsPatch = { [K in SettingKey]?: Settings[K] | null };
 
 /** How a draft string becomes a value, and what is wrong with it. */
 type Kind =
-	| { type: "int"; min: number; max: number }
+	/** `optional`: empty means none (null), such as no turn limit. */
+	| { type: "int"; min: number; max: number; optional?: true }
 	| { type: "minutes" }
+	/** An amount in US dollars above 0. Empty means none (null): no budget. */
+	| { type: "dollars" }
 	| { type: "text" }
 	| { type: "choice" };
 
 const KINDS: Partial<Record<SettingKey, Kind>> = {
 	maxConcurrentRuns: { type: "int", min: 1, max: 16 },
 	maxStepsPerRun: { type: "int", min: 1, max: 100_000 },
+	budgetUsd: { type: "dollars" },
+	maxTurns: { type: "int", min: 1, max: 100_000, optional: true },
+	idleMinutes: { type: "minutes" },
 	cleanUpAfterDays: { type: "int", min: 1, max: 365 },
 	usageLimitFirstWaitMinutes: { type: "minutes" },
 	usageLimitMaxWaitMinutes: { type: "minutes" },
@@ -40,6 +46,7 @@ function parseDraft(
 	const text = raw.trim();
 	switch (kind.type) {
 		case "int": {
+			if (kind.optional && text === "") return { value: null };
 			const n = Number(text);
 			if (text === "" || !Number.isInteger(n) || n < kind.min || n > kind.max) {
 				return {
@@ -52,6 +59,14 @@ function parseDraft(
 			const n = Number(text);
 			if (text === "" || !Number.isFinite(n) || n <= 0 || n > MAX_MINUTES) {
 				return { error: "More than 0 and at most 10,080 minutes (a week)." };
+			}
+			return { value: n };
+		}
+		case "dollars": {
+			if (text === "") return { value: null };
+			const n = Number(text.replace(/^\$/, ""));
+			if (!Number.isFinite(n) || n <= 0 || n > 100_000) {
+				return { error: "An amount above 0, for example 5 or 2.50." };
 			}
 			return { value: n };
 		}
@@ -122,7 +137,9 @@ export function useSettingsForm(
 	const save = useSaveSettings();
 	const reset = useSaveSettings();
 
-	const current = (key: SettingKey) => String(data.values[key]);
+	// A setting with no value (no budget) shows an empty field.
+	const current = (key: SettingKey) =>
+		data.values[key] === null ? "" : String(data.values[key]);
 	const value = (key: SettingKey) => drafts[key] ?? current(key);
 	const changed = keys.filter(
 		(key) => drafts[key] !== undefined && drafts[key] !== current(key),
@@ -183,7 +200,9 @@ export function useSettingsForm(
 						const { [key]: _dropped, ...rest } = before;
 						return rest;
 					});
-					toast.success(`${label} reset to ${String(next.values[key])}`);
+					toast.success(
+						`${label} reset to ${next.values[key] === null ? "no limit" : String(next.values[key])}`,
+					);
 				},
 				onError: (resetError) => toast.error(resetError.message),
 			});

@@ -1,4 +1,4 @@
-import type { Flow, Policy } from "@nightshift/flows";
+import type { Flow, Policy, PolicyValues } from "@nightshift/flows";
 import { DEFAULT_POLICY, setPolicyValue } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -45,6 +45,22 @@ const POLICY_FIELDS: {
 		hint: "The run stops after this many steps, as a safety net. You can resume it.",
 		whole: true,
 	},
+	{
+		key: "budgetUsd",
+		label: "Budget (USD)",
+		hint: "The run stops when it has spent this much. Resume it to spend as much again.",
+	},
+	{
+		key: "maxTurns",
+		label: "Max turns per agent step",
+		hint: "A turn is one reply of the agent. The step fails when the agent takes more. An Agent node can set its own.",
+		whole: true,
+	},
+	{
+		key: "idleMinutes",
+		label: "Idle timeout (minutes)",
+		hint: "An agent step fails when the agent shows no activity for this long. An Agent node can set its own.",
+	},
 ];
 
 /** Shown when nothing is selected: the flow's own settings and how to edit. */
@@ -61,7 +77,7 @@ export function FlowInspector({
 	/** The flow's project: with `name`, whose kept values the Variables show. */
 	projectId?: string;
 	/** The daemon's run policy settings: what an empty number uses. Undefined while they load. */
-	policyDefaults?: Required<Policy>;
+	policyDefaults?: PolicyValues;
 	onChange: (change: (flow: Flow) => Flow) => void;
 }) {
 	const id = useId();
@@ -208,8 +224,8 @@ export function FlowInspector({
 							value={flow.policy?.[key]}
 							placeholder={
 								policyDefaults
-									? `${policyDefaults[key]} (from Settings)`
-									: `${DEFAULT_POLICY[key]} (default)`
+									? `${policyDefaults[key] ?? "No limit"} (from Settings)`
+									: `${DEFAULT_POLICY[key] ?? "No limit"} (default)`
 							}
 							describedBy={`${id}-${key}-hint`}
 							onChange={(value) =>

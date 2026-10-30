@@ -180,6 +180,7 @@ const FIELD_MESSAGES: Record<string, string> = {
 	max: "The max must be a whole number above 0.",
 	id: "Use lowercase letters, digits and _, starting with a letter.",
 	idleMinutes: "The idle timeout must be a whole number of minutes above 0.",
+	maxTurns: "Max turns must be a whole number above 0.",
 	flow: "Pick a flow to run.",
 	"each.as": "Pick the input that gets the item.",
 	"each.source.value": "Set the list: a template that gives a JSON array.",
@@ -204,6 +205,9 @@ const POLICY_MESSAGES: Record<string, string> = {
 		"Run policy: the longest usage-limit wait must be above 0.",
 	networkGraceMinutes: "Run policy: the network grace must be above 0.",
 	maxSteps: "Run policy: max steps must be a whole number above 0.",
+	budgetUsd: "Run policy: the budget must be above 0.",
+	maxTurns: "Run policy: max turns must be a whole number above 0.",
+	idleMinutes: "Run policy: the idle timeout must be above 0.",
 };
 
 /** The words of a draft check: what the editor says about each issue. */

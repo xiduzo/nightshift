@@ -139,6 +139,8 @@ export function TextSetting({
 	inputMode,
 	mono,
 	suggestions,
+	placeholder,
+	format,
 }: {
 	form: SettingsForm;
 	data: SettingsView;
@@ -149,6 +151,10 @@ export function TextSetting({
 	inputMode?: "numeric" | "decimal";
 	mono?: boolean;
 	suggestions?: readonly string[];
+	/** Shown in an empty field: what no value means. */
+	placeholder?: string;
+	/** How the source line writes a value, such as the default. */
+	format?: (value: unknown) => string;
 }) {
 	const id = useId();
 	const error = form.error(settingKey);
@@ -162,6 +168,7 @@ export function TextSetting({
 		autoComplete: "off",
 		spellCheck: false,
 		list: suggestions ? `${id}-suggestions` : undefined,
+		placeholder,
 		"aria-invalid": error ? true : undefined,
 		"aria-describedby": describedBy,
 		className: mono ? "font-mono" : "tabular-nums",
@@ -194,6 +201,7 @@ export function TextSetting({
 			<SettingSource
 				field={data.fields[settingKey]}
 				label={label}
+				{...(format ? { format } : {})}
 				resetting={form.resettingKey === settingKey}
 				onReset={() => form.reset(settingKey, label)}
 			/>

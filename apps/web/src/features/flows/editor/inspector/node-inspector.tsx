@@ -312,7 +312,8 @@ export function NodeInspector({
 						tab="setup"
 						defaultOpen={
 							node.timeoutMinutes !== undefined ||
-							(node.type === "agent" && node.idleMinutes !== undefined)
+							(node.type === "agent" &&
+								(node.idleMinutes !== undefined || node.maxTurns !== undefined))
 						}
 					>
 						<Field
@@ -341,12 +342,34 @@ export function NodeInspector({
 								<PositiveIntInput
 									id={`${id}-idle`}
 									value={node.idleMinutes}
-									placeholder="No limit"
+									placeholder="From the run policy"
 									describedBy={`${id}-idle-hint`}
 									onChange={(idleMinutes) =>
 										onChange((current) =>
 											current.type === "agent"
 												? { ...current, idleMinutes }
+												: current,
+										)
+									}
+								/>
+							</Field>
+						) : null}
+						{node.type === "agent" ? (
+							<Field
+								id={`${id}-max-turns`}
+								label="Max turns"
+								optional
+								hint="A turn is one reply of the agent. The step fails when the agent takes more."
+							>
+								<PositiveIntInput
+									id={`${id}-max-turns`}
+									value={node.maxTurns}
+									placeholder="From the run policy"
+									describedBy={`${id}-max-turns-hint`}
+									onChange={(maxTurns) =>
+										onChange((current) =>
+											current.type === "agent"
+												? { ...current, maxTurns }
 												: current,
 										)
 									}

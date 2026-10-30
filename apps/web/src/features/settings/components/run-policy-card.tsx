@@ -21,10 +21,17 @@ import {
 } from "./setting-fields";
 
 const POLICY_KEYS = [
+	"budgetUsd",
+	"maxTurns",
+	"idleMinutes",
 	"usageLimitFirstWaitMinutes",
 	"usageLimitMaxWaitMinutes",
 	"networkGraceMinutes",
 ] as const;
+
+/** A limit that may be off: no value is "no limit". */
+const orNoLimit = (value: unknown) =>
+	value === null ? "no limit" : String(value);
 
 export function RunPolicyCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, POLICY_KEYS);
@@ -40,6 +47,36 @@ export function RunPolicyCard({ data }: { data: SettingsView }) {
 							<ResumeSetting data={data} />
 							<FieldSeparator />
 							<div className="grid gap-6 sm:grid-cols-2">
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="budgetUsd"
+									label="Budget per run"
+									description="A run stops when it has spent this much. Resume it to spend as much again. Leave it empty for no budget."
+									unit="USD"
+									inputMode="decimal"
+									placeholder="No budget"
+									format={orNoLimit}
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="maxTurns"
+									label="Max turns per agent step"
+									description="A turn is one reply of the agent. The step fails when the agent takes more. Leave it empty for no limit."
+									inputMode="numeric"
+									placeholder="No limit"
+									format={orNoLimit}
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="idleMinutes"
+									label="Idle timeout"
+									description="An agent step fails when the agent shows no activity for this long."
+									unit="min"
+									inputMode="decimal"
+								/>
 								<TextSetting
 									form={form}
 									data={data}
