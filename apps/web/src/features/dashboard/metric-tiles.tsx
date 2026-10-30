@@ -118,7 +118,7 @@ function Change({
 	before: number | null | undefined;
 }) {
 	const line = (icon: ReactNode, text: string) => (
-		<span className="flex items-center gap-1 text-xs opacity-80">
+		<span className="flex items-center gap-1 text-xs">
 			{icon}
 			{text}
 		</span>

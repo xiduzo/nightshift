@@ -74,6 +74,7 @@
 /*
  * The four numbers on a project's page: a line on the chart, and a tile that
  * takes a light shade of the same color with a dark shade for its text.
+ * Each pair keeps a contrast of at least 4.5:1 (WCAG AA) for small text.
  */
 :root {
 	--metric-runs: var(--color-blue-600);
@@ -93,16 +94,16 @@
 .dark {
 	--metric-runs: var(--color-blue-400);
 	--metric-runs-tile: var(--color-blue-400);
-	--metric-runs-tile-foreground: var(--color-blue-900);
+	--metric-runs-tile-foreground: var(--color-blue-950);
 	--metric-finished: var(--color-green-400);
 	--metric-finished-tile: var(--color-green-400);
-	--metric-finished-tile-foreground: var(--color-green-900);
+	--metric-finished-tile-foreground: var(--color-green-950);
 	--metric-spend: var(--color-violet-400);
 	--metric-spend-tile: var(--color-violet-400);
-	--metric-spend-tile-foreground: var(--color-violet-900);
+	--metric-spend-tile-foreground: var(--color-violet-950);
 	--metric-gates: var(--color-amber-400);
 	--metric-gates-tile: var(--color-amber-400);
-	--metric-gates-tile-foreground: var(--color-amber-900);
+	--metric-gates-tile-foreground: var(--color-amber-950);
 }
 
 @theme inline {
