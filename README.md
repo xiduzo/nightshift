@@ -219,6 +219,7 @@ The concept, the decisions, and the delivery order are in [docs/PLAN.md](docs/PL
 | [docs/steering/](docs/steering/) | The vision, and the technical, QA, and design rules every change follows. |
 | [docs/adr/](docs/adr/) | The architecture decisions, one record each. |
 | [docs/deploy/](docs/deploy/) | Run Night Shift on a server and reach it from your other computers. |
+| [docs/deploy/triggers.md](docs/deploy/triggers.md) | Start a flow from GitHub Actions, n8n, Zapier or a script, with a signed webhook. |
 | [docs/releasing.md](docs/releasing.md) | Release the desktop app and the phone app. |
 | [docs/research/](docs/research/) | Spikes and design notes behind the bigger decisions. |
 

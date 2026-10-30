@@ -167,6 +167,18 @@ describe("webhookAuthentic", () => {
 		expect(bearer(SECRET)).toBe(false);
 		expect(webhookAuthentic(new Headers(), payload, SECRET)).toBe(false);
 	});
+
+	test("takes the signature of the curl example in docs/deploy/triggers.md", () => {
+		// `printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET"` gives this hex.
+		const sent = new TextEncoder().encode(
+			'{"event":"workflow_dispatch","ref":"main"}',
+		);
+		const headers = new Headers({
+			"x-hub-signature-256":
+				"sha256=c98cccfa6a826fa62986e44f9d6f1415f5cda15491c5e96a1f29f8bd1e9fcba5",
+		});
+		expect(webhookAuthentic(headers, sent, SECRET)).toBe(true);
+	});
 });
 
 describe("a webhook schedule", () => {

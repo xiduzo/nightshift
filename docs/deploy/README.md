@@ -365,3 +365,10 @@ Do this after any of the guides.
 
 The other computer learns every address of the Host when it pairs. When you
 add an address later, it learns it on its next connection.
+
+## Start flows from other tools
+
+A schedule can start its flow when a webhook arrives at the Host. GitHub
+Actions, n8n, Make, Zapier or a script then start a run, with no connector
+for each. See [Start a flow from another tool](triggers.md): the signed
+webhook, a `curl` example and a GitHub Actions workflow.
