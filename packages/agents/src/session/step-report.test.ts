@@ -432,3 +432,68 @@ describe("a spec without an outcome (something else picks it)", () => {
 		expect(text).not.toContain("Pick the outcome");
 	});
 });
+
+describe("learnings", () => {
+	const rules = reportRules({ learnings: true }) as ReportRules;
+
+	test("only a spec that allows them asks for them, in one sentence", () => {
+		expect(reportRules(true)?.learnings).toBeUndefined();
+		expect(TOOL_REPORT_INSTRUCTION).not.toContain("learnings");
+		expect(rules.defaultOutcomes).toBe(true);
+		const tool = toolReportInstruction(rules);
+		expect(tool.startsWith(TOOL_REPORT_INSTRUCTION)).toBe(true);
+		expect(tool.slice(TOOL_REPORT_INSTRUCTION.length)).toBe(
+			" If you learned something about this project that would help the next agent, add it to `learnings`: a list of short notes. Leave it out otherwise.",
+		);
+		expect(textReportInstruction(rules)).toContain('"learnings": ["…"]');
+	});
+
+	test("the tool takes them as an optional list of strings", () => {
+		const schema = reportInputSchema(rules) as {
+			properties: Record<string, { type: string }>;
+			required: string[];
+		};
+		expect(schema.properties.learnings?.type).toBe("array");
+		expect(schema.required).toEqual(["outcome", "summary"]);
+	});
+
+	test("a report keeps its notes, one line each, and drops what is not a note", () => {
+		expect(
+			parseStepReport(
+				{
+					outcome: "pass",
+					summary: "Done.",
+					learnings: ["  Tests run with\nbun test. ", "", 3, "Use pnpm."],
+				},
+				rules,
+			),
+		).toEqual({
+			outcome: "pass",
+			summary: "Done.",
+			learnings: ["Tests run with bun test.", "Use pnpm."],
+		});
+		expect(
+			parseStepReport(
+				{ outcome: "pass", summary: "Done.", learnings: "x" },
+				rules,
+			),
+		).toEqual({ outcome: "pass", summary: "Done." });
+		// Without the rule, notes are not read.
+		expect(
+			parseStepReport({ outcome: "pass", summary: "Done.", learnings: ["x"] }),
+		).toEqual({ outcome: "pass", summary: "Done." });
+	});
+
+	test("a text report carries them too", () => {
+		expect(
+			parseTextReport(
+				'Done.\nNIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "Ok.", "learnings": ["Run make first."]}',
+				rules,
+			),
+		).toEqual({
+			outcome: "pass",
+			summary: "Ok.",
+			learnings: ["Run make first."],
+		});
+	});
+});

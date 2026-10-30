@@ -360,6 +360,8 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		outcome: z.string(),
 		summary: z.string(),
 		data: z.unknown().optional(),
+		/** What the agent proposed to learn about the project. */
+		learnings: z.array(z.string()).optional(),
 	}),
 	z.object({ type: z.literal("usage"), usage: agentUsageSchema }),
 	z.object({

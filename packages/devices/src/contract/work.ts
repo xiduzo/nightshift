@@ -156,6 +156,7 @@ const stepReportSchema = z.union([
 			.optional(),
 		output: z.record(z.string(), z.unknown()).optional(),
 		outcome: z.boolean().optional(),
+		learnings: z.boolean().optional(),
 	}),
 ]);
 

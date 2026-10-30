@@ -175,6 +175,13 @@ export type StepReportSpec = {
 	 * Default: true.
 	 */
 	outcome?: boolean;
+	/**
+	 * The agent may add `learnings` to its report: short notes about the
+	 * project that would help a later agent. Optional, so a report with
+	 * nothing to say stays as short as before. The Device sets it for an
+	 * agent that reads the project's knowledge.
+	 */
+	learnings?: boolean;
 };
 
 /**
@@ -229,6 +236,8 @@ export type AgentEvent =
 			summary: string;
 			/** Present when the spec has an output schema (not yet validated). */
 			data?: unknown;
+			/** What the agent proposes to learn, when the spec allows it. */
+			learnings?: string[];
 	  }
 	/**
 	 * What the session has used so far: a running total, not a step. Only

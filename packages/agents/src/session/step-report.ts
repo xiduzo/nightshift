@@ -49,6 +49,8 @@ export type StepReport = {
 	summary: string;
 	/** Only with an output schema; not validated against it. */
 	data?: unknown;
+	/** Only when the rules allow learnings, and the agent gave some. */
+	learnings?: string[];
 };
 
 /** The line prefix of a text report. */
@@ -62,6 +64,14 @@ const DEFAULT_OUTCOME_DESCRIPTION =
 
 const SUMMARY_RULE =
 	"Put a one or two sentence summary of the result in `summary`.";
+
+/** One sentence, only for an agent that may propose learnings. */
+const LEARNINGS_RULE =
+	"If you learned something about this project that would help the next agent, add it to `learnings`: a list of short notes. Leave it out otherwise.";
+
+/** The most notes one report proposes, and the longest note. */
+const MAX_LEARNINGS = 10;
+const MAX_LEARNING_LENGTH = 500;
 
 const TOOL_DESCRIPTION =
 	"Report the outcome of your task to Night Shift. Call it exactly once, at the end.";
@@ -88,6 +98,8 @@ export type ReportRules = {
 	defaultOutcomes: boolean;
 	/** False: the agent reports no outcome (something else picks it). */
 	withOutcome: boolean;
+	/** The agent may add short notes it learned (`learnings`). */
+	learnings?: boolean;
 };
 
 /** The rules of `stepReport: true`. */
@@ -110,6 +122,7 @@ export function reportRules(
 			: DEFAULT_RULES),
 		withOutcome: stepReport.outcome !== false,
 		...(stepReport.output ? { output: stepReport.output } : {}),
+		...(stepReport.learnings ? { learnings: true } : {}),
 	};
 }
 
@@ -146,6 +159,7 @@ export function toolReportInstruction(rules: ReportRules): string {
 					"Put the structured result in `data`; it must match the tool's schema for `data`.",
 				]
 			: []),
+		...(rules.learnings ? [LEARNINGS_RULE] : []),
 	].join(" ");
 }
 
@@ -163,6 +177,9 @@ export function textReportInstruction(rules: ReportRules): string {
 			? [
 					`Put the structured result in "data", on that same line. It must match this JSON Schema: ${JSON.stringify(rules.output)}`,
 				]
+			: []),
+		...(rules.learnings
+			? [`${LEARNINGS_RULE} Put it on that same line: "learnings": ["…"].`]
 			: []),
 	].join("\n");
 }
@@ -271,18 +288,43 @@ export function parseStepReport(
 	rules: ReportRules = DEFAULT_RULES,
 ): StepReport | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
-	const { outcome, summary, data } = input as Record<string, unknown>;
+	const { outcome, summary, data, learnings } = input as Record<
+		string,
+		unknown
+	>;
 	if (rules.withOutcome) {
 		if (typeof outcome !== "string") return undefined;
 		if (!outcomeNames(rules).includes(outcome)) return undefined;
 	}
 	if (typeof summary !== "string") return undefined;
 	if (rules.output && data === undefined) return undefined;
+	const notes = rules.learnings ? learningsOf(learnings) : [];
 	return {
 		outcome: rules.withOutcome ? (outcome as string) : "",
 		summary: summary.trim(),
 		...(rules.output ? { data: unwrapJsonText(data, rules.output) } : {}),
+		...(notes.length > 0 ? { learnings: notes } : {}),
 	};
+}
+
+/**
+ * The notes of `learnings`: its strings, each on one line and trimmed,
+ * the empty ones left out, at most `MAX_LEARNINGS` of
+ * `MAX_LEARNING_LENGTH` characters. Anything else is none: a report never
+ * fails over its learnings.
+ */
+function learningsOf(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return value
+		.filter((note): note is string => typeof note === "string")
+		.map((note) => note.replace(/\s+/g, " ").trim())
+		.filter((note) => note !== "")
+		.slice(0, MAX_LEARNINGS)
+		.map((note) =>
+			note.length > MAX_LEARNING_LENGTH
+				? `${note.slice(0, MAX_LEARNING_LENGTH - 1)}…`
+				: note,
+		);
 }
 
 /**
@@ -350,7 +392,20 @@ export function reportInputSchema(rules: ReportRules): Record<string, unknown> {
 		type: "string",
 		description: "One or two sentences about the result.",
 	};
-	const head = rules.withOutcome ? { outcome, summary } : { summary };
+	const head = {
+		...(rules.withOutcome ? { outcome, summary } : { summary }),
+		...(rules.learnings
+			? {
+					learnings: {
+						type: "array",
+						items: { type: "string" },
+						maxItems: MAX_LEARNINGS,
+						description:
+							"Optional. Short notes about this project that would help the next agent. Leave it out when you have none.",
+					},
+				}
+			: {}),
+	};
 	const required = rules.withOutcome ? ["outcome", "summary"] : ["summary"];
 	if (!rules.output) {
 		return {
@@ -397,6 +452,7 @@ export function reportStepTool(
 			: []),
 		"summary: string",
 		...(rules.output ? ["data: (see the schema)"] : []),
+		...(rules.learnings ? ["learnings?: string[]"] : []),
 	].join(", ");
 	return toolDefinition({
 		name: REPORT_TOOL_NAME,

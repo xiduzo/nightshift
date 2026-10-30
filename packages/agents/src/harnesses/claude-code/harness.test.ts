@@ -116,6 +116,35 @@ describe("claudeCodeHarness with knowledge", () => {
 		expect(run.prompt).not.toContain("Project knowledge");
 	});
 
+	test("a report with learnings carries them", async () => {
+		const claude = await fakeBin(dir, "claude", "fake-claude", {
+			FAKE_CLAUDE_CALLS: JSON.stringify([
+				{
+					name: "report_step",
+					arguments: {
+						outcome: "pass",
+						summary: "Done.",
+						learnings: ["The tests need a database."],
+					},
+				},
+			]),
+		});
+		const events: AgentEvent[] = [];
+		for await (const event of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input({ stepReport: { learnings: true } }))) {
+			events.push(event);
+		}
+		expect(events.filter((e) => e.type === "report")).toEqual([
+			{
+				type: "report",
+				outcome: "pass",
+				summary: "Done.",
+				learnings: ["The tests need a database."],
+			},
+		]);
+	});
+
 	test("without them, neither flag", async () => {
 		const claudeLog = join(dir, "claude.jsonl");
 		const claude = await fakeBin(dir, "claude", "fake-claude", {
