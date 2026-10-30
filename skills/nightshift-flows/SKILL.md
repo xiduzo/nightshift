@@ -33,6 +33,8 @@ In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. N
 - `needs_me`: the Gates that wait for a person, in every project, with the question and the options.
 - `answer_gate` (`gate`, `option`, `note`): answers one of them, and the run goes on. Answer only with the option the person chose.
 - `get_digest` (`since`): one line per run that ended since a time, and the Gates that wait. Without `since`: since the last morning digest.
+- `search_knowledge` (`query`, `limit`): the files of the project's knowledge (a wiki, web pages, work items) that best match the words, each with its path, title and an excerpt. Every word must match, else some of them. `"a phrase"` keeps words together, `word*` matches a start.
+- `read_knowledge` (`path`): one file of the knowledge, by the path `search_knowledge` gives.
 
 Add the server to Claude Code with `claude mcp add nightshift -- nightshift mcp`. Add `--project <id, name or folder>` to work in another project than the one of your folder.
 
