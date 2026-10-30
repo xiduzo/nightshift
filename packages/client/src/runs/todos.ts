@@ -26,8 +26,12 @@ const STATUSES: ReadonlySet<string> = new Set([
 
 /** Claude Code's `TodoWrite` and OpenCode's `todowrite`: `{todos: [{content, status, activeForm?}]}`. */
 const TODO_WRITE = new Set(["todowrite", "todo_write"]);
-/** Codex's to-do list: no input, the list in its answer as `{items: [{text, completed}]}`. */
-const CODEX_TODO_LIST = "todo_list";
+/**
+ * A list the harness keeps itself: Codex's to-do list (`{items: [{text,
+ * completed}]}`) and an ACP agent's plan (`{items: [{content, status}]}`).
+ * The input has the list while the agent works, the result once it is done.
+ */
+const TODO_LIST = "todo_list";
 
 function todoOf(value: unknown): Todo | undefined {
 	if (!isRecord(value)) return undefined;
@@ -58,9 +62,12 @@ function listOf(call: AgentToolCall): Todo[] | undefined {
 	if (TODO_WRITE.has(name)) {
 		return isRecord(call.input) ? todosOf(call.input.todos) : undefined;
 	}
-	if (name === CODEX_TODO_LIST) {
+	if (name === TODO_LIST) {
 		const answer = jsonResult(call.result);
-		return isRecord(answer) ? todosOf(answer.items) : undefined;
+		if (isRecord(answer) && Array.isArray(answer.items)) {
+			return todosOf(answer.items);
+		}
+		return isRecord(call.input) ? todosOf(call.input.items) : undefined;
 	}
 	return undefined;
 }
@@ -69,9 +76,6 @@ function listOf(call: AgentToolCall): Todo[] | undefined {
  * The agent's to-do list as it stands now: the list of its newest to-do
  * call, in call order. Undefined when the step never wrote one, or when the
  * newest list is empty.
- *
- * Codex sends its list only when the list is complete, so a Codex step
- * shows it at the end.
  */
 export function stepTodos(calls: readonly AgentToolCall[]): Todo[] | undefined {
 	let latest: Todo[] | undefined;

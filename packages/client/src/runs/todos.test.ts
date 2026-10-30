@@ -104,6 +104,72 @@ describe("stepTodos", () => {
 		]);
 	});
 
+	test("reads Codex's todo_list from its input while it works", () => {
+		expect(
+			stepTodos([
+				{
+					name: "todo_list",
+					input: {
+						items: [
+							{ text: "Plan", completed: true },
+							{ text: "Build", completed: false },
+						],
+					},
+				},
+			]),
+		).toEqual([
+			{ content: "Plan", status: "completed" },
+			{ content: "Build", status: "pending" },
+		]);
+	});
+
+	test("a todo_list's answer wins over its input", () => {
+		expect(
+			stepTodos([
+				{
+					name: "todo_list",
+					input: { items: [{ text: "Plan", completed: false }] },
+					result: JSON.stringify({
+						items: [{ text: "Plan", completed: true }],
+					}),
+				},
+			]),
+		).toEqual([{ content: "Plan", status: "completed" }]);
+	});
+
+	test("a todo_list whose answer has no list reads its input", () => {
+		expect(
+			stepTodos([
+				{
+					name: "todo_list",
+					input: { items: [{ text: "Plan", completed: false }] },
+					result: JSON.stringify({ status: "interrupted" }),
+				},
+			]),
+		).toEqual([{ content: "Plan", status: "pending" }]);
+	});
+
+	test("reads an ACP agent's plan, its statuses and its priorities", () => {
+		expect(
+			stepTodos([
+				{
+					name: "todo_list",
+					input: {
+						items: [
+							{ content: "Read", priority: "high", status: "completed" },
+							{ content: "Fix", priority: "medium", status: "in_progress" },
+							{ content: "Test", priority: "low", status: "pending" },
+						],
+					},
+				},
+			]),
+		).toEqual([
+			{ content: "Read", status: "completed" },
+			{ content: "Fix", status: "in_progress" },
+			{ content: "Test", status: "pending" },
+		]);
+	});
+
 	test("skips items without text and unknown statuses fall back to pending", () => {
 		expect(
 			stepTodos([
