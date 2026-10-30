@@ -1,7 +1,7 @@
 # Your LAN: a `.local` name
 
 Your computers find the Host by its LAN name, `<name>.local`, with mDNS.
-Put this address first: at home your computers then sync on the LAN.
+Put this address first. At home, your computers then sync on the LAN.
 
 ## 1. Find the LAN name
 
@@ -18,8 +18,8 @@ Check it from another computer: `ping studio.local`.
 
 ## 2. Make a certificate
 
-No public authority signs a certificate for a `.local` name. Make your own.
-Your other computers pin it when they pair.
+No public authority signs a certificate for a `.local` name, so make your
+own. Your other computers pin it when they pair.
 
 ```bash
 mkdir -p ~/.nightshift-tls && cd ~/.nightshift-tls
@@ -32,8 +32,8 @@ chmod 600 key.pem
 ## 3. Serve https:// with it
 
 Start Night Shift with the certificate. It serves `https://` on port 3443
-(`PORT` + 443) for other computers, and keeps plain http on port 3000 for
-this computer.
+(`PORT` + 443) for other computers. This computer keeps plain http on port
+3000.
 
 ```bash
 NIGHTSHIFT_TLS_CERT=~/.nightshift-tls/cert.pem \
@@ -41,17 +41,20 @@ NIGHTSHIFT_TLS_KEY=~/.nightshift-tls/key.pem \
 nightshift serve --host-address https://studio.local:3443
 ```
 
-In the desktop app, set the same two variables before you open it, and add
-`https://studio.local:3443` under Settings → This computer → Be a Host.
+For the desktop app:
 
-Set `NIGHTSHIFT_TLS_PORT` for another port.
+1. Set the same two variables.
+2. Open the app.
+3. Add `https://studio.local:3443` under Settings → This computer → Be a Host.
+
+For another port, set `NIGHTSHIFT_TLS_PORT`.
 
 ## 4. Pair
 
 Follow [Pair a computer with the Host](README.md#pair-a-computer-with-the-host).
 The other computer shows the fingerprint of the certificate with the code.
-The Host shows its fingerprint in Settings, under This computer. Allow the computer only
-when the two are the same.
+The Host shows its fingerprint in Settings, under This computer. Allow the
+computer only when the two are the same.
 
-When you make a new certificate, pair your computers again: they trust only
+When you make a new certificate, pair your computers again. They trust only
 the certificate they pinned.

@@ -5,15 +5,15 @@ Encrypt certificate for your domain. The address is your domain, for
 example `https://nightshift.example.com`.
 
 Tested here: the image of [`deploy/Dockerfile`](../../deploy/Dockerfile)
-behind Caddy, and pairing a computer through it. The Let's Encrypt part
-needs a real domain and was not tested.
+behind Caddy, and pairing a computer through it. Not tested: the Let's
+Encrypt part, because it needs a real domain.
 
 Before you start:
 
 - Point the domain's DNS (an A or AAAA record) at the server.
 - Open ports 80 and 443. The proxy needs 80 to get the certificate.
-- The Host's operator can read what the Host keeps. Put the Host on a server
-  you control.
+- Put the Host on a server you control. The Host's operator can read what
+  the Host keeps.
 
 ## With Docker Compose and Caddy
 
@@ -26,11 +26,11 @@ docker compose -f deploy/docker-compose.yml logs -f
 ```
 
 Caddy gets the certificate and renews it. Night Shift listens only on the
-compose network: Caddy is the only way in. The data is in the volume
+compose network, so Caddy is the only way in. The data is in the volume
 `nightshift`. Back it up.
 
-Docker Compose shows a Night Shift that stops responding as `unhealthy` in
-`docker compose ps`, but does not restart it. Restart it with
+When Night Shift stops responding, `docker compose ps` shows it as
+`unhealthy`. Docker Compose does not restart it. Restart it with
 `docker compose -f deploy/docker-compose.yml restart nightshift`.
 
 ## With Dokploy
@@ -40,15 +40,17 @@ Docker Compose shows a Night Shift that stops responding as `unhealthy` in
 2. Environment: `NIGHTSHIFT_HOST_ADDRESSES=https://nightshift.example.com`.
 3. Mounts: a volume at `/data`.
 4. Domains: `nightshift.example.com`, container port `3000`, HTTPS on,
-   certificate provider Let's Encrypt. Dokploy's Traefik then gets the
+   certificate provider Let's Encrypt. Dokploy's Traefik gets the
    certificate.
 5. Deploy.
 
 Dokploy runs the Application as a Docker Swarm service. The image has a
-health check: when Night Shift stops responding, Swarm replaces the
-container. You do not have to set anything. If you set your own health
-check (Advanced, Swarm Settings, Health Check), keep `nightshift health` as
-the test, and a start period of at least 2 minutes:
+health check. When Night Shift stops responding, Swarm replaces the
+container. You do not have to set anything.
+
+If you set your own health check (Advanced, Swarm Settings, Health Check),
+keep `nightshift health` as the test. Keep a start period of at least 2
+minutes:
 
 ```json
 {
@@ -61,15 +63,14 @@ the test, and a start period of at least 2 minutes:
 ```
 
 The times are in nanoseconds, as Docker takes them. The image has no
-`curl`: test with `nightshift health`, not with a web request.
+`curl`, so test with `nightshift health`, not with a web request.
 
 ### Updates: stop the old container first
 
 One data folder has one Night Shift. Night Shift holds a lease on its
-database while it runs. A second Night Shift on the same volume does not
-start while the first one holds it: it exits with code 1. A rolling update
-that starts the new container before it stops the old one (`start-first`)
-fails for that reason.
+database while it runs. While the first one holds it, a second Night Shift
+on the same volume exits with code 1. Thus a rolling update that starts the
+new container before it stops the old one (`start-first`) fails.
 
 Set the update order to `stop-first`. In Dokploy: Advanced, Swarm Settings,
 Update Config:
@@ -82,14 +83,15 @@ Update Config:
 ```
 
 In a Swarm stack file, that is `deploy.update_config.order: stop-first`.
-The old container stops cleanly on SIGTERM and gives the lease up, so the
-new one starts at once. Its runs continue in the new container.
+On SIGTERM, the old container stops cleanly and releases the lease. The new
+one then starts at once, and the runs continue in it.
 
 ## Without Docker
 
-Install the binary and the systemd unit
-([`deploy/nightshift.service`](../../deploy/nightshift.service)), and put
-Caddy in front:
+1. Install the binary.
+2. Install the systemd unit
+   ([`deploy/nightshift.service`](../../deploy/nightshift.service)).
+3. Put Caddy in front:
 
 ```
 nightshift.example.com {
@@ -97,7 +99,7 @@ nightshift.example.com {
 }
 ```
 
-Keep `NIGHTSHIFT_LISTEN=127.0.0.1` in the unit, so only Caddy reaches
+Keep `NIGHTSHIFT_LISTEN=127.0.0.1` in the unit. Then only Caddy reaches
 Night Shift.
 
 ## Sign in
@@ -119,9 +121,9 @@ Follow [Pair a computer with the Host](README.md#pair-a-computer-with-the-host).
 On a container, approve the code with
 `docker exec -it <container> nightshift pair ABCD-EFGH`.
 
-A certificate from Let's Encrypt needs no fingerprint check: your computers
+A certificate from Let's Encrypt needs no fingerprint check. Your computers
 trust it already.
 
 Do not use a proxy with its own private authority (Caddy's `tls internal`).
-Your computers cannot check that certificate, and joining stops with a
+Your computers cannot check that certificate. Joining then stops with a
 message that says so.

@@ -1,11 +1,11 @@
 # Night Shift from anywhere
 
-A Host is the Night Shift your other computers sync with. A Host answers
-other computers only at an `https://` address. This folder shows how to give
-a Host one, and how to run a Host without a screen.
+A Host is the Night Shift your other computers sync with. It answers them
+only at an `https://` address. This folder shows how to give a Host one, and
+how to run a Host without a screen.
 
-Pick a way out. Each one ends in an `https://` address. To Night Shift they
-are all the same.
+Pick a way out. Each one gives an `https://` address, and Night Shift treats
+them all the same.
 
 | Way out | Use it when | Address |
 | --- | --- | --- |
@@ -15,16 +15,16 @@ are all the same.
 | [An outbound tunnel](tunnel.md) | Your Host is at home, without Tailscale and without an open port | `https://nightshift.example.com` |
 
 A public address (Funnel, a public server, a tunnel) shows Night Shift's
-sign-in page to everyone. That is safe: a Host is invitation-only. Nobody
-makes an account without an invitation link from a Member, and the Host
+sign-in page to everyone. That is safe, because a Host is invitation-only.
+Nobody makes an account without an invitation link from a Member. The Host
 admin exists from the first start. Night Shift limits sign-in attempts per
-client. For more, [require two-factor sign-in](#require-two-factor-sign-in):
-then a password alone does not get anyone in.
+client. For more safety, [require two-factor sign-in](#require-two-factor-sign-in).
+Then a password alone signs nobody in.
 
 A Host can have several addresses. Your other computers try them in order and
 keep the first that answers. Put the LAN name first, then the tailnet name,
-then the public name. At home a computer then syncs on the LAN, in the
-tailnet it stays private, and in a café it uses the public name.
+then the public name. A computer then syncs on the LAN at home, stays private
+in the tailnet, and uses the public name in a café.
 
 ## Run a Host without a screen
 
@@ -57,8 +57,8 @@ nightshift serve --data-dir /var/lib/nightshift \
 - `--host-address` makes it a Host. Repeat it for each address.
 - `--listen 127.0.0.1` keeps it off the network when the way out (Caddy,
   Tailscale Serve, cloudflared) runs on the same computer.
-- `nightshift serve --help` lists every option. Each option has an
-  environment variable too.
+- `nightshift serve --help` lists every option. Each option also has an
+  environment variable.
 
 Two ready-made setups are in [`deploy/`](../../deploy/):
 
@@ -88,19 +88,21 @@ docker run -d --name nightshift -p 127.0.0.1:3000:3000 -v nightshift:/data \
 ```
 
 The Host shows its name in the sidebar and on the Devices page of each
-computer that pairs with it. Set the name with `NIGHTSHIFT_DEVICE_NAME`, for
-example `-e NIGHTSHIFT_DEVICE_NAME="Office Host"`. Without it, the name is
-the host name of the computer. A container that Docker names by its id
-cannot see the name of its computer: its name is the domain of its first
-Host address, else "Host". A Host named by an earlier default (a container
-id, or "Host") gets the new name when it starts. The sidebar marks the
-computer as a Host next to its name.
+computer that pairs with it. The sidebar also marks it as a Host. Set the
+name with `NIGHTSHIFT_DEVICE_NAME`, for example
+`-e NIGHTSHIFT_DEVICE_NAME="Office Host"`. Without it, the name is the host
+name of the computer.
+
+A container that Docker names by its id cannot see the name of its computer.
+Its name is then the domain of its first Host address, else "Host". A Host
+with an earlier default name (a container id, or "Host") gets the new name
+when it starts.
 
 ### Add your tools
 
 The image holds Night Shift, git and ssh. It has no agent CLIs and no other
-tools: you choose them. Build your own image on it, with the CLIs your flows
-use. The image is [Wolfi](https://github.com/wolfi-dev): add packages with
+tools. You choose them: build your own image on it, with the CLIs your flows
+use. The image is [Wolfi](https://github.com/wolfi-dev), so add packages with
 `apk add`. For example:
 
 ```dockerfile
@@ -116,11 +118,11 @@ USER bun
 ```
 
 - Install into `/usr/local`, not into the home folder of `bun`. A volume on
-  the home folder would keep old versions after you update the image.
+  the home folder keeps old versions after you update the image.
 - Pin the versions. The image then changes only when you change it.
 - Go back to `USER bun` at the end. Night Shift does not run as root.
-- Add each tool on the Agents page, under Tools. An Agent node may then run
-  it. Give it its login there (below), not in the image.
+- Add each tool on the Agents page, under Tools. An Agent node can then run
+  it. Give the tool its login there (below), not in the image.
 
 For Claude Code, make a token with `claude setup-token` and set
 `CLAUDE_CODE_OAUTH_TOKEN` in the environment of the container. Night Shift
@@ -137,15 +139,15 @@ Agents page, then the tool, then Edit:
 - **Several accounts of one program.** Add one tool per account: `gh` and
   `gh-work` both run the program `gh`, each with its own token. The agent
   types the tool's name. Say which account it is in the description.
-  A command types the tool's name too: `acli-dimpact jira ...`, not
-  `acli jira ...`, which runs without the login. The flow editor warns
-  about a command that does, and lists the tools you can insert.
+  A command also uses the tool's name: `acli-dimpact jira ...`, not
+  `acli jira ...`. The second one runs without the login. The flow editor
+  warns about such a command, and lists the tools you can insert.
 - **A program that keeps its sign-in in a file**, such as acli: turn on
   "Keep its own sign-in". Night Shift keeps a folder for the tool in the
-  data folder, `/data/tools/<name>`, and points the program at it with a
-  variable (`HOME` for acli). Its sign-in command runs there before the
-  first step, and again when a secret it reads changes. Give the token as
-  the command's input, never in the command:
+  data folder, `/data/tools/<name>`. A variable points the program at that
+  folder (`HOME` for acli). Its sign-in command runs there before the first
+  step, and again when a secret it reads changes. Give the token as the
+  command's input, never in the command:
 
   ```text
   Program          acli
@@ -159,14 +161,14 @@ Agents page, then the tool, then Edit:
   signs in with the tool's login, for example `github.com` for `gh`.
 
 A step gets only the logins of its own tools. The secrets that logins
-read do not reach other agents and commands, also when they are set in
+read do not reach other agents and commands, even when you set them in
 the environment of the container. A Command node that names one in
 `secrets` still gets it. The record of a step shows each value as `•••`.
 
 The agent runs as the same user as Night Shift. An agent that looks for a
 token in its tools can find it. Give each tool a token that can do only
-what the agent needs: a fine-grained token for the repositories it works
-on.
+what the agent needs, such as a fine-grained token for the repositories it
+works on.
 
 For other secrets, see
 [Secrets on a computer without a keychain](#secrets-on-a-computer-without-a-keychain).
@@ -177,11 +179,11 @@ A Host copies each project of its Spaces from GitHub: a project that a
 computer added, with a remote on `github.com`. Its schedules and chats can
 then use the project on the Host. The copies go into
 `/data/projects/<owner>/<repo>`. Night Shift looks for new projects every
-minute. A copy that fails is tried again later. Open the project on the
-Host to see why it failed. "Try again" there copies it at once.
+minute. When a copy fails, Night Shift tries again later. Open the project
+on the Host to see why it failed. "Try again" there copies it at once.
 
-- **A private repository** needs `gh`, signed in, for Night Shift itself:
-  add `gh` to your image and set `GH_TOKEN` in the environment of the
+- **A private repository** needs `gh`, signed in, for Night Shift itself.
+  Add `gh` to your image and set `GH_TOKEN` in the environment of the
   container. The logins of your tools are only for the steps of a flow.
   Without `gh`, the Host copies public repositories only.
 - **Another git host**, such as GitLab: the Host does not copy it. Add its
@@ -192,8 +194,8 @@ Host to see why it failed. "Try again" there copies it at once.
 ### Keep it running
 
 Night Shift can stop responding while it still answers web requests. Each
-setup above notices this, and starts Night Shift again. A run that was in
-progress goes on after the restart.
+setup above finds this and starts Night Shift again. A run in progress
+continues after the restart.
 
 Check it yourself:
 
@@ -210,14 +212,17 @@ curl http://127.0.0.1:3000/health   # 200 when it runs, else 503.
   Docker and Docker Compose only mark it unhealthy (`docker ps`).
 - **Updates in Docker Swarm and Dokploy**: stop the old container first
   (update order `stop-first`). One data folder has one Night Shift. While
-  the old container holds the database, a new one on the same volume does
-  not start: it exits with code 1. See
+  the old container holds the database, a new one on the same volume exits
+  with code 1. See
   [A public server](public-server.md#updates-stop-the-old-container-first).
 - **macOS**: two launchd agents. `nightshift.serve.plist` runs
   `nightshift serve` and starts it again when it stops.
   `nightshift.health.plist` runs `nightshift health --restart` every 60 s.
   When Night Shift does not respond twice, 15 s apart, it stops Night
-  Shift, and launchd starts it again. Install both:
+  Shift, and launchd starts it again.
+
+  Put the folders of your agent CLIs (`claude`, `codex`) in the `PATH` of
+  `nightshift.serve.plist`. Then install both:
 
   ```bash
   cd deploy/launchd
@@ -228,9 +233,7 @@ curl http://127.0.0.1:3000/health   # 200 when it runs, else 503.
   done
   ```
 
-  Put the folders of your agent CLIs (`claude`, `codex`) in the `PATH` of
-  `nightshift.serve.plist` first. The log is in
-  `~/Library/Logs/nightshift.log`. To stop it:
+  The log is in `~/Library/Logs/nightshift.log`. To stop it:
   `launchctl bootout gui/$(id -u)/nightshift.serve` (and `nightshift.health`).
 
 ### Secrets on a computer without a keychain
@@ -239,8 +242,8 @@ A server has no keychain. Night Shift reads secrets from files instead:
 
 - The auth secret: `BETTER_AUTH_SECRET`, else the file in
   `BETTER_AUTH_SECRET_FILE`, else `BETTER_AUTH_SECRET` in the secrets folder
-  below. Without any of these, Night Shift makes one in the data folder and
-  keeps it there.
+  below. Without any of these, Night Shift makes one and keeps it in the
+  data folder.
 - A `${NAME}` in a connection: the environment, else a file named `NAME` in
   the secrets folder. The secrets folder is `NIGHTSHIFT_SECRETS_DIR` (for
   example `/run/secrets` in Docker), else the credentials folder of systemd
@@ -250,9 +253,9 @@ A server has no keychain. Night Shift reads secrets from files instead:
 
 ### Sign in to a Host without a screen
 
-The Host admin is Night Shift's own Person on the Host. On the Host itself
-it is signed in for you. To sign in from a browser on another computer,
-give it an email and a password first. Run this on the Host:
+The Host admin is Night Shift's own Person on the Host. On the Host itself,
+Night Shift signs it in for you. To sign in from a browser on another
+computer, first give it an email and a password. Run this on the Host:
 
 ```bash
 nightshift admin --email you@example.com
@@ -260,12 +263,13 @@ nightshift admin --email you@example.com
 docker exec -it nightshift nightshift admin --email you@example.com
 ```
 
-It asks for the password and does not show it. To give it from a script,
-pipe it in with `--password-stdin`. Run it again to change the password.
+It asks for the password and does not show it. To give the password from a
+script, pipe it to `--password-stdin`. Run the command again to change the
+password.
 
 Then open the Host's address in a browser, for example
 `https://nightshift.example.com/login`, and sign in. Invite others from
-Members: the invitation link uses the address you opened the page with.
+Members. The invitation link uses the address you opened the page with.
 
 `nightshift serve` reminds you when the Host has no sign-in yet.
 
@@ -282,19 +286,19 @@ nightshift serve --require-two-factor ...
 NIGHTSHIFT_REQUIRE_TWO_FACTOR=on
 ```
 
-Then a person who has not turned it on can only set it up, or sign out.
-Night Shift shows them the setup after they sign in: the password, a QR
+Then a person who has not turned it on can only turn it on or sign out.
+After they sign in, Night Shift shows them the setup: the password, a QR
 code for the app, one code from it, and ten backup codes. Each backup code
 signs in once when the app is not at hand. Save them. Under Account, a
 person can make new backup codes or turn two-factor sign-in off.
 
 The requirement does not apply to:
 
-- the Host itself: the UI opened on the Host, or through an SSH tunnel to
-  it, outside a container;
-- your paired computers: they use their own access to the Host.
+- The Host itself: the UI opened on the Host, or through an SSH tunnel to
+  it, outside a container.
+- Your paired computers. They use their own access to the Host.
 
-Set it up for the Host admin first:
+Turn it on for the Host admin first:
 
 1. Give the Host admin a password: `nightshift admin --email you@example.com`.
 2. Start the Host with the requirement (`--require-two-factor` or
@@ -315,15 +319,15 @@ nightshift admin --email you@example.com --reset-two-factor
 docker exec -it nightshift nightshift admin --email you@example.com --reset-two-factor
 ```
 
-Then sign in, and set up two-factor sign-in again. Other people have no
-reset yet: a browser they trusted still signs them in, and from there they
+Then sign in and turn on two-factor sign-in again. Other people have no
+reset yet. A browser they trusted still signs them in, and from there they
 can make new backup codes. Ask everyone to keep their backup codes.
 
-Sign-in and its codes are limited to five tries a minute per client. Behind
-Cloudflare the client is `CF-Connecting-IP`, behind another proxy
-`X-Forwarded-For`. So that nobody can send these headers themselves, keep
-the Host off the network behind the proxy: `--listen 127.0.0.1`, or no
-published port in Docker.
+Sign-in and its codes allow five tries a minute per client. Behind
+Cloudflare, Night Shift finds the client in `CF-Connecting-IP`. Behind
+another proxy, it uses `X-Forwarded-For`. So that nobody can send these
+headers themselves, keep the Host off the network behind the proxy:
+`--listen 127.0.0.1`, or no published port in Docker.
 
 ### Open the UI over SSH
 
@@ -335,8 +339,8 @@ ssh -L 3000:127.0.0.1:3000 you@server
 open http://localhost:3000
 ```
 
-A container sees such a request come from outside it, so it asks you to
-sign in: use the sign-in from `nightshift admin`.
+A container sees such a request come from outside, so it asks you to sign
+in. Use the sign-in from `nightshift admin`.
 
 ## Pair a computer with the Host
 
@@ -368,14 +372,14 @@ add an address later, it learns it on its next connection.
 
 ## Start flows from other tools
 
-A schedule can start its flow when a webhook arrives at the Host. GitHub
-Actions, n8n, Make, Zapier or a script then start a run, with no connector
-for each. See [Start a flow from another tool](triggers.md): the signed
-webhook, a `curl` example and a GitHub Actions workflow.
+A schedule can start its flow when a webhook arrives at the Host. Then
+GitHub Actions, n8n, Make, Zapier or a script can start a run, with no
+connector for each. [Start a flow from another tool](triggers.md) has the
+signed webhook, a `curl` example and a GitHub Actions workflow.
 
 ## Watch your runs in a monitoring tool
 
 Each computer can send the runs it walks to a monitoring tool you choose,
-as OpenTelemetry traces and metrics. It is off by default. See
-[Monitoring](monitoring.md): Grafana in one container on a laptop, SigNoz on
-a Host, LangSmith through your own collector, and a Grafana dashboard.
+as OpenTelemetry traces and metrics. It is off by default.
+[Monitoring](monitoring.md) has Grafana in one container on a laptop, SigNoz
+on a Host, LangSmith through your own collector, and a Grafana dashboard.
