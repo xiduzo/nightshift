@@ -115,12 +115,20 @@ describe("notifications", () => {
 		expect(
 			await errorOf(call(procedures.digest.latest, undefined, { context })),
 		).toBe("UNAUTHORIZED");
+		expect(
+			await errorOf(call(procedures.digest.since, { since: 0 }, { context })),
+		).toBe("UNAUTHORIZED");
 	});
 
 	test("a Person without a digest yet reads none", async () => {
 		const ada = await contextFor((await sandbox.signUp("Ada")).headers);
 		expect(
 			await call(appRouter.notifications.digest.latest, undefined, {
+				context: ada,
+			}),
+		).toBeNull();
+		expect(
+			await call(appRouter.notifications.digest.since, undefined, {
 				context: ada,
 			}),
 		).toBeNull();

@@ -16,6 +16,7 @@ import { type Flow, singleAgentFlow } from "@nightshift/flows";
 import {
 	createInAppChannel,
 	createNotifications,
+	engineDigestSource,
 	engineRunEvents,
 	type Notifications,
 } from "@nightshift/notifications";
@@ -158,6 +159,7 @@ describe("replies of a real engine", () => {
 			events: engineRunEvents(engine),
 			sendsFor: async () => true,
 			inApp,
+			digests: engineDigestSource(engine),
 		});
 		await notifications.start();
 		context = testContext({
@@ -490,6 +492,11 @@ describe("replies of a real engine", () => {
 		})) as { copies: { runId: string }[] };
 		expect(copies.copies.map((c) => c.runId)).toEqual([started.id]);
 		await read(appRouter.gates.list);
+		// A digest read now (its `to` is now: two replies differ): the run that ended is its one line.
+		const digest = (await reply(appRouter.notifications.digest.since, {
+			since: 0,
+		})) as { runs: { runId: string }[] } | null;
+		expect(digest?.runs.map((r) => r.runId)).toEqual([started.id]);
 		const heard = await notices;
 		for (const notice of heard) {
 			expect(

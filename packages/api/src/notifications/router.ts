@@ -123,6 +123,26 @@ export const notifications = {
 			.handler(({ context }) =>
 				context.notifications.digest.latest(context.session.user.id),
 			),
+		since: protectedProcedure
+			.route({
+				summary:
+					"Reads a digest now: the runs that ended since a time (default: your last digest), with status, cost and pull request, and the Gates that wait now.",
+			})
+			.input(
+				z
+					.object({
+						/** Epoch ms. Left out: since your last digest, or a day back. */
+						since: z.number().int().min(0).optional(),
+					})
+					.optional(),
+			)
+			.output(output(digestSchema.nullable()))
+			.handler(({ context, input }) =>
+				context.notifications.digest.since(
+					context.session.user.id,
+					input?.since,
+				),
+			),
 	},
 	webPush: {
 		key: protectedProcedure

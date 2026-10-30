@@ -270,4 +270,15 @@ test("the inbox reads the last digest again: its runs, and the Gates that wait n
 	const latest = await digests.digest.latest(ada.userId);
 	expect(latest).toMatchObject({ to: nine, gates: [] });
 	expect(latest?.runs.map((r) => r.runId)).toEqual(["run-1"]);
+
+	// A digest read now starts at the last digest, or where you ask.
+	const sinceLast = await digests.digest.since(ada.userId);
+	expect(sinceLast).toMatchObject({ from: nine, to: clock });
+	expect(sinceLast?.runs.map((r) => r.runId)).toEqual(["run-2"]);
+	const sinceMorning = await digests.digest.since(
+		ada.userId,
+		nine - 24 * 60 * 60_000,
+	);
+	expect(sinceMorning?.runs.map((r) => r.runId)).toEqual(["run-2", "run-1"]);
+	expect(await digests.digest.since(ada.userId, clock)).toBeNull();
 });

@@ -127,6 +127,13 @@ export type Notifications = {
 		 * in every Space the Person is in. Null: no digest went out yet.
 		 */
 		latest(personId: string): Promise<Digest | null>;
+		/**
+		 * A digest read now: the runs that ended after `from` (default: at
+		 * the Person's last digest, or a day back) and the Gates that wait
+		 * now, in every Space the Person is in. Null: no run ended and no
+		 * Gate waits.
+		 */
+		since(personId: string, from?: number): Promise<Digest | null>;
 	};
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
@@ -212,6 +219,24 @@ export function createNotifications(
 				return readDigest(source, spaces, {
 					from: digestFrom(rows[index + 1]?.createdAt ?? null, row.createdAt),
 					to: row.createdAt,
+					time: digestTime(await settings.get(personId)),
+				});
+			},
+			async since(personId, from) {
+				const source = options.digests;
+				if (!source) return null;
+				const to = now();
+				const start =
+					from ??
+					digestFrom(
+						(await deliveries.ofPerson(personId, "digest", 1))[0]?.createdAt ??
+							null,
+						to,
+					);
+				const spaces = (await spacesOf(db, personId)).map((space) => space.id);
+				return readDigest(source, spaces, {
+					from: start,
+					to,
 					time: digestTime(await settings.get(personId)),
 				});
 			},
