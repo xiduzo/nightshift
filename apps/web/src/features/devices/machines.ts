@@ -85,7 +85,11 @@ export function spaceMachines(view: SpaceView): SpaceMachines {
 		};
 		starterIsHost = host.computer?.host.enabled === true;
 	}
-	const all = starter.id === null ? [starter, ...computers] : computers;
+	// A linked Host's own entry in the Space cannot tell if it is online: its link can.
+	const all = [
+		starter,
+		...computers.filter((c) => !(starterIsHost && c.id === starter.id)),
+	];
 	return {
 		starter,
 		starterIsHost,

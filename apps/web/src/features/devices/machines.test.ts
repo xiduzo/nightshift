@@ -95,6 +95,9 @@ describe("spaceMachines", () => {
 			online: true,
 			projectIds: ["keez"],
 		});
+		// A flow that names the Host sees its link's status too.
+		expect(machines.byName("hetzner-1")?.online).toBe(true);
+		expect(machines.byId("host-1")?.online).toBe(true);
 	});
 
 	test("alone in its Space, this computer starts the schedules", () => {
