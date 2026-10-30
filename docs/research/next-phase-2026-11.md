@@ -1,6 +1,6 @@
 # Next phase: doors, guards, eyes and knowledge
 
-**Status, 2026-10-30:** proposal. Not started. Follows the product and market
+**Status:** Sprint 1 in progress (2026-10-30). Follows the product and market
 review of 2026-10-30 (items 08 "What to integrate" and 09 "Next 90 days").
 
 Night Shift has run a real project every night since about 2026-10-16 and
