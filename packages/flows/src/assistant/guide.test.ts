@@ -99,8 +99,10 @@ describe("flowAuthoringGuide", () => {
 		// is a pair of ids (ADR 3), two more words per example node. 3150:
 		// how to group a flow into Sections (about 190 words), so the
 		// assistant tidies the flows it builds. 3200: the run budget and
-		// the turn and idle limits of an Agent step.
-		expect(words).toBeLessThan(3200);
+		// the turn and idle limits of an Agent step. 3400: the knowledge
+		// kits (one line each), the Agent's knowledge, $NS_KNOWLEDGE and
+		// the review of learnings.
+		expect(words).toBeLessThan(3400);
 	});
 });
 
