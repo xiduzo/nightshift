@@ -116,7 +116,7 @@ export function TwoFactorChallenge({
 								autoFocus
 							/>
 							<FieldDescription>
-								Open the app you use for Night Shift and enter the 6-digit code.
+								Enter the 6-digit code that the app shows for Night Shift.
 							</FieldDescription>
 						</>
 					)}

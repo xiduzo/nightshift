@@ -155,11 +155,11 @@ export function ComputerDetail({
 
 			<DetailSection
 				title="Projects"
-				description={`The projects of ${space.name} it has a copy of.`}
+				description={`The projects of ${space.name} on this computer.`}
 			>
 				{computer.clones.length === 0 ? (
 					<p className="text-muted-foreground text-sm">
-						It has no copy of a project of this Space yet.
+						No project of this Space is on it yet.
 					</p>
 				) : (
 					<div className="flex flex-wrap gap-1.5">
@@ -205,16 +205,13 @@ export function ComputerDetail({
 			)}
 
 			{computer.paired ? (
-				<DetailSection
-					title="Paired"
-					description="When it joined this computer."
-				>
+				<DetailSection title="Paired">
 					<p className="text-sm">
 						{revoked
 							? "You removed its access. To use it here again, pair it again."
 							: `Paired on ${formatDateTime(computer.paired.pairedAt)}.`}{" "}
 						{computer.paired.homeHost !== null && !revoked
-							? "Its settings are kept on this computer."
+							? "This computer keeps its settings."
 							: null}
 					</p>
 				</DetailSection>
@@ -224,7 +221,7 @@ export function ComputerDetail({
 				<>
 					<DetailSection
 						title="Coding agents"
-						description="The profiles, harnesses and tools of this computer."
+						description="The profiles and tools of this computer."
 					>
 						<Button
 							variant="outline"
@@ -238,7 +235,7 @@ export function ComputerDetail({
 					</DetailSection>
 					<DetailSection
 						title="Settings of this computer"
-						description="Be a Host, the Hosts it joined, and where it keeps its data."
+						description="Be a Host and the Hosts it joined."
 					>
 						<Button
 							variant="outline"

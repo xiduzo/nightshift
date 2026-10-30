@@ -31,7 +31,7 @@ export function ProjectFolderLine({
 	if (copy?.state === "failed") {
 		return (
 			<span className={cn("block text-destructive", className)}>
-				Not on this computer. The copy from GitHub failed: see Clones below.
+				Not on this computer. The copy from GitHub failed.
 			</span>
 		);
 	}

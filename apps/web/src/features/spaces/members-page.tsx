@@ -264,7 +264,7 @@ function MemberList({ overview }: { overview: MembersOverview }) {
 						</AlertDialogTitle>
 						<AlertDialogDescription>
 							They no longer see its projects, runs and gates. Runs they started
-							keep going. To let them back in, invite them again.
+							do not stop. To add them again, invite them.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -345,7 +345,7 @@ function Invitations({
 	return (
 		<PageSection
 			title="Invitations"
-			description="People who have a link to join, until they accept it."
+			description="Links to join that nobody accepted yet."
 		>
 			<Card>
 				<CardContent>

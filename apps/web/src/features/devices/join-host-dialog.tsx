@@ -209,8 +209,8 @@ function JoinHostSteps({
 			<DialogHeader>
 				<DialogTitle>Join a Host</DialogTitle>
 				<DialogDescription>
-					Sync this computer through a Host: your other computer, a server, or a
-					colleague's Night Shift.
+					Sync this computer through a Host. A Host is your other computer, a
+					server, or the Night Shift of a colleague.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup>
@@ -231,8 +231,7 @@ function JoinHostSteps({
 						<FieldError>{error}</FieldError>
 					) : (
 						<FieldDescription>
-							Any of the addresses on the Host's Devices page. This computer
-							learns the others when it pairs.
+							Use an address from the Devices page of the Host.
 						</FieldDescription>
 					)}
 				</Field>
@@ -385,8 +384,8 @@ function CodeStep({ step }: { step: Extract<Step, { kind: "code" }> }) {
 				<DialogTitle>Allow this computer on the Host</DialogTitle>
 				<DialogDescription>
 					{step.page
-						? "Open the Host, sign in, and allow this computer. It connects as soon as you do."
-						: "On the Host, open Devices, choose Pair a device, and enter this code. This computer connects as soon as you allow it there."}
+						? "Open the Host, sign in, and allow this computer. It connects when you do."
+						: "On the Host, open Devices, choose Pair a device, and enter this code. This computer connects when you allow it."}
 				</DialogDescription>
 			</DialogHeader>
 			<div className="flex items-center justify-center gap-2">

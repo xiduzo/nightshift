@@ -72,7 +72,7 @@ export function AccountForm({
 					result.error.message ??
 						(mode === "sign-in"
 							? "The email or the password is not correct."
-							: "The account was not made. Try again."),
+							: "Night Shift could not make the account. Try again."),
 				),
 			);
 			return;
@@ -126,7 +126,7 @@ export function AccountForm({
 							autoFocus
 						/>
 						<FieldDescription>
-							Members of the Space see it, and your commits in runs carry it.
+							Members of the Space see it. The commits of your runs show it too.
 						</FieldDescription>
 					</Field>
 				) : null}

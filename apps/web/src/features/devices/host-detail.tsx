@@ -90,8 +90,8 @@ function LinkedHostDetail({
 					It keeps the projects, runs and members of {space.name}. Runs start
 					there, unless a step names another computer.{" "}
 					{home
-						? "It is your home Host: it also keeps the settings of this computer."
-						: "It is a guest Host: it gets nothing of this computer but the Spaces it keeps."}
+						? "It is your home Host. It also keeps the settings of this computer."
+						: "It is a guest Host. It gets only the Spaces it keeps from this computer."}
 				</p>
 			</DetailSection>
 			<DetailSection
@@ -120,7 +120,7 @@ function LinkedHostDetail({
 			</DetailSection>
 			<DetailSection
 				title="Spaces it keeps"
-				description="The Spaces this computer takes part in through this Host."
+				description="Your Spaces on this Host."
 			>
 				<div className="flex flex-wrap gap-1.5">
 					{host.spaces.map((s) => (
@@ -168,7 +168,7 @@ function ThisComputerHostDetail({
 					{computer
 						? computer.host.enabled
 							? "Your other computers can pair with it and sync through it."
-							: "Only this computer works in it now. Turn on Be a Host in Settings to let your other computers pair with it."
+							: "Only this computer works in it now. To pair your other computers, turn on Be a Host in Settings."
 						: null}
 				</p>
 				{onPair ? (

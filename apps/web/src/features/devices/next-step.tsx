@@ -107,7 +107,7 @@ function deviceSteps(input: StepsInput): Step[] {
 			icon: ServerIcon,
 			title: "Let your other devices connect",
 			description:
-				"Turn on Be a Host. Your other computers and your phone can then connect to this computer.",
+				"Your other computers and your phone can then connect to this computer.",
 			done: hosted,
 			action: <BeAHostButton size="sm" />,
 			alternative: (
@@ -121,7 +121,7 @@ function deviceSteps(input: StepsInput): Step[] {
 			icon: PlusIcon,
 			title: "Add another computer",
 			description:
-				"Steps can then run there too, for example on a computer that stays on at night.",
+				"Run steps there too, for example on a computer that is on at night.",
 			done: view.yours.length > 1,
 			action: input.onPair ? (
 				<Button size="sm" onClick={input.onPair}>

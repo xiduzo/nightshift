@@ -201,8 +201,8 @@ function MoveProjectForm({
 			<DialogHeader>
 				<DialogTitle>Move {project.name} to another Space</DialogTitle>
 				<DialogDescription>
-					Its runs and their history move with it. The members of that Space see
-					them there, and this Space no longer does.
+					Its runs and their history move with it. Then only the members of that
+					Space see them.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup>
@@ -229,8 +229,8 @@ function MoveProjectForm({
 					</Select>
 					{targets.length === 0 && !spaces.isLoading ? (
 						<FieldDescription>
-							No other Space takes projects from you. Create one in the Space
-							menu first.
+							You are an owner or admin of no other Space. Create one in the
+							Space menu.
 						</FieldDescription>
 					) : null}
 					{move.error ? <FieldError>{move.error.message}</FieldError> : null}
