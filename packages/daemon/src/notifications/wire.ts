@@ -8,6 +8,7 @@ import {
 	createNotifications,
 	type DesktopNotifier,
 	type DesktopWindow,
+	engineDigestSource,
 	engineRunEvents,
 	type Notifications,
 	oneSenderPerSpace,
@@ -96,6 +97,7 @@ export async function wireNotifications(
 			createNotifications({
 				db,
 				events: engineRunEvents(wiring.engine),
+				digests: engineDigestSource(wiring.engine),
 				sendsFor: sendsPushesFor(db, settings, owner),
 				inApp,
 				webPush: { subject: webPushSubject(env) },

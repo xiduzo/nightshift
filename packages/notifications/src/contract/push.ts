@@ -10,7 +10,7 @@
 export const PUSH_CATEGORY = {
 	/** A lock-screen Gate with two options: Approve and Reject on the notification. */
 	decide: "gate-decide",
-	/** Any other Gate, and the end of quiet hours: a tap opens the app. */
+	/** Any other Gate, the end of quiet hours, and the digest: a tap opens the inbox. */
 	open: "gate-open",
 	/** A run that finished or failed, or a step that waits for a Device: a tap opens the run. */
 	run: "run",
@@ -33,6 +33,7 @@ export const PUSH_MESSAGE_KINDS = [
 	"run-failed",
 	"device-wait",
 	"gates-waiting",
+	"digest",
 ] as const;
 export type PushMessageKind = (typeof PUSH_MESSAGE_KINDS)[number];
 

@@ -5,7 +5,8 @@ import { z } from "zod";
 
 /**
  * A Person's notification settings: which events, quiet hours, which
- * screens, and how long a phone waits while another screen is open. They
+ * screens, how long a phone waits while another screen is open, and when
+ * the morning digest goes out. They
  * belong to the Person, not to a computer. A Person without a row has the
  * defaults.
  */
@@ -45,6 +46,18 @@ const quietHoursSchema = z.object({
 	end: timeOfDaySchema,
 });
 
+/**
+ * When the morning digest goes out: never (`off`), when quiet hours end
+ * (`quiet-hours-end`; without quiet hours at `time`), or at `time`.
+ */
+const DIGEST_WHEN = ["off", "quiet-hours-end", "time"] as const;
+
+const digestSchema = z.object({
+	when: z.enum(DIGEST_WHEN),
+	/** `HH:MM` in the Person's time zone. */
+	time: timeOfDaySchema,
+});
+
 /** Which kinds of screen get pushes. The open pages always update. */
 const screensSchema = z.object({
 	/** Browsers with every Night Shift page closed (Web Push). */
@@ -64,6 +77,8 @@ export const notificationSettingsSchema = z.object({
 	screens: screensSchema,
 	/** How long a push to a phone or a closed browser waits while a screen is open, in minutes. */
 	holdMinutes: z.number().int().min(0).max(60),
+	/** The morning digest: the runs that ended since the last one, and the Gates that wait. */
+	digest: digestSchema,
 });
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 
@@ -75,6 +90,7 @@ export const notificationSettingsPatchSchema = z
 		timeZone: timeZoneSchema.optional(),
 		screens: screensSchema.partial().optional(),
 		holdMinutes: notificationSettingsSchema.shape.holdMinutes.optional(),
+		digest: digestSchema.partial().optional(),
 	})
 	.strict();
 export type NotificationSettingsPatch = z.infer<
@@ -83,6 +99,12 @@ export type NotificationSettingsPatch = z.infer<
 
 /** How long a push waits while a screen is open, by default. */
 export const DEFAULT_HOLD_MINUTES = 3;
+
+/** The digest of a Person who never chose: when quiet hours end, else at 08:00. */
+const DEFAULT_DIGEST: NotificationSettings["digest"] = {
+	when: "quiet-hours-end",
+	time: "08:00",
+};
 
 /**
  * This computer's three notification switches: its own settings from
@@ -135,6 +157,7 @@ export function defaultSettings(
 		timeZone,
 		screens: { web: true, expo: true, desktop: true },
 		holdMinutes: DEFAULT_HOLD_MINUTES,
+		digest: DEFAULT_DIGEST,
 	};
 }
 
@@ -150,6 +173,7 @@ export function applyPatch(
 		timeZone: patch.timeZone ?? current.timeZone,
 		screens: { ...current.screens, ...patch.screens },
 		holdMinutes: patch.holdMinutes ?? current.holdMinutes,
+		digest: { ...current.digest, ...patch.digest },
 	});
 }
 
@@ -189,6 +213,51 @@ export function inQuietHours(
 	return start < end ? now >= start && now < end : now >= start || now < end;
 }
 
+/**
+ * The time of day the Person's digest goes out, `HH:MM`: the end of their
+ * quiet hours, or the time they chose. Null: they turned it off.
+ */
+export function digestTime(
+	settings: Pick<NotificationSettings, "digest" | "quietHours">,
+): string | null {
+	const { when, time } = settings.digest;
+	if (when === "off") return null;
+	const window = settings.quietHours;
+	if (when === "quiet-hours-end" && window && window.start !== window.end) {
+		return window.end;
+	}
+	return time;
+}
+
+/** The day of `at` in the time zone, `YYYY-MM-DD`. */
+function dayOf(at: number, timeZone: string): string {
+	const parts = new Intl.DateTimeFormat("en-GB", {
+		timeZone,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).formatToParts(new Date(at));
+	const part = (type: Intl.DateTimeFormatPartTypes) =>
+		parts.find((p) => p.type === type)?.value ?? "";
+	return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/**
+ * The day whose digest is due at `at`, `YYYY-MM-DD` in the Person's time
+ * zone: its time came today, and it is not quiet hours. A digest that did
+ * not go out at its time (the computer was off) goes later that day. Null:
+ * none is due, or the Person turned it off.
+ */
+export function digestDay(
+	settings: Pick<NotificationSettings, "digest" | "quietHours" | "timeZone">,
+	at: number,
+): string | null {
+	const time = digestTime(settings);
+	if (time === null || inQuietHours(settings, at)) return null;
+	if (minuteOfDay(at, settings.timeZone) < minutesOf(time)) return null;
+	return dayOf(at, settings.timeZone);
+}
+
 export type SettingsStore = ReturnType<typeof createSettingsStore>;
 
 export function createSettingsStore(
@@ -219,6 +288,10 @@ export function createSettingsStore(
 			timeZone: isTimeZone(row.timeZone) ? row.timeZone : fallbackZone,
 			screens: { ...defaults.screens, ...screens },
 			holdMinutes: row.holdMinutes,
+			digest: digestSchema.catch(defaults.digest).parse({
+				when: row.digestWhen,
+				time: row.digestTime,
+			}),
 		};
 	}
 
@@ -234,6 +307,8 @@ export function createSettingsStore(
 			timeZone: settings.timeZone,
 			screens: JSON.stringify(settings.screens),
 			holdMinutes: settings.holdMinutes,
+			digestWhen: settings.digest.when,
+			digestTime: settings.digest.time,
 			updatedAt: new Date(),
 		};
 	}

@@ -1,4 +1,10 @@
-import { endSession, roleAllows, roleIn, spaceIds } from "@nightshift/auth";
+import {
+	endSession,
+	roleAllows,
+	roleIn,
+	spaceIds,
+	spacesOf,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 
 import {
@@ -12,10 +18,17 @@ import {
 	type WebPushSender,
 } from "./channels";
 import { createDeliveryLog } from "./deliveries";
+import {
+	type Digest,
+	type DigestSource,
+	digestFrom,
+	readDigest,
+} from "./digest";
 import { createNotifier, type RunEventSource, spaceAudience } from "./notifier";
 import {
 	type ComputerSwitches,
 	createSettingsStore,
+	digestTime,
 	eventsOfSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
@@ -42,6 +55,8 @@ export type NotificationsOptions = {
 	inApp: InAppChannel;
 	/** The push channels this daemon has. Default: none, the in-app stream only. `stop` stops them too. */
 	push?: PushChannels;
+	/** The runs and Gates the morning digest reads. Absent: no digest. */
+	digests?: DigestSource;
 	/**
 	 * Web Push from this daemon, with the VAPID keys it keeps (made once).
 	 * `subject`: an `https:` URL or a `mailto:` address that push services
@@ -105,6 +120,14 @@ export type Notifications = {
 		/** The public VAPID key a browser subscribes with. Null: this daemon sends no Web Push. */
 		publicKey(): Promise<string | null>;
 	};
+	digest: {
+		/**
+		 * The Person's last digest, read again now: the runs that ended
+		 * between the digest before it and it, and the Gates that wait now,
+		 * in every Space the Person is in. Null: no digest went out yet.
+		 */
+		latest(personId: string): Promise<Digest | null>;
+	};
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
 	stop(): void;
@@ -130,6 +153,7 @@ export function createNotifications(
 			...(options.webPush.sender ? { sender: options.webPush.sender } : {}),
 		});
 	}
+	const deliveries = createDeliveryLog(db);
 	const notifier = createNotifier({
 		events: options.events,
 		audience: spaceAudience(db),
@@ -141,9 +165,10 @@ export function createNotifications(
 		},
 		settings,
 		targets,
-		deliveries: createDeliveryLog(db),
+		deliveries,
 		inApp: options.inApp,
 		push,
+		...(options.digests ? { digests: options.digests } : {}),
 		now,
 		...(options.tickMs ? { tickMs: options.tickMs } : {}),
 	});
@@ -174,6 +199,22 @@ export function createNotifications(
 		},
 		webPush: {
 			publicKey: async () => (vapid ? (await vapid.get()).publicKey : null),
+		},
+		digest: {
+			async latest(personId) {
+				const source = options.digests;
+				if (!source) return null;
+				const rows = await deliveries.ofPerson(personId, "digest", 14);
+				const index = rows.findIndex((row) => row.title !== null);
+				const row = rows[index];
+				if (!row) return null;
+				const spaces = (await spacesOf(db, personId)).map((space) => space.id);
+				return readDigest(source, spaces, {
+					from: digestFrom(rows[index + 1]?.createdAt ?? null, row.createdAt),
+					to: row.createdAt,
+					time: digestTime(await settings.get(personId)),
+				});
+			},
 		},
 		start: () => notifier.start(),
 		stop: () => {

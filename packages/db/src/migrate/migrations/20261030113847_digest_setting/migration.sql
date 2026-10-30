@@ -1,0 +1,2 @@
+ALTER TABLE `notification_settings` ADD `digest_when` text DEFAULT 'quiet-hours-end' NOT NULL;--> statement-breakpoint
+ALTER TABLE `notification_settings` ADD `digest_time` text DEFAULT '08:00' NOT NULL;

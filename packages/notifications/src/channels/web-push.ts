@@ -113,7 +113,9 @@ function urgencyOf(
 	kind: NotificationMessage["kind"],
 ): WebPushRequest["urgency"] {
 	if (kind === "gate-opened" || kind === "gates-waiting") return "high";
-	if (kind === "run-failed" || kind === "device-wait") return "normal";
+	if (kind === "run-failed" || kind === "device-wait" || kind === "digest") {
+		return "normal";
+	}
 	return "low";
 }
 

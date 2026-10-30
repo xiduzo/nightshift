@@ -120,6 +120,17 @@ export function expoMessage(
 			interruptionLevel: "active",
 		};
 	}
+	if (message.kind === "digest") {
+		// A summary, not a question: a tap opens the inbox, at default importance.
+		return {
+			...once,
+			data,
+			categoryId: PUSH_CATEGORY.open,
+			channelId: PUSH_ANDROID_CHANNEL.runs,
+			priority: "normal",
+			interruptionLevel: "active",
+		};
+	}
 	if (message.kind === "gates-waiting") data.count = message.count;
 	const options = message.gate?.lockScreen ? message.gate.options : [];
 	// The author marked this Gate to be answered from the lock screen. The

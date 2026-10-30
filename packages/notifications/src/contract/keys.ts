@@ -24,6 +24,15 @@ export function deviceWaitKey(wait: { runId: string; stepId: string }): string {
 	return `${wait.runId}:wait:${wait.stepId}`;
 }
 
+/**
+ * The morning digest of one day (`digest:<YYYY-MM-DD>`, the day in the
+ * Person's time zone). The delivery log keys it per Person, so each
+ * Person gets one digest a day, also after a restart.
+ */
+export function digestKey(day: string): string {
+	return `${DIGEST}:${day}`;
+}
+
 /** The notification at the end of quiet hours (`waiting:<ms>`). */
 export function waitingKey(at: number): string {
 	return `waiting:${at}`;
@@ -34,9 +43,12 @@ export type NotificationKey =
 	| { kind: "gate"; runId: string; stepId: string }
 	| { kind: "run-end"; runId: string; seq: number }
 	| { kind: "device-wait"; runId: string; stepId: string }
-	| { kind: "waiting"; at: number };
+	| { kind: "waiting"; at: number }
+	| { kind: "digest"; day: string };
 
 const WAITING = "waiting";
+const DIGEST = "digest";
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function integer(part: string): number | null {
 	return /^\d+$/.test(part) ? Number(part) : null;
@@ -49,6 +61,9 @@ export function parseKey(key: string): NotificationKey | null {
 	const [first, second, third] = parts;
 	if (first === undefined || second === undefined) return null;
 	if (parts.length === 2) {
+		if (first === DIGEST) {
+			return DAY.test(second) ? { kind: "digest", day: second } : null;
+		}
 		if (first !== WAITING)
 			return { kind: "gate", runId: first, stepId: second };
 		const at = integer(second);
@@ -84,7 +99,7 @@ export function parseDeviceWaitKey(
 		: null;
 }
 
-/** Whether a key names a Gate. A run's end, a device wait and the end of quiet hours do not. */
+/** Whether a key names a Gate. A run's end, a device wait, the end of quiet hours and a digest do not. */
 export function isGateKey(key: string): boolean {
 	return parseGateKey(key) !== null;
 }

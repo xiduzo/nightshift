@@ -29,18 +29,18 @@ export type GateFacts = {
 
 /** What one notification says. */
 export type NotificationMessage = {
-	/** The notification key (`contract/keys.ts`): a Gate, a run's end, or the end of quiet hours. */
+	/** The notification key (`contract/keys.ts`): a Gate, a run's end, the end of quiet hours, or a digest. */
 	key: string;
 	/** What happened. `gates-waiting`: quiet hours ended and Gates still wait. */
 	kind: NoticeKind | "gates-waiting";
-	/** Null for `gates-waiting`, which spans Spaces. */
+	/** Null for `gates-waiting` and `digest`, which span Spaces. */
 	spaceId: string | null;
 	runId: string | null;
 	/** The Gate's step, or the step that waits for a Device. Null for a run. */
 	stepId: string | null;
 	/** One short sentence for the person. */
 	title: string;
-	/** A second line, for a device wait. Absent: the screen says what fits the kind. */
+	/** A second line, for a device wait and a digest. Absent: the screen says what fits the kind. */
 	body?: string;
 	/**
 	 * Show it as a notification. False: a screen only updates what it
@@ -98,6 +98,8 @@ export function titleOf(kind: NoticeKind): string {
 			return "A run failed";
 		case "device-wait":
 			return "A step waits for a device";
+		case "digest":
+			return "Night Shift: last night";
 	}
 }
 

@@ -4,6 +4,7 @@ import type { NotificationMessage } from "../channels";
 import { expoMessage, expoWithdrawMessage } from "../channels/expo";
 import {
 	deviceWaitKey,
+	digestKey,
 	gateKey,
 	isGateKey,
 	type PushData,
@@ -64,6 +65,14 @@ describe("a notification key", () => {
 		expect(parseDeviceWaitKey("run-1:build")).toBeNull();
 		expect(parseGateKey(key)).toBeNull();
 		expect(isGateKey(key)).toBe(false);
+	});
+
+	test("a digest's key is its day, and is no Gate", () => {
+		const key = digestKey("2026-10-21");
+		expect(key).toBe("digest:2026-10-21");
+		expect(parseKey(key)).toEqual({ kind: "digest", day: "2026-10-21" });
+		expect(isGateKey(key)).toBe(false);
+		expect(parseKey("digest:today")).toBeNull();
 	});
 
 	test("a key Night Shift does not make names nothing", () => {
@@ -176,6 +185,7 @@ describe("where a tap goes", () => {
 
 	test("anything else, or a push without its ids, opens the inbox", () => {
 		expect(at("gates-waiting", null)).toBe("/inbox");
+		expect(at("digest", null)).toBe("/inbox");
 		expect(at("run-finished", null)).toBe("/inbox");
 		expect(at("gate-opened", "run-1")).toBe("/inbox");
 		expect(at("gate-opened", null, "review")).toBe("/inbox");
@@ -219,11 +229,42 @@ describe("from the Host to the phone", () => {
 				stepId: null,
 				count: 2,
 			}),
+			message({
+				kind: "digest",
+				key: "digest:2026-10-21",
+				spaceId: null,
+				runId: null,
+				stepId: null,
+				title: "Night Shift: last night",
+				body: "3 runs finished, 1 failed. $4.20 spent.",
+			}),
 		];
 		for (const one of sent) {
 			const { data } = expoMessage("token", one);
 			expect(pushDataOf(data)).toEqual(data as PushData);
 		}
+	});
+
+	test("a digest goes to the runs channel and opens the inbox", () => {
+		const push = expoMessage(
+			"token",
+			message({
+				kind: "digest",
+				key: "digest:2026-10-21",
+				spaceId: null,
+				runId: null,
+				stepId: null,
+				title: "Night Shift: last night",
+				body: "1 run finished.",
+			}),
+		);
+		expect(push).toMatchObject({
+			title: "Night Shift: last night",
+			body: "1 run finished.",
+			categoryId: "gate-open",
+			channelId: "runs",
+			priority: "normal",
+		});
 	});
 
 	test("a withdraw push reads back its key", () => {

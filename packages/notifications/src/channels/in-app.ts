@@ -17,7 +17,8 @@ import type {
 /** One item of the in-app stream. */
 export type InAppItem =
 	| {
-			kind: NoticeKind;
+			/** A digest has no item: a screen reads it when it shows the inbox. */
+			kind: Exclude<NoticeKind, "digest">;
 			key: string;
 			spaceId: string;
 			runId: string;
@@ -122,6 +123,7 @@ export function createInAppChannel(
 		async send(target, message: NotificationMessage) {
 			if (
 				message.kind === "gates-waiting" ||
+				message.kind === "digest" ||
 				message.spaceId === null ||
 				message.runId === null
 			) {

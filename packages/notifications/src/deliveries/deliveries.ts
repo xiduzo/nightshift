@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 /**
  * The delivery log: what the notifier did with each event for each
@@ -10,12 +10,18 @@ import { and, eq, inArray } from "drizzle-orm";
  * reaches each of them.
  */
 
-/** What a notification tells. `device-wait`: a step waits for a Device that is offline. */
+/**
+ * What a notification tells. `device-wait`: a step waits for a Device that
+ * is offline. `digest`: the runs that ended since the last digest, and the
+ * Gates that wait, once a day. A digest spans Spaces and runs: its entry
+ * has an empty `spaceId` and `runId`.
+ */
 export type NoticeKind =
 	| "gate-opened"
 	| "run-finished"
 	| "run-failed"
-	| "device-wait";
+	| "device-wait"
+	| "digest";
 
 /**
  * `sending`: claimed, and going out to `heldFor` now. A crash before it
@@ -217,6 +223,26 @@ export function createDeliveryLog(db: Database) {
 				.select()
 				.from(notificationDelivery)
 				.where(eq(notificationDelivery.status, "quiet"));
+			return rows.map(toDelivery);
+		},
+
+		/** The Person's entries of one kind, newest first: their digests. */
+		async ofPerson(
+			personId: string,
+			kind: NoticeKind,
+			limit: number,
+		): Promise<Delivery[]> {
+			const rows = await db
+				.select()
+				.from(notificationDelivery)
+				.where(
+					and(
+						eq(notificationDelivery.personId, personId),
+						eq(notificationDelivery.kind, kind),
+					),
+				)
+				.orderBy(desc(notificationDelivery.createdAt))
+				.limit(limit);
 			return rows.map(toDelivery);
 		},
 

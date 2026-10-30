@@ -148,5 +148,10 @@ export function noticeOf(message: NotificationMessage): DesktopNotice {
 				...base,
 				body: message.body ?? "Open the run to see what waits.",
 			};
+		case "digest":
+			return {
+				...base,
+				body: message.body ?? "Open Night Shift to see what ran.",
+			};
 	}
 }

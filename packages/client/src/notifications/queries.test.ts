@@ -14,6 +14,7 @@ const saved: NotificationSettings = {
 	timeZone: "Europe/Amsterdam",
 	screens: { web: true, expo: true, desktop: true },
 	holdMinutes: 3,
+	digest: { when: "quiet-hours-end", time: "08:00" },
 };
 
 describe("applySettingsPatch", () => {
@@ -45,5 +46,10 @@ describe("applySettingsPatch", () => {
 		});
 		expect(next.timeZone).toBe("UTC");
 		expect(next.screens).toEqual({ web: true, expo: false, desktop: true });
+	});
+
+	test("merges the digest", () => {
+		const next = applySettingsPatch(saved, { digest: { when: "time" } });
+		expect(next.digest).toEqual({ when: "time", time: "08:00" });
 	});
 });

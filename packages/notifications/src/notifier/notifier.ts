@@ -10,9 +10,17 @@ import {
 	type PushChannels,
 	titleOf,
 } from "../channels";
-import { parseGateKey, runEndKey, waitingKey } from "../contract";
+import { digestKey, parseGateKey, runEndKey, waitingKey } from "../contract";
 import type { Claim, Delivery, DeliveryLog, NoticeKind } from "../deliveries";
 import {
+	type Digest,
+	type DigestSource,
+	digestFrom,
+	readDigest,
+} from "../digest";
+import {
+	digestDay,
+	digestTime,
 	inQuietHours,
 	type NotificationSettings,
 	type SettingsStore,
@@ -62,6 +70,15 @@ import { createWaitTracker, type StartedWait } from "./wait-tracker";
  * - Lock-screen answers: a push about a Gate its author marked carries its
  *   options, only to a person whose role allows an answer (`mayAnswer`).
  *
+ * - The morning digest: once a day per Person, when their quiet hours
+ *   end or at the time they chose (`digestDay`), one push sums up the
+ *   runs that ended since the last digest and the Gates that wait. Its
+ *   key is the day (`digest:<YYYY-MM-DD>`), so a restart never sends a
+ *   day's digest twice. Nothing to say: no push. The push to a phone or a
+ *   browser covers the Spaces this daemon sends for. This computer's
+ *   desktop covers every Space it has, as for every other notice. It is
+ *   not held while a screen is open: it is the morning's summary.
+ *
  * At start, the open Gates are read: one the log has not told yet (it
  * opened while no notifier listened) is pushed then, the others tell
  * nobody again. A device wait the log told is withdrawn when its run no
@@ -90,6 +107,8 @@ export type NotifierDeps = {
 	deliveries: DeliveryLog;
 	inApp: InAppChannel;
 	push: PushChannels;
+	/** The runs and Gates the morning digest reads. Absent: no digest. */
+	digests?: DigestSource;
 	now?: () => number;
 	/** How often held pushes and the end of quiet hours are checked. Default 15 s. */
 	tickMs?: number;
@@ -116,6 +135,9 @@ const DEFAULT_TICK_MS = 15_000;
 /** A push still `sending` this long after its claim was cut short by a crash. */
 const LOST_AFTER_MS = 60_000;
 
+/** How often the notifier looks for digests that are due. */
+const DIGEST_CHECK_MS = 60_000;
+
 /**
  * The screens of this computer itself: the desktop notification. The
  * daemon here shows them for every Space this Replica has, not only the
@@ -139,6 +161,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	let stopped = false;
 	let unsubscribe: (() => void) | null = null;
 	let timer: ReturnType<typeof setInterval> | null = null;
+	/** The digests this notifier sent or skipped, as `personId digest:<day>`. */
+	const digestsDone = new Set<string>();
+	let digestCheckedAt = Number.NEGATIVE_INFINITY;
 
 	function enqueue(what: string, job: () => Promise<void>): Promise<void> {
 		queue = queue.then(job).catch((error) => onError(what, error));
@@ -454,6 +479,14 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 
 	/** The message of a held entry, as it went out the first time. */
 	function messageOf(row: Delivery): Promise<NotificationMessage> {
+		if (row.kind === "digest") {
+			return Promise.resolve(
+				digestMessage(row.key, {
+					title: row.title ?? titleOf("digest"),
+					body: row.body ?? "",
+				}),
+			);
+		}
 		return pushMessage(
 			row.kind,
 			row.key,
@@ -493,7 +526,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			}
 			// A run's end showed on the open screen: no push after it.
 			const seen =
-				row.kind !== "gate-opened" && deps.inApp.isActive(row.personId);
+				row.kind !== "gate-opened" &&
+				row.kind !== "digest" &&
+				deps.inApp.isActive(row.personId);
 			const sent = seen
 				? []
 				: await sendTo(
@@ -577,6 +612,112 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		}
 	}
 
+	/** The push of a digest. It spans Spaces: no Space, no run. */
+	function digestMessage(
+		key: string,
+		words: Pick<Digest, "title" | "body">,
+	): NotificationMessage {
+		return {
+			key,
+			kind: "digest",
+			spaceId: null,
+			runId: null,
+			stepId: null,
+			title: words.title,
+			...(words.body ? { body: words.body } : {}),
+			alert: true,
+			count: null,
+			at: now(),
+		};
+	}
+
+	/**
+	 * Sends each Person the digest that is due: once a day, keyed by the
+	 * day. The phones and browsers hear of the Spaces this daemon sends
+	 * for, this computer's desktop of every Space it has. The entry keeps
+	 * what the push said, also when nothing could take it, so the inbox can
+	 * show the last digest. A day with nothing to say leaves an entry
+	 * without words.
+	 */
+	async function sendDigests(at: number): Promise<void> {
+		const source = deps.digests;
+		if (!source || at - digestCheckedAt < DIGEST_CHECK_MS) return;
+		digestCheckedAt = at;
+		const spacesOf = new Map<string, string[]>();
+		const sending = new Set<string>();
+		for (const spaceId of await deps.spaces()) {
+			if (await deps.sendsFor(spaceId)) sending.add(spaceId);
+			for (const personId of await deps.audience(spaceId)) {
+				spacesOf.set(personId, [...(spacesOf.get(personId) ?? []), spaceId]);
+			}
+		}
+		for (const [personId, spaces] of spacesOf) {
+			const settings = await deps.settings.get(personId);
+			const day = digestDay(settings, at);
+			if (day === null) continue;
+			const key = digestKey(day);
+			const done = `${personId} ${key}`;
+			if (digestsDone.has(done)) continue;
+			const [last] = await deps.deliveries.ofPerson(personId, "digest", 1);
+			if (last?.key === key) {
+				digestsDone.add(done);
+				continue;
+			}
+			const window = {
+				from: digestFrom(last?.createdAt ?? null, at),
+				to: at,
+				time: digestTime(settings),
+			};
+			const everywhere = await readDigest(source, spaces, window);
+			const sent = spaces.filter((spaceId) => sending.has(spaceId));
+			const sendsAll = sent.length === spaces.length;
+			const remote =
+				everywhere === null || sendsAll
+					? everywhere
+					: sent.length > 0
+						? await readDigest(source, sent, window)
+						: null;
+			const words = remote ?? everywhere;
+			const reach = (await pushTargets(personId, settings)).filter(
+				(target) =>
+					(LOCAL_KINDS.has(target.kind) ? everywhere : remote) !== null,
+			);
+			const claim: Claim = {
+				personId,
+				key,
+				kind: "digest",
+				spaceId: "",
+				runId: "",
+				stepId: null,
+				title: words?.title ?? null,
+				body: words?.body ?? null,
+			};
+			digestsDone.add(done);
+			if (!words || reach.length === 0) {
+				await deps.deliveries.claim(claim, { status: "dropped" }, at);
+				continue;
+			}
+			const claimed = await deps.deliveries.claim(
+				claim,
+				{ status: "sending", heldFor: reach.map((t) => t.id) },
+				at,
+			);
+			if (!claimed) continue;
+			const sentTo: string[] = [];
+			for (const target of reach) {
+				const digest = LOCAL_KINDS.has(target.kind) ? everywhere : remote;
+				if (!digest) continue;
+				sentTo.push(...(await sendTo([target], digestMessage(key, digest))));
+			}
+			await deps.deliveries.update(personId, key, {
+				status: sentTo.length > 0 ? "sent" : "dropped",
+				sentTo,
+				heldFor: [],
+				sentAt: sentTo.length > 0 ? at : null,
+			});
+		}
+	}
+
 	async function baseline(): Promise<void> {
 		await gates.baseline(await deps.spaces());
 		// Gates that closed while this daemon was away: withdraw them now.
@@ -641,5 +782,6 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		await endWaits(at);
 		await sendDue(at);
 		await endQuietHours(at);
+		await sendDigests(at);
 	}
 }

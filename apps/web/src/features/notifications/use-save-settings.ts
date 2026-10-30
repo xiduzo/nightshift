@@ -1,3 +1,4 @@
+import { applySettingsPatch } from "@nightshift/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -18,16 +19,10 @@ export function useSaveSettings() {
 				await queryClient.cancelQueries({ queryKey });
 				const before = queryClient.getQueryData<NotificationSettings>(queryKey);
 				if (before) {
-					queryClient.setQueryData<NotificationSettings>(queryKey, {
-						events: { ...before.events, ...patch.events },
-						quietHours:
-							patch.quietHours === undefined
-								? before.quietHours
-								: patch.quietHours,
-						timeZone: patch.timeZone ?? before.timeZone,
-						screens: { ...before.screens, ...patch.screens },
-						holdMinutes: patch.holdMinutes ?? before.holdMinutes,
-					});
+					queryClient.setQueryData<NotificationSettings>(
+						queryKey,
+						applySettingsPatch(before, patch),
+					);
 				}
 				return { before };
 			},

@@ -99,6 +99,30 @@ describe("the desktop channel", () => {
 		});
 	});
 
+	test("a digest says its sum and opens the inbox", async () => {
+		const { notifier, desktop } = channel({
+			window: { focused: true, path: "/runs" },
+		});
+		await desktop.send(target(), {
+			...gate,
+			kind: "digest",
+			key: "digest:2026-10-21",
+			spaceId: null,
+			runId: null,
+			stepId: null,
+			title: "Night Shift: last night",
+			body: "3 runs finished, 1 failed. $4.20 spent.",
+		});
+		expect(notifier.shown).toEqual([
+			{
+				id: "digest:2026-10-21",
+				title: "Night Shift: last night",
+				body: "3 runs finished, 1 failed. $4.20 spent.",
+				open: "/inbox",
+			},
+		]);
+	});
+
 	test("a run without its id opens the inbox", async () => {
 		const { notifier, desktop } = channel();
 		await desktop.send(target(), { ...failed, runId: null });

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 
 import { testDatabase } from "../testing/database";
-import { createSettingsStore, defaultSettings, inQuietHours } from "./settings";
+import {
+	createSettingsStore,
+	defaultSettings,
+	digestDay,
+	inQuietHours,
+} from "./settings";
 
 let db: Database;
 let cleanup: () => void;
@@ -52,6 +57,40 @@ describe("quiet hours", () => {
 	});
 });
 
+describe("the digest's day", () => {
+	const base = defaultSettings("UTC");
+	const quiet = { ...base, quietHours: { start: "22:00", end: "07:00" } };
+
+	test("is due from the end of quiet hours, for the rest of that day", () => {
+		expect(digestDay(quiet, at(6, 59))).toBe(null);
+		expect(digestDay(quiet, at(7))).toBe("2026-10-21");
+		expect(digestDay(quiet, at(21, 59))).toBe("2026-10-21");
+		expect(digestDay(quiet, at(22, 30))).toBe(null);
+	});
+
+	test("without quiet hours, or at a time the person chose, is due from that time", () => {
+		expect(digestDay(base, at(7, 59))).toBe(null);
+		expect(digestDay(base, at(8))).toBe("2026-10-21");
+		const chosen = {
+			...quiet,
+			digest: { when: "time" as const, time: "10:00" },
+		};
+		expect(digestDay(chosen, at(9))).toBe(null);
+		expect(digestDay(chosen, at(10))).toBe("2026-10-21");
+	});
+
+	test("is never due when the person turned it off", () => {
+		const off = { ...base, digest: { when: "off" as const, time: "08:00" } };
+		expect(digestDay(off, at(12))).toBe(null);
+	});
+
+	test("is the day in the person's time zone", () => {
+		// 23:30 UTC on the 21st is 08:30 on the 22nd in Tokyo.
+		const tokyo = { ...base, timeZone: "Asia/Tokyo" };
+		expect(digestDay(tokyo, at(23, 30))).toBe("2026-10-22");
+	});
+});
+
 describe("the settings store", () => {
 	test("a Person without settings has the defaults", async () => {
 		const store = createSettingsStore(db, { timeZone: "Europe/Amsterdam" });
@@ -66,7 +105,19 @@ describe("the settings store", () => {
 			quietHours: null,
 			screens: { web: true, expo: true, desktop: true },
 			holdMinutes: 3,
+			digest: { when: "quiet-hours-end", time: "08:00" },
 		});
+	});
+
+	test("keeps the digest setting", async () => {
+		const store = createSettingsStore(db, { timeZone: "UTC" });
+		await store.save("ada", { digest: { when: "time" } });
+		const saved = await store.save("ada", { digest: { time: "09:15" } });
+		expect(saved.digest).toEqual({ when: "time", time: "09:15" });
+		expect((await store.get("ada")).digest).toEqual(saved.digest);
+		await expect(
+			store.save("ada", { digest: { time: "9:15" } }),
+		).rejects.toThrow("Use a time like 22:00.");
 	});
 
 	test("a change keeps what it does not name", async () => {

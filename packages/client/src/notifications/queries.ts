@@ -16,6 +16,7 @@ export function applySettingsPatch(
 		timeZone: patch.timeZone ?? settings.timeZone,
 		screens: { ...settings.screens, ...patch.screens },
 		holdMinutes: patch.holdMinutes ?? settings.holdMinutes,
+		digest: { ...settings.digest, ...patch.digest },
 	};
 }
 

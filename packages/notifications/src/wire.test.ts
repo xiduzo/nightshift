@@ -210,3 +210,64 @@ async function waitFor(
 		await Bun.sleep(5);
 	}
 }
+
+test("the inbox reads the last digest again: its runs, and the Gates that wait now", async () => {
+	const ada = await sandbox.signUp("Ada");
+	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+	const nine = Date.UTC(2026, 9, 21, 9);
+	let clock = nine;
+	const run = (id: string, endedAt: number) => ({
+		id,
+		spaceId,
+		title: `Triage · ${id}`,
+		flowName: "Triage",
+		status: "finished" as const,
+		result: null,
+		reason: null,
+		costUsd: 1,
+		costEstimated: false,
+		costMissing: 0,
+		costCalls: 1,
+		warnings: [],
+		endedAt,
+	});
+	const runs = [run("run-1", nine - 60 * 60_000)];
+	const digests = createNotifications({
+		db: sandbox.db,
+		events: events.source,
+		sendsFor: async () => true,
+		inApp: createInAppChannel(),
+		webPush: {
+			subject: "mailto:host@example.com",
+			sender: sender.send,
+			generateKeys: fakeVapidKeys().generate,
+		},
+		digests: {
+			endedRuns: async (_space, since) => runs.filter((r) => r.endedAt > since),
+			waitingGates: async () => [],
+		},
+		now: () => clock,
+		tickMs: 5,
+		timeZone: "UTC",
+	});
+	expect(await digests.digest.latest(ada.userId)).toBeNull();
+	await digests.targets.register(ada.userId, browser);
+	await digests.start();
+
+	await waitFor(() => sender.requests.length === 1);
+	digests.stop();
+	clock = nine + 60 * 60_000;
+	runs.push(run("run-2", nine + 30 * 60_000));
+
+	expect(sender.payloads()).toMatchObject([
+		{
+			kind: "digest",
+			key: "digest:2026-10-21",
+			title: "Night Shift: last night",
+			body: "1 run finished. $1.00 spent.",
+		},
+	]);
+	const latest = await digests.digest.latest(ada.userId);
+	expect(latest).toMatchObject({ to: nine, gates: [] });
+	expect(latest?.runs.map((r) => r.runId)).toEqual(["run-1"]);
+});
