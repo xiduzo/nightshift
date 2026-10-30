@@ -22,6 +22,7 @@ import type { RunSummary } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { PanelHeader } from "@/shared/panel";
+import { PrototypeSwitcher } from "@/shared/prototype-switcher";
 import { ComputerDetail } from "./computer-detail";
 import {
 	ComputerListItem,
@@ -35,6 +36,7 @@ import { MergePersonalAlert } from "./merge-personal";
 import { HostSpacesAlert, hostKeptSpaces } from "./open-space";
 import { PairDeviceDialog } from "./pair-device-dialog";
 import { PhoneDetail } from "./phone-detail";
+import { DEVICES_VARIANTS, DevicesVariant } from "./prototype-layout/variants";
 import { deviceQueries, runQueries } from "./queries";
 import { spaceView } from "./space-view";
 
@@ -56,11 +58,14 @@ const PHONE = "phone:";
  */
 export function DevicesPage({
 	selected,
+	variant = "A",
 	onSelect,
 	pair,
 	onPairClosed,
 }: {
 	selected: string | undefined;
+	/** PROTOTYPE, throw away: which shape of the page. */
+	variant?: string;
 	onSelect: (selected: string) => void;
 	pair: string | undefined;
 	onPairClosed: () => void;
@@ -154,6 +159,74 @@ export function DevicesPage({
 	const error = overview.error ?? spaceDevices.error ?? spaces.error;
 	const loading =
 		overview.isPending || spaceDevices.isPending || spaces.isPending;
+
+	// PROTOTYPE, throw away: the other shapes of the page get the same data.
+	if (variant !== "A") {
+		const picked =
+			selected !== undefined &&
+			(selected === "host" ||
+				openedPhone !== undefined ||
+				opened !== undefined);
+		const detail =
+			!picked || !view || !space ? null : selection.kind === "host" ? (
+				<HostDetail
+					host={view.host}
+					space={space}
+					onPair={canPair ? () => setPairOpen(true) : undefined}
+				/>
+			) : selection.kind === "phone" && openedPhone ? (
+				<PhoneDetail
+					key={openedPhone.id}
+					phone={openedPhone}
+					hostName={hostName}
+				/>
+			) : opened ? (
+				<ComputerDetail
+					key={opened.id}
+					computer={opened}
+					space={space}
+					runs={runsOn.get(opened.id) ?? []}
+					projectNames={projectNames}
+				/>
+			) : null;
+		const detailLabel =
+			selection.kind === "host"
+				? hostName
+				: selection.kind === "phone"
+					? (openedPhone?.name ?? "Phone")
+					: (opened?.name ?? "Computer");
+		return (
+			<>
+				<DevicesVariant
+					variant={variant}
+					loading={loading}
+					error={error && !view ? error : null}
+					space={space}
+					view={view}
+					phones={phones.data ?? []}
+					phonesPending={phones.isPending}
+					phonesHere={phonesHere}
+					hostName={hostName}
+					runsOn={runsOn}
+					now={now}
+					canPair={canPair}
+					onPair={() => setPairOpen(true)}
+					detail={detail}
+					detailLabel={detailLabel}
+					selected={picked ? selected : undefined}
+					elsewhere={
+						elsewhere.length > 0 ? <HostSpacesAlert spaces={elsewhere} /> : null
+					}
+				/>
+				<PairDeviceDialog
+					open={pairOpen}
+					onOpenChange={setPairOpen}
+					initialCode={pair}
+				/>
+				<PrototypeSwitcher variants={DEVICES_VARIANTS} current={variant} />
+			</>
+		);
+	}
 
 	return (
 		<>
@@ -335,6 +408,7 @@ export function DevicesPage({
 				onOpenChange={setPairOpen}
 				initialCode={pair}
 			/>
+			<PrototypeSwitcher variants={DEVICES_VARIANTS} current={variant} />
 		</>
 	);
 }

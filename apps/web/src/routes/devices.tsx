@@ -11,26 +11,29 @@ export const Route = createFileRoute("/devices")({
 	 */
 	validateSearch: (
 		search: Record<string, unknown>,
-	): { device?: string; pair?: string } => ({
+	): { device?: string; pair?: string; variant?: string } => ({
 		...(typeof search.device === "string" ? { device: search.device } : {}),
 		...(typeof search.pair === "string" ? { pair: search.pair } : {}),
+		// PROTOTYPE, throw away: which shape of the page.
+		...(typeof search.variant === "string" ? { variant: search.variant } : {}),
 	}),
 	component: DevicesRoute,
 });
 
 function DevicesRoute() {
-	const { device, pair } = Route.useSearch();
+	const { device, pair, variant } = Route.useSearch();
 	const navigate = Route.useNavigate();
 	return (
 		<DevicesPage
 			selected={device}
+			variant={variant}
 			onSelect={(next) =>
 				void navigate({ search: (prev) => ({ ...prev, device: next }) })
 			}
 			pair={pair}
 			onPairClosed={() =>
 				void navigate({
-					search: (prev) => ({ device: prev.device }),
+					search: (prev) => ({ device: prev.device, variant: prev.variant }),
 					replace: true,
 				})
 			}
