@@ -12,6 +12,7 @@ export {
 	formatDuration,
 	formatKnownCost,
 	formatRelative,
+	formatSize,
 	formatStepCost,
 	formatTime,
 	formatTokens,

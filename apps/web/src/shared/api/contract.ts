@@ -46,3 +46,7 @@ export type MergeResult = ApiOutputs["devices"]["merge"]["run"];
 
 /** The settings of this computer, their fields and their defaults. */
 export type SettingsView = ApiOutputs["settings"]["get"];
+
+/** A project's knowledge on this computer, and the flows that fill it. */
+export type Knowledge = ApiOutputs["knowledge"]["get"];
+export type KnowledgeFile = Knowledge["files"][number];

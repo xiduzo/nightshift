@@ -29,6 +29,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
+	BookOpenIcon,
 	BotIcon,
 	CalendarClockIcon,
 	ChevronRightIcon,
@@ -345,6 +346,13 @@ function ProjectPages({ project }: { project: Project }) {
 				}
 			/>
 			<ProjectPageItem
+				to="/projects/$projectId/knowledge"
+				projectId={project.id}
+				label="Knowledge"
+				icon={BookOpenIcon}
+				badge={null}
+			/>
+			<ProjectPageItem
 				to="/projects/$projectId/schedules"
 				projectId={project.id}
 				label="Schedules"
@@ -384,6 +392,7 @@ function ProjectPageItem({
 	to:
 		| "/projects/$projectId/flows"
 		| "/projects/$projectId/runs"
+		| "/projects/$projectId/knowledge"
 		| "/projects/$projectId/schedules"
 		| "/projects/$projectId/branches";
 	projectId: string;

@@ -67,6 +67,8 @@ export type {
 	FoundProgram,
 	HarnessRow,
 	HarnessRowName,
+	Knowledge,
+	KnowledgeFile,
 	McpServer,
 	McpTestResult,
 	MergePreview,

@@ -41,7 +41,7 @@ import {
 	SERVER_URL,
 	type StepSummary,
 } from "@/shared/api";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatDateTime, formatSize, formatTime } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
 import { SetBy } from "./run-variables";
 
@@ -76,12 +76,6 @@ const KIND_ICON = {
 	text: FileTextIcon,
 	file: FileIcon,
 } as const;
-
-function formatSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 /**
  * The files the run's agents kept for the person: screenshots, recordings,
