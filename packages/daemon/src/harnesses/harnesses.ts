@@ -107,7 +107,7 @@ export function localHarnesses(deps: {
 					// Words for the person: the step shows them as they are.
 					throw new Refusal(
 						"conflict",
-						`${agent.label} needs the ${noun} ${expanded.missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove the reference.`,
+						`${agent.label} needs the ${noun} ${expanded.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.`,
 					);
 				},
 			});

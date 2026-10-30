@@ -44,7 +44,7 @@ describe("a custom agent", () => {
 		expect(last).toMatchObject({
 			type: "error",
 			message:
-				"Goose needs the secret GOOSE_KEY, but it is not saved. Save it under Agents → Secrets, or remove the reference.",
+				"Goose needs the secret GOOSE_KEY, but it is not saved. Save it on the Secrets page, or remove the reference.",
 		});
 	});
 });

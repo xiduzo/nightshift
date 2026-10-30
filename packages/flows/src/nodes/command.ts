@@ -138,7 +138,7 @@ export const commandNodeSchema = z.object({
 	 */
 	exits: z.array(commandExitSchema).min(1).optional(),
 	/**
-	 * Secrets by name (Agents → Secrets): each reaches the command as an
+	 * Secrets by name (the Secrets page): each reaches the command as an
 	 * environment variable of the same name (`"$ZAC_USER"`). The Device that
 	 * runs the step reads them: its keychain, then its daemon's environment.
 	 * A secret it does not have errors the step before the command runs.

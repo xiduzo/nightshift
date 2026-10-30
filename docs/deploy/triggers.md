@@ -13,7 +13,7 @@ not tested here end to end.
 ## 1. Make a webhook schedule
 
 1. Make a long random secret, for example with `openssl rand -hex 32`.
-2. In Night Shift, add it under **Agents → Secrets**, for example as
+2. In Night Shift, add it on the **Secrets** page, for example as
    `NIGHTSHIFT_HOOK_SECRET`. On a Host without a screen, an environment
    variable of the same name works too.
 3. Open the project's **Schedules** page and choose **New schedule**.

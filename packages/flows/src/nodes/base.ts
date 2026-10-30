@@ -22,7 +22,7 @@ export const nameSchema = z
 export const nodeIdSchema = nameSchema;
 
 /**
- * A secret by name, as `${NAME}` reads it: saved under Agents → Secrets,
+ * A secret by name, as `${NAME}` reads it: saved on the Secrets page,
  * else set in the environment of the computer that runs the step. The rule
  * of an environment variable name, as a shell reads one.
  */

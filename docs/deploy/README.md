@@ -132,7 +132,7 @@ Give each CLI tool its login in Night Shift, not in the image. Open the
 Agents page, then the tool, then Edit:
 
 - **Login → variables.** A value can read a secret, for example
-  `GH_TOKEN = ${GH_WORK_TOKEN}`. Save the secret under Agents → Secrets,
+  `GH_TOKEN = ${GH_WORK_TOKEN}`. Save the secret on the Secrets page,
   or set it in the environment of the container.
 - **Several accounts of one program.** Add one tool per account: `gh` and
   `gh-work` both run the program `gh`, each with its own token. The agent
