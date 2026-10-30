@@ -29,6 +29,8 @@ export function createNotificationQueries(orpc: ApiQueryUtils) {
 		settings: () => orpc.notifications.settings.get.queryOptions(),
 		/** The browsers, phones and desktop apps that get the person's notifications. */
 		screens: () => orpc.notifications.targets.list.queryOptions(),
+		/** The person's last morning digest, read again now. Null: none went out yet. */
+		digest: () => orpc.notifications.digest.latest.queryOptions(),
 		/** The public key a browser subscribes with. Null: no browser notifications. */
 		webPushKey: () => ({
 			...orpc.notifications.webPush.key.queryOptions(),

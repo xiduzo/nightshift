@@ -8,6 +8,7 @@ import { z } from "zod";
 import { output, stream } from "../output";
 import { protectedProcedure, readable } from "../procedures";
 import {
+	digestSchema,
 	notificationItemSchema,
 	pushTargetSchema,
 	settingsSchema,
@@ -111,6 +112,17 @@ export const notifications = {
 					});
 				}
 			}),
+	},
+	digest: {
+		latest: protectedProcedure
+			.route({
+				summary:
+					"Reads your last morning digest again: the runs that ended before it, with status, cost and pull request, and the Gates that wait now.",
+			})
+			.output(output(digestSchema.nullable()))
+			.handler(({ context }) =>
+				context.notifications.digest.latest(context.session.user.id),
+			),
 	},
 	webPush: {
 		key: protectedProcedure

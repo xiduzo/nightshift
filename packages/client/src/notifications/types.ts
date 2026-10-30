@@ -18,6 +18,11 @@ export type NotificationSettings =
 export type NotificationSettingsPatch =
 	ApiInputs["notifications"]["settings"]["save"];
 
+/** The last morning digest: the runs that ended before it, and the Gates that wait now. */
+export type Digest = NonNullable<
+	ApiOutputs["notifications"]["digest"]["latest"]
+>;
+
 /** A browser, phone or desktop app that gets the person's notifications. */
 export type NotificationScreen =
 	ApiOutputs["notifications"]["targets"]["list"][number];

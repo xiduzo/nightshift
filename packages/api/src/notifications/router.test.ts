@@ -112,6 +112,18 @@ describe("notifications", () => {
 		expect(
 			await errorOf(call(procedures.webPush.key, undefined, { context })),
 		).toBe("UNAUTHORIZED");
+		expect(
+			await errorOf(call(procedures.digest.latest, undefined, { context })),
+		).toBe("UNAUTHORIZED");
+	});
+
+	test("a Person without a digest yet reads none", async () => {
+		const ada = await contextFor((await sandbox.signUp("Ada")).headers);
+		expect(
+			await call(appRouter.notifications.digest.latest, undefined, {
+				context: ada,
+			}),
+		).toBeNull();
 	});
 
 	test("a Person gets the public key a browser subscribes with", async () => {

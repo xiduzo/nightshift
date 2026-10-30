@@ -105,6 +105,7 @@ export {
 export {
 	applySettingsPatch,
 	createNotificationQueries,
+	type Digest,
 	type NotificationScreen,
 	type NotificationSettings,
 	type NotificationSettingsPatch,

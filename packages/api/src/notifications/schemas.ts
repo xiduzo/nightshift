@@ -1,4 +1,7 @@
 import {
+	type Digest,
+	type DigestGate,
+	type DigestRun,
 	type InAppItem,
 	type NotificationSettings,
 	notificationSettingsSchema,
@@ -8,6 +11,7 @@ import {
 import { z } from "zod";
 
 import { exact } from "../output";
+import { runStatusSchema } from "../runs";
 
 /** A Person's notification settings: which events, quiet hours, which screens, the phone delay. */
 export const settingsSchema = exact<NotificationSettings>()(
@@ -81,6 +85,43 @@ export const notificationItemSchema = exact<InAppItem>()(
 			at: z.number(),
 		}),
 	]),
+);
+
+const digestRunSchema = exact<DigestRun>()(
+	z.object({
+		runId: z.string(),
+		spaceId: z.string(),
+		/** The flow and the run's inputs, or "Quick run · <prompt>". */
+		title: z.string(),
+		status: runStatusSchema,
+		/** "Finished", "Nothing to do", "Failed", "Stopped". */
+		statusText: z.string(),
+		/** The cost with how sure it is, why it ended, what went wrong. */
+		detail: z.string().nullable(),
+		prUrl: z.string().nullable(),
+		endedAt: z.number(),
+	}),
+);
+
+const digestGateSchema = exact<DigestGate>()(
+	z.object({
+		spaceId: z.string(),
+		runId: z.string(),
+		stepId: z.string(),
+		title: z.string(),
+	}),
+);
+
+/** The last morning digest: the runs that ended before it, and the Gates that wait now. */
+export const digestSchema = exact<Digest>()(
+	z.object({
+		from: z.number(),
+		to: z.number(),
+		title: z.string(),
+		body: z.string(),
+		runs: z.array(digestRunSchema),
+		gates: z.array(digestGateSchema),
+	}),
 );
 
 /** Who follows the stream. Optional, so an older screen sends nothing. */
