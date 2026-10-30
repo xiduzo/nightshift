@@ -24,10 +24,10 @@ export function createQueryClient(handle: ErrorHandler): QueryClient {
 		handle,
 		show: (error, query) => {
 			// Queries that fail for one reason (a run that is gone) show one toast.
-			toast.error(`Error: ${error.message}`, {
+			toast.error(error.message, {
 				id: `query-error:${error.message}`,
 				action: {
-					label: "retry",
+					label: "Try again",
 					onClick: () => {
 						query.invalidate();
 					},

@@ -67,7 +67,7 @@ export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
 					<PageHeading
 						id="knowledge-heading"
 						title="Knowledge"
-						description="Files your agents read before they work. They stay on this computer, not in the project. Syncs and learnings keep them up to date."
+						description="Files your agents read before they work. They stay on this computer."
 					/>
 					<KnowledgeView projectId={project.id} />
 				</section>
@@ -112,7 +112,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 			<Syncs projectId={projectId} syncs={syncs} />
 			<PageSection
 				title="Files"
-				description={`${files.length} ${files.length === 1 ? "file" : "files"}. Agents get a list of them first, then search the files.`}
+				description={`${files.length} ${files.length === 1 ? "file" : "files"}.`}
 			>
 				{tooLarge ? (
 					<Alert>
@@ -120,7 +120,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 						<AlertTitle>This knowledge is very large</AlertTitle>
 						<AlertDescription>
 							It has more than 2 000 files. Agents find less in this much text.
-							Sync only what your agents need.
+							Sync only what they need.
 						</AlertDescription>
 					</Alert>
 				) : null}
@@ -131,7 +131,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 								<EmptyHeader>
 									<EmptyTitle>No files yet</EmptyTitle>
 									<EmptyDescription>
-										Run a flow above to fill the knowledge.
+										Choose Sync now above to add files.
 									</EmptyDescription>
 								</EmptyHeader>
 							</Empty>
@@ -160,9 +160,8 @@ function NoKnowledge({ projectId }: { projectId: string }) {
 				</EmptyMedia>
 				<EmptyTitle>No knowledge yet</EmptyTitle>
 				<EmptyDescription>
-					Knowledge is what your agents read besides the code, such as a wiki,
-					web pages or work items. Add a flow that calls a knowledge kit, then
-					run it.
+					Knowledge is what your agents read besides the code, such as a wiki or
+					web pages. Add a flow with a knowledge kit, then run it.
 				</EmptyDescription>
 			</EmptyHeader>
 			<EmptyContent>
@@ -200,8 +199,8 @@ function Learnings({
 			<AlertTitle>{notes}</AlertTitle>
 			<AlertDescription>
 				{review
-					? "Agents proposed what they learned about this project. Keep what is right, and agents read it in later runs."
-					: "Agents proposed what they learned about this project. Add the review-learnings starter flow to keep or delete them."}
+					? "Agents learned something about this project. Keep what is right. Agents read it in later runs."
+					: "Agents learned something about this project. Add the review-learnings starter flow to keep or delete it."}
 			</AlertDescription>
 			{review ? (
 				<AlertAction>
@@ -240,14 +239,14 @@ function Syncs({
 	return (
 		<PageSection
 			title="Syncs"
-			description="The flows that fill the knowledge. Schedule one to keep it fresh, or run it now."
+			description="The flows that add files. Schedule one, or run it now."
 		>
 			{syncs.length === 0 ? (
 				<Alert>
 					<BookOpenIcon />
 					<AlertTitle>No flow fills this knowledge</AlertTitle>
 					<AlertDescription>
-						Add a flow that calls a knowledge kit, so the files stay fresh.
+						Add a flow with a knowledge kit, then run it.
 					</AlertDescription>
 				</Alert>
 			) : (

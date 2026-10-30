@@ -19,7 +19,7 @@ describe("a cost that may be partly unknown", () => {
 	test("the note says what is estimated or missing", () => {
 		expect(costNote({ costUsd: 1 })).toBeUndefined();
 		expect(costNote({ costUsd: 1, costMissing: 2, costEstimated: true })).toBe(
-			"2 steps did not report their cost. Part of it is estimated from tokens.",
+			"2 steps did not report their cost. Night Shift estimates part of it from tokens.",
 		);
 	});
 
