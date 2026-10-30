@@ -110,6 +110,7 @@ export type {
 	RunHere,
 	RunStreamItem,
 	RunSummary,
+	RunTrace,
 	RunWalker,
 	StepDetail,
 } from "./read";

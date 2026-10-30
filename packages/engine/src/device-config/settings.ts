@@ -81,6 +81,20 @@ export function isLoopbackHost(hostname: string): boolean {
 	);
 }
 
+/** The protocols of the OTLP export: HTTP with protobuf or with JSON. */
+export const telemetryProtocolSchema = z.enum(["http/protobuf", "http/json"]);
+export type TelemetryProtocol = z.infer<typeof telemetryProtocolSchema>;
+
+/** An `http://` or `https://` address. */
+function isHttpAddress(value: string): boolean {
+	try {
+		const { protocol } = new URL(value);
+		return protocol === "http:" || protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
 const list = (raw: string) => {
 	const items = raw
 		.split(/[\s,]+/)
@@ -326,6 +340,38 @@ const DEFS = {
 		schema: z.number().int().min(1).max(365),
 		default: 30,
 	} satisfies Def<number>,
+	/**
+	 * "Send runs to your monitoring": the runs this computer walks go out
+	 * as OpenTelemetry traces and metrics to `telemetryEndpoint`, and its
+	 * Claude Code sessions send their own there too. Off by default:
+	 * nothing leaves the computer until a person turns it on. The headers
+	 * (an API key) are kept with the secrets, never in this document.
+	 */
+	telemetry: {
+		schema: z.boolean(),
+		default: false,
+		env: "NIGHTSHIFT_TELEMETRY",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	/** The OTLP endpoint, without `/v1/traces`: `http://localhost:4318`. Empty: none. */
+	telemetryEndpoint: {
+		schema: z
+			.string()
+			.trim()
+			.max(2000)
+			.refine((value) => value === "" || isHttpAddress(value), {
+				message:
+					"Use an http:// or https:// address, for example http://localhost:4318.",
+			}),
+		default: "",
+		env: "NIGHTSHIFT_OTLP_ENDPOINT",
+		fromEnv: text,
+	} satisfies Def<string>,
+	/** How the export talks OTLP over HTTP: protobuf (most receivers), or JSON. */
+	telemetryProtocol: {
+		schema: telemetryProtocolSchema,
+		default: "http/protobuf",
+	} satisfies Def<TelemetryProtocol>,
 };
 
 type Defs = typeof DEFS;

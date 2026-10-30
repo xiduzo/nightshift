@@ -25,6 +25,7 @@ import {
 	createRunHistory,
 	createRunLog,
 	getRunRow,
+	type LandedScope,
 	lastRunDevice,
 	logMemberChange,
 	placedRun,
@@ -53,6 +54,7 @@ import {
 	parseRunFlow,
 	type RunHere,
 	type RunSummary,
+	type RunTrace,
 } from "../read";
 import {
 	createScheduleFiles,
@@ -158,7 +160,10 @@ export interface Engine {
 	 * query (the landed feed). The notifier reads Gates, device waits and
 	 * run endings from it. Returns the unsubscribe.
 	 */
-	onLandedFacts(listener: (facts: readonly LandedFact[]) => void): () => void;
+	onLandedFacts(
+		listener: (facts: readonly LandedFact[]) => void,
+		scope?: LandedScope,
+	): () => void;
 	/**
 	 * Moves Projects from one Space to others, as one operation (a Space
 	 * move, `projects-move.ts`): no run becomes active in `move.from` and
@@ -197,6 +202,13 @@ export interface Engine {
 	 * reader that asks on every landed event (keep this computer awake).
 	 */
 	runHere(runId: string): Promise<RunHere | null>;
+	/**
+	 * A run as an export to monitoring reads it (`read/run-trace.ts`): its
+	 * walks and steps with their ends, sessions, Gates' waits and sleeps.
+	 * Null for a run this Replica has no events of. One derivation per
+	 * append, shared with every other reader of the run.
+	 */
+	runTrace(runId: string): Promise<RunTrace | null>;
 	/**
 	 * A Device is back (its link to this Host took work again): the steps
 	 * of the runs this computer walks that sleep because a Device was
@@ -740,8 +752,8 @@ export function createEngine(
 			return spaceOfRun(db, runId);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
-		onLandedFacts: (listener) =>
-			landed.subscribe((events) => listener(landedFacts(events))),
+		onLandedFacts: (listener, scope) =>
+			landed.subscribe((events) => listener(landedFacts(events)), scope),
 		moveProjects,
 		async forgetSpace(spaceId) {
 			await ready;
@@ -753,6 +765,10 @@ export function createEngine(
 		async runHere(runId) {
 			await ready;
 			return reads.runHere(runId);
+		},
+		async runTrace(runId) {
+			await ready;
+			return reads.trace(runId);
 		},
 		async deviceBack(_deviceId) {
 			await ready;

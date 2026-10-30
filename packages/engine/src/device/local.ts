@@ -144,6 +144,17 @@ export type LocalDeviceDeps = {
 	 * gets none.
 	 */
 	knowledge?: KnowledgeFolders;
+	/**
+	 * What a run step's harness session adds to its environment, read as
+	 * the session starts: the export to monitoring gives Claude Code its
+	 * own telemetry under the step (`@nightshift/telemetry`). Without it,
+	 * or when it gives nothing: nothing.
+	 */
+	sessionEnv?: (session: {
+		harness: AgentHarnessName;
+		runId: string;
+		stepId: string;
+	}) => Record<string, string>;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -300,7 +311,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 							return null;
 						})
 					: null;
-			const env = { ...known?.env, ...tools?.env };
+			const env = {
+				...(artifacts
+					? deps.sessionEnv?.({ harness: name, ...artifacts })
+					: {}),
+				...known?.env,
+				...tools?.env,
+			};
 			// An agent that reads the knowledge may propose to add to it.
 			const learn =
 				known?.addDirs && knowledge && artifacts && deps.knowledge
