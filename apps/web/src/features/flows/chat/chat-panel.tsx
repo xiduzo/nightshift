@@ -47,6 +47,7 @@ import { Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
 import { AgentMenus } from "../assistant/agent-picker";
 import { PromptInput } from "../assistant/prompt-input";
+import { Suggestions } from "../assistant/suggestions";
 import {
 	type AgentMessage,
 	ASK_WHY_MESSAGE,
@@ -211,22 +212,6 @@ function ChatEmpty({ blank, run, sendBlockedBy, onSend }: Props) {
 						: "Say what to change. The agent proposes it, and you see it on the canvas first."}
 				</EmptyDescription>
 			</EmptyHeader>
-			{blank ? (
-				<EmptyContent className="gap-2">
-					{STARTERS.map((starter) => (
-						<Button
-							key={starter}
-							variant="outline"
-							size="sm"
-							className="w-full justify-start"
-							disabled={sendBlockedBy !== null}
-							onClick={() => onSend(starter)}
-						>
-							{starter}
-						</Button>
-					))}
-				</EmptyContent>
-			) : null}
 		</Empty>
 	);
 }
@@ -366,23 +351,41 @@ function ProposalMessage({
 	);
 }
 
-function Composer({ streaming, sendBlockedBy, onSend, onStop }: Props) {
+function Composer({
+	thread,
+	blank,
+	run,
+	streaming,
+	sendBlockedBy,
+	onSend,
+	onStop,
+}: Props) {
 	const [text, setText] = useState("");
+	// A new flow and a new chat: ideas to start with, above the box.
+	const starters = blank && run === null && thread.messages.length === 0;
 	return (
-		<PromptInput
-			className="shrink-0 border-t p-3"
-			label="Message to the agent"
-			placeholder="Example: Run the tests after the build, and ask me before you open a pull request."
-			value={text}
-			onValueChange={setText}
-			onSubmit={(value) => {
-				onSend(value);
-				setText("");
-			}}
-			blockedBy={sendBlockedBy}
-			answering={streaming}
-			onStop={onStop}
-			tools={<AgentMenus purpose="chat" />}
-		/>
+		<div className="flex shrink-0 flex-col gap-2 border-t p-3">
+			{starters ? (
+				<Suggestions
+					items={STARTERS}
+					disabled={streaming || sendBlockedBy !== null}
+					onPick={onSend}
+				/>
+			) : null}
+			<PromptInput
+				label="Message to the agent"
+				placeholder="Example: Run the tests after the build, and ask me before you open a pull request."
+				value={text}
+				onValueChange={setText}
+				onSubmit={(value) => {
+					onSend(value);
+					setText("");
+				}}
+				blockedBy={sendBlockedBy}
+				answering={streaming}
+				onStop={onStop}
+				tools={<AgentMenus purpose="chat" />}
+			/>
+		</div>
 	);
 }

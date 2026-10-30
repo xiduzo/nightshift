@@ -37,6 +37,7 @@ import {
 	INSPECTOR_SELECTOR,
 } from "./flow-assistant";
 import { PromptInput } from "./prompt-input";
+import { Suggestions } from "./suggestions";
 import { useSuggestion } from "./use-suggestion";
 
 /**
@@ -243,22 +244,13 @@ function SuggestBody({
 			{state.status !== "ready" ? (
 				<>
 					{state.status !== "running" ? (
-						<div className="flex flex-wrap gap-1">
-							{picks.map((pick) => (
-								<Button
-									key={pick}
-									variant="outline"
-									size="xs"
-									className="font-normal"
-									onClick={() => {
-										setInstruction(pick);
-										send(pick);
-									}}
-								>
-									{pick}
-								</Button>
-							))}
-						</div>
+						<Suggestions
+							items={picks}
+							onPick={(pick) => {
+								setInstruction(pick);
+								send(pick);
+							}}
+						/>
 					) : null}
 					<PromptInput
 						label="What should it do?"
