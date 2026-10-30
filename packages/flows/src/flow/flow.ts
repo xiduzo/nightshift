@@ -107,14 +107,31 @@ export const policySchema = z.object({
  * `json`: any JSON value, read with a path (`{{item.title}}`); the start
  * dialog takes JSON.
  */
+/**
+ * The type of a flow input. `text` and `choice` give text, `number` a
+ * number, `boolean` true or false, `json` any JSON value.
+ */
+export const flowInputTypeSchema = z.enum([
+	"text",
+	"number",
+	"boolean",
+	"choice",
+	"json",
+]);
+
 export const flowInputSchema = z.object({
 	name: nameSchema,
-	type: z.enum(["text", "json"]).default("text"),
+	type: flowInputTypeSchema.default("text"),
 	/** Shown in the start dialog. Defaults to the name. */
 	label: z.string().optional(),
 	description: z.string().optional(),
-	/** Used when no value is given. For `json`, JSON text. */
+	/**
+	 * Used when no value is given, as text: JSON text for `json`, `42` for
+	 * `number`, `true` or `false` for `boolean`, one of `options` for `choice`.
+	 */
 	default: z.string().optional(),
+	/** `choice` only: the values to pick from. */
+	options: z.array(z.string()).optional(),
 	/** A run or a call cannot start without a value (or a default). */
 	required: z.boolean().optional(),
 });

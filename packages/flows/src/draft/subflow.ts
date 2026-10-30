@@ -141,7 +141,7 @@ export type SubflowChange =
 			kind: "info";
 			code: "input-added";
 			input: string;
-			type: "text" | "json";
+			type: FlowInputDef["type"];
 			source: SubflowInputSource;
 			readBy: string[];
 	  }
@@ -724,6 +724,9 @@ class Planner {
 						{
 							name: callerInput.name,
 							type: callerInput.type,
+							...(callerInput.options !== undefined && {
+								options: callerInput.options,
+							}),
 							...(callerInput.label !== undefined && {
 								label: callerInput.label,
 							}),

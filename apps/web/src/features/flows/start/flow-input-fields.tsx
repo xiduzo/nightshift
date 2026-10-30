@@ -1,7 +1,9 @@
-import type { FlowInputDef, JsonValue } from "@nightshift/flows";
+import { type InputTexts, inputProblem, isOptional } from "@nightshift/client";
+import type { FlowInputDef } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Field,
+	FieldContent,
 	FieldDescription,
 	FieldError,
 	FieldGroup,
@@ -10,75 +12,44 @@ import {
 	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@nightshift/ui/components/select";
+import { Switch } from "@nightshift/ui/components/switch";
 import { LargerTextarea } from "@/shared/larger-window";
 
-/** What the person typed per input: text, or JSON text for a `json` input. */
-export type InputTexts = Record<string, string>;
-
-/** Why a JSON input's text does not parse, or null. Empty is fine: it takes the default. */
-export function jsonProblem(
-	input: FlowInputDef,
-	text: string | undefined,
-): string | null {
-	if (input.type !== "json" || !text || text.trim() === "") return null;
-	try {
-		JSON.parse(text);
-		return null;
-	} catch (error) {
-		return error instanceof Error ? error.message : "Not valid JSON.";
-	}
-}
-
-/**
- * The values to send: text as typed (trimmed), JSON parsed, only the ones
- * filled in. Empty takes the default.
- */
-export function filledInputs(
-	inputs: readonly FlowInputDef[],
-	values: InputTexts,
-): Record<string, JsonValue> {
-	const filled: Record<string, JsonValue> = {};
-	for (const input of inputs) {
-		const text = values[input.name]?.trim() ?? "";
-		if (text === "") continue;
-		filled[input.name] =
-			input.type === "json" ? (JSON.parse(text) as JsonValue) : text;
-	}
-	return filled;
-}
-
-/** Stored values back to the text of the fields: JSON values as pretty JSON. */
-export function inputTexts(
-	inputs: readonly FlowInputDef[],
-	values: Readonly<Record<string, JsonValue>>,
-): InputTexts {
-	const texts: InputTexts = {};
-	for (const input of inputs) {
-		const value = values[input.name];
-		if (value === undefined || value === null) continue;
-		texts[input.name] =
-			typeof value === "string" ? value : JSON.stringify(value, null, 2);
-	}
-	return texts;
-}
-
-/** Required inputs without a value or a default. */
-export function missingInputs(
-	inputs: readonly FlowInputDef[],
-	values: InputTexts,
-): FlowInputDef[] {
-	return inputs.filter(
-		(input) =>
-			input.required &&
-			!input.default &&
-			(values[input.name]?.trim() ?? "") === "",
+/** The label of an input, with "(optional)" when it may stay empty. */
+function InputLabel({
+	htmlFor,
+	input,
+}: {
+	htmlFor: string;
+	input: FlowInputDef;
+}) {
+	return (
+		<FieldLabel htmlFor={htmlFor}>
+			{input.label || input.name}
+			{input.type === "json" ? (
+				<Badge variant="secondary" className="font-mono font-normal">
+					json
+				</Badge>
+			) : null}
+			{isOptional(input) ? (
+				<span className="font-normal text-muted-foreground">(optional)</span>
+			) : null}
+		</FieldLabel>
 	);
 }
 
 /**
- * One field per input of a flow: text, or JSON for a `json` input. With
- * `templates`, a value may read a webhook (`{{event.body.number}}`): its
- * JSON is read when the webhook arrives, not here.
+ * One field per input of a flow, by its type: a text field, a number
+ * field, a switch, a list to pick from, or JSON. With `templates`, a
+ * text, number or JSON value may read a webhook (`{{event.body.number}}`):
+ * it is read when the webhook arrives, not here.
  */
 export function FlowInputFields({
 	idPrefix,
@@ -102,35 +73,80 @@ export function FlowInputFields({
 			<FieldGroup className="gap-5">
 				{inputs.map((input) => {
 					const fieldId = `${idPrefix}-input-${input.name}`;
+					const hintId = `${fieldId}-hint`;
 					const value = values[input.name] ?? "";
 					const problem =
 						templates && value.includes("{{")
 							? null
-							: jsonProblem(input, value);
-					const hint = problem
-						? `Not valid JSON: ${problem}`
-						: input.description;
+							: inputProblem(input, value);
+					const hint = problem ?? input.description;
 					const set = (next: string) =>
 						onChange({ ...values, [input.name]: next });
+					const hintText = problem ? (
+						<FieldError id={hintId}>{hint}</FieldError>
+					) : hint ? (
+						<FieldDescription id={hintId}>{hint}</FieldDescription>
+					) : null;
+
+					if (input.type === "boolean") {
+						return (
+							<Field
+								key={input.name}
+								orientation="horizontal"
+								className="items-start"
+							>
+								<Switch
+									id={fieldId}
+									checked={(value || input.default) === "true"}
+									className="mt-0.5"
+									aria-describedby={hint ? hintId : undefined}
+									onCheckedChange={(on) => set(on ? "true" : "false")}
+								/>
+								<FieldContent>
+									<InputLabel htmlFor={fieldId} input={input} />
+									{hintText}
+								</FieldContent>
+							</Field>
+						);
+					}
+
+					// An optional choice without a default can stay empty.
+					const none = isOptional(input) && !input.default;
 					return (
 						<Field
 							key={input.name}
 							data-invalid={problem !== null || undefined}
 						>
-							<FieldLabel htmlFor={fieldId}>
-								{input.label || input.name}
-								{input.type === "json" ? (
-									<Badge variant="secondary" className="font-mono font-normal">
-										json
-									</Badge>
-								) : null}
-								{input.required ? (
-									<span className="font-normal text-muted-foreground">
-										(required)
-									</span>
-								) : null}
-							</FieldLabel>
-							{input.type === "json" ? (
+							<InputLabel htmlFor={fieldId} input={input} />
+							{input.type === "choice" ? (
+								<Select
+									items={[
+										...(none ? [{ value: null, label: "None" }] : []),
+										...(input.options ?? []).map((option) => ({
+											value: option,
+											label: option,
+										})),
+									]}
+									value={value === "" ? null : value}
+									onValueChange={(next) => set(next ?? "")}
+								>
+									<SelectTrigger
+										id={fieldId}
+										className="w-full"
+										aria-describedby={hint ? hintId : undefined}
+									>
+										<SelectValue placeholder={input.default ?? "None"} />
+									</SelectTrigger>
+									<SelectContent>
+										{none ? <SelectItem value={null}>None</SelectItem> : null}
+										{(input.options ?? []).map((option) => (
+											<SelectItem key={option} value={option}>
+												{option}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							) : input.type === "json" ? (
 								<LargerTextarea
 									title={input.label || input.name}
 									id={fieldId}
@@ -138,9 +154,9 @@ export function FlowInputFields({
 									placeholder={input.default ?? '{"title": "…"}'}
 									className="max-h-60 min-h-20 font-mono text-xs md:text-xs"
 									spellCheck={false}
-									aria-required={input.required === true}
+									aria-required={!isOptional(input)}
 									aria-invalid={problem !== null}
-									aria-describedby={hint ? `${fieldId}-hint` : undefined}
+									aria-describedby={hint ? hintId : undefined}
 									onChange={(event) => set(event.target.value)}
 								/>
 							) : (
@@ -149,18 +165,14 @@ export function FlowInputFields({
 									value={value}
 									placeholder={input.default}
 									autoComplete="off"
-									aria-required={input.required === true}
-									aria-describedby={hint ? `${fieldId}-hint` : undefined}
+									inputMode={input.type === "number" ? "decimal" : undefined}
+									aria-required={!isOptional(input)}
+									aria-invalid={problem !== null}
+									aria-describedby={hint ? hintId : undefined}
 									onChange={(event) => set(event.target.value)}
 								/>
 							)}
-							{problem ? (
-								<FieldError id={`${fieldId}-hint`}>{hint}</FieldError>
-							) : hint ? (
-								<FieldDescription id={`${fieldId}-hint`}>
-									{hint}
-								</FieldDescription>
-							) : null}
+							{hintText}
 						</Field>
 					);
 				})}

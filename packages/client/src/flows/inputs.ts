@@ -1,20 +1,45 @@
 import type { FlowInputDef, JsonValue } from "@nightshift/flows";
 
-/** What the person typed per input of a flow: text, or JSON text for a `json` input. */
+/**
+ * What the person entered per input of a flow, as text: JSON text for a
+ * `json` input, `true` or `false` for a `boolean` one.
+ */
 export type InputTexts = Record<string, string>;
 
-/** Why a JSON input's text is not valid, or null. Empty is fine: it takes the default. */
-export function jsonProblem(
+/**
+ * Why the text of a `json` or `number` input is not valid, as a message
+ * for the person, or null. Empty is fine: it takes the default.
+ */
+export function inputProblem(
 	input: Pick<FlowInputDef, "type">,
 	text: string | undefined,
 ): string | null {
-	if (input.type !== "json" || !text || text.trim() === "") return null;
+	if (!text || text.trim() === "") return null;
+	if (input.type === "number") {
+		return Number.isFinite(Number(text.trim()))
+			? null
+			: "Enter a number, for example 45.";
+	}
+	if (input.type !== "json") return null;
 	try {
 		JSON.parse(text);
 		return null;
 	} catch (error) {
-		return error instanceof Error ? error.message : "Not valid JSON.";
+		const reason = error instanceof Error ? error.message : "";
+		return `Not valid JSON. ${reason}`.trim();
 	}
+}
+
+/**
+ * Whether the person may leave the input empty: it is not required, or it
+ * has a default. A `boolean` input always has a value.
+ */
+export function isOptional(
+	input: Pick<FlowInputDef, "type" | "required" | "default">,
+): boolean {
+	return (
+		input.type !== "boolean" && (input.required !== true || !!input.default)
+	);
 }
 
 /** Required inputs without a value and without a default. */
@@ -24,6 +49,7 @@ export function missingInputs<T extends FlowInputDef>(
 ): T[] {
 	return inputs.filter(
 		(input) =>
+			input.type !== "boolean" &&
 			input.required === true &&
 			!input.default &&
 			(values[input.name]?.trim() ?? "") === "",
@@ -31,9 +57,9 @@ export function missingInputs<T extends FlowInputDef>(
 }
 
 /**
- * The inputs to start a run with: text as typed (trimmed), JSON parsed,
- * only the ones filled in. An empty one takes its default. Check
- * `jsonProblem` first: JSON that is not valid throws.
+ * The inputs to start a run with, only the ones filled in: text as typed
+ * (trimmed), a number, true or false, or parsed JSON. An empty one takes
+ * its default. Check `inputProblem` first: JSON that is not valid throws.
  */
 export function filledInputs(
 	inputs: readonly FlowInputDef[],
@@ -43,8 +69,19 @@ export function filledInputs(
 	for (const input of inputs) {
 		const text = values[input.name]?.trim() ?? "";
 		if (text === "") continue;
-		filled[input.name] =
-			input.type === "json" ? (JSON.parse(text) as JsonValue) : text;
+		switch (input.type) {
+			case "json":
+				filled[input.name] = JSON.parse(text) as JsonValue;
+				break;
+			case "number":
+				filled[input.name] = Number(text);
+				break;
+			case "boolean":
+				filled[input.name] = text === "true";
+				break;
+			default:
+				filled[input.name] = text;
+		}
 	}
 	return filled;
 }

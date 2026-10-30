@@ -187,7 +187,7 @@ export function checkUnusedVariables(scope: Scope, warning: Report): void {
 
 /**
  * Inputs: unique names, valid and not reserved, not the id of a node, and a
- * `json` default that parses as JSON.
+ * default that fits the type. A `choice` input has options.
  */
 export function checkInputs(
 	flow: Flow,
@@ -223,6 +223,28 @@ export function checkInputs(
 				JSON.parse(input.default);
 			} catch {
 				error(`The default of the json input "${name}" is not valid JSON.`, {});
+			}
+		}
+		const preset = input.default?.trim() ?? "";
+		if (input.type === "number" && preset !== "") {
+			if (!Number.isFinite(Number(preset))) {
+				error(`The default of the input "${name}" is not a number.`, {});
+			}
+		}
+		if (input.type === "boolean" && preset !== "") {
+			if (!["true", "false"].includes(preset.toLowerCase())) {
+				error(`The default of the input "${name}" must be true or false.`, {});
+			}
+		}
+		if (input.type === "choice") {
+			const options = input.options ?? [];
+			if (options.length === 0) {
+				error(`The input "${name}" has no options. Add at least one.`, {});
+			} else if (preset !== "" && !options.includes(preset)) {
+				error(
+					`The default of the input "${name}" is not one of its options.`,
+					{},
+				);
 			}
 		}
 	}

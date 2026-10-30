@@ -1,5 +1,9 @@
 import {
 	defaultPlacement,
+	filledInputs,
+	type InputTexts,
+	inputProblem,
+	missingInputs,
 	placementChoices,
 	useRunActed,
 	waitedText,
@@ -49,13 +53,7 @@ import {
 	useNow,
 } from "@/shared/format";
 import { BaseRefCombobox } from "./base-ref-combobox";
-import {
-	FlowInputFields,
-	filledInputs,
-	type InputTexts,
-	jsonProblem,
-	missingInputs,
-} from "./flow-input-fields";
+import { FlowInputFields } from "./flow-input-fields";
 import { placementDescription } from "./placement-words";
 
 const STORAGE_KEY = "nightshift:stop-time";
@@ -224,12 +222,12 @@ function StartRunForm({
 
 	const stopAt = stop.on ? nextOccurrence(stop.time, now) : null;
 	const missing = missingInputs(inputs, values);
-	const badJson = inputs.filter(
-		(input) => jsonProblem(input, values[input.name]) !== null,
+	const badInputs = inputs.filter(
+		(input) => inputProblem(input, values[input.name]) !== null,
 	);
 	const stopInvalid = stop.on && stopAt === null;
 	const invalid =
-		stopInvalid || missing.length > 0 || badJson.length > 0 || noDevice;
+		stopInvalid || missing.length > 0 || badInputs.length > 0 || noDevice;
 
 	const startRun = useMutation(
 		runMutations.start({
@@ -433,8 +431,8 @@ function StartRunForm({
 							? "None of your devices with this project is online."
 							: missing.length > 0
 								? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
-								: badJson.length > 0
-									? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
+								: badInputs.length > 0
+									? `Check the format of ${badInputs.map((input) => input.label || input.name).join(", ")} first.`
 									: undefined
 					}
 				>

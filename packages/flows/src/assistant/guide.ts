@@ -382,7 +382,7 @@ A flow is a directed graph of nodes and edges. Night Shift keeps it in the proje
 
 \`{ version: ${FLOW_VERSION}, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }\`
 
-- \`inputs\`: \`{ name, type: "text" | "json", label?, description?, default?, required? }\`. A \`json\` input takes a path: \`{{item.title}}\`.
+- \`inputs\`: \`{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }\`. The start dialog shows a field per type: a number field, a switch, a list to pick from. \`choice\` needs \`options\` (a list of text) and gives the picked text. A default is text: \`"45"\`, \`"true"\`, one of the options, or JSON text. Use \`boolean\` for yes/no, \`number\` for counts and minutes, \`choice\` for a fixed list. A \`json\` input takes a path: \`{{item.title}}\`.
 - \`outputs\`: \`{ name, value, description? }\`. \`value\` is a template, rendered when the flow ends.
 - \`variables\`: \`{ name, type, initial?, schema?, description?, keep? }\`, \`type\` one of ${code(variableTypeSchema.options)}.
 - \`policy\`: optional. \`maxSteps\` caps the steps of a run. \`budgetUsd\` stops the run when its cost passes it. \`maxTurns\` and \`idleMinutes\` (default 15) limit each Agent step. A node may set its own.

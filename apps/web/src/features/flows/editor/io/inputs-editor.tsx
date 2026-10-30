@@ -37,8 +37,73 @@ function jsonError(text: string | undefined): string | null {
 		JSON.parse(text);
 		return null;
 	} catch (error) {
-		return error instanceof Error ? error.message : "Not valid JSON.";
+		const reason = error instanceof Error ? error.message : "";
+		return `The default is not valid JSON. ${reason}`.trim();
 	}
+}
+
+/** Whether a number input's default is a number. Empty counts as no default. */
+function numberError(text: string | undefined): string | null {
+	if (text === undefined || text.trim() === "") return null;
+	return Number.isFinite(Number(text.trim()))
+		? null
+		: "The default is not a number. Enter one, for example 45.";
+}
+
+/** The types an input can take, in the order the type list shows them. */
+const INPUT_TYPES: readonly FlowInputDef["type"][] = [
+	"text",
+	"number",
+	"boolean",
+	"choice",
+	"json",
+];
+
+/**
+ * The options of a `choice` input, as one comma-separated line. The list
+ * commits on blur or Enter, so a comma does not drop an empty option mid-typing.
+ */
+function OptionsInput({
+	id,
+	options,
+	label,
+	onCommit,
+}: {
+	id: string;
+	options: readonly string[];
+	label: string;
+	onCommit: (options: string[]) => void;
+}) {
+	const joined = options.join(", ");
+	const [draft, setDraft] = useState<string | null>(null);
+	const commit = () => {
+		if (draft === null) return;
+		onCommit([
+			...new Set(
+				draft
+					.split(",")
+					.map((option) => option.trim())
+					.filter((option) => option !== ""),
+			),
+		]);
+		setDraft(null);
+	};
+	return (
+		<Input
+			id={id}
+			value={draft ?? joined}
+			aria-label={label}
+			aria-invalid={options.length === 0 && draft === null}
+			placeholder="Options, separated by commas: small, medium, large"
+			className="h-8 text-xs"
+			autoComplete="off"
+			onChange={(event) => setDraft(event.target.value)}
+			onBlur={commit}
+			onKeyDown={(event) => {
+				if (event.key === "Enter") commit();
+			}}
+		/>
+	);
 }
 
 /**
@@ -165,7 +230,11 @@ function InputRow({
 
 	const position = `input ${index + 1}`;
 	const isJson = input.type === "json";
-	const defaultError = isJson ? jsonError(input.default) : null;
+	const defaultError = isJson
+		? jsonError(input.default)
+		: input.type === "number"
+			? numberError(input.default)
+			: null;
 
 	return (
 		<Item
@@ -181,7 +250,7 @@ function InputRow({
 				autoFocus={autoFocus}
 				onCommit={onRename}
 			>
-				<div className="w-20 shrink-0">
+				<div className="w-24 shrink-0">
 					<NativeSelect
 						id={`${id}-type`}
 						size="sm"
@@ -190,11 +259,18 @@ function InputRow({
 						className="w-full font-mono text-xs"
 						onChange={(event) => {
 							const type = event.target.value as FlowInputDef["type"];
-							onUpdate((current) => ({ ...current, type }));
+							onUpdate(({ options, ...current }) =>
+								type === "choice"
+									? { ...current, type, options: options ?? [] }
+									: { ...current, type },
+							);
 						}}
 					>
-						<NativeSelectOption value="text">text</NativeSelectOption>
-						<NativeSelectOption value="json">json</NativeSelectOption>
+						{INPUT_TYPES.map((type) => (
+							<NativeSelectOption key={type} value={type}>
+								{type}
+							</NativeSelectOption>
+						))}
 					</NativeSelect>
 				</div>
 				<RowButtons
@@ -224,6 +300,16 @@ function InputRow({
 				autoComplete="off"
 				onChange={(event) => setOptional("description", event.target.value)}
 			/>
+			{input.type === "choice" ? (
+				<OptionsInput
+					id={`${id}-options`}
+					options={input.options ?? []}
+					label={`Options of ${position}`}
+					onCommit={(options) =>
+						onUpdate((current) => ({ ...current, options }))
+					}
+				/>
+			) : null}
 			{isJson ? (
 				<LargerTextarea
 					title={`Default of ${position}`}
@@ -237,12 +323,40 @@ function InputRow({
 					spellCheck={false}
 					onChange={(event) => setOptional("default", event.target.value)}
 				/>
+			) : input.type === "boolean" || input.type === "choice" ? (
+				<NativeSelect
+					id={`${id}-default`}
+					size="sm"
+					value={input.default ?? ""}
+					aria-label={`Default of ${position}`}
+					className="w-full text-xs"
+					onChange={(event) => setOptional("default", event.target.value)}
+				>
+					<NativeSelectOption value="">No default</NativeSelectOption>
+					{(input.type === "boolean"
+						? ["true", "false"]
+						: (input.options ?? [])
+					).map((option) => (
+						<NativeSelectOption key={option} value={option}>
+							{input.type === "boolean"
+								? `Default: ${option === "true" ? "on" : "off"}`
+								: `Default: ${option}`}
+						</NativeSelectOption>
+					))}
+				</NativeSelect>
 			) : (
 				<Input
 					id={`${id}-default`}
 					value={input.default ?? ""}
 					aria-label={`Default of ${position}`}
-					placeholder="Default (optional)"
+					aria-invalid={defaultError !== null}
+					aria-describedby={defaultError ? `${id}-default-error` : undefined}
+					placeholder={
+						input.type === "number"
+							? "Default (optional): 45"
+							: "Default (optional)"
+					}
+					inputMode={input.type === "number" ? "decimal" : undefined}
 					className="h-8 font-mono text-xs"
 					autoComplete="off"
 					spellCheck={false}
@@ -251,31 +365,33 @@ function InputRow({
 			)}
 			{defaultError ? (
 				<FieldError id={`${id}-default-error`} className="text-xs">
-					The default is not valid JSON: {defaultError}
+					{defaultError}
 				</FieldError>
 			) : null}
-			<Field orientation="horizontal" className="gap-2 pt-0.5">
-				<Checkbox
-					id={`${id}-required`}
-					checked={input.required === true}
-					onCheckedChange={(checked) =>
-						onUpdate(({ required: _, ...rest }) =>
-							checked ? { ...rest, required: true } : rest,
-						)
-					}
-				/>
-				<FieldLabel
-					htmlFor={`${id}-required`}
-					className="gap-1 font-normal text-xs"
-				>
-					Required
-					{input.default ? (
-						<span className="text-muted-foreground">
-							· the default is enough
-						</span>
-					) : null}
-				</FieldLabel>
-			</Field>
+			{input.type === "boolean" ? null : (
+				<Field orientation="horizontal" className="gap-2 pt-0.5">
+					<Checkbox
+						id={`${id}-required`}
+						checked={input.required === true}
+						onCheckedChange={(checked) =>
+							onUpdate(({ required: _, ...rest }) =>
+								checked ? { ...rest, required: true } : rest,
+							)
+						}
+					/>
+					<FieldLabel
+						htmlFor={`${id}-required`}
+						className="gap-1 font-normal text-xs"
+					>
+						Required
+						{input.default ? (
+							<span className="text-muted-foreground">
+								· the default is enough
+							</span>
+						) : null}
+					</FieldLabel>
+				</Field>
+			)}
 		</Item>
 	);
 }
