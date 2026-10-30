@@ -11,11 +11,12 @@ export const Route = createFileRoute("/devices")({
 	 */
 	validateSearch: (
 		search: Record<string, unknown>,
-	): { device?: string; pair?: string; variant?: string } => ({
+	): { device?: string; pair?: string; variant?: string; state?: string } => ({
 		...(typeof search.device === "string" ? { device: search.device } : {}),
 		...(typeof search.pair === "string" ? { pair: search.pair } : {}),
 		// PROTOTYPE, throw away: which shape of the page.
 		...(typeof search.variant === "string" ? { variant: search.variant } : {}),
+		...(typeof search.state === "string" ? { state: search.state } : {}),
 	}),
 	component: DevicesRoute,
 });
@@ -33,7 +34,11 @@ function DevicesRoute() {
 			pair={pair}
 			onPairClosed={() =>
 				void navigate({
-					search: (prev) => ({ device: prev.device, variant: prev.variant }),
+					search: (prev) => ({
+						device: prev.device,
+						variant: prev.variant,
+						state: prev.state,
+					}),
 					replace: true,
 				})
 			}

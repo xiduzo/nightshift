@@ -36,6 +36,7 @@ import { MergePersonalAlert } from "./merge-personal";
 import { HostSpacesAlert, hostKeptSpaces } from "./open-space";
 import { PairDeviceDialog } from "./pair-device-dialog";
 import { PhoneDetail } from "./phone-detail";
+import { StateSwitch } from "./prototype-layout/hub";
 import { DEVICES_VARIANTS, DevicesVariant } from "./prototype-layout/variants";
 import { deviceQueries, runQueries } from "./queries";
 import { spaceView } from "./space-view";
@@ -217,13 +218,22 @@ export function DevicesPage({
 					elsewhere={
 						elsewhere.length > 0 ? <HostSpacesAlert spaces={elsewhere} /> : null
 					}
+					beAHost={computer ? computer.host.enabled : null}
+					hasHome={computer?.hosts.some((h) => h.homeHost) ?? false}
+					onRetry={() => {
+						void overview.refetch();
+						void spaceDevices.refetch();
+						void spaces.refetch();
+					}}
 				/>
 				<PairDeviceDialog
 					open={pairOpen}
 					onOpenChange={setPairOpen}
 					initialCode={pair}
 				/>
-				<PrototypeSwitcher variants={DEVICES_VARIANTS} current={variant} />
+				<PrototypeSwitcher variants={DEVICES_VARIANTS} current={variant}>
+					{variant.startsWith("C") ? <StateSwitch /> : null}
+				</PrototypeSwitcher>
 			</>
 		);
 	}
