@@ -35,7 +35,12 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-import { CodeView, DiffLine, type DiffLineVariant } from "@/shared/code";
+import {
+	CodeView,
+	DiffLines,
+	type DiffLineVariant,
+	languageOfPath,
+} from "@/shared/code";
 
 const STATUS_LABEL: Record<ChangedFile["status"], string> = {
 	added: "Added",
@@ -153,13 +158,6 @@ function TreeNode({
 	);
 }
 
-/** The file's language for highlighting, from its extension. Unknown ones show plain. */
-function languageOf(path: string): string {
-	const name = path.split("/").at(-1) ?? "";
-	const dot = name.lastIndexOf(".");
-	return dot > 0 ? name.slice(dot + 1) : "text";
-}
-
 /** What changed in one file, change by change. */
 function FileChanges({ file }: { file: ChangedFile }) {
 	const name = file.path.split("/").at(-1) ?? file.path;
@@ -202,7 +200,7 @@ function ChangeView({
 			return (
 				<CodeView
 					code={change.content}
-					language={languageOf(path)}
+					language={languageOfPath(path)}
 					title={title ?? "New content"}
 					contentClassName="max-h-none"
 				/>
@@ -218,7 +216,14 @@ function ChangeView({
 					.split("\n")
 					.map((text) => ({ variant: "added" as const, text })),
 			];
-			return <DiffBlock title={title} lines={lines} copy={change.after} />;
+			return (
+				<DiffBlock
+					title={title}
+					lines={lines}
+					copy={change.after}
+					language={languageOfPath(path)}
+				/>
+			);
 		}
 		case "patch": {
 			const lines = change.diff.split("\n").map((line) => {
@@ -232,7 +237,14 @@ function ChangeView({
 					text: variant === "default" ? line : line.slice(1),
 				};
 			});
-			return <DiffBlock title={title} lines={lines} copy={change.diff} />;
+			return (
+				<DiffBlock
+					title={title}
+					lines={lines}
+					copy={change.diff}
+					language={languageOfPath(path)}
+				/>
+			);
 		}
 		case "delete":
 			return (
@@ -250,15 +262,17 @@ function ChangeView({
 	}
 }
 
-/** Removed and added lines, marked. */
+/** Removed and added lines, marked, and highlighted in the file's language. */
 function DiffBlock({
 	title,
 	lines,
 	copy,
+	language,
 }: {
 	title?: string;
 	lines: { variant: DiffLineVariant; text: string }[];
 	copy: string;
+	language: string;
 }) {
 	const actions = (
 		<CodeBlockActions>
@@ -276,11 +290,7 @@ function DiffBlock({
 				actions
 			)}
 			<CodeBlockContent wrap>
-				{lines.map((line, index) => (
-					<DiffLine key={index} variant={line.variant}>
-						{line.text}
-					</DiffLine>
-				))}
+				<DiffLines lines={lines} language={language} />
 			</CodeBlockContent>
 		</CodeBlock>
 	);

@@ -15,7 +15,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { CodeView, DiffLine } from "@/shared/code";
+import { CodeView, DiffLines } from "@/shared/code";
 import { InlineMarkdown, Markdown } from "@/shared/markdown";
 
 /** Context longer than this folds away behind "Show context". */
@@ -105,7 +105,7 @@ export function ContextList({
 								<CodeBlockCopyButton value={item.value} />
 							</CodeBlockActions>
 							<CodeBlockContent className="max-h-72 text-xs">
-								{diffLines(item.value)}
+								<DiffLines lines={diffLines(item.value)} />
 							</CodeBlockContent>
 						</CodeBlock>
 					) : item.kind === "code" ? (
@@ -125,18 +125,18 @@ export function ContextList({
 }
 
 /** A unified diff, one line each, with added and removed lines marked. */
-function diffLines(value: string): ReactNode[] {
-	return value.split("\n").map((line, index) => {
+function diffLines(value: string) {
+	return value.split("\n").map((line) => {
 		const added = line.startsWith("+") && !line.startsWith("+++");
 		const removed = line.startsWith("-") && !line.startsWith("---");
-		return (
-			<DiffLine
-				key={index}
-				variant={added ? "added" : removed ? "removed" : "default"}
-			>
-				{added || removed ? line.slice(1) : line}
-			</DiffLine>
-		);
+		return {
+			variant: added
+				? ("added" as const)
+				: removed
+					? ("removed" as const)
+					: ("default" as const),
+			text: added || removed ? line.slice(1) : line,
+		};
 	});
 }
 

@@ -1,3 +1,14 @@
+/**
+ * The language of a file for highlighting, from its extension ("kt",
+ * "ts"): the highlighter maps an extension to its language. A file without
+ * an extension is plain text.
+ */
+export function languageOfPath(path: string): string {
+	const name = path.split("/").at(-1) ?? "";
+	const dot = name.lastIndexOf(".");
+	return dot > 0 ? name.slice(dot + 1).toLowerCase() : "text";
+}
+
 /** The languages a code field can show, in the order a picker lists them. */
 export const CODE_LANGUAGES = [
 	{ value: "markdown", label: "Markdown" },

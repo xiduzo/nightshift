@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { guessLanguage } from "./guess-language";
+import { guessLanguage, languageOfPath } from "./guess-language";
 
 describe("guessLanguage", () => {
 	test("a shebang decides", () => {
@@ -54,5 +54,19 @@ describe("guessLanguage", () => {
 				"Write a short summary of the change.\nNote: keep it friendly.",
 			),
 		).toBeNull();
+	});
+});
+
+describe("languageOfPath", () => {
+	test("is the file's extension", () => {
+		expect(languageOfPath("src/itest/ZaakTest.kt")).toBe("kt");
+		expect(languageOfPath("/work/a/Main.JAVA")).toBe("java");
+		expect(languageOfPath("web/app.config.ts")).toBe("ts");
+	});
+
+	test("is plain text without an extension", () => {
+		expect(languageOfPath("Makefile")).toBe("text");
+		expect(languageOfPath("src/.env")).toBe("text");
+		expect(languageOfPath("src.d/README")).toBe("text");
 	});
 });

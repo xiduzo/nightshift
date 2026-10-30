@@ -2,6 +2,8 @@ import { CodeBlockLine } from "@nightshift/ui/components/code-block";
 import { cn } from "@nightshift/ui/lib/utils";
 import type { ReactNode } from "react";
 
+import { useHighlightedCode } from "./use-highlighted-code";
+
 /** How a line of a diff reads: added, removed, or kept as it was. */
 export type DiffLineVariant = "added" | "removed" | "default";
 
@@ -10,14 +12,12 @@ export type DiffLineVariant = "added" | "removed" | "default";
  * muted background, so an added line here takes a green tint and a green
  * "+", the way a removed line takes the destructive red.
  */
-export function DiffLine({
+function DiffLine({
 	variant,
 	children,
-	className,
 }: {
 	variant: DiffLineVariant;
 	children: ReactNode;
-	className?: string;
 }) {
 	return (
 		<CodeBlockLine
@@ -25,10 +25,33 @@ export function DiffLine({
 			className={cn(
 				variant === "added" &&
 					"bg-green-600/10 after:text-green-700 dark:bg-green-400/10 dark:after:text-green-400",
-				className,
 			)}
 		>
 			{children}
 		</CodeBlockLine>
 	);
+}
+
+/**
+ * The lines of a diff, for a `CodeBlockContent`: each marked added or
+ * removed, and highlighted by Shiki in `language` once it loads. A language
+ * Shiki does not know (such as "text") shows the plain lines.
+ */
+export function DiffLines({
+	lines,
+	language = "text",
+}: {
+	lines: readonly { variant: DiffLineVariant; text: string }[];
+	language?: string;
+}) {
+	const highlighted = useHighlightedCode(
+		lines.map((line) => line.text).join("\n"),
+		language,
+	);
+	return lines.map((line, index) => (
+		// A diff does not change while it shows.
+		<DiffLine key={index} variant={line.variant}>
+			{highlighted[index] ?? line.text}
+		</DiffLine>
+	));
 }

@@ -12,9 +12,11 @@ const languages = {
 	css: () => import("shiki/langs/css.mjs"),
 	diff: () => import("shiki/langs/diff.mjs"),
 	html: () => import("shiki/langs/html.mjs"),
+	java: () => import("shiki/langs/java.mjs"),
 	javascript: () => import("shiki/langs/javascript.mjs"),
 	json: () => import("shiki/langs/json.mjs"),
 	jsx: () => import("shiki/langs/jsx.mjs"),
+	kotlin: () => import("shiki/langs/kotlin.mjs"),
 	markdown: () => import("shiki/langs/markdown.mjs"),
 	python: () => import("shiki/langs/python.mjs"),
 	sql: () => import("shiki/langs/sql.mjs"),
@@ -24,8 +26,13 @@ const languages = {
 };
 
 const aliases: Record<string, keyof typeof languages> = {
+	cjs: "javascript",
 	js: "javascript",
+	kt: "kotlin",
+	kts: "kotlin",
 	md: "markdown",
+	mjs: "javascript",
+	mts: "typescript",
 	py: "python",
 	sh: "bash",
 	shell: "bash",
