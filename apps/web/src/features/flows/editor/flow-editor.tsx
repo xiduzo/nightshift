@@ -19,13 +19,14 @@ import {
 	updateNode,
 	updateSection,
 } from "@nightshift/flows";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
@@ -41,11 +42,10 @@ import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
 	CheckIcon,
-	CircleDotIcon,
+	CircleAlertIcon,
 	CopyIcon,
 	DownloadIcon,
 	HistoryIcon,
-	type LucideIcon,
 	MoreHorizontalIcon,
 	PlayIcon,
 	Redo2Icon,
@@ -729,71 +729,20 @@ function Editor({
 					{ label: <span className="font-mono">{name}</span> },
 				]}
 			>
-				<div
-					aria-live="polite"
-					className="sr-only sm:not-sr-only sm:flex sm:items-center"
-				>
-					{dirty ? (
-						<Badge
-							variant="outline"
-							className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting"
-						>
-							<CircleDotIcon aria-hidden="true" />
-							Unsaved changes
-						</Badge>
-					) : (
-						<Badge variant="outline" className="text-muted-foreground">
-							<CheckIcon aria-hidden="true" />
-							Saved
-						</Badge>
-					)}
-				</div>
-				<ButtonGroup aria-label="History">
-					<HistoryButton
-						label="Undo"
-						keys={["⌘/Ctrl", "Z"]}
-						icon={Undo2Icon}
-						onClick={undo}
-						disabled={!canUndo || preview !== null}
-					/>
-					<HistoryButton
-						label="Redo"
-						keys={["⌘/Ctrl", "Shift", "Z"]}
-						icon={Redo2Icon}
-						onClick={redo}
-						disabled={!canRedo || preview !== null}
-					/>
-				</ButtonGroup>
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={save}
-					disabled={!canSave}
-					title={
-						savable
-							? "Save (⌘/Ctrl + S)"
-							: "Fix the fields marked in the issues first."
+				<SaveButton
+					state={
+						saveFlow.isPending
+							? "saving"
+							: !dirty
+								? "saved"
+								: !savable
+									? "blocked"
+									: saveFlow.isError
+										? "failed"
+										: "unsaved"
 					}
-				>
-					{saveFlow.isPending ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<SaveIcon data-icon="inline-start" />
-					)}
-					{saveFlow.isPending ? "Saving…" : "Save"}
-				</Button>
-				<Button
-					variant={revisionsOpen || shownRevision ? "secondary" : "outline"}
-					size="sm"
-					aria-label="Revisions"
-					onClick={() => {
-						setShownRevision(null);
-						setRevisionsOpen(true);
-					}}
-				>
-					<HistoryIcon data-icon="inline-start" />
-					<span className="hidden md:inline">Revisions</span>
-				</Button>
+					onClick={save}
+				/>
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
@@ -806,7 +755,36 @@ function Editor({
 					>
 						<MoreHorizontalIcon />
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-48">
+					<DropdownMenuContent align="end" className="w-56">
+						<DropdownMenuGroup>
+							<DropdownMenuItem
+								disabled={!canUndo || preview !== null}
+								onClick={undo}
+							>
+								<Undo2Icon aria-hidden="true" />
+								Undo
+								<DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								disabled={!canRedo || preview !== null}
+								onClick={redo}
+							>
+								<Redo2Icon aria-hidden="true" />
+								Redo
+								<DropdownMenuShortcut>⇧⌘Z</DropdownMenuShortcut>
+							</DropdownMenuItem>
+						</DropdownMenuGroup>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							onClick={() => {
+								setShownRevision(null);
+								setRevisionsOpen(true);
+							}}
+						>
+							<HistoryIcon aria-hidden="true" />
+							Revisions
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							disabled={!everSaved}
 							onClick={() => void exportFlow()}
@@ -823,15 +801,22 @@ function Editor({
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<Button
-					variant={chat.open ? "secondary" : "outline"}
-					size="sm"
-					aria-pressed={chat.open}
-					onClick={chat.toggle}
-				>
-					<SparklesIcon data-icon="inline-start" />
-					Build with an agent
-				</Button>
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant={chat.open ? "secondary" : "outline"}
+								size="icon-sm"
+								aria-label="Build with an agent"
+								aria-pressed={chat.open}
+								onClick={chat.toggle}
+							/>
+						}
+					>
+						<SparklesIcon />
+					</TooltipTrigger>
+					<TooltipContent>Build with an agent</TooltipContent>
+				</Tooltip>
 				<Button
 					size="sm"
 					onClick={() => setStarting(true)}
@@ -1064,43 +1049,87 @@ function Editor({
 }
 
 /** Undo or Redo in the header, with its keys in the tooltip. */
-function HistoryButton({
-	label,
-	keys,
-	icon: Icon,
+type SaveState = "saved" | "unsaved" | "saving" | "failed" | "blocked";
+
+const saveLooks: Record<
+	SaveState,
+	{ label: string; hint: string; status: string }
+> = {
+	saved: { label: "Saved", hint: "All changes are saved", status: "Saved" },
+	unsaved: { label: "Save", hint: "Save", status: "Unsaved changes" },
+	saving: { label: "Saving…", hint: "Saving", status: "Saving" },
+	failed: {
+		label: "Save",
+		hint: "Could not save. Try again.",
+		status: "Could not save",
+	},
+	blocked: {
+		label: "Save",
+		hint: "Fix the fields marked in the issues first.",
+		status: "Unsaved changes",
+	},
+};
+
+/** The Save button shows whether the flow has changes that wait to be saved. */
+function SaveButton({
+	state,
 	onClick,
-	disabled,
 }: {
-	label: string;
-	keys: string[];
-	icon: LucideIcon;
+	state: SaveState;
 	onClick: () => void;
-	disabled: boolean;
 }) {
+	const look = saveLooks[state];
 	return (
-		<Tooltip>
-			<TooltipTrigger
-				render={
-					<Button
-						variant="outline"
-						size="icon-sm"
-						aria-label={label}
-						onClick={onClick}
-						disabled={disabled}
-					/>
-				}
-			>
-				<Icon />
-			</TooltipTrigger>
-			<TooltipContent>
-				{label}
-				<KbdGroup>
-					{keys.map((key) => (
-						<Kbd key={key}>{key}</Kbd>
-					))}
-				</KbdGroup>
-			</TooltipContent>
-		</Tooltip>
+		<>
+			<span aria-live="polite" className="sr-only">
+				{look.status}
+			</span>
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={onClick}
+							disabled={state !== "unsaved" && state !== "failed"}
+							className={cn(
+								"relative",
+								state === "saved" && "text-muted-foreground",
+							)}
+						/>
+					}
+				>
+					{state === "saving" ? (
+						<Spinner data-icon="inline-start" />
+					) : state === "saved" ? (
+						<CheckIcon data-icon="inline-start" />
+					) : state === "failed" ? (
+						<CircleAlertIcon
+							data-icon="inline-start"
+							className="text-destructive"
+						/>
+					) : (
+						<SaveIcon data-icon="inline-start" />
+					)}
+					{look.label}
+					{(state === "unsaved" || state === "blocked") && (
+						<span
+							aria-hidden="true"
+							className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-status-waiting"
+						/>
+					)}
+				</TooltipTrigger>
+				<TooltipContent>
+					{look.hint}
+					{state === "unsaved" || state === "failed" ? (
+						<KbdGroup>
+							<Kbd>⌘/Ctrl</Kbd>
+							<Kbd>S</Kbd>
+						</KbdGroup>
+					) : null}
+				</TooltipContent>
+			</Tooltip>
+		</>
 	);
 }
 
