@@ -1,33 +1,39 @@
 /**
- * Which agent answers: a compact button that shows the choice, and a
- * popover with the fields of an Agent node (profile, harness, model,
- * effort). The field helpers and the chat share the choice, and this
- * browser keeps it (`agent-choice.ts`).
+ * Which agent answers, as two menus in the row under a Prompt Input (the
+ * AI Elements Model Selector): one for the agent (a profile, or a model
+ * of a harness), one for the effort. The field helpers and the chat share
+ * the choice, and this browser keeps it (`agent-choice.ts`).
  */
 import { type AssistantAgent, harnessTakesTools } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	Field,
-	FieldDescription,
-	FieldGroup,
-	FieldLabel,
-} from "@nightshift/ui/components/field";
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
 import {
-	NativeSelect,
-	NativeSelectOption,
-} from "@nightshift/ui/components/native-select";
-import {
-	Popover,
-	PopoverContent,
-	PopoverDescription,
-	PopoverHeader,
-	PopoverTitle,
-	PopoverTrigger,
-} from "@nightshift/ui/components/popover";
-import { cn } from "@nightshift/ui/lib/utils";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import { Field, FieldLabel } from "@nightshift/ui/components/field";
+import { InputGroupButton } from "@nightshift/ui/components/input-group";
 import { useQuery } from "@tanstack/react-query";
 import { BotIcon, ChevronDownIcon, TriangleAlertIcon } from "lucide-react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import {
 	EFFORTS,
 	type HarnessName,
@@ -36,12 +42,15 @@ import {
 	ModelCombobox,
 	profileQueries,
 	useCustomAgents,
+	useHarnessModels,
 } from "@/features/agents";
 import { settingsQueries } from "@/features/settings/queries";
 import type { AgentProfileRow, Effort } from "@/shared/api";
 import {
 	type AgentChoice,
 	currentAgentChoice,
+	pickModel,
+	profileModel,
 	requestAgent,
 	setAgentChoice,
 	useAgentChoice,
@@ -50,8 +59,11 @@ import {
 /** What the agent is for: the chat needs a harness that can use its tools. */
 export type AgentPurpose = "suggest" | "chat";
 
-/** The profile select's value for "None". Profile names cannot hold a colon. */
+/** The profile radio's value for the profile for help, and for no profile. Profile names cannot hold a colon. */
+const HELP = ":help";
 const NONE = ":none";
+/** The effort radio's value for "no effort set here". */
+const NO_EFFORT = ":default";
 
 const quiet = { staleTime: 30_000, meta: { quietErrors: true } } as const;
 
@@ -87,6 +99,8 @@ function useAgentOptions(purpose: AgentPurpose) {
 	};
 }
 
+type Options = ReturnType<typeof useAgentOptions>;
+
 /** The request fields of the choice now, for a request sent from a callback. */
 export function agentRequest(): AssistantAgent {
 	return requestAgent(
@@ -95,7 +109,35 @@ export function agentRequest(): AssistantAgent {
 	);
 }
 
-/** The button's words: "Profile for help", "worker · haiku", "Claude Code · haiku · low". */
+/** What the menus show for a choice: the profile in use, the harness, model and effort that answer. */
+function resolve(choice: AgentChoice, options: Options) {
+	const none = choice.profile === undefined && choice.harness !== undefined;
+	const usesHelp = choice.profile === undefined && !none;
+	const profile: AgentProfileRow | undefined = usesHelp
+		? options.forHelp
+		: options.profiles.find((p) => p.name === choice.profile);
+	const harness: HarnessName =
+		choice.harness ??
+		profile?.harness ??
+		options.harnesses[0]?.name ??
+		"claude-code";
+	const model =
+		choice.model ??
+		(none ? options.info(harness).defaultModel : (profile?.model ?? ""));
+	const effort = choice.effort ?? (none ? undefined : profile?.effort);
+	return {
+		none,
+		usesHelp,
+		profile,
+		harness,
+		model,
+		effort,
+		// The profile for help, and there is none: only a harness and model can answer.
+		locked: usesHelp && !options.forHelp,
+	};
+}
+
+/** The trigger's words: "Profile for help", "worker · haiku", "Claude Code · haiku". */
 function choiceLabel(
 	choice: AgentChoice,
 	info: (name: HarnessName) => { label: string },
@@ -110,77 +152,7 @@ function choiceLabel(
 			: choice.harness !== undefined
 				? [info(choice.harness).label, choice.model]
 				: ["Profile for help"];
-	return [...parts, choice.effort].filter(Boolean).join(" · ");
-}
-
-export function AgentPicker({
-	purpose,
-	className,
-}: {
-	purpose: AgentPurpose;
-	className?: string;
-}) {
-	const choice = useAgentChoice();
-	const options = useAgentOptions(purpose);
-	const label = choiceLabel(choice, options.info);
-	const refusal = chatRefusal(choice, purpose, options);
-	return (
-		<Popover>
-			<PopoverTrigger
-				render={
-					<Button
-						variant="ghost"
-						size="xs"
-						className={cn(
-							"min-w-0 max-w-full justify-start font-normal text-muted-foreground",
-							className,
-						)}
-						aria-label={`Agent: ${label}. Change the agent.`}
-						title="Choose the agent that answers"
-					>
-						{refusal ? (
-							<TriangleAlertIcon
-								data-icon="inline-start"
-								className="text-destructive"
-							/>
-						) : (
-							<BotIcon data-icon="inline-start" />
-						)}
-						<span className="truncate">{label}</span>
-						<ChevronDownIcon data-icon="inline-end" />
-					</Button>
-				}
-			/>
-			<PopoverContent
-				align="start"
-				className="w-[min(22rem,var(--available-width))] gap-3"
-			>
-				<PopoverHeader>
-					<PopoverTitle>Agent</PopoverTitle>
-					<PopoverDescription className="text-xs">
-						The agent that answers here. It reads your project and changes
-						nothing.
-					</PopoverDescription>
-				</PopoverHeader>
-				<AgentFields
-					choice={choice}
-					purpose={purpose}
-					options={options}
-					refusal={refusal}
-				/>
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-type Options = ReturnType<typeof useAgentOptions>;
-
-/** The harness the choice runs on, when the page can tell. */
-function harnessOf(
-	choice: AgentChoice,
-	profile: AgentProfileRow | undefined,
-): HarnessName | undefined {
-	return choice.harness ?? profile?.harness;
+	return parts.filter(Boolean).join(" · ");
 }
 
 /** Why the chat cannot run on the choice, or null. */
@@ -196,214 +168,349 @@ function chatRefusal(
 			: choice.harness === undefined
 				? options.forHelp
 				: undefined;
-	const harness = harnessOf(choice, profile);
+	const harness = choice.harness ?? profile?.harness;
 	if (harness === undefined || options.fits(harness)) return null;
 	return `${options.info(harness).label} cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode for the chat.`;
 }
 
-function AgentFields({
+/** The agent's two menus, for the `block-end` row of a Prompt Input. */
+export function AgentMenus({ purpose }: { purpose: AgentPurpose }) {
+	const choice = useAgentChoice();
+	const options = useAgentOptions(purpose);
+	const now = resolve(choice, options);
+	const label = choiceLabel(choice, options.info);
+	const refusal = chatRefusal(choice, purpose, options);
+	const [otherModel, setOtherModel] = useState<HarnessName | null>(null);
+	const pick = (harness: HarnessName, model: string) =>
+		setAgentChoice(
+			pickModel(
+				choice,
+				{ harness, model },
+				now.profile && {
+					name: now.profile.name,
+					harness: now.profile.harness,
+				},
+			),
+		);
+	return (
+		<>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<InputGroupButton
+							className="min-w-0 shrink font-normal text-muted-foreground"
+							aria-label={`Agent: ${label}. Choose the agent.`}
+							title={refusal ?? "Choose the agent that answers"}
+						>
+							{refusal ? (
+								<TriangleAlertIcon className="text-destructive" />
+							) : (
+								<BotIcon />
+							)}
+							<span className="truncate">{label}</span>
+							<ChevronDownIcon />
+						</InputGroupButton>
+					}
+				/>
+				<DropdownMenuContent align="start" className="w-72">
+					{refusal ? (
+						<DropdownMenuGroup>
+							<DropdownMenuLabel className="font-normal text-destructive">
+								{refusal}
+							</DropdownMenuLabel>
+						</DropdownMenuGroup>
+					) : null}
+					<ProfileGroup
+						choice={choice}
+						purpose={purpose}
+						options={options}
+						now={now}
+					/>
+					<DropdownMenuSeparator />
+					<DropdownMenuGroup>
+						<DropdownMenuLabel>Model</DropdownMenuLabel>
+						{harnessList(choice, options).map(({ name, added }) => (
+							<DropdownMenuSub key={name}>
+								<DropdownMenuSubTrigger
+									disabled={purpose === "chat" && !options.fits(name)}
+								>
+									<span className="truncate">
+										{options.info(name).label}
+										{added ? "" : " (not added)"}
+										{purpose === "chat" && !options.fits(name)
+											? " (cannot chat)"
+											: ""}
+									</span>
+									{name === now.harness ? (
+										<DropdownMenuShortcut className="tracking-normal">
+											{now.model}
+										</DropdownMenuShortcut>
+									) : null}
+								</DropdownMenuSubTrigger>
+								<DropdownMenuSubContent className="max-h-80 min-w-44">
+									<HarnessModels
+										harness={name}
+										current={name === now.harness ? now.model : null}
+										onPick={(model) => pick(name, model)}
+										onOther={() => setOtherModel(name)}
+									/>
+								</DropdownMenuSubContent>
+							</DropdownMenuSub>
+						))}
+						{!now.none && (choice.harness || choice.model) ? (
+							<DropdownMenuItem
+								onClick={() => setAgentChoice(profileModel(choice))}
+							>
+								Use the profile's model
+								{now.profile?.model ? (
+									<DropdownMenuShortcut className="tracking-normal">
+										{now.profile.model}
+									</DropdownMenuShortcut>
+								) : null}
+							</DropdownMenuItem>
+						) : null}
+					</DropdownMenuGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<EffortMenu choice={choice} now={now} />
+			{otherModel ? (
+				<OtherModelDialog
+					harness={otherModel}
+					label={options.info(otherModel).label}
+					initial={otherModel === now.harness ? now.model : ""}
+					onClose={() => setOtherModel(null)}
+					onPick={(model) => {
+						pick(otherModel, model);
+						setOtherModel(null);
+					}}
+				/>
+			) : null}
+		</>
+	);
+}
+
+/** The harnesses the menu offers: the added ones, and the chosen one when it is not added. */
+function harnessList(choice: AgentChoice, options: Options) {
+	const list = options.harnesses.map((h) => ({ name: h.name, added: true }));
+	if (choice.harness && !list.some((h) => h.name === choice.harness))
+		list.push({ name: choice.harness, added: false });
+	return list;
+}
+
+function ProfileGroup({
 	choice,
 	purpose,
 	options,
-	refusal,
+	now,
 }: {
 	choice: AgentChoice;
 	purpose: AgentPurpose;
 	options: Options;
-	refusal: string | null;
+	now: ReturnType<typeof resolve>;
 }) {
-	const id = useId();
-	const { profiles, harnesses, forHelp, fits, info } = options;
-	const none = choice.profile === undefined && choice.harness !== undefined;
-	const usesHelp = choice.profile === undefined && !none;
-	// The profile the fields fall back to: the one picked, or the one for help.
-	const profile = usesHelp
-		? forHelp
-		: profiles.find((p) => p.name === choice.profile);
-	const harnessName: HarnessName =
-		harnessOf(choice, profile) ?? harnesses[0]?.name ?? "claude-code";
-	const harness = info(harnessName);
-	const fromProfile = (value: string) => `From the profile (${value})`;
-	// A change on the profile for help pins that profile, with the change on top.
-	const change = (patch: Partial<AgentChoice>) => {
-		const base: AgentChoice = usesHelp
-			? forHelp
-				? { profile: forHelp.name }
-				: {}
-			: { ...choice };
-		const next: AgentChoice = { ...base, ...patch };
-		for (const key of Object.keys(patch) as (keyof AgentChoice)[]) {
-			if (patch[key] === undefined) delete next[key];
-		}
-		setAgentChoice(next);
-	};
-	const locked = usesHelp && !forHelp;
-	const cannotChat = (name: HarnessName) =>
-		purpose === "chat" && !fits(name) ? " (cannot chat)" : "";
-	const harnessOptions = [
-		...harnesses.map((h) => ({ value: h.name, label: info(h.name).label })),
-		...(choice.harness && !harnesses.some((h) => h.name === choice.harness)
-			? [
-					{
-						value: choice.harness,
-						label: `${info(choice.harness).label} (not added)`,
-					},
-				]
-			: []),
-	];
-	const unknownProfile =
+	const { profiles, forHelp, fits, info } = options;
+	const value = now.usesHelp ? HELP : now.none ? NONE : (choice.profile ?? "");
+	const unknown =
 		choice.profile !== undefined &&
 		!profiles.some((p) => p.name === choice.profile);
-
 	return (
-		<FieldGroup className="gap-3">
-			<Field>
-				<FieldLabel htmlFor={`${id}-profile`}>Profile</FieldLabel>
-				<NativeSelect
-					id={`${id}-profile`}
-					size="sm"
-					className="w-full"
-					value={usesHelp ? "" : none ? NONE : choice.profile}
-					aria-invalid={unknownProfile || undefined}
-					onChange={(event) => {
-						const value = event.target.value;
-						if (value === "") setAgentChoice({});
-						else if (value === NONE) {
-							// Keep what the profile gave, so the same agent answers.
-							setAgentChoice({
-								harness: harnessName,
-								model: choice.model ?? profile?.model ?? harness.defaultModel,
-								...((choice.effort ?? profile?.effort)
-									? { effort: choice.effort ?? profile?.effort }
-									: {}),
-							});
-						} else setAgentChoice({ profile: value });
-					}}
-				>
-					<NativeSelectOption value="">
-						{forHelp
-							? `Profile for help (${forHelp.name})`
-							: "Profile for help (none yet)"}
-					</NativeSelectOption>
-					<NativeSelectOption value={NONE}>
-						None: choose the agent here
-					</NativeSelectOption>
-					{profiles.map((p) => (
-						<NativeSelectOption
-							key={p.name}
-							value={p.name}
-							disabled={purpose === "chat" && !fits(p.harness)}
-						>
-							{p.name} · {info(p.harness).label} · {p.model}
-							{cannotChat(p.harness)}
-						</NativeSelectOption>
-					))}
-					{unknownProfile ? (
-						<NativeSelectOption value={choice.profile}>
-							{choice.profile} (not found)
-						</NativeSelectOption>
-					) : null}
-				</NativeSelect>
-				{locked ? (
-					<FieldDescription className="text-xs">
-						Add a profile on the Agents page, or choose None to pick a harness
-						and model here.
-					</FieldDescription>
-				) : none ? null : (
-					<FieldDescription className="text-xs">
-						Change a field below to override the profile here. Choose From the
-						profile to undo.
-					</FieldDescription>
-				)}
-			</Field>
-
-			<Field>
-				<FieldLabel htmlFor={`${id}-harness`}>Harness</FieldLabel>
-				<NativeSelect
-					id={`${id}-harness`}
-					size="sm"
-					className="w-full"
-					disabled={locked}
-					value={choice.harness ?? ""}
-					aria-invalid={
-						(refusal !== null && choice.harness !== undefined) || undefined
-					}
-					onChange={(event) => {
-						const next = event.target.value as HarnessName | "";
-						if (next === "") change({ harness: undefined });
-						// A model of the old harness means nothing to the new one.
-						else
-							change({
-								harness: next,
-								model: none ? info(next).defaultModel : undefined,
-							});
-					}}
-				>
-					{!none ? (
-						<NativeSelectOption value="">
-							{fromProfile(profile ? info(profile.harness).label : "unknown")}
-						</NativeSelectOption>
-					) : null}
-					{harnessOptions.map(({ value, label }) => (
-						<NativeSelectOption
-							key={value}
-							value={value}
-							disabled={purpose === "chat" && !fits(value)}
-						>
-							{label}
-							{cannotChat(value)}
-						</NativeSelectOption>
-					))}
-				</NativeSelect>
-				{refusal ? (
-					<FieldDescription className="text-destructive text-xs">
-						{refusal}
-					</FieldDescription>
-				) : null}
-			</Field>
-
-			<div className="grid grid-cols-2 gap-3">
-				<Field>
-					<FieldLabel htmlFor={`${id}-model`}>Model</FieldLabel>
-					<ModelCombobox
-						id={`${id}-model`}
-						harness={harnessName}
-						value={choice.model ?? ""}
-						placeholder={
-							none ? harness.defaultModel : (profile?.model ?? undefined)
-						}
-						onChange={(model) =>
-							change({ model: model === "" && !none ? undefined : model })
-						}
-					/>
-				</Field>
-				<Field>
-					<FieldLabel htmlFor={`${id}-effort`}>Effort</FieldLabel>
-					<NativeSelect
-						id={`${id}-effort`}
-						size="sm"
-						className="w-full"
-						disabled={locked}
-						value={choice.effort ?? ""}
-						onChange={(event) =>
-							change({
-								effort: (event.target.value || undefined) as Effort | undefined,
-							})
-						}
+		<DropdownMenuGroup>
+			<DropdownMenuLabel>Profile</DropdownMenuLabel>
+			<DropdownMenuRadioGroup
+				value={value}
+				onValueChange={(next: string) => {
+					if (next === HELP) setAgentChoice({});
+					else if (next === NONE)
+						// Keep what the profile gave, so the same agent answers.
+						setAgentChoice({
+							harness: now.harness,
+							model: now.model || info(now.harness).defaultModel,
+							...(now.effort ? { effort: now.effort } : {}),
+						});
+					else setAgentChoice({ profile: next });
+				}}
+			>
+				<DropdownMenuRadioItem value={HELP} closeOnClick>
+					<span className="truncate">Profile for help</span>
+					<DropdownMenuShortcut className="tracking-normal">
+						{forHelp ? forHelp.name : "none yet"}
+					</DropdownMenuShortcut>
+				</DropdownMenuRadioItem>
+				{profiles.map((p) => (
+					<DropdownMenuRadioItem
+						key={p.name}
+						value={p.name}
+						closeOnClick
+						disabled={purpose === "chat" && !fits(p.harness)}
 					>
-						<NativeSelectOption value="">
-							{none
-								? "Model default"
-								: fromProfile(profile?.effort ?? "model default")}
-						</NativeSelectOption>
+						<span className="truncate">{p.name}</span>
+						<DropdownMenuShortcut className="truncate tracking-normal">
+							{info(p.harness).label} · {p.model}
+							{purpose === "chat" && !fits(p.harness) ? " (cannot chat)" : ""}
+						</DropdownMenuShortcut>
+					</DropdownMenuRadioItem>
+				))}
+				{unknown ? (
+					<DropdownMenuRadioItem value={choice.profile ?? ""} closeOnClick>
+						{choice.profile} (not found)
+					</DropdownMenuRadioItem>
+				) : null}
+				<DropdownMenuRadioItem value={NONE} closeOnClick>
+					No profile: choose a model below
+				</DropdownMenuRadioItem>
+			</DropdownMenuRadioGroup>
+			{now.locked ? (
+				<DropdownMenuLabel className="font-normal">
+					Add a profile on the Agents page, or choose a model below.
+				</DropdownMenuLabel>
+			) : null}
+		</DropdownMenuGroup>
+	);
+}
+
+/** The models of one harness, the one in use checked, and a way to name another. */
+function HarnessModels({
+	harness,
+	current,
+	onPick,
+	onOther,
+}: {
+	harness: HarnessName;
+	/** The model in use, when this harness answers. */
+	current: string | null;
+	onPick: (model: string) => void;
+	onOther: () => void;
+}) {
+	const { models } = useHarnessModels(harness);
+	const list =
+		current && !models.includes(current) ? [current, ...models] : models;
+	return (
+		<>
+			<DropdownMenuRadioGroup value={current ?? ""} onValueChange={onPick}>
+				{list.map((model) => (
+					<DropdownMenuRadioItem key={model} value={model} closeOnClick>
+						{model}
+					</DropdownMenuRadioItem>
+				))}
+			</DropdownMenuRadioGroup>
+			<DropdownMenuSeparator />
+			<DropdownMenuItem onClick={onOther}>Other model…</DropdownMenuItem>
+		</>
+	);
+}
+
+function EffortMenu({
+	choice,
+	now,
+}: {
+	choice: AgentChoice;
+	now: ReturnType<typeof resolve>;
+}) {
+	const fromProfile = !now.none && now.profile?.effort;
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<InputGroupButton
+						className="shrink-0 font-normal text-muted-foreground"
+						disabled={now.locked}
+						aria-label={`Effort: ${now.effort ?? "model default"}. Choose the effort.`}
+						title="Choose how hard the agent thinks"
+					>
+						{now.effort ?? "Effort"}
+						<ChevronDownIcon />
+					</InputGroupButton>
+				}
+			/>
+			<DropdownMenuContent align="start" className="w-48">
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Effort</DropdownMenuLabel>
+					<DropdownMenuRadioGroup
+						value={choice.effort ?? NO_EFFORT}
+						onValueChange={(next: string) => {
+							const effort = next === NO_EFFORT ? undefined : (next as Effort);
+							// A change on the profile for help pins that profile.
+							const base: AgentChoice = now.usesHelp
+								? now.profile
+									? { profile: now.profile.name }
+									: {}
+								: { ...choice };
+							const { effort: _, ...rest } = base;
+							setAgentChoice(effort ? { ...rest, effort } : rest);
+						}}
+					>
+						<DropdownMenuRadioItem value={NO_EFFORT} closeOnClick>
+							{fromProfile ? "From the profile" : "Model default"}
+							{fromProfile ? (
+								<DropdownMenuShortcut className="tracking-normal">
+									{fromProfile}
+								</DropdownMenuShortcut>
+							) : null}
+						</DropdownMenuRadioItem>
 						{EFFORTS.map((value) => (
-							<NativeSelectOption key={value} value={value}>
+							<DropdownMenuRadioItem key={value} value={value} closeOnClick>
 								{value}
-							</NativeSelectOption>
+							</DropdownMenuRadioItem>
 						))}
-					</NativeSelect>
-				</Field>
-			</div>
-		</FieldGroup>
+					</DropdownMenuRadioGroup>
+				</DropdownMenuGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** A model the list does not hold: the harness takes any model its CLI knows. */
+function OtherModelDialog({
+	harness,
+	label,
+	initial,
+	onClose,
+	onPick,
+}: {
+	harness: HarnessName;
+	label: string;
+	initial: string;
+	onClose: () => void;
+	onPick: (model: string) => void;
+}) {
+	const id = useId();
+	const [model, setModel] = useState(initial);
+	return (
+		<Dialog open onOpenChange={(open) => (open ? null : onClose())}>
+			<DialogContent className="sm:max-w-sm">
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => {
+						event.preventDefault();
+						if (model.trim()) onPick(model.trim());
+					}}
+				>
+					<DialogHeader>
+						<DialogTitle>Use another model</DialogTitle>
+						<DialogDescription>
+							Type the name of a model {label} supports. It does not need to be
+							in the list.
+						</DialogDescription>
+					</DialogHeader>
+					<Field>
+						<FieldLabel htmlFor={id}>Model</FieldLabel>
+						<ModelCombobox
+							id={id}
+							harness={harness}
+							value={model}
+							onChange={setModel}
+						/>
+					</Field>
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={model.trim() === ""}>
+							Use this model
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }

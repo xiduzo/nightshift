@@ -30,7 +30,7 @@ import {
 	useState,
 } from "react";
 import { Markdown } from "@/shared/markdown";
-import { AgentPicker, agentRequest } from "./agent-picker";
+import { AgentMenus, agentRequest } from "./agent-picker";
 import {
 	applyToDraft,
 	type FlowAssistant,
@@ -211,7 +211,6 @@ function SuggestBody({
 				<PopoverDescription className="text-xs">
 					{description}
 				</PopoverDescription>
-				<AgentPicker purpose="suggest" className="-ml-2 self-start" />
 			</PopoverHeader>
 
 			{state.status === "failed" ? (
@@ -273,6 +272,7 @@ function SuggestBody({
 						submitLabel={state.status === "failed" ? "Try again" : "Suggest"}
 						answering={state.status === "running"}
 						onStop={stop}
+						tools={<AgentMenus purpose="suggest" />}
 					/>
 				</>
 			) : null}

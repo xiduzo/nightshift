@@ -45,7 +45,7 @@ import type { RunStatus } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
-import { AgentPicker } from "../assistant/agent-picker";
+import { AgentMenus } from "../assistant/agent-picker";
 import { PromptInput } from "../assistant/prompt-input";
 import {
 	type AgentMessage,
@@ -129,9 +129,6 @@ export function FlowChatPanel(props: Props) {
 						</>
 					}
 				/>
-				<div className="shrink-0 border-b px-1.5 py-1">
-					<AgentPicker purpose="chat" />
-				</div>
 				{props.run ? <RunChip run={props.run} /> : null}
 				{empty ? <ChatEmpty {...props} /> : <ChatMessages {...props} />}
 				{props.notice ? (
@@ -385,6 +382,7 @@ function Composer({ streaming, sendBlockedBy, onSend, onStop }: Props) {
 			blockedBy={sendBlockedBy}
 			answering={streaming}
 			onStop={onStop}
+			tools={<AgentMenus purpose="chat" />}
 		/>
 	);
 }

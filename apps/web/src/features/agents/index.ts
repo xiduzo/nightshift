@@ -9,7 +9,7 @@ export {
 	switchHarness,
 	useCustomAgents,
 } from "./harnesses";
-export { ModelCombobox } from "./model-combobox";
+export { ModelCombobox, useHarnessModels } from "./model-combobox";
 export { WithdrawOfferDialog } from "./offer-dialog";
 export {
 	cliToolQueries,
