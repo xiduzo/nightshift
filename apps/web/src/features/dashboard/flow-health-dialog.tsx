@@ -100,7 +100,7 @@ function FlowHealthDetails({
 			>
 				{detail.error && !inRange ? (
 					<DetailsEmpty>
-						This flow could not load. Close it and open it again.
+						Night Shift could not load this flow. Close it and open it again.
 					</DetailsEmpty>
 				) : !inRange ? (
 					<div className="flex flex-col gap-3 pt-2">
@@ -163,7 +163,7 @@ function FlowHealthDetails({
 						<DetailsTabContent value="cost">
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Stat
-									label="Spent in all"
+									label="Total spent"
 									value={formatKnownCost(inRange.spent)}
 								/>
 								<Stat
@@ -176,7 +176,7 @@ function FlowHealthDetails({
 									}
 								/>
 								<Stat
-									label="Dearest run"
+									label="Most expensive run"
 									value={
 										inRange.dearest ? formatCost(inRange.dearest.costUsd) : "—"
 									}

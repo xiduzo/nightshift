@@ -148,7 +148,8 @@ function SpendDetails({
 								{unknown === 1
 									? `1 run in the last ${range} nights has a step that did not report its cost.`
 									: `${unknown} runs in the last ${range} nights have a step that did not report its cost.`}{" "}
-								The totals leave those steps out. The run shows which step.
+								The totals do not include those steps. Open the run to see which
+								step.
 							</AlertDescription>
 						</Alert>
 					) : null}

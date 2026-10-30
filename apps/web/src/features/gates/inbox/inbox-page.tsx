@@ -101,7 +101,7 @@ export function InboxPage({
 						<div className="min-w-0">
 							<h2 className="font-medium text-sm">Waiting for you</h2>
 							<p className="text-muted-foreground text-xs">
-								Each run goes on when you answer.
+								Each run continues when you answer.
 							</p>
 						</div>
 						{open.length > 0 ? (
@@ -187,9 +187,8 @@ export function InboxPage({
 								</EmptyMedia>
 								<EmptyTitle>Nothing waits for you</EmptyTitle>
 								<EmptyDescription>
-									When a run in one of your Spaces reaches a Gate node, its
-									question shows up here. Add one to a flow to ask before a step
-									that matters.
+									When a run reaches a Gate, its question shows here. Add a Gate
+									to a flow to ask you before an important step.
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
@@ -312,7 +311,7 @@ function SleepingGroup({
 	return (
 		<NavGroup
 			title="Sleeping"
-			hint="Each one goes on by itself"
+			hint="Each one continues on its own"
 			aside={
 				<Badge
 					variant="outline"

@@ -110,7 +110,7 @@ export function WebhookFields({
 					}
 				/>
 				<FieldDescription>
-					The name of a secret under Agents, Secrets. Give its value to GitHub
+					The name of a secret on the Secrets page. In GitHub, enter its value
 					as the webhook secret. Another sender sends it as Authorization:
 					Bearer and the value.
 				</FieldDescription>
@@ -130,8 +130,7 @@ export function WebhookFields({
 					onChange={(event) => onChange({ ...value, when: event.target.value })}
 				/>
 				<FieldDescription>
-					A JSONata rule over the webhook. Night Shift skips the webhooks it
-					does not hold for.
+					A JSONata rule. Night Shift skips each webhook that does not match it.
 				</FieldDescription>
 			</Field>
 			<Field orientation="horizontal" className="items-start">
@@ -148,8 +147,8 @@ export function WebhookFields({
 						Wake waiting runs
 					</FieldLabel>
 					<FieldDescription>
-						Runs of this project that wait for this signal continue, with the
-						webhook as their data.
+						Runs of this project that wait for this signal continue. They get
+						the webhook as their data.
 					</FieldDescription>
 				</FieldContent>
 			</Field>

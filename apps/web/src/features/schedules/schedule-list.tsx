@@ -178,8 +178,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					<AlertDescription>
 						{schedulerLock ?? (
 							<>
-								Schedules are paused, so no flow starts on its own. Turn them on
-								in{" "}
+								Schedules are paused. No flow starts on its own. Turn them on in{" "}
 								<Link to="/settings" className="underline underline-offset-4">
 									Settings
 								</Link>

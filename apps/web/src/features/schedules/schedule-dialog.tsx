@@ -403,8 +403,7 @@ function ScheduleForm({
 			<DialogHeader>
 				<DialogTitle>{schedule ? "Edit schedule" : "New schedule"}</DialogTitle>
 				<DialogDescription>
-					Choose a flow and when it runs. Night Shift starts it for you at set
-					times, or when a webhook arrives.
+					Choose a flow and when it runs. Night Shift starts it for you.
 				</DialogDescription>
 			</DialogHeader>
 

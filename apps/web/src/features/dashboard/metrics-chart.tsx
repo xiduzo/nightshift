@@ -115,8 +115,7 @@ export function MetricsChart({
 			</ChartContainer>
 			{compared ? null : (
 				<p className="text-center text-muted-foreground text-xs">
-					The nights before had no runs, so there is nothing to compare with
-					yet.
+					The nights before had no runs. There is nothing to compare with yet.
 				</p>
 			)}
 		</div>

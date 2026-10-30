@@ -41,8 +41,8 @@ export function useResolveGate({
 					`Answered ${outcomeLabel(input.choice)}${runTitle ? ` · ${runTitle}` : ""}`,
 					{
 						description: walkerName
-							? `Sent to ${walkerName}. The run goes on when ${walkerName} is online.`
-							: "The run goes on.",
+							? `Sent to ${walkerName}. The run continues when ${walkerName} is online.`
+							: "The run continues.",
 					},
 				);
 			},
