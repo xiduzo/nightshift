@@ -55,10 +55,13 @@ function subagentState(item: ToolItem, running: boolean) {
 export const SubagentRun = memo(function SubagentRun({
 	item,
 	running,
+	projectRoot,
 }: {
 	item: ToolItem;
 	/** The step still runs. */
 	running: boolean;
+	/** The project's folder of the run, to show paths relative to it. */
+	projectRoot?: string | undefined;
 }) {
 	const [open, setOpen] = useState<boolean>();
 	const task = subagentTask(item.name, item.input);
@@ -109,7 +112,12 @@ export const SubagentRun = memo(function SubagentRun({
 						<div className="flex flex-col gap-2">
 							{steps.map((step) =>
 								step.kind === "tool" ? (
-									<ToolCallRow key={step.key} item={step} running={working} />
+									<ToolCallRow
+										key={step.key}
+										item={step}
+										running={working}
+										projectRoot={projectRoot}
+									/>
 								) : step.kind === "thinking" ? (
 									<Reasoning key={step.key} item={step} running={working} />
 								) : (

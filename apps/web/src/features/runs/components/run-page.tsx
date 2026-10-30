@@ -484,6 +484,7 @@ export function RunPage({
 						transcript={
 							stream.transcript.steps.get(selectedStep.id) ?? emptyTranscript
 						}
+						projectRoot={runData.worktreePath}
 						connecting={stream.connection === "connecting"}
 						walker={runData.walker}
 						node={nodeOfStep(runData, steps, selectedStep)}

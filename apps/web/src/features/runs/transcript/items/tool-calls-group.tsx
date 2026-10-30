@@ -24,10 +24,13 @@ import { ToolCallRow } from "./tool-call-row";
 export const ToolCallsGroup = memo(function ToolCallsGroup({
 	items,
 	running,
+	projectRoot,
 }: {
 	items: (ToolItem | ThinkingItem)[];
 	/** The run is still running, so a call without a result is in progress. */
 	running: boolean;
+	/** The project's folder of the run, to show paths relative to it. */
+	projectRoot?: string | undefined;
 }) {
 	const [open, setOpen] = useState<boolean>();
 	const calls = items.filter((item) => item.kind === "tool");
@@ -70,7 +73,12 @@ export const ToolCallsGroup = memo(function ToolCallsGroup({
 						item.kind === "thinking" ? (
 							<Reasoning key={item.key} item={item} running={running} />
 						) : (
-							<ToolCallRow key={item.key} item={item} running={running} />
+							<ToolCallRow
+								key={item.key}
+								item={item}
+								running={running}
+								projectRoot={projectRoot}
+							/>
 						),
 					)}
 				</TraceCollapsibleContent>

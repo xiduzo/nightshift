@@ -99,10 +99,13 @@ function callState(item: ToolItem, running: boolean): TerminalState {
 export const ToolCallRow = memo(function ToolCallRow({
 	item,
 	running,
+	projectRoot,
 }: {
 	item: ToolItem;
 	/** The run is still running, so a call without a result is in progress. */
 	running: boolean;
+	/** The project's folder of the run, to show paths relative to it. */
+	projectRoot?: string | undefined;
 }) {
 	const kind: ToolKind =
 		item.connection !== undefined ? "other" : toolKind(item.name);
@@ -119,19 +122,25 @@ export const ToolCallRow = memo(function ToolCallRow({
 			/>
 		);
 	}
-	return <ToolLine item={item} kind={kind} state={state} />;
+	return (
+		<ToolLine item={item} kind={kind} state={state} projectRoot={projectRoot} />
+	);
 });
 
 function ToolLine({
 	item,
 	kind,
 	state,
+	projectRoot,
 }: {
 	item: ToolItem;
 	kind: ToolKind;
 	state: TerminalState;
+	projectRoot: string | undefined;
 }) {
-	const summary = item.hasInput ? summarizeToolInput(item.input) : "";
+	const summary = item.hasInput
+		? summarizeToolInput(item.input, projectRoot)
+		: "";
 	const target = truncate(summary.replace(/\s+/g, " "), 200);
 	// A Tool node's call shows its connection; an agent's tool call, the tool.
 	const Icon = item.connection !== undefined ? PlugIcon : KIND_ICON[kind];

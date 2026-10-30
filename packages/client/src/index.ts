@@ -165,6 +165,7 @@ export {
 	parseStackTrace,
 	parseTestRun,
 	placementChoices,
+	projectPath,
 	type RunActions,
 	type RunDetail,
 	type RunResult,

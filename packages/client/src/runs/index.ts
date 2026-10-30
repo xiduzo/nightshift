@@ -51,6 +51,7 @@ export {
 	stepPosition,
 	stepState,
 } from "./progress";
+export { projectPath } from "./project-path";
 export { createRunQueries } from "./queries";
 export { mergeSteps } from "./steps";
 export {

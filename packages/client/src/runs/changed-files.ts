@@ -1,3 +1,4 @@
+import { projectPath } from "./project-path";
 import {
 	type AgentToolCall,
 	isRecord,
@@ -224,16 +225,6 @@ function touchesOf(call: AgentToolCall): Touch[] {
 		return path ? [{ path, change: { kind: "delete" } }] : [];
 	}
 	return [];
-}
-
-/** A path as the person knows it: relative to the project's folder when it is inside it. */
-function projectPath(path: string, root?: string): string {
-	const trimmed = path.trim();
-	if (root) {
-		const base = root.replace(/\/+$/, "");
-		if (trimmed.startsWith(`${base}/`)) return trimmed.slice(base.length + 1);
-	}
-	return trimmed.replace(/^(\.\/)+/, "");
 }
 
 /**

@@ -89,10 +89,13 @@ export function StepTranscript({
 	walker,
 	answerPending = false,
 	node,
+	projectRoot,
 }: {
 	runId: string;
 	step: StepSummary;
 	transcript: TranscriptState;
+	/** The project's folder of the run, to show paths relative to it. */
+	projectRoot?: string | undefined;
 	/** The first replay has not arrived yet. */
 	connecting: boolean;
 	/** The device that runs the run. */
@@ -294,7 +297,11 @@ export function StepTranscript({
 											}
 										>
 											{row.kind === "tool-calls" ? (
-												<ToolCallsGroup items={row.items} running={running} />
+												<ToolCallsGroup
+													items={row.items}
+													running={running}
+													projectRoot={projectRoot}
+												/>
 											) : row.kind === "command" ? (
 												<CommandRun
 													command={row.command}
@@ -316,6 +323,7 @@ export function StepTranscript({
 											) : (
 												<TranscriptItemView
 													item={row.item}
+													projectRoot={projectRoot}
 													node={node}
 													itemTitle={
 														row.item.kind === "item-end"
@@ -451,8 +459,11 @@ const TranscriptItemView = memo(function TranscriptItemView({
 	session,
 	sessionNumber,
 	node,
+	projectRoot,
 }: {
 	item: TranscriptItem;
+	/** The project's folder of the run, to show paths relative to it. */
+	projectRoot?: string | undefined;
 	/** For an item's end: the title from its start. */
 	itemTitle?: string;
 	running: boolean;
@@ -476,9 +487,9 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <Reasoning item={item} running={running} />;
 		case "tool":
 			return isSubagentCall(item) ? (
-				<SubagentRun item={item} running={running} />
+				<SubagentRun item={item} running={running} projectRoot={projectRoot} />
 			) : (
-				<ToolCallRow item={item} running={running} />
+				<ToolCallRow item={item} running={running} projectRoot={projectRoot} />
 			);
 		case "report":
 			return <ReportCard item={item} node={node} />;
