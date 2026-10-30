@@ -27,7 +27,14 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowDownToLineIcon, SearchXIcon, WorkflowIcon } from "lucide-react";
-import { type ComponentProps, useMemo, useRef, useState } from "react";
+import {
+	type ComponentProps,
+	useEffect,
+	useEffectEvent,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { deviceQueries } from "@/features/devices";
 import { projectQueries } from "@/features/projects";
 import { useMediaQuery } from "@/shared/media-query";
@@ -110,6 +117,21 @@ export function RunPage({
 	const consolePanel = useRef<PanelHandle>(null);
 	/** The height the console last had open, to open it at again. */
 	const consoleSize = useRef<string>("45%");
+
+	// A link to a step of this run (`?step=`) selects it and opens the
+	// console, also when the page is open already. Only a new link does:
+	// the person's own picks after it stay.
+	const openLinkedStep = useEffectEvent((id: string) => {
+		setFocus(null);
+		setTab("steps");
+		setPickedStepId(id);
+		setConsoleOpen(true);
+		const panel = consolePanel.current;
+		if (panel?.isCollapsed()) panel.resize(consoleSize.current);
+	});
+	useEffect(() => {
+		if (stepId !== undefined) openLinkedStep(stepId);
+	}, [stepId]);
 
 	const steps = useMemo(
 		() => mergeSteps(run.data?.steps ?? [], stream.steps),
