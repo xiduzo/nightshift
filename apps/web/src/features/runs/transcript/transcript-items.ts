@@ -24,6 +24,21 @@ export type SessionItem = ItemBase & {
 
 export type MessageItem = ItemBase & { kind: "message"; text: string };
 
+/** What the model thought, one item per thought. Older transcripts have none. */
+export type ThinkingItem = ItemBase & {
+	kind: "thinking";
+	text: string;
+	/** When the thought began: the entry before its first delta. */
+	startedAt: number;
+	/** When its last delta came. */
+	endedAt: number;
+	/** Something came after it: the thought is over. */
+	done: boolean;
+};
+
+/** One part of a subagent's work, inside the call that started it. */
+export type SubagentStep = ToolItem | MessageItem | ThinkingItem;
+
 export type ToolItem = ItemBase & {
 	kind: "tool";
 	toolCallId: string;
@@ -32,6 +47,12 @@ export type ToolItem = ItemBase & {
 	input?: unknown;
 	hasInput: boolean;
 	result?: string;
+	/** When the result came. */
+	endedAt?: number;
+	/** A call that started a subagent: the subagent's work, in order. */
+	steps?: SubagentStep[];
+	/** When the subagent's latest part came. */
+	lastAt?: number;
 	/** A Tool node's call: the connection it called. Absent for an agent's tool call. */
 	connection?: string;
 	/**
@@ -186,6 +207,7 @@ export type TranscriptItem =
 	| GateOpenItem
 	| GateResolvedItem
 	| MessageItem
+	| ThinkingItem
 	| ToolItem
 	| ReportItem
 	| FinishedItem

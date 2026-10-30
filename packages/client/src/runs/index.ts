@@ -61,6 +61,7 @@ export {
 	type Wait,
 	waitFor,
 } from "./stream";
+export { isLaunchNotice, subagentTask } from "./subagent";
 export { runTime, workedSoFar } from "./time";
 export { stepTodos, type Todo } from "./todos";
 export {

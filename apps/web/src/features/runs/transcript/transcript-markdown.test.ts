@@ -34,6 +34,36 @@ describe("itemToMarkdown", () => {
 		);
 	});
 
+	test("a thought says how long it took and quotes its text", () => {
+		const item: TranscriptItem = {
+			...base,
+			key: "t",
+			kind: "thinking",
+			text: "Read the tests.\nThen fix.",
+			startedAt: 0,
+			endedAt: 12_000,
+			done: true,
+		};
+		expect(itemToMarkdown(item, context)).toBe(
+			"**Thought for 12s**\n\n> Read the tests.\n> Then fix.",
+		);
+	});
+
+	test("a subagent's work follows its call as a quote", () => {
+		const item: TranscriptItem = {
+			...base,
+			key: "a",
+			kind: "tool",
+			toolCallId: "a",
+			name: "Agent",
+			hasInput: false,
+			steps: [{ ...base, key: "m", kind: "message", text: "Found it." }],
+		};
+		expect(itemToMarkdown(item, context)).toBe(
+			"**Tool** `Agent`\n\n> Found it.",
+		);
+	});
+
 	test("a tool call keeps its input and cuts a long result", () => {
 		const item: TranscriptItem = {
 			...base,

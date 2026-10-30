@@ -1,4 +1,5 @@
 import type { StepSummary } from "@/shared/api";
+import { thoughtTitle } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 
 /**
@@ -65,6 +66,8 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 		}
 		case "message":
 			return item.text.trim();
+		case "thinking":
+			return `**${thoughtTitle(item)}**\n\n${quote(item.text.trim())}`;
 		case "tool": {
 			const name = item.connection
 				? `${item.connection} → ${item.name}`
@@ -73,6 +76,11 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 			if (item.input !== undefined)
 				parts.push(fence(cut(json(item.input)), "json"));
 			if (item.result) parts.push(fence(cut(item.result)));
+			// A subagent's work follows the call that started it.
+			const steps = (item.steps ?? [])
+				.map((step) => itemToMarkdown(step, context))
+				.filter((text) => text !== "");
+			if (steps.length > 0) parts.push(quote(steps.join("\n\n")));
 			return parts.join("\n\n");
 		}
 		case "report": {

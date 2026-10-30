@@ -1,8 +1,10 @@
 import type { TranscriptEntry } from "@/shared/api";
+import { formatDuration } from "@/shared/format";
 import type {
 	GateOpenItem,
 	MessageItem,
 	SessionItem,
+	ThinkingItem,
 	ToolItem,
 	TranscriptItem,
 	WaitReason,
@@ -10,7 +12,8 @@ import type {
 
 /**
  * Folds the raw transcript entries of a run into display items, per step. An
- * agent step gets one block per assistant message, one row per tool call, a
+ * agent step gets one block per assistant message, one item per thought, one
+ * row per tool call (a subagent's work inside the call that started it), a
  * boundary per session, its step report, and the events that end a session.
  * A command step gets its command line, one log, and its exit code. A
  * decision step gets what was asked and the label it picked; a gate step its
@@ -25,6 +28,10 @@ export type TranscriptState = {
 	items: TranscriptItem[];
 	/** Item key to index in `items`. */
 	index: Map<string, number>;
+	/** When the last entry came: where the next thought begins. */
+	lastAt?: number;
+	/** The key of the thought still streaming, if the last entry was one. */
+	openThought?: string;
 };
 
 export const emptyTranscript: TranscriptState = {
@@ -161,11 +168,37 @@ function applyStepEntries(
 		return key;
 	};
 
+	let lastAt = state.lastAt;
+	let openThought = state.openThought;
 	for (const entry of entries) {
 		const sessionKey =
 			entry.sessionId === null ? null : ensureSession(entry, entry.sessionId);
 		const event = entry.event;
 		const base = { sessionId: entry.sessionId, at: entry.at };
+		const startedAt = lastAt ?? entry.at;
+		lastAt = entry.at;
+
+		// Anything after a thought ends it.
+		const thoughtKey =
+			event.type === "thinking"
+				? `thinking:${entry.sessionId}:${event.messageId}`
+				: undefined;
+		if (openThought && openThought !== thoughtKey) {
+			update<ThinkingItem>(openThought, (item) => ({ ...item, done: true }));
+		}
+		openThought = thoughtKey;
+
+		// A subagent's work goes inside the call that started it.
+		if (
+			"parentToolCallId" in event &&
+			event.parentToolCallId &&
+			update<ToolItem>(
+				`tool:${entry.sessionId}:${event.parentToolCallId}`,
+				(item) => withSubagentStep(item, entry),
+			)
+		) {
+			continue;
+		}
 
 		switch (event.type) {
 			case "session":
@@ -188,6 +221,26 @@ function applyStepEntries(
 				}
 				break;
 			}
+			case "thinking": {
+				const key = `thinking:${entry.sessionId}:${event.messageId}`;
+				const found = update<ThinkingItem>(key, (item) => ({
+					...item,
+					text: item.text + event.delta,
+					endedAt: entry.at,
+				}));
+				if (!found) {
+					push({
+						...base,
+						kind: "thinking",
+						key,
+						text: event.delta,
+						startedAt,
+						endedAt: entry.at,
+						done: false,
+					});
+				}
+				break;
+			}
 			case "tool-start":
 				ensureTool(entry, event.toolCallId, event.name);
 				break;
@@ -206,6 +259,7 @@ function applyStepEntries(
 				update<ToolItem>(key, (item) => ({
 					...item,
 					result: event.content,
+					endedAt: entry.at,
 					// Older transcripts have no flag: their calls show as done.
 					...(event.isError ? { failed: true } : {}),
 				}));
@@ -463,7 +517,100 @@ function applyStepEntries(
 		}
 	}
 
-	return { items, index };
+	return {
+		items,
+		index,
+		...(lastAt !== undefined ? { lastAt } : {}),
+		...(openThought !== undefined ? { openThought } : {}),
+	};
+}
+
+/**
+ * The call that started a subagent, with one more event of the subagent
+ * folded into its steps: text and thinking join by message, a tool call's
+ * parts by its id. A step that follows a thought ends it.
+ */
+function withSubagentStep(item: ToolItem, entry: TranscriptEntry): ToolItem {
+	const event = entry.event;
+	const steps = (item.steps ?? []).slice();
+	const at = (key: string) => steps.findIndex((step) => step.key === key);
+	const base = { sessionId: entry.sessionId, at: entry.at };
+	const last = steps.at(-1);
+	const thoughtKey =
+		event.type === "thinking"
+			? `thinking:${entry.sessionId}:${event.messageId}`
+			: undefined;
+	if (last?.kind === "thinking" && !last.done && last.key !== thoughtKey) {
+		steps[steps.length - 1] = { ...last, done: true };
+	}
+	switch (event.type) {
+		case "text":
+		case "thinking": {
+			const key = thoughtKey ?? `message:${entry.sessionId}:${event.messageId}`;
+			const found = at(key);
+			const step = steps[found];
+			if (step && step.kind !== "tool") {
+				steps[found] = {
+					...step,
+					text: step.text + event.delta,
+					...(step.kind === "thinking" ? { endedAt: entry.at } : {}),
+				};
+			} else if (event.type === "text") {
+				steps.push({ ...base, kind: "message", key, text: event.delta });
+			} else {
+				steps.push({
+					...base,
+					kind: "thinking",
+					key,
+					text: event.delta,
+					startedAt: item.lastAt ?? item.at,
+					endedAt: entry.at,
+					done: false,
+				});
+			}
+			break;
+		}
+		case "tool-start":
+		case "tool-end":
+		case "tool-result": {
+			const key = `tool:${entry.sessionId}:${event.toolCallId}`;
+			const found = at(key);
+			const step: ToolItem =
+				found >= 0 && steps[found]?.kind === "tool"
+					? (steps[found] as ToolItem)
+					: {
+							...base,
+							kind: "tool",
+							key,
+							toolCallId: event.toolCallId,
+							name: event.type === "tool-result" ? "tool" : event.name,
+							hasInput: false,
+						};
+			const next: ToolItem =
+				event.type === "tool-start"
+					? step
+					: event.type === "tool-end"
+						? { ...step, name: event.name, input: event.input, hasInput: true }
+						: {
+								...step,
+								result: event.content,
+								endedAt: entry.at,
+								...(event.isError ? { failed: true } : {}),
+							};
+			if (found >= 0) steps[found] = next;
+			else steps.push(next);
+			break;
+		}
+		default:
+			return item;
+	}
+	return { ...item, steps, lastAt: entry.at };
+}
+
+/** "Thought for 12s", or "Thought" when it took less than a second. */
+export function thoughtTitle(item: ThinkingItem): string {
+	const ms = item.endedAt - item.startedAt;
+	return ms < 1000 ? "Thought" : `Thought for ${formatDuration(ms)}`;
 }
 
 /** A one-line summary of a tool's input: the command, path, or pattern it acts on. */

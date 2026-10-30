@@ -56,8 +56,14 @@ export function StepConsole({
 }) {
 	const gist = step ? stepGist(step) : undefined;
 	const outputCount = step ? Object.keys(step.outputs).length : 0;
+	// A subagent's calls change files too: they sit inside the call that started it.
 	const calls = useMemo(
-		() => items.filter((item) => item.kind === "tool"),
+		() =>
+			items.flatMap((item) =>
+				item.kind === "tool"
+					? [item, ...(item.steps ?? []).filter((step) => step.kind === "tool")]
+					: [],
+			),
 		[items],
 	);
 	const todos = useMemo(() => stepTodos(calls), [calls]);

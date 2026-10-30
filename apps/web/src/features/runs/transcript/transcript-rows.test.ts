@@ -80,3 +80,49 @@ describe("transcriptRows", () => {
 		expect(keysOf(rows[0])).toEqual(["c"]);
 	});
 });
+
+describe("transcriptRows with thoughts and subagents", () => {
+	function thought(key: string): TranscriptItem {
+		return {
+			...base,
+			kind: "thinking",
+			key,
+			text: key,
+			startedAt: 0,
+			endedAt: 0,
+			done: true,
+		};
+	}
+
+	test("a thought around and between calls is a step of their group", () => {
+		const rows = transcriptRows(
+			[thought("r1"), tool("t1"), thought("r2"), tool("t2"), message("m1")],
+			{ groupTools: true },
+		);
+		expect(rows.map((row) => row.kind)).toEqual(["tool-calls", "item"]);
+		expect(keysOf(rows[0])).toEqual(["r1", "t1", "r2", "t2"]);
+	});
+
+	test("a thought with one call, or alone, stays a row of its own", () => {
+		const rows = transcriptRows([thought("r1"), tool("t1"), message("m1")], {
+			groupTools: true,
+		});
+		expect(rows.map(keysOf)).toEqual([["r1"], ["t1"], ["m1"]]);
+	});
+
+	test("a call that started a subagent stands on its own", () => {
+		const agent: TranscriptItem = {
+			...base,
+			kind: "tool",
+			key: "a",
+			toolCallId: "a",
+			name: "Agent",
+			input: { subagent_type: "Explore", prompt: "Look." },
+			hasInput: true,
+		};
+		const rows = transcriptRows([tool("t1"), agent, tool("t2")], {
+			groupTools: true,
+		});
+		expect(rows.map(keysOf)).toEqual([["t1"], ["a"], ["t2"]]);
+	});
+});

@@ -53,6 +53,7 @@ import {
 } from "./items/decision-items";
 import { EndCard } from "./items/end-items";
 import { ItemEnd, ItemStart, ItemsRead } from "./items/list-items";
+import { Reasoning } from "./items/reasoning";
 import {
 	MessageBlock,
 	ReportCard,
@@ -60,6 +61,7 @@ import {
 	SessionError,
 	SessionFinished,
 } from "./items/session-items";
+import { isSubagentCall, SubagentRun } from "./items/subagent";
 import { ToolCallRow } from "./items/tool-call-row";
 import { ToolCallsGroup } from "./items/tool-calls-group";
 import { WaitCard, WakeMarker } from "./items/wait-items";
@@ -470,8 +472,14 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			);
 		case "message":
 			return <MessageBlock item={item} />;
+		case "thinking":
+			return <Reasoning item={item} running={running} />;
 		case "tool":
-			return <ToolCallRow item={item} running={running} />;
+			return isSubagentCall(item) ? (
+				<SubagentRun item={item} running={running} />
+			) : (
+				<ToolCallRow item={item} running={running} />
+			);
 		case "report":
 			return <ReportCard item={item} node={node} />;
 		case "finished":
