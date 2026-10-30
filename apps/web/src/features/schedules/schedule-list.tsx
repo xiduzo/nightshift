@@ -1,4 +1,4 @@
-import { scheduleLastRuns } from "@nightshift/client";
+import { readerTimeZone, scheduleLastRuns } from "@nightshift/client";
 import type { Schedule } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -127,7 +127,11 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	);
 
 	const saveAll = (next: Schedule[], onDone?: () => void) =>
-		save.mutate({ projectId, schedules: next }, { onSuccess: onDone });
+		save.mutate(
+			// A schedule's times are on the clock of the person who saves it.
+			{ projectId, schedules: next, timeZone: readerTimeZone() },
+			{ onSuccess: onDone },
+		);
 
 	const upsert = (schedule: Schedule, previousId: string | null) => {
 		const current = schedules.map(plain);

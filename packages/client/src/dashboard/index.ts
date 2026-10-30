@@ -1,6 +1,6 @@
-/** The dashboard: its query, computed on the server, and its view types. */
+/** The dashboard: its query, computed on the server, the reader's clock, and its view types. */
 
-export { createDashboardQueries } from "./queries";
+export { createDashboardQueries, readerTimeZone } from "./queries";
 export type {
 	DashboardSummary,
 	FlowHealthRow,

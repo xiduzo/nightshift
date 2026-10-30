@@ -1,4 +1,5 @@
 import type { ApiQueryUtils } from "../api";
+import { readerTimeZone } from "../dashboard";
 
 /**
  * How often a list of schedules reads them again: the next start moves on
@@ -23,8 +24,10 @@ export function createScheduleQueries(orpc: ApiQueryUtils) {
 			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
-		/** The next starts of a cron expression. */
+		/** The next starts of a cron expression, on this screen's clock: the one a save gives the schedule. */
 		preview: (cron: string) =>
-			orpc.schedules.preview.queryOptions({ input: { cron } }),
+			orpc.schedules.preview.queryOptions({
+				input: { cron, timeZone: readerTimeZone() },
+			}),
 	};
 }

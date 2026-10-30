@@ -340,11 +340,17 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.scheduleFiles.list(projectId);
 			},
 
-			async saveSchedules(projectId, schedules) {
+			async saveSchedules(projectId, schedules, timeZone) {
 				await ready;
 				// A project without a Clone here is refused before the Offers check.
 				await projects.get(projectId, spaceId);
-				return deps.scheduleFiles.save(spaceId, projectId, actor, schedules);
+				return deps.scheduleFiles.save(
+					spaceId,
+					projectId,
+					actor,
+					schedules,
+					timeZone,
+				);
 			},
 
 			watchRun(runId, { signal: watching, afterSeq }) {

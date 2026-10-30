@@ -258,7 +258,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		at: number,
 	): Promise<void> {
 		const key = keyOf(projectId, schedule.id);
-		const due = latestCronTime(schedule.cron, at);
+		const due = latestCronTime(schedule.cron, at, schedule.timeZone);
 		if (due === null) return;
 		const current = history.get(key);
 		if (current && due <= current.lastAt) return;
@@ -294,7 +294,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		}
 
 		const stopAt = schedule.stopAt
-			? (nextTimeOfDay(schedule.stopAt, at) ?? undefined)
+			? (nextTimeOfDay(schedule.stopAt, at, schedule.timeZone) ?? undefined)
 			: undefined;
 		let runId: string | null = null;
 		let error: string | null = null;
@@ -438,7 +438,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			if (!schedule.enabled || cron === undefined || schedule.webhook) {
 				return null;
 			}
-			const due = latestCronTime(cron, at);
+			const due = latestCronTime(cron, at, schedule.timeZone);
 			const current = history.get(keyOf(projectId, schedule.id));
 			if (
 				due !== null &&
@@ -447,7 +447,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			) {
 				return due;
 			}
-			return nextCronTimes(cron, at, 1)[0] ?? null;
+			return nextCronTimes(cron, at, 1, schedule.timeZone)[0] ?? null;
 		},
 	};
 }

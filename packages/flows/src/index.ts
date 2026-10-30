@@ -272,6 +272,7 @@ export {
 	cronError,
 	cronToTimeAndDays,
 	describeCron,
+	isTimeZone,
 	latestCronTime,
 	nextCronTimes,
 	nextTimeOfDay,

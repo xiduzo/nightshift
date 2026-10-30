@@ -229,7 +229,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 		}
 		if (schedule.flow !== undefined) {
 			const stopAt = schedule.stopAt
-				? (nextTimeOfDay(schedule.stopAt, at) ?? undefined)
+				? (nextTimeOfDay(schedule.stopAt, at, schedule.timeZone) ?? undefined)
 				: undefined;
 			try {
 				const inputs = webhookInputs(

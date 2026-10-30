@@ -120,11 +120,13 @@ export interface SpaceEngine {
 	listSchedules(projectId: string): Promise<ScheduleList>;
 	/**
 	 * Saves the schedules. Saves schedules with problems too; returns the
-	 * issues. The scheduler reads them on its next tick.
+	 * issues. The scheduler reads them on its next tick. `timeZone` is the
+	 * saver's clock: a schedule with a time and no time zone gets it.
 	 */
 	saveSchedules(
 		projectId: string,
 		schedules: readonly Schedule[],
+		timeZone?: string,
 	): Promise<ScheduleIssue[]>;
 	/**
 	 * The Space's runs (of one project), newest first. With `limit`, a page

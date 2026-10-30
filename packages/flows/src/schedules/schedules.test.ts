@@ -3,6 +3,7 @@ import {
 	cronError,
 	cronToTimeAndDays,
 	describeCron,
+	isTimeZone,
 	latestCronTime,
 	nextCronTimes,
 	nextTimeOfDay,
@@ -101,6 +102,30 @@ describe("cron helpers", () => {
 		expect(nextTimeOfDay("7am", at(16, 22))).toBeNull();
 	});
 
+	test("a time zone sets the clock of the cron line and the stop time", () => {
+		// Amsterdam is UTC+2 until 25 October 2026, then UTC+1.
+		const amsterdam = "Europe/Amsterdam";
+		expect(
+			nextCronTimes("0 22 * * *", Date.UTC(2026, 9, 24, 12), 2, amsterdam),
+		).toEqual([Date.UTC(2026, 9, 24, 20), Date.UTC(2026, 9, 25, 21)]);
+		expect(
+			nextCronTimes("0 22 * * *", Date.UTC(2026, 9, 30, 12), 1, "UTC"),
+		).toEqual([Date.UTC(2026, 9, 30, 22)]);
+		expect(
+			latestCronTime("0 22 * * *", Date.UTC(2026, 9, 30, 21, 30), amsterdam),
+		).toBe(Date.UTC(2026, 9, 30, 21));
+		expect(nextTimeOfDay("07:00", Date.UTC(2026, 9, 30, 21), amsterdam)).toBe(
+			Date.UTC(2026, 9, 31, 6),
+		);
+		expect(nextCronTimes("0 22 * * *", 0, 1, "Mars/Olympus")).toEqual([]);
+	});
+
+	test("isTimeZone knows IANA names only", () => {
+		expect(isTimeZone("Europe/Amsterdam")).toBe(true);
+		expect(isTimeZone("UTC")).toBe(true);
+		expect(isTimeZone("Mars/Olympus")).toBe(false);
+	});
+
 	test("time and days round-trip through a cron line", () => {
 		expect(
 			timeAndDaysToCron({ time: "22:00", days: [0, 1, 2, 3, 4, 5, 6] }),
@@ -176,6 +201,7 @@ describe("validateSchedules", () => {
 				schedule({ id: "b", flow: "unreadable" }),
 				schedule({ id: "c", flow: "broken" }),
 				schedule({ id: "d", cron: "0 25 * * *", inputs: { epic: "1" } }),
+				schedule({ id: "f", timeZone: "Mars/Olympus", inputs: { epic: "1" } }),
 				schedule({ id: "e", inputs: { epic: " ", other: "x", plan: "{" } }),
 				schedule({ id: "e", inputs: { epic: "1" } }),
 			],
@@ -189,6 +215,10 @@ describe("validateSchedules", () => {
 				'The flow "broken" has 2 errors. Fix the flow so this schedule can run.',
 			],
 			["d", expect.stringContaining("The cron expression is not valid")],
+			[
+				"f",
+				'The time zone "Mars/Olympus" is not valid. Use a name such as Europe/Amsterdam.',
+			],
 			["e", 'The flow "night" has no input "other".'],
 			["e", 'The input "epic" needs a value.'],
 			["e", 'The value of input "plan" is not valid JSON.'],

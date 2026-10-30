@@ -52,10 +52,20 @@ export const scheduleIdSchema = z
 		"Use lowercase letters, digits and -, starting with a letter or digit.",
 	);
 
-/** A time of day on the daemon's clock, `HH:MM` (24 hours). */
+/** A time of day on the schedule's clock, `HH:MM` (24 hours). */
 export const timeOfDaySchema = z
 	.string()
 	.regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM, for example 07:00.");
+
+/** Whether `timeZone` is an IANA time zone this runtime knows. */
+export function isTimeZone(timeZone: string): boolean {
+	try {
+		new Intl.DateTimeFormat("en-US", { timeZone });
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 /** A webhook's secret: one secret by name, as `${NAME}`. */
 export const webhookSecretSchema = z
@@ -108,9 +118,9 @@ export const scheduleSchema = z.object({
 	 */
 	inputs: z.record(z.string(), z.json()).default({}),
 	/**
-	 * Five fields (minute hour day-of-month month day-of-week) in the
-	 * daemon's local time zone, for example `0 22 * * 1-5`. A schedule has
-	 * either `cron` or `webhook`.
+	 * Five fields (minute hour day-of-month month day-of-week) in
+	 * `timeZone`, for example `0 22 * * 1-5`. A schedule has either `cron`
+	 * or `webhook`.
 	 */
 	cron: z.string().trim().min(1, "Enter a cron expression.").optional(),
 	/** Starts the run when a webhook arrives, instead of at cron times. */
@@ -119,6 +129,13 @@ export const scheduleSchema = z.object({
 	signal: scheduleSignalSchema.optional(),
 	/** The stop time: the first such time of day after the run starts. */
 	stopAt: timeOfDaySchema.optional(),
+	/**
+	 * The clock of `cron` and `stopAt`: the time zone of the person who
+	 * saved the schedule. Night Shift writes it on a save, so the Host
+	 * fires it at the same hour whatever its own clock says. Unset: the
+	 * clock of the computer that fires it.
+	 */
+	timeZone: z.string().trim().min(1).max(64).optional(),
 	/** The git ref to branch the worktree from. Default: the clone's current HEAD. */
 	baseRef: z.string().trim().min(1).optional(),
 	/** A paused schedule stays in the file and starts nothing. */
@@ -164,9 +181,12 @@ export type ScheduleFlowInfo = {
 	errorCount: number;
 };
 
-function cronOf(cron: string): Cron {
+function cronOf(cron: string, timeZone?: string): Cron {
 	// No callback: croner computes times and never starts a timer.
-	return new Cron(cron.trim(), { mode: "5-part" });
+	return new Cron(cron.trim(), {
+		mode: "5-part",
+		...(timeZone ? { timezone: timeZone } : {}),
+	});
 }
 
 /** Why a cron line does not parse, or null. */
@@ -180,14 +200,19 @@ export function cronError(cron: string): string | null {
 	}
 }
 
-/** The next `count` times of the cron line strictly after `after` (epoch ms). Empty when it does not parse. */
+/**
+ * The next `count` times of the cron line strictly after `after` (epoch ms),
+ * on the clock of `timeZone` (default: this computer's). Empty when it does
+ * not parse.
+ */
 export function nextCronTimes(
 	cron: string,
 	after: number,
 	count = 1,
+	timeZone?: string,
 ): number[] {
 	try {
-		return cronOf(cron)
+		return cronOf(cron, timeZone)
 			.nextRuns(count, new Date(after))
 			.map((date) => date.getTime());
 	} catch {
@@ -195,26 +220,43 @@ export function nextCronTimes(
 	}
 }
 
-/** The latest time of the cron line at or before `at`. Null when there is none or it does not parse. */
-export function latestCronTime(cron: string, at: number): number | null {
+/**
+ * The latest time of the cron line at or before `at`, on the clock of
+ * `timeZone` (default: this computer's). Null when there is none or it does
+ * not parse.
+ */
+export function latestCronTime(
+	cron: string,
+	at: number,
+	timeZone?: string,
+): number | null {
 	try {
 		// Croner strips milliseconds and excludes the reference itself: one
 		// second later makes `at` count when it is a time of the line.
-		const [previous] = cronOf(cron).previousRuns(1, new Date(at + 1000));
+		const [previous] = cronOf(cron, timeZone).previousRuns(
+			1,
+			new Date(at + 1000),
+		);
 		return previous && previous.getTime() <= at ? previous.getTime() : null;
 	} catch {
 		return null;
 	}
 }
 
-/** The first moment after `after` at which the clock shows `hhmm` ("07:00"): later today, else tomorrow. */
-export function nextTimeOfDay(hhmm: string, after: number): number | null {
+/**
+ * The first moment after `after` at which the clock of `timeZone` (default:
+ * this computer's) shows `hhmm` ("07:00"): later today, else tomorrow.
+ */
+export function nextTimeOfDay(
+	hhmm: string,
+	after: number,
+	timeZone?: string,
+): number | null {
 	if (!timeOfDaySchema.safeParse(hhmm).success) return null;
 	const [hours, minutes] = hhmm.split(":").map(Number);
-	const date = new Date(after);
-	date.setHours(hours ?? 0, minutes ?? 0, 0, 0);
-	if (date.getTime() <= after) date.setDate(date.getDate() + 1);
-	return date.getTime();
+	return (
+		nextCronTimes(`${minutes} ${hours} * * *`, after, 1, timeZone)[0] ?? null
+	);
 }
 
 const DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -378,6 +420,11 @@ export function validateSchedules(
 			const cronProblem = cronError(cron);
 			if (cronProblem)
 				error(`The cron expression is not valid: ${cronProblem}`);
+		}
+		if (schedule.timeZone !== undefined && !isTimeZone(schedule.timeZone)) {
+			error(
+				`The time zone "${schedule.timeZone}" is not valid. Use a name such as Europe/Amsterdam.`,
+			);
 		}
 		if (signal !== undefined && webhook === undefined) {
 			error("Only a schedule that waits for a webhook can send a signal.");

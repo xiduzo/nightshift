@@ -11,7 +11,8 @@ const POLL_MS = 5 * 60_000;
 
 /**
  * The time zone of this screen (IANA, such as `Europe/Amsterdam`): the
- * dashboard counts nights from noon to noon on the reader's clock.
+ * dashboard counts nights from noon to noon on the reader's clock, and a
+ * schedule someone saves runs on it.
  */
 export function readerTimeZone(): string {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";

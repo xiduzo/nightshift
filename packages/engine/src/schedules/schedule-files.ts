@@ -31,6 +31,23 @@ export type ScheduleFilesDeps = {
 
 export type ScheduleFiles = ReturnType<typeof createScheduleFiles>;
 
+/**
+ * Each schedule that starts at a time (`cron`) or stops at one (`stopAt`)
+ * and has no time zone, on the clock of `timeZone`. One on another clock
+ * keeps it.
+ */
+export function withTimeZone(
+	schedules: readonly Schedule[],
+	timeZone: string,
+): Schedule[] {
+	return schedules.map((schedule) =>
+		schedule.timeZone === undefined &&
+		(schedule.cron !== undefined || schedule.stopAt !== undefined)
+			? { ...schedule, timeZone }
+			: schedule,
+	);
+}
+
 export function createScheduleFiles(deps: ScheduleFilesDeps) {
 	const { scheduler } = deps;
 
@@ -70,12 +87,17 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 			};
 		},
 
-		/** Saves the project's schedules, with the Person of each schedule on another Person's Device. */
+		/**
+		 * Saves the project's schedules, with the Person of each schedule on
+		 * another Person's Device. `timeZone` is the saver's clock: each
+		 * schedule with a time and no time zone of its own gets it.
+		 */
 		async save(
 			spaceId: string,
 			projectId: string,
 			actor: Actor | undefined,
 			schedules: readonly Schedule[],
+			timeZone?: string,
 		) {
 			const project = {
 				id: projectId,
@@ -83,7 +105,12 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 			};
 			return deps.flows.saveSchedules(
 				projectId,
-				await deps.schedulesWithOffers(project, spaceId, actor, schedules),
+				await deps.schedulesWithOffers(
+					project,
+					spaceId,
+					actor,
+					timeZone ? withTimeZone(schedules, timeZone) : schedules,
+				),
 			);
 		},
 	};
