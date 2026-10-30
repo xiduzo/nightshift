@@ -246,8 +246,11 @@ export type NightOutput = {
 	night: number;
 	runs: number;
 	cost: KnownCost;
-	/** Its newest runs. */
-	latest: DashboardRun[];
+	/**
+	 * Its newest runs, whole, so they show like any run list. `group` is its
+	 * flow or its project, as on a DashboardRun.
+	 */
+	latest: (RunSummary & { group: string })[];
 };
 
 /** A run's next moment on its own: a wake-up or a stop time. */

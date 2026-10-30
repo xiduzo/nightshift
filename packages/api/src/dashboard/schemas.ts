@@ -221,7 +221,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				night: z.number(),
 				runs: z.number(),
 				cost: knownCostSchema,
-				latest: z.array(dashboardRunSchema),
+				latest: z.array(runSummarySchema.extend({ group: z.string() })),
 			})
 			.nullable(),
 		upNext: z.array(

@@ -282,7 +282,7 @@ function lastNightOf(runs: readonly PlacedRun[]): NightOutput | null {
 		cost: sumKnownCost(ofNight.map(({ run }) => run)),
 		latest: ofNight
 			.slice(0, OVERVIEW_ROWS)
-			.map(({ run, group }) => toDashboardRun(run, group)),
+			.map(({ run, group }) => ({ ...run, group })),
 	};
 }
 
