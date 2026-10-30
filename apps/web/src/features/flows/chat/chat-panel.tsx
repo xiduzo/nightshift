@@ -57,6 +57,7 @@ import type { RunStatus, StepSummary } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { type LinkView, Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
+import { UsageContext } from "@/shared/usage";
 import { AgentMenus } from "../assistant/agent-picker";
 import { PromptInput } from "../assistant/prompt-input";
 import { Suggestions } from "../assistant/suggestions";
@@ -368,7 +369,7 @@ function AgentAnswer({
 	onApply,
 	onDiscard,
 }: Props & { message: AgentMessage; answering: boolean }) {
-	const cost = message.usage?.costUsd;
+	const usage = message.usage;
 	return (
 		<Message>
 			<MessageContent>
@@ -402,11 +403,7 @@ function AgentAnswer({
 						You stopped the answer.
 					</p>
 				) : null}
-				{cost !== undefined && !answering ? (
-					<MessageFooter className="px-0 font-normal">
-						<span title="What this answer cost">{formatCost(cost)}</span>
-					</MessageFooter>
-				) : null}
+				{usage && !answering ? <AnswerUsage usage={usage} /> : null}
 			</MessageContent>
 		</Message>
 	);
@@ -435,6 +432,22 @@ function AnswerText({ text, run }: { text: string; run: Props["run"] }) {
 		[run],
 	);
 	return <Markdown text={text} link={link} />;
+}
+
+/** Below an answer: the tokens it used, and what it cost. */
+function AnswerUsage({ usage }: { usage: NonNullable<AgentMessage["usage"]> }) {
+	const cost =
+		usage.costUsd !== undefined ? formatCost(usage.costUsd) : undefined;
+	const tokens = usage.inputTokens + usage.outputTokens > 0;
+	if (!tokens && cost === undefined) return null;
+	return (
+		<MessageFooter className="items-center gap-2 px-0 font-normal">
+			{tokens ? <UsageContext size="xs" usage={usage} cost={cost} /> : null}
+			{cost !== undefined ? (
+				<span title="What this answer cost">{cost}</span>
+			) : null}
+		</MessageFooter>
+	);
 }
 
 function ProposalMessage({
