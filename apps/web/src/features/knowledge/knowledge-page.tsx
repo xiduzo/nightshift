@@ -40,6 +40,7 @@ import type { Knowledge, KnowledgeFile } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, formatSize } from "@/shared/format";
 import { PageHeading, PageSection } from "@/shared/page";
+import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
 
 /** What each knowledge kit fills the folder from, for a person. */
@@ -110,6 +111,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 				/>
 			) : null}
 			<Syncs projectId={projectId} syncs={syncs} />
+			{files.length > 0 ? <KnowledgeSearch projectId={projectId} /> : null}
 			<PageSection
 				title="Files"
 				description={`${files.length} ${files.length === 1 ? "file" : "files"}. Agents get a list of them first, then search the files.`}
