@@ -39,7 +39,7 @@ export function checkVariables(scope: Scope, error: Report): void {
 	for (const variable of flow.variables ?? []) {
 		const name = variable.name;
 		if (seen.has(name)) {
-			error(`The variable "${name}" is declared more than once.`, {});
+			error(`The flow has the variable "${name}" more than once.`, {});
 			continue;
 		}
 		seen.add(name);
@@ -199,7 +199,7 @@ export function checkInputs(
 	for (const input of flow.inputs) {
 		const name = input.name;
 		if (seen.has(name)) {
-			error(`The input "${name}" is declared more than once.`, {});
+			error(`The flow has the input "${name}" more than once.`, {});
 			continue;
 		}
 		seen.add(name);
@@ -235,7 +235,7 @@ export function checkOutputs(scope: Scope, error: Report): void {
 	for (const output of scope.flow.outputs) {
 		const name = output.name;
 		if (seen.has(name)) {
-			error(`The output "${name}" is declared more than once.`, {});
+			error(`The flow has the output "${name}" more than once.`, {});
 			continue;
 		}
 		seen.add(name);

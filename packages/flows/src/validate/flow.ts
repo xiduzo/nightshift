@@ -86,9 +86,12 @@ function validateIn(
 	const reserved: readonly string[] = reservedNames;
 	for (const node of flow.nodes) {
 		if (nodes.has(node.id)) {
-			error(`Node id "${node.id}" is used more than once.`, {
-				nodeId: node.id,
-			});
+			error(
+				`Two nodes have the id "${node.id}". Give one of them another id.`,
+				{
+					nodeId: node.id,
+				},
+			);
 			continue;
 		}
 		nodes.set(node.id, node);
@@ -121,33 +124,42 @@ function validateIn(
 	checkVariables(scope, error);
 
 	if (!nodes.has(flow.start)) {
-		error(`Start node "${flow.start}" does not exist.`, {
-			nodeId: flow.start,
-		});
+		error(
+			`The start node "${flow.start}" does not exist. Choose another start node.`,
+			{
+				nodeId: flow.start,
+			},
+		);
 	}
 
 	// Edges.
 	const edgeIds = new Set<string>();
 	for (const edge of flow.edges) {
 		if (edgeIds.has(edge.id)) {
-			error(`Edge id "${edge.id}" is used more than once.`, {
-				edgeId: edge.id,
-			});
+			error(
+				`Two edges have the id "${edge.id}". Give one of them another id.`,
+				{
+					edgeId: edge.id,
+				},
+			);
 		}
 		edgeIds.add(edge.id);
 
 		const source = nodes.get(edge.from);
 		if (!source) {
-			error(`Edge "${edge.id}" leaves unknown node "${edge.from}".`, {
-				edgeId: edge.id,
-			});
+			error(
+				`Edge "${edge.id}" leaves "${edge.from}", but the flow has no node "${edge.from}".`,
+				{
+					edgeId: edge.id,
+				},
+			);
 		} else if (
 			source.type === "agent" &&
 			source.ask === "person" &&
 			edge.outcome === "needs-input"
 		) {
 			error(
-				`Edge "${edge.id}" leaves "${edge.from}" on "needs-input", but that agent asks a person when it needs input and takes no edge. Remove the edge, or let the agent end on needs-input.`,
+				`Edge "${edge.id}" leaves "${edge.from}" on "needs-input", but that agent asks a person when it needs input. Remove the edge, or let the agent end on needs-input.`,
 				{ edgeId: edge.id },
 			);
 		} else if (source.type === "end") {
@@ -162,9 +174,12 @@ function validateIn(
 			);
 		}
 		if (!nodes.has(edge.to)) {
-			error(`Edge "${edge.id}" goes to unknown node "${edge.to}".`, {
-				edgeId: edge.id,
-			});
+			error(
+				`Edge "${edge.id}" goes to "${edge.to}", but the flow has no node "${edge.to}".`,
+				{
+					edgeId: edge.id,
+				},
+			);
 		}
 	}
 
@@ -181,7 +196,7 @@ function validateIn(
 		const earlier = unbounded.get(key);
 		if (earlier !== undefined) {
 			warning(
-				`Edge "${edge.id}" is never taken: edge "${earlier}" leaves "${edge.from}" on "${edge.outcome}" first and has no max.`,
+				`The run never takes edge "${edge.id}": edge "${earlier}" leaves "${edge.from}" on "${edge.outcome}" first and has no max.`,
 				{ edgeId: edge.id },
 			);
 		} else if (edge.max === undefined) {

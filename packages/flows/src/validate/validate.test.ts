@@ -964,11 +964,11 @@ describe("validateFlow: decisions and gates", () => {
 		).toEqual([
 			[
 				"decide",
-				'Decision node "decide" is decided by a model. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.',
+				'A model decides Decision node "decide". Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.',
 			],
 			[
 				"pick",
-				'Decision node "pick" is decided by a rule. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.',
+				'A rule decides Decision node "pick". Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.',
 			],
 		]);
 	});
@@ -995,11 +995,11 @@ describe("validateFlow: decisions and gates", () => {
 		).toEqual([
 			[
 				"one",
-				'Decision node "one" can be answered from the lock screen, but it has 1 option. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or turn off "Can be answered from the lock screen".',
+				'You can answer Decision node "one" from the lock screen, but it has 1 option. The lock screen shows only Approve and Reject, for the first and the second option. Give it two options, or turn off "Can be answered from the lock screen".',
 			],
 			[
 				"three",
-				'Decision node "three" can be answered from the lock screen, but it has 3 options. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or turn off "Can be answered from the lock screen".',
+				'You can answer Decision node "three" from the lock screen, but it has 3 options. The lock screen shows only Approve and Reject, for the first and the second option. Give it two options, or turn off "Can be answered from the lock screen".',
 			],
 		]);
 	});
@@ -1031,7 +1031,7 @@ describe("validateFlow: decisions and gates", () => {
 		);
 		expect(errors(defaultFirst)).toEqual([]);
 		expect(warnings(defaultFirst).map((issue) => issue.message)).toContain(
-			'Decision node "pick": the option "stop" has no rule, so it always matches. Put it last, or the options after it are never picked.',
+			'Decision node "pick": the option "stop" has no rule, so it always matches. Put it last, or the run never picks the options after it.',
 		);
 
 		// No default at all is fine: no match ends the step as error at run time.
@@ -1227,7 +1227,7 @@ describe("validateFlow: names and inputs", () => {
 			{ name: "epic", type: "json" },
 		]);
 		expect(errors(validateFlow(f)).map((issue) => issue.message)).toEqual([
-			'The input "epic" is declared more than once.',
+			'The flow has the input "epic" more than once.',
 		]);
 	});
 
@@ -1423,7 +1423,7 @@ describe("validateFlow: agent outcomes and output", () => {
 			{
 				severity: "error",
 				message:
-					'Edge "b" leaves "worker" on "needs-input", but that agent asks a person when it needs input and takes no edge. Remove the edge, or let the agent end on needs-input.',
+					'Edge "b" leaves "worker" on "needs-input", but that agent asks a person when it needs input. Remove the edge, or let the agent end on needs-input.',
 				edgeId: "b",
 			},
 		]);
@@ -1596,7 +1596,7 @@ describe("validateFlow: outputs", () => {
 				),
 			).map((issue) => issue.message),
 		).toEqual([
-			'The output "report" is declared more than once.',
+			'The flow has the output "report" more than once.',
 			expect.stringContaining('The output "Bad" is not a valid name'),
 			'The output "ended" clashes with a field every Subflow node has: outcome, ended, end_message, visit.',
 		]);
@@ -2552,7 +2552,7 @@ describe("validateFlow: variables", () => {
 		};
 		const found = messages(f);
 		expect(found).toContain(
-			'error: The variable "failures" is declared more than once.',
+			'error: The flow has the variable "failures" more than once.',
 		);
 		expect(found).toContain(
 			'error: The variable name "vars" is reserved. Pick another name.',

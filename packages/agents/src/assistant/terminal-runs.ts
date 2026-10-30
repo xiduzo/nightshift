@@ -486,7 +486,7 @@ export function terminalRunTools(
 				choice: choice.name,
 				...(words !== null ? { note: words } : {}),
 			});
-			return `Answered "${choice.name}" to the Gate of "${gate.runTitle}". The run goes on. Follow it at ${port.runLink(gate.runId, gate.stepId)}`;
+			return `Answered "${choice.name}" to the Gate of "${gate.runTitle}". The run continues. Follow it at ${port.runLink(gate.runId, gate.stepId)}`;
 		}),
 		toolDefinition({
 			name: RUN_TOOLS.getDigest,
