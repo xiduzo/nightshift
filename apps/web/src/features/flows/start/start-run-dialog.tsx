@@ -364,8 +364,7 @@ function StartRunForm({
 						onChange={setBaseRef}
 					/>
 					<FieldDescription id={`${id}-base-hint`}>
-						The branch, tag or commit the run starts from, for example the top
-						of an open stack. Leave it empty to use your current branch.
+						A branch, tag or commit, for example the top of an open stack.
 					</FieldDescription>
 				</Field>
 
@@ -388,7 +387,7 @@ function StartRunForm({
 							className={stopInvalid ? "text-destructive" : undefined}
 						>
 							{!stop.on ? (
-								"No stop time. The run goes until the flow ends."
+								"The run goes until the flow ends."
 							) : stopAt === null ? (
 								"Enter a time, for example 07:00."
 							) : (
@@ -400,8 +399,8 @@ function StartRunForm({
 									>
 										{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
 									</time>{" "}
-									(in {waitedText(stopAt - now)}). No new step starts after that
-									time, and the run stops.
+									(in {waitedText(stopAt - now)}). No new step starts after
+									that.
 								</>
 							)}
 						</FieldDescription>

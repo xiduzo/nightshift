@@ -158,8 +158,8 @@ export function ProposalCard({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Apply over your new changes?</AlertDialogTitle>
 						<AlertDialogDescription>
-							You changed the flow after you sent the message. The proposed
-							change does not include those changes. Apply replaces them.
+							You changed the flow after you sent the message. Apply replaces
+							those changes.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

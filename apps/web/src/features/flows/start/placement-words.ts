@@ -15,5 +15,5 @@ export function placementDescription(
 	if (device?.offers !== undefined) {
 		return "Another person's device. The run can use only the profiles it offers to this Space.";
 	}
-	return "Where the steps run: your devices that are online and have this project, and devices other people offer to this Space.";
+	return "Pick one of your online devices with this project, or a device that others offer to this Space.";
 }
