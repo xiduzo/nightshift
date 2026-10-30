@@ -62,7 +62,7 @@ import { GateDetail } from "./gate-detail";
 import { groupByProject } from "./group-gates";
 
 /**
- * The Needs-you inbox, laid out like the Agents page: open Gates on the left,
+ * The Needs-you inbox: a list and a detail. Open Gates on the left,
  * grouped by project and oldest first, and the selected Gate on the right.
  * It holds the Gates of every Space you are in; each project group shows
  * its Space. Sleeping runs (of the Space you work in) sit below the Gates.

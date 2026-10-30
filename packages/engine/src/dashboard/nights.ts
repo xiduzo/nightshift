@@ -1,8 +1,15 @@
 import type { RunSummary } from "../read";
 import { lastNights, nightOf } from "./clock";
-import { countStatuses, spreadOf, toDashboardRun, topRows } from "./stats";
+import {
+	countStatuses,
+	hasEnded,
+	spreadOf,
+	toDashboardRun,
+	topRows,
+} from "./stats";
 import {
 	type AskedGate,
+	type FailedRun,
 	type GateState,
 	type GatesGroup,
 	type GatesRange,
@@ -89,11 +96,17 @@ function perNight<T extends { night: number }>(
 
 /** Spend per night, stacked by group, the dearest runs and the totals. */
 function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
-	const byLabel = new Map<string, { runs: number; total: number }>();
+	const byLabel = new Map<
+		string,
+		{ runs: number; total: number; unfinished: number }
+	>();
 	for (const { run, group } of inRange) {
-		const totals = byLabel.get(group) ?? { runs: 0, total: 0 };
+		const totals = byLabel.get(group) ?? { runs: 0, total: 0, unfinished: 0 };
 		totals.runs += 1;
 		totals.total += run.costUsd;
+		if (hasEnded(run) && run.status !== "finished") {
+			totals.unfinished += run.costUsd;
+		}
 		byLabel.set(group, totals);
 	}
 	const ranked = [...byLabel.entries()].sort((a, b) => b[1].total - a[1].total);
@@ -110,6 +123,7 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 			label: `${rest.length} more`,
 			runs: rest.reduce((sum, [, totals]) => sum + totals.runs, 0),
 			total: rest.reduce((sum, [, totals]) => sum + totals.total, 0),
+			unfinished: rest.reduce((sum, [, totals]) => sum + totals.unfinished, 0),
 		});
 	}
 	const keyOf = new Map(
@@ -159,7 +173,22 @@ function runsOf(nights: readonly number[], inRange: PlacedRun[]): RunsRange {
 	const failed = inRange
 		.filter(({ run }) => run.status === "failed")
 		.sort((a, b) => b.run.createdAt - a.run.createdAt)
-		.map(({ run, group }) => toDashboardRun(run, group));
+		.map(({ run, group }): FailedRun => {
+			const later = (byGroup.get(group) ?? [])
+				.filter((other) => other.createdAt > run.createdAt)
+				.sort((a, b) => b.createdAt - a.createdAt);
+			const last = later[0];
+			return {
+				...toDashboardRun(run, group),
+				after: {
+					runs: later.length,
+					finished: later.filter((other) => other.status === "finished").length,
+					last: last
+						? { status: last.status, createdAt: last.createdAt }
+						: null,
+				},
+			};
+		});
 	return {
 		runs: inRange.length,
 		ended: ended.length,
@@ -199,6 +228,9 @@ function gatesOf(nights: readonly number[], asked: PlacedGate[]): GatesRange {
 				answered: answeredOfGroup.length,
 				unanswered: ofGroup.filter((gate) => gate.state === "unanswered")
 					.length,
+				waiting: ofGroup.filter((gate) => gate.state === "waiting").length,
+				runs: new Set(ofGroup.map((gate) => gate.runId)).size,
+				lastAskedAt: Math.max(...ofGroup.map((gate) => gate.openedAt)),
 				typical: spreadOf(waitsOf(answeredOfGroup))?.median ?? null,
 				longest: spreadOf(waitsOf(ofGroup))?.max ?? null,
 			};

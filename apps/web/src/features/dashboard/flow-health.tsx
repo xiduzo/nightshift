@@ -5,8 +5,15 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+	type Machine,
+	MachineBadge,
+	neededMachines,
+	useSpaceMachines,
+} from "@/features/devices";
 import { RunStatusIcon } from "@/features/runs";
 import type { FlowHealthRow, Project, Spread } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
@@ -17,12 +24,14 @@ import {
 	useNow,
 } from "@/shared/format";
 import { FlowHealthDialog } from "./flow-health-dialog";
+import { projectFlowsQuery } from "./queries";
 
 /**
  * Each flow over the page's range: the status of its last runs, its runs
  * and how many finished, and what a finished run costs. A stopped run did
  * not finish, so it counts against it. A flow a Subflow node ran counts
- * too, inside the run that called it. A row opens the details of its flow.
+ * too, inside the run that called it. Under its name: the computers its
+ * steps need. A row opens the details of its flow.
  */
 export function FlowHealthTable({
 	project,
@@ -36,6 +45,17 @@ export function FlowHealthTable({
 	// The name stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ name: string; open: boolean }>();
 	const open = (name: string) => setDetails({ name, open: true });
+	const flows = useQuery(projectFlowsQuery(project.id));
+	const machines = useSpaceMachines();
+	// The run's own computer is the one you start it on: only what the flow names.
+	const needs = useMemo(() => {
+		const out = new Map<string, Machine[]>();
+		if (!machines) return out;
+		for (const flow of flows.data ?? []) {
+			out.set(flow.name, neededMachines(machines, null, flow.devices));
+		}
+		return out;
+	}, [flows.data, machines]);
 
 	return (
 		<>
@@ -47,7 +67,7 @@ export function FlowHealthTable({
 			) : (
 				<DataTable
 					// The busiest flows, then the one that ran last.
-					columns={flowHealthColumns(now, open)}
+					columns={flowHealthColumns(now, open, needs)}
 					data={rows}
 					getRowId={(row) => row.name}
 					onRowClick={(row) => open(row.name)}
@@ -67,19 +87,26 @@ export function FlowHealthTable({
 
 const column = dataTableColumns<FlowHealthRow>();
 
-function flowHealthColumns(now: number, onOpen: (name: string) => void) {
+function flowHealthColumns(
+	now: number,
+	onOpen: (name: string) => void,
+	needs: ReadonlyMap<string, Machine[]>,
+) {
 	return column.columns([
 		column.accessor("name", {
 			header: "Flow",
-			cell: ({ row }) => (
-				<Button
-					variant="link"
-					size="xs"
-					className="h-auto px-0 font-mono"
-					onClick={() => onOpen(row.original.name)}
-				>
-					{row.original.name}
-				</Button>
+			cell: ({ row: { original } }) => (
+				<div className="flex flex-col items-start gap-1">
+					<Button
+						variant="link"
+						size="xs"
+						className="h-auto px-0 font-mono"
+						onClick={() => onOpen(original.name)}
+					>
+						{original.name}
+					</Button>
+					<Needs machines={needs.get(original.name) ?? []} />
+				</div>
 			),
 			meta: { headClassName: "pl-6", cellClassName: "pl-6" },
 		}),
@@ -115,6 +142,23 @@ function flowHealthColumns(now: number, onOpen: (name: string) => void) {
 			},
 		}),
 	]);
+}
+
+/** The computers the steps of a flow run on. Nothing when it names none. */
+function Needs({ machines }: { machines: Machine[] }) {
+	if (machines.length === 0) return null;
+	return (
+		<div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs">
+			<span>Needs</span>
+			{machines.map((machine) => (
+				<MachineBadge
+					key={machine.name}
+					machine={machine}
+					label="Steps of this flow run here."
+				/>
+			))}
+		</div>
+	);
 }
 
 /** The status of the last runs, newest first, and when the last one started. */
@@ -174,7 +218,7 @@ const PLOT_WIDTH = 96;
 const PLOT_HEIGHT = 14;
 
 /**
- * The median cost of a finished run, with a box plot of the spread: the
+ * A box plot of what a finished run costs, with the median under it: the
  * whiskers reach the cheapest and the dearest run, the box holds the middle
  * half. Each plot runs from zero to the dearest run of its own flow: some
  * flows cost far more than others, and one shared scale would squash the
@@ -240,7 +284,7 @@ function CostCell({
 	return (
 		<Tooltip>
 			<TooltipTrigger
-				render={<span className="inline-flex items-center justify-end gap-3" />}
+				render={<span className="inline-flex flex-col items-end gap-1" />}
 			>
 				<svg
 					width={PLOT_WIDTH}
@@ -286,7 +330,9 @@ function CostCell({
 						strokeWidth={2}
 					/>
 				</svg>
-				<span className="w-14">{formatCost(cost.median)}</span>
+				<span className="text-muted-foreground text-xs">
+					{formatCost(cost.median)}
+				</span>
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
 				<span>A finished run typically costs {formatCost(cost.median)}.</span>

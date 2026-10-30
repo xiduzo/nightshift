@@ -123,7 +123,7 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 					cannot
 						? "This decider cannot make a value. Choose one that can."
 						: keyMissing && decider?.apiKey
-							? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot ${makes === "value" ? "make a value" : "decide"}.`
+							? `Add the secret ${decider.apiKey} on the Secrets page, or this node cannot ${makes === "value" ? "make a value" : "decide"}.`
 							: null
 				}
 				hint={

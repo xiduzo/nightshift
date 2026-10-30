@@ -143,6 +143,8 @@ export type SpendGroup = {
 	label: string;
 	runs: number;
 	total: number;
+	/** What its runs that ended without finishing spent: part of `total`. */
+	unfinished: number;
 };
 
 export type SpendRange = {
@@ -159,6 +161,17 @@ export type SpendRange = {
 	perNight: NightCounts[];
 	/** The runs that cost the most, the dearest first. */
 	priciest: DashboardRun[];
+};
+
+/** A failed run, and how its flow or project did after it. */
+export type FailedRun = DashboardRun & {
+	/** The later runs of the same flow or project, in the range. */
+	after: {
+		runs: number;
+		finished: number;
+		/** The newest of them. Null when none started. */
+		last: { status: RunStatus; createdAt: number } | null;
+	};
 };
 
 /** How the runs of one flow or project went in a range. */
@@ -183,7 +196,7 @@ export type RunsRange = {
 	/** The most runs first. */
 	groups: TopRows<RunsGroup>;
 	/** The failed runs, newest first. */
-	failed: TopRows<DashboardRun>;
+	failed: TopRows<FailedRun>;
 };
 
 /** How an asked Gate stands. */
@@ -208,6 +221,12 @@ export type GatesGroup = {
 	asked: number;
 	answered: number;
 	unanswered: number;
+	/** The Gates that wait for an answer now. */
+	waiting: number;
+	/** The runs that asked them. */
+	runs: number;
+	/** When the newest of them opened. */
+	lastAskedAt: number;
 	/** The median wait of the answered Gates. */
 	typical: number | null;
 	/** The longest wait, the open Gates too. */

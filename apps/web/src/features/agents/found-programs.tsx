@@ -1,20 +1,15 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Item,
 	ItemActions,
 	ItemContent,
 	ItemDescription,
-	ItemGroup,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon, SearchCheckIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import type { FoundProgram } from "@/shared/api";
 import type { Selection } from "./agents-selection";
@@ -28,14 +23,17 @@ import {
 
 /**
  * The agent CLIs and the kits' tools that this computer has and that are
- * not set up yet, with one action each. Nothing when there are none.
+ * not set up yet, split by the list they join: agent CLIs under Harnesses,
+ * tools under Tools. `row` draws one, with its Set up action.
  */
-export function FoundPrograms({
-	onSetUp,
-}: {
+export function useFoundPrograms(
 	/** Shows what the action made: the profile or the tool. */
-	onSetUp: (selection: Selection) => void;
-}) {
+	onSetUp: (selection: Selection) => void,
+): {
+	agents: FoundProgram[];
+	tools: FoundProgram[];
+	row: (program: FoundProgram) => ReactNode;
+} {
 	const queryClient = useQueryClient();
 	const found = useQuery(programQueries.found());
 	const setUp = useMutation(
@@ -62,35 +60,24 @@ export function FoundPrograms({
 	);
 
 	const programs = found.data ?? [];
-	if (programs.length === 0) return null;
-
-	return (
-		<div className="mx-auto w-full max-w-6xl px-4 pt-8 md:px-8">
-			<Alert>
-				<SearchCheckIcon />
-				<AlertTitle>Found on this computer</AlertTitle>
-				<AlertDescription>
-					<p>Set these up, and your flows can use them.</p>
-					<ItemGroup className="mt-2 w-full gap-2">
-						{programs.map((program) => (
-							<FoundItem
-								key={program.program}
-								program={program}
-								pending={
-									setUp.isPending &&
-									setUp.variables?.program === program.program
-								}
-								disabled={setUp.isPending}
-								onSetUp={() => setUp.mutate({ program: program.program })}
-							/>
-						))}
-					</ItemGroup>
-				</AlertDescription>
-			</Alert>
-		</div>
-	);
+	return {
+		agents: programs.filter((program) => program.kind === "agent"),
+		tools: programs.filter((program) => program.kind !== "agent"),
+		row: (program) => (
+			<FoundItem
+				key={program.program}
+				program={program}
+				pending={
+					setUp.isPending && setUp.variables?.program === program.program
+				}
+				disabled={setUp.isPending}
+				onSetUp={() => setUp.mutate({ program: program.program })}
+			/>
+		),
+	};
 }
 
+/** A program that is here but not used yet: a dashed row with one action. */
 function FoundItem({
 	program,
 	pending,
@@ -103,11 +90,13 @@ function FoundItem({
 	onSetUp: () => void;
 }) {
 	return (
-		<Item variant="outline" size="sm">
+		<Item variant="outline" size="sm" className="border-dashed">
 			<ItemContent>
-				<ItemTitle>{program.label}</ItemTitle>
-				<ItemDescription className="font-mono text-xs">
-					{program.program}
+				<ItemTitle className="text-muted-foreground">{program.label}</ItemTitle>
+				<ItemDescription>
+					{program.kind === "agent"
+						? "On this computer, no profile uses it yet"
+						: "On this computer, not added yet"}
 				</ItemDescription>
 			</ItemContent>
 			<ItemActions>

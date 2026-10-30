@@ -5,7 +5,7 @@ import { AgentsPage } from "@/features/agents";
 export const Route = createFileRoute("/agents")({
 	// The checks run CLIs on the daemon; nothing to render on the server.
 	ssr: false,
-	/** `item`: what the detail pane shows, for example `harness:claude-code`. */
+	/** `item`: what opens in detail, for example `harness:claude-code`. None: the overview. */
 	validateSearch: (search: Record<string, unknown>): { item?: string } =>
 		typeof search.item === "string" ? { item: search.item } : {},
 	component: AgentsRoute,

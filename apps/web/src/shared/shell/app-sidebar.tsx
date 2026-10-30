@@ -40,6 +40,7 @@ import {
 	HistoryIcon,
 	HouseIcon,
 	InboxIcon,
+	KeyRoundIcon,
 	type LucideIcon,
 	MonitorIcon,
 	MonitorSmartphoneIcon,
@@ -155,7 +156,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 					</SidebarMenu>
 				</SidebarGroup>
 				<NavProjects projects={projects.data} />
-				{/* Saved on this computer only: its agents and its settings. */}
+				{/* Saved on this computer only: its agents, secrets and settings. */}
 				<SidebarGroup className="mt-auto">
 					<ThisDeviceLabel />
 					<SidebarMenu>
@@ -167,6 +168,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 							>
 								<BotIcon aria-hidden="true" />
 								<span>Agents</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Secrets"
+								isActive={Boolean(matchRoute({ to: "/secrets" }))}
+								render={<Link to="/secrets" />}
+							>
+								<KeyRoundIcon aria-hidden="true" />
+								<span>Secrets</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 						<SidebarMenuItem>

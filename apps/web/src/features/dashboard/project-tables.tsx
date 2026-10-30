@@ -2,14 +2,6 @@ import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
-import {
 	Tabs,
 	TabsContent,
 	TabsList,
@@ -17,10 +9,12 @@ import {
 } from "@nightshift/ui/components/tabs";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import type { NightsRange, Project } from "@/shared/api";
-import { formatCost, formatDateTime, formatDuration } from "@/shared/format";
+import { FailuresTable } from "./failures-table";
 import { FlowHealthTable } from "./flow-health";
+import { GatesTable } from "./gates-table";
+import { SpendTable } from "./spend-table";
 
 type Tab = "flows" | "failures" | "gates" | "spend";
 
@@ -66,53 +60,17 @@ export function ProjectTables({
 					</TabsContent>
 
 					<TabsContent value="failures">
-						<SimpleTable
-							head={["Run", "Why it failed", "Started"]}
-							empty={`No run failed in the last ${range?.nights ?? ""} nights.`}
-							rows={(failed?.rows ?? []).map((run) => [
-								<Link
-									key="title"
-									to="/runs/$runId"
-									params={{ runId: run.id }}
-									className="font-medium hover:underline"
-								>
-									{run.title}
-								</Link>,
-								<span
-									key="reason"
-									className="line-clamp-2 text-muted-foreground text-xs"
-								>
-									{run.reason ?? "No reason given"}
-								</span>,
-								formatDateTime(run.createdAt),
-							])}
-						/>
+						{range ? (
+							<FailuresTable failed={range.runs.failed} nights={range.nights} />
+						) : null}
 					</TabsContent>
 
 					<TabsContent value="gates">
-						<SimpleTable
-							head={["Flow", "Asked", "Answered", "Typical wait", "Longest"]}
-							empty="No flow asked you anything in this range."
-							rows={(range?.gates.groups.rows ?? []).map((group) => [
-								group.label,
-								group.asked,
-								group.answered,
-								group.typical === null ? "—" : formatDuration(group.typical),
-								group.longest === null ? "—" : formatDuration(group.longest),
-							])}
-						/>
+						{range ? <GatesTable groups={range.gates.groups} /> : null}
 					</TabsContent>
 
 					<TabsContent value="spend">
-						<SimpleTable
-							head={["Flow", "Runs", "Spend"]}
-							empty="Nothing spent in this range."
-							rows={(range?.spend.groups ?? []).map((group) => [
-								group.label,
-								group.runs,
-								formatCost(group.total),
-							])}
-						/>
+						{range ? <SpendTable spend={range.spend} /> : null}
 					</TabsContent>
 				</Tabs>
 			</CardContent>
@@ -143,62 +101,5 @@ function TabLink({ tab, projectId }: { tab: Tab; projectId: string }) {
 			{link.label}
 			<ArrowRightIcon data-icon="inline-end" />
 		</Button>
-	);
-}
-
-/** A small table: the first column leads, the others are numbers. */
-function SimpleTable({
-	head,
-	rows,
-	empty,
-}: {
-	head: string[];
-	rows: ReactNode[][];
-	empty: string;
-}) {
-	return (
-		<Table>
-			<TableHeader>
-				<TableRow>
-					{head.map((label, index) => (
-						<TableHead
-							key={label}
-							className={index === 0 ? "pl-6" : "text-right last:pr-6"}
-						>
-							{label}
-						</TableHead>
-					))}
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{rows.length === 0 ? (
-					<TableRow>
-						<TableCell
-							colSpan={head.length}
-							className="py-6 text-center text-muted-foreground"
-						>
-							{empty}
-						</TableCell>
-					</TableRow>
-				) : (
-					rows.map((cells, row) => (
-						<TableRow key={row}>
-							{cells.map((cell, index) => (
-								<TableCell
-									key={index}
-									className={
-										index === 0
-											? "max-w-md pl-6"
-											: "text-right tabular-nums last:pr-6"
-									}
-								>
-									{cell}
-								</TableCell>
-							))}
-						</TableRow>
-					))
-				)}
-			</TableBody>
-		</Table>
 	);
 }

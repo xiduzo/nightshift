@@ -288,11 +288,11 @@ describe("spend over a night range", () => {
 		);
 		const spend = nightsOf(summarize(runs), 7).spend;
 		expect(spend.groups).toEqual([
-			{ key: "g0", label: "a", runs: 2, total: 7 },
-			{ key: "g1", label: "b", runs: 1, total: 5 },
-			{ key: "g2", label: "c", runs: 1, total: 4 },
-			{ key: "g3", label: "d", runs: 1, total: 3 },
-			{ key: "other", label: "2 more", runs: 2, total: 3 },
+			{ key: "g0", label: "a", runs: 2, total: 7, unfinished: 0 },
+			{ key: "g1", label: "b", runs: 1, total: 5, unfinished: 0 },
+			{ key: "g2", label: "c", runs: 1, total: 4, unfinished: 0 },
+			{ key: "g3", label: "d", runs: 1, total: 3, unfinished: 0 },
+			{ key: "other", label: "2 more", runs: 2, total: 3, unfinished: 0 },
 		]);
 		expect(spend.total).toBe(22);
 		expect(spend.runs).toBe(7);
@@ -316,6 +316,19 @@ describe("spend over a night range", () => {
 		).spend;
 		expect(spend.unknown).toBe(1);
 		expect(spend.total).toBe(1);
+	});
+
+	test("tells what the runs that did not finish spent", () => {
+		const spend = nightsOf(
+			summarize([
+				aRun({ status: "finished", costUsd: 4 }),
+				aRun({ status: "failed", costUsd: 2 }),
+				aRun({ status: "stopped", costUsd: 1 }),
+				aRun({ status: "running", costUsd: 8 }),
+			]),
+			7,
+		).spend;
+		expect(spend.groups[0]).toMatchObject({ total: 15, unfinished: 3 });
 	});
 
 	test("over all projects, groups by project, and a run of a removed project by itself", () => {
@@ -432,6 +445,40 @@ describe("runs over a night range", () => {
 		expect(range.failed.count).toBe(2);
 		expect(range.failed.rows[0]?.id).toBe("newest-failure");
 	});
+
+	test("tell how the flow did after each failure", () => {
+		const range = nightsOf(
+			summarize([
+				aRun({
+					id: "early",
+					flowName: "night",
+					status: "failed",
+					createdAt: NOW - 3 * HOUR,
+				}),
+				aRun({
+					flowName: "night",
+					status: "failed",
+					createdAt: NOW - 2 * HOUR,
+				}),
+				aRun({ flowName: "night", status: "finished", createdAt: NOW - HOUR }),
+				aRun({ flowName: "fix", status: "finished", createdAt: NOW }),
+			]),
+			7,
+		).runs;
+		expect(range.failed.rows.map((run) => run.after)).toEqual([
+			{
+				runs: 1,
+				finished: 1,
+				last: { status: "finished", createdAt: NOW - HOUR },
+			},
+			{
+				runs: 2,
+				finished: 1,
+				last: { status: "finished", createdAt: NOW - HOUR },
+			},
+		]);
+		expect(range.failed.rows[1]?.id).toBe("early");
+	});
 });
 
 describe("the totals of a night range", () => {
@@ -544,6 +591,7 @@ describe("Gates over a night range", () => {
 			typical: (HOUR + 60_000) / 2,
 			longest: HOUR,
 		});
+		expect(range.groups.rows[1]).toMatchObject({ label: "fix", waiting: 1 });
 	});
 });
 

@@ -31,11 +31,11 @@ function hasSecretValue(secret: SecretView | undefined): boolean {
 
 /** What the editor says about a secret this computer has no value for. */
 function missingSecretMessage(name: string): string {
-	return `The secret ${name} is not saved on this computer. The step stops before the command runs. Save it under Agents → Secrets, or remove it here.`;
+	return `The secret ${name} is not saved on this computer. The step stops before the command runs. Save it on the Secrets page, or remove it here.`;
 }
 
 /**
- * The secrets a Command node reads: names from Agents → Secrets. A
+ * The secrets a Command node reads: names from the Secrets page. A
  * multiple Combobox with a chip per name; a name without a value on this
  * computer stays as a destructive chip, so it can be removed.
  */
@@ -73,11 +73,10 @@ export function SecretsField({
 			<Note>
 				There are no secrets yet.{" "}
 				<Link
-					to="/agents"
-					search={{ item: undefined }}
+					to="/secrets"
 					className="text-foreground underline underline-offset-4 hover:text-primary"
 				>
-					Add one under Agents → Secrets
+					Add one under Secrets
 				</Link>
 				, then pick it here.
 			</Note>

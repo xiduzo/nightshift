@@ -292,7 +292,7 @@ async function decideOnce(
 	if (spec.apiKey && !key) {
 		return failed(
 			"harness",
-			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Agents page.`,
+			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Secrets page.`,
 		);
 	}
 	const result = await decide({
@@ -342,7 +342,7 @@ async function valueOnce(
 	if (spec.apiKey && !key) {
 		return valueFailed(
 			"harness",
-			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Agents page.`,
+			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Secrets page.`,
 		);
 	}
 	const abortController = new AbortController();
