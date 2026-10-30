@@ -3,7 +3,7 @@
 The web app is built from [shadcn/ui](https://ui.shadcn.com/docs/components)
 components and [blocks](https://ui.shadcn.com/blocks), and almost nothing else.
 This page lists every component and block, what it is for, and where Night
-Shift uses it. The rule itself is in `AGENTS.md`.
+Shift uses it. The rule is in `AGENTS.md`.
 
 ## Setup
 
@@ -14,7 +14,7 @@ Shift uses it. The rule itself is in `AGENTS.md`.
 - **Where things go:** components install into `packages/ui/src/components`
   and are imported as `@nightshift/ui/components/<name>`. Hooks go in
   `packages/ui/src/hooks`. Theme tokens live in
-  `packages/ui/src/styles/globals.css`; the app's own tokens (status and
+  `packages/ui/src/styles/globals.css`. The app's own tokens (status and
   outcome colors) live in `apps/web/src/index.css`.
 - **Adding a component:** run the CLI from `apps/web`. It reads both
   `components.json` files and writes to `packages/ui`:
@@ -45,13 +45,13 @@ CLI when you need them.
 
 | Component | What it is for |
 | --- | --- |
-| ✓ [Field](https://ui.shadcn.com/docs/components/field) | Wraps any control with a label, description and error. `FieldSet`, `FieldLegend` and `FieldGroup` group fields; `orientation="horizontal"` for a switch or checkbox row. Use it for every form field. |
+| ✓ [Field](https://ui.shadcn.com/docs/components/field) | Wraps any control with a label, description and error. `FieldSet`, `FieldLegend` and `FieldGroup` group fields. Use `orientation="horizontal"` for a switch or checkbox row. Use it for every form field. |
 | ✓ [Button](https://ui.shadcn.com/docs/components/button) | Actions. Variants: `default`, `secondary`, `outline`, `ghost`, `destructive`, `link`. Sizes include `sm`, `xs`, `lg`, `icon`, `icon-sm`. Use `render={<Link />}` for a link that looks like a button. |
 | ✓ [Button Group](https://ui.shadcn.com/docs/components/button-group) | Joins related buttons (split buttons, prev/next, a button with a dropdown). |
 | ✓ [Input](https://ui.shadcn.com/docs/components/input) | One-line text. |
 | ✓ [Input Group](https://ui.shadcn.com/docs/components/input-group) | An input or textarea with addons inside the border: an icon, a prefix, a button, a counter. |
 | ✓ [Input OTP](https://ui.shadcn.com/docs/components/input-otp) | One-time codes, one box per digit: the two-factor code at sign-in and in its setup (`features/access/code-input.tsx`). |
-| ✓ [Textarea](https://ui.shadcn.com/docs/components/textarea) | Multi-line text: prompts, notes, JSON. `CodeTextarea` (`shared/code`) lays Shiki highlighting and `{{template}}` marks behind it, for commands and prompts. A field without a set language guesses one (`guessLanguage`). Every multi-line field opens in a larger Dialog from a button in its corner: `LargerTextarea` (`shared/larger-window`), or its parts in a template field, which adds a picker for the language. |
+| ✓ [Textarea](https://ui.shadcn.com/docs/components/textarea) | Multi-line text: prompts, notes, JSON. `CodeTextarea` (`shared/code`) puts Shiki highlighting and `{{template}}` marks behind it, for commands and prompts. A field without a set language guesses one (`guessLanguage`). A button in the corner of every multi-line field opens it in a larger Dialog: `LargerTextarea` (`shared/larger-window`). A template field uses its parts and adds a language picker. |
 | ✓ [Checkbox](https://ui.shadcn.com/docs/components/checkbox) | One on/off choice inside a form, or several from a list. |
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. As cards (`FieldLabel` around a horizontal `Field`): a profile's harness, a Gate's choices in the inbox. |
 | ✓ [Select](https://ui.shadcn.com/docs/components/select) | One choice from a list, in a styled popup. |
@@ -60,7 +60,7 @@ CLI when you need them.
 | [Slider](https://ui.shadcn.com/docs/components/slider) | A number in a range. |
 | [Calendar](https://ui.shadcn.com/docs/components/calendar) | Pick a date or range on a month grid. |
 | [Date Picker](https://ui.shadcn.com/docs/components/date-picker) | A button or input that opens a Calendar in a Popover. |
-| ✓ [Combobox](https://ui.shadcn.com/docs/components/combobox) | A searchable select, with single or multiple choice (chips). |
+| ✓ [Combobox](https://ui.shadcn.com/docs/components/combobox) | A searchable select, with one or more choices (chips). |
 | ✓ [Label](https://ui.shadcn.com/docs/components/label) | A label tied to a control. Inside a Field, use `FieldLabel`. |
 
 ### Layout and navigation
@@ -90,7 +90,7 @@ CLI when you need them.
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
-| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands; `CommandDialog` is a ⌘K palette. The list of variables a template field offers after `{{`. |
+| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. `CommandDialog` is a ⌘K palette. The list of variables a template field offers after `{{`. |
 
 ### Feedback and status
 
@@ -99,7 +99,7 @@ CLI when you need them.
 | ✓ [Alert](https://ui.shadcn.com/docs/components/alert) | A message in the page flow: a run failed, a run sleeps until a reset, a flow has errors. |
 | ✓ [Sonner](https://ui.shadcn.com/docs/components/sonner) | Toasts (`toast()` from `sonner`). `<Toaster />` sits in the root. Toast is the older name for the same thing. |
 | ✓ [Progress](https://ui.shadcn.com/docs/components/progress) | How far something is (items done of a Call with `each`, the night until stop time). |
-| ✓ [Spinner](https://ui.shadcn.com/docs/components/spinner) | Something is loading or running. Put it in a Button while it is pending. |
+| ✓ [Spinner](https://ui.shadcn.com/docs/components/spinner) | Something loads or runs. Put it in a Button while its action is pending. |
 | ✓ [Skeleton](https://ui.shadcn.com/docs/components/skeleton) | A placeholder in the shape of content that is still loading. |
 | ✓ [Badge](https://ui.shadcn.com/docs/components/badge) | A short status or tag (run status, outcome, node type). Variants: `default`, `secondary`, `outline`, `destructive`, `ghost`, `link`. |
 | ✓ [Empty](https://ui.shadcn.com/docs/components/empty) | A page or section with nothing in it yet, with what to do next. |
@@ -112,10 +112,10 @@ CLI when you need them.
 | ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow and schedule cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
 | ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
-| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (sidebar), a sparkline in every stat card on Home, the metrics chart of a project's page, and the history chart in each details dialog. Recharts keeps a 5px margin by default; set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars; give it a hidden `YAxis` with a domain of at least 1. |
+| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (sidebar), a sparkline in every stat card on Home, the metrics chart of a project's page, and the history chart in each details dialog. Recharts keeps a 5px margin by default. Set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars. Give it a hidden `YAxis` with a domain of at least 1. |
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
-| [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes; there is nothing to install. |
+| [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
 | ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. |
 | ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K). |
 
@@ -131,8 +131,8 @@ CLI when you need them.
 
 ### AI and chat (newer registry items)
 
-These are in the registry for the `base-*` styles. Some do not have docs pages
-yet; read the source with `shadcn view <name>`.
+These are in the registry for the `base-*` styles. Some have no docs page
+yet. Read the source with `shadcn view <name>`.
 
 | Component | What it is for |
 | --- | --- |
@@ -149,14 +149,14 @@ yet; read the source with `shadcn view <name>`.
 
 [AI Elements](https://ui.shadcn.com/docs/ai-elements) patterns are recipes,
 not packages: compose them from the components above. Use the Base UI pages
-(`/docs/ai-elements/base/<pattern>`). Map Night Shift's own data onto them; do
+(`/docs/ai-elements/base/<pattern>`). Map Night Shift's own data onto them. Do
 not add the AI SDK.
 
 | Pattern | What it is for |
 | --- | --- |
 | [Plan](https://ui.shadcn.com/docs/ai-elements/base/plan) | Steps known up front, each done, running or pending, the title counting the done ones. On `Trace`. The agent's to-do list in the step console (`features/runs/components/step-plan.tsx`, from `stepTodos` in `@nightshift/client`). |
 | [Queue](https://ui.shadcn.com/docs/ai-elements/base/queue) | A to-do list split into what remains and what is done. Not used: the step console shows the agent's list as a Plan, in the agent's own order. |
-| [File Tree](https://ui.shadcn.com/docs/ai-elements/base/file-tree) | Files in folders: a `Collapsible` per folder, a ghost `Button` per file. The files a step changed: its agent's edits, and every file the run's copy of the project shows changed (commands, formatters, lockfiles, a Command step's files), with a "By command" `Badge` on an Agent step's file no edit tool changed. Each opens a Sheet with its diff as `DiffLines` (`shared/code`): `CodeBlockLine` added and removed lines, added ones tinted green, a wrapped line hanging at its own indent, in Shiki colours of the file's extension. A file with the agent's edits and the whole diff shows both as `Tabs` ("All changes", "Each edit"). Quiet notes say when other steps ran at the same time or a diff is cut short (`features/runs/components/changed-files.tsx`, from `changedFiles` and `fileTree` in `@nightshift/client`, over the step's last `worktree-changes`). |
+| [File Tree](https://ui.shadcn.com/docs/ai-elements/base/file-tree) | Files in folders: a `Collapsible` per folder, a ghost `Button` per file. The files a step changed: its agent's edits, and every changed file in the run's copy of the project (commands, formatters, lockfiles, a Command step's files). An Agent step's file that no edit tool changed gets a "By command" `Badge`. Each file opens a Sheet with its diff as `DiffLines` (`shared/code`): `CodeBlockLine` added and removed lines, added ones tinted green. A wrapped line hangs at its own indent, in the Shiki colors of the file's extension. A file with the agent's edits and the whole diff shows both as `Tabs` ("All changes", "Each edit"). Quiet notes say when other steps ran at the same time or a diff is cut short (`features/runs/components/changed-files.tsx`, from `changedFiles` and `fileTree` in `@nightshift/client`, over the step's last `worktree-changes`). |
 | [Context](https://ui.shadcn.com/docs/ai-elements/base/context) | The tokens used: an outline `Button` that opens a `HoverCard`, with a `Progress` bar of the context window when the size is known. `UsageContext` (`shared/usage`): input, cache, output and cost. No harness reports a context window yet, so it has no bar. The Tokens fact of a step, and the footer of an answer in the flow chat, beside its cost (`features/flows/chat/chat-panel.tsx`). |
 | [Chain of Thought](https://ui.shadcn.com/docs/ai-elements/base/chain-of-thought) | Steps folded behind one summary line that opens on them. On `Trace`, open while the last step runs. Two or more tool calls in a row in a run's transcript: "Ran 6 commands · read 3 files" (`features/runs/transcript/items/tool-calls-group.tsx`, from `groupToolCalls` and `toolCallsSummary` in `@nightshift/client`). The thoughts around and between those calls are steps inside the group. The phone shows the same line. |
 | [Reasoning](https://ui.shadcn.com/docs/ai-elements/base/reasoning) | What the model thought: a `TraceLine` "Thinking…" (running, open) while it streams, then "Thought for 12s" (from the entry times), opening on the text as Markdown. One item per thought in a run's transcript (`features/runs/transcript/items/reasoning.tsx`). Only harnesses that send the thinking text have it: Claude Code does from 2.1.94 on, as summaries. The phone leaves thinking out. |
@@ -171,12 +171,12 @@ not add the AI SDK.
 | [Model Selector](https://ui.shadcn.com/docs/ai-elements/base/model-selector) | Two `DropdownMenu`s with radio items in the Prompt Input's `block-end` addon. The agent (profiles, then a submenu of models per harness) and the effort (`AgentMenus` in `features/flows/assistant/agent-picker.tsx`). |
 | [Suggestion](https://ui.shadcn.com/docs/ai-elements/base/suggestion) | Messages to send with one click: outline sm `Button`s above the Prompt Input. A row that scrolls sideways for the starters of a new flow's chat, rows that wrap (`wrap`) for the quick picks of a Suggest popover (`features/flows/assistant/suggestions.tsx`). |
 | [Inline Citation](https://ui.shadcn.com/docs/ai-elements/base/inline-citation) | A source named in the sentence: a secondary xs `Button` as the `HoverCardTrigger`, the source's details in the `HoverCardContent`. In a flow chat about a run, a step the answer names: the step's name, its outcome, how long it took, its cost and one line on what it did. A click opens the run at that step (`features/flows/chat/step-citation.tsx`). The agent cites a step with a Markdown link to `#step-<stepId>` (`stepCitation` and `citedStepId` in `@nightshift/flows`). A step the run does not have shows as text. |
-| Shimmer | Text that shimmers while the agent works: a `TraceLine status="running"`, whose `TraceTitle` shimmers. What the agent does now, in a flow chat answer and a Suggest popover. |
+| Shimmer | Text that shimmers while the agent works: a `TraceLine status="running"`, whose `TraceTitle` shimmers. It shows what the agent does now, in a flow chat answer and a Suggest popover. |
 
 ## Blocks
 
 Blocks are whole sections and pages. `shadcn add <block>` copies the block's
-files into the app; then adapt the copy. Browse them at
+files into the app. Then adapt the copy. Browse them at
 <https://ui.shadcn.com/blocks>.
 
 | Block | What it is |
@@ -188,7 +188,7 @@ files into the app; then adapt the copy. Browse them at
 | `sidebar-04` | A floating sidebar with submenus. |
 | `sidebar-05` | A sidebar with collapsible submenus. |
 | `sidebar-06` | A sidebar with submenus as dropdowns. |
-| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell is based on it; its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). |
+| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell comes from it. Its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). |
 | `sidebar-08` | An inset sidebar with secondary navigation. |
 | `sidebar-09` | Collapsible nested sidebars (a mail-client layout). |
 | `sidebar-10` | A sidebar in a popover. |
@@ -229,5 +229,5 @@ files into the app; then adapt the copy. Browse them at
 Custom components are for what shadcn does not cover. In Night Shift that is
 the flow canvas (React Flow nodes and edges, and the node dock of shadcn
 Buttons over it) and domain wrappers that compose shadcn pieces, such as a
-run-status badge. Build them from shadcn components
-and theme tokens, never with a parallel set of styles.
+run-status badge. Build them from shadcn components and theme tokens, never
+with a parallel set of styles.

@@ -13,43 +13,43 @@ Last updated: 2026-10-10
 | Contract | Method packages | `bun test` | A `method.json` validates, its flows resolve, its skill pack materializes. |
 | E2E | User flows in the web UI | Playwright (to add in Slice 1) | Chat to gate to issue. Board reflects facts. |
 
-The night-shift script's sandbox test is the model for integration tests: a repo with a bare origin, fakes of `gh`, `claude`, and `opencode` on `PATH`, and a fixture file as the fake GitHub.
+Model integration tests on the sandbox test of the night-shift script: a repo with a bare origin, fakes of `gh`, `claude` and `opencode` on `PATH`, and a fixture file as the fake GitHub.
 
 ## Coverage Requirements
 
 - **New and modified code:** 80% minimum (lines + branches)
 - **Public functions:** at least one happy-path and one error-path test each
-- **Bug fixes:** must include a regression test that would have caught the bug
+- **Bug fixes:** add a regression test that fails without the fix
 - **`packages/engine`:** 90% minimum. The engine is the product.
 
 ## Test Patterns
 
 - **Framework:** Bun's test runner. `describe` / `it` / `expect`.
-- **Test file location:** Colocated `*.test.ts` next to the module.
+- **Test file location:** `*.test.ts` next to the module.
 - **Fixture strategy:** Factory functions per package in `src/test/factories.ts`. Fake CLIs in `test/fakes/`.
-- **Mock boundary:** Only mock at system boundaries (harness CLIs, `gh`, `acli`, the file system of a worktree, the clock). Do not mock internal application code.
-- **Database:** Integration tests run against a real libsql file in a temp directory. No in-memory fakes of the schema.
-- **Harness sessions:** A test never spawns a real coding agent. A fake harness binary replays a scripted NDJSON stream.
-- **Time:** Run policy tests inject a clock. No real sleeps. In the engine, `sleepClock` (`testing/test-support.ts`) stands still while a run works and moves to its wake time when it sleeps, so a wait lasts exactly its minutes however late a timer fires. Assert what the engine's clock says, not the wall clock.
+- **Mock boundary:** Mock only at system boundaries (harness CLIs, `gh`, `acli`, the file system of a worktree, the clock). Never mock internal application code.
+- **Database:** Integration tests use a real libsql file in a temp directory. No in-memory fakes of the schema.
+- **Harness sessions:** A test never starts a real coding agent. A fake harness binary replays a scripted NDJSON stream.
+- **Time:** Run policy tests inject a clock. No real sleeps. In the engine, `sleepClock` (`testing/test-support.ts`) stands still while a run works. When the run sleeps, it moves to the wake time. Thus a wait lasts exactly its minutes, however late a timer fires. Assert the engine's clock, not the wall clock.
 - **Determinism:** A test that reads the network is a bug.
 
 ## Gherkin → Test Mapping
 
-- Each Gherkin scenario maps to at least one automated test
-- Test names must reference the scenario name so failures are traceable
-- Given steps → test setup, When steps → action, Then steps → assertion
-- Scenarios describe observable behavior, not implementation details
+- Each Gherkin scenario maps to at least one automated test.
+- A test name contains its scenario name, so you can trace a failure.
+- Given steps → test setup, When steps → action, Then steps → assertion.
+- Scenarios describe what you can observe, not implementation details.
 - No Gherkin runner is declared yet. `wtf.verify-trace` looks for a test whose name matches the scenario name.
 
 ## Definition of Done
 
-- [ ] All claimed Gherkin scenarios covered by automated tests
-- [ ] Coverage meets threshold on all new/modified files
+- [ ] Automated tests cover all claimed Gherkin scenarios
+- [ ] Coverage meets the threshold on all new and modified files
 - [ ] `bun run check` and `bun run check-types` pass
 - [ ] `bun test` passes with no real CLI, network, or sleep
-- [ ] No new flaky tests introduced
-- [ ] Regression test added for any bug fix
-- [ ] Edge cases listed in the Feature are covered
+- [ ] No new flaky tests
+- [ ] Each bug fix has a regression test
+- [ ] Tests cover the edge cases the Feature lists
 - [ ] Every new fact has an event, and every derived status has a test
 - [ ] A new adapter has a fake and a contract test
 
@@ -64,7 +64,7 @@ No staging. The product runs on the user's machine.
 
 ## Known Flaky Areas
 
-- None yet. Watch harness adapter tests: a leaked real `claude` on `PATH` turns a fake-driven test into a real session.
+- None yet. Watch the harness adapter tests: a real `claude` that leaks onto `PATH` turns a test with fakes into a real session.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
