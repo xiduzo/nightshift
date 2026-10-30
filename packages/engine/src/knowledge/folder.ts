@@ -55,7 +55,7 @@ const MAX_FILES = 20_000;
 /** What the index reads of a file for its title and first sentence. */
 const HEAD_BYTES = 4096;
 /** The files whose text the index reads. Any other file shows its name only. */
-const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
+export const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
 
 /** An id as one file or folder name: nothing that could leave the folder. */
 function folderName(id: string): string {

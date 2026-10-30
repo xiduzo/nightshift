@@ -13,3 +13,9 @@ export {
 	sessionKnowledge,
 	withLearnings,
 } from "./handoff";
+export {
+	createKnowledgeSearch,
+	type KnowledgeHit,
+	type KnowledgeSearch,
+	type KnowledgeText,
+} from "./search";

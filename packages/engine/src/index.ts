@@ -76,9 +76,13 @@ export {
 export type { WalkFile, WalkRef } from "./graph";
 export {
 	createKnowledgeFolders,
+	createKnowledgeSearch,
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeFile,
 	type KnowledgeFolders,
+	type KnowledgeHit,
+	type KnowledgeSearch,
+	type KnowledgeText,
 } from "./knowledge";
 export type {
 	CopyStamp,
