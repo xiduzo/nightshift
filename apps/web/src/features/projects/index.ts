@@ -3,7 +3,6 @@
 export { AddProjectDialog } from "./add-project-form";
 export { CopyProjectHere } from "./copy-project-here";
 export { ProjectFolderLine } from "./project-folder-line";
-export { ProjectList } from "./project-list";
 export { ProjectMenu } from "./project-menu";
 export { ProjectPage } from "./project-page";
 export { projectMutations, projectQueries } from "./queries";

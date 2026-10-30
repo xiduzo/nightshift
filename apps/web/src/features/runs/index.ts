@@ -3,7 +3,6 @@
 export { CostText } from "./components/cost-text";
 export { QuickRunDialog } from "./components/new-run-form";
 export { ProjectRunsPage } from "./components/project-runs-page";
-export { RunList } from "./components/run-list";
 export { RunPage } from "./components/run-page";
 export {
 	RunStatusBadge,

@@ -97,22 +97,28 @@ export function RunStatusBadge({
 
 /**
  * A run's status as its icon alone, in the status colour, for a dense
- * list. The label shows on hover and reaches screen readers.
+ * list. The label shows on hover and reaches screen readers. `context`
+ * goes before the label on hover, such as the flow and when it ran.
  */
 export function RunStatusIcon({
 	status,
 	result = null,
 	className,
+	context,
 }: {
 	status: RunStatus;
 	result?: RunSummary["result"];
 	className?: string;
+	context?: { before?: string; after?: string };
 }) {
 	const {
 		icon: Icon,
 		className: statusClassName,
 		label,
 	} = statusLook(status, result);
+	const hover = [context?.before, label, context?.after]
+		.filter(Boolean)
+		.join(" · ");
 	return (
 		<Tooltip>
 			<TooltipTrigger
@@ -129,9 +135,9 @@ export function RunStatusIcon({
 				}
 			>
 				<Icon aria-hidden="true" />
-				<span className="sr-only">{label}</span>
+				<span className="sr-only">{hover}</span>
 			</TooltipTrigger>
-			<TooltipContent>{label}</TooltipContent>
+			<TooltipContent>{hover}</TooltipContent>
 		</Tooltip>
 	);
 }

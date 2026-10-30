@@ -24,14 +24,12 @@ export {
 	isTwoFactorRequired,
 } from "./api";
 export {
-	type ActivityRange,
 	createDashboardQueries,
 	type DashboardSummary,
 	type FlowHealthRow,
 	type FlowRange,
 	type FlowRun,
 	type GateState,
-	type HourRange,
 	type NightRange,
 	type NightsRange,
 	type Spread,

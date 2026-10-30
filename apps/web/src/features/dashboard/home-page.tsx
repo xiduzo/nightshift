@@ -1,22 +1,45 @@
-import { Card, CardContent } from "@nightshift/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
-import { ProjectList, projectQueries } from "@/features/projects";
-import { RunList, runQueries } from "@/features/runs";
-import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
-
-import { OVERVIEW_ROWS } from "./overview";
+import { useState } from "react";
+import { useOpenGates } from "@/features/gates";
+import { projectQueries } from "@/features/projects";
+import { runQueries } from "@/features/runs";
+import type { NightRange } from "@/shared/api";
+import { PageHeading, SiteHeader } from "@/shared/page";
+import { HomeLanes } from "./home-lanes";
+import { HomeProjects } from "./home-projects";
+import { MetricDetails } from "./metric-details";
+import { MetricStrip } from "./metric-strip";
+import { type Metric, metricsOf } from "./metrics";
 import { dashboardQueries } from "./queries";
-import { SectionCards } from "./section-cards";
+import { RangeBar } from "./range-bar";
+import { nightsOf } from "./ranges";
 
 /**
- * Home: tonight over all projects. The section cards, the recent runs, and
- * the projects.
+ * Home: tonight over all projects. One range for the page, the four numbers
+ * in a strip, then three lanes in the order you act on them (running,
+ * waiting for you, failed), and the projects.
  */
-export function HomePage() {
-	const projects = useQuery(projectQueries.list());
-	// The project list says how each project's runs stand: only the newest runs load.
-	const runs = useQuery(runQueries.latest(OVERVIEW_ROWS));
+export function HomePage({
+	range,
+	onRangeChange,
+}: {
+	range: NightRange;
+	onRangeChange: (range: NightRange) => void;
+}) {
 	const summary = useQuery(dashboardQueries.summary());
+	const projects = useQuery(projectQueries.list());
+	const gates = useOpenGates();
+	// At work or asleep now. A run at a Gate shows in its own lane.
+	const openRuns = useQuery(runQueries.open());
+	// The metric stays while the dialog closes, so its body does not go blank.
+	const [details, setDetails] = useState<{ metric: Metric; open: boolean }>();
+	const nights = summary.data ? nightsOf(summary.data, range) : undefined;
+	const metrics = nights ? metricsOf(nights) : undefined;
+	const running = (openRuns.data ?? []).filter(
+		(run) => run.status === "running" || run.status === "sleeping",
+	);
+	const waiting = gates.data?.length ?? 0;
+	const failed = nights?.runs.failed.count ?? 0;
 
 	return (
 		<>
@@ -24,34 +47,39 @@ export function HomePage() {
 			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
 				<PageHeading
 					title="Tonight"
-					description="What runs, what waits for you, and what it cost."
+					description={
+						!nights
+							? "What runs, what waits for you, and what failed."
+							: waiting + failed === 0
+								? "Nothing needs you. Your projects ran without trouble."
+								: `${running.length} running now, ${waiting} waiting for you, ${failed} failed.`
+					}
 				/>
+				<RangeBar value={range} onValueChange={onRangeChange} />
+				<MetricStrip
+					metrics={metrics}
+					onDetails={(metric) => setDetails({ metric, open: true })}
+				/>
+				<HomeLanes
+					running={running}
+					gates={gates.data ?? []}
+					failed={nights?.runs.failed}
+					projects={projects.data}
+					range={range}
+					isLoading={openRuns.isLoading || gates.isLoading}
+					onFailedDetails={() => setDetails({ metric: "finished", open: true })}
+				/>
+				<HomeProjects projects={projects.data} range={range} />
 
-				<SectionCards summary={summary.data} isLoading={summary.isLoading} />
-
-				<PageSection title="Recent runs">
-					<Card className="py-0">
-						<CardContent className="px-0">
-							<RunList
-								runs={runs.data}
-								projects={projects.data}
-								isLoading={runs.isLoading}
-								pageSize={OVERVIEW_ROWS}
-								emptyDescription="Open a project and start a run. It shows up here."
-							/>
-						</CardContent>
-					</Card>
-				</PageSection>
-
-				<PageSection
-					title="Projects"
-					description="The code Night Shift works on. Open one to see its flows and runs."
-				>
-					<ProjectList
-						projects={projects.data}
-						isLoading={projects.isLoading}
+				{summary.data && details ? (
+					<MetricDetails
+						metric={details.metric}
+						open={details.open}
+						onOpenChange={(open) => setDetails({ ...details, open })}
+						summary={summary.data}
+						range={range}
 					/>
-				</PageSection>
+				) : null}
 			</div>
 		</>
 	);

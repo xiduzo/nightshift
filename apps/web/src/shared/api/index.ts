@@ -5,7 +5,6 @@
  */
 
 export type {
-	ActivityRange,
 	AgentErrorKind,
 	AgentUsage,
 	Artifact,
@@ -18,7 +17,6 @@ export type {
 	GateChoice,
 	GateState,
 	GitInstall,
-	HourRange,
 	InvitationView,
 	ItemState,
 	ItemSummary,

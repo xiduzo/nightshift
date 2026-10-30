@@ -1,10 +1,4 @@
-import type {
-	ActivityRange,
-	DashboardSummary,
-	HourRange,
-	NightRange,
-	NightsRange,
-} from "@/shared/api";
+import type { DashboardSummary, NightRange, NightsRange } from "@/shared/api";
 
 /** The part of the dashboard's numbers a range toggle picks. */
 
@@ -14,14 +8,5 @@ export function nightsOf(
 ): NightsRange {
 	const found = summary.nights.find((nights) => nights.nights === range);
 	if (!found) throw new Error(`The dashboard has no range of ${range} nights.`);
-	return found;
-}
-
-export function hoursOf(
-	summary: DashboardSummary,
-	range: HourRange,
-): ActivityRange {
-	const found = summary.activity.find((hours) => hours.hours === range);
-	if (!found) throw new Error(`The dashboard has no range of ${range} hours.`);
 	return found;
 }

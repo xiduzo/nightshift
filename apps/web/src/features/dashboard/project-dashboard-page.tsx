@@ -4,7 +4,6 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { ZapIcon } from "lucide-react";
 import { useState } from "react";
-import { useOpenGates } from "@/features/gates";
 import {
 	CopyProjectHere,
 	ProjectFolderLine,
@@ -12,9 +11,9 @@ import {
 	ProjectPage,
 } from "@/features/projects";
 import { QuickRunDialog } from "@/features/runs";
-import type { DashboardSummary, NightRange, Project } from "@/shared/api";
+import type { NightRange } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
-import { GatesDialog } from "./gates-dialog";
+import { MetricDetails } from "./metric-details";
 import { MetricTiles } from "./metric-tiles";
 import { type Metric, metricsOf } from "./metrics";
 import { MetricsChart } from "./metrics-chart";
@@ -23,8 +22,6 @@ import { ProjectTables } from "./project-tables";
 import { dashboardQueries } from "./queries";
 import { RangeBar } from "./range-bar";
 import { nightsOf } from "./ranges";
-import { RunsDialog } from "./runs-dialog";
-import { SpendDialog } from "./spend-dialog";
 
 /**
  * The project's root, after the Performance page of Search Console: one
@@ -116,52 +113,5 @@ export function ProjectDashboardPage({
 				</>
 			)}
 		</ProjectPage>
-	);
-}
-
-/**
- * The details of a number, at the page's range: Runs and Finished open the
- * runs (Finished on the failed ones), Spend and Gates their own.
- */
-function MetricDetails({
-	metric,
-	open,
-	onOpenChange,
-	project,
-	summary,
-	range,
-}: {
-	metric: Metric;
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
-	project: Project;
-	summary: DashboardSummary;
-	range: NightRange;
-}) {
-	const gates = useOpenGates();
-	const props = {
-		open,
-		onOpenChange,
-		summary,
-		project,
-		initialRange: range,
-	};
-
-	if (metric === "spend") return <SpendDialog {...props} />;
-	if (metric === "gates") {
-		return (
-			<GatesDialog
-				{...props}
-				gates={
-					gates.data?.filter((gate) => gate.projectId === project.id) ?? []
-				}
-			/>
-		);
-	}
-	return (
-		<RunsDialog
-			{...props}
-			initialTab={metric === "finished" ? "failed" : "overview"}
-		/>
 	);
 }

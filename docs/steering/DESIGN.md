@@ -66,13 +66,12 @@ Pipeline board and spec tree components do not exist yet. Build them in `package
 
 ### Overview lists
 
-An overview shows **at most 5 rows** in a list or table. This covers the sections on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
+An overview shows **at most 5 rows** in a list or table. This covers the Failed lane on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
 
 - One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
 - The full list is one link away: a section action ("Flows", "All runs") or the dialog footer. Under a cut list in a dialog, `MoreRows` says how many rows it leaves out.
-- Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit.
-- Recent runs on Home pages through every run, 5 to a page, instead of a cut list. It needs no hint and no "All runs" link. A project's runs page shows 15 runs to a page.
+- Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit. Neither do Home's Running now and Waiting for you lanes: what needs you now shows in full. A project's runs page shows 15 runs to a page.
 
 ### A project's page
 
@@ -86,6 +85,16 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 - What runs or waits now shows in one slim line, only when there is something.
 - **Details** on a tile opens the details dialog of that number at the page's range.
 - Setup does not go on this page. The computers that have the project are in its ⋯ menu.
+
+### Home
+
+Home answers "what needs me tonight" over every project. Keep its shape:
+
+- The same range as a project's page, on top: 7, 30 or 90 nights, in the URL (`?range=30`).
+- The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per night, with the nights before dashed, and says how it moved against them. A number opens its details dialog.
+- Three lanes of equal height, in the order you act on them: Running now, Waiting for you, Failed. Each lane has a count, scrolls inside, and shows an empty state when it has nothing.
+- Every row opens its place: a run its run page, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
+- Under the lanes, the projects, each with the status of its last runs. A project opens its page at the same range.
 
 ### Details dialogs
 

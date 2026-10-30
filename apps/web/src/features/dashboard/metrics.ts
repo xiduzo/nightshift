@@ -117,3 +117,43 @@ export function metricsOf(range: NightsRange): {
 		compared: range.before.runs > 0,
 	};
 }
+
+/**
+ * How a number moved against the same nights just before: a sentence, and
+ * a short form for a tight row. Undefined `before` means the nights before
+ * had no runs at all.
+ */
+export function changeOf(
+	metric: Metric,
+	value: number | null,
+	before: number | null | undefined,
+): { trend: "up" | "down" | "flat"; text: string; short: string } {
+	if (before === undefined) {
+		return { trend: "flat", text: "Nothing to compare with yet", short: "new" };
+	}
+	if (value === null) {
+		return { trend: "flat", text: "No runs ended in these nights", short: "—" };
+	}
+	if (before === null) {
+		return {
+			trend: "flat",
+			text: "No runs ended in the nights before",
+			short: "—",
+		};
+	}
+	if (before === 0 && value > 0) {
+		return { trend: "up", text: "None in the nights before", short: "new" };
+	}
+	const delta = value - before;
+	if (Math.abs(delta) < 0.005) {
+		return { trend: "flat", text: "Same as the nights before", short: "same" };
+	}
+	const amount =
+		metric === "spend" ? formatCost(Math.abs(delta)) : String(Math.abs(delta));
+	const unit = metric === "finished" ? " points" : "";
+	return {
+		trend: delta > 0 ? "up" : "down",
+		text: `${amount}${unit} ${delta > 0 ? "more" : "less"} than the nights before`,
+		short: `${delta > 0 ? "+" : "−"}${amount}${metric === "finished" ? " pts" : ""}`,
+	};
+}

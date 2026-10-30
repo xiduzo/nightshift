@@ -1,4 +1,4 @@
-/** The overview of the nights: Home's section cards, and a project's page of metrics, chart and lists. */
+/** The overview of the nights: Home's numbers and lanes, and a project's page of metrics, chart and lists. */
 
 export { HomePage } from "./home-page";
 export { preloadHomePage, preloadProjectDashboardPage } from "./preload";

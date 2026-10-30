@@ -2,13 +2,11 @@
 
 export { createDashboardQueries } from "./queries";
 export type {
-	ActivityRange,
 	DashboardSummary,
 	FlowHealthRow,
 	FlowRange,
 	FlowRun,
 	GateState,
-	HourRange,
 	NightRange,
 	NightsRange,
 	Spread,

@@ -1,17 +1,9 @@
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Toggle } from "@nightshift/ui/components/toggle";
-import {
-	ArrowUpRightIcon,
-	CheckSquareIcon,
-	MinusIcon,
-	SquareIcon,
-	TrendingDownIcon,
-	TrendingUpIcon,
-} from "lucide-react";
-import type { ReactNode } from "react";
-import { formatCost } from "@/shared/format";
-import { METRICS, type Metric, type MetricValues } from "./metrics";
+import { ArrowUpRightIcon, CheckSquareIcon, SquareIcon } from "lucide-react";
+import { changeOf, METRICS, type Metric, type MetricValues } from "./metrics";
+import { TrendIcon } from "./trend-icon";
 
 /**
  * The four numbers on top, flush in one row. A tile switches its number
@@ -104,10 +96,7 @@ export function MetricTiles({
 	);
 }
 
-/**
- * How a number moved against the same nights just before. Undefined
- * `before` means the nights before had no runs at all.
- */
+/** How a number moved against the same nights just before, in a sentence. */
 function Change({
 	metric,
 	value,
@@ -117,36 +106,11 @@ function Change({
 	value: number | null;
 	before: number | null | undefined;
 }) {
-	const line = (icon: ReactNode, text: string) => (
+	const change = changeOf(metric, value, before);
+	return (
 		<span className="flex items-center gap-1 text-xs">
-			{icon}
-			{text}
+			<TrendIcon trend={change.trend} />
+			{change.text}
 		</span>
-	);
-	if (before === undefined) {
-		return line(<MinusIcon />, "Nothing to compare with yet");
-	}
-	if (value === null) {
-		return line(<MinusIcon />, "No runs ended in these nights");
-	}
-	if (before === null) {
-		return line(<MinusIcon />, "No runs ended in the nights before");
-	}
-	if (before === 0 && value > 0) {
-		return line(<TrendingUpIcon />, "None in the nights before");
-	}
-	const delta = value - before;
-	if (Math.abs(delta) < 0.005) {
-		return line(<MinusIcon />, "Same as the nights before");
-	}
-	const amount =
-		metric === "spend"
-			? formatCost(Math.abs(delta))
-			: metric === "finished"
-				? `${Math.abs(delta)} points`
-				: String(Math.abs(delta));
-	return line(
-		delta > 0 ? <TrendingUpIcon /> : <TrendingDownIcon />,
-		`${amount} ${delta > 0 ? "more" : "less"} than the nights before`,
 	);
 }

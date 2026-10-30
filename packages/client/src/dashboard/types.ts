@@ -8,9 +8,6 @@ export type DashboardRun = DashboardSummary["open"]["rows"][number];
 /** The details over the last 7, 30 or 90 nights. */
 export type NightsRange = DashboardSummary["nights"][number];
 export type NightRange = NightsRange["nights"];
-/** What was at work over the last 24, 48 or 168 hours. */
-export type ActivityRange = DashboardSummary["activity"][number];
-export type HourRange = ActivityRange["hours"];
 export type FlowHealthRow = NonNullable<
 	DashboardSummary["flowHealth"]
 >["rows"][number];
