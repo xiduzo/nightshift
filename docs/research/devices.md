@@ -104,8 +104,10 @@ one Walker; its steps run where they are placed.
 
 ## Why it holds: every row has one Owner
 
-Night Shift's data falls into five classes. Each has one writer, so run
-data never needs conflict resolution.
+Night Shift's data falls into six classes. Each has one writer, so run
+data never needs conflict resolution. Knowledge is the one class that
+merges per path: two Devices can change one file, and the later change
+wins.
 
 | Class | Examples | Owner | Sync rule |
 | --- | --- | --- | --- |
@@ -114,6 +116,7 @@ data never needs conflict resolution.
 | Space definitions | Projects by remote, which Devices have a Clone, Offers into the Space, Members (mirrored from auth) | any Member for Projects; the offering Device for Offers | the Space document (Yjs) |
 | Run history | runs, steps, sessions, events, `HandedOff` | the Walker | exchange by cursor: immutable rows, the union is the merge |
 | Run state | LangGraph checkpoints, transcripts, command logs | the Walker | copied to the Space's Host archive when a node ends; fetched on demand; a running step's transcript followed live while someone watches it |
+| Knowledge | a Project's knowledge files: their list (`knowledge:<project id>`) and their content by hash | the Device that changed a path last, per path | the list: a Yjs document like the flow documents, the later change wins per path; the content: copied to the Space's Host archive by hash, immutable, fetched on demand; each Device's folder is a working copy, reconciled before and after each step that gets it ([ADR 4](../adr/0004-knowledge-belongs-to-the-space.md)) |
 
 Consequences: status derives the same on every Replica (a Run's events
 come from one Walker in one order; `event.seq` becomes `(walkerId, seq)`),
