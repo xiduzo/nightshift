@@ -249,6 +249,23 @@ describe("codexHarness", () => {
 		expect(line?.config["mcp_servers.tanstack.url"]).toContain("http");
 	});
 
+	test("knowledge: the line before the prompt, no writable folder", async () => {
+		const { log, harness } = await fakeCodex();
+		await collect(
+			harness.run(
+				input({
+					addDirs: ["/data/knowledge/p1"],
+					instructions: "Project knowledge is in /data/knowledge/p1.",
+				}),
+			),
+		);
+		const [line] = await readLog(log);
+		expect(line?.prompt).toStartWith(
+			"Project knowledge is in /data/knowledge/p1.\n\nDo the thing",
+		);
+		expect(line?.argv).not.toContain("--add-dir");
+	});
+
 	test("resume: the session event comes first, before any output", async () => {
 		const { log, harness } = await fakeCodex();
 		const events = await collect(

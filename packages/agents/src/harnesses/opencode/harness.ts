@@ -120,7 +120,10 @@ export function mergeConfig(
 
 /** The session's own OpenCode config, before the adapter's bridge. */
 export function opencodeSessionConfig(
-	input: Pick<AgentSessionInput, "permissionMode" | "mcpServers" | "clis">,
+	input: Pick<
+		AgentSessionInput,
+		"permissionMode" | "mcpServers" | "clis" | "addDirs"
+	>,
 	extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
 	const servers = input.mcpServers ?? {};
@@ -132,6 +135,7 @@ export function opencodeSessionConfig(
 			input.permissionMode,
 			names,
 			input.clis ?? [],
+			input.addDirs ?? [],
 		),
 		...(names.length > 0 ? { mcp: opencodeMcpConfig(servers) } : {}),
 	});

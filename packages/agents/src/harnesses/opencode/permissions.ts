@@ -59,12 +59,14 @@ const READ_ONLY = new Set([
  * tools (`tanstack_*`: `report_step`) and the tools of the session's own MCP
  * servers (`<server>_*`): the node listed them on purpose. Its CLI tools
  * (`clis`) are allowed in the shell when the mode denies other commands
- * (`acceptEdits`, `default`); plan mode runs nothing.
+ * (`acceptEdits`, `default`); plan mode runs nothing. The session's
+ * outside folders (`addDirs`) may be read in every mode.
  */
 export function opencodePermission(
 	mode: PermissionMode,
 	mcpServerNames: readonly string[] = [],
 	clis: readonly string[] = [],
+	addDirs: readonly string[] = [],
 ): Record<string, Rule> {
 	const set = (pick: (name: string) => Action): Record<string, Action> =>
 		Object.fromEntries(PERMISSIONS.map((name) => [name, pick(name)]));
@@ -109,15 +111,35 @@ export function opencodePermission(
 	rules.question = "deny";
 	rules["tanstack_*"] = "allow";
 	for (const name of mcpServerNames) rules[`${name}_*`] = "allow";
+	const withDirs = outsideDirs(rules, addDirs);
 	if (rules.bash === "allow" || mode === "plan" || clis.length === 0) {
-		return rules;
+		return withDirs;
 	}
 	const bash: Record<string, Action> = { "*": "deny" };
 	for (const name of clis) {
 		bash[name] = "allow";
 		bash[`${name} *`] = "allow";
 	}
-	return { ...rules, bash };
+	return { ...withDirs, bash };
+}
+
+/**
+ * The session's outside folders (`addDirs`, the knowledge folder) allowed
+ * where the mode denies paths outside the worktree. OpenCode matches the
+ * path with `*` as any text, and the last matching pattern wins.
+ */
+function outsideDirs(
+	rules: Record<string, Action>,
+	addDirs: readonly string[],
+): Record<string, Rule> {
+	const base = rules.external_directory ?? "deny";
+	if (base === "allow" || addDirs.length === 0) return rules;
+	const external: Record<string, Action> = { "*": base };
+	for (const dir of addDirs) {
+		external[dir] = "allow";
+		external[`${dir}/*`] = "allow";
+	}
+	return { ...rules, external_directory: external };
 }
 
 /** The adapter's own permission handler mode, for requests it does see. */

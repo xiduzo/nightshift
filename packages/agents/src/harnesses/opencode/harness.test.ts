@@ -163,6 +163,19 @@ describe("opencodePermission", () => {
 		expect(opencodePermission("auto", [], ["gh"]).bash).toBe("allow");
 		expect(opencodePermission("plan", [], ["gh"]).bash).toBe("deny");
 	});
+
+	test("the outside folders may be read where other outside paths are denied", () => {
+		for (const mode of ["auto", "acceptEdits", "default", "plan"] as const) {
+			expect(
+				opencodePermission(mode, [], [], ["/k/p1"]).external_directory,
+			).toEqual({ "*": "deny", "/k/p1": "allow", "/k/p1/*": "allow" });
+		}
+		expect(
+			opencodePermission("bypassPermissions", [], [], ["/k/p1"])
+				.external_directory,
+		).toBe("allow");
+		expect(opencodePermission("auto").external_directory).toBe("deny");
+	});
 });
 
 describe("opencodeMcpConfig", () => {
@@ -399,6 +412,27 @@ describe("opencodeHarness", () => {
 			enabled: true,
 		});
 		expect(line?.config.permission["docs_*"]).toBe("allow");
+	});
+
+	test("knowledge: the folder is allowed, the line comes before the prompt", async () => {
+		const { log, harness } = await fakeOpencode();
+		await collect(
+			harness.run(
+				input({
+					addDirs: ["/data/knowledge/p1"],
+					instructions: "Project knowledge is in /data/knowledge/p1.",
+				}),
+			),
+		);
+		const [line] = await readLog(log);
+		expect(line?.config.permission.external_directory).toEqual({
+			"*": "deny",
+			"/data/knowledge/p1": "allow",
+			"/data/knowledge/p1/*": "allow",
+		});
+		expect(line?.prompt).toStartWith(
+			"Project knowledge is in /data/knowledge/p1.\n\n",
+		);
 	});
 
 	test("resume continues a known session with the follow-up only", async () => {

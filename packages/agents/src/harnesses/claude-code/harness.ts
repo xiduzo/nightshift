@@ -253,6 +253,10 @@ async function claudeCodeAdapter(
 		emitDiff: false,
 		...(allowedTools ? { allowedTools } : {}),
 		...(disallowedTools ? { disallowedTools } : {}),
+		// Folders it may read outside the worktree: `--add-dir`.
+		...(input.addDirs && input.addDirs.length > 0
+			? { addDirs: input.addDirs }
+			: {}),
 		claudeExecutable: claudeCommand(
 			executable,
 			mcp.path,

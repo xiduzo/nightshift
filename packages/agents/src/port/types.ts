@@ -77,6 +77,20 @@ export type AgentSessionInput = {
 	 * its own login). The agent's shell finds it first on its PATH.
 	 */
 	toolsPath?: string;
+	/**
+	 * Folders outside `cwd` the agent may read, for example the project's
+	 * knowledge folder. Claude Code takes each as `--add-dir`, OpenCode as
+	 * an allowed outside path. Codex and the other harnesses read any path
+	 * already: `instructions` says where.
+	 */
+	addDirs?: string[];
+	/**
+	 * A short line for the agent next to its prompt, for example where the
+	 * project's knowledge is. Claude Code takes it as
+	 * `--append-system-prompt`; every other harness puts it before the
+	 * prompt. Never the contents of a folder: the agent reads those itself.
+	 */
+	instructions?: string;
 	/** Added to the environment of the harness and of every command it runs. */
 	env?: Record<string, string>;
 	/**

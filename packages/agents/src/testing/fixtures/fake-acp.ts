@@ -5,7 +5,7 @@
  * MCP server, calls its `report_step` tool the way a real agent would.
  *
  * `FAKE_ACP_LOG`: a file that gets one JSON line per event (argv, session,
- * permission, report, config), for the test to read.
+ * prompt, permission, report, config), for the test to read.
  *
  * `FAKE_ACP_CONFIG`: `options` offers the model and a thought level as
  * session config options (as pi-acp and OpenCode 2.x do). A model it does
@@ -169,6 +169,12 @@ class FakeAgent implements acp.Agent {
 
 	async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
 		const { sessionId } = params;
+		log({
+			type: "prompt",
+			text: params.prompt
+				.map((block) => (block.type === "text" ? block.text : ""))
+				.join(""),
+		});
 		await this.connection.sessionUpdate({
 			sessionId,
 			update: {

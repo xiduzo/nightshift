@@ -397,6 +397,9 @@ export function harnessSession(options: {
 				adapter: setup.adapter,
 				threadId: id,
 				messages: [{ role: "user", content: report.prompt }],
+				// Claude Code takes it as `--append-system-prompt`; the other
+				// adapters put it before the prompt.
+				...(input.instructions ? { systemPrompts: [input.instructions] } : {}),
 				...(report.tools.length > 0 ? { tools: report.tools } : {}),
 				...(input.resumeSessionId
 					? { modelOptions: { sessionId: input.resumeSessionId } }

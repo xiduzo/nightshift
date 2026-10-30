@@ -282,7 +282,8 @@ export function codexSetup(
 ) {
 	// CLI tools (`input.clis`) change nothing here: Codex never asks, and its
 	// sandbox decides what a shell command may do. The run checks that they
-	// are installed.
+	// are installed. `input.addDirs` neither: every sandbox mode reads any
+	// folder, and `--add-dir` would let the agent write there too.
 	const ownEffort: Record<string, string> =
 		input.effort !== undefined && !KNOWN_MODELS.has(input.model)
 			? { model_reasoning_effort: tomlString(codexEffort(input.effort)) }

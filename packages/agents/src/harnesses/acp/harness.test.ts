@@ -162,6 +162,17 @@ describe("acpHarness", () => {
 		]);
 	});
 
+	test("knowledge: the line comes before the prompt", async () => {
+		await run({
+			addDirs: ["/data/knowledge/p1"],
+			instructions: "Project knowledge is in /data/knowledge/p1.",
+		});
+		const prompt = entry(await logged(), "prompt")?.text;
+		expect(prompt).toStartWith(
+			"Project knowledge is in /data/knowledge/p1.\n\nRun the tests",
+		);
+	});
+
 	test("a resumed session loads the session it continues", async () => {
 		const events = await run({ resumeSessionId: "fake-session-1" });
 		expect(entry(await logged(), "load")).toEqual({

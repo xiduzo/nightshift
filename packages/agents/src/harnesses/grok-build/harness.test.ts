@@ -101,3 +101,16 @@ describe("grokBuildHarness", () => {
 		expect(grokPolicy("plan")?.capabilities?.fileWrite).toBe("deny");
 	});
 });
+
+describe("grokBuildHarness with knowledge", () => {
+	test("the line comes before the prompt", async () => {
+		await run({
+			addDirs: ["/data/knowledge/p1"],
+			instructions: "Project knowledge is in /data/knowledge/p1.",
+		});
+		const args = await argv();
+		expect(args[args.indexOf("-p") + 1]).toStartWith(
+			"Project knowledge is in /data/knowledge/p1.\n\nRun the tests",
+		);
+	});
+});
