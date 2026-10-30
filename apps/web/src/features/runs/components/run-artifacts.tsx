@@ -106,7 +106,7 @@ export function RunArtifacts({
 					<EmptyDescription>
 						{run.walker.thisDevice
 							? "Agents keep screenshots, recordings and other files of this run here."
-							: `Artifacts stay on the device that ran the step. Open this run on ${run.walker.name ?? "that device"} to see them.`}
+							: `Open this run on ${run.walker.name ?? "the device that ran it"} to see its artifacts.`}
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>

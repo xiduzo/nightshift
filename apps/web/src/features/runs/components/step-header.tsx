@@ -163,7 +163,7 @@ export function StepOutputs({ step }: { step: StepSummary }) {
 			<p className="text-muted-foreground text-xs">
 				{step.outcome === null
 					? "The step has not ended yet."
-					: "This step left nothing for later nodes to read."}
+					: "This step left no outputs."}
 			</p>
 		);
 	}

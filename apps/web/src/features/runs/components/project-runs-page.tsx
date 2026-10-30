@@ -36,7 +36,7 @@ export function ProjectRunsPage({ projectId }: { projectId: string }) {
 						<PageHeading
 							id="runs-heading"
 							title="Runs"
-							description="Every run of this project, started by you or by a schedule. Open one to follow its steps."
+							description="Open a run to follow its steps."
 							actions={
 								<>
 									{sleeping > 0 ? (
@@ -93,7 +93,7 @@ export function ProjectRunsPage({ projectId }: { projectId: string }) {
 												}
 											: undefined
 									}
-									emptyDescription="Start a quick run, or run a flow from Flows. Your runs show up here."
+									emptyDescription="Your runs show here. Start a quick run, or run a flow from Flows."
 									emptyAction={
 										<Button onClick={() => setQuickRun(true)}>
 											<ZapIcon data-icon="inline-start" />

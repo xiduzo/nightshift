@@ -115,7 +115,7 @@ export function QuickRunDialog({
 					<DialogHeader>
 						<DialogTitle>Quick run</DialogTitle>
 						<DialogDescription>
-							One agent with a prompt, no flow needed. It works on a new branch
+							One agent with a prompt, without a flow. It works on a new branch
 							in its own copy of the project.
 						</DialogDescription>
 					</DialogHeader>

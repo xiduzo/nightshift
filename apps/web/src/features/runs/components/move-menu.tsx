@@ -40,7 +40,7 @@ export function MoveMenu({
 		runMutations.move({
 			onSuccess: (_, input) => {
 				const to = targets.find((d) => d.deviceId === input.deviceId);
-				toast.success(`${to?.name ?? "The device"} goes on with the run.`);
+				toast.success(`${to?.name ?? "The device"} continues the run.`);
 				runActed(input.runId);
 			},
 			onError: (error) => toast.error(`Could not move: ${error.message}`),
@@ -71,7 +71,7 @@ export function MoveMenu({
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-64">
 				<DropdownMenuGroup>
-					<DropdownMenuLabel>Go on with the run on</DropdownMenuLabel>
+					<DropdownMenuLabel>Continue the run on</DropdownMenuLabel>
 					{targets.map((d) => (
 						<DropdownMenuItem
 							key={d.deviceId}
