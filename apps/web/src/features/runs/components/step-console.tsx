@@ -1,14 +1,16 @@
+import { stepTodos } from "@nightshift/client";
 import type { OutcomeColor } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import type { RunStatus, StepSummary } from "@/shared/api";
-
+import type { TranscriptItem } from "../transcript/transcript-items";
 import { StepFacts, StepLine, StepOutputs, stepGist } from "./step-header";
+import { StepPlan } from "./step-plan";
 
 /** The height of the closed console: its bar alone. */
 export const CONSOLE_BAR_PX = 44;
@@ -17,7 +19,8 @@ export const CONSOLE_BAR_PX = 44;
  * The selected step along the bottom of the run page, like a browser's
  * devtools. Closed, it is one line: the step and what it did in a few words.
  * Open, it shows everything at once: the step's facts, summary and outputs
- * on the left, and its transcript (what the agent ran and said) on the right.
+ * on the left, with the agent's to-do list, and its transcript (what the
+ * agent ran and said) on the right.
  */
 export function StepConsole({
 	step,
@@ -26,6 +29,7 @@ export function StepConsole({
 	onOpenChange,
 	summary,
 	transcript,
+	items,
 	empty,
 	outcomeColor,
 	className,
@@ -38,6 +42,8 @@ export function StepConsole({
 	summary: ReactNode;
 	/** The live transcript. */
 	transcript: ReactNode;
+	/** The step's transcript items, for the agent's to-do list. */
+	items: readonly TranscriptItem[];
 	/** Shown in the bar while there is no step. */
 	empty: string;
 	/** The colour the step's node gives its outcome. */
@@ -46,6 +52,10 @@ export function StepConsole({
 }) {
 	const gist = step ? stepGist(step) : undefined;
 	const outputCount = step ? Object.keys(step.outputs).length : 0;
+	const todos = useMemo(
+		() => stepTodos(items.filter((item) => item.kind === "tool")),
+		[items],
+	);
 
 	return (
 		<section
@@ -102,6 +112,9 @@ export function StepConsole({
 					<ScrollArea className="h-2/5 shrink-0 border-b lg:h-auto lg:min-h-0 lg:border-b-0">
 						<div className="flex flex-col gap-5 p-4">
 							<StepFacts step={step} />
+							{todos ? (
+								<StepPlan todos={todos} running={step.outcome === null} />
+							) : null}
 							{summary}
 							<section
 								aria-labelledby="step-outputs-heading"

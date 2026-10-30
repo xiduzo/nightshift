@@ -175,6 +175,8 @@ export {
 	stepName,
 	stepOutcomeLabel,
 	stepState,
+	stepTodos,
+	type Todo,
 	type ToolKind,
 	type TranscriptEntry,
 	toolCallsSummary,

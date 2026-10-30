@@ -43,6 +43,7 @@ export {
 	waitFor,
 } from "./stream";
 export { runTime, workedSoFar } from "./time";
+export { stepTodos, type Todo } from "./todos";
 export {
 	groupToolCalls,
 	type ToolKind,

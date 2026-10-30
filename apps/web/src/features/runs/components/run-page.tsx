@@ -459,6 +459,12 @@ export function RunPage({ runId }: { runId: string }) {
 					/>
 				) : null
 			}
+			items={
+				selectedStep
+					? (stream.transcript.steps.get(selectedStep.id) ?? emptyTranscript)
+							.items
+					: emptyTranscript.items
+			}
 			transcript={
 				selectedStep ? (
 					<StepTranscript
