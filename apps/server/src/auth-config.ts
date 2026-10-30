@@ -12,4 +12,13 @@ import { createDb } from "@nightshift/db";
 
 import { ENV } from "./env";
 
-export const auth = createAuth(ENV, createDb({ DATABASE_URL: ":memory:" }));
+export const auth = createAuth(
+	{
+		BETTER_AUTH_URL: ENV.BETTER_AUTH_URL,
+		CORS_ORIGIN: ENV.CORS_ORIGIN,
+		// The CLI signs nothing: a dev checkout without a secret still generates.
+		BETTER_AUTH_SECRET:
+			ENV.BETTER_AUTH_SECRET ?? "schema-generation-only-signs-nothing",
+	},
+	createDb({ DATABASE_URL: ":memory:" }),
+);
