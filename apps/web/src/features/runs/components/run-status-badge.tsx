@@ -1,5 +1,10 @@
 import { runStatusLabel } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	CircleAlertIcon,
@@ -58,6 +63,15 @@ const NOTHING_TO_DO = {
 	className: "border-border bg-muted text-muted-foreground",
 };
 
+/** The icon, colour and label of a status, "Nothing to do" included. */
+function statusLook(status: RunStatus, result: RunSummary["result"]) {
+	const nothing = status === "finished" && result === "nothing-to-do";
+	return {
+		...(nothing ? NOTHING_TO_DO : STATUS[status]),
+		label: nothing ? "Nothing to do" : runStatusLabel(status),
+	};
+}
+
 export function RunStatusBadge({
 	status,
 	result = null,
@@ -68,15 +82,56 @@ export function RunStatusBadge({
 	result?: RunSummary["result"];
 	className?: string;
 }) {
-	const nothing = status === "finished" && result === "nothing-to-do";
-	const { icon: Icon, className: statusClassName } = nothing
-		? NOTHING_TO_DO
-		: STATUS[status];
-	const label = nothing ? "Nothing to do" : runStatusLabel(status);
+	const {
+		icon: Icon,
+		className: statusClassName,
+		label,
+	} = statusLook(status, result);
 	return (
 		<Badge variant="outline" className={cn(statusClassName, className)}>
 			<Icon aria-hidden="true" />
 			{label}
 		</Badge>
+	);
+}
+
+/**
+ * A run's status as its icon alone, in the status colour, for a dense
+ * list. The label shows on hover and reaches screen readers.
+ */
+export function RunStatusIcon({
+	status,
+	result = null,
+	className,
+}: {
+	status: RunStatus;
+	result?: RunSummary["result"];
+	className?: string;
+}) {
+	const {
+		icon: Icon,
+		className: statusClassName,
+		label,
+	} = statusLook(status, result);
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<span
+						className={cn(
+							"relative z-10 flex shrink-0 [&>svg]:size-4",
+							statusClassName,
+							// Keep the badge's text colour, drop its border and fill.
+							"border-0 bg-transparent",
+							className,
+						)}
+					/>
+				}
+			>
+				<Icon aria-hidden="true" />
+				<span className="sr-only">{label}</span>
+			</TooltipTrigger>
+			<TooltipContent>{label}</TooltipContent>
+		</Tooltip>
 	);
 }
