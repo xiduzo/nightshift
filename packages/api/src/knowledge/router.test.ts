@@ -11,26 +11,24 @@ import { accessAs, stub, testContext } from "../testing/context";
  * size warning and the flows that fill it, for the owner of this computer.
  */
 
-const syncFlow: Flow = flowSchema.parse({
-	version: 7,
-	start: "web",
-	nodes: [
-		{
-			id: "web",
-			type: "call",
-			position: { x: 0, y: 0 },
-			flow: "kit:knowledge/web",
-			inputs: { urls: "https://example.com" },
-		},
-	],
-	edges: [],
-});
+const callFlow = (kit: string, inputs: Record<string, string>): Flow =>
+	flowSchema.parse({
+		version: 7,
+		start: "call",
+		nodes: [
+			{ id: "call", type: "call", position: { x: 0, y: 0 }, flow: kit, inputs },
+		],
+		edges: [],
+	});
+const syncFlow = callFlow("kit:knowledge/web", { urls: "https://example.com" });
+const reviewFlow = callFlow("kit:knowledge/review-learnings", {});
 
 function context(personId: string, files: number) {
 	return testContext({
 		access: accessAs({ personId, spaceId: "s1", role: "owner" }),
 		daemon: { device: { id: "d1", name: "studio", ownerId: "owner" } },
 		knowledge: {
+			proposed: async () => 3,
 			index: async () =>
 				Array.from({ length: files }, (_, i) => ({
 					path: `page-${i}.md`,
@@ -42,7 +40,11 @@ function context(personId: string, files: number) {
 			space: () =>
 				stub<SpaceEngine>("Space view", {
 					flows: stub<SpaceFlows>("flows", {
-						map: async () => ({ sync: syncFlow, broken: null }),
+						map: async () => ({
+							sync: syncFlow,
+							"review-learnings": reviewFlow,
+							broken: null,
+						}),
 					}),
 				}),
 		},
@@ -50,7 +52,7 @@ function context(personId: string, files: number) {
 }
 
 describe("knowledge.get", () => {
-	test("the files, the flows that fill the folder, and no warning", async () => {
+	test("the files, the flows that fill the folder or review its learnings, and no warning", async () => {
 		const got = await call(
 			appRouter.knowledge.get,
 			{ projectId: "p1" },
@@ -59,6 +61,8 @@ describe("knowledge.get", () => {
 		expect(got.files.map((f) => f.path)).toEqual(["page-0.md", "page-1.md"]);
 		expect(got.tooLarge).toBe(false);
 		expect(got.syncs).toEqual([{ flow: "sync", kits: ["kit:knowledge/web"] }]);
+		expect(got.proposed).toBe(3);
+		expect(got.reviews).toEqual(["review-learnings"]);
 	});
 
 	test("warns past 2 000 files", async () => {

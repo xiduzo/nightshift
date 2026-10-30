@@ -21,7 +21,11 @@ export const knowledgeSchema = z.object({
 	files: z.array(knowledgeFileSchema),
 	/** So many files that an agent reads it badly. */
 	tooLarge: z.boolean(),
-	/** The flows of the project that call a `kit:knowledge/*` kit, by name. */
+	/** The flows of the project that call a `kit:knowledge/*` kit to fill it, by name. */
 	syncs: z.array(z.object({ flow: z.string(), kits: z.array(z.string()) })),
+	/** How many learnings agents proposed that wait for a person. */
+	proposed: z.number(),
+	/** The flows of the project that review the learnings, by name. */
+	reviews: z.array(z.string()),
 });
 export type KnowledgeView = z.infer<typeof knowledgeSchema>;

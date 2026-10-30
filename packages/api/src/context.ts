@@ -86,7 +86,7 @@ export type Services = {
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
 	/** The projects' knowledge folders on this computer, with their index. */
-	knowledge: Pick<KnowledgeFolders, "index">;
+	knowledge: Pick<KnowledgeFolders, "index" | "proposed">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */

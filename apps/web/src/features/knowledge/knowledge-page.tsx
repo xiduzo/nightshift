@@ -1,5 +1,6 @@
 import {
 	Alert,
+	AlertAction,
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
@@ -28,6 +29,7 @@ import { Link } from "@tanstack/react-router";
 import {
 	BookOpenIcon,
 	CircleAlertIcon,
+	LightbulbIcon,
 	RefreshCwIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
@@ -94,12 +96,19 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 			</div>
 		);
 	}
-	const { files, syncs, tooLarge } = knowledge.data;
-	if (files.length === 0 && syncs.length === 0) {
+	const { files, syncs, tooLarge, proposed, reviews } = knowledge.data;
+	if (files.length === 0 && syncs.length === 0 && proposed === 0) {
 		return <NoKnowledge projectId={projectId} />;
 	}
 	return (
 		<>
+			{proposed > 0 ? (
+				<Learnings
+					projectId={projectId}
+					proposed={proposed}
+					reviews={reviews}
+				/>
+			) : null}
 			<Syncs projectId={projectId} syncs={syncs} />
 			<PageSection
 				title="Files"
@@ -166,6 +175,48 @@ function NoKnowledge({ projectId }: { projectId: string }) {
 				</Button>
 			</EmptyContent>
 		</Empty>
+	);
+}
+
+/**
+ * The learnings agents proposed, which wait for a person, and the flow
+ * that asks about them.
+ */
+function Learnings({
+	projectId,
+	proposed,
+	reviews,
+}: {
+	projectId: string;
+	proposed: number;
+	reviews: string[];
+}) {
+	const [open, setOpen] = useState(false);
+	const review = reviews[0];
+	const notes = `${proposed} ${proposed === 1 ? "learning waits" : "learnings wait"} for you`;
+	return (
+		<Alert>
+			<LightbulbIcon />
+			<AlertTitle>{notes}</AlertTitle>
+			<AlertDescription>
+				{review
+					? "Agents proposed what they learned about this project. Keep what is right, and agents read it in later runs."
+					: "Agents proposed what they learned about this project. Add the review-learnings starter flow to keep or delete them."}
+			</AlertDescription>
+			{review ? (
+				<AlertAction>
+					<Button size="sm" onClick={() => setOpen(true)}>
+						Review learnings
+					</Button>
+					<StartRunDialog
+						open={open}
+						onOpenChange={setOpen}
+						projectId={projectId}
+						flowName={review}
+					/>
+				</AlertAction>
+			) : null}
+		</Alert>
 	);
 }
 
