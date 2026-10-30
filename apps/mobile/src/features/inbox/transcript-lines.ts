@@ -1,13 +1,16 @@
 import {
 	gateParts,
+	groupToolCalls,
 	markdownPreview,
 	plainText,
 	type TranscriptEntry,
+	toolCallsSummary,
 } from "@nightshift/client";
 
 /**
  * A run's transcript as lines to read on a phone: what each agent said,
- * the commands and what they wrote, and what Night Shift did. Pure: the
+ * what its tools did, the commands and what they wrote, and what Night
+ * Shift did. Pure: the
  * transcript sheet follows the run and draws these.
  */
 
@@ -15,6 +18,8 @@ import {
  * Who a line is from:
  * - `step`: a step starts. Its text is the step's name.
  * - `agent`: what an agent said, or its report.
+ * - `tools`: the tool calls an agent made in a row, in one line: "Ran 6
+ *   commands · read 3 files".
  * - `command`: a command line.
  * - `output`: what a command wrote.
  * - `night-shift`: what Night Shift did: a choice, a wait, an answer.
@@ -22,6 +27,7 @@ import {
 export type TranscriptLineKind =
 	| "step"
 	| "agent"
+	| "tools"
 	| "command"
 	| "output"
 	| "night-shift";
@@ -39,8 +45,9 @@ const MAX_OUTPUT = 2000;
 
 /**
  * Folds transcript entries, in seq order, into lines. A step's lines open
- * with its name. Text deltas of one message join into one line, and the
- * output of one command into one line (its end, when it is long).
+ * with its name. Text deltas of one message join into one line, the tool
+ * calls in a row into one summary line, and the output of one command into
+ * one line (its end, when it is long).
  */
 export function transcriptLines(
 	entries: readonly TranscriptEntry[],
@@ -72,6 +79,16 @@ export function transcriptLines(
 		switch (event.type) {
 			case "text":
 				append(`text:${stepId}:${event.messageId}`, "agent", event.delta);
+				break;
+			case "tool-start":
+			case "tool-end": {
+				// One line per call for now: a run of calls folds into one below.
+				const key = `tool:${stepId}:${event.toolCallId}`;
+				if (!at.has(key)) push({ key, kind: "tools", text: event.name });
+				break;
+			}
+			case "tool-call":
+				push({ key: `tool-call:${seq}`, kind: "tools", text: event.tool });
 				break;
 			case "report":
 				if (event.summary.trim() !== "") {
@@ -157,7 +174,16 @@ export function transcriptLines(
 				break;
 		}
 	}
-	const shown = lines
+	const folded = groupToolCalls(lines, (line) => line.kind === "tools").map(
+		(row): TranscriptLine => {
+			const calls = row.kind === "item" ? [row.item] : row.items;
+			const first = calls[0] ?? { key: "tools", kind: "tools", text: "" };
+			return first.kind === "tools"
+				? { ...first, text: toolCallsSummary(calls.map((call) => call.text)) }
+				: first;
+		},
+	);
+	const shown = folded
 		.filter((line) => line.text.trim() !== "")
 		.map((line) =>
 			line.kind === "agent"

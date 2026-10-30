@@ -71,7 +71,7 @@ describe("transcriptLines", () => {
 		const lines = transcriptLines(
 			[
 				entry("s1", { type: "session", sessionId: "x" }),
-				entry("s1", { type: "tool-start", toolCallId: "t", name: "Read" }),
+				entry("s1", { type: "usage", usage: {} }),
 				entry("s2", {
 					type: "decision",
 					label: "approve",
@@ -83,6 +83,35 @@ describe("transcriptLines", () => {
 		expect(lines.map((line) => [line.kind, line.text])).toEqual([
 			["step", "Review"],
 			["night-shift", "Chose approve. Looks fine"],
+		]);
+	});
+
+	test("folds the tool calls in a row into one line", () => {
+		const lines = transcriptLines(
+			[
+				entry("s1", { type: "text", messageId: "m1", delta: "Looking." }),
+				entry("s1", { type: "tool-start", toolCallId: "a", name: "Bash" }),
+				entry("s1", {
+					type: "tool-end",
+					toolCallId: "a",
+					name: "Bash",
+					input: {},
+				}),
+				entry("s1", { type: "tool-result", toolCallId: "a", content: "ok" }),
+				entry("s1", { type: "tool-start", toolCallId: "b", name: "Read" }),
+				entry("s1", { type: "tool-start", toolCallId: "c", name: "Bash" }),
+				entry("s1", { type: "tool-start", toolCallId: "d", name: "Edit" }),
+				entry("s1", { type: "text", messageId: "m2", delta: "Done." }),
+				entry("s1", { type: "tool-start", toolCallId: "e", name: "Grep" }),
+			],
+			label,
+		);
+		expect(lines.map((line) => [line.kind, line.text])).toEqual([
+			["step", "Build"],
+			["agent", "Looking."],
+			["tools", "Ran 2 commands · read 1 file · edited 1 file"],
+			["agent", "Done."],
+			["tools", "Searched once"],
 		]);
 	});
 

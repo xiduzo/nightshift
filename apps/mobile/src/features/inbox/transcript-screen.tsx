@@ -14,6 +14,7 @@ import { useLocalSearchParams } from "expo-router";
 import {
 	Bot,
 	Info,
+	ListChecks,
 	type LucideIcon,
 	SquareTerminal,
 } from "lucide-react-native";
@@ -29,8 +30,8 @@ import { useRunTranscript } from "./use-run-transcript";
 
 /**
  * A run's transcript as a sheet: `transcript/<runId>`. What each agent
- * said, the commands and what they wrote, and what Night Shift did, step
- * by step. It follows the run while it is open.
+ * said, what its tools did (one line per run of calls), the commands and
+ * what they wrote, and what Night Shift did, step by step. It follows the run while it is open.
  */
 export function TranscriptScreen() {
 	const { runId } = useLocalSearchParams<{ runId: string }>();
@@ -85,7 +86,7 @@ export function TranscriptScreen() {
 }
 
 const WHO: Record<
-	Exclude<TranscriptLine["kind"], "step" | "output">,
+	Exclude<TranscriptLine["kind"], "step" | "output" | "tools">,
 	{ icon: LucideIcon; label: string }
 > = {
 	agent: { icon: Bot, label: "Agent" },
@@ -103,6 +104,15 @@ function Line({ line }: { line: TranscriptLine }) {
 				>
 					{line.text}
 				</Text>
+			);
+		case "tools":
+			return (
+				<View className="flex-row items-center gap-1.5" accessible>
+					<Icon as={ListChecks} className="size-4 text-muted-foreground" />
+					<Text className="flex-1 text-muted-foreground text-sm">
+						{line.text}
+					</Text>
+				</View>
 			);
 		case "output":
 			return (
