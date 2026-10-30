@@ -225,7 +225,8 @@ const PLOT_HEIGHT = 14;
  * cheap ones flat. What the runs that did not finish spent goes in the
  * tooltip.
  */
-function CostCell({
+// PROTOTYPE: exported for the Console variant.
+export function CostCell({
 	cost,
 	unfinished,
 	unknownCost,

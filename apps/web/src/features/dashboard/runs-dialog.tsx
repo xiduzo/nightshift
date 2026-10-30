@@ -31,6 +31,7 @@ import {
 	ChartSection,
 	DetailsDialog,
 	DetailsEmpty,
+	type DetailsExtras,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
@@ -56,12 +57,14 @@ export function RunsDialog({
 	onOpenChange,
 	summary,
 	project,
+	extras,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
+	extras?: DetailsExtras;
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
@@ -69,6 +72,7 @@ export function RunsDialog({
 				summary={summary}
 				project={project}
 				onNavigate={() => onOpenChange(false)}
+				extras={extras}
 			/>
 		</DetailsDialog>
 	);
@@ -78,14 +82,18 @@ function RunsDetails({
 	summary,
 	project,
 	onNavigate,
+	extras,
 }: {
 	summary: DashboardSummary;
 	project?: Project;
 	onNavigate: () => void;
+	extras?: DetailsExtras;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<NightRange>(30);
-	const [tab, setTab] = useState<Tab>("overview");
+	const [range, setRange] = useState<NightRange>(extras?.initialRange ?? 30);
+	const [tab, setTab] = useState<Tab>(
+		(extras?.initialTab as Tab) ?? "overview",
+	);
 	const lastDay = summary.cards.lastDay;
 	const inRange: NightsRange["runs"] = nightsOf(summary, range).runs;
 	const { ended, finished, nightsWithRuns, groups, failed } = inRange;
@@ -105,6 +113,10 @@ function RunsDetails({
 					{ value: "overview", label: "Overview" },
 					{ value: "groups", label: project ? "By flow" : "By project" },
 					{ value: "failed", label: "Failed", count: failed.count },
+					...(extras?.extraTabs ?? []).map(({ value, label }) => ({
+						value: value as Tab,
+						label,
+					})),
 				]}
 				value={tab}
 				onValueChange={setTab}
@@ -288,6 +300,11 @@ function RunsDetails({
 						)}
 					</ChartSection>
 				</DetailsTabContent>
+				{extras?.extraTabs?.map(({ value, content }) => (
+					<DetailsTabContent key={value} value={value}>
+						{content}
+					</DetailsTabContent>
+				))}
 			</DetailsTabs>
 
 			{project ? (

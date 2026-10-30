@@ -56,7 +56,7 @@ export function ProjectDashboardPage({ projectId }: { projectId: string }) {
 	const search = useSearch({ strict: false }) as { variant?: string };
 	const variant = VARIANTS.some((v) => v.key === search.variant)
 		? (search.variant as string)
-		: "A";
+		: "B";
 
 	return (
 		<ProjectPage projectId={projectId}>

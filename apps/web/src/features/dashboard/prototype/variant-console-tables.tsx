@@ -5,7 +5,6 @@
  */
 
 import { Card, CardContent } from "@nightshift/ui/components/card";
-import { Progress } from "@nightshift/ui/components/progress";
 import {
 	Table,
 	TableBody,
@@ -22,17 +21,16 @@ import {
 } from "@nightshift/ui/components/tabs";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { RunStatusBadge } from "@/features/runs";
 import type { DashboardSummary, Project } from "@/shared/api";
 import {
 	formatCost,
 	formatDateTime,
 	formatDuration,
-	formatRelative,
 	useNow,
 } from "@/shared/format";
 import { hoursOf, nightsOf } from "../ranges";
 import type { DashboardRange } from "./range-bar";
+import { ConsoleFlows } from "./variant-console-flows";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -58,7 +56,6 @@ export function ConsoleTables({
 		(run) => run.createdAt >= since,
 	);
 	const hours = hoursOf(summary, range === "24h" ? 24 : 168);
-	const flows = summary.flowHealth?.rows ?? [];
 
 	return (
 		<Card className="py-0">
@@ -75,51 +72,7 @@ export function ConsoleTables({
 					</TabsList>
 
 					<TabsContent value="flows">
-						<Note>
-							{range === summary.healthNights
-								? null
-								: `Flows count the last ${summary.healthNights} nights.`}
-						</Note>
-						<ConsoleTable
-							head={[
-								"Flow",
-								"Last run",
-								"Finished",
-								"Runs",
-								"Per finished run",
-							]}
-							empty="No flow ran yet."
-							rows={flows.map((flow) => [
-								<Link
-									key="name"
-									to="/projects/$projectId/flows/$name"
-									params={{ projectId: project.id, name: flow.name }}
-									className="font-mono text-xs hover:underline"
-								>
-									{flow.name}
-								</Link>,
-								flow.last ? (
-									<span key="last" className="flex items-center gap-2">
-										<RunStatusBadge status={flow.last.status} />
-										<span className="text-muted-foreground text-xs">
-											{formatRelative(flow.last.startedAt, now)}
-										</span>
-									</span>
-								) : (
-									"Never run"
-								),
-								flow.rate === null ? (
-									"—"
-								) : (
-									<span key="rate" className="flex items-center gap-2">
-										<Progress value={flow.rate} className="w-24" />
-										<span className="text-xs tabular-nums">{flow.rate}%</span>
-									</span>
-								),
-								flow.runs,
-								flow.cost ? formatCost(flow.cost.median) : "—",
-							])}
-						/>
+						<ConsoleFlows project={project} summary={summary} range={range} />
 					</TabsContent>
 
 					<TabsContent value="failures">

@@ -35,6 +35,7 @@ import {
 	ChartSection,
 	DetailsDialog,
 	DetailsEmpty,
+	type DetailsExtras,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
@@ -70,6 +71,7 @@ export function GatesDialog({
 	gates,
 	summary,
 	project,
+	extras,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -78,6 +80,7 @@ export function GatesDialog({
 	/** The numbers of `project` when given: the Gates its runs asked. */
 	summary: DashboardSummary;
 	project?: Project;
+	extras?: DetailsExtras;
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
@@ -86,6 +89,7 @@ export function GatesDialog({
 				summary={summary}
 				project={project}
 				onNavigate={() => onOpenChange(false)}
+				extras={extras}
 			/>
 		</DetailsDialog>
 	);
@@ -96,16 +100,20 @@ function GatesDetails({
 	summary,
 	project,
 	onNavigate,
+	extras,
 }: {
 	/** Oldest first: the Host sends them in the inbox order. */
 	gates: OpenGate[];
 	summary: DashboardSummary;
 	project?: Project;
 	onNavigate: () => void;
+	extras?: DetailsExtras;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<NightRange>(30);
-	const [tab, setTab] = useState<Tab>("overview");
+	const [range, setRange] = useState<NightRange>(extras?.initialRange ?? 30);
+	const [tab, setTab] = useState<Tab>(
+		(extras?.initialTab as Tab) ?? "overview",
+	);
 	const oldest = waiting[0];
 	const asked = nightsOf(summary, range).gates;
 	const { answerTime, runsAsking, groups } = asked;
@@ -120,6 +128,10 @@ function GatesDetails({
 					{ value: "waiting", label: "Waiting", count: waiting.length },
 					{ value: "groups", label: project ? "By flow" : "By project" },
 					{ value: "latest", label: "Latest" },
+					...(extras?.extraTabs ?? []).map(({ value, label }) => ({
+						value: value as Tab,
+						label,
+					})),
 				]}
 				value={tab}
 				onValueChange={setTab}
@@ -292,6 +304,11 @@ function GatesDetails({
 						)}
 					</ChartSection>
 				</DetailsTabContent>
+				{extras?.extraTabs?.map(({ value, content }) => (
+					<DetailsTabContent key={value} value={value}>
+						{content}
+					</DetailsTabContent>
+				))}
 			</DetailsTabs>
 
 			<DialogFooter>

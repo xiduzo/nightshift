@@ -36,6 +36,7 @@ import {
 	ChartSection,
 	DetailsDialog,
 	DetailsEmpty,
+	type DetailsExtras,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
@@ -58,12 +59,14 @@ export function SpendDialog({
 	onOpenChange,
 	summary,
 	project,
+	extras,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
+	extras?: DetailsExtras;
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
@@ -71,6 +74,7 @@ export function SpendDialog({
 				summary={summary}
 				project={project}
 				onNavigate={() => onOpenChange(false)}
+				extras={extras}
 			/>
 		</DetailsDialog>
 	);
@@ -80,14 +84,18 @@ function SpendDetails({
 	summary,
 	project,
 	onNavigate,
+	extras,
 }: {
 	summary: DashboardSummary;
 	project?: Project;
 	onNavigate: () => void;
+	extras?: DetailsExtras;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<NightRange>(30);
-	const [tab, setTab] = useState<Tab>("overview");
+	const [range, setRange] = useState<NightRange>(extras?.initialRange ?? 30);
+	const [tab, setTab] = useState<Tab>(
+		(extras?.initialTab as Tab) ?? "overview",
+	);
 	const history = nightsOf(summary, range).spend;
 	const lastDay = summary.cards.lastDay;
 	// Runs with a step whose cost is not known: the totals leave that step out.
@@ -116,6 +124,10 @@ function SpendDetails({
 					{ value: "overview", label: "Overview" },
 					{ value: "groups", label: project ? "By flow" : "By project" },
 					{ value: "priciest", label: "Most expensive" },
+					...(extras?.extraTabs ?? []).map(({ value, label }) => ({
+						value: value as Tab,
+						label,
+					})),
 				]}
 				value={tab}
 				onValueChange={setTab}
@@ -309,6 +321,11 @@ function SpendDetails({
 						)}
 					</ChartSection>
 				</DetailsTabContent>
+				{extras?.extraTabs?.map(({ value, content }) => (
+					<DetailsTabContent key={value} value={value}>
+						{content}
+					</DetailsTabContent>
+				))}
 			</DetailsTabs>
 
 			{project ? (

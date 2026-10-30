@@ -142,6 +142,16 @@ export function DetailsEmpty({ children }: { children: ReactNode }) {
 	);
 }
 
+/**
+ * PROTOTYPE, throw away: where a details dialog opens, and tabs a caller
+ * adds to it (the Console variant's placeholders for telemetry to come).
+ */
+export type DetailsExtras = {
+	initialRange?: NightRange;
+	initialTab?: string;
+	extraTabs?: { value: string; label: string; content: ReactNode }[];
+};
+
 export type DetailsTab<Tab extends string> = {
 	value: Tab;
 	label: string;

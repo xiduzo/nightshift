@@ -5,6 +5,7 @@
  * tabbed table under it.
  */
 
+import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	type ChartConfig,
@@ -16,23 +17,29 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Toggle } from "@nightshift/ui/components/toggle";
 import { Link } from "@tanstack/react-router";
 import {
+	ArrowUpRightIcon,
 	CheckSquareIcon,
 	HourglassIcon,
 	LoaderCircleIcon,
+	MinusIcon,
 	SquareIcon,
 	TrendingDownIcon,
 	TrendingUpIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useOpenGates } from "@/features/gates";
-import type { DashboardSummary } from "@/shared/api";
+import type { DashboardSummary, Project } from "@/shared/api";
 import { formatCost, formatTime } from "@/shared/format";
+import { GatesDialog } from "../gates-dialog";
 import { formatNight, formatNightShort } from "../nights";
 import type { VariantProps } from "../project-dashboard-page";
 import { nightsOf } from "../ranges";
+import { RunsDialog } from "../runs-dialog";
+import { SpendDialog } from "../spend-dialog";
 import { type DashboardRange, RangeBar, useDashboardRange } from "./range-bar";
 import { ConsoleTables } from "./variant-console-tables";
+import { Guards, HotSpots, Money, Outcomes } from "./variant-observatory";
 
 type Metric = "runs" | "finished" | "spend" | "gates";
 
@@ -184,8 +191,10 @@ function seriesOf(
 }
 
 export function VariantConsole({ project, summary, isLoading }: VariantProps) {
-	const { range, compare } = useDashboardRange();
+	const { range } = useDashboardRange();
 	const [on, setOn] = useState<Metric[]>(["runs", "finished"]);
+	// The name stays while the dialog closes, so its body does not go blank.
+	const [details, setDetails] = useState<{ metric: Metric; open: boolean }>();
 	const series = summary ? seriesOf(summary, range) : null;
 
 	return (
@@ -194,21 +203,32 @@ export function VariantConsole({ project, summary, isLoading }: VariantProps) {
 			<NowStrip projectId={project.id} summary={summary} />
 			<MetricTiles
 				totals={series?.totals}
-				before={compare ? (series?.before ?? null) : null}
+				before={series?.before ?? null}
 				on={on}
 				onChange={setOn}
+				onDetails={(metric) => setDetails({ metric, open: true })}
 				loading={isLoading}
 			/>
 			<Card>
 				<CardContent>
 					{series ? (
-						<ConsoleChart rows={series.rows} on={on} compare={compare} />
+						<ConsoleChart rows={series.rows} on={on} />
 					) : (
 						<Skeleton className="h-72 w-full" />
 					)}
 				</CardContent>
 			</Card>
 			<ConsoleTables project={project} summary={summary} range={range} />
+			{summary && details ? (
+				<MetricDetails
+					metric={details.metric}
+					open={details.open}
+					onOpenChange={(open) => setDetails({ ...details, open })}
+					project={project}
+					summary={summary}
+					range={range}
+				/>
+			) : null}
 		</div>
 	);
 }
@@ -260,12 +280,15 @@ function MetricTiles({
 	before,
 	on,
 	onChange,
+	onDetails,
 	loading,
 }: {
 	totals: Totals | undefined;
+	/** Null when the numbers do not reach back that far: 90 nights. */
 	before: Totals | null;
 	on: Metric[];
 	onChange: (on: Metric[]) => void;
+	onDetails: (metric: Metric) => void;
 	loading: boolean;
 }) {
 	return (
@@ -273,59 +296,188 @@ function MetricTiles({
 			{METRICS.map((metric) => {
 				const pressed = on.includes(metric.key);
 				const value = totals?.[metric.key] ?? null;
-				const prev = before?.[metric.key] ?? null;
-				const delta = value !== null && prev !== null ? value - prev : null;
 				return (
-					<Toggle
+					<div
 						key={metric.key}
-						pressed={pressed}
-						onPressedChange={(next) =>
-							onChange(
-								next
-									? [...on, metric.key]
-									: on.filter((key) => key !== metric.key),
-							)
-						}
-						className="h-auto flex-col items-start gap-3 rounded-none border-r p-4 text-left last:border-r-0 aria-pressed:text-background"
+						className="relative flex border-r last:border-r-0 data-pressed:text-background"
+						data-pressed={pressed ? "" : undefined}
 						style={pressed ? { backgroundColor: metric.color } : undefined}
 					>
-						<span className="flex items-center gap-2 font-medium text-sm">
-							{pressed ? <CheckSquareIcon /> : <SquareIcon />}
-							{metric.label}
-						</span>
-						{loading || !totals ? (
-							<Skeleton className="h-9 w-20" />
-						) : (
-							<span className="font-semibold text-4xl tabular-nums tracking-tight">
-								{metric.format(value)}
+						<Toggle
+							pressed={pressed}
+							onPressedChange={(next) =>
+								onChange(
+									next
+										? [...on, metric.key]
+										: on.filter((key) => key !== metric.key),
+								)
+							}
+							className="h-auto w-full flex-col items-start justify-start gap-3 rounded-none p-4 text-left text-inherit hover:bg-transparent aria-pressed:bg-transparent aria-pressed:text-inherit"
+						>
+							<span className="flex items-center gap-2 font-medium text-sm">
+								{pressed ? <CheckSquareIcon /> : <SquareIcon />}
+								{metric.label}
 							</span>
-						)}
-						{delta !== null ? (
-							<span className="flex items-center gap-1 text-xs opacity-80">
-								{delta >= 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
-								{metric.key === "spend"
-									? formatCost(Math.abs(delta))
-									: Math.abs(delta)}
-								{metric.key === "finished" ? " points" : ""}{" "}
-								{delta >= 0 ? "more" : "less"} than the nights before
-							</span>
-						) : null}
-					</Toggle>
+							{loading || !totals ? (
+								<Skeleton className="h-9 w-20" />
+							) : (
+								<span className="font-semibold text-4xl tabular-nums tracking-tight">
+									{metric.format(value)}
+								</span>
+							)}
+							<Change
+								metric={metric.key}
+								value={value}
+								before={before ? before[metric.key] : undefined}
+							/>
+						</Toggle>
+						<Button
+							variant="ghost"
+							size="xs"
+							className="absolute top-3 right-3 text-inherit hover:bg-foreground/10 hover:text-inherit"
+							onClick={() => onDetails(metric.key)}
+						>
+							Details
+							<ArrowUpRightIcon data-icon="inline-end" />
+						</Button>
+					</div>
 				);
 			})}
 		</div>
 	);
 }
 
-function ConsoleChart({
-	rows,
-	on,
-	compare,
+/**
+ * How a number moved against the period before. Always shown: "undefined"
+ * when the numbers do not reach back that far, null when nothing ended then.
+ */
+function Change({
+	metric,
+	value,
+	before,
 }: {
-	rows: Row[];
-	on: Metric[];
-	compare: boolean;
+	metric: Metric;
+	value: number | null;
+	before: number | null | undefined;
 }) {
+	const line = (icon: ReactNode, text: string) => (
+		<span className="flex items-center gap-1 text-xs opacity-80">
+			{icon}
+			{text}
+		</span>
+	);
+	if (before === undefined)
+		return line(<MinusIcon />, "Nothing to compare with yet");
+	if (value === null || before === null)
+		return line(<MinusIcon />, "No runs ended in the period before");
+	if (before === 0 && value > 0)
+		return line(<TrendingUpIcon />, "None in the period before");
+	const delta = value - before;
+	if (delta === 0) return line(<MinusIcon />, "Same as the period before");
+	const amount =
+		metric === "spend"
+			? formatCost(Math.abs(delta))
+			: metric === "finished"
+				? `${Math.abs(delta)} points`
+				: String(Math.abs(delta));
+	return line(
+		delta > 0 ? <TrendingUpIcon /> : <TrendingDownIcon />,
+		`${amount} ${delta > 0 ? "more" : "less"} than the period before`,
+	);
+}
+
+/**
+ * The details of a number, in the dialog the cards open now, at the page's
+ * range. Tabs for telemetry to come (sample data) sit beside the real ones.
+ */
+function MetricDetails({
+	metric,
+	open,
+	onOpenChange,
+	project,
+	summary,
+	range,
+}: {
+	metric: Metric;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	project: Project;
+	summary: DashboardSummary;
+	range: DashboardRange;
+}) {
+	const gates = useOpenGates();
+	const waiting =
+		gates.data?.filter((gate) => gate.projectId === project.id) ?? [];
+	const flows = summary.flowHealth?.rows.map((row) => row.name) ?? [];
+	const initialRange = range === "24h" ? 7 : range;
+	const props = { open, onOpenChange, summary, project };
+
+	if (metric === "spend") {
+		return (
+			<SpendDialog
+				{...props}
+				extras={{
+					initialRange,
+					extraTabs: [
+						{
+							value: "models",
+							label: "By model",
+							content: <Money summary={summary} range={range} />,
+						},
+						{
+							value: "budgets",
+							label: "Budgets",
+							content: <Guards summary={summary} flows={flows} range={range} />,
+						},
+					],
+				}}
+			/>
+		);
+	}
+	if (metric === "gates") {
+		return (
+			<GatesDialog
+				{...props}
+				gates={waiting}
+				extras={{
+					initialRange,
+					extraTabs: [
+						{
+							value: "scores",
+							label: "Answers as scores",
+							content: (
+								<Outcomes summary={summary} flows={flows} range={range} />
+							),
+						},
+					],
+				}}
+			/>
+		);
+	}
+	return (
+		<RunsDialog
+			{...props}
+			extras={{
+				initialRange,
+				initialTab: metric === "finished" ? "failed" : "overview",
+				extraTabs: [
+					{
+						value: "steps",
+						label: "Steps",
+						content: <HotSpots flows={flows} range={range} />,
+					},
+					{
+						value: "outcomes",
+						label: "Outcomes",
+						content: <Outcomes summary={summary} flows={flows} range={range} />,
+					},
+				],
+			}}
+		/>
+	);
+}
+
+function ConsoleChart({ rows, on }: { rows: Row[]; on: Metric[] }) {
 	if (on.length === 0) {
 		return (
 			<p className="flex h-72 items-center justify-center text-muted-foreground text-sm">
@@ -381,22 +533,20 @@ function ConsoleChart({
 						connectNulls
 					/>
 				))}
-				{compare
-					? shown.map((metric) => (
-							<Line
-								key={`prev_${metric.key}`}
-								yAxisId={metric.key}
-								dataKey={`prev_${metric.key}`}
-								type="monotone"
-								stroke={`var(--color-${metric.key})`}
-								strokeWidth={1.5}
-								strokeDasharray="4 4"
-								strokeOpacity={0.6}
-								dot={false}
-								connectNulls
-							/>
-						))
-					: null}
+				{shown.map((metric) => (
+					<Line
+						key={`prev_${metric.key}`}
+						yAxisId={metric.key}
+						dataKey={`prev_${metric.key}`}
+						type="monotone"
+						stroke={`var(--color-${metric.key})`}
+						strokeWidth={1.5}
+						strokeDasharray="4 4"
+						strokeOpacity={0.6}
+						dot={false}
+						connectNulls
+					/>
+				))}
 			</LineChart>
 		</ChartContainer>
 	);

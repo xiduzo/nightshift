@@ -244,7 +244,7 @@ function Digest({
 	);
 }
 
-function Guards({
+export function Guards({
 	summary,
 	flows,
 	range,
@@ -351,7 +351,7 @@ const TOKEN_CONFIG = {
 	tokens: { label: "Tokens" },
 } satisfies ChartConfig;
 
-function Money({
+export function Money({
 	summary,
 	range,
 }: {
@@ -469,7 +469,7 @@ function Money({
 	);
 }
 
-function HotSpots({
+export function HotSpots({
 	flows,
 	range,
 }: {
@@ -540,7 +540,7 @@ function HotSpots({
 	);
 }
 
-function Outcomes({
+export function Outcomes({
 	summary,
 	flows,
 	range,
