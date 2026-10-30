@@ -106,6 +106,40 @@ async function syncDocuments(...devices: TestDevice[]) {
 
 const NOW = Date.now();
 
+describe("removeFolder", () => {
+	test("removes a folder's entries for every Device, and its files here and there", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		await a.put("web/a.md", "a");
+		await a.put("web/b.md", "b");
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.sync.reconcile("p1");
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+		expect(await b.has("web/a.md")).toBe(true);
+
+		expect(await a.sync.removeFolder("p1", "web")).toBe(2);
+
+		expect([...(await a.entries()).keys()]).toEqual(["wiki/Home.md"]);
+		expect(await a.has("web/a.md")).toBe(false);
+		expect(await a.has("wiki/Home.md")).toBe(true);
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+		expect(await b.has("web/b.md")).toBe(false);
+		expect(await b.has("wiki/Home.md")).toBe(true);
+	});
+
+	test("refuses a folder outside the knowledge, and Night Shift's own", async () => {
+		const a = await device(null);
+		for (const folder of ["", "../x", "learnings", ".hidden"]) {
+			await expect(a.sync.removeFolder("p1", folder)).rejects.toThrow(
+				"Choose a folder inside the knowledge",
+			);
+		}
+	});
+});
+
 describe("reconcile", () => {
 	test("publishes a file the folder changed: content to the Host first, then its entry", async () => {
 		const { kept, host } = memoryHost();

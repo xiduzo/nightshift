@@ -533,6 +533,35 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			};
 		},
 		/**
+		 * Removes a folder of the project's knowledge, for every Device of
+		 * the Space: its entries leave the document (after a reconcile, so
+		 * this Device's own changes are in it first), and the next reconcile
+		 * of each Device removes the files from its folder. Removes the
+		 * folder's files here at once. Returns how many files it removed.
+		 */
+		async removeFolder(projectId: string, folder: string): Promise<number> {
+			const prefix = `${folder.replace(/\/+$/, "")}/`;
+			if (!isKnowledgePath(`${prefix}x`) || prefix.startsWith("learnings/")) {
+				throw new Refusal(
+					"invalid",
+					"Choose a folder inside the knowledge. learnings is Night Shift's own.",
+				);
+			}
+			await reconcile(projectId);
+			const document = await deps.documents.open(projectId);
+			const paths = [...knowledgeEntries(document).keys()].filter((path) =>
+				path.startsWith(prefix),
+			);
+			if (paths.length > 0) {
+				const map = knowledgeFiles(document);
+				await document.change(() => {
+					for (const path of paths) map.delete(path);
+				});
+			}
+			await reconcile(projectId);
+			return paths.length;
+		},
+		/**
 		 * Reconciles every folder on this computer: the import on upgrade
 		 * at the first start, and what waited while the daemon was down.
 		 */
