@@ -28,6 +28,7 @@ export {
 	flowVariableSchema,
 	type Outcome,
 	type Policy,
+	type PolicyValues,
 	policyFromSettings,
 	type ResolvedPolicy,
 	type SectionColor,

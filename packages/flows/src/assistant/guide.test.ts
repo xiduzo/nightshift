@@ -98,8 +98,9 @@ describe("flowAuthoringGuide", () => {
 		// list of kits, one line per kit (about 200 words). 2950: a profile
 		// is a pair of ids (ADR 3), two more words per example node. 3150:
 		// how to group a flow into Sections (about 190 words), so the
-		// assistant tidies the flows it builds.
-		expect(words).toBeLessThan(3150);
+		// assistant tidies the flows it builds. 3200: the run budget and
+		// the turn and idle limits of an Agent step.
+		expect(words).toBeLessThan(3200);
 	});
 });
 

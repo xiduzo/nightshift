@@ -79,6 +79,23 @@ export const policySchema = z.object({
 	/** Safety net: the most steps a run may take before it stops (resumable). */
 	maxSteps: z.number().int().positive().optional(),
 	/**
+	 * The most a run may spend, in USD, as far as its cost is known (an
+	 * estimate counts). Past it the run stops `failed`; a resume may spend
+	 * as much again. Unset: the daemon's setting, else no budget.
+	 */
+	budgetUsd: z.number().positive().optional(),
+	/**
+	 * The most turns (model replies) one session of an Agent step may take,
+	 * unless the node sets its own. Past it the step ends `fail`. Unset:
+	 * the daemon's setting, else no limit.
+	 */
+	maxTurns: z.number().int().positive().optional(),
+	/**
+	 * An Agent step with no activity for this long ends `fail`, unless the
+	 * node sets its own `idleMinutes`.
+	 */
+	idleMinutes: z.number().positive().optional(),
+	/**
 	 * After a daemon restart, a run the daemon stopped mid-step continues on
 	 * its own (true) or waits for a person (false).
 	 */
@@ -219,25 +236,43 @@ export type FlowInput = z.input<typeof flowSchema>;
 export type FlowNode = z.infer<typeof flowNodeSchema>;
 export type Policy = z.infer<typeof policySchema>;
 /**
+ * The policy values that may stay unset: the step cap and the resume
+ * switch (the engine reads the setting when it applies), and the run
+ * budget and the turn limit (none unless the flow or the settings set one).
+ */
+type OpenPolicyKey =
+	| "maxSteps"
+	| "resumeInterruptedRuns"
+	| "budgetUsd"
+	| "maxTurns";
+
+/**
  * A policy with every wait filled in: the flow's own, else the daemon's
- * setting. `maxSteps` and `resumeInterruptedRuns` stay the flow's own: the
+ * setting. The open values (`OpenPolicyKey`) stay the flow's own: the
  * engine reads the setting when it applies.
  */
-export type ResolvedPolicy = Required<
-	Omit<Policy, "maxSteps" | "resumeInterruptedRuns">
-> &
-	Pick<Policy, "maxSteps" | "resumeInterruptedRuns">;
+export type ResolvedPolicy = Required<Omit<Policy, OpenPolicyKey>> &
+	Pick<Policy, OpenPolicyKey>;
+
+/** Every policy value, as the settings hold it: null for no budget or no turn limit. */
+export type PolicyValues = Required<Omit<Policy, "budgetUsd" | "maxTurns">> & {
+	budgetUsd: number | null;
+	maxTurns: number | null;
+};
 
 /**
  * The built-in run policy: what each value is when neither the flow nor the
  * daemon's settings set it. The settings fall back to these.
  */
-export const DEFAULT_POLICY: Readonly<Required<Policy>> = {
+export const DEFAULT_POLICY: Readonly<PolicyValues> = {
 	usageLimitFirstWaitMinutes: 5,
 	usageLimitMaxWaitMinutes: 60,
 	networkGraceMinutes: 240,
 	maxSteps: 500,
 	resumeInterruptedRuns: true,
+	budgetUsd: null,
+	maxTurns: null,
+	idleMinutes: 15,
 };
 
 /** The daemon settings that hold the run policy of a flow that does not set its own. */
@@ -247,16 +282,22 @@ type PolicySettings = {
 	networkGraceMinutes: number;
 	maxStepsPerRun: number;
 	resumeInterruptedRuns: boolean;
+	budgetUsd: number | null;
+	maxTurns: number | null;
+	idleMinutes: number;
 };
 
 /** The run policy of a flow that sets none of its own: the daemon's settings. */
-export function policyFromSettings(settings: PolicySettings): Required<Policy> {
+export function policyFromSettings(settings: PolicySettings): PolicyValues {
 	return {
 		usageLimitFirstWaitMinutes: settings.usageLimitFirstWaitMinutes,
 		usageLimitMaxWaitMinutes: settings.usageLimitMaxWaitMinutes,
 		networkGraceMinutes: settings.networkGraceMinutes,
 		maxSteps: settings.maxStepsPerRun,
 		resumeInterruptedRuns: settings.resumeInterruptedRuns,
+		budgetUsd: settings.budgetUsd,
+		maxTurns: settings.maxTurns,
+		idleMinutes: settings.idleMinutes,
 	};
 }
 export type FlowInputDef = z.infer<typeof flowInputSchema>;

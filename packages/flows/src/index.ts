@@ -143,6 +143,7 @@ export {
 	outcomeColor,
 	outputFieldsByType,
 	type Policy,
+	type PolicyValues,
 	policyFromSettings,
 	QUICK_RUN_HARNESS,
 	type ResolvedPolicy,

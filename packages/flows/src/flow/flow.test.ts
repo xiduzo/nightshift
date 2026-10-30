@@ -10,6 +10,9 @@ describe("policyFromSettings", () => {
 				networkGraceMinutes: 30,
 				maxStepsPerRun: 50,
 				resumeInterruptedRuns: false,
+				budgetUsd: 5,
+				maxTurns: null,
+				idleMinutes: 20,
 			}),
 		).toEqual({
 			usageLimitFirstWaitMinutes: 10,
@@ -17,6 +20,9 @@ describe("policyFromSettings", () => {
 			networkGraceMinutes: 30,
 			maxSteps: 50,
 			resumeInterruptedRuns: false,
+			budgetUsd: 5,
+			maxTurns: null,
+			idleMinutes: 20,
 		});
 	});
 

@@ -219,8 +219,17 @@ export const agentNodeSchema = z.object({
 	 * refuses to start.
 	 */
 	clis: z.array(cliNameSchema).optional(),
-	/** The step fails when the agent shows no activity for this long. */
+	/**
+	 * The step ends `fail` when the agent shows no activity for this long.
+	 * Unset: the run policy's `idleMinutes`.
+	 */
 	idleMinutes: z.number().int().positive().optional(),
+	/**
+	 * The most turns (model replies) one session of this step may take; past
+	 * it the step ends `fail`. Unset: the run policy's `maxTurns`, else no
+	 * limit.
+	 */
+	maxTurns: z.number().int().positive().optional(),
 	/**
 	 * Connections by name: MCP servers defined once on this daemon (the
 	 * Connections page), added to the harness's own configuration. A flow
