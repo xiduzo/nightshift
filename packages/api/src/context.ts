@@ -11,7 +11,8 @@ import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	Engine,
-	KnowledgeFolders,
+	KnowledgeSearch,
+	KnowledgeSync,
 	ToolLaunchers,
 } from "@nightshift/engine";
 import type {
@@ -28,6 +29,7 @@ import type {
 } from "@nightshift/engine/projects";
 import type { AssistantService } from "@nightshift/flows";
 import type { Notifications } from "@nightshift/notifications";
+import type { Telemetry } from "@nightshift/telemetry";
 
 /** What a procedure gets: the request, and the daemon's services. */
 export type Context = Services & {
@@ -80,13 +82,21 @@ export type Services = {
 	 * push targets.
 	 */
 	notifications: Notifications;
+	/** The export to monitoring: its headers, kept like a secret, by name only. */
+	telemetry: Pick<Telemetry, "headers">;
 	connections: ConnectionStore;
 	cliTools: CliToolStore;
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
-	/** The projects' knowledge folders on this computer, with their index. */
-	knowledge: Pick<KnowledgeFolders, "index" | "proposed">;
+	/**
+	 * The projects' knowledge in their Spaces (ADR 4): the files the
+	 * knowledge document lists, and one file's content by its hash for a
+	 * computer whose folder lacks it.
+	 */
+	knowledge: Pick<KnowledgeSync, "listing" | "read">;
+	/** Keyword search over the projects' knowledge on this computer, and reading one file of its folder. */
+	knowledgeSearch: Pick<KnowledgeSearch, "search" | "read">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */

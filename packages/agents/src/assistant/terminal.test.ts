@@ -67,6 +67,8 @@ function fakePort(
 		gates: async () => [],
 		answerGate: async () => {},
 		digest: async () => null,
+		searchKnowledge: async () => [],
+		readKnowledge: async () => null,
 		runLink: (id, step) =>
 			`http://localhost:9/runs/${id}${step ? `?step=${step}` : ""}`,
 		flowLink: (p, name) => `http://localhost:9/projects/${p}/flows/${name}`,
@@ -114,7 +116,9 @@ describe("nightshift mcp tools", () => {
 			"list_skills",
 			"list_tools",
 			"needs_me",
+			"read_knowledge",
 			"save_flow",
+			"search_knowledge",
 			"start_run",
 			"stop_run",
 		]);
@@ -508,6 +512,81 @@ describe("the run tools of nightshift mcp", () => {
 		expect(asked).toEqual([undefined, NOW - 12 * HOUR, NOW]);
 		expect((await call("get_digest", { since: "yesterday" })).isError).toBe(
 			true,
+		);
+	});
+});
+
+describe("the knowledge tools", () => {
+	test("search_knowledge gives the paths, titles and excerpts in the folder's project", async () => {
+		const asked: unknown[] = [];
+		const { call } = await connect(
+			fakePort({
+				searchKnowledge: async (projectId, query, limit) => {
+					asked.push({ projectId, query, limit });
+					return [
+						{
+							path: "wiki/deploy.md",
+							title: "Deploy",
+							snippet: [
+								{ text: "We ", match: false },
+								{ text: "deploy", match: true },
+								{ text: " at night.", match: false },
+							],
+						},
+					];
+				},
+			}),
+			{ folder: "/work/site" },
+		);
+		const found = await call("search_knowledge", {
+			query: " deploy ",
+			limit: 99,
+		});
+		expect(found.isError).toBe(false);
+		expect(JSON.parse(found.text)).toEqual([
+			{
+				path: "wiki/deploy.md",
+				title: "Deploy",
+				excerpt: "We **deploy** at night.",
+			},
+		]);
+		expect(asked).toEqual([{ projectId: "p2", query: "deploy", limit: 50 }]);
+	});
+
+	test("search_knowledge says when nothing matches, and asks for words", async () => {
+		const { call } = await connect(fakePort(), { project: "App" });
+		expect(
+			(await call("search_knowledge", { query: "nothing" })).text,
+		).toContain('No file in the knowledge of "App" matches "nothing"');
+		expect((await call("search_knowledge", { query: " " })).isError).toBe(true);
+	});
+
+	test("read_knowledge gives the text, says when it is cut, and when there is no file", async () => {
+		const { call } = await connect(
+			fakePort({
+				readKnowledge: async (_projectId, path, maxBytes) =>
+					path === "big.md"
+						? {
+								path,
+								title: "Big",
+								text: "x".repeat(10),
+								size: maxBytes * 3,
+								truncated: true,
+							}
+						: path === "a.md"
+							? { path, title: "A", text: "# A\n", size: 4, truncated: false }
+							: null,
+			}),
+			{ project: "App" },
+		);
+		expect((await call("read_knowledge", { path: "a.md" })).text).toBe(
+			"a.md: A\n\n# A\n",
+		);
+		expect((await call("read_knowledge", { path: "big.md" })).text).toContain(
+			"The file is 300 KB. This is its first 100 KB.",
+		);
+		expect((await call("read_knowledge", { path: "gone.md" })).text).toContain(
+			'has no file "gone.md"',
 		);
 	});
 });

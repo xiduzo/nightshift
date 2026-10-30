@@ -45,6 +45,7 @@ export {
 } from "./read-model";
 export type { RunBundleSummary } from "./run-bundle";
 export { exportRun } from "./run-bundle";
+export type { RunTrace } from "./run-trace";
 export type { FeedStep } from "./run-transcript";
 export type {
 	OpenGate,

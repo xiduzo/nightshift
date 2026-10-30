@@ -252,6 +252,7 @@ describe("runMetrics", () => {
 			tokens: { input: 1000, output: 200, cacheRead: 600, cacheWrite: 100 },
 			costBasis: "unknown",
 			prUrl: "https://github.com/acme/app/pull/8",
+			scores: [],
 		});
 	});
 
@@ -267,5 +268,23 @@ describe("runMetrics", () => {
 		expect(facts.metrics.wallMs).toBe(300);
 		expect(facts.metrics.prUrl).toBe("https://github.com/acme/app/pull/8");
 		expect(facts.costMissing).toBe(1);
+	});
+
+	test("lists the run's scores, oldest first", () => {
+		const { events } = night().at(
+			1400,
+			"Scored",
+			{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+			{ stepId: "s2" },
+		);
+		expect(runFacts(events).metrics.scores).toEqual([
+			{
+				score: "gate_decision",
+				value: 1,
+				label: "approve",
+				stepId: "s2",
+				at: 1400,
+			},
+		]);
 	});
 });

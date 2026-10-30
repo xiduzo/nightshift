@@ -130,6 +130,33 @@ export function createRelay(deps: {
 			);
 		},
 
+		async knowledgePut(ref, content) {
+			const to = await route(ref.spaceId);
+			if (to.at === "here") return;
+			if (to.at === "unreachable") throw new HostUnreachableError();
+			await to.ask((client) =>
+				client.archive.knowledgePut({ ...ref, content }),
+			);
+		},
+
+		async knowledge(ref) {
+			const to = await route(ref.spaceId);
+			if (to.at === "unreachable") throw new HostUnreachableError();
+			return to.at === "host"
+				? to.ask((client) => client.archive.knowledgeGet(ref))
+				: null;
+		},
+
+		async inStep(spaceId, documentName) {
+			const to = await route(spaceId);
+			if (to.at === "here") return true;
+			const link = to.at === "host" ? deps.links().get(to.hostId) : undefined;
+			if (!link) return null;
+			if (link.synced(documentName)) return true;
+			link.check();
+			return false;
+		},
+
 		async reachable(spaceId) {
 			return (await route(spaceId)).at === "host";
 		},

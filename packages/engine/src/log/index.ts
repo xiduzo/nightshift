@@ -21,6 +21,7 @@ export type {
 	RunTrigger,
 	RunWarningKind,
 	Scope,
+	ScoreName,
 	SessionOutcome,
 	StepBudget,
 	StepOutcome,

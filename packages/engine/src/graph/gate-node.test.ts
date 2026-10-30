@@ -206,11 +206,17 @@ describe("the Gate node", () => {
 			"StepStarted",
 			"GateOpened",
 			"StepEnded",
+			"Scored",
 			"EdgeTaken",
 			"StepStarted",
 			"StepEnded",
 		]);
 		const after = await h.events();
+		// The answer is scored on the Gate's step: what it took, and who chose.
+		expect(payloads(after, "Scored")).toEqual([
+			{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+		]);
+		expect(after.find((e) => e.type === "Scored")?.stepId).toBe(stepId);
 		expect(payloads(after, "StepEnded")[0]).toEqual({
 			outcome: "approve",
 			outputs: { outcome: "approve", note: "LGTM, merge after CI.", visit: 1 },

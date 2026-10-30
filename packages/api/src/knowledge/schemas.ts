@@ -1,4 +1,8 @@
-import type { KnowledgeFile } from "@nightshift/engine";
+import type {
+	KnowledgeFile,
+	KnowledgeHit,
+	KnowledgeText,
+} from "@nightshift/engine";
 import { z } from "zod";
 
 import { exact } from "../output";
@@ -12,10 +16,12 @@ const knowledgeFileSchema = exact<KnowledgeFile>()(
 		size: z.number(),
 		/** Epoch ms. */
 		changedAt: z.number(),
+		/** Larger than 10 MB: it stays on the computer that synced it. */
+		local: z.literal(true).optional(),
 	}),
 );
 
-/** A project's knowledge on this computer, and the flows that fill it. */
+/** A project's knowledge in its Space, and the flows that fill it. */
 export const knowledgeSchema = z.object({
 	/** Every file but the index, by path. */
 	files: z.array(knowledgeFileSchema),
@@ -27,5 +33,33 @@ export const knowledgeSchema = z.object({
 	proposed: z.number(),
 	/** The flows of the project that review the learnings, by name. */
 	reviews: z.array(z.string()),
+	/** The project's Space is not a personal one: each of its Members reads the knowledge. */
+	shared: z.boolean(),
 });
 export type KnowledgeView = z.infer<typeof knowledgeSchema>;
+
+/** A file a knowledge search found. */
+export const knowledgeHitSchema = exact<KnowledgeHit>()(
+	z.object({
+		/** Relative to the folder, with `/` between its parts. */
+		path: z.string(),
+		title: z.string(),
+		/** A short excerpt around the best match. `match` parts are the words found. */
+		snippet: z.array(z.object({ text: z.string(), match: z.boolean() })),
+		/** How well it matches: higher is better, within one search. */
+		score: z.number(),
+	}),
+);
+
+/** One file of a project's knowledge, its text cut at the size asked for. */
+export const knowledgeTextSchema = exact<KnowledgeText>()(
+	z.object({
+		path: z.string(),
+		title: z.string(),
+		text: z.string(),
+		/** Bytes of the whole file. */
+		size: z.number(),
+		/** The text stops before the file ends. */
+		truncated: z.boolean(),
+	}),
+);

@@ -32,6 +32,8 @@ import {
 import {
 	commandKnowledge,
 	type KnowledgeFolders,
+	type KnowledgeRequest,
+	type KnowledgeSync,
 	keepLearnings,
 	sessionKnowledge,
 	withLearnings,
@@ -144,6 +146,23 @@ export type LocalDeviceDeps = {
 	 * gets none.
 	 */
 	knowledge?: KnowledgeFolders;
+	/**
+	 * What a run step's harness session adds to its environment, read as
+	 * the session starts: the export to monitoring gives Claude Code its
+	 * own telemetry under the step (`@nightshift/telemetry`). Without it,
+	 * or when it gives nothing: nothing.
+	 */
+	sessionEnv?: (session: {
+		harness: AgentHarnessName;
+		runId: string;
+		stepId: string;
+	}) => Record<string, string>;
+	/**
+	 * Keeps a project's folder in step with its Space (ADR 4): before and
+	 * after each step that gets it. Without it, the folder is this
+	 * computer's alone.
+	 */
+	knowledgeSync?: Pick<KnowledgeSync, "reconcile">;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -177,6 +196,21 @@ function keepArtifact(
 		const artifact = await store.save({ ...step, cwd, ...file });
 		return `Kept "${artifact.title}" as an artifact of this run.`;
 	};
+}
+
+/**
+ * Brings the project's folder in step with its Space, when this computer
+ * syncs it. A reconcile that fails leaves the folder as it is: the step
+ * goes on.
+ */
+async function reconcileKnowledge(
+	deps: LocalDeviceDeps,
+	request: KnowledgeRequest | undefined,
+): Promise<void> {
+	if (!request || !deps.knowledge || !deps.knowledgeSync) return;
+	await deps.knowledgeSync.reconcile(request.projectId).catch((error) => {
+		console.warn("The knowledge was not brought in step:", error);
+	});
 }
 
 /** This computer as a Device. */
@@ -293,6 +327,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					? cliToolsInstruction(await deps.cliToolsFor(clis))
 					: "";
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
+			// The knowledge as the Space has it now, before the agent reads it.
+			await reconcileKnowledge(deps, knowledge);
 			const known =
 				knowledge && deps.knowledge
 					? await sessionKnowledge(deps.knowledge, knowledge).catch((error) => {
@@ -300,7 +336,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 							return null;
 						})
 					: null;
-			const env = { ...known?.env, ...tools?.env };
+			const env = {
+				...(artifacts
+					? deps.sessionEnv?.({ harness: name, ...artifacts })
+					: {}),
+				...known?.env,
+				...tools?.env,
+			};
 			// An agent that reads the knowledge may propose to add to it.
 			const learn =
 				known?.addDirs && knowledge && artifacts && deps.knowledge
@@ -335,6 +377,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				: events;
 		} finally {
 			await tools?.cleanup();
+			// What the step changed, and the learnings it proposed, go to the Space.
+			await reconcileKnowledge(deps, knowledge);
 		}
 	}
 
@@ -374,6 +418,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "refused", message: missingSecretsMessage(found.missing) };
 			return;
 		}
+		// The knowledge as the Space has it now, before the command reads it.
+		await reconcileKnowledge(deps, knowledge);
 		// The sync flows write here. A folder that cannot be made is left out.
 		const known =
 			knowledge && deps.knowledge
@@ -397,6 +443,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield* hidden.length > 0 ? redactExec(events, hidden) : events;
 		} finally {
 			await tools?.cleanup();
+			// What the command changed, a sync's files, go to the Space.
+			await reconcileKnowledge(deps, knowledge);
 		}
 	}
 

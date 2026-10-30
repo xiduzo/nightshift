@@ -323,6 +323,29 @@ describe("session", () => {
 		]);
 		expect(plain?.saveArtifact).toBeUndefined();
 	});
+
+	test("a session for a step gets what the export to monitoring adds to its environment", async () => {
+		const harness = fakeHarness();
+		const asked: unknown[] = [];
+		const d = device({
+			harnesses: { "claude-code": harness },
+			sessionEnv: (session) => {
+				asked.push(session);
+				return { TRACEPARENT: `00-${session.runId}-${session.stepId}-01` };
+			},
+		});
+		await collect(
+			d.session(sessionInput({ artifacts: { runId: "r1", stepId: "s1" } })),
+		);
+		await collect(d.session(sessionInput()));
+		const [forStep, plain] = harness.calls;
+		expect(forStep?.env).toEqual({ TRACEPARENT: "00-r1-s1-01" });
+		expect(asked).toEqual([
+			{ harness: "claude-code", runId: "r1", stepId: "s1" },
+		]);
+		// A session of no step (the assistant's) gets nothing.
+		expect(plain?.env).toBeUndefined();
+	});
 });
 
 describe("the project's knowledge", () => {

@@ -2,20 +2,71 @@
 
 Knowledge is the files your agents read besides the code of a project:
 a wiki, web pages, Jira work items, Confluence pages, private notes.
-Night Shift keeps them per project, outside the repository, on each
-computer that runs steps.
+Night Shift keeps them per project, outside the repository. They belong
+to the project's Space ([ADR 4](adr/0004-knowledge-belongs-to-the-space.md)):
+every computer of the Space works on the same files.
 
 ## Where it lives
 
-`<data folder>/knowledge/<project id>/` on the computer that runs the step.
-Each computer has its own folder (phase 1). Nothing goes into the
-repository or into a run's copy of the project.
+Three parts, like the flows of a project:
+
+- **The knowledge document**, `knowledge:<project id>`: one entry per file,
+  with its path, the sha256 of its content, its size, when it changed, and
+  the computer that changed it. A Yjs document, synced like the flow
+  documents: the Space's Host keeps it, and every computer of the Space
+  has a copy.
+- **The content, by hash**: `<data folder>/archive/<space>/knowledge/<sha256>`.
+  A computer copies new content to the Space's Host, and fetches what it
+  lacks from there. Content never changes after it is written. A Space
+  without a Host keeps it on its one computer.
+- **The folder**, `<data folder>/knowledge/<project id>/` on each
+  computer: a working copy that agents and kits read and write as plain
+  files. Nothing goes into the repository or into a run's copy of the
+  project.
+
+### Reconcile
+
+Before and after each step that gets the folder (every Command step and
+every Agent step), the computer that runs the step brings its folder and
+the document in step. The Knowledge page does it too when it reads.
+
+- A file the step added, changed or removed goes into the document. Its
+  content goes to the Host first.
+- An entry that another computer changed is fetched and written into the
+  folder whole, or its file is removed.
+- When both changed one path, the later change wins. A change wins over
+  a removal, so nothing is lost.
+
+A hidden file in the folder, `.reconciled.json`, holds what the folder had
+at the last reconcile. `INDEX.md` and hidden files never sync. A file
+larger than 10 MB stays on the computer that has it: the others list it,
+but do not fetch it.
+
+A computer that cannot reach its Host works on its own copy. Content it
+cannot copy waits, and Night Shift tries again each minute and at the next
+reconcile. A file whose content it cannot fetch keeps its old version
+until the next reconcile. The step goes on.
+
+The first start after the upgrade reconciles each folder a computer has:
+it publishes its files. When two computers have one path, the later change
+wins.
+
+### Who may read and change it
+
+Every Member of the Space reads the knowledge, on any computer and on the
+Host. A computer of a Member whose role may start runs publishes its
+changes. A browser changes knowledge only through flows: the syncs and the
+review of learnings. In a shared Space, the Knowledge page says that every
+Member can read what you sync there. Before you sync a client's Jira or
+Confluence into a shared Space, make sure that each Member may see it.
+
+### The index
 
 Night Shift writes `INDEX.md` at the top of the folder: one line per file,
 with its path, title, first sentence and the day it changed. It writes it
 again when a file is newer than it, or a file came or went, at the moment
 an agent gets the folder and when the Knowledge page reads it. A sync does
-not need to write it.
+not need to write it. Each computer writes its own: it never syncs.
 
 `learnings/` is Night Shift's own: what agents propose to learn waits in
 `learnings/proposed/` until you accept it into `learnings/accepted/`. The
@@ -73,15 +124,46 @@ Its report instructions say so in one sentence, and the field is
 optional, so an agent with nothing to say reports as before.
 
 The computer that ran the step keeps them in
-`learnings/proposed/<run id>.md`. They wait for you there: the index does
-not list them, and no agent reads them.
+`learnings/proposed/<run id>.md`, and its reconcile after the step puts
+them in the Space. They wait for you there: the index does not list them,
+and no agent reads them.
 
 The `review-learnings` starter flow calls `kit:knowledge/review-learnings`.
 It opens a Gate with the proposals. **Keep** moves them to
 `learnings/accepted/`, where the index lists them and agents read them.
 **Delete** removes them. A proposal that comes in while the Gate waits
 stays for the next review. The Knowledge page says how many wait, with a
-button that runs the review.
+button that runs the review. The review runs on any computer of the
+Space: its reconcile fetches the proposals first, and puts what it kept
+or deleted back in the Space.
+
+## Search
+
+Each computer keeps a keyword index of its knowledge: the text files
+(`.md`, `.markdown`, `.mdx`, `.txt`, `.rst`), not `INDEX.md`, hidden files
+or the learnings that wait. The Knowledge page has a search field, and
+`nightshift mcp` has two tools for an agent:
+
+- `search_knowledge` (`query`, `limit`): the best files first, each with
+  its path, title and an excerpt with the words found in bold.
+- `read_knowledge` (`path`): one file, at most its first 100 KB.
+
+Every word must match. When no file has them all, files with some of them
+come back. A word in the title counts most, then one in the path, then one
+in the text. `"a phrase"` keeps words together, `deploy*` matches a word
+that starts with it, and so does the last word you type. Words match
+their other forms: `deploying` finds `deploy`.
+
+The index is in `<data folder>/knowledge/.search.sqlite` (SQLite FTS5,
+BM25 ranking). It is the computer's own: it never syncs, and you can
+delete it. Before each search, Night Shift reads again only the files
+whose size or time of change differ, and drops the ones that went. So it
+stays right whoever changes the folder. For 2 000 files the first search
+takes about half a second, and a later one about 50 ms. It reads the first
+1 MB of a file.
+
+An agent that gets the folder keeps reading `INDEX.md` and grepping it. A
+node that wants search adds the `nightshift` MCP server as a connection.
 
 ## Size
 
@@ -91,6 +173,12 @@ agents need.
 
 ## Known gaps (phase 1)
 
-- The Knowledge page shows the folder of the computer that serves the
-  page. A project that runs on another Device has its knowledge there.
-- No search index: files and grep only.
+- Content that no entry names any more stays in the archive: retention is
+  undecided, as it is for run history.
+- A run does not record which version of the knowledge it read.
+- Two steps of one run that run at the same time on two computers and
+  propose learnings write one file: the later change wins.
+- A project that joins another one when a computer joins its home Host
+  keeps its knowledge folder under its old id.
+- Search is by keyword, not by meaning: a word that is not in a file
+  does not find it.

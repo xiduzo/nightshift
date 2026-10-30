@@ -3,6 +3,7 @@ import { ROLE_REFUSAL, roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
+	type KnowledgeStore,
 	type PeerProjects,
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,
@@ -85,6 +86,11 @@ export function createHostExchange(deps: {
 	isHost(): boolean;
 	/** The calls of runs this Host walks, for the Devices they are placed on. */
 	work: WorkHub;
+	/**
+	 * Where this Host keeps knowledge content by hash, the archive its
+	 * Devices copy to (ADR 4). Without it, it keeps none.
+	 */
+	knowledge?: Pick<KnowledgeStore, "read" | "write">;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
@@ -382,6 +388,43 @@ export function createHostExchange(deps: {
 			return owner.walkerId === deps.selfId
 				? exchange.archive.own(ref)
 				: exchange.archive.read(ref);
+		},
+
+		async knowledgePut(key, { spaceId, sha256, content }) {
+			await admit(key);
+			const role = await roleIn(db, key.personId, spaceId);
+			if (!role) throw new Refusal("not-found", "That Space does not exist.");
+			if (!roleAllows(role, { run: ["start"] })) {
+				forbidden(ROLE_REFUSAL.message);
+			}
+			// A Space another Host keeps is not this Host's to keep.
+			if (
+				!deps.knowledge ||
+				(await engine.hostSpaces.hostOf(spaceId)) !== null
+			) {
+				throw new Refusal(
+					"unavailable",
+					"This computer does not keep the knowledge of that Space.",
+				);
+			}
+			await deps.knowledge.write(
+				spaceId,
+				sha256,
+				new Uint8Array(Buffer.from(content, "base64")),
+			);
+		},
+
+		async knowledgeGet(key, { spaceId, sha256 }) {
+			await admit(key);
+			if (
+				!deps.knowledge ||
+				!(await isMember(key, spaceId)) ||
+				(await engine.hostSpaces.hostOf(spaceId)) !== null
+			) {
+				return null;
+			}
+			const content = await deps.knowledge.read(spaceId, sha256);
+			return content ? Buffer.from(content).toString("base64") : null;
 		},
 
 		async *archiveFollow(key, { step, afterSeq }, signal) {

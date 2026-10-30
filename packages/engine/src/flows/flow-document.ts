@@ -22,6 +22,7 @@ import {
 	openPersistedDocument,
 	type PersistedDocument,
 } from "../device-config";
+import { knowledgeDocumentProject } from "../knowledge";
 import { spaceIdOf } from "../projects";
 import type { FlowMigrations } from "./flow-migration";
 
@@ -106,8 +107,9 @@ export function flowDocumentProject(name: string): string | null {
 
 /**
  * The Space of a synced document, for the relay's access check: a Space
- * document, or a flow document of a Project this Replica has. Null for
- * another kind, and for a Project it does not have.
+ * document, or a flow document or the knowledge document of a Project
+ * this Replica has. Null for another kind, and for a Project it does not
+ * have.
  */
 export function documentSpace(
 	db: Database,
@@ -115,13 +117,16 @@ export function documentSpace(
 	return async (name) => {
 		const spaceId = spaceIdOf(name);
 		if (spaceId !== null) return { spaceId, kind: "space" };
-		const projectId = flowDocumentProject(name);
+		const flows = flowDocumentProject(name);
+		const knowledge = flows === null ? knowledgeDocumentProject(name) : null;
+		const projectId = flows ?? knowledge;
 		if (projectId === null) return null;
 		const [row] = await db
 			.select({ spaceId: project.spaceId })
 			.from(project)
 			.where(eq(project.id, projectId));
-		return row ? { spaceId: row.spaceId, kind: "flows" } : null;
+		if (!row) return null;
+		return { spaceId: row.spaceId, kind: flows ? "flows" : "knowledge" };
 	};
 }
 

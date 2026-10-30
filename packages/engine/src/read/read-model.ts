@@ -46,7 +46,8 @@ import {
 } from "./derive-steps";
 import { inboxOrder } from "./inbox";
 import { type MemberName, namesOf, runPerson } from "./people";
-import { runMetrics, stepMetrics } from "./run-metrics";
+import { deriveScores, runMetrics, stepMetrics } from "./run-metrics";
+import { type RunTrace, runTrace } from "./run-trace";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
 import type {
 	ItemSummary,
@@ -169,7 +170,13 @@ export function runFacts(events: readonly LoggedEvent[]) {
 			.sort((a, b) => a.from - b.from),
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: deriveWorktree(events),
-		metrics: runMetrics(steps, cost, deriveStartedAt(events), endedAt),
+		metrics: runMetrics(
+			steps,
+			cost,
+			deriveStartedAt(events),
+			endedAt,
+			deriveScores(events),
+		),
 	};
 }
 
@@ -759,6 +766,11 @@ export function createReadModel(deps: ReadModelDeps) {
 	 * and whether this computer walks it or runs its steps. Null when this
 	 * Replica has no such run. One row and the run log's kept facts.
 	 */
+	/** The run as monitoring reads it (`run-trace.ts`), or null when the log has none of it. */
+	async function trace(runId: string): Promise<RunTrace | null> {
+		return one(runId, runTrace);
+	}
+
 	async function runHere(runId: string): Promise<RunHere | null> {
 		const [row] = await db
 			.select({ walkerId: run.walkerId, deviceId: run.deviceId })
@@ -965,6 +977,7 @@ export function createReadModel(deps: ReadModelDeps) {
 		getStep,
 		runStatus,
 		runHere,
+		trace,
 		listGates,
 		watch,
 	};

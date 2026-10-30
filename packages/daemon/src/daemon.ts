@@ -28,9 +28,14 @@ import {
 import {
 	createArtifactStore,
 	createFlowDocuments,
+	createKnowledgeDocuments,
 	createKnowledgeFolders,
+	createKnowledgeSearch,
+	createKnowledgeStore,
+	createKnowledgeSync,
 	createToolLaunchers,
 	documentSpace,
+	type KnowledgeHost,
 	localDevice,
 } from "@nightshift/engine";
 import {
@@ -93,6 +98,7 @@ import {
 	stopOnSignals,
 } from "./runtime";
 import { keepSync } from "./sync";
+import { wireTelemetry } from "./telemetry";
 
 export type DaemonOptions = {
 	/** The port the daemon listens on: its own addresses may call it. Default: PORT, else DEFAULT_PORT. */
@@ -224,6 +230,17 @@ export async function createDaemon(
 		(kept) => kept.flush(),
 	);
 
+	/**
+	 * The knowledge documents: the files of each Project's knowledge, by
+	 * hash (ADR 4). Every Device keeps a copy, and the relay serves them to
+	 * the Devices of the Space.
+	 */
+	const knowledgeDocuments = await slots.keep(
+		"nightshiftKnowledgeDocuments",
+		() => createKnowledgeDocuments({ db }),
+		(kept) => kept.flush(),
+	);
+
 	const trustedOrigins = trustedOriginsOf(env, port);
 	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
 	let hostSettings: () => { host: boolean; hostAddresses: readonly string[] } =
@@ -278,6 +295,7 @@ export async function createDaemon(
 	// Replica from before them are imported here, once.
 	await spaces.openAll();
 	await flows.openAll();
+	await knowledgeDocuments.openAll();
 
 	/**
 	 * One person on one computer signs in to nothing: a request from this
@@ -344,8 +362,43 @@ export async function createDaemon(
 	/** The project's folder here: where its runs' worktrees branch from. */
 	const clonePath = clonePathOf(db, async () => device.id);
 
+	/**
+	 * What a run step's harness session adds to its environment: the
+	 * export to monitoring's, once it exists below. Nothing before.
+	 */
+	let sessionEnv = (_session: {
+		harness: string;
+		runId: string;
+		stepId: string;
+	}): Record<string, string> => ({});
+
 	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
 	const knowledge = createKnowledgeFolders(dataDir);
+	/**
+	 * Keyword search over them: this computer's own index, built from the
+	 * folders and never synced. One open index file across reloads.
+	 */
+	const knowledgeSearch = await slots.keep(
+		"nightshiftKnowledgeSearch",
+		() => createKnowledgeSearch(dataDir),
+		(kept) => kept.close(),
+	);
+	/** The devices runtime, once it is made below: the Hosts of the Spaces. */
+	let devicesRuntime: { knowledge: KnowledgeHost } | null = null;
+	/**
+	 * Each folder is a working copy of its Project's knowledge in the
+	 * Space (ADR 4): reconciled before and after each step that gets it,
+	 * and when the Knowledge page reads it. The content travels by hash
+	 * through the Space's Host.
+	 */
+	const knowledgeSync = createKnowledgeSync({
+		db,
+		folders: knowledge,
+		documents: knowledgeDocuments,
+		store: createKnowledgeStore(dataDir),
+		deviceId: device.id,
+		host: () => devicesRuntime?.knowledge ?? null,
+	});
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
 		id: device.id,
@@ -370,10 +423,13 @@ export async function createDaemon(
 		profileFor: (ref) => profiles.settingsFor(ref),
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
-		// The projects' knowledge, outside every repository.
+		// The projects' knowledge, outside every repository, in step with the Space.
 		knowledge,
+		knowledgeSync,
 		// What each step changed in the run's copy of the project, also by commands.
 		snapshots: true,
+		// A Claude Code session sends its own telemetry while the export is on.
+		sessionEnv: (session) => sessionEnv(session),
 	});
 
 	/**
@@ -413,6 +469,7 @@ export async function createDaemon(
 		document,
 		spaces,
 		flows,
+		knowledge: knowledgeDocuments,
 		self: device,
 		ownerId: person.userId,
 		local,
@@ -436,6 +493,7 @@ export async function createDaemon(
 		...(outside.hosts ? { hostClient: outside.hosts } : {}),
 	});
 	const { engine } = devices;
+	devicesRuntime = devices;
 
 	/**
 	 * The relay's document half: the owner's clients sync this Device's
@@ -446,7 +504,10 @@ export async function createDaemon(
 		document: async (name) =>
 			name === document.name
 				? document.doc
-				: (spaces.byName(name)?.doc ?? (await flows.find(name))?.doc ?? null),
+				: (spaces.byName(name)?.doc ??
+					(await flows.find(name))?.doc ??
+					(await knowledgeDocuments.find(name))?.doc ??
+					null),
 		// On a Host: the documents of the Devices whose home Host this is.
 		kept: {
 			has: async (name) =>
@@ -500,6 +561,29 @@ export async function createDaemon(
 	// Not awaited: it reads the runs that have not ended.
 	void keepAwake.start();
 
+	/**
+	 * "Send runs to your monitoring" (this computer's setting, off by
+	 * default): the runs it walks as OpenTelemetry spans and metrics, and
+	 * its Claude Code sessions' own telemetry to the same endpoint.
+	 */
+	const telemetry = await slots.replace(
+		"nightshiftTelemetry",
+		async () => {
+			const wired = wireTelemetry({
+				engine,
+				deviceId: device.id,
+				settings,
+				document,
+				dataDir,
+				keyStore,
+			});
+			await wired.start();
+			return wired;
+		},
+		(before) => before.stop(),
+	);
+	sessionEnv = (session) => telemetry.sessionEnv(session);
+
 	const gitInstaller = systemGitInstaller();
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
 	const gitHubClones = await slots.keep("nightshiftGitHubClones", () =>
@@ -525,6 +609,33 @@ export async function createDaemon(
 		(before) => before.stop(),
 	);
 	projectCopies.start();
+
+	/**
+	 * Every knowledge folder here, once the Links had a moment to come up:
+	 * the import on upgrade (ADR 4, decision 10), and what changed while
+	 * the daemon was down. Then, each minute, the folders whose content
+	 * still waits for its Host.
+	 */
+	await slots.replace(
+		"nightshiftKnowledgeTimers",
+		() => {
+			const first = setTimeout(() => {
+				knowledgeSync.reconcileAll().catch((error) => {
+					console.warn("The knowledge was not brought in step:", error);
+				});
+			}, 15_000);
+			const retry = setInterval(() => {
+				knowledgeSync.retryPending().catch(() => {});
+			}, 60_000);
+			first.unref();
+			retry.unref();
+			return { first, retry };
+		},
+		({ first, retry }) => {
+			clearTimeout(first);
+			clearInterval(retry);
+		},
+	);
 
 	const info: DaemonInfo = {
 		dataDir,
@@ -555,6 +666,7 @@ export async function createDaemon(
 		engine,
 		settings: computerSettings,
 		notifications,
+		telemetry,
 		toolLaunchers,
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the
@@ -569,7 +681,8 @@ export async function createDaemon(
 			connections,
 		}),
 		checks: programChecks(),
-		knowledge,
+		knowledge: knowledgeSync,
+		knowledgeSearch,
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),
 			setUpGit: (input) => setUpGit(input),

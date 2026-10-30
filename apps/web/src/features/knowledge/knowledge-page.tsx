@@ -24,6 +24,11 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -32,14 +37,17 @@ import {
 	LightbulbIcon,
 	RefreshCwIcon,
 	TriangleAlertIcon,
+	UsersIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { flowQueries, StartRunDialog } from "@/features/flows";
 import { ProjectPage } from "@/features/projects";
 import type { Knowledge, KnowledgeFile } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, formatSize } from "@/shared/format";
 import { PageHeading, PageSection } from "@/shared/page";
+import { KnowledgeFileSheet } from "./knowledge-file-sheet";
+import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
 
 /** What each knowledge kit fills the folder from, for a person. */
@@ -67,7 +75,7 @@ export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
 					<PageHeading
 						id="knowledge-heading"
 						title="Knowledge"
-						description="Files your agents read before they work. They stay on this computer, not in the project. Syncs and learnings keep them up to date."
+						description="Files your agents read before they work, kept apart from the code. Every computer in this Space gets the same files. Syncs and learnings keep them up to date."
 					/>
 					<KnowledgeView projectId={project.id} />
 				</section>
@@ -78,6 +86,8 @@ export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
 
 function KnowledgeView({ projectId }: { projectId: string }) {
 	const knowledge = useQuery(knowledgeQueries.get(projectId));
+	const [open, setOpen] = useState<string | null>(null);
+	const columns = useMemo(() => fileColumns(setOpen), []);
 
 	if (knowledge.error) {
 		return (
@@ -96,7 +106,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 			</div>
 		);
 	}
-	const { files, syncs, tooLarge, proposed, reviews } = knowledge.data;
+	const { files, syncs, tooLarge, proposed, reviews, shared } = knowledge.data;
 	if (files.length === 0 && syncs.length === 0 && proposed === 0) {
 		return <NoKnowledge projectId={projectId} />;
 	}
@@ -109,7 +119,8 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 					reviews={reviews}
 				/>
 			) : null}
-			<Syncs projectId={projectId} syncs={syncs} />
+			<Syncs projectId={projectId} syncs={syncs} shared={shared} />
+			{files.length > 0 ? <KnowledgeSearch projectId={projectId} /> : null}
 			<PageSection
 				title="Files"
 				description={`${files.length} ${files.length === 1 ? "file" : "files"}. Agents get a list of them first, then search the files.`}
@@ -137,7 +148,7 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 							</Empty>
 						) : (
 							<DataTable
-								columns={fileColumns}
+								columns={columns}
 								data={files}
 								getRowId={(file) => file.path}
 								pageSize={50}
@@ -146,6 +157,11 @@ function KnowledgeView({ projectId }: { projectId: string }) {
 					</CardContent>
 				</Card>
 			</PageSection>
+			<KnowledgeFileSheet
+				projectId={projectId}
+				path={open}
+				onClose={() => setOpen(null)}
+			/>
 		</>
 	);
 }
@@ -220,13 +236,18 @@ function Learnings({
 	);
 }
 
-/** The flows that fill the knowledge, each with a button that runs it now. */
+/**
+ * The flows that fill the knowledge, each with a button that runs it now.
+ * In a shared Space, a note that every Member reads what they sync.
+ */
 function Syncs({
 	projectId,
 	syncs,
+	shared,
 }: {
 	projectId: string;
 	syncs: Knowledge["syncs"];
+	shared: boolean;
 }) {
 	const flows = useQuery({
 		...flowQueries.list(projectId),
@@ -242,6 +263,18 @@ function Syncs({
 			title="Syncs"
 			description="The flows that fill the knowledge. Schedule one to keep it fresh, or run it now."
 		>
+			{shared ? (
+				<Alert>
+					<UsersIcon />
+					<AlertTitle>
+						Every Member of this Space can read this knowledge
+					</AlertTitle>
+					<AlertDescription>
+						Before you sync work items or pages here, make sure that each Member
+						may see them.
+					</AlertDescription>
+				</Alert>
+			) : null}
 			{syncs.length === 0 ? (
 				<Alert>
 					<BookOpenIcon />
@@ -306,37 +339,58 @@ function Syncs({
 
 const column = dataTableColumns<KnowledgeFile>();
 
-const fileColumns = column.columns([
-	column.accessor("path", {
-		header: "File",
-		cell: ({ row }) => (
-			<span className="break-all font-mono text-xs">{row.original.path}</span>
-		),
-		meta: {
-			headClassName: "pl-6",
-			cellClassName: "w-full max-w-0 py-3 pl-6",
-		},
-	}),
-	column.accessor("changedAt", {
-		header: "Changed",
-		cell: ({ row }) => (
-			<time
-				dateTime={new Date(row.original.changedAt).toISOString()}
-				title={formatDateTime(row.original.changedAt)}
-				className="whitespace-nowrap text-muted-foreground text-sm"
-			>
-				{formatRelative(row.original.changedAt)}
-			</time>
-		),
-		meta: { cellClassName: "py-3" },
-	}),
-	column.accessor("size", {
-		header: "Size",
-		cell: ({ row }) => (
-			<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
-				{formatSize(row.original.size)}
-			</span>
-		),
-		meta: { headClassName: "pr-6", cellClassName: "py-3 pr-6 text-right" },
-	}),
-]);
+/** The columns of the file list. A file's path opens it. */
+function fileColumns(open: (path: string) => void) {
+	return column.columns([
+		column.accessor("path", {
+			header: "File",
+			cell: ({ row }) => (
+				<div className="flex flex-wrap items-center gap-2">
+					<Button
+						variant="link"
+						className="h-auto whitespace-normal break-all p-0 text-left font-mono text-xs"
+						onClick={() => open(row.original.path)}
+					>
+						{row.original.path}
+					</Button>
+					{row.original.local ? (
+						<Tooltip>
+							<TooltipTrigger render={<Badge variant="secondary" />}>
+								On one computer
+							</TooltipTrigger>
+							<TooltipContent>
+								Larger than 10 MB. It stays on the computer that synced it.
+							</TooltipContent>
+						</Tooltip>
+					) : null}
+				</div>
+			),
+			meta: {
+				headClassName: "pl-6",
+				cellClassName: "w-full max-w-0 py-3 pl-6",
+			},
+		}),
+		column.accessor("changedAt", {
+			header: "Changed",
+			cell: ({ row }) => (
+				<time
+					dateTime={new Date(row.original.changedAt).toISOString()}
+					title={formatDateTime(row.original.changedAt)}
+					className="whitespace-nowrap text-muted-foreground text-sm"
+				>
+					{formatRelative(row.original.changedAt)}
+				</time>
+			),
+			meta: { cellClassName: "py-3" },
+		}),
+		column.accessor("size", {
+			header: "Size",
+			cell: ({ row }) => (
+				<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
+					{formatSize(row.original.size)}
+				</span>
+			),
+			meta: { headClassName: "pr-6", cellClassName: "py-3 pr-6 text-right" },
+		}),
+	]);
+}

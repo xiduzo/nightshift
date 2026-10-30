@@ -372,3 +372,10 @@ A schedule can start its flow when a webhook arrives at the Host. GitHub
 Actions, n8n, Make, Zapier or a script then start a run, with no connector
 for each. See [Start a flow from another tool](triggers.md): the signed
 webhook, a `curl` example and a GitHub Actions workflow.
+
+## Watch your runs in a monitoring tool
+
+Each computer can send the runs it walks to a monitoring tool you choose,
+as OpenTelemetry traces and metrics. It is off by default. See
+[Monitoring](monitoring.md): Grafana in one container on a laptop, SigNoz on
+a Host, LangSmith through your own collector, and a Grafana dashboard.

@@ -453,6 +453,7 @@ describe("replies of a real engine", () => {
 			tokens: expect.objectContaining({ input: expect.any(Number) }),
 			costBasis: expect.stringMatching(/^(billed|estimated|unknown)$/),
 			prUrl: null,
+			scores: [],
 		});
 		const listed = (await read(appRouter.projects.list)) as {
 			id: string;

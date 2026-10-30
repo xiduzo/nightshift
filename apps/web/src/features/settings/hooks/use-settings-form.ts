@@ -17,6 +17,8 @@ type Kind =
 	/** An amount in US dollars above 0. Empty means none (null): no budget. */
 	| { type: "dollars" }
 	| { type: "text" }
+	/** An `http://` or `https://` address. Empty means none. */
+	| { type: "address" }
 	| { type: "choice" };
 
 const KINDS: Partial<Record<SettingKey, Kind>> = {
@@ -35,6 +37,8 @@ const KINDS: Partial<Record<SettingKey, Kind>> = {
 	agentPermissionMode: { type: "choice" },
 	decisionDecider: { type: "choice" },
 	assistantProfile: { type: "choice" },
+	telemetryEndpoint: { type: "address" },
+	telemetryProtocol: { type: "choice" },
 };
 
 const MAX_MINUTES = 10_080;
@@ -72,6 +76,15 @@ function parseDraft(
 		}
 		case "text":
 			return text === "" ? { error: "Cannot be empty." } : { value: text };
+		case "address": {
+			if (text === "") return { value: "" };
+			try {
+				const { protocol } = new URL(text);
+				if (protocol === "http:" || protocol === "https:")
+					return { value: text };
+			} catch {}
+			return { error: "Use an address like http://localhost:4318." };
+		}
 		case "choice":
 			return { value: text };
 	}

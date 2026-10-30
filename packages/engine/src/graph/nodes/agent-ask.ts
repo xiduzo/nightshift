@@ -7,6 +7,7 @@ import {
 	type NodeAction,
 	type StepContext,
 } from "../context";
+import { scoreGate } from "../gate";
 import { interruptNode } from "../interrupt";
 import { resumePromptOf, sessionOf } from "../resume-point";
 import { parkCommand, route, type StepEnd } from "../route";
@@ -72,8 +73,11 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 					{ ...askOutputs(pending), outcome: "fail", note },
 					null,
 				);
+				// After the end, so the StepEnded carries the answering Command.
+				await scoreGate(ctx, step.stepId, answer);
 				return route(ctx, state, node, end, config);
 			}
+			await scoreGate(ctx, step.stepId, answer);
 			step.leaveOpen();
 			const asked: PendingGate = {
 				...pending,

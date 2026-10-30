@@ -37,6 +37,8 @@ describe("the Host's contract", () => {
 			"sync.mergePersonal",
 			"archive.put",
 			"archive.get",
+			"archive.knowledgePut",
+			"archive.knowledgeGet",
 			"archive.follow",
 			"archive.tail",
 			"devices.work",

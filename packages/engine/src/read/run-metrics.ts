@@ -1,4 +1,5 @@
 import type { JsonValue } from "@nightshift/flows";
+import type { LoggedEvent, ScoreName } from "../log";
 import type { CostTally } from "./cost";
 import type { DerivedSession, DerivedStep, StepSleep } from "./derive-steps";
 
@@ -45,7 +46,38 @@ export type RunMetrics = {
 	costBasis: CostBasis;
 	/** The address of the GitHub pull request a step opened or named in its outputs. Null when none did. */
 	prUrl: string | null;
+	/**
+	 * The feedback on the run (`Scored`), oldest first: each Gate answered,
+	 * and what became of its pull request. Only a run's metrics have them.
+	 * Older Hosts send none.
+	 */
+	scores?: RunScore[];
 };
+
+/** One `Scored` of a run: what it scores, its value and label, on which step, and when. */
+export type RunScore = {
+	score: ScoreName;
+	value: number;
+	label: string | null;
+	stepId: string | null;
+	at: number;
+};
+
+/** The run's scores, in log order. */
+export function deriveScores(events: readonly LoggedEvent[]): RunScore[] {
+	const scores: RunScore[] = [];
+	for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
+		if (e.type !== "Scored") continue;
+		scores.push({
+			score: e.payload.score,
+			value: e.payload.value,
+			label: e.payload.label,
+			stepId: e.stepId,
+			at: e.at,
+		});
+	}
+	return scores;
+}
 
 const NO_TOKENS: TokenCounts = {
 	input: 0,
@@ -70,7 +102,7 @@ export function costBasis(cost: CostTally): CostBasis {
 }
 
 /** A session's tokens: its final usage, else what it used so far. */
-function sessionTokens(session: DerivedSession): TokenCounts {
+export function sessionTokens(session: DerivedSession): TokenCounts {
 	const usage = session.ending?.usage ?? session.spent?.usage;
 	if (!usage) return NO_TOKENS;
 	return {
@@ -162,6 +194,7 @@ export function runMetrics(
 	cost: CostTally,
 	startedAt: number | null,
 	endedAt: number | null,
+	scores: RunScore[] = [],
 ): RunMetrics {
 	let tokens = NO_TOKENS;
 	let agentMs = 0;
@@ -188,5 +221,6 @@ export function runMetrics(
 		tokens,
 		costBasis: costBasis(cost),
 		prUrl,
+		scores,
 	};
 }

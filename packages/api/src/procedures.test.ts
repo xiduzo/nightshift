@@ -125,6 +125,7 @@ const engine: Context["engine"] = {
 		merge: async () => ({ flows: {}, schedules: {} }),
 	},
 	runHere: async () => null,
+	runTrace: async () => null,
 	deviceBack: async () => {},
 	webhook: async () => ({
 		answer: { kind: "not-found" },

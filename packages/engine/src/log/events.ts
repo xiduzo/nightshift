@@ -472,6 +472,21 @@ export type EnginePayloads = {
 	 */
 	RunWarned: { kind: RunWarningKind; message: string };
 	/**
+	 * Feedback on what a run did: a Gate was answered (`gate_decision`, on
+	 * the Gate's step), or a kit's webhook reported what became of the pull
+	 * request the run opened (`pr_merged`, `pr_closed`,
+	 * `reverted_within_7d`). `value` is 1 for a fact that happened; `label`
+	 * says more: the option a Gate took. `by`: who answered a Gate, a
+	 * person or its deadline. The metrics and the export count them, so a
+	 * later read tells which flow version merges.
+	 */
+	Scored: {
+		score: ScoreName;
+		value: number;
+		label: string | null;
+		by?: "person" | "deadline";
+	};
+	/**
 	 * A schedule came due and the scheduler started its run (`runId`), or
 	 * tried to and could not (`error`). `at` is the cron time, not the
 	 * moment of the tick: no cron time of a schedule fires twice. Logged
@@ -543,6 +558,16 @@ export type EngineEventType = keyof EnginePayloads;
  * list: a later build may add one.
  */
 export type RunWarningKind = "cost-unknown" | "budget" | "stalled" | "looping";
+
+/**
+ * What a `Scored` event scores. A reader treats the names as an open list:
+ * a later build may add one.
+ */
+export type ScoreName =
+	| "gate_decision"
+	| "pr_merged"
+	| "pr_closed"
+	| "reverted_within_7d";
 
 /**
  * One event as this Replica's log has it. Any payload may also carry

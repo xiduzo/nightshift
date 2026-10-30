@@ -55,6 +55,8 @@ export type DerivedSession = {
 	resumeSessionId: string | null;
 	harness: AgentHarnessName;
 	harnessSessionId: string | null;
+	/** The model the harness said it runs, once it said it. */
+	model: string | null;
 	startedAt: number;
 	startSeq: number;
 	/** When it ended (its first `SessionEnded`). Null while it runs, or when it never ended. */
@@ -82,6 +84,7 @@ export function deriveSessions(
 				resumeSessionId: e.payload.resumeSessionId,
 				harness: e.payload.harness ?? "claude-code",
 				harnessSessionId: null,
+				model: null,
 				startedAt: e.at,
 				startSeq: e.seq,
 				endedAt: null,
@@ -96,6 +99,7 @@ export function deriveSessions(
 		if (session.endedAt === null) session.lastAt = e.at;
 		if (e.type === "HarnessSessionAssigned") {
 			session.harnessSessionId ??= e.payload.harnessSessionId;
+			session.model ??= e.payload.model;
 		} else if (e.type === "SessionUsage") {
 			session.spent = e.payload;
 		} else if (e.type === "SessionEnded" && session.ending === null) {

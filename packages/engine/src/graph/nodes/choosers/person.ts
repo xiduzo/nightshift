@@ -8,7 +8,7 @@ import {
 
 import type { GateChoice, GateDeadline } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
-import { openGate } from "../../gate";
+import { openGate, scoreGate } from "../../gate";
 import { interruptNode } from "../../interrupt";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
 import {
@@ -310,12 +310,13 @@ async function resolve(
 		note,
 		...(answer.byDeadline ? { byDeadline: true as const } : {}),
 	});
-	return {
-		kind: "ended",
-		end: await step.end(
-			choice,
-			decisionOutputs(choice, note, step.visit),
-			null,
-		),
-	};
+	const end = await step.end(
+		choice,
+		decisionOutputs(choice, note, step.visit),
+		null,
+	);
+	// After the end: an answer's first event is its StepEnded, which carries
+	// the Command that answered (`stampedAppend`).
+	await scoreGate(ctx, step.stepId, answer);
+	return { kind: "ended", end };
 }

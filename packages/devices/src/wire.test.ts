@@ -4,6 +4,7 @@ import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, runCommand, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
+	createKnowledgeDocuments,
 	type Device,
 	type FlowDocuments,
 	type SessionInput,
@@ -97,6 +98,7 @@ async function startB(
 		document,
 		spaces: paired.documents,
 		flows,
+		knowledge: createKnowledgeDocuments({ db: b.db }),
 		self: { id: b.deviceId, name: "B" },
 		ownerId: owner?.id as string,
 		local: placedDevice(),
@@ -640,7 +642,7 @@ describe("the devices runtime across a reload", () => {
 });
 
 describe("the documents a Device syncs of a Host's Spaces", () => {
-	test("each Space document, and the flow documents of every Project in it", async () => {
+	test("each Space document, and the flow and knowledge documents of every Project in it", async () => {
 		const space = await paired.documents.open(a.spaceId);
 		space.doc.transact(() => {
 			for (const id of ["project-b", "project-a"]) {
@@ -653,19 +655,23 @@ describe("the documents a Device syncs of a Host's Spaces", () => {
 				});
 			}
 		});
+		const knowledge = createKnowledgeDocuments({ db: b.db });
 		const synced = await hostSpaceDocuments(
-			{ spaces: paired.documents, flows },
+			{ spaces: paired.documents, flows, knowledge },
 			[a.spaceId],
 		);
 		expect(synced.map((document) => document.name)).toEqual([
 			space.name,
 			"flows:project-a",
 			"flows-history:project-a",
+			"knowledge:project-a",
 			"flows:project-b",
 			"flows-history:project-b",
+			"knowledge:project-b",
 		]);
 		const opened = await flows.open("project-a");
 		expect(synced[1]?.doc).toBe(opened.current.doc);
 		expect(synced[2]?.doc).toBe(opened.history.doc);
+		expect(synced[3]?.doc).toBe((await knowledge.open("project-a")).doc);
 	});
 });

@@ -150,6 +150,15 @@ describe("a Gate with a deadline", () => {
 			},
 			{ type: "gate-resolved", choice: "keep", note, byDeadline: true },
 		]);
+		// The score says the deadline chose, not a person.
+		const scored = events.find((e) => e.type === "Scored");
+		expect(scored?.stepId).toBe(stepId);
+		expect(scored?.payload).toEqual({
+			score: "gate_decision",
+			value: 1,
+			label: "keep",
+			by: "deadline",
+		});
 	});
 
 	test("a person who answers first wins: the timer later changes nothing", async () => {

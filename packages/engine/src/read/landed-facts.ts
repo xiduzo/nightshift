@@ -2,6 +2,7 @@ import type {
 	EngineEventType,
 	LandedRunEvent,
 	RunEnding,
+	ScoreName,
 	WaitReason,
 } from "../log";
 
@@ -42,6 +43,14 @@ export type LandedFact = {
 	| { kind: "wait-ended"; stepId: string }
 	| { kind: "step-ended"; stepId: string }
 	| { kind: "run-ended"; status: RunEnding }
+	/** Feedback on the run (`Scored`): on a Gate's step, or on the run. */
+	| {
+			kind: "scored";
+			stepId: string | null;
+			score: ScoreName;
+			value: number;
+			label: string | null;
+	  }
 	/** Any other event of the run. */
 	| { kind: "other" }
 );
@@ -83,6 +92,17 @@ function landedFact(e: LandedRunEvent): LandedFact {
 	};
 	if (e.type === "RunEnded") {
 		return { ...base, kind: "run-ended", status: e.payload.status };
+	}
+	if (e.type === "Scored") {
+		const { score, value, label } = e.payload;
+		return {
+			...base,
+			kind: "scored",
+			stepId: e.stepId,
+			score,
+			value,
+			label,
+		};
 	}
 	const stepId = e.stepId;
 	if (stepId === null) return { ...base, kind: "other" };

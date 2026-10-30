@@ -1,0 +1,734 @@
+{
+	"title": "Night Shift",
+	"uid": "nightshift-runs",
+	"tags": ["nightshift"],
+	"timezone": "browser",
+	"schemaVersion": 39,
+	"version": 1,
+	"editable": true,
+	"time": {
+		"from": "now-7d",
+		"to": "now"
+	},
+	"refresh": "5m",
+	"description": "The runs Night Shift sends with Settings \u2192 Monitoring: outcomes, time, cost, tokens, retries, Gate waits and scores.",
+	"templating": {
+		"list": [
+			{
+				"name": "datasource",
+				"label": "Data source",
+				"type": "datasource",
+				"query": "prometheus",
+				"current": {},
+				"hide": 0
+			},
+			{
+				"name": "project",
+				"label": "Project",
+				"type": "query",
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${datasource}"
+				},
+				"query": {
+					"query": "label_values(nightshift_run_outcome_total, nightshift_project_id)",
+					"refId": "project"
+				},
+				"definition": "label_values(nightshift_run_outcome_total, nightshift_project_id)",
+				"includeAll": true,
+				"multi": true,
+				"allValue": ".*",
+				"current": {
+					"text": "All",
+					"value": "$__all"
+				},
+				"refresh": 2,
+				"sort": 1
+			},
+			{
+				"name": "flow",
+				"label": "Flow",
+				"type": "query",
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${datasource}"
+				},
+				"query": {
+					"query": "label_values(nightshift_run_outcome_total{nightshift_project_id=~\"$project\"}, nightshift_flow_id)",
+					"refId": "flow"
+				},
+				"definition": "label_values(nightshift_run_outcome_total{nightshift_project_id=~\"$project\"}, nightshift_flow_id)",
+				"includeAll": true,
+				"multi": true,
+				"allValue": ".*",
+				"current": {
+					"text": "All",
+					"value": "$__all"
+				},
+				"refresh": 2,
+				"sort": 1
+			}
+		]
+	},
+	"panels": [
+		{
+			"id": 1,
+			"type": "stat",
+			"title": "Runs ended",
+			"description": "Runs that ended in the time range.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 0,
+				"w": 6,
+				"h": 4
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(nightshift_run_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "runs"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "value",
+				"graphMode": "none",
+				"textMode": "auto"
+			}
+		},
+		{
+			"id": 2,
+			"type": "stat",
+			"title": "Runs failed",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 6,
+				"y": 0,
+				"w": 6,
+				"h": 4
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(nightshift_run_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", end_reason=\"failed\"}[$__range])) or vector(0)",
+					"legendFormat": "failed"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "value",
+				"graphMode": "none",
+				"textMode": "auto"
+			}
+		},
+		{
+			"id": 3,
+			"type": "stat",
+			"title": "Cost",
+			"description": "What runs cost in the time range: reported and estimated.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 0,
+				"w": 6,
+				"h": 4
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(nightshift_run_cost_usd_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "USD"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "currencyUSD"
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "value",
+				"graphMode": "none",
+				"textMode": "auto"
+			}
+		},
+		{
+			"id": 4,
+			"type": "stat",
+			"title": "Tokens",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 18,
+				"y": 0,
+				"w": 6,
+				"h": 4
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(nightshift_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "tokens"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "short"
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "value",
+				"graphMode": "none",
+				"textMode": "auto"
+			}
+		},
+		{
+			"id": 5,
+			"type": "timeseries",
+			"title": "Runs by how they ended",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 4,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (end_reason) (increase(nightshift_run_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "{{end_reason}}"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "normal"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			},
+			"interval": "1h"
+		},
+		{
+			"id": 6,
+			"type": "timeseries",
+			"title": "Run duration",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 4,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "histogram_quantile(0.5, sum by (le) (rate(nightshift_run_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"legendFormat": "p50"
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "histogram_quantile(0.95, sum by (le) (rate(nightshift_run_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"legendFormat": "p95"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "none"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			}
+		},
+		{
+			"id": 7,
+			"type": "barchart",
+			"title": "Cost per flow",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 12,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (nightshift_flow_id) (increase(nightshift_run_cost_usd_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "{{nightshift_flow_id}}",
+					"instant": true,
+					"format": "table"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "currencyUSD"
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"orientation": "horizontal",
+				"showValue": "auto",
+				"xTickLabelRotation": 0
+			}
+		},
+		{
+			"id": 8,
+			"type": "timeseries",
+			"title": "Cost by model and basis",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 12,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (gen_ai_request_model, basis) (increase(nightshift_run_cost_usd_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "{{gen_ai_request_model}} ({{basis}})"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "currencyUSD",
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "normal"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			},
+			"interval": "1h"
+		},
+		{
+			"id": 9,
+			"type": "timeseries",
+			"title": "Tokens by type",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 20,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (type) (increase(nightshift_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "{{type}}"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "short",
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "normal"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			},
+			"interval": "1h"
+		},
+		{
+			"id": 10,
+			"type": "timeseries",
+			"title": "Step duration p95 by node kind",
+			"description": "",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 20,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "histogram_quantile(0.95, sum by (le, nightshift_node_kind) (rate(nightshift_step_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"legendFormat": "{{nightshift_node_kind}}"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "none"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			}
+		},
+		{
+			"id": 11,
+			"type": "timeseries",
+			"title": "Retries by node kind",
+			"description": "Steps that ran again: a visit of a node after the first.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 28,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (nightshift_node_kind) (increase(nightshift_retries_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "{{nightshift_node_kind}}"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "normal"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			},
+			"interval": "1h"
+		},
+		{
+			"id": 12,
+			"type": "timeseries",
+			"title": "Gate wait",
+			"description": "How long Gates waited for a person.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 28,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "histogram_quantile(0.5, sum by (le) (rate(nightshift_gate_wait_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"legendFormat": "p50"
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "histogram_quantile(0.95, sum by (le) (rate(nightshift_gate_wait_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"legendFormat": "p95"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "s",
+					"custom": {
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"stacking": {
+							"mode": "none"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			}
+		},
+		{
+			"id": 13,
+			"type": "barchart",
+			"title": "Gate answers",
+			"description": "Each Gate answered, by the option it took.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 36,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (nightshift_score_label) (increase(nightshift_score_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_score_name=\"gate_decision\"}[$__range]))",
+					"legendFormat": "{{nightshift_score_label}}",
+					"instant": true,
+					"format": "table"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"orientation": "horizontal",
+				"showValue": "auto",
+				"xTickLabelRotation": 0
+			}
+		},
+		{
+			"id": 14,
+			"type": "barchart",
+			"title": "Pull requests",
+			"description": "What became of the pull requests runs opened, as a kit's webhook reported it.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 36,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (outcome) (increase(nightshift_pr_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "{{outcome}}",
+					"instant": true,
+					"format": "table"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"orientation": "horizontal",
+				"showValue": "auto",
+				"xTickLabelRotation": 0
+			}
+		}
+	]
+}

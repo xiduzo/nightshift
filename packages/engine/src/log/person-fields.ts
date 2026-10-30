@@ -66,6 +66,7 @@ export const PERSON_FIELDS = {
 	StopAfterStepCancelled: [],
 	RunEnded: [],
 	RunWarned: [],
+	Scored: [],
 	ScheduleFired: [],
 	ScheduleSkipped: [],
 	WebhookReceived: [],
