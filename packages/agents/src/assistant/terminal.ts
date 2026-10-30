@@ -5,6 +5,8 @@
  * instead of `get_draft` and `propose_flow` the agent saves a checked flow
  * (`save_flow`) and starts a run (`start_run`). The run tools
  * (`terminal-runs.ts`) follow, stop and report on runs and answer Gates.
+ * The knowledge tools (`terminal-knowledge.ts`) search the project's
+ * knowledge and read one file of it.
  * The tools read and write through a `TerminalPort`: Night Shift on this
  * computer, over its API.
  *
@@ -25,6 +27,10 @@ import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../port";
 import { flowJson } from "./prompts";
 import {
+	type TerminalKnowledgePort,
+	terminalKnowledgeTools,
+} from "./terminal-knowledge";
+import {
 	chooseProject,
 	projectOfFolder,
 	type TerminalProject,
@@ -44,26 +50,27 @@ import {
 } from "./tools";
 
 /** What the terminal tools read and write: Night Shift on this computer. */
-export type TerminalPort = TerminalRunPort & {
-	projects(): Promise<TerminalProject[]>;
-	flows(projectId: string): Promise<ProjectFlowMap>;
-	/** The profiles a node of the project may name, each on its Device. */
-	profiles(projectId: string): Promise<AuthoringProfile[]>;
-	tools(): Promise<{
-		clis: AuthoringCliTool[];
-		connections: AuthoringToolInfo[];
-	}>;
-	skills(projectId: string): Promise<AuthoringSkill[]>;
-	/** Saves the flow as a new revision. Returns its issues as saved. */
-	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
-	startRun(
-		projectId: string,
-		flowName: string,
-		inputs: Record<string, JsonValue>,
-	): Promise<{ id: string; status: string }>;
-	/** Where a person opens the flow in Night Shift. */
-	flowLink(projectId: string, name: string): string;
-};
+export type TerminalPort = TerminalRunPort &
+	TerminalKnowledgePort & {
+		projects(): Promise<TerminalProject[]>;
+		flows(projectId: string): Promise<ProjectFlowMap>;
+		/** The profiles a node of the project may name, each on its Device. */
+		profiles(projectId: string): Promise<AuthoringProfile[]>;
+		tools(): Promise<{
+			clis: AuthoringCliTool[];
+			connections: AuthoringToolInfo[];
+		}>;
+		skills(projectId: string): Promise<AuthoringSkill[]>;
+		/** Saves the flow as a new revision. Returns its issues as saved. */
+		saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
+		startRun(
+			projectId: string,
+			flowName: string,
+			inputs: Record<string, JsonValue>,
+		): Promise<{ id: string; status: string }>;
+		/** Where a person opens the flow in Night Shift. */
+		flowLink(projectId: string, name: string): string;
+	};
 
 export type TerminalToolOptions = {
 	/** The project to work in: an id, a name or a folder. */
@@ -356,5 +363,6 @@ export function terminalTools(
 			return `Started run ${run.id} of "${flow}" (${run.status}). Follow it at ${port.runLink(run.id)}`;
 		}),
 		...terminalRunTools(port, projectOf, options.now),
+		...terminalKnowledgeTools(port, projectOf),
 	];
 }
