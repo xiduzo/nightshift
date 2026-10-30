@@ -250,6 +250,13 @@ export const agentNodeSchema = z.object({
 	 */
 	ask: z.enum(["person"]).optional(),
 	/**
+	 * The project's knowledge folder, on the computer that runs the step.
+	 * Unset: the agent gets it when the folder has files. `true`: always.
+	 * `false`: never. The agent reads it itself; nothing goes into the prompt
+	 * but one line that says where it is.
+	 */
+	knowledge: z.boolean().optional(),
+	/**
 	 * A JSON Schema for the `data` of the step report. The agent must report
 	 * data that matches it, else the step ends as `error`. Later nodes read
 	 * it as `{{<node>.data}}` or a path into it, for example `{{planner.data.tasks}}`.
