@@ -36,10 +36,13 @@ export { useMeasured } from "./canvas/use-measured";
 export { chatAboutRun } from "./chat/chat-link";
 export { InspectorSection } from "./editor/fields";
 export { RunRevision } from "./editor/revisions/run-revision";
+export { NewFlowDialog } from "./flow-list";
+export { FlowNotices } from "./flow-notices";
 export { FlowPage } from "./flow-page";
+export { ImportFlowButton } from "./move/import-flow-button";
 export { preloadFlowPage } from "./preload";
 export { ProjectFlowsPage } from "./project-flows-page";
-export { flowQueries } from "./queries";
+export { flowMutations, flowQueries } from "./queries";
 export { BaseRefCombobox } from "./start/base-ref-combobox";
 export type { InputTexts } from "./start/flow-input-fields";
 export {
@@ -48,3 +51,4 @@ export {
 	jsonProblem,
 	missingInputs,
 } from "./start/flow-input-fields";
+export { StartRunDialog } from "./start/start-run-dialog";

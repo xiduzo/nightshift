@@ -435,7 +435,8 @@ function FlowMeta({ flow }: { flow: FlowListItem }) {
 	);
 }
 
-function NewFlowDialog({
+/** PROTOTYPE: exported for the flows overview prototype. */
+export function NewFlowDialog({
 	open,
 	onOpenChange,
 	projectId,
