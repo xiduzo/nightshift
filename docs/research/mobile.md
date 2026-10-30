@@ -5,7 +5,8 @@ Home Host merges its personal Space into the Host's, so the Phone sees all
 personal work ([ADR 1](../adr/0001-one-personal-space-per-home-host.md),
 built). The text below about "Personal on <Host>" is history.
 
-Status: decided, 2026-10-21. Nothing here is built. The shape is decided:
+Status: decided 2026-10-21, built since. The phone app ships (`apps/mobile`),
+with the notifier and the shared inbox. The shape is decided:
 **the phone is a Person's client of a Host**, not a Device. A notifier on
 the server tells the person about Gates and runs on every screen they use.
 The Needs-you inbox shows the Gates of every Space the person is in. The

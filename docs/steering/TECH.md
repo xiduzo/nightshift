@@ -10,18 +10,19 @@ Last updated: 2026-10-25
 | --- | --- | --- |
 | Runtime | Bun | 1.3 |
 | Language | TypeScript | 6.0 |
-| Desktop shell | Electrobun | 2.0 |
+| Desktop shell | Electrobun (`apps/desktop`) | 2.0 |
 | Web UI | TanStack Start, TanStack Router, TanStack Query, React | Start 1.168, Router 1.170, Query 5.102, React 19.3 (pinned to 19.3.0: Expo SDK 58 needs it) |
 | Styling | Tailwind CSS, shadcn | Tailwind 4.3, shadcn 4.21 |
 | API server | Hono | 4.13 |
-| API contract | oRPC with Zod | oRPC 1.15, Zod 4.5 |
-| Database | libsql (SQLite file) with Drizzle ORM | libsql 0.5, Drizzle 1.0.0-rc |
+| API contract | oRPC with Zod | oRPC 1.15, Zod 4.6 |
+| Database | libsql (SQLite file) with Drizzle ORM, through `@libsql/client` | `@libsql/client` 0.18, libsql 0.5, Drizzle 1.0.0-rc |
 | Auth | Better Auth, with the expo plugin for the phone app | 1.7.12 |
 | Document sync | Yjs, served by Hocuspocus on Bun's WebSockets (the Device and Space documents) | Yjs 13.6, Hocuspocus 4.7 |
-| Agents | `@tanstack/ai` with harness adapters (`ai-claude-code`, `ai-opencode`, `ai-codex`) | ai 0.69, claude-code 0.9, opencode 0.5, codex 0.6 (planned, not installed yet) |
-| Flow editor | React Flow (`@xyflow/react`) | 12.12 (planned, not installed yet) |
+| Agents | `@tanstack/ai` with harness adapters (`ai-claude-code`, `ai-opencode`, `ai-codex`, `ai-grok-build`, `ai-acp`) | ai 0.69, claude-code 0.9, opencode 0.5, codex 0.6, grok-build 0.5, acp 0.3 |
+| Engine | LangGraph (`@langchain/langgraph`), checkpointed in libsql | 1.5 |
+| Flow editor | React Flow (`@xyflow/react`) | 12.12 |
 | Phone app | Expo with Expo Router, Uniwind, React Native Reusables, `@better-auth/expo`, EAS Update (`expo-updates`), from the Better-T-Stack `native-uniwind` skeleton (`apps/mobile`, `packages/ui-native`) | Expo SDK 58, React Native 0.88, Uniwind 1.13, React Native Reusables CLI 0.7 |
-| Push | `web-push` (VAPID), `expo-server-sdk`, `expo-notifications` | planned, not installed yet |
+| Push | `web-push` (VAPID), `expo-server-sdk`, `expo-notifications` | web-push 3.6, expo-server-sdk 7.2, expo-notifications 58.1 |
 | Tooling | Turborepo, Biome, Lefthook, varlock | Turbo 2.10, Biome 2.5 |
 
 ## Architecture
@@ -216,8 +217,8 @@ Full ADRs go in `docs/adr/` when a decision needs more than one line of rational
 ## Known Pain Points
 
 - `@tanstack/ai` moves fast (0.39 → 0.68 in a few months). Pin exact versions and upgrade on purpose.
-- Electrobun packaging needs a static web build of TanStack Start. Not yet verified.
-- Not yet verified: whether the harness adapters accept our own tools, and whether they expose session resume and the usage-limit reset time.
+- Electrobun packages the static web build of TanStack Start (`apps/web/dist/client`). The nightly desktop release builds this way.
+- Claude Code takes our own tools, resumes a session, and gives the usage-limit reset time: real nights wait for the reset and go on. Not yet verified for the other harnesses.
 - `drizzle-orm` is a release candidate.
 - Hermes (Expo SDK 58) cannot compile a destructured rest parameter, which `@orpc/client` uses. `apps/mobile/babel.config.js` runs `@babel/plugin-transform-parameters` on the `@orpc` packages only.
 - Bun's isolated installs keep several copies of one version of a package (one per set of peers). Expo's autolinking module resolution puts one copy of each in the phone's bundle, but `expo-doctor` reports the copies as duplicates. They do not break the native build: on 2026-10-21 `expo run:ios` (Xcode 27, iPhone 17 Pro simulator, iOS 26.5) built, installed and ran the app, Metro bundled it, and sign-in, the tabs and Settings worked against a sandbox Host. No fix was needed, so `check-layers` keeps its guarantees unchanged.
