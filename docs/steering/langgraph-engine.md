@@ -113,7 +113,7 @@ packages/engine/src/
   graph/step-runner.ts     The step runner (below): runStep() owns the step
                            lifecycle every node shares, from the resume
                            point to route(); beginStep/OpenStep is the lower
-                           seam for the loop-shaped nodes (Call, Call with
+                           seam for the loop-shaped nodes (Subflow, Subflow with
                            `each`, the Gate).
   graph/run-position.ts    The run position (below): where a run is, as
                            the checkpoint and the log agree. commitVisit
@@ -158,12 +158,12 @@ packages/engine/src/
                            node opens it, its ask node interrupts),
                            rule.ts (JSONata rules),
                            model.ts (the decider).
-  graph/nodes/call.ts      the Call node: runs its flow once, or hands
+  graph/nodes/call.ts      the Subflow node: runs its flow once, or hands
                            over to call-each.ts; CALL, whose facts follow
                            `each`.
-  graph/nodes/call-each.ts the per-element loop of a Call with `each`
+  graph/nodes/call-each.ts the per-element loop of a Subflow with `each`
                            (one element per super-step)
-  graph/nodes/body.ts      What a Call does once and per element: bodyGraph,
+  graph/nodes/body.ts      What a Subflow does once and per element: bodyGraph,
                            runBody (a called flow as a subgraph of the node),
                            BodyEnd (how the body ended) and hasStoppedEdge.
   graph/nodes/value.ts     value node, the Decision's twin: routes on the
@@ -183,9 +183,9 @@ packages/engine/src/
                            (Device.callTool), the Connection resolved as
                            for an Agent node. No wait node: a transport
                            failure is `fail`. TOOL.
-  graph/each.ts            the pure parts of a Call with `each`: list items
+  graph/each.ts            the pure parts of a Subflow with `each`: list items
                            from a source, item facts, the step's outputs
-  graph/inputs.ts          a flow's input values, a Call's bindings, outputs
+  graph/inputs.ts          a flow's input values, a Subflow's bindings, outputs
   graph/output-schema.ts   the output schema check (ajv)
   graph/policy.ts          the run policy's wait plan (planWait), pure
   graph/consume.ts         reads a harness stream, gives up after a grace
@@ -288,7 +288,7 @@ packages/engine/src/
    `interrupt({ kind: "parked", ... })`. The runner appends `RunEnded`
    when it sees that interrupt. A resume is `Command({ resume })` and
    re-enters the node. This is what makes "resume at the last step's node,
-   inside a Call with `each` at the same item" free at any depth.
+   inside a Subflow with `each` at the same item" free at any depth.
 3. **The event log is written exactly as before.** Same payloads, same
    order: `StepStarted`, `SessionStarted`, `HarnessSessionAssigned`,
    `SessionEnded`, `StepEnded`, `EdgeTaken`, `GateOpened`, `WaitStarted`,
@@ -314,7 +314,7 @@ packages/engine/src/
    outputs), a waiting step's streak (`pending.streak`), an open Gate
    (`pending.kind === "gate"`), the wait a wake ends (the interrupt).
    The log is the read model for people and the crash-recovery source.
-6. **Scopes.** A Call body is a subgraph invoked from the
+6. **Scopes.** A Subflow body is a subgraph invoked from the
    node with the config passed through (so it checkpoints under the node's
    namespace). The scope `{ parentStepId, itemId }` travels in
    `config.configurable.scope`; body nodes stamp it on their events as before.
@@ -365,7 +365,7 @@ packages/engine/src/
     it. Since 2026-10-25 every end prunes, and so does a run that parks
     at a wait or a Gate: a failed, stopped or parked run keeps its latest
     root checkpoint and the namespaces of the tasks that are not done, so
-    a body that parked, waits or was cut short inside a Call goes on in
+    a body that parked, waits or was cut short inside a Subflow goes on in
     its own namespace. The saver itself keeps only the latest checkpoint
     of each namespace, and drops the namespaces below an older one, at
     every put. An interrupted run (the daemon died) prunes when
@@ -377,7 +377,7 @@ packages/engine/src/
 11. **Durability** is `"sync"`: the checkpoint is written before the next
     node starts. Subgraphs inherit it through the config `runBody` passes
     on, as they inherit the drive's `recursionLimit`
-    (`Number.MAX_SAFE_INTEGER`: every node visit, park, wait and Call
+    (`Number.MAX_SAFE_INTEGER`: every node visit, park, wait and Subflow
     element is one super-step, and the walk's own step cap is enforced by
     `beginStep` from the log, not by the graph).
 12. **Recovery at startup** keeps `recoverInterruptedWork`'s facts: open
@@ -385,7 +385,7 @@ packages/engine/src/
     timers back; open Gates stay; and the daemon resumes interrupted runs
     itself under the same policy as before, now by `invoke(null)`. How the
     steps end deviates (below: "Recovery ends work as a stop does").
-13. **A Call with `each`** (the For Each node until flow version 4) keeps its semantics: sources json, command and files;
+13. **A Subflow with `each`** (the For Each node until flow version 4) keeps its semantics: sources json, command and files;
     `blockersFirst`/`nextItem` ordering; blocked items; per-item
     branches on top of the last finished element (`branch: "per-item"`)
     or the shared branch; `haltOn`; `maxItems`; the list is read again
@@ -404,8 +404,8 @@ packages/engine/src/
 Decisions taken while implementing, from the code and its comments:
 
 - **A body failure does not park the run** (`graph/nodes/body.ts`). A body
-  step that fails inside a Call parks the *body's* thread
-  namespace (rule 2), but `runBody` swallows that interrupt: the Call
+  step that fails inside a Subflow parks the *body's* thread
+  namespace (rule 2), but `runBody` swallows that interrupt: the Subflow
   step ends `fail`, or the element ends `ItemEnded failed` and the items
   that depend on it block, and the walk goes on, as before. The parked
   namespace is never invoked again (the next invoke of the node is a new
@@ -505,10 +505,10 @@ Decisions taken while implementing, from the code and its comments:
   outside in. Now every cut (a stop, a missed deadline, a daemon death)
   appends the events `closingEvents` gives, so two things changed for an
   interrupted step. Its outputs are its kind's (`cutShortOutputs` with
-  `interrupted`): a Decision gets `note: ""`, a Call `ended: ""`, and a
-  Call with `each` its item counts, summary and results, so a template or
+  `interrupted`): a Decision gets `note: ""`, a Subflow `ended: ""`, and a
+  Subflow with `each` its item counts, summary and results, so a template or
   a rerun that reads `nodes.<id>.*` finds every field. And the steps end
-  from the inside out: a step inside a Call before the Call. No reader
+  from the inside out: a step inside a Subflow before the Subflow. No reader
   depends on the order between steps. Recovery reads the run's whole log
   for this, since its lifecycle filter has no item events, and publishes
   on the bus. A step of a kind an old log has and the engine no longer
@@ -536,7 +536,7 @@ Now one module owns it, behind a small interface:
 
 - `commitVisit(node, visit)`: the one writer of `visits`. A node commits
   when its step ended, when its step sleeps, and after each element of a
-  Call with `each`. A Gate does not commit while it is open.
+  Subflow with `each`. A Gate does not commit while it is open.
 - `positionOf(state, events, scope)`: where the run is in one scope, for
   one node at a time. `held` (what a wait, a park or a Gate holds),
   `looping`, `latest`, `uncommitted`, `done`, `cursorBehind` and
@@ -567,7 +567,7 @@ run position:
    was checkpointed. The planner read that thread as ended and jumped, and
    LangGraph refused two writes to `pending` in one step. `ThreadState`
    now says `pending`, and `invoke(null)` applies the writes and goes on.
-3. **A loop's cursor catches up.** An element of a Call with `each` ended
+3. **A loop's cursor catches up.** An element of a Subflow with `each` ended
    and the commit after it never landed. The re-run started the next
    element in the same task, so in the namespace of the body that had
    ended, which returned at once. Now the node commits the cursor first
@@ -587,7 +587,7 @@ position is the one place where the two are compared.
 ## Fan-out and join (`graph/branches.ts`, `graph/nodes/join.ts`)
 
 Built 2026-10-26 (node review, `docs/research/node-review-2026-10.md`
-§5.1). The earlier plan here made each branch a body, as a Call's is. The
+§5.1). The earlier plan here made each branch a body, as a Subflow's is. The
 flow file chose plain edges instead: two or more edges without a `max` on
 one outcome are a fan-out, and every branch ends at the same Join node
 (`wait: "all" | "first"`). `@nightshift/flows` reads the shape
@@ -683,7 +683,7 @@ The rule, in this order:
 5. Else a new visit.
 
 The prompt and the harness session are set only for a step with a harness
-session to continue, so a Call or Decision step reopens with `prompt:
+session to continue, so a Subflow or Decision step reopens with `prompt:
 null`, as before.
 
 The node kinds differ only in which existing step they take up. That is
@@ -693,8 +693,8 @@ all `ResumeRules` lets them say (`RESUME_RULES`):
 | --- | --- | --- |
 | Agent | `with-session`: reopen with the resume prompt | `with-session`: reopen, open or ended (the harness process is gone) |
 | Decision or Value by a model | `new` | `new` |
-| Call once | `new` | `take-up`: continue open, reopen ended |
-| Call with `each` | `cut-short`: reopen a `stopped`, `error` or `interrupted` step; an exhausted loop starts over | `take-up`, and `loop` for the cursor |
+| Subflow once | `new` | `take-up`: continue open, reopen ended |
+| Subflow with `each` | `cut-short`: reopen a `stopped`, `error` or `interrupted` step; an exhausted loop starts over | `take-up`, and `loop` for the cursor |
 | Gate | `new` | `asked-gate`: continue only while open with `GateOpened` after its latest opening |
 | Wait | `new` | `new` |
 | Command, Tool, Decision or Value by a rule (`fresh`) | `new` | `new` |
@@ -779,7 +779,7 @@ The node modules keep their body only: `runSession` (Agent), `runShell`
 `Chooser` or `Producer` is a `NodeAction` that runs `runStep` with its
 own body.
 
-Three nodes do not fit `runStep`: a Call once, a Call with `each` and the
+Three nodes do not fit `runStep`: a Subflow once, a Subflow with `each` and the
 Gate. Their step stays open across a subgraph or an interrupt, or spans
 many super-steps, or ends in another graph node. They open and close the
 step through the lower seam, `beginStep` and `OpenStep` (`end()`,
@@ -870,7 +870,7 @@ own module. Now the engine asks the descriptor:
 | `resumeRules(node)` | the kind's own factory | the `RESUME_RULES` entry each factory named |
 | `isChosenEnd(node, outcome)` | `route()` | `isChosenEnd`, `isOwnAgentLabel`, `isSuccessExit` in route.ts |
 | `endReason(node, outcome)` | `route()` | `finishedReason` in route.ts |
-| `endedLabel(node, outcome)` | the Call node | `endedLabel` in body.ts |
+| `endedLabel(node, outcome)` | the Subflow node | `endedLabel` in body.ts |
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
 | `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
@@ -879,19 +879,19 @@ own module. Now the engine asks the descriptor:
 
 The deletion test picked the members: a fact is on the descriptor only
 when deleting the switch in a caller would make the fact reappear there.
-A fact may depend on `node.by` (Decision, Value) or `node.each` (Call);
+A fact may depend on `node.by` (Decision, Value) or `node.each` (Subflow);
 the chooser and producer seams stay as they are. Not on the descriptor, on
 purpose: the zod union in `packages/flows` and the web's `NODE_TYPE` record
 (inherent, outside this package); the transcript-event unions in `log/step-events.ts`
 (typed data, no switch asks them); the `WaitReason` enum in `state.ts` (a
 Wait node's `until` kinds and the policy's reasons, not node kinds); which
-flow a Call calls (`flows/run-flows.ts`, `open-work.nodesOf`: only a Call does,
+flow a Subflow calls (`flows/run-flows.ts`, `open-work.nodesOf`: only a Subflow does,
 both read `node.flow`); the first Agent prompt a quick run is titled by;
 and the resume target's "an Agent step with a harness session".
 
 The registry imports the node modules, and no module a node imports
 imports the registry. The runner puts `kindOf` on the `StepContext`, so
-`compile.ts`, `route.ts`, the step runner and the Call node ask
+`compile.ts`, `route.ts`, the step runner and the Subflow node ask
 `ctx.kindOf(node)`. The chooser and producer seams have a leaf of their own
 (`choosers/chooser.ts`, `producers/producer.ts`), so a chooser does not
 import the Decision node that picks it. `graph/` has no import cycle, and

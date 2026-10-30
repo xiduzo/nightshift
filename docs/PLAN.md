@@ -21,14 +21,14 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Users | One developer: the author. Better Auth stays, and local mode auto-creates one user and one session. |
 | The method | The flow is the method. No method packages and no `method.json`. A WTF night is one flow among others. |
 | Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Night Shift data, not a file in the repo: a Yjs document in the Space that keeps its Project, with a published zod schema. Every save is a Flow revision. People edit flows in the editor, and agents through `nightshift mcp` and the `nightshift` CLI ([ADR 2](adr/0002-flows-are-night-shift-data.md)). Night Shift knows no method and no tracker: GitHub, WTF, and the rpgdotexe night are flows, CLI tools and commands, never engine concepts. |
-| Flow I/O | A flow declares **inputs** and **outputs**, like a function. The inputs of the top-level flow are asked when a run starts. A Call node calls a flow once with bound inputs, or with `each` once per list element, bound to an input. The outputs come back to the caller. Version 1 files (with `params` and `input: "item"`) migrate on load. |
+| Flow I/O | A flow declares **inputs** and **outputs**, like a function. The inputs of the top-level flow are asked when a run starts. A Subflow node calls a flow once with bound inputs, or with `each` once per list element, bound to an input. The outputs come back to the caller. Version 1 files (with `params` and `input: "item"`) migrate on load. |
 | Templates | `{{name.path}}` reads a value: `name` is a node id, an input, or `run`. Node ids and inputs share one namespace. A path reaches into JSON: `{{planner.data.tasks}}`, `{{item.parent.number}}`. A command gets every value as an environment variable, never as shell text. |
-| Node types | Agent, Command, Tool, Decision, Value, Wait, Call. A Gate is a Decision decided by you; a Call with `each` runs once per list element. See section 3. |
+| Node types | Agent, Command, Tool, Decision, Value, Wait, Subflow. A Gate is a Decision decided by you; a Subflow with `each` runs once per list element. See section 3. |
 | Edges | An edge leaves a node on a named outcome (`pass`, `fail`, an Agent's own outcome, or a Decision option). An edge back to an earlier node is a retry loop. Every loop has a maximum count. The engine refuses a flow with an unbounded loop. |
 | Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. The node names its harness; a flow mixes them freely. Unattended Claude Code runs in `auto` permission mode. |
 | Daemon | Nights run on a stable daemon (`bun run night`): a built server without hot reload. Development uses `bun run dev` in a separate git worktree, so code changes never reload a daemon that runs a night. |
 | Skills | An Agent node names a skill that the harness already has (user, project, or plugin skills). No skill pack materialization. |
-| Lists | A Call with `each` reads a list from a source: a JSON value (often another node's output), a command that prints JSON, or files that match a glob. An issue tracker is a command on its CLI (`gh`, `glab`, `acli`): Suggest command writes one for the project. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
+| Lists | A Subflow with `each` reads a list from a source: a JSON value (often another node's output), a command that prints JSON, or files that match a glob. An issue tracker is a command on its CLI (`gh`, `glab`, `acli`): Suggest command writes one for the project. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
 | Triggers | A run starts by hand, or from a schedule of the project, for example every night at 22:00 with a stop time of 07:00. The Space keeps its schedules with its flows ([ADR 2](adr/0002-flows-are-night-shift-data.md)). A schedule that names no Device fires once, on the Host of its Space ([ADR 1](adr/0001-one-personal-space-per-home-host.md)). |
 | GitHub | GitHub is a CLI tool (`gh`) and a list command (the sub-issues of an issue, the issues with a label) that Suggest command writes. An Agent node that lists `gh` runs it with the user's login, or with the tool's own login (`gh-work` runs `gh` with its own token: several accounts of one program); a Command node or a list source runs it in the worktree. Nothing in the engine knows GitHub. |
 | Tools | A flow reaches the outside world through the CLI and MCP, as equals. A Command node runs a CLI; a Tool node calls one tool of a Connection (an MCP server defined once on the daemon, secrets as `${NAME}`) with arguments from templates and gets a typed result, with no model in the loop. The same Connections an Agent node hands to its session. Nothing in the engine knows any service. |
@@ -57,7 +57,7 @@ Jira is a kit on `acli`, not an engine concept.
 | Decision | Picks one of its options: you (a Gate: waits in the Needs-you inbox with a question; `lockScreen: true` lets a phone answer it from the lock screen), a rule (the first option whose `when` holds, else the default), or a model (reads the prompt, picks, and notes why). | One edge per option |
 | Value | Makes `data` that matches its output schema: a rule (a JSONata expression over the run's values, `$filter(planner.data.tasks, function($t) { $t.size = "small" })`) or a model (reads the prompt and answers in the shape of the schema). Later nodes read `data` or a path into it, and why it failed as `note`. | `pass`, `fail` |
 | Wait | Sleeps until a duration passes, a time comes (a template that renders a date and time, or a time of day), a command exits 0 (run again every `everyMinutes`), or a signal arrives (`runs.signal`). Keeps `waited_minutes`, and a command's last `log_tail`. `timeoutMinutes` ends it `timeout`. | `done`, `timeout` |
-| Call | Runs another flow with its inputs bound by templates. Without `each`: once; its outputs are the called flow's outputs plus `ended` (the label it ended on). With `each`: once per element of a list (a JSON value, the JSON a command prints, or files that match a glob), bound to one of its inputs (`as`, default `item`). Reads the list again before each element. Orders by `dependsOn`; a failed element blocks the elements that depend on it. Each element can work on its own branch, stacked on the last one that finished. Its outputs hold the results of every element. | `pass` (finished), `fail`; with `each`: `done`, `halted`; both: `stopped` (the stop time came; with an edge on it, the nodes after it run past the stop time and the run then finishes) |
+| Subflow | Runs another flow with its inputs bound by templates. Without `each`: once; its outputs are the called flow's outputs plus `ended` (the label it ended on). With `each`: once per element of a list (a JSON value, the JSON a command prints, or files that match a glob), bound to one of its inputs (`as`, default `item`). Reads the list again before each element. Orders by `dependsOn`; a failed element blocks the elements that depend on it. Each element can work on its own branch, stacked on the last one that finished. Its outputs hold the results of every element. | `pass` (finished), `fail`; with `each`: `done`, `halted`; both: `stopped` (the stop time came; with an edge on it, the nodes after it run past the stop time and the run then finishes) |
 
 A node reads earlier values through templates, for example `{{check.log_tail}}`, `{{item.title}}`, or `{{epic}}`.
 
@@ -95,7 +95,7 @@ flowchart LR
 | `packages/ui` | Shared components and tokens. |
 | `packages/auth` | Identity and access on Better Auth: login, two-factor, pairing, device keys, Spaces, members and roles. |
 | `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, CLI tool permissions, the decider providers. |
-| `packages/engine` | The run engine on LangGraph (`docs/steering/langgraph-engine.md`): a flow compiled to a graph, one thread per run, run policy, gates, worktrees, the item ordering of a Call with `each`. |
+| `packages/engine` | The run engine on LangGraph (`docs/steering/langgraph-engine.md`): a flow compiled to a graph, one thread per run, run policy, gates, worktrees, the item ordering of a Subflow with `each`. |
 | `packages/devices` | This computer among other Devices and Hosts: Placement, Offers, the exchange of run history, the Links to Hosts and pairing, this computer as a Host, and the work relay. It implements the engine's `Peers` port. |
 | `packages/api` | The oRPC procedures, one group per domain. The web app takes only its router type. |
 | `packages/daemon` | The daemon: one boot sequence (`startDaemon`) for the dev entry, the command line and the desktop app. Hono, the oRPC handlers, Better Auth, the document sync relay, the database lease, health, signals, the hot-reload handover. |
@@ -107,13 +107,13 @@ The packages are in the order of their layers, from the bottom. The layer map an
 
 ## 5. Delivery
 
-Status (2026-10-30): Slices 1 to 8 are built, and Night Shift has run a real project every night since 2026-10-16. Slices 5 to 8 and the LangGraph engine run real nights: Calls with `each` over a command's list, Agent outcomes, schedules that start runs without a person, Waits on CI, and Gates. A flow ran an Epic overnight to its end on 2026-10-25, the condition to retire `night-shift.py`.
+Status (2026-10-30): Slices 1 to 8 are built, and Night Shift has run a real project every night since 2026-10-16. Slices 5 to 8 and the LangGraph engine run real nights: Subflows with `each` over a command's list, Agent outcomes, schedules that start runs without a person, Waits on CI, and Gates. A flow ran an Epic overnight to its end on 2026-10-25, the condition to retire `night-shift.py`.
 
 Not yet done for real:
 
 - ~~A usage limit at night.~~ Done: on 2026-10-19 and 2026-10-25 a step hit the session limit at night, waited for the reset, and went on to `pass`.
 - A Codex or OpenCode step. Every Agent step of a real run so far ran on Claude Code.
-- A planner that feeds a Call with `each`. Every real Call with `each` reads its list from a command (`gh`).
+- A planner that feeds a Subflow with `each`. Every real Subflow with `each` reads its list from a command (`gh`).
 
 Done (2026-10-16): the engine's hand-rolled walk, resume points and wait bookkeeping were replaced by LangGraph (`docs/steering/langgraph-engine.md`, after `docs/research/langgraph-spike.md`). A run is one LangGraph thread, checkpointed after every node in the daemon's database; waits, Gates and parked steps are interrupts, so a resume lands at the same node at any depth. The `Engine` interface, the event log, the API and the web app did not change; the engine test suites pass on it. Every real night since 2026-10-18 ran on it.
 
@@ -151,22 +151,22 @@ The first nights showed two things: the dev server reloads under a running night
 - For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob). A fourth source, `github` (sub-issues), went on 2026-10-16: it is a `command` recipe on `gh` now, and old files migrate on load. Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input; `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
 - Start from a branch: the start dialog takes a base ref, so a night can continue on an open stack.
 - The rpgdotexe flows move to version 2.
-- 2026-10-17, flow format version 4: the Subflow and For Each nodes became one Call node, with `each` optional (`docs/research/foundational-nodes.md` §3.1). A Command node takes `output: "json"` (§3.5). Version 3 files migrate on load.
+- 2026-10-17, flow format version 4: the Subflow and For Each nodes became one Subflow node, with `each` optional (`docs/research/foundational-nodes.md` §3.1). A Command node takes `output: "json"` (§3.5). Version 3 files migrate on load.
 
 Proves: any flow can call any flow, and a list can come from anywhere.
 
-Status: built, and in real nights since 2026-10-18: a Call with `each` runs a flow per Feature and per Trace of an Epic. 2026-10-17: the rpgdotexe flows were rebuilt on format version 4 with the seven node types and three Agent Profiles (`examples/rpgdotexe/README.md`): Decisions by rule, Values by rule over Call results, a Wait on CI, and JSON output from Commands replace the files and the shell checks the script passed between steps.
+Status: built, and in real nights since 2026-10-18: a Subflow with `each` runs a flow per Feature and per Trace of an Epic. 2026-10-17: the rpgdotexe flows were rebuilt on format version 4 with the seven node types and three Agent Profiles (`examples/rpgdotexe/README.md`): Decisions by rule, Values by rule over Subflow results, a Wait on CI, and JSON output from Commands replace the files and the shell checks the script passed between steps.
 
 ### Slice 6 — Agents that answer in shape
 
 - Agent outcomes: an Agent node may declare its own outcomes (`approved`, `changes-requested`, …) instead of `pass`/`fail`/`needs-input`.
-- Agent output schema: an Agent node may declare a JSON schema for `data` in its Step Report. The engine validates it; the step fails on a mismatch. `{{planner.data.tasks}}` feeds a Call with `each`.
+- Agent output schema: an Agent node may declare a JSON schema for `data` in its Step Report. The engine validates it; the step fails on a mismatch. `{{planner.data.tasks}}` feeds a Subflow with `each`.
 - Generic items in the UI: id, title, a link when the element has `url`, and the raw JSON.
 - A starter flow library in `examples/starters/`: implement → check → retry; plan → For Each task → review; review a pull request; one agent per file of a glob.
 
 Proves: a planner agent can decide what the night does.
 
-Status: built. Agent outcomes run in real nights. The starters validate; none has run against a real harness yet. No planner has fed a Call with `each` for real yet.
+Status: built. Agent outcomes run in real nights. The starters validate; none has run against a real harness yet. No planner has fed a Subflow with `each` for real yet.
 
 ### Slice 7 — Triggers
 
@@ -261,13 +261,13 @@ Run bundles: "Export" on a run page downloads the run as one SQLite file, `<flow
 - The desktop app has no icon (`apps/desktop/icon.iconset`), no signing and no notarization yet. A daemon that holds the lease on another port makes the app quit at start with only a log line.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools, so we append the flags to the `claude` executable string, which the adapter splits on spaces. Recheck on every adapter upgrade, and ask upstream for an option.
 - An item cut short by a stop or a daemon death shows `failed` with a reason until the run resumes; after a daemon death that is a few seconds later, on its own. The item then continues. Consider `stopped` and `interrupted` item states.
-- `timeoutMinutes` on a Call node with `each` is not enforced. Every step inside the body keeps its own limit.
+- `timeoutMinutes` on a Subflow node with `each` is not enforced. Every step inside the body keeps its own limit.
 - Item branches are `nightshift/<run8>-<id>-<title>`: git cannot nest a branch under the run branch `nightshift/<run8>`.
 - Usage-limit and network sleeps are tested with fakes only. The first real usage limit at night is the real test.
 - `@tanstack/ai-opencode` 0.5 drives OpenCode 1.x servers only (verified with 1.19.2). OpenCode 2.x serves a different API. Point the OpenCode harness at a 1.x `opencode` until the adapter catches up. The harness works around four adapter quirks (empty first tool input, the prompt echoed as text, a finish held until the next heartbeat, abort teardown): report them upstream.
 - The Codex harness is tested against a fake `codex` only: the event shapes, `exec resume`, error wording, and the TOML MCP overrides are unverified. In `workspace-write`, commits from a linked worktree may need the git common dir in `additionalDirectories`.
 - The take-over commands for OpenCode (`opencode --session <id>`) and Codex (`codex resume <id>`) come from the CLI docs. Neither was run against a real session.
-- Slices 5 to 8 have not run a real night. The first scheduled night, the first planner that feeds a Call with `each`, and the first OpenCode or Codex step are the real tests.
+- Slices 5 to 8 have not run a real night. The first scheduled night, the first planner that feeds a Subflow with `each`, and the first OpenCode or Codex step are the real tests.
 - Schedule catch-up looks only at the latest missed cron time. Earlier missed times are dropped without a log entry, so a daemon that was down for two nights starts at most one run.
 - Every daemon runs the scheduler, a dev daemon too. A project added to both databases starts its schedules twice. Consider a switch to turn the scheduler off in development.
 - An MCP `${NAME}` that the daemon lacks fails the step when it starts, not the run at its start. A night finds out at that node. The Agents page shows each variable as Keychain, Environment or Missing; a start check could refuse the run instead.
@@ -280,4 +280,4 @@ Run bundles: "Export" on a run page downloads the run as one SQLite file, `<flow
 - When a guard changes during the few seconds before the daemon resumes a run (the scheduler switched off, the stop time came), the run stays `interrupted` with the plain end reason; only the daemon's log says why.
 - The run log trusts that its daemon is the only writer of the database. An event that anything else writes (a second daemon, a hand edit) does not show in the UI or the walk until the daemon restarts. It keeps the logs of open runs and of the latest ended runs, up to 20 000 events (about 14 MB), plus a small summary per run. A database of 50 000 events takes about 35 MB with every log in memory.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.
-- A LangGraph checkpoint copies the whole run state after every node (node outputs included; the lists of a Call with `each` stay in the log), so a running run's checkpoints grow with it. A finished run is pruned to its latest checkpoint (`LibsqlSaver.pruneThread`, 2026-10-17); a stopped or failed run keeps its history until it finishes. A failed Call body leaves its namespace parked for good; the caller fails as before and never continues it. The first real night on the LangGraph engine (2026-10-16) is the real test.
+- A LangGraph checkpoint copies the whole run state after every node (node outputs included; the lists of a Subflow with `each` stay in the log), so a running run's checkpoints grow with it. A finished run is pruned to its latest checkpoint (`LibsqlSaver.pruneThread`, 2026-10-17); a stopped or failed run keeps its history until it finishes. A failed Subflow body leaves its namespace parked for good; the caller fails as before and never continues it. The first real night on the LangGraph engine (2026-10-16) is the real test.

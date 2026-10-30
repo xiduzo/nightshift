@@ -61,7 +61,7 @@ Steps are nodes. Each node type does one job:
 | **Decision** | Picks one of its options. Who picks is up to you: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. |
 | **Value** | Makes data that matches a JSON schema, from a rule or a model. |
 | **Wait** | Waits for a duration, a time, a command that passes, or a signal, for example from a webhook. |
-| **Call** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
+| **Subflow** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
 | **Join** | Waits for the branches that run at once, all of them or the first. |
 | **End** | Ends the run on purpose: done, nothing to do, or failed, with one line that says why. |
 
@@ -95,7 +95,7 @@ An Agent node names the coding agent it runs on. One flow can mix them.
 
 A node can add connections (MCP servers) and CLI tools such as `gh`. Each CLI tool runs with its own login, so one program can run as two accounts, for example `gh` and `gh-work`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" ([ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
 
-Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Call runs one as `kit:github/publish-draft-pr`.
+Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Subflow runs one as `kit:github/publish-draft-pr`.
 
 ### Runs that survive the night
 

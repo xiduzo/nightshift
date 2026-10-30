@@ -34,14 +34,14 @@ Goal: the docs tell the truth, and a bad night cannot cost more than its budget.
   a real project every night since 2026-10-16."
 - `docs/PLAN.md` §5: status line dated today. Slices 5 to 8 and the LangGraph
   engine run real nights. List what has still not happened for real: a usage
-  limit at night, a Codex or OpenCode step, a planner that feeds a Call with
+  limit at night, a Codex or OpenCode step, a planner that feeds a Subflow with
   `each` (check each against the real project's history and strike the ones
   that did happen).
 - `docs/steering/TECH.md` stack table: React Flow, Codex, push, libsql, Electrobun rows.
 - `docs/research/mobile.md` line 8, `examples/starters/README.md` and the
   starter files: format version 7. `examples/rpgdotexe/README.md`: 7.
-- README table: one name, Call. Glossary line 98: "Shown as Subflow in the
-  app" goes, or the app says Call. Pick Call.
+- README table and glossary: one name, Subflow, as the app shows it.
+  The flow JSON keeps `call`.
 - PLAN §2 "Dropped: Jira" becomes "Jira is a kit on `acli`, not an engine concept."
 - `SECURITY.md`: a short triage of the 30 audit findings. One line per high
   finding: why it does not reach the unattended surface.
@@ -254,7 +254,7 @@ Confluence export.
 - Import of Claude Code dynamic workflow scripts: a demo for after the pitch.
 - gh-aw lock file export, ACP registry listing: an afternoon each, after sprint 3.
 - Vectors, LangSmith as a native sink, Langfuse self-host recipes.
-- Per-item `timeoutMinutes` on a Call with `each`, run retention, transcript
+- Per-item `timeoutMinutes` on a Subflow with `each`, run retention, transcript
   deletion: PLAN §7 items that the budgets and metrics make visible first.
 
 ## 6. Risks
