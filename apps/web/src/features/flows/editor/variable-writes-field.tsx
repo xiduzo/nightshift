@@ -251,11 +251,7 @@ function WriteRow({
 				<Field
 					id={`${id}-expression`}
 					label="Expression"
-					hint={
-						<>
-							A JSONata expression, for example <code>vars.tries + 1</code>.
-						</>
-					}
+					hint={<>A JSONata expression.</>}
 				>
 					<Input
 						id={`${id}-expression`}

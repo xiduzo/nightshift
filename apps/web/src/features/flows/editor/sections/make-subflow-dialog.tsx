@@ -91,7 +91,7 @@ const GROUPS: {
 	{ key: "moves", title: "What moves" },
 	{ key: "inputs", title: "What the new flow gets" },
 	{ key: "outputs", title: "What comes back" },
-	{ key: "exits", title: "How this flow goes on" },
+	{ key: "exits", title: "How this flow continues" },
 ];
 
 function MakeSubflowForm({

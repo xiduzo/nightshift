@@ -31,7 +31,7 @@ const POLICY_FIELDS: {
 	{
 		key: "usageLimitFirstWaitMinutes",
 		label: "Usage limit: first wait (minutes)",
-		hint: "How long to wait when an agent reaches its usage limit and gives no reset time. The wait doubles each time.",
+		hint: "The wait when an agent reaches its usage limit and gives no reset time. It doubles each time.",
 	},
 	{
 		key: "usageLimitMaxWaitMinutes",
@@ -46,7 +46,7 @@ const POLICY_FIELDS: {
 	{
 		key: "maxSteps",
 		label: "Max steps",
-		hint: "The run stops after this many steps, as a safety net. You can resume it.",
+		hint: "The run stops after this many steps. You can resume it.",
 		whole: true,
 	},
 	{
@@ -116,11 +116,7 @@ export function FlowInspector({
 						<DescriptionSuggest before={flow.description ?? ""} />
 					</div>
 				</Field>
-				<Field
-					id={`${id}-start`}
-					label="Start node"
-					hint="The run starts here."
-				>
+				<Field id={`${id}-start`} label="Start node">
 					<NativeSelect
 						id={`${id}-start`}
 						value={flow.start}
@@ -219,7 +215,7 @@ export function FlowInspector({
 			<InspectorSection
 				title="Run policy"
 				defaultOpen={policySet}
-				description="These apply when you run this flow itself, not when another flow calls it. Leave a field empty to use Settings."
+				description="These apply when you run this flow, not when another flow calls it. Leave a field empty to use Settings."
 			>
 				{POLICY_FIELDS.map(({ key, label, hint, whole, format = String }) => {
 					const fallback = (policyDefaults ?? DEFAULT_POLICY)[key];
@@ -242,7 +238,7 @@ export function FlowInspector({
 				<Field
 					id={`${id}-resume`}
 					label="After Night Shift restarts"
-					hint="A run that stopped halfway continues where it left off, or waits for you. It continues only while schedules are on."
+					hint="A run continues where it stopped, or waits for you. It continues only while schedules are on."
 				>
 					<NativeSelect
 						id={`${id}-resume`}
@@ -293,7 +289,7 @@ export function FlowInspector({
 				defaultOpen={flow.nodes.length <= 1}
 			>
 				<ul className="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground text-xs leading-relaxed marker:text-border">
-					<li>Add a node with the buttons above the canvas.</li>
+					<li>Add a node with the buttons on the left of the canvas.</li>
 					<li>
 						Drag from an outcome dot on the right of a node to another node to
 						add an edge.
@@ -312,8 +308,8 @@ export function FlowInspector({
 					</li>
 					<li>
 						A Decision node has one outcome per option, a Command node one per
-						exit code, an Agent node one per own outcome. Renaming one moves its
-						edges along.
+						exit code, an Agent node one per own outcome. When you rename one,
+						its edges follow it.
 					</li>
 					<li>
 						A Subflow node runs another flow once, or once for each item in a

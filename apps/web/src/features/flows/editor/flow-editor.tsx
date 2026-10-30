@@ -314,7 +314,7 @@ function Editor({
 					).length;
 					if (errors > 0) {
 						toast.warning(
-							`Saved with ${errors} ${errors === 1 ? "error" : "errors"}. Fix them before running.`,
+							`Saved with ${errors} ${errors === 1 ? "error" : "errors"}. Fix them before you run the flow.`,
 						);
 					} else {
 						toast.success("Flow saved");
@@ -366,7 +366,7 @@ function Editor({
 		setDraft(next);
 		if (!isSavable(next)) {
 			toast.info(
-				`Created ${calledName}. Fix this flow's fields and save it, then open ${calledName} from the node.`,
+				`Created ${calledName}. Fix and save this flow, then open ${calledName} from the node.`,
 			);
 			return;
 		}
@@ -899,7 +899,7 @@ function Editor({
 						/>
 						{shownRevision ? (
 							<ProposalBar
-								title={`You see the revision of ${formatDateTime(shownRevision.at)}: what it changed`}
+								title={`What the revision of ${formatDateTime(shownRevision.at)} changed`}
 								onHide={() => setShownRevision(null)}
 								className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
 							>

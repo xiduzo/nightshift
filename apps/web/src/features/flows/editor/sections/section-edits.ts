@@ -78,7 +78,7 @@ export function sectionEdits(
 		toast.success(
 			`Made the Subflow "${made.name}". Save this flow to keep the change.`,
 			{
-				description: "Press i to look inside it.",
+				description: "Press i to open it.",
 				action: {
 					label: "Undo",
 					onClick: () => {

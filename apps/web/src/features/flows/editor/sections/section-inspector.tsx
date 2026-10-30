@@ -237,13 +237,13 @@ export function SectionInspector({
 					{entry
 						? `The flow comes into this Section at ${entry}.`
 						: "The flow has no single way into this Section."}{" "}
-					Remove the Section to keep its nodes on their own.
+					When you remove the Section, its nodes stay.
 				</Note>
 			</InspectorSection>
 
 			<InspectorSection
 				title="Subflow"
-				description="Move these nodes to a new flow. A Subflow runs it here in their place. You see each change before it happens."
+				description="Move these nodes to a new flow. A Subflow runs it in their place. You see each change first."
 			>
 				<Button
 					variant="outline"

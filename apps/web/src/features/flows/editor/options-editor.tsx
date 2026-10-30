@@ -322,7 +322,7 @@ function OptionRow({
 					aria-label={`Rule of ${position}`}
 					placeholder={
 						index === count - 1 && count > 1
-							? "No rule: picked when none above holds"
+							? "No rule: picked when no rule above matches"
 							: "build.data.tests_passed = true"
 					}
 					className="h-8 font-mono text-xs"
@@ -471,7 +471,7 @@ function ExitCodeInput({
 			aria-invalid={!valid}
 			title={
 				valid
-					? "Exit code. Leave it empty for any other code. Write data when the command picks this outcome in its data."
+					? "Exit code. Leave it empty to match any other code. Type data when the command picks the outcome in its data."
 					: "Use 0 to 255, or data."
 			}
 			placeholder="any"
