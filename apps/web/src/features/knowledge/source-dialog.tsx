@@ -1,3 +1,4 @@
+import { type InputTexts, missingInputs } from "@nightshift/client";
 import {
 	cronToTimeAndDays,
 	KNOWLEDGE_SOURCE_KINDS,
@@ -43,11 +44,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { UsersIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import {
-	FlowInputFields,
-	type InputTexts,
-	missingInputs,
-} from "@/features/flows";
+import { FlowInputFields } from "@/features/flows";
 import { orpc } from "@/shared/api";
 import { knowledgeMutations } from "./queries";
 
