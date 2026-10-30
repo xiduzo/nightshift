@@ -114,6 +114,7 @@ const nightsRangeSchema = z.object({
 				label: z.string(),
 				runs: z.number(),
 				total: z.number(),
+				unfinished: z.number(),
 			}),
 		),
 		perNight: z.array(nightCountsSchema),
@@ -134,7 +135,17 @@ const nightsRangeSchema = z.object({
 				failed: z.number(),
 			}),
 		),
-		failed: topRows(dashboardRunSchema),
+		failed: topRows(
+			dashboardRunSchema.extend({
+				after: z.object({
+					runs: z.number(),
+					finished: z.number(),
+					last: z
+						.object({ status: runStatusSchema, createdAt: z.number() })
+						.nullable(),
+				}),
+			}),
+		),
 	}),
 	gates: z.object({
 		asked: z.number(),
@@ -150,6 +161,9 @@ const nightsRangeSchema = z.object({
 				asked: z.number(),
 				answered: z.number(),
 				unanswered: z.number(),
+				waiting: z.number(),
+				runs: z.number(),
+				lastAskedAt: z.number(),
 				typical: z.number().nullable(),
 				longest: z.number().nullable(),
 			}),
