@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SpaceEngine, SpaceFlows } from "@nightshift/engine";
-import { type Flow, flowSchema } from "@nightshift/flows";
+import { type Flow, flowSchema, type Schedule } from "@nightshift/flows";
 import { call, ORPCError } from "@orpc/server";
 
 import { appRouter } from "../router";
@@ -56,6 +56,25 @@ function context(personId: string, files: number) {
 							};
 						},
 					}),
+					listSchedules: async () =>
+						({
+							path: "",
+							issues: [],
+							schedules: [
+								{ id: "sync", flow: "sync", cron: "0 6 * * *", enabled: true },
+							],
+						}) as unknown as Awaited<ReturnType<SpaceEngine["listSchedules"]>>,
+					listRuns: async () =>
+						[
+							{
+								id: "r2",
+								flowName: "sync",
+								status: "failed",
+								createdAt: 5,
+								endedAt: 6,
+							},
+							{ id: "r1", flowName: "sync", status: "finished", createdAt: 1 },
+						] as unknown as Awaited<ReturnType<SpaceEngine["listRuns"]>>,
 				}),
 		},
 	});
@@ -70,7 +89,18 @@ describe("knowledge.get", () => {
 		);
 		expect(got.files.map((f) => f.path)).toEqual(["page-0.md", "page-1.md"]);
 		expect(got.tooLarge).toBe(false);
-		expect(got.syncs).toEqual([{ flow: "sync", kits: ["kit:knowledge/web"] }]);
+		expect(got.syncs).toEqual([
+			{
+				flow: "sync",
+				kits: ["kit:knowledge/web"],
+				source: {
+					kit: "kit:knowledge/web",
+					inputs: { urls: "https://example.com" },
+				},
+				schedule: { cron: "0 6 * * *", enabled: true },
+				lastRun: { id: "r2", status: "failed", at: 6 },
+			},
+		]);
 		expect(got.proposed).toBe(3);
 		expect(got.reviews).toEqual(["review-learnings"]);
 		expect(got.shared).toBe(true);
@@ -216,5 +246,235 @@ describe("knowledge.search and knowledge.read", () => {
 			{ context: ctx },
 		);
 		expect(hits).toHaveLength(1);
+	});
+});
+
+/** A project's flows and schedules in memory, as the source procedures change them. */
+function sourceContext(
+	personId: string,
+	role: "member" | "viewer" = "member",
+	flows: Record<string, Flow | null> = {},
+) {
+	const state = {
+		flows: { ...flows },
+		schedules: [] as Schedule[],
+		removedFolders: [] as string[],
+	};
+	const ctx = testContext({
+		access: accessAs({ personId, spaceId: "s1", role }),
+		daemon: { device: { id: "d1", name: "studio", ownerId: "owner" } },
+		knowledge: {
+			removeFolder: async (_projectId, folder) => {
+				state.removedFolders.push(folder);
+				return 2;
+			},
+		},
+		engine: {
+			space: () =>
+				stub<SpaceEngine>("Space view", {
+					flows: stub<SpaceFlows>("flows", {
+						map: async () => ({ ...state.flows }),
+						save: async (_projectId, name, flow) => {
+							state.flows[name] = flow;
+							return [];
+						},
+						remove: async (_projectId, name) => {
+							delete state.flows[name];
+						},
+					}),
+					listSchedules: async () =>
+						({
+							path: "",
+							issues: [],
+							schedules: state.schedules.map((schedule) => ({
+								...schedule,
+								nextAt: null,
+								last: null,
+								deliveries: [],
+								issues: [],
+							})),
+						}) as unknown as Awaited<ReturnType<SpaceEngine["listSchedules"]>>,
+					saveSchedules: async (_projectId, schedules) => {
+						state.schedules = [...schedules];
+						return [];
+					},
+				}),
+		},
+	});
+	return { ctx, state };
+}
+
+describe("knowledge.saveSource and knowledge.removeSource", () => {
+	test("adds a source as a flow that calls the kit, with its own folder and a schedule", async () => {
+		const { ctx, state } = sourceContext("owner", "member", { sync: syncFlow });
+		const saved = await call(
+			appRouter.knowledge.saveSource,
+			{
+				projectId: "p1",
+				source: {
+					kit: "kit:knowledge/web",
+					inputs: { urls: " https://example.org ", folder: "" },
+				},
+				keepUpToDate: { cron: "0 6 * * *" },
+				timeZone: "Europe/Amsterdam",
+			},
+			{ context: ctx },
+		);
+		expect(saved).toEqual({ name: "knowledge-web-pages", issues: [] });
+		// The other web sync fills web: this one gets a folder of its own.
+		expect(state.flows["knowledge-web-pages"]?.nodes[0]).toMatchObject({
+			type: "call",
+			flow: "kit:knowledge/web",
+			inputs: { urls: "https://example.org", folder: "web-2" },
+		});
+		expect(state.schedules).toEqual([
+			{
+				id: "knowledge-web-pages",
+				flow: "knowledge-web-pages",
+				inputs: {},
+				cron: "0 6 * * *",
+				enabled: true,
+			},
+		]);
+	});
+
+	test("a folder of this computer syncs on this computer", async () => {
+		const { ctx, state } = sourceContext("owner");
+		await call(
+			appRouter.knowledge.saveSource,
+			{
+				projectId: "p1",
+				source: { kit: "kit:knowledge/folder", inputs: { path: "~/notes" } },
+				keepUpToDate: { cron: "0 6 * * *" },
+			},
+			{ context: ctx },
+		);
+		expect(state.schedules[0]?.device).toBe("studio");
+		expect(state.flows["knowledge-folder"]?.nodes[0]).toMatchObject({
+			inputs: { path: "~/notes", folder: "folder" },
+		});
+	});
+
+	test("edits a source in place, and refuses a flow the page did not make", async () => {
+		const { ctx, state } = sourceContext("member", "member", {
+			drawn: flowSchema.parse({
+				...syncFlow,
+				nodes: [
+					...syncFlow.nodes,
+					{ id: "end", type: "end", position: { x: 1, y: 1 }, status: "done" },
+				],
+			}),
+		});
+		const first = await call(
+			appRouter.knowledge.saveSource,
+			{
+				projectId: "p1",
+				source: { kit: "kit:knowledge/github-wiki", inputs: { repo: "a/b" } },
+			},
+			{ context: ctx },
+		);
+		await call(
+			appRouter.knowledge.saveSource,
+			{
+				projectId: "p1",
+				name: first.name,
+				source: { kit: "kit:knowledge/github-wiki", inputs: { repo: "c/d" } },
+			},
+			{ context: ctx },
+		);
+		expect(Object.keys(state.flows).sort()).toEqual([
+			"drawn",
+			"knowledge-github-wiki",
+		]);
+		expect(state.flows["knowledge-github-wiki"]?.nodes[0]).toMatchObject({
+			inputs: { repo: "c/d", folder: "wiki" },
+		});
+		await expect(
+			call(
+				appRouter.knowledge.saveSource,
+				{
+					projectId: "p1",
+					name: "drawn",
+					source: { kit: "kit:knowledge/web", inputs: { urls: "x" } },
+				},
+				{ context: ctx },
+			),
+		).rejects.toThrow("no such source");
+	});
+
+	test("refuses missing values, a schedule from someone who does not own this computer, and a viewer", async () => {
+		const member = sourceContext("member").ctx;
+		await expect(
+			call(
+				appRouter.knowledge.saveSource,
+				{ projectId: "p1", source: { kit: "kit:knowledge/web", inputs: {} } },
+				{ context: member },
+			),
+		).rejects.toThrow("Fill in Pages.");
+		await expect(
+			call(
+				appRouter.knowledge.saveSource,
+				{
+					projectId: "p1",
+					source: { kit: "kit:knowledge/web", inputs: { urls: "x" } },
+					keepUpToDate: { cron: "0 6 * * *" },
+				},
+				{ context: member },
+			),
+		).rejects.toThrow("Only the owner of this computer");
+		await expect(
+			call(
+				appRouter.knowledge.saveSource,
+				{
+					projectId: "p1",
+					source: { kit: "kit:knowledge/web", inputs: { urls: "x" } },
+				},
+				{ context: sourceContext("viewer", "viewer").ctx },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+	});
+
+	test("removes a source, its schedule and its files, but not a folder another flow fills", async () => {
+		const { ctx, state } = sourceContext("owner");
+		const one = await call(
+			appRouter.knowledge.saveSource,
+			{
+				projectId: "p1",
+				source: { kit: "kit:knowledge/web", inputs: { urls: "a" } },
+				keepUpToDate: { cron: "0 6 * * *" },
+			},
+			{ context: ctx },
+		);
+		const removed = await call(
+			appRouter.knowledge.removeSource,
+			{ projectId: "p1", name: one.name, removeFiles: true },
+			{ context: ctx },
+		);
+		expect(removed).toEqual({ removedFiles: 2 });
+		expect(state.flows).toEqual({});
+		expect(state.schedules).toEqual([]);
+		expect(state.removedFolders).toEqual(["web"]);
+
+		const two = await call(
+			appRouter.knowledge.saveSource,
+			{
+				projectId: "p1",
+				source: { kit: "kit:knowledge/web", inputs: { urls: "a" } },
+			},
+			{ context: ctx },
+		);
+		state.flows.other = syncFlow;
+		state.flows[two.name] = callFlow("kit:knowledge/web", {
+			urls: "a",
+			folder: "web",
+		});
+		expect(
+			await call(
+				appRouter.knowledge.removeSource,
+				{ projectId: "p1", name: two.name, removeFiles: true },
+				{ context: ctx },
+			),
+		).toEqual({ removedFiles: 0 });
+		expect(state.removedFolders).toEqual(["web"]);
 	});
 });

@@ -3,9 +3,11 @@ import type {
 	KnowledgeHit,
 	KnowledgeText,
 } from "@nightshift/engine";
+import { knowledgeSourceSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { exact } from "../output";
+import { runStatusSchema } from "../runs";
 
 /** One file of a project's knowledge folder. */
 const knowledgeFileSchema = exact<KnowledgeFile>()(
@@ -28,7 +30,27 @@ export const knowledgeSchema = z.object({
 	/** So many files that an agent reads it badly. */
 	tooLarge: z.boolean(),
 	/** The flows of the project that call a `kit:knowledge/*` kit to fill it, by name. */
-	syncs: z.array(z.object({ flow: z.string(), kits: z.array(z.string()) })),
+	syncs: z.array(
+		z.object({
+			flow: z.string(),
+			kits: z.array(z.string()),
+			/** The source, when the flow is one the Knowledge page made and can edit. */
+			source: knowledgeSourceSchema.nullable(),
+			/** Its schedule at set times, if it has one. */
+			schedule: z
+				.object({
+					cron: z.string(),
+					enabled: z.boolean(),
+					/** The Device its runs run on, by name. */
+					device: z.string().optional(),
+				})
+				.nullable(),
+			/** Its latest run among the project's recent ones: when it ended, else started. */
+			lastRun: z
+				.object({ id: z.string(), status: runStatusSchema, at: z.number() })
+				.nullable(),
+		}),
+	),
 	/** How many learnings agents proposed that wait for a person. */
 	proposed: z.number(),
 	/** The flows of the project that review the learnings, by name. */

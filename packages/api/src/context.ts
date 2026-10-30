@@ -92,9 +92,9 @@ export type Services = {
 	/**
 	 * The projects' knowledge in their Spaces (ADR 4): the files the
 	 * knowledge document lists, and one file's content by its hash for a
-	 * computer whose folder lacks it.
+	 * computer whose folder lacks it, and the removal of a source's folder.
 	 */
-	knowledge: Pick<KnowledgeSync, "listing" | "read">;
+	knowledge: Pick<KnowledgeSync, "listing" | "read" | "removeFolder">;
 	/** Keyword search over the projects' knowledge on this computer, and reading one file of its folder. */
 	knowledgeSearch: Pick<KnowledgeSearch, "search" | "read">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
