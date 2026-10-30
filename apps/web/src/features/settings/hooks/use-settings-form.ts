@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { SettingsView } from "@/shared/api";
 import { settingsMutations, settingsQueries } from "../queries";
@@ -77,6 +77,24 @@ function parseDraft(
 	}
 }
 
+/** How long a field waits after the last keystroke before it saves. */
+const SAVE_DELAY_MS = 800;
+
+/**
+ * The patch that puts `keys` back as `view` has them: a saved value comes
+ * back, a default or outside value is forgotten again.
+ */
+function restorePatch(
+	view: SettingsView,
+	keys: readonly SettingKey[],
+): SettingsPatch {
+	const patch: Record<string, unknown> = {};
+	for (const key of keys) {
+		patch[key] = view.fields[key].source === "saved" ? view.values[key] : null;
+	}
+	return patch as SettingsPatch;
+}
+
 /** Saves a patch and puts the answer in the cache, so every reader sees it. */
 export function useSaveSettings() {
 	const queryClient = useQueryClient();
@@ -90,12 +108,33 @@ export function useSaveSettings() {
 }
 
 /**
- * An on/off setting that saves at once. The switch moves before the daemon
- * answers, and moves back when the save fails.
+ * A toast that says what was saved, with Undo. Undo saves `undo`, the
+ * values from before the change.
  */
-export function useToggleSetting() {
+function useUndoToast() {
+	const undo = useSaveSettings();
+	return (message: string, patch: SettingsPatch) =>
+		toast.success(message, {
+			action: {
+				label: "Undo",
+				onClick: () =>
+					undo.mutate(patch, {
+						onSuccess: () => toast.info("Change undone"),
+						onError: (error) => toast.error(`Not undone: ${error.message}`),
+					}),
+			},
+		});
+}
+
+/**
+ * An on/off setting that saves at once. The switch moves before the daemon
+ * answers, and moves back when the save fails. A toast names the section
+ * `title` and offers Undo.
+ */
+export function useToggleSetting(title: string) {
 	const queryClient = useQueryClient();
 	const queryKey = settingsQueries.get().queryKey;
+	const undoToast = useUndoToast();
 	return useMutation(
 		settingsMutations.save({
 			onMutate: async (patch) => {
@@ -120,7 +159,13 @@ export function useToggleSetting() {
 				if (context?.before) queryClient.setQueryData(queryKey, context.before);
 				toast.error(`Not saved: ${error.message}`);
 			},
-			onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+			onSuccess: (data, patch, context) => {
+				queryClient.setQueryData(queryKey, data);
+				if (context?.before) {
+					const keys = Object.keys(patch) as SettingKey[];
+					undoToast(`${title} saved`, restorePatch(context.before, keys));
+				}
+			},
 		}),
 	);
 }
@@ -135,84 +180,130 @@ function shown(key: SettingKey, value: unknown): string {
 }
 
 /**
- * The drafts of one card's fields. A field with no draft shows the saved
- * value. Save sends the fields that changed; Reset forgets a saved value.
+ * The fields of one section. A field with no draft shows the saved value.
+ * A change saves itself after a short pause, or at once when the field
+ * loses focus. A field that is not valid waits until it is.
+ *
+ * `title` names the section in toasts. `switches` are the section's
+ * on/off settings, which save through `useToggleSetting`: Reset puts them
+ * back too.
  */
 export function useSettingsForm(
 	data: SettingsView,
 	keys: readonly SettingKey[],
+	{ title, switches = [] }: { title: string; switches?: readonly SettingKey[] },
 ) {
 	const [drafts, setDrafts] = useState<Partial<Record<SettingKey, string>>>({});
 	const save = useSaveSettings();
 	const reset = useSaveSettings();
+	const undoToast = useUndoToast();
+
+	// The timer reads the newest drafts and data, not those of its render.
+	const latest = useRef({ drafts, data });
+	latest.current = { drafts, data };
+	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
 	// A setting with no value (no budget) shows an empty field.
-	const current = (key: SettingKey) => shown(key, data.values[key]);
-	const value = (key: SettingKey) => drafts[key] ?? current(key);
-	const changed = keys.filter(
-		(key) => drafts[key] !== undefined && drafts[key] !== current(key),
-	);
-	const error = (key: SettingKey): string | undefined => {
+	const currentIn = (view: SettingsView, key: SettingKey) =>
+		shown(key, view.values[key]);
+	const valueIn = (
+		view: SettingsView,
+		from: Partial<Record<SettingKey, string>>,
+		key: SettingKey,
+	) => from[key] ?? currentIn(view, key);
+	const value = (key: SettingKey) => valueIn(data, drafts, key);
+
+	const errorIn = (
+		view: SettingsView,
+		from: Partial<Record<SettingKey, string>>,
+		key: SettingKey,
+	): string | undefined => {
 		const kind = KINDS[key];
 		if (!kind) return undefined;
-		const parsed = parseDraft(kind, value(key));
+		const parsed = parseDraft(kind, valueIn(view, from, key));
 		if ("error" in parsed) return parsed.error;
 		// The daemon refuses this pair too; say so before the save.
 		if (
 			key === "usageLimitFirstWaitMinutes" &&
-			Number(parsed.value) > Number(value("usageLimitMaxWaitMinutes"))
+			Number(parsed.value) >
+				Number(valueIn(view, from, "usageLimitMaxWaitMinutes"))
 		) {
 			return "Cannot be longer than the longest usage-limit wait.";
 		}
 		return undefined;
 	};
-	const invalid = keys.some((key) => error(key) !== undefined);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reads refs; keys and title are constants of the card
+	const flush = useCallback(() => {
+		clearTimeout(timer.current);
+		timer.current = undefined;
+		const { drafts: from, data: view } = latest.current;
+		const patch: Record<string, unknown> = {};
+		const sent: Partial<Record<SettingKey, string>> = {};
+		for (const key of keys) {
+			const draft = from[key];
+			if (draft === undefined || draft === currentIn(view, key)) continue;
+			const kind = KINDS[key];
+			if (!kind || errorIn(view, from, key) !== undefined) continue;
+			const parsed = parseDraft(kind, draft);
+			if (!("value" in parsed)) continue;
+			patch[key] = parsed.value;
+			sent[key] = draft;
+		}
+		const changed = Object.keys(sent) as SettingKey[];
+		if (changed.length === 0) return;
+		const undo = restorePatch(view, changed);
+		save.mutate(patch as SettingsPatch, {
+			onSuccess: () => {
+				// A field typed in while the save went keeps its newer draft.
+				setDrafts((before) => {
+					const next = { ...before };
+					for (const key of changed) {
+						if (next[key] === sent[key]) delete next[key];
+					}
+					return next;
+				});
+				undoToast(`${title} saved`, undo);
+			},
+		});
+	}, []);
+
+	// A change that waits when the section goes still saves.
+	useEffect(() => flush, [flush]);
+
+	const all = [...keys, ...switches];
+	const resettable = all.filter((key) => data.fields[key].source === "saved");
 
 	return {
 		value,
-		error,
-		dirty: changed.length > 0,
-		invalid,
+		error: (key: SettingKey) => errorIn(data, drafts, key),
 		saving: save.isPending,
 		saveError: save.error,
-		resettingKey: reset.isPending
-			? (Object.keys(reset.variables ?? {})[0] as SettingKey | undefined)
-			: undefined,
 		set: (key: SettingKey, next: string) => {
 			save.reset();
 			setDrafts((before) => ({ ...before, [key]: next }));
+			clearTimeout(timer.current);
+			timer.current = setTimeout(flush, SAVE_DELAY_MS);
 		},
-		discard: () => {
+		/** Saves a waiting change now, such as when a field loses focus. */
+		flush,
+		/** Some setting of the section differs from its default. */
+		canReset: resettable.length > 0,
+		resetting: reset.isPending,
+		/** Puts every setting of the section back to its default. */
+		reset: () => {
+			clearTimeout(timer.current);
+			timer.current = undefined;
 			save.reset();
-			setDrafts({});
-		},
-		save: () => {
-			const patch: Record<string, unknown> = {};
-			for (const key of changed) {
-				const kind = KINDS[key];
-				if (!kind) continue;
-				const parsed = parseDraft(kind, value(key));
-				if ("value" in parsed) patch[key] = parsed.value;
-			}
-			save.mutate(patch as SettingsPatch, {
+			const undo = restorePatch(data, resettable);
+			const patch = Object.fromEntries(resettable.map((key) => [key, null]));
+			reset.mutate(patch as SettingsPatch, {
 				onSuccess: () => {
 					setDrafts({});
-					toast.success("Settings saved");
+					undoToast(`${title} reset to defaults`, undo);
 				},
-			});
-		},
-		reset: (key: SettingKey, label: string) => {
-			reset.mutate({ [key]: null } as SettingsPatch, {
-				onSuccess: (next) => {
-					setDrafts((before) => {
-						const { [key]: _dropped, ...rest } = before;
-						return rest;
-					});
-					toast.success(
-						`${label} reset to ${next.values[key] === null ? "no limit" : shown(key, next.values[key])}`,
-					);
-				},
-				onError: (resetError) => toast.error(resetError.message),
+				onError: (resetError) =>
+					toast.error(`Not reset: ${resetError.message}`),
 			});
 		},
 	};

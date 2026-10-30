@@ -364,7 +364,7 @@ test("run() is the engine's part of the current values", async () => {
 		maxTurns: null,
 		resumeInterruptedRuns: true,
 		cleanUpRuns: true,
-		cleanUpAfterDays: 14,
+		cleanUpAfterDays: 90,
 		policy: {
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,

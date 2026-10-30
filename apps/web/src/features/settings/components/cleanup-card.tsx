@@ -12,20 +12,29 @@ import { useId } from "react";
 import type { SettingsView } from "@/shared/api";
 import { PageSection } from "@/shared/page";
 import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
-import { CardForm, FormFooter, SaveError, TextSetting } from "./setting-fields";
+import {
+	CardForm,
+	ResetSection,
+	SaveError,
+	TextSetting,
+} from "./setting-fields";
 
 const CLEANUP_KEYS = ["cleanUpAfterDays"] as const;
 
 /** The scheduled cleanup of what ended runs left on this computer. */
 export function CleanupCard({ data }: { data: SettingsView }) {
-	const form = useSettingsForm(data, CLEANUP_KEYS);
-	const toggle = useToggleSetting();
+	const form = useSettingsForm(data, CLEANUP_KEYS, {
+		title: "Cleanup",
+		switches: ["cleanUpRuns"],
+	});
+	const toggle = useToggleSetting("Cleanup");
 	const id = useId();
 
 	return (
 		<PageSection
 			title="Cleanup"
 			description="Each run works in its own copy of the project, on its own branch. Night Shift can remove old ones for you."
+			actions={<ResetSection form={form} />}
 		>
 			<Card>
 				<CardForm form={form}>
@@ -56,7 +65,6 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 							<div className="grid gap-6 sm:grid-cols-2">
 								<TextSetting
 									form={form}
-									data={data}
 									settingKey="cleanUpAfterDays"
 									label="Clean up after"
 									unit="days"
@@ -67,7 +75,6 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 							<SaveError error={form.saveError} />
 						</FieldGroup>
 					</CardContent>
-					<FormFooter form={form} label="Save cleanup" />
 				</CardForm>
 			</Card>
 		</PageSection>

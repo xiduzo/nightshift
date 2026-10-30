@@ -3,9 +3,7 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import { CardFooter } from "@nightshift/ui/components/card";
 import {
 	Field,
 	FieldDescription,
@@ -28,44 +26,9 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { CircleAlertIcon, SaveIcon } from "lucide-react";
+import { CircleAlertIcon, RotateCcwIcon } from "lucide-react";
 import { type ReactNode, useId } from "react";
-import type { SettingsView } from "@/shared/api";
-import type {
-	SettingField,
-	SettingKey,
-	SettingsForm,
-} from "../hooks/use-settings-form";
-
-/** Discard and Save at the bottom of a card with a form. */
-export function FormFooter({
-	form,
-	label,
-}: {
-	form: SettingsForm;
-	label: string;
-}) {
-	return (
-		<CardFooter className="justify-end gap-2 border-t">
-			{form.dirty && !form.saving ? (
-				<Button type="button" variant="ghost" onClick={form.discard}>
-					Discard
-				</Button>
-			) : null}
-			<Button
-				type="submit"
-				disabled={!form.dirty || form.invalid || form.saving}
-			>
-				{form.saving ? (
-					<Spinner data-icon="inline-start" />
-				) : (
-					<SaveIcon data-icon="inline-start" />
-				)}
-				{form.saving ? "Saving…" : label}
-			</Button>
-		</CardFooter>
-	);
-}
+import type { SettingKey, SettingsForm } from "../hooks/use-settings-form";
 
 /** The daemon's answer when it refused a save. */
 export function SaveError({ error }: { error: Error | null }) {
@@ -79,59 +42,30 @@ export function SaveError({ error }: { error: Error | null }) {
 	);
 }
 
-/** Where a value comes from: its default, the daemon's environment, or a saved value. */
-export function SettingSource({
-	field,
-	label,
-	format = String,
-	resetting,
-	onReset,
-}: {
-	field: SettingField;
-	label: string;
-	format?: (value: unknown) => string;
-	resetting: boolean;
-	onReset: () => void;
-}) {
-	const fallback =
-		field.envValue !== undefined
-			? `${format(field.envValue)}, set outside Night Shift`
-			: `${format(field.default)}, the default`;
+/** "Reset to defaults" for a whole section, beside its title. */
+export function ResetSection({ form }: { form: SettingsForm }) {
+	if (!form.canReset) return null;
 	return (
-		<div className="flex min-h-6 flex-wrap items-center gap-2">
-			{field.source === "saved" ? (
-				<>
-					<Badge variant="secondary">Saved</Badge>
-					<Button
-						type="button"
-						variant="ghost"
-						size="xs"
-						disabled={resetting}
-						title={`Back to ${fallback}`}
-						aria-label={`Reset ${label}, back to ${fallback}`}
-						onClick={onReset}
-					>
-						{resetting ? <Spinner data-icon="inline-start" /> : null}
-						Reset
-					</Button>
-				</>
-			) : field.source === "env" ? (
-				<Badge variant="outline" className="font-mono">
-					Set outside Night Shift
-				</Badge>
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			disabled={form.resetting}
+			onClick={form.reset}
+		>
+			{form.resetting ? (
+				<Spinner data-icon="inline-start" />
 			) : (
-				<Badge variant="outline" className="text-muted-foreground">
-					Default
-				</Badge>
+				<RotateCcwIcon data-icon="inline-start" />
 			)}
-		</div>
+			Reset to defaults
+		</Button>
 	);
 }
 
-/** A number or text setting: label, input, description, error, source. */
+/** A number or text setting: label, input, error, description. */
 export function TextSetting({
 	form,
-	data,
 	settingKey,
 	label,
 	description,
@@ -140,10 +74,8 @@ export function TextSetting({
 	mono,
 	suggestions,
 	placeholder,
-	format,
 }: {
 	form: SettingsForm;
-	data: SettingsView;
 	settingKey: SettingKey;
 	label: string;
 	description: ReactNode;
@@ -153,8 +85,6 @@ export function TextSetting({
 	suggestions?: readonly string[];
 	/** Shown in an empty field: what no value means. */
 	placeholder?: string;
-	/** How the source line writes a value, such as the default. */
-	format?: (value: unknown) => string;
 }) {
 	const id = useId();
 	const error = form.error(settingKey);
@@ -164,6 +94,7 @@ export function TextSetting({
 		value: form.value(settingKey),
 		onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
 			form.set(settingKey, event.target.value),
+		onBlur: form.flush,
 		inputMode,
 		autoComplete: "off",
 		spellCheck: false,
@@ -198,13 +129,6 @@ export function TextSetting({
 			<FieldDescription id={`${id}-description`}>
 				{description}
 			</FieldDescription>
-			<SettingSource
-				field={data.fields[settingKey]}
-				label={label}
-				{...(format ? { format } : {})}
-				resetting={form.resettingKey === settingKey}
-				onReset={() => form.reset(settingKey, label)}
-			/>
 		</Field>
 	);
 }
@@ -212,7 +136,6 @@ export function TextSetting({
 /** A choice from a short list, in a Select. */
 export function SelectSetting<V extends string>({
 	form,
-	data,
 	settingKey,
 	label,
 	description,
@@ -220,7 +143,6 @@ export function SelectSetting<V extends string>({
 	onPick,
 }: {
 	form: SettingsForm;
-	data: SettingsView;
 	settingKey: SettingKey;
 	label: string;
 	description: ReactNode;
@@ -228,8 +150,6 @@ export function SelectSetting<V extends string>({
 	onPick?: (value: V) => void;
 }) {
 	const id = useId();
-	const labelOf = (value: unknown) =>
-		options.find((option) => option.value === value)?.label ?? String(value);
 	return (
 		<Field>
 			<FieldLabel htmlFor={id}>{label}</FieldLabel>
@@ -262,18 +182,11 @@ export function SelectSetting<V extends string>({
 			<FieldDescription id={`${id}-description`}>
 				{description}
 			</FieldDescription>
-			<SettingSource
-				field={data.fields[settingKey]}
-				label={label}
-				format={labelOf}
-				resetting={form.resettingKey === settingKey}
-				onReset={() => form.reset(settingKey, label)}
-			/>
 		</Field>
 	);
 }
 
-/** A form inside a card: Enter saves. */
+/** A form inside a card: Enter saves at once. */
 export function CardForm({
 	form,
 	children,
@@ -287,7 +200,7 @@ export function CardForm({
 			noValidate
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (form.dirty && !form.invalid && !form.saving) form.save();
+				form.flush();
 			}}
 		>
 			{children}
