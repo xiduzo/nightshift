@@ -16,13 +16,14 @@ import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
 import { AssistantCard } from "./components/assistant-card";
 import { CleanupCard } from "./components/cleanup-card";
+import { MonitoringCard } from "./components/monitoring-card";
 import { PhoneCard } from "./components/phone-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
 import { settingsQueries } from "./queries";
 
 /**
- * The Settings page: runs, run policy, new Agent nodes, notifications, the
+ * The Settings page: runs, run policy, new Agent nodes, monitoring, notifications, the
  * phone, appearance, and `thisComputer`: the section of this computer, which
  * the Devices vertical owns.
  */
@@ -48,6 +49,7 @@ export function SettingsPage({ thisComputer }: { thisComputer: ReactNode }) {
 							<CleanupCard data={settings.data} />
 							<AgentDefaultsCard data={settings.data} />
 							<AssistantCard data={settings.data} />
+							<MonitoringCard data={settings.data} />
 						</>
 					) : settings.error ? (
 						<Alert variant="destructive">
