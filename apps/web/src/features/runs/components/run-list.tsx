@@ -37,8 +37,8 @@ import { RunStatusIcon } from "./run-status-badge";
 
 /**
  * Runs as a table, newest first. Each row: a status icon, the title (a link
- * to the run) and its outcome; icons for the trigger, the device, the cost
- * and the branch; and the start, which sorts. What every run shares (one
+ * to the run) and its outcome under it; icons for the trigger, the device,
+ * the cost and the branch, with how long ago it started under them. What every run shares (one
  * project) does not repeat on each row. Narrow screens drop the icons. With
  * `pageSize`, the runs show in pages. With `more`, a button under the list
  * loads the next runs.
@@ -142,24 +142,21 @@ function runColumns(projectNames: Map<string, string> | undefined) {
 				cellClassName: "w-full max-w-0 py-2.5 pl-6",
 			},
 		}),
-		column.display({
-			id: "facts",
-			header: () => <span className="sr-only">Details</span>,
-			cell: ({ row }) => <RunFacts run={row.original} />,
-			meta: {
-				headClassName: "hidden w-0 sm:table-cell",
-				cellClassName: "hidden w-0 py-2.5 align-top sm:table-cell",
-			},
-		}),
+		// Sorted by, never sortable: the newest run stays on top.
 		column.accessor("createdAt", {
 			id: "started",
-			header: "Started",
-			enableSorting: true,
-			cell: ({ row }) => <Started at={row.original.createdAt} />,
+			header: () => <span className="sr-only">Details</span>,
+			cell: ({ row }) => (
+				<>
+					<RunFacts run={row.original} />
+					<p className="mt-0.5 whitespace-nowrap text-right text-muted-foreground text-xs">
+						<Started at={row.original.createdAt} />
+					</p>
+				</>
+			),
 			meta: {
-				headClassName: "hidden pr-6 text-right sm:table-cell",
-				cellClassName:
-					"hidden py-2.5 pr-6 text-right align-top text-muted-foreground sm:table-cell",
+				headClassName: "w-0 pr-6",
+				cellClassName: "w-0 py-2.5 pr-6 align-top",
 			},
 		}),
 	]);
@@ -222,10 +219,6 @@ function RunTitle({
 					{run.reason}
 				</p>
 			) : null}
-			{/* The start, which the hidden column holds, on narrow screens. */}
-			<p className="mt-0.5 pl-6 text-muted-foreground text-xs sm:hidden">
-				<Started at={run.createdAt} />
-			</p>
 		</>
 	);
 }
@@ -238,7 +231,7 @@ function RunTitle({
 function RunFacts({ run }: { run: RunSummary }) {
 	const { trigger } = run;
 	return (
-		<div className="flex items-center justify-end gap-2 text-muted-foreground">
+		<div className="flex h-5 items-center justify-end gap-2 text-muted-foreground max-sm:hidden">
 			{trigger.kind !== "manual" ? (
 				<Fact
 					label={
