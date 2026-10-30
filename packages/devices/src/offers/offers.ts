@@ -317,7 +317,7 @@ export function offerRefusal(
 	// A flow that touches nothing there (Gates, rules, waits) needs no Offer.
 	if (!nodes.some(touchesDevice)) return null;
 	if (!placed.mayUse) {
-		return `${deviceName} is not your device, and your role in this Space does not allow using what others offer.`;
+		return `${deviceName} is not your device, and your role in this Space does not let you use what others offer.`;
 	}
 	if (offers.length === 0) return offersNothing(deviceName);
 	const others = nodes.filter((n) => n.type !== "agent" && touchesDevice(n));

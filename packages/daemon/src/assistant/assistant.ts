@@ -85,8 +85,8 @@ export function chatRefusal(picked: PickedAgent): string | null {
 	const { harness } = picked.settings;
 	if (chatCanUseTools(harness)) return null;
 	return picked.profile !== null
-		? `The chat cannot use the profile "${picked.profile}": ${harnessLabel(harness)} cannot read your flow or propose changes. Choose a profile that uses Claude Code, Codex or OpenCode for the chat.`
-		: `The chat cannot use ${harnessLabel(harness)}: it cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode for the chat.`;
+		? `The chat cannot use the profile "${picked.profile}". ${harnessLabel(harness)} cannot read your flow or propose changes. Choose a profile that uses Claude Code, Codex or OpenCode.`
+		: `The chat cannot use ${harnessLabel(harness)}. It cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode.`;
 }
 
 /**

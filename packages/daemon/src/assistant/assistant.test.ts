@@ -484,7 +484,7 @@ describe("assistant.chat", () => {
 			{
 				type: "error",
 				message:
-					"The chat cannot use pi: it cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode for the chat.",
+					"The chat cannot use pi. It cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode.",
 			},
 		]);
 	});
@@ -505,7 +505,7 @@ describe("assistant.chat", () => {
 		const refused = await chat(assistant, { profile: "local" });
 		expect(refused).toHaveLength(1);
 		expect(refused[0]?.type === "error" && refused[0].message).toContain(
-			"Choose a profile that uses Claude Code, Codex or OpenCode for the chat.",
+			"Choose a profile that uses Claude Code, Codex or OpenCode.",
 		);
 		// The profile for help does not fit the chat: the first that does.
 		const events = await chat(assistant);

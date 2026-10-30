@@ -92,7 +92,7 @@ export async function startUpdates(options: Options): Promise<Updates> {
 			if (!found.updateReady) {
 				if (manual) {
 					Utils.showNotification({
-						title: `${APP_NAME} ${found.version} is downloading`,
+						title: `${APP_NAME} ${found.version} is on its way`,
 						body: "Night Shift asks you to restart when it is ready.",
 						silent: true,
 					});
@@ -162,7 +162,7 @@ export async function startUpdates(options: Options): Promise<Updates> {
 			console.error(Updater.updateInfo().error);
 			await tell(
 				`${APP_NAME} cannot install the update.`,
-				`Open ${APP_NAME} again to keep working. It tries the update again later.`,
+				`Open ${APP_NAME} again. It tries the update again later.`,
 			);
 			Utils.quit();
 		},

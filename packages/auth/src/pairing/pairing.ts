@@ -185,7 +185,7 @@ export function normalizeUserCode(userCode: string): string {
 }
 
 const NOT_YOURS =
-	"Another person is approving this code. Ask them, or start the pairing again on the device.";
+	"Another person has this code open. Ask them, or start the pairing again on the device.";
 
 /** The OAuth error code of a device authorization error, if it is one. */
 function oauthError(error: unknown): string | null {
@@ -207,7 +207,10 @@ function refusalOf(error: unknown): unknown {
 					?.error_description ?? "",
 			);
 			if (/processed/i.test(text)) {
-				return new Refusal("conflict", "This code was already used.");
+				return new Refusal(
+					"conflict",
+					"Someone used this code already. Start the pairing again on the device.",
+				);
 			}
 			if (/claimed/i.test(text)) {
 				return new Refusal("invalid", "Enter the code first, then approve it.");
@@ -220,7 +223,7 @@ function refusalOf(error: unknown): unknown {
 		case "expired_token":
 			return new Refusal(
 				"conflict",
-				"This code has expired. Start the pairing again on the device.",
+				"This code expired. Start the pairing again on the device.",
 			);
 		case "access_denied":
 			return new Refusal("forbidden", NOT_YOURS);

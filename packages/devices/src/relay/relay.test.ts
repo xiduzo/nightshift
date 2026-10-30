@@ -465,7 +465,7 @@ describe("the relay, for a Space a Host keeps", () => {
 			flowSyncMs: 200,
 		});
 		await expect(relay.startRun(start("space-team") as never)).rejects.toThrow(
-			"The flows of this project have not reached the computer that keeps this Space yet. Start the run again in a moment.",
+			"The flows of this project are not on the computer that keeps this Space yet. Start the run again in a moment.",
 		);
 		expect(host.taken).toEqual([]);
 	});

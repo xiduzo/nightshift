@@ -475,12 +475,12 @@ for (const [path, call] of Object.entries(paths)) {
 			).toBe("This device runs steps for Members of this Space only.");
 			expect(
 				await outcome(request({ personId: "viewer", call: offered() })),
-			).toBe("Your role in this Space does not allow using what others offer.");
+			).toBe("Your role in this Space does not let you use what others offer.");
 			expect(await outcome(request({ call: offered() }))).toBe("served");
 			// The colleague's role changes while the run walks: the next call is refused.
 			await mirror({ colleague: "viewer" });
 			expect(await outcome(request({ call: { kind: "flows" } }))).toBe(
-				"Your role in this Space does not allow using what others offer.",
+				"Your role in this Space does not let you use what others offer.",
 			);
 		});
 
@@ -618,7 +618,7 @@ describe("Offer admission, its owner's run", () => {
 		);
 		await mirror({ [ME]: "viewer" });
 		expect(await serve(mine())).toBe(
-			"Your role in this Space does not allow starting runs.",
+			"Your role in this Space does not let you start runs.",
 		);
 	});
 
