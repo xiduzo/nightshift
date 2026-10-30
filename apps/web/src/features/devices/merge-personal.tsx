@@ -55,7 +55,7 @@ export function MergePersonalAlert() {
 				<AlertDescription>
 					{blocked ??
 						(state
-							? "A merge of your Personal stopped before it was done. Go on to finish it."
+							? "A merge of your Personal stopped before the end. Finish it now."
 							: `This computer has its own Personal beside your Personal on ${host}. Merge them to see all your projects and runs in one place, on every device.`)}
 				</AlertDescription>
 				<AlertAction>
@@ -179,7 +179,7 @@ function MergeSteps({
 					<CircleAlertIcon />
 					<AlertTitle>The merge stopped</AlertTitle>
 					<AlertDescription>
-						{merge.error.message} Nothing is lost. Try again to go on.
+						{merge.error.message} Nothing is lost. Try again.
 					</AlertDescription>
 				</Alert>
 			) : null}

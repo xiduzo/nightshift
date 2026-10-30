@@ -183,8 +183,8 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				<DialogTitle>Add project</DialogTitle>
 				<DialogDescription>
 					{folderPicker
-						? "Choose a folder on this computer, or copy a repository from GitHub. Each run works in its own copy, so your files stay as they are."
-						: "Copy a repository from GitHub to this computer. Each run works in its own copy of it."}
+						? "Choose a folder on this computer, or copy a repository from GitHub. Runs do not change the files in your folder."
+						: "Copy a repository from GitHub to this computer."}
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup className="gap-5">

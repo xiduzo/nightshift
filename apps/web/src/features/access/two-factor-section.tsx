@@ -81,9 +81,9 @@ export function TwoFactorSection({
 					</EmptyMedia>
 					<EmptyTitle>Set a password first</EmptyTitle>
 					<EmptyDescription>
-						Night Shift signs you in on this computer for you. To sign in from
-						another computer, run this command on this computer. Then turn on
-						two-factor sign-in.
+						You need a password to sign in from another computer. Run this
+						command on this computer to set one. Then turn on two-factor
+						sign-in.
 					</EmptyDescription>
 				</EmptyHeader>
 				<EmptyContent>

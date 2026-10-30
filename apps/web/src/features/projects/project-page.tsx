@@ -83,7 +83,9 @@ export function ProjectPage({
 										<FolderXIcon aria-hidden="true" />
 									</EmptyMedia>
 									<EmptyTitle>Project not found</EmptyTitle>
-									<EmptyDescription>It may have been removed.</EmptyDescription>
+									<EmptyDescription>
+										It is not in this Space. Someone removed it or moved it.
+									</EmptyDescription>
 								</EmptyHeader>
 								<EmptyContent>
 									<Button

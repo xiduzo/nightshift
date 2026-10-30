@@ -123,7 +123,7 @@ function InviteForm({ spaceName }: { spaceName: string }) {
 						</InputGroupAddon>
 					</InputGroup>
 					<FieldDescription>
-						You find it again under Invitations until they accept it.
+						Copy it again from Invitations until they accept it.
 					</FieldDescription>
 				</Field>
 				<DialogFooter>

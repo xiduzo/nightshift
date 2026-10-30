@@ -30,12 +30,11 @@ type GitHubAccess = "missing" | "signed-out" | "signed-in";
 
 /** How the description under the field guides the person, by the GitHub sign-in of this computer. */
 const HINT: Record<GitHubAccess, string> = {
-	"signed-in":
-		"Pick one of your repositories, or enter one, for example acme/app.",
+	"signed-in": "Choose one of your repositories, or enter one.",
 	"signed-out":
-		"Enter a repository, for example acme/app or its GitHub link. For a private repository, sign in to GitHub on this computer: run gh auth login.",
+		"Enter a repository or its GitHub link. For a private repository, run gh auth login on this computer.",
 	missing:
-		"Enter a public repository, for example acme/app or its GitHub link. For a private repository, install the GitHub CLI on this computer and run gh auth login.",
+		"Enter a public repository or its GitHub link. For a private repository, install the GitHub CLI and run gh auth login.",
 };
 
 /**

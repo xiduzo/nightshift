@@ -62,7 +62,7 @@ export function TwoFactorPage({
 					<CardTitle>Turn on two-factor sign-in</CardTitle>
 					<CardDescription>
 						This Host asks for a code from an authenticator app when you sign in
-						from another computer. Set it up once to continue.
+						from another computer. Turn it on once to continue.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>

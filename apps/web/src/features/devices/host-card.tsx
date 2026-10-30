@@ -125,7 +125,7 @@ export function HostCard({
 						<AlertTitle>This computer cannot reach {linked.name}</AlertTitle>
 						<AlertDescription>
 							Not connected since {formatRelative(linked.since, now)}. Night
-							Shift keeps trying, and syncs again once it answers.
+							Shift tries again, and syncs when it answers.
 						</AlertDescription>
 						<AlertAction>
 							<Button

@@ -40,7 +40,7 @@ export function LeaveHostButton({ hostName }: { hostName: string }) {
 				toast.success(`You left ${result.host.name}`);
 			} else {
 				toast.warning(
-					`You left ${result.host.name}. It did not answer, so remove this computer on its Devices page too.`,
+					`You left ${result.host.name}. It did not answer. Remove this computer on its Devices page too.`,
 				);
 			}
 			if (result.waiting !== null) {
@@ -70,9 +70,9 @@ export function LeaveHostButton({ hostName }: { hostName: string }) {
 						<AlertDialogTitle>Leave {hostName}?</AlertDialogTitle>
 						<AlertDialogDescription>
 							This computer stops syncing with {hostName}. {hostName} keeps all
-							your projects, flows and runs. This computer keeps its own
-							Personal with the projects here, their flows and schedules, and
-							its runs. Night Shift keeps a copy of your data from before.
+							your projects, flows and runs. This computer keeps a Personal with
+							its own projects, flows, schedules and runs. Night Shift also
+							keeps a copy of your data from before you leave.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{leave.error ? (

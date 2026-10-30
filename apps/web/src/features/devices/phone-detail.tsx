@@ -54,10 +54,7 @@ export function PhoneDetail({
 				},
 			]}
 		>
-			<DetailSection
-				title="What it does"
-				description="A phone signs in to a Host."
-			>
+			<DetailSection title="What it does">
 				<p className="text-sm">
 					It shows the runs and Gates of your Spaces on {hostName}, and tells
 					you when a Gate waits. You can start a run and answer a Gate from it.

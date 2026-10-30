@@ -32,7 +32,7 @@ export function computerLine(computer: SpaceComputer, now: number): string {
 	if (computer.lastSeenAt)
 		return `Last seen ${formatRelative(computer.lastSeenAt, now)}.`;
 	if (computer.online === false) return "Not connected yet.";
-	return "Only its Host knows whether it is online.";
+	return "Night Shift cannot tell if it is online.";
 }
 
 export function HostStatus({ status }: { status: LinkedHost["status"] }) {

@@ -101,7 +101,7 @@ function PairDeviceSteps({
 	const decline = useMutation(
 		deviceMutations.deny({
 			onSuccess: () => {
-				toast("The device was declined");
+				toast("You declined the device");
 				onDone();
 			},
 		}),
@@ -199,9 +199,9 @@ function PairDeviceSteps({
 			<DialogHeader>
 				<DialogTitle>Pair a device</DialogTitle>
 				<DialogDescription>
-					On the other computer, open Devices and choose Join a Host, or run{" "}
-					<span className="font-mono">nightshift join</span>, with the address
-					of this one. Enter the code it shows.
+					On the other computer, choose Join a Host, or run{" "}
+					<span className="font-mono">nightshift join</span> with the address of
+					this computer. Then enter the code it shows.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup>
