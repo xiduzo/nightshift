@@ -23,16 +23,17 @@ import {
 	WebhookIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import { walkerName } from "@/features/devices";
 import type { Project, RunSummary } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	costNote,
 	formatDateTime,
+	formatKnownCost,
 	formatRelative,
 	formatTime,
 } from "@/shared/format";
-import { CostText } from "./cost-text";
 import { RunStatusIcon } from "./run-status-badge";
 
 /**
@@ -230,8 +231,9 @@ function RunTitle({
  */
 function RunFacts({ run }: { run: RunSummary }) {
 	const { trigger } = run;
+	const note = costNote(run);
 	return (
-		<div className="flex h-5 items-center justify-end gap-2 text-muted-foreground max-sm:hidden">
+		<div className="flex h-5 items-center justify-end gap-1 text-muted-foreground max-sm:hidden">
 			{trigger.kind !== "manual" ? (
 				<Fact
 					label={
@@ -239,36 +241,86 @@ function RunFacts({ run }: { run: RunSummary }) {
 							? `Started by a webhook of the schedule ${trigger.scheduleId}, at ${formatDateTime(trigger.at)}`
 							: `Started by the schedule ${trigger.scheduleId}, for ${formatDateTime(trigger.at)}`
 					}
+					copy={{ what: "schedule ID", value: trigger.scheduleId }}
 				>
 					{trigger.kind === "webhook" ? <WebhookIcon /> : <CalendarClockIcon />}
 				</Fact>
 			) : null}
 			{run.device.thisDevice ? null : (
-				<Fact label={`Runs on ${walkerName(run.device)}`}>
+				<Fact
+					label={`Runs on ${walkerName(run.device)}`}
+					copy={{ what: "device name", value: walkerName(run.device) }}
+				>
 					<MonitorIcon />
 				</Fact>
 			)}
-			{run.costUsd > 0 || costNote(run) ? (
-				<CostText cost={run} className="relative z-10 tabular-nums" />
+			{run.costUsd > 0 || note ? (
+				<Fact
+					label={note ?? "What the run cost"}
+					copy={{ what: "cost", value: formatKnownCost(run) }}
+				>
+					<span
+						className={
+							note
+								? "text-sm tabular-nums underline decoration-dotted underline-offset-4"
+								: "text-sm tabular-nums"
+						}
+					>
+						{formatKnownCost(run)}
+					</span>
+				</Fact>
 			) : null}
-			<Fact label={`Branch ${run.branch}`}>
+			<Fact
+				label={`Branch ${run.branch}`}
+				copy={{ what: "branch name", value: run.branch }}
+			>
 				<GitBranchIcon />
 			</Fact>
 		</div>
 	);
 }
 
-/** One icon of RunFacts: its words on hover and for screen readers. */
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * One fact of RunFacts: its words on hover and for screen readers. A click
+ * copies its value. It sits above the row's link, so the click stays here.
+ */
+function Fact({
+	label,
+	copy,
+	children,
+}: {
+	label: string;
+	copy: { what: string; value: string };
+	children: ReactNode;
+}) {
+	const onClick = async () => {
+		try {
+			await navigator.clipboard.writeText(copy.value);
+			toast.success(`Copied the ${copy.what}.`);
+		} catch {
+			toast.error("Could not copy.");
+		}
+	};
 	return (
 		<Tooltip>
 			<TooltipTrigger
-				render={<span className="relative z-10 flex [&>svg]:size-3.5" />}
+				render={
+					<button
+						type="button"
+						onClick={onClick}
+						className="relative z-10 flex cursor-pointer items-center rounded-sm p-0.5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&>svg]:size-3.5"
+					/>
+				}
 			>
 				{children}
-				<span className="sr-only">{label}</span>
+				<span className="sr-only">
+					{label}. Copy the {copy.what}.
+				</span>
 			</TooltipTrigger>
-			<TooltipContent>{label}</TooltipContent>
+			<TooltipContent>
+				<p>{label}</p>
+				<p className="opacity-70">Click to copy the {copy.what}.</p>
+			</TooltipContent>
 		</Tooltip>
 	);
 }
