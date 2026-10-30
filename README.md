@@ -5,7 +5,7 @@
 # Night Shift
 
 **Draw your agent pipeline as a flow. Night Shift runs it on your machine while you sleep.**<br>
-You wake up to a stack of pull requests and a short list of decisions that need you.
+You wake up to a stack of pull requests and a short list of decisions that need you. Answer them on your computer or on your phone.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
@@ -13,7 +13,7 @@ You wake up to a stack of pull requests and a short list of decisions that need 
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org)
 ![Platform: macOS · Linux](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux-lightgrey)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Starter flows](examples/starters/) · [Plan](docs/PLAN.md) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Your computers](#your-computers-a-host-and-your-phone) · [Starter flows](examples/starters/) · [Plan](docs/PLAN.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -67,6 +67,18 @@ Steps are nodes. Each node type does one job:
 
 A flow declares inputs and outputs, like a function. Steps read earlier values through templates such as `{{verify.log_tail}}` or `{{planner.data.tasks}}`. Two or more edges on one outcome run their branches at once. A variable can keep its value from one run to the next.
 
+A large flow stays readable. Put related nodes in a **Section**, a box on the canvas that you zoom into. A Section can hold other Sections. Choose Lay out, and Night Shift arranges the nodes for you. The editor has undo, redo, copy, and paste.
+
+### Build a flow with an agent
+
+You do not have to draw every node yourself. An agent helps you in the editor, on your own logins:
+
+- **Chat beside the canvas.** Tell the agent what the flow must do. It proposes the changes, and the canvas marks each node and edge that it adds, removes, or changes. You keep the proposal or drop it.
+- **Suggest on each field.** A prompt, the outcomes, a rule, a command, or the output fields: one click gives a suggestion that fits the flow.
+- **Ask why.** When a run does not finish, the run page asks an agent why, and the agent reads the run for you.
+
+You choose the agent that answers. An agent in a terminal gets the same help through `nightshift mcp` (see [Flows from a terminal](#flows-from-a-terminal)).
+
 ### Agents on your own logins
 
 An Agent node names the coding agent it runs on. One flow can mix them.
@@ -81,13 +93,14 @@ An Agent node names the coding agent it runs on. One flow can mix them.
 | Any other agent that speaks the Agent Client Protocol | Add it as a custom agent with its command, for example `goose acp` |
 | GitHub Copilot, Gemini CLI, Cursor | Through the Agent Client Protocol, not yet verified |
 
-A node can add connections (MCP servers) and CLI tools such as `gh`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" ([ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
+A node can add connections (MCP servers) and CLI tools such as `gh`. Each CLI tool runs with its own login, so one program can run as two accounts, for example `gh` and `gh-work`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" ([ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
 
 Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Call runs one as `kit:github/publish-draft-pr`.
 
 ### Runs that survive the night
 
-- **Schedules** start a flow at a set time and stop it at a stop time, for example 22:00 to 07:00. A schedule can also start when a webhook arrives, for example when a pull request opens, or wake a Wait when CI is done.
+- **Schedules** start a flow at a set time and stop it at a stop time, for example 22:00 to 07:00. A schedule can also start when a webhook arrives, for example when a pull request opens, or wake a Wait when CI is done. A schedule names the computer where its run runs. When you have a Host, the Host starts every schedule.
+- **A computer that goes offline does not end the run.** A step on that computer waits for it until the stop time, and Night Shift tells you.
 - **Run policy** handles fresh retries with the failure log, a rescue by a stronger model, network grace, and usage-limit waits that resume the same session.
 - **Each run works in its own copy of your project**, so your checkout stays clean.
 - **Gates** wait in a "Needs you" inbox. An unattended run never blocks on a question in the middle of a session. A Gate with a deadline picks an option for you when nobody answers in time.
@@ -131,10 +144,12 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | --- | --- |
 | `implement-and-check` | An agent builds a task, a command checks it, retries with the log, then a rescue on a stronger model. |
 | `plan-and-build` | A planner splits a goal into tasks. Each task gets its own stacked branch, in dependency order. A reviewer ends it. |
-| `review-pr` | An agent reviews a pull request. A gate asks you before the review is posted. |
+| `build-task` | Builds one task of `plan-and-build`. |
+| `review-pr` | An agent reviews a pull request. A gate asks you before the agent posts the review. |
 | `per-file` | Applies one instruction to every file that matches a glob. |
+| `edit-file` | Edits one file of `per-file`. |
 
-Details are in [examples/starters/](examples/starters/).
+A flow that calls another flow needs that flow in the project too. Import all six. Details are in [examples/starters/](examples/starters/).
 
 ### Flows from a terminal
 
@@ -151,9 +166,20 @@ nightshift flows revisions fix-issue         # who saved what, newest first
 
 The commands work in the project of the folder you run them in. `--project <id, name or folder>` picks another one. For an agent, `nightshift mcp` serves the same reads and saves as MCP tools: `claude mcp add nightshift -- nightshift mcp`.
 
-### Run it on a server
+## Your computers, a Host, and your phone
 
-`nightshift` is Night Shift in one file: the server, the web UI, and the database. It runs on Linux (x64, arm64) and macOS (arm64), with Docker and systemd recipes. Your laptop can pair with it over your LAN, Tailscale, a public server, or a tunnel. See [docs/deploy/](docs/deploy/). When it is your home Host, your Personal is one Space on all your computers and on your phone ([ADR 1](docs/adr/0001-one-personal-space-per-home-host.md)).
+Night Shift runs on each of your computers. To join them, run one of them as a **Host**.
+
+`nightshift` is Night Shift in one file: the server, the web UI, and the database. It runs on Linux (x64, arm64) and macOS (arm64), with Docker and systemd recipes. Your other computers reach the Host over your LAN, Tailscale, a public server, or a tunnel. See [docs/deploy/](docs/deploy/).
+
+- **Pair a computer.** Run `nightshift join <host>` on the computer, or choose Settings → This computer → Join a Host. Allow the code on the Host. `nightshift leave` ends the pairing.
+- **One Personal everywhere.** When a computer joins its home Host, its personal projects and flows move into your Personal there. You see the same Personal on all your computers and on your phone ([ADR 1](docs/adr/0001-one-personal-space-per-home-host.md)).
+- **Spaces for a team.** A Space shares projects, runs, and gates with the people you invite. Each person gets a role: owner, admin, member, or viewer.
+- **Offers.** You decide which of your agent profiles a Space can use. Each Offer sets the widest permission mode and how many sessions run at once.
+- **Each step runs where you place it.** A node names a profile and its computer. Night Shift moves the work of the run between the computers for you.
+- **The Host copies your GitHub projects.** It then runs work without one of your computers. A private repository needs `gh` and a `GH_TOKEN` on the Host.
+
+The **phone app** connects to your Host. Start a flow with its inputs, follow a run live, and answer a gate. A push notification tells you when a gate waits for you or when a run ends.
 
 ## Status
 
@@ -172,12 +198,14 @@ The concept, the decisions, and the delivery order are in [docs/PLAN.md](docs/PL
 | [docs/PLAN.md](docs/PLAN.md) | The concept, the settled decisions, the architecture, and the setup. |
 | [docs/glossary.md](docs/glossary.md) | One name for one thing: flow, run, step, node, gate, and more. |
 | [docs/steering/](docs/steering/) | The vision, and the technical, QA, and design rules every change follows. |
+| [docs/adr/](docs/adr/) | The architecture decisions, one record each. |
 | [docs/deploy/](docs/deploy/) | Run Night Shift on a server and reach it from your other computers. |
+| [docs/releasing.md](docs/releasing.md) | Release the desktop app and the phone app. |
 | [docs/research/](docs/research/) | Spikes and design notes behind the bigger decisions. |
 
 ## Built with
 
-[Bun](https://bun.sh) · [TanStack Start](https://tanstack.com/start) and [TanStack AI](https://tanstack.com/ai) · [React Flow](https://reactflow.dev) · [LangGraph](https://github.com/langchain-ai/langgraphjs) · [Hono](https://hono.dev) · [oRPC](https://orpc.unnoq.com) · [Drizzle](https://orm.drizzle.team) on libsql · [Better Auth](https://better-auth.com) · [shadcn/ui](https://ui.shadcn.com) · [Electrobun](https://electrobun.dev)
+[Bun](https://bun.sh) · [TanStack Start](https://tanstack.com/start) and [TanStack AI](https://tanstack.com/ai) · [React Flow](https://reactflow.dev) · [LangGraph](https://github.com/langchain-ai/langgraphjs) · [Yjs](https://yjs.dev) · [Hono](https://hono.dev) · [oRPC](https://orpc.unnoq.com) · [Drizzle](https://orm.drizzle.team) on libsql · [Better Auth](https://better-auth.com) · [shadcn/ui](https://ui.shadcn.com) · [Electrobun](https://electrobun.dev) · [Expo](https://expo.dev) and [React Native Reusables](https://reactnativereusables.com)
 
 ## Contributing
 
