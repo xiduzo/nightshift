@@ -16,16 +16,23 @@ const importedHere: FlowMigration = {
 /** The example projects of the repo: `examples/<project>/flows/*.json`, files to import. */
 const examplesDir = join(import.meta.dir, "..", "..", "..", "..", "examples");
 
-const projects = readdirSync(examplesDir, { withFileTypes: true })
-	.filter(
-		(entry) =>
-			entry.isDirectory() && existsSync(join(examplesDir, entry.name, "flows")),
-	)
-	.map((entry) => entry.name)
-	.sort();
+/** The flow folder of each project: the examples, and the starters Night Shift ships. */
+const folders: Record<string, string> = {
+	...Object.fromEntries(
+		readdirSync(examplesDir, { withFileTypes: true })
+			.filter(
+				(entry) =>
+					entry.isDirectory() &&
+					existsSync(join(examplesDir, entry.name, "flows")),
+			)
+			.map((entry) => [entry.name, join(examplesDir, entry.name, "flows")]),
+	),
+	starters: join(import.meta.dir, "..", "starters", "flows"),
+};
+const projects = Object.keys(folders).sort();
 
 function flowFiles(project: string): string[] {
-	const dir = join(examplesDir, project, "flows");
+	const dir = folders[project] as string;
 	return readdirSync(dir)
 		.filter((name) => name.endsWith(".json"))
 		.sort()

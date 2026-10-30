@@ -17,6 +17,7 @@ import {
 	migrateFlow,
 	type ProjectFlowMap,
 	parsedFlows,
+	starterList,
 	suffixedName,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -90,6 +91,9 @@ export type FlowExport = { fileName: string; json: string };
 /** A flow that an import or a copy saved: its name there, and its problems. */
 export type SavedFlow = { name: string; issues: FlowIssue[] };
 
+/** What an import of the starters did: the names it saved, and the names the project had already. */
+export type StarterImport = { imported: string[]; skipped: string[] };
+
 /** The flows of a Space's projects, as a Person sees them. */
 export type SpaceFlows = {
 	/** The project's flows, from its flow document: every Device has them, with or without a Clone. */
@@ -134,6 +138,13 @@ export type SpaceFlows = {
 	 * first. A name the project has already gets a suffix (`-2`).
 	 */
 	import(projectId: string, name: string, json: string): Promise<SavedFlow>;
+	/**
+	 * Saves the starters that ship with Night Shift as flows of the
+	 * project, each a revision of kind `import`. A starter whose name the
+	 * project has already is skipped: its flow stays as it is, and no
+	 * starter takes another name, as the starters call each other by name.
+	 */
+	importStarters(projectId: string): Promise<StarterImport>;
 	/**
 	 * Copies the flow into a project of this Space as `to.name`, a
 	 * revision of kind `copy` there. The flows it calls stay behind: the
@@ -332,6 +343,27 @@ export function createSpaceFlows(
 				return { name: free, issues };
 			},
 
+			async importStarters(projectId) {
+				await inSpace(projectId);
+				const migration = await deps.migration?.();
+				const taken = namesOf(await flows.flows(projectId));
+				const result: StarterImport = { imported: [], skipped: [] };
+				for (const starter of starterList()) {
+					if (taken.has(starter.name)) {
+						result.skipped.push(starter.name);
+						continue;
+					}
+					await flows.save(
+						projectId,
+						starter.name,
+						migratedFlow(starter.source, migration),
+						{ kind: "import", personId },
+					);
+					result.imported.push(starter.name);
+				}
+				return result;
+			},
+
 			async copy(projectId, name, to) {
 				await inSpace(projectId);
 				await inSpace(to.projectId);
@@ -368,6 +400,11 @@ function importedFlow(json: string, migration?: FlowMigration): Flow {
 			"This file is not a flow. Choose a flow file that Night Shift exported.",
 		);
 	}
+	return migratedFlow(parsed, migration);
+}
+
+/** A flow file's contents, brought to the current format, or a refusal that says what is wrong. */
+function migratedFlow(parsed: unknown, migration?: FlowMigration): Flow {
 	const migrated = migrateFlow(parsed, migration);
 	const version =
 		migrated !== null && typeof migrated === "object" && "version" in migrated

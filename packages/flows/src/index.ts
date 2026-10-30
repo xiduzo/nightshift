@@ -300,6 +300,7 @@ export {
 	sectionOf,
 	sectionPath,
 } from "./sections";
+export { type Starter, starterList } from "./starters";
 export {
 	applyVariableWrites,
 	chooseByRule,

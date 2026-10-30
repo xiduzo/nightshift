@@ -4,6 +4,7 @@ import {
 	type Flow,
 	flowSchema,
 	singleAgentFlow,
+	starterList,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -248,6 +249,42 @@ describe("moving a flow between projects", () => {
 			"build",
 			"build-2",
 		]);
+	});
+
+	test("the starters arrive as flows of kind import, valid and in the current format", async () => {
+		const result = await files.importStarters(PROJECT);
+		expect(result.skipped).toEqual([]);
+		expect(result.imported.sort()).toEqual(
+			starterList()
+				.map((starter) => starter.name)
+				.sort(),
+		);
+		for (const listed of await files.list(PROJECT)) {
+			const loaded = await files.get(PROJECT, listed.name);
+			expect(loaded.flow?.version).toBe(FLOW_VERSION);
+			const [revision] = await files.revisions(PROJECT, listed.name);
+			expect(revision).toMatchObject({ kind: "import", person: { id: "ada" } });
+		}
+		const errors = (await files.list(PROJECT)).map((listed) => [
+			listed.name,
+			listed.errorCount,
+		]);
+		expect(errors.filter(([, count]) => count !== 0)).toEqual([]);
+	});
+
+	test("a starter never replaces a flow of its name, and takes no other name", async () => {
+		const mine = quick("My own check");
+		await files.save(PROJECT, "implement-and-check", mine);
+		const result = await files.importStarters(PROJECT);
+		expect(result.skipped).toEqual(["implement-and-check"]);
+		expect(result.imported).not.toContain("implement-and-check");
+		expect((await files.get(PROJECT, "implement-and-check")).flow).toEqual(
+			mine,
+		);
+		const names = (await files.list(PROJECT)).map((f) => f.name);
+		expect(names.some((name) => name.endsWith("-2"))).toBe(false);
+		// A second import adds nothing.
+		expect((await files.importStarters(PROJECT)).imported).toEqual([]);
 	});
 
 	test("an import brings a flow of an older format up to date", async () => {

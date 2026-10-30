@@ -1,6 +1,6 @@
 # Starter flows
 
-Small, self-contained flows to save into a project and change. The files are format version 6. Night Shift brings them to the current format, version 7, when you import them. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+Small, self-contained flows that ship with Night Shift, to change in a project. The files are format version 6. Night Shift brings them to the current format, version 7, when you import them. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
 
 | Flow | Inputs | Does |
 | --- | --- | --- |
@@ -13,8 +13,8 @@ Small, self-contained flows to save into a project and change. The files are for
 
 ## Use them
 
-1. Add the project in Night Shift.
-2. Save the flows into the project. Night Shift keeps flows itself, so do not copy the files into the project. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`. Choose Import in the project's flow list for each file in `examples/starters/flows/`, or run `nightshift flows import <file>` for each one in the project's folder.
+1. Add the project in Night Shift. Leave "Add the starter flows" checked: Night Shift saves all six into the project. A flow the project has already keeps its own version.
+2. To add them later, choose Import in the project's flow list for each file in this folder's `flows/`, or run `nightshift flows import <file>` for each one in the project's folder. A flow that calls another one needs it too: `plan-and-build` needs `build-task` and `implement-and-check`, `per-file` needs `edit-file`.
 3. Open a flow in the editor, and change the prompts, models, and `check` to fit the project.
 4. Start a run: the start dialog asks for the flow's inputs.
 

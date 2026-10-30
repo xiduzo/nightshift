@@ -53,16 +53,32 @@ export const projects = {
 	add: permitted({ project: ["add"] })
 		.route({
 			summary:
-				"Adds a git repository on this computer as a project of the Space.",
+				"Adds a git repository on this computer as a project of the Space, with the starter flows when asked.",
 		})
 		.output(output(projectSchema))
 		.input(
 			z.object({
 				repoPath: z.string().min(1),
 				name: z.string().min(1).optional(),
+				/** Also save the starter flows into the project. A flow it has already stays. */
+				starters: z.boolean().optional(),
 			}),
 		)
-		.handler(({ context, input }) => context.space.addProject(input)),
+		.handler(async ({ context, input }) => {
+			const project = await context.space.addProject({
+				repoPath: input.repoPath,
+				name: input.name,
+			});
+			if (input.starters) {
+				// The project is added: a failed import leaves it, without the starters.
+				await context.space.flows.importStarters(project.id).catch((error) => {
+					console.warn(
+						`Could not import the starters into ${project.name}: ${error instanceof Error ? error.message : String(error)}`,
+					);
+				});
+			}
+			return project;
+		}),
 	/** The local and remote branches of the clone, for "Start from". Read-only, no fetch. */
 	branches: protectedProcedure
 		.route({

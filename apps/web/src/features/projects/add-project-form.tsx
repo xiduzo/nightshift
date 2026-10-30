@@ -1,4 +1,5 @@
 import { Button } from "@nightshift/ui/components/button";
+import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	Dialog,
 	DialogClose,
@@ -10,6 +11,8 @@ import {
 } from "@nightshift/ui/components/dialog";
 import {
 	Field,
+	FieldContent,
+	FieldDescription,
 	FieldError,
 	FieldGroup,
 	FieldLabel,
@@ -65,6 +68,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	const [folderPath, setFolderPath] = useState("");
 	const [repo, setRepo] = useState("");
 	const [name, setName] = useState("");
+	const [starters, setStarters] = useState(true);
 	/** The person asked to add the GitHub repository: add it once its copy is ready. */
 	const [addWhenReady, setAddWhenReady] = useState(false);
 
@@ -98,8 +102,13 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 
 	const addProject = useMutation(
 		projectMutations.add({
-			onSuccess: (project) => {
-				toast.success(`Added ${project.name}`);
+			onSuccess: (project, variables) => {
+				toast.success(
+					`Added ${project.name}`,
+					variables.starters
+						? { description: "Its starter flows are in its flow list." }
+						: undefined,
+				);
 				setFolderPath("");
 				setRepo("");
 				setName("");
@@ -127,6 +136,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 		addProject.mutate({
 			repoPath,
 			name: name.trim() || (source === "github" ? repoName : undefined),
+			starters,
 		});
 
 	// Add the repository as soon as its copy is ready, when the person asked for it.
@@ -290,6 +300,22 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						placeholder={defaultName || "Project name"}
 						autoComplete="off"
 					/>
+				</Field>
+				<Field orientation="horizontal">
+					<Checkbox
+						id={`${id}-starters`}
+						checked={starters}
+						onCheckedChange={(checked) => setStarters(checked === true)}
+					/>
+					<FieldContent>
+						<FieldLabel htmlFor={`${id}-starters`}>
+							Add the starter flows
+						</FieldLabel>
+						<FieldDescription>
+							Six small flows to change and run, for example implement and
+							check, or review a pull request.
+						</FieldDescription>
+					</FieldContent>
 				</Field>
 				{addProject.error ? (
 					<FieldError>{addProject.error.message}</FieldError>

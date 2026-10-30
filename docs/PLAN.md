@@ -162,7 +162,7 @@ Status: built, and in real nights since 2026-10-18: a Subflow with `each` runs a
 - Agent outcomes: an Agent node may declare its own outcomes (`approved`, `changes-requested`, …) instead of `pass`/`fail`/`needs-input`.
 - Agent output schema: an Agent node may declare a JSON schema for `data` in its Step Report. The engine validates it; the step fails on a mismatch. `{{planner.data.tasks}}` feeds a Subflow with `each`.
 - Generic items in the UI: id, title, a link when the element has `url`, and the raw JSON.
-- A starter flow library in `examples/starters/`: implement → check → retry; plan → For Each task → review; review a pull request; one agent per file of a glob.
+- A starter flow library in `packages/flows/src/starters/` (it was `examples/starters/`), saved into a project when it is added: implement → check → retry; plan → For Each task → review; review a pull request; one agent per file of a glob.
 
 Proves: a planner agent can decide what the night does.
 

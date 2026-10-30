@@ -13,7 +13,7 @@ You wake up to a stack of pull requests and a short list of decisions that need 
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org)
 ![Platform: macOS · Linux](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux-lightgrey)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Your computers](#your-computers-a-host-and-your-phone) · [Starter flows](examples/starters/) · [Plan](docs/PLAN.md) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Your computers](#your-computers-a-host-and-your-phone) · [Starter flows](packages/flows/src/starters/) · [Plan](docs/PLAN.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -35,7 +35,7 @@ Night Shift turns the pipeline into a flow that you draw. The engine owns the or
 
 ## How it works
 
-A flow is a graph of steps. Each edge leaves a step on a named outcome. This is the [`implement-and-check`](examples/starters/flows/implement-and-check.json) starter:
+A flow is a graph of steps. Each edge leaves a step on a named outcome. This is the [`implement-and-check`](packages/flows/src/starters/flows/implement-and-check.json) starter:
 
 ```mermaid
 flowchart LR
@@ -113,20 +113,14 @@ You need macOS or Linux, [Bun](https://bun.sh) 1.3, git, and at least one coding
 git clone https://github.com/xiduzo/nightshift.git
 cd nightshift
 bun install
-bun run db:push
-bun run dev            # web UI and API with hot reload
+bun run dev            # web UI on :3001, API on :3000, with hot reload
 ```
 
-Then open the web UI, add a project, and give it the [starter flows](examples/starters/). Night Shift keeps flows itself, so do not copy the files into your project. Choose Import in the project's flow list, or import them from your project's folder:
+No `.env` file is needed to start: outside production, Night Shift makes its own auth secret once and says so in its log. Then, in the web UI at http://localhost:3001:
 
-```bash
-# from your project's folder, with the dev daemon on port 3000:
-for file in <this checkout>/examples/starters/flows/*.json; do
-  bun <this checkout>/apps/server/src/cli.ts flows import "$file"
-done
-```
-
-Open a flow in the editor, change the prompts and the check to fit your project, and start a run.
+1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked: the six [starter flows](packages/flows/src/starters/) arrive in the project. Night Shift keeps flows itself, so nothing is written into your repository.
+2. **Set up your agents.** The Agents page shows the agent CLIs and tools it finds on this computer (`claude`, `codex`, `opencode`, `pi`, `gh`, `acli`). Choose Add profile or Add tool for each one you want.
+3. **Run a starter.** Open `implement-and-check`, set the check to your project's test command, and start a run with a small task.
 
 | Command | Use it to |
 | --- | --- |
@@ -149,7 +143,7 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | `per-file` | Applies one instruction to every file that matches a glob. |
 | `edit-file` | Edits one file of `per-file`. |
 
-A flow that calls another flow needs that flow in the project too. Import all six. Details are in [examples/starters/](examples/starters/).
+Night Shift saves all six into a project when you add it. A flow that calls another flow needs that flow in the project too. Details are in [packages/flows/src/starters/](packages/flows/src/starters/).
 
 ### Drive Night Shift from a terminal or an agent
 
