@@ -141,7 +141,7 @@ yet; read the source with `shadcn view <name>`.
 | ✓ `message-scroller` | A chat scroll area that sticks to the bottom while new content streams, with a "jump to latest" button. |
 | ✓ `attachment` | A file or link attached to a message: media, title, description, actions. |
 | ✓ `marker` | An inline marker in a conversation: a system note, a divider, a status line. |
-| ✓ `trace` | A collapsible line of agent activity (a tool call, a thinking step) with icon, title and description. Use for transcript tool calls. |
+| ✓ `trace` | A collapsible line of agent activity (a tool call, a thinking step) with icon, title and description. The base of the Chain of Thought, Terminal and Tool patterns in a run's transcript. |
 | ✓ `code-block` | Code with a header, title, copy button and Shiki highlighting (`useHighlightedCode` in `apps/web/src/shared/code`). Use for commands, logs, JSON. |
 | `questionnaire` | A step-by-step set of questions with choices (a Gate's question form). |
 
@@ -158,6 +158,11 @@ not add the AI SDK.
 | [Queue](https://ui.shadcn.com/docs/ai-elements/base/queue) | A to-do list split into what remains and what is done. Not used: the step console shows the agent's list as a Plan, in the agent's own order. |
 | [File Tree](https://ui.shadcn.com/docs/ai-elements/base/file-tree) | Files in folders: a `Collapsible` per folder, a ghost `Button` per file. The files a step's agent changed, each opening a Sheet with its diff in `CodeBlockLine` added and removed lines (`features/runs/components/changed-files.tsx`, from `changedFiles` and `fileTree` in `@nightshift/client`). |
 | [Context](https://ui.shadcn.com/docs/ai-elements/base/context) | The tokens used: an outline `Button` that opens a `HoverCard`, with a `Progress` bar of the context window when the size is known. `UsageContext` (`shared/usage`): input, cache, output and cost. No harness reports a context window yet, so it has no bar. The Tokens fact of a step. |
+| [Chain of Thought](https://ui.shadcn.com/docs/ai-elements/base/chain-of-thought) | Steps folded behind one summary line that opens on them. On `Trace`, open while the last step runs. Two or more tool calls in a row in a run's transcript: "Ran 6 commands · read 3 files" (`features/runs/transcript/items/tool-calls-group.tsx`, from `groupToolCalls` and `toolCallsSummary` in `@nightshift/client`). The phone shows the same line. |
+| [Terminal](https://ui.shadcn.com/docs/ai-elements/base/terminal) | A command and its output: a `TraceLine` with the command as its title, a `CodeBlock size="sm"` with the output under it (Shiki `ansi`), running and error states. An agent's shell call and a Command step's command (`features/runs/transcript/items/terminal.tsx`). `TerminalOutput` is the output area: parsed test results or a stack trace go there. |
+| [Tool](https://ui.shadcn.com/docs/ai-elements/base/tool) | Any other tool call: "Reading", "Read", "Failed to read" and what it acted on, the input and result under it. A long result opens in a Sheet with "Show all" (`features/runs/transcript/items/tool-call-row.tsx`). |
+| [Checkpoint](https://ui.shadcn.com/docs/ai-elements/base/checkpoint) | A point in the conversation: a separator `Marker`. Where each agent session starts in a run's transcript. Night Shift has no restore to a session, so it has no Restore button. |
+| [Confirmation](https://ui.shadcn.com/docs/ai-elements/base/confirmation) | A question to approve: an outline `Item` with an icon, title, description and the choices in `ItemActions`. An open Gate in a run's transcript (`GateConfirmation` in `features/gates`). More than two choices list under the question in the same Item. |
 
 ## Blocks
 
@@ -207,7 +212,7 @@ files into the app; then adapt the copy. Browse them at
 | A message in the page | Alert |
 | A form | Field, FieldGroup, FieldSet with the matching control |
 | Two or more views of one thing | Tabs, or Toggle Group for a compact switch |
-| A run's transcript | message, trace, code-block, marker inside Scroll Area or message-scroller |
+| A run's transcript | message, marker and the Chain of Thought, Terminal, Tool, Checkpoint and Confirmation patterns (trace, code-block, item) inside message-scroller |
 | Confirm before a destructive step | Alert Dialog |
 | Feedback after an action | Sonner `toast()` |
 | Long content in a fixed box | Scroll Area |
