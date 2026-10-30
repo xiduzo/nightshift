@@ -82,7 +82,7 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 						<AlertTitle>Answer sent</AlertTitle>
 						<AlertDescription>
 							Your answer is on its way to {walkerName(gate.walker)}. The run
-							goes on when {walkerName(gate.walker)} is online.
+							continues when {walkerName(gate.walker)} is online.
 						</AlertDescription>
 					</Alert>
 				) : (

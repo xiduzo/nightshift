@@ -122,7 +122,7 @@ export function CostPerRun({
 			hint={
 				median === undefined
 					? "Each ended run, oldest first"
-					: `Each ended run, oldest first. The dashed line is the median of the finished runs that used an agent, ${formatCost(median)}.`
+					: `Each ended run, oldest first. The dashed line is the typical cost of a finished run, ${formatCost(median)}.`
 			}
 		>
 			{runs.length === 0 ? (

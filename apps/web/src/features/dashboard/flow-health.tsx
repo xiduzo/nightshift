@@ -240,16 +240,16 @@ function CostCell({
 		freeRuns > 0 ? (
 			<span>
 				{freeRuns === 1
-					? "1 finished run is left out: it used no agent, so it cost nothing."
-					: `${freeRuns} finished runs are left out: they used no agent, so they cost nothing.`}
+					? "The cost does not include 1 finished run that used no agent."
+					: `The cost does not include ${freeRuns} finished runs that used no agent.`}
 			</span>
 		) : null;
 	const unknownLine =
 		unknownCost > 0 ? (
 			<span>
 				{unknownCost === 1
-					? "1 finished run is left out: a step did not report its cost."
-					: `${unknownCost} finished runs are left out: a step did not report its cost.`}
+					? "The cost does not include 1 finished run with an unknown cost."
+					: `The cost does not include ${unknownCost} finished runs with an unknown cost.`}
 			</span>
 		) : null;
 	const unfinishedLine =

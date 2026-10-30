@@ -107,8 +107,8 @@ export function WebhookDialog({
 				<DialogHeader>
 					<DialogTitle>Webhook</DialogTitle>
 					<DialogDescription>
-						Send the webhook to this address. Night Shift checks its secret,
-						then starts the flow or wakes the runs that wait.
+						Send the webhook to this address. Night Shift checks the secret.
+						Then it starts the flow or wakes the waiting runs.
 					</DialogDescription>
 				</DialogHeader>
 				{schedule ? (
@@ -121,8 +121,8 @@ export function WebhookDialog({
 							<FieldLabel>Secret</FieldLabel>
 							<p className="font-mono text-sm">{secret ?? "—"}</p>
 							<FieldDescription>
-								Give the value of this secret to the sender. You find it under
-								Agents, Secrets.
+								Give the value of this secret to the sender. Find it on the
+								Secrets page.
 							</FieldDescription>
 						</Field>
 						<Field>
@@ -132,8 +132,7 @@ export function WebhookDialog({
 									<EmptyHeader>
 										<EmptyTitle>No webhooks yet</EmptyTitle>
 										<EmptyDescription>
-											Each webhook that arrives shows here, also the ones Night
-											Shift refused.
+											Every webhook that arrives shows here, refused ones too.
 										</EmptyDescription>
 									</EmptyHeader>
 								</Empty>

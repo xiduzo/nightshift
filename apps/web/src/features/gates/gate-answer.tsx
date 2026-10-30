@@ -94,7 +94,7 @@ export function GateAnswer({
 				/>
 				<FieldDescription id={`${id}-note-hint`} className="text-xs">
 					{answersAgent ? (
-						"The agent gets your note as its answer, and goes on."
+						"The agent gets your note as its answer and continues."
 					) : (
 						<>
 							The next steps of the run get your note, as{" "}

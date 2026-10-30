@@ -336,7 +336,7 @@ function AskedPerNight({
 	return (
 		<ChartSection
 			title="History"
-			hint="Gates asked per night, noon to noon, by how they stand"
+			hint="Gates asked per night, noon to noon, by status"
 		>
 			{gates.asked === 0 ? (
 				<DetailsEmpty>

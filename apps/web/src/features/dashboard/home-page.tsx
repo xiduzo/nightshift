@@ -49,7 +49,7 @@ export function HomePage({
 					title="Home"
 					description={
 						!nights
-							? "What runs now, what waits for you and what failed, in all your projects."
+							? "What runs now, what waits for you and what failed in all your projects."
 							: needsYou(waiting, failed, range)
 					}
 				/>
