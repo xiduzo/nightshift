@@ -82,11 +82,11 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Dialog](https://ui.shadcn.com/docs/components/dialog) | A modal task: start a run, edit a schedule. |
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow). |
-| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, the mobile sidebar. |
+| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, what an agent changed in one file, the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
 | ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. The hint of an inspector field, behind an info icon beside its label. Needs `TooltipProvider` (in the root). |
-| ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node). |
+| ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node, the tokens a step used). |
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
@@ -144,6 +144,20 @@ yet; read the source with `shadcn view <name>`.
 | ✓ `trace` | A collapsible line of agent activity (a tool call, a thinking step) with icon, title and description. Use for transcript tool calls. |
 | ✓ `code-block` | Code with a header, title, copy button and Shiki highlighting (`useHighlightedCode` in `apps/web/src/shared/code`). Use for commands, logs, JSON. |
 | `questionnaire` | A step-by-step set of questions with choices (a Gate's question form). |
+
+### AI Elements patterns
+
+[AI Elements](https://ui.shadcn.com/docs/ai-elements) patterns are recipes,
+not packages: compose them from the components above. Use the Base UI pages
+(`/docs/ai-elements/base/<pattern>`). Map Night Shift's own data onto them; do
+not add the AI SDK.
+
+| Pattern | What it is for |
+| --- | --- |
+| [Plan](https://ui.shadcn.com/docs/ai-elements/base/plan) | Steps known up front, each done, running or pending, the title counting the done ones. On `Trace`. The agent's to-do list in the step console (`features/runs/components/step-plan.tsx`, from `stepTodos` in `@nightshift/client`). |
+| [Queue](https://ui.shadcn.com/docs/ai-elements/base/queue) | A to-do list split into what remains and what is done. Not used: the step console shows the agent's list as a Plan, in the agent's own order. |
+| [File Tree](https://ui.shadcn.com/docs/ai-elements/base/file-tree) | Files in folders: a `Collapsible` per folder, a ghost `Button` per file. The files a step's agent changed, each opening a Sheet with its diff in `CodeBlockLine` added and removed lines (`features/runs/components/changed-files.tsx`, from `changedFiles` and `fileTree` in `@nightshift/client`). |
+| [Context](https://ui.shadcn.com/docs/ai-elements/base/context) | The tokens used: an outline `Button` that opens a `HoverCard`, with a `Progress` bar of the context window when the size is known. `UsageContext` (`shared/usage`): input, cache, output and cost. No harness reports a context window yet, so it has no bar. The Tokens fact of a step. |
 
 ## Blocks
 
