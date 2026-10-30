@@ -17,7 +17,7 @@ export const getRouter = () => {
 		defaultPreloadStaleTime: 0,
 		context: { orpc, queryClient },
 		defaultPendingComponent: () => <Loader />,
-		defaultNotFoundComponent: () => <div>Not Found</div>,
+		defaultNotFoundComponent: () => <div>Page not found</div>,
 	});
 
 	setupRouterSsrQueryIntegration({

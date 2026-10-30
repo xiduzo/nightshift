@@ -76,7 +76,9 @@ export function costNote(cost: KnownCost): string | undefined {
 						: `${missing} steps did not report their cost.`,
 				]
 			: []),
-		...(cost.costEstimated ? ["Part of it is estimated from tokens."] : []),
+		...(cost.costEstimated
+			? ["Night Shift estimates part of it from tokens."]
+			: []),
 	];
 	return notes.length > 0 ? notes.join(" ") : undefined;
 }
