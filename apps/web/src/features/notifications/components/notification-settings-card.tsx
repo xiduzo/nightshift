@@ -92,6 +92,15 @@ const SCREENS: {
 	},
 ];
 
+const DIGEST_WHEN: {
+	value: NotificationSettings["digest"]["when"];
+	label: string;
+}[] = [
+	{ value: "quiet-hours-end", label: "When quiet hours end" },
+	{ value: "time", label: "At a set time" },
+	{ value: "off", label: "Off" },
+];
+
 /** Quiet hours when you turn them on. */
 const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -109,7 +118,7 @@ function timeZones(current: string): string[] {
 
 /**
  * Your notification settings, on every screen: which events, quiet hours,
- * which kinds of screen, and how long a phone waits. Each change saves at
+ * the morning digest, which kinds of screen, and how long a phone waits. Each change saves at
  * once. Then the phones and browsers that can notify you.
  */
 export function NotificationSettingsCard() {
@@ -154,7 +163,6 @@ export function NotificationSettingsCard() {
 function SettingsForm({ data }: { data: NotificationSettings }) {
 	const id = useId();
 	const save = useSaveSettings();
-	const zones = useMemo(() => timeZones(data.timeZone), [data.timeZone]);
 
 	return (
 		<Card>
@@ -223,36 +231,16 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 											save.mutate({ quietHours: { ...data.quietHours, end } })
 										}
 									/>
-									<Field>
-										<FieldLabel htmlFor={`${id}-zone`}>Time zone</FieldLabel>
-										<Select
-											items={zones.map((zone) => ({
-												value: zone,
-												label: zone.replace(/_/g, " "),
-											}))}
-											value={data.timeZone}
-											onValueChange={(zone) => {
-												if (zone) save.mutate({ timeZone: zone });
-											}}
-										>
-											<SelectTrigger id={`${id}-zone`} className="w-full">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectGroup>
-													{zones.map((zone) => (
-														<SelectItem key={zone} value={zone}>
-															{zone.replace(/_/g, " ")}
-														</SelectItem>
-													))}
-												</SelectGroup>
-											</SelectContent>
-										</Select>
-									</Field>
+									<TimeZoneField
+										value={data.timeZone}
+										onSave={(zone) => save.mutate({ timeZone: zone })}
+									/>
 								</div>
 							) : null}
 						</FieldGroup>
 					</FieldSet>
+					<FieldSeparator />
+					<DigestField data={data} />
 					<FieldSeparator />
 					<FieldSet>
 						<FieldLegend>Where Night Shift tells you</FieldLegend>
@@ -317,6 +305,113 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 				</FieldGroup>
 			</CardContent>
 		</Card>
+	);
+}
+
+/**
+ * The morning digest: off, when quiet hours end, or at a time. Without
+ * quiet hours it comes at its time, so the time shows then too.
+ */
+function DigestField({ data }: { data: NotificationSettings }) {
+	const id = useId();
+	const save = useSaveSettings();
+	const { when, time } = data.digest;
+	const atTime =
+		when === "time" || (when === "quiet-hours-end" && !data.quietHours);
+	return (
+		<FieldSet>
+			<FieldGroup>
+				<Field>
+					<FieldLabel htmlFor={`${id}-digest`}>Morning digest</FieldLabel>
+					<Select
+						items={DIGEST_WHEN}
+						value={when}
+						onValueChange={(next) => {
+							if (next) save.mutate({ digest: { when: next } });
+						}}
+					>
+						<SelectTrigger
+							id={`${id}-digest`}
+							className="w-full sm:w-56"
+							aria-describedby={`${id}-digest-description`}
+						>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectGroup>
+								{DIGEST_WHEN.map((item) => (
+									<SelectItem key={item.value} value={item.value}>
+										{item.label}
+									</SelectItem>
+								))}
+							</SelectGroup>
+						</SelectContent>
+					</Select>
+					<FieldDescription id={`${id}-digest-description`}>
+						Once a day, one notification sums up the runs that ended and the
+						Gates that wait. On a day with nothing to tell, none comes.
+						{when === "quiet-hours-end" && !data.quietHours
+							? ` You have no quiet hours, so it comes at ${time}.`
+							: null}
+					</FieldDescription>
+				</Field>
+				{atTime ? (
+					<div className="grid gap-4 sm:grid-cols-3">
+						<TimeField
+							label="Time"
+							value={time}
+							onSave={(next) => save.mutate({ digest: { time: next } })}
+						/>
+						{data.quietHours ? null : (
+							<TimeZoneField
+								value={data.timeZone}
+								onSave={(zone) => save.mutate({ timeZone: zone })}
+							/>
+						)}
+					</div>
+				) : null}
+			</FieldGroup>
+		</FieldSet>
+	);
+}
+
+/** Your time zone: quiet hours and the digest's time are in it. */
+function TimeZoneField({
+	value,
+	onSave,
+}: {
+	value: string;
+	onSave: (zone: string) => void;
+}) {
+	const id = useId();
+	const zones = useMemo(() => timeZones(value), [value]);
+	return (
+		<Field>
+			<FieldLabel htmlFor={id}>Time zone</FieldLabel>
+			<Select
+				items={zones.map((zone) => ({
+					value: zone,
+					label: zone.replace(/_/g, " "),
+				}))}
+				value={value}
+				onValueChange={(zone) => {
+					if (zone) onSave(zone);
+				}}
+			>
+				<SelectTrigger id={id} className="w-full">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectGroup>
+						{zones.map((zone) => (
+							<SelectItem key={zone} value={zone}>
+								{zone.replace(/_/g, " ")}
+							</SelectItem>
+						))}
+					</SelectGroup>
+				</SelectContent>
+			</Select>
+		</Field>
 	);
 }
 
