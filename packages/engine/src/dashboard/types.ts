@@ -232,12 +232,39 @@ export type GatesRange = {
 	latest: AskedGate[];
 };
 
+/** The headline numbers of one night: runs, how they ended, spend, Gates. */
+export type NightTotals = {
+	night: number;
+	runs: number;
+	/** Runs that finished or failed. */
+	ended: number;
+	finished: number;
+	/** What the runs spent, the steps with a known cost. */
+	costUsd: number;
+	/** Gates the runs asked. */
+	gates: number;
+};
+
+/** The headline numbers of a period, and per night, oldest first. */
+export type PeriodTotals = Omit<NightTotals, "night"> & {
+	perNight: NightTotals[];
+};
+
 /** The details over the last `nights` nights. */
 export type NightsRange = {
 	nights: NightRange;
 	spend: SpendRange;
 	runs: RunsRange;
 	gates: GatesRange;
+	/** The headline numbers over these nights. */
+	totals: PeriodTotals;
+	/**
+	 * The same numbers over as many nights just before: what every number
+	 * compares with.
+	 */
+	before: PeriodTotals;
+	/** Flow health over these nights, on a project's dashboard. */
+	flows: TopRows<FlowHealthRow> | null;
 };
 
 /** What the latest night with runs produced. */
@@ -268,10 +295,15 @@ export type LastFlowRun = {
 	startedAt: number;
 };
 
-/** One row of Flow health: a flow over the last 30 nights. */
+/** How many of a flow's last runs a Flow health row carries. */
+export const LAST_FLOW_RUNS = 10;
+
+/** One row of Flow health: a flow over the last nights. */
 export type FlowHealthRow = {
 	name: string;
 	last: LastFlowRun | null;
+	/** Its last runs, at most {@link LAST_FLOW_RUNS}, newest first, of any night. */
+	lastRuns: LastFlowRun[];
 	/** Runs in the last nights, on its own and as a subflow. */
 	runs: number;
 	finished: number;

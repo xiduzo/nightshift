@@ -341,9 +341,13 @@ export function summarizeDashboard(
 		activity: HOUR_RANGES.map((range) =>
 			activityOf(range, placed, now, timeZone),
 		),
-		nights: NIGHT_RANGES.map((range) =>
-			nightsRange(range, placed, gates, now, timeZone),
-		),
+		nights: NIGHT_RANGES.map((range) => ({
+			...nightsRange(range, placed, gates, now, timeZone),
+			flows:
+				scope.kind === "project"
+					? flowHealthRows(scope.flows, runs, now, timeZone, range)
+					: null,
+		})),
 		healthNights: FLOW_HEALTH_NIGHTS,
 		lastNight: lastNightOf(placed),
 		upNext: upNextOf(runs, now),

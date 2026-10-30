@@ -1,5 +1,4 @@
 import { Button } from "@nightshift/ui/components/button";
-import { Card, CardContent } from "@nightshift/ui/components/card";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
@@ -8,15 +7,9 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
-import { RunStatusBadge } from "@/features/runs";
-import type {
-	DashboardSummary,
-	FlowHealthRow,
-	Project,
-	Spread,
-} from "@/shared/api";
+import { RunStatusIcon } from "@/features/runs";
+import type { FlowHealthRow, Project, Spread } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatCost,
@@ -24,73 +17,43 @@ import {
 	formatRelative,
 	useNow,
 } from "@/shared/format";
-import { PageSection } from "@/shared/page";
 import { FlowHealthDialog } from "./flow-health-dialog";
-import { OVERVIEW_ROWS } from "./overview";
 
 /**
- * Each flow over the nights Flow health covers: its last run, how often it finished, and
- * what a finished run costs. A stopped run did not finish, so it counts
- * against it. A flow a Subflow node ran counts too, inside the run that
- * called it. A row opens the details of its flow.
+ * Each flow over the page's range: the status of its last runs, its runs
+ * and how many finished, and what a finished run costs. A stopped run did
+ * not finish, so it counts against it. A flow a Subflow node ran counts
+ * too, inside the run that called it. A row opens the details of its flow.
  */
-export function FlowHealth({
+export function FlowHealthTable({
 	project,
-	summary,
+	rows,
 }: {
 	project: Project;
-	/** Undefined while it loads. */
-	summary: DashboardSummary | undefined;
+	/** Undefined while they load. */
+	rows: FlowHealthRow[] | undefined;
 }) {
 	const now = useNow(60_000);
-	const health = summary?.flowHealth;
 	// The name stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ name: string; open: boolean }>();
-
-	if (health && health.count === 0) return null;
+	const open = (name: string) => setDetails({ name, open: true });
 
 	return (
-		<PageSection
-			title="Flow health"
-			description={
-				summary
-					? `The ${OVERVIEW_ROWS} busiest flows over the last ${summary.healthNights} nights, on their own or as a subflow.`
-					: `The ${OVERVIEW_ROWS} busiest flows, on their own or as a subflow.`
-			}
-			actions={
-				<Button
-					variant="outline"
-					size="sm"
-					nativeButton={false}
-					render={
-						<Link
-							to="/projects/$projectId/flows"
-							params={{ projectId: project.id }}
-						/>
-					}
-				>
-					Flows
-					<ArrowRightIcon data-icon="inline-end" />
-				</Button>
-			}
-		>
-			<Card className="py-0">
-				<CardContent className="px-0">
-					{!health ? (
-						<div className="flex flex-col gap-2 px-6 py-4">
-							<Skeleton className="h-9 w-full" />
-							<Skeleton className="h-9 w-full" />
-						</div>
-					) : (
-						<FlowHealthTable
-							// The busiest flows, then the one that ran last.
-							rows={health.rows}
-							now={now}
-							onOpen={(name) => setDetails({ name, open: true })}
-						/>
-					)}
-				</CardContent>
-			</Card>
+		<>
+			{!rows ? (
+				<div className="flex flex-col gap-2 px-6 py-4">
+					<Skeleton className="h-9 w-full" />
+					<Skeleton className="h-9 w-full" />
+				</div>
+			) : (
+				<DataTable
+					// The busiest flows, then the one that ran last.
+					columns={flowHealthColumns(now, open)}
+					data={rows}
+					getRowId={(row) => row.name}
+					onRowClick={(row) => open(row.name)}
+				/>
+			)}
 			{details ? (
 				<FlowHealthDialog
 					open={details.open}
@@ -99,26 +62,7 @@ export function FlowHealth({
 					project={project}
 				/>
 			) : null}
-		</PageSection>
-	);
-}
-
-function FlowHealthTable({
-	rows,
-	now,
-	onOpen,
-}: {
-	rows: FlowHealthRow[];
-	now: number;
-	onOpen: (name: string) => void;
-}) {
-	return (
-		<DataTable
-			columns={flowHealthColumns(now, onOpen)}
-			data={rows}
-			getRowId={(row) => row.name}
-			onRowClick={(row) => onOpen(row.name)}
-		/>
+		</>
 	);
 }
 
@@ -142,56 +86,16 @@ function flowHealthColumns(now: number, onOpen: (name: string) => void) {
 		}),
 		column.accessor((row) => row.last?.startedAt, {
 			id: "last",
-			header: "Last run",
+			header: "Last runs",
 			enableSorting: true,
 			sortUndefined: "last",
-			cell: ({ row: { original } }) =>
-				original.last ? (
-					<span className="flex items-center gap-2">
-						<RunStatusBadge status={original.last.status} />
-						<time
-							dateTime={new Date(original.last.startedAt).toISOString()}
-							title={formatDateTime(original.last.startedAt)}
-							className="text-muted-foreground text-xs"
-						>
-							{formatRelative(original.last.startedAt, now)}
-						</time>
-					</span>
-				) : (
-					<span className="text-muted-foreground text-xs">Never run</span>
-				),
-		}),
-		// Null (none ended) sorts like a missing value: last.
-		column.accessor((row) => row.rate ?? undefined, {
-			id: "rate",
-			header: "Finished",
-			enableSorting: true,
-			sortUndefined: "last",
-			cell: ({ row: { original } }) =>
-				original.rate === null ? (
-					<span className="text-muted-foreground text-xs">—</span>
-				) : (
-					<span
-						className="flex items-center gap-2"
-						title={`${original.finished} of ${original.ended} finished. A stopped run did not finish.`}
-					>
-						<Progress
-							value={original.rate}
-							aria-label={`${original.rate}% finished`}
-							className="w-24"
-						/>
-						<span className="text-xs tabular-nums">{original.rate}%</span>
-					</span>
-				),
-			meta: { headClassName: "w-48" },
+			cell: ({ row: { original } }) => <LastRuns row={original} now={now} />,
 		}),
 		column.accessor("runs", {
 			header: "Runs",
 			enableSorting: true,
-			meta: {
-				headClassName: "text-right",
-				cellClassName: "text-right tabular-nums",
-			},
+			cell: ({ row: { original } }) => <RunsCell row={original} />,
+			meta: { headClassName: "w-56" },
 		}),
 		column.accessor((row) => row.cost?.median, {
 			id: "perRun",
@@ -212,6 +116,66 @@ function flowHealthColumns(now: number, onOpen: (name: string) => void) {
 			},
 		}),
 	]);
+}
+
+/** The status of the last runs, newest first, and when the last one started. */
+function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
+	if (!row.last) {
+		return <span className="text-muted-foreground text-xs">Never run</span>;
+	}
+	return (
+		<div className="flex flex-col gap-1">
+			<div className="flex items-center gap-0.5">
+				{row.lastRuns.map((run) => (
+					<Link
+						key={run.runId}
+						to="/runs/$runId"
+						params={{ runId: run.runId }}
+						// The row opens the flow; an icon opens its run.
+						onClick={(event) => event.stopPropagation()}
+						className="rounded-sm p-0.5 hover:bg-muted"
+					>
+						<RunStatusIcon status={run.status} />
+					</Link>
+				))}
+			</div>
+			<time
+				dateTime={new Date(row.last.startedAt).toISOString()}
+				title={formatDateTime(row.last.startedAt)}
+				className="text-muted-foreground text-xs"
+			>
+				Last run {formatRelative(row.last.startedAt, now)}
+			</time>
+		</div>
+	);
+}
+
+/** Its runs, and under it how many of those that ended finished. */
+function RunsCell({ row }: { row: FlowHealthRow }) {
+	return (
+		<div
+			className="flex flex-col gap-1"
+			title={`${row.finished} of ${row.ended} ended runs finished. A stopped run did not finish.`}
+		>
+			<span className="text-sm tabular-nums">
+				{row.runs} {row.runs === 1 ? "run" : "runs"}
+			</span>
+			{row.rate === null ? (
+				<span className="text-muted-foreground text-xs">None ended yet</span>
+			) : (
+				<span className="flex items-center gap-2">
+					<Progress
+						value={row.rate}
+						aria-label={`${row.rate}% finished`}
+						className="w-24"
+					/>
+					<span className="text-muted-foreground text-xs tabular-nums">
+						{row.rate}% finished
+					</span>
+				</span>
+			)}
+		</div>
+	);
 }
 
 const PLOT_WIDTH = 96;

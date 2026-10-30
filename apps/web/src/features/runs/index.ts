@@ -5,7 +5,10 @@ export { QuickRunDialog } from "./components/new-run-form";
 export { ProjectRunsPage } from "./components/project-runs-page";
 export { RunList } from "./components/run-list";
 export { RunPage } from "./components/run-page";
-export { RunStatusBadge } from "./components/run-status-badge";
+export {
+	RunStatusBadge,
+	RunStatusIcon,
+} from "./components/run-status-badge";
 export { ProjectRunCopiesPage } from "./copies/run-copies-page";
 export { preloadRunCopiesPage, preloadRunPage } from "./preload";
 export { runQueries } from "./queries";

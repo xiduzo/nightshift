@@ -66,13 +66,25 @@ Pipeline board and spec tree components do not exist yet. Build them in `package
 
 ### Overview lists
 
-An overview shows **at most 5 rows** in a list or table. This covers the sections on Home and on a project page (Recent runs, What the night produced, Up next, Flow health), and every tab of a details dialog.
+An overview shows **at most 5 rows** in a list or table. This covers the sections on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
 
 - One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
 - The full list is one link away: a section action ("Flows", "All runs") or the dialog footer. Under a cut list in a dialog, `MoreRows` says how many rows it leaves out.
 - Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit.
 - Recent runs on Home pages through every run, 5 to a page, instead of a cut list. It needs no hint and no "All runs" link. A project's runs page shows 15 runs to a page.
+
+### A project's page
+
+A project's page reads like the Performance page of Search Console. Keep its shape:
+
+- One range for the whole page, on top: 7, 30 or 90 nights, in the URL (`?range=30`). No section has a range of its own.
+- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile switches its line on the chart on or off. Each tile always says how its number moved against the same nights just before. That is not a choice.
+- One line chart of the tiles that are on, with the nights before as a dashed line.
+- One card with tabs under the chart. Each tab is an overview list (see Overview lists).
+- What runs or waits now shows in one slim line, only when there is something.
+- **Details** on a tile opens the details dialog of that number at the page's range.
+- Setup does not go on this page. The computers that have the project are in its ⋯ menu.
 
 ### Details dialogs
 

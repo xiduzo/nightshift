@@ -21,6 +21,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	ArrowRightLeftIcon,
+	MonitorIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
 	Trash2Icon,
@@ -29,12 +30,14 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import type { Project } from "@/shared/api";
 import { MoveProjectDialog, RenameProjectDialog } from "./project-actions";
+import { ProjectClonesDialog } from "./project-clones-dialog";
 import { projectFolder } from "./projects";
 import { projectMutations } from "./queries";
 
 /**
- * The ⋯ menu of a project: rename it, move it to another Space, or remove
- * it. `children` are items above these, such as "Open project".
+ * The ⋯ menu of a project: the computers that have it, rename it, move it
+ * to another Space, or remove it. `children` are items above these, such
+ * as "Open project".
  */
 export function ProjectMenu({
 	project,
@@ -47,9 +50,9 @@ export function ProjectMenu({
 }) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const [dialog, setDialog] = useState<"rename" | "move" | "remove" | null>(
-		null,
-	);
+	const [dialog, setDialog] = useState<
+		"computers" | "rename" | "move" | "remove" | null
+	>(null);
 	const close = (open: boolean) => {
 		if (!open) setDialog(null);
 	};
@@ -82,6 +85,10 @@ export function ProjectMenu({
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-44">
 					{children}
+					<DropdownMenuItem onClick={() => setDialog("computers")}>
+						<MonitorIcon aria-hidden="true" />
+						Computers…
+					</DropdownMenuItem>
 					<DropdownMenuItem onClick={() => setDialog("rename")}>
 						<PencilIcon aria-hidden="true" />
 						Rename…
@@ -101,6 +108,10 @@ export function ProjectMenu({
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
+			<ProjectClonesDialog
+				project={dialog === "computers" ? project : null}
+				onOpenChange={close}
+			/>
 			<RenameProjectDialog
 				project={dialog === "rename" ? project : null}
 				onOpenChange={close}

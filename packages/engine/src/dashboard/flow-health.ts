@@ -13,6 +13,8 @@ import {
 	type FlowRange,
 	type FlowRun,
 	type FlowWarning,
+	LAST_FLOW_RUNS,
+	type LastFlowRun,
 	NIGHT_RANGES,
 	type NightCounts,
 	type NightRange,
@@ -102,8 +104,8 @@ function toFlowRun({ night: _night, ...run }: PlacedFlowRun): FlowRun {
 }
 
 /**
- * Each flow over the last 30 nights: its last run, how often it finished,
- * and what a finished run costs. A stopped run did not finish, so it counts
+ * Each flow over the last `nights` nights: its last runs, how often it
+ * finished, and what a finished run costs. A stopped run did not finish, so it counts
  * against it. A flow a Subflow node ran counts too, inside the run that
  * called it. The busiest flows first, then the one that ran last.
  */
@@ -112,15 +114,21 @@ export function flowHealthRows(
 	runs: readonly RunSummary[],
 	now: number,
 	timeZone: string,
+	nights: NightRange = FLOW_HEALTH_NIGHTS,
 ): TopRows<FlowHealthRow> {
-	const first = lastNights(FLOW_HEALTH_NIGHTS, now, timeZone)[0] ?? 0;
+	const first = lastNights(nights, now, timeZone)[0] ?? 0;
 	const rows = flows.map((name): FlowHealthRow => {
 		const mine = runsOf(name, runs, timeZone);
-		const last = mine.reduce<PlacedFlowRun | undefined>(
-			(latest, run) =>
-				latest === undefined || run.startedAt > latest.startedAt ? run : latest,
-			undefined,
-		);
+		const lastRuns = [...mine]
+			.sort((a, b) => b.startedAt - a.startedAt)
+			.slice(0, LAST_FLOW_RUNS)
+			.map(
+				(run): LastFlowRun => ({
+					runId: run.runId,
+					status: run.status,
+					startedAt: run.startedAt,
+				}),
+			);
 		const recent = mine.filter((run) => run.night >= first);
 		const ended = recent.filter(hasEnded);
 		const finished = ended.filter((run) => run.status === "finished");
@@ -130,9 +138,8 @@ export function flowHealthRows(
 		const { cost, unknown, free } = finishedCostOf(finished);
 		return {
 			name,
-			last: last
-				? { runId: last.runId, status: last.status, startedAt: last.startedAt }
-				: null,
+			last: lastRuns[0] ?? null,
+			lastRuns,
 			runs: recent.length,
 			finished: finished.length,
 			ended: ended.length,

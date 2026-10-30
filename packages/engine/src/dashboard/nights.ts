@@ -9,7 +9,9 @@ import {
 	type NightCounts,
 	type NightRange,
 	type NightsRange,
+	type NightTotals,
 	OVERVIEW_ROWS,
+	type PeriodTotals,
 	type RunsRange,
 	type SpendGroup,
 	type SpendRange,
@@ -224,15 +226,51 @@ function gatesOf(nights: readonly number[], asked: PlacedGate[]): GatesRange {
 	};
 }
 
-/** Spend, runs and Gates over the last `range` nights. */
+/** The headline numbers of `nights`, per night and in all. */
+function totalsOf(
+	nights: readonly number[],
+	runs: readonly PlacedRun[],
+	gates: readonly PlacedGate[],
+): PeriodTotals {
+	const perNight = nights.map((night): NightTotals => {
+		const ofNight = runs.filter((placed) => placed.night === night);
+		const finished = ofNight.filter(({ run }) => run.status === "finished");
+		const failed = ofNight.filter(({ run }) => run.status === "failed");
+		return {
+			night,
+			runs: ofNight.length,
+			ended: finished.length + failed.length,
+			finished: finished.length,
+			costUsd: ofNight.reduce((sum, { run }) => sum + run.costUsd, 0),
+			gates: gates.filter((gate) => gate.night === night).length,
+		};
+	});
+	const sum = (key: keyof Omit<NightTotals, "night">) =>
+		perNight.reduce((total, night) => total + night[key], 0);
+	return {
+		runs: sum("runs"),
+		ended: sum("ended"),
+		finished: sum("finished"),
+		costUsd: sum("costUsd"),
+		gates: sum("gates"),
+		perNight,
+	};
+}
+
+/**
+ * Spend, runs and Gates over the last `range` nights, and the headline
+ * numbers of the `range` nights before. Flow health is the caller's: it
+ * needs the flows.
+ */
 export function nightsRange(
 	range: NightRange,
 	runs: readonly PlacedRun[],
 	gates: readonly PlacedGate[],
 	now: number,
 	timeZone: string,
-): NightsRange {
-	const nights = lastNights(range, now, timeZone);
+): Omit<NightsRange, "flows"> {
+	const both = lastNights(range * 2, now, timeZone);
+	const nights = both.slice(range);
 	const first = nights[0] ?? 0;
 	const inRange = runs.filter(({ night }) => night >= first);
 	const asked = gates
@@ -243,5 +281,7 @@ export function nightsRange(
 		spend: spendOf(nights, inRange),
 		runs: runsOf(nights, inRange),
 		gates: gatesOf(nights, asked),
+		totals: totalsOf(nights, inRange, asked),
+		before: totalsOf(both.slice(0, range), runs, gates),
 	};
 }

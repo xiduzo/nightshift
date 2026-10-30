@@ -434,6 +434,66 @@ describe("runs over a night range", () => {
 	});
 });
 
+describe("the totals of a night range", () => {
+	test("count runs, outcomes, spend and Gates, and the same nights just before", () => {
+		const summary = summarize([
+			aRun({
+				status: "finished",
+				costUsd: 2,
+				createdAt: TONIGHT + HOUR,
+				gates: [{ openedAt: TONIGHT + HOUR, closedAt: TONIGHT + 2 * HOUR }],
+			}),
+			aRun({ status: "failed", costUsd: 1, createdAt: TONIGHT - 3 * NIGHT }),
+			// Stopped: a run, not one that ended for the finished share.
+			aRun({ status: "stopped", createdAt: TONIGHT - 6 * NIGHT }),
+			// The 7 nights before.
+			aRun({ status: "finished", costUsd: 4, createdAt: TONIGHT - 8 * NIGHT }),
+			aRun({ status: "failed", createdAt: TONIGHT - 13 * NIGHT }),
+			// Older than both: in neither.
+			aRun({ status: "finished", costUsd: 9, createdAt: TONIGHT - 14 * NIGHT }),
+		]);
+		const { totals, before } = nightsOf(summary, 7);
+		expect(totals).toMatchObject({
+			runs: 3,
+			ended: 2,
+			finished: 1,
+			costUsd: 3,
+			gates: 1,
+		});
+		expect(totals.perNight).toHaveLength(7);
+		expect(totals.perNight.at(-1)).toEqual({
+			night: TONIGHT,
+			runs: 1,
+			ended: 1,
+			finished: 1,
+			costUsd: 2,
+			gates: 1,
+		});
+		expect(before).toMatchObject({
+			runs: 2,
+			ended: 2,
+			finished: 1,
+			costUsd: 4,
+			gates: 0,
+		});
+		expect(before.perNight[0]?.night).toBe(TONIGHT - 13 * NIGHT);
+		expect(before.perNight.at(-1)?.night).toBe(TONIGHT - 7 * NIGHT);
+	});
+
+	test("give Flow health per range on a project, and none over all projects", () => {
+		const summary = summarize(
+			[
+				aRun({ flowName: "night", createdAt: TONIGHT + HOUR }),
+				aRun({ flowName: "night", createdAt: TONIGHT - 20 * NIGHT }),
+			],
+			project(["night"]),
+		);
+		expect(nightsOf(summary, 7).flows?.rows[0]?.runs).toBe(1);
+		expect(nightsOf(summary, 30).flows?.rows[0]?.runs).toBe(2);
+		expect(nightsOf(summarize([], all({})), 7).flows).toBeNull();
+	});
+});
+
 describe("Gates over a night range", () => {
 	test("tell answered, not answered and waiting Gates apart, and how fast you answered", () => {
 		const range = nightsOf(
@@ -564,6 +624,27 @@ describe("the project dashboard", () => {
 		expect(rows[0]?.cost?.median).toBe(3);
 		expect(rows[2]).toMatchObject({ last: null, runs: 0, rate: null });
 		expect(summary.flowHealth?.count).toBe(3);
+	});
+
+	test("gives each flow its last ten runs, newest first, of any night", () => {
+		const summary = summarize(
+			Array.from({ length: 12 }, (_, index) =>
+				aRun({
+					id: `r${index}`,
+					flowName: "night",
+					status: index % 2 === 0 ? "finished" : "failed",
+					// One a night, the newest first; most older than 7 nights.
+					createdAt: NOW - HOUR - index * NIGHT,
+				}),
+			),
+			project(["night"]),
+		);
+		const row = nightsOf(summary, 7).flows?.rows[0];
+		expect(row?.lastRuns.map((run) => run.runId)).toEqual(
+			Array.from({ length: 10 }, (_, index) => `r${index}`),
+		);
+		expect(row?.last).toEqual(row?.lastRuns[0] ?? null);
+		expect(row?.runs).toBe(7);
 	});
 });
 
