@@ -79,6 +79,7 @@ export type {
 	LoggedEvent,
 	PlacedRun,
 	TranscriptEntry,
+	WorktreeChanges,
 } from "./log";
 export {
 	ForeignRowsError,

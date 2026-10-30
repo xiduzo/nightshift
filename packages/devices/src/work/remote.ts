@@ -14,6 +14,7 @@ import type {
 	SessionInput,
 	ToolResult,
 	Worktree,
+	WorktreeChanges,
 } from "@nightshift/engine";
 import type { FlowSources } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
@@ -211,8 +212,16 @@ export function remoteDevice(
 			once<Worktree>({ kind: "receiveHandOff", ...input }),
 		itemBranch: (input) =>
 			once<{ branch: string; base: string }>({ kind: "itemBranch", ...input }),
+		// A Device of an older Night Shift cannot read these calls: an error, which the step runner skips.
+		snapshotWorktree: ({ cwd, signal }) =>
+			once<{ tree: string }>({ kind: "snapshotWorktree", cwd }, signal),
+		worktreeChanges: ({ cwd, from, signal }) =>
+			once<WorktreeChanges>({ kind: "worktreeChanges", cwd, from }, signal),
 	};
 }
+
+/** The words of a snapshot call on a Device that takes none. */
+const NO_SNAPSHOTS = "This device does not tell what a step changed.";
 
 /**
  * Serves one call on this computer's Device, as the placed Device does
@@ -259,6 +268,22 @@ export async function* serveWork(
 						run: call.run,
 						branch: call.branch,
 						commit: call.commit,
+					}),
+				);
+				return;
+			case "snapshotWorktree":
+				if (!device.snapshotWorktree)
+					throw new Refusal("conflict", NO_SNAPSHOTS);
+				yield result(await device.snapshotWorktree({ cwd: call.cwd, signal }));
+				return;
+			case "worktreeChanges":
+				if (!device.worktreeChanges)
+					throw new Refusal("conflict", NO_SNAPSHOTS);
+				yield result(
+					await device.worktreeChanges({
+						cwd: call.cwd,
+						from: call.from,
+						signal,
 					}),
 				);
 				return;

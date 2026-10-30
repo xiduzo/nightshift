@@ -31,6 +31,7 @@ import {
 } from "../device-config";
 import {
 	checkProjectFolder,
+	createWorktreeSnapshots,
 	createWorktrees,
 	type Git,
 	NOT_ON_THIS_COMPUTER,
@@ -121,6 +122,12 @@ export type LocalDeviceDeps = {
 	 * before a worktree is added. Default: the git programs on this computer.
 	 */
 	git?: Git;
+	/**
+	 * Whether this computer takes snapshots of a run's worktree, over the
+	 * git port, to tell what a step changed there (`snapshotWorktree`,
+	 * `worktreeChanges`). The daemon's does. Without it, it has neither.
+	 */
+	snapshots?: boolean;
 	/** A profile defined on this computer, by its id, or null. */
 	profileFor?: (id: string) => ProfileSettings | null;
 	/** Where a session keeps its artifacts. Without it, sessions keep none. */
@@ -172,6 +179,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		pullRunBranch,
 		pushRunBranch,
 	} = createWorktrees(git);
+	const snapshots = deps.snapshots ? createWorktreeSnapshots(git) : null;
 	const findCli = deps.findCli ?? ((name: string) => Bun.which(name));
 	const mcpServersFor =
 		deps.mcpServersFor ??
@@ -436,5 +444,17 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			await createAndCheckoutBranch(cwd, branch, from);
 			return { branch, base: from };
 		},
+		// Each git command has its own time limit (`CHANGE_LIMITS`): the signal is not needed here.
+		...(snapshots
+			? {
+					snapshotWorktree: async ({ cwd }) => ({
+						tree: await snapshots.snapshotTree(cwd),
+					}),
+					async worktreeChanges({ cwd, from }) {
+						const to = await snapshots.snapshotTree(cwd);
+						return snapshots.treeChanges(cwd, from, to);
+					},
+				}
+			: {}),
 	};
 }

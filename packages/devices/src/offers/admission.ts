@@ -354,6 +354,15 @@ export function createOfferAdmission(deps: {
 				handOff: async (input) => (await pick()).handOff(input),
 				receiveHandOff: async (input) => (await pick()).receiveHandOff(input),
 				itemBranch: async (input) => (await pick()).itemBranch(input),
+				// Only when this computer tells what a step changed.
+				...(device.snapshotWorktree && device.worktreeChanges
+					? {
+							snapshotWorktree: async (input: SnapshotInput) =>
+								snapshotsOf(await pick()).snapshotWorktree(input),
+							worktreeChanges: async (input: ChangesInput) =>
+								snapshotsOf(await pick()).worktreeChanges(input),
+						}
+					: {}),
 			};
 		},
 	};
@@ -362,6 +371,23 @@ export function createOfferAdmission(deps: {
 /** The key of an Offer's sessions and calls. */
 const offerKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
 
+type SnapshotInput = Parameters<NonNullable<Device["snapshotWorktree"]>>[0];
+type ChangesInput = Parameters<NonNullable<Device["worktreeChanges"]>>[0];
+
+/**
+ * The snapshot calls of a Device. `deviceFor` has them only when this
+ * computer has them, and its admitted path always does.
+ */
+function snapshotsOf(
+	device: Device,
+): Required<Pick<Device, "snapshotWorktree" | "worktreeChanges">> {
+	const { snapshotWorktree, worktreeChanges } = device;
+	if (!snapshotWorktree || !worktreeChanges) {
+		throw new Error(`${device.name} takes no snapshots of a worktree.`);
+	}
+	return { snapshotWorktree, worktreeChanges };
+}
+
 /** The calls that work in the project's Clone; a model or a tool needs none. */
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
@@ -369,6 +395,8 @@ const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"itemBranch",
 	"handOff",
 	"receiveHandOff",
+	"snapshotWorktree",
+	"worktreeChanges",
 	"session",
 	"exec",
 ]);
@@ -381,6 +409,8 @@ function cwdOf(call: WorkCall): string | null {
 			return call.input.cwd;
 		case "itemBranch":
 		case "handOff":
+		case "snapshotWorktree":
+		case "worktreeChanges":
 			return call.cwd;
 		default:
 			return null;
@@ -391,7 +421,8 @@ function cwdOf(call: WorkCall): string | null {
  * The check of one call of another Person's run, given this computer's
  * Offers in force into the run's Space: an offered session of one of
  * them, or the run's own folder work (its flows, its worktree, its item
- * branches, the Hand-off of its work to and from it). Anything
+ * branches, the Hand-off of its work to and from it, the snapshots that
+ * tell what a step changed in it). Anything
  * else is refused: a command, a tool, the decider, a session it did not
  * offer, and its capabilities (private to its owner). Null when it serves
  * the call.
@@ -409,6 +440,8 @@ function offeredCallRefusal(
 		case "itemBranch":
 		case "handOff":
 		case "receiveHandOff":
+		case "snapshotWorktree":
+		case "worktreeChanges":
 			return null;
 		case "session": {
 			if (!("offered" in call.input)) return refused;

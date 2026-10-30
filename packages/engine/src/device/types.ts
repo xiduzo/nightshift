@@ -13,6 +13,7 @@ import type {
 	JsonValue,
 	ProfileSettings,
 } from "@nightshift/flows";
+import type { WorktreeChanges } from "../log";
 
 /**
  * The Device port: what a step body needs from a computer, as one
@@ -101,6 +102,29 @@ export type Device = {
 		base: string | null;
 		fallback: string;
 	}): Promise<{ branch: string; base: string }>;
+	/**
+	 * A snapshot of the files in the run's worktree at `cwd`: what is
+	 * staged, what is not, and the new files git does not ignore, as the id
+	 * of a git tree. Nothing in the worktree, its index or its branch
+	 * changes. Refuses a worktree with too many new files. Absent: this
+	 * Device does not tell what a step changed (a test's), and a step shows
+	 * only its agent's own edits. A Device of an older Night Shift refuses
+	 * the call.
+	 */
+	snapshotWorktree?(input: {
+		cwd: string;
+		signal?: AbortSignal;
+	}): Promise<{ tree: string }>;
+	/**
+	 * What changed in the worktree at `cwd` since the snapshot `from`: a new
+	 * snapshot, and each file that differs, with its diff up to the limits
+	 * (`projects/worktree-changes.ts`). Present when `snapshotWorktree` is.
+	 */
+	worktreeChanges?(input: {
+		cwd: string;
+		from: string;
+		signal?: AbortSignal;
+	}): Promise<WorktreeChanges>;
 };
 
 export type DeviceState = { online: boolean };

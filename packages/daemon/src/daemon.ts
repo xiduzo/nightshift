@@ -355,6 +355,8 @@ export async function createDaemon(
 		profileFor: (ref) => profiles.settingsFor(ref),
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
+		// What each step changed in the run's copy of the project, also by commands.
+		snapshots: true,
 	});
 
 	/**

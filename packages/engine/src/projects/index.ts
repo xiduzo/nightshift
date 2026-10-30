@@ -1,4 +1,4 @@
-/** Projects, their Clones and the Space document that defines them, the git port, the git setup of a project folder, and run worktrees. */
+/** Projects, their Clones and the Space document that defines them, the git port, the git setup of a project folder, run worktrees, and the snapshots that tell what a step changed in one. */
 
 export type { Git } from "./git";
 export { systemGit } from "./git";
@@ -20,5 +20,6 @@ export {
 export type { SpaceDocuments } from "./space-document";
 export { createSpaceDocuments, memberName, spaceIdOf } from "./space-document";
 export { forgetSpaceRows, spaceMoveBatch, spaceRunIds } from "./space-rows";
+export { createWorktreeSnapshots } from "./worktree-changes";
 export type { Branches } from "./worktrees";
 export { createWorktrees, itemBranchName } from "./worktrees";

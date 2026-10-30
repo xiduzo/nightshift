@@ -47,6 +47,8 @@ export type WorkCall =
 	  }
 	| { kind: "handOff"; cwd: string; runBranch: string }
 	| { kind: "receiveHandOff"; run: RunRef; branch: string; commit: string }
+	| { kind: "snapshotWorktree"; cwd: string }
+	| { kind: "worktreeChanges"; cwd: string; from: string }
 	| {
 			kind: "session";
 			input: Omit<SessionInput, "signal"> | Omit<OfferedSessionInput, "signal">;
@@ -67,6 +69,8 @@ export const WORK_KINDS = [
 	"itemBranch",
 	"handOff",
 	"receiveHandOff",
+	"snapshotWorktree",
+	"worktreeChanges",
 	"session",
 	"exec",
 	"callTool",
@@ -227,6 +231,12 @@ const workCallSchema = z.discriminatedUnion("kind", [
 		run: runRefSchema,
 		branch: z.string(),
 		commit: z.string(),
+	}),
+	z.object({ kind: z.literal("snapshotWorktree"), cwd: z.string() }),
+	z.object({
+		kind: z.literal("worktreeChanges"),
+		cwd: z.string(),
+		from: z.string(),
 	}),
 	z.object({
 		kind: z.literal("session"),

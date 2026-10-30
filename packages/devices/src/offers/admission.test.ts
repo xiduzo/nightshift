@@ -109,6 +109,14 @@ const device = {
 		ran.push({ kind: "itemBranch" });
 		return { branch: "b", base: "main" };
 	},
+	async snapshotWorktree() {
+		ran.push({ kind: "snapshotWorktree" });
+		return { tree: "tree-1" };
+	},
+	async worktreeChanges() {
+		ran.push({ kind: "worktreeChanges" });
+		return { tree: "tree-2", files: [] };
+	},
 } as unknown as Device;
 
 beforeEach(async () => {
@@ -368,7 +376,26 @@ for (const [path, call] of Object.entries(paths)) {
 			expect(await outcome(request({ call: { kind: "flows" } }))).toBe(
 				"served",
 			);
-			expect(ran.map((r) => r.kind)).toEqual(["session", "worktree", "flows"]);
+			// What a step changed in the run's folder: its own folder work too.
+			expect(
+				await outcome(
+					request({ call: { kind: "snapshotWorktree", cwd: worktree } }),
+				),
+			).toBe("served");
+			expect(
+				await outcome(
+					request({
+						call: { kind: "worktreeChanges", cwd: worktree, from: "tree-1" },
+					}),
+				),
+			).toBe("served");
+			expect(ran.map((r) => r.kind)).toEqual([
+				"session",
+				"worktree",
+				"flows",
+				"snapshotWorktree",
+				"worktreeChanges",
+			]);
 		});
 
 		test("an offered session runs the profile as its owner set it, the mode no wider than the cap", async () => {
@@ -603,6 +630,9 @@ describe("Offer admission, its owner's run", () => {
 			expect(await serve(mine({ call: exec(cwd) }))).toBe(
 				"This device works only in the run's own folder.",
 			);
+			expect(
+				await serve(mine({ call: { kind: "snapshotWorktree", cwd } })),
+			).toBe("This device works only in the run's own folder.");
 		}
 		expect(
 			await serve(
