@@ -497,6 +497,11 @@ export function RunPage({
 							.items
 					: emptyTranscript.items
 			}
+			changes={
+				selectedStep
+					? stream.transcript.steps.get(selectedStep.id)?.changes
+					: undefined
+			}
 			projectRoot={runData.worktreePath}
 			transcript={
 				selectedStep ? (

@@ -1,6 +1,6 @@
 import { projectPath } from "@nightshift/client";
 
-import type { TranscriptEntry } from "@/shared/api";
+import type { TranscriptEntry, WorktreeChangesEvent } from "@/shared/api";
 import { formatDuration } from "@/shared/format";
 import type {
 	GateOpenItem,
@@ -21,8 +21,10 @@ import type {
  * decision step gets what was asked and the label it picked; a gate step its
  * question and the answer. A Call step with `each` gets the item lists it read and a
  * start and an end per item. A wait of the run policy shows where it happens,
- * with the wake that ends it. Folding is incremental so a long replay and a fast
- * live stream only touch the items that change.
+ * with the wake that ends it. What a step changed in the run's copy of the
+ * project is no item: the step keeps the last list (`changes`). Folding is
+ * incremental so a long replay and a fast live stream only touch the items
+ * that change.
  */
 
 /** The transcript of one step. */
@@ -34,6 +36,12 @@ export type TranscriptState = {
 	lastAt?: number;
 	/** The key of the thought still streaming, if the last entry was one. */
 	openThought?: string;
+	/**
+	 * Every file the step changed in the run's copy of the project, also by
+	 * commands: its last `worktree-changes`. Absent when Night Shift could
+	 * not tell.
+	 */
+	changes?: WorktreeChangesEvent;
 };
 
 export const emptyTranscript: TranscriptState = {
@@ -172,10 +180,17 @@ function applyStepEntries(
 
 	let lastAt = state.lastAt;
 	let openThought = state.openThought;
+	let changes = state.changes;
 	for (const entry of entries) {
+		const event = entry.event;
+		// Not part of what the step said or ran: it changes no item.
+		if (event.type === "worktree-snapshot") continue;
+		if (event.type === "worktree-changes") {
+			changes = event;
+			continue;
+		}
 		const sessionKey =
 			entry.sessionId === null ? null : ensureSession(entry, entry.sessionId);
-		const event = entry.event;
 		const base = { sessionId: entry.sessionId, at: entry.at };
 		const startedAt = lastAt ?? entry.at;
 		lastAt = entry.at;
@@ -524,6 +539,7 @@ function applyStepEntries(
 		index,
 		...(lastAt !== undefined ? { lastAt } : {}),
 		...(openThought !== undefined ? { openThought } : {}),
+		...(changes !== undefined ? { changes } : {}),
 	};
 }
 

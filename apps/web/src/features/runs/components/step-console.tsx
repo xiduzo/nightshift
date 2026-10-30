@@ -7,7 +7,11 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 
-import type { RunStatus, StepSummary } from "@/shared/api";
+import type {
+	RunStatus,
+	StepSummary,
+	WorktreeChangesEvent,
+} from "@/shared/api";
 import { stepGist } from "../lib/step-gist";
 import type { TranscriptItem } from "../transcript/transcript-items";
 import { ChangedFiles } from "./changed-files";
@@ -21,8 +25,9 @@ export const CONSOLE_BAR_PX = 44;
  * The selected step along the bottom of the run page, like a browser's
  * devtools. Closed, it is one line: the step and what it did in a few words.
  * Open, it shows everything at once: the step's facts, summary and outputs
- * on the left, with the agent's to-do list and the files it changed, and
- * its transcript (what the agent ran and said) on the right.
+ * on the left, with the agent's to-do list and the files the step changed
+ * (by the agent's edits and by commands), and its transcript (what the
+ * agent ran and said) on the right.
  */
 export function StepConsole({
 	step,
@@ -32,6 +37,7 @@ export function StepConsole({
 	summary,
 	transcript,
 	items,
+	changes,
 	projectRoot,
 	empty,
 	outcomeColor,
@@ -47,6 +53,8 @@ export function StepConsole({
 	transcript: ReactNode;
 	/** The step's transcript items, for the agent's to-do list and the files it changed. */
 	items: readonly TranscriptItem[];
+	/** Every file the step changed in the run's copy of the project, when Night Shift could tell. */
+	changes?: WorktreeChangesEvent;
 	/** The project's folder of the run, to show changed files relative to it. */
 	projectRoot: string;
 	/** Shown in the bar while there is no step. */
@@ -68,9 +76,10 @@ export function StepConsole({
 		[items],
 	);
 	const todos = useMemo(() => stepTodos(calls), [calls]);
+	// Also what commands changed, and a Command step's files.
 	const files = useMemo(
-		() => changedFiles(calls, projectRoot),
-		[calls, projectRoot],
+		() => changedFiles(calls, projectRoot, changes),
+		[calls, projectRoot, changes],
 	);
 
 	return (
@@ -135,6 +144,9 @@ export function StepConsole({
 							{files.length > 0 ? (
 								<ChangedFiles
 									files={files}
+									marksCommands={step.nodeType === "agent"}
+									overlapped={changes?.overlapped === true}
+									omitted={changes?.omitted ?? 0}
 									title={
 										<SectionTitle
 											id="step-files-heading"

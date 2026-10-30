@@ -51,6 +51,7 @@ export type {
 	ThisComputer,
 	TranscriptEntry,
 	WaitEvent,
+	WorktreeChangesEvent,
 } from "@nightshift/client";
 export { isSignInRequired, isTwoFactorRequired } from "@nightshift/client";
 export { authClient } from "./auth-client";

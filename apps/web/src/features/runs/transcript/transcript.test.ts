@@ -206,3 +206,25 @@ describe("a tool call's one-line summary", () => {
 		expect(summarizeToolInput({ path: root }, root)).toBe(".");
 	});
 });
+
+describe("what a step changed in the run's copy of the project", () => {
+	const changes = (to: string): StepEvent => ({
+		type: "worktree-changes",
+		from: "t0",
+		to,
+		files: [{ path: "a.ts", status: "added", added: 1, removed: 0 }],
+	});
+
+	test("makes no item, and the step keeps the last list", () => {
+		const state = [
+			entriesOf([{ type: "worktree-snapshot", tree: "t0" }, changes("t1")]),
+			entriesOf([{ type: "command-start", command: "make" }, changes("t2")], 2),
+		].reduce(applyEntries, emptyRunTranscript);
+		const step = state.steps.get("step");
+		expect(step?.items.map((item) => item.kind)).toEqual([
+			"session",
+			"command",
+		]);
+		expect(step?.changes).toMatchObject({ to: "t2" });
+	});
+});
