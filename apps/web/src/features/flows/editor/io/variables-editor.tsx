@@ -298,7 +298,7 @@ function VariableRow({
 					reference={`vars.${variable.name}`}
 					label="Shape"
 					output={variable.schema}
-					description="The shape every value must have. A write that does not fit fails its step."
+					description="Every value must fit this shape. A step that writes a value that does not fit fails."
 					onChange={(schema) =>
 						onUpdate(({ schema: _, ...rest }) =>
 							schema === undefined ? rest : { ...rest, schema },

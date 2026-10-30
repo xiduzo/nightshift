@@ -20,9 +20,9 @@ const KIND_ORDER: WaitUntil["kind"][] = [
 ];
 
 const KIND_HINT: Record<WaitUntil["kind"], string> = {
-	duration: "The step waits this long, then goes on.",
-	time: "The step waits until this time, then goes on.",
-	command: "The step runs the command until it succeeds, then goes on.",
+	duration: "The step waits this long, then continues.",
+	time: "The step waits until this time, then continues.",
+	command: "The step runs the command until it succeeds, then continues.",
 	signal:
 		"The step waits until someone sends the run this signal, or a webhook of this project does.",
 };
@@ -71,7 +71,7 @@ export function WaitFields({
 				<Field
 					id={`${id}-minutes`}
 					label="Minutes"
-					hint="For example 15. A whole number above 0."
+					hint="A whole number above 0."
 				>
 					<PositiveIntInput
 						id={`${id}-minutes`}
@@ -89,7 +89,7 @@ export function WaitFields({
 				<TemplateField
 					id={`${id}-at`}
 					label="Time"
-					hint="A date and time, such as 2026-10-18T07:00, or a time of day, such as 07:00, for the next one on this computer's clock. Templates work: {{deploy_window}}."
+					hint="A time of day, such as 07:00, means the next one on the clock of this computer. Or give a date and time: 2026-10-18T07:00."
 					flow={flow}
 					nodeId={node.id}
 					value={until.at}
@@ -106,7 +106,7 @@ export function WaitFields({
 						id={`${id}-command`}
 						language="bash"
 						label="Command"
-						hint='Runs in the project until it succeeds. Put templates in quotes, for example: gh pr checks "{{pr}}".'
+						hint='Put templates in quotes: gh pr checks "{{pr}}".'
 						flow={flow}
 						nodeId={node.id}
 						value={until.command}
@@ -120,7 +120,7 @@ export function WaitFields({
 					<Field
 						id={`${id}-every`}
 						label="Try every (minutes)"
-						hint="For example 5. The timeout below must be longer."
+						hint="The timeout below must be longer."
 					>
 						<PositiveIntInput
 							id={`${id}-every`}
@@ -140,7 +140,7 @@ export function WaitFields({
 					<Field
 						id={`${id}-name`}
 						label="Signal name"
-						hint="For example ci-done. Send it from the run page, or from a schedule that waits for a webhook."
+						hint="Send it from the run page, or from a schedule that waits for a webhook."
 					>
 						<Input
 							id={`${id}-name`}
@@ -159,7 +159,7 @@ export function WaitFields({
 					<TemplateField
 						id={`${id}-key`}
 						label="Key (optional)"
-						hint="Only a webhook with the same key continues this step, for example {{pr}}. Without a key, any does."
+						hint="Only a webhook with the same key continues this step. Without a key, any webhook does."
 						flow={flow}
 						nodeId={node.id}
 						value={until.key ?? ""}

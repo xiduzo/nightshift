@@ -329,9 +329,9 @@ export function AgentFields({
 					hint={
 						chosen
 							? chosen.thisDevice
-								? `This node runs on this computer with ${profileOnDevice(chosen)}. Override a setting for this node only, or leave it to the profile.`
-								: `This node runs on ${chosen.deviceName} with ${profileOnDevice(chosen)}. Open Night Shift on ${chosen.deviceName} to see or change the profile. Override a setting for this node only, or leave it to the profile.`
-							: "A saved agent setup of one of your computers. The node runs on that computer. Without one, set the harness, model and permission mode below."
+								? `This node runs on this computer with ${profileOnDevice(chosen)}. You can override a setting for this node only.`
+								: `This node runs on ${chosen.deviceName} with ${profileOnDevice(chosen)}. To change the profile, open Night Shift on ${chosen.deviceName}.`
+							: "The node runs on the computer of the profile. Without a profile, set the harness, model and permission mode below."
 					}
 				>
 					<ProfileSelect
@@ -385,8 +385,8 @@ export function AgentFields({
 					label="Session on a later visit"
 					hint={
 						node.session === "fresh"
-							? "A retry starts over with only the task."
-							: "A retry continues where the agent left off, with everything it knew."
+							? "A retry starts again with only the task."
+							: "A retry continues where the agent stopped, with everything it knew."
 					}
 				>
 					<NativeSelect
@@ -451,7 +451,7 @@ export function AgentFields({
 						id={`${id}-prompt`}
 						language="markdown"
 						label="Prompt"
-						hint="What the agent should do."
+						hint="Tell the agent what to do."
 						flow={flow}
 						nodeId={node.id}
 						value={node.prompt}
@@ -467,7 +467,7 @@ export function AgentFields({
 						<Field
 							id={`${id}-skill`}
 							label="Skill"
-							hint="Pick a skill of this project or this computer, or type its name. Leave out the slash."
+							hint="Pick a skill of this project or this computer, or type its name without the slash."
 							error={node.skill === undefined ? "Write the skill name." : null}
 						>
 							<SkillCombobox

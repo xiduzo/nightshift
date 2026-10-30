@@ -145,7 +145,7 @@ export function NodeInspector({
 						className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
 						onClick={onDelete}
 						aria-label={`Delete ${node.id}`}
-						title="Delete node (Backspace)"
+						title="Delete the node (Backspace)"
 					>
 						<Trash2Icon />
 					</Button>
@@ -337,7 +337,7 @@ export function NodeInspector({
 								id={`${id}-idle`}
 								label="Idle timeout in minutes"
 								optional
-								hint="The step fails when the agent shows no activity for this long."
+								hint="The step fails when the agent does nothing for this long."
 							>
 								<PositiveIntInput
 									id={`${id}-idle`}
@@ -359,7 +359,7 @@ export function NodeInspector({
 								id={`${id}-max-turns`}
 								label="Max turns"
 								optional
-								hint="A turn is one reply of the agent. The step fails when the agent takes more."
+								hint="A turn is one reply of the agent. The step fails after this many."
 							>
 								<PositiveIntInput
 									id={`${id}-max-turns`}
@@ -420,7 +420,7 @@ function IdField({
 			<input
 				id={id}
 				aria-label="Id"
-				title={`Later nodes use its outputs as {{${nodeId}.field}}. Renaming it updates every edge and reference.`}
+				title={`Later nodes read its outputs as {{${nodeId}.field}}. A new id also changes every edge and reference to it.`}
 				value={text}
 				size={Math.max(text.length, 2)}
 				className="min-w-0 max-w-full rounded-sm bg-transparent px-0.5 font-mono text-foreground outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring aria-invalid:text-destructive"

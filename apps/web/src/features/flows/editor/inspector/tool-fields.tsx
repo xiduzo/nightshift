@@ -138,7 +138,7 @@ export function ToolFields({
 								? "Loading the tools…"
 								: listed && listed.length === 0
 									? "This MCP server has no tools."
-									: "The tool this node calls.")
+									: undefined)
 					}
 				>
 					{listed && listed.length > 0 ? (
@@ -298,7 +298,7 @@ function Arguments({
 						? schema
 							? "This tool takes no arguments."
 							: "Add the arguments the tool takes. Each value is a template."
-						: "Fill in each argument. A value that is one reference keeps its JSON value."}
+						: "Give a value for each argument. A value that is one reference keeps its JSON value."}
 				</FieldDescription>
 			</div>
 			{properties.length > 0 || !schema ? (

@@ -70,8 +70,8 @@ export function CallFields({
 					support={support}
 					hint={
 						each
-							? "Runs once for each item. The item goes to one of its inputs."
-							: "Runs once. This node passes when the called flow finishes, and fails when it does not."
+							? "Each item goes to one of its inputs."
+							: "This node passes when the called flow finishes, and fails when it does not."
 					}
 					onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
 				/>
@@ -182,7 +182,7 @@ function EachFields({
 				<Field
 					id={`${id}-kind`}
 					label="Items from"
-					hint="Night Shift reads the list again before each item, so items added during the run run too."
+					hint="Night Shift reads the list again before each item. New items in the list run too."
 				>
 					<NativeSelect
 						id={`${id}-kind`}
@@ -271,7 +271,7 @@ function EachFields({
 					id={`${id}-max`}
 					label="Max items"
 					optional
-					hint="The most items to start, as a safety net."
+					hint="Night Shift starts no more items than this."
 				>
 					<PositiveIntInput
 						id={`${id}-max`}
@@ -288,11 +288,12 @@ function EachFields({
 
 				<Note>
 					Ends with <span className="text-foreground">done</span> when no item
-					is left to start, or <span className="text-foreground">halted</span>.
-					It ends with <span className="text-foreground">stopped</span> at the
-					stop time. Connect <span className="text-foreground">stopped</span> to
-					nodes that still run after the stop time, for example a report. A
-					failed item blocks the items that depend on it. Later nodes read{" "}
+					is left to start, or with{" "}
+					<span className="text-foreground">halted</span>. It ends with{" "}
+					<span className="text-foreground">stopped</span> at the stop time.
+					Connect <span className="text-foreground">stopped</span> to nodes that
+					must run after the stop time, such as a report. A failed item blocks
+					the items that depend on it. Later nodes read{" "}
 					<code>{`{{${node.id}.summary}}`}</code>,{" "}
 					<code>{`{{${node.id}.done_count}}`}</code>, and each item's result in{" "}
 					<code>{`{{${node.id}.results}}`}</code>.
@@ -323,13 +324,7 @@ function SourceFields({
 				<TemplateField
 					id={`${id}-value`}
 					label="List"
-					hint={
-						<>
-							A list, for example{" "}
-							<code className="font-mono">{"{{planner.data.tasks}}"}</code>, or
-							the list itself as JSON.
-						</>
-					}
+					hint="A template that gives a list, or the list itself as JSON."
 					flow={flow}
 					nodeId={node.id}
 					value={source.value}
@@ -345,7 +340,7 @@ function SourceFields({
 					id={`${id}-command`}
 					language="bash"
 					label="Source command"
-					hint="A shell command that prints the list as JSON, for example cat tasks.json."
+					hint="A shell command that prints the list as JSON."
 					flow={flow}
 					nodeId={node.id}
 					value={source.command}
@@ -388,7 +383,7 @@ function AsField({
 	const hint =
 		picked?.type === "text"
 			? "A text input gets the item as text. Use a json input to read its fields."
-			: `The called flow gets the item in this input, and reads it as {{${each.as}}} or {{${each.as}.title}}.`;
+			: `The called flow reads the item as {{${each.as}}} or {{${each.as}.title}}.`;
 
 	return (
 		<Field

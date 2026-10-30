@@ -55,8 +55,8 @@ export function AgentOutcomeSection({
 			label="When it needs input"
 			hint={
 				asks
-					? "Night Shift asks you its questions. Your answer goes to the same session. Stop ends the step as failed."
-					: "The agent ends on needs input, and the run takes that edge."
+					? "Night Shift asks you the questions of the agent. The agent continues with your answer. Stop makes the step fail."
+					: "The run takes the needs input edge."
 			}
 		>
 			<ToggleGroup
@@ -118,9 +118,9 @@ export function AgentOutcomeSection({
 					))}
 				</div>
 				<p className="text-muted-foreground text-xs">
-					The standard outcomes:{" "}
-					{asks ? "pass or fail" : "pass, fail, or needs input"}. Use your own,
-					such as approved and changes-requested, each with its own edge.
+					The standard outcomes are{" "}
+					{asks ? "pass or fail" : "pass, fail, or needs input"}. You can use
+					your own, such as approved and changes-requested.
 				</p>
 				<div className="flex flex-wrap items-center gap-1.5">
 					<Button
@@ -143,7 +143,7 @@ export function AgentOutcomeSection({
 			node={node}
 			min={1}
 			lead={lead}
-			hint="Exactly one is picked. Each outcome gets its own edge. A description says when to pick it."
+			hint="The agent picks one. Each outcome gets its own edge. Describe when to pick it."
 			onChange={onChange}
 			onRenameOutcome={onRenameOutcome}
 			onRemoveOutcome={onRemoveOutcome}

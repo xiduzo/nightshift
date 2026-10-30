@@ -10,7 +10,7 @@ export function lockScreenHint(
 	node: Pick<DecisionNode, "lockScreen" | "options">,
 ): string {
 	if (node.lockScreen !== true) {
-		return "The notification opens the app on your phone. The app checks that it is you before your answer goes.";
+		return "The notification opens the app. The app checks that it is you before it sends your answer.";
 	}
 	const [first, second] = node.options;
 	if (node.options.length !== 2 || !first || !second) {

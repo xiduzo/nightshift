@@ -258,7 +258,7 @@ const PROBLEM = {
 	},
 	cycle: {
 		icon: RepeatIcon,
-		title: (flow: ReactNode) => <>{flow} is open above already</>,
+		title: (flow: ReactNode) => <>{flow} is already open above</>,
 		description: (_flow: string, nodeId: string, above: string) =>
 			`The Subflow ${nodeId} runs a flow that contains it. A flow cannot contain itself. Pick another flow in ${above}.`,
 	},

@@ -223,7 +223,7 @@ function KitNote({
 			<ItemContent className="gap-1 text-xs">
 				{description ? <p>{description}</p> : null}
 				<p className="text-muted-foreground">
-					Night Shift ships this kit, and you cannot change it.
+					You cannot change a kit.
 					{copy
 						? ` To change it, copy it into this project as ${copy}. This node then runs the copy.`
 						: ""}
@@ -380,7 +380,7 @@ export function InputBindings({
 						? skip
 							? "It takes no other input."
 							: "It takes no input."
-						: "Fill in each input. Leave one empty to use its default."}
+						: "Give a value for each input. Leave one empty to use its default."}
 				</FieldDescription>
 			</div>
 			{inputs.map((input) => {
