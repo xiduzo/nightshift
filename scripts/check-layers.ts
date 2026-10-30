@@ -70,6 +70,7 @@ export const LAYERS: Record<string, Rule> = {
 	// 3. Core domains
 	"@nightshift/devices": { layer: 3, mayImport: "lower" },
 	"@nightshift/notifications": { layer: 3, mayImport: "lower" },
+	"@nightshift/telemetry": { layer: 3, mayImport: "lower" },
 	// 4. Surface
 	"@nightshift/api": { layer: 4, mayImport: "lower" },
 	// 5. Runtime
