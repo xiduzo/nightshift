@@ -370,6 +370,7 @@ export function RunPage({
 						runStatus={status}
 						selectedStepId={selectedStep?.id ?? null}
 						selectedItem={focus}
+						revealStepId={stepId ?? null}
 						onSelect={setPickedStepId}
 						onSelectItem={selectItem}
 						calledName={(step) => calledFlowName(runData, steps, step)}

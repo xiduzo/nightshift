@@ -26,7 +26,7 @@ import {
 	TriangleAlertIcon,
 	WorkflowIcon,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
 	hasCost,
 	ItemStateBadge,
@@ -99,6 +99,7 @@ export function StepTimeline({
 	selectedStepId,
 	selectedItem,
 	onSelect,
+	revealStepId = null,
 	onSelectItem,
 	calledName,
 	runsEach,
@@ -113,6 +114,8 @@ export function StepTimeline({
 	runStatus: RunStatus;
 	selectedStepId: string | null;
 	selectedItem: ItemScope;
+	/** A step a link opened the run at: its row scrolls into view while it is selected. */
+	revealStepId?: string | null;
 	onSelect: (stepId: string) => void;
 	onSelectItem: (scope: ItemScope) => void;
 	/** The name of the flow a Call step calls. */
@@ -227,6 +230,7 @@ export function StepTimeline({
 					depth={depth}
 					runStatus={runStatus}
 					selected={step.id === selectedStepId}
+					reveal={step.id === selectedStepId && step.id === revealStepId}
 					warned={warnedStepIds?.has(step.id) ?? false}
 					onSelect={() => onSelect(step.id)}
 					outcomeColor={outcomeColor?.(step)}
@@ -331,6 +335,7 @@ function StepRow({
 	depth,
 	runStatus,
 	selected,
+	reveal,
 	warned,
 	onSelect,
 	action,
@@ -343,6 +348,8 @@ function StepRow({
 	depth: number;
 	runStatus: RunStatus;
 	selected: boolean;
+	/** A link opened the run at this step: the row scrolls into view. */
+	reveal: boolean;
 	/** The run warned about this step. */
 	warned: boolean;
 	onSelect: () => void;
@@ -352,8 +359,13 @@ function StepRow({
 	outcomeColor?: OutcomeColor;
 }) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
+	const row = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (reveal) row.current?.scrollIntoView({ block: "nearest" });
+	}, [reveal]);
 	return (
 		<div
+			ref={row}
 			className={cn(
 				ROW,
 				"flex items-center gap-1 rounded-md pr-1",
