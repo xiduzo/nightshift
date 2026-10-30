@@ -7,7 +7,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { runQueries } from "@/features/runs/queries";
+import { runQueries } from "@/features/runs/flows-port";
 import { type FlowAssistant, replaceDraft } from "../assistant/flow-assistant";
 import type { ChatLink } from "./chat-link";
 import type { FlowChatPanel } from "./chat-panel";

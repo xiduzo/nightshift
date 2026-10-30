@@ -68,6 +68,8 @@ describe("listFlowSources", () => {
 				inputs: quick().inputs,
 				callers: [],
 				devices: { names: [], ids: [] },
+				nodeTypes: [{ type: "agent", count: 1 }],
+				gateCount: 0,
 			},
 			{
 				name: "broken",
@@ -78,6 +80,8 @@ describe("listFlowSources", () => {
 				inputs: [],
 				callers: [],
 				devices: { names: [], ids: [] },
+				nodeTypes: [],
+				gateCount: 0,
 			},
 			{
 				name: "quick",
@@ -88,6 +92,8 @@ describe("listFlowSources", () => {
 				inputs: quick().inputs,
 				callers: ["zeta"],
 				devices: { names: [], ids: [] },
+				nodeTypes: [{ type: "agent", count: 1 }],
+				gateCount: 0,
 			},
 			{
 				name: "zeta",
@@ -98,8 +104,53 @@ describe("listFlowSources", () => {
 				inputs: [],
 				callers: [],
 				devices: { names: [], ids: [] },
+				nodeTypes: [{ type: "call", count: 1 }],
+				gateCount: 0,
 			},
 		]);
+	});
+
+	test("counts the nodes by type, the most first, without End nodes, and the Gates", () => {
+		const decision = (id: string, by: "person" | "rule") => ({
+			id,
+			type: "decision",
+			position: { x: 0, y: 0 },
+			prompt: "Ship it?",
+			options: [{ name: "yes" }, { name: "no" }],
+			by,
+			decider: "typesafe",
+		});
+		const gated = {
+			version: FLOW_VERSION,
+			start: "ask",
+			nodes: [
+				decision("ask", "person"),
+				decision("check", "rule"),
+				decision("again", "person"),
+				{
+					id: "run",
+					type: "command",
+					position: { x: 0, y: 0 },
+					command: "bun test",
+					output: "text",
+				},
+				{
+					id: "end",
+					type: "end",
+					position: { x: 0, y: 0 },
+					status: "nothing-to-do",
+				},
+			],
+			edges: [],
+		};
+		const [item] = listFlowSources({ gated: { json: gated } });
+		expect(item).toMatchObject({
+			nodeTypes: [
+				{ type: "decision", count: 3 },
+				{ type: "command", count: 1 },
+			],
+			gateCount: 2,
+		});
 	});
 
 	test("no sources is an empty list", () => {

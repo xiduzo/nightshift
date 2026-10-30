@@ -1,5 +1,11 @@
 import { Refusal } from "@nightshift/refusal";
-import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../flow";
+import {
+	FLOW_VERSION,
+	type Flow,
+	type FlowNodeType,
+	flowSchema,
+	migrateFlow,
+} from "../flow";
 import { flowNameSchema, isProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { ScheduleFlowInfo } from "../schedules";
@@ -46,6 +52,7 @@ export function listFlowSources(sources: FlowSources): FlowListItem[] {
 			inputs: loaded.flow?.inputs ?? [],
 			callers: callersOf(name, flows),
 			devices: devicesOf(name, flows),
+			...nodesOf(loaded.flow),
 		});
 	}
 	return items;
@@ -106,6 +113,24 @@ export function callersOf(name: string, flows: ProjectFlowMap): string[] {
 		)
 		.map(([caller]) => caller)
 		.sort();
+}
+
+/** A flow's nodes by type, the most first, without End nodes, and its Gates. */
+function nodesOf(
+	flow: Flow | null,
+): Pick<FlowListItem, "nodeTypes" | "gateCount"> {
+	const counts = new Map<FlowNodeType, number>();
+	let gateCount = 0;
+	for (const node of flow?.nodes ?? []) {
+		if (node.type !== "end") {
+			counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
+		}
+		if (node.type === "decision" && node.by === "person") gateCount += 1;
+	}
+	const nodeTypes = [...counts]
+		.map(([type, count]) => ({ type, count }))
+		.sort((a, b) => b.count - a.count);
+	return { nodeTypes, gateCount };
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { Flow, FlowInputDef } from "../flow";
+import type { Flow, FlowInputDef, FlowNodeType } from "../flow";
 
 /** One problem in a flow. A flow with any `error` cannot run. */
 export type FlowIssue = {
@@ -46,6 +46,13 @@ export type FlowListItem = FlowFile & {
 	callers: string[];
 	/** The Devices its nodes and the flows it calls run on (`FlowDevices`). */
 	devices: FlowDevices;
+	/**
+	 * Its nodes by type, with a count each: the most first, End nodes left
+	 * out. Empty when the file does not parse.
+	 */
+	nodeTypes: { type: FlowNodeType; count: number }[];
+	/** Its Gates: Decisions a person decides. A run waits for you there. */
+	gateCount: number;
 };
 
 /**

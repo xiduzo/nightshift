@@ -13,8 +13,10 @@ import {
 	type FlowIssue,
 	type FlowListItem,
 	type FlowNode,
+	type FlowNodeType,
 	flowSchema,
 	type LoadedFlow,
+	NODE_TYPE_LABEL,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -49,6 +51,17 @@ export const flowListItemSchema = exact<FlowListItem>()(
 			names: z.array(z.string()),
 			ids: z.array(z.string()),
 		}),
+		/** Its nodes by type, the most first, without End nodes. */
+		nodeTypes: z.array(
+			z.object({
+				type: z.enum(
+					Object.keys(NODE_TYPE_LABEL) as [FlowNodeType, ...FlowNodeType[]],
+				),
+				count: z.number(),
+			}),
+		),
+		/** Its Gates: Decisions a person decides. */
+		gateCount: z.number(),
 	}),
 );
 

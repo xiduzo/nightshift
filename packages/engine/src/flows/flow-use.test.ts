@@ -63,6 +63,8 @@ describe("flowUse", () => {
 							inputs: [],
 							callers: [],
 							devices: { names: [], ids: [] },
+							nodeTypes: [],
+							gateCount: 0,
 						},
 						{
 							name: "day",
@@ -73,6 +75,8 @@ describe("flowUse", () => {
 							inputs: [],
 							callers: [],
 							devices: { names: [], ids: [] },
+							nodeTypes: [],
+							gateCount: 0,
 						},
 						{
 							name: "broken",
@@ -83,6 +87,8 @@ describe("flowUse", () => {
 							inputs: [],
 							callers: [],
 							devices: { names: [], ids: [] },
+							nodeTypes: [],
+							gateCount: 0,
 						},
 					];
 				},

@@ -150,7 +150,7 @@ Two exceptions exist, as in yapyap. Each one is listed by name in `scripts/check
 
 The check fails on a leaf contract or a peer port that nothing uses any more, so neither outlives its reason.
 
-Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds, and the barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are seven peer ports, all in `apps/web` (section 5).
+Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds, and the barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are nine peer ports, all in `apps/web` (section 5).
 
 ### Growth
 
@@ -197,8 +197,8 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature and no other shared piece imports it: only the routes and the entry files do. The check enforces this, tests included.
 - The other shared pieces import no feature (checked, tests included). Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
 - The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `notifications`, then `settings`, `schedules` and `dashboard`. A feature imports only features below it. The notifications stream follows the Host for every page, so `notifications` sits above the pages it keeps live. The Settings page shows projects, flows, runs, agent defaults and the notification settings, so `settings` sits above them.
-- Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. Today `agents`, `flows` and `devices` read `settings/queries`. `flows` and `gates` read `runs/queries`. `agents` reads `devices/queries` (the Offers of a profile).
-- `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port.
+- Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. Today `agents`, `flows` and `devices` read `settings/queries`. `gates` reads `runs/queries`. `agents` reads `devices/queries` (the Offers of a profile). The Flows page reads `schedules/queries` and `dashboard/queries` (what starts each flow, its last runs).
+- `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port. `flows` reaches the run queries and the status icon through one port, `runs/flows-port.ts` (start a run, a flow's last runs).
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.
 
 - A route file declares the route (path, `ssr`, search and params validation) and renders one page from a vertical's barrel. It gives the params and the search to the page as props. It holds no other markup.

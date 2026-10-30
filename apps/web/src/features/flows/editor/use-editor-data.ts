@@ -2,7 +2,7 @@ import { type ProfileRef, policyFromSettings } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { connectionQueries } from "@/features/agents";
-import { runQueries } from "@/features/runs/queries";
+import { runQueries } from "@/features/runs/flows-port";
 import { settingsQueries } from "@/features/settings/queries";
 import { useProjectFlows } from "../use-project-flows";
 import { useCommandTools } from "./cli-tools-field";

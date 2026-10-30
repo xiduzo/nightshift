@@ -18,7 +18,7 @@ import {
 } from "@nightshift/ui/components/native-select";
 import { useQuery } from "@tanstack/react-query";
 import { profileQueries } from "@/features/agents";
-import { runQueries } from "@/features/runs/queries";
+import { runQueries } from "@/features/runs/flows-port";
 
 /** A profile a node can name: the pair, its name, and its Device. */
 export type ProfileChoice<P extends Profile> = {

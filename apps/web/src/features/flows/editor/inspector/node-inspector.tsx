@@ -17,7 +17,7 @@ import { Input } from "@nightshift/ui/components/input";
 import { useQuery } from "@tanstack/react-query";
 import { PlayIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
-import { runQueries } from "@/features/runs/queries";
+import { runQueries } from "@/features/runs/flows-port";
 import { nodeMeta } from "../../canvas/node-type";
 import type { DaemonConnection } from "../connections-field";
 import { DeviceField, runsOnDevice, withDevice } from "../device-field";
