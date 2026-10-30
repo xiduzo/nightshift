@@ -175,7 +175,7 @@ export function createOffers(deps: {
 			if (own && !roleAllows(own.role, { offer: ["make"] })) {
 				throw new Refusal(
 					"forbidden",
-					"Your role in that Space does not allow offering profiles.",
+					"Your role in that Space does not let you offer profiles.",
 				);
 			}
 			if (

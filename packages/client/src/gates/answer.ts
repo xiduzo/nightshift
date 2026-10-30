@@ -117,7 +117,7 @@ export function unreachableAnswerText(
 ): { title: string; description: string } | null {
 	if (!isHostUnreachable(error)) return null;
 	return {
-		title: "The Host of this Space cannot be reached",
+		title: "Night Shift cannot reach the Host of this Space",
 		description:
 			"Night Shift did not send your answer. The Gate still waits. Try again later.",
 	};

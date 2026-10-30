@@ -127,7 +127,7 @@ describe("an answer while the Host of the Space cannot be reached", () => {
 
 	test("has its own words; any other error has none", () => {
 		const text = unreachableAnswerText(unreachable);
-		expect(text?.title).toBe("The Host of this Space cannot be reached");
+		expect(text?.title).toBe("Night Shift cannot reach the Host of this Space");
 		expect(text?.description).not.toMatch(/[;]|n't/);
 		for (const other of [
 			new ORPCError("BAD_REQUEST", { message: "The run cap is reached." }),

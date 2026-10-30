@@ -84,7 +84,7 @@ describe("offerRefusal: the Walker's check at run start", () => {
 				mayUse: false,
 			}),
 		).toBe(
-			"hetzner-1 is not your device, and your role in this Space does not allow using what others offer.",
+			"hetzner-1 is not your device, and your role in this Space does not let you use what others offer.",
 		);
 		expect(
 			offerRefusal([agent({ profile: offeredCoder })], {

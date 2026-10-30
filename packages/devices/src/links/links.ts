@@ -88,7 +88,7 @@ export function createDeviceLinks(deps: {
 		const secret = key ?? (await deps.keys.get(link.hostId));
 		if (!secret) {
 			console.error(
-				`No key for ${link.name} on this computer: pair with it again.`,
+				`This computer has no key for ${link.name}. Pair with it again.`,
 			);
 			return;
 		}

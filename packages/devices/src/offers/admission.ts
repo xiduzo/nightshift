@@ -179,7 +179,7 @@ export function createOfferAdmission(deps: {
 		let offers: DeviceOffer[] | null = null;
 		if (owner === personId) {
 			if (!role || !roleAllows(role, { run: ["start"] })) {
-				return refuse("Your role in this Space does not allow starting runs.");
+				return refuse("Your role in this Space does not let you start runs.");
 			}
 		} else {
 			if (!role) {
@@ -187,7 +187,7 @@ export function createOfferAdmission(deps: {
 			}
 			if (!roleAllows(role, { offer: ["use"] })) {
 				return refuse(
-					"Your role in this Space does not allow using what others offer.",
+					"Your role in this Space does not let you use what others offer.",
 				);
 			}
 			offers = await offersHere(spaceId);

@@ -34,7 +34,7 @@ export async function removePhone(
 	if (!phones.some((phone) => phone.id === id)) {
 		throw new ORPCError("NOT_FOUND", {
 			message:
-				"This phone is not in your list. Reload the page to see the list now.",
+				"This phone is not in your list. Reload the page to see the list.",
 		});
 	}
 	await notifications.targets.remove(personId, id);

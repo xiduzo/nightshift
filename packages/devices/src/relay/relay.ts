@@ -67,7 +67,7 @@ export function createRelay(deps: {
 		}
 		throw new Refusal(
 			"unavailable",
-			"The flows of this project have not reached the computer that keeps this Space yet. Start the run again in a moment.",
+			"The flows of this project are not on the computer that keeps this Space yet. Start the run again in a moment.",
 		);
 	}
 

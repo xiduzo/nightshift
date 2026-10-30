@@ -340,7 +340,7 @@ export function createHostExchange(deps: {
 			await admit(key);
 			const role = await roleIn(db, key.personId, input.spaceId);
 			if (!role || !roleAllows(role, { offer: ["make"] })) {
-				forbidden("Your role in this Space does not allow offering profiles.");
+				forbidden("Your role in this Space does not let you offer profiles.");
 			}
 			await engine.offers.publish({
 				...input,
