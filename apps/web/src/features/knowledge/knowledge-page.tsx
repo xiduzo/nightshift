@@ -67,7 +67,7 @@ export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
 					<PageHeading
 						id="knowledge-heading"
 						title="Knowledge"
-						description="Files your agents read before they work, kept on this computer and outside the project. Flows with a knowledge kit fill them."
+						description="Files your agents read before they work. They stay on this computer, not in the project. Syncs and learnings keep them up to date."
 					/>
 					<KnowledgeView projectId={project.id} />
 				</section>

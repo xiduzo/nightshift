@@ -2,7 +2,6 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { CheckIcon } from "lucide-react";
 import type { NightRange } from "@/shared/api";
 
 /** The ranges of a project's page, as the dashboard numbers have them. */
@@ -37,7 +36,6 @@ export function RangeBar({
 					value={String(nights)}
 					className="aria-pressed:bg-secondary"
 				>
-					{nights === value ? <CheckIcon data-icon="inline-start" /> : null}
 					{nights} nights
 				</ToggleGroupItem>
 			))}

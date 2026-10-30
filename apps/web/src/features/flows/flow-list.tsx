@@ -101,7 +101,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 			<PageHeading
 				id="flows-heading"
 				title="Flows"
-				description="The steps an agent follows. Run one, or open it to edit."
+				description="Each flow is a set of steps that Night Shift runs for you. Run one, or open it to edit."
 				actions={
 					<>
 						<ImportFlowButton projectId={projectId} />

@@ -15,7 +15,7 @@ import { RangeBar } from "./range-bar";
 import { nightsOf } from "./ranges";
 
 /**
- * Home: tonight over all projects. One range for the page, the four numbers
+ * Home: what needs you over all projects. One range for the page, the four numbers
  * in a strip, then three lanes in the order you act on them (running,
  * waiting for you, failed), and the projects.
  */
@@ -46,13 +46,11 @@ export function HomePage({
 			<SiteHeader crumbs={[{ label: "Home" }]} />
 			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
 				<PageHeading
-					title="Tonight"
+					title="Home"
 					description={
 						!nights
-							? "What runs, what waits for you, and what failed."
-							: waiting + failed === 0
-								? "Nothing needs you. Your projects ran without trouble."
-								: `${running.length} running now, ${waiting} waiting for you, ${failed} failed.`
+							? "What runs now, what waits for you and what failed, in all your projects."
+							: needsYou(waiting, failed, range)
 					}
 				/>
 				<RangeBar value={range} onValueChange={onRangeChange} />
@@ -83,4 +81,17 @@ export function HomePage({
 			</div>
 		</>
 	);
+}
+
+/** The line under the heading: what needs you, over the range of the page. */
+function needsYou(waiting: number, failed: number, range: NightRange) {
+	const gates =
+		waiting === 0
+			? "Nothing waits for you."
+			: `${waiting} ${waiting === 1 ? "Gate waits" : "Gates wait"} for you.`;
+	const runs =
+		failed === 0
+			? `No run failed in the last ${range} nights.`
+			: `${failed} ${failed === 1 ? "run" : "runs"} failed in the last ${range} nights.`;
+	return `${gates} ${runs}`;
 }

@@ -88,7 +88,7 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 
 ### Home
 
-Home answers "what needs me tonight" over every project. Keep its shape:
+Home answers "what needs me" over every project. The heading says how many Gates wait and how many runs failed in the range. Keep its shape:
 
 - The same range as a project's page, on top: 7, 30 or 90 nights, in the URL (`?range=30`).
 - The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per night, with the nights before dashed, and says how it moved against them. A number opens its details dialog.

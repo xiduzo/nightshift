@@ -36,7 +36,7 @@ export function AccountPage() {
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
 					<PageHeading
 						title="Account"
-						description="Who you are in Night Shift, and how you sign in."
+						description="Your name, your email and how you sign in."
 					/>
 					{status.error ? (
 						<Alert variant="destructive">

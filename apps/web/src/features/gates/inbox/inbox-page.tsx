@@ -117,7 +117,8 @@ export function InboxPage({
 						<ListSkeleton />
 					) : open.length === 0 ? (
 						<p className="px-2 text-muted-foreground text-xs">
-							No open Gates right now.
+							Nothing waits for you. A run asks you here when it needs your
+							decision.
 						</p>
 					) : (
 						byProject.map(([projectId, list], index) => (

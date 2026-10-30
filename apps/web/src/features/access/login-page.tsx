@@ -30,7 +30,7 @@ export function LoginPage({
 				<CardHeader>
 					<CardTitle>Sign in to Night Shift</CardTitle>
 					<CardDescription>
-						Use the email and password of your account here.
+						Enter the email and password of your account.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>

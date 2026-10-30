@@ -36,7 +36,7 @@ export function ProjectRunsPage({ projectId }: { projectId: string }) {
 						<PageHeading
 							id="runs-heading"
 							title="Runs"
-							description="Every flow and quick run you start. Open one to follow its steps."
+							description="Every run of this project, started by you or by a schedule. Open one to follow its steps."
 							actions={
 								<>
 									{sleeping > 0 ? (
