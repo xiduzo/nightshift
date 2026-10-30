@@ -9,6 +9,7 @@ import {
 } from "@/features/projects";
 import { QuickRunDialog } from "@/features/runs";
 import { PageHeading } from "@/shared/page";
+import { FlowCost } from "./flow-cost";
 import { FlowHealth } from "./flow-health";
 import { NightOutput } from "./night-output";
 import { ProjectClones } from "./project-clones";
@@ -65,6 +66,7 @@ export function ProjectDashboardPage({ projectId }: { projectId: string }) {
 						<div className="flex flex-col gap-4">
 							<UpNext projectId={project.id} upNext={summary.data?.upNext} />
 							<RunOutcomes summary={summary.data} />
+							<FlowCost summary={summary.data} />
 						</div>
 					</div>
 
