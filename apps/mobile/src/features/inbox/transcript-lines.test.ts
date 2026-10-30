@@ -86,6 +86,29 @@ describe("transcriptLines", () => {
 		]);
 	});
 
+	test("leaves out the agent's thinking and a subagent's work", () => {
+		const lines = transcriptLines(
+			[
+				entry("s1", { type: "thinking", messageId: "r1", delta: "Hmm." }),
+				entry("s1", {
+					type: "text",
+					messageId: "sub",
+					delta: "Searching.",
+					parentToolCallId: "task-1",
+				}),
+				entry("s1", {
+					type: "tool-start",
+					toolCallId: "sub-c1",
+					name: "Grep",
+					parentToolCallId: "task-1",
+				}),
+				entry("s1", { type: "text", messageId: "m1", delta: "Found it." }),
+			],
+			label,
+		);
+		expect(lines.map((line) => line.text)).toEqual(["Build", "Found it."]);
+	});
+
 	test("folds the tool calls in a row into one line", () => {
 		const lines = transcriptLines(
 			[

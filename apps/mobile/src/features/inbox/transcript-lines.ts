@@ -72,6 +72,9 @@ export function transcriptLines(
 
 	for (const entry of entries) {
 		const { event, seq, stepId } = entry;
+		// A subagent's work stays on the computer's screen; the phone shows the
+		// call that started it. Thinking stays out too: it has no case below.
+		if ("parentToolCallId" in event && event.parentToolCallId) continue;
 		if (stepId !== step) {
 			step = stepId;
 			push({ key: `step:${seq}`, kind: "step", text: stepLabel(stepId) });
