@@ -34,7 +34,7 @@ describe("a project's profiles file from before ADR 3", () => {
 			{
 				severity: "error",
 				message:
-					'The profile "broken" is not valid. It needs a name, and either a harness, a model and a permission mode (for Agent nodes) or a decider (for Decision and Value nodes).',
+					'The profile "broken" is not valid. It needs a name, and a harness, a model and a permission mode, or a decider.',
 				profile: "broken",
 			},
 			{

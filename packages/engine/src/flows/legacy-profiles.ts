@@ -85,7 +85,7 @@ export function parseLegacyProfiles(
 		if (!parsed.success) {
 			issues.push({
 				severity: "error",
-				message: `The profile ${named ? `"${named}"` : `at position ${index + 1}`} is not valid. It needs a name, and either a harness, a model and a permission mode (for Agent nodes) or a decider (for Decision and Value nodes).`,
+				message: `The profile ${named ? `"${named}"` : `at position ${index + 1}`} is not valid. It needs a name, and a harness, a model and a permission mode, or a decider.`,
 				...(named ? { profile: named } : {}),
 			});
 			return;

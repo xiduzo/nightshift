@@ -554,7 +554,7 @@ describe("the import on upgrade", () => {
 		expect(laptop.profiles.get("triage")?.name).toBe("triage");
 		expect(await noticesOf(laptop)).toEqual([
 			"Night Shift made this profile on laptop from the project's profiles: triage.",
-			'laptop already has a profile named "builder", so the project\'s one is now "builder_project". The flows still use the one of laptop.',
+			'laptop already has a profile named "builder". The project\'s profile is now "builder_project". The flows still use the profile of laptop.',
 		]);
 	});
 

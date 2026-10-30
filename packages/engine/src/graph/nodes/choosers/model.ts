@@ -146,7 +146,7 @@ function decideWithin(
 		() => ({
 			kind: "error",
 			errorKind: "aborted",
-			message: "The decider did not stop when it was aborted.",
+			message: "The decider did not stop when Night Shift asked it to.",
 			costUsd: null,
 		}),
 	);

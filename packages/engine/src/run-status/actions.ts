@@ -118,7 +118,7 @@ const NOT_NOW: Record<RunAction, Partial<Record<RunStatus, string>>> = {
 	},
 	move: {
 		running:
-			"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
+			"The run is in the middle of a step. Move it when it waits, sleeps or is stopped.",
 		finished: "The run has ended. There is nothing to move.",
 	},
 	resume: {

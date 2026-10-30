@@ -199,7 +199,7 @@ export function createSpaces(deps: SpacesDeps) {
 					if (status === "waiting") {
 						throw new Refusal(
 							"conflict",
-							"A run of this project waits at a Gate. Answer or stop it first.",
+							"A run of this project waits at a Gate. Answer the Gate or stop the run first.",
 						);
 					}
 					if (status === "sleeping") {

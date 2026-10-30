@@ -88,7 +88,7 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 				}),
 			),
 		signal,
-		() => lateResult("The decider did not stop when it was aborted."),
+		() => lateResult("The decider did not stop when Night Shift asked it to."),
 	);
 	const cost = {
 		costUsd: result.costUsd,

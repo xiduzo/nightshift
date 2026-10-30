@@ -230,7 +230,7 @@ describe("CLI tools at the start", () => {
 				flow: flowOf([agent("worker", { clis: ["gh", "aws"] })]),
 			}),
 		).rejects.toThrow(
-			'The flow uses the CLI tool "aws", but this computer does not have it. Install aws, or take it off the flow.',
+			'The flow uses the CLI tool "aws", but this computer does not have it. Install aws, or remove it from the flow.',
 		);
 	});
 
@@ -271,7 +271,7 @@ describe("CLI tools at the start", () => {
 				flow: flowOf([agent("worker", { clis: ["jq"] })]),
 			}),
 		).rejects.toThrow(
-			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or take it off the flow.',
+			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or remove it from the flow.',
 		);
 	});
 });
@@ -441,7 +441,7 @@ describe("settings", () => {
 			expect(detail.status).toBe("failed");
 			// One wait of 1 min fits the grace of 1 min; the next of 2 does not.
 			expect(harness.calls).toHaveLength(2);
-			expect(detail.steps[0]?.error).toContain("grace of 1 min");
+			expect(detail.steps[0]?.error).toContain("for more than 1 min");
 		});
 
 		test("a number the flow sets itself wins over the settings", async () => {
@@ -470,7 +470,7 @@ describe("settings", () => {
 			expect(detail.status).toBe("failed");
 			// Waits of 1 and 2 min fit the grace of 4 min; the next of 5 does not.
 			expect(harness.calls).toHaveLength(3);
-			expect(detail.steps[0]?.error).toContain("grace of 4 min");
+			expect(detail.steps[0]?.error).toContain("for more than 4 min");
 		});
 	});
 });

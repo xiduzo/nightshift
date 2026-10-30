@@ -502,14 +502,14 @@ describe("a run that moves to another Device", () => {
 		await expect(
 			space.act(slow.id, { kind: "move", to: b.sandbox.deviceId }),
 		).rejects.toThrow(
-			"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
+			"The run is in the middle of a step. Move it when it waits, sleeps or is stopped.",
 		);
 		await space.act(slow.id, { kind: "stop" });
 
 		const { runId } = await waitingOn(a);
 		await expect(
 			space.act(runId, { kind: "move", to: a.sandbox.deviceId }),
-		).rejects.toThrow("This computer walks the run already.");
+		).rejects.toThrow("This run already runs on this computer.");
 		await expect(
 			space.act(runId, { kind: "move", to: "no-such-device" }),
 		).rejects.toThrow("That device is not one of yours.");

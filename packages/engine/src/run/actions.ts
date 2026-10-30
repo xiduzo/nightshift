@@ -162,7 +162,7 @@ function refuseAnswer(
 	if (picked?.needsNote && (note ?? "").trim() === "") {
 		throw new RunRefusal(
 			"invalid-answer",
-			`Write a note to choose "${choice}": the agent goes on with it.`,
+			`Write a note to choose "${choice}". The agent continues with it.`,
 		);
 	}
 }
@@ -305,7 +305,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		if (to === self || to === deps.device.id) {
 			throw new RunRefusal(
 				"walks-here",
-				"This computer walks the run already.",
+				"This run already runs on this computer.",
 			);
 		}
 		await runner.hold(runId, async ({ events, active }) => {

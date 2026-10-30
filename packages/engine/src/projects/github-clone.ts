@@ -282,7 +282,7 @@ export function cloneProblem(
 	if (/not found|could not resolve to a repository|does not exist/.test(said)) {
 		return signedIn
 			? `GitHub has no repository ${label} that you can open. Check the name and your access.`
-			: `GitHub has no public repository ${label}. Check the name. For a private repository, sign in to GitHub on this computer: run gh auth login.`;
+			: `GitHub has no public repository ${label}. Check the name. For a private repository, run gh auth login on this computer.`;
 	}
 	if (
 		/could not read username|authentication failed|terminal prompts disabled|permission denied|403/.test(
@@ -291,7 +291,7 @@ export function cloneProblem(
 	) {
 		return signedIn
 			? `GitHub refused access to ${label}. Check your access to it.`
-			: `GitHub refused access to ${label}. Sign in to GitHub on this computer: run gh auth login.`;
+			: `GitHub refused access to ${label}. To sign in to GitHub, run gh auth login on this computer.`;
 	}
 	return `Night Shift could not copy ${label} from GitHub. Try again.`;
 }

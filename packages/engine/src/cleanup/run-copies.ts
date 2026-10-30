@@ -192,7 +192,7 @@ export function createRunCopies(deps: RunCopiesDeps) {
 		if (state.exists && !state.registered) {
 			throw new Refusal(
 				"conflict",
-				"Git does not know this folder as a copy of the project, so Night Shift leaves it. Remove it yourself.",
+				"Night Shift does not know this folder as a copy of the project. Remove it yourself.",
 			);
 		}
 		if (!state.exists && !state.registered) {

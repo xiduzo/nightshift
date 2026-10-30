@@ -147,7 +147,7 @@ export async function importClone(
 			for (const { name, label } of made.labelled) {
 				notices.push({
 					kind: "profiles-made",
-					message: `${device.name} already has a profile named "${name}", so the project's one is now "${label}". The flows still use the one of ${device.name}.`,
+					message: `${device.name} already has a profile named "${name}". The project's profile is now "${label}". The flows still use the profile of ${device.name}.`,
 				});
 			}
 		}

@@ -82,7 +82,7 @@ export function planWait(input: {
 	if (now - since + pause > policy.networkGraceMinutes * minuteMs) {
 		return {
 			kind: "give-up",
-			error: `The network did not come back within the grace of ${policy.networkGraceMinutes} min: ${input.message}`,
+			error: `The network was down for more than ${policy.networkGraceMinutes} min: ${input.message}`,
 		};
 	}
 	return {

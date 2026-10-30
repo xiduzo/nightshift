@@ -154,7 +154,7 @@ const sessionEnded = (
 		"outcome" | "error" | "errorKind"
 	> = {
 		outcome: "stopped",
-		error: "The session was aborted.",
+		error: "The step was stopped.",
 		errorKind: "aborted",
 	},
 ): ClosingEvent => ({
@@ -287,7 +287,7 @@ describe("closingEvents: a missed deadline", () => {
 		expect(closingEvents(events, cut, FLOWS)).toEqual([
 			sessionEnded("w", "x", {
 				outcome: "failed",
-				error: "The session was aborted.",
+				error: "The step was stopped.",
 				errorKind: "aborted",
 			}),
 			stepEnded("w", { visit: 1 }, "error", cut.error),

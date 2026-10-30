@@ -98,7 +98,7 @@ const ASK_STOP = "stop";
 export const ASK_CHOICES: readonly GateChoice[] = [
 	{
 		name: ASK_ANSWER,
-		description: "Send your note to the agent. It goes on where it stopped.",
+		description: "Send your note to the agent. It continues where it stopped.",
 		color: "green",
 		needsNote: true,
 	},

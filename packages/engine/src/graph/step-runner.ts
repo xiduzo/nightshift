@@ -484,7 +484,7 @@ async function askPerson(
 		const end = await step.end(
 			"error",
 			{ ...ask.outputs, outcome: "error" },
-			`The question to a person could not open: ${stepFailure(error, `the Gate of node "${node.id}" of run ${ctx.run.id}`)}`,
+			`The Gate could not open: ${stepFailure(error, `the Gate of node "${node.id}" of run ${ctx.run.id}`)}`,
 		);
 		return route(ctx, state, node, end, config);
 	}

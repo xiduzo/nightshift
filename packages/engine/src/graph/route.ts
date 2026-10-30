@@ -362,7 +362,7 @@ export function parkNode(node: FlowNode): NodeAction {
 	return interruptNode({
 		kind: "parked",
 		nodeId: node.id,
-		missing: `Nothing is parked at node "${node.id}".`,
+		missing: `Nothing waits at node "${node.id}".`,
 		value: (pending) => ({
 			kind: "parked",
 			stepId: pending.stepId,

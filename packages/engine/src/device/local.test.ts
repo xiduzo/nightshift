@@ -609,7 +609,7 @@ describe("exec", () => {
 			{
 				type: "refused",
 				message:
-					"The command needs the secret ZAC_PASSWORD, but it is not saved. Save it under Agents → Secrets, or remove it from the node.",
+					"The command needs the secret ZAC_PASSWORD, but it is not saved. Save it on the Secrets page, or remove it from the node.",
 			},
 		]);
 		expect(existsSync(marker)).toBe(false);

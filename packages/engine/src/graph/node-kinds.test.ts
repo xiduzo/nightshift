@@ -476,7 +476,7 @@ describe("connections and requirements: what run start asks", () => {
 		const caps = await has();
 		const nodes = [agent({ harness: "codex", clis: ["gh"] })];
 		expect(NODE_KINDS.agent.requirements.map((r) => r(nodes, caps))).toEqual([
-			'The flow uses the CLI tool "gh", but this computer does not have it. Install gh, or take it off the flow.',
+			'The flow uses the CLI tool "gh", but this computer does not have it. Install gh, or remove it from the flow.',
 			"The flow has an Agent node on Codex (n), but no Codex harness is added. Add it under Agents.",
 		]);
 	});

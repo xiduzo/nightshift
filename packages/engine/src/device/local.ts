@@ -183,7 +183,7 @@ function missingSecretsMessage(missing: readonly string[]): string {
 		missing.length === 1
 			? ["secret", "it is", "it"]
 			: ["secrets", "they are", "them"];
-	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove ${it} from the node.`;
+	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove ${it} from the node.`;
 }
 
 /** The session's `saveArtifact`: copies the file and tells the agent it is kept. */

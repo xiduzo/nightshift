@@ -254,7 +254,7 @@ describe("a webhook schedule", () => {
 		expect(
 			list.schedules[0]?.deliveries.map((d) => [d.result, d.reason]),
 		).toEqual([
-			["refused", "It came without the secret."],
+			["refused", "The request had no secret."],
 			["refused", "The secret did not match."],
 		]);
 	});
@@ -268,7 +268,7 @@ describe("a webhook schedule", () => {
 		});
 		const list = await space.listSchedules(projectId);
 		expect(list.schedules[0]?.deliveries[0]?.reason).toBe(
-			"The secret OTHER has no value on this computer. Add it under Agents, Secrets.",
+			"The secret OTHER has no value on this computer. Add it on the Secrets page.",
 		);
 	});
 

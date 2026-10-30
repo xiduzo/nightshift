@@ -286,7 +286,7 @@ describe("expandMcpServers", () => {
 		expect(result).toEqual({
 			ok: false,
 			message:
-				'The MCP server "a" needs the secrets MISSING_ONE, MISSING_TWO, but they are not saved. Save them under Agents → Secrets, or remove the reference.',
+				'The MCP server "a" needs the secrets MISSING_ONE, MISSING_TWO, but they are not saved. Save them on the Secrets page, or remove the reference.',
 		});
 	});
 
