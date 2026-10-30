@@ -37,6 +37,11 @@ describe("kits", () => {
 			"kit:github/wait-for-checks",
 			"kit:jira/assign",
 			"kit:jira/move",
+			"kit:knowledge/confluence",
+			"kit:knowledge/files",
+			"kit:knowledge/github-wiki",
+			"kit:knowledge/jira",
+			"kit:knowledge/web",
 		]);
 		for (const kit of kits) {
 			expect({ kit: kit.name, issues: parseFlow(kit.flow).issues }).toEqual({

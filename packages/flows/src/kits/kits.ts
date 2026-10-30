@@ -6,13 +6,19 @@ import { publishDraftPrKit } from "./github/publish-draft-pr";
 import { waitForChecksKit } from "./github/wait-for-checks";
 import { jiraAssignKit } from "./jira/assign";
 import { jiraMoveKit } from "./jira/move";
+import { knowledgeConfluenceKit } from "./knowledge/confluence";
+import { knowledgeFilesKit } from "./knowledge/files";
+import { knowledgeGithubWikiKit } from "./knowledge/github-wiki";
+import { knowledgeJiraKit } from "./knowledge/jira";
+import { knowledgeWebKit } from "./knowledge/web";
 
 /**
  * Kits: flows that ship with Night Shift, read only. A Call node runs one
  * by name, `"flow": "kit:github/publish-draft-pr"`, as it runs a flow of
  * the project. Each is plain Commands on a command-line tool a person has
  * (git, `gh`, `acli`), so the engine knows no tracker, and a kit runs on
- * any Device that has those tools and is signed in. A person can copy a
+ * any Device that has those tools and is signed in. The `knowledge/*`
+ * kits fill the project's knowledge folder (`$NS_KNOWLEDGE`). A person can copy a
  * kit into the project and change it there (`kitCopyName`).
  */
 
@@ -27,6 +33,11 @@ const SOURCES: Readonly<Record<string, FlowInput>> = {
 	"kit:github/wait-for-checks": waitForChecksKit,
 	"kit:jira/assign": jiraAssignKit,
 	"kit:jira/move": jiraMoveKit,
+	"kit:knowledge/confluence": knowledgeConfluenceKit,
+	"kit:knowledge/files": knowledgeFilesKit,
+	"kit:knowledge/github-wiki": knowledgeGithubWikiKit,
+	"kit:knowledge/jira": knowledgeJiraKit,
+	"kit:knowledge/web": knowledgeWebKit,
 };
 
 /** One kit: its name and its flow. */

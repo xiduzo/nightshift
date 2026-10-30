@@ -81,7 +81,7 @@ Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outco
 
 ### command
 
-A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. `output: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `secrets` names secrets that reach the command as environment variables. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`. Use double quotes or a heredoc without quotes (`<<EOF`). Single quotes and a quoted heredoc (`<<'EOF'`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (`signsIn` in list_tools) by its name to run its program signed in: `acli-dimpact jira`, not `acli jira`.
+A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. `output: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `secrets` names secrets that reach the command as environment variables. `$NS_KNOWLEDGE` is the project's knowledge folder: a sync writes markdown there (or call a `kit:knowledge/*` kit), and agents read it. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`. Use double quotes or a heredoc without quotes (`<<EOF`). Single quotes and a quoted heredoc (`<<'EOF'`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (`signsIn` in list_tools) by its name to run its program signed in: `acli-dimpact jira`, not `acli jira`.
 
 Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_code`, `log_tail`, `data`, `visit`.
 
@@ -186,6 +186,11 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. 
 - `kit:github/wait-for-checks` (ref) → state, sha, failed, total: Waits until the checks of a commit on GitHub are done, for at most 3 hours.
 - `kit:jira/assign` (key*, assignee, tool): Assigns a Jira work item to a person, or to you.
 - `kit:jira/move` (key*, status*, tool): Moves a Jira work item to another status, for example In Progress.
+- `kit:knowledge/confluence` (site*, email*, pages*, folder) → files: Copies Confluence pages into the project's knowledge as markdown, one file each.
+- `kit:knowledge/files` (from*, folder) → files: Copies files of the project into its knowledge, also files that git ignores, such as private notes.
+- `kit:knowledge/github-wiki` (repo*, folder) → files: Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync.
+- `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
+- `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.
 
 A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`.
 

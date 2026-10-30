@@ -37,6 +37,8 @@ let bin: string;
 /** What `gh <a> <b>` answers: `<a>-<b>.json`, else nothing, and `<a>-<b>.exit`. */
 let fixtures: string;
 let log: string;
+/** The project's knowledge folder, in `$NS_KNOWLEDGE`. */
+let knowledge: string;
 
 const GIT_ENV = {
 	GIT_AUTHOR_NAME: "Night Shift",
@@ -69,6 +71,15 @@ code=0
 exit "$code"
 `;
 
+/**
+ * A stub of `curl`: logs one line of arguments, with the value of
+ * `CONFLUENCE_API_TOKEN` as it got it, and prints `curl.out`.
+ */
+const CURL_STUB = `#!/bin/sh
+printf '%s\\n' "curl $*" >> "$STUB_LOG"
+cat "$STUB_FIXTURES/curl.out"
+`;
+
 async function sh(cwd: string, command: string): Promise<string> {
 	const proc = Bun.spawn(["sh", "-c", command], {
 		cwd,
@@ -92,6 +103,7 @@ beforeEach(async () => {
 	bin = join(root, "bin");
 	fixtures = join(root, "fixtures");
 	log = join(root, "stub.log");
+	knowledge = join(root, "knowledge");
 	await mkdir(repo);
 	await mkdir(bin);
 	await mkdir(fixtures);
@@ -100,6 +112,8 @@ beforeEach(async () => {
 		await writeFile(join(bin, name), STUB);
 		await chmod(join(bin, name), 0o755);
 	}
+	await writeFile(join(bin, "curl"), CURL_STUB);
+	await chmod(join(bin, "curl"), 0o755);
 	await sh(root, `git init -q --bare -b main "${origin}"`);
 	await sh(
 		repo,
@@ -139,6 +153,7 @@ async function step(
 	nodeId: string,
 	inputs: Record<string, string>,
 	nodes: Record<string, Record<string, JsonValue>> = {},
+	where: { cwd?: string; env?: Record<string, string> } = {},
 ): Promise<Ran> {
 	const node = flow.nodes.find(
 		(candidate): candidate is CommandNode =>
@@ -157,12 +172,14 @@ async function step(
 	const output = join(root, `${nodeId}.json`);
 	await writeFile(output, "");
 	const proc = Bun.spawn(["sh", "-c", command], {
-		cwd: repo,
+		cwd: where.cwd ?? repo,
 		env: {
 			...process.env,
 			...GIT_ENV,
+			...where.env,
 			...env,
 			NS_OUTPUT: output,
+			NS_KNOWLEDGE: knowledge,
 			PATH: `${bin}:${process.env.PATH}`,
 			STUB_LOG: log,
 			STUB_FIXTURES: fixtures,
@@ -535,6 +552,167 @@ describe("kit:jira", () => {
 		expect(await calls()).toEqual([
 			"acli-dimpact jira workitem assign --key PROJ-1 --assignee @me --yes",
 			"acli-dimpact jira workitem transition --key PROJ-1 --status Done --yes",
+		]);
+	});
+});
+
+describe("the knowledge kits", () => {
+	const read = (path: string) => readFile(join(knowledge, path), "utf8");
+
+	test("every one refuses a folder outside the knowledge, or Night Shift's own", async () => {
+		for (const folder of ["../out", "/tmp/x", "learnings/accepted", ""]) {
+			const ran = await step(kit("kit:knowledge/web"), "sync", {
+				urls: "https://example.com",
+				folder,
+			});
+			expect(ran.outcome).toBe("fail");
+		}
+		expect(await calls()).toEqual([]);
+	});
+
+	test("files: copies what git ignores from the project's folder, also from the run's copy", async () => {
+		await sh(
+			repo,
+			"mkdir -p docs/private && printf '# Secret plan\\n' > docs/private/plan.md && printf 'n' > notes.md && echo 'docs/private/' > .gitignore",
+		);
+		const copy = join(root, "copy");
+		await sh(repo, `git worktree add -q "${copy}"`);
+		const ran = await step(
+			kit("kit:knowledge/files"),
+			"sync",
+			{ from: "docs/private\nnotes.*\nmissing/*" },
+			{},
+			{ cwd: copy },
+		);
+		expect(ran.outcome).toBe("synced");
+		expect(ran.data).toEqual({ files: 2 });
+		expect(await read("files/docs/private/plan.md")).toBe("# Secret plan\n");
+		expect(await read("files/notes.md")).toBe("n");
+
+		// A later sync replaces what the folder had.
+		await sh(repo, "rm notes.md");
+		const again = await step(kit("kit:knowledge/files"), "sync", {
+			from: "notes.*",
+		});
+		expect(again.outcome).toBe("nothing");
+		expect(await read("files/notes.md")).toBe("n");
+		const one = await step(kit("kit:knowledge/files"), "sync", {
+			from: "docs/private",
+		});
+		expect(one.data).toEqual({ files: 1 });
+		await expect(read("files/notes.md")).rejects.toThrow();
+	});
+
+	test("github-wiki: clones the wiki, then takes the newest pages", async () => {
+		const wiki = join(root, "project.wiki.git");
+		const work = join(root, "wiki-work");
+		await sh(root, `git init -q --bare -b master "${wiki}"`);
+		await sh(
+			root,
+			`git clone -q "${wiki}" "${work}" 2>/dev/null; cd "${work}" && printf '# Home\\n' > Home.md && git add Home.md && git commit -qm home && git push -q origin HEAD`,
+		);
+		const url = `file://${wiki}`;
+		const first = await step(kit("kit:knowledge/github-wiki"), "sync", {
+			repo: url,
+		});
+		expect(first.outcome).toBe("synced");
+		expect(first.data).toEqual({ files: 1 });
+		expect(await read("wiki/Home.md")).toBe("# Home\n");
+
+		await sh(
+			work,
+			"printf '# Setup\\n' > Setup.md && git add Setup.md && git commit -qm setup && git push -q origin HEAD",
+		);
+		const second = await step(kit("kit:knowledge/github-wiki"), "sync", {
+			repo: url,
+		});
+		expect(second.data).toEqual({ files: 2 });
+		expect(await read("wiki/Setup.md")).toBe("# Setup\n");
+	});
+
+	test("web: each page through the reader, named after its address", async () => {
+		await writeFile(join(fixtures, "curl.out"), "Title: Docs\n\nThe docs.");
+		const ran = await step(kit("kit:knowledge/web"), "sync", {
+			urls: "https://example.com/docs?page=1\nhttps://example.org",
+		});
+		expect(ran.outcome).toBe("synced");
+		expect(ran.data).toEqual({ files: 2 });
+		expect(await read("web/example.com-docs-page-1.md")).toBe(
+			"Title: Docs\n\nThe docs.",
+		);
+		expect(await calls()).toEqual([
+			"curl -fsSL --max-time 120 https://r.jina.ai/https://example.com/docs?page=1",
+			"curl -fsSL --max-time 120 https://r.jina.ai/https://example.org",
+		]);
+	});
+
+	test("jira: each work item as markdown, its description as text", async () => {
+		await fixture("jira-workitem", {
+			key: "PROJ-1",
+			fields: {
+				summary: "Log in",
+				issuetype: { name: "Story" },
+				status: { name: "To Do" },
+				description: {
+					type: "doc",
+					content: [
+						{
+							type: "paragraph",
+							content: [{ type: "text", text: "A person logs in." }],
+						},
+						{
+							type: "paragraph",
+							content: [{ type: "text", text: "With a password." }],
+						},
+					],
+				},
+			},
+		});
+		const ran = await step(kit("kit:knowledge/jira"), "sync", {
+			keys: "PROJ-1, PROJ-2",
+			tool: "acli-dimpact",
+		});
+		expect(ran.outcome).toBe("synced");
+		expect(ran.data).toEqual({ files: 2 });
+		expect(await read("jira/PROJ-1.md")).toBe(
+			"# PROJ-1: Log in\n\nType: Story\nStatus: To Do\n\nA person logs in.\n\nWith a password.\n\n\n",
+		);
+		expect(await calls()).toEqual([
+			"acli-dimpact jira workitem view PROJ-1 --json",
+			"acli-dimpact jira workitem view PROJ-2 --json",
+		]);
+	});
+
+	test("confluence: each page as markdown, with the token as a secret", async () => {
+		await writeFile(
+			join(fixtures, "curl.out"),
+			JSON.stringify({
+				title: "Runbook",
+				body: {
+					storage: {
+						value:
+							"<h1>Start</h1><p>Run it &amp; check.</p><ul><li>One</li></ul>",
+					},
+				},
+			}),
+		);
+		const ran = await step(
+			kit("kit:knowledge/confluence"),
+			"sync",
+			{
+				site: "https://team.example.net/wiki",
+				email: "me@example.net",
+				pages: "123",
+			},
+			{},
+			{ env: { CONFLUENCE_API_TOKEN: "t0ken" } },
+		);
+		expect(ran.outcome).toBe("synced");
+		expect(await read("confluence/123.md")).toBe(
+			"# Runbook\n\n\n## Start\nRun it & check.\n- One\n\n\n",
+		);
+		expect(await calls()).toEqual([
+			"curl -fsS --max-time 120 -u me@example.net:t0ken -H Accept: application/json https://team.example.net/wiki/api/v2/pages/123?body-format=storage",
 		]);
 	});
 });
