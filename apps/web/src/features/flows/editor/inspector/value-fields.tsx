@@ -49,7 +49,7 @@ export function ValueFields({
 					label="Made by"
 					hint={
 						by === "rule"
-							? "An expression reads the values of earlier nodes and inputs. No model, no cost."
+							? "An expression reads the values of earlier nodes and inputs. It uses no model and costs nothing."
 							: "A small model reads the prompt and answers with data in the shape below."
 					}
 				>
@@ -110,7 +110,7 @@ export function ValueFields({
 						id={`${id}-prompt`}
 						language="markdown"
 						label="Prompt"
-						hint="What to make, with the context it needs. The model answers with data in the shape below."
+						hint="Say what to make, and give the context it needs."
 						flow={flow}
 						nodeId={node.id}
 						value={prompt}

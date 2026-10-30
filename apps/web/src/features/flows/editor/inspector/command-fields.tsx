@@ -89,10 +89,10 @@ export function CommandFields({
 					label="Command"
 					hint={
 						<>
-							Put templates in quotes, for example:{" "}
+							Put templates in quotes:{" "}
 							<code className="font-mono">echo "{"{{worker.summary}}"}"</code>.
-							To hand on data, write JSON to{" "}
-							<code className="font-mono">"$NS_OUTPUT"</code>, for example:{" "}
+							To give data to later nodes, write JSON to{" "}
+							<code className="font-mono">"$NS_OUTPUT"</code>:{" "}
 							<code className="font-mono">
 								echo '{"{"}"count": 3{"}"}' {">"} "$NS_OUTPUT"
 							</code>
@@ -121,8 +121,8 @@ export function CommandFields({
 							<>
 								The command prints JSON. Later nodes read it as{" "}
 								<code className="font-mono">{`{{${node.id}.data.tests}}`}</code>
-								. Output that is not JSON ends on any other code. Writing to{" "}
-								<code className="font-mono">"$NS_OUTPUT"</code> is safer: a
+								. Output that is not JSON ends on any other code. Write to{" "}
+								<code className="font-mono">"$NS_OUTPUT"</code> instead, and a
 								stray echo cannot break it.
 							</>
 						) : (
@@ -190,7 +190,7 @@ export function CommandFields({
 				kind="exit"
 				node={node}
 				min={1}
-				hint='Each exit code gets its own edge. Leave the code empty on the last one to catch any other code. Without it, any other code fails the run. An exit with the code data is one the command picks: it writes {"outcome": "name"} to "$NS_OUTPUT".'
+				hint='Each exit code gets its own edge. Leave the last code empty to catch any other code. Without it, any other code fails the run. For the code data, the command writes {"outcome": "name"} to "$NS_OUTPUT".'
 				onChange={onChange}
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}

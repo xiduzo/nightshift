@@ -14,7 +14,7 @@ const STATUSES: EndStatus[] = ["done", "nothing-to-do", "failed"];
 
 const STATUS_HINT: Record<EndStatus, string> = {
 	done: "The run did its work.",
-	"nothing-to-do": "The run found no work. It is not a failure.",
+	"nothing-to-do": "The run found no work. This is not a failure.",
 	failed: "The run fails here on purpose. You can run it again from a step.",
 };
 
@@ -57,7 +57,7 @@ export function EndFields({
 			<TemplateField
 				id={`${id}-message`}
 				label="Message"
-				hint="One line for you. The runs list and the notification show it. Templates work: {{look.data.count}}."
+				hint="One line for you in the runs list and the notification."
 				flow={flow}
 				nodeId={node.id}
 				value={node.message ?? ""}
@@ -70,9 +70,9 @@ export function EndFields({
 				}
 			/>
 			<Note>
-				The run ends here: no edge leaves this node. In a subflow it ends the
-				subflow only. The Subflow node then reads the result as{" "}
-				<code>ended</code> and the message as <code>end_message</code>.
+				No edge leaves this node. In a subflow, it ends only the subflow. The
+				Subflow node reads the result as <code>ended</code> and the message as{" "}
+				<code>end_message</code>.
 			</Note>
 		</InspectorSection>
 	);

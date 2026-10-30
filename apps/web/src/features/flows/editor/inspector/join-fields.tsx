@@ -14,9 +14,9 @@ const WAIT_LABEL: Record<JoinWait, string> = {
 };
 
 const WAIT_HINT: Record<JoinWait, string> = {
-	all: "The run goes on with the results of every branch.",
+	all: "The run continues with the results of every branch.",
 	first:
-		"The run goes on with the first result. Night Shift stops the other branches.",
+		"The run continues with the first result. Night Shift stops the other branches.",
 };
 
 /**
@@ -33,7 +33,11 @@ export function JoinFields({
 	const id = useId();
 	return (
 		<InspectorSection title="Join">
-			<Field id={`${id}-wait`} label="Go on when" hint={WAIT_HINT[node.wait]}>
+			<Field
+				id={`${id}-wait`}
+				label="Continue when"
+				hint={WAIT_HINT[node.wait]}
+			>
 				<NativeSelect
 					id={`${id}-wait`}
 					value={node.wait}

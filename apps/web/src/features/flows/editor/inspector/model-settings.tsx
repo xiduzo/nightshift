@@ -128,8 +128,8 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 				}
 				hint={
 					makes === "value"
-						? "The decider whose model makes the value."
-						: "The decision model that picks the option."
+						? "Its model makes the value."
+						: "Its model picks the option."
 				}
 			>
 				<NativeSelect
@@ -213,9 +213,9 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 				hint={
 					chosen
 						? chosen.thisDevice
-							? `This node uses ${profileOnDevice(chosen)}, this computer. Override the decider or the model for this node only.`
-							: `This node runs on ${chosen.deviceName} with ${profileOnDevice(chosen)}. Open Night Shift on ${chosen.deviceName} to see or change the profile. Override the decider or the model for this node only.`
-						: "A model profile of one of your computers. The node runs on that computer. Without one, pick the decider and the model below."
+							? `This node uses ${profileOnDevice(chosen)} on this computer. You can override the decider or the model for this node only.`
+							: `This node runs on ${chosen.deviceName} with ${profileOnDevice(chosen)}. To change the profile, open Night Shift on ${chosen.deviceName}.`
+						: "The node runs on the computer of the profile. Without a profile, pick the decider and the model below."
 				}
 			>
 				<ProfileSelect

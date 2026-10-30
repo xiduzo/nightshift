@@ -59,22 +59,22 @@ export function DecisionFields({
 		by === "person"
 			? {
 					label: "Question",
-					hint: "What you are asked in the Needs-you inbox, with the context you need to answer. Write it in Markdown. JSON shows formatted. The run waits until you answer.",
+					hint: "Write the question in Markdown, with the context you need to answer. It shows in the Needs-you inbox.",
 					placeholder:
-						"The worker opened {{worker.summary}}. Merge it and go on?",
+						"The worker opened {{worker.summary}}. Merge it and continue?",
 					invalid: node.prompt.trim() === "",
 				}
 			: by === "model"
 				? {
 						label: "Prompt",
-						hint: "What to decide, with the context it needs. The model picks one option and notes why.",
+						hint: "Say what to decide, and give the context it needs. The model picks one option and says why.",
 						placeholder:
 							"Read {{check.log_tail}}. Is the build green enough to open a pull request?",
 						invalid: node.prompt.trim() === "",
 					}
 				: {
 						label: "Note",
-						hint: "Optional. A note for you on what the rules check. Nothing reads it.",
+						hint: "Optional. Say what the rules check. Only you read it.",
 						placeholder: "Ship when the tests pass and the check exits 0.",
 						invalid: false,
 					};
@@ -82,8 +82,8 @@ export function DecisionFields({
 		by === "person"
 			? "Each option is a button in the inbox, with its own edge."
 			: by === "model"
-				? "The model picks exactly one. Each option gets its own edge. A description tells the model when to pick it."
-				: "Night Shift tries the rules from top to bottom and picks the first option whose rule holds. Leave the last option without a rule: it is picked when none holds.";
+				? "The model picks one. Each option gets its own edge. Describe when to pick it."
+				: "Night Shift picks the first option from the top whose rule holds. Leave the last option without a rule. Night Shift picks it when no rule holds.";
 
 	// Settings → New nodes: the decider a node starts on when a model decides it.
 	const settings = useQuery(settingsQueries.get());
@@ -97,7 +97,7 @@ export function DecisionFields({
 						by === "person"
 							? "The run waits in the Needs-you inbox until you pick an option."
 							: by === "rule"
-								? "A rule reads the values of earlier nodes and inputs. No model, no cost."
+								? "A rule reads the values of earlier nodes and inputs. It uses no model and costs nothing."
 								: "A small model reads the prompt and picks an option."
 					}
 				>

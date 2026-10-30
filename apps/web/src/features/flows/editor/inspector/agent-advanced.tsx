@@ -26,8 +26,8 @@ type KnowledgeChoice = "auto" | "always" | "never";
 const KNOWLEDGE_HINTS: Record<KnowledgeChoice, string> = {
 	auto: "The agent reads the project's knowledge when there is some.",
 	always:
-		"The agent is told where the project's knowledge is, also when there is none yet.",
-	never: "The agent works from the project and its task only.",
+		"Night Shift tells the agent where the project knowledge is, also when there is none yet.",
+	never: "The agent works only from the project and its task.",
 };
 
 function knowledgeChoice(node: AgentNode): KnowledgeChoice {

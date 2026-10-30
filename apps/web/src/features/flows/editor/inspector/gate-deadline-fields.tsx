@@ -110,7 +110,7 @@ export function GateDeadlineSection({
 						<TemplateField
 							id={`${id}-at`}
 							label="Time"
-							hint="A time of day, such as 07:00, for the next one after the Gate opens. Or a date and time, such as 2026-10-18T07:00."
+							hint="A time of day, such as 07:00, means the next one after the Gate opens. Or give a date and time: 2026-10-18T07:00."
 							flow={flow}
 							nodeId={node.id}
 							value={deadline.at ?? ""}
@@ -123,7 +123,7 @@ export function GateDeadlineSection({
 						<Field
 							id={`${id}-minutes`}
 							label="Minutes after the Gate opens"
-							hint="For example 90. A whole number above 0."
+							hint="A whole number above 0."
 						>
 							<PositiveIntInput
 								id={`${id}-minutes`}
@@ -137,7 +137,7 @@ export function GateDeadlineSection({
 					<Field
 						id={`${id}-choose`}
 						label="Then pick"
-						hint="The option Night Shift picks. The note says the deadline chose it."
+						hint="The note says that the deadline picked this option."
 						error={chosen ? null : "Pick one of the Gate's options."}
 					>
 						<NativeSelect
