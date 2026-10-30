@@ -418,7 +418,7 @@ export function CustomAgentDetail({
 
 			<DetailSection
 				title="Models"
-				description={`Model default uses the model ${agent.label} is set to.`}
+				description={`Model default: the model set in ${agent.label}.`}
 			>
 				<p className="text-muted-foreground text-sm">
 					To use another model, type its name on a profile or an Agent node, for

@@ -72,7 +72,7 @@ describe("nightshift leave", () => {
 				waiting: null,
 			}),
 		).toEqual([
-			"This computer left studio. It did not answer, so remove this computer on its Devices page too.",
+			"This computer left studio. It did not answer. Remove this computer on its Devices page too.",
 			"Your Personal stays as it is.",
 		]);
 	});

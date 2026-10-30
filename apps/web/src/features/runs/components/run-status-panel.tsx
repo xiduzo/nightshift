@@ -192,7 +192,7 @@ function noticeOf({
 					tone: "text-status-waiting",
 					title: "Answer sent",
 					gist: `It applies when ${elsewhere} is online.`,
-					body: `Your answer is on its way to ${elsewhere}. The run goes on when ${elsewhere} is online.`,
+					body: `Your answer is on its way to ${elsewhere}. The run continues when ${elsewhere} is online.`,
 				};
 			}
 			return openGateNodeId

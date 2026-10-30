@@ -55,7 +55,7 @@ export function leaveResultLines(result: LeaveResult): string[] {
 	const lines = [
 		result.told
 			? `This computer left ${host.name}.`
-			: `This computer left ${host.name}. It did not answer, so remove this computer on its Devices page too.`,
+			: `This computer left ${host.name}. It did not answer. Remove this computer on its Devices page too.`,
 	];
 	if (split) {
 		lines.push(

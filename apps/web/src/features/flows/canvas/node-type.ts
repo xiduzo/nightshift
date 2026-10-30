@@ -72,7 +72,7 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 	join: {
 		label: NODE_TYPE_LABEL.join,
 		icon: MergeIcon,
-		blurb: "Waits for branches that run at once, then goes on.",
+		blurb: "Waits for branches that run at once, then continues.",
 	},
 };
 

@@ -41,30 +41,30 @@ const POLICY_FIELDS: {
 	{
 		key: "networkGraceMinutes",
 		label: "Network grace (minutes)",
-		hint: "The longest total wait for the network before the step fails.",
+		hint: "How long a step waits for the network before it fails.",
 	},
 	{
 		key: "maxSteps",
 		label: "Max steps",
-		hint: "The run stops after this many steps. You can resume it.",
+		hint: "Stops a flow that loops. You can resume the run.",
 		whole: true,
 	},
 	{
 		key: "budgetUsd",
 		label: "Budget (USD)",
-		hint: "The run stops when it has spent this much. Resume it to spend as much again.",
+		hint: "The run stops at this amount. Resume it to spend as much again.",
 		format: dollars,
 	},
 	{
 		key: "maxTurns",
 		label: "Max turns per agent step",
-		hint: "A turn is one reply of the agent. The step fails when the agent takes more. An Agent node can set its own.",
+		hint: "A turn is one reply of the agent. The step fails after this many. An Agent node can set its own.",
 		whole: true,
 	},
 	{
 		key: "idleMinutes",
 		label: "Idle timeout (minutes)",
-		hint: "An agent step fails when the agent shows no activity for this long. An Agent node can set its own.",
+		hint: "The step fails when the agent does nothing for this long. An Agent node can set its own.",
 	},
 ];
 

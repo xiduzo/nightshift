@@ -151,7 +151,7 @@ export function RestartStepDialog({
 						<DialogDescription>
 							Night Shift stops this step and starts it again at once.{" "}
 							{agent
-								? "The agent continues where it left off."
+								? "The agent continues where it stopped."
 								: "The step runs again from the start."}
 						</DialogDescription>
 					</DialogHeader>

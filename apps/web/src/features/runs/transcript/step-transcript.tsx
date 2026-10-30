@@ -261,7 +261,7 @@ export function StepTranscript({
 							<AlertTitle>Answer sent</AlertTitle>
 							<AlertDescription>
 								Your answer is on its way to {elsewhere ?? "the device"}. The
-								run goes on when it is online.
+								run continues when it is online.
 							</AlertDescription>
 						</Alert>
 					) : (

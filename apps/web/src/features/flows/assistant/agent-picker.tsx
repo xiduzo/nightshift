@@ -170,7 +170,7 @@ function chatRefusal(
 				: undefined;
 	const harness = choice.harness ?? profile?.harness;
 	if (harness === undefined || options.fits(harness)) return null;
-	return `${options.info(harness).label} cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode for the chat.`;
+	return `${options.info(harness).label} cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode.`;
 }
 
 /** The agent's two menus, for the `block-end` row of a Prompt Input. */
