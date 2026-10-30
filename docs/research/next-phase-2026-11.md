@@ -254,6 +254,9 @@ Confluence export.
 - Import of Claude Code dynamic workflow scripts: a demo for after the pitch.
 - gh-aw lock file export, ACP registry listing: an afternoon each, after sprint 3.
 - Vectors, LangSmith as a native sink, Langfuse self-host recipes.
+- Delta (Zed) as a run sink or knowledge source: see `delta.md`. A kit
+  when a project uses it; take its ideas (past runs as knowledge, changes
+  anchored to the call that made them) without the dependency.
 - Per-item `timeoutMinutes` on a Subflow with `each`, run retention, transcript
   deletion: PLAN §7 items that the budgets and metrics make visible first.
 
