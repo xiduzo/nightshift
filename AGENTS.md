@@ -3,7 +3,7 @@
 Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 
 - **Layers point down.** A package imports only from lower layers (`db`, `flows`, `ui`,
-  `ui-native` → `auth`, `agents` → `engine` → `devices`, `notifications` → `api`
+  `ui-native` → `auth`, `agents` → `engine` → `devices`, `notifications`, `telemetry` → `api`
   → `daemon`, `client` → apps). No package imports an app. The web and phone apps
   import only `client`, the `flows` root and `ui` or `ui-native`. A workspace
   declares only the workspaces it imports.
