@@ -1,17 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 
 import type { RunStreamConnection } from "../runs";
-import {
-	applyRunBatch,
-	type EntryFold,
-	emptyLiveRun,
-	type LiveRun,
-	type LiveRunState,
-} from "./run-state";
+import { keepRunBatch, keptRunQuery, keptRunSeq } from "./kept-run";
+import { type EntryFold, emptyLiveRun, type LiveRun } from "./run-state";
 import { type HostApi, useLiveCache } from "./use-live-cache";
 
 export type LiveRunOptions<T> = {
-	/** How the screen keeps the transcript entries. */
+	/** How the screen keeps the transcript entries. Keep it the same object between renders. */
 	entries: EntryFold<T>;
 	/**
 	 * Stop the stream for now and keep what came. When it is false again
@@ -28,7 +24,9 @@ export type LiveRunOptions<T> = {
  * its transcript entries, in batches. It reconnects with backoff and hands
  * on each entry once. Lay its steps over the run you read (`mergeSteps`):
  * the run is read again only when a step starts or ends, or the run
- * changes. A new `runId` starts from nothing.
+ * changes. What came stays in the query client for a few minutes
+ * (`keptRunQuery`): a new open of the run shows it at once and follows on
+ * after the last entry. A new `runId` starts from nothing.
  */
 export function useLiveRun<T>(
 	host: HostApi,
@@ -37,44 +35,29 @@ export function useLiveRun<T>(
 ): LiveRun<T> {
 	const { client, orpc } = host;
 	const live = useLiveCache(orpc);
-	const fold = useRef(entries);
-	useEffect(() => {
-		fold.current = entries;
-	});
-	/** The last entry so far, so a follow after a pause goes on from it. */
-	const lastSeq = useRef<{ runId: string; seq: number } | null>(null);
-	const [state, setState] = useState<LiveRunState<T>>(() =>
-		emptyLiveRun(entries),
-	);
+	const queryClient = useQueryClient();
+	const kept = useQuery(keptRunQuery(runId, entries));
+	const empty = useMemo(() => emptyLiveRun(entries), [entries]);
 	const [connection, setConnection] =
 		useState<RunStreamConnection>("connecting");
 
 	useEffect(() => {
 		if (paused) return;
 		const controller = new AbortController();
-		const known = lastSeq.current;
-		const afterSeq = known?.runId === runId ? known.seq : undefined;
-		if (afterSeq === undefined) setState(emptyLiveRun(fold.current));
-
 		void live.followRun({
 			client,
 			runId,
-			afterSeq,
+			afterSeq: keptRunSeq(queryClient, runId, entries),
 			signal: controller.signal,
 			flushMs,
-			// Keep what came in before a pause: the next follow starts after it.
+			// Keep what came in before a stop: the next follow starts after it.
 			flushOnStop: true,
 			onConnection: setConnection,
-			onBatch: (batch) => {
-				if (batch.lastSeq !== null) {
-					lastSeq.current = { runId, seq: batch.lastSeq };
-				}
-				setState((current) => applyRunBatch(current, batch, fold.current));
-			},
+			onBatch: (batch) => keepRunBatch(queryClient, runId, entries, batch),
 		});
 
 		return () => controller.abort();
-	}, [paused, runId, client, live, flushMs]);
+	}, [paused, runId, client, live, flushMs, queryClient, entries]);
 
-	return { ...state, connection };
+	return { ...(kept.data?.state ?? empty), connection };
 }
