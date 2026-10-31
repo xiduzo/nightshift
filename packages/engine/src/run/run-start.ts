@@ -33,6 +33,7 @@ import {
 	toSummary,
 } from "../read";
 import type { PlacementPort, PlannedRun } from "./peers";
+import { checkServiceDevices } from "./service-devices";
 
 /**
  * Run start: from a `StartRunInput` to a run the runner drives. Two layers
@@ -185,6 +186,7 @@ export async function prepareRun(
 			);
 		}
 	}
+	checkServiceDevices(planned);
 	if (input.stopAt !== undefined && input.stopAt <= deps.now()) {
 		throw new Refusal("invalid", "The stop time has passed already.");
 	}

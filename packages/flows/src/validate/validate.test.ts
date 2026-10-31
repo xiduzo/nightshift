@@ -3052,6 +3052,42 @@ describe("the Service node", () => {
 		]);
 	});
 
+	test("given a step in its scope on another device, then it is an error on that step", () => {
+		const elsewhere = (work: FlowNode, own: Partial<ServiceNode> = {}) =>
+			errors(
+				validateFlow(
+					named([service(own), work], [edge("a", "stack", "ready", "work")]),
+				),
+			).map((issue) => [issue.nodeId, issue.message]);
+		const onBox = { ...command("work"), device: "box" } as FlowNode;
+		expect(elsewhere(onBox)).toEqual([
+			[
+				"work",
+				'Node "work" runs on the device "box", but the service "stack" runs on the run\'s device. Every step while the service runs must run on its device. Give them the same device.',
+			],
+		]);
+		expect(elsewhere(onBox, { device: "box" })).toEqual([]);
+		expect(elsewhere(command("work"), { device: "box" })).toHaveLength(1);
+	});
+
+	test("given a step on another device outside its Section, then the flow has no issues", () => {
+		const issues = validateFlow({
+			...named(
+				[
+					service({ scope: { section: "stack_up" } }),
+					command("work"),
+					{ ...command("report"), device: "box" } as FlowNode,
+				],
+				[
+					edge("a", "stack", "ready", "work"),
+					edge("b", "work", "pass", "report"),
+				],
+			),
+			sections: [{ id: "stack_up", label: "Stack", nodes: ["stack", "work"] }],
+		});
+		expect(errors(issues)).toEqual([]);
+	});
+
 	test("given a Section scope, then the Section must exist and hold the node", () => {
 		const scoped = (section: string, members: string[]) =>
 			validateFlow({
