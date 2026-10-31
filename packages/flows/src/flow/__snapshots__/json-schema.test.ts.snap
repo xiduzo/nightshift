@@ -3282,6 +3282,11 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
               },
               "type": "object",
             },
+            "pausedUntil": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
             "person": {
               "maxLength": 128,
               "minLength": 1,
@@ -3434,6 +3439,11 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
                 "type": "string",
               },
               "type": "object",
+            },
+            "pausedUntil": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
             },
             "person": {
               "maxLength": 128,
@@ -4139,10 +4149,10 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "profileSchema": "0165ead8699fec436d41796fb0955feffcc6b4f201b0397ca25cd993719194e5",
   "profileSettingsSchema": "4c1961c44eec004cdae153b1e41e4bc22ef0666c00b2e29c5a4e7109b4ec00d6",
   "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "scheduleSchema": "39711baa05d8c65bc31acdd60fc984daa2c88467070bf65647cbbcb4d0ee4189",
+  "scheduleSchema": "b44ca3e9f35983345c07d9b2972c67c6f4d3eccfcbabd0dfc24e44eb22e4168b",
   "scheduleSignalSchema": "72340129c840cb54c596990620242a4a89780d13706772bdabc77b1f8ebf3dad",
   "scheduleWebhookSchema": "70545dcc8c286be6daaed5f150a58473f47db13bd006063aae6d7a1b7795a442",
-  "schedulesFileSchema": "4df9d571e985b6870c4a8fa511d8c7f6c00d0def2bb73096c37c79670d11ebe2",
+  "schedulesFileSchema": "703158f80670e9a6dc0b5187f3a6239e785e3faa5799b0db9ac43951d8e225e9",
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
