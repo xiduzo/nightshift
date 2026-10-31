@@ -54,6 +54,7 @@ export {
 } from "./progress";
 export { projectPath } from "./project-path";
 export { createRunQueries } from "./queries";
+export { finishedShare } from "./share";
 export { mergeSteps } from "./steps";
 export {
 	followRun,

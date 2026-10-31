@@ -1,3 +1,4 @@
+import { finishedShare } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	ChartContainer,
@@ -147,7 +148,9 @@ function RunsDetails({
 						<Stat
 							label="Finished"
 							value={
-								ended > 0 ? `${Math.round((finished / ended) * 100)}%` : "—"
+								finishedShare(finished, ended) === null
+									? "—"
+									: `${finishedShare(finished, ended)}%`
 							}
 							hint={`${finished} of ${ended} ended runs`}
 						/>

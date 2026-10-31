@@ -1,3 +1,4 @@
+import { finishedShare } from "@nightshift/client";
 import type { ChartConfig } from "@nightshift/ui/components/chart";
 
 import type { NightsRange } from "@/shared/api";
@@ -35,7 +36,7 @@ export const METRICS: {
 		label: "Finished",
 		color: "var(--metric-finished)",
 		format: (value) => (value === null ? "—" : `${value}%`),
-		of: finishedShare,
+		of: (totals) => finishedShare(totals.finished, totals.ended),
 	},
 	{
 		key: "spend",
@@ -60,13 +61,6 @@ export const METRICS_CHART = Object.fromEntries(
 		[`before_${key}`, { label: `${label}, the nights before`, color }],
 	]),
 ) satisfies ChartConfig;
-
-/** Finished out of the runs that finished or failed, in whole percent. */
-function finishedShare(totals: Omit<Totals, "perNight">): number | null {
-	return totals.ended === 0
-		? null
-		: Math.round((totals.finished / totals.ended) * 100);
-}
 
 export type MetricValues = Record<Metric, number | null>;
 

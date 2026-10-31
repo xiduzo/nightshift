@@ -18,4 +18,5 @@ export {
 	WALKED_ELSEWHERE,
 	whyNot,
 } from "./actions";
+export { finishedShare } from "./share";
 export type { RunResult, RunStatus } from "./status";

@@ -1,4 +1,5 @@
 import type { RunSummary } from "../read";
+import { finishedShare } from "../run-status";
 import { lastNights, nightOf } from "./clock";
 import {
 	countStatuses,
@@ -143,10 +144,7 @@ export function flowHealthRows(
 			runs: recent.length,
 			finished: finished.length,
 			ended: ended.length,
-			rate:
-				ended.length > 0
-					? Math.round((finished.length / ended.length) * 100)
-					: null,
+			rate: finishedShare(finished.length, ended.length),
 			cost,
 			unknownCost: unknown,
 			freeRuns: free,

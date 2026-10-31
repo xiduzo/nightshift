@@ -149,6 +149,7 @@ export {
 	type FileChange,
 	type FileTreeNode,
 	fileTree,
+	finishedShare,
 	flowLabel,
 	formatCost,
 	formatKnownCost,
