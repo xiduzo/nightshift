@@ -1,4 +1,9 @@
-import { readerTimeZone, scheduleLastRuns } from "@nightshift/client";
+import {
+	readerTimeZone,
+	scheduleLastRuns,
+	scheduleName,
+	scheduleWhen,
+} from "@nightshift/client";
 import type { Schedule } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -45,7 +50,7 @@ import type { ScheduleSummary } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
 import { scheduleMutations, scheduleQueries } from "./queries";
-import { IssueLines, nameOf, ScheduleCard, whenText } from "./schedule-card";
+import { IssueLines, ScheduleCard } from "./schedule-card";
 import { ScheduleDialog } from "./schedule-dialog";
 import { WebhookDialog } from "./webhook-deliveries";
 
@@ -293,10 +298,10 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 						<AlertDialogTitle>Remove this schedule?</AlertDialogTitle>
 						<AlertDialogDescription>
 							<span className="font-mono">
-								{toDelete ? nameOf(toDelete) : null}
+								{toDelete ? scheduleName(toDelete) : null}
 							</span>
-							, {toDelete ? whenText(toDelete).toLowerCase() : null}. Its past
-							runs stay. To stop it for a while, pause it instead.
+							, {toDelete ? scheduleWhen(toDelete).toLowerCase() : null}. Its
+							past runs stay. To stop it for a while, pause it instead.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

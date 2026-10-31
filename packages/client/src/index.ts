@@ -236,12 +236,15 @@ export {
 } from "./runs";
 export {
 	createScheduleQueries,
+	dayWord,
 	isPausedTonight,
 	type ScheduleIssue,
 	type ScheduleLastRuns,
 	type ScheduleResult,
 	type ScheduleSummary,
 	scheduleLastRuns,
+	scheduleName,
+	scheduleWhen,
 } from "./schedules";
 export {
 	createSpaceQueries,

@@ -1,9 +1,10 @@
 import {
 	isPausedTonight,
 	type ScheduleLastRuns,
+	scheduleName,
+	scheduleWhen,
 	waitedText,
 } from "@nightshift/client";
-import { describeCron, type Schedule } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -49,19 +50,6 @@ import {
 } from "@/shared/format";
 import { LastDelivery } from "./webhook-deliveries";
 
-/** What a schedule starts, for its name: its flow, else its signal. */
-export function nameOf(schedule: Schedule): string {
-	return schedule.flow ?? schedule.signal?.name ?? schedule.id;
-}
-
-/** When it starts, in words: its cron line, or a webhook. */
-export function whenText(schedule: Schedule): string {
-	if (schedule.webhook) return "When a webhook arrives";
-	if (!schedule.cron) return "Never";
-	const text = describeCron(schedule.cron);
-	return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
 /**
  * One schedule on the Schedules page. It answers, in order: what it
  * starts, when, when next, how its last runs went, and where they run.
@@ -98,7 +86,7 @@ export function ScheduleCard({
 	/** Shows a webhook schedule's address, secret and latest webhooks. */
 	onWebhook: () => void;
 }) {
-	const name = nameOf(schedule);
+	const name = scheduleName(schedule);
 	const errors = schedule.issues.filter((issue) => issue.severity === "error");
 	const StartIcon = schedule.webhook ? WebhookIcon : CalendarClockIcon;
 	return (
@@ -153,7 +141,7 @@ export function ScheduleCard({
 					</div>
 					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span className="font-medium">
-							{whenText(schedule)}
+							{scheduleWhen(schedule)}
 							{schedule.stopAt ? `, stops ${schedule.stopAt}` : ""}
 						</span>
 						<span className="truncate font-mono text-muted-foreground text-xs">

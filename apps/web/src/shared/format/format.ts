@@ -114,22 +114,6 @@ export function formatDayTime(epochMs: number): string {
 	});
 }
 
-/** "today", "tomorrow", or the weekday, for a moment after `now`. */
-export function dayWord(epochMs: number, now = Date.now()): string {
-	const day = (ms: number) => {
-		const date = new Date(ms);
-		return new Date(
-			date.getFullYear(),
-			date.getMonth(),
-			date.getDate(),
-		).getTime();
-	};
-	const days = Math.round((day(epochMs) - day(now)) / (24 * 60 * 60 * 1000));
-	if (days === 0) return "today";
-	if (days === 1) return "tomorrow";
-	return new Date(epochMs).toLocaleDateString(undefined, { weekday: "long" });
-}
-
 /**
  * The next time the clock shows `hhmm` ("07:00"): later today, else tomorrow.
  * Null when the text is not a time.
