@@ -8,6 +8,7 @@ import {
 	type HarnessName,
 	isAgentProfile,
 	isCustomHarness,
+	modelAddressProblem,
 	type Profile,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -77,6 +78,8 @@ export async function saveProfile(
 			`There is no CLI tool named ${unknownClis.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 		);
 	}
+	const misfit = isAgentProfile(profile) ? null : modelAddressProblem(profile);
+	if (misfit !== null) throw new Refusal("invalid", misfit);
 	return stores.profiles.save(profile, id);
 }
 

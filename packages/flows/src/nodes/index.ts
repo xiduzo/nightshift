@@ -28,7 +28,9 @@ export {
 	permissionModeSchema,
 } from "./agent";
 export {
+	addressRoot,
 	type DeciderName,
+	deciderAddress,
 	deciderNameSchema,
 	deviceNameSchema,
 	flowNameSchema,
@@ -37,6 +39,8 @@ export {
 	jsonSchemaSchema,
 	kitNameSchema,
 	labelSchema,
+	type ModelAddress,
+	modelAddressSchema,
 	type NodeCheck,
 	type NodeProfile,
 	nameSchema,

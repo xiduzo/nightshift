@@ -206,6 +206,28 @@ describe("model profiles", () => {
 		});
 	});
 
+	test("a Decision asks at the address of its profile, and the run keeps it", async () => {
+		const decider = fakeDecider([{ label: "yes" }]);
+		const address = { baseUrl: "http://gpu-box:11434", apiKey: "PROXY_KEY" };
+		const engine = makeEngine(
+			{},
+			{
+				decider,
+				profileFor: (id) =>
+					id === "small" ? { decider: "ollama", address } : null,
+			},
+		);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([triage()]),
+		});
+		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
+		expect(decider.calls[0]).toMatchObject({ decider: "ollama", address });
+		expect((await engine.getRun(run.id)).flow.nodes[0]).toMatchObject({
+			address,
+		});
+	});
+
 	test("the node's own decider and model still work, and win", async () => {
 		const decider = fakeDecider([{ label: "no" }]);
 		const engine = makeEngine(

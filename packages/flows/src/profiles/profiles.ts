@@ -7,9 +7,11 @@ import {
 	canMakeValue,
 	cliNameSchema,
 	type DecisionNode,
+	deciderAddress,
 	deciderNameSchema,
 	effortSchema,
 	isProfileRef,
+	modelAddressSchema,
 	type NodeProfile,
 	nameSchema,
 	permissionModeSchema,
@@ -53,14 +55,36 @@ export type AgentProfile = z.infer<typeof agentProfileSchema>;
 
 /**
  * What a Model Profile sets on the Decisions and Values decided by a model
- * that name it: the decider, and its model. Without a model, each node
- * uses the decider's default for what it asks (a decision or a value).
+ * that name it: the decider, its model, and where its server is. Without a
+ * model, each node uses the decider's default for what it asks (a decision
+ * or a value). Without an address, the decider's own default (ADR 5).
+ * Whether the decider takes an address is `modelAddressProblem`'s, not a
+ * refinement: the schema stays one that others extend.
  */
 export const modelProfileSettingsSchema = z.object({
 	decider: deciderNameSchema,
 	model: z.string().trim().min(1).optional(),
+	address: modelAddressSchema.optional(),
 });
 export type ModelProfileSettings = z.infer<typeof modelProfileSettingsSchema>;
+
+/**
+ * Why a Model Profile's address does not fit its decider: a vendor API
+ * takes none, and a decider without a vendor API needs one. Null when it
+ * fits.
+ */
+export function modelAddressProblem(
+	settings: Pick<ModelProfileSettings, "decider" | "address">,
+): string | null {
+	const takes = deciderAddress(settings.decider);
+	if (settings.address !== undefined && takes === null) {
+		return `The decider "${settings.decider}" always uses its own service, so it takes no address. Remove the address, or choose another decider.`;
+	}
+	if (settings.address === undefined && takes === "required") {
+		return `The decider "${settings.decider}" needs an address. Add the address of its server.`;
+	}
+	return null;
+}
 
 export const modelProfileSchema = modelProfileSettingsSchema.extend({
 	name: nameSchema,
@@ -153,21 +177,25 @@ export function resolveAgentNode(
 /**
  * A Decision or a Value with its Model Profile filled in: the node's own
  * decider wins, and so does its own model. A node that picks another
- * decider than the profile's does not take the profile's model, as a model
- * belongs to its decider. The `profile` stays, for the record.
+ * decider than the profile's takes neither the profile's model nor its
+ * address, as both belong to its decider. The `profile` stays, for the
+ * record.
  */
 export function resolveModelNode<N extends DecisionNode | ValueNode>(
 	node: N,
 	profile: ModelProfileSettings,
 ): N {
 	const decider = node.decider ?? profile.decider;
-	const model =
-		node.model ?? (decider === profile.decider ? profile.model : undefined);
+	const own = decider === profile.decider;
+	const model = node.model ?? (own ? profile.model : undefined);
+	const address = own ? profile.address : undefined;
+	const { address: _set, ...rest } = node;
 	return {
-		...node,
+		...rest,
 		decider,
 		...(model !== undefined ? { model } : {}),
-	};
+		...(address !== undefined ? { address } : {}),
+	} as N;
 }
 
 /**
@@ -196,6 +224,15 @@ export function resolveNodeProfile(
 		};
 	}
 	const resolved = resolveModelNode<DecisionNode | ValueNode>(node, profile);
+	if (
+		resolved.decider !== undefined &&
+		resolved.address === undefined &&
+		deciderAddress(resolved.decider) === "required"
+	) {
+		return {
+			problem: `The ${node.type === "decision" ? "Decision" : "Value"} node "${node.id}" uses the decider "${resolved.decider}", which needs an address, but the profile "${name}" has none for it. Pick a profile on ${resolved.decider} with an address.`,
+		};
+	}
 	if (
 		resolved.type === "value" &&
 		resolved.decider !== undefined &&

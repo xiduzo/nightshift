@@ -11,6 +11,8 @@ import {
 	type AgentProfileSettings,
 	agentProfileSettingsSchema,
 	type ModelProfileSettings,
+	modelAddressProblem,
+	modelProfileSettingsSchema,
 	profileLabel,
 	profileSettingsSchema,
 	resolveAgentNode,
@@ -313,5 +315,75 @@ describe("model profiles", () => {
 	test("a Value with a profile and no decider of its own is valid: the run checks the profile", () => {
 		const issues = validateFlow(flowOf(value()));
 		expect(issues.filter((i) => i.severity === "error")).toEqual([]);
+	});
+});
+
+describe("the address of a model profile", () => {
+	const remote: ModelProfileSettings = {
+		decider: "ollama",
+		model: "qwen3:4b",
+		address: {
+			baseUrl: "http://gpu-box:11434",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+			headers: { "X-Proxy-Key": "${PROXY_KEY}" },
+		},
+	};
+
+	test("an address is a base URL, the secret of its API key, and headers", () => {
+		expect(
+			modelProfileSettingsSchema.parse({
+				decider: "openai",
+				address: { baseUrl: " http://openjev:8080/v1 ", apiKey: "OPENJEV_KEY" },
+			}).address,
+		).toEqual({ baseUrl: "http://openjev:8080/v1", apiKey: "OPENJEV_KEY" });
+		for (const address of [
+			{ baseUrl: "openjev:8080" },
+			{ baseUrl: "ftp://openjev" },
+			{ baseUrl: "http://openjev:8080/?key=1" },
+			{ baseUrl: "http://openjev:8080", apiKey: "not a name" },
+			{ baseUrl: "http://openjev:8080", headers: { "bad header": "x" } },
+		]) {
+			expect(
+				modelProfileSettingsSchema.safeParse({ decider: "openai", address })
+					.success,
+			).toBe(false);
+		}
+	});
+
+	test("a vendor API takes no address", () => {
+		expect(modelAddressProblem(remote)).toBeNull();
+		expect(modelAddressProblem({ decider: "openai" })).toBeNull();
+		expect(
+			modelAddressProblem({
+				decider: "typesafe",
+				address: { baseUrl: "http://openjev:8080" },
+			}),
+		).toBe(
+			'The decider "typesafe" always uses its own service, so it takes no address. Remove the address, or choose another decider.',
+		);
+	});
+
+	test("a node takes the address of its profile, with the profile's decider only", () => {
+		expect(resolveModelNode(decision(), remote).address).toEqual(
+			remote.address,
+		);
+		expect(
+			"address" in resolveModelNode(decision({ decider: "openai" }), remote),
+		).toBe(false);
+	});
+
+	test("a flow does not set an address: the profile has it", () => {
+		const issues = validateFlow(
+			flowOf(
+				decision({ address: { baseUrl: "http://openjev:8080" } }),
+				value({ address: { baseUrl: "http://openjev:8080" } }),
+			),
+		).map((issue) => issue.message);
+		expect(issues).toContain(
+			'Decision node "pick" sets an address. Put the address on a Model Profile, and pick that profile.',
+		);
+		expect(issues).toContain(
+			'Value node "plan" sets an address. Put the address on a Model Profile, and pick that profile.',
+		);
 	});
 });
