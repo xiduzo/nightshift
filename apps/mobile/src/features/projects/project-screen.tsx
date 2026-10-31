@@ -1,4 +1,5 @@
 import {
+	createDashboardQueries,
 	createFlowQueries,
 	createGateQueries,
 	createProjectQueries,
@@ -24,6 +25,7 @@ import {
 import { type ReactNode, useCallback } from "react";
 import { Linking, View } from "react-native";
 
+import { offlineAlert, useOfflineNeeds } from "@/features/dashboard";
 import { useHostQueries } from "@/features/host";
 import { GateRow } from "@/features/inbox";
 import { InitialsAvatar } from "@/shared/avatar";
@@ -32,6 +34,7 @@ import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
+import { ConsoleGlance } from "./console-glance";
 import { projectLinks } from "./links";
 import { clonesText, newestFirst, remoteParts } from "./overview";
 import { SHOWN } from "./prefetch";
@@ -39,13 +42,15 @@ import { ProjectRunRow } from "./rows";
 
 /**
  * One project: where its code lives, the way to its Gates, runs and
- * flows, the Gates that wait in it (oldest first) and its newest runs.
+ * flows, the Gates that wait in it (oldest first), how last week went and
+ * its newest runs.
  */
 export function ProjectScreen({ projectId }: { projectId: string }) {
 	const projectQueries = useHostQueries(createProjectQueries);
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const flowQueries = useHostQueries(createFlowQueries);
+	const dashboard = useHostQueries(createDashboardQueries);
 	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
 	const ofProject = useCallback(
 		(open: OpenGate[]) => open.filter((gate) => gate.projectId === projectId),
@@ -66,11 +71,19 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 		...flowQueries.list(projectId),
 		...useWhileFocused(),
 	});
+	// The project's Console numbers: the Flows sheet reads the same.
+	const summary = useQuery({
+		...dashboard.summary({ projectId }),
+		...useWhileFocused(),
+	});
+	const offline = useOfflineNeeds(projectId);
+	const offlineTitle = offline ? offlineAlert(offline)?.title : undefined;
 	const refresh = useScreenRefresh([
 		projects.refetch,
 		gates.refetch,
 		runs.refetch,
 		flows.refetch,
+		summary.refetch,
 	]);
 	const project = projects.data?.find((p) => p.id === projectId);
 	// An older Host sends no counts, and every run whatever the limit.
@@ -106,7 +119,11 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 						<ListRow
 							icon={Workflow}
 							title="Flows"
-							caption="How often their runs finish"
+							caption={
+								offlineTitle
+									? [{ text: offlineTitle, tone: "failed" }]
+									: "How often their runs finish"
+							}
 							value={flows.data ? String(flows.data.length) : undefined}
 							href={projectLinks.flows(projectId)}
 							accessibilityHint="Shows how the flows of this project do"
@@ -150,6 +167,8 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							<Skeleton className="h-20 w-full rounded-xl" />
 						)}
 					</View>
+
+					<ConsoleGlance summary={summary.data} failed={summary.isError} />
 
 					<View className="gap-3">
 						<SectionHead
