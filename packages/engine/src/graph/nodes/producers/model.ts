@@ -75,6 +75,7 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 			prompt,
 			output: node.output,
 			model,
+			...(node.address !== undefined ? { address: node.address } : {}),
 			signal,
 		});
 	const result = await withinGrace(

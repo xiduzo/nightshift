@@ -9,6 +9,7 @@ import type {
 	CustomHarnessName,
 	DeciderName,
 	HarnessName,
+	ModelAddress,
 } from "@nightshift/flows";
 
 import type { AnyTool } from "@tanstack/ai";
@@ -299,6 +300,12 @@ export type DecisionInput = {
 	labels: { name: string; description?: string }[];
 	/** Unset: the decider's default model. */
 	model?: string;
+	/**
+	 * Where the decider finds its server, from the node's Model Profile
+	 * (ADR 5). Secrets by name: the Device reads their values. Unset: the
+	 * decider's default.
+	 */
+	address?: ModelAddress;
 	signal: AbortSignal;
 };
 
@@ -330,6 +337,8 @@ export type ValueInput = {
 	output: Record<string, unknown>;
 	/** Unset: the decider's default chat model. */
 	model?: string;
+	/** Where the decider finds its server, as for a decision. */
+	address?: ModelAddress;
 	signal: AbortSignal;
 };
 

@@ -133,6 +133,28 @@ describe("saveProfile", () => {
 			{ id: fast.id, name: "fast", model: "opus" },
 		]);
 	});
+
+	test("a model profile keeps its address, and a vendor API refuses one", async () => {
+		const stores = await makeStores();
+		const address = { baseUrl: "http://gpu-box:11434", apiKey: "PROXY_KEY" };
+		const saved = await saveProfile(
+			stores,
+			{ name: "remote", decider: "ollama", address },
+			unused,
+		);
+		expect(stores.profiles.get(saved.id)).toMatchObject({ address });
+		expect(
+			await errorOf(
+				saveProfile(
+					stores,
+					{ name: "jev", decider: "typesafe", address },
+					unused,
+				),
+			),
+		).toBe(
+			'The decider "typesafe" always uses its own service, so it takes no address. Remove the address, or choose another decider.',
+		);
+	});
 });
 
 describe("connections and CLI tools", () => {

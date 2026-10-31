@@ -73,7 +73,14 @@ async function decide(
 	});
 	const result = await decideWithin(
 		step.device,
-		{ decider: picker, prompt, labels: options, model, signal },
+		{
+			decider: picker,
+			prompt,
+			labels: options,
+			model,
+			...(node.address !== undefined ? { address: node.address } : {}),
+			signal,
+		},
 		signal,
 	);
 	const cost = {

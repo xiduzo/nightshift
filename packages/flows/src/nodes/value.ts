@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
+	checkModelAddress,
 	checkNodeProfile,
 	type DeciderName,
 	deciderNameSchema,
 	isObjectSchema,
 	jsonSchemaSchema,
+	modelAddressSchema,
 	type NodeCheck,
 	nodeBase,
 	nodeProfileSchema,
@@ -78,6 +80,12 @@ export const valueNodeSchema = z.object({
 	decider: deciderNameSchema.optional(),
 	/** `by: "model"` only. The decider's model. Unset: the decider's default chat model. */
 	model: z.string().min(1).optional(),
+	/**
+	 * `by: "model"` only: where the decider finds its server. A run copies
+	 * it from the Model Profile (ADR 5), so the run's copy of the flow has
+	 * it. A flow does not set it: validation refuses one.
+	 */
+	address: modelAddressSchema.optional(),
 });
 export type ValueNode = z.infer<typeof valueNodeSchema>;
 
@@ -92,6 +100,7 @@ export const valueOutputFields = ["outcome", "data", "note", "visit"] as const;
 /** A Value node's maker fits `by` (`checkMaker`), and its prompt reads known names. */
 export function checkValueNode(node: ValueNode, check: NodeCheck): void {
 	checkMaker(node, check);
+	checkModelAddress(node, "Value", check);
 	if (node.prompt !== undefined) check.template(node.prompt, "prompt");
 }
 

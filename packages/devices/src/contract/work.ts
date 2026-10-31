@@ -11,6 +11,7 @@ import {
 	agentHarnessSchema,
 	deciderNameSchema,
 	effortSchema,
+	modelAddressSchema,
 	permissionModeSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
@@ -205,12 +206,14 @@ const decideInputSchema = z.union([
 			z.object({ name: z.string(), description: z.string().optional() }),
 		),
 		model: z.string().optional(),
+		address: modelAddressSchema.optional(),
 	}),
 	z.object({
 		decider: deciderNameSchema,
 		prompt: z.string(),
 		output: z.record(z.string(), z.unknown()),
 		model: z.string().optional(),
+		address: modelAddressSchema.optional(),
 	}),
 ]);
 

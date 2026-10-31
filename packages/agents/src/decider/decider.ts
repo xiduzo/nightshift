@@ -8,7 +8,13 @@
  * first call, not when Night Shift starts: the model lists here are copies.
  */
 
-import { canMakeValue, valueDeciderNameSchema } from "@nightshift/flows";
+import {
+	addressRoot,
+	canMakeValue,
+	deciderAddress,
+	type ModelAddress,
+	valueDeciderNameSchema,
+} from "@nightshift/flows";
 import {
 	type AnyEvaluateAdapter,
 	type AnyTextAdapter,
@@ -48,6 +54,24 @@ export type DeciderContext = {
 	ollama?: () => OllamaAddress;
 };
 
+/** A Model Profile's address with its secrets read: what an adapter connects to. */
+export type ReachedAddress = {
+	/** The server, without a trailing `/v1` (`addressRoot`). */
+	root: string;
+	/** The address's headers, with their `${NAME}` secrets filled in. */
+	headers: Record<string, string>;
+};
+
+/**
+ * What an adapter connects with: the API key's value, and the address of
+ * the node's Model Profile when it has one (ADR 5). With an address, the
+ * key is the address's own: a decider's vendor key does not go to it.
+ */
+export type DeciderAccess = {
+	apiKey: string | undefined;
+	address: ReachedAddress | undefined;
+};
+
 /**
  * How a decider makes a value: its TanStack AI text adapter and the chat
  * model it starts on. Only deciders in `valueDeciderNameSchema` have one.
@@ -60,7 +84,7 @@ export type ValueAdapter = {
 	models?: readonly string[];
 	create: (
 		model: string,
-		apiKey: string | undefined,
+		access: DeciderAccess,
 		context: DeciderContext,
 	) => AnyTextAdapter | Promise<AnyTextAdapter>;
 };
@@ -76,7 +100,7 @@ export type DeciderAdapter = {
 	apiKey: string | null;
 	create: (
 		model: string,
-		apiKey: string | undefined,
+		access: DeciderAccess,
 		context: DeciderContext,
 	) => AnyEvaluateAdapter | Promise<AnyEvaluateAdapter>;
 	/** Set when the decider can also make a value (a Value node made by a model). */
@@ -125,6 +149,92 @@ const OLLAYA_MODELS = [
 	"laya:multilingual",
 ] as const satisfies typeof OLLAYA_EVALUATE_MODELS;
 
+/**
+ * The key and options of an OpenAI client: the vendor's API, or the
+ * profile's address (an OpenJev `/v1/decisions`, for example). The SDK
+ * wants a key, so an address without one gets a placeholder.
+ */
+function openaiClient(
+	access: DeciderAccess,
+): [string, { baseURL: string; defaultHeaders: Record<string, string> }?] {
+	const { address, apiKey } = access;
+	if (!address) return [apiKey ?? ""];
+	return [
+		apiKey ?? "none",
+		{ baseURL: `${address.root}/v1`, defaultHeaders: address.headers },
+	];
+}
+
+/** Bearer authorization for the key, unless the address's headers already authorize. */
+function withBearer(
+	headers: Record<string, string>,
+	apiKey: string | undefined,
+): Record<string, string> {
+	const authorized = Object.keys(headers).some(
+		(name) => name.toLowerCase() === "authorization",
+	);
+	return apiKey && !authorized
+		? { ...headers, Authorization: `Bearer ${apiKey}` }
+		: headers;
+}
+
+/** The profile's Ollama, else the Device's (`ollamaAddress`), else Ollama's default. */
+function ollamaAt(
+	access: DeciderAccess,
+	context: DeciderContext,
+): OllamaAddress | undefined {
+	const { address, apiKey } = access;
+	if (!address) return context.ollama?.();
+	return { host: address.root, headers: withBearer(address.headers, apiKey) };
+}
+
+/** `${NAME}`: a secret, as a header value reads it. */
+const SECRET_REFERENCE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+
+/**
+ * The key and the address an adapter connects with, or why it cannot: a
+ * missing secret. With an address, its own key and headers, and no vendor
+ * key (ADR 5); a vendor API without a key fails as before.
+ */
+async function accessFor(
+	spec: DeciderAdapter,
+	address: ModelAddress | undefined,
+	name: DeciderName,
+	secret: (name: string) => Promise<string | undefined>,
+): Promise<DeciderAccess | { problem: string }> {
+	if (address === undefined || deciderAddress(name) === null) {
+		const apiKey = spec.apiKey ? await secret(spec.apiKey) : undefined;
+		if (spec.apiKey && !apiKey) {
+			return {
+				problem: `${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Secrets page.`,
+			};
+		}
+		return { apiKey, address: undefined };
+	}
+	const apiKey = address.apiKey ? await secret(address.apiKey) : undefined;
+	if (address.apiKey && !apiKey) {
+		return {
+			problem: `The address ${address.baseUrl} needs the secret ${address.apiKey}. Add it on the Secrets page.`,
+		};
+	}
+	const headers: Record<string, string> = {};
+	for (const [header, value] of Object.entries(address.headers ?? {})) {
+		let filled = value;
+		for (const match of value.matchAll(SECRET_REFERENCE)) {
+			const ref = match[1] as string;
+			const found = await secret(ref);
+			if (found === undefined) {
+				return {
+					problem: `The address ${address.baseUrl} needs the secret ${ref}. Add it on the Secrets page.`,
+				};
+			}
+			filled = filled.replaceAll(match[0], found);
+		}
+		headers[header] = filled;
+	}
+	return { apiKey, address: { root: addressRoot(address), headers } };
+}
+
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
 export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 	typesafe: {
@@ -133,9 +243,9 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		models: TYPESAFE_MODELS,
 		defaultModel: "jev-latest",
 		apiKey: "TYPESAFE_API_KEY",
-		create: async (model, key) => {
+		create: async (model, { apiKey }) => {
 			const { createTypesafeDecider } = await import("@tanstack/ai-typesafe");
-			return createTypesafeDecider(model, key ?? "");
+			return createTypesafeDecider(model, apiKey ?? "");
 		},
 	},
 	openrouter: {
@@ -144,22 +254,22 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		models: OPENROUTER_MODELS,
 		defaultModel: "~typesafe/jev-latest",
 		apiKey: "OPENROUTER_API_KEY",
-		create: async (model, key) => {
+		create: async (model, { apiKey }) => {
 			const { createOpenRouterDecider } = await import(
 				"@tanstack/ai-openrouter"
 			);
-			return createOpenRouterDecider(model, key ?? "");
+			return createOpenRouterDecider(model, apiKey ?? "");
 		},
 		pricing: { providerId: "openrouter" },
 		value: {
 			defaultModel: "~openai/gpt-mini-latest",
-			create: async (model, key) => {
+			create: async (model, { apiKey }) => {
 				const { createOpenRouterText } = await import(
 					"@tanstack/ai-openrouter"
 				);
 				return createOpenRouterText(
 					model as Parameters<typeof createOpenRouterText>[0],
-					key ?? "",
+					apiKey ?? "",
 				);
 			},
 		},
@@ -170,18 +280,21 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		models: OPENAI_MODELS,
 		defaultModel: "gpt-6-luna",
 		apiKey: "OPENAI_API_KEY",
-		create: async (model, key) => {
+		create: async (model, access) => {
 			const { createOpenaiDecider } = await import("@tanstack/ai-openai");
-			return createOpenaiDecider(model, key ?? "");
+			return createOpenaiDecider(
+				model as Parameters<typeof createOpenaiDecider>[0],
+				...openaiClient(access),
+			);
 		},
 		pricing: { providerId: "openai" },
 		value: {
 			defaultModel: "gpt-5-mini",
-			create: async (model, key) => {
+			create: async (model, access) => {
 				const { createOpenaiChat } = await import("@tanstack/ai-openai");
 				return createOpenaiChat(
 					model as Parameters<typeof createOpenaiChat>[0],
-					key ?? "",
+					...openaiClient(access),
 				);
 			},
 		},
@@ -204,7 +317,8 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		models: OLLAMA_MODELS,
 		defaultModel: OLLAMA_DEFAULT_MODEL,
 		apiKey: null,
-		create: (model, _key, context) => ollamaDecider(model, context.ollama?.()),
+		create: (model, access, context) =>
+			ollamaDecider(model, ollamaAt(access, context)),
 		pricing: "free",
 		probability: false,
 		listModels: (context) => ollamaModels(context.ollama?.()),
@@ -212,7 +326,8 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		value: {
 			defaultModel: OLLAMA_DEFAULT_MODEL,
 			models: OLLAMA_MODELS,
-			create: (model, _key, context) => ollamaChat(model, context.ollama?.()),
+			create: (model, access, context) =>
+				ollamaChat(model, ollamaAt(access, context)),
 		},
 	},
 };
@@ -297,15 +412,19 @@ async function decideOnce(
 	options: TanstackDeciderOptions,
 ): Promise<DecisionResult> {
 	const spec = DECIDER_ADAPTERS[input.decider];
-	const key = spec.apiKey ? await options.secret(spec.apiKey) : undefined;
-	if (spec.apiKey && !key) {
-		return failed(
-			"harness",
-			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Secrets page.`,
-		);
-	}
+	const access = await accessFor(
+		spec,
+		input.address,
+		input.decider,
+		options.secret,
+	);
+	if ("problem" in access) return failed("harness", access.problem);
 	const result = await decide({
-		adapter: await spec.create(input.model ?? spec.defaultModel, key, options),
+		adapter: await spec.create(
+			input.model ?? spec.defaultModel,
+			access,
+			options,
+		),
 		state: input.prompt,
 		questions: {
 			label: choice({
@@ -347,13 +466,13 @@ async function valueOnce(
 	const maker = canMakeValue(input.decider) ? spec.value : undefined;
 	if (!maker)
 		return valueFailed("harness", cannotMakeValueMessage(input.decider));
-	const key = spec.apiKey ? await options.secret(spec.apiKey) : undefined;
-	if (spec.apiKey && !key) {
-		return valueFailed(
-			"harness",
-			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Secrets page.`,
-		);
-	}
+	const access = await accessFor(
+		spec,
+		input.address,
+		input.decider,
+		options.secret,
+	);
+	if ("problem" in access) return valueFailed("harness", access.problem);
 	const abortController = new AbortController();
 	const onAbort = () => abortController.abort();
 	input.signal.addEventListener("abort", onAbort, { once: true });
@@ -361,7 +480,7 @@ async function valueOnce(
 	let usage: TokenUsage | undefined;
 	try {
 		const data: unknown = await chat({
-			adapter: await maker.create(model, key, options),
+			adapter: await maker.create(model, access, options),
 			messages: [{ role: "user", content: input.prompt }],
 			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
 			stream: false,

@@ -1,9 +1,11 @@
 import { z } from "zod";
 import {
+	checkModelAddress,
 	checkNodeProfile,
 	type DeciderName,
 	deciderNameSchema,
 	labelSchema,
+	modelAddressSchema,
 	type NodeCheck,
 	nodeBase,
 	nodeProfileSchema,
@@ -69,6 +71,12 @@ export const decisionNodeSchema = z.object({
 	/** `by: "model"` only. The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
 	model: z.string().min(1).optional(),
 	/**
+	 * `by: "model"` only: where the decider finds its server. A run copies
+	 * it from the Model Profile (ADR 5), so the run's copy of the flow has
+	 * it. A flow does not set it: validation refuses one.
+	 */
+	address: modelAddressSchema.optional(),
+	/**
 	 * `by: "person"` only, with exactly two options: this Gate can be
 	 * answered from the lock screen. Its notification on a phone shows
 	 * Approve (the first option) and Reject (the second). Without it
@@ -117,6 +125,7 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 	);
 	checkDecidedBy(node, check);
 	checkDeadline(node, check);
+	checkModelAddress(node, "Decision", check);
 	if (node.profile !== undefined && node.by !== "model") {
 		check.error(
 			`Decision node "${node.id}" names a profile, but ${node.by === "person" ? "you decide" : "a rule decides"} it. Only a model reads a profile. Remove the profile, or let a model decide.`,

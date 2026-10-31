@@ -460,3 +460,102 @@ describe("tanstackDecider: Ollama", () => {
 		expect(sent).toHaveLength(0);
 	});
 });
+
+describe("tanstackDecider: the address of a Model Profile", () => {
+	/** Records each request's URL and headers, and answers with `respond`. */
+	function stubAddress(respond: (url: string) => Response) {
+		const sent: { url: string; headers: Headers }[] = [];
+		globalThis.fetch = (async (
+			url: string | URL | Request,
+			init?: RequestInit,
+		) => {
+			const request = url instanceof Request ? url : null;
+			const href = request ? request.url : String(url);
+			sent.push({
+				url: href,
+				headers: new Headers(init?.headers ?? request?.headers),
+			});
+			return respond(href);
+		}) as typeof fetch;
+		return sent;
+	}
+
+	const secrets: Record<string, string> = {
+		OPENAI_API_KEY: "vendor-key",
+		OPENJEV_KEY: "jev-key",
+		PROXY_KEY: "proxy-key",
+	};
+	const withSecrets = tanstackDecider({
+		secret: async (name) => secrets[name],
+		ollama: () => ({ host: "http://127.0.0.1:11434" }),
+	});
+
+	test("Ollama at the profile's address wins over the Device's, with its key and headers", async () => {
+		const sent = stubAddress(() => ollamaChat('{"choice":"ship"}'));
+		await withSecrets.decide(
+			input({
+				decider: "ollama",
+				address: {
+					baseUrl: "http://gpu-box:11434/",
+					apiKey: "OPENJEV_KEY",
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+					headers: { "X-Proxy-Key": "key ${PROXY_KEY}" },
+				},
+			}),
+		);
+		expect(sent[0]?.url).toBe("http://gpu-box:11434/api/chat");
+		expect(sent[0]?.headers.get("authorization")).toBe("Bearer jev-key");
+		expect(sent[0]?.headers.get("x-proxy-key")).toBe("key proxy-key");
+	});
+
+	test("OpenAI at an address asks its /v1/decisions with the address's key, not the vendor's", async () => {
+		const sent = stubAddress(() =>
+			Response.json({
+				id: "dec_1",
+				object: "decision",
+				model: "openjev-latest",
+				answers: [
+					{
+						type: "choice",
+						name: "label",
+						choice: "ship",
+						probabilities: [
+							{ value: "ship", probability: 0.9 },
+							{ value: "hold", probability: 0.1 },
+						],
+						confidence: 0.6,
+					},
+				],
+				usage: { input_tokens: 20, output_tokens: 0, total_tokens: 20 },
+			}),
+		);
+		const result = await withSecrets.decide(
+			input({
+				decider: "openai",
+				model: "openjev-latest",
+				address: { baseUrl: "http://openjev:8080/v1", apiKey: "OPENJEV_KEY" },
+			}),
+		);
+		expect(result).toMatchObject({ kind: "decided", label: "ship" });
+		expect(sent[0]?.url).toBe("http://openjev:8080/v1/decisions");
+		expect(sent[0]?.headers.get("authorization")).toBe("Bearer jev-key");
+	});
+
+	test("a secret the address reads that is missing names it, and sends nothing", async () => {
+		const sent = stubAddress(() => ollamaChat('{"choice":"ship"}'));
+		const address = {
+			baseUrl: "http://gpu-box:11434",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+			headers: { "X-Proxy-Key": "${NOT_SAVED}" },
+		};
+		const message =
+			"The address http://gpu-box:11434 needs the secret NOT_SAVED. Add it on the Secrets page.";
+		expect(
+			await withSecrets.decide(input({ decider: "ollama", address })),
+		).toMatchObject({ kind: "error", errorKind: "harness", message });
+		expect(
+			await withSecrets.value?.(valueInput({ decider: "ollama", address })),
+		).toMatchObject({ kind: "error", errorKind: "harness", message });
+		expect(sent).toHaveLength(0);
+	});
+});

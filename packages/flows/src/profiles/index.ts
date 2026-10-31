@@ -7,6 +7,7 @@ export {
 	isAgentProfile,
 	type ModelProfile,
 	type ModelProfileSettings,
+	modelAddressProblem,
 	modelProfileSchema,
 	type Profile,
 	type ProfileSettings,
