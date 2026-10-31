@@ -21,4 +21,5 @@ export const runMutations = {
 	restartStep: orpc.runs.restartStep.mutationOptions,
 	rerun: orpc.runs.rerun.mutationOptions,
 	move: orpc.runs.move.mutationOptions,
+	releaseLease: orpc.runs.releaseLease.mutationOptions,
 };

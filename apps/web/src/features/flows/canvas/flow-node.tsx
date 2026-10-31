@@ -29,6 +29,7 @@ import {
 } from "@xyflow/react";
 import {
 	CircleAlertIcon,
+	LockIcon,
 	MonitorIcon,
 	PlayIcon,
 	TriangleAlertIcon,
@@ -124,6 +125,17 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 		return new Map([
 			["pass", "The tool answered"],
 			["fail", "It reported an error"],
+		]);
+	}
+	if (node.type === "lease") {
+		return new Map([
+			["held", "The run holds the lease"],
+			[
+				"busy",
+				node.waitMinutes
+					? `Another run holds it after ${node.waitMinutes} min`
+					: "Another run holds it",
+			],
 		]);
 	}
 	if (node.type === "join") {
@@ -458,6 +470,15 @@ const FlowNodeCard = memo(function FlowNodeCard({
 								<span className="truncate">On {node.device}</span>
 							</span>
 						) : null}
+					</div>
+				) : null}
+
+				{node.type === "lease" ? (
+					<div className="-mt-1 flex min-w-0 items-center gap-1 px-2.5 pb-2 text-[11px] text-muted-foreground">
+						<LockIcon className="size-3 shrink-0" aria-hidden="true" />
+						<span className="truncate font-mono" title={node.name}>
+							{node.name || "No name yet"}
+						</span>
 					</div>
 				) : null}
 

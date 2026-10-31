@@ -54,6 +54,7 @@ const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
 	command: "The flow waits for a command to pass.",
 	signal: "The flow waits for a signal.",
 	"device-offline": "The device of the next step is offline.",
+	lease: "The flow waits for a lease another run holds.",
 };
 
 /** The icon and colour of the notice of a run that ended. */

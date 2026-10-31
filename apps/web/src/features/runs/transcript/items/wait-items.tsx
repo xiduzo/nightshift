@@ -22,6 +22,7 @@ const WAIT_TITLE: Record<WaitItem["reason"], string> = {
 	signal: "Waiting for a signal",
 	any: "Waiting for a signal or a command",
 	"device-offline": "Waiting for a device",
+	lease: "Waiting for a lease",
 };
 
 /** A Wait node's own wait, or the run policy's (a usage limit, the network). */
@@ -65,6 +66,8 @@ export function WaitCard({ item }: { item: WaitItem }) {
 				<span className="font-mono text-foreground">{item.signal}</span> arrives
 				{at ? <>, or tries the command again at {at}</> : null}.
 			</>
+		) : item.reason === "lease" ? (
+			<>Asks for the lease again{at ? <> at {at}</> : null}.</>
 		) : item.reason === "device-offline" ? (
 			<>
 				Checks for the device again
