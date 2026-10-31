@@ -51,6 +51,17 @@ export function missingProfileMessage(_profile: ProfileRef): string {
 	return "Its device no longer has this profile. The flow cannot run until you pick another profile.";
 }
 
+/**
+ * What the editor says about a node that names a device you cannot use:
+ * the run does not start. A Subflow names a computer.
+ */
+export function missingDeviceMessage(
+	name: string,
+	node: Pick<FlowNode, "type">,
+): string {
+	return `You have no ${node.type === "call" ? "computer" : "device"} named ${name}. Pick another one so the run can start.`;
+}
+
 /** What the editor says about a command that calls a program without the login of its CLI tool. */
 export function programWithoutLoginMessage(
 	program: string,
@@ -229,6 +240,7 @@ const MESSAGES: DraftMessages = {
 	},
 	missingConnection: missingConnectionMessage,
 	missingProfile: missingProfileMessage,
+	missingDevice: missingDeviceMessage,
 	programWithoutLogin: programWithoutLoginMessage,
 };
 
@@ -302,6 +314,8 @@ export function checkFlow(
 	profiles?: {
 		known: readonly ProfileRef[];
 		untoldDevices: readonly string[];
+		/** The names of the devices a run may use: a node that names another does not start. */
+		deviceNames: readonly string[];
 	},
 	cliTools?: readonly CliToolRef[],
 ): FlowCheck {
@@ -311,7 +325,11 @@ export function checkFlow(
 		connections,
 		cliTools,
 		...(profiles
-			? { profiles: profiles.known, untoldDevices: profiles.untoldDevices }
+			? {
+					profiles: profiles.known,
+					untoldDevices: profiles.untoldDevices,
+					devices: profiles.deviceNames,
+				}
 			: {}),
 	});
 }

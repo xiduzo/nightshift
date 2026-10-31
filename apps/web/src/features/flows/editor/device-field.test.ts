@@ -7,8 +7,9 @@ const node = (fields: Record<string, unknown>) =>
 	({ id: "n", position: { x: 0, y: 0 }, ...fields }) as unknown as FlowNode;
 
 describe("a node's Device", () => {
-	test("an Agent, a Command, a Tool and a model Decision or Value run on one", () => {
+	test("an Agent, a Command, a Tool, a Subflow and a model Decision or Value run on one", () => {
 		expect(runsOnDevice(node({ type: "agent" }))).toBe(true);
+		expect(runsOnDevice(node({ type: "call" }))).toBe(true);
 		expect(runsOnDevice(node({ type: "command" }))).toBe(true);
 		expect(runsOnDevice(node({ type: "tool" }))).toBe(true);
 		expect(runsOnDevice(node({ type: "decision", by: "model" }))).toBe(true);

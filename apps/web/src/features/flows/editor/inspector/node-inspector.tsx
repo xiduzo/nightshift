@@ -20,7 +20,12 @@ import { useId, useState } from "react";
 import { runQueries } from "@/features/runs/flows-port";
 import { nodeMeta } from "../../canvas/node-type";
 import type { DaemonConnection } from "../connections-field";
-import { DeviceField, runsOnDevice, withDevice } from "../device-field";
+import {
+	DeviceField,
+	runsOnDevice,
+	SUBFLOW_DEVICE_COPY,
+	withDevice,
+} from "../device-field";
 import { Field, InspectorSection, PositiveIntInput } from "../fields";
 import { InspectorTabs } from "../inspector-tabs";
 import { VariableWritesSection } from "../variable-writes-field";
@@ -288,7 +293,7 @@ export function NodeInspector({
 
 				{onDevice ? (
 					<InspectorSection
-						title="Device"
+						title={node.type === "call" ? "Computer" : "Device"}
 						tab="setup"
 						defaultOpen={"device" in node && node.device !== undefined}
 					>
@@ -296,6 +301,7 @@ export function NodeInspector({
 							id={`${id}-device`}
 							value={"device" in node ? node.device : undefined}
 							devices={nodeDevices.data}
+							{...(node.type === "call" ? { copy: SUBFLOW_DEVICE_COPY } : {})}
 							onChange={(device) =>
 								onChange((current) => withDevice(current, device))
 							}

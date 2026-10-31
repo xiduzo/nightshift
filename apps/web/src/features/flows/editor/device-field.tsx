@@ -8,6 +8,7 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 
+import { missingDeviceMessage } from "../flow-draft";
 import { Field } from "./fields";
 
 /**
@@ -20,12 +21,16 @@ export type DeviceChoice = {
 	offers?: string[];
 };
 
-/** The node types whose step runs on a device; a Decision and a Value only when a model decides. */
+/**
+ * The node types whose step runs on a device; a Decision and a Value only
+ * when a model decides. A Subflow names where the steps of its flow run.
+ */
 export function runsOnDevice(node: FlowNode): boolean {
 	switch (node.type) {
 		case "agent":
 		case "command":
 		case "tool":
+		case "call":
 			return true;
 		case "decision":
 		case "value":
@@ -49,23 +54,50 @@ export function withDevice(
 
 const RUN_DEVICE = "__run__";
 
+/** The words of a `DeviceField`: a step's device, or where a Subflow runs. */
+export type DeviceFieldCopy = {
+	label: string;
+	hint: string;
+	/** The choice for no device of its own. */
+	run: string;
+	/** The error for a name the list does not have. */
+	unknown: (name: string) => string;
+};
+
+const STEP_COPY: DeviceFieldCopy = {
+	label: "Device",
+	hint: "Pick one of your devices, or a device that someone offers for this profile.",
+	run: "The device the run starts on",
+	unknown: (name) => missingDeviceMessage(name, { type: "command" }),
+};
+
+/** A Subflow's words: its steps run on the computer it names. */
+export const SUBFLOW_DEVICE_COPY: DeviceFieldCopy = {
+	label: "Runs on",
+	hint: "The steps of this Subflow run on the computer you pick, wherever the run runs. Pick one with the folder or tools they need.",
+	run: "Where the run runs",
+	unknown: (name) => missingDeviceMessage(name, { type: "call" }),
+};
+
 /**
  * Where a step runs: one of your devices by name, or the device the run
  * starts on. The list is what the Host says this node may name: yours,
  * and other people's that offer the node's profile to the Space. A name
- * that is not one of them stays, marked, so a flow from a colleague keeps
- * its choice.
+ * that is not one of them stays, marked as an error, so a flow from a
+ * colleague keeps its choice until you pick another.
  */
 export function DeviceField({
 	id,
 	value,
 	devices,
+	copy = STEP_COPY,
 	onChange,
 }: {
 	id: string;
 	value: string | undefined;
 	/** The devices this node may name (`runs.devices` with `forNode`); undefined while they load. */
 	devices: readonly DeviceChoice[] | undefined;
+	copy?: DeviceFieldCopy;
 	onChange: (device: string | undefined) => void;
 }) {
 	const listed = devices ?? [];
@@ -73,23 +105,25 @@ export function DeviceField({
 	const unknown = value !== undefined && !names.includes(value);
 	const label = (name: string) => {
 		const known = listed.find((d) => d.name === name);
-		if (!known) return `${name} (not one of your devices)`;
+		if (!known) return `${name} (not found)`;
 		if (known.offers !== undefined && !known.thisDevice) {
 			return `${name} (offers ${known.offers.join(", ")})`;
 		}
 		return known.thisDevice ? `${name} (this computer)` : name;
 	};
 	const items = [
-		{ value: RUN_DEVICE, label: "The device the run starts on" },
+		{ value: RUN_DEVICE, label: copy.run },
 		...(unknown ? [{ value, label: label(value) }] : []),
 		...names.map((name) => ({ value: name, label: label(name) })),
 	];
 	return (
 		<Field
 			id={id}
-			label="Device"
+			label={copy.label}
 			optional
-			hint="Pick one of your devices, or a device that someone offers for this profile."
+			hint={copy.hint}
+			// Only once the list is in: a name it lacks does not run.
+			error={unknown && devices !== undefined ? copy.unknown(value) : null}
 		>
 			<Select
 				items={items}
@@ -103,6 +137,7 @@ export function DeviceField({
 					id={id}
 					className="w-full"
 					aria-describedby={`${id}-hint`}
+					aria-invalid={(unknown && devices !== undefined) || undefined}
 				>
 					<SelectValue />
 				</SelectTrigger>

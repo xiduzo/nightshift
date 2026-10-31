@@ -30,7 +30,7 @@ export function useEditorData(projectId: string, name: string) {
 		() => connections?.map((connection) => connection.name),
 		[connections],
 	);
-	// Every Device's profiles a node may name, as the Host lists them.
+	// Every Device's profiles a node may name, and the Devices' names, as the Host lists them.
 	const devices = useQuery({
 		...runQueries.devices(projectId),
 		meta: { quietErrors: true },
@@ -47,6 +47,7 @@ export function useEditorData(projectId: string, name: string) {
 				untoldDevices: devices.data
 					.filter((device) => device.profiles === undefined)
 					.map((device) => device.deviceId),
+				deviceNames: devices.data.map((device) => device.name),
 			},
 		[devices.data],
 	);

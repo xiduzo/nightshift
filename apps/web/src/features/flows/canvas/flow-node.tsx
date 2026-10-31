@@ -29,6 +29,7 @@ import {
 } from "@xyflow/react";
 import {
 	CircleAlertIcon,
+	MonitorIcon,
 	PlayIcon,
 	TriangleAlertIcon,
 	VariableIcon,
@@ -443,6 +444,15 @@ const FlowNodeCard = memo(function FlowNodeCard({
 							name={node.flow}
 							prefix={runsEach(node) ? "Each runs" : "Runs"}
 						/>
+						{node.device !== undefined ? (
+							<span
+								className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground"
+								title={`Its steps run on ${node.device}`}
+							>
+								<MonitorIcon className="size-3 shrink-0" aria-hidden="true" />
+								<span className="truncate">On {node.device}</span>
+							</span>
+						) : null}
 					</div>
 				) : null}
 
