@@ -43,16 +43,8 @@ import {
 } from "@nightshift/ui-native/components/ui/text";
 import { Textarea } from "@nightshift/ui-native/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
+import { type Href, Redirect, router, useLocalSearchParams } from "expo-router";
 import {
-	type Href,
-	Link,
-	Redirect,
-	router,
-	useLocalSearchParams,
-} from "expo-router";
-import {
-	ChevronRight,
-	CircleAlert,
 	CircleCheck,
 	CircleDot,
 	CirclePlay,
@@ -76,8 +68,9 @@ import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
-import { CHECK_COPY } from "./answer-check";
+import { AskScreen } from "./ask-screen";
 import { ChoiceCards } from "./choice-cards";
+import { Breadcrumbs } from "./gate-breadcrumbs";
 import { nextGate } from "./gate-list";
 import { GateDeadline, GateStatus, RunSteps } from "./gate-times";
 import {
@@ -89,13 +82,10 @@ import {
 	stepsHint,
 } from "./gate-view";
 import { InlineMarkdown } from "./markdown";
+import { ProblemAlert } from "./problem-alert";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
-import {
-	type GoneRefusal,
-	type Problem,
-	useGateAnswer,
-} from "./use-gate-answer";
+import { type GoneRefusal, useGateAnswer } from "./use-gate-answer";
 import { useInbox } from "./use-inbox";
 
 /**
@@ -240,6 +230,22 @@ function OpenGateScreen({
 		pathname: "/runs/[runId]",
 		params: { runId: gate.runId },
 	};
+
+	// An Ask (ADR 10) is answered with a form, not a choice.
+	if (gate.form) {
+		return (
+			<AskScreen
+				gate={gate}
+				form={gate.form}
+				inbox={inbox}
+				manySpaces={manySpaces}
+				projectHere={projectHere}
+				onRefresh={onRefresh}
+				onSent={onSent}
+				onGone={onGone}
+			/>
+		);
+	}
 
 	return (
 		<Screen
@@ -448,69 +454,6 @@ function OpenGateScreen({
 	);
 }
 
-/**
- * "Acme › website › Fix the login bug": the run opens its screen, and so
- * does the project when it is in the Space this phone works in.
- */
-function Breadcrumbs({
-	gate,
-	manySpaces,
-	projectHere,
-	runHref,
-}: {
-	gate: OpenGate;
-	manySpaces: boolean;
-	projectHere: boolean;
-	runHref: Href;
-}) {
-	return (
-		<View className="flex-row flex-wrap items-center gap-x-1">
-			{manySpaces ? (
-				<>
-					<Text className="text-muted-foreground text-sm">
-						{gate.spaceName}
-					</Text>
-					<Icon as={ChevronRight} className="size-3.5 text-muted-foreground" />
-				</>
-			) : null}
-			<Crumb
-				label={gate.projectName}
-				href={
-					projectHere
-						? {
-								pathname: "/projects/[projectId]",
-								params: { projectId: gate.projectId },
-							}
-						: undefined
-				}
-			/>
-			<Icon as={ChevronRight} className="size-3.5 text-muted-foreground" />
-			<Crumb label={gate.runTitle} href={runHref} />
-		</View>
-	);
-}
-
-function Crumb({ label, href }: { label: string; href: Href | undefined }) {
-	if (!href) {
-		return (
-			<Text className="flex-shrink text-muted-foreground text-sm">{label}</Text>
-		);
-	}
-	return (
-		<Link href={href} asChild>
-			<Button
-				variant="link"
-				size="sm"
-				className="h-auto min-h-11 flex-shrink px-0 py-2"
-			>
-				<Text className="text-sm" numberOfLines={1}>
-					{label}
-				</Text>
-			</Button>
-		</Link>
-	);
-}
-
 const LINK_ICON: Record<GateLink["kind"], LucideIcon> = {
 	pull: GitPullRequest,
 	issue: CircleDot,
@@ -633,25 +576,5 @@ function ConfirmDialog({
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
-	);
-}
-
-function ProblemAlert({ problem }: { problem: Problem }) {
-	const copy =
-		problem.kind === "check"
-			? CHECK_COPY[problem.failure]
-			: problem.kind === "refused"
-				? gateRefusalText(problem.refusal)
-				: problem.kind === "unreachable"
-					? problem.text
-					: {
-							title: "Your answer was not sent",
-							description: `${problem.message} Check that this phone is online. Then send it again.`,
-						};
-	return (
-		<Alert icon={CircleAlert} variant="destructive">
-			<AlertTitle>{copy.title}</AlertTitle>
-			<AlertDescription>{copy.description}</AlertDescription>
-		</Alert>
 	);
 }

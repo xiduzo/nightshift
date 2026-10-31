@@ -42,6 +42,7 @@ export {
 	choiceItemSchema,
 	choicesFieldProblem,
 	formDataProblem,
+	isSimpleForm,
 	withChoices,
 } from "./ask";
 export {

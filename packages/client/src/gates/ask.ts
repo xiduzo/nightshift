@@ -4,6 +4,7 @@ import {
 	type AskForm,
 	askFields,
 	formDataProblem,
+	isSimpleForm,
 	type JsonValue,
 } from "@nightshift/flows";
 
@@ -33,6 +34,11 @@ export type AskOption = {
 /** The fields of the form, in the order of the schema. */
 export function askFormFields(form: AskForm): AskField[] {
 	return askFields(form.schema);
+}
+
+/** Whether the phone fills in the form itself: every field is text, a choice, a switch or a number. */
+export function phoneCanAnswer(form: AskForm): boolean {
+	return isSimpleForm(form.schema);
 }
 
 /** The options of a choice field: the run's choices for their field, else the `enum`. */
