@@ -20,12 +20,16 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
+	OTLP_HEADER_VARIABLES,
 	readOnlyInput,
 	type SessionReport,
 } from "../../session";
 import { harnessFacts } from "../facts";
 import { CLAUDE_CODE_PROFILE } from "./profile";
-import { claudeKnowsThinkingDisplay } from "./version";
+import {
+	claudeKeepsOtelFromCommands,
+	claudeKnowsThinkingDisplay,
+} from "./version";
 
 /** How a `claude` process is started. Shared by the harness and the decider. */
 export type ClaudeCodeProcessOptions = {
@@ -238,6 +242,9 @@ async function claudeCodeAdapter(
 	const { claudeCodeText } = await import("@tanstack/ai-claude-code");
 	const executable = options.claudeExecutable ?? "claude";
 	const showThinking = await claudeKnowsThinkingDisplay(executable);
+	// An older Claude Code hands its OTEL_* on to every command it runs: it
+	// gets no OTLP headers, and its own export goes out without them.
+	const keepsOtel = await claudeKeepsOtelFromCommands(executable);
 	const mcp = await writeMcpConfig(input.mcpServers);
 	const allowedTools = claudeAllowedTools(input, report.allowedTools);
 	const disallowedTools = claudeDisallowedTools(input, options.disallowedTools);
@@ -277,7 +284,11 @@ async function claudeCodeAdapter(
 			...options.env,
 		},
 	});
-	return { adapter, cleanup: mcp.cleanup };
+	return {
+		adapter,
+		cleanup: mcp.cleanup,
+		...(keepsOtel ? {} : { withoutEnv: OTLP_HEADER_VARIABLES }),
+	};
 }
 
 /** Runs Claude Code sessions through TanStack AI, on the host, in `input.cwd`. */

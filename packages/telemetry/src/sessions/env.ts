@@ -10,6 +10,13 @@ import type { ExportTarget } from "../otlp";
  * tool inputs and the replies stay out: each of those switches is set off,
  * whatever this computer's own environment says.
  *
+ * The headers go in `OTEL_EXPORTER_OTLP_HEADERS`, which Claude Code's
+ * exporter reads. The commands Claude Code runs (Bash, hooks, MCP servers)
+ * do not inherit its `OTEL_*` variables from 2.1.128 on (checked on
+ * 2.1.316: Bash sees none of them). The harness leaves the headers out
+ * for an older Claude Code, and a Command step never gets this
+ * environment at all.
+ *
  * Other harnesses get nothing: the engine's own spans and metrics cover
  * them. Codex has OTel logs only, set in its config (`-c otel.exporter`),
  * which would put the headers on its command line. Not here.

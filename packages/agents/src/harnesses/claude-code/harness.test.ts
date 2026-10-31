@@ -64,8 +64,8 @@ describe("claudeCommand", () => {
 	});
 });
 
-describe("claudeCodeHarness thinking and subagent text", () => {
-	async function firstRun(version: string) {
+describe("claudeCodeHarness thinking, subagent text and OTLP headers", () => {
+	async function firstRun(version: string, env?: Record<string, string>) {
 		const claudeLog = join(dir, "claude.jsonl");
 		const claude = await fakeBin(dir, "claude", "fake-claude", {
 			FAKE_CLAUDE_LOG: claudeLog,
@@ -73,11 +73,26 @@ describe("claudeCodeHarness thinking and subagent text", () => {
 		});
 		for await (const _ of claudeCodeHarness({
 			claudeExecutable: claude,
-		}).run(input())) {
+		}).run(input(env ? { env } : {}))) {
 			// Drain the session.
 		}
 		return JSON.parse((await readFile(claudeLog, "utf8")).trim());
 	}
+
+	const otel = {
+		OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
+		OTEL_EXPORTER_OTLP_HEADERS: "api-key=secret-1",
+	};
+
+	test("a Claude Code that keeps its OTEL_* from its commands gets the export's headers", async () => {
+		const run = await firstRun("2.1.128 (Claude Code)", otel);
+		expect(run.otlpHeaders).toBe("api-key=secret-1");
+	});
+
+	test("an older Claude Code would hand the headers to its commands: it gets none", async () => {
+		const run = await firstRun("2.1.127 (Claude Code)", otel);
+		expect(run.otlpHeaders).toBeNull();
+	});
 
 	test("a Claude Code that knows the flag shows its thinking", async () => {
 		const run = await firstRun("2.1.314 (Claude Code)");

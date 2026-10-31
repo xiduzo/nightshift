@@ -2,11 +2,12 @@
  * A fake `claude` for tests. Never talks to Anthropic.
  *
  * `--version` prints `$FAKE_CLAUDE_VERSION` (default `2.1.314 (Claude Code)`)
- * and nothing else. Any other call appends
- * `{ argv, prompt, tools, mcpConfigs, forwardSubagentText }` as one JSON
- * line to `$FAKE_CLAUDE_LOG` (`tools`: the bridge's `tools/list`, when there
+ * and nothing else. Any other call appends `{ argv, prompt, tools,
+ * mcpConfigs, forwardSubagentText, otlpHeaders }` as one JSON line to
+ * `$FAKE_CLAUDE_LOG` (`tools`: the bridge's `tools/list`, when there
  * is a bridge; `mcpConfigs`: every `--mcp-config` file, parsed;
- * `forwardSubagentText`: `$CLAUDE_CODE_FORWARD_SUBAGENT_TEXT`), then
+ * `forwardSubagentText`: `$CLAUDE_CODE_FORWARD_SUBAGENT_TEXT`;
+ * `otlpHeaders`: `$OTEL_EXPORTER_OTLP_HEADERS`), then
  * prints a stream-json session: an init message; each message of the JSON
  * array `$FAKE_CLAUDE_MESSAGES` as it is; for each entry of the JSON
  * array `$FAKE_CLAUDE_CALLS`, a call of that bridged tool over the real MCP
@@ -116,6 +117,7 @@ if (log) {
 			mcpConfigs: configs,
 			forwardSubagentText:
 				process.env.CLAUDE_CODE_FORWARD_SUBAGENT_TEXT ?? null,
+			otlpHeaders: process.env.OTEL_EXPORTER_OTLP_HEADERS ?? null,
 		})}\n`,
 	);
 }

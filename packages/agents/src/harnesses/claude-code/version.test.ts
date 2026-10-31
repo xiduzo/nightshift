@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	claudeCodeVersion,
 	claudeKnowsThinkingDisplay,
+	keepsOtelFromCommands,
 	knowsThinkingDisplay,
 } from "./version";
 
@@ -27,6 +28,15 @@ describe("knowsThinkingDisplay", () => {
 		expect(knowsThinkingDisplay([3, 0, 0])).toBe(true);
 		expect(knowsThinkingDisplay([1, 9, 999])).toBe(false);
 		expect(knowsThinkingDisplay(null)).toBe(false);
+	});
+});
+
+describe("keepsOtelFromCommands", () => {
+	test("from 2.1.128 on", () => {
+		expect(keepsOtelFromCommands([2, 1, 127])).toBe(false);
+		expect(keepsOtelFromCommands([2, 1, 128])).toBe(true);
+		expect(keepsOtelFromCommands([2, 1, 316])).toBe(true);
+		expect(keepsOtelFromCommands(null)).toBe(false);
 	});
 });
 

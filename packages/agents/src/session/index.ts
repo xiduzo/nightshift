@@ -8,6 +8,7 @@ export {
 	freePort,
 	type HarnessSpec,
 	harnessSession,
+	OTLP_HEADER_VARIABLES,
 	type SessionReport,
 } from "./adapter-session";
 export { ARTIFACT_TOOL_NAME } from "./artifact-tool";

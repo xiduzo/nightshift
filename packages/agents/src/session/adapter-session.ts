@@ -118,7 +118,35 @@ export type AdapterSetup = {
 	policy?: SandboxPolicy;
 	/** Runs after the session, always: temp files, config the session made. */
 	cleanup?: () => Promise<void>;
+	/**
+	 * Variables of the input's `env` this session leaves out, because this
+	 * harness would hand them on to the commands it runs: the OTLP headers
+	 * of a Claude Code that does not keep its `OTEL_*` to itself.
+	 */
+	withoutEnv?: readonly string[];
 };
+
+/**
+ * The variables that carry OTLP headers. A harness that exports its own
+ * telemetry reads them; the commands it runs must not see them.
+ */
+export const OTLP_HEADER_VARIABLES: readonly string[] = [
+	"OTEL_EXPORTER_OTLP_HEADERS",
+	"OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+	"OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+	"OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+];
+
+/** The input without the variables the adapter leaves out. */
+function inputWithout<T extends Pick<AgentSessionInput, "env">>(
+	input: T,
+	names: readonly string[] | undefined,
+): T {
+	if (!input.env || !names || names.length === 0) return input;
+	const env = { ...input.env };
+	for (const name of names) delete env[name];
+	return { ...input, env };
+}
 
 /**
  * The step report of one session, per the spec's `report`. Exported so an
@@ -362,7 +390,10 @@ export function harnessSession(options: {
 			const report = sessionReport(input, spec, options.allowedTools);
 			const setup = await options.adapter(report);
 			cleanup = setup.cleanup ?? cleanup;
-			const environment = await sessionEnvironment(input, spec);
+			const environment = await sessionEnvironment(
+				inputWithout(input, setup.withoutEnv),
+				spec,
+			);
 			cleanupEnv = environment.cleanup;
 
 			// One id per session: the sandbox middleware keys its in-memory

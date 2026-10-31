@@ -614,6 +614,25 @@ describe("exec", () => {
 		expect(events.filter((e) => e.type === "exit")).toHaveLength(1);
 	});
 
+	test("a command never sees the export's OTLP headers: only an agent's harness gets them", async () => {
+		const d = device({
+			sessionEnv: () => ({
+				env: { OTEL_EXPORTER_OTLP_HEADERS: "api-key=secret-1" },
+				values: ["secret-1"],
+			}),
+		});
+		const events = await collect(
+			d.exec({
+				command: 'printf "%s" "${OTEL_EXPORTER_OTLP_HEADERS-none}"',
+				cwd: sandbox.repoPath,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(
+			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join(""),
+		).toBe("none");
+	});
+
 	test("an abort kills the command: the exit has no code", async () => {
 		const controller = new AbortController();
 		const stream = device().exec({

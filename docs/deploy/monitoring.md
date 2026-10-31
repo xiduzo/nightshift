@@ -162,6 +162,17 @@ While the export is on, a Claude Code step starts with:
 - `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES`,
   `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` set to `0`.
 
+The commands that a step runs do not see your headers:
+
+- Claude Code 2.1.128 and later keeps its `OTEL_*` variables from the
+  commands it runs: Bash, hooks and MCP servers.
+- An older Claude Code would pass them on. Night Shift then leaves the
+  headers out, so its own export goes without them. Update Claude Code.
+- A Command step never gets the export's variables.
+
+One gap stays. On Linux, a command of the same user can read the
+environment of its parent process in `/proc`. On macOS it cannot.
+
 Other harnesses send nothing of their own. Night Shift's spans and metrics
 cover their steps. Codex can send OpenTelemetry logs through its own config
 (`-c otel.exporter=...`). Night Shift does not set it, because it puts your
