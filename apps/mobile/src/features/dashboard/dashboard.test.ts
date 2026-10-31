@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DashboardSummary } from "@nightshift/client";
 
-import { healthOf, hiddenText } from "./health";
+import { healthOf, hiddenText, offlineAlert, offlineText } from "./health";
 
 type Nights = DashboardSummary["nights"][number];
 type FlowHealth = NonNullable<DashboardSummary["flowHealth"]>;
@@ -121,6 +121,7 @@ describe("healthOf", () => {
 				share: 75,
 				detail: "3 of 4 finished · 1 failed",
 				more: null,
+				offline: null,
 				last: null,
 			},
 			{
@@ -130,6 +131,7 @@ describe("healthOf", () => {
 				share: 0,
 				detail: "0 of 3 finished · 3 failed",
 				more: null,
+				offline: null,
 				last: null,
 			},
 		]);
@@ -173,6 +175,7 @@ describe("healthOf", () => {
 				share: 67,
 				detail: "2 of 3 finished",
 				more: "1 did not finish",
+				offline: null,
 				last: { runId: "r1", status: "failed", startedAt: 9 },
 			},
 			{
@@ -182,6 +185,7 @@ describe("healthOf", () => {
 				share: null,
 				detail: "No run ended yet",
 				more: null,
+				offline: null,
 				last: null,
 			},
 			{
@@ -191,6 +195,7 @@ describe("healthOf", () => {
 				share: 67,
 				detail: "2 of 3 finished",
 				more: "Typical cost $0.40 · 1 did not finish",
+				offline: null,
 				last: { runId: "r1", status: "failed", startedAt: 9 },
 			},
 		]);
@@ -244,5 +249,60 @@ describe("healthOf", () => {
 		expect(hiddenText(0)).toBeNull();
 		expect(hiddenText(1)).toBe("1 more is not shown.");
 		expect(hiddenText(4)).toBe("4 more are not shown.");
+	});
+
+	test("says which flow waits for a computer that is offline", () => {
+		const row: FlowHealth["rows"][number] = {
+			name: "nightly",
+			last: null,
+			lastRuns: [],
+			runs: 1,
+			finished: 1,
+			ended: 1,
+			rate: 100,
+			cost: null,
+			unfinished: { count: 0, costUsd: 0 },
+			unknownCost: 0,
+			freeRuns: 0,
+		};
+		const health = healthOf(
+			summary({
+				flowHealth: { rows: [row, { ...row, name: "docs" }], count: 2 },
+			}),
+			new Map([["nightly", ["Mac mini"]]]),
+		);
+		expect(health?.rows.map((r) => r.offline)).toEqual([
+			"Mac mini is offline. Its steps wait until it is back.",
+			null,
+		]);
+	});
+});
+
+describe("offline computers", () => {
+	test("names the computers in a sentence", () => {
+		expect(offlineText([])).toBeNull();
+		expect(offlineText(["A", "B", "C"])).toBe(
+			"A, B and C are offline. Their steps wait until they are back.",
+		);
+	});
+
+	test("sums up the flows that need them", () => {
+		expect(offlineAlert(new Map())).toBeNull();
+		expect(offlineAlert(new Map([["nightly", ["Mac mini"]]]))).toEqual({
+			title: "Mac mini is offline",
+			description: "1 flow needs it. Those steps wait until it is back.",
+		});
+		expect(
+			offlineAlert(
+				new Map([
+					["nightly", ["Mac mini"]],
+					["docs", ["Mac mini", "Tower"]],
+				]),
+			),
+		).toEqual({
+			title: "2 computers are offline",
+			description:
+				"2 flows need Mac mini and Tower. Those steps wait until they are back.",
+		});
 	});
 });

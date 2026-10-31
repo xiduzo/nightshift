@@ -2,23 +2,30 @@ import {
 	createDashboardQueries,
 	createProjectQueries,
 } from "@nightshift/client";
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui-native/components/ui/alert";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
-import { Workflow } from "lucide-react-native";
+import { WifiOff, Workflow } from "lucide-react-native";
 
 import { useHostQueries } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
-import { healthOf } from "./health";
+import { healthOf, offlineAlert } from "./health";
 import { RunHealth } from "./run-health";
+import { useOfflineNeeds } from "./use-offline-needs";
 
 /**
  * How your flows did: the share of their runs that finished. With a
  * project, each flow of it; without one, each project over every Space you
- * are in. A sheet from Home (`/flows`) and from a project
+ * are in. In a project, a flow that needs a computer that is offline says
+ * so. A sheet from Home (`/flows`) and from a project
  * (`/flows?projectId=…`).
  */
 export function FlowHealthScreen({ projectId }: { projectId?: string }) {
@@ -36,7 +43,10 @@ export function FlowHealthScreen({ projectId }: { projectId?: string }) {
 	const project = projectId
 		? projects.data?.find((p) => p.id === projectId)
 		: undefined;
-	const health = summary.data ? healthOf(summary.data) : null;
+	// Only the flows of a project name their computers.
+	const offline = useOfflineNeeds(projectId);
+	const health = summary.data ? healthOf(summary.data, offline) : null;
+	const alert = offline ? offlineAlert(offline) : null;
 	const now = summary.data?.at ?? Date.now();
 
 	return (
@@ -47,6 +57,12 @@ export function FlowHealthScreen({ projectId }: { projectId?: string }) {
 			<Stack.Screen
 				options={{ title: project ? `Flows in ${project.name}` : "Flows" }}
 			/>
+			{alert ? (
+				<Alert icon={WifiOff} variant="destructive">
+					<AlertTitle>{alert.title}</AlertTitle>
+					<AlertDescription>{alert.description}</AlertDescription>
+				</Alert>
+			) : null}
 			{summary.data ? (
 				health ? (
 					<RunHealth health={health} now={now} />

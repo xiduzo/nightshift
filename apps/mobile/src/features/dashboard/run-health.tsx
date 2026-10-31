@@ -38,7 +38,15 @@ function HealthRowView({ row, now }: { row: HealthRow; now: number }) {
 	const look = last ? runStatusLook(last.status) : null;
 	const lastText = last ? `Last run ${agoLabel(last.startedAt, now)}` : null;
 	const share = row.share === null ? "No run ended" : `${row.share}% finished`;
-	const label = [row.label, share, row.detail, row.more, lastText, look?.label]
+	const label = [
+		row.label,
+		share,
+		row.detail,
+		row.more,
+		row.offline,
+		lastText,
+		look?.label,
+	]
 		.filter(Boolean)
 		.join(", ");
 
@@ -70,6 +78,9 @@ function HealthRowView({ row, now }: { row: HealthRow; now: number }) {
 			<Text className="text-muted-foreground text-sm">{row.detail}</Text>
 			{row.more ? (
 				<Text className="text-muted-foreground text-sm">{row.more}</Text>
+			) : null}
+			{row.offline ? (
+				<Text className="text-destructive text-sm">{row.offline}</Text>
 			) : null}
 			{last && look ? (
 				<View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">

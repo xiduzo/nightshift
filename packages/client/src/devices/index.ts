@@ -1,5 +1,6 @@
 /** Devices, pairing and Offers: their query options and view types. */
 
+export { type KnownComputer, knownComputers, offlineNeeds } from "./needs";
 export { platformName } from "./platform";
 export {
 	createDeviceQueries,
