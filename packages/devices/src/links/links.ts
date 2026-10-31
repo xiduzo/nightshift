@@ -1,16 +1,12 @@
 import type { HostClient, HostHello } from "../contract";
+import type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
 import {
 	type DeviceKeyStore,
 	type HostLink,
 	type HostLinks,
 	isHomeHost,
 } from "./host-links";
-import {
-	type HttpsLinkOptions,
-	httpsLink,
-	type Link,
-	type SyncedDocument,
-} from "./link";
+import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
 import type { LinkedHost } from "./types";
 
 /**
@@ -62,6 +58,8 @@ export function createDeviceLinks(deps: {
 	 * with the link's key and its pinned certificate (`hostClient`).
 	 */
 	hostClient?(address: string): HostClient;
+	/** The document channel of each link. Default: Hocuspocus (`hocuspocusChannel`). */
+	documentChannel?: OpenDocumentChannel;
 	/** For tests: shorter heartbeats and backoffs. */
 	linkOptions?: LinkOptions;
 }): DeviceLinks {
@@ -89,6 +87,9 @@ export function createDeviceLinks(deps: {
 		const started = httpsLink({
 			...deps.linkOptions,
 			...(deps.hostClient ? { clientFor: deps.hostClient } : {}),
+			...(deps.documentChannel
+				? { documentChannel: deps.documentChannel }
+				: {}),
 			link,
 			key: secret,
 			...(deps.documents

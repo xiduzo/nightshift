@@ -1,9 +1,8 @@
 /**
  * Test helpers of `@nightshift/engine`: a migrated database in a temporary
  * folder, a test device, the peers and the Device rows of a computer that is
- * alone, a run log and bus to write events into, a project's flows
- * (`seedFlows`), and a Space document brought to another Replica
- * (`syncSpaceDocument`). Also the engine's own stores and readers that
+ * alone, a run log and bus to write events into, and a project's flows
+ * (`seedFlows`). Also the engine's own stores and readers that
  * only tests build or read directly: production code reaches them through the
  * `Engine`, `openConfigStores` and the daemon's run files. Only tests
  * import this entry.
@@ -25,7 +24,6 @@ export { openRunBundle } from "../read/run-bundle";
 export { testKnowledge } from "./knowledge";
 export { runEvents } from "./run-events";
 export { seedFlows } from "./seed-flows";
-export { syncSpaceDocument } from "./space-sync";
 export {
 	createSandbox,
 	expectRunLogsInSync,

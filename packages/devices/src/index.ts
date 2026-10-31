@@ -46,8 +46,10 @@ export {
 	hostRouter,
 	type OtherDeviceView,
 	type PairingReviewView,
+	type ServedDocuments,
+	servedDocuments,
 } from "./host";
-export type { HostRole, JoinProgress } from "./links";
+export type { HostRole, JoinProgress, OpenDocumentChannel } from "./links";
 export type { Offers, OfferView, SpaceDeviceView } from "./offers";
 export { deviceDirectory, type PeerEngine } from "./peers";
 export {

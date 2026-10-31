@@ -4,7 +4,6 @@ import type { Context } from "@nightshift/api/context";
 import {
 	createAuth,
 	createLocalSession,
-	documentAccess,
 	hasLogin,
 	hostPolicyFromEnv,
 	localPerson,
@@ -20,8 +19,10 @@ import { migrateDb } from "@nightshift/db/migrate";
 import {
 	deviceDirectory,
 	type HostClient,
+	type OpenDocumentChannel,
 	selfDevice,
 	selfOwnerId,
+	servedDocuments,
 	setSelfOwner,
 	startDevices,
 } from "@nightshift/devices";
@@ -34,7 +35,6 @@ import {
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
-	documentRows,
 	localDevice,
 } from "@nightshift/engine";
 import {
@@ -129,6 +129,11 @@ export type DaemonOutside = {
 	 * over HTTPS, with the Link's key and its pinned certificate.
 	 */
 	hosts?: (address: string) => HostClient;
+	/**
+	 * The documents of the Hosts, as this computer's Links sync them.
+	 * Default: Hocuspocus to each Host's relay.
+	 */
+	documents?: OpenDocumentChannel;
 };
 
 /** Facts about this daemon that change only on a restart. */
@@ -503,6 +508,7 @@ export async function createDaemon(
 		moveRows: [deliveryMoves(db, sendsPushesFor(db, settings, person))],
 		kept: hot,
 		...(outside.hosts ? { hostClient: outside.hosts } : {}),
+		...(outside.documents ? { documentChannel: outside.documents } : {}),
 	});
 	const { engine } = devices;
 	// The runs this engine walks go to the monitoring while the export is on.
@@ -514,27 +520,23 @@ export async function createDaemon(
 	 * document here. Kept across `bun --hot` reloads with its connections,
 	 * like the document, and bound to this daemon's closures.
 	 */
-	const sync = await keepSync(slots, {
-		document: async (name) => (await documents.find(name))?.doc ?? null,
-		// On a Host: the documents of the Devices whose home Host this is.
-		kept: {
-			has: async (name) =>
-				(await engine.devices.keptDocumentOwner(name)) !== null,
-			...documentRows(db),
-		},
-		authorize: documentAccess({
-			auth,
+	const sync = await keepSync(
+		slots,
+		servedDocuments({
 			db,
-			localSession,
-			ownerId: person.userId,
-			isThisComputer: (peer, request) =>
-				isThisComputer(peer, request, trustedOrigins),
-			documentOf: (name) => documents.documentOf(name),
-			policy: hostPolicy,
-			keptOwner: (name) => engine.devices.keptDocumentOwner(name),
+			documents,
+			registry: engine.devices,
 			deviceKey: (token) => devices.host.syncKey(token),
+			sessions: {
+				auth,
+				localSession,
+				ownerId: person.userId,
+				isThisComputer: (peer, request) =>
+					isThisComputer(peer, request, trustedOrigins),
+				policy: hostPolicy,
+			},
 		}),
-	});
+	);
 
 	const { notifications, settings: computerSettings } = await wireNotifications(
 		{

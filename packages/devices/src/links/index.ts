@@ -1,6 +1,7 @@
 /** This computer's Links to the Hosts it paired with: the links it keeps, the Spaces of those Hosts, pairing from the Device's side, and the procedures it calls on a Host. */
 
 export { backoff, pause } from "./backoff";
+export type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
 export { fromHost } from "./from-host";
 export {
 	createHostLinks,
@@ -19,7 +20,7 @@ export {
 	personOnHost,
 } from "./host-spaces";
 export { joinHost } from "./join";
-export type { Link, SyncedDocument } from "./link";
+export type { Link } from "./link";
 export {
 	createDeviceLinks,
 	type DeviceLinks,

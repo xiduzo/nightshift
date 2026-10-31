@@ -2,16 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { daemonLease } from "@nightshift/db/schema";
+import { daemonLease, project as projectTable } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
-import { documentName } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
-import * as Y from "yjs";
+import { eq } from "drizzle-orm";
 
 import { createDaemon, type Daemon, type DaemonOutside } from "./daemon";
 import { type DaemonEnv, hot, processDatabase } from "./runtime";
@@ -59,7 +58,7 @@ function envIn(dataDir: string): DaemonEnv {
 /** A daemon in this process. The price list is never fetched (the network is never reached), and the OS's sleep lock is never taken. */
 async function start(
 	env: DaemonEnv,
-	outside: Pick<DaemonOutside, "hosts"> = {},
+	outside: Pick<DaemonOutside, "hosts" | "documents"> = {},
 ): Promise<Daemon> {
 	const daemon = await createDaemon(env, {
 		port: PORT,
@@ -189,14 +188,20 @@ describe("the daemon, wired in one process", () => {
 		// Paired by hand: A takes the daemon's Device, and the daemon keeps the Link.
 		const first = await start(env);
 		const key = await host.join(first.info.device.id, "B");
-		await host.link({
-			db: processDatabase(first.info.databaseUrl),
-			dataDir: first.info.dataDir,
-		});
+		await host.link(
+			{
+				db: processDatabase(first.info.databaseUrl),
+				dataDir: first.info.dataDir,
+			},
+			key,
+		);
 		// The Link starts with the daemon: its next start reaches A in memory.
 		await first.stop();
 		started.splice(started.indexOf(first), 1);
-		const daemon = await start(env, { hosts: () => host.memory.client(key) });
+		const daemon = await start(env, {
+			hosts: () => host.memory.client(key),
+			documents: host.memory.documentChannel,
+		});
 
 		type Overview = {
 			thisComputer: { hosts: { hostId: string; status: string }[] } | null;
@@ -209,13 +214,17 @@ describe("the daemon, wired in one process", () => {
 			{ label: "the Link to A online", timeoutMs: 15_000 },
 		);
 		// A's Space, as the Link syncs it: its project comes to the daemon.
-		const documents = hot.nightshiftDocuments;
-		if (!documents) throw new Error("The daemon keeps no documents.");
-		const name = documentName("space", a.spaceId);
-		const copy = await documents.open(name);
-		const source = await host.synced.open(name);
-		Y.applyUpdate(copy.doc, Y.encodeStateAsUpdate(source.doc));
-		await copy.flush();
+		const db = processDatabase(daemon.info.databaseUrl);
+		await waitFor(
+			async () =>
+				(
+					await db
+						.select({ id: projectTable.id })
+						.from(projectTable)
+						.where(eq(projectTable.id, project.id))
+				).length > 0,
+			{ label: "A's project on the daemon", timeoutMs: 15_000 },
+		);
 
 		await rpc(daemon, "spaces/switch", { spaceId: a.spaceId });
 		const run = await rpc<{

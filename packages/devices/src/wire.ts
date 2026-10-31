@@ -37,6 +37,7 @@ import {
 	deviceKeyStore,
 	type HostLink,
 	type LinkOptions,
+	type OpenDocumentChannel,
 	type SyncedDocument,
 } from "./links";
 import { createHomeMembership } from "./membership";
@@ -189,6 +190,11 @@ export type DevicesDeps = {
 	 * gives a Host in memory.
 	 */
 	hostClient?(address: string): HostClient;
+	/**
+	 * The document channel of this computer's Links. Default: Hocuspocus
+	 * to the Host's relay. A test gives a Host in memory.
+	 */
+	documentChannel?: OpenDocumentChannel;
 	/** Knobs for tests only. */
 	internals?: {
 		engine?: Parameters<typeof createPeerEngine>[1];
@@ -394,6 +400,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			};
 		},
 		...(deps.hostClient ? { hostClient: deps.hostClient } : {}),
+		...(deps.documentChannel ? { documentChannel: deps.documentChannel } : {}),
 		...(deps.internals?.links ? { linkOptions: deps.internals.links } : {}),
 	});
 

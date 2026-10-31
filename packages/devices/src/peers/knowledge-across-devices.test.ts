@@ -7,6 +7,7 @@ import {
 	type ExecEvent,
 	localDevice,
 	type SpaceArchive,
+	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -15,7 +16,6 @@ import {
 } from "@nightshift/engine/testing";
 import { kitFlow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import * as Y from "yjs";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 
 /**
@@ -23,7 +23,7 @@ import { type PairedReplicas, pairedReplicas } from "../testing";
  * are Devices of its owner, paired with it. Each reconciles its own
  * working copy; the content travels by hash through A's Space archive,
  * each Replica's peer engine connects its own archive to its relay, and
- * the knowledge documents sync as their Links sync them (here by hand).
+ * the knowledge documents sync over each Device's link to A, in memory.
  */
 
 let a: Sandbox;
@@ -58,13 +58,18 @@ afterEach(() => {
 
 /**
  * A Replica's knowledge, as the daemon assembles it: its folder, document
- * and reconcile over the Space archive of its peer engine, and itself as
- * a Device that runs commands.
+ * (one of the documents it syncs, `synced`) and reconcile over the Space
+ * archive of its peer engine, and itself as a Device that runs commands.
  */
-function knowledgeOn(sandbox: Sandbox, archive: SpaceArchive) {
-	const { knowledge, documents, folder, close } = testKnowledge(sandbox, {
+function knowledgeOn(
+	sandbox: Sandbox,
+	archive: SpaceArchive,
+	synced: SyncedDocuments,
+) {
+	const { knowledge, folder, close } = testKnowledge(sandbox, {
 		pageWaitMs: 10_000,
 		archive,
+		synced,
 	});
 	closes.push(close);
 	knowledge.connect({ inStep: async () => {} });
@@ -76,7 +81,6 @@ function knowledgeOn(sandbox: Sandbox, archive: SpaceArchive) {
 	});
 	const dir = () => folder(projectId);
 	return {
-		documents,
 		knowledge,
 		/** The folder in step with the Space, as the Knowledge page asks for it. */
 		reconcile: () => knowledge.listing(projectId),
@@ -102,23 +106,10 @@ function knowledgeOn(sandbox: Sandbox, archive: SpaceArchive) {
 			),
 	};
 }
-type Knowledge = ReturnType<typeof knowledgeOn>;
 
 /** The Host's own knowledge: its Spaces are its own, so content stays in its archive. */
 function hostKnowledge() {
-	return knowledgeOn(a, paired.host.archive);
-}
-
-/** The knowledge documents in step, as each Device's Link to A syncs them. */
-async function linked(host: Knowledge, ...devices: Knowledge[]) {
-	const docOf = async (k: Knowledge) => (await k.documents.open(projectId)).doc;
-	const hub = await docOf(host);
-	for (const device of devices) {
-		Y.applyUpdate(hub, Y.encodeStateAsUpdate(await docOf(device)));
-	}
-	for (const device of devices) {
-		Y.applyUpdate(await docOf(device), Y.encodeStateAsUpdate(hub));
-	}
+	return knowledgeOn(a, paired.host.archive, paired.hostSynced);
 }
 
 async function put(dir: string, path: string, text: string) {
@@ -131,8 +122,8 @@ describe("knowledge in the Space, across paired Devices", () => {
 		const third = await paired.pair(c, "C");
 		await third.projectOnDevice(projectId);
 		const onA = hostKnowledge();
-		const onB = knowledgeOn(b, paired.device.archive);
-		const onC = knowledgeOn(c, third.engine.archive);
+		const onB = knowledgeOn(b, paired.device.archive, paired.synced);
+		const onC = knowledgeOn(c, third.engine.archive, third.synced);
 
 		// A sync on B: a command step that writes into its knowledge.
 		const ran = await onB.exec(
@@ -145,7 +136,6 @@ describe("knowledge in the Space, across paired Devices", () => {
 		);
 		expect(archived).toHaveLength(1);
 
-		await linked(onA, onB, onC);
 		// A run on A, and a command on C: each reconciles before it reads.
 		await onA.reconcile();
 		const onCRead = await onC.exec('cat "$NS_KNOWLEDGE/wiki/Home.md"');
@@ -163,8 +153,8 @@ describe("knowledge in the Space, across paired Devices", () => {
 		const third = await paired.pair(c, "C");
 		await third.projectOnDevice(projectId);
 		const onA = hostKnowledge();
-		const onB = knowledgeOn(b, paired.device.archive);
-		const onC = knowledgeOn(c, third.engine.archive);
+		const onB = knowledgeOn(b, paired.device.archive, paired.synced);
+		const onC = knowledgeOn(c, third.engine.archive, third.synced);
 
 		// An agent's step on B proposed two learnings; its reconcile after the step publishes them.
 		await put(
@@ -173,7 +163,6 @@ describe("knowledge in the Space, across paired Devices", () => {
 			"# Learnings of run run-1\n\n- Run the tests with bun.\n- The API lives in packages/api.\n",
 		);
 		await onB.reconcile();
-		await linked(onA, onB, onC);
 		// The Knowledge page on A counts them.
 		expect((await onA.reconcile()).proposed).toBe(2);
 
@@ -187,7 +176,6 @@ describe("knowledge in the Space, across paired Devices", () => {
 		expect(ran.at(-1)).toMatchObject({ type: "exit", exitCode: 0 });
 		expect(await onC.has("learnings/proposed/run-1.md")).toBe(false);
 
-		await linked(onA, onB, onC);
 		await onB.reconcile();
 		await onA.reconcile();
 		for (const knowledge of [onA, onB]) {
@@ -201,17 +189,15 @@ describe("knowledge in the Space, across paired Devices", () => {
 
 	test("a Device that cannot reach its Host works on its own copy; its change reaches the others when the Host is back", async () => {
 		const onA = hostKnowledge();
-		const onB = knowledgeOn(b, paired.device.archive);
+		const onB = knowledgeOn(b, paired.device.archive, paired.synced);
 		await put(onB.dir(), "notes.md", "first\n");
 		await onB.reconcile();
-		await linked(onA, onB);
 		await onA.reconcile();
 
 		paired.memory.down();
 		await put(onB.dir(), "notes.md", "written offline\n");
 		// The step goes on: its change waits for the Host.
 		await onB.reconcile();
-		await linked(onA, onB);
 		await onA.reconcile();
 		expect(await onA.read("notes.md")).toBe("first\n");
 

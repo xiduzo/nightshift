@@ -1,5 +1,5 @@
 import { Hocuspocus } from "@hocuspocus/server";
-import type { SyncAuthorize } from "@nightshift/auth";
+import type { ServedDocuments } from "@nightshift/devices";
 import type { Server, ServerWebSocket, WebSocketHandler } from "bun";
 import * as Y from "yjs";
 
@@ -15,7 +15,7 @@ import * as Y from "yjs";
  *   the Replica on every update. Hocuspocus only carries their updates:
  *   when it loads one it takes the engine's state, and from then on every
  *   update goes both ways (the `BRIDGE` origin) until it unloads it.
- * - Kept documents (`KeptDocuments`): on a Host, the Device documents of
+ * - Kept documents: on a Host, the Device documents of
  *   the Devices whose home Host it is. The engine never opens them.
  *   Hocuspocus loads them from the Replica's `ydoc` rows (`documentRows`)
  *   and stores them back after changes, with its own debounce.
@@ -27,33 +27,12 @@ import * as Y from "yjs";
  * The next daemon keeps it and binds it to its own closures (`keepSync`).
  */
 
-/**
- * Documents a daemon keeps for others: a Host keeps the Device documents
- * of the Devices whose home Host it is. Hocuspocus loads them from the
- * Replica's `ydoc` rows and stores them back after changes.
- */
-export type KeptDocuments = {
-	/** Whether this daemon keeps a document of that name. */
-	has(name: string): boolean | Promise<boolean>;
-	fetch(name: string): Promise<Uint8Array | null>;
-	store(name: string, state: Uint8Array): Promise<void>;
-};
-
-/** What the relay reads, from the daemon that made it or kept it last. */
-export type SyncOptions = {
-	/** The live document the daemon owns under that name, or null. */
-	document: (name: string) => Y.Doc | null | Promise<Y.Doc | null>;
-	/** The documents it keeps for others. None by default. */
-	kept?: KeptDocuments;
-	authorize: SyncAuthorize;
-};
-
 export type Sync = {
 	/**
 	 * Reads `options` from now on: the closures of the next daemon after a
 	 * reload. The connections stay.
 	 */
-	rebind(options: SyncOptions): void;
+	rebind(options: ServedDocuments): void;
 	/** For the daemon's fetch handler: upgrades a request for the sync path. */
 	upgrade(request: Request, server: Server<SocketData>): Response | undefined;
 	/** Bun's WebSocket handlers for the upgraded sockets. */
@@ -96,7 +75,7 @@ export type SyncSlot = {
  */
 export async function keepSync(
 	slots: SyncSlot,
-	options: SyncOptions,
+	options: ServedDocuments,
 ): Promise<Sync> {
 	const sync = await slots.keep(
 		"nightshiftSync",
@@ -109,7 +88,7 @@ export async function keepSync(
 	return sync;
 }
 
-export function createSync(first: SyncOptions): Sync {
+export function createSync(first: ServedDocuments): Sync {
 	const unbind = new Map<string, () => void>();
 	let options = first;
 	const isKept = async (name: string) => {

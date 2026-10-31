@@ -2,7 +2,13 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import { createRouterClient, ORPCError } from "@orpc/server";
 import { type HostClient, type HostHello, hostContract } from "../contract";
 import type { HostExchange } from "../exchange";
-import { type HostPeerContext, hostRouter } from "../host";
+import {
+	type HostPeerContext,
+	hostRouter,
+	type ServedDocuments,
+} from "../host";
+import type { OpenDocumentChannel } from "../links";
+import { memoryDocuments } from "./memory-documents";
 
 /**
  * A Host in this process: the Host's own router (`hostRouter`), called
@@ -17,8 +23,11 @@ import { type HostPeerContext, hostRouter } from "../host";
  * - A plain Error inside a stream is an INTERNAL_SERVER_ERROR, as the RPC
  *   handler sends it.
  * - `down()` is the network gone: every call rejects with a TypeError, as
- *   a fetch does, and every open stream ends with one. `up()` brings it
- *   back.
+ *   a fetch does, and every open stream ends with one. No document syncs.
+ *   `up()` brings it back.
+ *
+ * With the Host's documents (`documents`) it is the document channel's
+ * second adapter too (`memoryDocuments`), beside Hocuspocus.
  *
  * Pairing is not served here, and the Host keeps no phones.
  */
@@ -31,6 +40,11 @@ export type MemoryHost = {
 	client(key: KeyOf): HostClient;
 	/** For `httpsLink({ clientFor })`: every address reaches this Host. */
 	clientFor(key: KeyOf): (address: string) => HostClient;
+	/**
+	 * The Host's documents as a link syncs them, for the token it sends
+	 * (`httpsLink({ documentChannel })`). Throws when the Host serves none.
+	 */
+	documentChannel: OpenDocumentChannel;
 	/** The network drops: calls reject, open streams end with an error. */
 	down(): void;
 	/** The network is back. */
@@ -51,8 +65,22 @@ export function inMemoryHost(deps: {
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** `link.leave`: the Host removes the Device's access (`Host.revoke`). Default: not served. */
 	revoke?(personId: string, deviceId: string): Promise<void>;
+	/** What the Host serves over the document channel. Default: no documents. */
+	documents?: ServedDocuments;
 }): MemoryHost {
 	let network = new AbortController();
+	const watchers = new Set<() => void>();
+	const documentChannel = deps.documents
+		? memoryDocuments(deps.documents, {
+				up: () => !network.signal.aborted,
+				watch(changed) {
+					watchers.add(changed);
+					return () => watchers.delete(changed);
+				},
+			})
+		: () => {
+				throw new Error("This Host in memory serves no documents.");
+			};
 
 	/** Throws as a fetch does while the network is down. */
 	function reachable(): AbortSignal {
@@ -122,11 +150,16 @@ export function inMemoryHost(deps: {
 	return {
 		client,
 		clientFor: (key) => () => client(key),
+		documentChannel,
 		down() {
+			if (network.signal.aborted) return;
 			network.abort();
+			for (const changed of watchers) changed();
 		},
 		up() {
-			if (network.signal.aborted) network = new AbortController();
+			if (!network.signal.aborted) return;
+			network = new AbortController();
+			for (const changed of watchers) changed();
 		},
 	};
 }

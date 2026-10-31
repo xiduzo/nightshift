@@ -1,13 +1,13 @@
-import {
-	HocuspocusProvider,
-	HocuspocusProviderWebsocket,
-} from "@hocuspocus/provider";
 import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
-import type * as Y from "yjs";
 import type { HostClient, HostHello } from "../contract";
-import { pinnedWebSocket } from "../reach";
 import { type Backoff, backoff, pause } from "./backoff";
+import {
+	type DocumentChannel,
+	hocuspocusChannel,
+	type OpenDocumentChannel,
+	type SyncedDocument,
+} from "./document-channel";
 import { hostClient } from "./host-client";
 import type { HostLink } from "./host-links";
 import type { LinkStatus } from "./types";
@@ -15,9 +15,10 @@ import type { LinkStatus } from "./types";
 /**
  * The `Link` port: a Device's outbound connection to one Host. The Host
  * never calls into a Device; everything goes out from the Device over its
- * link. `httpsLink` is the one adapter: oRPC with the Device key, and the
- * Hocuspocus WebSocket to the same origin. (A peer-to-peer adapter, iroh,
- * comes later: see docs/research/devices.md, "Connectivity".)
+ * link. `httpsLink` is the one adapter: oRPC with the Device key, and its
+ * document channel (`DocumentChannel`), by default the Hocuspocus
+ * WebSocket to the same origin. (A peer-to-peer adapter, iroh, comes
+ * later: see docs/research/devices.md, "Connectivity".)
  *
  * - It tries the Host's addresses in order and keeps the first that
  *   answers: the LAN name at home, the tailnet name in the tailnet, the
@@ -30,7 +31,7 @@ import type { LinkStatus } from "./types";
  * - The documents it syncs are the caller's (`documents`), asked again
  *   with every answer of the Host: one the caller no longer gives stops
  *   syncing.
- * - Every document goes over one WebSocket per link.
+ * - Every document goes over one channel per link.
  *
  * The link owns the life of every call over it. A long call (the exchange
  * of run history, the work of placed steps) is a named `stream`: it runs
@@ -83,9 +84,6 @@ export type Link = {
 	close(): Promise<void>;
 };
 
-/** A document a link syncs: the name the Host knows it by, and this Replica's copy. */
-export type SyncedDocument = { name: string; doc: Y.Doc };
-
 export type LinkState = {
 	status: LinkStatus;
 	/** The address that answers. Null while it looks for one. */
@@ -118,6 +116,8 @@ export type HttpsLinkOptions = {
 	onState?(state: LinkState): void;
 	/** The Host at one address. Default: `hostClient` with the key and the pin. */
 	clientFor?(address: string): HostClient;
+	/** The document channel to the Host at one address. Default: `hocuspocusChannel`. */
+	documentChannel?: OpenDocumentChannel;
 	now?: () => number;
 };
 
@@ -189,8 +189,8 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	let addresses = [...link.addresses];
 	let state: LinkState = { status: "connecting", address: null, since: now() };
 	let current: HostClient | null = null;
-	let socket: HocuspocusProviderWebsocket | null = null;
-	const providers = new Map<string, HocuspocusProvider>();
+	const openChannel = options.documentChannel ?? hocuspocusChannel;
+	let channel: DocumentChannel | null = null;
 	/** Aborts when the link drops: every stream stops. */
 	let online: AbortController | null = null;
 	const stop = new AbortController();
@@ -236,56 +236,24 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		options.onAddresses?.(next);
 	}
 
-	/** The one WebSocket of this link to the Host's relay. */
-	function socketTo(address: string): HocuspocusProviderWebsocket {
-		if (socket) return socket;
-		const url = new URL("/sync", address);
-		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-		// Bun's WebSocket does not fall back from `::1` to `127.0.0.1` as its
-		// fetch does, and a daemon on this computer listens on `127.0.0.1`.
-		if (url.hostname === "localhost") url.hostname = "127.0.0.1";
-		socket = new HocuspocusProviderWebsocket({
-			url: url.toString(),
-			WebSocketPolyfill: pinnedWebSocket(link.certificate),
-		});
-		return socket;
-	}
-
-	function attach(address: string, name: string, doc: Y.Doc) {
-		if (providers.has(name)) return;
-		const provider = new HocuspocusProvider({
-			websocketProvider: socketTo(address),
-			name,
-			document: doc,
-			token: key,
-			// The Host closed the socket (its owner may have removed this
-			// computer's access): ask now instead of at the next heartbeat.
-			onClose: check,
-		});
-		provider.attach();
-		providers.set(name, provider);
-	}
-
 	/** Syncs the documents the caller gives for this answer: the new ones attach, the gone ones detach. */
 	async function syncDocuments(address: string, hello: HostHello) {
 		if (!options.documents) return;
 		const listed = await options.documents(hello);
-		const names = new Set(listed.map((document) => document.name));
-		for (const [name, provider] of providers) {
-			if (names.has(name)) continue;
-			provider.destroy();
-			providers.delete(name);
-		}
-		for (const document of listed) {
-			attach(address, document.name, document.doc);
-		}
+		channel ??= openChannel({
+			address,
+			key,
+			certificate: link.certificate,
+			// The Host closed the channel (its owner may have removed this
+			// computer's access): ask now instead of at the next heartbeat.
+			closed: check,
+		});
+		channel.sync(listed);
 	}
 
 	function stopDocuments() {
-		for (const provider of providers.values()) provider.destroy();
-		providers.clear();
-		socket?.destroy();
-		socket = null;
+		channel?.close();
+		channel = null;
 	}
 
 	/**
@@ -459,10 +427,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		check,
 		async inStep(names, options = {}) {
 			const synced = () =>
-				names.every((name) => {
-					const provider = providers.get(name);
-					return provider?.isSynced === true && !provider.hasUnsyncedChanges;
-				});
+				names.length === 0 || channel?.inStep(names) === true;
 			if (synced()) return true;
 			check();
 			const end = now() + (options.timeoutMs ?? IN_STEP_MS);

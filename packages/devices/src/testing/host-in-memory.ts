@@ -1,4 +1,9 @@
-import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
+import {
+	type Auth,
+	createLocalSession,
+	type DeviceKeyAccess,
+	type SyncDeviceKey,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, user } from "@nightshift/db/schema";
 import {
@@ -17,11 +22,15 @@ import {
 	type Sandbox,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
-import * as Y from "yjs";
 import type { HostClient, HostHello, WorkRelay } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
-import { createHost } from "../host";
-import { type DeviceLinks, deviceKeyStore, type Link } from "../links";
+import { createHost, servedDocuments } from "../host";
+import {
+	type DeviceLinks,
+	deviceKeyStore,
+	type Link,
+	type OpenDocumentChannel,
+} from "../links";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { createRelay } from "../relay";
 import { createWorkHub } from "../work";
@@ -34,7 +43,11 @@ export type HostReplica = {
 	host: PeerEngine;
 	/** A's exchange, as its API serves it. */
 	hostExchange: HostExchange;
-	/** A's procedures in memory: `memory.client(key)` is what a Device calls. */
+	/**
+	 * A's procedures and documents in memory: `memory.client(key)` is what
+	 * a Device calls, and `memory.documentChannel` with the key's token
+	 * (`token`) what its link syncs.
+	 */
 	memory: MemoryHost;
 	/** A's Space documents: its engine's. */
 	documents: SpaceDocuments;
@@ -50,13 +63,19 @@ export type HostReplica = {
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** A's registry takes a Device of A's owner, as pairing does: its key on A. */
 	join(deviceId: string, name: string): Promise<DeviceKeyAccess>;
+	/** The token a Device sends with its key: A's relay knows it once the Device joined. */
+	token(key: DeviceKeyAccess): string;
 	/**
 	 * The Link of a Replica to A, as pairing leaves it: a `host_link` (A
-	 * is its home Host) and its key in the Replica's file key store. Its
-	 * address reaches nothing: the Host at an address is
-	 * `memory.client(key)`, as the Replica's runtime is told.
+	 * is its home Host) and the key's token in the Replica's file key
+	 * store. Its address reaches nothing: the Host at an address is
+	 * `memory.client(key)` and `memory.documentChannel`, as the Replica's
+	 * runtime is told.
 	 */
-	link(replica: { db: Database; dataDir: string }): Promise<void>;
+	link(
+		replica: { db: Database; dataDir: string },
+		key: DeviceKeyAccess,
+	): Promise<void>;
 };
 
 /** How A behaves as a Host. */
@@ -70,8 +89,11 @@ export type HostReplicaOptions = Partial<
 /**
  * Replica A as a Host, with "Be a Host" on, in this process: its engine
  * with its peers, its exchange of run history, and its procedures behind
- * `HostClient` (`inMemoryHost`). It serves no pairing: a Device joins by
- * hand (`join`, `link`). A's own relay has no links.
+ * `HostClient` (`inMemoryHost`), and its documents behind the document
+ * channel, served as the daemon serves them (`servedDocuments`, with
+ * `documentAccess`). It serves no pairing and no sessions: a Device joins
+ * by hand (`join`, `link`), and its key is checked by its token alone. A's
+ * own relay has no links.
  */
 export async function hostInMemory(
 	a: Sandbox,
@@ -117,7 +139,7 @@ export async function hostInMemory(
 	});
 	await settings.load();
 	const asHost = createHost({
-		auth: noPairing,
+		auth: noAuth,
 		db: a.db,
 		registry: host.devices,
 		settings,
@@ -135,10 +157,25 @@ export async function hostInMemory(
 		isHost: asHost.isHost,
 		work: createWorkHub(),
 	});
+	/** The Device keys A knows, by their token: what `Host.syncKey` verifies. */
+	const keys = new Map<string, SyncDeviceKey>();
+	const token = (key: DeviceKeyAccess) => `nsd_memory-${key.deviceId}`;
 	const memory = inMemoryHost({
 		exchange: hostExchange,
 		hello: asHost.hello,
 		revoke: asHost.revoke,
+		documents: servedDocuments({
+			db: a.db,
+			documents: synced,
+			registry: host.devices,
+			deviceKey: async (sent) => keys.get(sent) ?? null,
+			sessions: {
+				auth: noAuth,
+				localSession: createLocalSession(noAuth, a.db, personId),
+				ownerId: personId,
+				isThisComputer: () => false,
+			},
+		}),
 	});
 
 	return {
@@ -151,6 +188,7 @@ export async function hostInMemory(
 		hostId,
 		personId,
 		hello: asHost.hello,
+		token,
 		async join(deviceId, name) {
 			await host.devices.join({
 				id: deviceId,
@@ -160,7 +198,7 @@ export async function hostInMemory(
 				// A is its home Host, as its link says (`link`).
 				homeHost: "https://a.invalid",
 			});
-			return {
+			const key: DeviceKeyAccess = {
 				keyId: `key-${deviceId}`,
 				deviceId,
 				personId,
@@ -170,8 +208,10 @@ export async function hostInMemory(
 					archive: ["put", "get"],
 				},
 			};
+			keys.set(token(key), { deviceId, personId, home: true });
+			return key;
 		},
-		async link(replica) {
+		async link(replica, key) {
 			await replica.db.insert(hostLink).values({
 				hostId,
 				name: "A",
@@ -180,82 +220,32 @@ export async function hostInMemory(
 				personId,
 				keyStore: "file",
 			});
-			const keys = await deviceKeyStore({
+			const stored = await deviceKeyStore({
 				dataDir: replica.dataDir,
 				prefer: "file",
 			});
-			await keys.set(hostId, "memory");
+			await stored.set(hostId, token(key));
 		},
 	};
 }
 
-/** Better Auth for a Host that serves no pairing: any use of it fails. */
-const noPairing = new Proxy({} as Auth, {
+/** Better Auth for a Host that serves no pairing and no sessions: any use of it fails. */
+const noAuth = new Proxy({} as Auth, {
 	get() {
-		throw new Error("Pairing is not served in memory.");
+		throw new Error("Pairing and sessions are not served in memory.");
 	},
 });
 
 /**
- * A Replica's documents and its Host's, by name, as a Link in memory
- * compares them. Null: that side does not have it.
- */
-export type DocumentPairs = {
-	here(name: string): Promise<Y.Doc | null>;
-	host(name: string): Promise<Y.Doc | null>;
-};
-
-/**
- * Whether the Host's copy has every change of this Replica's: what the
- * Hocuspocus provider of a real Link waits for. Nothing syncs in memory:
- * a test that wants them in step copies the updates itself.
- */
-async function hostHasAll(documents: DocumentPairs, name: string) {
-	const here = await documents.here(name);
-	if (!here) return true;
-	const host = await documents.host(name);
-	const probe = new Y.Doc();
-	if (host) Y.applyUpdate(probe, Y.encodeStateAsUpdate(host));
-	const before = Y.snapshot(probe);
-	Y.applyUpdate(probe, Y.encodeStateAsUpdate(here));
-	const after = Y.snapshot(probe);
-	probe.destroy();
-	return Y.equalSnapshots(before, after);
-}
-
-/**
  * Links that are always online, one per Host: what a relay reads. They
  * run no streams: a test of the exchange starts its own `httpsLink`.
- * `inStep` compares the documents of `documents` (a link without them
- * cannot answer it): in step once the Host's copy has every change this
- * Replica made. It does not model the other half, this Replica taking
- * the Host's state.
+ * `inStep` asks the Host's document channel (`channels`), as a real link
+ * does: a link without one cannot answer it.
  */
 export function linksTo(
 	clients: Map<string, HostClient>,
-	documents?: DocumentPairs,
+	channels: Map<string, ReturnType<OpenDocumentChannel>> = new Map(),
 ): DeviceLinks {
-	async function inStep(
-		names: readonly string[],
-		options: { timeoutMs?: number; signal?: AbortSignal } = {},
-	): Promise<boolean> {
-		if (!documents) {
-			throw new Error("This link in memory compares no documents.");
-		}
-		const pairs = documents;
-		const all = async () => {
-			for (const name of names)
-				if (!(await hostHasAll(pairs, name))) return false;
-			return true;
-		};
-		const end = Date.now() + (options.timeoutMs ?? 10_000);
-		while (true) {
-			if (await all()) return true;
-			if (Date.now() >= end || options.signal?.aborted) return false;
-			await Bun.sleep(20);
-		}
-	}
-
 	const linkOf = (hostId: string, client: HostClient): Link => ({
 		hostId,
 		state: () => ({ status: "online", address: "memory", since: 0 }),
@@ -266,7 +256,18 @@ export function linksTo(
 		call: (use) => use(client),
 		ready: async () => client,
 		check: () => {},
-		inStep,
+		async inStep(names, options = {}) {
+			const channel = channels.get(hostId);
+			if (!channel) {
+				throw new Error("This link in memory syncs no documents.");
+			}
+			const end = Date.now() + (options.timeoutMs ?? 10_000);
+			while (true) {
+				if (channel.inStep(names)) return true;
+				if (Date.now() >= end || options.signal?.aborted) return false;
+				await Bun.sleep(20);
+			}
+		},
 		close: async () => {},
 	});
 	return {

@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import { member, user } from "@nightshift/db/schema";
+import { user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
 	createSyncedDocuments,
@@ -16,13 +16,11 @@ import {
 	mustGit,
 	type RunLog,
 	type Sandbox,
-	syncSpaceDocument,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
-import { eq } from "drizzle-orm";
-import * as Y from "yjs";
 import type { HostRelay, WorkRelay } from "../contract";
 import type { HostExchange } from "../exchange";
+import type { SyncedDocument } from "../links";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { createRelay } from "../relay";
 import { hostInMemory, linksTo } from "./host-in-memory";
@@ -50,21 +48,22 @@ export type PairedDevice = {
 	synced: SyncedDocuments;
 	/**
 	 * Brings a project of A to the Device, as its Link does: A's Space
-	 * document (every project of the Space) syncs to it, and its rows
-	 * follow. With `clone`, the Device adds its folder of the repository
-	 * too (A records the Clone), so it can walk its
-	 * runs.
+	 * document (every project of the Space) syncs to it, its rows follow,
+	 * and then the project's flow and knowledge documents sync. From then
+	 * on they stay in step by themselves, over A's document channel in
+	 * memory. With `clone`, the Device adds its folder of the repository
+	 * too (A records the Clone), so it can walk its runs.
 	 */
 	projectOnDevice(
 		projectId: string,
 		options?: { clone?: boolean },
 	): Promise<void>;
 	/**
-	 * Brings the Device's changes of a project's flows to A, as its Link
-	 * does. Its relay waits for this before a run starts on A: nothing
-	 * syncs in memory by itself.
+	 * The Device's documents in step with A, as its Link syncs them on
+	 * each answer of A: the documents of the Spaces A keeps for it, and
+	 * of the Projects they list. Resolves once they are in step.
 	 */
-	flowsToHost(projectId: string): Promise<void>;
+	syncWithHost(): Promise<void>;
 };
 
 /** Replica A as a Host and Replica B as its paired Device, in one process. */
@@ -77,7 +76,9 @@ export type PairedReplicas = {
 	deviceLog: RunLog;
 	/** A's exchange, as its API serves it. */
 	hostExchange: HostExchange;
-	/** A's procedures in memory: `memory.client(key)` is what B calls. */
+	/** Every document A syncs, by name: what A's document channel serves. */
+	hostSynced: SyncedDocuments;
+	/** A's procedures and documents in memory: `memory.client(key)` is what B calls. */
 	memory: MemoryHost;
 	/** B's Device key on A. */
 	key: DeviceKeyAccess;
@@ -93,8 +94,8 @@ export type PairedReplicas = {
 	synced: SyncedDocuments;
 	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
 	projectOnDevice: PairedDevice["projectOnDevice"];
-	/** Brings B's changes of a project's flows to A (`PairedDevice.flowsToHost`). */
-	flowsToHost: PairedDevice["flowsToHost"];
+	/** B's documents in step with A (`PairedDevice.syncWithHost`). */
+	syncWithHost: PairedDevice["syncWithHost"];
 	/** Pairs one more Device of A's owner with A, as B is: a third Replica. */
 	pair(sandbox: Sandbox, name: string): Promise<PairedDevice>;
 };
@@ -113,12 +114,12 @@ export type PairedOptions = Partial<Pick<TestEngineOptions, "harnesses">> & {
 };
 
 /**
- * Pairs B with A by hand, as pairing and the Host's documents would: A is
- * a Host in memory (`hostInMemory`), B is on A's registry with a key of
- * A's owner, B keeps A's Spaces (a `host_link`, the Host's Spaces, their
- * Members mirrored into B's Space documents), and each engine has its
- * relay. B reaches A through `memory` only: A's own relay has no links.
- * `pair` adds another Device the same way.
+ * Pairs B with A by hand, as pairing would: A is a Host in memory
+ * (`hostInMemory`), B is on A's registry with a key of A's owner, B keeps
+ * A's Spaces (a `host_link`, the Host's Spaces), and each engine has its
+ * relay. B reaches A through `memory` only, its procedures and its
+ * documents: A's own relay has no links. `pair` adds another Device the
+ * same way.
  */
 export async function pairedReplicas(
 	a: Sandbox,
@@ -145,14 +146,21 @@ export async function pairedReplicas(
 		});
 		const flows = createFlowDocuments({ db: sandbox.db, documents: synced });
 		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		// The Device's link to A syncs its documents over A's channel in memory.
+		const channel = memory.documentChannel({
+			address: "memory",
+			key: replica.token(key),
+			certificate: null,
+			closed: () => {},
+		});
 		const relay = createRelay({
 			engine: () => engine,
 			registry: () => engine.devices,
 			links: () =>
-				linksTo(new Map([[hostId, memory.client(key)]]), {
-					here: async (name) => (await synced.find(name))?.doc ?? null,
-					host: async (name) => (await replica.synced.find(name))?.doc ?? null,
-				}),
+				linksTo(
+					new Map([[hostId, memory.client(key)]]),
+					new Map([[hostId, channel]]),
+				),
 			flows,
 		});
 		const engine: PeerEngine = createPeerEngine(
@@ -170,7 +178,7 @@ export async function pairedReplicas(
 		);
 
 		// The Device keeps A's Spaces, as its link does with the Host's answer.
-		await replica.link(sandbox);
+		await replica.link(sandbox, key);
 		const [local] = await sandbox.db.select().from(user);
 		const listed = await hello(key);
 		await engine.hostSpaces.update(
@@ -178,27 +186,37 @@ export async function pairedReplicas(
 			listed.spaces,
 			local?.id as string,
 		);
-		// Their Members, as the Space documents mirror them.
-		for (const space of listed.spaces) {
-			const members = await a.db
-				.select({ id: user.id, name: user.name, role: member.role })
-				.from(member)
-				.innerJoin(user, eq(user.id, member.userId))
-				.where(eq(member.organizationId, space.id));
-			const document = await documents.open(space.id);
-			document.doc.transact(() => {
-				for (const m of members) {
-					document.members.set(m.id, { name: m.name, role: m.role });
-				}
-			});
-		}
 
-		async function flowsToHost(projectId: string) {
-			const here = await flows.open(projectId);
-			const there = await replica.flows.open(projectId);
-			for (const part of ["current", "history"] as const) {
-				Y.applyUpdate(there[part].doc, Y.encodeStateAsUpdate(here[part].doc));
-				await there[part].flush();
+		/**
+		 * What the link syncs on each answer of A: the documents of each
+		 * Space A keeps for the Device, and of its Projects here. A Project
+		 * comes with the Space document's rows, so it syncs again until the
+		 * list stays the same. The Device's own document does not sync in
+		 * memory.
+		 */
+		async function syncWithHost() {
+			let before = "";
+			for (let round = 0; round < 5; round++) {
+				const listed: SyncedDocument[] = [];
+				for (const spaceId of await engine.hostSpaces.ofHost(hostId)) {
+					for (const document of await synced.ofSpace(spaceId)) {
+						listed.push({ name: document.name, doc: document.doc });
+					}
+				}
+				channel.sync(listed);
+				const names = listed.map((document) => document.name);
+				const end = Date.now() + 10_000;
+				while (!channel.inStep(names)) {
+					if (Date.now() >= end) {
+						throw new Error(`${name}'s documents are not in step with A.`);
+					}
+					await Bun.sleep(5);
+				}
+				// Their rows follow them.
+				await synced.flush();
+				const now = names.join(",");
+				if (now === before) return;
+				before = now;
 			}
 		}
 
@@ -210,19 +228,20 @@ export async function pairedReplicas(
 			flows,
 			synced,
 			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
-				const { spaceId, remote } = await host.projects.find(projectId);
-				await syncSpaceDocument(replica.documents, documents, spaceId);
+				const { remote } = await host.projects.find(projectId);
+				await syncWithHost();
 				if (!withClone) return;
 				if (remote !== PAIRED_REMOTE) {
 					throw new Error(
 						`A's project ${projectId} is not of A's repository: the Device has no folder of it.`,
 					);
 				}
+				const { spaceId } = await host.projects.find(projectId);
 				await engine.space(spaceId).addProject({ repoPath: sandbox.repoPath });
-				// The Clone's import marks the flows: the Link brings that to A.
-				await flowsToHost(projectId);
+				// The Clone's import marks the flows: the link brings that to A.
+				await syncWithHost();
 			},
-			flowsToHost,
+			syncWithHost,
 		};
 	}
 
@@ -232,6 +251,7 @@ export async function pairedReplicas(
 		device: paired.engine,
 		deviceLog: paired.log,
 		hostExchange,
+		hostSynced: replica.synced,
 		memory,
 		key: paired.key,
 		hostId,
@@ -239,7 +259,7 @@ export async function pairedReplicas(
 		documents: paired.documents,
 		flows: paired.flows,
 		synced: paired.synced,
-		flowsToHost: paired.flowsToHost,
+		syncWithHost: paired.syncWithHost,
 		projectOnDevice: paired.projectOnDevice,
 		pair,
 	};

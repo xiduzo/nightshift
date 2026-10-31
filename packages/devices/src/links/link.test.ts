@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import type { SyncAccess } from "@nightshift/auth";
 import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
+import * as Y from "yjs";
 import type { HostHello } from "../contract";
-import { partialHostClient } from "../testing";
+import { memoryDocuments, partialHostClient } from "../testing";
 import type { HostLink } from "./host-links";
 import { firstAnswering, httpsLink, type LinkState } from "./link";
 
@@ -335,5 +337,133 @@ describe("httpsLink", () => {
 		const waiting = link.inStep(["flows:p"], { timeoutMs: 60_000 });
 		await link.close();
 		expect(await waiting).toBe(false);
+	});
+
+	describe("its documents, over the Host's document channel in memory", () => {
+		/**
+		 * A Host that serves `flows:p` to change, `space:s` to read, and
+		 * refuses `device:x`, as its access rules say for this key.
+		 */
+		function documentHost() {
+			const docs = new Map([
+				["flows:p", new Y.Doc()],
+				["space:s", new Y.Doc()],
+				["device:x", new Y.Doc()],
+			]);
+			const access: Record<string, SyncAccess> = {
+				"flows:p": "write",
+				"space:s": "read",
+			};
+			let up = true;
+			const watchers = new Set<() => void>();
+			const network = {
+				up: () => up,
+				watch(changed: () => void) {
+					watchers.add(changed);
+					return () => watchers.delete(changed);
+				},
+				set(next: boolean) {
+					up = next;
+					for (const changed of watchers) changed();
+				},
+			};
+			const channel = memoryDocuments(
+				{
+					document: (name) => docs.get(name) ?? null,
+					authorize: ({ documentName, token }) =>
+						token === "nsd_key" && (access[documentName] ?? false),
+				},
+				network,
+			);
+			const host = fakeHost({
+				"https://studio.local": () => Promise.resolve(hello([])),
+			});
+			/** This Replica's copies, the ones the link gives now. */
+			const here = new Map<string, Y.Doc>();
+			const link = httpsLink({
+				link: LINK,
+				key: "nsd_key",
+				clientFor: host.clientFor,
+				heartbeatMs: 20,
+				documentChannel: channel,
+				documents: async () => [...here].map(([name, doc]) => ({ name, doc })),
+			});
+			const on = (name: string) => docs.get(name)?.getMap("m");
+			return { link, here, network, on };
+		}
+
+		test("a document it may change syncs both ways and is in step", async () => {
+			const { link, here, on } = documentHost();
+			const flows = new Y.Doc();
+			here.set("flows:p", flows);
+			on("flows:p")?.set("from", "the Host");
+			expect(await link.inStep(["flows:p"])).toBe(true);
+			expect(flows.getMap("m").get("from")).toBe("the Host");
+
+			flows.getMap("m").set("saved", "here");
+			expect(on("flows:p")?.get("saved")).toBe("here");
+			expect(await link.inStep(["flows:p"], { timeoutMs: 0 })).toBe(true);
+			await link.close();
+		});
+
+		test("a read-only document takes the Host's changes, and its own change keeps it out of step", async () => {
+			const { link, here, on } = documentHost();
+			const space = new Y.Doc();
+			here.set("space:s", space);
+			expect(await link.inStep(["space:s"])).toBe(true);
+			on("space:s")?.set("project", "shop");
+			expect(space.getMap("m").get("project")).toBe("shop");
+
+			space.getMap("m").set("project", "changed here");
+			expect(on("space:s")?.get("project")).toBe("shop");
+			expect(await link.inStep(["space:s"], { timeoutMs: 100 })).toBe(false);
+			await link.close();
+		});
+
+		test("a document the Host refuses never syncs and is never in step", async () => {
+			const { link, here, on } = documentHost();
+			const other = new Y.Doc();
+			here.set("device:x", other);
+			on("device:x")?.set("secret", "names");
+			expect(await link.inStep(["device:x"], { timeoutMs: 100 })).toBe(false);
+			expect(other.getMap("m").size).toBe(0);
+			await link.close();
+		});
+
+		test("while the network is down nothing syncs; when it is back, the edits of both sides merge", async () => {
+			const { link, here, network, on } = documentHost();
+			const flows = new Y.Doc();
+			here.set("flows:p", flows);
+			expect(await link.inStep(["flows:p"])).toBe(true);
+
+			network.set(false);
+			flows.getMap("m").set("a", "on the Device");
+			on("flows:p")?.set("b", "on the Host");
+			expect(await link.inStep(["flows:p"], { timeoutMs: 50 })).toBe(false);
+			expect(on("flows:p")?.has("a")).toBe(false);
+
+			network.set(true);
+			expect(await link.inStep(["flows:p"])).toBe(true);
+			expect(flows.getMap("m").toJSON()).toEqual({
+				a: "on the Device",
+				b: "on the Host",
+			});
+			expect(on("flows:p")?.get("a")).toBe("on the Device");
+			await link.close();
+		});
+
+		test("a document the caller no longer gives stops syncing at the next answer of the Host", async () => {
+			const { link, here, on } = documentHost();
+			const flows = new Y.Doc();
+			here.set("flows:p", flows);
+			expect(await link.inStep(["flows:p"])).toBe(true);
+
+			here.delete("flows:p");
+			await Bun.sleep(100);
+			on("flows:p")?.set("later", "on the Host");
+			expect(flows.getMap("m").has("later")).toBe(false);
+			expect(await link.inStep(["flows:p"], { timeoutMs: 0 })).toBe(false);
+			await link.close();
+		});
 	});
 });

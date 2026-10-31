@@ -3,6 +3,10 @@
 export { createDevices } from "./devices";
 export { createHost, type Host, type PendingPairings } from "./host";
 export { type HostPeerContext, type HostPhones, hostRouter } from "./router";
+export {
+	type ServedDocuments,
+	servedDocuments,
+} from "./served-documents";
 export type {
 	Devices,
 	DevicesOverview,

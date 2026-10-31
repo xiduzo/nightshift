@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { createSpaceArchive, type SpaceArchive } from "../archive";
+import type { SyncedDocuments } from "../documents";
 import { createKnowledgeFolders } from "../knowledge/folder";
 import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
 import { createProjectKnowledge } from "../knowledge/project-knowledge";
@@ -14,11 +15,23 @@ import { createKnowledgeSearch } from "../knowledge/search";
  */
 export function testKnowledge(
 	sandbox: { db: Database; dataDir: string; deviceId: string },
-	options: { pageWaitMs?: number; archive?: SpaceArchive } = {},
+	options: {
+		pageWaitMs?: number;
+		archive?: SpaceArchive;
+		/** The Replica's synced documents, as its Link syncs them. Default: its own over `db`. */
+		synced?: SyncedDocuments;
+	} = {},
 ) {
-	const { archive = createSpaceArchive(sandbox.dataDir), ...rest } = options;
+	const {
+		archive = createSpaceArchive(sandbox.dataDir),
+		synced,
+		...rest
+	} = options;
 	const search = createKnowledgeSearch(sandbox.dataDir);
-	const documents = createKnowledgeDocuments({ db: sandbox.db });
+	const documents = createKnowledgeDocuments({
+		db: sandbox.db,
+		...(synced ? { documents: synced } : {}),
+	});
 	const knowledge = createProjectKnowledge({
 		db: sandbox.db,
 		dataDir: sandbox.dataDir,
