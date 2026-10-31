@@ -68,7 +68,7 @@ logs in ClickHouse. It has dashboards and alerts for GenAI spans.
 2. On the Host, set the address to SigNoz's OTLP/HTTP receiver, for example
    `http://signoz-otel-collector:4318`.
 
-Alerts on `nightshift.run.outcome` with `end_reason="failed"`, or on
+Alerts on `nightshift.run.outcome` with `nightshift.run.status="failed"`, or on
 `nightshift.run.cost_usd`, tell you about a bad night.
 
 ## LangSmith, through your collector
@@ -132,15 +132,14 @@ conventions of OpenTelemetry, which are still in development.
 
 | Metric | Kind | Attributes |
 | --- | --- | --- |
-| `nightshift.run.duration` (s) | histogram | `end_reason` |
+| `nightshift.run.duration` (s) | histogram | `nightshift.run.status` |
 | `nightshift.step.duration` (s) | histogram | `nightshift.node.kind`, `nightshift.step.outcome`, `nightshift.agent` |
-| `nightshift.run.cost_usd` | counter | `basis` (`billed`, `estimated`), `nightshift.agent`, `gen_ai.request.model` |
+| `nightshift.run.cost_usd` | counter | `basis` (`billed`, `estimated`), `nightshift.agent`, `gen_ai.request.model`: the same cost as the Spend tab, also for a run that was cut short |
 | `nightshift.tokens` | counter | `type` (`input`, `output`, `cache_read`, `cache_write`) |
 | `nightshift.retries` | counter | `nightshift.node.kind`: a step that ran again |
 | `nightshift.gate.wait` (s) | histogram | how long Gates waited for a person |
-| `nightshift.run.outcome` | counter | `end_reason` (`finished`, `failed`, `stopped`, ...) |
-| `nightshift.score` | counter | `nightshift.score.name`, `nightshift.score.label`: a Gate answered, a pull request outcome |
-| `nightshift.pr.outcome` | counter | `outcome` (`merged`, `closed`, `reverted`) |
+| `nightshift.run.outcome` | counter | `nightshift.run.status` (`finished`, `failed`, `stopped`, ...) |
+| `nightshift.score` | counter | `nightshift.score.name`, `nightshift.score.label`, `nightshift.score.by` (`person`, `deadline`): a Gate answered |
 
 Each point also has `nightshift.project.id`, `nightshift.flow.id` and
 `nightshift.device.id`. No point has the id of one run or step, so there are

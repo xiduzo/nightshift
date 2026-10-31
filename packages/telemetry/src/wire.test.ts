@@ -133,39 +133,6 @@ function cutShortRun() {
 		.ended("interrupted");
 }
 
-const fact = (
-	extra:
-		| { kind: "step-ended"; stepId: string; seq: number }
-		| { kind: "run-ended"; seq: number }
-		| {
-				kind: "scored";
-				seq: number;
-				score: "gate_decision" | "pr_merged";
-				label: string | null;
-		  },
-): LandedFact => {
-	const base = {
-		spaceId: "space-1",
-		runId: "run-1",
-		changes: "summary" as const,
-	};
-	if (extra.kind === "run-ended") {
-		return { ...base, seq: extra.seq, kind: "run-ended", status: "finished" };
-	}
-	if (extra.kind === "scored") {
-		return {
-			...base,
-			seq: extra.seq,
-			kind: "scored",
-			stepId: null,
-			score: extra.score,
-			value: 1,
-			label: extra.label,
-		};
-	}
-	return { ...base, seq: extra.seq, kind: "step-ended", stepId: extra.stepId };
-};
-
 type Monitoring = {
 	telemetry: boolean;
 	telemetryEndpoint: string;
@@ -366,7 +333,7 @@ describe("the export to monitoring", () => {
 		expect(
 			points
 				.get("nightshift.run.outcome")
-				?.map((p) => [p.attributes.end_reason, p.value]),
+				?.map((p) => [p.attributes["nightshift.run.status"], p.value]),
 		).toEqual([["finished", 1]]);
 		const runDuration = points.get("nightshift.run.duration")?.[0]
 			?.value as Histogram;
@@ -407,22 +374,21 @@ describe("the export to monitoring", () => {
 		expect(sum(cost, { "nightshift.agent": "codex" })).toBeCloseTo(0.4);
 	});
 
-	test("a score counts, and a merged pull request counts as an outcome", async () => {
-		const h = await setup();
-		h.land([
-			fact({ kind: "scored", seq: 50, score: "gate_decision", label: "yes" }),
-			fact({ kind: "scored", seq: 51, score: "pr_merged", label: null }),
-		]);
+	test("a Gate's answer counts as a score, with who chose", async () => {
+		const run = nightRun().push(
+			"Scored",
+			{ score: "gate_decision", value: 1, label: "yes", by: "person" },
+			{ stepId: "s-gate" },
+		);
+		const h = await setup({}, run);
+		h.landRun();
 		await h.done();
-		const points = h.points();
 		expect(
-			sum(points.get("nightshift.score"), {
+			sum(h.points().get("nightshift.score"), {
 				"nightshift.score.name": "gate_decision",
 				"nightshift.score.label": "yes",
+				"nightshift.score.by": "person",
 			}),
-		).toBe(1);
-		expect(
-			sum(points.get("nightshift.pr.outcome"), { outcome: "merged" }),
 		).toBe(1);
 	});
 

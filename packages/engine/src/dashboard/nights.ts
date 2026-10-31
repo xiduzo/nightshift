@@ -37,9 +37,10 @@ export type PlacedRun = { run: RunSummary; night: number; group: string };
 type PlacedGate = AskedGate & { night: number };
 
 /**
- * Every Gate the runs asked. A Gate that closed when its run ended, without
- * the run finishing, was not answered: the run stopped or failed while it
- * waited. So was one left open by a run that no longer waits.
+ * Every Gate the runs asked. A Gate is answered when a person chose its
+ * option. One whose deadline chose, or that closed with no answer (its
+ * run stopped or failed while it waited), was not answered. An open one
+ * waits while its run waits.
  */
 export function askedGates(
 	runs: readonly PlacedRun[],
@@ -49,13 +50,11 @@ export function askedGates(
 	return runs.flatMap(({ run, group }) =>
 		run.gates.map((gate, index) => {
 			const state: GateState =
-				gate.closedAt === null
-					? run.status === "waiting"
+				gate.answeredBy === "person"
+					? "answered"
+					: gate.closedAt === null && run.status === "waiting"
 						? "waiting"
-						: "unanswered"
-					: gate.closedAt === run.endedAt && run.status !== "finished"
-						? "unanswered"
-						: "answered";
+						: "unanswered";
 			return {
 				key: `${run.id}-${index}`,
 				runId: run.id,

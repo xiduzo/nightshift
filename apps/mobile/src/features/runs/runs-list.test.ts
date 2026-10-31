@@ -135,7 +135,13 @@ describe("rowValue", () => {
 		const sleeping = run({
 			status: "sleeping",
 			createdAt: NOW - 60 * MIN,
-			gates: [{ openedAt: NOW - 50 * MIN, closedAt: NOW - 40 * MIN }],
+			gates: [
+				{
+					openedAt: NOW - 50 * MIN,
+					closedAt: NOW - 40 * MIN,
+					answeredBy: null,
+				},
+			],
 			sleeps: [
 				{ from: NOW - 30 * MIN, to: NOW - 20 * MIN },
 				{ from: NOW - 15 * MIN, to: null },
@@ -152,9 +158,13 @@ describe("rowValue", () => {
 			status: "waiting",
 			createdAt: NOW - 90 * MIN,
 			gates: [
-				{ openedAt: NOW - 80 * MIN, closedAt: NOW - 70 * MIN },
-				{ openedAt: NOW - 25 * MIN, closedAt: null },
-				{ openedAt: NOW - 5 * MIN, closedAt: null },
+				{
+					openedAt: NOW - 80 * MIN,
+					closedAt: NOW - 70 * MIN,
+					answeredBy: null,
+				},
+				{ openedAt: NOW - 25 * MIN, closedAt: null, answeredBy: null },
+				{ openedAt: NOW - 5 * MIN, closedAt: null, answeredBy: null },
 			],
 		});
 		expect(rowValue(waiting, NOW)).toEqual({

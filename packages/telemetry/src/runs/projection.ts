@@ -35,7 +35,7 @@ import { meterOf, type RunningExport } from "../otlp";
  * - `run-ended`: the run's span (`invoke_workflow {flow}`), the trace's
  *   root; a resumed run's later end is a span under it. Its time and how
  *   it ended.
- * - `scored`: a score, and for a pull request what became of it.
+ * - `scored`: a score, with its name, label and who answered a Gate.
  */
 
 /** The run as the engine derives it, or null when it has none. */
@@ -52,7 +52,6 @@ type Instruments = {
 	retries: Counter;
 	gateWait: Histogram;
 	runOutcome: Counter;
-	prOutcome: Counter;
 	score: Counter;
 };
 
@@ -82,13 +81,9 @@ function instruments(running: RunningExport): Instruments {
 			METRIC.runOutcome,
 			"Runs that ended, by how they ended.",
 		),
-		prOutcome: counter(
-			METRIC.prOutcome,
-			"What became of the pull requests runs opened.",
-		),
 		score: counter(
 			METRIC.score,
-			"Feedback on runs: Gate answers, pull request outcomes.",
+			"Feedback on runs: Gate answers, and later pull request outcomes.",
 		),
 	};
 }
@@ -283,9 +278,9 @@ export function createRunProjection(deps: {
 		const point = { ...runMetricAttributes(run), [ATTR.deviceId]: deviceId };
 		m.runDuration.record(Math.max(end.at - from, 0) / 1000, {
 			...point,
-			[ATTR.endReason]: end.status,
+			[ATTR.status]: end.status,
 		});
-		m.runOutcome.add(1, { ...point, [ATTR.endReason]: end.status });
+		m.runOutcome.add(1, { ...point, [ATTR.status]: end.status });
 	}
 
 	function scored(
@@ -297,14 +292,8 @@ export function createRunProjection(deps: {
 			...point,
 			[ATTR.score]: fact.score,
 			...(fact.label ? { [ATTR.scoreLabel]: fact.label } : {}),
+			...(fact.by ? { [ATTR.scoreBy]: fact.by } : {}),
 		});
-		const pr: Record<string, string> = {
-			pr_merged: "merged",
-			pr_closed: "closed",
-			reverted_within_7d: "reverted",
-		};
-		const outcome = pr[fact.score];
-		if (outcome) m.prOutcome.add(1, { ...point, [ATTR.prOutcome]: outcome });
 	}
 
 	async function one(fact: LandedFact): Promise<void> {

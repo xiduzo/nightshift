@@ -23,6 +23,7 @@ export const ATTR = {
 	toolName: "gen_ai.tool.name",
 	deviceId: "nightshift.device.id",
 	trigger: "nightshift.run.trigger",
+	/** How a run ended (`finished`, `failed`, `stopped`, ...): on its span and its metric points. */
 	status: "nightshift.run.status",
 	reason: "nightshift.run.reason",
 	resumed: "nightshift.run.resumed",
@@ -32,12 +33,11 @@ export const ATTR = {
 	basis: "basis",
 	/** On `nightshift.tokens`: `input`, `output`, `cache_read`, `cache_write`. */
 	tokenType: "type",
-	/** On `nightshift.run.outcome`: how the run ended. */
-	endReason: "end_reason",
-	/** On `nightshift.score` and `nightshift.pr.outcome`. */
+	/** On `nightshift.score`. */
 	score: "nightshift.score.name",
 	scoreLabel: "nightshift.score.label",
-	prOutcome: "outcome",
+	/** On `nightshift.score` for a Gate's answer: who chose, `person` or `deadline`. */
+	scoreBy: "nightshift.score.by",
 	serviceName: "service.name",
 	serviceInstance: "service.instance.id",
 } as const;
@@ -58,7 +58,6 @@ export const METRIC = {
 	retries: { name: "nightshift.retries", unit: "{step}" },
 	gateWait: { name: "nightshift.gate.wait", unit: "s" },
 	runOutcome: { name: "nightshift.run.outcome", unit: "{run}" },
-	prOutcome: { name: "nightshift.pr.outcome", unit: "{pull_request}" },
 	score: { name: "nightshift.score", unit: "{score}" },
 } as const;
 

@@ -254,7 +254,7 @@ describe("activeBetween", () => {
 			sleeps: [
 				{ from: 10, to: 14, reason: "duration", signal: null, opening: 0 },
 			],
-			gateWaits: [{ from: 14, to: 20, opening: 0 }],
+			gateWaits: [{ from: 14, to: 20, opening: 0, answeredBy: null }],
 		});
 		expect(activeBetween(atGate, 0, 30)).toBe(false);
 	});

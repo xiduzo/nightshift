@@ -10,6 +10,7 @@ import {
 	sessionCost,
 } from "../log";
 import { runEvents as log } from "../testing/run-events";
+import { runFacts } from "./read-model";
 import { deriveScores } from "./run-metrics";
 import { runTrace } from "./run-trace";
 import {
@@ -475,8 +476,13 @@ describe("gates", () => {
 			b.events.filter((e) => e.type === type)[index]?.at ?? 0;
 		const waits = () => deriveSteps(b.state()).flatMap((s) => s.gateWaits);
 		expect(waits()).toEqual([
-			{ from: at("GateOpened"), to: at("StepEnded"), opening: 0 },
-			{ from: at("GateOpened", 1), to: null, opening: 0 },
+			{
+				from: at("GateOpened"),
+				to: at("StepEnded"),
+				opening: 0,
+				answeredBy: null,
+			},
+			{ from: at("GateOpened", 1), to: null, opening: 0, answeredBy: null },
 		]);
 
 		b.ended("stopped");
@@ -1004,6 +1010,38 @@ describe("one place decides when a step ends", () => {
 		]);
 	});
 
+	test("a Gate's answer score tells who answered its wait", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1")
+			.stepEnded("s1", "approve")
+			.push(
+				"Scored",
+				{ score: "gate_decision", value: 1, label: "approve", by: "deadline" },
+				{ stepId: "s1" },
+			)
+			.stepStarted("s2", "gate", 2)
+			.gateOpened("s2")
+			.stepEnded("s2", "approve")
+			.push(
+				"Scored",
+				{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+				{ stepId: "s2" },
+			)
+			.stepStarted("s3", "gate", 3)
+			.gateOpened("s3")
+			.ended("stopped");
+		expect(
+			deriveSteps(b.state()).map((s) => s.gateWaits[0]?.answeredBy),
+		).toEqual(["deadline", "person", null]);
+		expect(runFacts(b.state()).gates.map((g) => g.answeredBy)).toEqual([
+			"deadline",
+			"person",
+			null,
+		]);
+	});
+
 	test("a GateOpened again while the Gate waits opens no second wait", () => {
 		const b = log()
 			.runStarted()
@@ -1011,11 +1049,11 @@ describe("one place decides when a step ends", () => {
 			.gateOpened("s1")
 			.gateOpened("s1");
 		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
-			{ from: 1002, to: null, opening: 0 },
+			{ from: 1002, to: null, opening: 0, answeredBy: null },
 		]);
 		b.stepEnded("s1", "approve");
 		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
-			{ from: 1002, to: 1004, opening: 0 },
+			{ from: 1002, to: 1004, opening: 0, answeredBy: null },
 		]);
 		expect(runTrace(b.state())?.steps[0]?.ends[0]?.gateWaits).toHaveLength(1);
 	});
@@ -1046,6 +1084,7 @@ describe("one place decides when a step ends", () => {
 				label: "approve",
 				stepId: "s1",
 				at: 1002,
+				by: "person",
 			},
 		]);
 	});

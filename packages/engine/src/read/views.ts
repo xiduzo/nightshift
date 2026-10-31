@@ -6,6 +6,7 @@ import type {
 } from "@nightshift/flows";
 import type { RunCommandKind } from "../contract";
 import type {
+	AnsweredBy,
 	GateChoice,
 	GateDeadline,
 	ResumeAction,
@@ -208,9 +209,14 @@ export type RunSummary = {
 	subflows: SubflowRun[];
 	/**
 	 * Every Gate the run asked, also in called flows, oldest first.
-	 * `closedAt` is null while the Gate waits for an answer.
+	 * `closedAt` is null while the Gate waits for an answer. `answeredBy`:
+	 * who chose its option, a person or its deadline. Null: nobody did.
 	 */
-	gates: { openedAt: number; closedAt: number | null }[];
+	gates: {
+		openedAt: number;
+		closedAt: number | null;
+		answeredBy: AnsweredBy | null;
+	}[];
 	/**
 	 * Every time a step of the run slept, also in called flows, oldest
 	 * first. `to` is null while it sleeps. Older Hosts send none.

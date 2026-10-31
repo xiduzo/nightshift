@@ -125,7 +125,13 @@ describe("the stat cards", () => {
 				status: "finished",
 				createdAt: NOW - 26 * HOUR,
 				endedAt: NOW - 23 * HOUR,
-				gates: [{ openedAt: NOW - 25 * HOUR, closedAt: NOW - 23 * HOUR }],
+				gates: [
+					{
+						openedAt: NOW - 25 * HOUR,
+						closedAt: NOW - 23 * HOUR,
+						answeredBy: null,
+					},
+				],
 			}),
 			// Older than two days: in neither.
 			aRun({ status: "finished", costUsd: 4, createdAt: NOW - 50 * HOUR }),
@@ -189,7 +195,7 @@ describe("the stat cards", () => {
 		const { hours } = summarize([
 			aRun({
 				status: "waiting",
-				gates: [{ openedAt: NOW - 2 * HOUR, closedAt: null }],
+				gates: [{ openedAt: NOW - 2 * HOUR, closedAt: null, answeredBy: null }],
 			}),
 		]).cards;
 		expect(hours.slice(-3).map((hour) => hour.gates)).toEqual([1, 1, 1]);
@@ -240,7 +246,13 @@ describe("the activity details", () => {
 				status: "finished",
 				createdAt: NOW - 4 * HOUR,
 				endedAt: NOW,
-				gates: [{ openedAt: NOW - 3 * HOUR, closedAt: NOW - 2 * HOUR }],
+				gates: [
+					{
+						openedAt: NOW - 3 * HOUR,
+						closedAt: NOW - 2 * HOUR,
+						answeredBy: null,
+					},
+				],
 				sleeps: [
 					{ from: NOW - 2 * HOUR, to: NOW - HOUR - HOUR / 2 },
 					{ from: NOW - HOUR, to: NOW - HOUR / 2 },
@@ -488,7 +500,13 @@ describe("the totals of a night range", () => {
 				status: "finished",
 				costUsd: 2,
 				createdAt: TONIGHT + HOUR,
-				gates: [{ openedAt: TONIGHT + HOUR, closedAt: TONIGHT + 2 * HOUR }],
+				gates: [
+					{
+						openedAt: TONIGHT + HOUR,
+						closedAt: TONIGHT + 2 * HOUR,
+						answeredBy: null,
+					},
+				],
 			}),
 			aRun({ status: "failed", costUsd: 1, createdAt: TONIGHT - 3 * NIGHT }),
 			// Stopped: a run, not one that ended for the finished share.
@@ -549,33 +567,55 @@ describe("Gates over a night range", () => {
 					status: "finished",
 					endedAt: NOW - HOUR,
 					gates: [
-						{ openedAt: NOW - 3 * HOUR, closedAt: NOW - 2 * HOUR },
-						{ openedAt: NOW - 2 * HOUR, closedAt: NOW - 2 * HOUR + 60_000 },
+						{
+							openedAt: NOW - 3 * HOUR,
+							closedAt: NOW - 2 * HOUR,
+							answeredBy: "person",
+						},
+						{
+							openedAt: NOW - 2 * HOUR,
+							closedAt: NOW - 2 * HOUR + 60_000,
+							answeredBy: "person",
+						},
+						// Nobody answered: the deadline chose.
+						{
+							openedAt: NOW - 2 * HOUR,
+							closedAt: NOW - HOUR,
+							answeredBy: "deadline",
+						},
 					],
 				}),
 				// The run stopped while its Gate waited.
 				aRun({
 					status: "stopped",
 					endedAt: NOW - HOUR,
-					gates: [{ openedAt: NOW - 90 * 60_000, closedAt: NOW - HOUR }],
+					gates: [
+						{
+							openedAt: NOW - 90 * 60_000,
+							closedAt: NOW - HOUR,
+							answeredBy: null,
+						},
+					],
 				}),
 				aRun({
 					flowName: "fix",
 					status: "waiting",
-					gates: [{ openedAt: NOW - HOUR / 2, closedAt: null }],
+					gates: [
+						{ openedAt: NOW - HOUR / 2, closedAt: null, answeredBy: null },
+					],
 				}),
 			]),
 			30,
 		).gates;
-		expect(range.asked).toBe(4);
+		expect(range.asked).toBe(5);
 		expect(range.runsAsking).toBe(3);
 		expect(range.answered).toBe(2);
-		expect(range.unanswered).toBe(1);
+		expect(range.unanswered).toBe(2);
 		expect(range.answerTime?.median).toBe((HOUR + 60_000) / 2);
 		expect(range.states).toEqual(["answered", "unanswered", "waiting"]);
 		expect(range.perNight.at(-1)?.counts).toEqual({
 			answered: 2,
-			unanswered: 1,
+			unanswered: 2,
 			waiting: 1,
 		});
 		expect(range.latest[0]).toMatchObject({
@@ -585,9 +625,9 @@ describe("Gates over a night range", () => {
 		});
 		expect(range.groups.rows[0]).toMatchObject({
 			label: "night",
-			asked: 3,
+			asked: 4,
 			answered: 2,
-			unanswered: 1,
+			unanswered: 2,
 			typical: (HOUR + 60_000) / 2,
 			longest: HOUR,
 		});

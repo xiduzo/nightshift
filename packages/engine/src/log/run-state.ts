@@ -25,6 +25,7 @@ import {
 	scopeKey,
 	type WaitReason,
 } from "./events";
+import { type AnsweredBy, answeredBy } from "./scores";
 
 /**
  * The run state: one fold of a run's event log, events in, state out.
@@ -44,6 +45,8 @@ import {
  *   reopen. A Gate of the step waits from its `GateOpened` to the step's end
  *   or reopen. A `GateOpened` while the Gate still waits opens no second
  *   wait. Every run-level event (a start, a resume, an end) closes both.
+ * - A Gate's answer (a `Scored` on its step) answers the step's latest
+ *   Gate wait.
  * - A session belongs to the step it started in, and to the opening of the
  *   step it started in: the part of the step whose end tells it. So do a
  *   sleep and a Gate's wait.
@@ -104,11 +107,18 @@ export type DerivedItem = {
 /** A time span of a step. `to` is null while it lasts. */
 export type StepSleep = { from: number; to: number | null };
 
-/** A time a Gate of the step waited for a person, in the opening (its index in `openings`) it began in. */
-export type GateWait = StepSleep & { opening: number };
+/** A time span of a step in the opening (its index in `openings`) it began in. */
+type PartSpan = StepSleep & { opening: number };
+
+/**
+ * A time a Gate of the step waited for a person, and who chose its option
+ * (the Gate's answer score). Null: nobody did yet, or the run stopped
+ * while it waited.
+ */
+export type GateWait = PartSpan & { answeredBy: AnsweredBy | null };
 
 /** A time a step slept, and what for: a reason, and the signal of a Wait node on one (else null). */
-export type SleepSpan = GateWait & {
+export type SleepSpan = PartSpan & {
 	reason: WaitReason;
 	signal: string | null;
 };
@@ -645,6 +655,20 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 	}
 	const current = step.openings.at(-1);
 	switch (e.type) {
+		case "Scored": {
+			const by = answeredBy(e.payload);
+			const wait = step.gateWaits.at(-1);
+			if (by && wait && wait.answeredBy === null) {
+				step = {
+					...step,
+					gateWaits: [
+						...step.gateWaits.slice(0, -1),
+						{ ...wait, answeredBy: by },
+					],
+				};
+			}
+			break;
+		}
 		case "WaitStarted": {
 			const sleep = step.sleeps.at(-1);
 			// A wait logged again in the same sleep (a new daemon) goes on with it.
@@ -698,7 +722,12 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 					...step,
 					gateWaits: [
 						...step.gateWaits,
-						{ from: e.at, to: null, opening: step.openings.length - 1 },
+						{
+							from: e.at,
+							to: null,
+							opening: step.openings.length - 1,
+							answeredBy: null,
+						},
 					],
 				};
 			}

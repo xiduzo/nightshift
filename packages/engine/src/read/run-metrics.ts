@@ -1,11 +1,12 @@
 import type { JsonValue } from "@nightshift/flows";
-import type {
-	CostTally,
-	DerivedSession,
-	DerivedStep,
-	RunState,
-	ScoreName,
-	StepSleep,
+import {
+	type CostTally,
+	type DerivedSession,
+	type DerivedStep,
+	type RunScore,
+	type RunState,
+	runScore,
+	type StepSleep,
 } from "../log";
 
 /**
@@ -59,24 +60,9 @@ export type RunMetrics = {
 	scores?: RunScore[];
 };
 
-/** One `Scored` of a run: what it scores, its value and label, on which step, and when. */
-export type RunScore = {
-	score: ScoreName;
-	value: number;
-	label: string | null;
-	stepId: string | null;
-	at: number;
-};
-
 /** The run's scores, in log order. */
 export function deriveScores(run: RunState): RunScore[] {
-	return run.scores.map((e) => ({
-		score: e.payload.score,
-		value: e.payload.value,
-		label: e.payload.label,
-		stepId: e.stepId,
-		at: e.at,
-	}));
+	return run.scores.map(runScore);
 }
 
 const NO_TOKENS: TokenCounts = {

@@ -472,13 +472,10 @@ export type EnginePayloads = {
 	 */
 	RunWarned: { kind: RunWarningKind; message: string };
 	/**
-	 * Feedback on what a run did: a Gate was answered (`gate_decision`, on
-	 * the Gate's step), or a kit's webhook reported what became of the pull
-	 * request the run opened (`pr_merged`, `pr_closed`,
-	 * `reverted_within_7d`). `value` is 1 for a fact that happened; `label`
-	 * says more: the option a Gate took. `by`: who answered a Gate, a
-	 * person or its deadline. The metrics and the export count them, so a
-	 * later read tells which flow version merges.
+	 * Feedback on what a run did: a Gate was answered, on the Gate's step.
+	 * What each name, value and `by` means is in `scores.ts`. The metrics
+	 * and the export count them, so a later read tells which flow version
+	 * merges.
 	 */
 	Scored: {
 		score: ScoreName;
@@ -560,8 +557,9 @@ export type EngineEventType = keyof EnginePayloads;
 export type RunWarningKind = "cost-unknown" | "budget" | "stalled" | "looping";
 
 /**
- * What a `Scored` event scores. A reader treats the names as an open list:
- * a later build may add one.
+ * What a `Scored` event of this build scores (`scores.ts` says what each
+ * means). A reader treats the names as an open list: a later build may add
+ * one.
  */
 export type ScoreName =
 	| "gate_decision"

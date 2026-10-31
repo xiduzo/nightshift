@@ -248,6 +248,7 @@ describe("runMetrics", () => {
 				label: "approve",
 				stepId: "s2",
 				at: 1400,
+				by: "person",
 			},
 		]);
 	});

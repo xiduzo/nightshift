@@ -87,6 +87,12 @@ const costFields = {
 	costCalls: z.number(),
 };
 
+/** Who chose a Gate's option: a person or its deadline. Null: nobody, or an older Host that does not say. */
+const answeredBySchema = z
+	.enum(["person", "deadline"])
+	.nullable()
+	.default(null);
+
 /** A time a step slept; `to` is null while it sleeps. Older Hosts send no sleeps. */
 const sleepSchema = z.object({ from: z.number(), to: z.number().nullable() });
 
@@ -108,20 +114,20 @@ const metricsSchema = z.object({
 	/** `billed`: every cost was reported. `estimated`: part is priced from tokens. `unknown`: part is not known. */
 	costBasis: z.enum(["billed", "estimated", "unknown"]),
 	prUrl: z.string().nullable(),
-	/** The feedback on a run: each Gate answered, and what became of its pull request. Older Hosts send none. */
+	/**
+	 * The feedback on a run: each Gate answered, and what became of its pull
+	 * request. Older Hosts send none. A score's name is an open list: a
+	 * newer peer's name passes. Older Hosts send no `by`.
+	 */
 	scores: z
 		.array(
 			z.object({
-				score: z.enum([
-					"gate_decision",
-					"pr_merged",
-					"pr_closed",
-					"reverted_within_7d",
-				]),
+				score: z.string(),
 				value: z.number(),
 				label: z.string().nullable(),
 				stepId: z.string().nullable(),
 				at: z.number(),
+				by: answeredBySchema,
 			}),
 		)
 		.optional(),
@@ -172,7 +178,11 @@ export const runSummarySchema = exact<RunSummary>()(
 			}),
 		),
 		gates: z.array(
-			z.object({ openedAt: z.number(), closedAt: z.number().nullable() }),
+			z.object({
+				openedAt: z.number(),
+				closedAt: z.number().nullable(),
+				answeredBy: answeredBySchema,
+			}),
 		),
 		sleeps: z.array(sleepSchema).optional(),
 		metrics: metricsSchema.optional(),

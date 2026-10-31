@@ -162,9 +162,10 @@ export function runFacts(run: RunState) {
 		calls: deriveCalls(steps),
 		gates: steps
 			.flatMap((step) =>
-				step.gateWaits.map(({ from, to }) => ({
+				step.gateWaits.map(({ from, to, answeredBy }) => ({
 					openedAt: from,
 					closedAt: to,
+					answeredBy,
 				})),
 			)
 			.sort((a, b) => a.openedAt - b.openedAt),

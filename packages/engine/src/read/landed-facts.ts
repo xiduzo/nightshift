@@ -1,9 +1,10 @@
-import type {
-	EngineEventType,
-	LandedRunEvent,
-	RunEnding,
-	ScoreName,
-	WaitReason,
+import {
+	type EngineEventType,
+	type LandedRunEvent,
+	type RunEnding,
+	type RunScore,
+	runScore,
+	type WaitReason,
 } from "../log";
 
 /**
@@ -44,13 +45,7 @@ export type LandedFact = {
 	| { kind: "step-ended"; stepId: string }
 	| { kind: "run-ended"; status: RunEnding }
 	/** Feedback on the run (`Scored`): on a Gate's step, or on the run. */
-	| {
-			kind: "scored";
-			stepId: string | null;
-			score: ScoreName;
-			value: number;
-			label: string | null;
-	  }
+	| ({ kind: "scored" } & Omit<RunScore, "at">)
 	/** Any other event of the run. */
 	| { kind: "other" }
 );
@@ -94,15 +89,8 @@ function landedFact(e: LandedRunEvent): LandedFact {
 		return { ...base, kind: "run-ended", status: e.payload.status };
 	}
 	if (e.type === "Scored") {
-		const { score, value, label } = e.payload;
-		return {
-			...base,
-			kind: "scored",
-			stepId: e.stepId,
-			score,
-			value,
-			label,
-		};
+		const { at: _, ...score } = runScore(e);
+		return { ...base, kind: "scored", ...score };
 	}
 	const stepId = e.stepId;
 	if (stepId === null) return { ...base, kind: "other" };
