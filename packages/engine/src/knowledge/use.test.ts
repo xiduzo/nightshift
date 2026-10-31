@@ -105,15 +105,16 @@ describe("stepSources", () => {
 		const sources = stepSources([
 			searched(1, ["a.md", "b.md", "c.md", "d.md"]),
 			read(2, "b.md"),
+			read(2, "c.md", { from: { section: "S2" } }),
 			read(3, "e.pdf", { from: { page: 4, line: 2 } }),
 			read(4, "gone.md", { found: false }),
 			read(5, "b.md"),
 		]);
 		expect(sources).toEqual([
 			{ path: "b.md", section: "S1", page: null, line: 1, read: true },
+			{ path: "c.md", section: "S2", page: null, line: 1, read: true },
 			{ path: "e.pdf", section: null, page: 4, line: 2, read: true },
 			{ path: "a.md", section: "S0", page: null, line: 1, read: false },
-			{ path: "c.md", section: "S2", page: null, line: 1, read: false },
 		]);
 		expect(stepSources([])).toEqual([]);
 	});

@@ -179,11 +179,19 @@ export function stepSources(
 		const { path, found: there, from } = use.payload;
 		if (!there || read.has(path)) continue;
 		const hit = foundAt.get(path);
+		// A read from the section a search found is at that hit.
+		const atHit =
+			!from ||
+			(from.section !== undefined &&
+				from.section === hit?.section &&
+				from.line === undefined);
 		read.set(path, {
 			path,
-			section: from ? (from.section ?? null) : (hit?.section ?? null),
-			page: from ? (from.page ?? null) : (hit?.page ?? null),
-			line: from ? (from.line ?? 1) : (hit?.line ?? 1),
+			section: atHit
+				? (hit?.section ?? from?.section ?? null)
+				: (from?.section ?? null),
+			page: atHit ? (hit?.page ?? from?.page ?? null) : (from?.page ?? null),
+			line: atHit ? (hit?.line ?? 1) : (from?.line ?? 1),
 			read: true,
 		});
 	}
