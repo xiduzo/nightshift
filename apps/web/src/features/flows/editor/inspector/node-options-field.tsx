@@ -32,6 +32,7 @@ export function NodeOptionsField<T extends OptionNode>({
 	min,
 	hint,
 	rules = false,
+	rulePlaceholder,
 	lead,
 	onChange,
 	onRenameOutcome,
@@ -47,6 +48,8 @@ export function NodeOptionsField<T extends OptionNode>({
 	hint: string;
 	/** Each option takes a rule (a Decision decided by a rule). */
 	rules?: boolean;
+	/** The placeholder of every rule, when it is not a Decision's. */
+	rulePlaceholder?: string;
 	/** Above the hint, such as who picks the outcome. */
 	lead?: ReactNode;
 	onChange: (change: (node: T) => T) => void;
@@ -108,6 +111,7 @@ export function NodeOptionsField<T extends OptionNode>({
 								)
 						: undefined
 				}
+				rulePlaceholder={rulePlaceholder}
 				onCode={onCode}
 				onColor={(index, color) =>
 					change((list) =>

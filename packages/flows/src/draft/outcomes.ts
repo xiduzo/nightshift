@@ -15,24 +15,28 @@ import {
 	type CommandNode,
 	commandExits,
 	type DecisionNode,
+	type WaitNode,
 } from "../nodes";
 import { updateNode } from "./graph";
 
 /** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */
-/** A Decision option, an Agent outcome, or a Command exit (with its `code`). */
+/** A Decision option, an Agent or Wait outcome, or a Command exit (with its `code`). */
 export type NodeOption = DecisionNode["options"][number] & {
 	code?: CommandExit["code"];
 };
 /** A node whose outcomes are its own options. */
-export type OptionNode = DecisionNode | AgentNode | CommandNode;
+export type OptionNode = DecisionNode | AgentNode | CommandNode | WaitNode;
 
 export function isOptionNode(node: FlowNode): node is OptionNode {
 	return (
-		node.type === "decision" || node.type === "agent" || node.type === "command"
+		node.type === "decision" ||
+		node.type === "agent" ||
+		node.type === "command" ||
+		node.type === "wait"
 	);
 }
 
-/** The options of a Decision node, an Agent's own outcomes, or a Command's exits. */
+/** The options of a Decision node, an Agent's or a Wait's own outcomes, or a Command's exits. */
 export function nodeOptions(node: OptionNode): NodeOption[] {
 	if (node.type === "decision") return node.options;
 	if (node.type === "command") return commandExits(node);
@@ -52,6 +56,13 @@ export function withOptions<T extends OptionNode>(
 			...(color === undefined ? {} : { color }),
 		}));
 		return { ...node, exits };
+	}
+	if (node.type === "wait") {
+		// A Wait without its own outcomes ends done or timeout only.
+		const { outcomes: _, ...rest } = node;
+		if (options.length === 0) return rest as T;
+		const outcomes = options.map(({ code: _code, ...option }) => option);
+		return { ...rest, outcomes } as T;
 	}
 	return { ...node, outcomes: options };
 }

@@ -61,6 +61,7 @@ export function OptionsEditor({
 	onRename,
 	onDescribe,
 	onRule,
+	rulePlaceholder,
 	onCode,
 	onColor,
 	onAdd,
@@ -80,6 +81,8 @@ export function OptionsEditor({
 	onDescribe?: (index: number, description: string | undefined) => void;
 	/** Decisions decided by a rule: the rule of each option. Empty removes it. */
 	onRule?: (index: number, when: string | undefined) => void;
+	/** The placeholder of every rule. Unset: a Decision's, with its default last. */
+	rulePlaceholder?: string;
 	/**
 	 * Command nodes: the exit code of each row. Empty makes it the
 	 * catch-all; `"data"` an exit the command picks in its data.
@@ -125,6 +128,7 @@ export function OptionsEditor({
 								: undefined
 						}
 						onRule={onRule ? (when) => onRule(index, when) : undefined}
+						rulePlaceholder={rulePlaceholder}
 						onCode={onCode ? (code) => onCode(index, code) : undefined}
 						onColor={onColor ? (color) => onColor(index, color) : undefined}
 						onRemove={() => onRemove(index)}
@@ -162,6 +166,7 @@ function OptionRow({
 	onRename,
 	onDescribe,
 	onRule,
+	rulePlaceholder,
 	onCode,
 	onColor,
 	onRemove,
@@ -178,6 +183,7 @@ function OptionRow({
 	onRename: (name: string) => string | null;
 	onDescribe?: (description: string | undefined) => void;
 	onRule?: (when: string | undefined) => void;
+	rulePlaceholder?: string;
 	onCode?: (code: NodeOption["code"]) => void;
 	onColor?: (color: OutcomeColor | undefined) => void;
 	onRemove: () => void;
@@ -321,9 +327,10 @@ function OptionRow({
 					value={option.when ?? ""}
 					aria-label={`Rule of ${position}`}
 					placeholder={
-						index === count - 1 && count > 1
+						rulePlaceholder ??
+						(index === count - 1 && count > 1
 							? "No rule: picked when no rule above matches"
-							: "build.data.tests_passed = true"
+							: "build.data.tests_passed = true")
 					}
 					className="h-8 font-mono text-xs"
 					autoComplete="off"
