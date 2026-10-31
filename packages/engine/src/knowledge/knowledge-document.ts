@@ -6,7 +6,7 @@ import {
 	openPersistedDocument,
 	type PersistedDocument,
 } from "../device-config";
-import { INDEX_FILE } from "./folder";
+import { isKnowledgePath } from "./folder";
 
 /**
  * The knowledge document (ADR 4): the files of a Project's knowledge, in
@@ -58,35 +58,6 @@ export function knowledgeDocumentProject(name: string): string | null {
 	return name.startsWith("knowledge:")
 		? name.slice("knowledge:".length) || null
 		: null;
-}
-
-/**
- * What the sync kits name a file or folder while they write it, before a
- * rename makes it whole (`$dest.part`, `page.md.part`): never knowledge.
- */
-const STAGING_SUFFIX = ".part";
-
-/** The longest path the document takes. */
-const MAX_PATH = 1024;
-
-/**
- * Whether a path may be in the document and in the folder: relative, with
- * `/` between its parts, none of them empty, `.`, `..` or hidden, none a
- * file or folder a sync kit still writes (`*.part`), and not the index
- * Night Shift writes. A path another Device wrote that is not one is left
- * out: it never leaves the folder.
- */
-export function isKnowledgePath(path: string): boolean {
-	if (path === "" || path.length > MAX_PATH) return false;
-	// Not even in another case: on macOS, `index.md` is the index.
-	if (path.toLowerCase() === INDEX_FILE.toLowerCase()) return false;
-	if (/[\\\0]/.test(path)) return false;
-	return path
-		.split("/")
-		.every(
-			(part) =>
-				part !== "" && !part.startsWith(".") && !part.endsWith(STAGING_SUFFIX),
-		);
 }
 
 /** The document's `files`: path → entry. */

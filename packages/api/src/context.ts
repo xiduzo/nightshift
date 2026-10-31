@@ -95,8 +95,8 @@ export type Services = {
 	 * computer whose folder lacks it, and the removal of a source's folder.
 	 */
 	knowledge: Pick<KnowledgeSync, "listing" | "read" | "removeFolder">;
-	/** Keyword search over the projects' knowledge on this computer, and reading one file of its folder. */
-	knowledgeSearch: Pick<KnowledgeSearch, "search" | "read">;
+	/** Keyword search over the projects' knowledge on this computer. */
+	knowledgeSearch: Pick<KnowledgeSearch, "search">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */

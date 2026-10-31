@@ -522,6 +522,7 @@ describe("the project's knowledge", () => {
 				seen.push(`start ${projectId}`);
 				return { done: async () => void seen.push(`done ${projectId}`) };
 			},
+			read: async () => null,
 		};
 		await collect(
 			device({ knowledge, knowledgeSync }).exec({

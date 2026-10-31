@@ -10,6 +10,7 @@ export {
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeFile,
 	type KnowledgeFolders,
+	type KnowledgeText,
 } from "./folder";
 export {
 	commandKnowledge,
@@ -34,7 +35,6 @@ export {
 	createKnowledgeSearch,
 	type KnowledgeHit,
 	type KnowledgeSearch,
-	type KnowledgeText,
 } from "./search";
 export {
 	createKnowledgeStore,

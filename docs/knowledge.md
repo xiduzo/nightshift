@@ -198,8 +198,8 @@ the proposals, and then puts what it kept or deleted back in the Space.
 
 Each computer keeps a keyword index of its knowledge: the text files
 (`.md`, `.markdown`, `.mdx`, `.txt`, `.rst`) and the text of PDF and Word
-files (`.pdf`, `.docx`), not `INDEX.md`, hidden files or the learnings that
-wait. A PDF or Word file over 10 MB is found by its path only. The
+files (`.pdf`, `.docx`), not `INDEX.md`, hidden files, the files a sync
+kit still writes or the learnings that wait. A PDF or Word file over 10 MB is found by its path only. The
 Knowledge page has a search field. Every Agent step that gets the folder
 has two tools (where its harness takes them), and so does `nightshift mcp`:
 
@@ -207,6 +207,12 @@ has two tools (where its harness takes them), and so does `nightshift mcp`:
   its path, title and an excerpt with the words found in bold.
 - `read_knowledge` (`path`): one file, at most its first 100 KB. For a PDF
   or Word file, its text.
+
+A step and `nightshift mcp` read a file in the same way. Night Shift
+reads the copy on this computer first. When this computer does not have
+the file yet, Night Shift gets its content from the Space by its hash.
+Both give the text of a PDF or Word file. Neither gives the learnings
+that wait for a person.
 
 LangChain's document loaders read the text: `PDFLoader` for a PDF and
 `DocxLoader` (on `mammoth`) for a Word file. Night Shift gives `PDFLoader`

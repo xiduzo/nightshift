@@ -173,13 +173,13 @@ export type LocalDeviceDeps = {
 	 * after each step that gets it. Without it, the folder is this
 	 * computer's alone.
 	 */
-	knowledgeSync?: Pick<KnowledgeSync, "startStep">;
+	knowledgeSync?: Pick<KnowledgeSync, "startStep" | "read">;
 	/**
 	 * Keyword search over the folders: this Device's own index. With it, an
 	 * agent that gets the folder also gets `search_knowledge` and
 	 * `read_knowledge`, where its harness takes Night Shift's own tools.
 	 */
-	knowledgeSearch?: Pick<KnowledgeSearch, "search" | "read" | "refresh">;
+	knowledgeSearch?: Pick<KnowledgeSearch, "search" | "refresh">;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -290,6 +290,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			}
 		: null;
 
+	/** One file of a project's knowledge: this computer's copy, else the Space's. */
+	const readKnowledge = (projectId: string, path: string, maxBytes: number) =>
+		deps.knowledgeSync
+			? deps.knowledgeSync.read(projectId, path, maxBytes)
+			: (deps.knowledge?.read(projectId, path, maxBytes) ??
+				Promise.resolve(null));
+
 	async function* session(
 		input: SessionInput | OfferedSessionInput,
 	): AsyncGenerator<SessionEvent> {
@@ -367,7 +374,11 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			// starts to catch up with the folder now, not at the first search.
 			const search =
 				known?.addDirs && knowledge && deps.knowledgeSearch
-					? sessionKnowledgeTools(deps.knowledgeSearch, knowledge.projectId)
+					? sessionKnowledgeTools(
+							deps.knowledgeSearch,
+							readKnowledge,
+							knowledge.projectId,
+						)
 					: null;
 			if (search && knowledge) {
 				deps.knowledgeSearch?.refresh(knowledge.projectId).catch((error) => {

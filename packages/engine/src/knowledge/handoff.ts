@@ -70,12 +70,13 @@ export async function sessionKnowledge(
  * learns about them. The harness drops both when it cannot take them.
  */
 export function sessionKnowledgeTools(
-	search: Pick<KnowledgeSearch, "search" | "read">,
+	search: Pick<KnowledgeSearch, "search">,
+	read: KnowledgePort["readKnowledge"],
 	projectId: string,
 ): Required<Pick<AgentSessionInput, "tools" | "toolsInstruction">> {
 	const port: KnowledgePort = {
 		searchKnowledge: (id, query, limit) => search.search(id, query, { limit }),
-		readKnowledge: (id, path, maxBytes) => search.read(id, path, { maxBytes }),
+		readKnowledge: read,
 	};
 	return {
 		tools: knowledgeTools(port, { project: { id: projectId } }),

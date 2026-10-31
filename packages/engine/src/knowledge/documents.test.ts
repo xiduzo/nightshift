@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tinyDocx, tinyPdf } from "../testing/documents";
-import { documentText, loadDocument } from "./documents";
+import { documentText, loadDocument, loadDocumentContent } from "./documents";
 
 let dir: string;
 
@@ -49,6 +49,31 @@ describe("loadDocument", () => {
 		expect(await documentText(abs)).toBe(
 			"Onboarding guide\n\nEvery new teammate meets the wombat.",
 		);
+	});
+
+	test("a file is parsed again when it changes, and a reader's change stays its own", async () => {
+		const abs = join(dir, "notes.docx");
+		await writeFile(abs, tinyDocx("First", ["One."]));
+		const first = await loadDocument(abs);
+		if (first?.[0]) first[0].pageContent = "changed by a reader";
+		expect((await loadDocument(abs))?.[0]?.pageContent).toBe("First\n\nOne.");
+		await writeFile(abs, tinyDocx("Second version", ["Two."]));
+		expect(await documentText(abs)).toBe("Second version\n\nTwo.");
+	});
+
+	test("a file's content by hash reads as the file does", async () => {
+		const content = tinyPdf(["Release checklist"]);
+		const abs = join(dir, "release.pdf");
+		await writeFile(abs, content);
+		const fromFile = await loadDocument(abs);
+		const fromContent = await loadDocumentContent("docs/release.pdf", content);
+		expect(fromContent?.map((doc) => doc.pageContent)).toEqual(
+			fromFile?.map((doc) => doc.pageContent),
+		);
+		expect(fromContent?.[0]?.metadata.source).toBe("docs/release.pdf");
+		expect(
+			await loadDocumentContent("notes.md", new TextEncoder().encode("# A")),
+		).toBeNull();
 	});
 
 	test("null for a file that is missing, broken or not a document", async () => {

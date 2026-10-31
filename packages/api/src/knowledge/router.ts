@@ -335,15 +335,10 @@ export const knowledge = {
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			const options = { maxBytes: input.maxBytes ?? READ_MAX_BYTES };
-			// This computer's folder first: it may not have the file yet.
-			return (
-				(await context.knowledgeSearch.read(
-					input.projectId,
-					input.path,
-					options,
-				)) ??
-				(await context.knowledge.read(input.projectId, input.path, options))
+			return context.knowledge.read(
+				input.projectId,
+				input.path,
+				input.maxBytes ?? READ_MAX_BYTES,
 			);
 		}),
 };

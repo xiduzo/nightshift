@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
-import type { Document } from "@langchain/core/documents";
+import { Document } from "@langchain/core/documents";
 import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
@@ -20,6 +20,10 @@ import { LOCAL_ONLY_BYTES } from "./store";
  * A file over 10 MB is not read: it stays on the Device that has it (ADR 4)
  * and its text could hold a lot of memory. It shows by its name only. So
  * does a file that does not open as its kind.
+ *
+ * A file is parsed once per change: `INDEX.md` and the search index read
+ * it one after the other, so the last documents read stay here while the
+ * file keeps its size and time of change.
  */
 
 /** The documents whose text Night Shift takes out. */
@@ -116,6 +120,45 @@ async function loadDocx(blob: Blob): Promise<Document[]> {
 	return new DocxLoader(blob).load();
 }
 
+/** How many files' documents stay parsed. */
+const PARSED_FILES = 16;
+
+/** The documents of the files parsed last, by path, while they stay as they were. */
+const parsed = new Map<
+	string,
+	{ size: number; mtimeMs: number; docs: Document<DocumentMetadata>[] }
+>();
+
+/** Copies, so no reader changes what another reads. */
+const copies = (docs: Document<DocumentMetadata>[]) =>
+	docs.map(
+		(doc) =>
+			new Document<DocumentMetadata>({
+				pageContent: doc.pageContent,
+				metadata: { ...doc.metadata },
+			}),
+	);
+
+/** A document's content parsed as its kind, its text tidied, from `source`. */
+async function parse(
+	kind: string,
+	content: Uint8Array,
+	source: string,
+): Promise<Document<DocumentMetadata>[]> {
+	// A copy on its own buffer: what a Blob takes.
+	const blob = new Blob([content.slice()]);
+	const docs = kind === ".pdf" ? await loadPdf(blob) : await loadDocx(blob);
+	return docs.flatMap((doc) => {
+		const pageContent = tidy(doc.pageContent);
+		if (pageContent === "") return [];
+		doc.pageContent = pageContent;
+		// The loaders say "blob": say which file it was.
+		doc.metadata.source = source;
+		delete doc.metadata.blobType;
+		return [doc as Document<DocumentMetadata>];
+	});
+}
+
 /**
  * The `Document`s of the PDF or Word file at `abs`, their text tidied.
  * Null when it is not one, is larger than 10 MB, or does not open. An
@@ -130,21 +173,40 @@ export function loadDocument(
 		try {
 			const info = await stat(abs);
 			if (!info.isFile() || info.size > LOCAL_ONLY_BYTES) return null;
-			const blob = new Blob([await readFile(abs)]);
-			const docs = kind === ".pdf" ? await loadPdf(blob) : await loadDocx(blob);
-			return docs.flatMap((doc) => {
-				const pageContent = tidy(doc.pageContent);
-				if (pageContent === "") return [];
-				doc.pageContent = pageContent;
-				// The loaders say "blob": say which file it was.
-				doc.metadata.source = abs;
-				delete doc.metadata.blobType;
-				return [doc as Document<DocumentMetadata>];
-			});
+			const kept = parsed.get(abs);
+			if (kept?.size === info.size && kept.mtimeMs === info.mtimeMs) {
+				// The latest at the end: the oldest goes first.
+				parsed.delete(abs);
+				parsed.set(abs, kept);
+				return copies(kept.docs);
+			}
+			const docs = await parse(kind, new Uint8Array(await readFile(abs)), abs);
+			parsed.delete(abs);
+			parsed.set(abs, { size: info.size, mtimeMs: info.mtimeMs, docs });
+			for (const old of parsed.keys()) {
+				if (parsed.size <= PARSED_FILES) break;
+				parsed.delete(old);
+			}
+			return copies(docs);
 		} catch {
 			return null;
 		}
 	});
+}
+
+/**
+ * The `Document`s of a PDF or Word file's content, for a file this Device
+ * has by its hash only: `path` says its kind. Null as `loadDocument` gives it.
+ */
+export function loadDocumentContent(
+	path: string,
+	content: Uint8Array,
+): Promise<Document<DocumentMetadata>[] | null> {
+	const kind = extname(path).toLowerCase();
+	if (!DOCUMENT_FILES.has(kind) || content.length > LOCAL_ONLY_BYTES) {
+		return Promise.resolve(null);
+	}
+	return oneAtATime(() => parse(kind, content, path).catch(() => null));
 }
 
 /** The text of a document's `Document`s: an empty line between pages. */

@@ -1,17 +1,18 @@
 import { Database } from "bun:sqlite";
 import { rmSync } from "node:fs";
-import { lstat, mkdir, open, realpath } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { documentText, isDocument } from "./documents";
 import {
 	createKnowledgeFolders,
+	cutText,
 	describeDocumentText,
 	describeText,
-	INDEX_FILE,
+	fallbackTitle,
 	type KnowledgeFile,
+	readStart,
 	TEXT_FILES,
 } from "./folder";
-import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
  * Full-text search over a project's knowledge folder, on this Device.
@@ -29,9 +30,10 @@ import { LOCAL_ONLY_BYTES } from "./store";
  * kit, a person, or the Space's knowledge as it arrives.
  *
  * It indexes the text files (`TEXT_FILES`) the index lists, and the text
- * of PDF and Word files (`documents.ts`): not `INDEX.md`, hidden files or
- * the learnings that wait for a person. A document over 10 MB is found by
- * its path only.
+ * of PDF and Word files (`documents.ts`): the files a person or an agent
+ * reads (`isReadable`), so not `INDEX.md`, hidden files or the learnings
+ * that wait for a person. A document over 10 MB is found by its path only.
+ * Reading one file is `KnowledgeSync.read`.
  */
 
 /** A part of a hit's excerpt: `match` parts are the words the query found. */
@@ -46,18 +48,6 @@ export type KnowledgeHit = {
 	snippet: KnowledgeSnippetPart[];
 	/** How well it matches (BM25): higher is better. Only compares hits of one search. */
 	score: number;
-};
-
-/** One file of the folder, read for a person or an agent. */
-export type KnowledgeText = {
-	path: string;
-	title: string;
-	/** The text, cut at the size asked for. */
-	text: string;
-	/** Bytes of the whole file. For a PDF or Word file: of its whole text. */
-	size: number;
-	/** The text stops before the file ends. */
-	truncated: boolean;
 };
 
 /** What a refresh did. */
@@ -83,9 +73,6 @@ const LIMIT_DEFAULT = 10;
 const LIMIT_MAX = 50;
 /** Words around a match in an excerpt. */
 const SNIPPET_TOKENS = 16;
-/** What `read` returns of a file by default. */
-const READ_DEFAULT_BYTES = 256 * 1024;
-const PROPOSED_DIR = "learnings/proposed";
 
 /** Marks a match in `snippet()` output: never in a text file. */
 const OPEN = "\u0002";
@@ -94,18 +81,6 @@ const CLOSE = "\u0003";
 const isText = (path: string) => TEXT_FILES.has(extname(path).toLowerCase());
 /** The files the index reads: text files and documents. */
 const isIndexed = (path: string) => isText(path) || isDocument(path);
-
-/** The first `bytes` of a text, cut at a character. */
-function cutText(text: string, bytes: number): { text: string; size: number } {
-	const buffer = Buffer.from(text, "utf8");
-	if (buffer.length <= bytes) return { text, size: buffer.length };
-	// A cut inside a character drops that character.
-	const cut = buffer
-		.subarray(0, bytes)
-		.toString("utf8")
-		.replace(/\uFFFD$/, "");
-	return { text: cut, size: buffer.length };
-}
 
 /**
  * The FTS5 query for what a person or an agent typed, or null when it has
@@ -160,47 +135,6 @@ function snippetParts(raw: string): KnowledgeSnippetPart[] {
 	const final = parts.at(-1);
 	if (final && !final.match) final.text = final.text.trimEnd();
 	return parts.filter((part) => part.text !== "");
-}
-
-/**
- * A path inside the folder as a person or an agent gave it, or null when
- * it could leave the folder or names a hidden file or a proposal.
- */
-function safePath(path: string): string | null {
-	const parts = path
-		.trim()
-		.replace(/^\.\/+/, "")
-		.split("/");
-	const ok = parts.every(
-		(part) => part !== "" && !part.startsWith(".") && !part.includes("\\"),
-	);
-	if (!ok) return null;
-	const clean = parts.join("/");
-	if (clean === PROPOSED_DIR || clean.startsWith(`${PROPOSED_DIR}/`)) {
-		return null;
-	}
-	return clean;
-}
-
-async function readStart(
-	abs: string,
-	bytes: number,
-): Promise<{ text: string; size: number } | null> {
-	const handle = await open(abs, "r").catch(() => null);
-	if (!handle) return null;
-	try {
-		const info = await handle.stat();
-		if (!info.isFile()) return null;
-		const length = Math.min(info.size, bytes);
-		const buffer = Buffer.alloc(length);
-		const { bytesRead } = await handle.read(buffer, 0, length, 0);
-		return {
-			text: buffer.subarray(0, bytesRead).toString("utf8"),
-			size: info.size,
-		};
-	} finally {
-		await handle.close();
-	}
 }
 
 type Row = { id: number; path: string; size: number; changed_at: number };
@@ -340,8 +274,7 @@ export function createKnowledgeSearch(dataDir: string) {
 				changed.slice(at, at + BATCH).map(async (f) => {
 					const abs = join(dir, ...f.path.split("/"));
 					const name = f.path.split("/").at(-1) ?? f.path;
-					const fallback =
-						name.slice(0, name.length - extname(name).length) || name;
+					const fallback = fallbackTitle(f.path);
 					if (isDocument(f.path)) {
 						const text = await documentText(abs);
 						if (text === null) return { file: f, title: name, body: "" };
@@ -451,68 +384,6 @@ export function createKnowledgeSearch(dataDir: string) {
 					? hits
 					: query(sqlite, projectId, any, limit);
 			});
-		},
-		/**
-		 * One file of the project's knowledge, by its path in the folder, at
-		 * most `maxBytes` of it. Null when the folder has no such file, or
-		 * the path leaves the folder, or names a hidden file or a proposal.
-		 */
-		async read(
-			projectId: string,
-			path: string,
-			options: { maxBytes?: number } = {},
-		): Promise<KnowledgeText | null> {
-			const clean = safePath(path);
-			if (clean === null) return null;
-			const dir = folders.folder(projectId);
-			const abs = join(dir, ...clean.split("/"));
-			// A link could lead out of the folder: only the files the index lists.
-			const info = await lstat(abs).catch(() => null);
-			if (!info?.isFile()) return null;
-			const [real, base] = await Promise.all([
-				realpath(abs).catch(() => ""),
-				realpath(dir).catch(() => ""),
-			]);
-			if (base === "" || !real.startsWith(`${base}/`)) return null;
-			const bytes = Math.max(1, options.maxBytes ?? READ_DEFAULT_BYTES);
-			const name = clean.split("/").at(-1) ?? clean;
-			const fallback = name.slice(0, name.length - extname(name).length);
-			if (isDocument(clean)) {
-				if (info.size > LOCAL_ONLY_BYTES) {
-					throw new Error(
-						`"${clean}" is larger than 10 MB. Night Shift does not read its text.`,
-					);
-				}
-				const text = await documentText(abs);
-				if (text === null) {
-					throw new Error(`Night Shift cannot read the text of "${clean}".`);
-				}
-				const cut = cutText(text, bytes);
-				return {
-					path: clean,
-					title: describeDocumentText(text.slice(0, 4096), fallback || name)
-						.title,
-					text: cut.text,
-					size: cut.size,
-					truncated: cut.size > bytes,
-				};
-			}
-			const read = await readStart(abs, bytes);
-			if (!read) return null;
-			if (read.text.includes("\u0000")) {
-				throw new Error(`"${clean}" is not a text file.`);
-			}
-			const title =
-				isText(clean) && clean !== INDEX_FILE
-					? describeText(read.text.slice(0, 4096), fallback || name).title
-					: name;
-			return {
-				path: clean,
-				title,
-				text: read.text,
-				size: read.size,
-				truncated: read.size > bytes,
-			};
 		},
 		/** Closes the index file. A later call opens it again. */
 		close(): void {

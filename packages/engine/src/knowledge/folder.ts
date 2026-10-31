@@ -6,18 +6,22 @@ import {
 	open,
 	readdir,
 	readFile,
+	realpath,
 	rename,
 	stat,
 	writeFile,
 } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
+import { Refusal } from "@nightshift/refusal";
 import {
 	type DocumentMetadata,
 	isDocument,
 	loadDocument,
+	loadDocumentContent,
 	textOf,
 } from "./documents";
+import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
  * The knowledge folder of a project: markdown (and any other files) that
@@ -38,6 +42,11 @@ import {
  * `learnings/` is Night Shift's own: what agents proposed to learn wait in
  * `learnings/proposed/` until a person accepts them into
  * `learnings/accepted/`. The index lists the accepted ones only.
+ *
+ * Which files count, and how one is read, is decided here once: the
+ * reconcile, `INDEX.md`, the search index and every read take the same
+ * walk (`walkFolder`), the same rules (`isKnowledgePath`, `isReadable`) and
+ * the same read (`readFolderFile`, `knowledgeText`).
  */
 
 /** One file of the knowledge, as the index and the Knowledge page list it. */
@@ -54,14 +63,33 @@ export type KnowledgeFile = {
 
 /**
  * Past this many files, the folder is too large to read well: the
- * Knowledge page warns, and a search index (phase 2) would pay off.
+ * Knowledge page warns: agents find more with `search_knowledge` than by a grep.
  */
 export const KNOWLEDGE_FILES_WARNING = 2000;
+
+/** One file of the folder, read for a person or an agent. */
+export type KnowledgeText = {
+	path: string;
+	title: string;
+	/** The text, cut at the size asked for. */
+	text: string;
+	/** Bytes of the whole file. For a PDF or Word file: of its whole text. */
+	size: number;
+	/** The text stops before the file ends. */
+	truncated: boolean;
+};
 
 /** The file Night Shift writes at the top of the folder. */
 export const INDEX_FILE = "INDEX.md";
 /** The proposals that wait for a person: never in the index. */
 export const PROPOSED_DIR = "learnings/proposed";
+/**
+ * What the sync kits name a file or folder while they write it, before a
+ * rename makes it whole (`$dest.part`, `page.md.part`): never knowledge.
+ */
+const STAGING_SUFFIX = ".part";
+/** The longest path the knowledge takes. */
+const MAX_PATH = 1024;
 /** The most files the index lists: a folder past it is far too large to read. */
 const MAX_FILES = 20_000;
 /** What the index reads of a file for its title and first sentence. */
@@ -71,6 +99,45 @@ export const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
 /** The first line of the index's text: an index without it is written again. */
 const INDEX_INTRO =
 	"Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. PDF and Word files too. Read a file, or grep the folder, for more.";
+
+/**
+ * Whether a path is one of the knowledge, in the folder and in the
+ * Space's document: relative, with `/` between its parts, none of them
+ * empty, `.`, `..` or hidden, none a file or folder a sync kit still
+ * writes (`*.part`), and not the index Night Shift writes. A path another
+ * Device wrote that is not one is left out: it never leaves the folder.
+ */
+export function isKnowledgePath(path: string): boolean {
+	if (path === "" || path.length > MAX_PATH) return false;
+	// Not even in another case: on macOS, `index.md` is the index.
+	if (path.toLowerCase() === INDEX_FILE.toLowerCase()) return false;
+	if (/[\\\0]/.test(path)) return false;
+	return path
+		.split("/")
+		.every(
+			(part) =>
+				part !== "" && !part.startsWith(".") && !part.endsWith(STAGING_SUFFIX),
+		);
+}
+
+/** Whether a path is a proposal that waits for a person. */
+export function isProposal(path: string): boolean {
+	return path === PROPOSED_DIR || path.startsWith(`${PROPOSED_DIR}/`);
+}
+
+/**
+ * Whether a person or an agent reads a path: one of the knowledge, but no
+ * proposal. The index, search and `read_knowledge` take these only.
+ */
+export function isReadable(path: string): boolean {
+	return isKnowledgePath(path) && !isProposal(path);
+}
+
+/** A file's title when its text gives none: its name without the extension. */
+export function fallbackTitle(path: string): string {
+	const name = path.split("/").at(-1) ?? path;
+	return name.slice(0, name.length - extname(name).length) || name;
+}
 
 /** Whether an id is one file or folder name: nothing that could leave the folder. */
 const isId = (id: string) => /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
@@ -150,15 +217,25 @@ export function createKnowledgeFolders(dataDir: string) {
 			}
 			return count;
 		},
-		/** The files of the folder, the index left out, by path. None when it is not there. */
-		files: async (projectId: string) => (await walk(folder(projectId))).files,
+		/**
+		 * The files a person or an agent reads (`isReadable`), by path, at
+		 * most 20 000. None when the folder is not there.
+		 */
+		files: async (projectId: string) =>
+			(await walkFolder(folder(projectId), readable)).files,
+		/**
+		 * One file of the folder, by its path, at most `maxBytes` of its
+		 * text (`readFolderFile`). Null when the folder has no such file.
+		 */
+		read: (projectId: string, path: string, maxBytes: number) =>
+			readFolderFile(folder(projectId), path, maxBytes),
 		/**
 		 * The index of the folder, written again when it is stale. Returns
 		 * the files it lists. A folder that is not there is made.
 		 */
 		async index(projectId: string): Promise<KnowledgeFile[]> {
 			const path = await ensure(projectId);
-			const { files, newest } = await walk(path);
+			const { files, newest } = await walkFolder(path, readable);
 			const indexPath = join(path, INDEX_FILE);
 			const written = await stat(indexPath).catch(() => null);
 			const text =
@@ -176,14 +253,20 @@ export function createKnowledgeFolders(dataDir: string) {
 	};
 }
 
+/** What a person or an agent reads, at most 20 000 files. */
+const readable = { only: isReadable, limit: MAX_FILES };
+
 /**
- * Every file under `dir` but the index, hidden ones (`.git`), links and
- * the proposals, sorted by path; and the newest change among them and
- * their folders.
+ * Every file of the knowledge under `dir` (`isKnowledgePath`), no link,
+ * sorted by path; and the newest change among them and their folders.
+ * `only` leaves out more, `limit` stops the walk.
  */
-async function walk(
+export async function walkFolder(
 	dir: string,
+	options: { only?: (path: string) => boolean; limit?: number } = {},
 ): Promise<{ files: KnowledgeFile[]; newest: number }> {
+	const only = options.only ?? isKnowledgePath;
+	const limit = options.limit ?? Number.POSITIVE_INFINITY;
 	const files: KnowledgeFile[] = [];
 	let newest = 0;
 	const visit = async (abs: string, rel: string): Promise<void> => {
@@ -194,17 +277,17 @@ async function walk(
 			return;
 		}
 		for (const name of entries.sort()) {
-			if (files.length >= MAX_FILES) return;
-			if (name.startsWith(".")) continue;
+			if (files.length >= limit) return;
 			const path = rel === "" ? name : `${rel}/${name}`;
-			if (path === INDEX_FILE || path === PROPOSED_DIR) continue;
 			const info = await lstat(join(abs, name)).catch(() => null);
 			if (!info) continue;
 			if (info.isDirectory()) {
+				// A folder whose files would all be left out is not walked.
+				if (!only(`${path}/x`)) continue;
 				// A file that went changes its folder.
 				newest = Math.max(newest, info.mtimeMs);
 				await visit(join(abs, name), path);
-			} else if (info.isFile()) {
+			} else if (info.isFile() && only(path)) {
 				newest = Math.max(newest, info.mtimeMs);
 				files.push({ path, size: info.size, changedAt: info.mtimeMs });
 			}
@@ -255,14 +338,8 @@ async function indexText(
 
 type Description = { title: string; sentence: string };
 
-/**
- * What the index said of each document, by its path on disk, while its
- * size and time of change stay: an index written again reads a PDF once.
- */
-const described = new Map<
-	string,
-	{ size: number; changedAt: number; description: Description }
->();
+/** Whether the text of a file is read for its title: a text file. */
+const isText = (path: string) => TEXT_FILES.has(extname(path).toLowerCase());
 
 /** A file's title and first sentence: from its first bytes, or a document's text. */
 async function describe(
@@ -270,30 +347,15 @@ async function describe(
 	file: KnowledgeFile,
 ): Promise<Description> {
 	const name = file.path.split("/").at(-1) ?? file.path;
-	const fallback = name.slice(0, name.length - extname(name).length) || name;
 	if (isDocument(name)) {
-		const kept = described.get(abs);
-		if (kept?.size === file.size && kept.changedAt === file.changedAt) {
-			return kept.description;
-		}
 		const docs = await loadDocument(abs);
-		const description =
-			docs === null
-				? { title: name, sentence: "" }
-				: describeDocument(docs, fallback);
-		if (described.size >= MAX_FILES) described.clear();
-		described.set(abs, {
-			size: file.size,
-			changedAt: file.changedAt,
-			description,
-		});
-		return description;
+		return docs === null
+			? { title: name, sentence: "" }
+			: describeDocument(docs, fallbackTitle(name));
 	}
-	if (!TEXT_FILES.has(extname(name).toLowerCase())) {
-		return { title: name, sentence: "" };
-	}
-	const head = await readHead(abs);
-	return describeText(head, fallback);
+	if (!isText(name)) return { title: name, sentence: "" };
+	const head = await readStart(abs, HEAD_BYTES);
+	return describeText(head?.text ?? "", fallbackTitle(name));
 }
 
 /**
@@ -392,16 +454,160 @@ function oneLine(text: string): string {
 	return text.replace(/\s+/g, " ").replace(/`/g, "'").trim();
 }
 
-async function readHead(path: string): Promise<string> {
-	const handle = await open(path, "r").catch(() => null);
-	if (!handle) return "";
+/** The first `bytes` of a file as text, and its size. Null when it is no file. */
+export async function readStart(
+	abs: string,
+	bytes: number,
+): Promise<{ text: string; size: number } | null> {
+	const handle = await open(abs, "r").catch(() => null);
+	if (!handle) return null;
 	try {
-		const buffer = Buffer.alloc(HEAD_BYTES);
-		const { bytesRead } = await handle.read(buffer, 0, HEAD_BYTES, 0);
-		return buffer.subarray(0, bytesRead).toString("utf8");
+		const info = await handle.stat();
+		if (!info.isFile()) return null;
+		const length = Math.min(info.size, bytes);
+		const buffer = Buffer.alloc(length);
+		const { bytesRead } = await handle.read(buffer, 0, length, 0);
+		return {
+			text: buffer.subarray(0, bytesRead).toString("utf8"),
+			size: info.size,
+		};
 	} finally {
 		await handle.close();
 	}
+}
+
+/** The first `bytes` of a text, cut at a character, and the size of the whole. */
+export function cutText(
+	text: string,
+	bytes: number,
+): { text: string; size: number } {
+	const buffer = Buffer.from(text, "utf8");
+	if (buffer.length <= bytes) return { text, size: buffer.length };
+	// A cut inside a character drops that character.
+	const cut = buffer
+		.subarray(0, bytes)
+		.toString("utf8")
+		.replace(/\uFFFD$/, "");
+	return { text: cut, size: buffer.length };
+}
+
+/**
+ * A path as a person or an agent gave it (`./` in front, spaces around),
+ * or null when it is not one they read (`isReadable`).
+ */
+function cleanPath(path: string): string | null {
+	const clean = path.trim().replace(/^\.\/+/, "");
+	return isReadable(clean) ? clean : null;
+}
+
+/** A PDF or Word file's text as `read` gives it, or a Refusal when it gives none. */
+function documentResult(
+	path: string,
+	docs: Document<DocumentMetadata>[] | null,
+	maxBytes: number,
+): KnowledgeText {
+	if (docs === null) {
+		throw new Refusal(
+			"invalid",
+			`Night Shift cannot read the text of "${path}".`,
+		);
+	}
+	const text = textOf(docs);
+	const cut = cutText(text, maxBytes);
+	return {
+		path,
+		title: describeDocument(docs, fallbackTitle(path)).title,
+		text: cut.text,
+		size: cut.size,
+		truncated: cut.size > maxBytes,
+	};
+}
+
+/** A file's first bytes as `read` gives them, or a Refusal when they are not text. */
+function textResult(
+	path: string,
+	text: string,
+	size: number,
+	maxBytes: number,
+): KnowledgeText {
+	if (text.includes("\u0000")) {
+		throw new Refusal("invalid", `"${path}" is not a text file.`);
+	}
+	const name = path.split("/").at(-1) ?? path;
+	return {
+		path,
+		title: isText(path)
+			? describeText(text.slice(0, HEAD_BYTES), fallbackTitle(path)).title
+			: name,
+		text,
+		size,
+		truncated: size > maxBytes,
+	};
+}
+
+/** A PDF or Word file over 10 MB: its text is not read. */
+function tooLarge(path: string): Refusal {
+	return new Refusal(
+		"unavailable",
+		`"${path}" is larger than 10 MB. Night Shift does not read its text.`,
+	);
+}
+
+/**
+ * One file of the knowledge folder `dir`, by its path, at most `maxBytes`
+ * of its text: a PDF or Word file's text, any other file's first bytes.
+ * Null when the folder has no such file, or the path is not one a person
+ * or an agent reads, or a link leads it out of the folder. Refuses a file
+ * that is not text and a document whose text it cannot read.
+ */
+export async function readFolderFile(
+	dir: string,
+	path: string,
+	maxBytes: number,
+): Promise<KnowledgeText | null> {
+	const clean = cleanPath(path);
+	if (clean === null) return null;
+	const abs = join(dir, ...clean.split("/"));
+	const info = await lstat(abs).catch(() => null);
+	if (!info?.isFile()) return null;
+	const [real, base] = await Promise.all([
+		realpath(abs).catch(() => ""),
+		realpath(dir).catch(() => ""),
+	]);
+	if (base === "" || !real.startsWith(`${base}/`)) return null;
+	const bytes = Math.max(1, maxBytes);
+	if (isDocument(clean)) {
+		if (info.size > LOCAL_ONLY_BYTES) throw tooLarge(clean);
+		return documentResult(clean, await loadDocument(abs), bytes);
+	}
+	const read = await readStart(abs, bytes);
+	if (!read) return null;
+	return textResult(clean, read.text, read.size, bytes);
+}
+
+/**
+ * A file of the knowledge from its content, as `readFolderFile` reads it:
+ * for a Device that has the file by its hash only. Null for a path a
+ * person or an agent does not read.
+ */
+export async function knowledgeText(
+	path: string,
+	content: Uint8Array,
+	maxBytes: number,
+): Promise<KnowledgeText | null> {
+	const clean = cleanPath(path);
+	if (clean === null) return null;
+	const bytes = Math.max(1, maxBytes);
+	if (isDocument(clean)) {
+		if (content.length > LOCAL_ONLY_BYTES) throw tooLarge(clean);
+		return documentResult(
+			clean,
+			await loadDocumentContent(clean, content),
+			bytes,
+		);
+	}
+	const start = Buffer.from(content.subarray(0, bytes)).toString("utf8");
+	return textResult(clean, start, content.length, bytes);
 }
 
 /** Writes the file whole or not at all: a reader never sees half an index. */

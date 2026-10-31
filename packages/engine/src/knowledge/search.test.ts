@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import {
-	mkdir,
-	mkdtemp,
-	rm,
-	symlink,
-	utimes,
-	writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tinyDocx, tinyPdf } from "../testing/documents";
@@ -63,8 +56,11 @@ describe("knowledge search", () => {
 		expect(await search.search("p1", "kubernetes")).toEqual([]);
 	});
 
-	test("leaves out the index, hidden files and the learnings that wait", async () => {
+	test("leaves out the index, hidden files, staging files and the learnings that wait", async () => {
 		await put("INDEX.md", "# Knowledge index\n\n- `a.md`: secret word\n");
+		await put("index.md", "secret word in another case");
+		await put("wiki.part/a.md", "secret word, half");
+		await put("web/b.md.part", "secret word, half");
 		await put(".hidden/a.md", "secret word");
 		await put("learnings/proposed/r1.md", "- secret word");
 		await put("learnings/accepted/r0.md", "- secret word kept");
@@ -219,47 +215,6 @@ describe("matchQuery", () => {
 	});
 });
 
-describe("reading a file", () => {
-	test("gives its text and title, cut at the size asked for", async () => {
-		await put("wiki/a.md", "# Alpha\n\nSome text here.\n");
-		expect(await search.read("p1", "wiki/a.md")).toEqual({
-			path: "wiki/a.md",
-			title: "Alpha",
-			text: "# Alpha\n\nSome text here.\n",
-			size: 25,
-			truncated: false,
-		});
-		const cut = await search.read("p1", "./wiki/a.md", { maxBytes: 7 });
-		expect(cut?.text).toBe("# Alpha");
-		expect(cut?.truncated).toBe(true);
-	});
-
-	test("refuses what leaves the folder, hidden files, proposals and links", async () => {
-		await writeFile(join(dataDir, "outside.md"), "secret");
-		await put(".hidden.md", "hidden");
-		await put("learnings/proposed/r1.md", "- wait");
-		await symlink(join(dataDir, "outside.md"), join(dir, "link.md"));
-		for (const path of [
-			"../outside.md",
-			"/etc/hosts",
-			"wiki/../../outside.md",
-			".hidden.md",
-			"learnings/proposed/r1.md",
-			"link.md",
-			"missing.md",
-			"",
-			"wiki",
-		]) {
-			expect(await search.read("p1", path)).toBeNull();
-		}
-	});
-
-	test("says a binary file is not text", async () => {
-		await writeFile(join(dir, "a.bin"), Buffer.from([0, 1, 2]));
-		await expect(search.read("p1", "a.bin")).rejects.toThrow("not a text file");
-	});
-});
-
 describe("PDF and Word files", () => {
 	const putBytes = async (path: string, bytes: Uint8Array) => {
 		await mkdir(join(dir, path, ".."), { recursive: true });
@@ -284,26 +239,8 @@ describe("PDF and Word files", () => {
 		expect(docx?.title).toBe("Onboarding guide");
 	});
 
-	test("read gives their text, cut at the size asked for", async () => {
-		await putBytes(
-			"guide.docx",
-			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
-		);
-		const read = await search.read("p1", "guide.docx");
-		expect(read?.title).toBe("Onboarding guide");
-		expect(read?.text).toContain("Every new teammate meets the wombat.");
-		expect(read?.truncated).toBe(false);
-		const cut = await search.read("p1", "guide.docx", { maxBytes: 10 });
-		expect(cut?.text).toBe("Onboarding");
-		expect(cut?.truncated).toBe(true);
-		expect(cut?.size).toBe(Buffer.byteLength(read?.text ?? ""));
-	});
-
-	test("one that does not open is found by its path, and read says so", async () => {
+	test("one that does not open is found by its path", async () => {
 		await putBytes("broken.pdf", new TextEncoder().encode("not a pdf"));
 		expect(paths(await search.search("p1", "broken"))).toEqual(["broken.pdf"]);
-		await expect(search.read("p1", "broken.pdf")).rejects.toThrow(
-			"cannot read the text",
-		);
 	});
 });

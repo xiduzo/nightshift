@@ -152,28 +152,16 @@ function searchContext(personId: string) {
 					},
 				];
 			},
-			read: async (projectId, path, options) => {
-				asked.push({ projectId, path, options });
+		},
+		knowledge: {
+			read: async (projectId, path, maxBytes) => {
+				asked.push({ projectId, path, maxBytes });
 				return path === "wiki/deploy.md"
 					? {
 							path,
 							title: "Deploy",
 							text: "# Deploy",
 							size: 8,
-							truncated: false,
-						}
-					: null;
-			},
-		},
-		knowledge: {
-			read: async (_projectId, path, options) => {
-				asked.push({ byHash: path, options });
-				return path === "wiki/elsewhere.md"
-					? {
-							path,
-							title: "Elsewhere",
-							text: "# Elsewhere",
-							size: 11,
 							truncated: false,
 						}
 					: null;
@@ -204,7 +192,7 @@ describe("knowledge.search and knowledge.read", () => {
 		]);
 	});
 
-	test("read gives one file: this computer's copy, else by its hash in the Space, or null when there is none", async () => {
+	test("read gives one file of the knowledge, at most 1 MB, or null when there is none", async () => {
 		const { ctx, asked } = searchContext("member");
 		const file = await call(
 			appRouter.knowledge.read,
@@ -212,16 +200,9 @@ describe("knowledge.search and knowledge.read", () => {
 			{ context: ctx },
 		);
 		expect(file?.text).toBe("# Deploy");
-		const elsewhere = await call(
-			appRouter.knowledge.read,
-			{ projectId: "p1", path: "wiki/elsewhere.md" },
-			{ context: ctx },
-		);
-		expect(elsewhere?.text).toBe("# Elsewhere");
-		expect(asked).toContainEqual({
-			byHash: "wiki/elsewhere.md",
-			options: { maxBytes: 1024 * 1024 },
-		});
+		expect(asked).toEqual([
+			{ projectId: "p1", path: "wiki/deploy.md", maxBytes: 1024 * 1024 },
+		]);
 		expect(
 			await call(
 				appRouter.knowledge.read,
@@ -229,6 +210,13 @@ describe("knowledge.search and knowledge.read", () => {
 				{ context: ctx },
 			),
 		).toBeNull();
+		await expect(
+			call(
+				appRouter.knowledge.read,
+				{ projectId: "p9", path: "wiki/deploy.md" },
+				{ context: ctx },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
 	});
 
 	test("any Member of the Space searches, and only its projects", async () => {

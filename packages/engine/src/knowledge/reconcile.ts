@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import {
 	lstat,
 	mkdir,
-	readdir,
 	readFile,
 	rename,
 	rm,
@@ -10,28 +9,28 @@ import {
 	stat,
 	writeFile,
 } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { organization, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import type { PersistedDocument } from "../device-config";
 import {
-	describeText,
-	INDEX_FILE,
+	isKnowledgePath,
+	isProposal,
+	isReadable,
 	type KnowledgeFile,
 	type KnowledgeFolders,
-	PROPOSED_DIR,
-	TEXT_FILES,
+	type KnowledgeText,
+	knowledgeText,
+	walkFolder,
 } from "./folder";
 import {
-	isKnowledgePath,
 	type KnowledgeDocuments,
 	type KnowledgeEntry,
 	knowledgeEntries,
 	knowledgeFiles,
 } from "./knowledge-document";
-import type { KnowledgeText } from "./search";
 import {
 	type KnowledgeStore,
 	LOCAL_ONLY_BYTES,
@@ -113,7 +112,7 @@ export type KnowledgeListing = {
 
 export type KnowledgeSyncDeps = {
 	db: Database;
-	folders: Pick<KnowledgeFolders, "folder" | "known" | "index">;
+	folders: Pick<KnowledgeFolders, "folder" | "known" | "read">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	store: KnowledgeStore;
 	/** This Device: it signs the entries it writes. */
@@ -500,17 +499,16 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		},
 		/**
 		 * The Knowledge page's list: a reconcile first, for a while, so the
-		 * document has this Device's own changes, and a fresh index. Then the
-		 * document's files and how many notes its proposals hold. The
-		 * reconcile goes on when the wait ends. While a step writes the
-		 * folder, the page lists the document as it is.
+		 * document has this Device's own changes. Then the document's files
+		 * and how many notes its proposals hold. The reconcile goes on when
+		 * the wait ends. While a step writes the folder, the page lists the
+		 * document as it is.
 		 */
 		async listing(projectId: string): Promise<KnowledgeListing> {
 			const reconciled = busy(projectId)
 				? Promise.resolve()
 				: reconcileQuietly(projectId);
 			await Promise.race([reconciled, Bun.sleep(deps.pageWaitMs ?? 2_000)]);
-			await folders.index(projectId).catch(() => {});
 			const spaceId = await spaceOf(projectId);
 			const entries = knowledgeEntries(await deps.documents.open(projectId));
 			const host = deps.host?.() ?? null;
@@ -519,7 +517,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			for (const [path, entry] of [...entries].sort(([a], [b]) =>
 				a.localeCompare(b),
 			)) {
-				if (!path.startsWith(`${PROPOSED_DIR}/`)) {
+				if (!isProposal(path)) {
 					files.push({
 						path,
 						size: entry.size,
@@ -542,20 +540,26 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			};
 		},
 		/**
-		 * One file of the project's knowledge, by its hash in the document:
-		 * for a Device whose folder lacks it. At most `maxBytes` of its text.
-		 * Null when the document has no such file. Refuses a file that is
-		 * not text, one that stays on another Device, and one whose content
-		 * cannot be fetched now.
+		 * One file of the project's knowledge, by its path, at most
+		 * `maxBytes` of its text: this Device's copy, else its content by
+		 * its hash in the document, from the store or the Host. A PDF or
+		 * Word file gives its text either way. Null when neither has the
+		 * file, and for a proposal. Refuses (never a plain error) a file
+		 * that is not text, one that stays on another Device, and one whose
+		 * content cannot be fetched now.
 		 */
 		async read(
 			projectId: string,
 			path: string,
-			options: { maxBytes: number },
+			maxBytes: number,
 		): Promise<KnowledgeText | null> {
+			// This computer's folder first: it may not have the file yet.
+			const here = await folders.read(projectId, path, maxBytes);
+			if (here) return here;
+			const clean = path.trim().replace(/^\.\/+/, "");
 			const spaceId = await spaceOf(projectId);
-			const entry = isKnowledgePath(path)
-				? knowledgeEntries(await deps.documents.open(projectId)).get(path)
+			const entry = isReadable(clean)
+				? knowledgeEntries(await deps.documents.open(projectId)).get(clean)
 				: undefined;
 			if (spaceId === null || !entry) return null;
 			if (entry.local && entry.deviceId !== deviceId) {
@@ -575,24 +579,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					"Night Shift cannot get this file now. Try again when the computer that keeps this Space is online.",
 				);
 			}
-			const start = content.subarray(0, Math.max(1, options.maxBytes));
-			if (start.subarray(0, 8192).includes(0)) {
-				throw new Refusal("invalid", `"${path}" is not a text file.`);
-			}
-			const text = new TextDecoder().decode(start);
-			const name = path.split("/").at(-1) ?? path;
-			const fallback = name.slice(0, name.length - extname(name).length);
-			const title =
-				TEXT_FILES.has(extname(name).toLowerCase()) && path !== INDEX_FILE
-					? describeText(text.slice(0, 4096), fallback || name).title
-					: name;
-			return {
-				path,
-				title,
-				text,
-				size: content.length,
-				truncated: content.length > start.length,
-			};
+			return knowledgeText(clean, content, maxBytes);
 		},
 		/**
 		 * Removes a folder of the project's knowledge, for every Device of
@@ -661,27 +648,15 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 /** A file of the folder, as the reconcile compares it. */
 type FileStat = { size: number; mtimeMs: number };
 
-/**
- * Every file of the folder that syncs, by path: no hidden file or
- * folder, no link, no index.
- */
+/** Every file of the folder that syncs (`isKnowledgePath`), by path. */
 async function scan(root: string): Promise<Map<string, FileStat>> {
-	const files = new Map<string, FileStat>();
-	const visit = async (abs: string, rel: string): Promise<void> => {
-		const names = await readdir(abs).catch(() => [] as string[]);
-		for (const name of names) {
-			if (name.startsWith(".")) continue;
-			const path = rel === "" ? name : `${rel}/${name}`;
-			const info = await lstat(join(abs, name)).catch(() => null);
-			if (!info) continue;
-			if (info.isDirectory()) await visit(join(abs, name), path);
-			else if (info.isFile() && isKnowledgePath(path)) {
-				files.set(path, { size: info.size, mtimeMs: info.mtimeMs });
-			}
-		}
-	};
-	await visit(root, "");
-	return files;
+	const { files } = await walkFolder(root);
+	return new Map(
+		files.map((file) => [
+			file.path,
+			{ size: file.size, mtimeMs: file.changedAt },
+		]),
+	);
 }
 
 /** Whether a document ever had an update: an empty one may only be new. */

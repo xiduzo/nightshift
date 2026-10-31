@@ -10,8 +10,10 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
+import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
 import { createSandbox, type Sandbox } from "../testing";
+import { tinyDocx, tinyPdf } from "../testing/documents";
 import { createKnowledgeFolders } from "./folder";
 import {
 	createKnowledgeDocuments,
@@ -315,9 +317,9 @@ describe("reconcile", () => {
 				local: true,
 			},
 		]);
-		await expect(
-			b.sync.read("p1", "big.txt", { maxBytes: 1024 }),
-		).rejects.toThrow("stays on the computer that synced it");
+		await expect(b.sync.read("p1", "big.txt", 1024)).rejects.toThrow(
+			"stays on the computer that synced it",
+		);
 	});
 
 	test("the first reconcile imports the folder, and the later change wins where the document has the path", async () => {
@@ -496,7 +498,7 @@ describe("reconcile", () => {
 		expect(await a.read("notes.md")).toBe("kept\n");
 	});
 
-	test("lists the document's files, counts the proposed notes, and reads one file", async () => {
+	test("lists the document's files and counts the proposed notes", async () => {
 		const { host } = memoryHost();
 		const a = await device(host);
 		const b = await device(host);
@@ -514,24 +516,101 @@ describe("reconcile", () => {
 		expect(listing.proposed).toBe(2);
 		// The sandbox's Space is the personal one of its Person.
 		expect(listing.shared).toBe(false);
-		// B's folder lacks them: B reads them by their hash.
-		await rm(b.dir, { recursive: true, force: true });
-		expect(await b.sync.read("p1", "wiki/Home.md", { maxBytes: 1024 })).toEqual(
-			{
-				path: "wiki/Home.md",
-				title: "Home",
-				text: "# Home\n",
-				size: 7,
-				truncated: false,
-			},
+	});
+});
+
+describe("read", () => {
+	/** A's folder has the files, B has them by hash only: both must read alike. */
+	async function twoDevices() {
+		const { host } = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		const both = async () => {
+			await a.sync.reconcile("p1");
+			await syncDocuments(a, b);
+		};
+		return { a, b, both };
+	}
+
+	test("a file reads the same from this Device's folder and by its hash", async () => {
+		const { a, b, both } = await twoDevices();
+		await a.put("wiki/a.md", "# Alpha\n\nSome text here.\n");
+		await a.put(
+			"docs/guide.docx",
+			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
 		);
-		expect(
-			await b.sync.read("p1", "wiki/Home.md", { maxBytes: 3 }),
-		).toMatchObject({ text: "# H", truncated: true });
-		await expect(
-			b.sync.read("p1", "logo.png", { maxBytes: 1024 }),
-		).rejects.toThrow("not a text file");
-		expect(await b.sync.read("p1", "none.md", { maxBytes: 1024 })).toBeNull();
+		await a.put(
+			"docs/release.pdf",
+			tinyPdf(["Release checklist", "We ship on Fridays."]),
+		);
+		await both();
+		expect(await b.has("wiki/a.md")).toBe(false);
+		for (const path of ["wiki/a.md", "docs/guide.docx", "docs/release.pdf"]) {
+			const here = await a.sync.read("p1", path, 1024);
+			expect(await b.sync.read("p1", path, 1024)).toEqual(here);
+			expect(await b.sync.read("p1", path, 7)).toEqual(
+				await a.sync.read("p1", path, 7),
+			);
+		}
+		expect(await a.sync.read("p1", "./wiki/a.md", 1024)).toEqual({
+			path: "wiki/a.md",
+			title: "Alpha",
+			text: "# Alpha\n\nSome text here.\n",
+			size: 25,
+			truncated: false,
+		});
+		expect(await b.sync.read("p1", "wiki/a.md", 7)).toMatchObject({
+			text: "# Alpha",
+			truncated: true,
+		});
+		expect(await b.sync.read("p1", "docs/guide.docx", 1024)).toMatchObject({
+			title: "Onboarding guide",
+			text: "Onboarding guide\n\nEvery new teammate meets the wombat.",
+		});
+		expect(await b.sync.read("p1", "docs/release.pdf", 1024)).toMatchObject({
+			title: "Release checklist",
+		});
+	});
+
+	test("never a proposal, a hidden file, a link or a path out of the folder: here or by hash", async () => {
+		const { a, b, both } = await twoDevices();
+		await writeFile(join(a.sandbox.root, "outside.md"), "secret");
+		await a.put(".hidden.md", "hidden");
+		await a.folders.propose("p1", "run-1", ["Use bun."]);
+		await mkdir(a.dir, { recursive: true });
+		await symlink(join(a.sandbox.root, "outside.md"), join(a.dir, "link.md"));
+		await both();
+		expect((await b.entries()).has("learnings/proposed/run-1.md")).toBe(true);
+		for (const reader of [a, b]) {
+			for (const path of [
+				"../outside.md",
+				"/etc/hosts",
+				"wiki/../../outside.md",
+				".hidden.md",
+				"learnings/proposed/run-1.md",
+				"link.md",
+				"missing.md",
+				"",
+				"wiki",
+			]) {
+				expect(await reader.sync.read("p1", path, 1024)).toBeNull();
+			}
+		}
+	});
+
+	test("refuses a file that is not text, and a document it cannot read: here and by hash", async () => {
+		const { a, b, both } = await twoDevices();
+		await a.put("logo.png", new Uint8Array([137, 80, 78, 71, 0, 1, 2]));
+		await a.put("broken.pdf", "not a pdf");
+		await both();
+		for (const reader of [a, b]) {
+			const binary = reader.sync.read("p1", "logo.png", 1024);
+			await expect(binary).rejects.toBeInstanceOf(Refusal);
+			await expect(binary).rejects.toThrow('"logo.png" is not a text file.');
+			const broken = reader.sync.read("p1", "broken.pdf", 1024);
+			await expect(broken).rejects.toBeInstanceOf(Refusal);
+			await expect(broken).rejects.toThrow("cannot read the text");
+		}
 	});
 });
 
