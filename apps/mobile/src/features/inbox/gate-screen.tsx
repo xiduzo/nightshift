@@ -78,6 +78,7 @@ import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { CHECK_COPY } from "./answer-check";
 import { ChoiceCards } from "./choice-cards";
+import { nextGate } from "./gate-list";
 import { GateDeadline, GateStatus, RunSteps } from "./gate-times";
 import {
 	confirmText,
@@ -87,7 +88,6 @@ import {
 	sentText,
 	stepsHint,
 } from "./gate-view";
-import { nextGate } from "./inbox-view";
 import { InlineMarkdown } from "./markdown";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
@@ -114,7 +114,7 @@ function GateAnswer() {
 		runId: string;
 		stepId: string;
 	}>();
-	const inbox = useInbox();
+	const inbox = useInbox(useWhileFocused().subscribed);
 	/** Night Shift refused the answer: the Gate does not wait for you anymore. */
 	const [gone, setGone] = useState<GoneRefusal | null>(null);
 	/** The answer went: the screen keeps the Gate while the inbox drops it. */
@@ -178,10 +178,10 @@ function ClosedGate({
 			<EmptyState icon={CircleCheck} title={title} description={description}>
 				<Button
 					size="lg"
-					onPress={() => router.dismissTo("/inbox")}
+					onPress={() => router.dismissTo("/needs")}
 					className="h-auto min-h-11 py-2"
 				>
-					<Text>Back to Inbox</Text>
+					<Text>Back to Needs you</Text>
 				</Button>
 			</EmptyState>
 		</Screen>

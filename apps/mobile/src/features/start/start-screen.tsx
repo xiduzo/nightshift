@@ -12,38 +12,41 @@ import {
 	placementChoices,
 	useRunActed,
 } from "@nightshift/client";
+import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
+import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { FolderGit2, Workflow } from "lucide-react-native";
+import { FolderGit2, Play } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 
 import { canFollowOnLockScreen, useFollowAfterStart } from "@/features/glance";
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { openRun } from "@/features/runs";
-import { ActionBar } from "@/shared/action-bar";
+import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { ListGroup, ListRow, SectionHead, SwitchRow } from "@/shared/list";
+import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { ChoiceSelect } from "./choice-select";
 import { FlowInputFields } from "./flow-input-fields";
 import { PlacementField } from "./placement-field";
+import { RadioRows } from "./radio-rows";
 import {
 	chosenFlow,
 	flowCaption,
+	phoneInputs,
 	readsFlowFile,
 	startBlocker,
 } from "./start-words";
 
 /**
- * New run, in the Space you chose in the header: pick one of a project's
- * flows, fill in its inputs, choose where it runs, then start it and
- * follow it live. `projectId` chooses the project first (from a project
- * page).
+ * New run, in the Space you chose in the header: pick a project and one
+ * of its flows, fill in the inputs it cannot start without, choose where
+ * it runs, then start it and follow it live. `projectId` chooses the
+ * project first (from a project page).
  */
 export function StartScreen({ projectId }: { projectId?: string }) {
 	const projectQueries = useHostQueries(createProjectQueries);
@@ -114,7 +117,10 @@ export function StartScreen({ projectId }: { projectId?: string }) {
 	);
 }
 
-/** The form of one project: its flows, the chosen flow's inputs, where it runs, and the Start run bar. */
+/**
+ * The form of one project: the projects as chips, its flows, the inputs
+ * the run needs, where it runs, Follow on the lock screen, and Start run.
+ */
 function NewRun({
 	projects,
 	project,
@@ -158,9 +164,10 @@ function NewRun({
 
 	const chosen = chosenFlow(listed, flow.data);
 	const inputs = chosen?.inputs ?? [];
+	const { needed, more } = phoneInputs(inputs);
 	const choices = placementChoices(placements.data ?? [], devices.data ?? []);
 	const place = defaultPlacement(choices, chosenDevice);
-	const badJson = inputs.filter(
+	const badJson = needed.filter(
 		(input) => inputProblem(input, values[input.name]) !== null,
 	);
 	const blocker = startBlocker({
@@ -186,44 +193,53 @@ function NewRun({
 	const ready =
 		flowName !== null && chosen?.valid === true && blocker === null && place;
 
+	function startRun() {
+		if (!project || !flowName || !place) return;
+		const filled = filledInputs(needed, values);
+		start.mutate({
+			projectId: project.id,
+			flowName,
+			...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
+			...(place.thisDevice ? {} : { deviceId: place.deviceId }),
+		});
+	}
+
 	return (
 		<Screen
 			onRefresh={onRefresh}
 			footer={
-				<ActionBar
-					caption={
-						flowName
-							? (blocker ?? (place ? `Runs on ${place.name}` : "New run"))
-							: "New run"
-					}
-					label={flowName ?? "Choose a flow"}
-					action={{
-						label: "Start run",
-						busyLabel: "Starting…",
-						busy: start.isPending,
-						disabled: !ready,
-						onPress: () => {
-							if (!project || !flowName || !place) return;
-							const filled = filledInputs(inputs, values);
-							start.mutate({
-								projectId: project.id,
-								flowName,
-								...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
-								...(place.thisDevice ? {} : { deviceId: place.deviceId }),
-							});
-						},
-					}}
-				/>
+				<View className="gap-2">
+					<Button
+						size="lg"
+						disabled={!ready || start.isPending}
+						onPress={startRun}
+						className="h-auto min-h-11 w-full py-2"
+					>
+						<Icon as={Play} />
+						<Text>{start.isPending ? "Starting…" : "Start run"}</Text>
+					</Button>
+					{blocker ? (
+						<Text variant="muted" className="text-center text-muted-foreground">
+							{blocker}
+						</Text>
+					) : null}
+				</View>
 			}
 		>
 			{projects.length > 1 ? (
-				<ChoiceSelect
-					label="Project"
-					placeholder="Choose a project"
-					choices={projects.map((p) => ({ value: p.id, label: p.name }))}
-					value={project?.id ?? null}
-					onChange={onProject}
-				/>
+				<View className="gap-3">
+					<SectionHead title="Project" />
+					<ChipRail>
+						{projects.map((p) => (
+							<Chip
+								key={p.id}
+								label={p.name}
+								selected={p.id === project?.id}
+								onPress={() => onProject(p.id)}
+							/>
+						))}
+					</ChipRail>
+				</View>
 			) : null}
 
 			{project ? (
@@ -240,23 +256,20 @@ function NewRun({
 						flows.data.length === 0 ? (
 							<Line text="This project has no flows yet. Make one in Night Shift on your computer." />
 						) : (
-							<ListGroup>
-								{flows.data.map((item) => (
-									<ListRow
-										key={item.name}
-										icon={Workflow}
-										title={item.name}
-										caption={flowCaption(item)}
-										selected={item.name === flowName}
-										disabled={!canStart(item)}
-										onPress={() => {
-											setFlowName(item.name);
-											setValues({});
-										}}
-										accessibilityHint="Chooses this flow for the run"
-									/>
-								))}
-							</ListGroup>
+							<RadioRows
+								label="Flow"
+								choices={flows.data.map((item) => ({
+									value: item.name,
+									title: item.name,
+									caption: flowCaption(item),
+									disabled: !canStart(item),
+								}))}
+								value={flowName}
+								onChange={(name) => {
+									setFlowName(name);
+									setValues({});
+								}}
+							/>
 						)
 					) : flows.isError ? (
 						<ErrorAlert
@@ -268,22 +281,26 @@ function NewRun({
 					) : (
 						<Skeleton className="h-32 w-full rounded-xl" />
 					)}
+					{chosen?.valid && more ? (
+						<Text variant="muted" className="text-muted-foreground">
+							{needed.length > 0
+								? "The other inputs use their defaults. To change them, start the run on the desktop."
+								: "Inputs use their defaults. To change them, start the run on the desktop."}
+						</Text>
+					) : null}
 				</View>
 			) : null}
 
 			{project && flowName ? (
 				chosen ? (
 					chosen.valid ? (
-						inputs.length > 0 ? (
+						needed.length > 0 ? (
 							<View className="gap-3">
-								<SectionHead
-									title="Inputs"
-									hint="An empty field uses its default."
-								/>
+								<SectionHead title="Inputs" />
 								<Card className="py-4">
 									<CardContent className="px-4">
 										<FlowInputFields
-											inputs={inputs}
+											inputs={needed}
 											values={values}
 											onChange={setValues}
 										/>
@@ -310,12 +327,9 @@ function NewRun({
 				)
 			) : null}
 
-			{project && flowName ? (
+			{project ? (
 				<View className="gap-3">
-					<SectionHead
-						title="Where it runs"
-						hint="The computer must be online and have this project."
-					/>
+					<SectionHead title="Where it runs" />
 					{placements.data === undefined && !placements.isError ? (
 						<Skeleton className="h-16 w-full rounded-xl" />
 					) : placements.data === undefined ? (
@@ -344,10 +358,11 @@ function NewRun({
 				</View>
 			) : null}
 
-			{project && flowName && canFollowOnLockScreen ? (
+			{project && canFollowOnLockScreen ? (
 				<ListGroup>
 					<SwitchRow
 						title="Follow on the lock screen"
+						caption="See its step and time without opening the app."
 						checked={followOnLockScreen}
 						onChange={setFollowOnLockScreen}
 					/>

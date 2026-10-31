@@ -43,7 +43,6 @@ export {
 	stepOutcomeLabel,
 	tokensLabel,
 	tokensSplit,
-	whenLabel,
 } from "./format";
 export { metricsByNode, type NodeMetrics } from "./node-metrics";
 export {
@@ -76,7 +75,6 @@ export { type RerunStart, rerunStarts, runningStep } from "./retry";
 export { finishedShare } from "./share";
 export {
 	applyStepChanges,
-	changedFileCount,
 	lastWorktreeChanges,
 	linesLabel,
 	type StepChangedFiles,
@@ -93,7 +91,7 @@ export {
 	waitFor,
 } from "./stream";
 export { isLaunchNotice, subagentTask } from "./subagent";
-export { runTime, workedSoFar } from "./time";
+export { runTime } from "./time";
 export { stepTodos, type Todo } from "./todos";
 export {
 	groupToolCalls,

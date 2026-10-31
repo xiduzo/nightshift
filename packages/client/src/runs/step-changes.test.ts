@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	applyStepChanges,
-	changedFileCount,
 	lastWorktreeChanges,
 	linesLabel,
 	type StepChanges,
@@ -95,10 +94,6 @@ describe("the changed files of a run, per step", () => {
 		]);
 		expect(groups[1]).toMatchObject({ added: 3, removed: 3 });
 		expect(groups[2]).toMatchObject({ files: [], omitted: 4 });
-	});
-
-	test("a file two steps changed counts once", () => {
-		expect(changedFileCount(stepChangedFiles(kept, ["s1", "s2"]))).toBe(2);
 	});
 
 	test("lines read +added −removed", () => {

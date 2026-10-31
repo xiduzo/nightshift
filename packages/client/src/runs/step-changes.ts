@@ -75,12 +75,6 @@ export function stepChangedFiles(
 	return groups;
 }
 
-/** How many files the steps changed together: a file two steps changed counts once. */
-export function changedFileCount(groups: readonly StepChangedFiles[]): number {
-	return new Set(groups.flatMap((group) => group.files.map((f) => f.path)))
-		.size;
-}
-
 /** "+12 −3": the lines of a change. Nothing for a file without line counts (a binary file). */
 export function linesLabel(
 	lines: { added: number; removed: number } | undefined,

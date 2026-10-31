@@ -18,8 +18,8 @@ import { useSwitchSpace } from "./use-switch-space";
 
 /**
  * The Space this phone works in, in a screen's header. Runs, projects and
- * starting a flow are per Space. Home and the inbox show every Space and do
- * not need it.
+ * starting a flow are per Space. Watch and Needs you show every Space and
+ * do not need it.
  */
 export function SpacePicker({ className }: { className?: string }) {
 	const spaceQueries = useHostQueries(createSpaceQueries);

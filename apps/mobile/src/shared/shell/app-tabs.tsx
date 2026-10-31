@@ -4,14 +4,14 @@ import { useEffect } from "react";
 
 import { LockScreenRuns, updateGlance, useHomeWidget } from "@/features/glance";
 import { useHost, useSignedIn } from "@/features/host";
-import { useWaitingCount } from "@/features/inbox";
+import { needsTabLabel, useNeedsCount } from "@/features/needs";
 import { phoneNotifications, usePhonePush } from "@/features/push";
 import { useRememberedSpace } from "@/features/spaces";
 import { useInFront } from "@/shared/in-front";
 import { TabBar } from "./tab-bar";
 
 /**
- * The four tabs: Home, Inbox, Runs and Projects. Without a Host, or
+ * The three tabs: Watch, Needs you and Runs. Without a Host, or
  * signed out, the person goes to the connect screen first. While signed
  * in and in front, the app follows the Host: the live cache reads again
  * what changed, and a new Gate shows as a banner in the app. The home
@@ -39,12 +39,12 @@ function SignedInTabs() {
 	});
 	usePhonePush();
 	useHomeWidget();
-	const waiting = useWaitingCount();
+	const waiting = useNeedsCount();
 
 	return (
 		<>
 			<LockScreenRuns />
-			<TabBar waiting={waiting} />
+			<TabBar waiting={waiting} needsLabel={needsTabLabel(waiting)} />
 		</>
 	);
 }

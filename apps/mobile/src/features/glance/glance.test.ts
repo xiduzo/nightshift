@@ -225,10 +225,16 @@ describe("the props outside the app", () => {
 		expect(props).toEqual({
 			flow: "feature",
 			statusText: "Running",
+			headline: "Running · Step 2 of 3",
 			step: "build",
 			position: "Step 2 of 3",
+			short: "2/3",
 			fraction: 2 / 3,
 			ended: false,
+			symbol: "arrow.triangle.2.circlepath",
+			startedAt: props.startedAt,
+			endedAt: 0,
+			deadlineAt: 0,
 			light: "#0064b9",
 			dark: "#5db2f7",
 			staleText: "Open Night Shift to see the latest",
@@ -237,5 +243,20 @@ describe("the props outside the app", () => {
 				muted: { light: "#737373", dark: "#a1a1a1" },
 			},
 		});
+	});
+
+	test("say Needs you at a Gate, and when it chooses by itself", () => {
+		const progress = {
+			...progressOf("waiting", ["plan", "build"]),
+			deadlineAt: 1000,
+		};
+		const props = runActivityProps(progress, () => "07:30");
+		expect(props.statusText).toBe("Needs you");
+		expect(props.headline).toBe("Needs you · Answer by 07:30");
+		expect(props.symbol).toBe("hand.raised.fill");
+		expect(props.deadlineAt).toBe(1000);
+		expect(runActivityProps({ ...progress, deadlineAt: null }).headline).toBe(
+			"Needs you · Waits for your answer",
+		);
 	});
 });

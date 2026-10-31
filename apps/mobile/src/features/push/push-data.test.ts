@@ -119,16 +119,16 @@ describe("a push while the app is in front", () => {
 		expect(showInFront(gate, { pathname: "/gates/run-2/review" })).toBe(true);
 	});
 
-	test("no banner on the inbox, or on that Gate", () => {
-		expect(showInFront(gate, { pathname: "/inbox" })).toBe(false);
+	test("no banner on Needs you, or on that Gate", () => {
+		expect(showInFront(gate, { pathname: "/needs" })).toBe(false);
 		expect(showInFront(gate, { pathname: "/gates/run-1/review" })).toBe(false);
 	});
 
-	test("the end of quiet hours shows, except on the inbox", () => {
+	test("the end of quiet hours shows, except on Needs you", () => {
 		const waiting = pushDataOf({ kind: "gates-waiting", key: "waiting:5" });
 		expect(showInFront(waiting, { pathname: "/settings" })).toBe(true);
 		expect(showInFront(waiting, { pathname: "/" })).toBe(true);
-		expect(showInFront(waiting, { pathname: "/inbox" })).toBe(false);
+		expect(showInFront(waiting, { pathname: "/needs" })).toBe(false);
 	});
 
 	test("a step that waits for a device shows, except on its run", () => {
@@ -173,12 +173,12 @@ describe("where a tap goes", () => {
 		).toEqual({ pathname: "/runs/[runId]", params: { runId: "run-1" } });
 	});
 
-	test("the end of quiet hours, or a run's end without its run, opens the inbox", () => {
+	test("the end of quiet hours, or a run's end without its run, opens Needs you", () => {
 		expect(screenOf({ kind: "gates-waiting", key: "waiting:5" })).toEqual({
-			pathname: "/inbox",
+			pathname: "/needs",
 		});
 		expect(screenOf({ kind: "run-failed", key: "r:end:1" })).toEqual({
-			pathname: "/inbox",
+			pathname: "/needs",
 		});
 	});
 

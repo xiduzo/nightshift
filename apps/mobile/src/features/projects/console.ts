@@ -1,56 +1,38 @@
 import {
 	CONSOLE_METRICS,
-	changeOf,
-	consoleNumbers,
+	type ConsoleMetric,
+	consoleValues,
 	type DashboardSummary,
 	type NightRange,
 } from "@nightshift/client";
 
 /**
- * The Console of a project, kept simple for the phone: the four numbers
- * of the desktop over the last nights, each with how it moved against the
- * nights just before. No chart.
+ * How a project did over the last nights, kept simple for the phone: its
+ * runs, the share that finished and what they cost. The desktop has the
+ * chart and the comparison.
  */
 
 /** The nights the glance covers: last week. */
 export const GLANCE_NIGHTS: NightRange = 7;
 
-export type GlanceTile = {
-	key: string;
-	label: string;
-	value: string;
-	/** How it moved: "3 more than the nights before". Null with nothing to compare. */
-	change: string | null;
-};
+/** The numbers the phone shows, in this order. */
+const SHOWN: readonly ConsoleMetric[] = ["runs", "finished", "spend"];
 
-export type ConsoleGlance = {
-	/** "Compared with the 7 nights before", or why there is nothing to compare. */
-	hint: string;
-	tiles: GlanceTile[];
-	/** No runs in these nights, nor in the nights before. */
-	empty: boolean;
-};
+export type NightsFact = { key: ConsoleMetric; label: string; value: string };
 
-/** The glance of a project's numbers. Null when the Host does not count these nights. */
-export function consoleGlance(
+/** The facts of a project's last nights. Null when the Host does not count these nights. */
+export function nightsFacts(
 	summary: DashboardSummary,
 	nights: NightRange = GLANCE_NIGHTS,
-): ConsoleGlance | null {
+): NightsFact[] | null {
 	const range = summary.nights.find((found) => found.nights === nights);
 	if (!range) return null;
-	const { values, before, compared } = consoleNumbers(range);
-	return {
-		hint: compared
-			? `Compared with the ${nights} nights before`
-			: "Nothing to compare with yet",
-		tiles: CONSOLE_METRICS.map((metric) => ({
+	const values = consoleValues(range.totals);
+	return CONSOLE_METRICS.filter((metric) => SHOWN.includes(metric.key)).map(
+		(metric) => ({
 			key: metric.key,
 			label: metric.label,
 			value: metric.format(values[metric.key]),
-			change: compared
-				? changeOf(metric.key, values[metric.key], before[metric.key]).text
-				: null,
-		})),
-		empty: range.totals.runs === 0 && !compared,
-	};
+		}),
+	);
 }

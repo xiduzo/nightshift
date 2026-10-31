@@ -1,5 +1,4 @@
 import {
-	type RunActions as Allowed,
 	hasEnded,
 	type RerunStart,
 	type RunActing,
@@ -24,7 +23,6 @@ import {
 	buttonTextVariants,
 	buttonVariants,
 } from "@nightshift/ui-native/components/ui/button";
-import { CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import {
@@ -47,6 +45,7 @@ import { View } from "react-native";
 
 import { useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
+import type { RunActionKind } from "./run-facts";
 
 const ACTIONS = ["stop", "resume", "restart", "rerun"] as const;
 type Action = (typeof ACTIONS)[number];
@@ -115,106 +114,119 @@ const FAILED: Record<Action, string> = {
 };
 
 /**
- * Resume a run that ended, run it again from a step, restart the step
- * that runs, or stop the run, as the run allows (`runActions`). Each asks
- * first. The content of the run's Card, or nothing when the run allows
- * none of them.
+ * One action of a run: Stop, Resume (or Retry), Restart step or Run
+ * again. Each asks first. `primary`: the run's main action, filled (Stop
+ * in the destructive color). Otherwise an outline button. Full width.
  */
-export function RunActions({
+export function RunActionButton({
 	runId,
-	allows,
+	action,
 	act,
+	primary = false,
+	label,
+	resumeAt = null,
 	restartStep,
-	rerunFrom,
+	rerunFrom = [],
 	labels,
 }: {
 	runId: string;
-	allows: Pick<Allowed, Action>;
+	action: RunActionKind;
 	act: RunAct;
+	primary?: boolean;
+	/** The words of a resume: "Retry", "Resume at build". */
+	label?: string;
+	/** The step a resume continues at. */
+	resumeAt?: string | null;
 	/** The step a restart starts again (`runningStep`). */
-	restartStep: StepSummary | undefined;
+	restartStep?: StepSummary;
 	/** Where the run can run again from (`rerunStarts`). */
-	rerunFrom: RerunStart<StepSummary>[];
+	rerunFrom?: RerunStart<StepSummary>[];
 	labels: ReadonlyMap<string, string>;
 }) {
 	const { stop, resume, restart, rerun, acting, only } = act;
-	const canRestart = allows.restart && restartStep !== undefined;
-	const canRerun = allows.rerun && rerunFrom.length > 0;
-	const failed = ACTIONS.find((action) => act[action].error);
-	const failure = failed
-		? { title: FAILED[failed], message: act[failed].error?.message ?? "" }
-		: null;
-
-	if (!allows.stop && !canRestart && !allows.resume && !canRerun) return null;
-
-	return (
-		<CardContent className="gap-3 px-4">
-			<View className="gap-2">
-				{allows.resume ? (
-					<Confirm
-						button="Resume run"
-						icon={Play}
-						busy={acting?.action === "resume"}
-						title="Resume this run?"
-						description="The run continues at its last step."
-						confirm="Resume run"
-						onConfirm={() => {
-							only("resume");
-							resume.mutate({ runId });
-						}}
-					/>
-				) : null}
-				{canRerun ? (
-					<RerunConfirm
-						starts={rerunFrom}
-						labels={labels}
-						busy={acting?.action === "rerun"}
-						secondary={allows.resume}
-						onConfirm={(step) => {
-							only("rerun");
-							rerun.mutate({ runId, nodeId: step.nodeId, stepId: step.id });
-						}}
-					/>
-				) : null}
-				{canRestart && restartStep ? (
-					<Confirm
-						button="Restart step"
-						icon={RotateCcw}
-						busy={acting?.action === "restart"}
-						title={`Restart ${stepName(restartStep, labels)}?`}
-						description="The step stops and starts again at once. An agent continues its conversation."
-						confirm="Restart step"
-						secondary
-						onConfirm={() => {
-							only("restart");
-							restart.mutate({ runId, stepId: restartStep.id });
-						}}
-					/>
-				) : null}
-				{allows.stop ? (
-					<Confirm
-						button="Stop run"
-						icon={CircleStop}
-						busy={acting?.action === "stop"}
-						title="Stop this run?"
-						description="The running step stops now, and no new step starts. You can resume the run later."
-						confirm="Stop run"
-						destructive
-						onConfirm={() => {
-							only("stop");
-							stop.mutate({ runId, when: "now" });
-						}}
-					/>
-				) : null}
-			</View>
-			{failure ? (
-				<ErrorAlert
-					title={failure.title}
-					message={failure.message}
-					fix="Check that this phone is online and that your role in this Space lets you do this."
+	const busy = acting?.action === action;
+	switch (action) {
+		case "resume": {
+			const retry = label === "Retry";
+			return (
+				<Confirm
+					button={label ?? "Resume run"}
+					icon={retry ? RotateCcw : Play}
+					busy={busy}
+					primary={primary}
+					title={retry ? "Retry this run?" : "Resume this run?"}
+					description={
+						retry
+							? "The run continues at the step that failed."
+							: `The run continues at ${resumeAt ?? "its last step"}.`
+					}
+					confirm={retry ? "Retry" : "Resume run"}
+					onConfirm={() => {
+						only("resume");
+						resume.mutate({ runId });
+					}}
 				/>
-			) : null}
-		</CardContent>
+			);
+		}
+		case "rerun":
+			return rerunFrom.length > 0 ? (
+				<RerunConfirm
+					starts={rerunFrom}
+					labels={labels}
+					busy={busy}
+					primary={primary}
+					onConfirm={(step) => {
+						only("rerun");
+						rerun.mutate({ runId, nodeId: step.nodeId, stepId: step.id });
+					}}
+				/>
+			) : null;
+		case "restart":
+			return restartStep ? (
+				<Confirm
+					button="Restart step"
+					icon={RotateCcw}
+					busy={busy}
+					primary={primary}
+					title={`Restart ${stepName(restartStep, labels)}?`}
+					description="The step stops and starts again at once. An agent continues its conversation."
+					confirm="Restart step"
+					onConfirm={() => {
+						only("restart");
+						restart.mutate({ runId, stepId: restartStep.id });
+					}}
+				/>
+			) : null;
+		case "stop":
+			return (
+				<Confirm
+					button="Stop"
+					icon={CircleStop}
+					busy={busy}
+					primary={primary}
+					title="Stop this run?"
+					description="The running step stops now, and no new step starts. You can resume the run later."
+					confirm="Stop run"
+					destructive
+					onConfirm={() => {
+						only("stop");
+						stop.mutate({ runId, when: "now" });
+					}}
+				/>
+			);
+	}
+}
+
+/** Why the last action did not work, and how to fix it. Nothing when none failed. */
+export function RunActionFailure({ act }: { act: RunAct }) {
+	const failed = ACTIONS.find((action) => act[action].error);
+	if (!failed) return null;
+	return (
+		<ErrorAlert
+			title={FAILED[failed]}
+			message={act[failed].error?.message ?? ""}
+			fix="Check that this phone is online and that your role in this Space lets you do this."
+		/>
 	);
 }
 
@@ -227,14 +239,13 @@ function RerunConfirm({
 	starts,
 	labels,
 	busy,
-	secondary,
+	primary,
 	onConfirm,
 }: {
 	starts: RerunStart<StepSummary>[];
 	labels: ReadonlyMap<string, string>;
 	busy: boolean;
-	/** Resume is the main action next to it. */
-	secondary: boolean;
+	primary: boolean;
 	onConfirm: (step: StepSummary) => void;
 }) {
 	const [from, setFrom] = useState<RerunStart["from"]>("last");
@@ -244,10 +255,10 @@ function RerunConfirm({
 			button="Run again"
 			icon={RotateCcw}
 			busy={busy}
+			primary={primary}
 			title="Run this again?"
 			description="The step you choose runs again. The steps after it follow as the flow says."
 			confirm="Run again"
-			secondary={secondary}
 			onConfirm={() => {
 				if (chosen) onConfirm(chosen.step);
 			}}
@@ -285,7 +296,7 @@ function RerunConfirm({
 	);
 }
 
-/** A button that asks in an Alert Dialog before it acts. */
+/** A full-width button that asks in an Alert Dialog before it acts. */
 function Confirm({
 	button,
 	icon,
@@ -294,7 +305,7 @@ function Confirm({
 	description,
 	confirm,
 	destructive = false,
-	secondary = false,
+	primary = false,
 	onConfirm,
 	children,
 }: {
@@ -305,8 +316,8 @@ function Confirm({
 	description: string;
 	confirm: string;
 	destructive?: boolean;
-	/** Not the main action: an outline button. */
-	secondary?: boolean;
+	/** The main action: a filled button. Otherwise an outline button. */
+	primary?: boolean;
 	onConfirm: () => void;
 	/** A choice to make before it acts, under the description. */
 	children?: ReactNode;
@@ -316,7 +327,9 @@ function Confirm({
 			<AlertDialogTrigger asChild>
 				<Button
 					size="lg"
-					variant={destructive || secondary ? "outline" : "default"}
+					variant={
+						primary ? (destructive ? "destructive" : "default") : "outline"
+					}
 					disabled={busy}
 					className="h-auto min-h-11 py-2"
 				>

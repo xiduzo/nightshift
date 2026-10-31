@@ -8,57 +8,56 @@ import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import type { ListRenderItemInfo } from "@shopify/flash-list";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
-import { History, X } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { type Href, router, useLocalSearchParams } from "expo-router";
+import { Folder, History, Search } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { View } from "react-native";
 
-import { useHostQueries } from "@/features/host";
-import { SearchResults } from "@/features/search";
+import { useHostQueries, useSignedIn } from "@/features/host";
 import { SpacePicker } from "@/features/spaces";
 import { Chip, ChipRail } from "@/shared/chips";
+import { useClock } from "@/shared/clock";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { HeaderSearch, HeaderToolbar } from "@/shared/header";
-import { type Cell, CellSeparator, cellsOf, ListCell } from "@/shared/list";
+import { HeaderSearch, TabRootHeader } from "@/shared/header";
+import {
+	CellSeparator,
+	cellsOf,
+	ListCell,
+	ListGroup,
+	ListRow,
+	SectionHead,
+} from "@/shared/list";
 import { ScreenList } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { RunRow } from "./run-row";
 import {
+	byNight,
 	countedFilters,
-	emptyFilterTitle,
 	filterCounts,
-	filterRuns,
 	filterStatuses,
-	ofProject,
 	RUN_FILTERS,
 	RUNS_PAGE,
 	type RunFilter,
 	runFilterOf,
-	runsSummary,
+	shownRuns,
 } from "./runs-list";
 
-/** The Space picker and the search field in the native header. */
-function RunsHeader({ onSearch }: { onSearch: (query: string) => void }) {
-	return (
-		<>
-			<HeaderToolbar
-				placement="right"
-				items={[{ kind: "view", key: "space", element: <SpacePicker /> }]}
-			/>
-			<HeaderSearch placeholder="Runs and Gates" onChange={onSearch} />
-		</>
-	);
-}
+/** One item of the list: the heading of a night, or a run in that night's card. */
+type Item =
+	| { kind: "night"; label: string; count: number }
+	| { kind: "run"; item: RunSummary; first: boolean; last: boolean };
 
 /**
- * The filter and project of the list, kept in the link: `/runs?filter=failed`
+ * The status and project of the list, kept in the link: `/runs?filter=failed`
  * shows the failed runs, `/runs?project=<id>` the runs of one project.
  */
 function useRunsParams(): {
 	filter: RunFilter;
 	projectId: string | null;
 	setFilter: (filter: RunFilter) => void;
-	clearProject: () => void;
+	setProject: (projectId: string | null) => void;
+	clear: () => void;
 } {
 	const params = useLocalSearchParams<{ filter?: string; project?: string }>();
 	const projectId =
@@ -70,18 +69,24 @@ function useRunsParams(): {
 		projectId,
 		setFilter: (filter) =>
 			router.setParams({ filter: filter === "all" ? undefined : filter }),
-		clearProject: () => router.setParams({ project: undefined }),
+		setProject: (id) => router.setParams({ project: id ?? undefined }),
+		clear: () => router.setParams({ filter: undefined, project: undefined }),
 	};
 }
 
+function projectHref(projectId: string): Href {
+	return { pathname: "/projects/[projectId]", params: { projectId } };
+}
+
 /**
- * The runs of the Space you chose in the header, newest first. Chips show
- * the runs on their way, the runs that need you, the failed and the
- * finished ones. Pull down, or come back to the tab, to read them again.
- * The next page reads as you scroll near the end.
+ * The runs of the Space you chose in the header, newest first and grouped
+ * by night. Search them by title, flow or project, and pick a status or a
+ * project with the chips. Pull down, or come back to the tab, to read them
+ * again. The next page reads as you scroll near the end.
  */
 export function RunsScreen() {
-	const { filter, projectId, setFilter, clearProject } = useRunsParams();
+	const { person } = useSignedIn();
+	const { filter, projectId, setFilter, setProject, clear } = useRunsParams();
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
 	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
@@ -96,41 +101,71 @@ export function RunsScreen() {
 		...useWhileFocused(),
 	});
 	const refresh = useScreenRefresh([runs.refetch, projects.refetch]);
+	const [query, setQuery] = useState("");
+	const searching = query.trim() !== "";
+	// The night headings change at noon.
+	const now = useClock(60_000);
 
 	const projectNames = useMemo(
 		() => new Map((projects.data ?? []).map((p) => [p.id, p.name])),
 		[projects.data],
 	);
 	const loaded = useMemo(() => runs.data?.pages.flat(), [runs.data]);
-	// An older Host sends every run whatever the filter: the screen filters too.
-	const inProject = useMemo(
-		() => ofProject(loaded ?? [], projectId),
-		[loaded, projectId],
+	const shown = useMemo(
+		() =>
+			shownRuns(loaded ?? [], {
+				projectId,
+				filter,
+				query,
+				projectName: (id) => projectNames.get(id),
+			}),
+		[loaded, projectId, filter, query, projectNames],
 	);
 	const counts = useMemo(
-		() => countedFilters(projects.data, projectId) ?? filterCounts(inProject),
-		[projects.data, projectId, inProject],
+		() =>
+			countedFilters(projects.data, projectId) ??
+			filterCounts(
+				shownRuns(loaded ?? [], {
+					projectId,
+					filter: "all",
+					query: "",
+					projectName: () => undefined,
+				}),
+			),
+		[projects.data, projectId, loaded],
 	);
-	const shown = useMemo(
-		() => filterRuns(inProject, filter),
-		[inProject, filter],
+	const items = useMemo(
+		() =>
+			byNight(shown, now).flatMap((night): Item[] => [
+				{ kind: "night", label: night.label, count: night.runs.length },
+				...cellsOf(night.runs).map((cell) => ({
+					kind: "run" as const,
+					...cell,
+				})),
+			]),
+		[shown, now],
 	);
 	const projectName = projectId
 		? (projectNames.get(projectId) ?? "This project")
 		: null;
-	const [query, setQuery] = useState("");
-	const searching = query.trim() !== "";
 
-	const cells = useMemo(() => cellsOf(shown), [shown]);
-	const renderRun = useCallback(
-		({ item }: ListRenderItemInfo<Cell<RunSummary>>) => (
-			<ListCell first={item.first} last={item.last}>
-				<RunRow
-					run={item.item}
-					projectName={projectNames.get(item.item.projectId) ?? null}
-				/>
-			</ListCell>
-		),
+	const renderItem = useCallback(
+		({ item }: ListRenderItemInfo<Item>) =>
+			item.kind === "night" ? (
+				<View className="pt-4 pb-3">
+					<SectionHead
+						title={item.label}
+						hint={item.count === 1 ? "1 run" : `${item.count} runs`}
+					/>
+				</View>
+			) : (
+				<ListCell first={item.first} last={item.last}>
+					<RunRow
+						run={item.item}
+						projectName={projectNames.get(item.item.projectId) ?? null}
+					/>
+				</ListCell>
+			),
 		[projectNames],
 	);
 	const { hasNextPage, isFetchingNextPage, fetchNextPage } = runs;
@@ -142,18 +177,23 @@ export function RunsScreen() {
 	const spaceRuns =
 		countedFilters(projects.data, null)?.all ?? loaded?.length ?? 0;
 	const listed =
-		!searching &&
 		!runs.isPending &&
 		!(runs.isError && runs.data === undefined) &&
 		!(projects.data !== undefined && spaceRuns === 0);
 
+	// A search finds only the runs read so far: read on until one matches.
+	useEffect(() => {
+		if (listed && shown.length === 0) readMore();
+	}, [listed, shown.length, readMore]);
+
 	// Every state keeps the same list as the root of the screen: the large
-	// title collapses with it, and search results swap in place of the rows.
+	// title collapses with it.
 	return (
 		<ScreenList
-			data={listed ? cells : []}
-			renderItem={renderRun}
-			keyExtractor={runKey}
+			data={listed ? items : []}
+			renderItem={renderItem}
+			keyExtractor={itemKey}
+			getItemType={itemType}
 			ItemSeparatorComponent={CellSeparator}
 			onEndReached={listed ? readMore : undefined}
 			onEndReachedThreshold={1}
@@ -162,14 +202,15 @@ export function RunsScreen() {
 					<Skeleton className="mt-4 h-14 w-full rounded-xl" />
 				) : null
 			}
-			onRefresh={searching || runs.isPending ? undefined : refresh}
-			summary={listed ? runsSummary(counts[filter], projectName) : undefined}
+			onRefresh={runs.isPending ? undefined : refresh}
 			header={
 				<>
-					<RunsHeader onSearch={setQuery} />
-					{searching ? (
-						<SearchResults query={query} />
-					) : runs.isPending ? (
+					<TabRootHeader
+						name={person.name}
+						right={[{ kind: "view", key: "space", element: <SpacePicker /> }]}
+					/>
+					<HeaderSearch placeholder="Search runs" onChange={setQuery} />
+					{runs.isPending ? (
 						<>
 							<Skeleton className="h-11 w-full rounded-full" />
 							<Skeleton className="h-72 w-full rounded-xl" />
@@ -198,55 +239,62 @@ export function RunsScreen() {
 						</EmptyState>
 					) : (
 						<>
-							<ChipRail>
-								{projectName ? (
-									<Chip
-										label={projectName}
-										icon={X}
-										selected
-										onPress={clearProject}
-										role="button"
-										accessibilityHint="Shows the runs of every project"
-									/>
+							<View className="gap-2">
+								<ChipRail>
+									{RUN_FILTERS.map(({ key, label }) => (
+										<Chip
+											key={key}
+											label={label}
+											count={searching ? undefined : counts[key]}
+											selected={filter === key}
+											onPress={() => setFilter(key)}
+										/>
+									))}
+								</ChipRail>
+								{projects.data && projects.data.length > 1 ? (
+									<ChipRail>
+										<Chip
+											label="All projects"
+											selected={projectId === null}
+											onPress={() => setProject(null)}
+										/>
+										{projects.data.map((project) => (
+											<Chip
+												key={project.id}
+												label={project.name}
+												selected={projectId === project.id}
+												onPress={() => setProject(project.id)}
+											/>
+										))}
+									</ChipRail>
 								) : null}
-								{RUN_FILTERS.map(({ key, label }) => (
-									<Chip
-										key={key}
-										label={label}
-										count={counts[key]}
-										selected={filter === key}
-										onPress={() => setFilter(key)}
+							</View>
+							{projectId && projectName ? (
+								<ListGroup>
+									<ListRow
+										icon={Folder}
+										title={projectName}
+										caption="See what needs you there and the last 7 nights"
+										href={projectHref(projectId)}
+										accessibilityHint="Opens the project"
 									/>
-								))}
-							</ChipRail>
-							{shown.length > 0 ? null : filter === "all" ? (
-								<EmptyState
-									icon={History}
-									title="No runs in this project"
-									description="Show every project to see the other runs."
-								>
-									<Button
-										size="lg"
-										variant="outline"
-										onPress={clearProject}
-										className="h-auto min-h-11 py-2"
-									>
-										<Text>Show every project</Text>
-									</Button>
-								</EmptyState>
+								</ListGroup>
+							) : null}
+							{shown.length > 0 ? null : hasNextPage ? (
+								<Skeleton className="h-14 w-full rounded-xl" />
 							) : (
 								<EmptyState
-									icon={History}
-									title={emptyFilterTitle(filter)}
-									description="Choose another filter, or show all runs."
+									icon={Search}
+									title="No runs match"
+									description="Try another word, or show every status and project."
 								>
 									<Button
 										size="lg"
 										variant="outline"
-										onPress={() => setFilter("all")}
+										onPress={clear}
 										className="h-auto min-h-11 py-2"
 									>
-										<Text>Show all runs</Text>
+										<Text>Clear the filters</Text>
 									</Button>
 								</EmptyState>
 							)}
@@ -258,6 +306,10 @@ export function RunsScreen() {
 	);
 }
 
-function runKey(cell: Cell<RunSummary>): string {
-	return cell.item.id;
+function itemKey(item: Item): string {
+	return item.kind === "night" ? `night:${item.label}` : item.item.id;
+}
+
+function itemType(item: Item): Item["kind"] {
+	return item.kind;
 }

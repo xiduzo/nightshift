@@ -56,10 +56,6 @@ export default function RootLayout() {
 					options={{ title: "Project", headerLargeTitleEnabled: true }}
 				/>
 				<Stack.Screen
-					name="learnings"
-					options={{ title: "Learnings", headerLargeTitleEnabled: true }}
-				/>
-				<Stack.Screen
 					name="settings"
 					options={{ title: "Settings", headerLargeTitleEnabled: true }}
 				/>
@@ -67,14 +63,7 @@ export default function RootLayout() {
 					name="start"
 					options={{ title: "New run", presentation: "modal" }}
 				/>
-				<Stack.Screen
-					name="schedules"
-					options={{ title: "Schedules", headerLargeTitleEnabled: true }}
-				/>
-				<Stack.Screen name="schedule" options={sheet("Schedule")} />
-				<Stack.Screen name="flows" options={sheet("Flows")} />
 				<Stack.Screen name="computers" options={sheet("Computers")} />
-				<Stack.Screen name="inbox-filter" options={sheet("Show Gates from")} />
 				<Stack.Screen name="gate-link" options={sheet("Link")} />
 				<Stack.Screen name="gate-actions" options={sheet("Gate actions")} />
 				<Stack.Screen name="transcript/[runId]" options={sheet("Transcript")} />

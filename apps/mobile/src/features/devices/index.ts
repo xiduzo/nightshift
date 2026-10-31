@@ -1,4 +1,3 @@
-/** The person's computers on this phone: which ones can run a flow now (the Computers sheet). */
+/** The person's computers on this phone: which ones can run a flow now, and what tonight needs of them (the Computers sheet). */
 
-export { ComputersRow } from "./computers-row";
 export { ComputersScreen } from "./computers-screen";

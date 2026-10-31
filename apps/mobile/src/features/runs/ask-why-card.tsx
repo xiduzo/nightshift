@@ -16,7 +16,6 @@ import { ActivityIndicator, View } from "react-native";
 
 import { useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
-import { SectionHead } from "@/shared/list";
 import { useThemeColors } from "@/shared/theme";
 
 /** The last ask about one run, as the mutation cache keeps it. */
@@ -27,11 +26,12 @@ type LastAsk = {
 };
 
 /**
- * "Ask why" for a run that ended early: one answer from an agent, about
- * what went wrong and what you can do. No thread: "Ask again" asks anew.
- * The answer stays in the mutation cache, so it shows again when the run
- * opens again. Nothing for a run that finished, and nothing on a Host of
- * an older version, which does not have it.
+ * "Ask why" for a run that ended early: a full-width outline button. Its
+ * one answer, about what went wrong and what you can do, shows in its
+ * place. No thread: "Ask again" asks anew. The answer stays in the
+ * mutation cache, so it shows again when the run opens again. Nothing for
+ * a run that finished, and nothing on a Host of an older version, which
+ * does not have it.
  */
 export const AskWhyCard = memo(function AskWhyCard({
 	runId,
@@ -41,10 +41,10 @@ export const AskWhyCard = memo(function AskWhyCard({
 	status: RunStatus;
 }) {
 	if (!askWhyAnswer(status)) return null;
-	return <AskWhy runId={runId} />;
+	return <AskWhy runId={runId} failed={status === "failed"} />;
 });
 
-function AskWhy({ runId }: { runId: string }) {
+function AskWhy({ runId, failed }: { runId: string; failed: boolean }) {
 	const { host } = useSignedIn();
 	const { colors } = useThemeColors();
 	const [activity, setActivity] = useState<string | null>(null);
@@ -67,64 +67,75 @@ function AskWhy({ runId }: { runId: string }) {
 	});
 	const last = asks.at(-1);
 	if (last?.error && isMissingOnHost(last.error)) return null;
-	const asking = last?.status === "pending";
 	const asked = () => ask.mutate();
 
-	return (
-		<View className="gap-3">
-			<SectionHead title="Ask why" />
+	if (!last || last.status === "idle") {
+		return (
+			<Button
+				size="lg"
+				variant="outline"
+				className="h-auto min-h-11 py-2"
+				onPress={asked}
+				accessibilityHint="An agent reads the run and tells you what went wrong"
+			>
+				<Icon as={MessageCircleQuestion} />
+				<Text>Ask why</Text>
+			</Button>
+		);
+	}
+
+	if (last.status === "pending") {
+		return (
 			<Card className="py-4">
-				<CardContent className="gap-3 px-4">
-					{asking ? (
-						<View
-							className="flex-row items-center gap-3"
-							accessibilityLiveRegion="polite"
-						>
-							<ActivityIndicator color={colors.mutedForeground} />
-							<View className="flex-1 gap-0.5">
-								<Text>The agent reads the run.</Text>
-								<Text
-									numberOfLines={1}
-									className="text-muted-foreground text-sm"
-								>
-									{activity ?? "This can take a minute."}
-								</Text>
-							</View>
-						</View>
-					) : last?.status === "success" && last.answer ? (
-						<Text selectable>{last.answer}</Text>
-					) : last?.status === "error" && last.error ? (
-						<ErrorAlert title="No answer came" message={last.error.message} />
-					) : (
-						<Text className="text-muted-foreground">
-							An agent reads the run and tells you what went wrong and what you
-							can do.
+				<CardContent
+					className="flex-row items-center gap-3 px-4"
+					accessibilityLiveRegion="polite"
+				>
+					<ActivityIndicator color={colors.mutedForeground} />
+					<View className="flex-1 gap-0.5">
+						<Text>The agent reads the run.</Text>
+						<Text numberOfLines={1} className="text-muted-foreground text-sm">
+							{activity ?? "This can take a minute."}
 						</Text>
-					)}
-					{asking ? null : last && last.status !== "idle" ? (
-						<Button
-							size="lg"
-							variant="outline"
-							className="h-auto min-h-11 self-start py-2"
-							onPress={asked}
-							accessibilityHint="Asks the agent about this run again"
-						>
-							<Icon as={RotateCcw} />
-							<Text>Ask again</Text>
-						</Button>
-					) : (
-						<Button
-							size="lg"
-							className="h-auto min-h-11 self-start py-2"
-							onPress={asked}
-							accessibilityHint="An agent reads the run and answers"
-						>
-							<Icon as={MessageCircleQuestion} />
-							<Text>Ask why</Text>
-						</Button>
-					)}
+					</View>
 				</CardContent>
 			</Card>
-		</View>
+		);
+	}
+
+	return (
+		<Card className="py-4">
+			<CardContent className="gap-3 px-4">
+				{last.status === "success" && last.answer ? (
+					<>
+						<View className="flex-row items-center gap-2">
+							<Icon
+								as={MessageCircleQuestion}
+								className="size-4 text-muted-foreground"
+							/>
+							<Text accessibilityRole="header" className="font-semibold">
+								{failed ? "Why it failed" : "Why it stopped"}
+							</Text>
+						</View>
+						<Text selectable>{last.answer}</Text>
+					</>
+				) : (
+					<ErrorAlert
+						title="No answer came"
+						message={last.error?.message ?? ""}
+					/>
+				)}
+				<Button
+					size="lg"
+					variant="outline"
+					className="h-auto min-h-11 self-start py-2"
+					onPress={asked}
+					accessibilityHint="Asks the agent about this run again"
+				>
+					<Icon as={RotateCcw} />
+					<Text>Ask again</Text>
+				</Button>
+			</CardContent>
+		</Card>
 	);
 }

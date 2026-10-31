@@ -1,51 +1,42 @@
 import { NativeTabs } from "expo-router/native-tabs";
 
 import { useThemeColors } from "@/shared/theme";
-import { inboxTabLabel, type TabBarProps } from "./tabs";
+import type { TabBarProps } from "./tabs";
 
 /**
- * The four tabs on the system's own tab bar: on iOS 26 the floating Liquid
- * Glass bar, with SF Symbols. The chosen tab takes the theme's `primary`
- * (near black, near white in dark), not a brand color. The Inbox shows how
- * many Gates wait for you, in the system's badge color. Android has its own file (`tab-bar.android.tsx`).
+ * The three tabs on the system's own tab bar: on iOS 26 the floating
+ * Liquid Glass bar, with SF Symbols. Watch answers "how did it go",
+ * Needs you "does something need me", Runs holds every run. The chosen
+ * tab takes the theme's `primary` (near black, near white in dark), not a
+ * brand color. Needs you shows how many things wait, in the system's
+ * badge color. Android has its own file (`tab-bar.android.tsx`).
  */
-export function TabBar({ waiting }: TabBarProps) {
+export function TabBar({ waiting, needsLabel }: TabBarProps) {
 	const { colors } = useThemeColors();
 	return (
 		<NativeTabs
-			// The badge keeps the system's color: waiting Gates are no error.
+			// The badge keeps the system's color: what waits is no error.
 			tintColor={colors.primary}
 		>
-			<NativeTabs.Trigger name="(home)">
+			<NativeTabs.Trigger name="(watch)">
 				<NativeTabs.Trigger.Icon
-					sf={{ default: "house", selected: "house.fill" }}
+					sf={{ default: "moon", selected: "moon.fill" }}
 				/>
-				<NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+				<NativeTabs.Trigger.Label>Watch</NativeTabs.Trigger.Label>
 			</NativeTabs.Trigger>
-			<NativeTabs.Trigger
-				name="inbox"
-				accessibilityLabel={inboxTabLabel(waiting)}
-			>
+			<NativeTabs.Trigger name="needs" accessibilityLabel={needsLabel}>
 				<NativeTabs.Trigger.Icon
-					sf={{ default: "tray", selected: "tray.fill" }}
+					sf={{ default: "hand.raised", selected: "hand.raised.fill" }}
 				/>
-				<NativeTabs.Trigger.Label>Inbox</NativeTabs.Trigger.Label>
+				<NativeTabs.Trigger.Label>Needs you</NativeTabs.Trigger.Label>
 				{/* No Badge, no badge: `hidden` and empty children leave a mark on iOS. */}
 				{waiting > 0 ? (
 					<NativeTabs.Trigger.Badge>{String(waiting)}</NativeTabs.Trigger.Badge>
 				) : null}
 			</NativeTabs.Trigger>
 			<NativeTabs.Trigger name="runs">
-				<NativeTabs.Trigger.Icon
-					sf={{ default: "play.circle", selected: "play.circle.fill" }}
-				/>
+				<NativeTabs.Trigger.Icon sf="clock.arrow.circlepath" />
 				<NativeTabs.Trigger.Label>Runs</NativeTabs.Trigger.Label>
-			</NativeTabs.Trigger>
-			<NativeTabs.Trigger name="projects">
-				<NativeTabs.Trigger.Icon
-					sf={{ default: "folder", selected: "folder.fill" }}
-				/>
-				<NativeTabs.Trigger.Label>Projects</NativeTabs.Trigger.Label>
 			</NativeTabs.Trigger>
 		</NativeTabs>
 	);

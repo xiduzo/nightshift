@@ -5,6 +5,5 @@ export {
 	GLANCE_RUNS,
 	type GlanceSnapshot,
 	glanceSnapshot,
-	waitingText,
 } from "./snapshot";
 export type { GlanceTone } from "./tone";

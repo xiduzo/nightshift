@@ -58,15 +58,3 @@ export function schedulePlan(
 	);
 	return plan;
 }
-
-/** The schedule that starts first and is not paused tonight, or null. */
-export function nextPlanned(
-	plan: SchedulePlan,
-	now: number,
-): PlannedSchedule | null {
-	return (
-		plan.soon.find((entry) => !isPausedTonight(entry.schedule, now)) ??
-		plan.later[0] ??
-		null
-	);
-}

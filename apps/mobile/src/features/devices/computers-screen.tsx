@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Laptop, Server } from "lucide-react-native";
 
 import { useHostQueries } from "@/features/host";
+import { OfflineHelp, useTonight } from "@/features/schedules";
+import { useClock } from "@/shared/clock";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, ListRow } from "@/shared/list";
@@ -11,8 +13,12 @@ import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { type Computer, computersOf, onlineSummary } from "./computers";
 
-/** Your computers and whether each can run a flow now. A sheet from Home. */
+/**
+ * Your computers and whether each can run a flow now, and Pause tonight
+ * for a schedule whose computer is offline. A sheet from Watch.
+ */
 export function ComputersScreen() {
+	const tonight = useTonight(useClock(60_000));
 	const devices = useHostQueries(createDeviceQueries);
 	// Online changes by the minute: it follows the Host while the sheet is open.
 	const overview = useQuery({
@@ -27,7 +33,7 @@ export function ComputersScreen() {
 
 	return (
 		<Screen
-			onRefresh={() => overview.refetch()}
+			onRefresh={() => Promise.all([overview.refetch(), tonight.refetch()])}
 			summary={
 				computers && computers.length > 0
 					? onlineSummary(computers)
@@ -42,11 +48,14 @@ export function ComputersScreen() {
 						description="To run flows on a computer, open Devices in Night Shift on it and choose Join a Host."
 					/>
 				) : (
-					<ListGroup>
-						{computers.map((computer) => (
-							<ComputerRow key={computer.id} computer={computer} now={now} />
-						))}
-					</ListGroup>
+					<>
+						<ListGroup>
+							{computers.map((computer) => (
+								<ComputerRow key={computer.id} computer={computer} now={now} />
+							))}
+						</ListGroup>
+						<OfflineHelp tonight={tonight} />
+					</>
 				)
 			) : overview.isError ? (
 				<ErrorAlert

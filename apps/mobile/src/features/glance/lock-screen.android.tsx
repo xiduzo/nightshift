@@ -77,7 +77,7 @@ const layout = (
 					{props.flow}
 				</Text>
 				<Text color={color} maxLines={1} style={{ fontSize: 14 }}>
-					{props.statusText}
+					{props.headline}
 				</Text>
 				{props.step ? (
 					<Text color={text} maxLines={1} style={{ fontSize: 14 }}>

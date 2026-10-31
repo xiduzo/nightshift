@@ -28,6 +28,7 @@ import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
+import { changesSummary } from "./run-facts";
 import { usePhoneLiveRun } from "./use-live-run";
 
 const STATUS: Record<
@@ -41,9 +42,10 @@ const STATUS: Record<
 };
 
 /**
- * The files a run changed, per step in the order the steps started: each
- * file with its status and its lines added and removed. No diffs: open the
- * run on your computer for those. It reads what the run screen follows
+ * The files a run changed: the run's title, how many files and lines,
+ * and each file with its lines added and removed. When more than one step
+ * changed files, they show per step, in the order the steps started. No
+ * diffs: those open on the desktop. It reads what the run screen follows
  * already (`usePhoneLiveRun`).
  */
 export function ChangesScreen({ runId }: { runId: string }) {
@@ -80,7 +82,7 @@ export function ChangesScreen({ runId }: { runId: string }) {
 		(live.connection === "connecting" || run.isPlaceholderData || !run.data);
 
 	return (
-		<Screen onRefresh={refresh}>
+		<Screen onRefresh={refresh} summary={run.data?.title}>
 			{run.isError && !run.data ? (
 				<ErrorAlert
 					title="This run did not load"
@@ -100,34 +102,46 @@ export function ChangesScreen({ runId }: { runId: string }) {
 					description="When a step of this run changes files in the project, they show here."
 				/>
 			) : (
-				groups.map((group) => {
-					const step = steps.find((s) => s.id === group.stepId);
-					return (
-						<StepFiles
-							key={group.stepId}
-							title={step ? stepName(step, labels) : group.stepId}
-							group={group}
-						/>
-					);
-				})
+				<>
+					<Text className="font-semibold text-lg tabular-nums">
+						{changesSummary(groups)}
+					</Text>
+					{groups.length === 1 && groups[0] ? (
+						<StepFiles group={groups[0]} />
+					) : (
+						groups.map((group) => {
+							const step = steps.find((s) => s.id === group.stepId);
+							return (
+								<StepFiles
+									key={group.stepId}
+									title={step ? stepName(step, labels) : group.stepId}
+									group={group}
+								/>
+							);
+						})
+					)}
+					<Text className="text-muted-foreground text-sm">
+						The diff opens on the desktop.
+					</Text>
+				</>
 			)}
 		</Screen>
 	);
 }
 
-/** The files of one step, under its name and its line counts. */
+/** The files of one step: under its name and line counts when `title` is given. */
 function StepFiles({
 	title,
 	group,
 }: {
-	title: string;
+	title?: string;
 	group: StepChangedFiles;
 }) {
-	const count =
-		group.files.length === 1 ? "1 file" : `${group.files.length} files`;
 	return (
 		<View className="gap-3">
-			<SectionHead title={title} hint={`${count} · ${linesLabel(group)}`} />
+			{title ? (
+				<SectionHead title={title} hint={changesSummary([group])} />
+			) : null}
 			{group.files.length > 0 ? (
 				<ListGroup>
 					{group.files.map((file) => (
@@ -151,7 +165,7 @@ function StepFiles({
 	);
 }
 
-/** One file: its name, its folder and status, and "+12 −3". */
+/** One file: its name, its folder in mono, and "+12 −3". */
 function FileRow({ file }: { file: ChangedFile }) {
 	const { icon, word } = STATUS[file.status];
 	const slash = file.path.lastIndexOf("/");
@@ -161,9 +175,9 @@ function FileRow({ file }: { file: ChangedFile }) {
 	return (
 		<ListRow
 			icon={icon}
+			iconLabel={word}
 			title={name}
 			caption={[
-				word,
 				folder ? { text: folder, mono: true } : "",
 				file.binary ? "Binary file" : "",
 			]}

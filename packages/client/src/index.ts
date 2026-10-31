@@ -104,7 +104,6 @@ export {
 	type RunProgress,
 	runProgress,
 	sameProgress,
-	waitingText,
 } from "./glance";
 export { createKnowledgeQueries } from "./knowledge";
 export {
@@ -164,7 +163,6 @@ export {
 	askWhyAnswer,
 	askWhyMutation,
 	type ChangedFile,
-	changedFileCount,
 	changedFiles,
 	compactCount,
 	costLabel,
@@ -247,16 +245,13 @@ export {
 	type WaitEvent,
 	type WorktreeChangesEvent,
 	waitFor,
-	whenLabel,
 	whyNot,
-	workedSoFar,
 } from "./runs";
 export {
 	createScheduleQueries,
 	dayWord,
 	isPausedTonight,
 	type NudgeProblem,
-	nextPlanned,
 	nudgeProblem,
 	type PlannedSchedule,
 	type ScheduleIssue,

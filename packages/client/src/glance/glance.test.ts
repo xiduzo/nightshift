@@ -100,6 +100,9 @@ const step = (
 		...extra,
 	}) as RunDetail["steps"][number];
 
+const hasEndedStatus = (status: RunStatus) =>
+	["finished", "failed", "stopped"].includes(status);
+
 const detail = (
 	status: RunStatus,
 	steps: RunDetail["steps"],
@@ -110,6 +113,8 @@ const detail = (
 		flowName: "feature",
 		status,
 		steps,
+		createdAt: 100,
+		endedAt: hasEndedStatus(status) ? 900 : null,
 		flow: { nodes },
 		calledFlows: {},
 	}) as unknown as Detail;
@@ -129,7 +134,36 @@ describe("a run's progress on the lock screen", () => {
 			position: "Step 2 of 3",
 			fraction: 2 / 3,
 			ended: false,
+			startedAt: 100,
+			endedAt: null,
+			deadlineAt: null,
 		});
+	});
+
+	test("counts down to the deadline of the Gate that waits", () => {
+		const progress = runProgress(
+			detail("waiting", [
+				step("plan", 1, 2),
+				step("build", 3, null, {
+					gate: {
+						question: "Ship it?",
+						choices: [],
+						openedAt: 3,
+						deadline: { at: 5000, choose: "yes" },
+					},
+				}),
+			]),
+		);
+		expect(progress.deadlineAt).toBe(5000);
+		expect(
+			runProgress(detail("running", [step("plan", 1, null)])).deadlineAt,
+		).toBeNull();
+	});
+
+	test("keeps the end time of a run that ended", () => {
+		expect(runProgress(detail("failed", [step("plan", 1, 2)])).endedAt).toBe(
+			900,
+		);
 	});
 
 	test("says Starting before the first step", () => {

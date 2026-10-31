@@ -1,15 +1,24 @@
-import { routeOf } from "@nightshift/client";
+import { type PushData, routeOf } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui-native/components/ui/alert";
 import { usePathname } from "expo-router";
-import { BellRing } from "lucide-react-native";
+import {
+	BellRing,
+	CircleCheck,
+	CircleX,
+	Hand,
+	type LucideIcon,
+	MonitorSmartphone,
+	Sunrise,
+} from "lucide-react-native";
 import { useEffect } from "react";
 import { Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { TONE_CLASS, type Tone } from "@/shared/tone";
 import { hideBanner, setInFrontPlace, useBanner } from "./in-front";
 import { openPhoneRoute } from "./open-route";
 import { showInFront } from "./push-data";
@@ -21,8 +30,19 @@ const SHOWN_MS = 6000;
 const TAP = {
 	gate: { hint: "Opens the Gate", text: "Tap to answer it." },
 	run: { hint: "Opens the run", text: "Tap to open the run." },
-	inbox: { hint: "Opens the inbox", text: "Tap to open your inbox." },
+	inbox: { hint: "Opens Needs you", text: "Tap to see what needs you." },
 } as const;
+
+/** The icon and tone of each kind of message, as the app's rows show them. */
+const LOOK: Record<PushData["kind"], { icon: LucideIcon; tone: Tone | null }> =
+	{
+		"gate-opened": { icon: Hand, tone: "waiting" },
+		"gates-waiting": { icon: Hand, tone: "waiting" },
+		"run-finished": { icon: CircleCheck, tone: "finished" },
+		"run-failed": { icon: CircleX, tone: "failed" },
+		"device-wait": { icon: MonitorSmartphone, tone: "waiting" },
+		digest: { icon: Sunrise, tone: null },
+	};
 
 /**
  * A Gate that opened, or a step that waits for a device, while the app is
@@ -51,6 +71,7 @@ export function InFrontBanner() {
 	if (!banner) return null;
 	const route = routeOf(banner.data);
 	const tap = TAP[route.to];
+	const look = LOOK[banner.data.kind] ?? { icon: BellRing, tone: null };
 
 	return (
 		<Pressable
@@ -63,7 +84,10 @@ export function InFrontBanner() {
 			className="absolute right-4 left-4 rounded-lg shadow-black/10 shadow-lg active:opacity-80"
 			style={{ top: insets.top + 8 }}
 		>
-			<Alert icon={BellRing}>
+			<Alert
+				icon={look.icon}
+				iconClassName={look.tone ? TONE_CLASS[look.tone].text : undefined}
+			>
 				<AlertTitle>{banner.title}</AlertTitle>
 				<AlertDescription>{tap.text}</AlertDescription>
 			</Alert>

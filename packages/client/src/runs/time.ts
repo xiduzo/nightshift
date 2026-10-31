@@ -1,4 +1,4 @@
-import type { RunSummary, StepSummary } from "./types";
+import type { StepSummary } from "./types";
 
 /** How long a run took: open from start to end, and how much of that it waited for a person or slept. */
 export type RunTime = {
@@ -78,22 +78,4 @@ export function runTime(
 	}
 	const open = end - start;
 	return { open, waited, slept, active: open - waited - slept, going };
-}
-
-/**
- * How long a run on its way has worked by `now`, from its summary alone:
- * from its start, without the time a Gate waited for a person or a step slept.
- */
-export function workedSoFar(
-	run: Pick<RunSummary, "createdAt" | "gates" | "sleeps">,
-	now: number,
-): number {
-	const idle = [
-		...run.gates.map((gate): Span => [gate.openedAt, gate.closedAt ?? now]),
-		...(run.sleeps ?? []).map((sleep): Span => [sleep.from, sleep.to ?? now]),
-	].sort((a, b) => a[0] - b[0]);
-	return without([run.createdAt, now], idle).reduce(
-		(sum, [from, to]) => sum + to - from,
-		0,
-	);
 }

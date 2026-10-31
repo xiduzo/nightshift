@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
 
 import { nudgeProblem, scheduleNudges, withPause } from "./nudges";
-import { nextPlanned, type PlannedSchedule, schedulePlan } from "./plan";
+import { type PlannedSchedule, schedulePlan } from "./plan";
 import type { ScheduleSummary } from "./types";
 import { scheduleName, scheduleWhen } from "./words";
 
@@ -88,18 +88,6 @@ describe("schedulePlan", () => {
 		);
 		expect(ids(plan.idle)).toEqual(["alpha", "mid", "zeta"]);
 		expect(plan.soon).toEqual([]);
-	});
-
-	test("the next one skips a schedule paused tonight", () => {
-		const plan = schedulePlan(
-			[
-				entry(schedule("paused", { pausedUntil: NOW + 8 * HOUR })),
-				entry(schedule("weekly", { nextAt: NOW + 72 * HOUR })),
-			],
-			NOW,
-		);
-		expect(nextPlanned(plan, NOW)?.schedule.id).toBe("weekly");
-		expect(nextPlanned(schedulePlan([], NOW), NOW)).toBeNull();
 	});
 });
 

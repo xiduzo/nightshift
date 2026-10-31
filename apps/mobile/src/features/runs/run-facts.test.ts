@@ -2,7 +2,20 @@
 import { describe, expect, test } from "bun:test";
 import type { StepSummary } from "@nightshift/client";
 
-import { itemStateLabel, runFacts, runLinks, sizeLabel } from "./run-facts";
+import {
+	changesSummary,
+	computerName,
+	linkCaption,
+	linkLook,
+	moreActions,
+	primaryAction,
+	type RunLink,
+	runFacts,
+	runLinks,
+	runTimeLine,
+	runVerdict,
+	sizeLabel,
+} from "./run-facts";
 
 const MIN = 60_000;
 const NOW = new Date(2026, 9, 23, 10, 0).getTime();
@@ -11,14 +24,8 @@ type FactRun = Parameters<typeof runFacts>[0];
 
 function factRun(fields: Partial<FactRun> = {}): FactRun {
 	return {
-		id: "run_42",
-		flowName: "Feature factory",
-		branch: "nightshift/run-42",
-		device: { id: "d1", name: "Mac mini", thisDevice: true },
 		createdAt: NOW - 30 * MIN,
 		endedAt: null,
-		trigger: { kind: "manual" },
-		startedBy: { id: "u1", name: "Sander" },
 		costUsd: 0.42,
 		costMissing: 0,
 		costCalls: 3,
@@ -32,135 +39,217 @@ function byLabel(facts: ReturnType<typeof runFacts>) {
 }
 
 describe("runFacts", () => {
-	test("the tokens the agents used show next to the cost, when known", () => {
+	test("cost, tokens and length, in that order", () => {
 		const metrics = {
 			tokens: { input: 12_000, output: 345, cacheRead: 9000, cacheWrite: 0 },
 		} as FactRun["metrics"];
-		const fact = byLabel(
-			runFacts(factRun({ metrics }), {
-				status: "finished",
-				steps: 2,
-				now: NOW,
-			}),
-		);
+		const facts = runFacts(factRun({ metrics }), {
+			status: "running",
+			now: NOW,
+		});
+		expect(facts.map((fact) => fact.label)).toEqual([
+			"Cost",
+			"Tokens",
+			"Length",
+		]);
+		const fact = byLabel(facts);
+		expect(fact.get("Cost")?.value).toBe("$0.42");
 		expect(fact.get("Tokens")).toMatchObject({
 			value: "12.3K",
 			sub: "12K in, 345 out",
 		});
-		const none = byLabel(
-			runFacts(factRun(), { status: "finished", steps: 2, now: NOW }),
-		);
-		expect(none.has("Tokens")).toBe(false);
-	});
-
-	test("a run on its way: flow, branch, computer, start, duration so far, cost and id", () => {
-		const facts = runFacts(factRun(), {
-			status: "running",
-			steps: 3,
-			now: NOW,
-		});
-		expect(facts.map((fact) => fact.label)).toEqual([
-			"Flow",
-			"Branch",
-			"Computer",
-			"Started",
-			"Duration",
-			"Cost",
-			"Run",
-		]);
-		const fact = byLabel(facts);
-		expect(fact.get("Flow")?.value).toBe("Feature factory");
-		expect(fact.get("Branch")).toMatchObject({
-			value: "nightshift/run-42",
-			mono: true,
-		});
-		expect(fact.get("Computer")?.value).toBe("Mac mini");
-		expect(fact.get("Started")).toMatchObject({
-			value: "30 min ago",
-			sub: "By Sander",
-		});
-		expect(fact.get("Duration")).toMatchObject({
+		expect(fact.get("Length")).toMatchObject({
 			value: "30 min",
-			sub: "3 steps",
+			sub: "So far",
 		});
-		expect(fact.get("Cost")).toMatchObject({ value: "$0.42" });
-		expect(fact.get("Run")).toMatchObject({ value: "run_42", mono: true });
 	});
 
-	test("a run shown from a list says no step count while its steps load", () => {
+	test("what is not known says —", () => {
 		const fact = byLabel(
-			runFacts(factRun(), { status: "running", steps: null, now: NOW }),
+			runFacts(factRun({ costUsd: 0, costCalls: 0, endedAt: null }), {
+				status: "finished",
+				now: NOW,
+			}),
 		);
-		expect(fact.get("Duration")?.value).toBe("30 min");
-		expect(fact.get("Duration")?.sub).toBeUndefined();
+		expect(fact.get("Cost")?.value).toBe("—");
+		expect(fact.get("Tokens")?.value).toBe("—");
+		expect(fact.get("Length")?.value).toBe("—");
 	});
 
-	test("a run that waits for its computer to make its worktree shows no branch yet", () => {
-		const facts = runFacts(factRun({ branch: "" }), {
-			status: "sleeping",
-			steps: 0,
-			now: NOW,
-		});
-		expect(facts.map((fact) => fact.label)).not.toContain("Branch");
-	});
-
-	test("an ended run counts to its end; a scheduled quick run on an unnamed Host", () => {
+	test("an ended run counts to its end; the cost says when it is not complete", () => {
 		const fact = byLabel(
-			runFacts(
-				factRun({
-					flowName: null,
-					endedAt: NOW - 18 * MIN,
-					trigger: { kind: "schedule", scheduleId: "s1", at: NOW - 30 * MIN },
-					device: { id: "d1", name: null, thisDevice: true },
-				}),
-				{ status: "finished", steps: 1, now: NOW },
-			),
+			runFacts(factRun({ endedAt: NOW - 8 * MIN, costMissing: 1 }), {
+				status: "failed",
+				now: NOW,
+			}),
 		);
-		expect(fact.get("Flow")?.value).toBe("Quick run");
-		expect(fact.get("Computer")?.value).toBe("Your Host");
-		expect(fact.get("Started")?.sub).toBe("By a schedule");
-		const hooked = byLabel(
-			runFacts(
-				factRun({
-					trigger: { kind: "webhook", scheduleId: "s1", at: NOW - 30 * MIN },
-				}),
-				{ status: "running", steps: 1, now: NOW },
-			),
-		);
-		expect(hooked.get("Started")?.sub).toBe("By a webhook");
-		expect(fact.get("Duration")).toMatchObject({
-			value: "12 min",
-			sub: "1 step",
-		});
-	});
-
-	test("the cost says when it is not complete", () => {
-		const cost = (fields: Partial<FactRun>) =>
-			byLabel(
-				runFacts(factRun(fields), { status: "running", steps: 1, now: NOW }),
-			).get("Cost");
-		expect(cost({ costMissing: 1 })).toMatchObject({
+		expect(fact.get("Length")).toMatchObject({ value: "22 min" });
+		expect(fact.get("Length")?.sub).toBeUndefined();
+		expect(fact.get("Cost")).toMatchObject({
 			value: "$0.42+",
 			sub: "A step did not report its cost",
 		});
-		expect(cost({ costEstimated: true })?.sub).toBe("Part of it is estimated");
-		expect(cost({ costUsd: 0, costCalls: 0 })).toMatchObject({
-			value: "None yet",
-		});
-		expect(cost({ costUsd: 0, costCalls: 1, costMissing: 1 })).toMatchObject({
-			value: "Not known",
-		});
 	});
+});
 
-	test("an ended run that cost nothing says None", () => {
-		const fact = byLabel(
-			runFacts(factRun({ costUsd: 0, costCalls: 0 }), {
-				status: "finished",
-				steps: 1,
-				now: NOW,
+describe("runTimeLine", () => {
+	const time = (ms: number) => `t${(ms - NOW) / MIN}`;
+	test("started while live, ended and how long once it ended", () => {
+		expect(runTimeLine(factRun(), "running", time)).toBe("started t-30");
+		expect(
+			runTimeLine(factRun({ endedAt: NOW - 8 * MIN }), "stopped", time),
+		).toBe("ended t-8 · ran 22 min");
+	});
+});
+
+describe("computerName", () => {
+	test("its name, or the Host", () => {
+		expect(computerName({ name: "Mac mini", thisDevice: false })).toBe(
+			"Mac mini",
+		);
+		expect(computerName({ name: null, thisDevice: true })).toBe("your Host");
+	});
+});
+
+describe("linkLook", () => {
+	test("a pull request on GitHub, a ticket elsewhere", () => {
+		const pr = linkLook("https://github.com/xiduzo/nightshift/pull/415");
+		expect(pr).toEqual({ pullRequest: true, number: "#415", site: "GitHub" });
+		expect(linkCaption(pr)).toEqual(["Pull request", "opens on GitHub"]);
+		const ticket = linkLook("https://www.example.com/browse/ZAC-1");
+		expect(ticket).toEqual({
+			pullRequest: false,
+			number: null,
+			site: "example.com",
+		});
+		expect(linkCaption(linkLook("not a url"))).toEqual([
+			"Link",
+			"opens in the browser",
+		]);
+	});
+});
+
+describe("runVerdict", () => {
+	const base = {
+		gateQuestion: null,
+		step: null,
+		computer: "Mac mini",
+		notice: null,
+		pullRequests: 0,
+	};
+	test("one sentence per status", () => {
+		expect(
+			runVerdict({ ...base, status: "waiting", gateQuestion: "Which one?" }),
+		).toBe("Which one?");
+		expect(runVerdict({ ...base, status: "running", step: "build" })).toBe(
+			"Now at build, on Mac mini.",
+		);
+		expect(
+			runVerdict({
+				...base,
+				status: "failed",
+				notice: { gist: "The tests failed." },
 			}),
-		).get("Cost");
-		expect(fact).toMatchObject({ value: "None" });
+		).toBe("The tests failed.");
+		expect(runVerdict({ ...base, status: "finished" })).toBe(
+			"It finished without a pull request.",
+		);
+		expect(runVerdict({ ...base, status: "finished", pullRequests: 2 })).toBe(
+			"It made 2 pull requests.",
+		);
+	});
+});
+
+describe("primaryAction and moreActions", () => {
+	const none = { stop: false, resume: false, restart: false, rerun: false };
+	const input = {
+		status: "running" as const,
+		allows: none,
+		gate: null,
+		resumeAt: "build",
+		canRestart: false,
+		canRerun: true,
+		links: [] as RunLink[],
+	};
+	test("a waiting run answers its Gate; Stop moves to more", () => {
+		const waiting = {
+			...input,
+			status: "waiting" as const,
+			allows: { ...none, stop: true },
+			gate: { stepId: "s1" },
+		};
+		const primary = primaryAction(waiting);
+		expect(primary).toEqual({ kind: "answer", stepId: "s1" });
+		expect(moreActions(waiting, primary)).toEqual(["stop"]);
+	});
+	test("a running run stops; a restart stays in more", () => {
+		const running = {
+			...input,
+			allows: { ...none, stop: true, restart: true },
+			canRestart: true,
+		};
+		const primary = primaryAction(running);
+		expect(primary).toEqual({ kind: "stop" });
+		expect(moreActions(running, primary)).toEqual(["restart"]);
+	});
+	test("failed retries, stopped resumes at its step, run again goes to more", () => {
+		const allows = { ...none, resume: true, rerun: true };
+		const failed = { ...input, status: "failed" as const, allows };
+		expect(primaryAction(failed)).toEqual({ kind: "resume", label: "Retry" });
+		expect(moreActions(failed, primaryAction(failed))).toEqual(["rerun"]);
+		expect(
+			primaryAction({ ...input, status: "interrupted" as const, allows }),
+		).toEqual({ kind: "resume", label: "Resume at build" });
+	});
+	test("a failed run that cannot resume runs again", () => {
+		expect(
+			primaryAction({
+				...input,
+				status: "failed",
+				allows: { ...none, rerun: true },
+			}),
+		).toEqual({ kind: "rerun" });
+	});
+	test("a finished run opens its pull request, or offers nothing", () => {
+		const link = (url: string): RunLink => ({
+			id: url,
+			title: "A",
+			state: "done",
+			branch: null,
+			url,
+		});
+		const finished = { ...input, status: "finished" as const };
+		expect(
+			primaryAction({
+				...finished,
+				links: [
+					link("https://example.com/browse/ZAC-1"),
+					link("https://github.com/a/b/pull/415"),
+				],
+			}),
+		).toEqual({
+			kind: "open",
+			url: "https://github.com/a/b/pull/415",
+			label: "Open #415",
+		});
+		expect(primaryAction(finished)).toBeNull();
+	});
+});
+
+describe("changesSummary", () => {
+	test("files once each, plus the ones left out, and all lines", () => {
+		const file = (path: string) => ({ path }) as never;
+		expect(
+			changesSummary([
+				{ files: [file("a"), file("b")], added: 10, removed: 2, omitted: 0 },
+				{ files: [file("b")], added: 3, removed: 1, omitted: 1 },
+			]),
+		).toBe("3 files · +13 −3");
+		expect(
+			changesSummary([
+				{ files: [file("a")], added: 1, removed: 0, omitted: 0 },
+			]),
+		).toBe("1 file · +1 −0");
 	});
 });
 
@@ -187,23 +276,7 @@ describe("runLinks", () => {
 				],
 			},
 		] as Pick<StepSummary, "items">[];
-		expect(runLinks(steps)).toEqual([
-			{
-				id: "1",
-				title: "Item 1",
-				state: "done",
-				branch: "feat/one",
-				url: "https://example.com/pull/1",
-			},
-			{
-				id: "3",
-				title: "Item 3",
-				state: "done",
-				branch: null,
-				url: "https://example.com/pull/3",
-			},
-		]);
-		expect(itemStateLabel("halted")).toBe("Stopped");
+		expect(runLinks(steps).map((link) => link.id)).toEqual(["1", "3"]);
 	});
 });
 

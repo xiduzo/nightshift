@@ -6,16 +6,6 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-function clock(at: Date): string {
-	const hours = String(at.getHours()).padStart(2, "0");
-	const minutes = String(at.getMinutes()).padStart(2, "0");
-	return `${hours}:${minutes}`;
-}
-
-function startOfDay(at: Date): number {
-	return new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
-}
-
 /**
  * How long ago, short: "just now", "5 min ago", "3 h ago", "yesterday",
  * "4 days ago", or the date. Written out because Hermes has no
@@ -45,24 +35,6 @@ export function formatCountdown(ms: number): string {
 	return hours > 0
 		? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
 		: `${minutes}:${seconds}`;
-}
-
-/** When something started, short: "Just now", "12 min ago", "Today 09:41", "Yesterday 23:05", "3 Oct 14:20". */
-export function whenLabel(at: number, now = Date.now()): string {
-	const ago = now - at;
-	if (ago >= 0 && ago < MINUTE) return "Just now";
-	if (ago >= 0 && ago < 60 * MINUTE) {
-		return `${Math.floor(ago / MINUTE)} min ago`;
-	}
-	const date = new Date(at);
-	const days = Math.round((startOfDay(new Date(now)) - startOfDay(date)) / DAY);
-	if (days === 0) return `Today ${clock(date)}`;
-	if (days === 1) return `Yesterday ${clock(date)}`;
-	const day = date.toLocaleDateString(undefined, {
-		day: "numeric",
-		month: "short",
-	});
-	return `${day} ${clock(date)}`;
 }
 
 /** A cost and how sure it is, as runs, steps, subflow runs and the dashboard carry it. */

@@ -1,4 +1,3 @@
-/** Projects on this phone: the projects of a Space, and one project with the way to its Gates, runs and flows. */
+/** Projects on this phone: one project at a glance, with what needs you in it, its last 7 nights and its newest runs. */
 
 export { ProjectScreen } from "./project-screen";
-export { ProjectsScreen } from "./projects-screen";

@@ -1,7 +1,6 @@
 import { Button } from "@nightshift/ui-native/components/ui/button";
-import { CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 
 import { useLockScreenFollow } from "./use-lock-screen";
 
@@ -12,9 +11,9 @@ const FOLLOW_HINT =
 		: "Shows the step and status of this run on your lock screen until it ends.";
 
 /**
- * "Follow on the lock screen" for a run on its way, or "Stop following".
- * Content of the run's Card. Nothing on a phone that cannot show it, or
- * once the run has ended.
+ * "Follow on the lock screen" for a run on its way, or "Stop following":
+ * a full-width outline button with a hint under it. Nothing on a phone
+ * that cannot show it, or once the run has ended.
  */
 export function FollowOnLockScreen({
 	runId,
@@ -28,7 +27,7 @@ export function FollowOnLockScreen({
 	if (!available || ended) return null;
 
 	return (
-		<CardContent className="gap-2 px-4">
+		<View className="gap-2">
 			<Button
 				size="lg"
 				variant="outline"
@@ -44,10 +43,10 @@ export function FollowOnLockScreen({
 							: "Follow on the lock screen"}
 				</Text>
 			</Button>
-			<Text variant="muted" className="text-muted-foreground">
+			<Text className="text-muted-foreground text-sm">
 				{problem ??
 					(following ? "You follow this run on the lock screen." : FOLLOW_HINT)}
 			</Text>
-		</CardContent>
+		</View>
 	);
 }

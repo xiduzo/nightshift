@@ -8,7 +8,6 @@ export {
 	withPause,
 } from "./nudges";
 export {
-	nextPlanned,
 	type PlannedSchedule,
 	type SchedulePlan,
 	schedulePlan,

@@ -1,15 +1,9 @@
 import { Tabs } from "expo-router";
-import {
-	FolderGit2,
-	House,
-	Inbox,
-	type LucideIcon,
-	Play,
-} from "lucide-react-native";
+import { Hand, History, type LucideIcon, Moon } from "lucide-react-native";
 import type { ColorValue } from "react-native";
 
 import { useThemeColors } from "@/shared/theme";
-import { inboxTabLabel, type TabBarProps } from "./tabs";
+import type { TabBarProps } from "./tabs";
 
 function icon(Icon: LucideIcon) {
 	return ({ color, size }: { color: ColorValue; size: number }) => (
@@ -18,12 +12,12 @@ function icon(Icon: LucideIcon) {
 }
 
 /**
- * The four tabs on Android: the JavaScript tab bar with lucide icons. The
+ * The three tabs on Android: the JavaScript tab bar with lucide icons. The
  * native tabs of Android need `expo-symbols` or drawables for their icons,
  * which this app does not ship. Each tab is a stack with its own native
  * header (`TabStack`), which keeps the page below the status bar.
  */
-export function TabBar({ waiting }: TabBarProps) {
+export function TabBar({ waiting, needsLabel }: TabBarProps) {
 	const { colors } = useThemeColors();
 	return (
 		<Tabs
@@ -35,25 +29,21 @@ export function TabBar({ waiting }: TabBarProps) {
 			}}
 		>
 			<Tabs.Screen
-				name="(home)"
-				options={{ title: "Home", tabBarIcon: icon(House) }}
+				name="(watch)"
+				options={{ title: "Watch", tabBarIcon: icon(Moon) }}
 			/>
 			<Tabs.Screen
-				name="inbox"
+				name="needs"
 				options={{
-					title: "Inbox",
-					tabBarIcon: icon(Inbox),
+					title: "Needs you",
+					tabBarIcon: icon(Hand),
 					tabBarBadge: waiting > 0 ? waiting : undefined,
-					tabBarAccessibilityLabel: inboxTabLabel(waiting),
+					tabBarAccessibilityLabel: needsLabel,
 				}}
 			/>
 			<Tabs.Screen
 				name="runs"
-				options={{ title: "Runs", tabBarIcon: icon(Play) }}
-			/>
-			<Tabs.Screen
-				name="projects"
-				options={{ title: "Projects", tabBarIcon: icon(FolderGit2) }}
+				options={{ title: "Runs", tabBarIcon: icon(History) }}
 			/>
 		</Tabs>
 	);

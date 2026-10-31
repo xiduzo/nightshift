@@ -14,17 +14,7 @@ import { useMemo } from "react";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { useWhileFocused } from "@/shared/refresh";
-
-/**
- * How often a view of schedules reads the clock: a start moves from
- * "today" to "tomorrow", a pause tonight ends. Starts show to the minute.
- */
-export const PLAN_TICK_MS = 60_000;
-
-/** One schedule of one project, as a key: schedule ids are per project. */
-export function scheduleKey(projectId: string, scheduleId: string): string {
-	return `${projectId}:${scheduleId}`;
-}
+import { scheduleKey } from "./tonight";
 
 type ListResults = UseQueryResult<
 	{ schedules: PlannedSchedule["schedule"][] },
@@ -45,23 +35,17 @@ function combineLists(results: ListResults) {
 }
 
 /**
- * The schedules of the active Space by when they start (`schedulePlan`),
- * or of one project with `projectId`. One read of the projects, and one
- * read of the schedules of each project. While reads are on their way,
- * the plan holds what came back already.
+ * The schedules of the active Space by when they start (`schedulePlan`).
+ * One read of the projects, and one read of the schedules of each
+ * project. While reads are on their way, the plan holds what came back
+ * already.
  */
-export function useSchedulePlan(projectId: string | undefined, now: number) {
+export function useSchedulePlan(now: number) {
 	const projectQueries = useHostQueries(createProjectQueries);
 	const scheduleQueries = useHostQueries(createScheduleQueries);
 	const focused = useWhileFocused();
 	const projects = useQuery({ ...projectQueries.list(), ...focused });
-	const shown = useMemo(
-		() =>
-			projectId
-				? projects.data?.filter((project) => project.id === projectId)
-				: projects.data,
-		[projects.data, projectId],
-	);
+	const shown = projects.data;
 	const lists = useQueries({
 		queries: (shown ?? []).map((project) => ({
 			...scheduleQueries.list(project.id),
@@ -89,9 +73,6 @@ export function useSchedulePlan(projectId: string | undefined, now: number) {
 	return {
 		plan,
 		entries,
-		/** The project of `projectId`, once the projects are in. */
-		project: projectId ? shown?.[0] : undefined,
-		projectsLoaded: projects.data !== undefined,
 		/** Nothing to show: the projects, or every list, did not load. */
 		error: projects.error ?? lists.error,
 		loading: projects.isPending || (lists.pending && entries.length === 0),

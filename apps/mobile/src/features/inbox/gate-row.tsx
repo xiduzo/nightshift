@@ -10,10 +10,10 @@ import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { gateLook, NEEDS_YOU } from "@/shared/tone";
-import { gateRowText } from "./inbox-view";
+import { gateRowText } from "./gate-list";
 
 /**
- * One open Gate, the same on Home, the Inbox, Search, a project and a run:
+ * One open Gate, the same on Watch, Needs you, Search, a project and a run:
  * "project · flow", its question, its choices and node, and how long it
  * waited. A Gate that needs you shows the hand in the waiting tone (a
  * screen reader hears "Needs you"); any other Gate says why in a word:
@@ -36,7 +36,7 @@ export const GateRow = memo(function GateRow({
 	const soon = deadlineSoon(gate.deadline, now);
 	const look = gateLook(gate);
 	const needsYou = look === NEEDS_YOU;
-	// The Gate itself is in the inbox already: the steps of its run are not.
+	// The Gate itself is in the list of open Gates already: the steps of its run are not.
 	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
 	return (
 		<ListRow

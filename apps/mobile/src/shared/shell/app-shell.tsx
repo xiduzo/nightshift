@@ -9,14 +9,17 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { HostProvider } from "@/features/host";
 import { InFrontBanner, useNotificationTaps } from "@/features/push";
 import { createQueryClient } from "@/shared/api";
-import { useThemeColors } from "@/shared/theme";
+import { applyKeptAppearance, useThemeColors } from "@/shared/theme";
 import { NAV_THEME } from "./nav-theme";
+
+// Before the first screen: the appearance the person chose on this phone.
+applyKeptAppearance();
 
 /**
  * The app frame: data, the Host, the theme, gestures and the
  * keyboard. A tap on a notification opens its screen. The banner of a
  * push in front and the portals (menus, dialogs) render last, above
- * everything.
+ * everything. The theme follows the appearance in Settings.
  */
 export function AppShell({ children }: { children: ReactNode }) {
 	useNotificationTaps();

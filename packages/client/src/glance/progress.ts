@@ -14,7 +14,8 @@ import { type GlanceTone, glanceTone } from "./tone";
 /**
  * One run's progress for the lock screen (a Live Activity on iOS, an
  * ongoing notification on Android): its flow, the step that runs now,
- * step x of y and the status. No inputs, no Gate question, no agent text.
+ * step x of y and the status, and the times a lock screen counts by
+ * itself. No inputs, no Gate question, no agent text.
  */
 export type RunProgress = {
 	runId: string;
@@ -30,13 +31,29 @@ export type RunProgress = {
 	fraction: number;
 	/** It finished, failed or was stopped. Not when it is interrupted: Night Shift resumes it. */
 	ended: boolean;
+	/** When the run started: a lock screen counts its time at work from here. */
+	startedAt: number;
+	/** When the run ended, or null while it is on its way. */
+	endedAt: number | null;
+	/**
+	 * When the open Gate takes its default choice, or null without one. A
+	 * lock screen counts down to it while the run waits.
+	 */
+	deadlineAt: number | null;
 };
 
 /** The run's progress from the run as `runs.get` returns it. */
 export function runProgress(
 	run: Pick<
 		RunDetail,
-		"id" | "flowName" | "status" | "steps" | "flow" | "calledFlows"
+		| "id"
+		| "flowName"
+		| "status"
+		| "steps"
+		| "flow"
+		| "calledFlows"
+		| "createdAt"
+		| "endedAt"
 	>,
 ): RunProgress {
 	// Night Shift resumes an interrupted run by itself after a restart:
@@ -67,6 +84,13 @@ export function runProgress(
 		position,
 		fraction,
 		ended,
+		startedAt: run.createdAt,
+		endedAt: ended ? run.endedAt : null,
+		deadlineAt:
+			run.status === "waiting"
+				? (top.find((step) => step.endedAt === null && step.gate?.deadline)
+						?.gate?.deadline?.at ?? null)
+				: null,
 	};
 }
 
@@ -78,6 +102,8 @@ export function sameProgress(a: RunProgress, b: RunProgress): boolean {
 		a.status === b.status &&
 		a.step === b.step &&
 		a.position === b.position &&
-		a.fraction === b.fraction
+		a.fraction === b.fraction &&
+		a.endedAt === b.endedAt &&
+		a.deadlineAt === b.deadlineAt
 	);
 }

@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	chosenFlow,
 	flowCaption,
+	phoneInputs,
 	placementHint,
 	readsFlowFile,
 	startBlocker,
@@ -50,21 +51,48 @@ describe("the chosen flow", () => {
 
 test("placementHint says what each place is", () => {
 	expect(placementHint({ online: false, thisDevice: false })).toBe(
-		"Offline. Open Night Shift on that computer to run flows on it.",
+		"Offline. Open Night Shift on it to use it.",
 	);
-	expect(placementHint({ online: true, thisDevice: true })).toBe("Your Host.");
+	expect(placementHint({ online: true, thisDevice: true })).toBe(
+		"Host · online",
+	);
 	expect(placementHint({ online: true, thisDevice: false })).toBe(
-		"One of your computers.",
+		"Your computer · online",
 	);
 	expect(
 		placementHint({ online: true, thisDevice: false, lastRun: true }),
-	).toBe("One of your computers. The last run of this project ran here.");
+	).toBe("Your computer · online · ran the last run");
 	expect(
 		placementHint({ online: true, thisDevice: false, offers: ["claude"] }),
-	).toBe("Another person offers this computer to the Space, with claude.");
+	).toBe("Another person offers it, with claude · online");
 	expect(placementHint({ online: true, thisDevice: false, offers: [] })).toBe(
-		"Another person offers this computer to the Space, with no profiles.",
+		"Another person offers it, with no profiles · online",
 	);
+});
+
+describe("phoneInputs", () => {
+	const ticket = { name: "ticket", type: "text" as const, required: true };
+	const branch = {
+		name: "branch",
+		type: "text" as const,
+		required: true,
+		default: "main",
+	};
+	const note = { name: "note", type: "text" as const, required: false };
+	const dry = { name: "dry", type: "boolean" as const, required: true };
+
+	test("asks only for what the run cannot start without", () => {
+		expect(phoneInputs([ticket, branch, note, dry])).toEqual({
+			needed: [ticket],
+			more: true,
+		});
+	});
+
+	test("says when the flow has no other inputs", () => {
+		expect(phoneInputs([ticket])).toEqual({ needed: [ticket], more: false });
+		expect(phoneInputs([])).toEqual({ needed: [], more: false });
+		expect(phoneInputs([note])).toEqual({ needed: [], more: true });
+	});
 });
 
 test("placementHint names the Host admin of a Host that another person runs", () => {
