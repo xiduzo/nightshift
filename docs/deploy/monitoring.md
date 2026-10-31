@@ -120,8 +120,9 @@ your traces stay on LangSmith's servers.
 | `{kind} {node}` | Any other step (`decision`, `wait`, `call`, `value`, ...). A step in a called flow hangs under its Call step. |
 | `gate {node}` | A Gate's wait for a person, with `nightshift.gate.wait_ms`. |
 | `wait {reason}` | A sleep: a Wait node, a usage limit, the network, an offline Device. |
+| `orpc.{procedure}` | An API request this computer answers, from the web app, the phone or a peer, with `call_procedure`, `handler` and the input checks under it. A request to a Host is `send_request`. Each request is a trace of its own. |
 
-A span goes out when its step or run ends. Every span has
+A span goes out when its step or run ends. Every span of a run has
 `nightshift.project.id`, `nightshift.flow.id`, `nightshift.run.id` (also as
 `gen_ai.conversation.id`), and, on a step, `nightshift.step.id`,
 `nightshift.node.kind`, `nightshift.device.id`, `nightshift.agent` and

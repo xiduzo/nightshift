@@ -11,15 +11,16 @@ import {
 	type RunningExport,
 	startExport,
 } from "./otlp";
+import { traceRequests } from "./requests";
 import { createRunProjection, type RunProjection } from "./runs";
 import { claudeCodeEnv, codexSession } from "./sessions";
 
 /**
  * The export to monitoring of this computer, composed: off by default, on
  * with one setting. While it is on, the runs this computer walks go out as
- * OpenTelemetry spans and metrics (`runs/`), and the Claude Code and Codex
+ * OpenTelemetry spans and metrics (`runs/`), the Claude Code and Codex
  * sessions of their steps send their own telemetry to the same place
- * (`sessions/`).
+ * (`sessions/`), and each API request is a trace of its own (`requests/`).
  * Nothing is created while it is off: no provider, no exporter, no
  * connection. It reads its settings from the settings store and the
  * `${NAME}` references of its headers from the secrets, and starts,
@@ -76,6 +77,7 @@ export async function createTelemetry(deps: {
 		values: string[];
 		running: RunningExport;
 		projection: RunProjection;
+		untraceRequests: () => void;
 	} | null = null;
 	/** Changes and landings go one at a time, in order. */
 	let queue: Promise<void> = Promise.resolve();
@@ -112,6 +114,7 @@ export async function createTelemetry(deps: {
 		if ((current?.key ?? "") === key) return;
 		const before = current;
 		current = null;
+		before?.untraceRequests();
 		await before?.running.shutdown();
 		if (!next.on) return;
 		const running = startExport(sinks(next.target), {
@@ -128,6 +131,7 @@ export async function createTelemetry(deps: {
 				read: async (runId) => (engine ? engine.runTrace(runId) : null),
 				deviceId: deps.deviceId,
 			}),
+			untraceRequests: traceRequests(running.tracerProvider),
 		};
 	}
 
@@ -180,6 +184,7 @@ export async function createTelemetry(deps: {
 			await queue;
 			const before = current;
 			current = null;
+			before?.untraceRequests();
 			await before?.running.shutdown();
 		},
 	};

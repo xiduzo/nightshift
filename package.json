@@ -16,6 +16,7 @@
 			"@orpc/server": "^1.15.0",
 			"@orpc/openapi": "^1.15.0",
 			"@orpc/zod": "^1.15.0",
+			"@orpc/otel": "1.15.5",
 			"better-auth": "1.7.12",
 			"@better-auth/api-key": "1.7.12",
 			"@better-auth/core": "1.7.12",

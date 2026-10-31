@@ -28,10 +28,11 @@ import { ATTR, SCOPE_NAME, SERVICE_NAME } from "../conventions";
 
 /**
  * The tracer and meter providers of one export: OTLP over HTTP to one
- * endpoint, with its headers. Hand-written spans only (Bun has no working
- * auto-instrumentation), so nothing is registered globally: the export is
- * these two providers and nothing else, and turning it off shuts them
- * down. No context manager is needed: every span names its parent.
+ * endpoint, with its headers. The run spans are hand-written (Bun has no
+ * working auto-instrumentation) and each names its parent, so they need
+ * no context manager and nothing global. Only the request spans of oRPC
+ * use the globals while the export is on (`requests/`). Turning the export
+ * off shuts both providers down.
  */
 
 /** Where the export sends its spans and metrics. */
@@ -78,6 +79,8 @@ export type SpanInput = {
 /** One running export. */
 export type RunningExport = {
 	meterProvider: MeterProvider;
+	/** What request spans go through (`requests/`). Run spans go through `writeSpan`. */
+	tracerProvider: TracerProvider;
 	/** Writes one finished span with the ids it is given. */
 	writeSpan(span: SpanInput): void;
 	/** Sends what waits. */
@@ -137,6 +140,7 @@ export function startExport(
 	const tracer = tracerProvider.getTracer(SCOPE_NAME);
 	return {
 		meterProvider,
+		tracerProvider,
 		writeSpan(span) {
 			ids.traceId = span.traceId;
 			ids.spanId = span.spanId;

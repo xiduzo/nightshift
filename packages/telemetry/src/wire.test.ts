@@ -7,6 +7,7 @@ import {
 	runEvents,
 	waitFor,
 } from "@nightshift/engine/testing";
+import { trace } from "@opentelemetry/api";
 import {
 	AggregationTemporality,
 	type DataPoint,
@@ -17,13 +18,16 @@ import {
 	InMemorySpanExporter,
 	type ReadableSpan,
 } from "@opentelemetry/sdk-trace";
+import { os } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
 
 import { runSpanIdOf, stepSpanIdOf, traceIdOf } from "./conventions";
 import { createTelemetry } from "./wire";
 
 /*
  * The export over in-memory exporters: what a run's facts give as spans
- * and metric points, the environment of a Claude Code session, headers
+ * and metric points, the spans of an API request, the environment of a
+ * Claude Code or Codex session, headers
  * whose secrets stay in the secrets, and nothing at all while the setting
  * is off.
  * The run is shape only.
@@ -423,6 +427,56 @@ describe("the export to monitoring", () => {
 				"nightshift.score.name": "pr_merged",
 			}),
 		).toBe(1);
+	});
+
+	test("an API request is a trace of its own while the export is on, and nothing after", async () => {
+		const handler = new RPCHandler({
+			ping: os
+				.use(async ({ next }) => next())
+				.handler(async () => {
+					await Bun.sleep(1);
+					return "pong";
+				}),
+		});
+		const ask = () =>
+			handler.handle(
+				new Request("http://localhost/rpc/ping", {
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						// Propagation is off: a caller's trace starts nothing here.
+						traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+					},
+					body: JSON.stringify({ json: null }),
+				}),
+				{ prefix: "/rpc" },
+			);
+		const h = await setup();
+		const answer = await ask();
+		expect(answer.matched).toBe(true);
+		// Another library's spans stay out of the export.
+		trace.getTracer("better-auth").startSpan("db findOne session").end();
+		await h.settings.save({ telemetry: false });
+		await waitFor(() => !h.on(), { label: "the export off" });
+		await ask();
+		await h.done();
+
+		const spans = h.spans();
+		const call = byName(spans, "call_procedure");
+		const handled = byName(spans, "handler");
+		// One request, one trace, its spans nested under the procedure's.
+		const root = byName(spans, "orpc.ping");
+		expect(parentOf(root)).toBeNull();
+		expect(parentOf(call)).toBe(root.spanContext().spanId);
+		expect(handled.spanContext().traceId).toBe(call.spanContext().traceId);
+		expect(call.spanContext().traceId).not.toBe("a".repeat(32));
+		expect(spans.filter((s) => s.name === "call_procedure")).toHaveLength(1);
+		expect(spans.map((s) => s.name)).not.toContain("db findOne session");
+		expect(
+			spans.every(
+				(s) => s.spanContext().traceId === call.spanContext().traceId,
+			),
+		).toBe(true);
 	});
 
 	test("a Claude Code session gets its telemetry under the step, with no content", async () => {
