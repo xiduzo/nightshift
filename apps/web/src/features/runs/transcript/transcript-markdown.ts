@@ -122,6 +122,10 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 			return `**${item.byDeadline ? "Picked at the deadline" : "Answer"}:** \`${item.choice}\`${item.note.trim() ? `\n\n${quote(item.note)}` : ""}`;
 		case "end":
 			return `**Ended:** ${END_WORDS[item.status]}${item.message ? `. ${item.message}` : ""}`;
+		case "lease":
+			return item.held
+				? `**Lease:** took \`${item.name}\``
+				: `**Lease:** \`${item.name}\` is busy${item.holderTitle ? `. ${item.holderTitle} holds it.` : ""}`;
 		case "items-read":
 			return `_Read ${item.count} items, ${item.open} still to do._`;
 		case "item-start":

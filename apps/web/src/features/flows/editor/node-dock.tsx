@@ -8,7 +8,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { type PaletteItem, paletteMeta } from "../canvas/node-type";
 
 /**
- * In groups: do, decide, shape, wait, compose, end
+ * In groups: do, decide, shape, wait (a Wait, a Lease), compose, end
  * (docs/research/foundational-nodes.md §5). A Decision shows twice, as the
  * words people look for: a Gate (you decide) and a Branch (a rule decides).
  * A Decision by a model is the same node, set in the inspector.
@@ -21,6 +21,7 @@ const PALETTE: PaletteItem[] = [
 	"branch",
 	"value",
 	"wait",
+	"lease",
 	"call",
 	"join",
 	"end",

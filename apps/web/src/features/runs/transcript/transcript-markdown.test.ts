@@ -34,6 +34,24 @@ describe("itemToMarkdown", () => {
 		);
 	});
 
+	test("a Lease step says it took the lease, or which run holds it", () => {
+		const took: TranscriptItem = {
+			...base,
+			key: "l1",
+			kind: "lease",
+			name: "branch:x",
+			held: true,
+			holderTitle: null,
+		};
+		expect(itemToMarkdown(took, context)).toBe("**Lease:** took `branch:x`");
+		expect(
+			itemToMarkdown(
+				{ ...took, held: false, holderTitle: "Fix red PRs" },
+				context,
+			),
+		).toBe("**Lease:** `branch:x` is busy. Fix red PRs holds it.");
+	});
+
 	test("a thought says how long it took and quotes its text", () => {
 		const item: TranscriptItem = {
 			...base,

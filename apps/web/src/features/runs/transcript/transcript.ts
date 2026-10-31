@@ -434,6 +434,16 @@ function applyStepEntries(
 					message: event.message,
 				});
 				break;
+			case "lease":
+				push({
+					...base,
+					kind: "lease",
+					key: `lease:${entry.seq}`,
+					name: event.name,
+					held: event.held,
+					holderTitle: event.holderTitle ?? null,
+				});
+				break;
 			case "items-read":
 				push({
 					...base,

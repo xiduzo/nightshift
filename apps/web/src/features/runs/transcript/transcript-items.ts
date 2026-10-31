@@ -141,6 +141,15 @@ export type EndItem = ItemBase & {
 	message: string | null;
 };
 
+/** A Lease step took its lease, or another run holds it. */
+export type LeaseItem = ItemBase & {
+	kind: "lease";
+	name: string;
+	held: boolean;
+	/** The title of the run that holds it, when this one did not get it. */
+	holderTitle: string | null;
+};
+
 /** A Call step with `each` read its source. */
 export type ItemsReadItem = ItemBase & {
 	kind: "items-read";
@@ -219,4 +228,5 @@ export type TranscriptItem =
 	| ValueItem
 	| LogItem
 	| ExitItem
-	| EndItem;
+	| EndItem
+	| LeaseItem;

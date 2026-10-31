@@ -52,6 +52,7 @@ import {
 	ValueCard,
 } from "./items/decision-items";
 import { EndCard } from "./items/end-items";
+import { LeaseCard } from "./items/lease-items";
 import { ItemEnd, ItemStart, ItemsRead } from "./items/list-items";
 import { Reasoning } from "./items/reasoning";
 import {
@@ -530,5 +531,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <ValueCard item={item} />;
 		case "end":
 			return <EndCard item={item} />;
+		case "lease":
+			return <LeaseCard item={item} />;
 	}
 });
