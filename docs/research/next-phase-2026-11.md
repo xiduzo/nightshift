@@ -347,6 +347,16 @@ only where a measurement says keyword search misses.
 
 ### 5.2 Find by meaning, phase 3 (engine, 5 days, only after 5.1)
 
+**Status 2026-10-31: landed, ahead of 5.1, at the user's request.** Search
+finds by meaning on each computer where Ollama answers and has
+`qwen3-embedding:0.6b`. Without it, search finds by words only. It is not
+turned on per project: 5.1 can still turn it off for a project later.
+Keyword search uses the same sections, so a hit points at a section. On
+this repo's docs, through `createKnowledgeSearch`: words 18 to 20 of 26,
+words and meaning 21 to 22 of 26, vectors alone 23. Still open: run the Linux
+binary with Ollama in the Host image, measure embedding speed on the
+Host's CPU, and decide whether Devices share embeddings (below).
+
 Behind the same `createKnowledgeSearch` port, so the API, the MCP tools,
 the agent tools and the page do not change.
 
@@ -447,7 +457,7 @@ Moved from 4.4, unchanged. It goes last, when the proof of 5.6 is in.
 - Learnings in the step console, and the digest in the web inbox.
 - The Agents page shows OpenCode as found while it reports a problem. Fix
   that.
-- A search snippet shows a score of 0. Fix that.
+- A search snippet shows a score of 0. Fixed 2026-10-31 (5.2): the score is the fused rank score, never 0.
 - gh-aw lock file export and the ACP registry listing, an afternoon each.
 
 ### Not in this sprint

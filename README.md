@@ -176,7 +176,7 @@ The commands use the project of the current folder. `--project <id, name or fold
 | `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
 | `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
 | `get_digest` | What happened since a time: the runs that ended, and the Gates that wait. |
-| `search_knowledge` | Search the project's knowledge by keyword: the best files, each with its path and an excerpt. |
+| `search_knowledge` | Search the project's knowledge by keyword, and by meaning when Ollama runs: the best files, each with its path, section and an excerpt. |
 | `read_knowledge` | Read one file of the knowledge by its path. |
 
 To start a flow from another tool, such as GitHub Actions, n8n or Zapier, send a webhook to a schedule. See [docs/deploy/triggers.md](docs/deploy/triggers.md).

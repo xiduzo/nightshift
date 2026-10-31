@@ -94,7 +94,8 @@ Where the harness takes Night Shift's own tools, the agent also gets
 run's project only, and one more line after its prompt:
 
 > To find something in the project knowledge, call `search_knowledge` with
-> a few keywords. It finds files by their words, PDF and Word files too.
+> a few keywords or a question. It finds sections of files by their words,
+> and by their meaning when this computer can. PDF and Word files too.
 > Then read a file it gives with `read_knowledge`.
 
 | Harness | The folder | The line | Search tools |
@@ -200,7 +201,7 @@ the proposals, and then puts what it kept or deleted back in the Space.
 
 ## Search
 
-Each computer keeps a keyword index of its knowledge: the text files
+Each computer keeps a search index of its knowledge: the text files
 (`.md`, `.markdown`, `.mdx`, `.txt`, `.rst`) and the text of PDF and Word
 files (`.pdf`, `.docx`), not `INDEX.md`, hidden files, the files a sync
 kit still writes or the learnings that wait. A PDF or Word file over 10 MB is found by its path only. The
@@ -208,7 +209,8 @@ Knowledge page has a search field. Every Agent step that gets the folder
 has two tools (where its harness takes them), and so does `nightshift mcp`:
 
 - `search_knowledge` (`query`, `limit`): the best files first, each with
-  its path, title and an excerpt with the words found in bold.
+  its path, title, the section it found (heading, line, page of a PDF) and
+  an excerpt with the words found in bold.
 - `read_knowledge` (`path`): one file, at most its first 100 KB. For a PDF
   or Word file, its text.
 
@@ -225,19 +227,58 @@ of scanned pages has no text to find. `INDEX.md` lists a PDF or Word file
 with the title the PDF gives, else the first line of its text, and its
 first sentence.
 
-Every word must match. When no file has them all, the search returns files
-with some of them. A word in the title counts most, then one in the path,
-then one in the text. `"a phrase"` keeps words together. `deploy*` matches
-a word that starts with it, and so does the last word you type. Words
-match their other forms: `deploying` finds `deploy`.
+Night Shift cuts each file into sections of about 1 200 characters, at
+its headings first (`@langchain/textsplitters`). A PDF is cut page by
+page. A hit is a file at its best section, so the result says where to
+look.
 
-The index is in `<data folder>/knowledge/.search.sqlite` (SQLite FTS5,
-BM25 ranking). It belongs to the computer. It never syncs, and you can
-delete it. Before each search, Night Shift reads again only the files
-whose size or time of change differ, and drops the removed ones. Thus the
-index stays correct, whoever changes the folder. For 2 000 files the first
-search takes about half a second, and a later one about 50 ms. It reads
-the first 1 MB of a file.
+### By words
+
+Every word must match in one section. When no section has them all, the
+search returns sections with some of them. A word in the title counts
+most, then one in the path, then one in a heading, then one in the text.
+`"a phrase"` keeps words together. `deploy*` matches a word that starts
+with it, and so does the last word you type. Words match their other
+forms: `deploying` finds `deploy`.
+
+### By meaning
+
+Search also finds a section by its meaning when Ollama runs on the
+computer and has the embedding model `qwen3-embedding:0.6b`. Then a
+question in other words finds the answer too. It reads Dutch as well as
+English. To turn it on:
+
+1. Install Ollama from https://ollama.com.
+2. Run `ollama pull qwen3-embedding:0.6b` (639 MB).
+
+Nothing else is needed. Night Shift finds Ollama at `OLLAMA_HOST`, else at
+`http://127.0.0.1:11434`. The Knowledge page says whether search by meaning
+is on, and how far the first preparation is.
+
+After each change to the folder, Night Shift embeds the new and changed
+sections in the background (`@langchain/ollama`, `num_ctx` 2048, so the
+model takes about 1 GB of memory). A search never waits for it. It uses
+the vectors there are and finds the rest by words. On an M4 Max the first
+preparation of 1 100 sections takes about one minute. Later ones embed
+only the sections that changed.
+
+The search fuses the two lists by reciprocal rank (each list adds
+1 / (60 + rank) to a file). Without Ollama, search finds by words only,
+and nothing else changes. On this repository's `docs/` (26 questions),
+search by words found 18 to 20 answers in the top 5, search by words and
+meaning 21 to 22, and search by meaning alone 23.
+
+### The index
+
+The index is in `<data folder>/knowledge/.search.sqlite`: SQLite FTS5 with
+BM25 ranking for the words, and float32 vectors scanned in full for the
+meaning. It belongs to the computer. It never syncs, and you can delete
+it. Before each search, Night Shift reads again only the files whose size
+or time of change differ, and splits again only those whose content hash
+changed. It drops the removed ones. Thus the index stays correct, whoever
+changes the folder. For 2 000 files the first search takes about half a
+second, and a later one about 50 ms. It reads the first 1 MB of a file.
+A new embedding model builds the vectors again.
 
 An agent that gets the folder can still read `INDEX.md` and grep the
 folder. In `nightshift mcp` the tools take a `project` too. In a step they
@@ -258,5 +299,5 @@ agents need.
   propose learnings write one file: the later change wins.
 - A project that joins another one when a computer joins its home Host
   keeps its knowledge folder under its old id.
-- Search is by keyword, not by meaning: a word that is not in a file
-  does not find it.
+- Search by meaning needs Ollama on each computer. Each computer embeds
+  its own copy of the knowledge. The Host image has no Ollama yet.
