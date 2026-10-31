@@ -63,10 +63,11 @@ function has(overrides: Partial<TestDeviceDeps> = {}): Promise<Capabilities> {
 describe("REQUIREMENTS", () => {
 	test("lists the shared connections check, then every kind's own, once each", async () => {
 		expect(REQUIREMENTS[0]).toBe(connectionsExist);
-		expect(REQUIREMENTS).toHaveLength(5);
+		expect(REQUIREMENTS).toHaveLength(6);
 		expect(AGENT.requirements).toEqual([cliToolsInstalled, harnessesAdded]);
 		expect(DECISION.requirements).toEqual([modelDecisionsHaveDecider]);
-		expect(VALUE.requirements).toEqual([modelValuesHaveDecider]);
+		expect(VALUE.requirements[0]).toBe(modelValuesHaveDecider);
+		expect(VALUE.requirements).toHaveLength(2);
 	});
 
 	test("a kind's requirement sees its own nodes only", async () => {
