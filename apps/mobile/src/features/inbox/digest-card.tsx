@@ -1,4 +1,8 @@
-import { createNotificationQueries, type Digest } from "@nightshift/client";
+import {
+	createNotificationQueries,
+	type Digest,
+	digestShown,
+} from "@nightshift/client";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
 import { View } from "react-native";
@@ -7,9 +11,6 @@ import { useHostQueries } from "@/features/host";
 import { formatTime } from "@/shared/format";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
-
-/** A digest older than this no longer shows: the next one comes soon. */
-const SHOWN_FOR_MS = 24 * 60 * 60_000;
 
 /**
  * The last morning digest on top of the inbox: its sum, and one row per
@@ -20,7 +21,7 @@ export function DigestCard({ now }: { now: number }) {
 	const queries = useHostQueries(createNotificationQueries);
 	const digest = useQuery(queries.digest());
 	const data = digest.data;
-	if (!data || now - data.to > SHOWN_FOR_MS) return null;
+	if (!digestShown(data, now)) return null;
 	return (
 		<View className="gap-2">
 			<SectionHead

@@ -58,12 +58,14 @@ import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
 import { SiteHeader } from "@/shared/page";
 import { useOpenGates } from "../use-open-gates";
+import { DigestGroup } from "./digest-group";
 import { GateDetail } from "./gate-detail";
 import { groupByProject } from "./group-gates";
 
 /**
- * The Needs-you inbox: a list and a detail. Open Gates on the left,
- * grouped by project and oldest first, and the selected Gate on the right.
+ * The Needs-you inbox: a list and a detail. Your last morning digest and
+ * the open Gates on the left, the Gates grouped by project and oldest
+ * first, and the selected Gate on the right.
  * It holds the Gates of every Space you are in; each project group shows
  * its Space. Sleeping runs (of the Space you work in) sit below the Gates.
  * Each pane scrolls on its own.
@@ -97,6 +99,7 @@ export function InboxPage({
 					aria-label="Inbox"
 					className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
 				>
+					<DigestGroup now={now} />
 					<div className="flex items-center justify-between gap-2 px-2">
 						<div className="min-w-0">
 							<h2 className="font-medium text-sm">Waiting for you</h2>

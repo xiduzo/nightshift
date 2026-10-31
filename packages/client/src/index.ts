@@ -110,6 +110,7 @@ export {
 	applySettingsPatch,
 	createNotificationQueries,
 	type Digest,
+	digestShown,
 	type NotificationScreen,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
