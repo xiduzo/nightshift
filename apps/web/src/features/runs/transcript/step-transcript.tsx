@@ -452,6 +452,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	end: "Ending the run…",
 	join: "Waiting for the branches…",
 	lease: "Taking the lease…",
+	service: "Starting the service…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({

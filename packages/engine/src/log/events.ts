@@ -549,11 +549,12 @@ export type EnginePayloads = {
 	/**
 	 * The run stopped a service before its end. `scope`: it left the
 	 * service's Section. `failed`: the service did not get ready.
+	 * `stopped`: its step stopped before the service was ready.
 	 */
 	ServiceStopped: {
 		nodeId: string;
 		scope: Scope | null;
-		why: "scope" | "failed";
+		why: "scope" | "failed" | "stopped";
 	};
 	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
 	WaitEnded: { early: boolean; signal?: string };

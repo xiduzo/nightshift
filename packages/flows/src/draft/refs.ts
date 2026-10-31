@@ -269,6 +269,21 @@ export function rewriteOwnTemplates(
 			return node;
 		case "lease":
 			return { ...node, name: rewrite(node.name) };
+		case "service":
+			return {
+				...node,
+				start: rewrite(node.start),
+				ready: {
+					...node.ready,
+					...(node.ready.command !== undefined
+						? { command: rewrite(node.ready.command) }
+						: {}),
+					...(node.ready.url !== undefined
+						? { url: rewrite(node.ready.url) }
+						: {}),
+				},
+				...(node.stop !== undefined ? { stop: rewrite(node.stop) } : {}),
+			};
 	}
 }
 

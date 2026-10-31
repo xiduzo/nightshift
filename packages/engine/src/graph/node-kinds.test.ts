@@ -10,6 +10,7 @@ import type {
 	JoinNode,
 	LeaseNode,
 	Outcome,
+	ServiceNode,
 	ToolNode,
 	ValueNode,
 	WaitNode,
@@ -68,6 +69,13 @@ const join = (fields: Record<string, unknown> = {}) =>
 	node<JoinNode>({ type: "join", wait: "all", ...fields });
 const lease = (fields: Record<string, unknown> = {}) =>
 	node<LeaseNode>({ type: "lease", name: "stack", ...fields });
+const service = (fields: Record<string, unknown> = {}) =>
+	node<ServiceNode>({
+		type: "service",
+		start: "docker compose up -d",
+		ready: { url: "http://127.0.0.1:8080" },
+		...fields,
+	});
 
 const ALL_TYPES: FlowNodeType[] = [
 	"agent",
@@ -80,6 +88,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"end",
 	"join",
 	"lease",
+	"service",
 ];
 
 describe("NODE_KINDS", () => {
@@ -102,6 +111,7 @@ describe("NODE_KINDS", () => {
 			end(),
 			join(),
 			lease(),
+			service(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -128,6 +138,7 @@ describe("make and resumeRules", () => {
 			[end(), RESUME_RULES.fresh],
 			[join(), RESUME_RULES.fresh],
 			[lease(), RESUME_RULES.wait],
+			[service(), RESUME_RULES.fresh],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -142,8 +153,9 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 			.aux(n)
 			.map((a) => a.kind);
 
-	test("an Agent, a model Decision, a model Value, a Wait and a Lease have a wait node", () => {
+	test("an Agent, a model Decision, a model Value, a Wait, a Lease and a Service have a wait node", () => {
 		expect(auxKinds(lease())).toEqual(["wait"]);
+		expect(auxKinds(service())).toEqual(["wait"]);
 		expect(auxKinds(agent())).toEqual(["wait"]);
 		expect(auxKinds(decision("model"))).toEqual(["wait"]);
 		expect(auxKinds(value("model"))).toEqual(["wait"]);
@@ -241,6 +253,12 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 		expect(chosen(lease(), "held")).toBe(true);
 		expect(reason(lease(), "held")).toBeNull();
 		expect(chosen(lease(), "busy")).toBe(false);
+	});
+
+	test("a Service that is ready ends the flow plainly; failed is a failure", () => {
+		expect(chosen(service(), "ready")).toBe(true);
+		expect(reason(service(), "ready")).toBeNull();
+		expect(chosen(service(), "failed")).toBe(false);
 	});
 
 	test("a Join that is done ends the flow plainly", () => {
@@ -346,8 +364,12 @@ describe("timeBudget: the step's timers", () => {
 		});
 	});
 
-	test("a Gate, a Wait and a Lease node have no step timer; the other kinds have their own", () => {
+	test("a Gate, a Wait, a Lease and a Service node have no step timer; the other kinds have their own", () => {
 		expect(budget(lease({ timeoutMinutes: 10, waitMinutes: 5 }))).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: undefined,
+		});
+		expect(budget(service({ timeoutMinutes: 10 }))).toEqual({
 			timeoutMinutes: undefined,
 			idleMinutes: undefined,
 		});
@@ -449,6 +471,7 @@ describe("cutShortOutputs: what a cut ends an open step with", () => {
 			"wait",
 			"end",
 			"lease",
+			"service",
 		] as const) {
 			for (const outcome of OUTCOMES) {
 				expect(
@@ -533,6 +556,7 @@ describe("works: what a step needs of its Device", () => {
 		const works = (n: FlowNode) => kindOf(n).works(n);
 		expect(works(agent())).toBe("worktree");
 		expect(works(command())).toBe("worktree");
+		expect(works(service())).toBe("worktree");
 		expect(works(tool())).toBe("device");
 		expect(works(decision("model"))).toBe("device");
 		expect(works(decision("person"))).toBeNull();

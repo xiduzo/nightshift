@@ -22,6 +22,7 @@ import {
 	leaseNode,
 	type NodeDefaults,
 	type Position,
+	serviceNode,
 	toolNode,
 	valueNode,
 	waitNode,
@@ -92,6 +93,7 @@ const NEW_NODE: Record<
 	end: { id: "end", create: endNode },
 	join: { id: "join", create: joinNode },
 	lease: { id: "lease", create: leaseNode },
+	service: { id: "service", create: serviceNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */

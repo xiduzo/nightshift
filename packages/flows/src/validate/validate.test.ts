@@ -9,6 +9,7 @@ import type {
 	CommandNode,
 	DecisionNode,
 	LeaseNode,
+	ServiceNode,
 	ValueNode,
 	WaitNode,
 } from "../nodes";
@@ -2985,5 +2986,89 @@ describe("the Lease node", () => {
 		expect(() =>
 			flowSchema.parse(flow([lease({ waitMinutes: -1 })], [], "own")),
 		).toThrow();
+	});
+});
+
+describe("the Service node", () => {
+	const service = (extra: Partial<ServiceNode> = {}): ServiceNode => ({
+		id: "stack",
+		type: "service",
+		position: { x: 0, y: 0 },
+		start: "docker compose -p {{name}} up -d",
+		ready: { url: "http://127.0.0.1:8080/health" },
+		stop: "docker compose -p {{name}} down",
+		...extra,
+	});
+	const named = (nodes: FlowNode[], edges: Parameters<typeof flow>[1]) => ({
+		...flow(nodes, edges, "stack"),
+		inputs: [{ name: "name", type: "text" as const, required: true }],
+	});
+
+	test("given commands with known references and a URL check, then the flow has no issues", () => {
+		const issues = validateFlow(
+			named(
+				[service(), command("work")],
+				[edge("a", "stack", "ready", "work")],
+			),
+		);
+		expect(issues).toEqual([]);
+	});
+
+	test("given no ready check, or both a command and a URL, then it is an error on the node", () => {
+		for (const ready of [
+			{},
+			{ command: "true", url: "http://127.0.0.1:8080" },
+		]) {
+			const issues = validateFlow(named([service({ ready })], []));
+			expect(errors(issues).map((issue) => issue.message)).toEqual([
+				'Service node "stack" needs one ready check: a command or a URL.',
+			]);
+		}
+	});
+
+	test("given a stop command that reads an unknown node, then it is an error on the node", () => {
+		const issues = validateFlow(
+			named([service({ stop: "docker compose -p {{ghost.name}} down" })], []),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([["stack", expect.stringContaining("{{ghost.name}}")]]);
+	});
+
+	test("given a timeout of the node, then it warns that the ready check says how long it waits", () => {
+		const issues = validateFlow(named([service({ timeoutMinutes: 5 })], []));
+		expect(warnings(issues).map((issue) => issue.message)).toContain(
+			'Service node "stack" does not use its timeout. Set how long it waits for the service with ready.timeoutMinutes.',
+		);
+	});
+
+	test("its outcomes are ready and failed, and later steps read its data and its log", () => {
+		expect(nodeOutcomes(service())).toEqual(["ready", "failed"]);
+		expect(outputFieldsByType.service).toEqual([
+			"outcome",
+			"data",
+			"log_tail",
+			"visit",
+		]);
+	});
+
+	test("given a Section scope, then the Section must exist and hold the node", () => {
+		const scoped = (section: string, members: string[]) =>
+			validateFlow({
+				...named(
+					[service({ scope: { section } }), command("work")],
+					[edge("a", "stack", "ready", "work")],
+				),
+				sections: [{ id: "deploy", label: "Deploy", nodes: members }],
+			});
+		expect(errors(scoped("deploy", ["stack", "work"]))).toEqual([]);
+		expect(
+			errors(scoped("ghost", ["stack", "work"])).map((i) => i.message),
+		).toEqual([
+			'Service node "stack" runs until the run leaves the Section "ghost", but the flow has no such Section. Pick a Section, or run the service for the whole run.',
+		]);
+		expect(errors(scoped("deploy", ["work"])).map((i) => i.message)).toEqual([
+			'Service node "stack" runs for the Section "deploy", but it is not in that Section. Move the node into the Section, or pick the Section it is in.',
+		]);
 	});
 });

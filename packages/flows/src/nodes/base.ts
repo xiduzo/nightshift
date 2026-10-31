@@ -330,6 +330,18 @@ export const variableWriteSchema = z.object({
 });
 export type VariableWrite = z.infer<typeof variableWriteSchema>;
 
+/**
+ * How long a run holds what a node takes for a scope: a lease (ADR 7) or a
+ * service (ADR 9). `run` (the default): until the run ends. `{ section }`:
+ * until the run leaves the Section with that id, which holds the node. A
+ * Section, here, only marks where the scope ends. An object, not a bare
+ * id: a Section may be called "run".
+ */
+export const holdScopeSchema = z.union([
+	z.literal("run"),
+	z.object({ section: z.string().min(1) }),
+]);
+
 export const nodeBase = {
 	id: nodeIdSchema,
 	/** Display name in the editor. Defaults to the id. */

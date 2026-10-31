@@ -144,6 +144,14 @@ export const sampleNodes = {
 		name: "branch:{{pr.data.head}}",
 		waitMinutes: 30,
 	},
+	service: {
+		id: "stack",
+		type: "service",
+		position: at,
+		start: "docker compose up -d",
+		ready: { url: "http://127.0.0.1:8080/health", timeoutMinutes: 5 },
+		stop: "docker compose down",
+	},
 } as const satisfies Record<FlowNodeType, NodeInput>;
 
 /** What each node type is for, and the fields it adds to the common ones. */
@@ -160,6 +168,8 @@ const nodeText: Record<FlowNodeType, string> = {
 		)} (\`{ kind: "duration", minutes }\`, \`{ kind: "time", at: "07:00" }\`, \`{ kind: "command", command, everyMinutes }\` until it exits 0, \`{ kind: "signal", name, key? }\`, \`{ kind: "any", signal: { name, key? }, command: { command, everyMinutes } }\`: whichever ends it first). \`timeoutMinutes\` ends it \`timeout\`. A signal comes from a person on the run page, or from a webhook schedule of the project: then \`data\` holds the webhook (\`{{wait_ci.data.body.check_suite.conclusion}}\`). With \`key\` (a template, for example \`{{pr}}\`), only a webhook whose signal key is that text wakes it. \`outcomes\` (each \`{ name, when? }\`, each with an edge) are more ways out than \`done\`. The command picks one: it writes \`{ "outcome": "red" }\` to \`$NS_OUTPUT\` and exits 0; an unlisted outcome or another exit code polls again. A signal picks the first outcome whose \`when\` (JSONata over \`event\`) holds; a webhook that matches no rule does not wake it.`,
 	lease:
 		"Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.",
+	service:
+		"Starts a process that keeps running while the steps after it work: a Docker Compose stack, a dev server. `start` runs in the background in the project. `ready` is a `command` (exit 0) or a `url` (answers 2xx), tried every `everySeconds` (default 2) up to `timeoutMinutes` (default 5). A ready command can write JSON to `$NS_OUTPUT`, read later as `{{stack.data.url}}`. `{{stack.log_tail}}` gives the last lines of its log. Night Shift stops it when the run ends, however it ends: with `stop` when it has one (`docker compose down`), else by ending its processes. `scope: { section: <id> }` stops it when the run leaves that Section, which holds the node. Every step in its scope runs on its computer. A service on a fixed port goes after a Lease on that port. `secrets` as on a Command. Without a `failed` edge, a service that does not get ready fails the run.",
 	join: `Where parallel branches meet. \`wait\`: \`all\` (default), or \`first\` (stops the other branches). \`data\` holds each branch's \`data\` by the node it came from: \`{{reviewed.data.security}}\`.`,
 	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its name), or a kit (\`kit:github/publish-draft-pr\`, see Kits), with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message. With \`device\` (a computer's name), its steps run on that computer wherever the run runs.`,
 	end: `Ends the run on purpose. \`status\`: ${endStatusSchema.options.map((status) => `\`${status}\``).join(", ")}. \`message\` (template) is one line for a person: the runs list and the notification show it. \`nothing-to-do\` is for a run that found no work: it is not a failure. \`failed\` fails the run on purpose. No edge leaves an End node.`,

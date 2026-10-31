@@ -173,6 +173,18 @@ export function transcriptLines(
 					text: event.message ? `Ended. ${event.message}` : "Ended.",
 				});
 				break;
+			case "service":
+				push({
+					key: `service:${seq}`,
+					kind: "night-shift",
+					text:
+						event.state === "starting"
+							? "Starts the service."
+							: event.state === "ready"
+								? "The service is ready."
+								: `The service did not get ready. ${event.reason ?? ""}`.trim(),
+				});
+				break;
 			case "lease":
 				push({
 					key: `lease:${seq}`,

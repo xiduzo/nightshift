@@ -8,6 +8,7 @@ import { DECISION } from "./nodes/decision";
 import { END } from "./nodes/end";
 import { JOIN } from "./nodes/join";
 import { LEASE } from "./nodes/lease";
+import { SERVICE } from "./nodes/service";
 import { TOOL } from "./nodes/tool";
 import { VALUE } from "./nodes/value";
 import { WAIT } from "./nodes/wait";
@@ -63,6 +64,7 @@ export const NODE_KINDS: { readonly [T in FlowNodeType]: KindOf<T> } = {
 	end: END,
 	join: JOIN,
 	lease: LEASE,
+	service: SERVICE,
 };
 
 /**

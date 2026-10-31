@@ -6,6 +6,7 @@ import {
 	checkDecisionNode,
 	checkEndNode,
 	checkLeaseNode,
+	checkServiceNode,
 	checkToolNode,
 	checkValueNode,
 	checkWaitNode,
@@ -85,6 +86,9 @@ export function checkNode(
 			break;
 		case "lease":
 			checkLeaseNode(node, check);
+			break;
+		case "service":
+			checkServiceNode(node, check);
 			break;
 	}
 }

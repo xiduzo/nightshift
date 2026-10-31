@@ -59,6 +59,18 @@ export type LeaseEvent = {
 	holderTitle?: string;
 };
 
+/**
+ * What a Service step writes to its transcript: it starts the service
+ * (`command`), the service is ready, or it failed (`reason`). The
+ * service's own output goes to its log, not here.
+ */
+export type ServiceEvent = {
+	type: "service";
+	state: "starting" | "ready" | "failed";
+	command?: string;
+	reason?: string;
+};
+
 /** What a Call step with `each` writes to its transcript. */
 export type ForEachEvent =
 	| { type: "items-read"; count: number; open: number }
@@ -199,6 +211,7 @@ export type StepEvent =
 	| ToolEvent
 	| EndEvent
 	| LeaseEvent
+	| ServiceEvent
 	| WorktreeEvent;
 
 /**
