@@ -4,8 +4,10 @@ import {
 	checkNodeProfile,
 	type DeciderName,
 	deciderNameSchema,
+	type ModelAddress,
 	modelAddressSchema,
 	type NodeCheck,
+	type NodeProfile,
 	nodeBase,
 	nodeProfileSchema,
 	placed,
@@ -37,7 +39,18 @@ export type DecidedBy = z.infer<typeof decidedBySchema>;
  * `minConfidence` every pick holds. A run copies the profile's address
  * onto the tier, as onto a node.
  */
-export const decisionTierSchema = z.object({
+/** A tier of a Decision's cascade. Named, so the declared types stay small. */
+export interface DecisionTier {
+	label?: string;
+	tries?: number;
+	profile?: NodeProfile;
+	decider?: DeciderName;
+	model?: string;
+	address?: ModelAddress;
+	minConfidence?: number;
+}
+
+export const decisionTierSchema: z.ZodType<DecisionTier> = z.object({
 	...tierBase,
 	profile: nodeProfileSchema.optional(),
 	decider: deciderNameSchema.optional(),
@@ -46,7 +59,6 @@ export const decisionTierSchema = z.object({
 	/** The least probability, from 0 to 1, the pick needs. Unset: every pick holds. */
 	minConfidence: z.number().min(0).max(1).optional(),
 });
-export type DecisionTier = z.infer<typeof decisionTierSchema>;
 
 /**
  * Picks one of its options, which is the step's outcome. `by` says who:

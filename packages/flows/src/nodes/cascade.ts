@@ -46,12 +46,18 @@ export const tierBase = {
  * Call's offers "try-again" (one more try on the last tier, with the
  * person's note) and "stop". A deadline chooses for nobody, as on a Gate.
  */
-export const personTierSchema = z.object({
+/** The last tier of a cascade as a person. Named, so the declared types stay small. */
+export interface PersonTier {
+	person: true;
+	label?: string;
+	deadline?: GateDeadline;
+}
+
+export const personTierSchema: z.ZodType<PersonTier> = z.object({
 	person: z.literal(true),
 	label: tierBase.label,
 	deadline: gateDeadlineSchema.optional(),
 });
-export type PersonTier = z.infer<typeof personTierSchema>;
 
 /** The choices of the person tier of an Agent or a Call. */
 export const RETRY_CHOICES = ["try-again", "stop"] as const;
