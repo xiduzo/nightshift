@@ -89,11 +89,14 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 	const decider = deciders.data?.find((d) => d.name === deciderName);
 	const label = (name: string) =>
 		deciders.data?.find((d) => d.name === name)?.label ?? name;
-	const options =
-		makes === "value"
-			? (deciders.data ?? []).filter((d) => d.value !== null)
-			: (deciders.data ?? []);
+	// A decider that needs an address reads it from a profile (ADR 5).
+	const options = (deciders.data ?? []).filter(
+		(d) =>
+			(makes !== "value" || d.value !== null) &&
+			(named || d.address !== "required" || d.name === deciderName),
+	);
 	const cannot = makes === "value" && decider !== undefined && !decider.value;
+	const needsProfile = !named && decider?.address === "required";
 	const keyMissing = decider?.apiKeySource === "missing";
 	const defaultModel =
 		makes === "value" ? decider?.value?.defaultModel : decider?.defaultModel;
@@ -122,9 +125,11 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 				error={
 					cannot
 						? "This decider cannot make a value. Choose one that can."
-						: keyMissing && decider?.apiKey
-							? `Add the secret ${decider.apiKey} on the Secrets page, or this node cannot ${makes === "value" ? "make a value" : "decide"}.`
-							: null
+						: needsProfile
+							? "This decider needs the address of its server. Pick a model profile that has one."
+							: keyMissing && decider?.apiKey
+								? `Add the secret ${decider.apiKey} on the Secrets page, or this node cannot ${makes === "value" ? "make a value" : "decide"}.`
+								: null
 				}
 				hint={
 					makes === "value"
@@ -135,7 +140,7 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 				<NativeSelect
 					id={`${id}-decider`}
 					value={named ? (node.decider ?? "") : deciderName}
-					aria-invalid={keyMissing || cannot}
+					aria-invalid={keyMissing || cannot || needsProfile}
 					aria-describedby={`${id}-decider-hint`}
 					onChange={(event) => {
 						const next = event.target.value as N["decider"] | "";

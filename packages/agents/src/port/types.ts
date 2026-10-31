@@ -315,6 +315,12 @@ export type DecisionResult =
 			kind: "decided";
 			label: string;
 			notes: string;
+			/**
+			 * The probability of the pick, from 0 to 1. Absent for a decider
+			 * that measures none (a chat model: Ollama, an OpenAI-compatible
+			 * server), whose pick is all it reports.
+			 */
+			probability?: number;
 			costUsd: number | null;
 			/** Absent: reported, when there is a cost. Null: no cost. */
 			costSource?: CostSource | null;

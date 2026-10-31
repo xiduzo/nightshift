@@ -254,26 +254,31 @@ export function ModelProfileDetail({
 						className="grid gap-2 sm:grid-cols-2"
 						aria-label="Decider"
 					>
-						{(deciders.data ?? []).map((d) => (
-							<FieldLabel key={d.name} htmlFor={`${id}-d-${d.name}`}>
-								<Field orientation="horizontal">
-									<FieldContent>
-										<FieldTitle>
-											{d.label}
-											{d.value ? null : (
-												<Badge variant="outline">Decisions only</Badge>
-											)}
-										</FieldTitle>
-										{d.apiKeySource === "missing" ? (
-											<FieldDescription className="text-status-waiting text-xs">
-												Needs the secret {d.apiKey}
-											</FieldDescription>
-										) : null}
-									</FieldContent>
-									<RadioGroupItem value={d.name} id={`${id}-d-${d.name}`} />
-								</Field>
-							</FieldLabel>
-						))}
+						{(deciders.data ?? [])
+							// The address fields come with the next change.
+							.filter(
+								(d) => d.address !== "required" || d.name === draft.decider,
+							)
+							.map((d) => (
+								<FieldLabel key={d.name} htmlFor={`${id}-d-${d.name}`}>
+									<Field orientation="horizontal">
+										<FieldContent>
+											<FieldTitle>
+												{d.label}
+												{d.value ? null : (
+													<Badge variant="outline">Decisions only</Badge>
+												)}
+											</FieldTitle>
+											{d.apiKeySource === "missing" ? (
+												<FieldDescription className="text-status-waiting text-xs">
+													Needs the secret {d.apiKey}
+												</FieldDescription>
+											) : null}
+										</FieldContent>
+										<RadioGroupItem value={d.name} id={`${id}-d-${d.name}`} />
+									</Field>
+								</FieldLabel>
+							))}
 					</RadioGroup>
 					{keyMissing && decider?.apiKey ? (
 						<Alert>

@@ -1,4 +1,4 @@
-import { deciderNameSchema } from "@nightshift/flows";
+import { deciderAddress, deciderNameSchema } from "@nightshift/flows";
 
 import type { DeciderName } from "../port";
 import {
@@ -28,6 +28,14 @@ export type DeciderView<Source> = {
 	apiKeySource: Source | null;
 	/** Set when the decider can also make a value (a Value node made by a model). */
 	value: { defaultModel: string; models: string[] } | null;
+	/**
+	 * Whether a Model Profile gives it an address (ADR 5): `required` for a
+	 * server without a vendor API, `optional` where the address replaces
+	 * the default, null for a vendor API only.
+	 */
+	address: "required" | "optional" | null;
+	/** False when it reports a pick without a probability (a chat model). */
+	probability: boolean;
 };
 
 /**
@@ -61,6 +69,8 @@ export function deciderViews<Source>(
 							models: offered.valueModels,
 						}
 					: null,
+				address: deciderAddress(name),
+				probability: adapter.probability !== false,
 			};
 		}),
 	);

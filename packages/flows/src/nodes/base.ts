@@ -81,7 +81,8 @@ export const reservedNames = ["run", "vars"] as const;
  * Who decides a Decision node: a TanStack AI decision model, through
  * `decide()`. TypeSafe and OpenRouter serve Jev, OpenAI its Decisions API,
  * Ollaya a `laya` model on this computer, Ollama any chat model pulled on
- * this computer.
+ * this computer. OpenJev serves the Jev wire API at an address, and
+ * `compatible` is any OpenAI-compatible chat server at an address (ADR 5).
  */
 export const deciderNameSchema = z.enum([
 	"typesafe",
@@ -89,6 +90,8 @@ export const deciderNameSchema = z.enum([
 	"openai",
 	"ollaya",
 	"ollama",
+	"openjev",
+	"compatible",
 ]);
 export type DeciderName = z.infer<typeof deciderNameSchema>;
 
@@ -103,6 +106,8 @@ const DECIDER_ADDRESS: Record<DeciderName, "required" | "optional" | null> = {
 	openai: "optional",
 	ollaya: null,
 	ollama: "optional",
+	openjev: "required",
+	compatible: "required",
 };
 
 /** Whether the decider takes an address, and whether it needs one. */

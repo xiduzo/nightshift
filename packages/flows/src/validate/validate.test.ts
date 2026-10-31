@@ -2270,7 +2270,7 @@ describe("validateFlow: Value", () => {
 			expect.objectContaining({
 				nodeId: "tests",
 				message:
-					'Value node "tests" uses the decider "typesafe", which cannot make a value. Choose one of: openrouter, openai, ollama.',
+					'Value node "tests" uses the decider "typesafe", which cannot make a value. Choose one of: openrouter, openai, ollama, compatible.',
 			}),
 		]);
 		const unknownRef = validateFlow(

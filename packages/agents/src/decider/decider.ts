@@ -39,6 +39,13 @@ import type {
 import { type SettledCost, settleCost } from "../pricing";
 import { failureKind } from "../session";
 import {
+	type AddressAccess,
+	addressModels,
+	compatibleChat,
+	withBearer,
+} from "./address";
+import { ChatEvaluateAdapter } from "./chat-evaluate";
+import {
 	OLLAMA_DEFAULT_MODEL,
 	OLLAMA_MODELS,
 	type OllamaAddress,
@@ -121,6 +128,11 @@ export type DeciderAdapter = {
 	 */
 	listModels?: (context: DeciderContext) => Promise<string[]>;
 	/**
+	 * The models the server at a profile's address lists (ADR 5): its
+	 * `/v1/models`, Ollama's tags. Throws when it does not answer.
+	 */
+	listAt?: (at: AddressAccess, context: DeciderContext) => Promise<string[]>;
+	/**
 	 * What a failure means for the person, and how to fix it. Undefined:
 	 * the failure keeps its own message.
 	 */
@@ -165,19 +177,6 @@ function openaiClient(
 	];
 }
 
-/** Bearer authorization for the key, unless the address's headers already authorize. */
-function withBearer(
-	headers: Record<string, string>,
-	apiKey: string | undefined,
-): Record<string, string> {
-	const authorized = Object.keys(headers).some(
-		(name) => name.toLowerCase() === "authorization",
-	);
-	return apiKey && !authorized
-		? { ...headers, Authorization: `Bearer ${apiKey}` }
-		: headers;
-}
-
 /** The profile's Ollama, else the Device's (`ollamaAddress`), else Ollama's default. */
 function ollamaAt(
 	access: DeciderAccess,
@@ -202,6 +201,11 @@ async function accessFor(
 	name: DeciderName,
 	secret: (name: string) => Promise<string | undefined>,
 ): Promise<DeciderAccess | { problem: string }> {
+	if (address === undefined && deciderAddress(name) === "required") {
+		return {
+			problem: `${spec.label} needs an address. Pick a Model Profile with the address of its server.`,
+		};
+	}
 	if (address === undefined || deciderAddress(name) === null) {
 		const apiKey = spec.apiKey ? await secret(spec.apiKey) : undefined;
 		if (spec.apiKey && !apiKey) {
@@ -211,28 +215,47 @@ async function accessFor(
 		}
 		return { apiKey, address: undefined };
 	}
+	const at = await reachAddress(address, secret);
+	if ("problem" in at) return at;
+	const { apiKey, ...reachedAt } = at;
+	return { apiKey, address: reachedAt };
+}
+
+/**
+ * A Model Profile's address with its secrets read: the API key's value and
+ * the headers with `${NAME}` filled in, or which secret is missing. The
+ * secrets are this Device's own (ADR 1).
+ */
+export async function reachAddress(
+	address: ModelAddress,
+	secret: (name: string) => Promise<string | undefined>,
+): Promise<AddressAccess | { problem: string }> {
+	const missing = (name: string) => ({
+		problem: `The address ${address.baseUrl} needs the secret ${name}. Add it on the Secrets page.`,
+	});
 	const apiKey = address.apiKey ? await secret(address.apiKey) : undefined;
-	if (address.apiKey && !apiKey) {
-		return {
-			problem: `The address ${address.baseUrl} needs the secret ${address.apiKey}. Add it on the Secrets page.`,
-		};
-	}
+	if (address.apiKey && !apiKey) return missing(address.apiKey);
 	const headers: Record<string, string> = {};
 	for (const [header, value] of Object.entries(address.headers ?? {})) {
 		let filled = value;
 		for (const match of value.matchAll(SECRET_REFERENCE)) {
 			const ref = match[1] as string;
 			const found = await secret(ref);
-			if (found === undefined) {
-				return {
-					problem: `The address ${address.baseUrl} needs the secret ${ref}. Add it on the Secrets page.`,
-				};
-			}
+			if (found === undefined) return missing(ref);
 			filled = filled.replaceAll(match[0], found);
 		}
 		headers[header] = filled;
 	}
-	return { apiKey, address: { root: addressRoot(address), headers } };
+	return { root: addressRoot(address), headers, apiKey };
+}
+
+/** OpenJev's decision models. Any other id its server serves works too. */
+const OPENJEV_MODELS = ["openjev-latest", "laya-1.0", "verdict-1.4"] as const;
+
+/** The address an adapter needs: a decider without a default has one by now (`accessFor`). */
+function reached(access: DeciderAccess, label: string): AddressAccess {
+	if (!access.address) throw new Error(`${label} needs an address.`);
+	return { ...access.address, apiKey: access.apiKey };
 }
 
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
@@ -288,6 +311,7 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 			);
 		},
 		pricing: { providerId: "openai" },
+		listAt: addressModels,
 		value: {
 			defaultModel: "gpt-5-mini",
 			create: async (model, access) => {
@@ -322,12 +346,61 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		pricing: "free",
 		probability: false,
 		listModels: (context) => ollamaModels(context.ollama?.()),
+		listAt: (at) =>
+			ollamaModels({
+				host: at.root,
+				headers: withBearer(at.headers, at.apiKey),
+			}),
 		explain: ollamaProblem,
 		value: {
 			defaultModel: OLLAMA_DEFAULT_MODEL,
 			models: OLLAMA_MODELS,
 			create: (model, access, context) =>
 				ollamaChat(model, ollamaAt(access, context)),
+		},
+	},
+	openjev: {
+		label: "OpenJev",
+		pkg: "@tanstack/ai-typesafe",
+		models: OPENJEV_MODELS,
+		defaultModel: "openjev-latest",
+		apiKey: null,
+		// The Jev wire API at the profile's address: TypeSafe's own adapter.
+		create: async (model, access) => {
+			const { createTypesafeDecider } = await import("@tanstack/ai-typesafe");
+			const at = reached(access, "OpenJev");
+			return createTypesafeDecider(
+				model as Parameters<typeof createTypesafeDecider>[0],
+				at.apiKey ?? "",
+				{ baseURL: at.root, headers: at.headers },
+			);
+		},
+		pricing: "free",
+		listAt: addressModels,
+	},
+	compatible: {
+		label: "OpenAI-compatible server",
+		pkg: "@tanstack/ai-openai",
+		models: [],
+		// Most servers answer with the model they run; name it on the profile.
+		defaultModel: "default",
+		apiKey: null,
+		create: (model, access) => {
+			const at = reached(access, "An OpenAI-compatible server");
+			return new ChatEvaluateAdapter(
+				model,
+				"compatible",
+				"An OpenAI-compatible server",
+				(m) => compatibleChat(m, at),
+			);
+		},
+		pricing: "free",
+		probability: false,
+		listAt: addressModels,
+		value: {
+			defaultModel: "default",
+			create: (model, access) =>
+				compatibleChat(model, reached(access, "An OpenAI-compatible server")),
 		},
 	},
 };
@@ -437,7 +510,8 @@ async function decideOnce(
 		abortSignal: input.signal,
 		debug: false,
 	});
-	const percent = Math.round(result.label.probability * 100);
+	const probability = result.label.probability;
+	const percent = Math.round(probability * 100);
 	return {
 		kind: "decided",
 		label: result.label.value,
@@ -445,6 +519,7 @@ async function decideOnce(
 			spec.probability === false
 				? `${spec.label} picked it.`
 				: `${spec.label} picked it with ${percent}% probability.`,
+		...(spec.probability === false ? {} : { probability }),
 		...costOf(spec, result.meta.model, result.meta.usage),
 	};
 }
@@ -536,6 +611,8 @@ export type DeciderModels = {
 export async function deciderModels(
 	name: DeciderName,
 	context: DeciderContext = {},
+	/** A profile's address, its secrets read (`reachAddress`): its server lists instead. */
+	at?: AddressAccess,
 ): Promise<DeciderModels> {
 	const spec = DECIDER_ADAPTERS[name];
 	const merged = (listed: string[], known: readonly string[]) => [
@@ -544,13 +621,20 @@ export async function deciderModels(
 	];
 	const result = (listed: string[], problem: string | null) => ({
 		models: merged(listed, spec.models),
-		valueModels: spec.value?.models ? merged(listed, spec.value.models) : [],
+		valueModels: spec.value ? merged(listed, spec.value.models ?? []) : [],
 		listed: listed.length,
 		problem,
 	});
-	if (!spec.listModels) return result([], null);
+	const list =
+		at && spec.listAt
+			? () => (spec.listAt as NonNullable<typeof spec.listAt>)(at, context)
+			: spec.listModels
+				? () =>
+						(spec.listModels as NonNullable<typeof spec.listModels>)(context)
+				: null;
+	if (!list) return result([], null);
 	try {
-		return result([...new Set(await spec.listModels(context))], null);
+		return result([...new Set(await list())], null);
 	} catch (error) {
 		return result([], error instanceof Error ? error.message : String(error));
 	}
