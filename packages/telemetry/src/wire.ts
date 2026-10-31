@@ -1,10 +1,12 @@
 import type { Engine, LandedFact } from "@nightshift/engine";
+import type {
+	ConnectionStore,
+	SettingsStore,
+} from "@nightshift/engine/device-config";
 
-import { type HeaderValues, keptHeaders, parseHeaders } from "./headers";
 import {
 	type ExportSinks,
 	type ExportTarget,
-	type OtlpProtocol,
 	otlpSinks,
 	type RunningExport,
 	startExport,
@@ -18,65 +20,57 @@ import { claudeCodeEnv } from "./sessions";
  * OpenTelemetry spans and metrics (`runs/`), and the Claude Code sessions
  * of their steps send their own telemetry to the same place (`sessions/`).
  * Nothing is created while it is off: no provider, no exporter, no
- * connection. `refresh` reads the settings and the headers again, and
- * starts, changes or stops the export to match, with no restart.
+ * connection. It reads its settings from the settings store and the
+ * `${NAME}` references of its headers from the secrets, and starts,
+ * changes or stops the export itself when either changes, with no restart.
  */
-
-/** This computer's settings of the export. */
-export type TelemetrySettings = {
-	enabled: boolean;
-	/** The OTLP endpoint, without `/v1/traces`. Empty: none, so the export stays off. */
-	endpoint: string;
-	protocol: OtlpProtocol;
-};
 
 export type Telemetry = {
 	/**
 	 * What a run step's harness session adds to its environment, and the
-	 * secret values in it (the headers' values), to take out of the
+	 * secret values in it (the headers' secrets), to take out of the
 	 * session's output. Nothing while the export is off.
 	 */
 	sessionEnv(session: { harness: string; runId: string; stepId: string }): {
 		env: Record<string, string>;
 		values: string[];
 	};
-	/** The export's headers: their names only, never their values. */
-	headers: {
-		names(): Promise<string[]>;
-		/**
-		 * Keeps the headers a person wrote (`name=value`, one per line) in
-		 * place of the ones before, and uses them at once. Null or empty:
-		 * forgets them. Returns their names.
-		 */
-		save(text: string | null): Promise<string[]>;
-	};
-	/** Reads the settings and headers again, and starts, changes or stops the export to match. */
-	refresh(): Promise<void>;
-	/** Whether the export is on now. */
-	active(): boolean;
+	/**
+	 * Sends the runs `engine` walks on this computer while the export is
+	 * on. Until it is called, only the sessions' own telemetry goes out.
+	 */
+	follow(engine: Pick<Engine, "onLandedFacts" | "runTrace">): void;
 	/** Sends what waits, and stops. */
 	stop(): Promise<void>;
 };
 
-export function createTelemetry(deps: {
-	engine: Pick<Engine, "onLandedFacts" | "runTrace">;
+/** The export as the settings and the secrets have it now. */
+type Wanted =
+	| { on: false }
+	| { on: true; target: ExportTarget; values: string[] };
+
+/**
+ * Starts the export to monitoring as the settings have it, and keeps it in
+ * step with them. Resolves once the first start is done.
+ */
+export async function createTelemetry(deps: {
 	/** This computer's Device: the Walker whose runs go out. */
 	deviceId: string;
-	settings: () => TelemetrySettings;
-	/** Where the headers are kept: the keychain, else a file. */
-	values: HeaderValues;
+	settings: Pick<SettingsStore, "current" | "onChange">;
+	/** Where the `${NAME}` references of the headers get their values. */
+	secrets: Pick<ConnectionStore, "expandEnv" | "onSecretsChange">;
 	/** Where spans and points go. Default: OTLP to the target. A test gives in-memory exporters. */
 	sinks?: (target: ExportTarget) => ExportSinks;
 	/** How often metrics go out. Default 60 s. */
 	metricIntervalMs?: number;
-}): Telemetry {
-	const kept = keptHeaders(deps.values);
+}): Promise<Telemetry> {
 	const sinks = deps.sinks ?? otlpSinks;
-	let headers: Record<string, string> = {};
-	let headersRead = false;
+	let engine: Pick<Engine, "onLandedFacts" | "runTrace"> | null = null;
+	let unfollow = () => {};
 	let current: {
 		key: string;
 		target: ExportTarget;
+		values: string[];
 		running: RunningExport;
 		projection: RunProjection;
 	} | null = null;
@@ -90,56 +84,54 @@ export function createTelemetry(deps: {
 		return next;
 	};
 
-	/** Where the export goes now, or null while it is off. */
-	function target(): ExportTarget | null {
-		const s = deps.settings();
-		const endpoint = s.endpoint.trim();
-		if (!s.enabled || endpoint === "") return null;
-		return { endpoint, protocol: s.protocol, headers };
-	}
-
-	async function readHeaders(): Promise<void> {
-		if (headersRead) return;
-		headers = await kept.read();
-		headersRead = true;
+	/** Where the export goes now, with the secrets of its headers read. */
+	async function wanted(): Promise<Wanted> {
+		const s = deps.settings.current();
+		const endpoint = s.telemetryEndpoint.trim();
+		if (!s.telemetry || endpoint === "") return { on: false };
+		const headers = await deps.secrets.expandEnv(s.telemetryHeaders);
+		if (!headers.ok) {
+			console.warn(
+				`[telemetry] the export to monitoring stays off: its headers need the secrets ${headers.missing.join(", ")}.`,
+			);
+			return { on: false };
+		}
+		return {
+			on: true,
+			target: { endpoint, protocol: s.telemetryProtocol, headers: headers.env },
+			values: headers.values,
+		};
 	}
 
 	async function apply(): Promise<void> {
-		// The keychain is read only once the export is wanted.
-		if (target() !== null) await readHeaders();
-		const wanted = target();
-		const key = wanted ? JSON.stringify(wanted) : "";
+		const next = await wanted();
+		const key = next.on ? JSON.stringify(next.target) : "";
 		if ((current?.key ?? "") === key) return;
 		const before = current;
 		current = null;
 		await before?.running.shutdown();
-		if (!wanted) return;
-		const running = startExport(sinks(wanted), {
+		if (!next.on) return;
+		const running = startExport(sinks(next.target), {
 			deviceId: deps.deviceId,
 			metricIntervalMs: deps.metricIntervalMs,
 		});
 		current = {
 			key,
-			target: wanted,
+			target: next.target,
+			values: next.values,
 			running,
 			projection: createRunProjection({
 				running,
-				read: (runId) => deps.engine.runTrace(runId),
+				read: async (runId) => (engine ? engine.runTrace(runId) : null),
 				deviceId: deps.deviceId,
 			}),
 		};
 	}
 
-	// The runs this computer walks: each run's events are written here once.
-	const off = deps.engine.onLandedFacts(
-		(facts: readonly LandedFact[]) => {
-			if (!current) return;
-			void enqueue(async () => {
-				await current?.projection.take(facts);
-			});
-		},
-		{ only: deps.deviceId },
-	);
+	const reapply = () => void enqueue(apply);
+	const offSettings = deps.settings.onChange(reapply);
+	const offSecrets = deps.secrets.onSecretsChange(reapply);
+	await enqueue(apply);
 
 	return {
 		sessionEnv(session) {
@@ -151,27 +143,27 @@ export function createTelemetry(deps: {
 					stepId: session.stepId,
 					deviceId: deps.deviceId,
 				}),
-				values: Object.values(current.target.headers),
+				values: current.values,
 			};
 		},
-		headers: {
-			async names() {
-				await readHeaders();
-				return Object.keys(headers);
-			},
-			async save(text) {
-				const next = text?.trim() ? parseHeaders(text) : {};
-				await kept.write(next);
-				headers = next;
-				headersRead = true;
-				await enqueue(apply);
-				return Object.keys(next);
-			},
+		follow(next) {
+			unfollow();
+			engine = next;
+			// The runs this computer walks: each run's events are written here once.
+			unfollow = next.onLandedFacts(
+				(facts: readonly LandedFact[]) => {
+					if (!current) return;
+					void enqueue(async () => {
+						await current?.projection.take(facts);
+					});
+				},
+				{ only: deps.deviceId },
+			);
 		},
-		refresh: () => enqueue(apply),
-		active: () => current !== null,
 		async stop() {
-			off();
+			offSettings();
+			offSecrets();
+			unfollow();
 			await queue;
 			const before = current;
 			current = null;

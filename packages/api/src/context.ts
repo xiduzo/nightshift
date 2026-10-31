@@ -29,7 +29,6 @@ import type {
 } from "@nightshift/engine/projects";
 import type { AssistantService } from "@nightshift/flows";
 import type { Notifications } from "@nightshift/notifications";
-import type { Telemetry } from "@nightshift/telemetry";
 
 /** What a procedure gets: the request, and the daemon's services. */
 export type Context = Services & {
@@ -82,8 +81,6 @@ export type Services = {
 	 * push targets.
 	 */
 	notifications: Notifications;
-	/** The export to monitoring: its headers, kept like a secret, by name only. */
-	telemetry: Pick<Telemetry, "headers">;
 	connections: ConnectionStore;
 	cliTools: CliToolStore;
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */

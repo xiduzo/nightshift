@@ -1,5 +1,1 @@
-export {
-	createTelemetry,
-	type Telemetry,
-	type TelemetrySettings,
-} from "./wire";
+export { createTelemetry, type Telemetry } from "./wire";

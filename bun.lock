@@ -205,7 +205,6 @@
         "@nightshift/flows": "workspace:*",
         "@nightshift/notifications": "workspace:*",
         "@nightshift/refusal": "workspace:*",
-        "@nightshift/telemetry": "workspace:*",
         "@orpc/server": "catalog:",
         "zod": "catalog:",
       },
@@ -401,7 +400,6 @@
       "name": "@nightshift/telemetry",
       "dependencies": {
         "@nightshift/engine": "workspace:*",
-        "@nightshift/refusal": "workspace:*",
         "@opentelemetry/api": "1.10.0",
         "@opentelemetry/exporter-metrics-otlp-http": "0.300.0",
         "@opentelemetry/exporter-metrics-otlp-proto": "0.300.0",

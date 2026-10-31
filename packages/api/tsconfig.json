@@ -16,7 +16,6 @@
 		{ "path": "../engine" },
 		{ "path": "../flows" },
 		{ "path": "../notifications" },
-		{ "path": "../refusal" },
-		{ "path": "../telemetry" }
+		{ "path": "../refusal" }
 	]
 }

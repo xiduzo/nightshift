@@ -1,6 +1,10 @@
 {
 	"extends": "@nightshift/config/tsconfig.base.json",
-	"references": [{ "path": "../api" }, { "path": "../refusal" }],
+	"references": [
+		{ "path": "../api" },
+		{ "path": "../refusal" },
+		{ "path": "../telemetry" }
+	],
 	"compilerOptions": {
 		"noEmit": true
 	},

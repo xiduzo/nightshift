@@ -1,3 +1,3 @@
-/** The export to monitoring of this computer, wired to the engine, the settings and the keychain. */
+/** The export's headers, moved from their old store into the setting and the secrets. */
 
-export { wireTelemetry } from "./telemetry";
+export { moveTelemetryHeaders } from "./headers-move";

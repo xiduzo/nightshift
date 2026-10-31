@@ -48,7 +48,12 @@ export type { KeyStoreKind } from "./keychain";
 export { valueStore } from "./keychain";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { profileChoice } from "./profiles";
-export type { SettingField, SettingKey, SettingsStore } from "./settings";
+export type {
+	SettingField,
+	SettingKey,
+	SettingsStore,
+	TelemetryProtocol,
+} from "./settings";
 export {
 	HARNESS_BIN,
 	isHostAddress,

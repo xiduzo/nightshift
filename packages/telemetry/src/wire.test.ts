@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { LandedFact, RunTrace } from "@nightshift/engine";
 import {
+	createConnectionStore,
+	createSandbox,
+	createSettingsStore,
+	waitFor,
+} from "@nightshift/engine/testing";
+import {
 	AggregationTemporality,
 	type DataPoint,
 	type Histogram,
@@ -12,12 +18,13 @@ import {
 } from "@opentelemetry/sdk-trace";
 
 import { runSpanIdOf, stepSpanIdOf, traceIdOf } from "./conventions";
-import { createTelemetry, type TelemetrySettings } from "./wire";
+import { createTelemetry } from "./wire";
 
 /*
  * The export over in-memory exporters: what a run's facts give as spans
- * and metric points, the environment of a Claude Code session, the
- * headers kept like a secret, and nothing at all while the setting is off.
+ * and metric points, the environment of a Claude Code session, headers
+ * whose secrets stay in the secrets, and nothing at all while the setting
+ * is off.
  * The run is shape only.
  */
 
@@ -31,6 +38,12 @@ class KeptMetrics extends InMemoryMetricExporter {
 
 const DEVICE = "mac";
 
+/**
+ * When the run starts, in epoch ms. The SDK reads a small number as time
+ * since this process started, so the run starts at a real date.
+ */
+const T = 1_700_000_000_000;
+
 /** A run of a flow: an Agent, a Gate that waited, a Call with a Wait inside, then it finished. */
 function nightRun(): RunTrace {
 	return {
@@ -38,12 +51,12 @@ function nightRun(): RunTrace {
 		projectId: "p1",
 		flowName: "nightly",
 		trigger: "schedule",
-		startedAt: 1_000,
+		startedAt: T + 1_000,
 		ends: [
 			{
 				seq: 40,
-				openedAt: 1_000,
-				at: 9_000,
+				openedAt: T + 1_000,
+				at: T + 9_000,
 				status: "finished",
 				reason: null,
 				first: true,
@@ -59,12 +72,12 @@ function nightRun(): RunTrace {
 				visit: 1,
 				parentStepId: null,
 				deviceId: DEVICE,
-				startedAt: 1_100,
+				startedAt: T + 1_100,
 				ends: [
 					{
 						seq: 10,
-						openedAt: 1_100,
-						at: 3_100,
+						openedAt: T + 1_100,
+						at: T + 3_100,
 						outcome: "pass",
 						error: null,
 						costUsd: null,
@@ -76,8 +89,8 @@ function nightRun(): RunTrace {
 						id: "x1",
 						harness: "claude-code",
 						model: "claude-sonnet",
-						startedAt: 1_200,
-						endedAt: 3_000,
+						startedAt: T + 1_200,
+						endedAt: T + 3_000,
 						costUsd: 0.75,
 						costBasis: "billed",
 						tokens: { input: 900, output: 100, cacheRead: 400, cacheWrite: 0 },
@@ -93,12 +106,12 @@ function nightRun(): RunTrace {
 				visit: 1,
 				parentStepId: null,
 				deviceId: DEVICE,
-				startedAt: 3_200,
+				startedAt: T + 3_200,
 				ends: [
 					{
 						seq: 20,
-						openedAt: 3_200,
-						at: 6_200,
+						openedAt: T + 3_200,
+						at: T + 6_200,
 						outcome: "yes",
 						error: null,
 						costUsd: null,
@@ -106,7 +119,7 @@ function nightRun(): RunTrace {
 					},
 				],
 				sessions: [],
-				gateWaits: [{ from: 3_200, to: 6_200 }],
+				gateWaits: [{ from: T + 3_200, to: T + 6_200 }],
 				sleeps: [],
 			},
 			{
@@ -116,12 +129,12 @@ function nightRun(): RunTrace {
 				visit: 1,
 				parentStepId: null,
 				deviceId: DEVICE,
-				startedAt: 6_300,
+				startedAt: T + 6_300,
 				ends: [
 					{
 						seq: 35,
-						openedAt: 6_300,
-						at: 8_900,
+						openedAt: T + 6_300,
+						at: T + 8_900,
 						outcome: "done",
 						error: null,
 						costUsd: null,
@@ -139,12 +152,12 @@ function nightRun(): RunTrace {
 				visit: 2,
 				parentStepId: "s-call",
 				deviceId: DEVICE,
-				startedAt: 6_400,
+				startedAt: T + 6_400,
 				ends: [
 					{
 						seq: 30,
-						openedAt: 6_400,
-						at: 8_400,
+						openedAt: T + 6_400,
+						at: T + 8_400,
 						outcome: "done",
 						error: null,
 						costUsd: null,
@@ -153,7 +166,7 @@ function nightRun(): RunTrace {
 				],
 				sessions: [],
 				gateWaits: [],
-				sleeps: [{ from: 6_500, to: 8_300, reason: "duration" }],
+				sleeps: [{ from: T + 6_500, to: T + 8_300, reason: "duration" }],
 			},
 		],
 	};
@@ -192,53 +205,80 @@ const fact = (
 	return { ...base, seq: extra.seq, kind: "step-ended", stepId: extra.stepId };
 };
 
-/** A telemetry over a fake engine and a value store in memory. */
-function setup(initial: Partial<TelemetrySettings> = {}) {
+type Monitoring = {
+	telemetry: boolean;
+	telemetryEndpoint: string;
+	telemetryProtocol: "http/protobuf" | "http/json";
+	telemetryHeaders: Record<string, string>;
+};
+
+/**
+ * A telemetry over a fake engine and this computer's real settings and
+ * secrets, with the secret values in memory.
+ */
+async function setup(initial: Partial<Monitoring> = {}) {
 	let listener: ((facts: readonly LandedFact[]) => void) | null = null;
 	let scope: unknown = null;
-	const settings: TelemetrySettings = {
-		enabled: true,
-		endpoint: "http://localhost:4318",
-		protocol: "http/protobuf",
+	const sandbox = await createSandbox();
+	const document = await sandbox.openDocument();
+	const kept = new Map<string, string>();
+	const settings = createSettingsStore({ document, env: {} });
+	const secrets = createConnectionStore({
+		document,
+		env: {},
+		secrets: {
+			get: async (name) => kept.get(name) ?? null,
+			set: async (name, value) => {
+				kept.set(name, value);
+			},
+			delete: async (name) => {
+				kept.delete(name);
+			},
+		},
+	});
+	await settings.save({
+		telemetry: true,
+		telemetryEndpoint: "http://localhost:4318",
+		telemetryProtocol: "http/protobuf",
 		...initial,
-	};
-	const values = new Map<string, string>();
+	});
 	const spans = new KeptSpans();
 	const metrics = new KeptMetrics(AggregationTemporality.CUMULATIVE);
 	const targets: unknown[] = [];
 	const run = nightRun();
-	const telemetry = createTelemetry({
-		engine: {
-			onLandedFacts: (l, s) => {
-				listener = l;
-				scope = s;
-				return () => {
-					listener = null;
-				};
-			},
-			runTrace: async (runId) => (runId === run.runId ? run : null),
-		},
+	const telemetry = await createTelemetry({
 		deviceId: DEVICE,
-		settings: () => settings,
-		values: {
-			get: async (name) => values.get(name) ?? null,
-			set: async (name, value) => {
-				values.set(name, value);
-			},
-			delete: async (name) => {
-				values.delete(name);
-			},
-		},
+		settings,
+		secrets,
 		sinks: (target) => {
 			targets.push(target);
 			return { spans, metrics };
 		},
 	});
+	telemetry.follow({
+		onLandedFacts: (l, s) => {
+			listener = l;
+			scope = s;
+			return () => {
+				listener = null;
+			};
+		},
+		runTrace: async (runId) => (runId === run.runId ? run : null),
+	});
+	const agentEnv = () =>
+		telemetry.sessionEnv({
+			harness: "claude-code",
+			runId: "run-1",
+			stepId: "s-agent",
+		});
 	return {
 		telemetry,
 		settings,
-		values,
+		secrets,
 		targets,
+		/** Whether the export is on now: a Claude Code step gets its telemetry. */
+		on: () => Object.keys(agentEnv().env).length > 0,
+		agentEnv,
 		scope: () => scope,
 		land: (facts: LandedFact[]) => listener?.(facts),
 		spans: () => spans.getFinishedSpans(),
@@ -252,6 +292,10 @@ function setup(initial: Partial<TelemetrySettings> = {}) {
 				}
 			}
 			return byName;
+		},
+		async done() {
+			await telemetry.stop();
+			await sandbox.cleanup();
 		},
 	};
 }
@@ -283,35 +327,26 @@ const sum = (
 
 describe("the export to monitoring", () => {
 	test("while the setting is off, nothing is made and nothing goes out", async () => {
-		const h = setup({ enabled: false });
-		await h.telemetry.refresh();
+		const h = await setup({ telemetry: false });
 		for (const landing of LANDINGS) h.land(landing);
-		await h.telemetry.stop();
-		expect(h.telemetry.active()).toBe(false);
+		expect(h.agentEnv()).toEqual({ env: {}, values: [] });
+		await h.done();
 		expect(h.targets).toEqual([]);
 		expect(h.spans()).toEqual([]);
-		expect(
-			h.telemetry.sessionEnv({
-				harness: "claude-code",
-				runId: "run-1",
-				stepId: "s-agent",
-			}),
-		).toEqual({ env: {}, values: [] });
 	});
 
 	test("on without an endpoint, it stays off", async () => {
-		const h = setup({ endpoint: "  " });
-		await h.telemetry.refresh();
-		expect(h.telemetry.active()).toBe(false);
+		const h = await setup({ telemetryEndpoint: "" });
+		expect(h.on()).toBe(false);
+		await h.done();
 		expect(h.targets).toEqual([]);
 	});
 
 	test("a run's facts give one trace: the run, its steps, a Gate's wait and a sleep", async () => {
-		const h = setup();
-		await h.telemetry.refresh();
+		const h = await setup();
 		expect(h.scope()).toEqual({ only: DEVICE });
 		for (const landing of LANDINGS) h.land(landing);
-		await h.telemetry.stop();
+		await h.done();
 
 		const spans = h.spans();
 		expect(spans.map((s) => s.name).sort()).toEqual([
@@ -341,8 +376,8 @@ describe("the export to monitoring", () => {
 			"nightshift.run.status": "finished",
 			"nightshift.run.trigger": "schedule",
 		});
-		expect(run.startTime).toEqual([1, 0]);
-		expect(run.endTime).toEqual([9, 0]);
+		expect(run.startTime).toEqual([1_700_000_001, 0]);
+		expect(run.endTime).toEqual([1_700_000_009, 0]);
 
 		const agent = byName(spans, "invoke_agent build");
 		expect(agent.spanContext().spanId).toBe(stepSpanIdOf("s-agent"));
@@ -406,13 +441,12 @@ describe("the export to monitoring", () => {
 	});
 
 	test("a score counts, and a merged pull request counts as an outcome", async () => {
-		const h = setup();
-		await h.telemetry.refresh();
+		const h = await setup();
 		h.land([
 			fact({ kind: "scored", seq: 50, score: "gate_decision", label: "yes" }),
 			fact({ kind: "scored", seq: 51, score: "pr_merged", label: null }),
 		]);
-		await h.telemetry.stop();
+		await h.done();
 		const points = h.points();
 		expect(
 			sum(points.get("nightshift.score"), {
@@ -426,17 +460,23 @@ describe("the export to monitoring", () => {
 	});
 
 	test("a Claude Code session gets its telemetry under the step, with no content", async () => {
-		const h = setup();
-		await h.telemetry.headers.save(
-			"Authorization=Bearer abc 123\nX-Scope-OrgID: night",
-		);
+		const h = await setup({
+			telemetryHeaders: {
+				Authorization: "Bearer ${GRAFANA_TOKEN}",
+				"X-Scope-OrgID": "night",
+			},
+		});
+		// The export waits for the secret its headers name.
+		expect(h.on()).toBe(false);
+		await h.secrets.setSecret("GRAFANA_TOKEN", "abc 123");
+		await waitFor(h.on, { label: "the export on" });
 		const { env, values } = h.telemetry.sessionEnv({
 			harness: "claude-code",
 			runId: "run-1",
 			stepId: "s-agent",
 		});
-		// The headers' values come back as ••• in the session's output.
-		expect(values.sort()).toEqual(["Bearer abc 123", "night"]);
+		// The secret's value comes back as ••• in the session's output.
+		expect(values).toEqual(["abc 123"]);
 		expect(env).toMatchObject({
 			CLAUDE_CODE_ENABLE_TELEMETRY: "1",
 			OTEL_METRICS_EXPORTER: "otlp",
@@ -459,54 +499,46 @@ describe("the export to monitoring", () => {
 				stepId: "s-agent",
 			}),
 		).toEqual({ env: {}, values: [] });
-		await h.telemetry.stop();
+		await h.done();
 	});
 
-	test("headers are kept outside the settings, read back by name only, and used at once", async () => {
-		const h = setup();
-		await h.telemetry.refresh();
-		expect(await h.telemetry.headers.save("api-key=secret-1")).toEqual([
-			"api-key",
-		]);
-		expect(await h.telemetry.headers.names()).toEqual(["api-key"]);
-		expect(h.values.get("otlp-headers")).toBe(
-			JSON.stringify({ "api-key": "secret-1" }),
-		);
-		// The export started again with the new headers.
+	test("a header reads its secret when the export starts, and a new value of the secret applies at once", async () => {
+		const h = await setup({
+			telemetryHeaders: { "api-key": "${OTLP_KEY}" },
+		});
+		await h.secrets.setSecret("OTLP_KEY", "secret-1");
+		await waitFor(() => h.targets.length === 1, { label: "the export" });
+		await h.secrets.setSecret("OTLP_KEY", "secret-2");
+		await waitFor(() => h.targets.length === 2, { label: "a new export" });
 		expect(h.targets).toEqual([
-			{
-				endpoint: "http://localhost:4318",
-				protocol: "http/protobuf",
-				headers: {},
-			},
 			{
 				endpoint: "http://localhost:4318",
 				protocol: "http/protobuf",
 				headers: { "api-key": "secret-1" },
 			},
+			{
+				endpoint: "http://localhost:4318",
+				protocol: "http/protobuf",
+				headers: { "api-key": "secret-2" },
+			},
 		]);
-		expect(h.telemetry.headers.save("no value here")).rejects.toThrow(
-			"Check the format",
-		);
-		expect(await h.telemetry.headers.save(null)).toEqual([]);
-		expect(h.values.has("otlp-headers")).toBe(false);
-		await h.telemetry.stop();
+		// The setting holds the reference, never the value.
+		expect(h.settings.current().telemetryHeaders).toEqual({
+			"api-key": "${OTLP_KEY}",
+		});
+		await h.done();
 	});
 
 	test("turning the setting off stops the export with no restart; on starts it again", async () => {
-		const h = setup();
-		await h.telemetry.refresh();
-		expect(h.telemetry.active()).toBe(true);
-		h.settings.enabled = false;
-		await h.telemetry.refresh();
-		expect(h.telemetry.active()).toBe(false);
+		const h = await setup();
+		expect(h.on()).toBe(true);
+		await h.settings.save({ telemetry: false });
+		await waitFor(() => !h.on(), { label: "the export off" });
 		h.land(LANDINGS[0] ?? []);
-		h.settings.enabled = true;
-		h.settings.protocol = "http/json";
-		await h.telemetry.refresh();
-		expect(h.telemetry.active()).toBe(true);
+		await h.settings.save({ telemetry: true, telemetryProtocol: "http/json" });
+		await waitFor(h.on, { label: "the export on" });
 		expect(h.targets).toHaveLength(2);
-		await h.telemetry.stop();
+		await h.done();
 		// The landing while it was off made nothing.
 		expect(h.spans()).toEqual([]);
 	});

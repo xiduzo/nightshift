@@ -4,7 +4,6 @@ export {
 	type ExportSinks,
 	type ExportTarget,
 	meterOf,
-	type OtlpProtocol,
 	otlpSinks,
 	type RunningExport,
 	startExport,

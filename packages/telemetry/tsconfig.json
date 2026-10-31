@@ -8,5 +8,5 @@
 		"outDir": "dist"
 	},
 	"include": ["src/**/*.ts"],
-	"references": [{ "path": "../engine" }, { "path": "../refusal" }]
+	"references": [{ "path": "../engine" }]
 }

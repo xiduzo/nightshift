@@ -54,6 +54,7 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine/projects";
 import { deliveryMoves } from "@nightshift/notifications";
+import { createTelemetry } from "@nightshift/telemetry";
 
 import { createAssistant } from "./assistant";
 import {
@@ -98,7 +99,7 @@ import {
 	stopOnSignals,
 } from "./runtime";
 import { keepSync } from "./sync";
-import { wireTelemetry } from "./telemetry";
+import { moveTelemetryHeaders } from "./telemetry";
 
 export type DaemonOptions = {
 	/** The port the daemon listens on: its own addresses may call it. Default: PORT, else DEFAULT_PORT. */
@@ -363,17 +364,26 @@ export async function createDaemon(
 	const clonePath = clonePathOf(db, async () => device.id);
 
 	/**
-	 * What a run step's harness session adds to its environment: the
-	 * export to monitoring's, once it exists below. Nothing before.
+	 * "Send runs to your monitoring" (this computer's setting, off by
+	 * default): its Claude Code sessions' own telemetry, and once it
+	 * follows the engine below, the runs it walks as OpenTelemetry spans
+	 * and metrics. It follows the setting and the secrets of its headers
+	 * itself. Headers kept the old way move into both first.
 	 */
-	let sessionEnv = (_session: {
-		harness: string;
-		runId: string;
-		stepId: string;
-	}): { env: Record<string, string>; values: readonly string[] } => ({
-		env: {},
-		values: [],
-	});
+	await moveTelemetryHeaders({
+		dataDir,
+		keyStore,
+		settings,
+		secrets: connections,
+	}).catch((error) =>
+		console.warn("[telemetry] the export's headers were not moved:", error),
+	);
+	const telemetry = await slots.replace(
+		"nightshiftTelemetry",
+		() =>
+			createTelemetry({ deviceId: device.id, settings, secrets: connections }),
+		(before) => before.stop(),
+	);
 
 	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
 	const knowledge = createKnowledgeFolders(dataDir);
@@ -437,7 +447,7 @@ export async function createDaemon(
 		// What each step changed in the run's copy of the project, also by commands.
 		snapshots: true,
 		// A Claude Code session sends its own telemetry while the export is on.
-		sessionEnv: (session) => sessionEnv(session),
+		sessionEnv: (session) => telemetry.sessionEnv(session),
 		// A session's output has every saved secret's value as •••.
 		secretValues: () => connections.secretValues(),
 	});
@@ -503,6 +513,8 @@ export async function createDaemon(
 		...(outside.hosts ? { hostClient: outside.hosts } : {}),
 	});
 	const { engine } = devices;
+	// The runs this engine walks go to the monitoring while the export is on.
+	telemetry.follow(engine);
 	devicesRuntime = devices;
 
 	/**
@@ -570,29 +582,6 @@ export async function createDaemon(
 	);
 	// Not awaited: it reads the runs that have not ended.
 	void keepAwake.start();
-
-	/**
-	 * "Send runs to your monitoring" (this computer's setting, off by
-	 * default): the runs it walks as OpenTelemetry spans and metrics, and
-	 * its Claude Code sessions' own telemetry to the same endpoint.
-	 */
-	const telemetry = await slots.replace(
-		"nightshiftTelemetry",
-		async () => {
-			const wired = wireTelemetry({
-				engine,
-				deviceId: device.id,
-				settings,
-				document,
-				dataDir,
-				keyStore,
-			});
-			await wired.start();
-			return wired;
-		},
-		(before) => before.stop(),
-	);
-	sessionEnv = (session) => telemetry.sessionEnv(session);
 
 	const gitInstaller = systemGitInstaller();
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
@@ -676,7 +665,6 @@ export async function createDaemon(
 		engine,
 		settings: computerSettings,
 		notifications,
-		telemetry,
 		toolLaunchers,
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the

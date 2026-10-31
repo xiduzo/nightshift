@@ -1,3 +1,4 @@
+import type { TelemetryProtocol } from "@nightshift/engine/device-config";
 import { OTLPMetricExporter as JsonMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPMetricExporter as ProtoMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
 import { OTLPTraceExporter as JsonTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -26,14 +27,12 @@ import { ATTR, SCOPE_NAME, SERVICE_NAME } from "../conventions";
  * down. No context manager is needed: every span names its parent.
  */
 
-/** How the export talks OTLP over HTTP. */
-export type OtlpProtocol = "http/protobuf" | "http/json";
-
 /** Where the export sends its spans and metrics. */
 export type ExportTarget = {
 	/** The OTLP endpoint, without `/v1/traces`: `http://localhost:4318`. */
 	endpoint: string;
-	protocol: OtlpProtocol;
+	/** How the export talks OTLP over HTTP: the setting's protocol. */
+	protocol: TelemetryProtocol;
 	/** Sent with every request: an API key, a tenant. */
 	headers: Readonly<Record<string, string>>;
 };
