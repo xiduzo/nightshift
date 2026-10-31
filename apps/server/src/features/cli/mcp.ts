@@ -139,6 +139,8 @@ export function apiPort(
 								...listed,
 								decider: p.decider,
 								...(p.model ? { model: p.model } : {}),
+								// The server only: the secrets of an address stay names.
+								...(p.address ? { address: p.address.baseUrl } : {}),
 								description,
 							};
 						}
