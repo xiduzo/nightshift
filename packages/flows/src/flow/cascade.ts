@@ -84,7 +84,8 @@ export function tierNode(node: FlowNode, index: number): FlowNode | null {
 	switch (node.type) {
 		case "agent": {
 			const own = tier as AgentTier;
-			const { cascade: _cascade, check: _check, profile: _p, ...rest } = node;
+			// The check stays: the engine runs it after each try of the tier.
+			const { cascade: _cascade, profile: _p, ...rest } = node;
 			return defined({
 				...rest,
 				profile: own.profile,
