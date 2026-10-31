@@ -138,6 +138,12 @@ export type WorkDelivery =
 const capabilityQuerySchema = z.object({
 	programs: z.array(z.string()).readonly().optional(),
 	profiles: z.array(z.string()).readonly().optional(),
+	addresses: z
+		.array(
+			z.object({ decider: deciderNameSchema, address: modelAddressSchema }),
+		)
+		.readonly()
+		.optional(),
 });
 
 /** A run, as the Device that holds its worktree sees it. */

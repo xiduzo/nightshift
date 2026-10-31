@@ -40,6 +40,7 @@ import { type SettledCost, settleCost } from "../pricing";
 import { failureKind } from "../session";
 import {
 	type AddressAccess,
+	AddressError,
 	addressModels,
 	compatibleChat,
 	withBearer,
@@ -216,7 +217,7 @@ async function accessFor(
 		return { apiKey, address: undefined };
 	}
 	const at = await reachAddress(address, secret);
-	if ("problem" in at) return at;
+	if ("problem" in at) return { problem: at.problem };
 	const { apiKey, ...reachedAt } = at;
 	return { apiKey, address: reachedAt };
 }
@@ -229,9 +230,10 @@ async function accessFor(
 export async function reachAddress(
 	address: ModelAddress,
 	secret: (name: string) => Promise<string | undefined>,
-): Promise<AddressAccess | { problem: string }> {
+): Promise<AddressAccess | { problem: string; secret: string }> {
 	const missing = (name: string) => ({
 		problem: `The address ${address.baseUrl} needs the secret ${name}. Add it on the Secrets page.`,
+		secret: name,
 	});
 	const apiKey = address.apiKey ? await secret(address.apiKey) : undefined;
 	if (address.apiKey && !apiKey) return missing(address.apiKey);
@@ -640,10 +642,55 @@ export async function deciderModels(
 	}
 }
 
+/** How a listing failure reads at run start: whether the server answered at all. */
+function listingReason(error: unknown): "silent" | "refused" | "other" {
+	if (error instanceof AddressError) return error.reason;
+	const message = error instanceof Error ? error.message : String(error);
+	if (/does not answer/i.test(message)) return "silent";
+	if (/\b(401|403)\b|unauthori[sz]ed|forbidden/i.test(message))
+		return "refused";
+	return "other";
+}
+
+/**
+ * Whether the server at a profile's address answers: it lists its models
+ * (`listAt`). Nothing answering, a refused key and a missing secret count;
+ * a server that answers with an error of its own answers.
+ */
+export async function checkAddress(
+	name: DeciderName,
+	address: ModelAddress,
+	options: TanstackDeciderOptions,
+): Promise<string | null> {
+	const spec = DECIDER_ADAPTERS[name];
+	if (deciderAddress(name) === null || !spec.listAt) return null;
+	const at = await reachAddress(address, options.secret);
+	if ("problem" in at) {
+		return `It needs the secret ${at.secret}. Add it on the Secrets page.`;
+	}
+	try {
+		await spec.listAt(at, options);
+		return null;
+	} catch (error) {
+		switch (listingReason(error)) {
+			case "silent":
+				return "Nothing answers there. Start the server, or change the address on the Agents page.";
+			case "refused":
+				return address.apiKey
+					? `It refuses the API key. Check the secret ${address.apiKey}.`
+					: "It wants an API key. Add the secret of its key to the address on the Agents page.";
+			default:
+				return null;
+		}
+	}
+}
+
 /** Decision nodes on `decide()`, Value nodes on `chat()`. Never throws. */
 export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 	return {
 		defaultModel: defaultDeciderModel,
+		checkAddress: ({ decider, address }) =>
+			checkAddress(decider, address, options).catch(() => null),
 		decide: async (input) => {
 			if (input.signal.aborted) {
 				return failed("aborted", "The decision was aborted");

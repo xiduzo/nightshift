@@ -228,6 +228,37 @@ describe("model profiles", () => {
 		});
 	});
 
+	test("an address that does not answer refuses the run, with the profile and the address", async () => {
+		const decider = fakeDecider([{ label: "yes" }], {
+			addresses: {
+				"http://openjev:8080":
+					"Nothing answers there. Start the server, or change the address on the Agents page.",
+			},
+		});
+		const engine = makeEngine(
+			{},
+			{
+				decider,
+				profileFor: (id) =>
+					id === "small"
+						? {
+								decider: "openjev",
+								address: { baseUrl: "http://openjev:8080" },
+							}
+						: null,
+			},
+		);
+		const started = engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([triage()]),
+		});
+		await expect(started).rejects.toThrow(
+			"The profile small uses the address http://openjev:8080 (triage). Nothing answers there. Start the server, or change the address on the Agents page.",
+		);
+		expect(await engine.listRuns()).toEqual([]);
+		expect(decider.calls).toHaveLength(0);
+	});
+
 	test("the node's own decider and model still work, and win", async () => {
 		const decider = fakeDecider([{ label: "no" }]);
 		const engine = makeEngine(

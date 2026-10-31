@@ -381,4 +381,14 @@ export interface Decider {
 	decide(input: DecisionInput): Promise<DecisionResult>;
 	/** Never throws. A decider that cannot make a value answers `kind: "error"`. */
 	value?(input: ValueInput): Promise<ValueResult>;
+	/**
+	 * Whether the server at a Model Profile's address answers (ADR 5): null
+	 * when it does, else why not, as sentences about "it" for the person
+	 * ("Nothing answers there. …"). A server that answers with an error of
+	 * its own still answers. Never throws.
+	 */
+	checkAddress?(input: {
+		decider: DeciderName;
+		address: ModelAddress;
+	}): Promise<string | null>;
 }

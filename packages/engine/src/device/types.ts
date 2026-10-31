@@ -11,6 +11,7 @@ import type {
 import type {
 	FlowSources,
 	JsonValue,
+	ModelAddress,
 	ProfileSettings,
 } from "@nightshift/flows";
 import type { KnowledgeRequest, KnowledgeUseEvent } from "../knowledge";
@@ -136,6 +137,8 @@ export type CapabilityQuery = {
 	programs?: readonly string[];
 	/** The profiles (Agent and Model Profiles) to look up on the Device, by id. */
 	profiles?: readonly string[];
+	/** The addresses of Model Profiles to ask, from this Device (ADR 5). */
+	addresses?: readonly AddressCheck[];
 };
 
 export type Capabilities = {
@@ -156,7 +159,27 @@ export type Capabilities = {
 	profiles: Record<string, ProfileSettings>;
 	/** The decider, when one is configured. */
 	decider: DeciderFacts | null;
+	/**
+	 * Whether the server at each asked address answers, by `addressKey`:
+	 * null when it does, else why not. Absent: the Device did not check
+	 * (no decider, or an older Night Shift).
+	 */
+	addresses?: Record<string, string | null>;
 };
+
+/** A Model Profile's address to check, with the decider that asks it. */
+export type AddressCheck = { decider: DeciderName; address: ModelAddress };
+
+/** One key per decider and address, as `Capabilities.addresses` answers it. */
+export function addressKey(check: AddressCheck): string {
+	const { baseUrl, apiKey, headers } = check.address;
+	return JSON.stringify([
+		check.decider,
+		baseUrl,
+		apiKey ?? null,
+		Object.entries(headers ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+	]);
+}
 
 export type DeciderFacts = {
 	/** Whether it makes values (a Value node made by a model). */

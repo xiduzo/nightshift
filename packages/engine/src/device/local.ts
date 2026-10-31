@@ -42,16 +42,18 @@ import { spawnCommand } from "./command";
 import { redactExec, redactSession } from "./redact";
 import { callServerTool } from "./tool-call";
 import type { ToolLaunchers } from "./tool-launchers";
-import type {
-	Capabilities,
-	DeciderFacts,
-	Device,
-	ExecEvent,
-	ExecInput,
-	OfferedSessionInput,
-	SessionEvent,
-	SessionInput,
-	ToolResult,
+import {
+	type AddressCheck,
+	addressKey,
+	type Capabilities,
+	type DeciderFacts,
+	type Device,
+	type ExecEvent,
+	type ExecInput,
+	type OfferedSessionInput,
+	type SessionEvent,
+	type SessionInput,
+	type ToolResult,
 } from "./types";
 
 /**
@@ -197,6 +199,19 @@ function keepArtifact(
 		const artifact = await store.save({ ...step, cwd, ...file });
 		return `Kept "${artifact.title}" as an artifact of this run.`;
 	};
+}
+
+/** Asks each address once, from this computer: null when its server answers. */
+async function checkAddresses(
+	checks: readonly AddressCheck[],
+	ask: NonNullable<Decider["checkAddress"]>,
+): Promise<Record<string, string | null>> {
+	const unique = new Map(checks.map((check) => [addressKey(check), check]));
+	return Object.fromEntries(
+		await Promise.all(
+			[...unique].map(async ([key, check]) => [key, await ask(check)] as const),
+		),
+	);
 }
 
 /** This computer as a Device. */
@@ -474,6 +489,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					}),
 				),
 				decider: deciderFacts,
+				...(query.addresses?.length && decider?.checkAddress
+					? {
+							addresses: await checkAddresses(
+								query.addresses,
+								async (check) => (await decider.checkAddress?.(check)) ?? null,
+							),
+						}
+					: {}),
 			};
 		},
 		session,
