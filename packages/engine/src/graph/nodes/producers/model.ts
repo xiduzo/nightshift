@@ -1,9 +1,19 @@
 import type { ValueResult } from "@nightshift/agents/types";
 import {
+	acceptsValue,
+	type JsonValue,
 	renderTemplate,
 	type ValueNode,
+	type ValueTier,
 	valueDecider,
 } from "@nightshift/flows";
+import type { StepOutputs } from "../../../log";
+import {
+	type Climb,
+	climbOutputs,
+	climbSpec,
+	climbValues,
+} from "../../cascade";
 import { isWaitKind, type StepContext, stepFailure } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { schemaProblem } from "../../output-schema";
@@ -35,18 +45,75 @@ import {
  * with why in `note`. No decider, or a decider that cannot make values, or
  * an output schema that is not a valid JSON Schema → `error`.
  */
-export function modelProducer(node: ValueNode, ctx: StepContext): Producer {
+export function modelProducer(
+	node: ValueNode,
+	ctx: StepContext,
+	/**
+	 * A try of a cascade (ADR 6): `node` is its tier's node. Data that
+	 * matches holds only when the tier's `accept` rule holds too; else the
+	 * try ends `fail`, and the node climbs.
+	 */
+	climb?: Climb<ValueTier>,
+): Producer {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
-			outputs: (step) => valueOutputs("", null, "", step.visit),
-			body: (step) => make(node, step),
+			outputs: (step) => ({
+				...valueOutputs("", null, "", step.visit),
+				...(climb ? climbOutputs(climb.root, climb.at) : {}),
+			}),
+			body: async (step) => {
+				const made = await make(node, step, climb);
+				return climb ? withClimb(made, climb, step) : made;
+			},
+			...(climb ? { climb: climbSpec(climb.root, climb.at) } : {}),
 		});
 }
 
+/**
+ * A try's end with the climb's fields, and the tier's `accept` rule
+ * tested on data that matched: data it refuses, or that it fails on, ends
+ * the try `fail` with why in `note`.
+ */
+async function withClimb(
+	made: BodyResult,
+	climb: Climb<ValueTier>,
+	step: StepHandle,
+): Promise<BodyResult> {
+	if (made.kind !== "end" && made.kind !== "aborted") return made;
+	const outputs: StepOutputs = {
+		...made.outputs,
+		...climbOutputs(climb.root, climb.at),
+	};
+	const rule = climb.tier.accept?.trim() ?? "";
+	if (made.kind !== "end" || made.outcome !== "pass" || rule === "") {
+		return { ...made, outputs };
+	}
+	let why: string | null = null;
+	try {
+		if (!(await acceptsValue(rule, outputs.data as JsonValue))) {
+			why = `The value does not pass the accept rule of the tier: ${rule}`;
+		}
+	} catch (error) {
+		why = `The accept rule of the tier failed: ${error instanceof Error ? error.message : String(error)}`;
+	}
+	if (why === null) return { ...made, outputs };
+	step.record(null, { type: "value", data: null, problem: why });
+	return {
+		...made,
+		outcome: "fail",
+		outputs: { ...outputs, ...valueOutputs("fail", null, why, step.visit) },
+	};
+}
+
 /** Asks the decider and ends the step on its answer, or asks for a wait. */
-async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
+async function make(
+	node: ValueNode,
+	step: StepHandle,
+	climb?: Climb<ValueTier>,
+): Promise<BodyResult> {
 	const { visit, signal } = step;
+	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
 	const prompt = renderTemplate(node.prompt ?? "", step.tctx);
 	const fail = (error: string): BodyResult => ({
 		kind: "end",

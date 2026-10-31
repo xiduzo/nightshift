@@ -215,11 +215,17 @@ async function routeOn(
 		...commitVisit(node, visit),
 		pending: { [node.id]: null },
 	};
+	// A park keeps the node's cascade (ADR 6): a resume climbs on where it
+	// stopped. Every other way on ends it.
+	const kept = { ...update };
+	const park = (status: "failed" | "stopped", reason: string | null) =>
+		parkCommand({ node, status, reason, step: end, update: kept });
+	if (state.cascades?.[node.id]) {
+		update.cascades = { [node.id]: null };
+	}
 	// A branch another branch outran goes no further, whatever its end:
 	// its Join went on without it (`branches.ts`).
 	if (outrun(ctx, state, node, config)) return new Command({ update });
-	const park = (status: "failed" | "stopped", reason: string | null) =>
-		parkCommand({ node, status, reason, step: end, update });
 	// A stop parks. The one exception: a Call node the stop time ended
 	// follows its `stopped` edge to the nodes that wrap the run up. Only a
 	// Call node passes `wrappingUp` (`hasStoppedEdge` in nodes/body.ts).

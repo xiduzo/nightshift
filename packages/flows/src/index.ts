@@ -121,6 +121,8 @@ export {
 	type BranchPlace,
 	type BuiltInOutcome,
 	branchPlaces,
+	type CascadeNode,
+	cascadeOf,
 	DECISION_LABEL,
 	DEFAULT_POLICY,
 	type FanOut,
@@ -135,6 +137,8 @@ export {
 	type FlowSection,
 	type FlowVariableDef,
 	flowSchema,
+	hasCascade,
+	lastModelTier,
 	migrateFlow,
 	migrateToolSets,
 	type NextEdge,
@@ -147,6 +151,7 @@ export {
 	outputFieldsByType,
 	type Policy,
 	type PolicyValues,
+	personTierIndex,
 	policyFromSettings,
 	QUICK_RUN_HARNESS,
 	type ResolvedPolicy,
@@ -154,8 +159,10 @@ export {
 	type SectionColor,
 	sectionColors,
 	singleAgentFlow,
+	tierNode,
 	type VariableType,
 	variableTypeSchema,
+	withTierNode,
 } from "./flow";
 export {
 	HARNESS_CATALOG,
@@ -208,6 +215,7 @@ export {
 	type CommandNode,
 	type CustomAgent,
 	type CustomHarnessName,
+	calledFlowNames,
 	canMakeValue,
 	cliNameSchema,
 	commandExits,
@@ -238,6 +246,7 @@ export {
 	isChosenExit,
 	isCustomHarness,
 	isOwnWaitOutcome,
+	isPersonTier,
 	isProfileRef,
 	type JoinNode,
 	type JoinWait,
@@ -268,6 +277,7 @@ export {
 	secretNameSchema,
 	signalRules,
 	type ToolNode,
+	tierLabel,
 	type ValueBy,
 	type ValueDeciderName,
 	type ValueNode,
@@ -285,11 +295,13 @@ export {
 	type AgentProfile,
 	type AgentProfileSettings,
 	agentProfileSchema,
+	cascadeProblem,
 	isAgentProfile,
 	type ModelProfile,
 	type ModelProfileSettings,
 	modelAddressProblem,
 	modelProfileSchema,
+	nodeProfiles,
 	type Profile,
 	type ProfileSettings,
 	placesItself,
@@ -300,6 +312,8 @@ export {
 	type ResolvedAgentNode,
 	resolvedAgent,
 	resolveNodeProfile,
+	runsAs,
+	tierUsers,
 } from "./profiles";
 export { githubSubIssuesCommand } from "./recipes";
 export {
@@ -339,6 +353,7 @@ export {
 } from "./sections";
 export { type Starter, starterList } from "./starters";
 export {
+	acceptsValue,
 	applyVariableWrites,
 	chooseByRule,
 	evaluateRule,

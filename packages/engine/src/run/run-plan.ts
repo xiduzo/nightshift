@@ -1,12 +1,17 @@
 import {
+	cascadeProblem,
 	type Flow,
 	type FlowNode,
 	type FlowSources,
+	hasCascade,
 	isProfileRef,
 	type ProfileRef,
 	type ProfileSettings,
 	profileOf,
 	resolveNodeProfile,
+	runsAs,
+	tierUsers,
+	withTierNode,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
@@ -28,7 +33,9 @@ import { checkAddresses } from "./start-addresses";
  * lookups, and so does the engine's own fake of a computer alone.
  *
  * A profile is an Agent Profile for an Agent node, or a Model Profile for
- * a Decision or a Value decided by a model. The run finds it on its own
+ * a Decision or a Value decided by a model. A node with a cascade (ADR 6)
+ * names one per tier: each tier is placed and resolved as a node of its
+ * own (`runsAs`), so its tries run on its profile's Device. The run finds it on its own
  * Device, by its id: never another Device's profile of the same name.
  * When that Device is offline, the run starts from the profile as the
  * Device's document last said, and the step waits for the Device (ADR 1,
@@ -113,7 +120,8 @@ async function placeNodes(
 	named: Map<string, PlacedDevice>;
 	byId: Map<string, PlacedDevice>;
 }> {
-	const nodes = flows.flatMap((f) => f.nodes);
+	// A cascade's tiers each name their own profile.
+	const nodes = flows.flatMap((f) => f.nodes.flatMap(runsAs));
 	const named = new Map<string, PlacedDevice>();
 	const byId = new Map<string, PlacedDevice>();
 	for (const node of nodes) {
@@ -235,53 +243,68 @@ async function placeNodes(
 	// A profile that does not fit its node: an Agent on a Model Profile, a
 	// Decision on an Agent Profile, a Value on a decider that cannot make one.
 	const misfits: string[] = [];
+	const placeOne = (node: FlowNode): FlowNode => {
+		const ref = profileOf(node);
+		if (!isProfileRef(ref)) return node;
+		const at = owners.get(ref.device);
+		if (!at) {
+			const name = gone.get(ref.device) ?? null;
+			problem(
+				(ids) =>
+					name === null
+						? `The flow uses a profile of a device that is no longer in this Space (${ids}). Pick another profile.`
+						: `${name} is no longer in this Space. Pick another profile for ${ids}.`,
+				`gone\u0000${ref.device}`,
+				node.id,
+			);
+			return node;
+		}
+		// Offered: the run's copy never holds the profile's settings.
+		if (at.offered) {
+			byId.set(at.id, at);
+			return node;
+		}
+		const label = labelOf(ref);
+		const settings = found.get(at)?.[ref.profile];
+		if (!settings) {
+			problem(
+				(ids) =>
+					at.offline
+						? `${at.name} is offline, and Night Shift does not know ${label === null ? "its profile" : `its profile ${label}`} (${ids}). Start the run when ${at.name} is online, or pick another profile.`
+						: label === null
+							? `The flow uses a profile on ${at.name} (${ids}) that ${at.name} no longer has. Pick another profile.`
+							: `The flow uses ${label} on ${at.name} (${ids}), but ${at.name} has no such profile. Pick another profile.`,
+				`missing\u0000${ref.device}\u0000${ref.profile}`,
+				node.id,
+			);
+			return node;
+		}
+		const resolved = resolveNodeProfile(node, settings, label ?? undefined);
+		if ("problem" in resolved) {
+			if (!misfits.includes(resolved.problem)) {
+				misfits.push(resolved.problem);
+			}
+			return node;
+		}
+		byId.set(at.id, at);
+		return resolved.node;
+	};
 	const placed = flows.map((flow) => ({
 		...flow,
 		nodes: flow.nodes.map((node): FlowNode => {
-			const ref = profileOf(node);
-			if (!isProfileRef(ref)) return node;
-			const at = owners.get(ref.device);
-			if (!at) {
-				const name = gone.get(ref.device) ?? null;
-				problem(
-					(ids) =>
-						name === null
-							? `The flow uses a profile of a device that is no longer in this Space (${ids}). Pick another profile.`
-							: `${name} is no longer in this Space. Pick another profile for ${ids}.`,
-					`gone\u0000${ref.device}`,
-					node.id,
-				);
-				return node;
-			}
-			// Offered: the run's copy never holds the profile's settings.
-			if (at.offered) {
-				byId.set(at.id, at);
-				return node;
-			}
-			const label = labelOf(ref);
-			const settings = found.get(at)?.[ref.profile];
-			if (!settings) {
-				problem(
-					(ids) =>
-						at.offline
-							? `${at.name} is offline, and Night Shift does not know ${label === null ? "its profile" : `its profile ${label}`} (${ids}). Start the run when ${at.name} is online, or pick another profile.`
-							: label === null
-								? `The flow uses a profile on ${at.name} (${ids}) that ${at.name} no longer has. Pick another profile.`
-								: `The flow uses ${label} on ${at.name} (${ids}), but ${at.name} has no such profile. Pick another profile.`,
-					`missing\u0000${ref.device}\u0000${ref.profile}`,
-					node.id,
-				);
-				return node;
-			}
-			const resolved = resolveNodeProfile(node, settings, label ?? undefined);
-			if ("problem" in resolved) {
-				if (!misfits.includes(resolved.problem)) {
-					misfits.push(resolved.problem);
+			if (!hasCascade(node)) return placeOne(node);
+			let climbing: FlowNode = node;
+			for (const tier of tierUsers(node)) {
+				const resolved = placeOne(tier.node);
+				if (resolved !== tier.node) {
+					climbing = withTierNode(climbing, tier.index, resolved);
 				}
-				return node;
 			}
-			byId.set(at.id, at);
-			return resolved.node;
+			const problem = cascadeProblem(climbing);
+			if (problem !== null && !misfits.includes(problem)) {
+				misfits.push(problem);
+			}
+			return climbing;
 		}),
 	}));
 	if (problems.size > 0) {
@@ -357,7 +380,8 @@ export async function planNodes(
 	const group = (body: Flow, key: string, around: PlacedDevice) => {
 		if (seen.has(`${key}\u0000${around.id}`)) return;
 		seen.add(`${key}\u0000${around.id}`);
-		for (const node of body.nodes) {
+		// A cascade's tiers each go to their own Device.
+		for (const node of body.nodes.flatMap(runsAs)) {
 			const ref = profileOf(node);
 			const name = namedDevice(node);
 			const at = isProfileRef(ref)

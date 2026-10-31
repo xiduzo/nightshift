@@ -147,6 +147,11 @@ const pendingGateSchema = z.object({
 	answer: z.string().optional(),
 	/** When nobody answered by `at` (epoch ms), the Gate takes `choose`. */
 	deadline: z.object({ at: z.number(), choose: z.string() }).optional(),
+	/**
+	 * The person tier of a cascade (ADR 6): its answer ends the step on an
+	 * option (a Decision), or tries once more or stops (an Agent, a Call).
+	 */
+	climb: z.literal(true).optional(),
 });
 const pendingSchema = z.discriminatedUnion("kind", [
 	pendingWaitSchema,
@@ -183,6 +188,36 @@ export type Ended = z.infer<typeof endedSchema>;
  * (`ItemsRead`, `ItemStarted`, `ItemEnded`), not from the state.
  */
 export type Loop = { index: number };
+
+/** One try of a cascade, as the next try reads it (`{{cascade.previous}}`). */
+export type CascadeTry = {
+	/** The tier's name (`tierLabel`). */
+	tier: string;
+	/** The try's number within its tier, from 1. */
+	try: number;
+	outcome: string;
+	/** What the try said: the agent's summary, the model's note, the flow's end message, or the error. */
+	summary: string;
+	/** A Decision's pick that did not hold, and its probability. */
+	pick?: string;
+	confidence?: number;
+	/** The end of the log of an Agent's check, or of a called flow's last command. */
+	log_tail?: string;
+	/** An Agent's harness session: the next try of the tier resumes it with `session: "resume"`. */
+	session_id?: string;
+};
+
+/**
+ * Where a node is on its cascade: the tier (an index into `cascade`), the
+ * try within it (from 1), and the tries before, in order. `note` is a
+ * person's, from the person tier's "try-again".
+ */
+export type CascadePosition = {
+	tier: number;
+	try: number;
+	trail: CascadeTry[];
+	note?: string;
+};
 
 export const RunState = z.object({
 	/** The flow's input values, defaults applied. */
@@ -231,6 +266,14 @@ export const RunState = z.object({
 	/** The cursors of Call nodes with `each`, by node id; null once the loop ended. */
 	loops: mergedRecord<Loop | null>(),
 	/**
+	 * Where each node climbs its cascade (ADR 6), by node id: the tier and
+	 * the try it runs, and the tries before. Written when a try does not
+	 * hold and the node goes back to itself, so it commits with the
+	 * checkpoint before the next try: a resume continues there. Null once
+	 * the node routed on (`route()`); a park keeps it.
+	 */
+	cascades: mergedRecord<CascadePosition | null>(),
+	/**
 	 * The steps a wait, a park or a Gate holds, by node id: one per branch
 	 * that holds one, so parallel branches each keep their own (`holds`).
 	 * Read it through `heldOf`: a checkpoint from before parallel branches
@@ -251,10 +294,12 @@ export const RunState = z.object({
 });
 export type RunStateValues = Omit<
 	z.infer<typeof RunState>,
-	"pending" | "joins"
+	"pending" | "joins" | "cascades"
 > & {
 	pending: PendingValue;
 	joins: Record<string, JoinRound>;
+	/** Optional: a state a test or an older checkpoint writes may have none. */
+	cascades?: Record<string, CascadePosition | null>;
 };
 /** A node's state update: the channels it writes. */
 export type RunStateUpdate = Partial<

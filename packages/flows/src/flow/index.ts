@@ -12,9 +12,11 @@ export {
 	fanOutsOf,
 } from "./branches";
 export {
+	type CascadeNode,
 	cascadeOf,
 	hasCascade,
 	lastModelTier,
+	personTierIndex,
 	tierNode,
 	withTierNode,
 } from "./cascade";

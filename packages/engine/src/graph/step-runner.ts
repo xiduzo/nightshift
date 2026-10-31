@@ -135,7 +135,8 @@ const GUARD_WARNINGS = {
  * that ends on its answer).
  */
 export type StepStart =
-	| { kind: "new" }
+	/** `untimed`: the step has no timers, whatever its kind says: the Gate of a cascade's person tier. */
+	| { kind: "new"; untimed?: true }
 	| { kind: "reopen"; stepId: string; prompt: string | null }
 	| { kind: "continue"; stepId: string; quiet?: boolean };
 
@@ -217,6 +218,8 @@ export type OpenStep = StepHandle & {
 			costUsd?: number | null;
 			costSource?: CostSource | null;
 			harnessSessionId?: string | null;
+			/** The node's variable writes do not apply: a try of a cascade that climbs on. */
+			skipWrites?: boolean;
 		},
 	): Promise<StepEnd>;
 	/** Closes the recorder and the timers but leaves the step open in the log (a wait). */
@@ -305,6 +308,16 @@ export type StepSpec = {
 	outputs?(step: StepHandle): StepOutputs | Promise<StepOutputs>;
 	/** What the step's route writes besides its end: a Join closes its round. */
 	update?: RunStateUpdate;
+	/**
+	 * A node with a cascade (ADR 6, `cascade.ts`): whether an end climbs to
+	 * the next try instead of routing, and the command that climbs. A
+	 * climbing end writes none of the node's variables: only the try that
+	 * routes does.
+	 */
+	climb?: {
+		climbs(end: Pick<StepEnd, "outcome" | "outputs" | "error">): boolean;
+		command(end: StepEnd): Command;
+	};
 };
 
 /**
@@ -323,6 +336,15 @@ export async function runStep(
 	const entry = resumePoint(node, state, runState, scopeOf(config), spec.rules);
 	const extra = spec.update;
 	if (entry.kind === "done") {
+		// A try that ended before its commit and did not hold climbs again.
+		const logged: StepEnd = {
+			stepId: entry.step.id,
+			visit: entry.step.visit,
+			outcome: entry.ended.outcome,
+			outputs: entry.ended.outputs,
+			error: entry.ended.error,
+		};
+		if (spec.climb?.climbs(logged)) return spec.climb.command(logged);
 		return routeDone(ctx, state, node, entry, config, extra);
 	}
 	const begun = await beginStep(
@@ -385,16 +407,29 @@ export async function runStep(
 			? { harnessSessionId: r.harnessSessionId }
 			: {}),
 	});
+	/** Ends the step, then climbs (a try that did not hold, with a try left) or routes. */
+	const endAndGo = async (
+		outcome: StepOutcome,
+		outputs: StepOutputs,
+		error: string | null,
+		costs: ReturnType<typeof extraOf>,
+	): Promise<Command> => {
+		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
+		const end = await step.end(outcome, outputs, error, {
+			...costs,
+			...(climbing ? { skipWrites: true } : {}),
+		});
+		if (climbing && spec.climb) return spec.climb.command(end);
+		return route(ctx, state, node, end, config, extra);
+	};
 	switch (result.kind) {
-		case "end": {
-			const end = await step.end(
+		case "end":
+			return endAndGo(
 				result.outcome,
 				{ ...result.outputs, outcome: result.outcome },
 				result.error,
 				extraOf(result),
 			);
-			return route(ctx, state, node, end, config, extra);
-		}
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
 			const reason = step.signal.reason as AbortReason | undefined;
@@ -419,13 +454,12 @@ export async function runStep(
 				);
 				return parkFailed(node, end, aborted.error ?? "", extra);
 			}
-			const end = await step.end(
+			return endAndGo(
 				aborted.outcome,
 				aborted.outputs,
 				aborted.error,
 				extraOf(result),
 			);
-			return route(ctx, state, node, end, config, extra);
 		}
 		case "ask":
 			return askPerson(ctx, node, state, config, step, result);
@@ -452,13 +486,7 @@ export async function runStep(
 				);
 				return parkStopped(node, end, slept.reason);
 			}
-			const end = await step.end(
-				"error",
-				await blank("error"),
-				slept.error,
-				costs,
-			);
-			return route(ctx, state, node, end, config, extra);
+			return endAndGo("error", await blank("error"), slept.error, costs);
 		}
 	}
 }
@@ -595,9 +623,10 @@ export async function beginStep(
 	// Agent step has an idle clock (its own, else the policy's). The log
 	// keeps the same limits, so they hold when the timers do not
 	// (`deriveStepClocks`).
-	const { timeoutMinutes, idleMinutes } = ctx
-		.kindOf(node)
-		.timeBudget(node, ctx.policy());
+	const { timeoutMinutes, idleMinutes } =
+		start.kind === "new" && start.untimed
+			? { timeoutMinutes: undefined, idleMinutes: undefined }
+			: ctx.kindOf(node).timeBudget(node, ctx.policy());
 	const budget: StepBudget = {
 		...(timeoutMinutes ? { timeoutMs: timeoutMinutes * ctx.minuteMs } : {}),
 		...(idleMinutes !== undefined
@@ -881,13 +910,9 @@ export async function beginStep(
 			let outcome = ended;
 			let outputs = endOutputs;
 			let error = endError;
-			const written = await writeVariables(
-				ctx,
-				node,
-				handle.tctx,
-				outcome,
-				outputs,
-			);
+			const written = extra?.skipWrites
+				? ({ ok: true, values: {} } as const)
+				: await writeVariables(ctx, node, handle.tctx, outcome, outputs);
 			if (!written.ok) {
 				outcome = "error";
 				outputs = { ...outputs, outcome };

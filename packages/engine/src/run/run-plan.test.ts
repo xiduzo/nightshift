@@ -190,6 +190,53 @@ describe("the node walk of a run's plan", () => {
 		]);
 	});
 
+	test("each tier of a cascade is resolved and placed on its own profile's Device (ADR 6)", async () => {
+		const climbing = {
+			id: "work",
+			type: "agent",
+			position: { x: 0, y: 0 },
+			prompt: "Work.",
+			session: "fresh",
+			cascade: [
+				{ profile: { device: "this", profile: "here_only" }, tries: 2 },
+				{ profile: { device: "studio", profile: "everywhere" } },
+				{ person: true },
+			],
+		} as FlowNode;
+		const planned = await planNodes(
+			{ projectId: "p", flow: flow([climbing]) },
+			devices(["here_only"]),
+			"the-person",
+		);
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([
+			["this", ["work"]],
+			["studio", ["work"]],
+		]);
+		const [node] = planned.flow.nodes;
+		expect(node?.type === "agent" && node.cascade).toEqual([
+			{
+				profile: { device: "this", profile: "here_only" },
+				tries: 2,
+				harness: "claude-code",
+				model: "sonnet",
+				permissionMode: "auto",
+			},
+			{
+				profile: { device: "studio", profile: "everywhere" },
+				harness: "claude-code",
+				model: "sonnet",
+				permissionMode: "auto",
+			},
+			{ person: true },
+		]);
+		expect(planned.plan.devices.studio).toEqual({
+			id: "studio",
+			name: "studio",
+		});
+	});
+
 	test("a node's profile names its Device: the node runs there with the profile's settings, by the Device's id", async () => {
 		const planned = await planNodes(
 			{

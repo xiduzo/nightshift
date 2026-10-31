@@ -1,12 +1,20 @@
 import type { DecisionInput, DecisionResult } from "@nightshift/agents/types";
 import {
 	type DecisionNode,
+	type DecisionTier,
 	decisionDecider,
 	optionProblem,
 	renderTemplate,
 } from "@nightshift/flows";
 
 import type { Device } from "../../../device";
+import type { StepOutputs } from "../../../log";
+import {
+	type Climb,
+	climbOutputs,
+	climbSpec,
+	climbValues,
+} from "../../cascade";
 import {
 	isWaitKind,
 	STOP_GRACE_MS,
@@ -36,12 +44,25 @@ import { type Chooser, decisionOutputs, visibleOptions } from "./chooser";
  * (`wait__<id>`), or ends the step `error` on a give-up. This module is
  * the body: `decide`.
  */
-export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
+export function modelChooser(
+	node: DecisionNode,
+	ctx: StepContext,
+	/**
+	 * A try of a cascade (ADR 6): `node` is its tier's node. The pick holds
+	 * only with the tier's `minConfidence`; one that does not ends the try
+	 * `fail`, and the node climbs.
+	 */
+	climb?: Climb<DecisionTier>,
+): Chooser {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
-			outputs: (step) => decisionOutputs("", "", step.visit),
-			body: (step) => decide(node, step),
+			outputs: (step) => ({
+				...decisionOutputs("", "", step.visit),
+				...(climb ? climbOutputs(climb.root, climb.at) : {}),
+			}),
+			body: (step) => decide(node, step, climb),
+			...(climb ? { climb: climbSpec(climb.root, climb.at) } : {}),
 		});
 }
 
@@ -49,8 +70,11 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
 async function decide(
 	node: DecisionNode,
 	step: StepHandle,
+	climb?: Climb<DecisionTier>,
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
+	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
+	const climbing: StepOutputs = climb ? climbOutputs(climb.root, climb.at) : {};
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
 	const decider = (await step.device.capabilities()).decider;
@@ -58,7 +82,7 @@ async function decide(
 		return {
 			kind: "end",
 			outcome: "error",
-			outputs: decisionOutputs("error", "", visit),
+			outputs: { ...decisionOutputs("error", "", visit), ...climbing },
 			error: "No decider is configured for Decision nodes.",
 		};
 	}
@@ -96,17 +120,30 @@ async function decide(
 		});
 	}
 	const note = result.kind === "decided" ? result.notes : "";
-	const end = (outcome: string, error: string | null): BodyResult => ({
+	const sure: StepOutputs =
+		result.kind === "decided" && result.probability !== undefined
+			? { confidence: result.probability }
+			: {};
+	const end = (
+		outcome: string,
+		error: string | null,
+		more: StepOutputs = {},
+	): BodyResult => ({
 		kind: "end",
 		outcome,
-		outputs: decisionOutputs(outcome, note, visit),
+		outputs: {
+			...decisionOutputs(outcome, note, visit),
+			...climbing,
+			...(climb ? sure : {}),
+			...more,
+		},
 		error,
 		...cost,
 	});
 	if (signal.aborted) {
 		return {
 			kind: "aborted",
-			outputs: decisionOutputs("", note, visit),
+			outputs: { ...decisionOutputs("", note, visit), ...climbing },
 			...cost,
 		};
 	}
@@ -125,6 +162,15 @@ async function decide(
 	}
 	const problem = optionProblem(node.options, result.label);
 	if (problem !== null) return end("error", problem);
+	const minimum = climb?.tier.minConfidence;
+	// A decider that gives no probability: its pick always holds (ADR 6.8).
+	if (
+		minimum !== undefined &&
+		result.probability !== undefined &&
+		result.probability < minimum
+	) {
+		return end("fail", null, { pick: result.label });
+	}
 	return end(result.label, null);
 }
 

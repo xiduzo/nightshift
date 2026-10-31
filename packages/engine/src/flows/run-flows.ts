@@ -1,4 +1,5 @@
 import {
+	calledFlowNames,
 	type Flow,
 	type FlowIssue,
 	type FlowSources,
@@ -12,9 +13,11 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
 
-/** The names of the flows a flow's Call nodes call. */
-function calledFlowNames(flow: Flow): string[] {
-	return flow.nodes.flatMap((n) => (n.type === "call" ? [n.flow] : []));
+/** The names of the flows a flow's Call nodes call, a cascade's tiers too. */
+function callsOf(flow: Flow): string[] {
+	return flow.nodes.flatMap((n) =>
+		n.type === "call" ? calledFlowNames(n) : [],
+	);
 }
 
 function refuseErrors(issues: readonly FlowIssue[], what = "The flow"): void {
@@ -88,7 +91,7 @@ export function flowsForRun(
 	};
 	const calledFlows: Record<string, Flow> = {};
 	const calledFlowRevisions: Record<string, string> = {};
-	const queue = calledFlowNames(flow);
+	const queue = callsOf(flow);
 	while (queue.length > 0) {
 		const name = queue.shift() as string;
 		if (Object.hasOwn(calledFlows, name)) continue;
@@ -107,7 +110,7 @@ export function flowsForRun(
 		calledFlows[name] = called;
 		const revision = isKitName(name) ? null : revisionOf(name);
 		if (revision !== null) calledFlowRevisions[name] = revision;
-		queue.push(...calledFlowNames(called));
+		queue.push(...callsOf(called));
 	}
 	return {
 		flow,

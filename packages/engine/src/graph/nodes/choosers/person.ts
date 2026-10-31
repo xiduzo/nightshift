@@ -1,12 +1,13 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
 	type DecisionNode,
+	type FlowNode,
 	optionProblem,
 	renderTemplate,
 	type TemplateContext,
 } from "@nightshift/flows";
 
-import type { GateChoice, GateDeadline } from "../../../log";
+import type { GateChoice, GateDeadline, StepOutputs } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { openGate, scoreGate } from "../../gate";
 import { interruptNode } from "../../interrupt";
@@ -63,8 +64,38 @@ import { type Chooser, decisionOutputs, gateChoices } from "./chooser";
  * ask node's interrupt and ends in another graph node.
  */
 export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
+	return gateChooser(node, ctx, {
+		question: (tctx) => renderTemplate(node.prompt, tctx),
+		choices: gateChoices(node),
+		lockScreen: node.lockScreen === true,
+		deadline: node.deadline,
+	});
+}
+
+/**
+ * What a Gate asks: the question (rendered when it opens), the choices,
+ * and its deadline. A Decision's Gate asks its prompt and options. The
+ * person tier of a cascade (ADR 6) asks what the tiers did: its step has
+ * no timers (`untimed`), its `outputs` are the fields its end keeps, and
+ * `climb` marks its Gate for the ask node.
+ */
+export type GateAsk = {
+	question: (tctx: TemplateContext) => string;
+	choices: GateChoice[];
+	lockScreen?: boolean;
+	deadline?: DecisionNode["deadline"];
+	outputs?: StepOutputs;
+	climb?: true;
+};
+
+/** Opens a Gate on a new step of `node` (or finds the one open) and jumps to the node's ask node. */
+export function gateChooser(
+	node: FlowNode,
+	ctx: StepContext,
+	ask: GateAsk,
+): Chooser {
 	return async (state, config) => {
-		const asked = await ensureOpen(ctx, node, state, config);
+		const asked = await ensureOpen(ctx, node, state, config, ask);
 		if (asked.kind === "parked") return asked.command;
 		if (asked.kind === "done") {
 			return routeDone(ctx, state, node, asked.done, config);
@@ -79,6 +110,8 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 			question: asked.question,
 			choices: asked.choices,
 			...(asked.deadline ? { deadline: asked.deadline } : {}),
+			...(ask.outputs ? { outputs: ask.outputs } : {}),
+			...(ask.climb ? { climb: true as const } : {}),
 		};
 		return new Command({ update: { pending }, goto: askNodeId(node.id) });
 	};
@@ -153,9 +186,10 @@ type Ensured =
  */
 async function ensureOpen(
 	ctx: StepContext,
-	node: DecisionNode,
+	node: FlowNode,
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
+	ask: GateAsk,
 ): Promise<Ensured> {
 	const runState = await ctx.log.state(ctx.run.id);
 	const point = resumePoint(
@@ -185,20 +219,20 @@ async function ensureOpen(
 		node,
 		state,
 		config,
-		{ kind: "new" },
+		ask.climb ? { kind: "new", untimed: true } : { kind: "new" },
 		runState,
 	);
 	if (begun.kind === "parked") return begun;
 	const step = begun.step;
 	try {
-		const asked = await open(ctx, node, step);
+		const asked = await open(ctx, ask, step);
 		return { kind: "open", ...asked };
 	} catch (error) {
 		return {
 			kind: "failed",
 			end: await step.end(
 				"error",
-				decisionOutputs("error", "", step.visit),
+				{ ...ask.outputs, ...decisionOutputs("error", "", step.visit) },
 				`The Gate could not open: ${messageOf(error)}`,
 			),
 		};
@@ -211,18 +245,23 @@ async function ensureOpen(
  */
 async function open(
 	ctx: StepContext,
-	node: DecisionNode,
+	ask: GateAsk,
 	step: OpenStep,
 ): Promise<Omit<OpenGate, "kind">> {
 	const { stepId, visit } = step;
 	try {
-		const question = renderTemplate(node.prompt, step.tctx);
-		const choices = gateChoices(node);
-		const deadline = deadlineOf(node, step.tctx, ctx.now(), ctx.minuteMs);
+		const question = ask.question(step.tctx);
+		const { choices } = ask;
+		const deadline = deadlineOf(
+			ask.deadline,
+			step.tctx,
+			ctx.now(),
+			ctx.minuteMs,
+		);
 		await openGate(ctx, step, {
 			question,
 			choices,
-			lockScreen: node.lockScreen === true,
+			lockScreen: ask.lockScreen === true,
 			deadline,
 		});
 		return { stepId, visit, question, choices, deadline };
@@ -237,13 +276,12 @@ async function open(
  * it. Null without a deadline. Throws when `at` is not a valid time: the
  * Gate does not open.
  */
-export function deadlineOf(
-	node: DecisionNode,
+function deadlineOf(
+	deadline: DecisionNode["deadline"],
 	tctx: TemplateContext,
 	now: number,
 	minuteMs: number,
 ): GateDeadline | null {
-	const deadline = node.deadline;
 	if (deadline === undefined) return null;
 	if (deadline.minutes !== undefined) {
 		return { at: now + deadline.minutes * minuteMs, choose: deadline.choose };
@@ -270,13 +308,19 @@ function deadlineNote(choice: string): string {
  * announces nothing: the step did not start again) so its recorder and
  * end are the shared scaffolding's.
  */
-async function resolve(
+export async function resolve(
 	ctx: StepContext,
-	node: DecisionNode,
+	node: FlowNode,
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
 	gate: PendingGate,
 	answer: Extract<ResumeValue, { kind: "gate" }>,
+	/**
+	 * How a choice ends the step, when not on itself: the person tier's
+	 * "stop" ends it `fail`, and its "try-again" climbs on (no route, so
+	 * the node's writes do not apply). Default: on the choice, routed.
+	 */
+	endOf?: (choice: string) => { outcome: string; climbs: boolean },
 ): Promise<
 	{ kind: "parked"; command: Command } | { kind: "ended"; end: StepEnd }
 > {
@@ -310,10 +354,15 @@ async function resolve(
 		note,
 		...(answer.byDeadline ? { byDeadline: true as const } : {}),
 	});
+	const ending = endOf?.(choice) ?? { outcome: choice, climbs: false };
 	const end = await step.end(
-		choice,
-		decisionOutputs(choice, note, step.visit),
+		ending.outcome,
+		{
+			...gate.outputs,
+			...decisionOutputs(ending.outcome, note, step.visit),
+		},
 		null,
+		ending.climbs ? { skipWrites: true } : undefined,
 	);
 	// After the end: an answer's first event is its StepEnded, which carries
 	// the Command that answered (`stampedAppend`).

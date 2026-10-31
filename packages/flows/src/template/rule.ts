@@ -116,6 +116,19 @@ export async function signalOutcome(
 	return null;
 }
 
+/**
+ * Whether a cascade tier's `accept` rule holds over the value a model
+ * made, as `data` (ADR 6). Throws with JSONata's message when the rule
+ * fails on it: the try does not hold then, and the message says why.
+ */
+export async function acceptsValue(
+	expr: string,
+	data: JsonValue,
+): Promise<boolean> {
+	const result: unknown = await jsonata(expr).evaluate({ data });
+	return isTruthy(result);
+}
+
 /** Why the rule is not valid JSONata, or null when it parses. */
 export function ruleProblem(expr: string): string | null {
 	try {

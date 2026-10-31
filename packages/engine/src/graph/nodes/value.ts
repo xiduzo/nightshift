@@ -1,4 +1,5 @@
-import type { ValueNode } from "@nightshift/flows";
+import type { ValueNode, ValueTier } from "@nightshift/flows";
+import { climbAt, tierAt } from "../cascade";
 import {
 	type NodeAction,
 	type NodeKind,
@@ -30,7 +31,31 @@ import { ruleProducer } from "./producers/rule";
  * schema). `by: "person"` (a form in the Needs-you inbox) is left for later.
  */
 export function valueNode(node: ValueNode, ctx: StepContext): NodeAction {
+	if (node.cascade !== undefined) return climbingValue(node, ctx);
 	return producerFor(node, ctx);
+}
+
+/**
+ * A Value with a cascade (ADR 6): each try asks the model of its tier
+ * (`producers/model.ts` with the climb). Data that does not match the
+ * schema, or that the tier's `accept` rule refuses, goes to the next try.
+ * No person tier yet: that is an Ask (ADR 10).
+ */
+function climbingValue(node: ValueNode, ctx: StepContext): NodeAction {
+	return (state, config) => {
+		const at = climbAt(state, node);
+		const tier = tierAt(node, at);
+		if (tier?.kind !== "node") {
+			throw new Error(
+				`Value node "${node.id}" has no model tier ${at.tier + 1} in its cascade.`,
+			);
+		}
+		return modelProducer(tier.node as ValueNode, ctx, {
+			root: node,
+			at,
+			tier: tier.tier as ValueTier,
+		})(state, config);
+	};
 }
 
 function producerFor(node: ValueNode, ctx: StepContext): Producer {
