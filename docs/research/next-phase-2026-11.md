@@ -410,15 +410,20 @@ keyword search, and 11 of 13 against 7 on paraphrases.
 ### 5.4 Knowledge that stays healthy (engine + devices + web, 2 days)
 
 - Garbage collection of archive content that no document lists any more.
+  Done: daily on the Replica that keeps the Space, after 7 days (17222b8f).
 - A Project whose id changes when a Device joins a Space moves its
-  knowledge to the new id.
+  knowledge to the new id. Done: also its content on any Space move (0fc0f25c).
 - Two Agent steps of one run that both propose learnings keep both.
+  Done: one proposal file per step (ca0f2f3b).
 - A Device and the Host compare builds before they exchange knowledge.
-  An older Host gets a plain message, not a failed sync.
+  An older Host gets a plain message, not a failed sync. Done: the link's
+  one version test, an Alert on the page (c65d9e47).
 - A source whose last sync failed shows an Alert on the page and a line in
   the digest. A source that has not synced in a week shows as stale.
+  Done (5d888105). The phone shows the digest's sentence, not its lines.
 - The Jira and Confluence kits need `jq`. The readiness check names it, and
-  the Host image ships it.
+  the Host image ships it. Done: the readiness check names jq and curl
+  (93c066a9). The image is 244fd1cb.
 
 ### 5.5 Scores and telemetry, the rest (telemetry + engine, 2 days)
 
