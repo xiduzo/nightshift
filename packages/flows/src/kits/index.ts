@@ -16,6 +16,7 @@ export {
 	type KnowledgeSourceKind,
 	type KnowledgeSourceKit,
 	knowledgeKitInputs,
+	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
 	knowledgeSourceKind,
 	knowledgeSourceKitSchema,

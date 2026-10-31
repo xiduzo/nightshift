@@ -131,3 +131,18 @@ export function knowledgeSourceFields(
 		(input) => input.name !== KNOWLEDGE_FOLDER_INPUT,
 	);
 }
+
+/**
+ * Why a source's values cannot be kept, or null: a value with `{{`. A
+ * source keeps plain values. In its flow `{{` starts a template, and a
+ * flow with one is no longer a source the Knowledge page can edit.
+ */
+export function knowledgeSourceBracesProblem(
+	source: KnowledgeSource,
+): string | null {
+	const labels = knowledgeKitInputs(source.kit)
+		.filter((input) => source.inputs[input.name]?.includes("{{"))
+		.map((input) => input.label ?? input.name);
+	if (labels.length === 0) return null;
+	return `${labels.join(", ")} cannot contain {{. Remove it.`;
+}

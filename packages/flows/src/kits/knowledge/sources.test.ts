@@ -3,6 +3,7 @@ import { kitFlow } from "../kits";
 import {
 	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_SOURCE_KINDS,
+	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
 } from "./sources";
 
@@ -29,5 +30,22 @@ describe("KNOWLEDGE_SOURCE_KINDS", () => {
 		);
 		expect(fields).toContain("urls");
 		expect(fields).not.toContain(KNOWLEDGE_FOLDER_INPUT);
+	});
+});
+
+describe("knowledgeSourceBracesProblem", () => {
+	test("a value with {{ cannot be kept, and the message names its field", () => {
+		expect(
+			knowledgeSourceBracesProblem({
+				kit: "kit:knowledge/web",
+				inputs: { urls: "https://example.org/{{page}}" },
+			}),
+		).toBe("Pages cannot contain {{. Remove it.");
+		expect(
+			knowledgeSourceBracesProblem({
+				kit: "kit:knowledge/web",
+				inputs: { urls: "https://example.org/{page}" },
+			}),
+		).toBeNull();
 	});
 });

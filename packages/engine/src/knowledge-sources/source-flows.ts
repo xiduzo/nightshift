@@ -6,6 +6,7 @@ import {
 	type KnowledgeSource,
 	type KnowledgeSourceKit,
 	knowledgeKitInputs,
+	knowledgeSourceBracesProblem,
 	knowledgeSourceKind,
 	knowledgeSourceKitSchema,
 	type Schedule,
@@ -54,10 +55,13 @@ function folderProblem(folder: string): string | null {
 /**
  * The source's values the kit takes: trimmed, the empty ones left out (so
  * they take the kit's default). Refuses a name the kit does not take, a
- * required value that is missing and a folder outside the knowledge.
+ * required value that is missing, a value with `{{` (its flow would not
+ * be a source any more) and a folder outside the knowledge.
  */
 function checkedInputs(source: KnowledgeSource): Record<string, string> {
 	const declared = knowledgeKitInputs(source.kit);
+	const braces = knowledgeSourceBracesProblem(source);
+	if (braces) throw new Refusal("invalid", braces);
 	const inputs: Record<string, string> = {};
 	for (const [name, value] of Object.entries(source.inputs)) {
 		if (!declared.some((input) => input.name === name)) {

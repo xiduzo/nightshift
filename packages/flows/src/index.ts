@@ -174,6 +174,7 @@ export {
 	kitList,
 	knowledgeKitInputs,
 	knowledgeKitsOf,
+	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
 	knowledgeSourceKind,
 	knowledgeSourceKitSchema,

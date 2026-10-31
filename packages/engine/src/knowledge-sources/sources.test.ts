@@ -222,6 +222,9 @@ describe("save", () => {
 		await expect(save({ path: "/x", folder: "../up" })).rejects.toThrow(
 			"Choose a folder inside the knowledge",
 		);
+		await expect(save({ path: "/notes/{{x}}" })).rejects.toThrow(
+			"Folder cannot contain {{. Remove it.",
+		);
 		await expect(save({ path: "/x", nope: "1" })).rejects.toThrow(
 			'This source has no field "nope".',
 		);

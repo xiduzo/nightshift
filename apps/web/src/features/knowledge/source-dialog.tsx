@@ -4,6 +4,7 @@ import {
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSource,
 	type KnowledgeSourceKind,
+	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
 	timeAndDaysToCron,
 } from "@nightshift/flows";
@@ -26,6 +27,7 @@ import {
 	Field,
 	FieldContent,
 	FieldDescription,
+	FieldError,
 	FieldGroup,
 	FieldLabel,
 	FieldLegend,
@@ -181,7 +183,9 @@ function SourceForm({
 		times.on &&
 		times.kind === "daily" &&
 		!/^([01]\d|2[0-3]):[0-5]\d$/.test(times.time);
-	const invalid = missing.length > 0 || badTime;
+	// A value with {{ would make its flow a template: the page could not edit it.
+	const braces = knowledgeSourceBracesProblem({ kit, inputs: values });
+	const invalid = missing.length > 0 || badTime || braces !== null;
 
 	const refresh = () =>
 		Promise.all([
@@ -298,6 +302,7 @@ function SourceForm({
 					onChange={setValues}
 					lines={kind?.lines ?? []}
 				/>
+				{braces ? <FieldError className="-mt-3">{braces}</FieldError> : null}
 				{kind?.local ? (
 					<FieldDescription className="-mt-3">
 						Only this computer has this folder. Night Shift syncs it here.
@@ -393,7 +398,7 @@ function SourceForm({
 					title={
 						missing.length > 0
 							? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
-							: undefined
+							: (braces ?? undefined)
 					}
 				>
 					{save.isPending ? <Spinner data-icon="inline-start" /> : null}
