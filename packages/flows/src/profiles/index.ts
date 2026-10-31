@@ -4,6 +4,7 @@ export {
 	type AgentProfile,
 	type AgentProfileSettings,
 	agentProfileSchema,
+	cascadeProblem,
 	isAgentProfile,
 	type ModelProfile,
 	type ModelProfileSettings,
@@ -20,4 +21,6 @@ export {
 	type ResolvedAgentNode,
 	resolvedAgent,
 	resolveNodeProfile,
+	runsAs,
+	tierUsers,
 } from "./profiles";

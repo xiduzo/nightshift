@@ -160,6 +160,14 @@ export function tierUsers(node: FlowNode): { index: number; node: FlowNode }[] {
 }
 
 /**
+ * The nodes the steps of a node run as: each tier of its cascade
+ * (`tierNode`), else the node itself. A person tier runs as no node.
+ */
+export function runsAs(node: FlowNode): FlowNode[] {
+	return hasCascade(node) ? tierUsers(node).map((tier) => tier.node) : [node];
+}
+
+/**
  * Why a resolved cascade does not fit its node, or null: a Decision's
  * decider without a probability (ADR 6.8) can only be its last model tier,
  * and tests no minimum confidence. The checks of a flow see only a tier's

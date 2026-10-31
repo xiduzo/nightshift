@@ -11,6 +11,7 @@ export {
 	type TemplateRef,
 } from "./context";
 export {
+	acceptsValue,
 	chooseByRule,
 	evaluateRule,
 	isTruthy,

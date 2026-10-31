@@ -1,4 +1,17 @@
-import type { DecisionNode } from "@nightshift/flows";
+import {
+	type DecisionNode,
+	type DecisionTier,
+	type PersonTier,
+	personTierIndex,
+	renderTemplate,
+} from "@nightshift/flows";
+import {
+	climbAt,
+	climbLines,
+	climbOutputs,
+	climbValues,
+	tierAt,
+} from "../cascade";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -9,9 +22,9 @@ import {
 	type StepContext,
 } from "../context";
 import { RESUME_RULES, type ResumeRules } from "../resume-point";
-import { type Chooser, decisionOutputs } from "./choosers/chooser";
+import { type Chooser, decisionOutputs, gateChoices } from "./choosers/chooser";
 import { modelChooser } from "./choosers/model";
-import { gateAskNode, personChooser } from "./choosers/person";
+import { gateAskNode, gateChooser, personChooser } from "./choosers/person";
 import { ruleChooser } from "./choosers/rule";
 
 /**
@@ -31,7 +44,63 @@ import { ruleChooser } from "./choosers/rule";
  * the person's note, the model's reasons, or "" for a rule.
  */
 export function decisionNode(node: DecisionNode, ctx: StepContext): NodeAction {
+	if (node.cascade !== undefined) return climbingDecision(node, ctx);
 	return chooserFor(node, ctx);
+}
+
+/**
+ * A Decision with a cascade (ADR 6): each try asks the model of its tier
+ * (`choosers/model.ts` with the climb), and a pick below the tier's
+ * `minConfidence` goes to the next try. The person tier is a Gate that
+ * shows each tier's pick and probability; its answer ends the step on
+ * the option (`gateAskNode`).
+ */
+function climbingDecision(node: DecisionNode, ctx: StepContext): NodeAction {
+	return (state, config) => {
+		const at = climbAt(state, node);
+		const tier = tierAt(node, at);
+		if (tier === null) {
+			throw new Error(
+				`Decision node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
+			);
+		}
+		if (tier.kind === "person") {
+			return gateChooser(node, ctx, {
+				question: (tctx) =>
+					climbQuestion(
+						renderTemplate(node.prompt, {
+							...tctx,
+							cascade: climbValues(node, at),
+						}),
+						at.trail,
+					),
+				choices: gateChoices(node),
+				deadline: tier.tier.deadline,
+				outputs: climbOutputs(node, at),
+				climb: true,
+			})(state, config);
+		}
+		return modelChooser(tier.node as DecisionNode, ctx, {
+			root: node,
+			at,
+			tier: tier.tier as DecisionTier,
+		})(state, config);
+	};
+}
+
+/** The question of a Decision's person tier: its prompt, then what each tier picked. */
+function climbQuestion(
+	prompt: string,
+	trail: Parameters<typeof climbLines>[0],
+): string {
+	if (trail.length === 0) return prompt;
+	return `${prompt}\n\nThe models were not sure enough:\n${climbLines(trail)}`;
+}
+
+/** Whether the Decision ends its cascade with a person: a Gate, so an ask node. */
+function asksAtTheTop(node: DecisionNode): PersonTier | null {
+	const index = personTierIndex(node);
+	return index === null ? null : (node.cascade?.[index] as PersonTier);
 }
 
 function chooserFor(node: DecisionNode, ctx: StepContext): Chooser {
@@ -80,11 +149,15 @@ export const DECISION: NodeKind<DecisionNode> = {
 	resumeRules: decisionRules,
 	aux: (node) =>
 		node.by === "model"
-			? [{ kind: "wait" }]
+			? asksAtTheTop(node)
+				? [{ kind: "wait" }, { kind: "ask", make: gateAskNode }]
+				: [{ kind: "wait" }]
 			: node.by === "person"
 				? [{ kind: "ask", make: gateAskNode }]
 				: [],
-	isChosenEnd: () => true,
+	// Every option; a cascade with no tier that held ends on `fail`.
+	isChosenEnd: (node, outcome) =>
+		node.options.some((option) => option.name === outcome),
 	endReason: (node, outcome) =>
 		outcome === "pass" ? null : endedAtReason(node, outcome),
 	endedLabel: (_node, outcome) => outcome,

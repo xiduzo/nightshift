@@ -4,6 +4,7 @@ import {
 	isProfileRef,
 	type ProfileRef,
 	profileOf,
+	runsAs,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { type AddressCheck, addressKey } from "../device";
@@ -39,7 +40,8 @@ export async function checkAddresses(
 ): Promise<void> {
 	type Use = { check: AddressCheck; label: string | null; nodeIds: string[] };
 	const asked = new Map<PlacedDevice, Map<string, Use>>();
-	for (const node of flows.flatMap((flow) => flow.nodes)) {
+	// A cascade's tiers each ask their own profile's address.
+	for (const node of flows.flatMap((flow) => flow.nodes.flatMap(runsAs))) {
 		const found = addressOf(node);
 		if (!found) continue;
 		const at = owners.get(found.ref.device);

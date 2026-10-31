@@ -1,4 +1,4 @@
-import { isProfileRef, profileOf } from "@nightshift/flows";
+import { isProfileRef, nodeProfiles, runsAs } from "@nightshift/flows";
 import type { SpaceFlows } from "./space-flows";
 
 /** A flow file of a project of the Space. */
@@ -53,9 +53,10 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 				projectName: project.name,
 				flowName: file.name,
 			};
-			const agents = (loaded?.flow?.nodes ?? []).flatMap((n) =>
-				n.type === "agent" ? [n] : [],
-			);
+			// A cascade's tiers add their own connections and CLI tools.
+			const agents = (loaded?.flow?.nodes ?? [])
+				.flatMap(runsAs)
+				.flatMap((n) => (n.type === "agent" ? [n] : []));
 			const toolConnections = (loaded?.flow?.nodes ?? []).flatMap((n) =>
 				n.type === "tool" ? [n.connection] : [],
 			);
@@ -76,10 +77,12 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			}
 			const byProfile = new Map<string, string[]>();
 			for (const node of loaded?.flow?.nodes ?? []) {
-				const profile = profileOf(node);
-				if (!isProfileRef(profile)) continue;
-				const key = profileUseKey(profile.device, profile.profile);
-				byProfile.set(key, [...(byProfile.get(key) ?? []), node.id]);
+				// A cascade names a profile per tier.
+				for (const profile of nodeProfiles(node).filter(isProfileRef)) {
+					const key = profileUseKey(profile.device, profile.profile);
+					const ids = byProfile.get(key) ?? [];
+					if (!ids.includes(node.id)) byProfile.set(key, [...ids, node.id]);
+				}
 			}
 			for (const [name, nodeIds] of byProfile) {
 				profiles.set(name, [
