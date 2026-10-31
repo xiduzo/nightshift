@@ -43,6 +43,10 @@ import {
 	isProposal,
 	isProposalFile,
 	notesIn,
+	notesOf,
+	PROPOSED_DIR,
+	proposalOf,
+	type WaitingLearning,
 } from "./learnings";
 
 /**
@@ -621,6 +625,39 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				shared: spaceId ? await isShared(spaceId) : false,
 				olderHost: spaceId ? isOlder(spaceId) : false,
 			};
+		},
+		/**
+		 * The proposals that wait for a person, newest first, with their
+		 * notes, as the Space's document has them. No reconcile first: a
+		 * step publishes its proposals when it ends. A proposal whose content
+		 * is neither here nor at the Host now has no notes.
+		 */
+		async waitingLearnings(projectId: string): Promise<WaitingLearning[]> {
+			const spaceId = await spaceOf(projectId);
+			if (spaceId === null) return [];
+			const entries = knowledgeEntries(await deps.documents.open(projectId));
+			const waiting: WaitingLearning[] = [];
+			for (const [path, entry] of entries) {
+				if (!isProposalFile(path)) continue;
+				const id = path.slice(PROPOSED_DIR.length + 1);
+				const step = proposalOf(id);
+				if (!step) continue;
+				const content = await archive
+					.read({ kind: "content", spaceId, sha256: entry.sha256 })
+					.catch((error: unknown) => {
+						heard(spaceId, error);
+						return null;
+					});
+				waiting.push({
+					id,
+					...step,
+					notes: content ? notesOf(content) : [],
+					proposedAt: entry.changedAt,
+				});
+			}
+			return waiting.sort(
+				(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
+			);
 		},
 		/**
 		 * One file of the project's knowledge, by its path, at most

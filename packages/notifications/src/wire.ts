@@ -140,6 +140,11 @@ export type Notifications = {
 	 * schedules changed without a run (a pause tonight). Quiet: no push.
 	 */
 	schedulesChanged(spaceId: string, projectId: string): Promise<void>;
+	/**
+	 * Tells the open screens of the Space's Members that the learnings of
+	 * a project changed: a person kept or deleted some. Quiet: no push.
+	 */
+	learningsChanged(spaceId: string, projectId: string): Promise<void>;
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
 	stop(): void;
@@ -248,6 +253,14 @@ export function createNotifications(
 		async schedulesChanged(spaceId, projectId) {
 			for (const personId of await audience(spaceId)) {
 				options.inApp.schedulesChanged(
+					{ kind: "in-app", personId },
+					{ spaceId, projectId },
+				);
+			}
+		},
+		async learningsChanged(spaceId, projectId) {
+			for (const personId of await audience(spaceId)) {
+				options.inApp.learningsChanged(
 					{ kind: "in-app", personId },
 					{ spaceId, projectId },
 				);

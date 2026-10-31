@@ -68,6 +68,16 @@ export type InAppItem =
 			spaceId: string;
 			projectId: string;
 			at: number;
+	  }
+	/**
+	 * A person kept or deleted learnings that waited in a project. Quiet,
+	 * as `run-changed`: a screen reads its learnings again.
+	 */
+	| {
+			kind: "learnings-changed";
+			spaceId: string;
+			projectId: string;
+			at: number;
 	  };
 
 /** A page counts as open this long after its stream ended: a page that reloads. */
@@ -103,6 +113,11 @@ export type InAppChannel = NotificationChannel<InAppTarget> & {
 	schedulesChanged(
 		target: InAppTarget,
 		change: { spaceId: string; projectId: string },
+	): void;
+	/** Tells the Person's open screens that the learnings of a project changed. No push. */
+	learningsChanged(
+		target: InAppTarget,
+		project: { spaceId: string; projectId: string },
 	): void;
 	/**
 	 * Whether the Person has a screen open, or closed a page a moment ago.
@@ -189,6 +204,14 @@ export function createInAppChannel(
 			publish(target.personId, {
 				kind: "schedules-changed",
 				...change,
+				at: now(),
+			});
+		},
+
+		learningsChanged(target, project) {
+			publish(target.personId, {
+				kind: "learnings-changed",
+				...project,
 				at: now(),
 			});
 		},

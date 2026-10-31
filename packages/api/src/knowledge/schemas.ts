@@ -7,6 +7,7 @@ import type {
 	KnowledgeQuestion,
 	KnowledgeText,
 	KnowledgeUseReport,
+	WaitingLearning,
 } from "@nightshift/engine";
 import { knowledgeSourceSchema } from "@nightshift/flows";
 import { z } from "zod";
@@ -81,6 +82,27 @@ export const knowledgeSchema = z.object({
 	olderHost: z.boolean(),
 });
 export type KnowledgeView = z.infer<typeof knowledgeSchema>;
+
+/** One step's proposals that wait for a person: keep them or delete them. */
+const waitingLearningSchema = exact<WaitingLearning>()(
+	z.object({
+		/** What keeps or deletes it. */
+		id: z.string(),
+		/** The run whose step proposed it. */
+		runId: z.string(),
+		/** That step. Null for a run from before steps had proposals of their own. */
+		stepId: z.string().nullable(),
+		/** What the agent proposed to learn, one note each. Empty: the text cannot be read now. */
+		notes: z.array(z.string()),
+		/** Epoch ms: when the step last added to it. */
+		proposedAt: z.number(),
+	}),
+);
+
+/** A proposal that waits, with the project it is for. */
+export const projectLearningSchema = waitingLearningSchema.extend({
+	projectId: z.string(),
+});
 
 /** A file a knowledge search found. */
 export const knowledgeHitSchema = exact<KnowledgeHit>()(

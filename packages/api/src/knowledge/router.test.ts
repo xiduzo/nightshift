@@ -12,8 +12,9 @@ import {
 } from "@nightshift/engine/testing";
 import { call, ORPCError } from "@orpc/server";
 
+import type { Context } from "../context";
 import { appRouter } from "../router";
-import { accessAs, testContext } from "../testing/context";
+import { accessAs, stub, testContext } from "../testing/context";
 
 /**
  * The Knowledge page's procedures over a real Space on this computer: the
@@ -432,5 +433,104 @@ describe("knowledge.evaluate and knowledge.setMeaning", () => {
 			{ context: context("member") },
 		);
 		expect(await built.knowledge.meaningOn(projectId)).toBe(false);
+	});
+});
+
+describe("knowledge.learnings, keepLearning and deleteLearning", () => {
+	test("any Member lists what waits; keeping or deleting asks a role that may start runs and tells the open screens", async () => {
+		await putFile(
+			"learnings/proposed/run-1.s1.md",
+			"# Learnings of run run-1\n\n- Use bun.\n- Tests run with bun.\n",
+		);
+		await putFile(
+			"learnings/proposed/run-2.md",
+			"- The API is in packages/api.\n",
+		);
+		// The page's read publishes this computer's folder to the Space.
+		await call(
+			appRouter.knowledge.get,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		const told: [string, string][] = [];
+		const asked = (personId: string, role: Role) => ({
+			...context(personId, role),
+			notifications: stub<Context["notifications"]>("notifications", {
+				learningsChanged: async (spaceId, project) => {
+					told.push([spaceId, project]);
+				},
+			}),
+		});
+
+		const waiting = await call(appRouter.knowledge.learnings, undefined, {
+			context: asked("viewer", "viewer"),
+		});
+		expect(
+			waiting.map((w) => [w.projectId, w.id, w.runId, w.stepId, w.notes]),
+		).toEqual(
+			expect.arrayContaining([
+				[
+					projectId,
+					"run-1.s1.md",
+					"run-1",
+					"s1",
+					["Use bun.", "Tests run with bun."],
+				],
+				[projectId, "run-2.md", "run-2", null, ["The API is in packages/api."]],
+			]),
+		);
+		expect(waiting).toHaveLength(2);
+		await expect(
+			call(
+				appRouter.knowledge.learnings,
+				{ projectId: "p9" },
+				{ context: asked("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+
+		await expect(
+			call(
+				appRouter.knowledge.keepLearning,
+				{ projectId, id: "run-1.s1.md" },
+				{ context: asked("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+		await call(
+			appRouter.knowledge.keepLearning,
+			{ projectId, id: "run-1.s1.md" },
+			{ context: asked("member", "member") },
+		);
+		await call(
+			appRouter.knowledge.deleteLearning,
+			{ projectId, id: "run-2.md" },
+			{ context: asked("member", "member") },
+		);
+		expect(told).toEqual([
+			[sandbox.spaceId, projectId],
+			[sandbox.spaceId, projectId],
+		]);
+		await expect(
+			call(
+				appRouter.knowledge.deleteLearning,
+				{ projectId, id: "run-2.md" },
+				{ context: asked("member", "member") },
+			),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+		expect(
+			await call(
+				appRouter.knowledge.learnings,
+				{ projectId },
+				{ context: asked("viewer", "viewer") },
+			),
+		).toEqual([]);
+		const got = await call(
+			appRouter.knowledge.get,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(got.proposed).toBe(0);
+		expect(got.files.map((f) => f.path)).toContain(
+			"learnings/accepted/run-1.s1.md",
+		);
 	});
 });

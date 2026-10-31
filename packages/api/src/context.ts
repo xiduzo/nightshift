@@ -90,11 +90,14 @@ export type Services = {
 	/**
 	 * The projects' knowledge in their Spaces (ADR 4): the files the
 	 * knowledge document lists, and one file's content by its hash for a
-	 * computer whose folder lacks it, and the removal of a source's folder.
+	 * computer whose folder lacks it, and the removal of a source's folder,
+	 * and the learnings that wait for a person.
 	 */
 	knowledge: Pick<
 		ProjectKnowledge,
 		| "listing"
+		| "waitingLearnings"
+		| "settleLearning"
 		| "read"
 		| "removeFolder"
 		| "questions"

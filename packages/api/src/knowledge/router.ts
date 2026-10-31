@@ -29,6 +29,7 @@ import {
 	knowledgeSchema,
 	knowledgeTextSchema,
 	knowledgeUseSchema,
+	projectLearningSchema,
 } from "./schemas";
 
 /** The knowledge sources of the Space the person works in, from this computer. */
@@ -101,6 +102,33 @@ async function knownProject(
 	}
 }
 
+/** One step's proposals that wait, in a project of the Space. */
+const learningInput = z.object({
+	projectId: z.string(),
+	id: z.string().min(1).max(300),
+});
+
+/**
+ * Keeps or deletes one step's proposals, then tells the open screens of
+ * the Space, so their lists of learnings read again.
+ */
+async function settle(
+	context: Pick<Context, "knowledge" | "notifications"> & {
+		spaceId: string;
+		space: { listProjects(): Promise<{ id: string }[]> };
+	},
+	input: z.infer<typeof learningInput>,
+	decision: "keep" | "delete",
+): Promise<void> {
+	await knownProject(context.space, input.projectId);
+	await context.knowledge.settleLearning(input.projectId, input.id, decision);
+	await context.notifications
+		.learningsChanged(context.spaceId, input.projectId)
+		.catch((error: unknown) => {
+			console.warn("The screens were not told of a kept learning:", error);
+		});
+}
+
 /**
  * A project's knowledge belongs to its Space (ADR 4): every Member of the
  * Space reads it, on any of its Devices and on its Host. A browser changes
@@ -136,6 +164,62 @@ export const knowledge = {
 				},
 			};
 		}),
+	/**
+	 * The learnings agents proposed that wait for a person, newest first:
+	 * of one project, or of every project of the Space. Each is one step's
+	 * proposals, with its notes and the run that proposed them.
+	 */
+	learnings: protectedProcedure
+		.route({
+			summary:
+				"Lists the learnings agents proposed that wait for a person, of one project or of every project of the Space, newest first.",
+		})
+		.output(output(z.array(projectLearningSchema)))
+		.input(z.object({ projectId: z.string().optional() }).optional())
+		.handler(async ({ context, input }) => {
+			const projectId = input?.projectId;
+			if (projectId !== undefined) {
+				await knownProject(context.space, projectId);
+			}
+			const ids =
+				projectId !== undefined
+					? [projectId]
+					: (await context.space.listProjects()).map((project) => project.id);
+			const lists = await Promise.all(
+				ids.map(async (id) =>
+					(await context.knowledge.waitingLearnings(id)).map((learning) => ({
+						...learning,
+						projectId: id,
+					})),
+				),
+			);
+			return lists
+				.flat()
+				.sort(
+					(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
+				);
+		}),
+	/**
+	 * Keeps one step's proposals: agents read them in later runs. As the
+	 * review of learnings does, it changes the knowledge, so it asks a
+	 * role that may start runs (ADR 4).
+	 */
+	keepLearning: permitted(MAY.changeKnowledge)
+		.route({
+			summary:
+				"Keeps the learnings of one step in the project's knowledge, where agents read them.",
+		})
+		.output(output(z.void()))
+		.input(learningInput)
+		.handler(({ context, input }) => settle(context, input, "keep")),
+	/** Deletes one step's proposals. A role that may start runs, as for keep. */
+	deleteLearning: permitted(MAY.changeKnowledge)
+		.route({
+			summary: "Deletes the learnings of one step: agents never read them.",
+		})
+		.output(output(z.void()))
+		.input(learningInput)
+		.handler(({ context, input }) => settle(context, input, "delete")),
 	/**
 	 * Adds a source to the project's knowledge, or changes one the page
 	 * added (`name`): its flow, which calls the kit with the values given

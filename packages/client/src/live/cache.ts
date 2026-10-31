@@ -9,6 +9,7 @@ import {
 	leavesInbox,
 	type OpenGate,
 } from "../gates";
+import { createKnowledgeQueries } from "../knowledge";
 import {
 	describeNotice,
 	followNotifications,
@@ -50,21 +51,29 @@ import type { Notice, ShownNotifications } from "./shown";
 /**
  * What a screen reads again. `gates`: the open Gates. `run`: what one run
  * changes, its detail and files, the lists of runs, the dashboard's
- * numbers, a schedule's last start and the run counts of the projects. `runs`: the same for every run.
- * `schedules`: the lists of schedules, after a pause tonight began or ended.
+ * numbers, a schedule's last start, the run counts of the projects and
+ * the learnings that wait (a step that ends may propose some). `runs`: the
+ * same for every run. `schedules`: the lists of schedules, after a pause
+ * tonight began or ended. `learnings`: the learnings that wait, and the
+ * Knowledge page that counts them.
  * The Devices a run can run on or move to do not change with a run.
  */
 type Read =
 	| { kind: "gates" }
 	| { kind: "runs" }
 	| { kind: "run"; runId: string }
-	| { kind: "schedules" };
+	| { kind: "schedules" }
+	| { kind: "learnings" };
 
 const GATES: Read = { kind: "gates" };
 const ofRun = (runId: string): Read => ({ kind: "run", runId });
 
 /** A missed stretch of the stream, or an item this screen does not know: read both, of every run. */
-const EVERYTHING: readonly Read[] = [GATES, { kind: "runs" }];
+const EVERYTHING: readonly Read[] = [
+	GATES,
+	{ kind: "runs" },
+	{ kind: "learnings" },
+];
 
 /**
  * What an item of `notifications.watch` reads again. A Gate that opens or
@@ -86,6 +95,8 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 			return [GATES, ofRun(item.runId)];
 		case "schedules-changed":
 			return [{ kind: "schedules" }];
+		case "learnings-changed":
+			return [{ kind: "learnings" }];
 		default:
 			return EVERYTHING;
 	}
@@ -177,6 +188,7 @@ export function createLiveCache({
 	const dashboard = createDashboardQueries(orpc);
 	const schedules = createScheduleQueries(orpc);
 	const projects = createProjectQueries(orpc);
+	const knowledge = createKnowledgeQueries(orpc);
 	const openKey = gates.open().queryKey;
 	/** The notifications stream was live before: a new `live` may have missed items. */
 	let wasLive = false;
@@ -193,8 +205,10 @@ export function createLiveCache({
 		steps: new Set<string>(),
 		/** The runs whose files to read. */
 		files: new Set<string>(),
-		/** A run changed: the lists of runs, the dashboard, the schedules and the projects. */
+		/** A run changed: the lists of runs, the dashboard, the schedules, the projects and the learnings. */
 		lists: false,
+		/** A person kept or deleted learnings: the Knowledge page counts them too. */
+		learnings: false,
 		/** The schedules only: a pause tonight began or ended. */
 		schedules: false,
 	};
@@ -217,6 +231,10 @@ export function createLiveCache({
 				pending.schedules = true;
 				continue;
 			}
+			if (one.kind === "learnings") {
+				pending.learnings = true;
+				continue;
+			}
 			pending.lists = true;
 			if (one.kind === "runs") {
 				pending.everyRun = true;
@@ -230,7 +248,7 @@ export function createLiveCache({
 		waiting = true;
 		schedule(() => {
 			waiting = false;
-			const { gates: readGates, everyRun, lists } = pending;
+			const { gates: readGates, everyRun, lists, learnings } = pending;
 			const readSchedules = pending.schedules && !lists;
 			const details = [...pending.details];
 			const steps = [...pending.steps];
@@ -239,6 +257,7 @@ export function createLiveCache({
 			pending.everyRun = false;
 			pending.lists = false;
 			pending.schedules = false;
+			pending.learnings = false;
 			pending.details.clear();
 			pending.steps.clear();
 			pending.files.clear();
@@ -260,6 +279,8 @@ export function createLiveCache({
 				invalidate(projects.lists());
 			}
 			if (readSchedules) invalidate(schedules.lists());
+			if (lists || learnings) invalidate(knowledge.learningsKey());
+			if (learnings) invalidate(knowledge.getKey());
 		}, READ_MS);
 	}
 

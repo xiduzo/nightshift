@@ -4,6 +4,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createApiClient, createQueryUtils } from "../api";
 import { createDashboardQueries } from "../dashboard";
 import { createGateQueries, type OpenGate } from "../gates";
+import { createKnowledgeQueries } from "../knowledge";
 import type {
 	NotificationItem,
 	NotificationWatchClient,
@@ -95,11 +96,15 @@ const KEYS = {
 	cron: createScheduleQueries(orpc).preview("0 3 * * *").queryKey,
 	projects: createProjectQueries(orpc).list().queryKey,
 	branches: createProjectQueries(orpc).branches("p1").queryKey,
+	learnings: createKnowledgeQueries(orpc).learnings().queryKey,
+	knowledge: orpc.knowledge.get.queryOptions({ input: { projectId: "p1" } })
+		.queryKey,
 } as const;
 type Name = keyof typeof KEYS;
 
-/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules, the projects' counts. */
+/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules, the projects' counts, the learnings that wait. */
 const RUN_1: Name[] = [
+	"learnings",
 	"everyRun",
 	"ofProject",
 	"run1",
@@ -110,8 +115,15 @@ const RUN_1: Name[] = [
 	"schedules",
 	"projects",
 ];
-/** What a missed stretch of the stream reads again: the Gates, and what every run changes. */
-const EVERYTHING: Name[] = ["gates", ...RUN_1, "run2", "step2", "files2"];
+/** What a missed stretch of the stream reads again: the Gates, what every run changes, and the Knowledge page. */
+const EVERYTHING: Name[] = [
+	"gates",
+	...RUN_1,
+	"run2",
+	"step2",
+	"files2",
+	"knowledge",
+];
 const NOTHING: Name[] = [];
 
 /** Names in the order `stale()` gives them. */
@@ -344,7 +356,21 @@ describe("the live cache follows the Host", () => {
 			orpc.dashboard.key(),
 			orpc.schedules.list.key(),
 			orpc.projects.list.key(),
+			orpc.knowledge.learnings.key(),
 		]);
+	});
+
+	test("learnings that a person kept or deleted read the learnings and the Knowledge page again, no run", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({
+			kind: "learnings-changed",
+			spaceId: "s1",
+			projectId: "p1",
+			at: 4,
+		});
+		timers.due(300);
+		expect(stale()).toEqual(sorted(["learnings", "knowledge"]));
 	});
 
 	test("an item of a kind this screen does not know reads everything again", async () => {

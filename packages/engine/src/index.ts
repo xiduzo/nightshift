@@ -111,6 +111,7 @@ export {
 	LOCAL_ONLY_BYTES,
 	type ProjectKnowledge,
 	questionKey,
+	type WaitingLearning,
 } from "./knowledge";
 export {
 	knowledgeSourceProblems,

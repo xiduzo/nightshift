@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	KNOWLEDGE_TOOLS_INSTRUCTION,
@@ -7,15 +7,23 @@ import {
 	knowledgeTools,
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
+import { Refusal } from "@nightshift/refusal";
 import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
 import { createKnowledgeFolders, INDEX_FILE, isReadable } from "./folder";
 import {
 	type KnowledgeDocuments,
+	knowledgeEntries,
 	meaningIsOn,
 	setMeaning,
 } from "./knowledge-document";
-import { keepLearnings, withLearnings } from "./learnings";
+import {
+	ACCEPTED_DIR,
+	keepLearnings,
+	PROPOSED_DIR,
+	proposalOf,
+	withLearnings,
+} from "./learnings";
 import {
 	formatQuestions,
 	type KnowledgeQuestion,
@@ -353,6 +361,50 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 				await hold.done();
 			}
 		},
+		/**
+		 * Keeps or deletes one step's proposals, as the review of learnings
+		 * (`kit:knowledge/review-learnings`) does: keep adds them to
+		 * `learnings/accepted/`, where agents read them, and both take them
+		 * out of `learnings/proposed/`. It holds the folder as a step does,
+		 * so the change goes to the Space when it ends. Refuses a proposal
+		 * that no longer waits, and one whose content cannot be fetched now.
+		 */
+		async settleLearning(
+			projectId: string,
+			id: string,
+			decision: "keep" | "delete",
+		): Promise<void> {
+			const gone = new Refusal(
+				"not-found",
+				"This learning no longer waits. Someone kept or deleted it.",
+			);
+			if (!proposalOf(id)) throw gone;
+			const hold = await sync.startStep(projectId);
+			try {
+				const root = folders.folder(projectId);
+				const proposed = join(root, ...PROPOSED_DIR.split("/"), id);
+				const content = await readFile(proposed).catch(() => null);
+				if (content === null) {
+					// Listed in the Space, but its content did not reach this folder.
+					const listed = knowledgeEntries(
+						await deps.documents.open(projectId),
+					).has(`${PROPOSED_DIR}/${id}`);
+					if (!listed) throw gone;
+					throw new Refusal(
+						"unavailable",
+						"Night Shift cannot get this learning now. Try again when the computer that keeps this Space is online.",
+					);
+				}
+				if (decision === "keep") {
+					const accepted = join(root, ...ACCEPTED_DIR.split("/"));
+					await mkdir(accepted, { recursive: true });
+					await appendFile(join(accepted, id), content);
+				}
+				await rm(proposed, { force: true });
+			} finally {
+				await hold.done();
+			}
+		},
 		/** Whether search by meaning is on for the project, in every Device of its Space. */
 		async meaningOn(projectId: string): Promise<boolean> {
 			return meaningIsOn(await deps.documents.open(projectId));
@@ -362,6 +414,7 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 			await setMeaning(await deps.documents.open(projectId), on);
 		},
 		listing: sync.listing,
+		waitingLearnings: sync.waitingLearnings,
 		read: sync.read,
 		removeFolder: sync.removeFolder,
 		reconcileAll: sync.reconcileAll,

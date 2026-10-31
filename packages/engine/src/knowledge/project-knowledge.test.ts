@@ -307,6 +307,66 @@ describe("the learnings of a run", () => {
 		expect(learned).toEqual(["- The API is in packages/api.", "- Use bun."]);
 		expect(await readProposals(b.dir)).toEqual(learned);
 	});
+
+	test("wait with their notes on another computer, and keep or delete there as the review does", async () => {
+		const host = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		const step = (stepId: string) => ({
+			runId: "run-1",
+			stepId,
+			stepReport: true as const,
+		});
+		for (const [stepId, notes] of [
+			["s1", ["Use bun.", "Tests  run\n with bun test."]],
+			["s2", ["The API is in packages/api."]],
+		] as const) {
+			const session = await a.knowledge.forSession(
+				{ projectId: "p1", always: true },
+				step(stepId),
+			);
+			for await (const _ of session.events(reporting([...notes]))) {
+			}
+			await session.done();
+		}
+		await exchange(a, b);
+
+		// B has no folder copy of them yet: the document and the Host's archive list them.
+		const waiting = await b.knowledge.waitingLearnings("p1");
+		expect(
+			waiting.map((w) => [w.id, w.runId, w.stepId, w.notes]).sort(),
+		).toEqual([
+			["run-1.s1.md", "run-1", "s1", ["Use bun.", "Tests run with bun test."]],
+			["run-1.s2.md", "run-1", "s2", ["The API is in packages/api."]],
+		]);
+		expect(waiting[0]?.proposedAt).toBeGreaterThanOrEqual(
+			waiting[1]?.proposedAt ?? 0,
+		);
+
+		await b.knowledge.settleLearning("p1", "run-1.s1.md", "keep");
+		await b.knowledge.settleLearning("p1", "run-1.s2.md", "delete");
+		await expect(
+			b.knowledge.settleLearning("p1", "run-1.s2.md", "keep"),
+		).rejects.toThrow("This learning no longer waits.");
+		await expect(
+			b.knowledge.settleLearning("p1", "../x.md", "keep"),
+		).rejects.toThrow("This learning no longer waits.");
+		expect(await b.knowledge.waitingLearnings("p1")).toEqual([]);
+
+		// A gets the change as a Link brings it: the kept notes are what agents read.
+		await exchange(a, b);
+		expect(await a.knowledge.waitingLearnings("p1")).toEqual([]);
+		await a.knowledge.listing("p1");
+		expect(await readProposals(a.dir)).toEqual([]);
+		const kept = await readFile(
+			join(a.dir, "learnings", "accepted", "run-1.s1.md"),
+			"utf8",
+		);
+		expect(kept).toContain("- Use bun.\n- Tests run with bun test.\n");
+		expect((await a.knowledge.listing("p1")).proposed).toBe(0);
+		expect(await a.paths()).toContain("learnings/accepted/run-1.s1.md");
+		expect(await a.paths()).not.toContain("learnings/accepted/run-1.s2.md");
+	});
 });
 
 /** The notes of every proposal in a knowledge folder, sorted. */

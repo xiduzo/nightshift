@@ -90,12 +90,17 @@ test("a run that changed reaches each open stream of the Person, with no key and
 		{ kind: "in-app", personId: "bob" },
 		{ spaceId: "space-1", runId: "run-2" },
 	);
+	inApp.learningsChanged(
+		{ kind: "in-app", personId: "ada" },
+		{ spaceId: "space-1", projectId: "p1" },
+	);
 	await new Promise((resolve) => setTimeout(resolve, 0));
 	stop.abort();
 	await done;
 
 	expect(got).toEqual([
 		{ kind: "run-changed", spaceId: "space-1", runId: "run-1", at: 5 },
+		{ kind: "learnings-changed", spaceId: "space-1", projectId: "p1", at: 5 },
 	]);
 });
 

@@ -39,13 +39,58 @@ export function isProposalFile(path: string): boolean {
 
 /** How many notes a proposal holds: one per `- ` line. */
 export function notesIn(content: Uint8Array | string): number {
+	return linesOf(content).filter((line) => line.startsWith("- ")).length;
+}
+
+function linesOf(content: Uint8Array | string): string[] {
 	const text =
 		typeof content === "string" ? content : new TextDecoder().decode(content);
-	return text.split("\n").filter((line) => line.startsWith("- ")).length;
+	return text.split("\n");
 }
+
+/** The notes of a proposal, in order: the text of each `- ` line. */
+export function notesOf(content: Uint8Array | string): string[] {
+	return linesOf(content)
+		.filter((line) => line.startsWith("- "))
+		.map((line) => line.slice(2).trim())
+		.filter((note) => note !== "");
+}
+
+/** The learnings a person kept: agents read them. */
+export const ACCEPTED_DIR = `${LEARNINGS_DIR}/accepted`;
 
 /** Ids that become a part of a file name. */
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+/**
+ * One step's proposal, by the name of its file in `learnings/proposed/`
+ * (`<runId>.<stepId>.md`, or `<runId>.md` before steps had files of their
+ * own): its run and step. Null for a name that is not a proposal's.
+ */
+export function proposalOf(
+	name: string,
+): { runId: string; stepId: string | null } | null {
+	if (!name.endsWith(".md")) return null;
+	const parts = name.slice(0, -3).split(".");
+	const [runId, stepId, ...rest] = parts;
+	if (runId === undefined || rest.length > 0 || !ID.test(runId)) return null;
+	if (stepId === undefined) return { runId, stepId: null };
+	return ID.test(stepId) ? { runId, stepId } : null;
+}
+
+/** One step's proposals that wait for a person, as the review lists them. */
+export type WaitingLearning = {
+	/** The name of its file in `learnings/proposed/`: what keeps or deletes it. */
+	id: string;
+	/** The run whose step proposed it. */
+	runId: string;
+	/** That step. Null for a proposal of a run from before steps had files of their own. */
+	stepId: string | null;
+	/** What the agent proposed to learn, one note each. Empty: its text cannot be read now. */
+	notes: string[];
+	/** Epoch ms: when the step last added to it. */
+	proposedAt: number;
+};
 
 /** A step of a run, as its proposals are named. */
 export type LearningStep = { runId: string; stepId?: string };

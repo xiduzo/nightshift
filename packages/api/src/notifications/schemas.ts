@@ -95,6 +95,16 @@ export const notificationItemSchema = exact<InAppItem>()(
 			projectId: z.string(),
 			at: z.number(),
 		}),
+		/**
+		 * A person kept or deleted learnings that waited in a project. No
+		 * key and no `alert`: an older screen reads everything again.
+		 */
+		z.object({
+			kind: z.literal("learnings-changed"),
+			spaceId: z.string(),
+			projectId: z.string(),
+			at: z.number(),
+		}),
 	]),
 );
 

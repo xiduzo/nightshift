@@ -19,6 +19,7 @@ export {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,
 } from "./knowledge-document";
+export type { WaitingLearning } from "./learnings";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
 export {
 	createProjectKnowledge,
