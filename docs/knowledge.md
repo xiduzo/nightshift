@@ -279,17 +279,56 @@ forms: `deploying` finds `deploy`.
 
 ### By meaning
 
-Search also finds a section by its meaning when Ollama runs on the
-computer and has the embedding model `qwen3-embedding:0.6b`. Then a
-question in other words finds the answer too. It reads Dutch as well as
-English. To turn it on:
+Search also finds a section by its meaning when Ollama answers and has
+the embedding model. Then a question in other words finds the answer too.
+The default model, `qwen3-embedding:0.6b`, reads Dutch as well as English.
+
+The Night Shift image (`deploy/Dockerfile`) has Ollama inside. A Host starts
+it by itself and downloads the model into its data folder on its first
+start. On your own computer:
 
 1. Install Ollama from https://ollama.com.
-2. Run `ollama pull qwen3-embedding:0.6b` (639 MB).
+2. Open Settings, then Meaning search. Click Download, or run
+   `ollama pull qwen3-embedding:0.6b` (639 MB).
 
-Nothing else is needed. Night Shift finds Ollama at `OLLAMA_HOST`, else at
-`http://127.0.0.1:11434`. The Knowledge page says whether search by meaning
-is on, and how far the first preparation is.
+The Settings page has a Meaning search section, for the owner of the
+computer only:
+
+- **Search by meaning.** `auto` (the default): a Host starts Ollama
+  itself, and another computer uses the Ollama that runs on it. `on`:
+  Night Shift starts Ollama on this computer too. `off`: search finds by
+  words only. The environment variable is `NIGHTSHIFT_OLLAMA`.
+- **Model.** A model that Ollama has, one of a short list, or any other
+  name. A model that Ollama does not have gets a Download button with its
+  progress. A new model builds the vectors again. The environment
+  variable is `NIGHTSHIFT_EMBEDDING_MODEL`. Only `qwen3-embedding:0.6b`
+  was measured on these docs and has a floor (below). The other models of
+  the list work, with no floor.
+- **Ollama address.** Empty: the Ollama on this computer. With another
+  address, your knowledge text goes to that computer to be embedded. The
+  environment variable is `OLLAMA_HOST`, as Ollama's own CLI reads it.
+  Decision nodes on Ollama use the same address.
+- **Headers.** For an Ollama behind a proxy: a value is a `${NAME}`
+  reference to a secret, as in the monitoring headers. Session output and
+  the log never show their values.
+
+A saved setting wins over its environment variable. The address decides
+where Ollama is, in this order: the setting, `OLLAMA_HOST`, then
+`http://127.0.0.1:11434`.
+
+Night Shift starts `ollama serve` as its own child only when all of these
+are true: search by meaning is not `off`, no address is set, the computer
+is a Host or its owner chose `on`, an `ollama` program is on `PATH`, and
+nothing answers at `127.0.0.1:11434`. It starts Ollama again when it stops
+(after 1 s, then up to 60 s), and stops it when Night Shift stops. Its
+models go to `<data folder>/ollama`. Its log lines go to Night Shift's log
+with an `[ollama]` prefix, errors only. On a person's own computer it
+starts nothing unless the owner chooses `on`: that computer has its own
+way to run Ollama.
+
+The Knowledge page says whether search by meaning is on, which Ollama it
+uses ("on this computer" or the host name), how far a download or the
+first preparation is, and when Ollama does not answer.
 
 After each change to the folder, Night Shift embeds the new and changed
 sections in the background (`@langchain/ollama`, `num_ctx` 2048, so the
@@ -297,6 +336,16 @@ model takes about 1 GB of memory). A search never waits for it. It uses
 the vectors there are and finds the rest by words. On an M4 Max the first
 preparation of 1 100 sections takes about one minute. Later ones embed
 only the sections that changed.
+
+On a CPU it is much slower. In the Night Shift image under Docker Desktop
+on an M4 Max (16 vCPUs), Ollama embeds about 0.25 sections per second with
+`qwen3-embedding:0.6b`, so 1 156 sections take about 77 minutes. Ollama
+then uses all 16 vCPUs. With 10 threads (`num_thread`) the same sections
+embed at about 2.5 per second, ten times as fast. `nomic-embed-text` is no
+faster there. The container takes about 1.2 GB while it embeds, 380 MB
+when it is idle. A preparation sends Ollama about 1.5 s of work at a time,
+and a query goes first, so a search finds by meaning during a long
+preparation too. A search waits up to 15 s for its query's vector.
 
 The search fuses the two lists by reciprocal rank (each list adds
 1 / (60 + rank) to a file). A file only the meaning found must pass the
@@ -382,5 +431,5 @@ agents need.
   Shift.
 - A source can still write into `evals/`: the kits refuse only
   `learnings/`.
-- Search by meaning needs Ollama on each computer. Each computer embeds
-  its own copy of the knowledge. The Host image has no Ollama yet.
+- Search by meaning needs Ollama on each computer, or an address of an
+  Ollama elsewhere. Each computer embeds its own copy of the knowledge.

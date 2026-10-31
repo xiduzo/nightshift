@@ -357,9 +357,17 @@ finds by meaning on each computer where Ollama answers and has
 turned on per project: 5.1 can still turn it off for a project later.
 Keyword search uses the same sections, so a hit points at a section. On
 this repo's docs, through `createKnowledgeSearch`: words 18 to 20 of 26,
-words and meaning 21 to 22 of 26, vectors alone 23. Still open: run the Linux
-binary with Ollama in the Host image, measure embedding speed on the
-Host's CPU, and decide whether Devices share embeddings (below).
+words and meaning 21 to 22 of 26, vectors alone 23.
+
+- Ollama in the Host image: done (1355241a). Night Shift starts and keeps
+  `ollama serve` on a Host and downloads the model into the volume
+  (9fcb1ea9). Model and address are owner settings (31f56339).
+- Host CPU speed: done. Docker Desktop on an M4 Max, 16 vCPUs:
+  0.25 sections/s with Ollama's default threads (1 156 sections, about
+  77 min), about 2.5/s with 10 threads, 1.2 GB peak. Queries now go first
+  during a preparation (69b92df0, 9c61dd4f).
+- Still open: measure on the real Host, and set `num_thread` if its
+  default is as slow there. Decide whether Devices share embeddings (below).
 
 Behind the same `createKnowledgeSearch` port, so the API, the MCP tools,
 the agent tools and the page do not change.
