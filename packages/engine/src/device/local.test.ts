@@ -353,19 +353,23 @@ describe("session", () => {
 		expect(plain?.env).toBeUndefined();
 	});
 
-	test("every secret value the session could see comes back as •••: the export's headers, its MCP servers' and the saved secrets", async () => {
-		const harness = fakeHarness({
-			steps: [
-				{
-					type: "tool",
-					name: "Bash",
-					input: { command: "env" },
-					result:
-						"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20glc-otlp-key mcp-key-123 saved-key-456",
-				},
-				{ type: "text", text: "The key is glc-otlp-key." },
-			],
-		});
+	test("every secret value the session could see comes back as •••: the export's headers, its MCP servers', the harness's own and the saved secrets", async () => {
+		const harness = {
+			...fakeHarness({
+				steps: [
+					{
+						type: "tool",
+						name: "Bash",
+						input: { command: "env" },
+						result:
+							"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20glc-otlp-key mcp-key-123 saved-key-456 agent-env-789",
+					},
+					{ type: "text", text: "The key is glc-otlp-key." },
+				],
+			}),
+			// A custom agent's env, expanded from the environment.
+			secretValues: async () => ["agent-env-789"],
+		};
 		const d = device({
 			harnesses: { "claude-code": harness },
 			sessionEnv: () => ({
@@ -391,7 +395,12 @@ describe("session", () => {
 		);
 		const out = JSON.stringify(events);
 		expect(out).toContain("•••");
-		for (const value of ["glc-otlp-key", "mcp-key-123", "saved-key-456"]) {
+		for (const value of [
+			"glc-otlp-key",
+			"mcp-key-123",
+			"saved-key-456",
+			"agent-env-789",
+		]) {
 			expect(out).not.toContain(value);
 		}
 	});

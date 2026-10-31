@@ -351,6 +351,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...(tools?.values ?? []),
 				...(mcp.values ?? []),
 				...(added?.values ?? []),
+				...((await harness.secretValues?.().catch((error) => {
+					console.warn("The agent's secrets were not read:", error);
+					return [];
+				})) ?? []),
 				...((await deps.secretValues?.().catch((error) => {
 					console.warn("The saved secrets were not read:", error);
 					return [];

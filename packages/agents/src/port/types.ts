@@ -277,6 +277,12 @@ export interface AgentHarness {
 	 * terminal, with the id quoted for the shell. Null when the CLI has none.
 	 */
 	takeOverCommand(sessionId: string): string | null;
+	/**
+	 * The secret values this harness gives its sessions itself, beside the
+	 * input's: a custom agent's env with `${NAME}` expanded. The session's
+	 * output shows each as `•••`. Asked once per session, as it starts.
+	 */
+	secretValues?(): Promise<readonly string[]>;
 }
 
 export type DecisionInput = {

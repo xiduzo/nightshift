@@ -487,7 +487,11 @@ describe("when a secret was set and used", () => {
 		expect(usedAt("TEAM")).toBe(1_002_000);
 
 		clock.advance(1000); // a custom agent's environment
-		await store.expandEnv({ X: ref("FROM_ENV") });
+		// Its values are the session's to hide, from the environment too.
+		expect(await store.expandEnv({ X: ref("FROM_ENV") })).toMatchObject({
+			ok: true,
+			values: ["e"],
+		});
 		expect(usedAt("FROM_ENV")).toBe(1_003_000);
 
 		clock.advance(1000); // a Command node's secrets

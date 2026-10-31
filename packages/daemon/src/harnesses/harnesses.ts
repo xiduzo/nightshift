@@ -90,27 +90,41 @@ export function localHarnesses(deps: {
 			),
 		},
 		// Custom agents: read from the settings at each session, so an edit
-		// applies to the next one. `${NAME}` in their env reads the secrets.
+		// applies to the next one. `${NAME}` in their env reads the secrets,
+		// then this computer's environment: once per session, and every value
+		// it reads comes back as `•••` in the session's output.
 		customHarness: (name) => {
 			const agent = settings
 				.current()
 				.customAgents.find((a) => `acp:${a.slug}` === name);
 			if (!agent) return undefined;
-			return customAcpHarness(agent, {
+			let expanding: ReturnType<ConnectionStore["expandEnv"]> | null = null;
+			const expanded = () => {
+				expanding ??= connections.expandEnv(agent.env);
+				return expanding;
+			};
+			const harness = customAcpHarness(agent, {
 				env: async () => {
-					const expanded = await connections.expandEnv(agent.env);
-					if (expanded.ok) return expanded.env;
+					const env = await expanded();
+					if (env.ok) return env.env;
 					const [noun, isNot, it] =
-						expanded.missing.length === 1
+						env.missing.length === 1
 							? ["secret", "it is", "it"]
 							: ["secrets", "they are", "them"];
 					// Words for the person: the step shows them as they are.
 					throw new Refusal(
 						"conflict",
-						`${agent.label} needs the ${noun} ${expanded.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.`,
+						`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.`,
 					);
 				},
 			});
+			return {
+				...harness,
+				secretValues: async () => {
+					const env = await expanded();
+					return env.ok ? env.values : [];
+				},
+			};
 		},
 		customHarnessNames: () =>
 			settings.current().customAgents.map((a) => `acp:${a.slug}` as const),
