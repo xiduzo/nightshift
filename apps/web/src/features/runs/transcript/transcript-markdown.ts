@@ -1,4 +1,5 @@
 import type { StepSummary } from "@/shared/api";
+import { LEARNINGS_TITLE, stepLearnings } from "../lib/step-learnings";
 import { thoughtTitle } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 
@@ -87,6 +88,12 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 			const parts = [`**Report:** \`${item.outcome}\``];
 			if (item.summary.trim()) parts.push(item.summary.trim());
 			if (item.data !== undefined) parts.push(fence(json(item.data), "json"));
+			const learnings = stepLearnings([item]);
+			if (learnings.length > 0) {
+				parts.push(
+					`**${LEARNINGS_TITLE}:**\n\n${learnings.map((note) => `- ${note}`).join("\n")}`,
+				);
+			}
 			return parts.join("\n\n");
 		}
 		case "finished":

@@ -70,6 +70,8 @@ export type ReportItem = ItemBase & {
 	summary: string;
 	/** The report's structured data, when the node has an output schema. */
 	data?: unknown;
+	/** What the agent proposed to learn about the project. */
+	learnings?: string[];
 };
 
 export type FinishedItem = ItemBase & { kind: "finished"; usage?: AgentUsage };

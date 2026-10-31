@@ -290,6 +290,7 @@ function applyStepEntries(
 					outcome: event.outcome,
 					summary: event.summary,
 					data: event.data,
+					...(event.learnings?.length ? { learnings: event.learnings } : {}),
 				});
 				break;
 			case "finished":

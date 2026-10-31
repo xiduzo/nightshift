@@ -13,9 +13,11 @@ import type {
 	WorktreeChangesEvent,
 } from "@/shared/api";
 import { stepGist } from "../lib/step-gist";
+import { stepLearnings } from "../lib/step-learnings";
 import type { TranscriptItem } from "../transcript/transcript-items";
 import { ChangedFiles } from "./changed-files";
 import { StepFacts, StepLine, StepOutputs } from "./step-header";
+import { StepLearnings } from "./step-learnings";
 import { StepPlan } from "./step-plan";
 
 /** The height of the closed console: its bar alone. */
@@ -25,8 +27,9 @@ export const CONSOLE_BAR_PX = 44;
  * The selected step along the bottom of the run page, like a browser's
  * devtools. Closed, it is one line: the step and what it did in a few words.
  * Open, it shows everything at once: the step's facts, summary and outputs
- * on the left, with the agent's to-do list and the files the step changed
- * (by the agent's edits and by commands), and its transcript (what the
+ * on the left, with the agent's to-do list, what it proposed to learn and
+ * the files the step changed (by the agent's edits and by commands), and
+ * its transcript (what the
  * agent ran and said) on the right.
  */
 export function StepConsole({
@@ -76,6 +79,7 @@ export function StepConsole({
 		[items],
 	);
 	const todos = useMemo(() => stepTodos(calls), [calls]);
+	const learnings = useMemo(() => stepLearnings(items), [items]);
 	// Also what commands changed, and a Command step's files.
 	const files = useMemo(
 		() => changedFiles(calls, projectRoot, changes),
@@ -141,6 +145,9 @@ export function StepConsole({
 								<StepPlan todos={todos} running={step.outcome === null} />
 							) : null}
 							{summary}
+							{learnings.length > 0 ? (
+								<StepLearnings notes={learnings} />
+							) : null}
 							{files.length > 0 ? (
 								<ChangedFiles
 									files={files}
