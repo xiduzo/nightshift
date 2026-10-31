@@ -237,6 +237,8 @@ export function NodeInspector({
 								current.type === "wait" ? change(current) : current,
 							)
 						}
+						onRenameOutcome={onRenameOutcome}
+						onRemoveOutcome={onRemoveOutcome}
 					/>
 				) : null}
 

@@ -107,6 +107,10 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 	}
 	if (node.type === "wait") {
 		return new Map([
+			...(node.outcomes ?? []).map(
+				(outcome) =>
+					[outcome.name, outcome.description ?? outcome.when] as const,
+			),
 			["done", WAIT_DONE[node.until.kind]],
 			[
 				"timeout",
