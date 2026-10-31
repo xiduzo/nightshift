@@ -3,6 +3,7 @@
 export { pruneCheckpoints } from "./checkpointer";
 export type { NodeKind, Requirement } from "./context";
 export { messageOf, onDevice } from "./context";
+export { combineHolds, type RunHolds } from "./holds";
 export { resolveInputs } from "./inputs";
 export { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
 export { missingNames } from "./nodes/agent";

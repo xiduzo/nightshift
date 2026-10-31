@@ -9,6 +9,7 @@ import {
 	messageOf,
 	openWork,
 	pruneCheckpoints,
+	type RunHolds,
 	type Runner,
 } from "../graph";
 import {
@@ -139,6 +140,11 @@ export type RecoveryDeps = ResumeBlockDeps & {
 	signal?: AbortSignal;
 	/** The daemon's resume makes a run active: it waits while the run's Space's Projects move. */
 	holds: Pick<StartHolds, "start">;
+	/**
+	 * What runs hold for a scope (leases). An interrupted run keeps them
+	 * for its resume; one that does not continue lets go.
+	 */
+	runHolds: RunHolds;
 };
 
 export type Recovery = ReturnType<typeof createRecovery>;
@@ -224,7 +230,7 @@ export function createRecovery(deps: RecoveryDeps) {
 			if (open.endsRun || open.steps.length > 0 || open.sessions.length > 0) {
 				// The open work ends as a stop ends it (`closeOpenWork`), from
 				// the run's whole log: a Call with `each` counts its items.
-				await closeOpenWork(deps, runId, {
+				await closeOpenWork({ ...deps, holds: deps.runHolds }, runId, {
 					kind: "interrupted",
 					reason: why
 						? `${INTERRUPTED_REASON} It did not continue on its own: ${why}`
@@ -240,6 +246,7 @@ export function createRecovery(deps: RecoveryDeps) {
 				});
 			}
 			if (open.endsRun && !why) toResume.push(runId);
+			if (open.endsRun && why) await notContinuing(runId);
 			// A sleeping run gets its timer back from the log (`deriveSleep`).
 			if (!open.endsRun) runner.restore(runId, runState);
 		}
@@ -289,6 +296,7 @@ export function createRecovery(deps: RecoveryDeps) {
 						console.warn(
 							`[engine] run ${runId} did not continue on its own: ${why}`,
 						);
+						await notContinuing(runId);
 						return;
 					}
 					await runner.take(
@@ -301,6 +309,18 @@ export function createRecovery(deps: RecoveryDeps) {
 			);
 		} catch (error) {
 			console.error(`[engine] could not resume run ${runId}`, error);
+		}
+	}
+
+	/** An interrupted run that does not continue lets go of what it holds. A failure is logged: a lease expires. */
+	async function notContinuing(runId: string): Promise<void> {
+		try {
+			await deps.runHolds.notContinuing(runId);
+		} catch (error) {
+			console.warn(
+				`[engine] could not let go of what run ${runId} holds`,
+				error,
+			);
 		}
 	}
 

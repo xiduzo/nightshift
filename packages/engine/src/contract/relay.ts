@@ -1,4 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
+import type { LeaseHost } from "./leases";
 import type { StartRunInput } from "./start-run";
 
 /** What a person reads when the Host that keeps a Space cannot be reached. */
@@ -74,6 +75,12 @@ export type Relay = {
 	startRun(
 		input: StartRunInput & { spaceId: string; deviceId: string },
 	): Promise<{ runId: string }>;
+	/**
+	 * The leases of a Space a Host keeps, through that Host (ADR 7).
+	 * Absent: this Replica reaches no Host's leases, and a run in such a
+	 * Space waits for its Host.
+	 */
+	leases?: LeaseHost;
 };
 
 /** A command as the engine asks for it: a person's action on a run another Device walks. */

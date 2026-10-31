@@ -20,6 +20,7 @@ import {
 } from "../read";
 import { type CutShortOutcome, type NodeKind, PLAIN_KIND } from "./context";
 import type { Overdue } from "./deadlines";
+import { letGo, type RunHolds } from "./holds";
 import { NODE_KINDS } from "./node-kinds";
 
 /**
@@ -230,13 +231,16 @@ export type CloseDeps = {
 	bus: RunBus;
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
+	/** What the run holds: let go once its end is written. Default: nothing. */
+	holds?: RunHolds;
 };
 
 /**
  * Ends the run's open work as `cut` says (`closingEvents`), from the run's
  * whole log, and tells the bus: `step-changed` per step, `status-changed`
- * at the end. Appends nothing when nothing is open. Takes no lock and
- * forgets no timer: both are the caller's.
+ * at the end. Appends nothing when nothing is open. A run that ends lets
+ * go of what it holds (`deps.holds`). Takes no lock and forgets no timer:
+ * both are the caller's.
  */
 export async function closeOpenWork(
 	deps: CloseDeps,
@@ -253,6 +257,9 @@ export async function closeOpenWork(
 		await deps.log.append({ ...event, runId });
 		if (event.type === "StepEnded") {
 			deps.bus.publish(runId, { kind: "step-changed", stepId: event.stepId });
+		}
+		if (event.type === "RunEnded" && deps.holds) {
+			await letGo(deps.holds, runId, event.payload.status);
 		}
 	}
 	if (closing.length > 0) deps.bus.publish(runId, { kind: "status-changed" });

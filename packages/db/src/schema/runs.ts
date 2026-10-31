@@ -216,3 +216,38 @@ export const keptVariable = sqliteTable(
 		index("kept_variable_spaceId_idx").on(table.spaceId),
 	],
 );
+
+// Owner: `@nightshift/engine` `leases/`: a Lease node takes a row, the
+// engine renews and releases it (ADR 7).
+
+/**
+ * A named lease of a Space: one run holds the name at a time. The Replica
+ * that keeps the Space keeps its rows: a run another Device walks takes
+ * and renews its leases through that Host. A row is free once
+ * `expires_at` has passed: its holder stopped renewing it, because its run
+ * ended or its Device is gone. Not run history: the exchange does not copy
+ * it, and a run's own log says what it held.
+ */
+export const runLease = sqliteTable(
+	"run_lease",
+	{
+		spaceId: spaceId(),
+		/** The rendered name: `branch:feature/x`, `zac-docker-stack`. */
+		name: text("name").notNull(),
+		/** The run that holds it. No foreign key: the run may live on another Replica. */
+		runId: text("run_id").notNull(),
+		/** The run's title when it took the lease, for a run that waits. */
+		runTitle: text("run_title").notNull(),
+		/** The Device that walks the run: it renews the lease. */
+		walkerId: text("walker_id").notNull(),
+		takenAt: integer("taken_at", { mode: "timestamp_ms" }).notNull(),
+		/** The lease is free after this time, unless its holder renews it. */
+		expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+		/** How long a renewal keeps it, in ms: the node's `ttlMinutes`. */
+		ttlMs: integer("ttl_ms").notNull(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.spaceId, table.name] }),
+		index("run_lease_runId_idx").on(table.runId),
+	],
+);
