@@ -43,7 +43,10 @@ export type WaitUntil = z.infer<typeof waitUntilSchema>;
  *
  * `outcomes` (ADR 8): more ways out than `done`. A polled command picks
  * one: it writes `{ "outcome": "red" }` to `$NS_OUTPUT` and exits 0
- * (`commandWaitOutcome`). Without `outcomes`, the Wait works as before.
+ * (`commandWaitOutcome`). A signal picks one by rule: the first outcome
+ * whose `when` (JSONata over `event`, the signal's data) holds. A webhook
+ * signal that matches no rule does not wake the Wait. Without `outcomes`,
+ * the Wait works as before.
  */
 export const waitNodeSchema = z.object({
 	...nodeBase,
@@ -59,6 +62,20 @@ export const WAIT_OUTCOMES = ["done", "timeout"] as const;
 /** A Wait node's own outcomes, in order: none when it lists none. */
 export function waitOutcomes(node: Pick<WaitNode, "outcomes">): Option[] {
 	return node.outcomes ?? [];
+}
+
+/**
+ * The rules a signal picks an outcome by, in order: the Wait's outcomes
+ * that have a `when`. Empty: any signal of the name ends the wait `done`.
+ */
+export function signalRules(
+	node: Pick<WaitNode, "outcomes">,
+): { outcome: string; when: string }[] {
+	return waitOutcomes(node).flatMap((outcome) =>
+		outcome.when === undefined || outcome.when.trim() === ""
+			? []
+			: [{ outcome: outcome.name, when: outcome.when }],
+	);
 }
 
 /** Whether `outcome` is one of the Wait's own outcomes, not `done` or `timeout`. */
@@ -130,16 +147,19 @@ export function checkWaitNode(node: WaitNode, check: NodeCheck): void {
 }
 
 /**
- * A Wait's own outcomes: only on a wait that can pick one (a command),
- * each a valid, unique label that is not `done` or `timeout`. A command
- * picks by its data, not by a rule. One without an edge ends the run
- * there: a warning.
+ * A Wait's own outcomes: only on a wait that can pick one (a command or a
+ * signal), each a valid, unique label that is not `done` or `timeout`. A
+ * command picks by its data, so its outcomes take no rule. A signal picks
+ * by rule: each rule is valid and reads only `event`, and an outcome
+ * without one is never picked. One without an edge ends the run there: a
+ * warning.
  */
 function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 	if (node.outcomes === undefined) return;
-	if (node.until.kind !== "command") {
+	const kind = node.until.kind;
+	if (kind === "duration" || kind === "time") {
 		check.error(
-			`Wait node "${node.id}" lists outcomes, but only a command can pick one. Remove the outcomes, or wait for a command.`,
+			`Wait node "${node.id}" lists outcomes, but only a command or a signal can pick one. Remove the outcomes, or wait for a command or a signal.`,
 		);
 		return;
 	}
@@ -151,10 +171,17 @@ function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 				`Wait node "${node.id}" lists the outcome "${outcome.name}", which every Wait has. Give it another name.`,
 			);
 		}
-		if (outcome.when !== undefined) {
+		const when = outcome.when?.trim() ?? "";
+		if (kind === "command" && when !== "") {
 			check.error(
 				`Wait node "${node.id}" has a rule on "${outcome.name}", but its command picks the outcome. Remove the rule.`,
 			);
+		} else if (kind === "signal" && when === "") {
+			check.warning(
+				`Wait node "${node.id}" has no rule for "${outcome.name}": a signal never ends the wait there. Give it a rule.`,
+			);
+		} else if (when !== "") {
+			check.eventRule(when, `The rule of "${outcome.name}" of "${node.id}"`);
 		}
 	}
 	checkOptions(

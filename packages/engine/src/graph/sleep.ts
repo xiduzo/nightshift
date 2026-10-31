@@ -89,6 +89,8 @@ export type OwnWait = {
 	signal?: string;
 	/** A wait on a signal with a key: the key, rendered. */
 	signalKey?: string;
+	/** A wait on a signal whose outcomes have rules: the rules, in order (`signalRules`). */
+	signalRules?: { outcome: string; when: string }[];
 };
 
 /** The step's Device (or the one its work must move from) is offline. */
@@ -251,6 +253,12 @@ export async function sleep(
 		request.kind === "own" && request.signalKey !== undefined
 			? { signalKey: request.signalKey }
 			: {};
+	const signalRules =
+		request.kind === "own" &&
+		request.signalRules !== undefined &&
+		request.signalRules.length > 0
+			? { signalRules: request.signalRules }
+			: {};
 	// The Device a policy wait is about (a usage limit is its harness
 	// login's), or the one that is offline. A Wait node's own wait has none.
 	const deviceId =
@@ -270,6 +278,7 @@ export async function sleep(
 			since,
 			...signal,
 			...signalKey,
+			...signalRules,
 			...deviceId,
 		},
 	});

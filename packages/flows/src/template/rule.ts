@@ -94,6 +94,28 @@ export async function chooseByRule(
 	return { matched: null, evaluated };
 }
 
+/**
+ * The outcome a signal picks: the first rule (`signalRules` of a Wait)
+ * that holds over `{ event }`, the signal's data, as a webhook schedule's
+ * rule reads it. Null when none holds. A rule that fails does not hold.
+ */
+export async function signalOutcome(
+	rules: readonly { outcome: string; when: string }[],
+	data: JsonValue | undefined,
+): Promise<string | null> {
+	for (const rule of rules) {
+		try {
+			const result: unknown = await jsonata(rule.when).evaluate({
+				event: data,
+			});
+			if (isTruthy(result)) return rule.outcome;
+		} catch {
+			// A rule that fails on this signal's data does not pick its outcome.
+		}
+	}
+	return null;
+}
+
 /** Why the rule is not valid JSONata, or null when it parses. */
 export function ruleProblem(expr: string): string | null {
 	try {

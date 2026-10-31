@@ -11,7 +11,7 @@ import {
 	type NodeCheck,
 } from "../nodes";
 import type { Report } from "./issues";
-import { checkRule, checkTemplate, type Scope } from "./scope";
+import { checkEventRule, checkRule, checkTemplate, type Scope } from "./scope";
 
 /**
  * The checks of one node's own content. Each node type keeps its checks in
@@ -31,6 +31,7 @@ export function checkNode(
 		template: (text, where) =>
 			checkTemplate(text, `The ${where} of "${node.id}"`, at, scope, error),
 		rule: (expr, subject) => checkRule(expr, subject, at, scope, error),
+		eventRule: (expr, subject) => checkEventRule(expr, subject, at, error),
 		routed: (outcome) =>
 			scope.flow.edges.some(
 				(edge) => edge.from === node.id && edge.outcome === outcome,

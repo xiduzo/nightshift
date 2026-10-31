@@ -451,6 +451,12 @@ export type EnginePayloads = {
 		 * webhook signal with the same key wakes it. Absent: any does.
 		 */
 		signalKey?: string;
+		/**
+		 * A Wait node on a signal whose outcomes have rules: the rules, in
+		 * order. A webhook signal that matches none does not wake it.
+		 * Absent: any signal of the name does.
+		 */
+		signalRules?: { outcome: string; when: string }[];
 		/** The Device the step waits for or on: a usage limit is its harness login's. */
 		deviceId?: string;
 		/** `device-offline`: the name of the Device it waits for, for a notification. */

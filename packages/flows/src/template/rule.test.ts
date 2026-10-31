@@ -7,6 +7,7 @@ import {
 	ruleContext,
 	ruleNames,
 	ruleProblem,
+	signalOutcome,
 } from "./rule";
 
 const context: TemplateContext = {
@@ -205,5 +206,29 @@ describe("ruleProblem and ruleNames", () => {
 		expect(ruleNames("build.data[tests_passed = true]")).toEqual(["build"]);
 		expect(ruleNames("$count(planner.data.tasks) > 3")).toEqual(["planner"]);
 		expect(ruleNames("broken (")).toEqual([]);
+	});
+});
+
+describe("signalOutcome", () => {
+	const rules = [
+		{ outcome: "green", when: 'event.body.conclusion = "success"' },
+		{
+			outcome: "red",
+			when: 'event.body.conclusion in ["failure", "timed_out"]',
+		},
+		{ outcome: "broken", when: "$number(event.body.conclusion) > 1" },
+	];
+
+	test("the first rule that holds over the event picks its outcome", async () => {
+		expect(
+			await signalOutcome(rules, { body: { conclusion: "timed_out" } }),
+		).toBe("red");
+	});
+
+	test("none holds, or a rule fails on the data: null", async () => {
+		expect(
+			await signalOutcome(rules, { body: { conclusion: "neutral" } }),
+		).toBeNull();
+		expect(await signalOutcome(rules, undefined)).toBeNull();
 	});
 });
