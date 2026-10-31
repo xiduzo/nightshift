@@ -8,7 +8,9 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AgentHarness } from "@nightshift/agents/types";
 import type {
+	AgentNode,
 	CommandNode,
 	Flow,
 	FlowEdge,
@@ -16,7 +18,10 @@ import type {
 	ServiceNode,
 	WaitNode,
 } from "@nightshift/flows";
-
+import {
+	defaultRunSettings,
+	type RunSettings,
+} from "../device-config/settings";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { RunDetail } from "../read/views";
 import {
@@ -24,6 +29,7 @@ import {
 	expectRunLogsInSync,
 	type Sandbox,
 	scriptedHarness,
+	type TestEngineOptions,
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
@@ -69,15 +75,20 @@ setInterval(() => {}, 1000);
 `;
 }
 
-function makeEngine(internals: EngineInternals = {}): SpaceEngine {
+function makeEngine(
+	internals: EngineInternals = {},
+	harness: AgentHarness = scriptedHarness().harness,
+	options: Pick<TestEngineOptions, "settings"> = {},
+): SpaceEngine {
 	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	runLogs.push(runLog);
 	return createEngine(
 		withDevice({
 			db: sandbox.db,
-			harnesses: { "claude-code": scriptedHarness().harness },
+			harnesses: { "claude-code": harness },
 			deviceId: sandbox.deviceId,
 			dataDir: sandbox.dataDir,
+			...options,
 		}),
 		{ runLog, minuteMs: MINUTE_MS, secondMs: SECOND_MS, ...internals },
 	).space(sandbox.spaceId);
@@ -281,5 +292,89 @@ describe("the engine stops a service on every end", () => {
 		expect((await endOf(engine, run.id)).status).toBe("finished");
 		await stopsAnswering(stackUrl());
 		expect(existsSync(join(dir, "stop-ran"))).toBe(true);
+	});
+});
+
+/** An Agent step whose harness the test drives. */
+const work: AgentNode = {
+	id: "work",
+	type: "agent",
+	position: at,
+	prompt: "Go",
+	harness: "claude-code",
+	model: "sonnet",
+	permissionMode: "acceptEdits",
+	session: "fresh",
+};
+
+const settingsWith = (patch: Partial<RunSettings>) => (): RunSettings => ({
+	...defaultRunSettings(),
+	...patch,
+});
+
+describe("a service lives for its scope", () => {
+	test("given a service for a Section, when the run leaves the Section, then the stack stops while the run goes on", async () => {
+		const engine = makeEngine();
+		const run = await start(engine, {
+			...flowOf(
+				[stack({ scope: { section: "tests" } }), useStack(), waitForSignal],
+				[edge("stack", "ready", "test"), edge("test", "pass", "hold")],
+			),
+			sections: [{ id: "tests", label: "Tests", nodes: ["stack", "test"] }],
+		});
+
+		await statusOf(engine, run.id, "sleeping");
+
+		expect(readFileSync(join(dir, "answer"), "utf8")).toBe(
+			"hello from the stack",
+		);
+		await stopsAnswering(stackUrl());
+		await engine.act(run.id, { kind: "stop" });
+		expect((await endOf(engine, run.id)).status).toBe("stopped");
+	});
+});
+
+describe("a daemon that died", () => {
+	async function dyingRun() {
+		const dying = scriptedHarness({ hang: true });
+		const dies = new AbortController();
+		const first = makeEngine({ signal: dies.signal }, dying.harness);
+		const run = await start(
+			first,
+			flowOf([stack(), work], [edge("stack", "ready", "work")]),
+		);
+		await waitFor(() => dying.sessions[0], { label: "the session" });
+		const url = stackUrl();
+		expect(await answers(url)).toBe(true);
+		dies.abort();
+		return { run, url };
+	}
+
+	test("given a run that does not continue on its own, when Night Shift starts again, then its stack stops", async () => {
+		const { run, url } = await dyingRun();
+
+		const second = makeEngine({ resumeGraceMs: 0 }, scriptedHarness().harness, {
+			settings: settingsWith({ resumeInterruptedRuns: false }),
+		});
+
+		expect((await second.getRun(run.id)).status).toBe("interrupted");
+		await stopsAnswering(url);
+	});
+
+	test("given a run that continues on its own, when it resumes, then the old stack stops and the service starts again before the next step", async () => {
+		const { run, url } = await dyingRun();
+		rmSync(join(dir, "port"));
+
+		const { harness, sessions } = scriptedHarness();
+		const second = makeEngine({ resumeGraceMs: 0 }, harness);
+		const resumed = await waitFor(() => sessions[0], { label: "the resume" });
+
+		await stopsAnswering(url);
+		const again = stackUrl();
+		expect(again).not.toBe(url);
+		expect(await answers(again)).toBe(true);
+		resumed.finish();
+		expect((await endOf(second, run.id)).status).toBe("finished");
+		await stopsAnswering(again);
 	});
 });

@@ -22,6 +22,7 @@ import type {
 import { checkNode } from "./nodes";
 import { describeNode, type Scope } from "./scope";
 import { checkSections } from "./sections";
+import { checkServicePlacement } from "./services";
 import { templateScope } from "./template-scope";
 import {
 	checkInputs,
@@ -211,6 +212,7 @@ function validateIn(
 		checkWrites(node, scope, error);
 	}
 
+	checkServicePlacement(flow, error);
 	checkOutputs(scope, error);
 	checkUnusedVariables(scope, warning);
 	checkBranches(flow, nodes, error, warning);

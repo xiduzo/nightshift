@@ -68,22 +68,39 @@ function runState(status: EnginePayloads["RunEnded"]["status"]): RunState {
 
 const device = { id: "this", name: "This computer" } as Device;
 
-function setup(status: EnginePayloads["RunEnded"]["status"]) {
+function setup(
+	status: EnginePayloads["RunEnded"]["status"],
+	ready: "ready" | "failed" = "ready",
+) {
 	const state = runState(status);
 	const stopped: string[] = [];
-	const keeper: Pick<ServiceKeeper, "stop"> = {
+	const broughtUp: string[] = [];
+	const appended: { type: string; payload: unknown }[] = [];
+	const keeper: Pick<ServiceKeeper, "stop" | "bringUp"> = {
 		stop: async (_runId, services) => {
 			for (const { service, device: at } of services) {
 				stopped.push(`${service.nodeId}@${at?.id ?? "nowhere"}`);
 			}
 		},
+		bringUp: async (input) => {
+			broughtUp.push(`${input.nodeId}@${input.device.id}`);
+			await input.onStarted({ pid: 43, startedAt: "later" });
+			return ready === "ready"
+				? { kind: "ready", logTail: "" }
+				: { kind: "failed", reason: "Port 8080 is taken.", logTail: "" };
+		},
 	};
 	const holds = serviceHolds({
 		keeper,
-		log: { state: async () => state },
+		log: {
+			state: async () => state,
+			append: (async (event: { type: string; payload: unknown }) => {
+				appended.push(event);
+			}) as never,
+		},
 		deviceOf: async (_runId, deviceId) => (deviceId === "this" ? device : null),
 	});
-	return { holds, stopped, state };
+	return { holds, stopped, state, broughtUp, appended };
 }
 
 describe("serviceHolds", () => {
@@ -105,8 +122,8 @@ describe("serviceHolds", () => {
 		expect(stopped).toEqual(["web@this"]);
 	});
 
-	test("given a run that resumes, then what still runs of its services stops first", async () => {
-		const { holds, stopped, state } = setup("interrupted");
+	test("given a run the daemon interrupted, when it resumes, then what still runs of its services stops, and each starts again", async () => {
+		const { holds, stopped, state, broughtUp, appended } = setup("interrupted");
 
 		await holds.resuming({ id: "run-1" } as RunRow, state, {
 			nodeId: "test",
@@ -114,6 +131,44 @@ describe("serviceHolds", () => {
 		});
 
 		expect(stopped).toEqual(["web@this"]);
+		expect(broughtUp).toEqual(["web@this"]);
+		expect(appended).toEqual([
+			{
+				type: "ServiceStarted",
+				runId: "run-1",
+				payload: expect.objectContaining({
+					nodeId: "web",
+					pid: 43,
+					startedAt: "later",
+					again: true,
+				}),
+			} as never,
+		]);
+	});
+
+	test("given a run that failed, when a person resumes it, then its services start again without a second stop", async () => {
+		const { holds, stopped, state, broughtUp } = setup("failed");
+
+		await holds.resuming({ id: "run-1" } as RunRow, state, {
+			nodeId: "test",
+			scope: null,
+		});
+
+		expect(stopped).toEqual([]);
+		expect(broughtUp).toEqual(["web@this"]);
+	});
+
+	test("given a service that does not get ready again, when the run resumes, then the resume is refused with the reason", async () => {
+		const { holds, state } = setup("failed", "failed");
+
+		await expect(
+			holds.resuming({ id: "run-1" } as RunRow, state, {
+				nodeId: "test",
+				scope: null,
+			}),
+		).rejects.toThrow(
+			'The service "web" did not start again. Port 8080 is taken.',
+		);
 	});
 });
 
