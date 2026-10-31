@@ -614,7 +614,7 @@ describe("a batch and what follows from it", () => {
 			await engineB.dispose();
 			await engineA.dispose();
 		} finally {
-			await documents.close();
+			await documents.flush();
 		}
 	});
 

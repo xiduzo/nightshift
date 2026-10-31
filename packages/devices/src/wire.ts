@@ -4,12 +4,13 @@ import {
 	createKnowledgeStore,
 	type Device,
 	type FlowDocuments,
-	type KnowledgeDocuments,
 	type KnowledgeHost,
 	type MoveRows,
+	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
 	createDeviceCopies,
+	type DeviceCopies,
 	type DeviceDocument,
 	type KeyStoreKind,
 	type ProfileStore,
@@ -17,9 +18,8 @@ import {
 	type SettingsStore,
 } from "@nightshift/engine/device-config";
 import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
-import type * as Y from "yjs";
 import { createKnowledgeArchive } from "./archive";
-import type { HostClient, HostRelay } from "./contract";
+import type { HostClient, HostHello, HostRelay } from "./contract";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
@@ -37,7 +37,9 @@ import {
 	createDeviceLinks,
 	createHostLinks,
 	deviceKeyStore,
+	type HostLink,
 	type LinkOptions,
+	type SyncedDocument,
 } from "./links";
 import { createHomeMembership } from "./membership";
 import {
@@ -152,11 +154,11 @@ export type DevicesDeps = {
 	settings: SettingsStore;
 	profiles: ProfileStore;
 	document: DeviceDocument;
+	/** The documents this Replica syncs, by name: the views below are over them. */
+	documents: SyncedDocuments;
 	spaces: SpaceDocuments;
 	/** The flow documents of the Projects: this Device keeps a copy of each. */
 	flows: FlowDocuments;
-	/** The knowledge documents of the Projects: this Device keeps a copy of each (ADR 4). */
-	knowledge: Pick<KnowledgeDocuments, "open">;
 	/** This computer's Device. */
 	self: { id: string; name: string };
 	/** The Person who owns this computer. */
@@ -240,7 +242,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	 * Read-only copies of the documents of this computer's owner's other
 	 * Devices, from the home Host: their names, profiles and secret names.
 	 */
-	const copies = createDeviceCopies({ db, selfId: self.id });
+	const copies = createDeviceCopies({
+		db,
+		selfId: self.id,
+		documents: deps.documents,
+	});
 
 	// The actions on rows another Device owns, carried over the Links. The
 	// relays reach the engine and the Links: they read both when they are
@@ -335,12 +341,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const links = createDeviceLinks({
 		links: hostLinks,
 		keys: keyStore,
-		document: deps.document,
 		// The Spaces the Host lists: kept here as the Host's, their documents
 		// synced read-only, before run rows that name their projects arrive.
 		// The flow and knowledge documents of their Projects sync both ways.
 		// A Project the Host adds later syncs from its next answer.
-		spaceDocuments: async (link, hello) => {
+		documents: async (link, hello) => {
 			const { hostSpaces } = engine;
 			await hostSpaces.update(
 				{ id: link.hostId, name: hello.host.name },
@@ -348,13 +353,13 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				ownerId,
 			);
 			const kept = new Set(await hostSpaces.ofHost(link.hostId));
-			return hostSpaceDocuments(
-				deps,
+			return documentsWithHost(
+				{ documents: deps.documents, document: deps.document, copies },
+				link,
+				hello,
 				hello.spaces.filter((space) => kept.has(space.id)).map((s) => s.id),
 			);
 		},
-		// The Devices the home Host lists: only this Person's own.
-		deviceDocuments: (_link, hello) => copies.keep(hello.devices ?? []),
 		// Without its home Host this computer learns nothing of the others,
 		// and its Personal splits off the Host's: it keeps a copy.
 		revoked: async (link) => {
@@ -431,7 +436,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		finishing.abort();
 		clearInterval(presence);
 		await links.close();
-		await copies.close();
 		// A command this engine is applying ends here: the next runtime
 		// reports its result, and does not apply it again.
 		await Promise.allSettled(
@@ -531,31 +535,32 @@ async function letGo(engine: { dispose(): Promise<void> }): Promise<void> {
 }
 
 /**
- * What a Device syncs of the Spaces a Host keeps: each Space document,
- * which it only receives, and the flow documents (ADR 2) and the
- * knowledge document (ADR 4) of each Project in it, which it keeps a copy
- * of and changes too.
+ * What a Device syncs with a Host. Over a link to its home Host: its own
+ * Device document, and a read-only copy of each of its owner's other
+ * Devices' documents that the Host lists (`DeviceCopies.keep`). Over any
+ * link: the documents of each Space the Host keeps for it, which it
+ * only receives, with the flow documents (ADR 2) and the knowledge
+ * document (ADR 4) of each Project in it, which it keeps a copy of and
+ * changes too (`SyncedDocuments.ofSpace`).
  */
-export async function hostSpaceDocuments(
-	documents: {
-		spaces: Pick<SpaceDocuments, "open">;
-		flows: Pick<FlowDocuments, "open">;
-		knowledge: Pick<KnowledgeDocuments, "open">;
+export async function documentsWithHost(
+	from: {
+		documents: Pick<SyncedDocuments, "ofSpace">;
+		document: SyncedDocument;
+		copies: Pick<DeviceCopies, "keep">;
 	},
+	link: Pick<HostLink, "role">,
+	hello: Pick<HostHello, "devices">,
 	spaceIds: readonly string[],
-): Promise<{ name: string; doc: Y.Doc }[]> {
-	const synced: { name: string; doc: Y.Doc }[] = [];
+): Promise<SyncedDocument[]> {
+	const synced: SyncedDocument[] = [];
+	if (link.role === "home") {
+		synced.push({ name: from.document.name, doc: from.document.doc });
+		synced.push(...(await from.copies.keep(hello.devices ?? [])));
+	}
 	for (const spaceId of spaceIds) {
-		const space = await documents.spaces.open(spaceId);
-		synced.push({ name: space.name, doc: space.doc });
-		for (const projectId of [...space.projects.keys()].sort()) {
-			const { current, history } = await documents.flows.open(projectId);
-			const knowledge = await documents.knowledge.open(projectId);
-			synced.push(
-				{ name: current.name, doc: current.doc },
-				{ name: history.name, doc: history.doc },
-				{ name: knowledge.name, doc: knowledge.doc },
-			);
+		for (const document of await from.documents.ofSpace(spaceId)) {
+			synced.push({ name: document.name, doc: document.doc });
 		}
 	}
 	return synced;

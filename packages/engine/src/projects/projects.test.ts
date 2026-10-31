@@ -25,7 +25,7 @@ beforeEach(async () => {
 	});
 });
 afterEach(async () => {
-	await documents.close();
+	await documents.flush();
 	await sandbox.cleanup();
 });
 
@@ -280,7 +280,7 @@ describe("what the peers ask of the Projects", () => {
 				),
 			).toEqual([sandbox.deviceId]);
 		} finally {
-			await replica.close();
+			await replica.flush();
 		}
 	});
 
@@ -346,7 +346,7 @@ describe("what the peers ask of the Projects", () => {
 			expect([...kept.projects.keys()]).toEqual([]);
 			expect([...kept.clones.keys()]).toEqual([]);
 		} finally {
-			await replica.close();
+			await replica.flush();
 		}
 	});
 

@@ -220,7 +220,7 @@ async function syncFlows(projectId: string) {
 	const ours = await paired.flows.open(projectId);
 	Y.applyUpdate(ours.current.doc, Y.encodeStateAsUpdate(theirs.current.doc));
 	Y.applyUpdate(ours.history.doc, Y.encodeStateAsUpdate(theirs.history.doc));
-	await onA.close();
+	await onA.flush();
 }
 
 async function spaceOfRun(sandbox: Sandbox, runId: string) {

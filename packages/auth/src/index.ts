@@ -4,7 +4,7 @@
 export {
 	type AccessRefusal,
 	authEndpointAccess,
-	type DocumentSpace,
+	type DocumentOf,
 	documentAccess,
 	type RequestAccess,
 	ROLE_REFUSAL,

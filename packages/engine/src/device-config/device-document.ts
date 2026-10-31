@@ -10,9 +10,12 @@ import {
 import { eq } from "drizzle-orm";
 import type * as Y from "yjs";
 
-import { openPersistedDocument, type PersistedDocument } from "./ydoc";
-
-export { type DocumentRows, documentRows } from "./ydoc";
+import {
+	createSyncedDocuments,
+	documentName,
+	type PersistedDocument,
+	type SyncedDocuments,
+} from "../documents";
 
 /**
  * The Device document: one Yjs document per Device, named `device:<id>`,
@@ -72,11 +75,8 @@ export type DeviceFacts = {
 
 /** The name of a Device's document. */
 export function deviceDocumentName(deviceId: string): string {
-	return `device:${deviceId}`;
+	return documentName("device", deviceId);
 }
-
-/** The transaction origin of the Owner's own changes. */
-export const OWNER_ORIGIN = Symbol("device-document-owner");
 
 /**
  * Opens this computer's Device document from the Replica. On the first
@@ -87,14 +87,12 @@ export const OWNER_ORIGIN = Symbol("device-document-owner");
 export async function openDeviceDocument(options: {
 	db: Database;
 	deviceId: string;
+	/** This Replica's synced documents. Default: its own over `db`. */
+	documents?: SyncedDocuments;
 }): Promise<DeviceDocument> {
 	const { db, deviceId } = options;
-	const persisted = await openPersistedDocument({
-		db,
-		name: deviceDocumentName(deviceId),
-		origin: OWNER_ORIGIN,
-		label: "The Device document",
-	});
+	const documents = options.documents ?? createSyncedDocuments({ db });
+	const persisted = await documents.open(deviceDocumentName(deviceId));
 	const { doc } = persisted;
 	const document: DeviceDocument = {
 		...persisted,

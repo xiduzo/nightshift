@@ -50,7 +50,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-	await documents.close();
+	await documents.flush();
 	await sandbox.cleanup();
 });
 

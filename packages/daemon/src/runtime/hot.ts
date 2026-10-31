@@ -1,17 +1,8 @@
 import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
-import type {
-	FlowDocuments,
-	KnowledgeDocuments,
-	KnowledgeSearch,
-} from "@nightshift/engine";
-import type { DeviceDocument } from "@nightshift/engine/device-config";
-import type {
-	GitHubClones,
-	ProjectCopies,
-	SpaceDocuments,
-} from "@nightshift/engine/projects";
+import type { KnowledgeSearch, SyncedDocuments } from "@nightshift/engine";
+import type { GitHubClones, ProjectCopies } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 import type { Telemetry } from "@nightshift/telemetry";
 
@@ -26,7 +17,7 @@ import type { Lease } from "./lease";
  * a slot here, and the daemon names its lifecycle once (`hotSlots`):
  *
  * - kept: the database client (one per database, so a reload leaks none),
- *   the lease, the Device, Space, flow and knowledge documents (one writer each), the
+ *   the lease, the synced documents (one writer each), the
  *   in-app channel (an open notification stream outlives a reload), the
  *   clones from GitHub, and the relay (`keepSync`: its connections stay,
  *   and it is bound to the newest daemon's closures). Bun reloads a
@@ -51,10 +42,13 @@ export type HotRegistry = KeptDevices &
 		/** The database clients of this process, by URL (`processDatabase`). */
 		nightshiftDatabases?: Map<string, Database>;
 		nightshiftLease?: Lease;
-		nightshiftDocument?: DeviceDocument;
-		nightshiftSpaces?: SpaceDocuments;
-		nightshiftFlows?: FlowDocuments;
-		nightshiftKnowledgeDocuments?: KnowledgeDocuments;
+		/** Every document this Replica syncs, by name. */
+		nightshiftDocuments?: SyncedDocuments;
+		/** A daemon of an older version kept these apart (`stopOlderDocuments`). */
+		nightshiftDocument?: OlderDocuments;
+		nightshiftSpaces?: OlderDocuments;
+		nightshiftFlows?: OlderDocuments;
+		nightshiftKnowledgeDocuments?: OlderDocuments;
 		nightshiftInApp?: InAppChannel;
 		nightshiftNotifications?: Notifications;
 		nightshiftKeepAwake?: KeepAwake;
@@ -75,6 +69,32 @@ export type HotRegistry = KeptDevices &
 	};
 
 export const hot = globalThis as HotRegistry;
+
+/** Documents a daemon of an older version kept, one slot per kind. */
+type OlderDocuments = { close?(): Promise<void> };
+
+/**
+ * A daemon of an older version kept the Device, Space, flow and
+ * knowledge documents in a slot each. The first daemon with one slot for
+ * every document closes them: each document keeps one writer in the
+ * process. A connection the relay kept still holds the older documents:
+ * restart the daemon after such a reload.
+ */
+export async function stopOlderDocuments(registry: HotRegistry) {
+	const names = [
+		"nightshiftDocument",
+		"nightshiftSpaces",
+		"nightshiftFlows",
+		"nightshiftKnowledgeDocuments",
+	] as const;
+	for (const name of names) {
+		const older = registry[name];
+		registry[name] = undefined;
+		await older?.close?.().catch((error) => {
+			console.error(`${name} did not stop cleanly:`, error);
+		});
+	}
+}
 
 type Value<R, K extends keyof R> = NonNullable<R[K]>;
 

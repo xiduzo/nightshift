@@ -12,7 +12,6 @@ import * as Y from "yjs";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	createFlowDocuments,
-	documentSpace,
 	type FlowDocument,
 	type FlowDocuments,
 	flowIdOf,
@@ -95,7 +94,7 @@ async function replica(clock: { at: number }): Promise<Replica> {
 		}),
 		document: () => documents.open(of),
 		dispose: async () => {
-			await documents.close();
+			await documents.flush();
 			await sandbox.cleanup();
 		},
 	};
@@ -387,7 +386,7 @@ describe("the flow document", () => {
 				enabled: true,
 			},
 		]);
-		await laptop.documents.close();
+		await laptop.documents.flush();
 
 		const again = createFlowDocuments({ db: laptop.sandbox.db });
 		try {
@@ -397,11 +396,11 @@ describe("the flow document", () => {
 			});
 			expect(scheduleOrderOf(document).toArray()).toEqual(["nightly"]);
 		} finally {
-			await again.close();
+			await again.flush();
 		}
 	});
 
-	test("openAll opens the documents of every project, and byName finds them", async () => {
+	test("openAll opens the documents of every project", async () => {
 		await laptop.sandbox.db.insert(project).values({
 			id: "listed",
 			spaceId: laptop.sandbox.spaceId,
@@ -409,16 +408,9 @@ describe("the flow document", () => {
 			createdAt: new Date(),
 		});
 		const documents = await laptop.documents.openAll();
-		expect(documents.map((document) => document.projectId)).toEqual(["listed"]);
-		for (const document of documents) {
-			expect(laptop.documents.byName(`flows:${document.projectId}`)).toBe(
-				document.current,
-			);
-			expect(
-				laptop.documents.byName(`flows-history:${document.projectId}`),
-			).toBe(document.history);
-		}
-		expect(laptop.documents.byName("flows:nothing")).toBeNull();
+		expect(
+			documents.map((d) => [d.projectId, d.current.name, d.history.name]),
+		).toEqual([["listed", "flows:listed", "flows-history:listed"]]);
 	});
 
 	test("a schedule that a newer Night Shift saved stays when the schedules are saved", async () => {
@@ -441,51 +433,6 @@ describe("the flow document", () => {
 			expect.objectContaining({ severity: "warning" }),
 		]);
 		expect(scheduleMap(document).has("future")).toBe(true);
-	});
-});
-
-describe("the documents of a Replica, for the relay", () => {
-	let sandbox: Sandbox;
-	let documents: FlowDocuments;
-
-	beforeEach(async () => {
-		sandbox = await createSandbox();
-		documents = createFlowDocuments({ db: sandbox.db });
-		await sandbox.db.insert(project).values({
-			id: "shop",
-			spaceId: sandbox.spaceId,
-			name: "Shop",
-			createdAt: new Date(),
-		});
-	});
-
-	afterEach(async () => {
-		await documents.close();
-		await sandbox.cleanup();
-	});
-
-	test("find opens the flow documents of a Project the Replica has, and no others", async () => {
-		const found = await documents.find("flows-history:shop");
-		expect(found?.name).toBe("flows-history:shop");
-		expect(documents.byName("flows:shop")).not.toBeNull();
-		expect(await documents.find("flows:elsewhere")).toBeNull();
-		expect(await documents.find(`space:${sandbox.spaceId}`)).toBeNull();
-	});
-
-	test("documentSpace names the Space of a Space document and of a flow document", async () => {
-		const spaceOf = documentSpace(sandbox.db);
-		expect(await spaceOf(`space:${sandbox.spaceId}`)).toEqual({
-			spaceId: sandbox.spaceId,
-			kind: "space",
-		});
-		for (const name of ["flows:shop", "flows-history:shop"]) {
-			expect(await spaceOf(name)).toEqual({
-				spaceId: sandbox.spaceId,
-				kind: "flows",
-			});
-		}
-		expect(await spaceOf("flows:elsewhere")).toBeNull();
-		expect(await spaceOf("device:someone")).toBeNull();
 	});
 });
 

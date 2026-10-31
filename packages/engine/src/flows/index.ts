@@ -4,7 +4,6 @@ export { createCloneImports } from "./clone-imports";
 export { cliToolsInUse, connectionsInUse, profilesInUse } from "./config-use";
 export {
 	createFlowDocuments,
-	documentSpace,
 	type FlowDocuments,
 	type FlowNotice,
 	revisionKinds,

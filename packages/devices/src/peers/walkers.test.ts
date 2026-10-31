@@ -106,7 +106,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	await Promise.all([engineA.dispose(), engineB.dispose()]);
-	await documentsB.close();
+	await documentsB.flush();
 	await Promise.all([a.cleanup(), b.cleanup()]);
 });
 

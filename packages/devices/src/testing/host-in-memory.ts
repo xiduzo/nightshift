@@ -4,7 +4,9 @@ import { hostLink, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
 	createKnowledgeStore,
+	createSyncedDocuments,
 	type FlowDocuments,
+	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
@@ -39,6 +41,8 @@ export type HostReplica = {
 	documents: SpaceDocuments;
 	/** A's flow documents: its engine's. */
 	flows: FlowDocuments;
+	/** Every document A syncs, by name. */
+	synced: SyncedDocuments;
 	/** A's id, as a Device names its Host. */
 	hostId: string;
 	/** A's owner: the Person of every Device that joins. */
@@ -79,12 +83,14 @@ export async function hostInMemory(
 	const personId = owner.id;
 	const hostId = a.deviceId;
 
-	// A's Space documents: the engine's, and where the Host records a Clone.
+	// A's documents. Its Space documents: the engine's, and where the Host records a Clone.
+	const synced = createSyncedDocuments({ db: a.db });
 	const documents = createSpaceDocuments({
 		db: a.db,
 		directory: deviceDirectory(a.db),
+		documents: synced,
 	});
-	const flows = createFlowDocuments({ db: a.db });
+	const flows = createFlowDocuments({ db: a.db, documents: synced });
 	const host: PeerEngine = createPeerEngine(
 		withPeers({
 			db: a.db,
@@ -143,6 +149,7 @@ export async function hostInMemory(
 		memory,
 		documents,
 		flows,
+		synced,
 		hostId,
 		personId,
 		hello: asHost.hello,

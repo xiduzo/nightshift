@@ -6,6 +6,7 @@ export {
 	createHostLinks,
 	type DeviceKeyStore,
 	deviceKeyStore,
+	type HostLink,
 	type HostLinks,
 	type HostRole,
 } from "./host-links";
@@ -18,7 +19,7 @@ export {
 	personOnHost,
 } from "./host-spaces";
 export { joinHost } from "./join";
-export type { Link } from "./link";
+export type { Link, SyncedDocument } from "./link";
 export {
 	createDeviceLinks,
 	type DeviceLinks,

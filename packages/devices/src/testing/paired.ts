@@ -2,9 +2,11 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import { member, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
+	createSyncedDocuments,
 	type FlowDocuments,
 	HostUnreachableError,
 	type KnowledgeHost,
+	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
@@ -46,6 +48,8 @@ export type PairedDevice = {
 	documents: SpaceDocuments;
 	/** Its flow documents: the engine's. */
 	flows: FlowDocuments;
+	/** Every document it syncs, by name: the views above are over them. */
+	synced: SyncedDocuments;
 	/** A's archive of knowledge content, as the Device reaches it over its relay. */
 	knowledge: KnowledgeHost;
 	/**
@@ -89,6 +93,8 @@ export type PairedReplicas = {
 	documents: SpaceDocuments;
 	/** B's flow documents: its engine's. */
 	flows: FlowDocuments;
+	/** Every document B syncs, by name (`PairedDevice.synced`). */
+	synced: SyncedDocuments;
 	/** A's archive of knowledge content, as B reaches it (`PairedDevice.knowledge`). */
 	knowledge: KnowledgeHost;
 	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
@@ -137,26 +143,21 @@ export async function pairedReplicas(
 	async function pair(sandbox: Sandbox, name: string): Promise<PairedDevice> {
 		await mustGit(sandbox.repoPath, ["remote", "add", "origin", PAIRED_ORIGIN]);
 		const key = await replica.join(sandbox.deviceId, name);
+		const synced = createSyncedDocuments({ db: sandbox.db });
 		const documents = createSpaceDocuments({
 			db: sandbox.db,
 			directory: deviceDirectory(sandbox.db),
+			documents: synced,
 		});
-		const flows = createFlowDocuments({ db: sandbox.db });
+		const flows = createFlowDocuments({ db: sandbox.db, documents: synced });
 		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		const relay = createRelay({
 			engine: () => engine,
 			registry: () => engine.devices,
 			links: () =>
 				linksTo(new Map([[hostId, memory.client(key)]]), {
-					// The documents a Link syncs: the Space and flow documents.
-					here: async (name) =>
-						documents.byName(name)?.doc ??
-						(await flows.find(name))?.doc ??
-						null,
-					host: async (name) =>
-						replica.documents.byName(name)?.doc ??
-						(await replica.flows.find(name))?.doc ??
-						null,
+					here: async (name) => (await synced.find(name))?.doc ?? null,
+					host: async (name) => (await replica.synced.find(name))?.doc ?? null,
 				}),
 			flows,
 		});
@@ -213,6 +214,7 @@ export async function pairedReplicas(
 			key,
 			documents,
 			flows,
+			synced,
 			knowledge: createKnowledgeArchive({ relay }),
 			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
 				const { spaceId, remote } = await host.projects.find(projectId);
@@ -243,6 +245,7 @@ export async function pairedReplicas(
 		personId,
 		documents: paired.documents,
 		flows: paired.flows,
+		synced: paired.synced,
 		flowsToHost: paired.flowsToHost,
 		knowledge: paired.knowledge,
 		projectOnDevice: paired.projectOnDevice,

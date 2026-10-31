@@ -61,7 +61,7 @@ beforeEach(async () => {
 	crashNext = false;
 });
 afterEach(async () => {
-	await documents.close();
+	await documents.flush();
 	await sandbox.cleanup();
 });
 
@@ -363,7 +363,7 @@ describe("the merge of one project's flows into another's", () => {
 	test("the merge is kept: the documents read it back from the Replica", async () => {
 		await seed();
 		await merge();
-		await documents.close();
+		await documents.flush();
 		documents = createFlowDocuments({ db: sandbox.db });
 		flows = flowsOn(documents);
 		expect(Object.keys(await flows.flows(HOSTED))).toEqual([

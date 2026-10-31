@@ -34,15 +34,17 @@ export type SyncAuthorize = (request: {
 }) => SyncAccess | SyncGrant | Promise<SyncAccess | SyncGrant>;
 
 /**
- * The Space a synced document belongs to, and its kind: the Space
- * document, a flow document of one of the Space's Projects (its flows
- * and schedules, or their revisions), or a Project's knowledge document
- * (its files by hash, ADR 4).
+ * What a synced document is, as the access rules read it: a Device's
+ * document, or a document of a Space: the Space document, a flow document
+ * of one of the Space's Projects (its flows and schedules, or their
+ * revisions), or a Project's knowledge document (its files by hash, ADR 4).
  */
-export type DocumentSpace = {
-	spaceId: string;
-	kind: "space" | "flows" | "knowledge";
-};
+export type DocumentOf =
+	| { kind: "device"; deviceId: string }
+	| { kind: "space" | "flows" | "knowledge"; spaceId: string };
+
+/** A document of a Space. */
+type SpaceDocumentOf = Exclude<DocumentOf, { kind: "device" }>;
 
 /** A Device key as the relay needs it. */
 export type SyncDeviceKey = {
@@ -93,7 +95,7 @@ const FLOW_WRITE: Permissions = {
 const KNOWLEDGE_WRITE: Permissions = { run: ["start"] };
 
 /** What a Device's role needs to change a document of each kind. Null: no Device changes it. */
-const DEVICE_WRITE: Record<DocumentSpace["kind"], Permissions | null> = {
+const DEVICE_WRITE: Record<SpaceDocumentOf["kind"], Permissions | null> = {
 	space: null,
 	flows: FLOW_WRITE,
 	knowledge: KNOWLEDGE_WRITE,
@@ -107,8 +109,8 @@ export function documentAccess(options: {
 	ownerId: string;
 	/** Whether the upgrade request came from this computer (the daemon's own rule). */
 	isThisComputer: (peer: string | null, request: Request) => boolean;
-	/** The Space of a document, or null for another kind of document. */
-	spaceOfDocument: (documentName: string) => Promise<DocumentSpace | null>;
+	/** What a document is, or null for a name this daemon does not serve. */
+	documentOf: (documentName: string) => Promise<DocumentOf | null>;
 	/**
 	 * The Host's rules for sessions from other computers. A session the
 	 * Host refuses (two-factor required, not on) opens no document.
@@ -133,11 +135,9 @@ export function documentAccess(options: {
 	 */
 	const spaceAccess = async (
 		personId: string,
-		documentName: string,
+		space: SpaceDocumentOf,
 		device = false,
 	): Promise<SyncAccess> => {
-		const space = await options.spaceOfDocument(documentName);
-		if (!space) return false;
 		const role = await roleIn(options.db, personId, space.spaceId);
 		if (role === null) return false;
 		const needs = DEVICE_WRITE[space.kind];
@@ -145,20 +145,22 @@ export function documentAccess(options: {
 	};
 
 	return async ({ documentName, token, request, peer }) => {
+		const document = await options.documentOf(documentName);
+		if (!document) return false;
 		if (isDeviceKey(token)) {
 			const key = await options.deviceKey?.(token);
 			if (!key) return false;
 			const context = { deviceId: key.deviceId };
-			if (documentName.startsWith("device:")) {
+			if (document.kind === "device") {
 				const owners =
 					key.home && (await ownerOf(documentName)) === key.personId;
 				if (!owners) return false;
 				return {
-					access: documentName === `device:${key.deviceId}` ? "write" : "read",
+					access: document.deviceId === key.deviceId ? "write" : "read",
 					context,
 				};
 			}
-			const access = await spaceAccess(key.personId, documentName, true);
+			const access = await spaceAccess(key.personId, document, true);
 			return access ? { access, context } : false;
 		}
 		const local = options.isThisComputer(peer, request);
@@ -170,11 +172,11 @@ export function documentAccess(options: {
 			options.policy,
 		);
 		if (!session || !hostAccess.allowed) return false;
-		if (documentName.startsWith("device:")) {
+		if (document.kind === "device") {
 			return session.user.id === (await ownerOf(documentName))
 				? "write"
 				: false;
 		}
-		return spaceAccess(session.user.id, documentName);
+		return spaceAccess(session.user.id, document);
 	};
 }

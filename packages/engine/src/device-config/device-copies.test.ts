@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as Y from "yjs";
+import { createSyncedDocuments } from "../documents";
 import { createSandbox, type Sandbox } from "../testing";
 import { createDeviceCopies } from "./device-copies";
 import { createProfileStore } from "./profiles";
@@ -39,12 +40,18 @@ async function laptopDocument() {
 	return { other, update: Y.encodeStateAsUpdate(document.doc), document };
 }
 
+/** The copies over a Replica's synced documents, and the documents, to close as a restart does. */
+function copiesOf(replica: Sandbox) {
+	const documents = createSyncedDocuments({ db: replica.db });
+	return Object.assign(
+		createDeviceCopies({ db: replica.db, selfId: replica.deviceId, documents }),
+		{ documents },
+	);
+}
+
 describe("device copies", () => {
 	test("a listed Device's document syncs into its copy: its name, profiles and secret names", async () => {
-		const copies = createDeviceCopies({
-			db: sandbox.db,
-			selfId: sandbox.deviceId,
-		});
+		const copies = copiesOf(sandbox);
 		const [synced] = await copies.keep([
 			{ id: "laptop", name: "laptop.local" },
 		]);
@@ -63,24 +70,18 @@ describe("device copies", () => {
 			],
 			checkedAt: 7,
 		});
-		await copies.close();
+		await copies.documents.close();
 		await other.cleanup();
 	});
 
 	test("a copy lasts across a restart, and the Host's name stands in for a Device that reports none", async () => {
-		const first = createDeviceCopies({
-			db: sandbox.db,
-			selfId: sandbox.deviceId,
-		});
+		const first = copiesOf(sandbox);
 		const synced = await first.keep([{ id: "desktop", name: "Desktop" }]);
 		for (const { doc } of synced) doc.getMap("facts").set("platform", "linux");
 		expect((await first.get("desktop"))?.name).toBe("Desktop");
-		await first.close();
+		await first.documents.close();
 
-		const again = createDeviceCopies({
-			db: sandbox.db,
-			selfId: sandbox.deviceId,
-		});
+		const again = copiesOf(sandbox);
 		expect(await again.list()).toEqual([
 			expect.objectContaining({
 				deviceId: "desktop",
@@ -88,14 +89,11 @@ describe("device copies", () => {
 				name: null,
 			}),
 		]);
-		await again.close();
+		await again.documents.close();
 	});
 
 	test("a Device the Host no longer lists loses its copy; this computer is never a copy", async () => {
-		const copies = createDeviceCopies({
-			db: sandbox.db,
-			selfId: sandbox.deviceId,
-		});
+		const copies = copiesOf(sandbox);
 		const synced = await copies.keep([
 			{ id: "laptop", name: "Laptop" },
 			{ id: "desktop", name: "Desktop" },
@@ -111,13 +109,10 @@ describe("device copies", () => {
 		expect((await copies.list()).map((c) => c.deviceId)).toEqual(["laptop"]);
 		expect(await copies.get("desktop")).toBeNull();
 		expect(await copies.get(sandbox.deviceId)).toBeNull();
-		await copies.close();
+		await copies.documents.close();
 
-		const again = createDeviceCopies({
-			db: sandbox.db,
-			selfId: sandbox.deviceId,
-		});
+		const again = copiesOf(sandbox);
 		expect((await again.list()).map((c) => c.deviceId)).toEqual(["laptop"]);
-		await again.close();
+		await again.documents.close();
 	});
 });

@@ -27,11 +27,9 @@ import type { LinkStatus } from "./types";
  *   that doubles up to `maxBackoffMs`.
  * - A Host that refuses the key (its owner removed this computer's
  *   access) ends the link for good: `revoked`.
- * - Over a link to its home Host, this Device's own document syncs, and a
- *   read-only copy of each of its owner's other Devices' documents that
- *   the Host lists. A copy the Host stops listing stops syncing.
- * - Over any link, the Space documents the Host lists (the Spaces this
- *   Device's owner is a Member of there) sync read-only.
+ * - The documents it syncs are the caller's (`documents`), asked again
+ *   with every answer of the Host: one the caller no longer gives stops
+ *   syncing.
  * - Every document goes over one WebSocket per link.
  *
  * The link owns the life of every call over it. A long call (the exchange
@@ -85,6 +83,9 @@ export type Link = {
 	close(): Promise<void>;
 };
 
+/** A document a link syncs: the name the Host knows it by, and this Replica's copy. */
+export type SyncedDocument = { name: string; doc: Y.Doc };
+
 export type LinkState = {
 	status: LinkStatus;
 	/** The address that answers. Null while it looks for one. */
@@ -96,19 +97,13 @@ export type LinkState = {
 export type HttpsLinkOptions = {
 	link: HostLink;
 	key: string;
-	/** This Device's document: it syncs over a link to the home Host. */
-	document?: { name: string; doc: Y.Doc };
 	/**
-	 * The Space documents to sync from this Host, read-only: called with
-	 * every answer of the Host, so a Space it lists later syncs too.
+	 * The documents to sync with this Host: called with every answer of
+	 * the Host. A document it gives syncs from then on, and one it no
+	 * longer gives stops: the link attaches and detaches by the
+	 * difference. What a Device syncs with which Host is the caller's rule.
 	 */
-	spaceDocuments?(hello: HostHello): Promise<{ name: string; doc: Y.Doc }[]>;
-	/**
-	 * The copies of the owner's other Devices' documents, over a link to
-	 * the home Host: called with every answer of the Host, so a Device it
-	 * lists later syncs too, and one it no longer lists stops.
-	 */
-	deviceDocuments?(hello: HostHello): Promise<{ name: string; doc: Y.Doc }[]>;
+	documents?(hello: HostHello): Promise<SyncedDocument[]>;
 	heartbeatMs?: number;
 	firstBackoffMs?: number;
 	maxBackoffMs?: number;
@@ -196,8 +191,6 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	let current: HostClient | null = null;
 	let socket: HocuspocusProviderWebsocket | null = null;
 	const providers = new Map<string, HocuspocusProvider>();
-	/** The names of the copies of other Devices' documents that sync now. */
-	const copies = new Set<string>();
 	/** Aborts when the link drops: every stream stops. */
 	let online: AbortController | null = null;
 	const stop = new AbortController();
@@ -273,33 +266,24 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		providers.set(name, provider);
 	}
 
+	/** Syncs the documents the caller gives for this answer: the new ones attach, the gone ones detach. */
 	async function syncDocuments(address: string, hello: HostHello) {
-		if (link.role === "home" && options.document) {
-			attach(address, options.document.name, options.document.doc);
+		if (!options.documents) return;
+		const listed = await options.documents(hello);
+		const names = new Set(listed.map((document) => document.name));
+		for (const [name, provider] of providers) {
+			if (names.has(name)) continue;
+			provider.destroy();
+			providers.delete(name);
 		}
-		for (const document of (await options.spaceDocuments?.(hello)) ?? []) {
+		for (const document of listed) {
 			attach(address, document.name, document.doc);
-		}
-		if (link.role === "home" && options.deviceDocuments) {
-			const listed = await options.deviceDocuments(hello);
-			const names = new Set(listed.map((document) => document.name));
-			for (const name of copies) {
-				if (names.has(name)) continue;
-				providers.get(name)?.destroy();
-				providers.delete(name);
-				copies.delete(name);
-			}
-			for (const document of listed) {
-				attach(address, document.name, document.doc);
-				copies.add(document.name);
-			}
 		}
 	}
 
 	function stopDocuments() {
 		for (const provider of providers.values()) provider.destroy();
 		providers.clear();
-		copies.clear();
 		socket?.destroy();
 		socket = null;
 	}

@@ -4,13 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { daemonLease } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
+import { documentName } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
-	syncSpaceDocument,
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import * as Y from "yjs";
 
 import { createDaemon, type Daemon, type DaemonOutside } from "./daemon";
 import { type DaemonEnv, hot, processDatabase } from "./runtime";
@@ -152,15 +153,15 @@ describe("the daemon, wired in one process", () => {
 		const env = envIn(dir);
 		const first = await start(env);
 		const firstLease = first.info.lease.epoch;
-		const spaces = hot.nightshiftSpaces;
-		expect(spaces).toBeDefined();
+		const documents = hot.nightshiftDocuments;
+		expect(documents).toBeDefined();
 		expect(hot.nightshiftDevices).toBeDefined();
 
 		await first.stop();
 		started.splice(started.indexOf(first), 1);
 
 		expect(hot.nightshiftLease).toBeUndefined();
-		expect(hot.nightshiftSpaces).toBeUndefined();
+		expect(hot.nightshiftDocuments).toBeUndefined();
 		expect(hot.nightshiftDevices).toBeUndefined();
 		expect(hot.nightshiftScheduler).toBeUndefined();
 		expect(hot.nightshiftSync).toBeUndefined();
@@ -170,7 +171,7 @@ describe("the daemon, wired in one process", () => {
 
 		const next = await start(env);
 		expect(next.info.lease.epoch).toBeGreaterThan(firstLease);
-		expect(hot.nightshiftSpaces).not.toBe(spaces);
+		expect(hot.nightshiftDocuments).not.toBe(documents);
 		expect((await call(next, "/health"))?.status).toBe(200);
 	});
 
@@ -208,9 +209,13 @@ describe("the daemon, wired in one process", () => {
 			{ label: "the Link to A online", timeoutMs: 15_000 },
 		);
 		// A's Space, as the Link syncs it: its project comes to the daemon.
-		const spaces = hot.nightshiftSpaces;
-		if (!spaces) throw new Error("The daemon keeps no Space documents.");
-		await syncSpaceDocument(host.documents, spaces, a.spaceId);
+		const documents = hot.nightshiftDocuments;
+		if (!documents) throw new Error("The daemon keeps no documents.");
+		const name = documentName("space", a.spaceId);
+		const copy = await documents.open(name);
+		const source = await host.synced.open(name);
+		Y.applyUpdate(copy.doc, Y.encodeStateAsUpdate(source.doc));
+		await copy.flush();
 
 		await rpc(daemon, "spaces/switch", { spaceId: a.spaceId });
 		const run = await rpc<{
@@ -233,7 +238,7 @@ describe("the daemon, wired in one process", () => {
 		started.splice(started.indexOf(daemon), 1);
 		expect(hot.nightshiftLease).toBeUndefined();
 		expect(hot.nightshiftDevices).toBeUndefined();
-		expect(hot.nightshiftSpaces).toBeUndefined();
+		expect(hot.nightshiftDocuments).toBeUndefined();
 		const [lease] = await processDatabase(daemon.info.databaseUrl)
 			.select()
 			.from(daemonLease);

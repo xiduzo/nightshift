@@ -4,8 +4,8 @@ import { eq, sql } from "drizzle-orm";
 import * as Y from "yjs";
 
 /**
- * A Yjs document this Replica owns, kept in its `ydoc` table: the Device
- * document and the Space documents. The full state is written after every
+ * A Yjs document this Replica keeps in its `ydoc` table: each document it
+ * syncs (`SyncedDocuments`). The full state is written after every
  * change, one write at a time. Changes made while one is written wait for
  * the next, which takes them all.
  */

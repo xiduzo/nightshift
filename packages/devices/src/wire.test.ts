@@ -4,7 +4,6 @@ import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, runCommand, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
-	createKnowledgeDocuments,
 	type Device,
 	type FlowDocuments,
 	type SessionInput,
@@ -21,6 +20,7 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import * as Y from "yjs";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import { setDeviceOffer } from "./offers/offers";
 import type { PeerEngine } from "./peers";
@@ -28,7 +28,7 @@ import { OFFLINE_AFTER_MS } from "./registry";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
 import {
 	type DevicesRuntime,
-	hostSpaceDocuments,
+	documentsWithHost,
 	type KeptDevices,
 	startDevices,
 } from "./wire";
@@ -61,7 +61,7 @@ beforeEach(async () => {
 	// B's engine is the runtime's.
 	await paired.device.dispose();
 	document = await b.openDocument();
-	flows = createFlowDocuments({ db: b.db });
+	flows = createFlowDocuments({ db: b.db, documents: paired.synced });
 	kept = {};
 	sessions = [];
 	open = new Map();
@@ -69,7 +69,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
 	await kept.nightshiftDevices?.release();
-	await flows.close();
+	await flows.flush();
 	await paired.host.dispose();
 	await Promise.all([a, b].map((s) => s.cleanup()));
 });
@@ -96,9 +96,9 @@ async function startB(
 		settings,
 		profiles,
 		document,
+		documents: paired.synced,
 		spaces: paired.documents,
 		flows,
-		knowledge: createKnowledgeDocuments({ db: b.db }),
 		self: { id: b.deviceId, name: "B" },
 		ownerId: owner?.id as string,
 		local: placedDevice(),
@@ -641,8 +641,8 @@ describe("the devices runtime across a reload", () => {
 	});
 });
 
-describe("the documents a Device syncs of a Host's Spaces", () => {
-	test("each Space document, and the flow and knowledge documents of every Project in it", async () => {
+describe("the documents a Device syncs with a Host", () => {
+	test("each Space document, and the flow and knowledge documents of every Project in it; over the home link, its own document and the copies too", async () => {
 		const space = await paired.documents.open(a.spaceId);
 		space.doc.transact(() => {
 			for (const id of ["project-b", "project-a"]) {
@@ -655,12 +655,16 @@ describe("the documents a Device syncs of a Host's Spaces", () => {
 				});
 			}
 		});
-		const knowledge = createKnowledgeDocuments({ db: b.db });
-		const synced = await hostSpaceDocuments(
-			{ spaces: paired.documents, flows, knowledge },
-			[a.spaceId],
-		);
-		expect(synced.map((document) => document.name)).toEqual([
+		const copies = {
+			keep: async (devices: readonly { id: string }[]) =>
+				devices.map((d) => ({ name: `device:${d.id}`, doc: new Y.Doc() })),
+		};
+		const from = { documents: paired.synced, document, copies };
+		const hello = { devices: [{ id: "laptop", name: "Laptop" }] };
+		const synced = await documentsWithHost(from, { role: "guest" }, hello, [
+			a.spaceId,
+		]);
+		expect(synced.map((d) => d.name)).toEqual([
 			space.name,
 			"flows:project-a",
 			"flows-history:project-a",
@@ -672,6 +676,11 @@ describe("the documents a Device syncs of a Host's Spaces", () => {
 		const opened = await flows.open("project-a");
 		expect(synced[1]?.doc).toBe(opened.current.doc);
 		expect(synced[2]?.doc).toBe(opened.history.doc);
-		expect(synced[3]?.doc).toBe((await knowledge.open("project-a")).doc);
+		expect(synced[3]?.doc).toBe(
+			(await paired.synced.open("knowledge:project-a")).doc,
+		);
+
+		const home = await documentsWithHost(from, { role: "home" }, hello, []);
+		expect(home.map((d) => d.name)).toEqual([document.name, "device:laptop"]);
 	});
 });

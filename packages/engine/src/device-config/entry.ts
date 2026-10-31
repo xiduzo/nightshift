@@ -24,7 +24,6 @@ export {
 export type { DeviceDocument } from "./device-document";
 export {
 	deviceDocumentName,
-	documentRows,
 	openDeviceDocument,
 	refreshDeviceFacts,
 } from "./device-document";

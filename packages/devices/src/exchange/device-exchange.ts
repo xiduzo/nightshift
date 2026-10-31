@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Engine } from "@nightshift/engine";
-import { spaceDocumentName } from "@nightshift/engine/projects";
+import { documentName, type Engine } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, RunCommand, RunRows } from "../contract";
 import { type HostSpaces, type Link, pause } from "../links";
@@ -337,10 +336,13 @@ export function createDeviceExchange(deps: {
 		} catch (error) {
 			if (!(error instanceof MissingProjectError)) throw error;
 			const spaces = [...new Set(batch.runs.map((run) => run.spaceId))];
-			const inStep = await link.inStep(spaces.map(spaceDocumentName), {
-				timeoutMs: deps.projectWaitMs ?? 30_000,
-				signal,
-			});
+			const inStep = await link.inStep(
+				spaces.map((id) => documentName("space", id)),
+				{
+					timeoutMs: deps.projectWaitMs ?? 30_000,
+					signal,
+				},
+			);
 			if (!inStep) throw error;
 			await exchange.ingest(batch);
 		}

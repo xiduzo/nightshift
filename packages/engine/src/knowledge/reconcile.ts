@@ -14,7 +14,7 @@ import type { Database } from "@nightshift/db";
 import { organization, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
-import type { PersistedDocument } from "../device-config";
+import type { PersistedDocument } from "../documents";
 import {
 	isKnowledgePath,
 	isReadable,

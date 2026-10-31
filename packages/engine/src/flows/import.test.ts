@@ -173,11 +173,11 @@ async function replica(name: string): Promise<Replica> {
 				at: Date.now(),
 			}),
 		restart: async () => {
-			await documents.close();
+			await documents.flush();
 			documents = createFlowDocuments({ db: sandbox.db });
 		},
 		dispose: async () => {
-			await documents.close();
+			await documents.flush();
 			await sandbox.cleanup();
 		},
 	};

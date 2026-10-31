@@ -1,4 +1,3 @@
-import type * as Y from "yjs";
 import type { HostClient, HostHello } from "../contract";
 import {
 	type DeviceKeyStore,
@@ -6,7 +5,12 @@ import {
 	type HostLinks,
 	isHomeHost,
 } from "./host-links";
-import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
+import {
+	type HttpsLinkOptions,
+	httpsLink,
+	type Link,
+	type SyncedDocument,
+} from "./link";
 import type { LinkedHost } from "./types";
 
 /**
@@ -40,21 +44,11 @@ export type LinkOptions = Pick<
 export function createDeviceLinks(deps: {
 	links: HostLinks;
 	keys: DeviceKeyStore;
-	/** This Device's document: it syncs with the home Host. */
-	document: { name: string; doc: Y.Doc };
-	/** The Space documents to sync from a Host, read-only (the Spaces it lists). */
-	spaceDocuments?(
-		link: HostLink,
-		hello: HostHello,
-	): Promise<{ name: string; doc: Y.Doc }[]>;
 	/**
-	 * The copies of the owner's other Devices' documents to sync from the
-	 * home Host, read-only (the Devices it lists).
+	 * The documents to sync with a Host, asked with each of its answers:
+	 * the link syncs these, and stops a document it no longer gets.
 	 */
-	deviceDocuments?(
-		link: HostLink,
-		hello: HostHello,
-	): Promise<{ name: string; doc: Y.Doc }[]>;
+	documents?(link: HostLink, hello: HostHello): Promise<SyncedDocument[]>;
 	/** The Host refused the key: this computer's access there was removed. */
 	revoked?(link: HostLink): Promise<void>;
 	/**
@@ -97,17 +91,10 @@ export function createDeviceLinks(deps: {
 			...(deps.hostClient ? { clientFor: deps.hostClient } : {}),
 			link,
 			key: secret,
-			document: deps.document,
-			...(deps.spaceDocuments
+			...(deps.documents
 				? {
-						spaceDocuments: (hello: HostHello) =>
-							deps.spaceDocuments?.(link, hello) ?? Promise.resolve([]),
-					}
-				: {}),
-			...(deps.deviceDocuments
-				? {
-						deviceDocuments: (hello: HostHello) =>
-							deps.deviceDocuments?.(link, hello) ?? Promise.resolve([]),
+						documents: (hello: HostHello) =>
+							deps.documents?.(link, hello) ?? Promise.resolve([]),
 					}
 				: {}),
 			onAddresses: (addresses) => {

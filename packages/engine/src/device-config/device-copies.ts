@@ -1,17 +1,21 @@
 import type { Database } from "@nightshift/db";
 import { ydoc } from "@nightshift/db/schema";
 import type { ProfileSettings } from "@nightshift/flows";
-import { eq, like, or } from "drizzle-orm";
+import { like, or } from "drizzle-orm";
 import * as Y from "yjs";
 import type { DeviceProfile } from "../contract";
+import {
+	createSyncedDocuments,
+	documentId,
+	documentKind,
+	documentName,
+	documentRows,
+	type PersistedDocument,
+	type SyncedDocuments,
+} from "../documents";
 import { savedSecretSchema } from "./connections";
 import { deviceDocumentName } from "./device-document";
 import { profileChoice, readProfiles } from "./profiles";
-import {
-	documentRows,
-	openPersistedDocument,
-	type PersistedDocument,
-} from "./ydoc";
 
 /**
  * Copies of the Device documents of this computer's owner's other
@@ -39,8 +43,6 @@ export type DeviceCopies = {
 	list(): Promise<DeviceCopy[]>;
 	/** The copy of one Device's document, or null when this computer has none. */
 	get(deviceId: string): Promise<DeviceCopy | null>;
-	/** Writes what synced, then stops keeping the copies. */
-	close(): Promise<void>;
 };
 
 /** One Device of the owner, as its last synced document says. */
@@ -62,33 +64,23 @@ export type DeviceCopy = {
 	checkedAt: number | null;
 };
 
-const PREFIX = "device-copy:";
-
-/** The transaction origin of the sync: the only writer of a copy. */
-const COPY_ORIGIN = Symbol("device-copy");
-
 export function createDeviceCopies(deps: {
 	db: Database;
 	/** This computer's Device id: its own document is never a copy. */
 	selfId: string;
+	/** This Replica's synced documents. Default: its own over `db`. */
+	documents?: SyncedDocuments;
 }): DeviceCopies {
 	const { db, selfId } = deps;
-	const open = new Map<string, Promise<PersistedDocument>>();
+	const documents = deps.documents ?? createSyncedDocuments({ db });
 	/** The names the Host gave, for a Device that reports none itself. */
 	const named = new Map<string, string>();
+	/** The copies opened since this view was made, before their first write. */
+	const open = new Set<string>();
 
 	function opened(deviceId: string): Promise<PersistedDocument> {
-		let document = open.get(deviceId);
-		if (!document) {
-			document = openPersistedDocument({
-				db,
-				name: `${PREFIX}${deviceId}`,
-				origin: COPY_ORIGIN,
-				label: "The copy of the Device document",
-			});
-			open.set(deviceId, document);
-		}
-		return document;
+		open.add(deviceId);
+		return documents.open(documentName("device-copy", deviceId));
 	}
 
 	/** The Device ids of the copies: in the Replica, and open before their first write. */
@@ -96,20 +88,18 @@ export function createDeviceCopies(deps: {
 		const rows = await db
 			.select({ name: ydoc.name })
 			.from(ydoc)
-			.where(like(ydoc.name, `${PREFIX}%`));
+			.where(like(ydoc.name, `${documentName("device-copy", "")}%`));
 		const ids = new Set([
-			...rows.map((row) => row.name.slice(PREFIX.length)),
-			...open.keys(),
+			...rows.map((row) => documentId("device-copy", row.name) ?? ""),
+			...open,
 		]);
 		return [...ids].filter((id) => id !== "" && id !== selfId);
 	}
 
 	async function drop(deviceId: string) {
-		const document = open.get(deviceId);
 		open.delete(deviceId);
 		named.delete(deviceId);
-		if (document) await (await document).close();
-		await db.delete(ydoc).where(eq(ydoc.name, `${PREFIX}${deviceId}`));
+		await documents.remove(documentName("device-copy", deviceId));
 	}
 
 	async function copyOf(deviceId: string): Promise<DeviceCopy> {
@@ -146,11 +136,6 @@ export function createDeviceCopies(deps: {
 			if (deviceId === selfId) return null;
 			if (!(await stored()).includes(deviceId)) return null;
 			return copyOf(deviceId);
-		},
-		async close() {
-			const documents = [...open.values()];
-			open.clear();
-			for (const document of documents) await (await document).close();
 		},
 	};
 }
@@ -189,12 +174,18 @@ export async function storedDevices(db: Database): Promise<DeviceCopy[]> {
 	const rows = await db
 		.select({ name: ydoc.name, state: ydoc.state })
 		.from(ydoc)
-		.where(or(like(ydoc.name, "device:%"), like(ydoc.name, `${PREFIX}%`)));
+		.where(
+			or(
+				like(ydoc.name, `${documentName("device", "")}%`),
+				like(ydoc.name, `${documentName("device-copy", "")}%`),
+			),
+		);
 	const found = new Map<string, DeviceCopy>();
 	for (const row of rows.sort((a, b) => (a.name < b.name ? -1 : 1))) {
-		const copy = row.name.startsWith(PREFIX);
-		const deviceId = row.name.slice(copy ? PREFIX.length : "device:".length);
-		if (deviceId === "" || (copy && found.has(deviceId))) continue;
+		const named = documentKind(row.name);
+		if (!named) continue;
+		const { kind, id: deviceId } = named;
+		if (kind === "device-copy" && found.has(deviceId)) continue;
 		const doc = new Y.Doc();
 		try {
 			Y.applyUpdate(doc, new Uint8Array(row.state));
@@ -221,7 +212,7 @@ export async function lastKnownProfiles(
 	const rows = documentRows(db);
 	const state =
 		(await rows.fetch(deviceDocumentName(deviceId))) ??
-		(await rows.fetch(`${PREFIX}${deviceId}`));
+		(await rows.fetch(documentName("device-copy", deviceId)));
 	if (!state) return null;
 	const doc = new Y.Doc();
 	try {

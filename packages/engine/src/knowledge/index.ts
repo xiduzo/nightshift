@@ -13,7 +13,6 @@ export {
 export {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,
-	knowledgeDocumentProject,
 } from "./knowledge-document";
 export { isLearningsFolder } from "./learnings";
 export {

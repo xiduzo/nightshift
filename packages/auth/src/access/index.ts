@@ -2,7 +2,7 @@
 // session, its Space, the Host rules), and who may open which synced
 // document. It composes the other verticals, and none of them imports it.
 export {
-	type DocumentSpace,
+	type DocumentOf,
 	documentAccess,
 	type SyncAccess,
 	type SyncAuthorize,

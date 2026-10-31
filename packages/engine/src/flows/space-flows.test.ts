@@ -99,7 +99,7 @@ describe("the revisions of a flow", () => {
 	});
 
 	afterEach(async () => {
-		await documents.close();
+		await documents.flush();
 		await sandbox.cleanup();
 	});
 
@@ -206,7 +206,7 @@ describe("moving a flow between projects", () => {
 	});
 
 	afterEach(async () => {
-		await documents.close();
+		await documents.flush();
 		await sandbox.cleanup();
 	});
 
@@ -350,7 +350,7 @@ describe("the Space of a project", () => {
 	});
 
 	afterEach(async () => {
-		await documents.close();
+		await documents.flush();
 		await sandbox.cleanup();
 	});
 

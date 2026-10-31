@@ -47,7 +47,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
 	signal.abort();
-	await documents.close();
+	await documents.flush();
 	await sandbox.cleanup();
 });
 
@@ -126,15 +126,13 @@ describe("import", () => {
 		});
 		const reopened = await again.open(sandbox.spaceId);
 		expect([...spaceProjects(reopened).keys()]).toEqual(["p1"]);
-		await again.close();
+		await again.flush();
 	});
 
 	test("every Space's document opens with the engine; its Members are mirrored", async () => {
 		const engine = makeEngine();
 		await engine.space(sandbox.spaceId).listProjects();
-		const document = documents.byName(spaceDocumentName(sandbox.spaceId));
-		if (!document)
-			throw new Error("The personal Space's document is not open.");
+		const document = await documents.open(sandbox.spaceId);
 		const [owner] = await sandbox.db
 			.select({ id: user.id, name: user.name })
 			.from(user);
@@ -219,7 +217,6 @@ describe("remove", () => {
 		await documents.remove(gone);
 
 		expect(await stored(gone)).toBe(0);
-		expect(documents.byName(spaceDocumentName(gone))).toBeNull();
 	});
 
 	test("the document of a Space that is still here, or that has a project here, stays", async () => {

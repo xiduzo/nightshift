@@ -71,7 +71,7 @@ afterEach(async () => {
 	try {
 		await expectRunLogsInSync(sandbox.db, runLogs);
 	} finally {
-		await documents.close();
+		await documents.flush();
 		await sandbox.cleanup();
 	}
 });

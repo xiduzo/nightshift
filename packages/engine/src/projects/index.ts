@@ -18,7 +18,7 @@ export {
 	type RunCopyState,
 } from "./run-branches";
 export type { SpaceDocuments } from "./space-document";
-export { createSpaceDocuments, memberName, spaceIdOf } from "./space-document";
+export { createSpaceDocuments, memberName } from "./space-document";
 export { forgetSpaceRows, spaceMoveBatch, spaceRunIds } from "./space-rows";
 export { createWorktreeSnapshots } from "./worktree-changes";
 export type { Branches } from "./worktrees";

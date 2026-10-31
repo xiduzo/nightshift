@@ -54,6 +54,12 @@ export {
 	type SignInResult,
 	type ToolLaunchers,
 } from "./device";
+export {
+	createSyncedDocuments,
+	documentName,
+	documentRows,
+	type SyncedDocuments,
+} from "./documents";
 export type {
 	FlowDocuments,
 	FlowExport,
@@ -68,7 +74,6 @@ export {
 	cliToolsInUse,
 	connectionsInUse,
 	createFlowDocuments,
-	documentSpace,
 	flowsForRun,
 	profilesInUse,
 	revisionKinds,

@@ -19,5 +19,3 @@ export type { ProfileStore, ProfileView } from "./profiles";
 
 export type { RunSettings } from "./settings";
 export { defaultRunSettings } from "./settings";
-export type { PersistedDocument } from "./ydoc";
-export { openPersistedDocument } from "./ydoc";

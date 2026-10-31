@@ -170,7 +170,7 @@ describe("a Run and its Flow revision", () => {
 			}
 			await sync(documents, desktop, projectId);
 		} finally {
-			await desktop.close();
+			await desktop.flush();
 			await other.cleanup();
 		}
 		expect(await engine.flows.get(projectId, "build")).toMatchObject({

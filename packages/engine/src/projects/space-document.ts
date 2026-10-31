@@ -1,14 +1,17 @@
 import { spaceIds, spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { clone, project, ydoc } from "@nightshift/db/schema";
+import { clone, project } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
 import type { DeviceDirectory } from "../contract";
 import {
-	openPersistedDocument,
+	createSyncedDocuments,
+	documentId,
+	documentName,
 	type PersistedDocument,
-} from "../device-config";
+	type SyncedDocuments,
+} from "../documents";
 
 /**
  * The Space document: one Yjs document per Space, named `space:<id>`, that
@@ -106,16 +109,8 @@ export function deviceNameIn(
 
 /** The name of a Space's document. */
 export function spaceDocumentName(spaceId: string): string {
-	return `space:${spaceId}`;
+	return documentName("space", spaceId);
 }
-
-/** The Space of a document name, or null for another kind. */
-export function spaceIdOf(name: string): string | null {
-	return name.startsWith("space:") ? name.slice("space:".length) : null;
-}
-
-/** The transaction origin of this Replica's own changes. */
-export const SPACE_ORIGIN = Symbol("space-document-owner");
 
 /** The key of a Clone in `clones`. */
 export const cloneKey = (projectId: string, deviceId: string) =>
@@ -180,14 +175,12 @@ export function recordClone(
 	}
 }
 
-/** The Space documents this Replica holds, opened once each. */
+/** The Space documents of this Replica: views of its synced documents. */
 export type SpaceDocuments = {
-	/** The Space's document: opened, imported and mirrored on first use. */
+	/** The Space's document: imported and mirrored on its first open. */
 	open(spaceId: string): Promise<SpaceDocument>;
 	/** Opens the document of every Space this Replica knows. */
 	openAll(): Promise<SpaceDocument[]>;
-	/** An open document by its name (`space:<id>`), for the relay. */
-	byName(name: string): SpaceDocument | null;
 	/** Writes the Space's Members into its document, from the auth tables. */
 	mirrorMembers(spaceId: string): Promise<void>;
 	/**
@@ -198,62 +191,59 @@ export type SpaceDocuments = {
 	remove(spaceId: string): Promise<void>;
 	/** Flushes every document. */
 	flush(): Promise<void>;
-	close(): Promise<void>;
 };
 
+/**
+ * The Space documents over this Replica's synced documents. It handles
+ * their kind there: on its first open a document is imported and
+ * mirrored (a Space this Replica keeps) or projected (a Space a Host
+ * keeps), and after every write, ours or a client's, its rows follow it.
+ */
 export function createSpaceDocuments(options: {
 	db: Database;
 	/** The names of the Devices of the Clones, and the Spaces a Host keeps. */
 	directory: Pick<DeviceDirectory, "names" | "hostedElsewhere">;
+	/** This Replica's synced documents. Default: its own over `db`. */
+	documents?: SyncedDocuments;
 }): SpaceDocuments {
 	const { db, directory } = options;
-	const opening = new Map<string, Promise<SpaceDocument>>();
-	const opened = new Map<string, SpaceDocument>();
+	const documents = options.documents ?? createSyncedDocuments({ db });
 
-	async function openOne(spaceId: string): Promise<SpaceDocument> {
-		const holder: { document?: SpaceDocument } = {};
-		const persisted = await openPersistedDocument({
-			db,
-			name: spaceDocumentName(spaceId),
-			origin: SPACE_ORIGIN,
-			label: "The Space document",
-			// Every write, ours or a client's, is projected into the rows.
-			afterStore: async () => {
-				if (holder.document) await projectSpace(db, holder.document);
-			},
-		});
+	/** The Space document view of a persisted one. */
+	async function viewOf(persisted: PersistedDocument): Promise<SpaceDocument> {
+		const spaceId = documentId("space", persisted.name) as string;
 		const { doc } = persisted;
-		const hostedElsewhere = await directory.hostedElsewhere(spaceId);
-		const document: SpaceDocument = {
+		return {
 			...persisted,
 			spaceId,
-			hostedElsewhere,
+			hostedElsewhere: await directory.hostedElsewhere(spaceId),
 			projects: doc.getMap("projects"),
 			clones: doc.getMap("clones"),
 			devices: doc.getMap("devices"),
 			offers: doc.getMap("offers"),
 			members: doc.getMap("members"),
 		};
-		holder.document = document;
-		if (!hostedElsewhere) {
-			await importRows(db, directory, document);
-			await mirror(db, document);
-		} else {
-			// What the Link brought before this start.
-			await projectSpace(db, document);
-		}
-		opened.set(document.name, document);
-		return document;
 	}
 
-	function open(spaceId: string): Promise<SpaceDocument> {
-		let found = opening.get(spaceId);
-		if (!found) {
-			found = openOne(spaceId);
-			opening.set(spaceId, found);
-			found.catch(() => opening.delete(spaceId));
-		}
-		return found;
+	documents.handle("space", {
+		async opened(persisted) {
+			const document = await viewOf(persisted);
+			if (!document.hostedElsewhere) {
+				await importRows(db, directory, document);
+				await mirror(db, document);
+			} else {
+				// What the Link brought before this start.
+				await projectSpace(db, document);
+			}
+		},
+		// Every write, ours or a client's, is projected into the rows.
+		async stored(persisted) {
+			await projectSpace(db, await viewOf(persisted));
+		},
+	});
+
+	async function open(spaceId: string): Promise<SpaceDocument> {
+		return viewOf(await documents.open(spaceDocumentName(spaceId)));
 	}
 
 	return {
@@ -268,7 +258,6 @@ export function createSpaceDocuments(options: {
 			}
 			return Promise.all([...spaces].map(open));
 		},
-		byName: (name) => opened.get(name) ?? null,
 		async mirrorMembers(spaceId) {
 			const document = await open(spaceId);
 			if (!document.hostedElsewhere) await mirror(db, document);
@@ -282,22 +271,9 @@ export function createSpaceDocuments(options: {
 			if (kept || (await spaceIds(db)).includes(spaceId)) {
 				throw new Error(`The Space ${spaceId} is still here.`);
 			}
-			const name = spaceDocumentName(spaceId);
-			const pending = opening.get(spaceId);
-			opening.delete(spaceId);
-			opened.delete(name);
-			const document = await pending?.catch(() => null);
-			await document?.close();
-			await db.delete(ydoc).where(eq(ydoc.name, name));
+			await documents.remove(spaceDocumentName(spaceId));
 		},
-		async flush() {
-			await Promise.all([...opened.values()].map((d) => d.flush()));
-		},
-		async close() {
-			await Promise.all([...opened.values()].map((d) => d.close()));
-			opened.clear();
-			opening.clear();
-		},
+		flush: () => documents.flush(),
 	};
 }
 

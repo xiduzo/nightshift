@@ -13,13 +13,13 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import {
+	documentRows,
 	HostUnreachableError,
 	type OwnDevice,
 	type PeerProfiles,
 } from "@nightshift/engine";
 import {
 	deviceDocumentName,
-	documentRows,
 	openDeviceDocument,
 } from "@nightshift/engine/device-config";
 import {
@@ -1182,7 +1182,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			"Laptop",
 		);
 		expect(named).toMatchObject({ deviceId: "laptop", online: false });
-		await spaceDocuments.close();
+		await spaceDocuments.flush();
 	});
 
 	test("a Host that cannot tell a Device's profiles gets them from the copy; another Person's offered ones stay", async () => {
@@ -1210,7 +1210,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			["laptop", LAPTOP_PROFILES],
 			["theirs", undefined],
 		]);
-		await spaceDocuments.close();
+		await spaceDocuments.flush();
 	});
 
 	test("never for another Person, and never in a Space of a Guest Host", async () => {
@@ -1220,14 +1220,14 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 				1,
 			),
 		).toEqual([]);
-		await own.spaceDocuments.close();
+		await own.spaceDocuments.flush();
 
 		await b.db.delete(hostLink);
 		const guest = await deviceInHostSpace({ role: "guest" });
 		expect(
 			(await guest.placement.devicesFor(SPACE, ON_HOST, "p-shared")).slice(1),
 		).toEqual([]);
-		await guest.spaceDocuments.close();
+		await guest.spaceDocuments.flush();
 	});
 });
 

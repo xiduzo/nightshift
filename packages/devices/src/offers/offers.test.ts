@@ -202,7 +202,7 @@ describe("another Person's run on the computer that walks it", () => {
 	});
 	afterEach(async () => {
 		signal.abort();
-		await documents.close();
+		await documents.flush();
 		await sandbox.cleanup();
 	});
 
@@ -481,7 +481,7 @@ describe("a schedule that fires on another Person's Device", () => {
 	afterEach(async () => {
 		signal.abort();
 		await Bun.sleep(TICK_MS * 4);
-		await documents.close();
+		await documents.flush();
 		await sandbox.cleanup();
 	});
 

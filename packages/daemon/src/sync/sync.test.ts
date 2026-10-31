@@ -19,11 +19,15 @@ import { deviceDirectory } from "@nightshift/devices";
 import {
 	createFlowDocuments,
 	createKnowledgeDocuments,
-	documentSpace,
+	createSyncedDocuments,
 	type FlowDocuments,
 	type KnowledgeDocuments,
+	type SyncedDocuments,
 } from "@nightshift/engine";
-import type { DeviceDocument } from "@nightshift/engine/device-config";
+import {
+	type DeviceDocument,
+	openDeviceDocument,
+} from "@nightshift/engine/device-config";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -66,6 +70,8 @@ let people: AuthSandbox;
 /** A session of a Person who does not own this computer. */
 let stranger: Headers;
 let document: DeviceDocument;
+/** Every document this Host syncs, by name: the views below are over them. */
+let synced: SyncedDocuments;
 let spaces: SpaceDocuments;
 /** The flow documents of this Host's Projects. */
 let flows: FlowDocuments;
@@ -87,7 +93,6 @@ let keptRows: Map<string, Uint8Array>;
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	document = await sandbox.openDocument();
 	people = await createAuthSandbox();
 	const owner = await localPerson(people.db);
 	ownerId = owner.userId;
@@ -95,20 +100,22 @@ beforeEach(async () => {
 	deviceKeys = new Map();
 	keptOwners = new Map();
 	keptRows = new Map();
+	synced = createSyncedDocuments({ db: people.db });
 	spaces = createSpaceDocuments({
 		db: people.db,
 		directory: deviceDirectory(people.db),
+		documents: synced,
 	});
-	flows = createFlowDocuments({ db: people.db });
-	knowledge = createKnowledgeDocuments({ db: people.db });
+	// This computer's Device document, among the documents the relay serves.
+	document = await openDeviceDocument({
+		db: people.db,
+		deviceId: sandbox.deviceId,
+		documents: synced,
+	});
+	flows = createFlowDocuments({ db: people.db, documents: synced });
+	knowledge = createKnowledgeDocuments({ db: people.db, documents: synced });
 	sync = createSync({
-		document: async (name) =>
-			name === document.name
-				? document.doc
-				: (spaces.byName(name)?.doc ??
-					(await flows.find(name))?.doc ??
-					(await knowledge.find(name))?.doc ??
-					null),
+		document: async (name) => (await synced.find(name))?.doc ?? null,
 		kept: {
 			has: (name) => keptOwners.has(name),
 			fetch: async (name) => keptRows.get(name) ?? null,
@@ -123,7 +130,7 @@ beforeEach(async () => {
 			ownerId: owner.userId,
 			isThisComputer: (peer, request) =>
 				isThisComputer(peer, request, new Set([ORIGIN])),
-			spaceOfDocument: documentSpace(people.db),
+			documentOf: (name) => synced.documentOf(name),
 			keptOwner: async (name) => keptOwners.get(name) ?? null,
 			deviceKey: async (token) => deviceKeys.get(token) ?? null,
 		}),
@@ -143,10 +150,7 @@ afterEach(async () => {
 	for (const provider of providers.splice(0)) provider.destroy();
 	await sync.close();
 	server.stop(true);
-	await document.close();
-	await spaces.close();
-	await flows.close();
-	await knowledge.close();
+	await synced.close();
 	await sandbox.cleanup();
 	people.cleanup();
 });
@@ -242,7 +246,10 @@ describe("Hocuspocus on Bun", () => {
 		await document.flush();
 
 		const again = createCliToolStore({
-			document: await sandbox.openDocument(),
+			document: await openDeviceDocument({
+				db: people.db,
+				deviceId: sandbox.deviceId,
+			}),
 		});
 		expect([...again.names()]).toEqual(["aws"]);
 	});
@@ -377,7 +384,7 @@ describe("documentAccess on a Host that requires two-factor", () => {
 			ownerId,
 			isThisComputer: (peer, request) =>
 				isThisComputer(peer, request, new Set([ORIGIN])),
-			spaceOfDocument: documentSpace(people.db),
+			documentOf: (name) => synced.documentOf(name),
 			policy: { requireTwoFactor: true },
 		});
 
@@ -818,7 +825,7 @@ describe("documentAccess: a flow document", () => {
 				(await flows.open(PROJECT)).current.doc.getMap("meta").has("from"),
 			).toBe(false);
 		} finally {
-			await device.documents.close();
+			await device.documents.flush();
 		}
 	});
 
@@ -869,7 +876,7 @@ describe("documentAccess: a flow document", () => {
 				{ label: "both edits on both sides" },
 			);
 		} finally {
-			await device.documents.close();
+			await device.documents.flush();
 		}
 	});
 });
