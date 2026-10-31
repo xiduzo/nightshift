@@ -11,7 +11,13 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
-import { documentText, isDocument } from "./documents";
+import type { Document } from "@langchain/core/documents";
+import {
+	type DocumentMetadata,
+	isDocument,
+	loadDocument,
+	textOf,
+} from "./documents";
 
 /**
  * The knowledge folder of a project: markdown (and any other files) that
@@ -270,11 +276,11 @@ async function describe(
 		if (kept?.size === file.size && kept.changedAt === file.changedAt) {
 			return kept.description;
 		}
-		const text = await documentText(abs);
+		const docs = await loadDocument(abs);
 		const description =
-			text === null
+			docs === null
 				? { title: name, sentence: "" }
-				: describeDocumentText(text.slice(0, HEAD_BYTES), fallback);
+				: describeDocument(docs, fallback);
 		if (described.size >= MAX_FILES) described.clear();
 		described.set(abs, {
 			size: file.size,
@@ -310,6 +316,22 @@ export function describeDocumentText(
 		title: isTitle ? first : fallback,
 		sentence: rest.length > 0 ? firstSentence(rest.join(" ")) : "",
 	};
+}
+
+/**
+ * The title and first sentence of a PDF or Word file: the title the
+ * document itself gives, else the one its text gives.
+ */
+export function describeDocument(
+	docs: Document<DocumentMetadata>[],
+	fallback: string,
+): Description {
+	const fromText = describeDocumentText(
+		textOf(docs).slice(0, HEAD_BYTES),
+		fallback,
+	);
+	const title = docs[0]?.metadata.title;
+	return title ? { ...fromText, title } : fromText;
 }
 
 /**

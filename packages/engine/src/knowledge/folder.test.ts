@@ -149,6 +149,27 @@ describe("PDF and Word files in the index", () => {
 		);
 	});
 
+	test("a PDF's own title comes first, unless a program made it up", async () => {
+		const folders = createKnowledgeFolders(dataDir);
+		const dir = await folders.ensure("p1");
+		await writeFile(
+			join(dir, "plan.pdf"),
+			tinyPdf(["We go on Monday. Then we rest."], { title: "Team plan" }),
+		);
+		await writeFile(
+			join(dir, "export.pdf"),
+			tinyPdf(["Exported notes", "We keep it short."], {
+				title: "Microsoft Word - notes.docx",
+			}),
+		);
+		await folders.index("p1");
+		const index = await readFile(join(dir, "INDEX.md"), "utf8");
+		expect(index).toContain("- `plan.pdf`: Team plan. We go on Monday (");
+		expect(index).toContain(
+			"- `export.pdf`: Exported notes. We keep it short (",
+		);
+	});
+
 	test("the first short line without a stop is the title, else the file name", () => {
 		expect(describeDocumentText("Plan\nWe go. Later more.", "f")).toEqual({
 			title: "Plan",
