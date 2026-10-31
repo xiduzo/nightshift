@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readFile, rm, stat } from "node:fs/promises";
+import { readdir, readFile, rm, stat, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 import { HostUnreachableError } from "../contract";
@@ -25,8 +25,11 @@ import { writeWhole } from "./write-whole";
  * Layout, the same on a Host and as a Device's cache:
  * `<data dir>/archive/<space>/<run>/<step>.ndjson`, `<step>.log`,
  * `<step>.<ext>.stamp` and `checkpoint.json`, and
- * `<data dir>/archive/<space>/knowledge/<sha256>`. Retention is
- * undecided, as it is for run history: everything is kept.
+ * `<data dir>/archive/<space>/knowledge/<sha256>`. Retention of walk
+ * files is undecided, as it is for run history: they are kept. Knowledge
+ * content that no document lists any more goes after a while
+ * (`collectContent` of the knowledge): its file's time is when it was
+ * last kept.
  *
  * The callers decide when to copy: the run actions after a node, the
  * knowledge reconcile after a publish. The archive decides where a file
@@ -52,6 +55,9 @@ export type WalkFile = { ref: WalkRef; content: string; stamp?: CopyStamp };
 /** Knowledge content by its hash, in a Space (ADR 4). */
 export type ContentRef = { kind: "content"; spaceId: string; sha256: string };
 export type ContentFile = { ref: ContentRef; content: Uint8Array };
+
+/** Knowledge content this Replica keeps: its Space, its hash, and when it was last kept (epoch ms). */
+export type KeptContent = { spaceId: string; sha256: string; keptAt: number };
 
 /** One file of the archive. */
 export type ArchiveRef = WalkRef | ContentRef;
@@ -206,7 +212,8 @@ export function createSpaceArchive(dataDir: string) {
 
 	/**
 	 * Keeps a file here, whole. Knowledge content that is here already
-	 * stays, and content that does not have its hash is refused. A step's
+	 * stays, with a new time: it was kept again now, so a collection waits
+	 * for it again. Content that does not have its hash is refused. A step's
 	 * file goes with its stamp: the content before its stamp, and an old
 	 * stamp before the content, so a reader that reads the stamp first
 	 * never takes a copy of an earlier end for a later one. Without a stamp
@@ -223,7 +230,11 @@ export function createSpaceArchive(dataDir: string) {
 				);
 			}
 			return oneAtATime(path, async () => {
-				if (await stat(path).catch(() => null)) return;
+				if (await stat(path).catch(() => null)) {
+					const now = new Date();
+					await utimes(path, now, now).catch(() => {});
+					return;
+				}
 				await writeWhole(path, content);
 			});
 		}
@@ -237,13 +248,59 @@ export function createSpaceArchive(dataDir: string) {
 		});
 	}
 
-	/** Removes a step's copy here: another Replica reopened the step. Nothing happens when there is none. */
-	async function dropHere(ref: WalkRef): Promise<void> {
+	function dropHere(ref: WalkRef): Promise<undefined>;
+	function dropHere(
+		ref: ContentRef,
+		options: { keptBefore: number },
+	): Promise<boolean>;
+	/**
+	 * Removes a copy here. A step's copy, with its stamp: another Replica
+	 * reopened the step. Knowledge content only when it was last kept
+	 * before `keptBefore`, read in the file's queue: content kept again
+	 * meanwhile stays. True when content went. Nothing happens when there
+	 * is none.
+	 */
+	async function dropHere(
+		ref: ArchiveRef,
+		options?: { keptBefore: number },
+	): Promise<boolean | undefined> {
 		const path = pathOf(dataDir, ref);
-		return oneAtATime(path, async () => {
+		if (ref.kind === "content") {
+			const keptBefore = options?.keptBefore ?? 0;
+			let dropped = false;
+			await oneAtATime(path, async () => {
+				const info = await stat(path).catch(() => null);
+				if (!info || info.mtimeMs >= keptBefore) return;
+				await rm(path, { force: true });
+				dropped = true;
+			});
+			return dropped;
+		}
+		await oneAtATime(path, async () => {
 			await rm(path, { force: true });
 			await rm(stampOf(path), { force: true });
 		});
+		return undefined;
+	}
+
+	/** The knowledge content this Replica keeps, in every Space. */
+	async function contentsHere(): Promise<KeptContent[]> {
+		const root = join(dataDir, "archive");
+		const spaces = await readdir(root).catch(() => [] as string[]);
+		const kept: KeptContent[] = [];
+		for (const spaceId of spaces) {
+			if (!SEGMENT.test(spaceId)) continue;
+			const dir = join(root, spaceId, "knowledge");
+			const names = await readdir(dir).catch(() => [] as string[]);
+			for (const sha256 of names) {
+				// Hidden files are writes under way.
+				if (!SHA256.test(sha256)) continue;
+				const info = await stat(join(dir, sha256)).catch(() => null);
+				if (info?.isFile())
+					kept.push({ spaceId, sha256, keptAt: info.mtimeMs });
+			}
+		}
+		return kept;
 	}
 
 	function read(ref: ContentRef): Promise<Uint8Array | null>;
@@ -282,7 +339,12 @@ export function createSpaceArchive(dataDir: string) {
 
 	return {
 		/** This Replica's own copies, as a Host serves them and a cache keeps them. */
-		here: { read: readHere, write: writeHere, drop: dropHere },
+		here: {
+			read: readHere,
+			write: writeHere,
+			drop: dropHere,
+			contents: contentsHere,
+		},
 		read,
 		/**
 		 * Keeps a file in the archive of the Replica that keeps its Space:

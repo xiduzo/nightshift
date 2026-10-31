@@ -62,8 +62,17 @@ export type HotRegistry = KeptDevices &
 		/** The daily update of the price list. */
 		nightshiftPrices?: PriceUpdates;
 		nightshiftFacts?: Timer;
-		/** The first reconcile of every knowledge folder, and the retry of what waits for a Host. */
-		nightshiftKnowledgeTimers?: { first: Timer; retry: Timer };
+		/**
+		 * The first reconcile of every knowledge folder, the retry of what
+		 * waits for a Host, and the collection of old content. A daemon of
+		 * an older version kept no collection timers.
+		 */
+		nightshiftKnowledgeTimers?: {
+			first: Timer;
+			retry: Timer;
+			firstCollect?: Timer;
+			collect?: Timer;
+		};
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;
 	};

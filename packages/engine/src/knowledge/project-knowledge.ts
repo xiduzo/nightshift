@@ -4,6 +4,7 @@ import {
 	knowledgeTools,
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
+import { type CollectResult, collectContent } from "./collect";
 import { createKnowledgeFolders, INDEX_FILE } from "./folder";
 import type { KnowledgeDocuments } from "./knowledge-document";
 import { keepLearnings, withLearnings } from "./learnings";
@@ -53,6 +54,11 @@ export type KnowledgeHosts = {
 		names: readonly string[],
 		options: { timeoutMs: number },
 	): Promise<unknown>;
+	/**
+	 * Whether this Replica keeps the Space: it is the Space's Host, or the
+	 * Space has none. Without it, nothing is collected.
+	 */
+	keeps?(spaceId: string): Promise<boolean>;
 };
 
 /** What a Command step gets: the folder in `NS_KNOWLEDGE`. */
@@ -199,6 +205,21 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 					runId === undefined ? events : keepLearnings(events, path, runId),
 				done: hold.done,
 			};
+		},
+		/**
+		 * Removes the content of the Spaces this Replica keeps that no
+		 * knowledge document lists any more, after a grace period
+		 * (`collectContent`). Nothing before the devices runtime connects.
+		 */
+		async collect(): Promise<CollectResult> {
+			const keeps = hosts?.keeps?.bind(hosts);
+			if (!keeps) return { removed: 0, waiting: 0 };
+			return collectContent({
+				db: deps.db,
+				documents: deps.documents,
+				archive: deps.archive,
+				keeps,
+			});
 		},
 		listing: sync.listing,
 		read: sync.read,

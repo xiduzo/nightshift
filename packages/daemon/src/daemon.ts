@@ -515,7 +515,12 @@ export async function createDaemon(
 	const { engine } = devices;
 	// The runs this engine walks go to the monitoring while the export is on.
 	telemetry.follow(engine);
-	knowledge.connect(devices);
+	knowledge.connect({
+		inStep: devices.inStep,
+		// The Spaces with no Host: this Replica keeps their knowledge content.
+		keeps: async (spaceId) =>
+			(await engine.hostSpaces.hostOf(spaceId)) === null,
+	});
 
 	/**
 	 * The relay's document half: the owner's clients sync this Device's
@@ -603,7 +608,9 @@ export async function createDaemon(
 	 * Every knowledge folder here, once the Links had a moment to come up:
 	 * the import on upgrade (ADR 4, decision 10), and what changed while
 	 * the daemon was down. Then, each minute, the folders whose content
-	 * still waits for its Host.
+	 * still waits for its Host. Once a day, from an hour after the start,
+	 * the content of the Spaces this computer keeps that no document lists
+	 * any more goes (`ProjectKnowledge.collect`).
 	 */
 	await slots.replace(
 		"nightshiftKnowledgeTimers",
@@ -616,13 +623,21 @@ export async function createDaemon(
 			const retry = setInterval(() => {
 				knowledge.retryPending().catch(() => {});
 			}, 60_000);
-			first.unref();
-			retry.unref();
-			return { first, retry };
+			const collectNow = () => {
+				knowledge.collect().catch((error) => {
+					console.warn("The old knowledge content was not removed:", error);
+				});
+			};
+			const firstCollect = setTimeout(collectNow, 60 * 60_000);
+			const collect = setInterval(collectNow, 24 * 60 * 60_000);
+			for (const timer of [first, retry, firstCollect, collect]) timer.unref();
+			return { first, retry, firstCollect, collect };
 		},
-		({ first, retry }) => {
+		({ first, retry, firstCollect, collect }) => {
 			clearTimeout(first);
 			clearInterval(retry);
+			clearTimeout(firstCollect);
+			clearInterval(collect);
 		},
 	);
 
