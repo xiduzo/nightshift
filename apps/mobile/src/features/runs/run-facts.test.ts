@@ -66,6 +66,14 @@ describe("runFacts", () => {
 		expect(fact.get("Run")).toMatchObject({ value: "run_42", mono: true });
 	});
 
+	test("a run shown from a list says no step count while its steps load", () => {
+		const fact = byLabel(
+			runFacts(factRun(), { status: "running", steps: null, now: NOW }),
+		);
+		expect(fact.get("Duration")?.value).toBe("30 min");
+		expect(fact.get("Duration")?.sub).toBeUndefined();
+	});
+
 	test("a run that waits for its computer to make its worktree shows no branch yet", () => {
 		const facts = runFacts(factRun({ branch: "" }), {
 			status: "sleeping",

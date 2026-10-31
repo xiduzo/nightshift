@@ -1,4 +1,8 @@
-import { type RunActions as Allowed, useRunActed } from "@nightshift/client";
+import {
+	type RunActions as Allowed,
+	type RunActing,
+	useRunActed,
+} from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -29,17 +33,12 @@ import { useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
 
 /**
- * Stop a run that is on its way, or resume one that is not, as the run
- * allows (`runActions`). Each asks first. The content of the run's Card,
- * or nothing when the run can do neither.
+ * Stop and Resume of one run. While one is on its way, and after it until
+ * the run gets there, `acting` says which: the screen shows its result at
+ * once (`actedRunStatus`). It reads the mutation's `variables`, so a
+ * failed action shows the run as it is again.
  */
-export function RunActions({
-	runId,
-	allows,
-}: {
-	runId: string;
-	allows: Pick<Allowed, "stop" | "resume">;
-}) {
+export function useRunAct(runId: string) {
 	const { host } = useSignedIn();
 	const runActed = useRunActed(host);
 	const refetch = () => runActed(runId);
@@ -49,7 +48,31 @@ export function RunActions({
 	const resume = useMutation(
 		host.orpc.runs.resume.mutationOptions({ onSuccess: refetch }),
 	);
+	const acting: RunActing =
+		stop.variables?.runId === runId && !stop.isError
+			? { action: "stop", settled: stop.isSuccess }
+			: resume.variables?.runId === runId && !resume.isError
+				? { action: "resume", settled: resume.isSuccess }
+				: null;
+	return { stop, resume, acting };
+}
 
+export type RunAct = ReturnType<typeof useRunAct>;
+
+/**
+ * Stop a run that is on its way, or resume one that is not, as the run
+ * allows (`runActions`). Each asks first. The content of the run's Card,
+ * or nothing when the run can do neither.
+ */
+export function RunActions({
+	runId,
+	allows,
+	act: { stop, resume, acting },
+}: {
+	runId: string;
+	allows: Pick<Allowed, "stop" | "resume">;
+	act: RunAct;
+}) {
 	const { stop: canStop, resume: canResume } = allows;
 	const failure = stop.error
 		? { title: "The run did not stop", message: stop.error.message }
@@ -66,7 +89,7 @@ export function RunActions({
 					<Confirm
 						button="Stop run"
 						icon={CircleStop}
-						busy={stop.isPending}
+						busy={acting?.action === "stop"}
 						title="Stop this run?"
 						description="The running step stops now, and no new step starts. You can resume the run later."
 						confirm="Stop run"
@@ -81,7 +104,7 @@ export function RunActions({
 					<Confirm
 						button="Resume run"
 						icon={Play}
-						busy={resume.isPending}
+						busy={acting?.action === "resume"}
 						title="Resume this run?"
 						description="The run continues at its last step."
 						confirm="Resume run"

@@ -1,5 +1,6 @@
 import {
 	type Artifact,
+	actedRunStatus,
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
@@ -42,7 +43,7 @@ import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { FactGrid, FactTile } from "@/shared/tiles";
 import { StepTrail, trailItemOf } from "@/shared/trail";
-import { RunActions } from "./run-actions";
+import { RunActions, useRunAct } from "./run-actions";
 import {
 	itemStateLabel,
 	type RunLink,
@@ -71,7 +72,11 @@ function SignedInRun({ runId }: { runId: string }) {
 	const gateQueries = useHostQueries(createGateQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
 	const queryClient = useQueryClient();
-	const run = useQuery({ ...runQueries.get(runId), ...useWhileFocused() });
+	// The run shows at once from a list in the cache. The steps follow.
+	const run = useQuery({
+		...runQueries.get(runId, queryClient),
+		...useWhileFocused(),
+	});
 	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
 	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
 	const live = usePhoneLiveRun(runId);
@@ -94,6 +99,7 @@ function SignedInRun({ runId }: { runId: string }) {
 			{run.data ? (
 				<RunBody
 					run={run.data}
+					partial={run.isPlaceholderData}
 					live={live}
 					gates={(gates.data ?? []).filter((gate) => gate.runId === runId)}
 					projectName={
@@ -122,16 +128,29 @@ function SignedInRun({ runId }: { runId: string }) {
 
 function RunBody({
 	run,
+	partial,
 	live,
 	gates,
 	projectName,
 }: {
 	run: RunDetail;
+	/** Only what a list knows of the run: its steps load still. */
+	partial: boolean;
 	live: PhoneLiveRun;
 	gates: OpenGate[];
 	projectName: string | null;
 }) {
-	const status: RunStatus = live.status ?? run.status;
+	const act = useRunAct(run.id);
+	// A stop or resume on its way shows its result at once.
+	const shown = actedRunStatus(
+		{
+			status: live.status ?? run.status,
+			result: run.result,
+			walkedHere: run.walker.thisDevice,
+		},
+		act.acting,
+	);
+	const status: RunStatus = shown.status;
 	const ended = hasEnded(status);
 	const steps = mergeSteps(run.steps, live.steps);
 	const ownSteps = steps.filter((step) => step.scope === null);
@@ -144,14 +163,18 @@ function RunBody({
 					stepState(step) === "running" &&
 					(live.entries.has(step.id) || step.nodeType === "agent"),
 			);
-	const allows = runActions(status, run.walker.thisDevice, run.result);
+	const allows = runActions(
+		live.status ?? run.status,
+		run.walker.thisDevice,
+		run.result,
+	);
 	const now = Date.now();
 
 	return (
 		<>
 			<View className="gap-2">
 				<View className="flex-row flex-wrap items-center gap-2">
-					<RunStatusBadge status={status} result={run.result} />
+					<RunStatusBadge status={status} result={shown.result} />
 					{live.connection === "reconnecting" && !ended ? (
 						<Text className="text-muted-foreground text-sm">Reconnecting…</Text>
 					) : null}
@@ -184,7 +207,7 @@ function RunBody({
 
 			{allows.stop || allows.resume ? (
 				<Card className="gap-4 py-4">
-					<RunActions runId={run.id} allows={allows} />
+					<RunActions runId={run.id} allows={allows} act={act} />
 					<FollowOnLockScreen runId={run.id} ended={ended} />
 				</Card>
 			) : null}
@@ -213,11 +236,13 @@ function RunBody({
 			<View className="gap-3">
 				<SectionHead title="Details" />
 				<FactGrid>
-					{runFacts(run, { status, steps: ownSteps.length, now }).map(
-						(fact) => (
-							<FactTile key={fact.label} {...fact} />
-						),
-					)}
+					{runFacts(run, {
+						status,
+						steps: partial ? null : ownSteps.length,
+						now,
+					}).map((fact) => (
+						<FactTile key={fact.label} {...fact} />
+					))}
 				</FactGrid>
 			</View>
 
@@ -227,6 +252,7 @@ function RunBody({
 				labels={labels}
 				status={status}
 				now={now}
+				loading={partial}
 			/>
 
 			<MadeSection run={run} live={!ended} links={runLinks(steps)} />
@@ -258,12 +284,15 @@ function StepsSection({
 	labels,
 	status,
 	now,
+	loading,
 }: {
 	runId: string;
 	steps: StepSummary[];
 	labels: Map<string, string>;
 	status: RunStatus;
 	now: number;
+	/** The steps load still: the trail shows as loading. */
+	loading: boolean;
 }) {
 	return (
 		<View className="gap-3">
@@ -277,7 +306,9 @@ function StepsSection({
 			/>
 			<Card className="py-4">
 				<CardContent className="px-4">
-					{steps.length === 0 ? (
+					{loading ? (
+						<Skeleton className="h-32 w-full rounded-xl" />
+					) : steps.length === 0 ? (
 						<Text className="text-muted-foreground">
 							The first step starts soon.
 						</Text>

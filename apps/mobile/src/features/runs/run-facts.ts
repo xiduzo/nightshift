@@ -72,8 +72,8 @@ function costFact(
 /**
  * The Details of a run, two by two: flow, branch, computer, when it
  * started and by whom, how long it took and how many steps, its cost and
- * its id. `steps` are the run's own steps, live; `now` counts a run on its
- * way.
+ * its id. `steps` are the run's own steps, live, or null while they load;
+ * `now` counts a run on its way.
  */
 export function runFacts(
 	run: Pick<
@@ -91,7 +91,11 @@ export function runFacts(
 		| "costCalls"
 		| "costEstimated"
 	>,
-	{ status, steps, now }: { status: RunStatus; steps: number; now: number },
+	{
+		status,
+		steps,
+		now,
+	}: { status: RunStatus; steps: number | null; now: number },
 ): RunFact[] {
 	const end = hasEnded(status) ? (run.endedAt ?? now) : now;
 	return [
@@ -106,7 +110,9 @@ export function runFacts(
 		{
 			label: "Duration",
 			value: waitedText(end - run.createdAt),
-			sub: steps === 1 ? "1 step" : `${steps} steps`,
+			...(steps === null
+				? {}
+				: { sub: steps === 1 ? "1 step" : `${steps} steps` }),
 		},
 		costFact(run, hasEnded(status)),
 		{ label: "Run", value: run.id, mono: true, wide: true },
