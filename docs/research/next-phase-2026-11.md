@@ -1,7 +1,8 @@
 # Next phase: doors, guards, eyes and knowledge
 
-**Status:** Sprints 1 and 2 on main, sprint 3 on main except the pitch and
-PR scores, sprint 4 planned (2026-10-30).
+**Status:** Sprints 1 to 3 on main except the pitch. Sprint 4 on main on
+2026-10-31 except the proof on real nights (5.6), the pitch (5.7), a
+scheduled evaluation kit and a few 5.8 items.
 Sprint 3 changed after sprint 2: knowledge moves into the Space
 ([ADR 4](../adr/0004-knowledge-belongs-to-the-space.md)) before search. Follows the product and market
 review of 2026-10-30 (items 08 "What to integrate" and 09 "Next 90 days").
@@ -436,7 +437,9 @@ keyword search, and 11 of 13 against 7 on paraphrases.
   Done (5d888105). The phone shows the digest's sentence, not its lines.
 - The Jira and Confluence kits need `jq`. The readiness check names it, and
   the Host image ships it. Done: the readiness check names jq and curl
-  (93c066a9). The image is 244fd1cb.
+  (93c066a9). The public image holds jq and curl (244fd1cb), and Ollama
+  (1355241a): it holds everything the built-in kits and meaning search
+  need, but no vendor CLIs.
 
 ### 5.5 Scores and telemetry, the rest (telemetry + engine, 2 days)
 
@@ -489,7 +492,9 @@ Moved from 4.4, unchanged. It goes last, when the proof of 5.6 is in.
 - A folder source synced only where its schedule pinned the run. Done: a
   Subflow names the computer its steps run on (`device`, **Runs on**), and
   a folder source names its own (e66dbeb7, 6bdad4cb, ac3d7dde, b2862645,
-  5a658151).
+  5a658151). The Knowledge page and the source dialog name that computer
+  (839da78d).
+- Sources and kits refuse `evals/` as well as `learnings/` (26f0a38b).
 - gh-aw lock file export and the ACP registry listing, an afternoon each.
 
 ### Not in this sprint
