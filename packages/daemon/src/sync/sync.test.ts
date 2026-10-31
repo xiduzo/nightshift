@@ -9,19 +9,13 @@ import {
 	localPerson,
 	type SyncDeviceKey,
 } from "@nightshift/auth";
-import {
-	type AuthSandbox,
-	createAuthSandbox,
-	turnOnTwoFactor,
-} from "@nightshift/auth/testing";
+import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
 import { project } from "@nightshift/db/schema";
 import { deviceDirectory } from "@nightshift/devices";
 import {
 	createFlowDocuments,
-	createKnowledgeDocuments,
 	createSyncedDocuments,
 	type FlowDocuments,
-	type KnowledgeDocuments,
 	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
@@ -75,8 +69,6 @@ let synced: SyncedDocuments;
 let spaces: SpaceDocuments;
 /** The flow documents of this Host's Projects. */
 let flows: FlowDocuments;
-/** The knowledge documents of this Host's Projects. */
-let knowledge: KnowledgeDocuments;
 let sync: Sync;
 let server: Server<SocketData>;
 const providers: HocuspocusProvider[] = [];
@@ -113,7 +105,6 @@ beforeEach(async () => {
 		documents: synced,
 	});
 	flows = createFlowDocuments({ db: people.db, documents: synced });
-	knowledge = createKnowledgeDocuments({ db: people.db, documents: synced });
 	sync = createSync({
 		document: async (name) => (await synced.find(name))?.doc ?? null,
 		kept: {
@@ -269,48 +260,58 @@ describe("Hocuspocus on Bun", () => {
 	});
 });
 
-describe("documentAccess: the Device document", () => {
-	test("another Person is refused, even on this computer", async () => {
-		const client = connect(document.name, {
-			origin: ORIGIN,
-			cookie: stranger.get("cookie") ?? "",
-		});
-		await waitFor(() => client.failed.length > 0);
-		expect(client.provider.isSynced).toBe(false);
+/**
+ * Platform: Ada owns it, Bob is a member, Cy a viewer. With `projectId`,
+ * it has that Project, and Bob and Cy each have a Device with a key of
+ * this Host. Who may open what is `documentAccess`'s, tested in
+ * `@nightshift/auth`: these tests check that the relay honours it.
+ */
+async function platform(projectId?: string) {
+	const ada = await people.signUp("Ada");
+	const bob = await people.signUp("Bob");
+	const cy = await people.signUp("Cy");
+	const space = await people.auth.api.createOrganization({
+		headers: ada.headers,
+		body: { name: "Platform", slug: "platform" },
 	});
-});
-
-describe("documentAccess: a Space document", () => {
-	/** Platform: Ada owns it, Bob is a member, Cy a viewer. Dee is not in it. */
-	async function platform() {
-		const ada = await people.signUp("Ada");
-		const bob = await people.signUp("Bob");
-		const cy = await people.signUp("Cy");
-		const space = await people.auth.api.createOrganization({
-			headers: ada.headers,
-			body: { name: "Platform", slug: "platform" },
+	if (!space) throw new Error("no space");
+	for (const [person, role] of [
+		[bob, "member"],
+		[cy, "viewer"],
+	] as const) {
+		await people.auth.api.addMember({
+			body: { userId: person.userId, role, organizationId: space.id },
 		});
-		if (!space) throw new Error("no space");
-		for (const [person, role] of [
-			[bob, "member"],
-			[cy, "viewer"],
+	}
+	if (projectId) {
+		await people.db.insert(project).values({
+			id: projectId,
+			spaceId: space.id,
+			name: "Shop",
+			createdAt: new Date(),
+		});
+		for (const [token, person] of [
+			["nsd_bob", bob],
+			["nsd_cy", cy],
 		] as const) {
-			await people.auth.api.addMember({
-				body: { userId: person.userId, role, organizationId: space.id },
+			deviceKeys.set(token, {
+				deviceId: `device-${person.userId}`,
+				personId: person.userId,
+				home: false,
 			});
 		}
-		const opened = await spaces.open(space.id);
-		const cookie = (headers: Headers) => headers.get("cookie") ?? "";
-		return {
-			opened,
-			spaceId: space.id,
-			name: spaceDocumentName(space.id),
-			ada: ada.headers,
-			bob: cookie(bob.headers),
-			cy: cookie(cy.headers),
-		};
 	}
+	const opened = await spaces.open(space.id);
+	const cookie = (headers: Headers) => headers.get("cookie") ?? "";
+	return {
+		opened,
+		name: spaceDocumentName(space.id),
+		bob: cookie(bob.headers),
+		cy: cookie(cy.headers),
+	};
+}
 
+describe("a read-only connection", () => {
 	const entry = (name: string) => ({
 		name,
 		remote: null,
@@ -343,92 +344,6 @@ describe("documentAccess: a Space document", () => {
 		const rows = await people.db.select().from(project);
 		expect(rows.map((row) => row.name)).toEqual(["From the engine"]);
 	});
-
-	test("a Person outside the Space is refused", async () => {
-		const { name } = await platform();
-		const outsider = connect(name, {
-			origin: ORIGIN,
-			cookie: stranger.get("cookie") ?? "",
-		});
-		await waitFor(() => outsider.failed.length > 0);
-		expect(outsider.provider.isSynced).toBe(false);
-		expect(outsider.doc.getMap("members").size).toBe(0);
-	});
-
-	test("a removed member is refused", async () => {
-		const { spaceId, name, ada, bob } = await platform();
-		await people.auth.api.removeMember({
-			headers: ada,
-			body: { memberIdOrEmail: "bob@example.com", organizationId: spaceId },
-		});
-		const removed = connect(name, { origin: ORIGIN, cookie: bob });
-		await waitFor(() => removed.failed.length > 0);
-		expect(removed.provider.isSynced).toBe(false);
-	});
-
-	test("this computer's Person is not a member of another Person's Space", async () => {
-		const { name } = await platform();
-		const local = connect(name, { origin: ORIGIN });
-		await waitFor(() => local.failed.length > 0);
-		expect(local.provider.isSynced).toBe(false);
-	});
-});
-
-describe("documentAccess on a Host that requires two-factor", () => {
-	/** The relay's check, with the requirement on. */
-	const authorize = () =>
-		documentAccess({
-			auth: people.auth,
-			db: people.db,
-			localSession: createLocalSession(people.auth, people.db, ownerId),
-			ownerId,
-			isThisComputer: (peer, request) =>
-				isThisComputer(peer, request, new Set([ORIGIN])),
-			documentOf: (name) => synced.documentOf(name),
-			policy: { requireTwoFactor: true },
-		});
-
-	/** A socket's upgrade through a tunnel on this computer: it adds its header. */
-	function throughTunnel(headers: Headers, documentName: string) {
-		return authorize()({
-			documentName,
-			token: "browser",
-			peer: "127.0.0.1",
-			request: new Request("https://studio.example.com/sync", {
-				headers: {
-					origin: ORIGIN,
-					cookie: headers.get("cookie") ?? "",
-					"cf-connecting-ip": "203.0.113.9",
-				},
-			}),
-		});
-	}
-
-	test("a session from another computer opens nothing until its Person turns two-factor on", async () => {
-		const ada = await people.signUp("Ada");
-		const space = await people.auth.api.createOrganization({
-			headers: ada.headers,
-			body: { name: "Platform", slug: "platform" },
-		});
-		if (!space) throw new Error("no space");
-		await spaces.open(space.id);
-		const name = spaceDocumentName(space.id);
-		expect(await throughTunnel(ada.headers, name)).toBe(false);
-		const { headers } = await turnOnTwoFactor(people.auth, ada.headers);
-		expect(await throughTunnel(headers, name)).toBe("read");
-	});
-
-	test("this computer still opens its own document", async () => {
-		const access = await authorize()({
-			documentName: document.name,
-			token: "this-computer",
-			peer: "127.0.0.1",
-			request: new Request(`http://localhost:${server.port}/sync`, {
-				headers: { origin: ORIGIN },
-			}),
-		});
-		expect(access).toBe("write");
-	});
 });
 
 describe("Device keys on the relay", () => {
@@ -460,144 +375,26 @@ describe("Device keys on the relay", () => {
 		await waitFor(() => page.failed.length > 0);
 	}, 20_000);
 
-	describe("the documents of the owner's other Devices (ADR 1, decision 2)", () => {
-		const C = "device:device-c";
-		const D = "device:device-d";
+	/** C is another home Device of the owner. */
+	const C = "device:device-c";
 
-		/** C is another home Device of the owner. D is a home Device of Dee. */
-		async function others() {
-			pairB();
-			keptOwners.set(C, ownerId);
-			keptOwners.set(D, (await people.signUp("Dee3")).userId);
-			const writer = connect(C, { origin: ORIGIN });
-			await waitFor(() => writer.provider.isSynced);
-			writer.doc
-				.getMap("facts")
-				.set("secrets", [{ name: "GH_TOKEN", setAt: 1 }]);
-			return writer;
-		}
+	test("a home Device reads another Device of its owner, and writes nothing to it", async () => {
+		pairB();
+		keptOwners.set(C, ownerId);
+		const writer = connect(C, { origin: ORIGIN });
+		await waitFor(() => writer.provider.isSynced);
+		writer.doc.getMap("facts").set("secrets", [{ name: "GH_TOKEN", setAt: 1 }]);
+		const reader = connect(C, { token: KEY });
+		await waitFor(
+			() => reader.doc.getMap("facts").get("secrets") !== undefined,
+		);
+		expect(reader.doc.getMap("facts").get("secrets")).toEqual([
+			{ name: "GH_TOKEN", setAt: 1 },
+		]);
 
-		test("a home Device reads another Device of its owner, and writes nothing to it", async () => {
-			const writer = await others();
-			const reader = connect(C, { token: KEY });
-			await waitFor(
-				() => reader.doc.getMap("facts").get("secrets") !== undefined,
-			);
-			expect(reader.doc.getMap("facts").get("secrets")).toEqual([
-				{ name: "GH_TOKEN", setAt: 1 },
-			]);
-
-			reader.doc.getMap("facts").set("platform", "from-b");
-			await Bun.sleep(100);
-			expect(writer.doc.getMap("facts").get("platform")).toBeUndefined();
-		});
-
-		test("a home Device reads the Host's own document when its owner owns the Host, and writes nothing to it", async () => {
-			pairB();
-			document.doc.getMap("facts").set("platform", "linux");
-			const reader = connect(document.name, { token: KEY });
-			await waitFor(
-				() => reader.doc.getMap("facts").get("platform") === "linux",
-			);
-			reader.doc.getMap("facts").set("platform", "from-b");
-			await Bun.sleep(100);
-			expect(document.facts.get("platform")).toBe("linux");
-		});
-
-		test("another Person's Device document is refused", async () => {
-			await others();
-			const client = connect(D, { token: KEY });
-			await waitFor(() => client.failed.length > 0);
-			expect(client.provider.isSynced).toBe(false);
-		});
-
-		test("a Device of another Person reads neither the owner's Devices nor the Host's own", async () => {
-			await others();
-			deviceKeys.set("nsd_dee", {
-				deviceId: "device-d",
-				personId: keptOwners.get(D) as string,
-				home: true,
-			});
-			for (const name of [C, document.name]) {
-				const client = connect(name, { token: "nsd_dee" });
-				await waitFor(() => client.failed.length > 0);
-				expect(client.provider.isSynced).toBe(false);
-			}
-		});
-
-		test("over a Guest Host a Device reads no other Device's document", async () => {
-			await others();
-			deviceKeys.set(KEY, {
-				deviceId: "device-b",
-				personId: ownerId,
-				home: false,
-			});
-			for (const name of [C, document.name]) {
-				const client = connect(name, { token: KEY });
-				await waitFor(() => client.failed.length > 0);
-				expect(client.provider.isSynced).toBe(false);
-			}
-		});
-	});
-
-	test("a guest Host never opens a Device document to a key", async () => {
-		pairB(false);
-		const client = connect(B, { token: KEY });
-		await waitFor(() => client.failed.length > 0);
-		expect(client.provider.isSynced).toBe(false);
-	});
-
-	test("a key of another Person is refused", async () => {
-		keptOwners.set(B, ownerId);
-		deviceKeys.set(KEY, {
-			deviceId: "device-b",
-			personId: "someone",
-			home: true,
-		});
-		const client = connect(B, { token: KEY });
-		await waitFor(() => client.failed.length > 0);
-	});
-
-	test("an unknown key from this computer does not get the local session", async () => {
-		const client = connect(document.name, { token: "nsd_unknown" });
-		await waitFor(() => client.failed.length > 0);
-		expect(client.provider.isSynced).toBe(false);
-	});
-
-	test("a Device reads the Space documents of its owner's Spaces, and writes none", async () => {
-		const dee = (await people.signUp("Dee2")).userId;
-		const space = await people.auth.api.createOrganization({
-			body: { name: "Platform", slug: "platform", userId: ownerId },
-		});
-		if (!space) throw new Error("no space");
-		const opened = await spaces.open(space.id);
-		const name = spaceDocumentName(space.id);
-
-		deviceKeys.set(KEY, {
-			deviceId: "device-b",
-			personId: ownerId,
-			home: false,
-		});
-		const device = connect(name, { token: KEY });
-		await waitFor(() => device.provider.isSynced);
-		device.doc.getMap("projects").set("p-device", {
-			name: "From the Device",
-			remote: null,
-			createdAt: 1,
-			removedAt: null,
-			updatedAt: 1,
-		});
+		reader.doc.getMap("facts").set("platform", "from-b");
 		await Bun.sleep(100);
-		expect(opened.projects.has("p-device")).toBe(false);
-
-		// A Device of a Person outside the Space: refused.
-		deviceKeys.set("nsd_other", {
-			deviceId: "device-d",
-			personId: dee,
-			home: true,
-		});
-		const other = connect(name, { token: "nsd_other" });
-		await waitFor(() => other.failed.length > 0);
+		expect(writer.doc.getMap("facts").get("platform")).toBeUndefined();
 	});
 
 	test("removing a Device's access ends its connections", async () => {
@@ -670,7 +467,7 @@ describe("the relay across a bun --hot reload", () => {
 	});
 });
 
-describe("documentAccess: a flow document", () => {
+describe("a flow document a Device keeps a copy of", () => {
 	const PROJECT = "project-shop";
 	const name = `flows:${PROJECT}`;
 	const historyName = `flows-history:${PROJECT}`;
@@ -704,47 +501,6 @@ describe("documentAccess: a flow document", () => {
 				node.type === "agent" ? node.prompt : null,
 			]),
 		);
-
-	/**
-	 * Platform with one Project: Ada owns it, Bob is a member, Cy a viewer.
-	 * Bob and Cy each have a Device with a key of this Host.
-	 */
-	async function platform() {
-		const ada = await people.signUp("Ada");
-		const bob = await people.signUp("Bob");
-		const cy = await people.signUp("Cy");
-		const space = await people.auth.api.createOrganization({
-			headers: ada.headers,
-			body: { name: "Platform", slug: "platform" },
-		});
-		if (!space) throw new Error("no space");
-		for (const [person, role] of [
-			[bob, "member"],
-			[cy, "viewer"],
-		] as const) {
-			await people.auth.api.addMember({
-				body: { userId: person.userId, role, organizationId: space.id },
-			});
-		}
-		await people.db.insert(project).values({
-			id: PROJECT,
-			spaceId: space.id,
-			name: "Shop",
-			createdAt: new Date(),
-		});
-		deviceKeys.set("nsd_bob", {
-			deviceId: "device-bob",
-			personId: bob.userId,
-			home: false,
-		});
-		deviceKeys.set("nsd_cy", {
-			deviceId: "device-cy",
-			personId: cy.userId,
-			home: false,
-		});
-		const cookie = (headers: Headers) => headers.get("cookie") ?? "";
-		return { bob: cookie(bob.headers), cy: cookie(cy.headers) };
-	}
 
 	/** The flows on this Host, as its engine saves them. */
 	const onHost = () =>
@@ -782,27 +538,8 @@ describe("documentAccess: a flow document", () => {
 		};
 	}
 
-	test("a member and a viewer read it in a browser; neither writes through the relay", async () => {
-		const { bob, cy } = await platform();
-		const member = connect(name, { origin: ORIGIN, cookie: bob });
-		const viewer = connect(name, { origin: ORIGIN, cookie: cy });
-		await waitFor(() => member.provider.isSynced && viewer.provider.isSynced);
-
-		member.doc.getMap("meta").set("from", "Bob");
-		viewer.doc.getMap("meta").set("from", "Cy");
-		await onHost().save(of, "build", twoNodes());
-		await waitFor(
-			() =>
-				member.doc.getMap("flows").size === 1 &&
-				viewer.doc.getMap("flows").size === 1,
-		);
-		expect(
-			(await flows.open(PROJECT)).current.doc.getMap("meta").has("from"),
-		).toBe(false);
-	});
-
 	test("a Device of a member saves into it; a Device of a viewer only reads", async () => {
-		await platform();
+		await platform(PROJECT);
 		const device = await deviceCopy();
 		try {
 			const [current, history] = device.link("nsd_bob");
@@ -829,25 +566,8 @@ describe("documentAccess: a flow document", () => {
 		}
 	});
 
-	test("a Person outside the Space, and a Project this Host does not have, are refused", async () => {
-		await platform();
-		const dee = (await people.signUp("Dee2")).userId;
-		deviceKeys.set("nsd_dee", {
-			deviceId: "device-dee",
-			personId: dee,
-			home: true,
-		});
-		const outsider = connect(name, { token: "nsd_dee" });
-		const unknown = connect("flows:no-such-project", { token: "nsd_bob" });
-		await waitFor(
-			() => outsider.failed.length > 0 && unknown.failed.length > 0,
-		);
-		expect(outsider.provider.isSynced).toBe(false);
-		expect(unknown.provider.isSynced).toBe(false);
-	});
-
 	test("edits on a Device without its Link and on the Host merge when the Link is back", async () => {
-		await platform();
+		await platform(PROJECT);
 		const host = onHost();
 		await host.save(of, "build", twoNodes());
 		const device = await deviceCopy();
@@ -878,102 +598,5 @@ describe("documentAccess: a flow document", () => {
 		} finally {
 			await device.documents.flush();
 		}
-	});
-});
-
-describe("documentAccess: a knowledge document", () => {
-	const PROJECT = "project-wiki";
-	const name = `knowledge:${PROJECT}`;
-	const entry = {
-		sha256: "a".repeat(64),
-		size: 7,
-		changedAt: 1,
-		deviceId: "device-bob",
-	};
-
-	/**
-	 * Platform with one Project: Ada owns it, Bob is a member, Cy a viewer.
-	 * Bob and Cy each have a Device with a key of this Host.
-	 */
-	async function platform() {
-		const ada = await people.signUp("Ada");
-		const bob = await people.signUp("Bob");
-		const cy = await people.signUp("Cy");
-		const space = await people.auth.api.createOrganization({
-			headers: ada.headers,
-			body: { name: "Platform", slug: "platform" },
-		});
-		if (!space) throw new Error("no space");
-		for (const [person, role] of [
-			[bob, "member"],
-			[cy, "viewer"],
-		] as const) {
-			await people.auth.api.addMember({
-				body: { userId: person.userId, role, organizationId: space.id },
-			});
-		}
-		await people.db.insert(project).values({
-			id: PROJECT,
-			spaceId: space.id,
-			name: "Wiki",
-			createdAt: new Date(),
-		});
-		for (const [token, person] of [
-			["nsd_bob", bob],
-			["nsd_cy", cy],
-		] as const) {
-			deviceKeys.set(token, {
-				deviceId: `device-${person.userId}`,
-				personId: person.userId,
-				home: false,
-			});
-		}
-		return { bob: bob.headers.get("cookie") ?? "" };
-	}
-
-	const onHost = async () =>
-		(await knowledge.open(PROJECT)).doc.getMap("files");
-
-	test("a Member reads it in a browser, and does not change it through the relay", async () => {
-		const { bob } = await platform();
-		const member = connect(name, { origin: ORIGIN, cookie: bob });
-		await waitFor(() => member.provider.isSynced);
-		member.doc.getMap("files").set("wiki/Home.md", entry);
-		await Bun.sleep(100);
-		expect((await onHost()).size).toBe(0);
-	});
-
-	test("a Device of a Member who may start runs publishes into it; a viewer's Device only reads", async () => {
-		await platform();
-		const device = connect(name, { token: "nsd_bob" });
-		await waitFor(() => device.provider.isSynced);
-		device.doc.getMap("files").set("wiki/Home.md", entry);
-		await waitFor(async () => (await onHost()).has("wiki/Home.md"));
-
-		const viewer = connect(name, { token: "nsd_cy" });
-		await waitFor(
-			() =>
-				viewer.provider.isSynced &&
-				viewer.doc.getMap("files").has("wiki/Home.md"),
-		);
-		viewer.doc.getMap("files").set("wiki/Other.md", entry);
-		await Bun.sleep(100);
-		expect((await onHost()).has("wiki/Other.md")).toBe(false);
-	});
-
-	test("a Person outside the Space, and a Project this Host does not have, are refused", async () => {
-		await platform();
-		const dee = (await people.signUp("Dee2")).userId;
-		deviceKeys.set("nsd_dee", {
-			deviceId: "device-dee",
-			personId: dee,
-			home: true,
-		});
-		const outsider = connect(name, { token: "nsd_dee" });
-		const unknown = connect("knowledge:no-such-project", { token: "nsd_bob" });
-		await waitFor(
-			() => outsider.failed.length > 0 && unknown.failed.length > 0,
-		);
-		expect(outsider.provider.isSynced).toBe(false);
 	});
 });
