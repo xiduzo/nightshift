@@ -5,7 +5,7 @@ import {
 	type FlowNode,
 	type ProfileRef,
 } from "@nightshift/flows";
-import type { Device } from "../device";
+import { addressKey, type Device } from "../device";
 import type { PlacedDevice } from "./peers";
 import { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";
 
@@ -380,5 +380,121 @@ describe("the node walk of a run's plan", () => {
 				"the-person",
 			),
 		).rejects.toThrow("bare does not have this project.");
+	});
+});
+
+describe("the addresses of a run's Model Profiles", () => {
+	const jev = {
+		decider: "openjev" as const,
+		address: { baseUrl: "http://127.0.0.1:8080" },
+	};
+	const decision = (id: string, profile: ProfileRef) =>
+		({
+			id,
+			type: "decision",
+			position: { x: 0, y: 0 },
+			prompt: "Ship it?",
+			options: [{ name: "ship" }, { name: "hold" }],
+			by: "model",
+			profile,
+		}) as FlowNode;
+
+	/** Decisions without edges: each option ends the run. */
+	const unlinked = (nodes: FlowNode[]): Flow => ({ ...flow(nodes), edges: [] });
+
+	/** A Device with the profile `jev`, whose address answers `answer`. */
+	function modelDevice(
+		id: string,
+		answer: string | null,
+		asked: unknown[][],
+		offline = false,
+	): PlacedDevice {
+		const device = {
+			id,
+			name: id,
+			flows: async () => ({}),
+			capabilities: async (query: {
+				profiles?: string[];
+				addresses?: { decider: string; address: { baseUrl: string } }[];
+			}) => {
+				if (query.addresses) asked.push([id, ...query.addresses]);
+				return {
+					profiles: Object.fromEntries(
+						(query.profiles ?? []).map((name) => [name, jev]),
+					),
+					addresses: Object.fromEntries(
+						(query.addresses ?? []).map((check) => [
+							addressKey(check as never),
+							answer,
+						]),
+					),
+				};
+			},
+		} as unknown as Device;
+		return {
+			device,
+			id,
+			name: id,
+			thisDevice: false,
+			hasClone: true,
+			...(offline ? { offline: true } : {}),
+		};
+	}
+
+	function withDevices(...placed: PlacedDevice[]): PlanDevices {
+		const walker = at("this", { thisDevice: true });
+		return {
+			walker,
+			byId: async () => walker,
+			byName: async () => null,
+			profileDevice: async (id) => placed.find((d) => d.id === id) ?? null,
+			profileFor: () => null,
+			lastKnown: async () => new Map([["jev", { name: "jev", settings: jev }]]),
+			flows: async () => ({}),
+		};
+	}
+
+	test("the profile's Device asks its address once; one that does not answer refuses the run", async () => {
+		const asked: unknown[][] = [];
+		const mac = modelDevice(
+			"mac",
+			"Nothing answers there. Start the server, or change the address on the Agents page.",
+			asked,
+		);
+		const start = planNodes(
+			{
+				projectId: "p",
+				flow: unlinked([
+					decision("triage", { device: "mac", profile: "jev" }),
+					decision("again", { device: "mac", profile: "jev" }),
+				]),
+			},
+			withDevices(mac),
+			null,
+		);
+		await expect(start).rejects.toThrow(
+			"The profile jev on mac uses the address http://127.0.0.1:8080 (triage, again). Nothing answers there. Start the server, or change the address on the Agents page.",
+		);
+		expect(asked).toEqual([["mac", jev]]);
+	});
+
+	test("an address that answers passes, and an offline Device is not asked", async () => {
+		const asked: unknown[][] = [];
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				flow: unlinked([
+					decision("triage", { device: "mac", profile: "jev" }),
+					decision("later", { device: "pi", profile: "jev" }),
+				]),
+			},
+			withDevices(
+				modelDevice("mac", null, asked),
+				modelDevice("pi", "Nothing answers there.", asked, true),
+			),
+			null,
+		);
+		expect(asked.map(([id]) => id)).toEqual(["mac"]);
+		expect(planned.flow.nodes[0]).toMatchObject({ address: jev.address });
 	});
 });

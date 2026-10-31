@@ -14,6 +14,7 @@ import { flowsForRun } from "../flows";
 import type { PlannedDevice } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
 import type { PlacedDevice, PlannedRun } from "./peers";
+import { checkAddresses } from "./start-addresses";
 
 /**
  * The node walk of a run's plan: where each node runs, and its profile.
@@ -294,6 +295,7 @@ async function placeNodes(
 		);
 	}
 	if (misfits.length > 0) throw new Refusal("invalid", misfits.join(" "));
+	await checkAddresses(placed, owners, labelOf);
 	return { flows: placed, named, byId };
 }
 

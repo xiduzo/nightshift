@@ -9,6 +9,7 @@ export {
 	type ToolLaunchers,
 } from "./tool-launchers";
 export type {
+	AddressCheck,
 	Capabilities,
 	CapabilityQuery,
 	Device,
@@ -22,3 +23,4 @@ export type {
 	ToolResult,
 	Worktree,
 } from "./types";
+export { addressKey } from "./types";

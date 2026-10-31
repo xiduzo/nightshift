@@ -328,6 +328,7 @@ export type FakeDecider = Decider & {
  * is not one of the input's labels, and it errors once the script runs out.
  * `options.values` scripts `value` calls the same way (the data is passed on
  * as is: the engine checks it against the schema, as with the real decider).
+ * `options.addresses` says which addresses do not answer.
  */
 export function fakeDecider(
 	script:
@@ -336,6 +337,11 @@ export function fakeDecider(
 	options: {
 		delayMs?: number;
 		values?: FakeValue[] | ((input: ValueInput, call: number) => FakeValue);
+		/**
+		 * What `checkAddress` answers for a base URL: why the server there
+		 * does not answer. Unlisted: it answers.
+		 */
+		addresses?: Record<string, string>;
 	} = {},
 ): FakeDecider {
 	const calls: DecisionInput[] = [];
@@ -424,5 +430,7 @@ export function fakeDecider(
 		defaultModel: defaultDeciderModel,
 		decide,
 		value,
+		checkAddress: async ({ address }) =>
+			options.addresses?.[address.baseUrl] ?? null,
 	};
 }

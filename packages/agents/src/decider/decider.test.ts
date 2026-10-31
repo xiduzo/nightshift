@@ -727,3 +727,53 @@ describe("tanstackDecider: OpenJev and an OpenAI-compatible server", () => {
 		);
 	});
 });
+
+describe("tanstackDecider: checkAddress", () => {
+	const decider = tanstackDecider({
+		secret: async (name) => (name === "OPENJEV_KEY" ? "jev-key" : undefined),
+	});
+	const check = (
+		address: { baseUrl: string; apiKey?: string },
+		name = "openjev",
+	) => decider.checkAddress?.({ decider: name as "openjev", address });
+	const reply = (respond: () => Response) => {
+		globalThis.fetch = (async () => respond()) as unknown as typeof fetch;
+	};
+
+	test("a server that lists its models answers, and so does one with an error of its own", async () => {
+		reply(() => Response.json({ data: [{ id: "openjev-latest" }] }));
+		expect(await check({ baseUrl: "http://openjev:8080" })).toBeNull();
+		reply(() => new Response("nope", { status: 404 }));
+		expect(await check({ baseUrl: "http://openjev:8080" })).toBeNull();
+	});
+
+	test("nothing answering, a refused key and a missing secret do not answer", async () => {
+		reply(() => {
+			throw new Error(
+				"Unable to connect. Is the computer able to access the url?",
+			);
+		});
+		expect(await check({ baseUrl: "http://openjev:8080" })).toBe(
+			"Nothing answers there. Start the server, or change the address on the Agents page.",
+		);
+		reply(() => new Response("no", { status: 401 }));
+		expect(
+			await check({ baseUrl: "http://openjev:8080", apiKey: "OPENJEV_KEY" }),
+		).toBe("It refuses the API key. Check the secret OPENJEV_KEY.");
+		expect(
+			await check({ baseUrl: "http://openjev:8080", apiKey: "NOT_SAVED" }),
+		).toBe("It needs the secret NOT_SAVED. Add it on the Secrets page.");
+	});
+
+	test("Ollama at an address answers through its tags", async () => {
+		const asked: string[] = [];
+		globalThis.fetch = (async (url: string | URL | Request) => {
+			asked.push(url instanceof Request ? url.url : String(url));
+			throw new Error("Unable to connect.");
+		}) as unknown as typeof fetch;
+		expect(await check({ baseUrl: "http://gpu-box:11434" }, "ollama")).toBe(
+			"Nothing answers there. Start the server, or change the address on the Agents page.",
+		);
+		expect(asked).toEqual(["http://gpu-box:11434/api/tags"]);
+	});
+});

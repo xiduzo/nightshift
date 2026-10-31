@@ -14,6 +14,19 @@ const LISTING_TIMEOUT_MS = 3_000;
 const NOT_ANSWERING =
 	/unable to connect|fetch failed|ECONNREFUSED|ConnectionRefused|connection refused|ENOTFOUND|getaddrinfo|timed? ?out|abort/i;
 
+/**
+ * Why a server at an address did not list its models: nothing answers,
+ * it refuses the key, or it answers with something else.
+ */
+export class AddressError extends Error {
+	readonly reason: "silent" | "refused" | "other";
+	constructor(reason: "silent" | "refused" | "other", message: string) {
+		super(message);
+		this.name = "AddressError";
+		this.reason = reason;
+	}
+}
+
 /** Bearer authorization for the key, unless the headers already authorize. */
 export function withBearer(
 	headers: Record<string, string>,
@@ -49,20 +62,25 @@ export async function addressModels(at: AddressAccess): Promise<string[]> {
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(
+		const silent =
 			NOT_ANSWERING.test(message) ||
-				(error instanceof Error && error.name === "TimeoutError")
-				? `Nothing answers at ${at.root}. Start the server, or check the address.`
-				: `${at.root} did not answer: ${message}`,
-		);
+			(error instanceof Error && error.name === "TimeoutError");
+		throw silent
+			? new AddressError(
+					"silent",
+					`Nothing answers at ${at.root}. Start the server, or check the address.`,
+				)
+			: new AddressError("other", `${at.root} did not answer: ${message}`);
 	}
 	if (response.status === 401 || response.status === 403) {
-		throw new Error(
+		throw new AddressError(
+			"refused",
 			`${at.root} refuses the API key. Check the secret of the address.`,
 		);
 	}
 	if (!response.ok) {
-		throw new Error(
+		throw new AddressError(
+			"other",
 			`${at.root} did not list its models (HTTP ${response.status}). Check the address.`,
 		);
 	}
