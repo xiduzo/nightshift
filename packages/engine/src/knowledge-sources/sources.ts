@@ -48,6 +48,11 @@ export type KnowledgeSync = {
 	kits: string[];
 	/** The source, when the flow is one the Knowledge page made and can edit. */
 	source: KnowledgeSource | null;
+	/**
+	 * The computer a source's Subflow names, if it names one: a folder
+	 * source syncs there, whoever starts the run. `here`: it is this one.
+	 */
+	computer: { name: string; here: boolean } | null;
 	/** Its own schedule at set times, if it has one. */
 	schedule: { cron: string; enabled: boolean; device?: string } | null;
 	/** Its latest run among the project's recent ones: when it ended, else started. */
@@ -213,11 +218,18 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 								at: last.endedAt ?? last.createdAt,
 							}
 						: null;
+					const source = parsed ? sourceOf(parsed) : null;
+					const node = parsed?.nodes[0];
+					const device =
+						source && node?.type === "call" ? node.device : undefined;
 					return [
 						{
 							flow,
 							kits: fills,
-							source: parsed ? sourceOf(parsed) : null,
+							source,
+							computer: device
+								? { name: device, here: device === deps.deviceName }
+								: null,
 							schedule: schedule?.cron
 								? {
 										cron: schedule.cron,

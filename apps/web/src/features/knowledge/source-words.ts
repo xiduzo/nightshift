@@ -18,6 +18,39 @@ export function sourceSummary(source: KnowledgeSource): string {
 	return more.length === 0 ? first : `${first} and ${more.length} more`;
 }
 
+/** The computer a source's Subflow names, as the page lists it. */
+type SourceComputer = Knowledge["syncs"][number]["computer"];
+
+/**
+ * A source's name for a person: its kind. A folder on another computer
+ * says which: "Folder on studio-b", not "Folder on this computer".
+ */
+export function sourceTitle(
+	source: KnowledgeSource,
+	computer: SourceComputer,
+): string {
+	const kind = knowledgeSourceKind(source.kit);
+	if (kind.local && computer && !computer.here) {
+		return `Folder on ${computer.name}`;
+	}
+	return kind.label;
+}
+
+/**
+ * Where a source syncs, quietly: "On studio-b". Null when its Subflow
+ * names no computer, or when its title names it already (`sourceTitle`).
+ */
+export function computerText(
+	source: KnowledgeSource,
+	computer: SourceComputer,
+): string | null {
+	if (!computer) return null;
+	if (sourceTitle(source, computer) !== knowledgeSourceKind(source.kit).label) {
+		return null;
+	}
+	return `On ${computer.name}`;
+}
+
 /** A sync's last run, for a person: what happened and when. */
 export function lastSyncText(
 	last: { status: RunStatus; at: number } | null,

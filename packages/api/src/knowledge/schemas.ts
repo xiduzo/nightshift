@@ -41,6 +41,8 @@ export const knowledgeSchema = z.object({
 			kits: z.array(z.string()),
 			/** The source, when the flow is one the Knowledge page made and can edit. */
 			source: knowledgeSourceSchema.nullable(),
+			/** The computer a source's Subflow names: a folder source syncs there. `here`: this one. */
+			computer: z.object({ name: z.string(), here: z.boolean() }).nullable(),
 			/** Its schedule at set times, if it has one. */
 			schedule: z
 				.object({

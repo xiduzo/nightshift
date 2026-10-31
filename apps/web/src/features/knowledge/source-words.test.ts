@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+	computerText,
 	lastSyncText,
 	scheduleText,
 	sourceActions,
 	sourceSummary,
+	sourceTitle,
 } from "./source-words";
 
 const ago = () => "2 hours ago";
@@ -25,6 +27,20 @@ describe("source words", () => {
 		expect(sourceSummary({ kit: "kit:knowledge/jira", inputs: {} })).toBe(
 			"Jira",
 		);
+	});
+
+	test("a folder source names its computer, another one by its name", () => {
+		const folder = { kit: "kit:knowledge/folder" as const, inputs: {} };
+		const here = { name: "studio-a", here: true };
+		const there = { name: "studio-b", here: false };
+		expect(sourceTitle(folder, here)).toBe("Folder on this computer");
+		expect(computerText(folder, here)).toBe("On studio-a");
+		expect(sourceTitle(folder, there)).toBe("Folder on studio-b");
+		expect(computerText(folder, there)).toBeNull();
+		expect(sourceTitle(folder, null)).toBe("Folder on this computer");
+		expect(computerText(folder, null)).toBeNull();
+		const web = { kit: "kit:knowledge/web" as const, inputs: {} };
+		expect(sourceTitle(web, null)).toBe("Web pages");
 	});
 
 	test("the last sync and the schedule", () => {

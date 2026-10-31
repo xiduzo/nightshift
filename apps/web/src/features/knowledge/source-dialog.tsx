@@ -64,11 +64,13 @@ const KIND_HINTS: Record<KnowledgeSourceKind["kit"], string> = {
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 const DEFAULT_TIME = "06:00";
 
-/** A source to edit: its flow's name, its values and its schedule. */
+/** A source to edit: its flow's name, its values, its schedule and its computer. */
 export type EditedSource = {
 	name: string;
 	source: KnowledgeSource;
 	schedule: { cron: string; enabled: boolean } | null;
+	/** The computer its Subflow names. `here`: this one. */
+	computer: { name: string; here: boolean } | null;
 };
 
 /**
@@ -176,6 +178,9 @@ function SourceForm({
 	);
 	const [syncNow, setSyncNow] = useState(startRuns);
 	const kind = KNOWLEDGE_SOURCE_KINDS.find((k) => k.kit === kit);
+	// A folder source of another computer stays there: say which one.
+	const elsewhere =
+		edited?.computer && !edited.computer.here ? edited.computer.name : null;
 	// The kit's folder is Night Shift's to pick: the dialog does not ask.
 	const inputs = knowledgeSourceFields(kit);
 	const missing = missingInputs(inputs, values);
@@ -280,7 +285,11 @@ function SourceForm({
 							<FieldLabel key={option.kit} htmlFor={`${id}-${option.kit}`}>
 								<Field orientation="horizontal">
 									<FieldContent>
-										<FieldTitle>{option.label}</FieldTitle>
+										<FieldTitle>
+											{option.local && elsewhere
+												? `Folder on ${elsewhere}`
+												: option.label}
+										</FieldTitle>
 										<FieldDescription>
 											{KIND_HINTS[option.kit]}
 										</FieldDescription>
@@ -305,7 +314,9 @@ function SourceForm({
 				{braces ? <FieldError className="-mt-3">{braces}</FieldError> : null}
 				{kind?.local ? (
 					<FieldDescription className="-mt-3">
-						Only this computer has this folder. Night Shift syncs it here.
+						{elsewhere
+							? `Only ${elsewhere} has this folder. Night Shift syncs it there.`
+							: "Only this computer has this folder. Night Shift syncs it here."}
 					</FieldDescription>
 				) : null}
 

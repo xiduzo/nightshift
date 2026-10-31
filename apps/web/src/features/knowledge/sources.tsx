@@ -1,4 +1,4 @@
-import { KNOWLEDGE_SOURCE_KINDS, knowledgeSourceKind } from "@nightshift/flows";
+import { KNOWLEDGE_SOURCE_KINDS } from "@nightshift/flows";
 import {
 	Alert,
 	AlertAction,
@@ -55,10 +55,12 @@ import { PageSection } from "@/shared/page";
 import { knowledgeMutations } from "./queries";
 import type { EditedSource } from "./source-dialog";
 import {
+	computerText,
 	lastSyncText,
 	scheduleText,
 	sourceActions,
 	sourceSummary,
+	sourceTitle,
 } from "./source-words";
 
 type Sync = Knowledge["syncs"][number];
@@ -70,7 +72,7 @@ function kitLabel(kit: string): string {
 
 /** A source's name for a person: its kind, or the name of the flow someone drew. */
 function sourceLabel(sync: Sync): string {
-	return sync.source ? knowledgeSourceKind(sync.source.kit).label : sync.flow;
+	return sync.source ? sourceTitle(sync.source, sync.computer) : sync.flow;
 }
 
 /**
@@ -187,12 +189,13 @@ function SourceItem({
 	const { source } = sync;
 	const schedule = scheduleText(sync.schedule);
 	const last = lastSyncText(sync.lastRun, (at) => formatRelative(at));
+	const computer = source ? computerText(source, sync.computer) : null;
 	return (
 		<Item variant="outline">
 			<ItemContent>
 				<ItemTitle>
 					{source ? (
-						knowledgeSourceKind(source.kit).label
+						sourceTitle(source, sync.computer)
 					) : (
 						<Link
 							to="/projects/$projectId/flows/$name"
@@ -231,6 +234,7 @@ function SourceItem({
 							last
 						)}
 						{schedule ? ` · ${schedule}` : null}
+						{computer ? ` · ${computer}` : null}
 					</span>
 				</ItemDescription>
 			</ItemContent>
@@ -242,7 +246,7 @@ function SourceItem({
 							<Button
 								variant="ghost"
 								size="icon-sm"
-								aria-label={`More for ${source ? knowledgeSourceKind(source.kit).label : sync.flow}`}
+								aria-label={`More for ${sourceLabel(sync)}`}
 							/>
 						}
 					>
@@ -256,6 +260,7 @@ function SourceItem({
 										name: sync.flow,
 										source,
 										schedule: sync.schedule,
+										computer: sync.computer,
 									})
 								}
 							>
@@ -374,7 +379,7 @@ function RemoveSourceDialog({
 	const id = useId();
 	const queryClient = useQueryClient();
 	const [removeFiles, setRemoveFiles] = useState(removesFiles);
-	const label = sync?.source ? knowledgeSourceKind(sync.source.kit).label : "";
+	const label = sync ? sourceLabel(sync) : "";
 	const remove = useMutation(
 		knowledgeMutations.removeSource({
 			onSuccess: ({ removedFiles }) => {

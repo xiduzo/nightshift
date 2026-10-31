@@ -139,6 +139,7 @@ describe("knowledge.get", () => {
 					kit: "kit:knowledge/web",
 					inputs: { urls: "https://example.org", folder: "web" },
 				},
+				computer: null,
 				schedule: { cron: "0 6 * * *", enabled: true },
 				lastRun: null,
 				health: null,

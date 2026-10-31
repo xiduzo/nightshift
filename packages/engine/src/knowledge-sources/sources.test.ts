@@ -172,6 +172,17 @@ describe("save", () => {
 		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
 			device: "test",
 		});
+		// The list names the computer, and whether it is this one.
+		const computer = async (deviceName: string) =>
+			(
+				await knowledgeSources({
+					space,
+					files: built.knowledge,
+					deviceName,
+				}).list(projectId)
+			).syncs.find((sync) => sync.flow === "knowledge-folder")?.computer;
+		expect(await computer("test")).toEqual({ name: "test", here: true });
+		expect(await computer("laptop")).toEqual({ name: "test", here: false });
 		// A source of another kind runs where the run runs.
 		await sources().save(
 			projectId,
@@ -339,6 +350,7 @@ describe("list", () => {
 					kit: "kit:knowledge/web",
 					inputs: { urls: "a", folder: "web" },
 				},
+				computer: null,
 				schedule: { cron: "0 6 * * *", enabled: true },
 				lastRun: null,
 				health: null,
