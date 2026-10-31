@@ -121,7 +121,11 @@ const position = z.object({ x: z.number(), y: z.number() });
  */
 export const deviceNameSchema = z.string().trim().min(1).max(64);
 
-/** Where the node's step runs. Unset: the profile's Device, else the run's. */
+/**
+ * Where the node's step runs. Unset: the profile's Device, else the
+ * Device of the Subflow it runs in (a Call node's `device`), else the run's.
+ * On a Call node: where the steps of its flow run.
+ */
 export const placed = { device: deviceNameSchema.optional() };
 
 /**

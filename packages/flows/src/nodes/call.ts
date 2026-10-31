@@ -5,6 +5,7 @@ import {
 	type NodeCheck,
 	nameSchema,
 	nodeBase,
+	placed,
 	reservedOutcomes,
 } from "./base";
 
@@ -85,9 +86,15 @@ export type CallEach = z.infer<typeof callEachSchema>;
  * the run goes on along it, and the nodes after it run past the stop time:
  * they wrap the night up (a report, a stack of pull requests). The element
  * that was running ends `failed`. The run then finishes, it cannot be resumed.
+ *
+ * `device` names the computer its steps run on (its Placement, as on a
+ * Command), whatever computer runs the rest of the run: a folder that
+ * exists on one computer only. A node inside that names its own Device,
+ * or a profile, keeps it. Unset: each step runs where it would anyway.
  */
 export const callNodeSchema = z.object({
 	...nodeBase,
+	...placed,
 	type: z.literal("call"),
 	/** A flow file of the project by name, or a kit: `kit:github/create-branch`. */
 	flow: calledFlowNameSchema,

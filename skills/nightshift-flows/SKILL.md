@@ -99,7 +99,7 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message.
+Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message. With `device` (a computer's name), its steps run on that computer wherever the run runs.
 
 Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `end_message`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 

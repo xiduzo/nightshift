@@ -100,6 +100,18 @@ export function profileOf(node: FlowNode): NodeProfile | undefined {
 }
 
 /**
+ * Whether a node says itself where its step runs: its profile names a
+ * Device, or it names one (`device`). A node that does not runs where the
+ * Subflow around it runs, else on the run's Device.
+ */
+export function placesItself(node: FlowNode): boolean {
+	return (
+		isProfileRef(profileOf(node)) ||
+		("device" in node && node.device !== undefined)
+	);
+}
+
+/**
  * A node's profile as words, when nothing better is known: a name left
  * from format 6 as it is, a `ProfileRef` by its profile's id. The empty
  * string for none.
