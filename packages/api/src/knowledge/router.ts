@@ -207,8 +207,8 @@ export const knowledge = {
 			);
 		}),
 	/**
-	 * Syncs a source the page added now: a run of its flow, on the computer
-	 * its schedule names when it reads a folder there.
+	 * Syncs a source the page added now: a run of its flow. A folder
+	 * source's Subflow runs on the computer that has the folder.
 	 */
 	syncSource: permitted(MAY.changeKnowledge)
 		.route({

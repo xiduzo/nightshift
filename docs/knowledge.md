@@ -170,12 +170,13 @@ sources, and the morning digest has a line for it. A source whose last
 sync ended more than 7 days ago shows **Out of date**. The digest names
 it too, but such a source alone sends no digest.
 
-A folder exists on one computer only. A Subflow node cannot name a Device, so a
-folder source keeps its runs on the computer where you added it through
-its schedule (`device`) and through **Sync now** on the Knowledge page
-(`knowledge.syncSource` starts it where its schedule runs it).
-A run of it started elsewhere, from the Flows page, does not find the
-folder and ends with "No files to copy".
+A folder exists on one computer only. A folder source names the computer
+where you added it on its Subflow node (`device`, **Runs on** in the
+editor). The Subflow's steps run there, whoever starts the run: the Host
+that fires its schedule, **Sync now**, or the Flows page. That computer's
+reconcile after the step publishes the files to the Space. An older folder
+source without `device` still runs where its schedule names, and moves
+over on its next save.
 
 Saving a flow needs a role that may save flows. Who may write to the
 knowledge stays as above: the computer that runs the sync publishes it.

@@ -85,8 +85,15 @@ function checkedInputs(source: KnowledgeSource): Record<string, string> {
 	return inputs;
 }
 
-/** The flow of a source: one Subflow node that calls its kit with its values. */
-function sourceFlow(kit: KnowledgeSourceKit, inputs: Record<string, string>) {
+/**
+ * The flow of a source: one Subflow node that calls its kit with its
+ * values, on the computer `device` names when it has one.
+ */
+function sourceFlow(
+	kit: KnowledgeSourceKit,
+	inputs: Record<string, string>,
+	device: string | undefined,
+) {
 	const kind = knowledgeSourceKind(kit);
 	return flowSchema.parse({
 		version: 7,
@@ -100,6 +107,7 @@ function sourceFlow(kit: KnowledgeSourceKit, inputs: Record<string, string>) {
 				position: { x: 0, y: 0 },
 				flow: kit,
 				inputs,
+				...(device !== undefined ? { device } : {}),
 			},
 		],
 		edges: [],
@@ -174,18 +182,28 @@ function free(base: string, taken: ReadonlySet<string>): string {
  * kit's folder, else a free one beside it, and an edited one keeps its
  * own. A folder another flow fills is refused, because each sync replaces
  * its folder.
+ *
+ * A source that reads a folder of one computer (`local`) names that
+ * computer on its Subflow (`device`), so its steps run there whoever
+ * starts the run, the Host included: the computer it already names, else
+ * `here.scheduled` (an older source ran on its schedule's computer),
+ * else `here.device` (where the person adds it).
  */
 export function savedSource(input: {
 	source: KnowledgeSource;
 	name?: string;
 	flows: FlowMap;
+	here: { device: string; scheduled?: string };
 }): { name: string; flow: Flow } {
 	const { source, name, flows } = input;
 	const inputs = checkedInputs(source);
 	let current: KnowledgeSource | null = null;
+	let placed: string | undefined;
 	if (name !== undefined) {
 		const flow = flows[name];
 		current = flow ? sourceOf(flow) : null;
+		const node = flow?.nodes[0];
+		placed = node?.type === "call" ? node.device : undefined;
 		if (!current) {
 			throw new Refusal(
 				"not-found",
@@ -220,7 +238,10 @@ export function savedSource(input: {
 		name ??
 		free(knowledgeSourceKind(source.kit).flowName, new Set(Object.keys(flows)));
 	flowNameSchema.parse(saved);
-	return { name: saved, flow: sourceFlow(source.kit, inputs) };
+	const device = knowledgeSourceKind(source.kit).local
+		? (placed ?? input.here.scheduled ?? input.here.device)
+		: undefined;
+	return { name: saved, flow: sourceFlow(source.kit, inputs, device) };
 }
 
 /**

@@ -139,7 +139,7 @@ describe("save", () => {
 		]);
 	});
 
-	test("a folder of this computer syncs on this computer", async () => {
+	test("a folder of this computer syncs on this computer: its Subflow names it, whoever starts the run", async () => {
 		await sources().save(
 			projectId,
 			{
@@ -148,10 +148,71 @@ describe("save", () => {
 			},
 			owner,
 		);
-		expect((await schedules())[0]?.device).toBe("test");
+		expect((await schedules())[0]?.device).toBeUndefined();
 		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
 			inputs: { path: "~/notes", folder: "folder" },
+			device: "test",
 		});
+		// Edited on another computer, it stays on the one that has the folder.
+		await knowledgeSources({
+			space,
+			files: built.knowledge,
+			deviceName: "laptop",
+		}).save(
+			projectId,
+			{
+				name: "knowledge-folder",
+				source: {
+					kit: "kit:knowledge/folder",
+					inputs: { path: "~/notes", patterns: "*.md" },
+				},
+			},
+			owner,
+		);
+		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
+			device: "test",
+		});
+		// A source of another kind runs where the run runs.
+		await sources().save(
+			projectId,
+			{ source: { kit: "kit:knowledge/web", inputs: { urls: "a" } } },
+			owner,
+		);
+		expect(
+			(await flows())["knowledge-web-pages"]?.nodes[0] as object,
+		).not.toHaveProperty("device");
+	});
+
+	test("an older folder source, pinned by its schedule, moves over to its Subflow on its next edit", async () => {
+		await space.flows.save(
+			projectId,
+			"knowledge-folder",
+			callFlow("kit:knowledge/folder", { path: "~/notes", folder: "folder" }),
+		);
+		await space.saveSchedules(projectId, [
+			{
+				id: "knowledge-folder",
+				flow: "knowledge-folder",
+				inputs: {},
+				cron: "0 6 * * *",
+				enabled: true,
+				device: "studio",
+			},
+		]);
+		await sources().save(
+			projectId,
+			{
+				name: "knowledge-folder",
+				source: { kit: "kit:knowledge/folder", inputs: { path: "~/notes" } },
+				keepUpToDate: { cron: "0 7 * * *" },
+			},
+			owner,
+		);
+		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
+			device: "studio",
+		});
+		expect((await schedules())[0]).toMatchObject({ cron: "0 7 * * *" });
+		expect((await schedules())[0]?.device).toBeUndefined();
 	});
 
 	test("an edit keeps the source's folder without asking for it, and its schedule's other settings", async () => {
@@ -357,7 +418,7 @@ describe("remove", () => {
 });
 
 describe("sync", () => {
-	test("runs a source where its schedule runs it", async () => {
+	test("runs a folder source on the computer its Subflow names", async () => {
 		const notes = join(sandbox.root, "notes");
 		await mkdir(notes, { recursive: true });
 		await writeFile(join(notes, "a.md"), "# A\n");

@@ -131,7 +131,7 @@ export type KnowledgeSourcesDeps = {
 	>;
 	/** This Device's knowledge: the files, and the removal of a folder. */
 	files: Pick<ProjectKnowledge, "listing" | "removeFolder">;
-	/** This computer's name: a source that reads a folder here runs here. */
+	/** This computer's name: a source that reads a folder here syncs here. */
 	deviceName: string;
 };
 
@@ -241,9 +241,9 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 		/**
 		 * Adds a source, or changes one the page added (`name`): its flow,
 		 * which calls the kit with the values given, and with `keepUpToDate`
-		 * its schedule (null removes it, unset leaves it). A source that
-		 * reads a folder of this computer runs its schedule here. Returns the
-		 * flow's name and its problems.
+		 * its schedule (null removes it, unset leaves it). Returns the
+		 * flow's name and its problems. A source that reads a folder names
+		 * the computer it reads it on, on its Subflow (`savedSource`).
 		 */
 		async save(
 			projectId: string,
@@ -264,22 +264,33 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 			if (problem) {
 				throw new Refusal("invalid", `This schedule is not valid: ${problem}`);
 			}
+			const { name } = input;
+			const schedules = await savedSchedules(projectId);
+			const scheduled =
+				name === undefined
+					? undefined
+					: schedules.find((item) => isSourceSchedule(item, name))?.device;
 			const saved = savedSource({
 				source: input.source,
-				...(input.name !== undefined ? { name: input.name } : {}),
+				...(name !== undefined ? { name } : {}),
 				flows: await space.flows.map(projectId),
+				here: {
+					device: deps.deviceName,
+					...(scheduled !== undefined ? { scheduled } : {}),
+				},
 			});
 			const issues = await space.flows.save(projectId, saved.name, saved.flow);
 			if (changesSchedule) {
-				const local = knowledgeSourceKind(input.source.kit).local;
-				const schedules = withSourceSchedule(
-					await savedSchedules(projectId),
-					saved.name,
-					cron === undefined
-						? null
-						: { cron, ...(local ? { device: deps.deviceName } : {}) },
+				// Its Subflow names the computer: the schedule runs anywhere.
+				await space.saveSchedules(
+					projectId,
+					withSourceSchedule(
+						schedules,
+						saved.name,
+						cron === undefined ? null : { cron },
+					),
+					input.timeZone,
 				);
-				await space.saveSchedules(projectId, schedules, input.timeZone);
 			}
 			return { name: saved.name, issues };
 		},
@@ -318,8 +329,10 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 			return { removedFiles };
 		},
 		/**
-		 * Syncs a source now: a run of its flow, on the computer its
-		 * schedule names when it reads a folder there, else as any run.
+		 * Syncs a source now: a run of its flow, as any run. A folder
+		 * source's Subflow runs on the computer it names. A schedule that
+		 * names a computer (an older folder source, or one a person set on
+		 * the Schedules page) still places the run there.
 		 */
 		async sync(
 			projectId: string,
