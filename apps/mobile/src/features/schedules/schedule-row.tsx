@@ -3,8 +3,10 @@ import type { Href } from "expo-router";
 import { CalendarClock } from "lucide-react-native";
 import { memo } from "react";
 
+import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { nextText, rowLook, whenLine } from "./schedule-words";
+import { PLAN_TICK_MS } from "./use-schedule-plan";
 
 /** The sheet of one schedule: what it does, and Pause tonight and Run now. */
 export function scheduleHref(projectId: string, scheduleId: string): Href {
@@ -16,14 +18,13 @@ export function scheduleHref(projectId: string, scheduleId: string): Href {
  * more than one), when it runs, and its next start at the end. Under the
  * title, "Paused tonight" or how its last start went. Tap opens its
  * sheet. Its props are plain values, so it renders again only when one
- * changes.
+ * changes, or when the shared clock moves its day word.
  */
 export const ScheduleRow = memo(function ScheduleRow({
 	projectId,
 	projectName,
 	schedule,
 	paused,
-	now,
 }: {
 	projectId: string;
 	/** The project, above the title. Leave it out in the list of one project. */
@@ -31,8 +32,8 @@ export const ScheduleRow = memo(function ScheduleRow({
 	schedule: ScheduleSummary;
 	/** Paused tonight, also while the pause is on its way. */
 	paused: boolean;
-	now: number;
 }) {
+	const now = useClock(PLAN_TICK_MS);
 	const next = nextText(schedule, now);
 	return (
 		<ListRow

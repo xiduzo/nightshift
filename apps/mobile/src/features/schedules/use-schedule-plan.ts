@@ -15,6 +15,12 @@ import { useMemo } from "react";
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { useWhileFocused } from "@/shared/refresh";
 
+/**
+ * How often a view of schedules reads the clock: a start moves from
+ * "today" to "tomorrow", a pause tonight ends. Starts show to the minute.
+ */
+export const PLAN_TICK_MS = 60_000;
+
 /** One schedule of one project, as a key: schedule ids are per project. */
 export function scheduleKey(projectId: string, scheduleId: string): string {
 	return `${projectId}:${scheduleId}`;

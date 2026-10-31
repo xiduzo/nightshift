@@ -8,8 +8,8 @@ import { router, Stack } from "expo-router";
 import { CalendarClock, FolderGit2 } from "lucide-react-native";
 
 import { openRun } from "@/features/runs";
+import { useClock } from "@/shared/clock";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { ScheduleNudges } from "./schedule-nudges";
@@ -22,6 +22,7 @@ import {
 	whenLine,
 } from "./schedule-words";
 import {
+	PLAN_TICK_MS,
 	scheduleKey,
 	usePendingPauses,
 	useSchedulePlan,
@@ -39,7 +40,7 @@ export function ScheduleScreen({
 	projectId: string;
 	scheduleId: string;
 }) {
-	const now = useNow();
+	const now = useClock(PLAN_TICK_MS);
 	const { entries, project, projectsLoaded, error, loading, refetch } =
 		useSchedulePlan(projectId, now);
 	const pending = usePendingPauses();

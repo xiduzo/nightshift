@@ -1,10 +1,10 @@
 import type { Href } from "expo-router";
 import { CalendarClock } from "lucide-react-native";
 
-import { useNow } from "@/shared/format";
+import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { nextStartLine } from "./schedule-words";
-import { useSchedulePlan } from "./use-schedule-plan";
+import { PLAN_TICK_MS, useSchedulePlan } from "./use-schedule-plan";
 
 /** Schedules: the schedules of the active Space, or of one project with `projectId`. */
 export function schedulesHref(projectId?: string): Href {
@@ -20,7 +20,7 @@ export function schedulesHref(projectId?: string): Href {
  * screen around it does not render again when they change.
  */
 export function SchedulesRow({ projectId }: { projectId?: string }) {
-	const now = useNow();
+	const now = useClock(PLAN_TICK_MS);
 	const { plan } = useSchedulePlan(projectId, now);
 	const next = nextStartLine(plan, now);
 	return (

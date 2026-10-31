@@ -3,15 +3,15 @@ import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Stack } from "expo-router";
 import { CalendarClock } from "lucide-react-native";
 import { View } from "react-native";
-
+import { useClock } from "@/shared/clock";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { ListGroup, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { ScheduleRow } from "./schedule-row";
 import { planSummary, shownPaused } from "./schedule-words";
 import {
+	PLAN_TICK_MS,
 	scheduleKey,
 	usePendingPauses,
 	useSchedulePlan,
@@ -24,8 +24,7 @@ import {
  * Pause tonight and Run now. Editing stays on the computer.
  */
 export function SchedulesScreen({ projectId }: { projectId?: string }) {
-	// Again every 30 s: a start moves from "today" to "tomorrow".
-	const now = useNow();
+	const now = useClock(PLAN_TICK_MS);
 	const { plan, entries, project, projectsLoaded, error, loading, refetch } =
 		useSchedulePlan(projectId, now);
 	const pending = usePendingPauses();
@@ -49,7 +48,6 @@ export function SchedulesScreen({ projectId }: { projectId?: string }) {
 								now,
 								pending.get(scheduleKey(entry.projectId, entry.schedule.id)),
 							)}
-							now={now}
 						/>
 					))}
 				</ListGroup>
