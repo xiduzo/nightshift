@@ -29,6 +29,10 @@ Three parts, like the flows of a project:
 Before and after each step that gets the folder (every Command step and
 every Agent step), the computer that runs the step makes its folder and
 the document match. The Knowledge page also does this when it reads.
+While a step writes the folder, only that step reconciles it: the
+Knowledge page and the retries each minute leave the folder alone until
+the step ends. When steps of one project run at the same time, the first
+reconciles before and the last reconciles after.
 
 - A file the step added, changed or removed goes into the document. Its
   content goes to the Host first.
@@ -38,7 +42,8 @@ the document match. The Knowledge page also does this when it reads.
   a removal, so nothing is lost.
 
 A hidden file in the folder, `.reconciled.json`, holds what the folder had
-at the last reconcile. `INDEX.md` and hidden files never sync. A file
+at the last reconcile. `INDEX.md`, hidden files and the files a sync kit
+still writes (names that end in `.part`) never sync. A file
 larger than 10 MB stays on the computer that has it. The others list it,
 but do not fetch it.
 

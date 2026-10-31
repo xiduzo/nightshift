@@ -427,6 +427,55 @@ describe("reconcile", () => {
 		).toBe(false);
 	});
 
+	test("never publishes what a sync kit still writes: a staging file or folder", async () => {
+		const { host, kept } = memoryHost();
+		const a = await device(host);
+		// As the kits stage them: `$dest.part`, and `page.md.part` beside the page.
+		await a.put("wiki.part/Home.md", "# Home, half\n");
+		await a.put("web/page.md.part", "half a pa");
+		await a.put("jira/KEY-1.json.part", "{");
+		await a.put("web/done.md", "# Done\n");
+		await a.sync.reconcile("p1");
+		expect([...(await a.entries()).keys()]).toEqual(["web/done.md"]);
+		expect(kept.size).toBe(1);
+	});
+
+	test("while a step writes the folder, the page and the timers leave it alone: the step's end publishes", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		const step = await a.sync.startStep("p1");
+		// Its before-reconcile published what was there.
+		expect([...(await a.entries()).keys()]).toEqual(["wiki/Home.md"]);
+		expect(a.sync.busy("p1")).toBe(true);
+
+		// The step writes: half a file, as a kit's `jq > page.md` leaves it.
+		await a.put("wiki/Page.md", "# Pa");
+		const listing = await a.sync.listing("p1");
+		expect(listing.files.map((f) => f.path)).toEqual(["wiki/Home.md"]);
+		await a.sync.reconcileAll();
+		await a.sync.retryPending();
+		expect((await a.entries()).has("wiki/Page.md")).toBe(false);
+		await expect(a.sync.removeFolder("p1", "wiki")).rejects.toThrow(
+			"A run is changing this knowledge now",
+		);
+
+		// A second step shares the hold: the first to end does not reconcile.
+		const second = await a.sync.startStep("p1");
+		await step.done();
+		expect((await a.entries()).has("wiki/Page.md")).toBe(false);
+		await a.put("wiki/Page.md", "# Page\n");
+		await second.done();
+		// A second `done` changes nothing.
+		await second.done();
+		expect(a.sync.busy("p1")).toBe(false);
+		expect([...(await a.entries()).keys()]).toEqual([
+			"wiki/Home.md",
+			"wiki/Page.md",
+		]);
+		expect(await a.sync.removeFolder("p1", "wiki")).toBe(2);
+	});
+
 	test("a Replica that lost its document publishes the folder again: it removes nothing", async () => {
 		const { host } = memoryHost();
 		const a = await device(host);

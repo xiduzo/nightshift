@@ -468,6 +468,48 @@ describe("the project's knowledge", () => {
 		).not.toContain("learnings/proposed");
 	});
 
+	test("a step holds the project's folder from its start to its end, also when it fails to start", async () => {
+		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const seen: string[] = [];
+		const knowledgeSync = {
+			startStep: async (projectId: string) => {
+				seen.push(`start ${projectId}`);
+				return { done: async () => void seen.push(`done ${projectId}`) };
+			},
+		};
+		await collect(
+			device({ knowledge, knowledgeSync }).exec({
+				command: "echo writing",
+				cwd: sandbox.repoPath,
+				knowledge: { projectId: "p1" },
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(seen).toEqual(["start p1", "done p1"]);
+		const broken = device({
+			knowledge,
+			knowledgeSync,
+			toolLaunchers: {
+				prepare: async () => ({ ok: true, ...noTools }),
+				guarded: () => [],
+				forCommand: async () => {
+					throw new Error("No launchers.");
+				},
+			},
+		});
+		await expect(
+			collect(
+				broken.exec({
+					command: "true",
+					cwd: sandbox.repoPath,
+					knowledge: { projectId: "p1" },
+					signal: new AbortController().signal,
+				}),
+			),
+		).rejects.toThrow("No launchers.");
+		expect(seen).toEqual(["start p1", "done p1", "start p1", "done p1"]);
+	});
+
 	test("a command gets the folder in NS_KNOWLEDGE, made for it", async () => {
 		const knowledge = createKnowledgeFolders(sandbox.dataDir);
 		const events = await collect(

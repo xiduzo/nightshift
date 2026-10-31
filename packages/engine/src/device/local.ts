@@ -164,7 +164,7 @@ export type LocalDeviceDeps = {
 	 * after each step that gets it. Without it, the folder is this
 	 * computer's alone.
 	 */
-	knowledgeSync?: Pick<KnowledgeSync, "reconcile">;
+	knowledgeSync?: Pick<KnowledgeSync, "startStep">;
 	/**
 	 * Keyword search over the folders: this Device's own index. With it, an
 	 * agent that gets the folder also gets `search_knowledge` and
@@ -208,17 +208,18 @@ function keepArtifact(
 
 /**
  * Brings the project's folder in step with its Space, when this computer
- * syncs it. A reconcile that fails leaves the folder as it is: the step
- * goes on.
+ * syncs it, and holds it for the step: nothing else reconciles it until
+ * `done`, which publishes what the step changed. A reconcile that fails
+ * leaves the folder as it is: the step goes on.
  */
-async function reconcileKnowledge(
+async function holdKnowledge(
 	deps: LocalDeviceDeps,
 	request: KnowledgeRequest | undefined,
-): Promise<void> {
-	if (!request || !deps.knowledge || !deps.knowledgeSync) return;
-	await deps.knowledgeSync.reconcile(request.projectId).catch((error) => {
-		console.warn("The knowledge was not brought in step:", error);
-	});
+): Promise<{ done(): Promise<void> }> {
+	if (!request || !deps.knowledge || !deps.knowledgeSync) {
+		return { done: async () => {} };
+	}
+	return deps.knowledgeSync.startStep(request.projectId);
 }
 
 /** This computer as a Device. */
@@ -327,6 +328,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "refused", message: tools.message };
 			return;
 		}
+		let hold: { done(): Promise<void> } | null = null;
 		try {
 			// A new session learns its CLI tools after the prompt. A resumed
 			// session has them already.
@@ -336,7 +338,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					: "";
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
 			// The knowledge as the Space has it now, before the agent reads it.
-			await reconcileKnowledge(deps, knowledge);
+			hold = await holdKnowledge(deps, knowledge);
 			const known =
 				knowledge && deps.knowledge
 					? await sessionKnowledge(deps.knowledge, knowledge).catch((error) => {
@@ -401,7 +403,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		} finally {
 			await tools?.cleanup();
 			// What the step changed, and the learnings it proposed, go to the Space.
-			await reconcileKnowledge(deps, knowledge);
+			await hold?.done();
 		}
 	}
 
@@ -442,14 +444,15 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return;
 		}
 		// The knowledge as the Space has it now, before the command reads it.
-		await reconcileKnowledge(deps, knowledge);
-		// The sync flows write here. A folder that cannot be made is left out.
-		const known =
-			knowledge && deps.knowledge
-				? await commandKnowledge(deps.knowledge, knowledge).catch(() => ({}))
-				: {};
-		const tools = (await deps.toolLaunchers?.forCommand()) ?? null;
+		const hold = await holdKnowledge(deps, knowledge);
+		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		try {
+			// The sync flows write here. A folder that cannot be made is left out.
+			const known =
+				knowledge && deps.knowledge
+					? await commandKnowledge(deps.knowledge, knowledge).catch(() => ({}))
+					: {};
+			tools = (await deps.toolLaunchers?.forCommand()) ?? null;
 			const env: Record<string, string> = {
 				...known,
 				...command.env,
@@ -467,7 +470,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		} finally {
 			await tools?.cleanup();
 			// What the command changed, a sync's files, go to the Space.
-			await reconcileKnowledge(deps, knowledge);
+			await hold.done();
 		}
 	}
 

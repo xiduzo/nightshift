@@ -148,6 +148,15 @@ type State = { files: Record<string, Kept>; unpushed: string[] };
 
 /** The reconciles of each folder in this process, one at a time. */
 const reconciling = new Map<string, Promise<unknown>>();
+/**
+ * How many steps write each folder now, in this process. While one does,
+ * only the steps reconcile it: a scan in the middle of a sync would
+ * publish half of what it writes.
+ */
+const writing = new Map<string, number>();
+
+/** A step's hold on a project's folder: `done` when the step ends. */
+export type KnowledgeStepHold = { done(): Promise<void> };
 
 /** A project's knowledge, as each Device keeps it in step with the Space. */
 export type KnowledgeSync = ReturnType<typeof createKnowledgeSync>;
@@ -435,18 +444,61 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		return run;
 	}
 
+	/** Whether a step writes the project's folder now. */
+	function busy(projectId: string): boolean {
+		return (writing.get(folders.folder(projectId)) ?? 0) > 0;
+	}
+
+	/** A reconcile whose failure leaves the folder as it is: the step goes on. */
+	function reconcileQuietly(projectId: string): Promise<unknown> {
+		return reconcile(projectId).catch((error) => {
+			console.warn("The knowledge was not brought in step:", error);
+		});
+	}
+
 	return {
 		reconcile,
+		busy,
+		/**
+		 * A step that gets the project's folder starts: the folder is brought
+		 * in step with the Space first, and nothing else reconciles it until
+		 * `done`. Then the reconcile publishes what the step wrote. Steps that
+		 * share the folder share the hold: the first reconciles before, the
+		 * last after. A reconcile that fails leaves the folder as it is.
+		 */
+		async startStep(projectId: string): Promise<KnowledgeStepHold> {
+			const root = folders.folder(projectId);
+			const held = writing.get(root) ?? 0;
+			writing.set(root, held + 1);
+			// A step that shares the folder waits for the first one's reconcile.
+			if (held === 0) await reconcileQuietly(projectId);
+			else await reconciling.get(root)?.catch(() => {});
+			let released = false;
+			return {
+				async done() {
+					if (released) return;
+					released = true;
+					const left = (writing.get(root) ?? 1) - 1;
+					if (left > 0) {
+						writing.set(root, left);
+						return;
+					}
+					writing.delete(root);
+					await reconcileQuietly(projectId);
+				},
+			};
+		},
 		/**
 		 * The Knowledge page's list: a reconcile first, for a while, so the
 		 * document has this Device's own changes, and a fresh index. Then the
 		 * document's files and how many notes its proposals hold. The
-		 * reconcile goes on when the wait ends.
+		 * reconcile goes on when the wait ends. While a step writes the
+		 * folder, the page lists the document as it is.
 		 */
 		async listing(projectId: string): Promise<KnowledgeListing> {
-			const reconciled = reconcile(projectId).catch((error) => {
-				console.warn("The knowledge was not brought in step:", error);
-			});
+			const reconciled = busy(projectId)
+				? Promise.resolve()
+				: reconcileQuietly(projectId);
 			await Promise.race([reconciled, Bun.sleep(deps.pageWaitMs ?? 2_000)]);
 			await folders.index(projectId).catch(() => {});
 			const spaceId = await spaceOf(projectId);
@@ -547,6 +599,12 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					"Choose a folder inside the knowledge. learnings is Night Shift's own.",
 				);
 			}
+			if (busy(projectId)) {
+				throw new Refusal(
+					"conflict",
+					"A run is changing this knowledge now. Try again when it ends.",
+				);
+			}
 			await reconcile(projectId);
 			const document = await deps.documents.open(projectId);
 			const paths = [...knowledgeEntries(document).keys()].filter((path) =>
@@ -567,6 +625,8 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		 */
 		async reconcileAll(): Promise<void> {
 			for (const projectId of await folders.known()) {
+				// A step's own reconcile publishes what it writes.
+				if (busy(projectId)) continue;
 				await reconcile(projectId).catch((error) => {
 					console.warn(
 						`The knowledge of ${projectId} was not brought in step:`,
@@ -575,9 +635,13 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				});
 			}
 		},
-		/** Reconciles the folders whose content waits for the Host. */
+		/**
+		 * Reconciles the folders whose content waits for the Host, but not
+		 * one a step writes now.
+		 */
 		async retryPending(): Promise<void> {
 			for (const projectId of [...pending]) {
+				if (busy(projectId)) continue;
 				await reconcile(projectId).catch(() => {});
 			}
 		},
