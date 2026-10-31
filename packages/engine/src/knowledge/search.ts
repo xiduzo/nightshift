@@ -48,6 +48,8 @@ import {
  * Meaning (`meaning.ts`): a vector per section, kept current in the
  * background by LangChain's `index()` after each change, never during a
  * search. A search fuses both lists by file with reciprocal rank fusion.
+ * A file found by meaning alone must pass the model's floor
+ * (`KnowledgeMeaning.floor`): a query no file matches finds nothing.
  * Without Ollama, or before the first vectors, it finds by words only.
  *
  * It indexes the text files (`TEXT_FILES`) the index lists, and the text
@@ -303,6 +305,8 @@ type WordsHit = {
 
 /** A file the meaning found, at its best section. */
 type MeaningHit = {
+	/** How similar its best section is to the query (cosine). */
+	similarity: number;
 	path: string;
 	title: string;
 	heading: string | null;
@@ -862,7 +866,7 @@ export function createKnowledgeSearch(
 		);
 		const out: MeaningHit[] = [];
 		const seen = new Set<string>();
-		for (const [doc] of found) {
+		for (const [doc, similarity] of found) {
 			const path = String(doc.metadata.path ?? "");
 			const f = files.get(path);
 			// A vector of a file that went waits for the next preparation to go.
@@ -872,6 +876,7 @@ export function createKnowledgeSearch(
 				.all(f.id)
 				.find((s) => embedText(f.title, s.text) === doc.pageContent);
 			out.push({
+				similarity,
 				path,
 				title: f.title,
 				heading: section?.heading ?? null,
@@ -929,10 +934,16 @@ export function createKnowledgeSearch(
 					words: new Map(words.map((hit) => [hit.path, hit])),
 					meaning: new Map(meant.map((hit) => [hit.path, hit])),
 				};
+				// A file only the meaning found must be close enough to the query.
+				const floor = meaning?.floor ?? 0;
+				const close = (path: string) =>
+					byPath.words.has(path) ||
+					(byPath.meaning.get(path)?.similarity ?? 0) >= floor;
 				return fuseRanks([
 					words.map((hit) => hit.path),
 					meant.map((hit) => hit.path),
 				])
+					.filter(({ key }) => close(key))
 					.slice(0, limit)
 					.flatMap(({ key, score }) => {
 						const word = byPath.words.get(key);

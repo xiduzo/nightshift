@@ -261,6 +261,39 @@ on this Mac, 46 MB of vectors plus the chunk text, a 25 ms scan, and about
 Expect it to be several times slower. The first index runs once. Later
 refreshes embed only changed chunks.
 
+### 3.4 A floor for hits by meaning alone (added 2026-10-31)
+
+After meaning search landed, a query that matched nothing still returned up
+to 20 files by meaning alone: the nearest vectors, however far. A file found
+by meaning alone now needs a cosine similarity of at least the model's
+floor (`MEANING_FLOORS` in `packages/engine/src/knowledge/meaning.ts`). A
+file that the words also found always stays.
+
+How the floor was chosen:
+
+1. Corpus: this repo's `docs/` on 2026-10-31, 42 files, 1 153 sections,
+   through `createKnowledgeSearch` with real Ollama on the M4 Max.
+2. Positives: the 26 questions of §3.1. For each, the similarity of the
+   best section of the first right file.
+3. Negatives: 22 queries the docs do not answer (a cake recipe, the 1998
+   World Cup, a puppy, two in Dutch, one string of nonsense). For each, the
+   similarity of the best section of any file.
+4. The floor goes between the lowest positive that was in the top 5 and the
+   highest negative.
+
+| Model | Right file in top 5 | Lowest positive in top 5 | Highest negative | Floor |
+| --- | --- | --- | --- | --- |
+| `qwen3-embedding:0.6b` | 23 of 26 | 0.527 | 0.453 (nonsense), 0.405 (real words) | **0.50** |
+| `nomic-embed-text` | 24 of 26 | 0.481 | 0.535 | none |
+
+With 0.50, `qwen3-embedding:0.6b` keeps every right file it had in the top
+5 and returns nothing for each of the 22 negatives. The three questions that
+failed everywhere (§3.2) scored 0.44 to 0.45 and were outside the top 10
+anyway. `nomic-embed-text` has another scale: its positives and negatives
+overlap, so no floor separates them, and it gets none. A model with no
+entry in `MEANING_FLOORS` has no floor. Measure a new model the same way
+before it gets one.
+
 ## 4. The evaluation plan (§5.1)
 
 ### 4.1 The question set

@@ -183,6 +183,33 @@ describe("search by meaning", () => {
 	});
 });
 
+describe("the floor of a model", () => {
+	test("a file found by meaning alone must be close enough: a query nothing matches finds nothing", async () => {
+		search.close();
+		search = createKnowledgeSearch(dataDir, {
+			meaning: { ...fake(), floor: 0.5 },
+		});
+		for (const [path, text] of Object.entries(FILES)) await put(path, text);
+		await prepared();
+		// Without a floor, every file is a little like any query.
+		const loose = createKnowledgeSearch(dataDir, { meaning: fake() });
+		await prepared(loose);
+		expect(paths(await loose.search("p1", "money"))).toHaveLength(3);
+		loose.close();
+
+		expect(await search.search("p1", "money")).toEqual([]);
+		expect(paths(await search.search("p1", "vehicle"))).toEqual(["cars.md"]);
+		// A file the words find stays, however far its meaning.
+		const fridays = await search.search("p1", "Fridays");
+		expect(fridays[0]?.path).toBe("ops.md");
+	});
+
+	test("qwen3-embedding has its floor, a model without one has none", () => {
+		expect(ollamaMeaning("qwen3-embedding:0.6b").floor).toBe(0.5);
+		expect(ollamaMeaning("some-other-model").floor).toBeUndefined();
+	});
+});
+
 describe("reciprocal rank fusion", () => {
 	test("adds 1 / (60 + rank) from each list, best first", () => {
 		const fused = fuseRanks([

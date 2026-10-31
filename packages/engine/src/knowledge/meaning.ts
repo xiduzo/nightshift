@@ -23,6 +23,17 @@ export type KnowledgeMeaning = {
 	query(text: string): string;
 	/** Whether it can embed on this computer now. Never throws. */
 	ready(): Promise<KnowledgeMeaningReady>;
+	/** The least similarity (cosine) of a hit found by meaning alone. Absent: no floor. */
+	floor?: number;
+};
+
+/**
+ * The floor of each model: a file found by meaning alone, and less
+ * similar to the query than this, is no hit. Each model has its own
+ * scale. How it was chosen: `docs/research/knowledge-vectors.md` §3.4.
+ */
+const MEANING_FLOORS: Readonly<Record<string, number>> = {
+	"qwen3-embedding:0.6b": 0.5,
 };
 
 /**
@@ -102,10 +113,12 @@ export function ollamaMeaning(model = knowledgeModel()): KnowledgeMeaning {
 			return "no-ollama";
 		}
 	}
+	const floor = MEANING_FLOORS[model];
 	return {
 		model,
 		embeddings,
 		query: queryFor(model),
+		...(floor !== undefined ? { floor } : {}),
 		async ready() {
 			const now = Date.now();
 			if (checked && now - checked.at < PROBE_TTL_MS) return checked.ready;
