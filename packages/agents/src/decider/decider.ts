@@ -17,7 +17,6 @@ import {
 	decide,
 	type TokenUsage,
 } from "@tanstack/ai";
-import { ollamaText } from "@tanstack/ai-ollama";
 import type { OLLAYA_EVALUATE_MODELS } from "@tanstack/ai-ollaya";
 import type { OPENAI_EVALUATE_MODELS } from "@tanstack/ai-openai";
 import type { OPENROUTER_EVALUATE_MODELS } from "@tanstack/ai-openrouter";
@@ -36,10 +35,18 @@ import { failureKind } from "../session";
 import {
 	OLLAMA_DEFAULT_MODEL,
 	OLLAMA_MODELS,
+	type OllamaAddress,
+	ollamaChat,
 	ollamaDecider,
 	ollamaModels,
 	ollamaProblem,
 } from "./ollama";
+
+/** What a decider may need from Night Shift beyond its API key: where Ollama is. */
+export type DeciderContext = {
+	/** Where Ollama is now. Absent: Ollama's own default address. */
+	ollama?: () => OllamaAddress;
+};
 
 /**
  * How a decider makes a value: its TanStack AI text adapter and the chat
@@ -54,6 +61,7 @@ export type ValueAdapter = {
 	create: (
 		model: string,
 		apiKey: string | undefined,
+		context: DeciderContext,
 	) => AnyTextAdapter | Promise<AnyTextAdapter>;
 };
 
@@ -69,6 +77,7 @@ export type DeciderAdapter = {
 	create: (
 		model: string,
 		apiKey: string | undefined,
+		context: DeciderContext,
 	) => AnyEvaluateAdapter | Promise<AnyEvaluateAdapter>;
 	/** Set when the decider can also make a value (a Value node made by a model). */
 	value?: ValueAdapter;
@@ -86,7 +95,7 @@ export type DeciderAdapter = {
 	 * The models the provider has on hand right now (Ollama: the models
 	 * pulled on this computer). Throws when the provider does not answer.
 	 */
-	listModels?: () => Promise<string[]>;
+	listModels?: (context: DeciderContext) => Promise<string[]>;
 	/**
 	 * What a failure means for the person, and how to fix it. Undefined:
 	 * the failure keeps its own message.
@@ -195,15 +204,15 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		models: OLLAMA_MODELS,
 		defaultModel: OLLAMA_DEFAULT_MODEL,
 		apiKey: null,
-		create: (model) => ollamaDecider(model),
+		create: (model, _key, context) => ollamaDecider(model, context.ollama?.()),
 		pricing: "free",
 		probability: false,
-		listModels: ollamaModels,
+		listModels: (context) => ollamaModels(context.ollama?.()),
 		explain: ollamaProblem,
 		value: {
 			defaultModel: OLLAMA_DEFAULT_MODEL,
 			models: OLLAMA_MODELS,
-			create: (model) => ollamaText(model),
+			create: (model, _key, context) => ollamaChat(model, context.ollama?.()),
 		},
 	},
 };
@@ -244,7 +253,7 @@ export function defaultDeciderModel(
 		: adapter.defaultModel;
 }
 
-export type TanstackDeciderOptions = {
+export type TanstackDeciderOptions = DeciderContext & {
 	/** A secret's value: the keychain, then the environment. */
 	secret: (name: string) => Promise<string | undefined>;
 };
@@ -296,7 +305,7 @@ async function decideOnce(
 		);
 	}
 	const result = await decide({
-		adapter: await spec.create(input.model ?? spec.defaultModel, key),
+		adapter: await spec.create(input.model ?? spec.defaultModel, key, options),
 		state: input.prompt,
 		questions: {
 			label: choice({
@@ -352,7 +361,7 @@ async function valueOnce(
 	let usage: TokenUsage | undefined;
 	try {
 		const data: unknown = await chat({
-			adapter: await maker.create(model, key),
+			adapter: await maker.create(model, key, options),
 			messages: [{ role: "user", content: input.prompt }],
 			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
 			stream: false,
@@ -405,7 +414,10 @@ export type DeciderModels = {
  * the models pulled on this computer), then the adapter's lists. Never
  * throws: a provider that does not answer leaves the adapter's lists.
  */
-export async function deciderModels(name: DeciderName): Promise<DeciderModels> {
+export async function deciderModels(
+	name: DeciderName,
+	context: DeciderContext = {},
+): Promise<DeciderModels> {
 	const spec = DECIDER_ADAPTERS[name];
 	const merged = (listed: string[], known: readonly string[]) => [
 		...listed,
@@ -419,7 +431,7 @@ export async function deciderModels(name: DeciderName): Promise<DeciderModels> {
 	});
 	if (!spec.listModels) return result([], null);
 	try {
-		return result([...new Set(await spec.listModels())], null);
+		return result([...new Set(await spec.listModels(context))], null);
 	} catch (error) {
 		return result([], error instanceof Error ? error.message : String(error));
 	}

@@ -1,11 +1,4 @@
-import {
-	afterAll,
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	test,
-} from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import type { DecisionInput, ValueInput } from "../port/types";
 import {
 	cannotMakeValueMessage,
@@ -309,14 +302,6 @@ const ollamaChat = (content: string) =>
 const free = tanstackDecider({ secret: async () => undefined });
 
 describe("tanstackDecider: Ollama", () => {
-	const host = process.env.OLLAMA_HOST;
-	beforeEach(() => {
-		delete process.env.OLLAMA_HOST;
-	});
-	afterAll(() => {
-		if (host !== undefined) process.env.OLLAMA_HOST = host;
-	});
-
 	test("asks a chat model held to the option keys, and reports no made-up probability", async () => {
 		const sent = stubOllama(() => ollamaChat('{"choice":"hold"}'));
 		const result = await free.decide(input({ decider: "ollama" }));
@@ -329,7 +314,7 @@ describe("tanstackDecider: Ollama", () => {
 		});
 		expect(sent).toHaveLength(1);
 		// Ollama's own default host.
-		expect(sent[0]?.url).toBe("http://localhost:11434/api/chat");
+		expect(sent[0]?.url).toBe("http://127.0.0.1:11434/api/chat");
 		expect(sent[0]?.body).toMatchObject({
 			model: "llama3.2:latest",
 			stream: false,
@@ -343,11 +328,33 @@ describe("tanstackDecider: Ollama", () => {
 		expect(messages.at(-1)?.content).toContain("ship: Everything is green");
 	});
 
-	test("honors OLLAMA_HOST", async () => {
-		process.env.OLLAMA_HOST = "http://studio.local:11500";
+	test("asks the Ollama Night Shift names, with its headers", async () => {
+		const headers: (string | null)[] = [];
 		const sent = stubOllama(() => ollamaChat('{"choice":"ship"}'));
-		await free.decide(input({ decider: "ollama" }));
+		const stubbed = globalThis.fetch;
+		globalThis.fetch = (async (
+			url: string | URL | Request,
+			init?: RequestInit,
+		) => {
+			headers.push(new Headers(init?.headers).get("authorization"));
+			return stubbed(url, init);
+		}) as typeof fetch;
+		const elsewhere = tanstackDecider({
+			secret: async () => undefined,
+			ollama: () => ({
+				host: "http://studio.local:11500",
+				headers: { Authorization: "Bearer t" },
+			}),
+		});
+		await elsewhere.decide(input({ decider: "ollama" }));
 		expect(sent[0]?.url).toBe("http://studio.local:11500/api/chat");
+		expect(headers).toEqual(["Bearer t"]);
+
+		const listed = stubOllama(() => Response.json({ models: [] }));
+		await deciderModels("ollama", {
+			ollama: () => ({ host: "http://studio.local:11500" }),
+		});
+		expect(listed[0]?.url).toBe("http://studio.local:11500/api/tags");
 	});
 
 	test("an answer outside the options fails the decision", async () => {
@@ -437,7 +444,7 @@ describe("tanstackDecider: Ollama", () => {
 		expect(offered.listed).toBe(0);
 		expect(offered.models).toEqual([...DECIDER_ADAPTERS.ollama.models]);
 		expect(offered.problem).toBe(
-			"Ollama is not running on this computer. Start Ollama to see the models you pulled.",
+			"Ollama does not answer on this computer. Start Ollama to see the models you pulled.",
 		);
 	});
 

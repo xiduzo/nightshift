@@ -1,7 +1,11 @@
 import { deciderNameSchema } from "@nightshift/flows";
 
 import type { DeciderName } from "../port";
-import { DECIDER_ADAPTERS, deciderModels } from "./decider";
+import {
+	DECIDER_ADAPTERS,
+	type DeciderContext,
+	deciderModels,
+} from "./decider";
 
 /**
  * A decider as the Agents page lists it. `Source` is the caller's: where
@@ -34,11 +38,13 @@ export type DeciderView<Source> = {
 export function deciderViews<Source>(
 	/** Where the value of an API key's secret comes from. */
 	secretSource: (name: string) => Source,
+	/** Where Ollama is, for its listing of the models it has. */
+	context: DeciderContext = {},
 ): Promise<DeciderView<Source>[]> {
 	return Promise.all(
 		deciderNameSchema.options.map(async (name) => {
 			const adapter = DECIDER_ADAPTERS[name];
-			const offered = await deciderModels(name);
+			const offered = await deciderModels(name, context);
 			return {
 				name,
 				label: adapter.label,

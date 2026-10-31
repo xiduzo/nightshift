@@ -11,8 +11,9 @@
  * options, and TanStack parses it. A chat model reports no probabilities,
  * so the answer carries none it did not measure (see `probabilities`).
  *
- * The host is Ollama's own default, `http://localhost:11434`, or
- * `OLLAMA_HOST` when it is set: `ollamaText()` and `ollamaModels()` read it.
+ * Where Ollama is, and the headers it needs, is the engine's to decide
+ * (one resolver for Decision nodes and search by meaning): the daemon
+ * passes it in as an `OllamaAddress`. Without one, Ollama's own default.
  */
 
 import {
@@ -28,8 +29,30 @@ import type {
 	WireAnswer,
 	WireChoiceQuestion,
 } from "@tanstack/ai/adapters";
-import { OllamaTextModels, ollamaText } from "@tanstack/ai-ollama";
+import { createOllamaChat, OllamaTextModels } from "@tanstack/ai-ollama";
 import { Ollama } from "ollama";
+
+/** Where Ollama is: its address, and the headers of a proxy in front of it. */
+export type OllamaAddress = {
+	host: string;
+	headers?: Record<string, string>;
+};
+
+/** Ollama's own default address. */
+const OLLAMA_DEFAULT: OllamaAddress = { host: "http://127.0.0.1:11434" };
+
+/** An Ollama chat adapter for `model` at `at`. */
+export function ollamaChat(
+	model: string,
+	at: OllamaAddress = OLLAMA_DEFAULT,
+): AnyTextAdapter {
+	return createOllamaChat(model, {
+		host: at.host,
+		...(at.headers && Object.keys(at.headers).length > 0
+			? { headers: at.headers }
+			: {}),
+	});
+}
 
 /** The models `@tanstack/ai-ollama` knows. Any model the person pulled works too. */
 export const OLLAMA_MODELS: readonly string[] = [...new Set(OllamaTextModels)];
@@ -70,7 +93,7 @@ export class OllamaEvaluateAdapter extends BaseEvaluateAdapter<string> {
 
 	constructor(
 		model: string,
-		text: (model: string) => AnyTextAdapter = ollamaText,
+		text: (model: string) => AnyTextAdapter = (m) => ollamaChat(m),
 	) {
 		super({}, model);
 		this.text = text;
@@ -152,9 +175,12 @@ export class OllamaEvaluateAdapter extends BaseEvaluateAdapter<string> {
 	}
 }
 
-/** Decides on an Ollama chat model, at `OLLAMA_HOST` or Ollama's default host. */
-export function ollamaDecider(model: string): OllamaEvaluateAdapter {
-	return new OllamaEvaluateAdapter(model);
+/** Decides on an Ollama chat model, at `at` or Ollama's default address. */
+export function ollamaDecider(
+	model: string,
+	at: OllamaAddress = OLLAMA_DEFAULT,
+): OllamaEvaluateAdapter {
+	return new OllamaEvaluateAdapter(model, (m) => ollamaChat(m, at));
 }
 
 /** How long a model listing waits for Ollama before it gives up. */
@@ -164,9 +190,12 @@ const LISTING_TIMEOUT_MS = 2_000;
  * The models pulled on this computer (`GET /api/tags`), by name. Throws when
  * Ollama does not answer, with a message for the person.
  */
-export async function ollamaModels(): Promise<string[]> {
+export async function ollamaModels(
+	at: OllamaAddress = OLLAMA_DEFAULT,
+): Promise<string[]> {
 	const client = new Ollama({
-		...(process.env.OLLAMA_HOST ? { host: process.env.OLLAMA_HOST } : {}),
+		host: at.host,
+		...(at.headers ? { headers: at.headers } : {}),
 		fetch: ((input: string | URL | Request, init?: RequestInit) =>
 			fetch(input, {
 				...init,
@@ -180,9 +209,21 @@ export async function ollamaModels(): Promise<string[]> {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new Error(
 			NOT_RUNNING.test(message) || /timed? ?out|abort/i.test(message)
-				? "Ollama is not running on this computer. Start Ollama to see the models you pulled."
+				? `Ollama does not answer ${placeOf(at)}. Start Ollama to see the models you pulled.`
 				: `Ollama did not list its models: ${message}`,
 		);
+	}
+}
+
+/** "on this computer", or "at" the host name of an Ollama elsewhere. */
+function placeOf(at: OllamaAddress): string {
+	try {
+		const { hostname } = new URL(at.host);
+		return /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(hostname)
+			? "on this computer"
+			: `at ${hostname}`;
+	} catch {
+		return "on this computer";
 	}
 }
 
