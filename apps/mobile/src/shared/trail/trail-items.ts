@@ -4,6 +4,7 @@ import {
 	type StepSummary,
 	stepName,
 	stepState,
+	tokensLabel,
 	waitedText,
 } from "@nightshift/client";
 
@@ -20,7 +21,7 @@ export type TrailItem = {
 	look: Look;
 	/** What happened: the step's error, or a line the screen gives. */
 	detail?: string;
-	/** "4 min · $0.12", "Waiting 12 min". */
+	/** "4 min · 12.3K tokens · $0.12", "Waiting 12 min". */
 	meta?: string;
 	/** An open Gate: the icon takes the waiting tone. */
 	waiting?: boolean;
@@ -28,7 +29,7 @@ export type TrailItem = {
 
 /**
  * A run's step as a StepTrail item: its kind, its name (with the visit),
- * its state, its error and "4 min · $0.12". `now` counts a step that has
+ * its state, its error and "4 min · 12.3K tokens · $0.12". `now` counts a step that has
  * not ended.
  */
 export function trailItemOf(
@@ -47,9 +48,12 @@ export function trailItemOf(
 	const waiting = state === "waiting";
 	const took = waitedText((step.endedAt ?? now) - step.startedAt);
 	const cost = costLabel(step);
+	const tokens = tokensLabel(step.metrics?.tokens);
 	const meta = waiting
 		? `Waiting ${took}`
-		: [took, cost].filter((part): part is string => part !== null).join(" · ");
+		: [took, tokens, cost]
+				.filter((part): part is string => part !== null)
+				.join(" · ");
 	return {
 		id: step.id,
 		kind: stepKind(step),

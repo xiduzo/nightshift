@@ -1,5 +1,6 @@
 import {
 	agoLabel,
+	compactCount,
 	costLabel,
 	flowLabel,
 	hasEnded,
@@ -7,6 +8,7 @@ import {
 	type RunDetail,
 	type RunStatus,
 	type StepSummary,
+	tokensSplit,
 	waitedText,
 	whenLabel,
 } from "@nightshift/client";
@@ -69,10 +71,24 @@ function costFact(
 	};
 }
 
+/** The tokens tile: how many the run's agents used, in and out. None when none are known. */
+function tokensFact(run: Pick<RunDetail, "metrics">): RunFact[] {
+	const tokens = run.metrics?.tokens;
+	const split = tokensSplit(tokens);
+	if (!tokens || split === null) return [];
+	return [
+		{
+			label: "Tokens",
+			value: compactCount(tokens.input + tokens.output),
+			sub: split,
+		},
+	];
+}
+
 /**
  * The Details of a run, two by two: flow, branch, computer, when it
- * started and by whom, how long it took and how many steps, its cost and
- * its id. `steps` are the run's own steps, live, or null while they load;
+ * started and by whom, how long it took and how many steps, its cost,
+ * the tokens its agents used, and its id. `steps` are the run's own steps, live, or null while they load;
  * `now` counts a run on its way.
  */
 export function runFacts(
@@ -90,6 +106,7 @@ export function runFacts(
 		| "costMissing"
 		| "costCalls"
 		| "costEstimated"
+		| "metrics"
 	>,
 	{
 		status,
@@ -115,6 +132,7 @@ export function runFacts(
 				: { sub: steps === 1 ? "1 step" : `${steps} steps` }),
 		},
 		costFact(run, hasEnded(status)),
+		...tokensFact(run),
 		{ label: "Run", value: run.id, mono: true, wide: true },
 	];
 }

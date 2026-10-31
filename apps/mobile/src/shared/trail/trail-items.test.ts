@@ -46,6 +46,22 @@ describe("trailItemOf", () => {
 		expect(trailItemLabel(item)).toBe("Agent step Build, Pass, 4 min, $0.12");
 	});
 
+	test("an agent step with tokens: time, tokens and cost", () => {
+		const metrics = {
+			wallMs: 4 * MIN,
+			agentMs: 4 * MIN,
+			gateWaitMs: 0,
+			tokens: { input: 40_000, output: 2_100, cacheRead: 0, cacheWrite: 0 },
+			costBasis: "billed",
+			prUrl: null,
+		} as StepSummary["metrics"];
+		const item = trailItemOf(step({ metrics }), { labels, now: 10 * MIN });
+		expect(item.meta).toBe("4 min · 42.1K tokens · $0.12");
+		expect(trailItemLabel(item)).toBe(
+			"Agent step Build, Pass, 4 min, 42.1K tokens, $0.12",
+		);
+	});
+
 	test("an open Gate waits since it started", () => {
 		const item = trailItemOf(
 			step({

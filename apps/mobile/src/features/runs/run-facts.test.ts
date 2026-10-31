@@ -32,6 +32,27 @@ function byLabel(facts: ReturnType<typeof runFacts>) {
 }
 
 describe("runFacts", () => {
+	test("the tokens the agents used show next to the cost, when known", () => {
+		const metrics = {
+			tokens: { input: 12_000, output: 345, cacheRead: 9000, cacheWrite: 0 },
+		} as FactRun["metrics"];
+		const fact = byLabel(
+			runFacts(factRun({ metrics }), {
+				status: "finished",
+				steps: 2,
+				now: NOW,
+			}),
+		);
+		expect(fact.get("Tokens")).toMatchObject({
+			value: "12.3K",
+			sub: "12K in, 345 out",
+		});
+		const none = byLabel(
+			runFacts(factRun(), { status: "finished", steps: 2, now: NOW }),
+		);
+		expect(none.has("Tokens")).toBe(false);
+	});
+
 	test("a run on its way: flow, branch, computer, start, duration so far, cost and id", () => {
 		const facts = runFacts(factRun(), {
 			status: "running",

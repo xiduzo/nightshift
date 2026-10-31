@@ -1,6 +1,7 @@
 import {
 	type Artifact,
 	actedRunStatus,
+	changedFileCount,
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
@@ -11,11 +12,16 @@ import {
 	type OpenGate,
 	type RunDetail,
 	type RunStatus,
+	rerunStarts,
 	runActions,
+	runningStep,
 	runningSteps,
+	type StepChanges,
 	type StepSummary,
+	stepChangedFiles,
 	stepName,
 	stepState,
+	stoppedNotice,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
@@ -27,6 +33,7 @@ import { type Href, Link, Redirect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import {
 	ChevronRight,
+	FileDiff,
 	FileText,
 	Link2,
 	Share as ShareIcon,
@@ -51,6 +58,7 @@ import {
 	runLinks,
 	sizeLabel,
 } from "./run-facts";
+import { RunNotice } from "./run-notice";
 import { RunStatusBadge } from "./status-badge";
 import { type PhoneLiveRun, usePhoneLiveRun } from "./use-live-run";
 
@@ -140,7 +148,7 @@ function RunBody({
 	gates: OpenGate[];
 	projectName: string | null;
 }) {
-	const act = useRunAct(run.id);
+	const act = useRunAct(run.id, live.status ?? run.status);
 	// A stop or resume on its way shows its result at once.
 	const shown = actedRunStatus(
 		{
@@ -161,13 +169,14 @@ function RunBody({
 		: runningSteps(steps).filter(
 				(step) =>
 					stepState(step) === "running" &&
-					(live.entries.has(step.id) || step.nodeType === "agent"),
+					(live.entries.messages.has(step.id) || step.nodeType === "agent"),
 			);
 	const allows = runActions(
 		live.status ?? run.status,
 		run.walker.thisDevice,
 		run.result,
 	);
+	const notice = stoppedNotice(run, status);
 	const now = Date.now();
 
 	return (
@@ -198,22 +207,33 @@ function RunBody({
 						</Button>
 					</Link>
 				) : null}
-				{ended && run.reason ? (
+				{ended && run.reason && !notice ? (
 					<Text className="text-muted-foreground text-sm">{run.reason}</Text>
 				) : null}
 			</View>
 
 			{gates.length > 0 ? <GateRows gates={gates} /> : null}
 
-			{allows.stop || allows.resume ? (
+			{notice ? <RunNotice notice={notice} /> : null}
+
+			{/* Room for Ask why, beside the reason the run ended. */}
+
+			{allows.stop || allows.resume || allows.restart || allows.rerun ? (
 				<Card className="gap-4 py-4">
-					<RunActions runId={run.id} allows={allows} act={act} />
+					<RunActions
+						runId={run.id}
+						allows={allows}
+						act={act}
+						restartStep={runningStep(steps)}
+						rerunFrom={rerunStarts(steps)}
+						labels={labels}
+					/>
 					<FollowOnLockScreen runId={run.id} ended={ended} />
 				</Card>
 			) : null}
 
 			{talking.map((step) => {
-				const message = live.entries.get(step.id);
+				const message = live.entries.messages.get(step.id);
 				return (
 					<View key={step.id} className="gap-3">
 						<SectionHead title="Now" hint={stepName(step, labels)} />
@@ -253,6 +273,12 @@ function RunBody({
 				status={status}
 				now={now}
 				loading={partial}
+			/>
+
+			<ChangedFilesRow
+				runId={run.id}
+				changes={live.entries.changes}
+				stepIds={steps.map((step) => step.id)}
 			/>
 
 			<MadeSection run={run} live={!ended} links={runLinks(steps)} />
@@ -322,6 +348,39 @@ function StepsSection({
 				</CardContent>
 			</Card>
 		</View>
+	);
+}
+
+/**
+ * A row that opens the files the run changed, with how many. Nothing
+ * until a step changed a file.
+ */
+function ChangedFilesRow({
+	runId,
+	changes,
+	stepIds,
+}: {
+	runId: string;
+	changes: StepChanges;
+	stepIds: string[];
+}) {
+	const groups = stepChangedFiles(changes, stepIds);
+	if (groups.length === 0) return null;
+	const count = changedFileCount(groups);
+	const steps = groups.length;
+	return (
+		<ListGroup>
+			<ListRow
+				icon={FileDiff}
+				title="Changed files"
+				caption={[
+					count === 1 ? "1 file" : `${count} files`,
+					steps === 1 ? "in 1 step" : `in ${steps} steps`,
+				]}
+				href={{ pathname: "/changes/[runId]", params: { runId } }}
+				accessibilityHint="Opens the files this run changed"
+			/>
+		</ListGroup>
 	);
 }
 
