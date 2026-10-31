@@ -4,6 +4,7 @@ import {
 	isObjectSchema,
 	jsonSchemaSchema,
 	type NodeCheck,
+	type NodeProfile,
 	nameSchema,
 	nodeBase,
 	nodeProfileSchema,
@@ -192,7 +193,21 @@ export type McpServer = z.infer<typeof mcpServerSchema>;
  * wins over its profile. `session: "resume"` continues the session of the
  * try before within the tier; a new tier starts a new session.
  */
-export const agentTierSchema = z.object({
+/** A tier of an Agent's cascade. Named, so the declared types stay small. */
+export interface AgentTier {
+	label?: string;
+	tries?: number;
+	profile?: NodeProfile;
+	harness?: AgentHarnessName;
+	model?: string;
+	effort?: z.infer<typeof effortSchema>;
+	permissionMode?: z.infer<typeof permissionModeSchema>;
+	clis?: string[];
+	connections?: string[];
+	session?: "fresh" | "resume";
+}
+
+export const agentTierSchema: z.ZodType<AgentTier> = z.object({
 	...tierBase,
 	profile: nodeProfileSchema.optional(),
 	harness: agentHarnessSchema.optional(),
@@ -203,7 +218,6 @@ export const agentTierSchema = z.object({
 	connections: z.array(nameSchema).optional(),
 	session: z.enum(["fresh", "resume"]).optional(),
 });
-export type AgentTier = z.infer<typeof agentTierSchema>;
 
 export const agentNodeSchema = z.object({
 	...nodeBase,

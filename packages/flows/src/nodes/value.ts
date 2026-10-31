@@ -6,8 +6,10 @@ import {
 	deciderNameSchema,
 	isObjectSchema,
 	jsonSchemaSchema,
+	type ModelAddress,
 	modelAddressSchema,
 	type NodeCheck,
+	type NodeProfile,
 	nodeBase,
 	nodeProfileSchema,
 	placed,
@@ -59,7 +61,18 @@ export type ValueBy = z.infer<typeof valueBySchema>;
  * output schema and the rule holds. A run copies the profile's address
  * onto the tier, as onto a node.
  */
-export const valueTierSchema = z.object({
+/** A tier of a Value's cascade. Named, so the declared types stay small. */
+export interface ValueTier {
+	label?: string;
+	tries?: number;
+	profile?: NodeProfile;
+	decider?: DeciderName;
+	model?: string;
+	address?: ModelAddress;
+	accept?: string;
+}
+
+export const valueTierSchema: z.ZodType<ValueTier> = z.object({
 	...tierBase,
 	profile: nodeProfileSchema.optional(),
 	decider: deciderNameSchema.optional(),
@@ -68,7 +81,6 @@ export const valueTierSchema = z.object({
 	/** A JSONata rule over the value as `data`: `$count(data.tasks) > 0`. Unset: data that matches holds. */
 	accept: z.string().optional(),
 });
-export type ValueTier = z.infer<typeof valueTierSchema>;
 
 /**
  * The twin of a Decision: a Decision picks a label, a Value makes `data`

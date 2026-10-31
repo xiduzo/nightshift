@@ -82,12 +82,19 @@ export type CallEach = z.infer<typeof callEachSchema>;
  * the node's; another flow takes only the tier's own. They may read
  * `{{cascade.previous}}`. A try holds when the called flow ends `pass`.
  */
-export const callTierSchema = z.object({
+/** A tier of a Call's cascade. Named, so the declared types stay small. */
+export interface CallTier {
+	label?: string;
+	tries?: number;
+	flow?: string;
+	inputs?: Record<string, string>;
+}
+
+export const callTierSchema: z.ZodType<CallTier> = z.object({
 	...tierBase,
 	flow: calledFlowNameSchema.optional(),
 	inputs: bindings.optional(),
 });
-export type CallTier = z.infer<typeof callTierSchema>;
 
 /**
  * Runs another flow of the project, or a kit (`kitFlow`): once, or once per element of a list
