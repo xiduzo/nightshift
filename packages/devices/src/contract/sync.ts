@@ -75,6 +75,7 @@ const runCommandSchema = exact<RunCommand>()(
 				stepId: z.string(),
 				choice: z.string(),
 				note: z.string().optional(),
+				data: z.json().optional(),
 			}),
 			...commandFields,
 		}),

@@ -8,7 +8,11 @@ import type {
 	StepDetail,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import { flowSchema, outcomeColorSchema } from "@nightshift/flows";
+import {
+	askFormSchema,
+	flowSchema,
+	outcomeColorSchema,
+} from "@nightshift/flows";
 import { z } from "zod";
 
 import { deviceProfileSchema } from "../config";
@@ -256,6 +260,8 @@ const stepSummarySchema = z.object({
 			choices: z.array(gateChoiceSchema),
 			openedAt: z.number(),
 			deadline: gateDeadlineSchema.nullable(),
+			/** An Ask: the form the answer fills in. Absent on every other Gate. */
+			form: askFormSchema.optional(),
 		})
 		.nullable(),
 	sleeps: z.array(sleepSchema).optional(),

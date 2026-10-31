@@ -1,5 +1,6 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
+	type AskForm,
 	type DecisionNode,
 	type FlowNode,
 	optionProblem,
@@ -7,7 +8,12 @@ import {
 	type TemplateContext,
 } from "@nightshift/flows";
 
-import type { GateChoice, GateDeadline, StepOutputs } from "../../../log";
+import type {
+	GateChoice,
+	GateDeadline,
+	StepEvent,
+	StepOutputs,
+} from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { openGate, scoreGate } from "../../gate";
 import { interruptNode } from "../../interrupt";
@@ -77,7 +83,9 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
  * and its deadline. A Decision's Gate asks its prompt and options. The
  * person tier of a cascade (ADR 6) asks what the tiers did: its step has
  * no timers (`untimed`), its `outputs` are the fields its end keeps, and
- * `climb` marks its Gate for the ask node.
+ * `climb` marks its Gate for the ask node. An Ask (a Value made by a
+ * person, ADR 10) makes its `form` as it opens: the choices of the run and
+ * the attachments the run keeps.
  */
 export type GateAsk = {
 	question: (tctx: TemplateContext) => string;
@@ -86,6 +94,7 @@ export type GateAsk = {
 	deadline?: DecisionNode["deadline"];
 	outputs?: StepOutputs;
 	climb?: true;
+	form?: (step: OpenStep) => Promise<AskForm>;
 };
 
 /** Opens a Gate on a new step of `node` (or finds the one open) and jumps to the node's ask node. */
@@ -112,6 +121,7 @@ export function gateChooser(
 			...(asked.deadline ? { deadline: asked.deadline } : {}),
 			...(ask.outputs ? { outputs: ask.outputs } : {}),
 			...(ask.climb ? { climb: true as const } : {}),
+			...(asked.form ? { form: asked.form } : {}),
 		};
 		return new Command({ update: { pending }, goto: askNodeId(node.id) });
 	};
@@ -163,6 +173,7 @@ type OpenGate = {
 	question: string;
 	choices: GateChoice[];
 	deadline: GateDeadline | null;
+	form: AskForm | null;
 };
 type Ensured =
 	| OpenGate
@@ -212,6 +223,7 @@ async function ensureOpen(
 			question: gate.question,
 			choices: gate.choices,
 			deadline: gate.deadline,
+			form: gate.form,
 		};
 	}
 	const begun = await beginStep(
@@ -233,7 +245,7 @@ async function ensureOpen(
 			end: await step.end(
 				"error",
 				{ ...ask.outputs, ...decisionOutputs("error", "", step.visit) },
-				`The Gate could not open: ${messageOf(error)}`,
+				`${ask.form ? "The question" : "The Gate"} could not open: ${messageOf(error)}`,
 			),
 		};
 	}
@@ -258,13 +270,15 @@ async function open(
 			ctx.now(),
 			ctx.minuteMs,
 		);
+		const form = ask.form ? await ask.form(step) : null;
 		await openGate(ctx, step, {
 			question,
 			choices,
 			lockScreen: ask.lockScreen === true,
 			deadline,
+			...(form ? { form } : {}),
 		});
-		return { stepId, visit, question, choices, deadline };
+		return { stepId, visit, question, choices, deadline, form };
 	} finally {
 		step.leaveOpen();
 	}
@@ -296,6 +310,18 @@ function deadlineOf(
 	return { at, choose: deadline.choose };
 }
 
+/**
+ * How an answer ends a Gate's step: its outcome, whether it climbs, and
+ * for an Ask the outputs, the note and the transcript entry it ends with.
+ */
+export type GateEnding = {
+	outcome: string;
+	climbs: boolean;
+	outputs?: StepOutputs;
+	note?: string;
+	event?: StepEvent;
+};
+
 /** The note of a Gate the deadline answered: why nobody's answer chose it. */
 function deadlineNote(choice: string): string {
 	return `Nobody answered by the deadline, so Night Shift chose "${choice}".`;
@@ -318,9 +344,11 @@ export async function resolve(
 	/**
 	 * How a choice ends the step, when not on itself: the person tier's
 	 * "stop" ends it `fail`, and its "try-again" climbs on (no route, so
-	 * the node's writes do not apply). Default: on the choice, routed.
+	 * the node's writes do not apply). An Ask ends with its own outputs
+	 * (the data), note and transcript entry. Default: on the choice,
+	 * routed.
 	 */
-	endOf?: (choice: string) => { outcome: string; climbs: boolean },
+	endOf?: (choice: string) => GateEnding,
 ): Promise<
 	{ kind: "parked"; command: Command } | { kind: "ended"; end: StepEnd }
 > {
@@ -348,18 +376,22 @@ export async function resolve(
 			),
 		};
 	}
+	const ending: GateEnding = endOf?.(choice) ?? {
+		outcome: choice,
+		climbs: false,
+	};
 	step.record(null, {
 		type: "gate-resolved",
 		choice,
-		note,
+		note: ending.note ?? note,
 		...(answer.byDeadline ? { byDeadline: true as const } : {}),
 	});
-	const ending = endOf?.(choice) ?? { outcome: choice, climbs: false };
+	if (ending.event) step.record(null, ending.event);
 	const end = await step.end(
 		ending.outcome,
 		{
 			...gate.outputs,
-			...decisionOutputs(ending.outcome, note, step.visit),
+			...(ending.outputs ?? decisionOutputs(ending.outcome, note, step.visit)),
 		},
 		null,
 		ending.climbs ? { skipWrites: true } : undefined,

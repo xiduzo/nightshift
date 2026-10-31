@@ -1,3 +1,4 @@
+import type { AskForm } from "@nightshift/flows";
 import type { GateChoice, GateDeadline, StepEvent } from "../log";
 import type { StepContext } from "./context";
 
@@ -11,7 +12,8 @@ import type { StepContext } from "./context";
  * The fact goes in the log first, so the Gate is open even when the daemon
  * dies before the transcript line is written. A Gate with a `deadline` (a
  * Decision's, worked out as it opens) logs it with the Gate: the runner
- * sets its timer from there.
+ * sets its timer from there. An Ask (a Value made by a person, ADR 10)
+ * logs its form with the Gate.
  */
 export async function openGate(
 	ctx: Pick<StepContext, "log" | "bus" | "run">,
@@ -24,6 +26,7 @@ export async function openGate(
 		choices: GateChoice[];
 		lockScreen?: boolean;
 		deadline?: GateDeadline | null;
+		form?: AskForm;
 	},
 ): Promise<void> {
 	const { stepId } = step;
@@ -38,6 +41,7 @@ export async function openGate(
 			choices,
 			...(gate.lockScreen === true ? { lockScreen: true as const } : {}),
 			...due,
+			...(gate.form ? { form: gate.form } : {}),
 		},
 	});
 	step.record(null, { type: "gate-open", question, choices, ...due });

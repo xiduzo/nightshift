@@ -10,6 +10,7 @@ import {
 } from "../context";
 import { RESUME_RULES } from "../resume-point";
 import { modelProducer } from "./producers/model";
+import { askAnswerNode, personProducer } from "./producers/person";
 import type { Producer } from "./producers/producer";
 import { ruleProducer } from "./producers/rule";
 
@@ -28,7 +29,11 @@ import { ruleProducer } from "./producers/rule";
  * Every producer ends its step with `{ outcome, data, note, visit }`: `pass`
  * with the data, or `fail` with `data: null` and why in `note` (the
  * expression threw, the model failed, or the result does not match the
- * schema). `by: "person"` (a form in the Needs-you inbox) is left for later.
+ * schema).
+ *
+ * - `person`: `producers/person.ts` opens an Ask (ADR 10), a Gate with a
+ *   form drawn from the output schema, and jumps to the node's ask node,
+ *   which ends the step with the answer's data.
  */
 export function valueNode(node: ValueNode, ctx: StepContext): NodeAction {
 	if (node.cascade !== undefined) return climbingValue(node, ctx);
@@ -65,17 +70,9 @@ function producerFor(node: ValueNode, ctx: StepContext): Producer {
 		case "model":
 			return modelProducer(node, ctx);
 		case "person":
-			throw new Error(
-				`Value node "${node.id}" is made by a person, which this Night Shift cannot run yet.`,
-			);
+			return personProducer(node, ctx);
 	}
 }
-
-/** A Value made by a person (an Ask) needs the Ask's producer, which comes next. */
-const personValuesNotYet: Requirement<ValueNode> = (nodes) =>
-	nodes.some((n) => n.by === "person")
-		? "The flow has a Value node made by a person, which this Night Shift cannot run yet."
-		: null;
 
 /** A Value made by a model needs a decider with a text adapter. */
 export const modelValuesHaveDecider: Requirement<ValueNode> = (nodes, has) =>
@@ -85,7 +82,9 @@ export const modelValuesHaveDecider: Requirement<ValueNode> = (nodes, has) =>
 
 /**
  * The Value kind: the plain facts, with a wait node and the model's resume
- * rules when a model makes the value, and the decider as a requirement.
+ * rules when a model makes the value, and the decider as a requirement. A
+ * person's Ask is a Gate: an ask node, the Gate's resume rules, and no
+ * time budget.
  */
 export const VALUE: NodeKind<ValueNode> = {
 	...PLAIN_KIND,
@@ -93,7 +92,21 @@ export const VALUE: NodeKind<ValueNode> = {
 	make: valueNode,
 	works: (node) => (node.by === "model" ? "device" : null),
 	resumeRules: (node) =>
-		node.by === "model" ? RESUME_RULES.model : RESUME_RULES.fresh,
-	aux: (node) => (node.by === "model" ? [{ kind: "wait" }] : []),
-	requirements: [modelValuesHaveDecider, personValuesNotYet],
+		node.by === "model"
+			? RESUME_RULES.model
+			: node.by === "person"
+				? RESUME_RULES.gate
+				: RESUME_RULES.fresh,
+	aux: (node) =>
+		node.by === "model"
+			? [{ kind: "wait" }]
+			: node.by === "person"
+				? [{ kind: "ask", make: askAnswerNode }]
+				: [],
+	timeBudget: (node) => ({
+		// An Ask waits as long as it must, as a Gate does.
+		timeoutMinutes: node.by === "person" ? undefined : node.timeoutMinutes,
+		idleMinutes: undefined,
+	}),
+	requirements: [modelValuesHaveDecider],
 };

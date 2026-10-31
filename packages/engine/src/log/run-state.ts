@@ -1,5 +1,6 @@
 import type { AgentHarnessName } from "@nightshift/agents/types";
 import type {
+	AskForm,
 	FlowNodeType,
 	ItemState,
 	JsonValue,
@@ -181,6 +182,8 @@ export type DerivedStep = {
 		openedSeq: number;
 		/** When nobody answered by then, the Gate takes an option. Null without one. */
 		deadline: GateDeadline | null;
+		/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
+		form: AskForm | null;
 	} | null;
 	/** When the step slept (a Wait node, a usage limit, the network), oldest first. */
 	sleeps: readonly SleepSpan[];
@@ -814,6 +817,7 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 					openedAt: e.at,
 					openedSeq: e.seq,
 					deadline: e.payload.deadline ?? null,
+					form: e.payload.form ?? null,
 				},
 			};
 			break;

@@ -15,6 +15,7 @@ export { resolveInputs } from "./inputs";
 export { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
 export { missingNames } from "./nodes/agent";
 export { closeOpenWork, openWork } from "./open-work";
+export { askAnswerProblem } from "./output-schema";
 export { resolvePolicy } from "./policy";
 export { rerunNodeRefusal } from "./reentry";
 export type { Runner } from "./runner";

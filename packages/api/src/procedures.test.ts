@@ -1157,6 +1157,7 @@ function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
 		answerPending: false,
 		lockScreen: false,
 		deadline: null,
+		form: null,
 	};
 }
 

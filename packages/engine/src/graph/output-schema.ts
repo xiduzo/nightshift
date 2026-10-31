@@ -1,3 +1,4 @@
+import type { AskForm } from "@nightshift/flows";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 
 /**
@@ -81,4 +82,17 @@ export function checkOutputData(
 	const problems = dataProblem(schema, data);
 	if (problems === null) return null;
 	return `The agent's data does not match the output schema: ${problems}.`;
+}
+
+/**
+ * Null when `data` answers the Ask (ADR 10): it matches the form's schema
+ * (the node's output, with the run's choices as the `enum` of their
+ * field). Else what is wrong, for the person who answered.
+ */
+export function askAnswerProblem(form: AskForm, data: unknown): string | null {
+	if (data === undefined) return "Fill in the form to answer.";
+	const problems = dataProblem(form.schema, data);
+	return problems === null
+		? null
+		: `The answer does not match the form: ${problems}.`;
 }

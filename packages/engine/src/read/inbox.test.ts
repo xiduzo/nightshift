@@ -30,6 +30,7 @@ function openGate(
 		lockScreen: false,
 		openedAt,
 		deadline: null,
+		form: null,
 		walker: { id: "device", name: "test", thisDevice: true },
 		answerPending: false,
 	};
