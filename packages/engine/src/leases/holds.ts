@@ -1,6 +1,6 @@
 import { HostUnreachableError } from "../contract";
 import type { RunHolds } from "../graph";
-import { type Hold, holdCovers, type RunLog } from "../log";
+import { holdCovers, type LeaseHold, type RunLog } from "../log";
 import { RunRefusal } from "../run-status";
 import type { LeaseKeeper } from "./keeper";
 
@@ -30,7 +30,7 @@ export function leaseHolds(deps: {
 		notContinuing: (runId) => keeper.release(runId),
 		async resuming(row, run, at) {
 			const leases = run.endedHolding.filter(
-				(hold): hold is Hold => hold.kind === "lease",
+				(hold): hold is LeaseHold => hold.kind === "lease",
 			);
 			if (leases.length === 0) return;
 			const parentOf = (stepId: string) => {
@@ -45,7 +45,7 @@ export function leaseHolds(deps: {
 					left.map((hold) => hold.name),
 				);
 			}
-			const taken: Hold[] = [];
+			const taken: LeaseHold[] = [];
 			for (const hold of again) {
 				const answer = await keeper.take(row, {
 					name: hold.name,

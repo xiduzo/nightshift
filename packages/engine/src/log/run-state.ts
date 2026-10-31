@@ -25,7 +25,7 @@ import {
 	scopeKey,
 	type WaitReason,
 } from "./events";
-import type { Hold } from "./holds";
+import { type Hold, sameService } from "./holds";
 import { type AnsweredBy, answeredBy } from "./scores";
 
 /**
@@ -293,7 +293,7 @@ export type RunState = {
 	steps: ReadonlyMap<string, DerivedStep>;
 	/** The sessions in the order they started. */
 	sessions: ReadonlyMap<string, DerivedSession>;
-	/** What the current walk holds for a scope (leases), oldest first. Empty once the run ended. */
+	/** What the current walk holds for a scope (leases, services), oldest first. Empty once the run ended. */
 	holds: readonly Hold[];
 	/** What the run held when it last ended: a resume takes it again. Empty once it resumed. */
 	endedHolding: readonly Hold[];
@@ -511,6 +511,27 @@ function apply(run: Draft, e: LoggedEvent): void {
 			run.holds = run.holds.filter(
 				(hold) => !(hold.kind === "lease" && hold.name === e.payload.name),
 			);
+			break;
+		case "ServiceStarted":
+			run.holds = [
+				...run.holds.filter((hold) => !sameService(hold, e.payload)),
+				{
+					kind: "service",
+					nodeId: e.payload.nodeId,
+					scope: e.payload.scope ?? null,
+					section: e.payload.section ?? null,
+					deviceId: e.payload.deviceId,
+					cwd: e.payload.cwd,
+					logPath: e.payload.logPath,
+					pid: e.payload.pid,
+					startedAt: e.payload.startedAt,
+					spec: e.payload.spec,
+					at: e.at,
+				},
+			];
+			break;
+		case "ServiceStopped":
+			run.holds = run.holds.filter((hold) => !sameService(hold, e.payload));
 			break;
 		case "Scored":
 			run.scores.push(logged(e));

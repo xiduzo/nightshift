@@ -84,6 +84,7 @@ export async function runCommand(
 				exit = { ...exit, refused: event.message };
 				break;
 			}
+			if (event.type === "started") continue;
 			if (event.type === "exit") {
 				exit = {
 					exitCode: event.exitCode,
@@ -116,6 +117,9 @@ export async function runCommand(
  * `exit`. Aborting the signal kills the whole group (SIGTERM, then
  * SIGKILL). Never throws.
  *
+ * With `pid`, the first event is `started` with the process id: the
+ * process leads its own group, so the id is the group's too.
+ *
  * With `outputFile`, the command gets a new, empty file in a folder of its
  * own under the system's temp folder, named in `NS_OUTPUT`. The `exit`
  * event holds what it wrote there, and the folder goes. Without, a
@@ -126,7 +130,7 @@ export async function* spawnCommand(
 	/** Taken out of Night Shift's environment before `env` is added. */
 	scrubEnv: readonly string[] = [],
 ): AsyncGenerator<ExecEvent> {
-	const { command, cwd, env, signal, outputFile = false } = input;
+	const { command, cwd, env, signal, outputFile = false, pid = false } = input;
 	const inherited = { ...process.env };
 	for (const name of scrubEnv) delete inherited[name];
 	delete inherited[OUTPUT_ENV];
@@ -195,6 +199,9 @@ export async function* spawnCommand(
 	}
 
 	if (child) {
+		if (pid && child.pid !== undefined) {
+			push({ type: "started", pid: child.pid });
+		}
 		const handle = (stream: "stdout" | "stderr") => (text: string) => {
 			if (!settled) push({ type: "output", stream, text });
 		};

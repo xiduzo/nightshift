@@ -32,6 +32,7 @@ export type {
 	RunWarningKind,
 	Scope,
 	ScoreName,
+	ServiceSpec,
 	SessionOutcome,
 	StepBudget,
 	StepOutcome,
@@ -46,7 +47,13 @@ export {
 	MissingProjectError,
 	type RunHistory,
 } from "./history";
-export { type Hold, holdCovers, leavingHolds } from "./holds";
+export {
+	type Hold,
+	holdCovers,
+	type LeaseHold,
+	leavingHolds,
+	type ServiceHold,
+} from "./holds";
 export {
 	createLandedFeed,
 	type LandedRunEvent,

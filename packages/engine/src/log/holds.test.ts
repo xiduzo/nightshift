@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Scope } from "./events";
-import { type Hold, holdCovers, leavingHolds } from "./holds";
+import { holdCovers, type LeaseHold, leavingHolds } from "./holds";
 
 const body: Scope = { parentStepId: "call-step", itemId: null };
 
-const hold = (extra: Partial<Hold> = {}): Hold => ({
+const hold = (extra: Partial<LeaseHold> = {}): LeaseHold => ({
 	kind: "lease",
 	name: "stack",
 	nodeId: "own",

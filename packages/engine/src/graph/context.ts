@@ -6,6 +6,7 @@ import { step } from "@nightshift/db/schema";
 import type {
 	Flow,
 	FlowNode,
+	JsonValue,
 	Outcome,
 	ResolvedPolicy,
 	TemplateContext,
@@ -24,6 +25,8 @@ import {
 	type RunRow,
 	readRunTranscript,
 	type Scope,
+	type ServiceHold,
+	type ServiceSpec,
 	type StepEvent,
 	type StepOutputs,
 	type TranscriptEntry,
@@ -145,6 +148,8 @@ export type StepContext = {
 	 * keeper, which asks this Replica's store or the Space's Host.
 	 */
 	leases: LeaseTaker;
+	/** Starts and stops the services of Service nodes (ADR 9). */
+	services: ServiceRunner;
 };
 
 /** How a Lease node takes its lease, and how a run lets go of one when it leaves its Section (`StepContext.leases`). */
@@ -156,6 +161,52 @@ export type LeaseTaker = {
 	/** Lets go of the run's leases of these names. */
 	release(runId: string, names: readonly string[]): Promise<void>;
 };
+
+/**
+ * How a Service node starts its service and waits until it is ready, and
+ * how a run stops one (`StepContext.services`, ADR 9). The engine's
+ * service keeper (`services/keeper.ts`) implements it.
+ */
+export type ServiceRunner = {
+	bringUp(input: ServiceBringUp): Promise<ServiceBroughtUp>;
+	/**
+	 * Stops these services, each on its Device. Never throws: a stop that
+	 * fails is logged, and the next service is still stopped.
+	 */
+	stop(runId: string, services: readonly StopService[]): Promise<void>;
+	/** The last lines of a service's log ("" before it printed anything). */
+	tail(logPath: string): string;
+};
+
+export type ServiceBringUp = {
+	runId: string;
+	nodeId: string;
+	scope: Scope | null;
+	/** The Device the service runs on. */
+	device: Device;
+	/** The Device is the computer that walks the run: a URL probe asks it from here. */
+	here: boolean;
+	cwd: string;
+	spec: ServiceSpec;
+	logPath: string;
+	/** Aborts the wait for ready: a stop of the run. The service then stops. */
+	signal: AbortSignal;
+	/** The process runs, before the first probe: the caller logs it, so it is always stopped. */
+	onStarted(started: {
+		pid: number | null;
+		startedAt: string | null;
+	}): Promise<void>;
+};
+
+export type ServiceBroughtUp =
+	/** `data`: what the ready command wrote to `$NS_OUTPUT`. */
+	| { kind: "ready"; data?: JsonValue; logTail: string }
+	/** The service stopped again (when it started at all). */
+	| { kind: "failed"; reason: string; logTail: string }
+	| { kind: "aborted"; logTail: string };
+
+/** A service to stop, and the Device it runs on (null: that Device cannot be reached now). */
+export type StopService = { service: ServiceHold; device: Device | null };
 
 /** A node of the compiled graph: runs one visit and returns where to go next. */
 export type NodeAction = (

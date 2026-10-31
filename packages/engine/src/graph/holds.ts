@@ -1,8 +1,7 @@
 import type { RunEnding, RunRow, RunState, Scope } from "../log";
 
 /**
- * What a run holds for a scope: a lease (ADR 7), and later a service
- * (ADR 9). The scope is the run, or a named Section. The engine lets go
+ * What a run holds for a scope: a lease (ADR 7) or a service (ADR 9). The scope is the run, or a named Section. The engine lets go
  * of what a run holds on every end of the run, whatever ends it, so a
  * flow never has to clean up after itself. Each kind that a run can hold
  * implements this port (`leases/holds.ts`), and `combineHolds` puts them
@@ -55,9 +54,20 @@ export function combineHolds(parts: readonly RunHolds[]): RunHolds {
 		ended: (runId, status) => each((part) => part.ended(runId, status)),
 		notContinuing: (runId) => each((part) => part.notContinuing(runId)),
 		// In order, each after the last: a run that cannot take its lease
-		// back does not start its service either.
+		// back does not start its service either. A part that refuses lets
+		// the parts before it go again: the run does not resume.
 		async resuming(row, run, at) {
-			for (const part of parts) await part.resuming(row, run, at);
+			for (const [i, part] of parts.entries()) {
+				try {
+					await part.resuming(row, run, at);
+				} catch (error) {
+					const status = run.latest?.ended?.status ?? "failed";
+					await Promise.allSettled(
+						parts.slice(0, i).map((done) => done.ended(row.id, status)),
+					);
+					throw error;
+				}
+			}
 		},
 	};
 }

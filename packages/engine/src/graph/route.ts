@@ -9,6 +9,7 @@ import {
 	type JsonValue,
 	nextEdge,
 } from "@nightshift/flows";
+import type { Device } from "../device";
 import {
 	leavingHolds,
 	type Scope,
@@ -16,7 +17,12 @@ import {
 	type StepOutputs,
 } from "../log";
 import { arrive, openRound, outrun, placeOf } from "./branches";
-import { messageOf, type NodeAction, type StepContext } from "./context";
+import {
+	messageOf,
+	type NodeAction,
+	type StepContext,
+	type StopService,
+} from "./context";
 import { interruptNode } from "./interrupt";
 import { commitVisit, type DoneStep } from "./run-position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
@@ -359,11 +365,12 @@ async function takeEdge(
 /**
  * Lets go of what the run holds for a Section the step leaves
  * (`leavingHolds`): it takes an edge out of the Section, or it is the Call
- * step whose flow the hold was taken in. `LeaseReleased` goes in the log
- * first, so a resume does not take the lease again. A lease that cannot be
- * released at its keeper expires after its ttl: the walk goes on. A hold
- * the log already let go of (an end whose commit was lost) is not let go
- * of twice.
+ * step whose flow the hold was taken in. `LeaseReleased` and
+ * `ServiceStopped` go in the log first, so a resume does not take the
+ * lease again or start the service again. A lease that cannot be released
+ * at its keeper expires after its ttl, and a service that does not stop
+ * is logged: the walk goes on. A hold the log already let go of (an end
+ * whose commit was lost) is not let go of twice.
  */
 async function leaveScopes(
 	ctx: StepContext,
@@ -380,6 +387,7 @@ async function leaveScopes(
 	});
 	if (left.length === 0) return;
 	const leases: string[] = [];
+	const services: StopService[] = [];
 	for (const hold of left) {
 		switch (hold.kind) {
 			case "lease":
@@ -390,14 +398,36 @@ async function leaveScopes(
 				});
 				leases.push(hold.name);
 				break;
+			case "service":
+				await ctx.log.append({
+					type: "ServiceStopped",
+					runId: ctx.run.id,
+					payload: { nodeId: hold.nodeId, scope: hold.scope, why: "scope" },
+				});
+				services.push({ service: hold, device: deviceOfService(ctx, hold) });
+				break;
 		}
 	}
+	if (services.length > 0) await ctx.services.stop(ctx.run.id, services);
+	if (leases.length === 0) return;
 	try {
 		await ctx.leases.release(ctx.run.id, leases);
 	} catch (error) {
 		console.warn(
 			`[engine] run ${ctx.run.id} could not let go of a lease: ${messageOf(error)}`,
 		);
+	}
+}
+
+/** The Device a service runs on, as a step of the run reaches it, or null. */
+function deviceOfService(
+	ctx: StepContext,
+	hold: { deviceId: string },
+): Device | null {
+	try {
+		return ctx.deviceById(hold.deviceId, ctx.run);
+	} catch {
+		return null;
 	}
 }
 

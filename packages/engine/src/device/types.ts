@@ -280,11 +280,19 @@ export type ExecInput = {
 	 * flow writes into it.
 	 */
 	knowledge?: { projectId: string };
+	/**
+	 * Yields a `started` event with the process id first (a service, ADR 9):
+	 * its process group has the same id. A Device of an older Night Shift
+	 * sends none.
+	 */
+	pid?: boolean;
 	/** Aborting kills the whole process group (SIGTERM, then SIGKILL). */
 	signal: AbortSignal;
 };
 
 export type ExecEvent =
+	/** With `pid`: the process started, and leads its own process group. */
+	| { type: "started"; pid: number }
 	| { type: "output"; stream: "stdout" | "stderr"; text: string }
 	| {
 			type: "exit";

@@ -12,7 +12,12 @@ import type { RunBus, RunEnding, RunLog, RunRow } from "../log";
 import type { RunResult } from "../run-status";
 import { createRaces } from "./branches";
 import { compileFlow } from "./compile";
-import type { createRecorders, LeaseTaker, StepContext } from "./context";
+import type {
+	createRecorders,
+	LeaseTaker,
+	ServiceRunner,
+	StepContext,
+} from "./context";
 import { createFence, type Fence, FencedSaver, fencedLog } from "./fence";
 import { kindOf } from "./node-kinds";
 import type {
@@ -73,6 +78,17 @@ export type ThreadDeps = {
 	policyFor(flow: Flow): ResolvedPolicy;
 	/** Takes the leases of Lease nodes (`StepContext.leases`). Default: none can be taken. */
 	leases?: LeaseTaker;
+	/** Starts and stops the services of Service nodes (`StepContext.services`). Default: none. */
+	services?: ServiceRunner;
+};
+
+/** A thread without services: a Service step fails with this. */
+const NO_SERVICES: ServiceRunner = {
+	bringUp: async () => {
+		throw new Error("This computer runs no services.");
+	},
+	stop: async () => {},
+	tail: () => "",
 };
 
 /** A thread without leases: a Lease step fails with this. */
@@ -195,6 +211,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		kindOf,
 		races: createRaces(),
 		leases: deps.leases ?? NO_LEASES,
+		services: deps.services ?? NO_SERVICES,
 	};
 	const saver = new FencedSaver(deps.db, fence);
 	const graph = compileFlow(flow, ctx).compile({ checkpointer: saver });

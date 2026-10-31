@@ -268,6 +268,8 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			outputFile: z.boolean().optional(),
 			/** The project whose knowledge folder goes in `NS_KNOWLEDGE`. */
 			knowledge: z.object({ projectId: z.string() }).optional(),
+			/** A service: a first `started` event with the process id. */
+			pid: z.boolean().optional(),
 		}),
 	}),
 	z.object({
