@@ -1,3 +1,4 @@
+import { nightsOf } from "@nightshift/client";
 import {
 	Card,
 	CardContent,
@@ -23,7 +24,6 @@ import type {
 } from "@/shared/api";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { dashboardQueries } from "./queries";
-import { nightsOf } from "./ranges";
 
 /** How many last runs a project shows. */
 const LAST_RUNS = 8;

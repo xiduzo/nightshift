@@ -1,4 +1,4 @@
-import { finishedShare } from "@nightshift/client";
+import { finishedShare, nightsOf } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	ChartContainer,
@@ -41,7 +41,6 @@ import {
 	Swatch,
 } from "./details";
 import { nightChartRows } from "./nights";
-import { nightsOf } from "./ranges";
 import { RUN_STATUS_CHART } from "./run-statuses";
 
 type Tab = "overview" | "groups" | "failed";

@@ -1,3 +1,4 @@
+import { nightsOf } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -44,7 +45,6 @@ import {
 	Swatch,
 } from "./details";
 import { nightChartRows } from "./nights";
-import { nightsOf } from "./ranges";
 
 type Tab = "overview" | "groups" | "priciest";
 

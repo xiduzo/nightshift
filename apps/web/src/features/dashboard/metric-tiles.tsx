@@ -1,8 +1,9 @@
+import { changeOf } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Toggle } from "@nightshift/ui/components/toggle";
 import { ArrowUpRightIcon, CheckSquareIcon, SquareIcon } from "lucide-react";
-import { changeOf, METRICS, type Metric, type MetricValues } from "./metrics";
+import { METRICS, type Metric, type MetricValues } from "./metrics";
 import { TrendIcon } from "./trend-icon";
 
 /**

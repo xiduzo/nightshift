@@ -1,3 +1,4 @@
+import { nightsOf } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
@@ -21,7 +22,6 @@ import { NowStrip } from "./now-strip";
 import { ProjectTables } from "./project-tables";
 import { dashboardQueries } from "./queries";
 import { RangeBar } from "./range-bar";
-import { nightsOf } from "./ranges";
 
 /**
  * The project's root, after the Performance page of Search Console: one

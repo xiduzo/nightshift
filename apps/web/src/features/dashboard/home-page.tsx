@@ -1,3 +1,4 @@
+import { nightsOf } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useOpenGates } from "@/features/gates";
@@ -12,7 +13,6 @@ import { MetricStrip } from "./metric-strip";
 import { type Metric, metricsOf } from "./metrics";
 import { dashboardQueries } from "./queries";
 import { RangeBar } from "./range-bar";
-import { nightsOf } from "./ranges";
 
 /**
  * Home: what needs you over all projects. One range for the page, the four numbers

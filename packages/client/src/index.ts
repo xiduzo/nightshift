@@ -24,6 +24,12 @@ export {
 	isTwoFactorRequired,
 } from "./api";
 export {
+	CONSOLE_METRICS,
+	type ConsoleMetric,
+	type ConsoleValues,
+	changeOf,
+	consoleNumbers,
+	consoleValues,
 	createDashboardQueries,
 	type DashboardSummary,
 	type FlowHealthRow,
@@ -32,6 +38,7 @@ export {
 	type GateState,
 	type NightRange,
 	type NightsRange,
+	nightsOf,
 	readerTimeZone,
 	type Spread,
 } from "./dashboard";

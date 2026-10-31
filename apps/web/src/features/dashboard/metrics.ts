@@ -1,58 +1,29 @@
-import { finishedShare } from "@nightshift/client";
+import {
+	CONSOLE_METRICS,
+	type ConsoleMetric,
+	type ConsoleValues,
+	consoleNumbers,
+	consoleValues,
+} from "@nightshift/client";
 import type { ChartConfig } from "@nightshift/ui/components/chart";
 
 import type { NightsRange } from "@/shared/api";
-import { formatCost } from "@/shared/format";
 import { formatNight, formatNightShort } from "./nights";
 
 /**
  * The four numbers on top of a project's page, after Search Console: each
  * a tile you switch on to plot it, over the page's range, beside the same
- * nights just before.
+ * nights just before. The numbers come from the client, the colours from
+ * the theme.
  */
 
-export type Metric = "runs" | "finished" | "spend" | "gates";
+export type Metric = ConsoleMetric;
 
-type Totals = NightsRange["totals"];
-
-export const METRICS: {
-	key: Metric;
-	label: string;
-	/** Its line on the chart. Its tile uses `--metric-<key>-tile`. */
-	color: string;
-	format: (value: number | null) => string;
-	/** The value of a period or a night. Null when it has none. */
-	of: (totals: Omit<Totals, "perNight">) => number | null;
-}[] = [
-	{
-		key: "runs",
-		label: "Runs",
-		color: "var(--metric-runs)",
-		format: (value) => String(value ?? 0),
-		of: (totals) => totals.runs,
-	},
-	{
-		key: "finished",
-		label: "Finished",
-		color: "var(--metric-finished)",
-		format: (value) => (value === null ? "—" : `${value}%`),
-		of: (totals) => finishedShare(totals.finished, totals.ended),
-	},
-	{
-		key: "spend",
-		label: "Spend",
-		color: "var(--metric-spend)",
-		format: (value) => formatCost(value ?? 0),
-		of: (totals) => totals.costUsd,
-	},
-	{
-		key: "gates",
-		label: "Gates asked",
-		color: "var(--metric-gates)",
-		format: (value) => String(value ?? 0),
-		of: (totals) => totals.gates,
-	},
-];
+/** Each metric, with its line on the chart. Its tile uses `--metric-<key>-tile`. */
+export const METRICS = CONSOLE_METRICS.map((metric) => ({
+	...metric,
+	color: `var(--metric-${metric.key})`,
+}));
 
 /** Each metric, and the same metric over the nights before, dashed. */
 export const METRICS_CHART = Object.fromEntries(
@@ -62,7 +33,7 @@ export const METRICS_CHART = Object.fromEntries(
 	]),
 ) satisfies ChartConfig;
 
-export type MetricValues = Record<Metric, number | null>;
+export type MetricValues = ConsoleValues;
 
 /** One night of the chart: its value per metric, and the night as far back. */
 export type MetricRow = {
@@ -70,12 +41,6 @@ export type MetricRow = {
 	title: string;
 } & MetricValues &
 	Partial<Record<`before_${Metric}`, number | null>>;
-
-function valuesOf(totals: Omit<Totals, "perNight">): MetricValues {
-	return Object.fromEntries(
-		METRICS.map((metric) => [metric.key, metric.of(totals)]),
-	) as MetricValues;
-}
 
 /**
  * The metrics of a range: per night for the chart, in all, and before.
@@ -93,7 +58,7 @@ export function metricsOf(range: NightsRange): {
 		return {
 			label: formatNightShort(night.night),
 			title: formatNight(night.night),
-			...valuesOf(night),
+			...consoleValues(night),
 			...(before
 				? Object.fromEntries(
 						METRICS.map((metric) => [
@@ -104,50 +69,5 @@ export function metricsOf(range: NightsRange): {
 				: {}),
 		};
 	});
-	return {
-		rows,
-		values: valuesOf(range.totals),
-		before: valuesOf(range.before),
-		compared: range.before.runs > 0,
-	};
-}
-
-/**
- * How a number moved against the same nights just before: a sentence, and
- * a short form for a tight row. Undefined `before` means the nights before
- * had no runs at all.
- */
-export function changeOf(
-	metric: Metric,
-	value: number | null,
-	before: number | null | undefined,
-): { trend: "up" | "down" | "flat"; text: string; short: string } {
-	if (before === undefined) {
-		return { trend: "flat", text: "Nothing to compare with yet", short: "new" };
-	}
-	if (value === null) {
-		return { trend: "flat", text: "No runs ended in these nights", short: "—" };
-	}
-	if (before === null) {
-		return {
-			trend: "flat",
-			text: "No runs ended in the nights before",
-			short: "—",
-		};
-	}
-	if (before === 0 && value > 0) {
-		return { trend: "up", text: "None in the nights before", short: "new" };
-	}
-	const delta = value - before;
-	if (Math.abs(delta) < 0.005) {
-		return { trend: "flat", text: "Same as the nights before", short: "same" };
-	}
-	const amount =
-		metric === "spend" ? formatCost(Math.abs(delta)) : String(Math.abs(delta));
-	const unit = metric === "finished" ? " points" : "";
-	return {
-		trend: delta > 0 ? "up" : "down",
-		text: `${amount}${unit} ${delta > 0 ? "more" : "less"} than the nights before`,
-		short: `${delta > 0 ? "+" : "−"}${amount}${metric === "finished" ? " pts" : ""}`,
-	};
+	return { rows, ...consoleNumbers(range) };
 }

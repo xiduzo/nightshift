@@ -1,3 +1,4 @@
+import { changeOf } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
@@ -7,7 +8,6 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Line, LineChart, YAxis } from "recharts";
 import {
-	changeOf,
 	METRICS,
 	type Metric,
 	type MetricRow,

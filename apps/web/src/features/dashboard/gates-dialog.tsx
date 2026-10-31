@@ -1,4 +1,4 @@
-import { gateParts, waitedText } from "@nightshift/client";
+import { gateParts, nightsOf, waitedText } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -45,7 +45,6 @@ import {
 } from "./details";
 import { nightChartRows } from "./nights";
 import { OVERVIEW_ROWS } from "./overview";
-import { nightsOf } from "./ranges";
 
 type Tab = "overview" | "waiting" | "groups" | "latest";
 
