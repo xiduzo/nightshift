@@ -25,6 +25,7 @@ import { View } from "react-native";
 import { ComputersRow } from "@/features/devices";
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
+import { LearningsRow, useWaitingLearnings } from "@/features/learnings";
 import { SchedulesRow } from "@/features/schedules";
 import { SearchResults } from "@/features/search";
 import { EmptyState } from "@/shared/empty";
@@ -64,6 +65,8 @@ export function HomeScreen() {
 		...useWhileFocused(),
 	});
 	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
+	// The row to the learnings shows only when some wait.
+	const learnings = useWaitingLearnings();
 	const refresh = useScreenRefresh([summary.refetch, gates.refetch]);
 	const [query, setQuery] = useState("");
 	const searching = query.trim() !== "";
@@ -174,6 +177,7 @@ export function HomeScreen() {
 						<SectionHead title="Your work" />
 						<ListGroup>
 							<ListRow icon={History} title="Runs" href="/runs" />
+							{learnings ? <LearningsRow count={learnings} /> : null}
 							<ListRow
 								icon={Workflow}
 								title="Flows"

@@ -56,6 +56,10 @@ export default function RootLayout() {
 					options={{ title: "Project", headerLargeTitleEnabled: true }}
 				/>
 				<Stack.Screen
+					name="learnings"
+					options={{ title: "Learnings", headerLargeTitleEnabled: true }}
+				/>
+				<Stack.Screen
 					name="settings"
 					options={{ title: "Settings", headerLargeTitleEnabled: true }}
 				/>

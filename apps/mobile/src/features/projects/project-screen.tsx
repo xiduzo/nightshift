@@ -28,6 +28,7 @@ import { Linking, View } from "react-native";
 import { offlineAlert, useOfflineNeeds } from "@/features/dashboard";
 import { useHostQueries } from "@/features/host";
 import { GateRow } from "@/features/inbox";
+import { LearningsRow, useWaitingLearnings } from "@/features/learnings";
 import { SchedulesRow } from "@/features/schedules";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ErrorAlert } from "@/shared/feedback";
@@ -78,6 +79,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 		...useWhileFocused(),
 	});
 	const offline = useOfflineNeeds(projectId);
+	const learnings = useWaitingLearnings(projectId);
 	const offlineTitle = offline ? offlineAlert(offline)?.title : undefined;
 	const refresh = useScreenRefresh([
 		projects.refetch,
@@ -130,6 +132,9 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							accessibilityHint="Shows how the flows of this project do"
 						/>
 						<SchedulesRow projectId={projectId} />
+						{learnings !== undefined ? (
+							<LearningsRow projectId={projectId} count={learnings} />
+						) : null}
 					</ListGroup>
 
 					<View className="gap-3">

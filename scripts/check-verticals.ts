@@ -1111,10 +1111,7 @@ function allWorkspaces(root: string): string[] {
  *
  * Shape: { entry: ["name"] }
  */
-export const PENDING_NAMES: Record<string, string[]> = {
-	// Ask why and the learnings that wait, for the phone (STRUCTURE.md section 8).
-	"@nightshift/client": ["createKnowledgeQueries"],
-};
+export const PENDING_NAMES: Record<string, string[]> = {};
 
 type Entry = {
 	/** How another workspace imports it: `@nightshift/db/migrate`. */
