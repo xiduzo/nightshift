@@ -258,6 +258,18 @@ const stepSummarySchema = z.object({
 		.nullable(),
 	sleeps: z.array(sleepSchema).optional(),
 	metrics: metricsSchema.optional(),
+	/** The knowledge files its agents used: read, or at the top of a search. Older Hosts send none. */
+	sources: z
+		.array(
+			z.object({
+				path: z.string(),
+				section: z.string().nullable(),
+				page: z.number().nullable(),
+				line: z.number(),
+				read: z.boolean(),
+			}),
+		)
+		.optional(),
 });
 
 /** One step with the prompt of each session and the element of each item. */

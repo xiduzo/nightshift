@@ -37,6 +37,8 @@ export {
 export {
 	type AskedQuestion,
 	askedQuestions,
+	type KnowledgeSource,
 	knowledgeUseEvent,
 	logKnowledgeUse,
+	stepSources,
 } from "./use";

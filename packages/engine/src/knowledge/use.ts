@@ -4,6 +4,7 @@ import { event } from "@nightshift/db/schema";
 import { and, desc, gte, inArray, sql } from "drizzle-orm";
 import {
 	type EventInput,
+	type KnowledgeUseFact,
 	type KnowledgeVia,
 	parseEventRow,
 	type RunLog,
@@ -125,4 +126,69 @@ export async function askedQuestions(
 		});
 	}
 	return [...asked.values()];
+}
+
+/**
+ * A knowledge file an agent of a step used: one it read, or one a search
+ * of it put at the top. At the section it read from, else the section the
+ * search found.
+ */
+export type KnowledgeSource = {
+	path: string;
+	section: string | null;
+	page: number | null;
+	line: number;
+	/** The agent read the file (`read_knowledge`). False: a search put it in its top 3. */
+	read: boolean;
+};
+
+/** The hits of each search that count as used: the top 3. */
+const SOURCE_HITS = 3;
+/** The most sources a step lists. */
+const MAX_SOURCES = 10;
+
+/**
+ * The knowledge files a step's agents used, from its searches and reads
+ * (`DerivedStep.knowledge`): the files it read first, in the order it read
+ * them, then the top hits of its searches that it did not read. No effort
+ * of the agent: it cites nothing itself.
+ */
+export function stepSources(
+	uses: readonly KnowledgeUseFact[],
+): KnowledgeSource[] {
+	/** Where each path was last found, for a read that names no spot. */
+	const foundAt = new Map<string, KnowledgeUseHit>();
+	const read = new Map<string, KnowledgeSource>();
+	const found = new Map<string, KnowledgeSource>();
+	for (const use of uses) {
+		if (use.type === "KnowledgeSearched") {
+			for (const [i, hit] of use.payload.hits.entries()) {
+				foundAt.set(hit.path, hit);
+				if (i < SOURCE_HITS && !found.has(hit.path)) {
+					found.set(hit.path, {
+						path: hit.path,
+						section: hit.section,
+						page: hit.page,
+						line: hit.line,
+						read: false,
+					});
+				}
+			}
+			continue;
+		}
+		const { path, found: there, from } = use.payload;
+		if (!there || read.has(path)) continue;
+		const hit = foundAt.get(path);
+		read.set(path, {
+			path,
+			section: from ? (from.section ?? null) : (hit?.section ?? null),
+			page: from ? (from.page ?? null) : (hit?.page ?? null),
+			line: from ? (from.line ?? 1) : (hit?.line ?? 1),
+			read: true,
+		});
+	}
+	return [
+		...read.values(),
+		...[...found.values()].filter((source) => !read.has(source.path)),
+	].slice(0, MAX_SOURCES);
 }

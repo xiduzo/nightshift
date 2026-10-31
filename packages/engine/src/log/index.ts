@@ -75,6 +75,7 @@ export {
 	type DerivedSession,
 	type DerivedStep,
 	foldRun,
+	type KnowledgeUseFact,
 	type RunState,
 	type StepSleep,
 	type VariableChange,

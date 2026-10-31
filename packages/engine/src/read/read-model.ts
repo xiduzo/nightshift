@@ -5,6 +5,7 @@ import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { stepSources } from "../knowledge";
 import {
 	addCost,
 	type CostTally,
@@ -473,6 +474,7 @@ export function toStepSummary(
 			: null,
 		sleeps: derived.sleeps.map(({ from, to }) => ({ from, to })),
 		metrics: stepMetrics(derived),
+		sources: stepSources(derived.knowledge),
 	};
 }
 

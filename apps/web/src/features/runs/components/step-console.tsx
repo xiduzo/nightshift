@@ -19,6 +19,7 @@ import { ChangedFiles } from "./changed-files";
 import { StepFacts, StepLine, StepOutputs } from "./step-header";
 import { StepLearnings } from "./step-learnings";
 import { StepPlan } from "./step-plan";
+import { StepSources } from "./step-sources";
 
 /** The height of the closed console: its bar alone. */
 export const CONSOLE_BAR_PX = 44;
@@ -27,8 +28,8 @@ export const CONSOLE_BAR_PX = 44;
  * The selected step along the bottom of the run page, like a browser's
  * devtools. Closed, it is one line: the step and what it did in a few words.
  * Open, it shows everything at once: the step's facts, summary and outputs
- * on the left, with the agent's to-do list, what it proposed to learn and
- * the files the step changed (by the agent's edits and by commands), and
+ * on the left, with the agent's to-do list, what it proposed to learn, the
+ * knowledge it used and the files the step changed (by the agent's edits and by commands), and
  * its transcript (what the
  * agent ran and said) on the right.
  */
@@ -147,6 +148,9 @@ export function StepConsole({
 							{summary}
 							{learnings.length > 0 ? (
 								<StepLearnings notes={learnings} />
+							) : null}
+							{step.sources && step.sources.length > 0 ? (
+								<StepSources sources={step.sources} />
 							) : null}
 							{files.length > 0 ? (
 								<ChangedFiles

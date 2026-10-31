@@ -5,6 +5,7 @@ import type {
 	JsonValue,
 } from "@nightshift/flows";
 import type { RunCommandKind } from "../contract";
+import type { KnowledgeSource } from "../knowledge";
 import type {
 	AnsweredBy,
 	GateChoice,
@@ -101,6 +102,8 @@ export type StepSummary = {
 	sleeps?: { from: number; to: number | null }[];
 	/** How long the step took, its agents' time and tokens, its Gate's wait. Older Hosts send none. */
 	metrics?: RunMetrics;
+	/** The knowledge files its agents used: read, or at the top of a search. Older Hosts send none. */
+	sources?: KnowledgeSource[];
 };
 
 /**
