@@ -23,7 +23,9 @@ export {
 	terminalTools,
 } from "./assistant";
 export {
+	type DeciderModels,
 	type DeciderView,
+	deciderModelsAt,
 	deciderViews,
 	type TanstackDeciderOptions,
 	tanstackDecider,

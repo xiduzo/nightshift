@@ -1,6 +1,7 @@
 import type {
 	CliCheck,
 	CliToolCheck,
+	DeciderModels,
 	DeciderView,
 	HarnessModels,
 	HarnessView,
@@ -265,6 +266,16 @@ export const installedSkillSchema = exact<InstalledSkill>()(
 );
 
 /** A decider that Decision and Value nodes pick, and whether it has its API key. */
+/** The models of a server at an address, or why it did not answer. */
+export const deciderModelsSchema = exact<DeciderModels>()(
+	z.object({
+		models: z.array(z.string()),
+		valueModels: z.array(z.string()),
+		listed: z.number(),
+		problem: z.string().nullable(),
+	}),
+);
+
 export const deciderViewSchema = exact<DeciderView<SecretSource>>()(
 	z.object({
 		name: deciderNameSchema,

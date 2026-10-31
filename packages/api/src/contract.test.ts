@@ -384,6 +384,17 @@ describe("replies of a real engine", () => {
 		await reply(appRouter.cliTools.signIn, { name: "gh-work" });
 		await read(appRouter.harnesses.list);
 		await read(appRouter.deciders.list);
+		// A missing secret answers before any request leaves this computer.
+		expect(
+			await read(appRouter.deciders.modelsAt, {
+				decider: "openjev",
+				address: { baseUrl: "http://127.0.0.1:9", apiKey: "NOT_SAVED" },
+			}),
+		).toMatchObject({
+			listed: 0,
+			problem:
+				"The address http://127.0.0.1:9 needs the secret NOT_SAVED. Add it on the Secrets page.",
+		});
 		await read(appRouter.settings.get);
 
 		await reply(appRouter.schedules.save, {

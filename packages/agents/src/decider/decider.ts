@@ -642,6 +642,22 @@ export async function deciderModels(
 	}
 }
 
+/**
+ * The models a decider offers at a profile's address, for the profile's
+ * page: the server's listing first, or why it did not answer (a missing
+ * secret too). This is also how the person tests an address. Never throws.
+ */
+export async function deciderModelsAt(
+	name: DeciderName,
+	address: ModelAddress,
+	options: TanstackDeciderOptions,
+): Promise<DeciderModels> {
+	const at = await reachAddress(address, options.secret);
+	if (!("problem" in at)) return deciderModels(name, options, at);
+	const known = await deciderModels(name, {});
+	return { ...known, problem: at.problem };
+}
+
 /** How a listing failure reads at run start: whether the server answered at all. */
 function listingReason(error: unknown): "silent" | "refused" | "other" {
 	if (error instanceof AddressError) return error.reason;
