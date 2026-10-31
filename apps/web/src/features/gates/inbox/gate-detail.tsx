@@ -29,6 +29,8 @@ import { projectQueries } from "@/features/projects";
 import type { OpenGate } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
+import { AskAttachments } from "../ask-attachments";
+import { AskForm } from "../ask-form";
 import { GateChoiceForm } from "../gate-choice-form";
 import { GateLinkItem } from "../gate-link-item";
 import { ContextList } from "../gate-question";
@@ -36,7 +38,8 @@ import { ContextList } from "../gate-question";
 /**
  * One open Gate in the inbox pane. What happened on the left; the links to
  * check and the answer on the right, in place while you read. A Gate of
- * any of your Spaces is answered here, and its run opens from here.
+ * any of your Spaces is answered here, and its run opens from here. An
+ * Ask shows its files with what happened, and its form as the answer.
  */
 export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 	const answerId = useId();
@@ -108,7 +111,8 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 							)}
 						</span>
 						<span>
-							Gate <span className="font-mono">{gate.nodeId}</span>
+							{gate.form ? "Ask" : "Gate"}{" "}
+							<span className="font-mono">{gate.nodeId}</span>
 						</span>
 					</div>
 				</div>
@@ -119,11 +123,18 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 					<h2 className="font-medium text-sm">What happened</h2>
 					{context.length > 0 ? (
 						<ContextList items={context} plain />
-					) : (
+					) : gate.form?.attachments ? null : (
 						<p className="text-muted-foreground text-sm">
 							The Gate asks only its question.
 						</p>
 					)}
+					{gate.form?.attachments ? (
+						<AskAttachments
+							runId={gate.runId}
+							attachments={gate.form.attachments}
+							filesHere={gate.walker.thisDevice}
+						/>
+					) : null}
 				</section>
 				<aside className="flex flex-col gap-6 lg:sticky lg:top-8 lg:self-start">
 					<section className="flex flex-col gap-2">
@@ -162,7 +173,16 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 						<h2 id={answerId} className="font-medium text-sm">
 							Your answer
 						</h2>
-						{gate.canAnswer ? (
+						{gate.canAnswer && gate.form ? (
+							<AskForm
+								runId={gate.runId}
+								stepId={gate.stepId}
+								form={gate.form}
+								deadline={gate.deadline}
+								runTitle={gate.runTitle}
+								filesHere={gate.walker.thisDevice}
+							/>
+						) : gate.canAnswer ? (
 							<GateChoiceForm gate={gate} labelledBy={answerId} />
 						) : (
 							<Alert>

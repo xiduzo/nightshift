@@ -43,12 +43,32 @@ export function deadlineWhen(
 }
 
 /**
- * What happens to a Gate when nobody answers in time: "If nobody answers,
- * Night Shift picks keep at 07:00 tomorrow."
+ * What happens at an Ask's deadline (ADR 10): it takes its default, or
+ * with none its step fails. Null for every other Gate.
  */
-export function deadlineText(deadline: GateDeadline, now: number): string {
+function askTakes(form: OpenGate["form"] | undefined): {
+	full: string;
+	short: string;
+} | null {
+	if (!form) return null;
+	return form.default === undefined
+		? { full: "the step fails", short: "Fails" }
+		: { full: "Night Shift takes the default", short: "Takes the default" };
+}
+
+/**
+ * What happens to a Gate when nobody answers in time: "If nobody answers,
+ * Night Shift picks keep at 07:00 tomorrow." An Ask takes its default
+ * instead.
+ */
+export function deadlineText(
+	deadline: GateDeadline,
+	now: number,
+	form?: OpenGate["form"],
+): string {
 	const { time, day } = deadlineWhen(deadline.at, now);
-	return `If nobody answers, Night Shift picks ${deadline.choose} at ${time}${day}.`;
+	const takes = askTakes(form)?.full ?? `Night Shift picks ${deadline.choose}`;
+	return `If nobody answers, ${takes} at ${time}${day}.`;
 }
 
 /**
@@ -59,9 +79,11 @@ export function deadlineText(deadline: GateDeadline, now: number): string {
 export function deadlineSoon(
 	deadline: GateDeadline | null,
 	now: number,
+	form?: OpenGate["form"],
 ): string | null {
 	if (!deadline) return null;
 	const left = deadline.at - now;
 	if (left <= 0 || left > SOON_MS) return null;
-	return `Picks ${deadline.choose} in ${waitedText(left)}`;
+	const takes = askTakes(form)?.short ?? `Picks ${deadline.choose}`;
+	return `${takes} in ${waitedText(left)}`;
 }

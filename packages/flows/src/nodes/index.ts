@@ -32,11 +32,16 @@ export {
 	ASK_ANSWER,
 	type AskAttachment,
 	type AskChoice,
+	type AskField,
+	type AskFieldKind,
 	type AskForm,
 	type AttachmentSource,
+	askFields,
 	askFormSchema,
 	type ChoiceItem,
 	choiceItemSchema,
+	choicesFieldProblem,
+	formDataProblem,
 	withChoices,
 } from "./ask";
 export {

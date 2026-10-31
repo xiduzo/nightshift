@@ -11,21 +11,33 @@ import { VALUE_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
+import { AskFields } from "./ask-fields";
 import { CascadeSection } from "./cascade-fields";
 import { ModelSettings } from "./model-settings";
 
 const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
 	{ by: "rule", label: "A rule" },
 	{ by: "model", label: "A model" },
+	{ by: "person", label: "A person" },
 ];
+
+/** What each maker does, under the toggle. */
+const MADE_BY_HINT: Record<ValueNode["by"], string> = {
+	rule: "An expression reads the values of earlier nodes and inputs. It uses no model and costs nothing.",
+	model:
+		"A small model reads the prompt and answers with data in the shape below.",
+	person:
+		"A person answers a form in the Needs-you inbox. The form comes from the shape below.",
+};
 
 const EXPRESSION_EXAMPLE =
 	'$filter(planner.data.tasks, function($t) { $t.size = "small" })';
 
 /**
  * A Value node makes data that fits its output schema. Who makes it is a
- * toggle, as on a Decision: a rule (a JSONata expression) or a model (a
- * decider that can make a value, with a prompt).
+ * toggle, as on a Decision: a rule (a JSONata expression), a model (a
+ * decider that can make a value, with a prompt), or a person (an Ask: a
+ * form in the Needs-you inbox, with a question).
  */
 export function ValueFields({
 	projectId,
@@ -45,15 +57,7 @@ export function ValueFields({
 	return (
 		<>
 			<InspectorSection title="Value">
-				<Field
-					id={`${id}-by`}
-					label="Made by"
-					hint={
-						by === "rule"
-							? "An expression reads the values of earlier nodes and inputs. It uses no model and costs nothing."
-							: "A small model reads the prompt and answers with data in the shape below."
-					}
-				>
+				<Field id={`${id}-by`} label="Made by" hint={MADE_BY_HINT[by]}>
 					<ToggleGroup
 						variant="outline"
 						size="sm"
@@ -110,13 +114,21 @@ export function ValueFields({
 					<TemplateField
 						id={`${id}-prompt`}
 						language="markdown"
-						label="Prompt"
-						hint="Say what to make, and give the context it needs."
+						label={by === "person" ? "Question" : "Prompt"}
+						hint={
+							by === "person"
+								? "What the person answers. Give the context they need to decide."
+								: "Say what to make, and give the context it needs."
+						}
 						flow={flow}
 						nodeId={node.id}
 						value={prompt}
 						invalid={prompt.trim() === ""}
-						placeholder="List the failing tests in {{check.log_tail}}."
+						placeholder={
+							by === "person"
+								? "Which design should the agent build?"
+								: "List the failing tests in {{check.log_tail}}."
+						}
 						assist="prompt"
 						onChange={(text) =>
 							onChange((current) => ({ ...current, prompt: text }))
@@ -155,6 +167,9 @@ export function ValueFields({
 				/>
 			</InspectorSection>
 
+			{by === "person" ? (
+				<AskFields flow={flow} node={node} onChange={onChange} />
+			) : null}
 			{by === "model" && node.cascade === undefined ? (
 				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
 			) : null}

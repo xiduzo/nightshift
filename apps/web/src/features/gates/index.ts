@@ -1,5 +1,6 @@
 /** Gates that wait for a person: the Needs-you inbox, gate cards and answers. */
 
+export { AskForm } from "./ask-form";
 export { GateAnswer } from "./gate-answer";
 export { GateConfirmation } from "./gate-confirmation";
 export { GateQuestion } from "./gate-question";

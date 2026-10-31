@@ -34,6 +34,7 @@ import {
 import { memo, type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+	AskForm,
 	GateAnswer,
 	GateConfirmation,
 	GateQuestion as GateQuestionText,
@@ -266,6 +267,15 @@ export function StepTranscript({
 								run continues when it is online.
 							</AlertDescription>
 						</Alert>
+					) : openGate.form ? (
+						<AskForm
+							runId={runId}
+							stepId={step.id}
+							form={openGate.form}
+							deadline={openGate.deadline}
+							filesHere={!elsewhere}
+							{...(elsewhere ? { walkerName: elsewhere } : {})}
+						/>
 					) : (
 						<GateAnswer
 							runId={runId}
@@ -311,6 +321,20 @@ export function StepTranscript({
 													{...(row.exit ? { exit: row.exit } : {})}
 													running={running}
 												/>
+											) : row.item.kind === "gate-open" &&
+												row.item.key === openGateKey &&
+												step.gate?.form ? (
+												<div className="flex flex-col gap-4 rounded-xl border p-4">
+													<GateQuestionText question={row.item.question} />
+													<AskForm
+														runId={runId}
+														stepId={step.id}
+														form={step.gate.form}
+														deadline={step.gate.deadline}
+														filesHere={!elsewhere}
+														{...(elsewhere ? { walkerName: elsewhere } : {})}
+													/>
+												</div>
 											) : row.item.kind === "gate-open" &&
 												row.item.key === openGateKey ? (
 												<GateConfirmation

@@ -37,14 +37,16 @@ export function useResolveGate({
 					}
 					return;
 				}
-				toast.success(
-					`Answered ${outcomeLabel(input.choice)}${runTitle ? ` · ${runTitle}` : ""}`,
-					{
-						description: walkerName
-							? `Sent to ${walkerName}. The run continues when ${walkerName} is online.`
-							: "The run continues.",
-					},
-				);
+				// An Ask's answer is its form, not a choice.
+				const said =
+					input.data === undefined
+						? `Answered ${outcomeLabel(input.choice)}`
+						: "Answer sent";
+				toast.success(`${said}${runTitle ? ` · ${runTitle}` : ""}`, {
+					description: walkerName
+						? `Sent to ${walkerName}. The run continues when ${walkerName} is online.`
+						: "The run continues.",
+				});
 			},
 			onError: (error) => {
 				const unreachable = unreachableAnswerText(error);
