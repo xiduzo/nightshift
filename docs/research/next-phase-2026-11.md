@@ -429,15 +429,15 @@ keyword search, and 11 of 13 against 7 on paraphrases.
 
 - PR scores: `pr_merged`, `pr_closed` and `reverted_within_7d` from a kit's
   GitHub webhook. The run metrics already hold the PR address, so the
-  webhook finds its run by that address. Done (efc5c44c): a webhook
+  webhook finds its run by that address. Done (72fdd800): a webhook
   schedule with `scorePullRequests`, a revert read from a push or a Revert
   pull request. Left: a run that another Device walks gets no score.
-- Codex spans and cost, as Claude has them. Done (16b9c401): `-c otel.*`
+- Codex spans and cost, as Claude has them. Done (ff0055c7): `-c otel.*`
   overrides, headers in the environment only. Left: verify on a real
   Codex that it reads `TRACEPARENT`.
-- Spans for API requests, through `@orpc/otel`. Done (874fb6a2).
+- Spans for API requests, through `@orpc/otel`. Done (d09b27ec).
 - Commands that a step runs no longer see the OTLP headers in their
-  environment. Done (94a08b4b). Left: on Linux a command can still read
+  environment. Done (26cfcb4b). Left: on Linux a command can still read
   its parent's environment in `/proc`.
 
 ### 5.6 Proof on real nights (1 day, spread over the sprint)
