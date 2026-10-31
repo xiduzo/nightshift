@@ -44,6 +44,8 @@ export type ListRowProps = {
 	 */
 	dismissTo?: boolean;
 	onPress?: () => void;
+	/** A finger touches the row: start to read what it opens. */
+	onPressIn?: () => void;
 	/** The chevron at the end. On by default when the row opens something. */
 	chevron?: boolean;
 	/**
@@ -80,6 +82,7 @@ export function ListRow({
 	href,
 	dismissTo,
 	onPress,
+	onPressIn,
 	chevron,
 	selected,
 	accessibilityLabel,
@@ -157,6 +160,7 @@ export function ListRow({
 	const row = (
 		<Pressable
 			onPress={onPress}
+			onPressIn={onPressIn}
 			disabled={disabled}
 			accessibilityRole="button"
 			accessibilityLabel={label}

@@ -1,5 +1,6 @@
-import type { RunSummary } from "@nightshift/client";
+import { type RunSummary, useRunPrefetch } from "@nightshift/client";
 
+import { useSignedIn } from "@/features/host";
 import { InitialsAvatar } from "@/shared/avatar";
 import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
@@ -11,6 +12,7 @@ import {
 	type ProjectOverview,
 	runTime,
 } from "./overview";
+import { useProjectPrefetch } from "./prefetch";
 
 /** One project of the Projects tab: its initials, name, what needs you and its last run. It keeps "3 h ago" current itself. */
 export function ProjectRow({
@@ -22,6 +24,7 @@ export function ProjectRow({
 	>;
 }) {
 	const now = useClock();
+	const prefetch = useProjectPrefetch();
 	return (
 		<ListRow
 			leading={<InitialsAvatar name={project.name} />}
@@ -34,6 +37,7 @@ export function ProjectRow({
 			caption={needsYou > 0 ? undefined : needsYouText(0)}
 			detail={lastRunText(lastRun, now)}
 			href={projectLinks.page(project.id)}
+			onPressIn={() => prefetch(project.id)}
 			accessibilityHint="Opens the project"
 		/>
 	);
@@ -44,6 +48,7 @@ export function ProjectRunRow({ run }: { run: RunSummary }) {
 	const now = useClock();
 	const look = runStatusLook(run.status, run.result);
 	const time = runTime(run, now);
+	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
 	return (
 		<ListRow
 			look={look}
@@ -57,6 +62,7 @@ export function ProjectRunRow({ run }: { run: RunSummary }) {
 			value={time.value}
 			valueLabel={time.label}
 			href={projectLinks.run(run.id)}
+			onPressIn={() => prefetch(run.id)}
 			accessibilityHint="Opens the run"
 		/>
 	);

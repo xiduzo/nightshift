@@ -1,6 +1,11 @@
-import { deadlineSoon, type OpenGate } from "@nightshift/client";
+import {
+	deadlineSoon,
+	type OpenGate,
+	useRunPrefetch,
+} from "@nightshift/client";
 import { GitPullRequest } from "lucide-react-native";
 
+import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { gateLook, NEEDS_YOU } from "@/shared/tone";
@@ -29,6 +34,8 @@ export function GateRow({
 	const soon = deadlineSoon(gate.deadline, now);
 	const look = gateLook(gate);
 	const needsYou = look === NEEDS_YOU;
+	// The Gate itself is in the inbox already: the steps of its run are not.
+	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
 	return (
 		<ListRow
 			look={look}
@@ -47,6 +54,7 @@ export function GateRow({
 				pathname: "/gates/[runId]/[stepId]",
 				params: { runId: gate.runId, stepId: gate.stepId },
 			}}
+			onPressIn={() => prefetch(gate.runId)}
 			accessibilityHint={
 				needsYou ? "Opens the Gate to answer it" : "Opens the Gate"
 			}

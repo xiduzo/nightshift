@@ -34,10 +34,8 @@ import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { projectLinks } from "./links";
 import { clonesText, newestFirst, remoteParts } from "./overview";
+import { SHOWN } from "./prefetch";
 import { ProjectRunRow } from "./rows";
-
-/** How many Gates and runs a section shows. "See all" opens the rest. */
-const SHOWN = 5;
 
 /**
  * One project: where its code lives, the way to its Gates, runs and

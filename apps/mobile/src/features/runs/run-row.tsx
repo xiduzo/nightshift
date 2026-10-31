@@ -1,6 +1,7 @@
-import type { RunSummary } from "@nightshift/client";
+import { type RunSummary, useRunPrefetch } from "@nightshift/client";
 import { type Href, router } from "expo-router";
 
+import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
@@ -30,6 +31,7 @@ export function RunRow({
 	const now = useClock();
 	const look = runStatusLook(run.status, run.result);
 	const { value, valueLabel } = rowValue(run, now);
+	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
 	return (
 		<ListRow
 			look={look}
@@ -38,6 +40,7 @@ export function RunRow({
 			value={value}
 			valueLabel={valueLabel}
 			href={runHref(run.id)}
+			onPressIn={() => prefetch(run.id)}
 			accessibilityLabel={runRowLabel(run, projectName, valueLabel)}
 			accessibilityHint="Opens the run"
 		/>

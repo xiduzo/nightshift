@@ -1,4 +1,6 @@
-import { waitedText } from "@nightshift/client";
+import { useRunPrefetch, waitedText } from "@nightshift/client";
+
+import { useSignedIn } from "@/features/host";
 import { formatTime } from "@/shared/format";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
@@ -11,6 +13,7 @@ import type { NightRun } from "./last-night";
 export function NightRunRow({ run, now }: { run: NightRun; now: number }) {
 	const look = runStatusLook(run.status);
 	const running = run.status === "running";
+	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
 	const value = running
 		? waitedText(now - run.createdAt)
 		: formatTime(run.createdAt);
@@ -27,6 +30,7 @@ export function NightRunRow({ run, now }: { run: NightRun; now: number }) {
 			value={value}
 			valueLabel={running ? `at work for ${value}` : `started ${value}`}
 			href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
+			onPressIn={() => prefetch(run.id)}
 			accessibilityHint="Opens the run"
 		/>
 	);
