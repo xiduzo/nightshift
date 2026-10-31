@@ -1,4 +1,9 @@
-import { runActions, useRunActed } from "@nightshift/client";
+import {
+	runActions,
+	type StoppedTone,
+	stoppedNotice,
+	useRunActed,
+} from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
@@ -49,6 +54,16 @@ const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
 	command: "The flow waits for a command to pass.",
 	signal: "The flow waits for a signal.",
 	"device-offline": "The device of the next step is offline.",
+};
+
+/** The icon and colour of the notice of a run that ended. */
+const ENDED_LOOK: Record<StoppedTone, { icon: LucideIcon; tone: string }> = {
+	done: { icon: FlagIcon, tone: "text-status-finished" },
+	"nothing-to-do": { icon: CircleDashedIcon, tone: "text-muted-foreground" },
+	"ended-failed": { icon: FlagIcon, tone: "text-destructive" },
+	failed: { icon: CircleXIcon, tone: "text-destructive" },
+	interrupted: { icon: CircleAlertIcon, tone: "text-status-interrupted" },
+	stopped: { icon: CircleStopIcon, tone: "text-status-stopped" },
 };
 
 /** A Wait node's own wait, not the run policy's. */
@@ -174,12 +189,9 @@ function noticeOf({
 	onShowGate: () => void;
 	wait: CurrentWait | null;
 }): Notice | null {
-	// A run of another device: answers, signals and stops go to it; only it resumes.
+	// A run of another device: answers, signals and stops go to it. Why a run ended: `stoppedNotice`.
 	const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
 	const allows = runActions(status, run.walker.thisDevice, run.result);
-	const resumeHere = elsewhere
-		? `Only ${elsewhere} can resume it.`
-		: "Resume it to continue.";
 	switch (status) {
 		case "waiting":
 			if (
@@ -287,66 +299,24 @@ function noticeOf({
 			};
 		}
 		case "finished":
-			// Only an End node with a message leaves you something to read.
-			if (!run.result || !run.reason) return null;
-			return {
-				icon: run.result === "nothing-to-do" ? CircleDashedIcon : FlagIcon,
-				tone:
-					run.result === "nothing-to-do"
-						? "text-muted-foreground"
-						: "text-status-finished",
-				title: run.result === "nothing-to-do" ? "Nothing to do" : "Done",
-				gist: firstLine(run.reason) ?? "",
-				body: run.reason,
-			};
 		case "failed":
-			if (run.result === "failed") {
-				return {
-					icon: FlagIcon,
-					tone: "text-destructive",
-					title: "The flow ended as failed",
-					gist: firstLine(run.reason) ?? "Run it again from a step.",
-					body: `${run.reason ?? "The flow chose to end the run here as failed."}\nFix what it found, then run it again from a step.`,
-				};
-			}
-			return {
-				icon: CircleXIcon,
-				tone: "text-destructive",
-				title: "The run failed",
-				gist: firstLine(run.reason) ?? resumeHere,
-				body: run.reason ?? `The run failed. ${resumeHere}`,
-				resumable: allows.resume,
-			};
 		case "interrupted":
+		case "stopped": {
+			const ended = stoppedNotice(run, status);
+			if (!ended) return null;
+			const look = ENDED_LOOK[ended.tone];
 			return {
-				icon: CircleAlertIcon,
-				tone: "text-status-interrupted",
-				title: "The run was interrupted",
-				gist: firstLine(run.reason) ?? "Night Shift stopped during this run.",
-				body: `${run.reason ?? "Night Shift stopped during this run."} ${elsewhere ? resumeHere : "Resume it to continue where it stopped."}`,
-				resumable: allows.resume,
+				icon: look.icon,
+				tone: look.tone,
+				title: ended.title,
+				gist: ended.gist,
+				body: ended.body,
+				resumable: ended.resumable,
 			};
-		case "stopped":
-			return {
-				icon: CircleStopIcon,
-				tone: "text-status-stopped",
-				title: "The run stopped",
-				gist: firstLine(run.reason) ?? resumeHere,
-				body:
-					run.reason ??
-					`The run stopped before its end. ${elsewhere ? resumeHere : "Resume it to continue where it stopped."}`,
-				resumable: allows.resume,
-			};
+		}
 		default:
 			return null;
 	}
-}
-
-function firstLine(text: string | null | undefined): string | undefined {
-	return text
-		?.split("\n")
-		.find((line) => line.trim())
-		?.trim();
 }
 
 /** How long until the run wakes, ticking. */

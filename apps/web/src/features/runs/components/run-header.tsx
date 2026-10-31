@@ -1,4 +1,4 @@
-import { runActions, useRunActed } from "@nightshift/client";
+import { runActions, runningStep, useRunActed } from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -158,10 +158,7 @@ export function RunActions({
 }) {
 	const [restarting, setRestarting] = useState(false);
 	const allows = runActions(status, run.walker.thisDevice, run.result);
-	// The innermost step that runs: a step inside a called flow starts after its caller.
-	const running = allows.restart
-		? [...steps].reverse().find((step) => step.endedAt === null)
-		: undefined;
+	const running = allows.restart ? runningStep(steps) : undefined;
 	const runActed = useRunActed({ orpc });
 	const stopRun = useMutation(
 		runMutations.stop({

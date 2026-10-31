@@ -163,3 +163,32 @@ export function runEndLine(
 	const label = RESULT_LABELS[run.result];
 	return run.reason ? `${label}: ${run.reason}` : label;
 }
+
+/**
+ * A count, short: "950", "12.3K", "123K", "1.2M". Written out because
+ * Hermes does not format compact numbers on every platform.
+ */
+export function compactCount(count: number): string {
+	const round = (value: number) =>
+		value < 100
+			? String(Math.round(value * 10) / 10)
+			: String(Math.round(value));
+	if (count < 1000) return String(Math.round(count));
+	if (count < 999_500) return `${round(count / 1000)}K`;
+	return `${round(count / 1_000_000)}M`;
+}
+
+/** The tokens a run's or a step's agents used, as its metrics carry them. */
+type Tokens = { input: number; output: number };
+
+/** "12.3K tokens": the tokens in and out. Null when none are known. */
+export function tokensLabel(tokens: Tokens | null | undefined): string | null {
+	const used = tokens ? tokens.input + tokens.output : 0;
+	return used > 0 ? `${compactCount(used)} tokens` : null;
+}
+
+/** "12K in, 300 out": what the tokens of `tokensLabel` are made of. Null when none are known. */
+export function tokensSplit(tokens: Tokens | null | undefined): string | null {
+	if (!tokens || tokens.input + tokens.output === 0) return null;
+	return `${compactCount(tokens.input)} in, ${compactCount(tokens.output)} out`;
+}

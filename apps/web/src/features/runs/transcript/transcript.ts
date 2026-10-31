@@ -1,4 +1,4 @@
-import { projectPath } from "@nightshift/client";
+import { lastWorktreeChanges, projectPath } from "@nightshift/client";
 
 import type { TranscriptEntry, WorktreeChangesEvent } from "@/shared/api";
 import { formatDuration } from "@/shared/format";
@@ -180,13 +180,14 @@ function applyStepEntries(
 
 	let lastAt = state.lastAt;
 	let openThought = state.openThought;
-	let changes = state.changes;
+	const changes = lastWorktreeChanges(entries) ?? state.changes;
 	for (const entry of entries) {
 		const event = entry.event;
 		// Not part of what the step said or ran: it changes no item.
-		if (event.type === "worktree-snapshot") continue;
-		if (event.type === "worktree-changes") {
-			changes = event;
+		if (
+			event.type === "worktree-snapshot" ||
+			event.type === "worktree-changes"
+		) {
 			continue;
 		}
 		const sessionKey =

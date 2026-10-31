@@ -20,7 +20,7 @@ export {
  * or taken by Night Shift (`settled` true). Null when there is none.
  */
 export type RunActing = {
-	action: "stop" | "resume";
+	action: "stop" | "resume" | "restart" | "rerun";
 	settled: boolean;
 } | null;
 
@@ -28,12 +28,16 @@ export type RunActing = {
 const RESULT_OF: Record<NonNullable<RunActing>["action"], RunStatus> = {
 	stop: "stopped",
 	resume: "running",
+	restart: "running",
+	rerun: "running",
 };
 
 /**
  * The status a run shows, with the result of an action on its way at
  * once. It shows the result while the action is sent, and after, until the
  * run's own status no longer allows the action: then the run got there.
+ * A run again is allowed after the run ends again too: the screen lets
+ * go of it once the run is on its way.
  */
 export function actedRunStatus(
 	run: { status: RunStatus; result: RunResult | null; walkedHere: boolean },

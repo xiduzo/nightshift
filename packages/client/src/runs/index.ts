@@ -31,6 +31,7 @@ export {
 export { askWhyMutation, explainRun } from "./explain";
 export {
 	agoLabel,
+	compactCount,
 	costLabel,
 	flowLabel,
 	formatCost,
@@ -40,9 +41,16 @@ export {
 	runEndLine,
 	runStatusLabel,
 	stepOutcomeLabel,
+	tokensLabel,
+	tokensSplit,
 	whenLabel,
 } from "./format";
 export { metricsByNode, type NodeMetrics } from "./node-metrics";
+export {
+	type StoppedNotice,
+	type StoppedTone,
+	stoppedNotice,
+} from "./notice";
 export {
 	defaultPlacement,
 	hostOwnerHint,
@@ -64,7 +72,17 @@ export {
 } from "./progress";
 export { projectPath } from "./project-path";
 export { createRunQueries } from "./queries";
+export { type RerunStart, rerunStarts, runningStep } from "./retry";
 export { finishedShare } from "./share";
+export {
+	applyStepChanges,
+	changedFileCount,
+	lastWorktreeChanges,
+	linesLabel,
+	type StepChangedFiles,
+	type StepChanges,
+	stepChangedFiles,
+} from "./step-changes";
 export { mergeSteps } from "./steps";
 export {
 	followRun,

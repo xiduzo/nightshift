@@ -2,11 +2,14 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	agoLabel,
+	compactCount,
 	costLabel,
 	formatCost,
 	formatCountdown,
 	formatKnownCost,
 	stepOutcomeLabel,
+	tokensLabel,
+	tokensSplit,
 	whenLabel,
 } from "./format";
 
@@ -124,5 +127,26 @@ describe("a countdown", () => {
 	test("rounds a part second up, and stops at zero", () => {
 		expect(formatCountdown(59_001)).toBe("1:00");
 		expect(formatCountdown(-5_000)).toBe("0:00");
+	});
+});
+
+describe("tokens, short", () => {
+	test("a count reads short at every size", () => {
+		expect(compactCount(0)).toBe("0");
+		expect(compactCount(950)).toBe("950");
+		expect(compactCount(1000)).toBe("1K");
+		expect(compactCount(12_345)).toBe("12.3K");
+		expect(compactCount(123_456)).toBe("123K");
+		expect(compactCount(999_499)).toBe("999K");
+		expect(compactCount(999_950)).toBe("1M");
+		expect(compactCount(1_234_567)).toBe("1.2M");
+	});
+
+	test("tokens in and out add up, nothing known is null", () => {
+		expect(tokensLabel({ input: 12_000, output: 345 })).toBe("12.3K tokens");
+		expect(tokensSplit({ input: 12_000, output: 345 })).toBe("12K in, 345 out");
+		expect(tokensLabel({ input: 0, output: 0 })).toBeNull();
+		expect(tokensLabel(undefined)).toBeNull();
+		expect(tokensSplit(null)).toBeNull();
 	});
 });
