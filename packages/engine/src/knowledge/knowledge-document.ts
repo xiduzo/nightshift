@@ -69,6 +69,8 @@ export function knowledgeEntries(
 export type KnowledgeDocuments = {
 	/** The Project's knowledge document. */
 	open(projectId: string): Promise<PersistedDocument>;
+	/** Closes the Project's knowledge document and deletes it from this Replica: its Project moved to another id. */
+	remove(projectId: string): Promise<void>;
 };
 
 export function createKnowledgeDocuments(options: {
@@ -80,5 +82,7 @@ export function createKnowledgeDocuments(options: {
 		options.documents ?? createSyncedDocuments({ db: options.db });
 	return {
 		open: (projectId) => documents.open(documentName("knowledge", projectId)),
+		remove: (projectId) =>
+			documents.remove(documentName("knowledge", projectId)),
 	};
 }

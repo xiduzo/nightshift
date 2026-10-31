@@ -701,6 +701,7 @@ export function createEngine(
 			landed.reread();
 		},
 		rows: options.moveRows ?? [],
+		...(options.projectsMoved ? { moved: options.projectsMoved } : {}),
 	});
 
 	const space = createSpaces({

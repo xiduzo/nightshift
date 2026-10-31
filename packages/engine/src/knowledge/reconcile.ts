@@ -1,5 +1,13 @@
-import { lstat, mkdir, readFile, rm, rmdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import {
+	lstat,
+	mkdir,
+	readFile,
+	rename,
+	rm,
+	rmdir,
+	stat,
+} from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { organization, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
@@ -94,7 +102,7 @@ export type KnowledgeListing = {
 export type KnowledgeSyncDeps = {
 	db: Database;
 	folders: Pick<KnowledgeFolders, "folder" | "known" | "read">;
-	documents: Pick<KnowledgeDocuments, "open">;
+	documents: Pick<KnowledgeDocuments, "open" | "remove">;
 	/** The content by hash: here, and at the Space's Host. */
 	archive: Pick<SpaceArchive, "here" | "read" | "put">;
 	/** This Device: it signs the entries it writes. */
@@ -133,6 +141,24 @@ const reconciling = new Map<string, Promise<unknown>>();
  * publish half of what it writes.
  */
 const writing = new Map<string, number>();
+
+/** A Project of a Space move: its Space and id before, and after (`ProjectsMoved` of the run). */
+export type MovedProject = {
+	from: { spaceId: string; projectId: string };
+	to: { spaceId: string; projectId: string };
+};
+
+/** Runs `change` after every reconcile or move of the folder before it, in this process. */
+function inTurn<T>(root: string, change: () => Promise<T>): Promise<T> {
+	const before = reconciling.get(root) ?? Promise.resolve();
+	const run = before.catch(() => {}).then(change);
+	reconciling.set(root, run);
+	const forget = () => {
+		if (reconciling.get(root) === run) reconciling.delete(root);
+	};
+	run.then(forget, forget);
+	return run;
+}
 
 /** A step's hold on a project's folder: `done` when the step ends. */
 export type KnowledgeStepHold = { done(): Promise<void> };
@@ -412,15 +438,65 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 
 	/** One reconcile of a folder at a time, in this process. */
 	function reconcile(projectId: string): Promise<ReconcileResult> {
-		const root = folders.folder(projectId);
-		const before = reconciling.get(root) ?? Promise.resolve();
-		const run = before.catch(() => {}).then(() => reconcileOnce(projectId));
-		reconciling.set(root, run);
-		const forget = () => {
-			if (reconciling.get(root) === run) reconciling.delete(root);
-		};
-		run.then(forget, forget);
-		return run;
+		return inTurn(folders.folder(projectId), () => reconcileOnce(projectId));
+	}
+
+	/**
+	 * A Project moved to another Space, and maybe to another id there (a
+	 * Device that joins a Space whose Project has its remote). Its content
+	 * goes into the new Space's archive here, and waits there for the new
+	 * Space's Host as unpushed content. With a new id, its folder becomes
+	 * the new id's folder (a file the new folder has already stays when it
+	 * is newer), its old document goes, and the next reconcile is an import:
+	 * it publishes every file into the new id's document, and the later
+	 * change wins. Nothing happens for a Project with no knowledge here.
+	 */
+	async function moveOnce({ from, to }: MovedProject): Promise<void> {
+		const fromRoot = folders.folder(from.projectId);
+		const toRoot = folders.folder(to.projectId);
+		const renamed = from.projectId !== to.projectId;
+		const state = await readState(fromRoot);
+		const document = await deps.documents.open(from.projectId);
+		const unpushed = new Set(state?.unpushed ?? []);
+		for (const entry of knowledgeEntries(document).values()) {
+			if (!entry.local) unpushed.add(entry.sha256);
+		}
+		if (from.spaceId !== to.spaceId) {
+			for (const sha256 of [...unpushed]) {
+				const content = await archive.here
+					.read({ kind: "content", spaceId: from.spaceId, sha256 })
+					.catch(() => null);
+				if (!content) {
+					// Not here: the Host of the old Space has it, or nobody does.
+					unpushed.delete(sha256);
+					continue;
+				}
+				await archive.here.write({
+					ref: { kind: "content", spaceId: to.spaceId, sha256 },
+					content,
+				});
+			}
+		}
+		const hasFolder = (await stat(fromRoot).catch(() => null)) !== null;
+		if (!renamed) {
+			if (!hasFolder && unpushed.size === 0) return;
+			await writeState(toRoot, {
+				files: state?.files ?? {},
+				unpushed: [...unpushed],
+			});
+			pending.add(to.projectId);
+			return;
+		}
+		if (hasFolder) await moveFolder(fromRoot, toRoot);
+		await deps.documents.remove(from.projectId);
+		if (!hasFolder && unpushed.size === 0) return;
+		// The state of the new folder knows none of its files: an import.
+		const before = await readState(toRoot);
+		await writeState(toRoot, {
+			files: {},
+			unpushed: [...new Set([...(before?.unpushed ?? []), ...unpushed])],
+		});
+		pending.add(to.projectId);
 	}
 
 	/** Whether a step writes the project's folder now. */
@@ -586,6 +662,20 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			return paths.length;
 		},
 		/**
+		 * Moves a Project's knowledge after a Space move (`moveOnce`), after
+		 * the reconciles of both folders that are under way. Its next
+		 * reconcile copies the content to the new Space's Host.
+		 */
+		move(project: MovedProject): Promise<void> {
+			const fromRoot = folders.folder(project.from.projectId);
+			const toRoot = folders.folder(project.to.projectId);
+			return inTurn(fromRoot, () =>
+				fromRoot === toRoot
+					? moveOnce(project)
+					: inTurn(toRoot, () => moveOnce(project)),
+			);
+		},
+		/**
 		 * Reconciles every folder on this computer: the import on upgrade
 		 * at the first start, and what waited while the daemon was down.
 		 */
@@ -626,6 +716,29 @@ async function scan(root: string): Promise<Map<string, FileStat>> {
 			{ size: file.size, mtimeMs: file.changedAt },
 		]),
 	);
+}
+
+/**
+ * Moves a knowledge folder to another place. When that place has a
+ * folder already, each file goes into it, unless the file there is
+ * newer. The old folder goes.
+ */
+async function moveFolder(from: string, to: string): Promise<void> {
+	if ((await stat(to).catch(() => null)) === null) {
+		await mkdir(dirname(to), { recursive: true });
+		await rename(from, to);
+		return;
+	}
+	const { files } = await walkFolder(from);
+	for (const file of files) {
+		const target = join(to, ...file.path.split("/"));
+		if (!(await inFolder(to, file.path))) continue;
+		const there = await stat(target).catch(() => null);
+		if (there && there.mtimeMs >= file.changedAt) continue;
+		await mkdir(dirname(target), { recursive: true });
+		await rename(join(from, ...file.path.split("/")), target);
+	}
+	await rm(from, { recursive: true, force: true });
 }
 
 /** Whether a document ever had an update: an empty one may only be new. */

@@ -45,6 +45,7 @@ export function testKnowledge(
 		knowledge,
 		documents,
 		archive,
+		search,
 		folder: (projectId: string) =>
 			createKnowledgeFolders(sandbox.dataDir).folder(projectId),
 		close: () => search.close(),

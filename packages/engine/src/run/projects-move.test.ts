@@ -37,7 +37,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine, type Engine } from "./engine";
-import type { MovedRuns, MoveRows } from "./projects-move";
+import type { MovedRuns, MoveRows, ProjectsMoved } from "./projects-move";
 import { START_HOLD_WORDS } from "./start-holds";
 
 /**
@@ -56,10 +56,13 @@ let signal: AbortController;
 let documents: SpaceDocuments;
 /** What the rows above the engine were asked to move. */
 let asked: MovedRuns[];
+/** What the data outside the rows (the knowledge) was asked to move. */
+let followed: ProjectsMoved[];
 beforeEach(async () => {
 	sandbox = await createSandbox();
 	runLogs = [];
 	asked = [];
+	followed = [];
 	signal = new AbortController();
 	documents = createSpaceDocuments({
 		db: sandbox.db,
@@ -104,6 +107,9 @@ function makeEngine(): Engine {
 			scheduler: false,
 			spaceDocuments: documents,
 			moveRows: [commands],
+			projectsMoved: async (move) => {
+				followed.push(move);
+			},
 		}),
 		{ runLog, signal: signal.signal },
 	);
@@ -227,6 +233,16 @@ describe("a Space move", () => {
 		]);
 		const inStudio = await documents.open(studio);
 		expect([...spaceProjects(inStudio).keys()]).toEqual([tools.id]);
+		// Then the knowledge of each Project follows it.
+		expect(followed).toEqual([
+			{
+				from: sandbox.spaceId,
+				projects: {
+					[app.id]: { spaceId: platform, projectId: app.id },
+					[tools.id]: { spaceId: studio, projectId: tools.id },
+				},
+			},
+		]);
 	});
 
 	test("while it plans, no run starts in its Space; one that fails before its batch moves nothing and frees the Space", async () => {

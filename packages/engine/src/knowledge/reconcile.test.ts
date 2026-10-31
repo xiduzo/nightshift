@@ -460,7 +460,7 @@ describe("reconcile", () => {
 		const fresh = createKnowledgeSync({
 			db: a.sandbox.db,
 			folders: a.folders,
-			documents: { open: async () => blankDocument() },
+			documents: { open: async () => blankDocument(), remove: async () => {} },
 			archive: archiveOf(a.sandbox.dataDir, host),
 			deviceId: a.sandbox.deviceId,
 		});

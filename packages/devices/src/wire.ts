@@ -182,6 +182,11 @@ export type DevicesDeps = {
 	 * runs, which this package does not import.
 	 */
 	moveRows?: readonly MoveRows[];
+	/**
+	 * What follows the Projects of a Space move outside the rows: their
+	 * knowledge, which this package does not keep.
+	 */
+	projectsMoved?: PeerEngineOptions["projectsMoved"];
 	/** Kept across `bun --hot` reloads: what the runtime before this one hands over. */
 	kept: KeptDevices;
 	/**
@@ -281,6 +286,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			scheduler: deps.scheduler,
 			...(deps.secret ? { secret: deps.secret } : {}),
 			...(deps.moveRows ? { moveRows: deps.moveRows } : {}),
+			...(deps.projectsMoved ? { projectsMoved: deps.projectsMoved } : {}),
 			// The hub for the Spaces this computer keeps; its Hosts for the others.
 			work: createWorkRelay({
 				hub: handover.hub,

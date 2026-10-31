@@ -85,7 +85,7 @@ export type ProjectKnowledgeDeps = Pick<
 > & {
 	/** Where this computer keeps its data: the folders. */
 	dataDir: string;
-	documents: Pick<KnowledgeDocuments, "open">;
+	documents: Pick<KnowledgeDocuments, "open" | "remove">;
 	/** This computer's index over the folders. */
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
 };
@@ -220,6 +220,29 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 				archive: deps.archive,
 				keeps,
 			});
+		},
+		/**
+		 * Projects moved to other Spaces (`Engine.moveProjects`): each one's
+		 * knowledge follows it, to its new id when it has one: the document,
+		 * the folder, the content and the search index (`KnowledgeSync.move`).
+		 * The next reconcile copies the content to the new Space's Host.
+		 */
+		async moved(move: {
+			from: string;
+			projects: Readonly<
+				Record<string, { spaceId: string; projectId: string }>
+			>;
+		}): Promise<void> {
+			for (const [projectId, to] of Object.entries(move.projects)) {
+				await sync.move({ from: { spaceId: move.from, projectId }, to });
+				if (to.projectId === projectId) continue;
+				// The old id's folder is gone: its rows leave the index.
+				await deps.search.refresh(projectId).catch(() => {});
+				deps.search.refresh(to.projectId).catch(() => {});
+			}
+			for (const to of Object.values(move.projects)) {
+				sync.reconcile(to.projectId).catch(() => {});
+			}
 		},
 		listing: sync.listing,
 		read: sync.read,

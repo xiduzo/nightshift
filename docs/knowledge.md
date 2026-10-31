@@ -56,6 +56,17 @@ The first start after the upgrade reconciles each folder a computer has,
 and so publishes its files. When two computers have one path, the later
 change wins.
 
+Once a day, the computer that keeps a Space (its Host, or the one computer
+of a Space without a Host) removes content that no knowledge document of
+the Space names any more. Content stays for 7 days after a computer last
+copied it, because its entry can reach the Host later than the content.
+
+When a project moves to another Space, its knowledge moves with it: its
+content goes to the new Space's Host. When a computer joins a Space that
+has the same project under another id, the folder moves to that id. Its
+files go into that project's document, and the later change wins. The
+old document and its search index go.
+
 ### Who may read and change it
 
 Every Member of the Space can read the knowledge, on any computer and on

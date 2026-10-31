@@ -37,7 +37,8 @@ import type { StartHolds } from "./start-holds";
  *    row lands in its new Space, or none does.
  * 5. The run log reads the moved runs again, and so does the landed feed.
  * 6. The Space documents this Replica writes follow the rows
- *    (`moveSpaceEntries`).
+ *    (`moveSpaceEntries`), then the data outside the rows (`moved`: the
+ *    knowledge of each Project).
  *
  * The flow documents of a Project that joins another one are the
  * caller's to merge: they may first have to come from a Host.
@@ -88,6 +89,17 @@ export type MovedProjects = {
 	schedules: number;
 };
 
+/**
+ * What a move moved, for the data of this Replica that follows its
+ * Projects outside the rows: each Project's knowledge (its document, its
+ * folder, its content in the archive and its search index).
+ */
+export type ProjectsMoved = {
+	from: string;
+	/** Each moved Project, by its id in `from`: its Space and its id there. */
+	projects: Readonly<Record<string, ProjectTarget>>;
+};
+
 /** The runs a move takes from one Space to another, for the rows that move with them. */
 export type MovedRuns = {
 	from: string;
@@ -117,6 +129,11 @@ export type ProjectsMoveDeps = {
 	/** The rows of these runs changed under the run log: read them again. */
 	reread(runIds: readonly string[]): void;
 	rows: readonly MoveRows[];
+	/**
+	 * After the batch and the documents: what follows the moved Projects
+	 * outside the rows. Its failure is logged: the move is done.
+	 */
+	moved?(move: ProjectsMoved): Promise<void>;
 };
 
 export function createProjectsMove(deps: ProjectsMoveDeps) {
@@ -230,6 +247,9 @@ export function createProjectsMove(deps: ProjectsMoveDeps) {
 					projects: plan.projects,
 					rows,
 					...(plan.ownRunsOnly ? { onlyDevice: walker } : {}),
+				});
+				await deps.moved?.({ from, projects: plan.projects }).catch((error) => {
+					console.warn("What follows the moved projects did not move:", error);
 				});
 			}
 			return moved;

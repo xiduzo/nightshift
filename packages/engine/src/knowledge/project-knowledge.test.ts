@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
+import { eq } from "drizzle-orm";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import type { ArchiveHost } from "../archive";
 import { createSandbox, type Sandbox } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
+import { otherSpace } from "../testing/test-support";
 import { knowledgeEntries } from "./knowledge-document";
 
 /**
@@ -20,13 +22,16 @@ afterEach(async () => {
 	await Promise.all(sandboxes.splice(0).map((s) => s.cleanup()));
 });
 
-/** A Host's archive in memory: content by hash. */
-function memoryHost(): ArchiveHost {
+/** A Host's archive in memory: content by hash, and the Spaces it came in. */
+function memoryHost(): ArchiveHost & { spaces: Set<string> } {
 	const kept = new Map<string, Uint8Array>();
+	const spaces = new Set<string>();
 	return {
+		spaces,
 		async archivePut({ ref, content }) {
 			if (ref.kind !== "content" || typeof content === "string") return false;
 			kept.set(ref.sha256, content.slice());
+			spaces.add(ref.spaceId);
 			return true;
 		},
 		async archiveGet(ref) {
@@ -51,6 +56,7 @@ async function device(host: ArchiveHost) {
 	const dir = built.folder("p1");
 	return {
 		...built,
+		sandbox,
 		dir,
 		put: async (path: string, text: string) => {
 			await mkdir(dirname(join(dir, path)), { recursive: true });
@@ -134,5 +140,98 @@ describe("a step's knowledge", () => {
 			title: "Home",
 			text: "# Home\n\nThe wiki.\n",
 		});
+	});
+});
+
+describe("a project that moves to another Space", () => {
+	test("to a new id there takes its knowledge along: the document, the folder, the content and the search index", async () => {
+		const host = memoryHost();
+		const a = await device(host);
+		await a.put("wiki/Home.md", "# Home\n\nThe lighthouse wiki.\n");
+		await a.put("notes.md", "Notes\n");
+		await a.knowledge.listing("p1");
+		const team = await otherSpace(a.sandbox.db, "Team");
+		// The move's batch re-ids the project's rows: p1 is p9 in the Team.
+		await a.sandbox.db
+			.update(project)
+			.set({ id: "p9", spaceId: team })
+			.where(eq(project.id, "p1"));
+
+		await a.knowledge.moved({
+			from: a.sandbox.spaceId,
+			projects: { p1: { spaceId: team, projectId: "p9" } },
+		});
+
+		expect(await stat(a.dir).catch(() => null)).toBeNull();
+		const folder = a.folder("p9");
+		expect(await readFile(join(folder, "wiki/Home.md"), "utf8")).toContain(
+			"lighthouse",
+		);
+		const listing = await a.knowledge.listing("p9");
+		expect(listing.files.map((f) => f.path)).toEqual([
+			"notes.md",
+			"wiki/Home.md",
+		]);
+		expect([...knowledgeEntries(await a.documents.open("p9")).keys()]).toEqual([
+			"notes.md",
+			"wiki/Home.md",
+		]);
+		// The old document is gone: an empty one opens in its place.
+		expect(knowledgeEntries(await a.documents.open("p1")).size).toBe(0);
+		// The content went to the Team's Host.
+		expect(host.spaces.has(team)).toBe(true);
+		expect(
+			(await a.search.search("p9", "lighthouse")).map((hit) => hit.path),
+		).toEqual(["wiki/Home.md"]);
+		expect(await a.search.search("p1", "lighthouse")).toEqual([]);
+	});
+
+	test("with its id takes its content to the new Space's Host, though no file changed", async () => {
+		const host = memoryHost();
+		const a = await device(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.knowledge.listing("p1");
+		const team = await otherSpace(a.sandbox.db, "Team");
+		await a.sandbox.db
+			.update(project)
+			.set({ spaceId: team })
+			.where(eq(project.id, "p1"));
+		expect(host.spaces.has(team)).toBe(false);
+
+		await a.knowledge.moved({
+			from: a.sandbox.spaceId,
+			projects: { p1: { spaceId: team, projectId: "p1" } },
+		});
+		await a.knowledge.listing("p1");
+
+		expect(host.spaces.has(team)).toBe(true);
+		expect(await a.paths()).toEqual(["wiki/Home.md"]);
+		expect(await readFile(join(a.dir, "wiki/Home.md"), "utf8")).toBe(
+			"# Home\n",
+		);
+	});
+
+	test("to an id whose folder is here already keeps the newer file of each path", async () => {
+		const a = await device(memoryHost());
+		await a.put("old.md", "from p1\n");
+		await a.put("both.md", "older\n");
+		await a.knowledge.listing("p1");
+		const target = a.folder("p9");
+		await mkdir(target, { recursive: true });
+		await writeFile(join(target, "both.md"), "newer\n");
+		const team = await otherSpace(a.sandbox.db, "Team");
+		await a.sandbox.db
+			.update(project)
+			.set({ id: "p9", spaceId: team })
+			.where(eq(project.id, "p1"));
+
+		await a.knowledge.moved({
+			from: a.sandbox.spaceId,
+			projects: { p1: { spaceId: team, projectId: "p9" } },
+		});
+
+		expect(await readFile(join(target, "old.md"), "utf8")).toBe("from p1\n");
+		expect(await readFile(join(target, "both.md"), "utf8")).toBe("newer\n");
+		expect(await stat(a.dir).catch(() => null)).toBeNull();
 	});
 });

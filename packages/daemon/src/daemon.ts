@@ -508,6 +508,8 @@ export async function createDaemon(
 		// A Space move takes the notifier's log of the moved runs along.
 		// Their new Space's sender notifies for them from then on.
 		moveRows: [deliveryMoves(db, sendsPushesFor(db, settings, person))],
+		// A moved Project's knowledge follows it, to its new id when it has one.
+		projectsMoved: (move) => knowledge.moved(move),
 		kept: hot,
 		...(outside.hosts ? { hostClient: outside.hosts } : {}),
 		...(outside.documents ? { documentChannel: outside.documents } : {}),
