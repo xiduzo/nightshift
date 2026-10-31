@@ -4,10 +4,9 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { member } from "@nightshift/db/schema";
 import {
-	createFlowDocuments,
 	type ExecEvent,
-	type KnowledgeHost,
 	localDevice,
+	type SpaceArchive,
 } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -17,16 +16,14 @@ import {
 import { kitFlow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
-import { createRelay } from "../relay";
 import { type PairedReplicas, pairedReplicas } from "../testing";
-import { linksTo } from "../testing/host-in-memory";
-import { createKnowledgeArchive } from "./knowledge-archive";
 
 /**
  * Knowledge in the Space (ADR 4), across Replicas: A is the Host, B and C
  * are Devices of its owner, paired with it. Each reconciles its own
- * working copy; the content travels by hash through A's archive, and the
- * knowledge documents sync as their Links sync them (here by hand).
+ * working copy; the content travels by hash through A's Space archive,
+ * each Replica's peer engine connects its own archive to its relay, and
+ * the knowledge documents sync as their Links sync them (here by hand).
  */
 
 let a: Sandbox;
@@ -61,15 +58,16 @@ afterEach(() => {
 
 /**
  * A Replica's knowledge, as the daemon assembles it: its folder, document
- * and reconcile, connected to `host`, and itself as a Device that runs
- * commands.
+ * and reconcile over the Space archive of its peer engine, and itself as
+ * a Device that runs commands.
  */
-function knowledgeOn(sandbox: Sandbox, host: KnowledgeHost) {
+function knowledgeOn(sandbox: Sandbox, archive: SpaceArchive) {
 	const { knowledge, documents, folder, close } = testKnowledge(sandbox, {
 		pageWaitMs: 10_000,
+		archive,
 	});
 	closes.push(close);
-	knowledge.connect({ knowledge: host, inStep: async () => {} });
+	knowledge.connect({ inStep: async () => {} });
 	const device = localDevice({
 		id: sandbox.deviceId,
 		name: sandbox.deviceId,
@@ -108,17 +106,7 @@ type Knowledge = ReturnType<typeof knowledgeOn>;
 
 /** The Host's own knowledge: its Spaces are its own, so content stays in its archive. */
 function hostKnowledge() {
-	return knowledgeOn(
-		a,
-		createKnowledgeArchive({
-			relay: createRelay({
-				engine: () => paired.host,
-				registry: () => paired.host.devices,
-				links: () => linksTo(new Map()),
-				flows: createFlowDocuments({ db: a.db }),
-			}),
-		}),
-	);
+	return knowledgeOn(a, paired.host.archive);
 }
 
 /** The knowledge documents in step, as each Device's Link to A syncs them. */
@@ -143,8 +131,8 @@ describe("knowledge in the Space, across paired Devices", () => {
 		const third = await paired.pair(c, "C");
 		await third.projectOnDevice(projectId);
 		const onA = hostKnowledge();
-		const onB = knowledgeOn(b, paired.knowledge);
-		const onC = knowledgeOn(c, third.knowledge);
+		const onB = knowledgeOn(b, paired.device.archive);
+		const onC = knowledgeOn(c, third.engine.archive);
 
 		// A sync on B: a command step that writes into its knowledge.
 		const ran = await onB.exec(
@@ -175,8 +163,8 @@ describe("knowledge in the Space, across paired Devices", () => {
 		const third = await paired.pair(c, "C");
 		await third.projectOnDevice(projectId);
 		const onA = hostKnowledge();
-		const onB = knowledgeOn(b, paired.knowledge);
-		const onC = knowledgeOn(c, third.knowledge);
+		const onB = knowledgeOn(b, paired.device.archive);
+		const onC = knowledgeOn(c, third.engine.archive);
 
 		// An agent's step on B proposed two learnings; its reconcile after the step publishes them.
 		await put(
@@ -213,7 +201,7 @@ describe("knowledge in the Space, across paired Devices", () => {
 
 	test("a Device that cannot reach its Host works on its own copy; its change reaches the others when the Host is back", async () => {
 		const onA = hostKnowledge();
-		const onB = knowledgeOn(b, paired.knowledge);
+		const onB = knowledgeOn(b, paired.device.archive);
 		await put(onB.dir(), "notes.md", "first\n");
 		await onB.reconcile();
 		await linked(onA, onB);
@@ -243,22 +231,27 @@ describe("knowledge in the Space, across paired Devices", () => {
 			client.archive.knowledgePut({ spaceId: a.spaceId, sha256, content }),
 		).rejects.toThrow("does not have the hash");
 
-		const host = paired.knowledge;
 		const bytes = new TextEncoder().encode("# Home\n");
 		const hash = createHash("sha256").update(bytes).digest("hex");
-		await host.put(a.spaceId, hash, bytes);
-		expect(
-			new TextDecoder().decode((await host.get(a.spaceId, hash)) ?? undefined),
-		).toBe("# Home\n");
+		const entry = {
+			ref: { kind: "content" as const, spaceId: a.spaceId, sha256: hash },
+			content: bytes,
+		};
+		await paired.device.archive.put(entry);
+		const get = () =>
+			client.archive.knowledgeGet({ spaceId: a.spaceId, sha256: hash });
+		expect(Buffer.from((await get()) ?? "", "base64").toString()).toBe(
+			"# Home\n",
+		);
 
 		// A viewer's Device reads, and keeps nothing.
 		await a.db
 			.update(member)
 			.set({ role: "viewer" })
 			.where(eq(member.userId, paired.personId));
-		await expect(host.put(a.spaceId, hash, bytes)).rejects.toThrow(
+		await expect(paired.device.archive.put(entry)).rejects.toThrow(
 			"does not allow",
 		);
-		expect(await host.get(a.spaceId, hash)).not.toBeNull();
+		expect(await get()).not.toBeNull();
 	});
 });

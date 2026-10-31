@@ -6,6 +6,7 @@ import type {
 	permissionModeSchema,
 } from "@nightshift/flows";
 import type { z } from "zod";
+import type { WalkFile, WalkRef } from "../archive";
 import type {
 	Actor,
 	NodeToPlace,
@@ -17,7 +18,7 @@ import type {
 } from "../contract";
 import type { Device } from "../device";
 import type { DeviceCopy } from "../device-config";
-import type { WalkFile, WalkFiles, WalkRef } from "../graph";
+import type { WalkFiles } from "../graph";
 import type {
 	CopyStamp,
 	EnginePayloads,

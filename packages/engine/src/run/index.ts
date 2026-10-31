@@ -14,6 +14,5 @@ export type {
 	PlannedRun,
 } from "./peers";
 export type { MoveRows } from "./projects-move";
-export { HOST_UNREACHABLE, HostUnreachableError } from "./relay";
 export { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";
 export type { SpaceEngine } from "./space-engine";

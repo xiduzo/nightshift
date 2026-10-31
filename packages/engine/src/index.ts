@@ -9,6 +9,14 @@
  */
 
 export {
+	type ArchiveHost,
+	type ArchiveRef,
+	createSpaceArchive,
+	type SpaceArchive,
+	type WalkFile,
+	type WalkRef,
+} from "./archive";
+export {
 	type Artifact,
 	createArtifactStore,
 } from "./artifacts";
@@ -25,7 +33,11 @@ export type {
 	RunCommandKind,
 	StartRunInput,
 } from "./contract";
-export { startRunInputSchema } from "./contract";
+export {
+	HOST_UNREACHABLE,
+	HostUnreachableError,
+	startRunInputSchema,
+} from "./contract";
 export {
 	type DashboardSummary,
 	type FlowHealthDetail,
@@ -78,18 +90,14 @@ export {
 	profilesInUse,
 	revisionKinds,
 } from "./flows";
-export type { WalkFile, WalkRef } from "./graph";
 export {
 	createKnowledgeDocuments,
 	createKnowledgeSearch,
-	createKnowledgeStore,
 	createProjectKnowledge,
 	type KnowledgeDocuments,
 	type KnowledgeFile,
 	type KnowledgeHit,
-	type KnowledgeHost,
 	type KnowledgeSearch,
-	type KnowledgeStore,
 	type KnowledgeText,
 	LOCAL_ONLY_BYTES,
 	type ProjectKnowledge,
@@ -108,7 +116,6 @@ export {
 	MissingProjectError,
 	parseTranscript,
 	RUN_NOT_FOUND,
-	stampHolds,
 	withoutPrivatePaths,
 } from "./log";
 export type {
@@ -148,8 +155,6 @@ export type {
 export {
 	createEngine,
 	GateClosedError,
-	HOST_UNREACHABLE,
-	HostUnreachableError,
 	type PlanDevices,
 	planNodes,
 	UNREACHABLE_DEVICE,

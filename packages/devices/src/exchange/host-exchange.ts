@@ -3,9 +3,9 @@ import { ROLE_REFUSAL, roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
-	type KnowledgeStore,
 	type PeerProjects,
 	RUN_NOT_FOUND,
+	type SpaceArchive,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
@@ -77,6 +77,8 @@ export function createHostExchange(deps: {
 		admission: Pick<OfferAdmission, "serve">;
 		projects: Pick<PeerProjects, "recordClone" | "matching" | "take">;
 		hostSpaces: Pick<HostSpaces, "hostOf">;
+		/** Its Space archive: the knowledge content its Devices copy here, by hash (ADR 4). */
+		archive: Pick<SpaceArchive, "here">;
 	};
 	registry: DeviceRegistry;
 	/** This Host's Device id: the Walker of its own runs. */
@@ -86,11 +88,6 @@ export function createHostExchange(deps: {
 	isHost(): boolean;
 	/** The calls of runs this Host walks, for the Devices they are placed on. */
 	work: WorkHub;
-	/**
-	 * Where this Host keeps knowledge content by hash, the archive its
-	 * Devices copy to (ADR 4). Without it, it keeps none.
-	 */
-	knowledge?: Pick<KnowledgeStore, "read" | "write">;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
@@ -398,32 +395,31 @@ export function createHostExchange(deps: {
 				forbidden(ROLE_REFUSAL.message);
 			}
 			// A Space another Host keeps is not this Host's to keep.
-			if (
-				!deps.knowledge ||
-				(await engine.hostSpaces.hostOf(spaceId)) !== null
-			) {
+			if ((await engine.hostSpaces.hostOf(spaceId)) !== null) {
 				throw new Refusal(
 					"unavailable",
 					"This computer does not keep the knowledge of that Space.",
 				);
 			}
-			await deps.knowledge.write(
-				spaceId,
-				sha256,
-				new Uint8Array(Buffer.from(content, "base64")),
-			);
+			await engine.archive.here.write({
+				ref: { kind: "content", spaceId, sha256 },
+				content: new Uint8Array(Buffer.from(content, "base64")),
+			});
 		},
 
 		async knowledgeGet(key, { spaceId, sha256 }) {
 			await admit(key);
 			if (
-				!deps.knowledge ||
 				!(await isMember(key, spaceId)) ||
 				(await engine.hostSpaces.hostOf(spaceId)) !== null
 			) {
 				return null;
 			}
-			const content = await deps.knowledge.read(spaceId, sha256);
+			const content = await engine.archive.here.read({
+				kind: "content",
+				spaceId,
+				sha256,
+			});
 			return content ? Buffer.from(content).toString("base64") : null;
 		},
 

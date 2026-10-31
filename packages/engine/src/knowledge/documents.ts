@@ -1,7 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
 import { Document } from "@langchain/core/documents";
-import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
  * The text of a PDF or Word file in the knowledge, so search finds its
@@ -25,6 +24,9 @@ import { LOCAL_ONLY_BYTES } from "./store";
  * it one after the other, so the last documents read stay here while the
  * file keeps its size and time of change.
  */
+
+/** A file larger than this stays on the Device that has it (ADR 4, decision 9). */
+export const LOCAL_ONLY_BYTES = 10 * 1024 * 1024;
 
 /** The documents whose text Night Shift takes out. */
 export const DOCUMENT_FILES = new Set([".pdf", ".docx"]);

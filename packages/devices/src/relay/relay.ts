@@ -1,4 +1,8 @@
-import { type FlowDocuments, HostUnreachableError } from "@nightshift/engine";
+import {
+	type FlowDocuments,
+	HostUnreachableError,
+	type WalkFile,
+} from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, InStep } from "../contract";
 import type { RunCommands } from "../exchange";
@@ -86,12 +90,42 @@ export function createRelay(deps: {
 			await onHost(input.spaceId, (client) => client.sync.withdrawOffer(input));
 		},
 
-		async archive(ref) {
+		async archiveGet(ref) {
 			const to = await route(ref.spaceId);
 			if (to.at === "unreachable") throw new HostUnreachableError();
-			return to.at === "host"
-				? to.ask((client) => client.archive.get({ ref }))
-				: null;
+			if (to.at === "here") return null;
+			if (ref.kind !== "content") {
+				return to.ask((client) => client.archive.get({ ref }));
+			}
+			// Knowledge content travels in base64.
+			const { spaceId, sha256 } = ref;
+			const content = await to.ask((client) =>
+				client.archive.knowledgeGet({ spaceId, sha256 }),
+			);
+			return content === null
+				? null
+				: new Uint8Array(Buffer.from(content, "base64"));
+		},
+
+		async archivePut(entry) {
+			const to = await route(entry.ref.spaceId);
+			if (to.at === "unreachable") throw new HostUnreachableError();
+			if (to.at === "here") return false;
+			if (entry.ref.kind === "content") {
+				const { spaceId, sha256 } = entry.ref;
+				const content = Buffer.from(entry.content as Uint8Array).toString(
+					"base64",
+				);
+				await to.ask((client) =>
+					client.archive.knowledgePut({ spaceId, sha256, content }),
+				);
+			} else {
+				const { ref, content, stamp } = entry as WalkFile;
+				await to.ask((client) =>
+					client.archive.put({ ref, content, ...(stamp ? { stamp } : {}) }),
+				);
+			}
+			return true;
 		},
 
 		async *follow(step, afterSeq, signal) {
@@ -103,29 +137,6 @@ export function createRelay(deps: {
 			} catch (error) {
 				throw fromHost(error);
 			}
-		},
-
-		async archivePut(ref, content, stamp) {
-			await onHost(ref.spaceId, (client) =>
-				client.archive.put({ ref, content, ...(stamp ? { stamp } : {}) }),
-			);
-		},
-
-		async knowledgePut(ref, content) {
-			const to = await route(ref.spaceId);
-			if (to.at === "here") return;
-			if (to.at === "unreachable") throw new HostUnreachableError();
-			await to.ask((client) =>
-				client.archive.knowledgePut({ ...ref, content }),
-			);
-		},
-
-		async knowledge(ref) {
-			const to = await route(ref.spaceId);
-			if (to.at === "unreachable") throw new HostUnreachableError();
-			return to.at === "host"
-				? to.ask((client) => client.archive.knowledgeGet(ref))
-				: null;
 		},
 
 		inStep,

@@ -5,6 +5,7 @@
  * working copy that a reconcile keeps in step before and after each step.
  */
 
+export { LOCAL_ONLY_BYTES } from "./documents";
 export {
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeFile,
@@ -20,14 +21,8 @@ export {
 	type KnowledgeRequest,
 	type ProjectKnowledge,
 } from "./project-knowledge";
-export type { KnowledgeHost } from "./reconcile";
 export {
 	createKnowledgeSearch,
 	type KnowledgeHit,
 	type KnowledgeSearch,
 } from "./search";
-export {
-	createKnowledgeStore,
-	type KnowledgeStore,
-	LOCAL_ONLY_BYTES,
-} from "./store";

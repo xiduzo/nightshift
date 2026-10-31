@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
+import { type ArchiveHost, createSpaceArchive, sha256Of } from "../archive";
 import { createSandbox, type Sandbox } from "../testing";
 import { tinyDocx, tinyPdf } from "../testing/documents";
 import { createKnowledgeFolders } from "./folder";
@@ -21,8 +22,7 @@ import {
 	knowledgeFiles,
 } from "./knowledge-document";
 import { proposeLearnings } from "./learnings";
-import { createKnowledgeSync, type KnowledgeHost } from "./reconcile";
-import { createKnowledgeStore, sha256Of } from "./store";
+import { createKnowledgeSync } from "./reconcile";
 
 /**
  * The reconcile of a knowledge folder with its document (ADR 4), on two
@@ -39,21 +39,31 @@ afterEach(async () => {
 function memoryHost() {
 	const kept = new Map<string, Uint8Array>();
 	const state = { down: false };
-	const host: KnowledgeHost = {
-		async put(_space, sha256, content) {
+	const host: ArchiveHost = {
+		async archivePut({ ref, content }) {
 			if (state.down) throw new TypeError("The network connection was lost.");
-			kept.set(sha256, content.slice());
+			if (ref.kind !== "content" || typeof content === "string") return false;
+			kept.set(ref.sha256, content.slice());
+			return true;
 		},
-		async get(_space, sha256) {
+		async archiveGet(ref) {
 			if (state.down) throw new TypeError("The network connection was lost.");
-			return kept.get(sha256)?.slice() ?? null;
+			if (ref.kind !== "content") return null;
+			return kept.get(ref.sha256)?.slice() ?? null;
 		},
 	};
 	return { kept, state, host };
 }
 
+/** A Device's archive, connected to `host` when there is one. */
+function archiveOf(dataDir: string, host: ArchiveHost | null) {
+	const archive = createSpaceArchive(dataDir);
+	if (host) archive.connect(host);
+	return archive;
+}
+
 /** A Device with project p1 and its knowledge, reaching `host`. */
-async function device(host: KnowledgeHost | null) {
+async function device(host: ArchiveHost | null) {
 	const sandbox = await createSandbox();
 	sandboxes.push(sandbox);
 	await sandbox.db
@@ -65,9 +75,8 @@ async function device(host: KnowledgeHost | null) {
 		db: sandbox.db,
 		folders,
 		documents,
-		store: createKnowledgeStore(sandbox.dataDir),
+		archive: archiveOf(sandbox.dataDir, host),
 		deviceId: sandbox.deviceId,
-		host: () => host,
 		pageWaitMs: 5_000,
 	});
 	const dir = folders.folder("p1");
@@ -452,9 +461,8 @@ describe("reconcile", () => {
 			db: a.sandbox.db,
 			folders: a.folders,
 			documents: { open: async () => blankDocument() },
-			store: createKnowledgeStore(a.sandbox.dataDir),
+			archive: archiveOf(a.sandbox.dataDir, host),
 			deviceId: a.sandbox.deviceId,
-			host: () => host,
 		});
 		expect(await fresh.reconcile("p1")).toMatchObject({
 			published: 1,

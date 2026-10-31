@@ -1,4 +1,22 @@
+import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "./start-run";
+
+/** What a person reads when the Host that keeps a Space cannot be reached. */
+export const HOST_UNREACHABLE =
+	"The computer that keeps this Space cannot be reached. Try again when it is online.";
+
+/**
+ * The Host that keeps the Space cannot be reached now: this computer has
+ * no online Link to it. The person tries again later. `Relay` throws it
+ * for an action on such a Space. The API answers it with its own code
+ * (`HOST_UNREACHABLE`), so a screen can say so.
+ */
+export class HostUnreachableError extends Refusal {
+	constructor() {
+		super("unavailable", HOST_UNREACHABLE);
+		this.name = "HostUnreachableError";
+	}
+}
 
 /**
  * What the engine asks of the Hosts this Device links to: the actions on

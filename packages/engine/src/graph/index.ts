@@ -14,7 +14,5 @@ export { createRunner } from "./runner";
 export {
 	createRunWalks,
 	type RunWalks,
-	type WalkFile,
 	type WalkFiles,
-	type WalkRef,
 } from "./walk-state";

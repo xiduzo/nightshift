@@ -10,8 +10,8 @@ import type {
 	WaitNode,
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import type { WalkFile, WalkRef } from "../archive";
 import type { OwnDevice } from "../contract";
-import type { WalkFile, WalkRef } from "../graph/walk-state";
 import { createRunLog } from "../log/run-log";
 import {
 	parseTranscript,

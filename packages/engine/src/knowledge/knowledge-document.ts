@@ -13,7 +13,7 @@ import { isKnowledgePath } from "./folder";
  * one Yjs document per Project, `knowledge:<projectId>`. Every Device of
  * the Project's Space keeps a copy in its Replica, and the relay serves
  * it beside the flow documents. The content is not in it: a Device keeps
- * each file's content by its hash (`KnowledgeStore`) and copies it to the
+ * each file's content by its hash (the Space archive) and copies it to the
  * Space's Host.
  *
  * `files`: path → `{ sha256, size, changedAt, deviceId, local? }`, one

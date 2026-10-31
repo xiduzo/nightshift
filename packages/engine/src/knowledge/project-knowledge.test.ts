@@ -3,10 +3,10 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
+import type { ArchiveHost } from "../archive";
 import { createSandbox, type Sandbox } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import { knowledgeEntries } from "./knowledge-document";
-import type { KnowledgeHost } from "./reconcile";
 
 /**
  * A project's knowledge on a Device, through the one module the daemon
@@ -21,20 +21,24 @@ afterEach(async () => {
 });
 
 /** A Host's archive in memory: content by hash. */
-function memoryHost(): KnowledgeHost {
+function memoryHost(): ArchiveHost {
 	const kept = new Map<string, Uint8Array>();
 	return {
-		async put(_space, sha256, content) {
-			kept.set(sha256, content.slice());
+		async archivePut({ ref, content }) {
+			if (ref.kind !== "content" || typeof content === "string") return false;
+			kept.set(ref.sha256, content.slice());
+			return true;
 		},
-		async get(_space, sha256) {
-			return kept.get(sha256)?.slice() ?? null;
+		async archiveGet(ref) {
+			return ref.kind === "content"
+				? (kept.get(ref.sha256)?.slice() ?? null)
+				: null;
 		},
 	};
 }
 
 /** A Device with project p1, connected to `host`. */
-async function device(host: KnowledgeHost) {
+async function device(host: ArchiveHost) {
 	const sandbox = await createSandbox();
 	sandboxes.push(sandbox);
 	await sandbox.db
@@ -42,7 +46,8 @@ async function device(host: KnowledgeHost) {
 		.values({ id: "p1", spaceId: sandbox.spaceId, name: "p1" });
 	const built = testKnowledge(sandbox, { pageWaitMs: 5_000 });
 	closes.push(built.close);
-	built.knowledge.connect({ knowledge: host, inStep: async () => {} });
+	built.archive.connect(host);
+	built.knowledge.connect({ inStep: async () => {} });
 	const dir = built.folder("p1");
 	return {
 		...built,

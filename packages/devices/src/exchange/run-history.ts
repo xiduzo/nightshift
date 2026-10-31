@@ -7,12 +7,12 @@ import {
 	type LoggedEvent,
 	type PeerContext,
 	parseTranscript,
+	type SpaceArchive,
 	type WalkFile,
 } from "@nightshift/engine";
 import { memberRole } from "@nightshift/engine/projects";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
-import { dropArchive, readCopy, writeArchive } from "../archive";
 import type { ArchiveRef, RunCommand, RunRows, SyncCursors } from "../contract";
 import type { HostSpaces } from "../links";
 import {
@@ -164,8 +164,8 @@ export type RunHistoryExchange = {
 export function createRunHistoryExchange(deps: {
 	/** This Replica's database: the cursors and Commands (`sync_cursor`, `run_command`). */
 	db: Database;
-	/** This computer's data folder: the archive files. */
-	dataDir: string;
+	/** This Replica's Space archive: the walk files of runs walked elsewhere, here and at the Hosts. */
+	archive: Pick<SpaceArchive, "here" | "read">;
 	/** What the engine offers the peers. */
 	context: Pick<
 		PeerContext,
@@ -175,14 +175,8 @@ export function createRunHistoryExchange(deps: {
 	hostSpaces: HostSpaces;
 	/** The feed of the Host that keeps a Space (over its link). */
 	upstream?: FeedPorts["upstream"];
-	/**
-	 * A file of the archive: this Replica's copy, else the Host's that
-	 * keeps the Space (`RunsPort.archived`). Throws when that Host cannot
-	 * be reached. Without it, only this Replica's copy is read.
-	 */
-	archived?(ref: ArchiveRef): Promise<string | null>;
 }): RunHistoryExchange {
-	const { db, dataDir, context, hostSpaces } = deps;
+	const { db, archive, context, hostSpaces } = deps;
 	const { history, runs, documents } = context;
 	const { runOwner } = history;
 
@@ -203,18 +197,14 @@ export function createRunHistoryExchange(deps: {
 		stepEnded: async (step) => (await runs.stepStamp(step))?.ended === true,
 		ownEntries: (at) => history.ownTranscript(at),
 		// Asked only for a step that ended. A copy of another end is not
-		// there yet: the feed reads the step instead, and again later. A
-		// copy from the Host is kept here, with the end it holds.
+		// there yet: the feed reads the step instead, and again later. The
+		// archive keeps a copy from the Host here, with the end it holds.
 		async archived(at) {
-			const ref: ArchiveRef = { kind: "transcript", ...at };
 			const known = await runs.stepStamp(at);
-			const local = await readCopy(dataDir, ref, known);
-			if (local !== null) return parseTranscript(local);
-			const fetched = await deps.archived?.(ref).catch(() => null);
-			if (fetched === null || fetched === undefined) return null;
-			// Not `archive.write` below: nothing about the step changed.
-			if (known?.ended) await writeArchive(dataDir, ref, fetched, known);
-			return parseTranscript(fetched);
+			const text = await archive
+				.read({ kind: "transcript", ...at }, known)
+				.catch(() => null);
+			return text === null ? null : parseTranscript(text);
 		},
 		...(deps.upstream ? { upstream: deps.upstream } : {}),
 	});
@@ -225,7 +215,7 @@ export function createRunHistoryExchange(deps: {
 	 * is read again once it ends. In a Space this Replica keeps, the
 	 * archive is the Walker's own copy, and the Walker puts it again. A
 	 * copy this misses after a crash holds no step: its stamp is of the
-	 * earlier end (`readCopy`).
+	 * earlier end (`SpaceArchive.here.read`).
 	 */
 	async function dropReopenedCopies(added: readonly LoggedEvent[]) {
 		for (const e of added) {
@@ -234,7 +224,7 @@ export function createRunHistoryExchange(deps: {
 			if (!owner || (await hostSpaces.hostOf(owner.spaceId)) === null) {
 				continue;
 			}
-			await dropArchive(dataDir, {
+			await archive.here.drop({
 				kind: "transcript",
 				spaceId: owner.spaceId,
 				runId: e.runId,
@@ -430,10 +420,10 @@ export function createRunHistoryExchange(deps: {
 			async read(ref) {
 				const known =
 					ref.kind === "checkpoint" ? null : await runs.stepStamp(ref);
-				return readCopy(dataDir, ref, known);
+				return archive.here.read(ref, known);
 			},
 			async write(ref, content, stamp) {
-				await writeArchive(dataDir, ref, content, stamp);
+				await archive.here.write({ ref, content, ...(stamp ? { stamp } : {}) });
 				// A watcher of the run reads the step's transcript again.
 				if (ref.kind === "transcript")
 					history.stepChanged(ref.runId, ref.stepId);

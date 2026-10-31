@@ -3,7 +3,6 @@ import type { Database } from "@nightshift/db";
 import { hostLink, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
-	createKnowledgeStore,
 	createSyncedDocuments,
 	type FlowDocuments,
 	type SyncedDocuments,
@@ -135,7 +134,6 @@ export async function hostInMemory(
 		ownerId: personId,
 		isHost: asHost.isHost,
 		work: createWorkHub(),
-		knowledge: createKnowledgeStore(a.dataDir),
 	});
 	const memory = inMemoryHost({
 		exchange: hostExchange,

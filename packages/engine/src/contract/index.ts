@@ -4,8 +4,8 @@
  * (`MemberChange`), a run start and its schema (`StartRunInput`,
  * `startRunInputSchema`), where a run can be placed (`Placement`,
  * `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the
- * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`) and the
- * Offer rule of a schedule (`OffersPort`). It imports no other vertical.
+ * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`, and
+ * `HostUnreachableError` when one cannot be reached) and the Offer rule of a schedule (`OffersPort`). It imports no other vertical.
  */
 
 export type { Actor, MemberChange } from "./actor";
@@ -17,5 +17,11 @@ export type {
 	OwnDevice,
 	Placement,
 } from "./placement";
-export type { Relay, RunCommandInput, RunCommandKind } from "./relay";
+export {
+	HOST_UNREACHABLE,
+	HostUnreachableError,
+	type Relay,
+	type RunCommandInput,
+	type RunCommandKind,
+} from "./relay";
 export { type StartRunInput, startRunInputSchema } from "./start-run";

@@ -207,10 +207,9 @@ describe("a disposed engine", () => {
 			command: async () => {},
 			addClone: async () => {},
 			reachable: async () => false,
-			archive: async (ref) => files().get(fileKey(ref)) ?? null,
-			archivePut: async () => {},
-			knowledgePut: async () => {},
-			knowledge: async () => null,
+			archiveGet: async (ref) =>
+				ref.kind === "content" ? null : (files().get(fileKey(ref)) ?? null),
+			archivePut: async () => true,
 			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");

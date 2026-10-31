@@ -1,12 +1,11 @@
 import { type Auth, roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import {
-	createKnowledgeStore,
-	type Device,
-	type FlowDocuments,
-	type KnowledgeHost,
-	type MoveRows,
-	type SyncedDocuments,
+import type {
+	Device,
+	FlowDocuments,
+	MoveRows,
+	SpaceArchive,
+	SyncedDocuments,
 } from "@nightshift/engine";
 import {
 	createDeviceCopies,
@@ -18,7 +17,6 @@ import {
 	type SettingsStore,
 } from "@nightshift/engine/device-config";
 import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
-import { createKnowledgeArchive } from "./archive";
 import type { HostClient, HostHello, HostRelay } from "./contract";
 import {
 	type AppliedCommands,
@@ -80,8 +78,6 @@ export type DevicesRuntime = {
 	reach: Reach;
 	/** How Bun serves this daemon: the hostname of its reach, and its own TLS. */
 	serve: { hostname: string; tls?: { cert: string; key: string } };
-	/** The Hosts of the Spaces, as the knowledge reconcile copies content to them and fetches it (ADR 4). */
-	knowledge: KnowledgeHost;
 	/** Waits until this Replica's documents of a Space are in step with its Host's. */
 	inStep: HostRelay["inStep"];
 };
@@ -166,6 +162,11 @@ export type DevicesDeps = {
 	/** This computer as a Device: every computer-touching piece of a step. */
 	local: Device;
 	dataDir: string;
+	/**
+	 * This Replica's Space archive, which the knowledge shares: the
+	 * runtime connects it to the Hosts this computer links to.
+	 */
+	archive: SpaceArchive;
 	/** Where the Device keys go: the keychain, else a file (`prefer: "file"`). */
 	keyStore: { prefer?: KeyStoreKind };
 	/** The engine's scheduler: off, or on until the signal aborts. */
@@ -264,6 +265,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			walkerId: self.id,
 			device: local,
 			dataDir: deps.dataDir,
+			archive: deps.archive,
 			settings: () => deps.settings.run(),
 			profileFor: (ref) => deps.profiles.settingsFor(ref),
 			spaceDocuments: deps.spaces,
@@ -321,8 +323,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		ownerId,
 		isHost: host.isHost,
 		work: handover.hub,
-		// The knowledge content its Devices copy here, by hash.
-		knowledge: createKnowledgeStore(deps.dataDir),
 	});
 
 	/** This computer's Offers into Spaces, as its owner makes and withdraws them. */
@@ -471,7 +471,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		hostExchange,
 		offers,
 		reach,
-		knowledge: createKnowledgeArchive({ relay }),
 		inStep: relay.inStep,
 		serve: {
 			hostname: listenHostname(reach, deps.env.NIGHTSHIFT_LISTEN),

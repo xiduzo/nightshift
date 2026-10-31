@@ -378,10 +378,8 @@ describe("a batch and what follows from it", () => {
 			command: async () => {},
 			addClone: async () => {},
 			reachable: async () => false,
-			archive,
-			archivePut: async () => {},
-			knowledgePut: async () => {},
-			knowledge: async () => null,
+			archiveGet: async (ref) => (ref.kind === "content" ? null : archive(ref)),
+			archivePut: async () => true,
 			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");
@@ -722,10 +720,8 @@ describe("a run walked elsewhere", () => {
 			},
 			addClone: async () => {},
 			reachable: async () => false,
-			archive: async () => null,
-			archivePut: async () => {},
-			knowledgePut: async () => {},
-			knowledge: async () => null,
+			archiveGet: async () => null,
+			archivePut: async () => true,
 			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");
@@ -802,15 +798,14 @@ describe("a run walked elsewhere", () => {
 			command: async () => {},
 			addClone: async () => {},
 			reachable: async () => false,
-			archive: async (ref) => {
+			archiveGet: async (ref) => {
+				if (ref.kind === "content") return null;
 				fetched.push(ref.kind === "checkpoint" ? ref.kind : ref.stepId);
 				return ref.kind === "transcript"
 					? (files.get(ref.stepId) ?? null)
 					: null;
 			},
-			archivePut: async () => {},
-			knowledgePut: async () => {},
-			knowledge: async () => null,
+			archivePut: async () => true,
 			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");

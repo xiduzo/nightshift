@@ -7,13 +7,8 @@ import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
 import { createKnowledgeFolders, INDEX_FILE } from "./folder";
 import type { KnowledgeDocuments } from "./knowledge-document";
 import { keepLearnings, withLearnings } from "./learnings";
-import {
-	createKnowledgeSync,
-	type KnowledgeHost,
-	type KnowledgeSyncDeps,
-} from "./reconcile";
+import { createKnowledgeSync, type KnowledgeSyncDeps } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
-import { createKnowledgeStore } from "./store";
 
 /**
  * A project's knowledge on this Device, as one module: its folder, the
@@ -52,8 +47,6 @@ export type KnowledgeRequest = {
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
 export type KnowledgeHosts = {
-	/** Content by hash, to and from the Host of a Space. */
-	knowledge: KnowledgeHost;
 	/** Waits until this Replica's documents of a Space are in step with its Host's. */
 	inStep(
 		spaceId: string,
@@ -82,9 +75,9 @@ export type SessionKnowledge = CommandKnowledge & {
 
 export type ProjectKnowledgeDeps = Pick<
 	KnowledgeSyncDeps,
-	"db" | "deviceId" | "pageWaitMs"
+	"db" | "deviceId" | "pageWaitMs" | "archive"
 > & {
-	/** Where this computer keeps its data: the folders, the content by hash. */
+	/** Where this computer keeps its data: the folders. */
 	dataDir: string;
 	documents: Pick<KnowledgeDocuments, "open">;
 	/** This computer's index over the folders. */
@@ -107,9 +100,8 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 		db: deps.db,
 		folders,
 		documents: deps.documents,
-		store: createKnowledgeStore(deps.dataDir),
+		archive: deps.archive,
 		deviceId: deps.deviceId,
-		host: () => hosts?.knowledge ?? null,
 		inStep: async (spaceId, names, options) =>
 			hosts?.inStep(spaceId, names, options),
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
@@ -137,8 +129,10 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 
 	return {
 		/**
-		 * The Hosts of the Spaces, from the devices runtime: from now on
-		 * content travels to and from them.
+		 * The Hosts of the Spaces, from the devices runtime: from now on a
+		 * reconcile waits for the document to be in step with its Host's.
+		 * The content travels through the archive, which the runtime
+		 * connects itself.
 		 */
 		connect(runtime: KnowledgeHosts): void {
 			hosts = runtime;

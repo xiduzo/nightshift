@@ -31,6 +31,7 @@ import {
 	createKnowledgeDocuments,
 	createKnowledgeSearch,
 	createProjectKnowledge,
+	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
 	documentRows,
@@ -387,15 +388,23 @@ export async function createDaemon(
 		(kept) => kept.close(),
 	);
 	/**
+	 * This computer's Space archive (`<dataDir>/archive`): the walk files of
+	 * runs walked elsewhere and the knowledge content by hash, here and at
+	 * the Spaces' Hosts once the devices runtime below connects it. One
+	 * over the folder, for the knowledge and the devices both.
+	 */
+	const archive = createSpaceArchive(dataDir);
+	/**
 	 * The projects' knowledge on this computer (`<dataDir>/knowledge`):
 	 * each folder a working copy of its Project's knowledge in the Space
 	 * (ADR 4), in step before and after each step that gets it, and when
 	 * the Knowledge page reads it. The content travels by hash through the
-	 * Space's Host, once the devices runtime below connects it.
+	 * archive.
 	 */
 	const knowledge = createProjectKnowledge({
 		db,
 		dataDir,
+		archive,
 		documents: knowledgeDocuments,
 		deviceId: device.id,
 		search: knowledgeSearch,
@@ -476,6 +485,7 @@ export async function createDaemon(
 		ownerId: person.userId,
 		local,
 		dataDir,
+		archive,
 		keyStore,
 		// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 		// Otherwise the Settings switch is read on every tick.

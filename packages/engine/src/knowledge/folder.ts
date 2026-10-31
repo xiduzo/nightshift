@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
 	lstat,
 	mkdir,
@@ -6,22 +5,21 @@ import {
 	readdir,
 	readFile,
 	realpath,
-	rename,
 	stat,
-	writeFile,
 } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
 import { Refusal } from "@nightshift/refusal";
+import { writeWhole } from "../archive";
 import {
 	type DocumentMetadata,
 	isDocument,
+	LOCAL_ONLY_BYTES,
 	loadDocument,
 	loadDocumentContent,
 	textOf,
 } from "./documents";
 import { isProposal } from "./learnings";
-import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
  * The knowledge folder of a project: markdown (and any other files) that
@@ -199,7 +197,7 @@ export function createKnowledgeFolders(dataDir: string) {
 				newest > written.mtimeMs ||
 				!text.includes(INDEX_INTRO) ||
 				!samePaths(indexedPaths(text), files);
-			if (stale) await writeAtomic(indexPath, await indexText(path, files));
+			if (stale) await writeWhole(indexPath, await indexText(path, files));
 			return files;
 		},
 	};
@@ -560,12 +558,4 @@ export async function knowledgeText(
 	}
 	const start = Buffer.from(content.subarray(0, bytes)).toString("utf8");
 	return textResult(clean, start, content.length, bytes);
-}
-
-/** Writes the file whole or not at all: a reader never sees half an index. */
-async function writeAtomic(path: string, text: string): Promise<void> {
-	// Hidden, so a walk at the same time skips it.
-	const temp = join(dirname(path), `.${INDEX_FILE}.${randomUUID()}.tmp`);
-	await writeFile(temp, text);
-	await rename(temp, path);
 }

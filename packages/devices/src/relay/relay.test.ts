@@ -31,6 +31,10 @@ const HOSTS: Record<string, string | null> = {
 };
 
 /** The Devices the Host lists, and the entry of its live transcript. */
+/** Knowledge content and the hash it goes by (the relay does not check it). */
+const CONTENT = new TextEncoder().encode("content");
+const SHA = "a".repeat(64);
+
 const LISTED: OwnDevice[] = [
 	{
 		deviceId: "device-b",
@@ -77,6 +81,9 @@ function fakeHost(
 		archive: {
 			get: take("archive.get", "from the Host"),
 			put: take("archive.put", undefined),
+			// "content" in base64.
+			knowledgeGet: take("archive.knowledgeGet", "Y29udGVudA=="),
+			knowledgePut: take("archive.knowledgePut", undefined),
 			follow: async (input: unknown) => {
 				taken.push({ procedure: "archive.follow", input });
 				return (async function* () {
@@ -239,9 +246,17 @@ function actions(relay: ReturnType<typeof createRelay>, spaceId: string) {
 				sessionCap: 1,
 			} as never),
 		withdrawOffer: () => relay.withdrawOffer({ spaceId, profile: "claude" }),
-		archivePut: () => relay.archivePut(ref(spaceId), "content"),
+		archivePut: () =>
+			relay.archivePut({ ref: ref(spaceId), content: "content" }),
+		contentPut: () =>
+			relay.archivePut({
+				ref: { kind: "content", spaceId, sha256: SHA },
+				content: CONTENT,
+			}),
+		contentGet: () =>
+			relay.archiveGet({ kind: "content", spaceId, sha256: SHA }),
 		startRun: () => relay.startRun(start(spaceId) as never),
-		archive: () => relay.archive(ref(spaceId)),
+		archiveGet: () => relay.archiveGet(ref(spaceId)),
 		devices: () => relay.devices({ spaceId, projectId: "project-1" }),
 		follow: async () => {
 			const entries = relay.follow?.(
@@ -346,7 +361,7 @@ describe("the relay, while the Host of the Space cannot be reached", () => {
 describe("the relay, for a Space kept here", () => {
 	test("reads answer with nothing: the caller has its own rows", async () => {
 		const { relay, host } = relayWith();
-		expect(await relay.archive(ref("space-own"))).toBeNull();
+		expect(await relay.archiveGet(ref("space-own"))).toBeNull();
 		expect(
 			await relay.devices({ spaceId: "space-own", projectId: "p" }),
 		).toEqual([]);
@@ -376,13 +391,26 @@ describe("the relay, for a Space kept here", () => {
 		const { relay } = relayWith();
 		const {
 			command: _here,
-			archive: _a,
+			archiveGet: _get,
+			archivePut: _put,
+			contentGet: _contentGet,
+			contentPut: _contentPut,
 			devices: _d,
 			...hostOnly
 		} = actions(relay, "space-own");
 		for (const [name, act] of Object.entries(hostOnly)) {
 			await expect(act(), name).rejects.toBeInstanceOf(HostUnreachableError);
 		}
+	});
+
+	test("a file of the archive stays here: nothing goes, nothing comes", async () => {
+		const { relay, host } = relayWith();
+		const act = actions(relay, "space-own");
+		expect(await act.archivePut()).toBe(false);
+		expect(await act.contentPut()).toBe(false);
+		expect(await act.archiveGet()).toBeNull();
+		expect(await act.contentGet()).toBeNull();
+		expect(host.taken).toEqual([]);
 	});
 });
 
@@ -394,9 +422,11 @@ describe("the relay, for a Space a Host keeps", () => {
 		await act.addClone();
 		await act.offer();
 		await act.withdrawOffer();
-		await act.archivePut();
+		expect(await act.archivePut()).toBe(true);
 		expect(await act.startRun()).toEqual({ runId: "run-on-host" });
-		expect(await act.archive()).toBe("from the Host");
+		expect(await act.archiveGet()).toBe("from the Host");
+		expect(await act.contentPut()).toBe(true);
+		expect(await act.contentGet()).toEqual(CONTENT);
 		expect(await act.devices()).toEqual(LISTED);
 		const { startedBy: _person, ...startOnHost } = start("space-team");
 		expect(host.taken).toEqual([
@@ -430,6 +460,15 @@ describe("the relay, for a Space a Host keeps", () => {
 			},
 			{ procedure: "sync.startRun", input: startOnHost },
 			{ procedure: "archive.get", input: { ref: ref("space-team") } },
+			// Knowledge content travels in base64.
+			{
+				procedure: "archive.knowledgePut",
+				input: { spaceId: "space-team", sha256: SHA, content: "Y29udGVudA==" },
+			},
+			{
+				procedure: "archive.knowledgeGet",
+				input: { spaceId: "space-team", sha256: SHA },
+			},
 			{
 				procedure: "sync.devices",
 				input: { spaceId: "space-team", projectId: "project-1" },
@@ -675,7 +714,7 @@ describe("the relay of a paired Device", () => {
 			const online = relayOver(paired.memory.client(paired.key));
 			const listed = await online.devices({ spaceId: a.spaceId, projectId });
 			expect(listed.map((d) => d.deviceId)).toContain(b.deviceId);
-			expect(await online.archive(ref(a.spaceId))).toBeNull();
+			expect(await online.archiveGet(ref(a.spaceId))).toBeNull();
 
 			const offline = relayOver(null);
 			await expect(

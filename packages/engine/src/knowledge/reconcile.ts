@@ -1,20 +1,17 @@
-import { randomUUID } from "node:crypto";
-import {
-	lstat,
-	mkdir,
-	readFile,
-	rename,
-	rm,
-	rmdir,
-	stat,
-	writeFile,
-} from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { lstat, mkdir, readFile, rm, rmdir, stat } from "node:fs/promises";
+import { join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { organization, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
+import {
+	type SpaceArchive,
+	sha256Of,
+	sha256OfFile,
+	writeWhole,
+} from "../archive";
 import type { PersistedDocument } from "../documents";
+import { LOCAL_ONLY_BYTES } from "./documents";
 import {
 	isKnowledgePath,
 	isReadable,
@@ -36,12 +33,6 @@ import {
 	isProposalFile,
 	notesIn,
 } from "./learnings";
-import {
-	type KnowledgeStore,
-	LOCAL_ONLY_BYTES,
-	sha256Of,
-	sha256OfFile,
-} from "./store";
 
 /**
  * Knowledge in the Space (ADR 4): each Device's folder is a working copy
@@ -57,9 +48,10 @@ import {
  *
  * A file the folder changed (its size or time differ, and so does its
  * hash), or a file that came or went, is published: its content goes
- * into the store and to the Space's Host, then its entry into the
- * document (or out of it). An entry another Device changed is written
- * into the folder: its content comes from the store, else from the Host,
+ * into the Space archive (here, and at the Space's Host), then its entry
+ * into the document (or out of it). An entry another Device changed is
+ * written into the folder: its content comes from the archive, here or
+ * from the Host,
  * and goes in whole. When both changed one path, the later change wins.
  * A change wins over a removal: nothing is lost.
  *
@@ -72,22 +64,6 @@ import {
  * upgrade: it publishes every file, and the later change wins where the
  * document has the path too. `INDEX.md` and hidden files never sync.
  */
-
-/** A Space's Host, as the reconcile copies content to it and fetches it from it. */
-export type KnowledgeHost = {
-	/**
-	 * Keeps content in the archive of the Host that keeps the Space.
-	 * Nothing for a Space this Replica keeps. Throws when that Host
-	 * cannot be reached or refuses.
-	 */
-	put(spaceId: string, sha256: string, content: Uint8Array): Promise<void>;
-	/**
-	 * Content from the archive of the Host that keeps the Space. Null for
-	 * a Space this Replica keeps, and when the Host has none. Throws when
-	 * that Host cannot be reached.
-	 */
-	get(spaceId: string, sha256: string): Promise<Uint8Array | null>;
-};
 
 /** What one reconcile did. */
 export type ReconcileResult = {
@@ -119,14 +95,10 @@ export type KnowledgeSyncDeps = {
 	db: Database;
 	folders: Pick<KnowledgeFolders, "folder" | "known" | "read">;
 	documents: Pick<KnowledgeDocuments, "open">;
-	store: KnowledgeStore;
+	/** The content by hash: here, and at the Space's Host. */
+	archive: Pick<SpaceArchive, "here" | "read" | "put">;
 	/** This Device: it signs the entries it writes. */
 	deviceId: string;
-	/**
-	 * The Host of a Space, read at each reconcile: the devices runtime,
-	 * made after this. Null or without it: content stays on this Device.
-	 */
-	host?: () => KnowledgeHost | null;
 	/**
 	 * Waits until this Replica's copies of documents of a Space and its
 	 * Host's are in step, for `timeoutMs` at most. At once for a Space this
@@ -169,7 +141,7 @@ export type KnowledgeStepHold = { done(): Promise<void> };
 export type KnowledgeSync = ReturnType<typeof createKnowledgeSync>;
 
 export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
-	const { db, folders, store, deviceId } = deps;
+	const { db, folders, archive, deviceId } = deps;
 	/** The projects whose content waits for the Host. */
 	const pending = new Set<string>();
 
@@ -190,20 +162,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		return row ? !row.personal : false;
 	}
 
-	/** Content by hash: this Device's, else the Host's, which it keeps. */
-	async function contentOf(
-		spaceId: string,
-		sha256: string,
-		host: KnowledgeHost | null,
-	): Promise<Uint8Array | null> {
-		const kept = await store.read(spaceId, sha256);
-		if (kept || !host) return kept;
-		const fetched = await host.get(spaceId, sha256);
-		if (!fetched || sha256Of(fetched) !== sha256) return null;
-		await store.write(spaceId, sha256, fetched);
-		return fetched;
-	}
-
 	async function reconcileOnce(projectId: string): Promise<ReconcileResult> {
 		const result: ReconcileResult = {
 			published: 0,
@@ -218,7 +176,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		const spaceId: string = space;
 		const root = folders.folder(projectId);
 		const document = await deps.documents.open(projectId);
-		const host = deps.host?.() ?? null;
 		// The Host's changes first, a short while: the step must not wait long.
 		await deps
 			.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_BEFORE_MS })
@@ -233,34 +190,41 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		);
 		const unpushed = new Set(state?.unpushed ?? []);
 		/** The Host failed once: the rest waits for the next reconcile. */
-		let offline = host === null;
+		let offline = false;
+		const ref = (sha256: string) => ({
+			kind: "content" as const,
+			spaceId,
+			sha256,
+		});
 
-		async function push(sha256: string, content: Uint8Array) {
-			if (!host) return;
-			if (offline) {
-				unpushed.add(sha256);
-				return;
+		/** Keeps content in the archive: here, and at the Host while it answers. */
+		async function keep(sha256: string, content: Uint8Array) {
+			if (!offline) {
+				try {
+					await archive.put({ ref: ref(sha256), content });
+					unpushed.delete(sha256);
+					return;
+				} catch {
+					offline = true;
+				}
 			}
-			try {
-				await host.put(spaceId, sha256, content);
-				unpushed.delete(sha256);
-			} catch {
-				offline = true;
-				unpushed.add(sha256);
-			}
+			await archive.here.write({ ref: ref(sha256), content });
+			unpushed.add(sha256);
 		}
 
 		// First what earlier reconciles could not copy to the Host.
 		for (const sha256 of [...unpushed]) {
-			if (!host || offline) break;
-			const content = await store.read(spaceId, sha256);
-			if (content) await push(sha256, content);
+			if (offline) break;
+			const content = await archive.here.read(ref(sha256));
+			if (content) await keep(sha256, content);
 			else unpushed.delete(sha256);
 		}
 
+		/** Content by hash: here, else from the Host while it answers. */
 		async function fetch(sha256: string): Promise<Uint8Array | null> {
+			if (offline) return archive.here.read(ref(sha256));
 			try {
-				return await contentOf(spaceId, sha256, offline ? null : host);
+				return await archive.read(ref(sha256));
 			} catch {
 				offline = true;
 				return null;
@@ -273,7 +237,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		const sets: [string, KnowledgeEntry][] = [];
 		const deletes: string[] = [];
 
-		/** Publishes the folder's file: content to the store and the Host, then its entry. */
+		/** Publishes the folder's file: content to the archive, then its entry. */
 		async function publish(
 			path: string,
 			file: FileStat,
@@ -293,8 +257,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					.catch(() => null);
 				if (content === null) return null;
 				const sha256 = sha256Of(content);
-				await store.write(spaceId, sha256, content);
-				await push(sha256, content);
+				await keep(sha256, content);
 				entry = { sha256, size: content.length, changedAt, deviceId };
 			}
 			sets.push([path, entry]);
@@ -310,7 +273,9 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			const content = await fetch(entry.sha256);
 			if (!content) return null;
 			const abs = join(root, ...path.split("/"));
-			const written = await writeWhole(abs, content).catch(() => null);
+			const written = await writeWhole(abs, content)
+				.then(() => stat(abs))
+				.catch(() => null);
 			if (!written) return null;
 			result.written++;
 			return { ...entry, size: written.size, mtimeMs: written.mtimeMs };
@@ -515,7 +480,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			await Promise.race([reconciled, Bun.sleep(deps.pageWaitMs ?? 2_000)]);
 			const spaceId = await spaceOf(projectId);
 			const entries = knowledgeEntries(await deps.documents.open(projectId));
-			const host = deps.host?.() ?? null;
 			const files: KnowledgeFile[] = [];
 			let proposed = 0;
 			for (const [path, entry] of [...entries].sort(([a], [b]) =>
@@ -532,7 +496,9 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				}
 				if (!isProposalFile(path)) continue;
 				const content = spaceId
-					? await contentOf(spaceId, entry.sha256, host).catch(() => null)
+					? await archive
+							.read({ kind: "content", spaceId, sha256: entry.sha256 })
+							.catch(() => null)
 					: null;
 				// A proposal whose content is not here holds one note at least.
 				proposed += content ? notesIn(content) : 1;
@@ -546,7 +512,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		/**
 		 * One file of the project's knowledge, by its path, at most
 		 * `maxBytes` of its text: this Device's copy, else its content by
-		 * its hash in the document, from the store or the Host. A PDF or
+		 * its hash in the document, from the archive here or at the Host. A PDF or
 		 * Word file gives its text either way. Null when neither has the
 		 * file, and for a proposal. Refuses (never a plain error) a file
 		 * that is not text, one that stays on another Device, and one whose
@@ -572,11 +538,9 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					"This file is larger than 10 MB. It stays on the computer that synced it.",
 				);
 			}
-			const content = await contentOf(
-				spaceId,
-				entry.sha256,
-				deps.host?.() ?? null,
-			).catch(() => null);
+			const content = await archive
+				.read({ kind: "content", spaceId, sha256: entry.sha256 })
+				.catch(() => null);
 			if (!content) {
 				throw new Refusal(
 					"unavailable",
@@ -686,27 +650,6 @@ async function readState(root: string): Promise<State | null> {
 
 async function writeState(root: string, state: State): Promise<void> {
 	await writeWhole(join(root, STATE_FILE), JSON.stringify(state));
-}
-
-/**
- * Writes a file whole: to a hidden file beside it, then a rename, so a
- * reader never sees half of it. Returns the file as written.
- */
-async function writeWhole(
-	path: string,
-	content: Uint8Array | string,
-): Promise<FileStat> {
-	const dir = dirname(path);
-	await mkdir(dir, { recursive: true });
-	const temporary = join(dir, `.knowledge.${randomUUID()}.tmp`);
-	try {
-		await writeFile(temporary, content);
-		await rename(temporary, path);
-	} finally {
-		await rm(temporary, { force: true });
-	}
-	const info = await stat(path);
-	return { size: info.size, mtimeMs: info.mtimeMs };
 }
 
 /**

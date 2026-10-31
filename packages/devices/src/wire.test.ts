@@ -4,6 +4,7 @@ import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, runCommand, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
+	createSpaceArchive,
 	type Device,
 	type FlowDocuments,
 	type SessionInput,
@@ -103,6 +104,7 @@ async function startB(
 		ownerId: owner?.id as string,
 		local: placedDevice(),
 		dataDir: b.dataDir,
+		archive: createSpaceArchive(b.dataDir),
 		keyStore: { prefer: "file" },
 		scheduler: false,
 		disconnect: () => {},

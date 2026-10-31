@@ -1,26 +1,15 @@
 import type { Database } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
-import type { Actor, Relay, RunCommandInput, StartRunInput } from "../contract";
+import {
+	type Actor,
+	HostUnreachableError,
+	type Relay,
+	type RunCommandInput,
+	type StartRunInput,
+} from "../contract";
 import { hasRunRow, type RunLog, type RunRow } from "../log";
 import type { RunSummary } from "../read";
 import { RunRefusal } from "../run-status";
-
-/** What a person reads when the Host that keeps a Space cannot be reached. */
-export const HOST_UNREACHABLE =
-	"The computer that keeps this Space cannot be reached. Try again when it is online.";
-
-/**
- * The Host that keeps the Space cannot be reached now: this computer has
- * no online Link to it. The person tries again later. `Relay` throws it
- * for an action on such a Space. The API answers it with its own code
- * (`HOST_UNREACHABLE`), so a screen can say so.
- */
-export class HostUnreachableError extends Refusal {
-	constructor() {
-		super("unavailable", HOST_UNREACHABLE);
-		this.name = "HostUnreachableError";
-	}
-}
 
 /** How long a Device waits for a run its Host started to arrive. */
 const RUN_ARRIVES_MS = 30_000;

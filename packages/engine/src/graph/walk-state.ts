@@ -3,8 +3,8 @@ import { dirname } from "node:path";
 import type { Database } from "@nightshift/db";
 import { lgCheckpoint, lgWrite, step } from "@nightshift/db/schema";
 import { and, eq, sql } from "drizzle-orm";
+import type { WalkFile, WalkRef } from "../archive";
 import {
-	type CopyStamp,
 	copyStamps,
 	ForeignRowsError,
 	parseTranscript,
@@ -19,25 +19,9 @@ import {
  * A run's walk state as files: its latest Checkpoint and each step's
  * transcript and command log. A run that moves takes them to its new
  * Walker, and the readers of a run walked elsewhere open them. The engine
- * writes and reads them. The archive of `@nightshift/devices` keeps and
- * carries them, and never sees the checkpoint tables.
+ * writes and reads them. The Space archive keeps and carries them, and
+ * never sees the checkpoint tables.
  */
-
-/** A file of a run's walk state, by its Space and run (and step). */
-export type WalkRef =
-	| { kind: "checkpoint"; spaceId: string; runId: string }
-	| {
-			kind: "transcript" | "log";
-			spaceId: string;
-			runId: string;
-			stepId: string;
-	  };
-
-/**
- * One file of a run's walk state. Its content is the engine's: the peers
- * keep and carry it. A step's file has the stamp of the end it holds.
- */
-export type WalkFile = { ref: WalkRef; content: string; stamp?: CopyStamp };
 
 /** What the peers read of the walk state of the runs this computer walks. */
 export type WalkFiles = {

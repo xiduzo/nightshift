@@ -5,7 +5,6 @@ import {
 	createSyncedDocuments,
 	type FlowDocuments,
 	HostUnreachableError,
-	type KnowledgeHost,
 	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
@@ -22,7 +21,6 @@ import {
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
-import { createKnowledgeArchive } from "../archive";
 import type { HostRelay, WorkRelay } from "../contract";
 import type { HostExchange } from "../exchange";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
@@ -50,8 +48,6 @@ export type PairedDevice = {
 	flows: FlowDocuments;
 	/** Every document it syncs, by name: the views above are over them. */
 	synced: SyncedDocuments;
-	/** A's archive of knowledge content, as the Device reaches it over its relay. */
-	knowledge: KnowledgeHost;
 	/**
 	 * Brings a project of A to the Device, as its Link does: A's Space
 	 * document (every project of the Space) syncs to it, and its rows
@@ -95,8 +91,6 @@ export type PairedReplicas = {
 	flows: FlowDocuments;
 	/** Every document B syncs, by name (`PairedDevice.synced`). */
 	synced: SyncedDocuments;
-	/** A's archive of knowledge content, as B reaches it (`PairedDevice.knowledge`). */
-	knowledge: KnowledgeHost;
 	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
 	projectOnDevice: PairedDevice["projectOnDevice"];
 	/** Brings B's changes of a project's flows to A (`PairedDevice.flowsToHost`). */
@@ -215,7 +209,6 @@ export async function pairedReplicas(
 			documents,
 			flows,
 			synced,
-			knowledge: createKnowledgeArchive({ relay }),
 			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
 				const { spaceId, remote } = await host.projects.find(projectId);
 				await syncSpaceDocument(replica.documents, documents, spaceId);
@@ -247,7 +240,6 @@ export async function pairedReplicas(
 		flows: paired.flows,
 		synced: paired.synced,
 		flowsToHost: paired.flowsToHost,
-		knowledge: paired.knowledge,
 		projectOnDevice: paired.projectOnDevice,
 		pair,
 	};

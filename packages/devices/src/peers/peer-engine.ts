@@ -3,6 +3,7 @@ import {
 	type Engine,
 	type EngineOptions,
 	type PeerProjects,
+	type SpaceArchive,
 } from "@nightshift/engine";
 import type { DeviceCopy } from "@nightshift/engine/device-config";
 import { commandMoves, type RunHistoryExchange } from "../exchange";
@@ -51,6 +52,12 @@ export type PeerEngine = Engine & {
 	readonly projects: PeerProjects;
 	/** What the Device document this Replica keeps of another Device says: its name, profiles, secret names. */
 	keptDevice(deviceId: string): Promise<DeviceCopy | null>;
+	/**
+	 * This Replica's Space archive, connected to its Hosts: the walk files
+	 * of runs walked elsewhere and the knowledge content, here and at the
+	 * Hosts. The Host's exchange serves it.
+	 */
+	readonly archive: SpaceArchive;
 };
 
 /**
@@ -78,6 +85,7 @@ export function createPeerEngine(
 		offerUse,
 		presence,
 		relay,
+		archive,
 		...engineOptions
 	} = options;
 	let built: BuiltPeers | undefined;
@@ -91,6 +99,7 @@ export function createPeerEngine(
 			peers: (context) => {
 				built = createPeers(context, options, {
 					...(relay ? { relay } : {}),
+					...(archive ? { archive } : {}),
 					...(work ? { work } : {}),
 					...(ownOffers ? { ownOffers } : {}),
 					...(ownProfiles ? { ownProfiles } : {}),
@@ -121,5 +130,6 @@ export function createPeerEngine(
 		admission: built.admission,
 		projects: built.projects,
 		keptDevice: built.keptDevice,
+		archive: built.archive,
 	};
 }

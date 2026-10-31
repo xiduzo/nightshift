@@ -5,6 +5,7 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
+import type { WalkFile } from "../archive";
 import { createRunHistory, ForeignRowsError } from "../log";
 import { createRunBus } from "../log/bus";
 import { createRunLog } from "../log/run-log";
@@ -17,7 +18,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import type { WalkFile } from "./walk-state";
 import { createRunWalks } from "./walk-state";
 
 /**

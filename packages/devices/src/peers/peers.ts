@@ -1,13 +1,15 @@
 import type { Database } from "@nightshift/db";
-import type {
-	DeviceProfile,
-	PeerContext,
-	PeerProjects,
-	Peers,
+import {
+	type ArchiveHost,
+	createSpaceArchive,
+	type DeviceProfile,
+	type PeerContext,
+	type PeerProjects,
+	type Peers,
+	type SpaceArchive,
 } from "@nightshift/engine";
 import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { memberName, memberRole } from "@nightshift/engine/projects";
-import { createRunArchive } from "../archive";
 import type { HostRelay, RunCommand, WorkRelay } from "../contract";
 import { createRunHistoryExchange, type RunHistoryExchange } from "../exchange";
 import { createHostSpaces, type HostSpaces } from "../links";
@@ -34,6 +36,11 @@ import { createWalkers } from "./walkers";
 export type PeerOptions = {
 	/** The Hosts this computer links to (`createRelay`). None on a computer alone. */
 	relay?: HostRelay;
+	/**
+	 * This Replica's Space archive, which its knowledge shares. The peers
+	 * connect it to the relay. Default: one over the engine's `dataDir`.
+	 */
+	archive?: SpaceArchive;
 	/**
 	 * On a Host: how its runs reach the Devices they are placed on (the
 	 * hub those Devices pull their work from). Without it, every run runs
@@ -100,6 +107,14 @@ export type BuiltPeers = {
 	projects: PeerProjects;
 	/** What the Device documents this Replica keeps say of those Devices. */
 	keptDevice: PeerContext["keptDevice"];
+	/** This Replica's Space archive, connected to its Hosts. */
+	archive: SpaceArchive;
+};
+
+/** The Hosts of a computer alone: none, so it keeps every Space. */
+const ALONE: ArchiveHost = {
+	archivePut: async () => false,
+	archiveGet: async () => null,
 };
 
 /**
@@ -168,21 +183,17 @@ export function createPeers(
 
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	const hostOf = (spaceId: string) => hostSpaces.hostOf(spaceId);
-	const archive = createRunArchive({
-		dataDir,
-		hostOf,
-		...(relay ? { relay } : {}),
-		stepStamp: context.runs.stepStamp,
-	});
+	// Files go to the Hosts and come from them through the relay. A
+	// computer alone keeps every Space.
+	const archive = options.archive ?? createSpaceArchive(dataDir);
+	archive.connect(relay ?? ALONE);
 	const exchange = createRunHistoryExchange({
 		db,
-		dataDir,
+		archive,
 		context,
 		hostSpaces,
 		// A Space a Host keeps: that Host's feed of the step, over its link.
 		...(relay?.follow ? { upstream: relay.follow.bind(relay) } : {}),
-		// And its archive copy of a step that ended.
-		archived: archive.archived,
 	});
 
 	const offers = createEngineOffers({
@@ -236,8 +247,14 @@ export function createPeers(
 			},
 			stepEntries: (step, afterSeq, signal) =>
 				exchange.feeds.entries(step, afterSeq, signal),
-			keepWalk: archive.keepWalk,
-			archived: archive.archived,
+			async keepWalk(files) {
+				for (const file of files) await archive.put(file);
+			},
+			async archived(ref) {
+				const known =
+					ref.kind === "checkpoint" ? null : await context.runs.stepStamp(ref);
+				return archive.read(ref, known);
+			},
 		},
 		...(relay ? { relay } : {}),
 		pathsFor: createPrivatePaths({ db, registry, ownerId: context.ownerId }),
@@ -260,5 +277,6 @@ export function createPeers(
 		admission,
 		projects: context.projects,
 		keptDevice: context.keptDevice,
+		archive,
 	};
 }
