@@ -990,6 +990,47 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "label": {
                   "type": "string",
                 },
+                "outcomes": {
+                  "items": {
+                    "properties": {
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "when": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
                 "position": {
                   "properties": {
                     "x": {
@@ -2596,6 +2637,48 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "label": {
                   "type": "string",
                 },
+                "outcomes": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "when": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
                 "position": {
                   "additionalProperties": false,
                   "properties": {
@@ -4098,7 +4181,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
   "callNodeSchema": "2df95633dbf823f195ca6bf1c95cd5d69a7f7ca94928ce4408a05e6fa737198b",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "3969e3ed7e182e9e562ee64f0beb049c3cd1076eb36eac36b2d504c11873a1cf",
+  "chatRequestSchema": "d6cc1fab5c736e38e8475d09719635034cdd99e51a424429d11d15b24b38f0ff",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -4117,9 +4200,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "cbd9bbb36a4ca7bd52bccb887b2cd36187ce7a03d712719602bd13e38256f246",
+  "flowNodeSchema": "6a521cfe856d0c639554b79649d7fc643994ece48b848f7912723010797677e4",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "546367ba184d5f748418e8a960981c0cad2aaf2864729b34a0b824045e537722",
+  "flowSchema": "7ec382ed8ebcffa4dc19ec09e13937b89cbd885284226180145897225b76f533",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -4156,7 +4239,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "02f2af2082a1136f806fcae75e6349ff723c54b95b2432e376c6e72a7dbb512a",
+  "suggestionRequestSchema": "502ca86e30bd7c3caed4db063ac2113d37007dfb92c2e1d992c5a88254ce2b59",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
@@ -4166,7 +4249,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "valueNodeSchema": "d142ca6615d88434c978eb432c84b8c49c41ddca27eba6b519c52cde85c7bacb",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
-  "waitNodeSchema": "7bedcef5392aa97907a474e2bad158b5563f6a59d94d44e59a566c526231c4e2",
+  "waitNodeSchema": "e461b0471e46a2334e5a54262056e254bd2b0b5d0980bb35140fd99b82bc9ced",
   "waitUntilSchema": "abb046648846ed643412eb8c1a94deda8c0b60af38f201c55a0b5c36e6d8ef6e",
   "webhookSecretSchema": "a0a552b5d82356dc8e33835d829408eb750ffa1fb7ea4f2f1d38c75ff5d2ccf6",
 }

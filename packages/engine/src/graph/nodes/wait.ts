@@ -1,4 +1,7 @@
 import {
+	commandWaitOutcome,
+	isOwnWaitOutcome,
+	type JsonValue,
 	renderCommand,
 	renderTemplate,
 	type WaitNode,
@@ -36,8 +39,9 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  *   `waited_minutes` the node gives it;
  * - the node's `timeoutMinutes` ran out: `timeout`;
  * - `duration` and `time`: `done` (a person who wakes it early skips the rest);
- * - `command`: the command runs again; exit 0 is `done`, else the step
- *   sleeps `everyMinutes` more and tries again;
+ * - `command`: the command runs again; exit 0 is `done`, or the outcome
+ *   its data picks from the node's `outcomes` (`commandWaitOutcome`), else
+ *   the step sleeps `everyMinutes` more and tries again;
  * - `signal`: `done` when the wake is that signal (`pending.signal`), with
  *   the event of the webhook that sent it as `data`; else the step keeps
  *   waiting. A `key` is rendered when the wait starts and logged with it
@@ -76,9 +80,10 @@ export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 }
 
 /**
- * The Wait kind. A wait node for its own sleeps; `done` is its chosen end
- * (`timeout` a failure); no step timer, as the node keeps its own deadline
- * across its sleeps; a command poll writes the command log.
+ * The Wait kind. A wait node for its own sleeps; `done` and its own
+ * outcomes are its chosen ends (`timeout` a failure); no step timer, as the
+ * node keeps its own deadline across its sleeps; a command poll writes the
+ * command log.
  */
 export const WAIT: NodeKind<WaitNode> = {
 	...PLAIN_KIND,
@@ -87,11 +92,14 @@ export const WAIT: NodeKind<WaitNode> = {
 	works: (node) => (node.until.kind === "command" ? "worktree" : null),
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
-	isChosenEnd: (_node, outcome) => outcome === "pass" || outcome === "done",
+	isChosenEnd: (node, outcome) =>
+		outcome === "pass" || outcome === "done" || isOwnWaitOutcome(node, outcome),
 	endReason: (node, outcome) =>
 		outcome === "pass" || outcome === "done"
 			? null
 			: endedAtReason(node, outcome),
+	endedLabel: (node, outcome) =>
+		isOwnWaitOutcome(node, outcome) ? outcome : "",
 	logsCommandOutput: (node) => node.until.kind === "command",
 	timeBudget: () => ({ timeoutMinutes: undefined, idleMinutes: undefined }),
 };
@@ -146,12 +154,12 @@ async function startWait(
 			});
 		}
 		case "command": {
-			const polled = await poll(ctx, step, until, outputs);
+			const polled = await poll(ctx, node, step, until, outputs);
 			if (polled.kind !== "again") return polled;
 			return sleep(node, {
 				until: now + until.everyMinutes * ctx.minuteMs,
 				deadline,
-				message: `The command did not pass yet. Tries again in ${until.everyMinutes} min.`,
+				message: againMessage(polled, until.everyMinutes),
 			});
 		}
 		case "signal":
@@ -195,12 +203,12 @@ async function continueWait(
 		case "time":
 			return end("done");
 		case "command": {
-			const polled = await poll(ctx, step, until, outputs);
+			const polled = await poll(ctx, node, step, until, outputs);
 			if (polled.kind !== "again") return polled;
 			return sleep(node, {
 				until: now + until.everyMinutes * ctx.minuteMs,
 				deadline,
-				message: `The command did not pass yet. Tries again in ${until.everyMinutes} min.`,
+				message: againMessage(polled, until.everyMinutes),
 			});
 		}
 		case "signal":
@@ -234,24 +242,50 @@ function signalWait(
 	};
 }
 
+/** Why a poll did not end the wait. */
+type Again = {
+	kind: "again";
+	logTail: string;
+	/** An outcome the command picked that the node does not list. */
+	picked?: string;
+	/** The data the command wrote is not valid JSON. */
+	notJson?: boolean;
+};
+
+/** What the wait says when it polls again. */
+function againMessage(again: Again, everyMinutes: number): string {
+	if (again.notJson) {
+		return `The data the command wrote is not valid JSON. Tries again in ${everyMinutes} min.`;
+	}
+	if (again.picked !== undefined) {
+		return `The command picked "${again.picked}", which is not an outcome of this Wait. Tries again in ${everyMinutes} min.`;
+	}
+	return `The command did not pass yet. Tries again in ${everyMinutes} min.`;
+}
+
 /**
  * Runs the command once, as a Command node does: template values as
- * environment variables, output to the transcript and the step's log file.
- * Exit 0 ends the step `done`; a kill or a stop ends it as the signal says;
- * a command that cannot start ends it `error`. Any other exit means wait.
+ * environment variables, output to the transcript and the step's log file,
+ * a new file for its data in `$NS_OUTPUT`. JSON written there is the
+ * step's `data`. Exit 0 ends the step `done`, or on the outcome the data
+ * picks (`commandWaitOutcome`); a kill or a stop ends it as the signal
+ * says; a command that cannot start ends it `error`. Anything else means
+ * wait.
  */
 async function poll(
 	ctx: StepContext,
+	node: WaitNode,
 	step: StepHandle,
 	until: Extract<WaitUntil, { kind: "command" }>,
 	outputs: StepOutputs,
-): Promise<BodyResult | { kind: "again"; logTail: string }> {
+): Promise<BodyResult | Again> {
 	const { command, env } = renderCommand(until.command, step.tctx);
 	step.record(null, { type: "command-start", command });
 	const result = await runCommand(step.device, {
 		command,
 		cwd: step.worktree,
 		env,
+		outputFile: true,
 		logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
 		signal: step.signal,
 		onOutput: (stream, text) =>
@@ -268,10 +302,31 @@ async function poll(
 			error: `The command could not start: ${result.spawnError}`,
 		};
 	}
-	if (result.exitCode === 0) {
-		return { kind: "end", outcome: "done", outputs: withTail, error: null };
+	const written = result.output?.trim() ?? "";
+	if (written !== "") {
+		try {
+			withTail.data = JSON.parse(written) as JsonValue;
+		} catch {
+			// Without outcomes, the exit code decides, as before.
+			if (node.outcomes !== undefined) {
+				return { kind: "again", logTail: result.logTail, notJson: true };
+			}
+		}
 	}
-	return { kind: "again", logTail: result.logTail };
+	const picked = commandWaitOutcome(node, result.exitCode, withTail.data);
+	if (picked.kind === "outcome") {
+		return {
+			kind: "end",
+			outcome: picked.outcome,
+			outputs: withTail,
+			error: null,
+		};
+	}
+	return {
+		kind: "again",
+		logTail: result.logTail,
+		...(picked.picked === undefined ? {} : { picked: picked.picked }),
+	};
 }
 
 /**
