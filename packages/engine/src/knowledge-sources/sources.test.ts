@@ -280,6 +280,12 @@ describe("save", () => {
 		await expect(save({ path: "/x", folder: "learnings" })).rejects.toThrow(
 			"Choose a folder inside the knowledge",
 		);
+		await expect(save({ path: "/x", folder: "evals" })).rejects.toThrow(
+			"learnings and evals are Night Shift's own.",
+		);
+		await expect(save({ path: "/x", folder: "evals/q" })).rejects.toThrow(
+			"Choose a folder inside the knowledge",
+		);
 		await expect(save({ path: "/x", folder: "../up" })).rejects.toThrow(
 			"Choose a folder inside the knowledge",
 		);

@@ -19,7 +19,6 @@ export {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,
 } from "./knowledge-document";
-export { isLearningsFolder } from "./learnings";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
 export {
 	createProjectKnowledge,

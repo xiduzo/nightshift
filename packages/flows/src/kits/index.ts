@@ -10,6 +10,10 @@ export {
 	REVIEW_LEARNINGS_KIT,
 } from "./kits";
 export {
+	isKnowledgeOwnFolder,
+	KNOWLEDGE_OWN_FOLDERS_WORDS,
+} from "./knowledge/shell";
+export {
 	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSource,

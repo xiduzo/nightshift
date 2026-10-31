@@ -163,8 +163,10 @@ export {
 } from "./harnesses";
 export {
 	isKitName,
+	isKnowledgeOwnFolder,
 	type Kit,
 	KNOWLEDGE_FOLDER_INPUT,
+	KNOWLEDGE_OWN_FOLDERS_WORDS,
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSource,
 	type KnowledgeSourceKind,

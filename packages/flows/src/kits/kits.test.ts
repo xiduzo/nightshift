@@ -591,7 +591,14 @@ describe("the knowledge kits", () => {
 	const read = (path: string) => readFile(join(knowledge, path), "utf8");
 
 	test("every one refuses a folder outside the knowledge, or Night Shift's own", async () => {
-		for (const folder of ["../out", "/tmp/x", "learnings/accepted", ""]) {
+		for (const folder of [
+			"../out",
+			"/tmp/x",
+			"learnings/accepted",
+			"evals",
+			"evals/questions",
+			"",
+		]) {
 			const ran = await step(kit("kit:knowledge/web"), "sync", {
 				urls: "https://example.com",
 				folder,

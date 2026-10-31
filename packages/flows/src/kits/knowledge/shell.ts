@@ -5,15 +5,32 @@
 import type { FlowInput } from "../../flow";
 
 /**
+ * Night Shift's own folders in the knowledge: no source fills them.
+ * `learnings/` holds what agents propose and what a person kept, `evals/`
+ * the question set. The kits and the Knowledge page's sources refuse them.
+ */
+const KNOWLEDGE_OWN_FOLDERS: readonly string[] = ["learnings", "evals"];
+
+/** Whether a folder of the knowledge is one of Night Shift's own, or in one. */
+export function isKnowledgeOwnFolder(folder: string): boolean {
+	return KNOWLEDGE_OWN_FOLDERS.some(
+		(name) => folder === name || folder.startsWith(`${name}/`),
+	);
+}
+
+/** That a folder is Night Shift's own, as the kits and the sources say it. */
+export const KNOWLEDGE_OWN_FOLDERS_WORDS = `${KNOWLEDGE_OWN_FOLDERS.join(" and ")} are Night Shift's own.`;
+
+/**
  * The start of every sync command: it stops on the first error, finds
  * the project's knowledge folder in `$NS_KNOWLEDGE`, and sets `dest` to
- * the kit's folder in it. `learnings/` is Night Shift's own.
+ * the kit's folder in it. It refuses Night Shift's own folders.
  */
 export const KNOWLEDGE_DEST = String.raw`set -e
 if [ -z "$NS_KNOWLEDGE" ]; then echo "Run this kit in a flow: the step gets the project's knowledge folder there." >&2; exit 2; fi
 folder="{{folder}}"
 case "$folder" in
-	""|/*|..|../*|*/..|*/../*|learnings|learnings/*) echo "Choose a folder inside the knowledge folder, for example docs. learnings is Night Shift's own." >&2; exit 2 ;;
+	""|/*|..|../*|*/..|*/../*|${KNOWLEDGE_OWN_FOLDERS.flatMap((name) => [name, `${name}/*`]).join("|")}) echo "Choose a folder inside the knowledge folder, for example docs. ${KNOWLEDGE_OWN_FOLDERS_WORDS}" >&2; exit 2 ;;
 esac
 dest="$NS_KNOWLEDGE/$folder"`;
 

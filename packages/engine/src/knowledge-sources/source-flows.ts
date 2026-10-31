@@ -2,7 +2,9 @@ import {
 	type Flow,
 	flowNameSchema,
 	flowSchema,
+	isKnowledgeOwnFolder,
 	KNOWLEDGE_FOLDER_INPUT,
+	KNOWLEDGE_OWN_FOLDERS_WORDS,
 	type KnowledgeSource,
 	type KnowledgeSourceKit,
 	knowledgeKitInputs,
@@ -12,7 +14,6 @@ import {
 	type Schedule,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { isLearningsFolder } from "../knowledge";
 
 /**
  * A source's flow and schedule, as pure rules over a project's flows: a
@@ -45,9 +46,9 @@ function folderProblem(folder: string): string | null {
 		folder === "" ||
 		folder.startsWith("/") ||
 		parts.includes("..") ||
-		isLearningsFolder(folder)
+		isKnowledgeOwnFolder(folder)
 	) {
-		return "Choose a folder inside the knowledge, for example docs. learnings is Night Shift's own.";
+		return `Choose a folder inside the knowledge, for example docs. ${KNOWLEDGE_OWN_FOLDERS_WORDS}`;
 	}
 	return null;
 }
