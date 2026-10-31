@@ -17,11 +17,17 @@ In Night Shift, open **Settings → Monitoring**:
 2. Set the **Address** of your OpenTelemetry receiver, for example
    `http://localhost:4318`. Night Shift adds `/v1/traces` and `/v1/metrics`.
 3. If your tool asks for JSON, change the **Format**. Else keep protobuf.
-4. If your tool needs an API key, add **Headers**, one per line:
-   `Authorization=Bearer abc123`. Night Shift keeps them in the system
-   keychain, like a secret. After you save, it shows only their names.
+4. If your tool needs an API key, add a **Header**, for example
+   `Authorization` with the value `Bearer ${GRAFANA_TOKEN}`. Save the key
+   itself on the Secrets page as `GRAFANA_TOKEN`. A value that is not
+   secret, such as a tenant id, can stay as written.
 
-A change applies at once, with no restart. Each computer has its own setting
+A header keeps only the `${NAME}` reference. The key stays in the secrets,
+and the record of a step shows it as `•••`. Headers saved by an older
+Night Shift move to the Secrets page at start, as `OTEL_HEADER_<NAME>`.
+
+A change applies at once, with no restart. A new value of a secret that a
+header reads applies at once too. Each computer has its own setting
 and sends the runs it walks. A Host sends the runs it walks, a laptop its
 own.
 
