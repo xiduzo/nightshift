@@ -71,7 +71,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -144,6 +144,14 @@ Where parallel branches meet. `wait`: `all` (default), or `first` (stops the oth
 Outcomes: `done`. Outputs: `outcome`, `data`, `visit`.
 
 `{"id":"reviewed","type":"join","position":{"x":0,"y":0},"wait":"all"}`
+
+### lease
+
+Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.
+
+Outcomes: `held`, `busy`. Outputs: `outcome`, `name`, `holder`, `holder_title`, `waited_minutes`, `visit`.
+
+`{"id":"own_branch","type":"lease","position":{"x":0,"y":0},"name":"branch:{{pr.data.head}}","waitMinutes":30}`
 
 ## Edges, outcomes and loops
 

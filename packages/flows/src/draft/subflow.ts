@@ -434,6 +434,8 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 			return false;
 		case "join":
 			return outcome === "done";
+		case "lease":
+			return outcome === "held";
 	}
 }
 

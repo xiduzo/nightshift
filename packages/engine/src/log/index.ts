@@ -19,6 +19,7 @@ export type {
 	InputValues,
 	ItemFacts,
 	KnowledgeVia,
+	LeaseWait,
 	LoggedEvent,
 	PolicyWaitReason,
 	ResumeAction,

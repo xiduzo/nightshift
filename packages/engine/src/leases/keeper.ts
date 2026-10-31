@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import { DEFAULT_LEASE_TTL_MINUTES } from "@nightshift/flows";
 import {
 	HostUnreachableError,
 	type LeaseAnswer,
@@ -7,8 +8,6 @@ import {
 import { spaceOfRun } from "../log";
 import type { LeaseStore } from "./store";
 
-/** How long a lease holds without a renewal when its node sets no `ttlMinutes`. */
-export const DEFAULT_LEASE_TTL_MINUTES = 30;
 /** How often the Walker renews the leases of its runs, in minutes. */
 const RENEW_EVERY_MINUTES = 5;
 

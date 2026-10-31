@@ -13,6 +13,7 @@ import {
 	decisionDecider,
 	type EndNode,
 	type JoinNode,
+	type LeaseNode,
 	type ListSource,
 	type ToolNode,
 	type ValueBy,
@@ -239,6 +240,11 @@ export function toolNode(id: string, position: Position): ToolNode {
 		tool: "",
 		arguments: {},
 	};
+}
+
+/** The name starts empty; the issues panel asks for it. It does not wait. */
+export function leaseNode(id: string, position: Position): LeaseNode {
+	return { id, type: "lease", position, name: "" };
 }
 
 /** A Join waits for every branch until the person picks `first`. */

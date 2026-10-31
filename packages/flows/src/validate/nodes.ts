@@ -5,6 +5,7 @@ import {
 	checkCommandNode,
 	checkDecisionNode,
 	checkEndNode,
+	checkLeaseNode,
 	checkToolNode,
 	checkValueNode,
 	checkWaitNode,
@@ -64,6 +65,9 @@ export function checkNode(
 			break;
 		case "join":
 			// A Join's checks are the branches' (`checkBranches`).
+			break;
+		case "lease":
+			checkLeaseNode(node, check);
 			break;
 	}
 }

@@ -8,6 +8,7 @@ import {
 	joinNodeSchema,
 	jsonSchemaSchema,
 	labelSchema,
+	leaseNodeSchema,
 	nameSchema,
 	nodeIdSchema,
 	toolNodeSchema,
@@ -41,6 +42,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	toolNodeSchema,
 	endNodeSchema,
 	joinNodeSchema,
+	leaseNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;

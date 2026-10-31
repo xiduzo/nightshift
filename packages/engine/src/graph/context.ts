@@ -12,6 +12,7 @@ import type {
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
+import type { LeaseAnswer } from "../contract";
 import type { Capabilities, Device } from "../device";
 import type { RunSettings } from "../device-config";
 import {
@@ -139,6 +140,19 @@ export type StepContext = {
 	 * branches it may stop (`branches.ts`). A body shares its caller's.
 	 */
 	races: Races;
+	/**
+	 * Takes a lease of the run's Space for the run (ADR 7): the engine's
+	 * keeper, which asks this Replica's store or the Space's Host.
+	 */
+	leases: LeaseTaker;
+};
+
+/** How a Lease node takes its lease (`StepContext.leases`). */
+export type LeaseTaker = {
+	take(
+		run: Pick<RunRow, "id" | "spaceId" | "title">,
+		input: { name: string; ttlMinutes?: number },
+	): Promise<LeaseAnswer>;
 };
 
 /** A node of the compiled graph: runs one visit and returns where to go next. */

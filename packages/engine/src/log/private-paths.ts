@@ -68,6 +68,7 @@ export const PATH_FIELDS = {
 	ItemBlocked: [],
 	ItemEnded: [],
 	WaitStarted: [],
+	LeaseTaken: [],
 	WaitEnded: [],
 	StopRequested: [],
 	StopAfterStepRequested: [],

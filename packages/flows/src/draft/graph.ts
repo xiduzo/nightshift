@@ -19,6 +19,7 @@ import {
 	endNode,
 	gateNode,
 	joinNode,
+	leaseNode,
 	type NodeDefaults,
 	type Position,
 	toolNode,
@@ -90,6 +91,7 @@ const NEW_NODE: Record<
 	tool: { id: "tool", create: toolNode },
 	end: { id: "end", create: endNode },
 	join: { id: "join", create: joinNode },
+	lease: { id: "lease", create: leaseNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */

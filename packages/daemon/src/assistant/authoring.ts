@@ -270,6 +270,10 @@ function lineOf(event: TranscriptEntry["event"]): string {
 			return event.reason ? `Item ${event.state}: ${event.reason}` : "";
 		case "end":
 			return `End: ${event.status}${event.message ? `. ${event.message}` : ""}`;
+		case "lease":
+			return event.held
+				? `Lease: took ${event.name}`
+				: `Lease: ${event.name} is held by run ${event.holder ?? "unknown"}`;
 		default:
 			return "";
 	}

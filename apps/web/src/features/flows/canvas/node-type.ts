@@ -14,6 +14,7 @@ import {
 	FlagIcon,
 	HandIcon,
 	HourglassIcon,
+	LockIcon,
 	type LucideIcon,
 	MergeIcon,
 	PlugIcon,
@@ -73,6 +74,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: NODE_TYPE_LABEL.join,
 		icon: MergeIcon,
 		blurb: "Waits for branches that run at once, then continues.",
+	},
+	lease: {
+		label: NODE_TYPE_LABEL.lease,
+		icon: LockIcon,
+		blurb: "Lets one run at a time do the next steps.",
 	},
 };
 

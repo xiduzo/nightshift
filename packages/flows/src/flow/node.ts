@@ -9,6 +9,8 @@ import {
 	decisionOutputFields,
 	endOutputFields,
 	joinOutputFields,
+	leaseOutcomes,
+	leaseOutputFields,
 	type OutcomeColor,
 	toolOutputFields,
 	valueOutputFields,
@@ -37,6 +39,7 @@ export const NODE_TYPE_LABEL = {
 	tool: "Tool",
 	end: "End",
 	join: "Join",
+	lease: "Lease",
 } as const satisfies Record<FlowNodeType, string>;
 
 /**
@@ -107,6 +110,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return [];
 		case "join":
 			return ["done"] satisfies BuiltInOutcome[];
+		case "lease":
+			return leaseOutcomes;
 	}
 }
 
@@ -147,6 +152,7 @@ export const outputFieldsByType = {
 	tool: toolOutputFields,
 	end: endOutputFields,
 	join: joinOutputFields,
+	lease: leaseOutputFields,
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /** Output fields that hold JSON, so a template may take a path below them. A Join's `data` holds one entry per branch. */

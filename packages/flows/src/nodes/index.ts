@@ -103,6 +103,14 @@ export {
 	joinOutputFields,
 } from "./join";
 export {
+	checkLeaseNode,
+	DEFAULT_LEASE_TTL_MINUTES,
+	type LeaseNode,
+	leaseNodeSchema,
+	leaseOutcomes,
+	leaseOutputFields,
+} from "./lease";
+export {
 	type Option,
 	type OutcomeColor,
 	option,

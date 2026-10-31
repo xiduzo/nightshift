@@ -90,7 +90,7 @@ import type { SpaceEngine } from "./space-engine";
 import { createStartHolds } from "./start-holds";
 import { createStartPlaces } from "./start-place";
 import { takeOver } from "./take-over";
-import { wakeOfflineSleeps } from "./wake";
+import { wakeLeaseSleeps, wakeOfflineSleeps } from "./wake";
 
 /**
  * The engine: projects, flows, schedules, Gates and runs, over the event
@@ -453,6 +453,10 @@ export function createEngine(
 		...(hosts?.leases ? { relay: hosts.leases } : {}),
 		walkerId: () => runLog.walkerId(),
 		minuteMs,
+		// The runs here that wait for a lease ask again.
+		onFreed: () => {
+			void wakeLeaseSleeps({ db, log: runLog, runner }).catch(() => {});
+		},
 	});
 	leases.start(signal);
 	/** What runs hold for a scope: the engine lets go of it when a run ends. */
@@ -473,6 +477,7 @@ export function createEngine(
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
 		signal,
 		holds: runHolds,
+		leases,
 		...(internals.overdueSweepMs !== undefined
 			? { overdueSweepMs: internals.overdueSweepMs }
 			: {}),
