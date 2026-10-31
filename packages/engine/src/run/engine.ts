@@ -25,7 +25,13 @@ import {
 	resolvePolicy,
 } from "../graph";
 import { logKnowledgeUse } from "../knowledge";
-import { createLeaseKeeper, createLeaseStore, leaseHolds } from "../leases";
+import {
+	createLeaseKeeper,
+	createLeaseStore,
+	leaseHolds,
+	leasesLost,
+	trackHeldLeases,
+} from "../leases";
 import {
 	copyStamps,
 	createLandedFeed,
@@ -457,10 +463,11 @@ export function createEngine(
 		onFreed: () => {
 			void wakeLeaseSleeps({ db, log: runLog, runner }).catch(() => {});
 		},
+		onLost: (runId, names) => leasesLost({ log: runLog }, runId, names),
 	});
 	leases.start(signal);
 	/** What runs hold for a scope: the engine lets go of it when a run ends. */
-	const runHolds = combineHolds([leaseHolds(leases)]);
+	const runHolds = combineHolds([leaseHolds({ keeper: leases, log: runLog })]);
 
 	const runner = createRunner({
 		db,
@@ -503,8 +510,14 @@ export function createEngine(
 		runHolds,
 	});
 
-	const ready = recovery
-		.recoverInterruptedWork()
+	// The leases the runs here held when the last daemon stopped are renewed
+	// from now on: before recovery, which lets go of those of the runs that
+	// do not continue.
+	const ready = trackHeldLeases({ db, log: runLog, keeper: leases })
+		.catch((error) => {
+			console.warn("[engine] could not read the leases of the runs", error);
+		})
+		.then(() => recovery.recoverInterruptedWork())
 		// Every Space's document: Projects from before it are imported once.
 		.then(() => documents.openAll())
 		.then(() =>

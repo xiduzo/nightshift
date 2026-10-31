@@ -11,6 +11,7 @@ import {
 	checkWaitNode,
 	type NodeCheck,
 } from "../nodes";
+import { nodesWithin, sectionPath } from "../sections";
 import type { Report } from "./issues";
 import { checkEventRule, checkRule, checkTemplate, type Scope } from "./scope";
 
@@ -37,6 +38,10 @@ export function checkNode(
 			scope.flow.edges.some(
 				(edge) => edge.from === node.id && edge.outcome === outcome,
 			),
+		section: (id) => {
+			const section = sectionPath(scope.flow, id).at(-1);
+			return section ? nodesWithin(scope.flow, section) : null;
+		},
 	};
 	switch (node.type) {
 		case "agent":

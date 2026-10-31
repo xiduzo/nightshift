@@ -80,6 +80,7 @@ const NO_LEASES: LeaseTaker = {
 	take: async () => {
 		throw new Error("This computer keeps no leases.");
 	},
+	release: async () => {},
 };
 
 /** One interrupt the thread sits at, with the id a resume answers it by. */

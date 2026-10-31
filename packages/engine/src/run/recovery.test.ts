@@ -357,6 +357,7 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 				notContinuing: async (runId) => {
 					holdsHeard.push(`${runId} does not continue`);
 				},
+				resuming: async () => {},
 			},
 		});
 		await recovery.recoverInterruptedWork();

@@ -25,6 +25,7 @@ import {
 	scopeKey,
 	type WaitReason,
 } from "./events";
+import type { Hold } from "./holds";
 import { type AnsweredBy, answeredBy } from "./scores";
 
 /**
@@ -292,6 +293,10 @@ export type RunState = {
 	steps: ReadonlyMap<string, DerivedStep>;
 	/** The sessions in the order they started. */
 	sessions: ReadonlyMap<string, DerivedSession>;
+	/** What the current walk holds for a scope (leases), oldest first. Empty once the run ended. */
+	holds: readonly Hold[];
+	/** What the run held when it last ended: a resume takes it again. Empty once it resumed. */
+	endedHolding: readonly Hold[];
 };
 
 /** The key of a node's visit count in one scope (`RunState.visits`). */
@@ -345,6 +350,8 @@ function emptyState(): Draft {
 		visits: new Map(),
 		steps: new Map(),
 		sessions: new Map(),
+		holds: [],
+		endedHolding: [],
 	};
 }
 
@@ -380,6 +387,8 @@ function draftOf(state: RunState): Draft {
 		visits: new Map(state.visits),
 		steps: new Map(state.steps),
 		sessions: new Map(state.sessions),
+		holds: [...state.holds],
+		endedHolding: [...state.endedHolding],
 	};
 }
 
@@ -482,6 +491,27 @@ function apply(run: Draft, e: LoggedEvent): void {
 		case "RunWarned":
 			run.warnings.push(logged(e));
 			break;
+		case "LeaseTaken":
+			run.holds = [
+				...run.holds.filter(
+					(hold) => !(hold.kind === "lease" && hold.name === e.payload.name),
+				),
+				{
+					kind: "lease",
+					name: e.payload.name,
+					nodeId: e.payload.nodeId,
+					scope: e.payload.scope ?? null,
+					section: e.payload.section ?? null,
+					ttlMinutes: e.payload.ttlMinutes,
+					at: e.at,
+				},
+			];
+			break;
+		case "LeaseReleased":
+			run.holds = run.holds.filter(
+				(hold) => !(hold.kind === "lease" && hold.name === e.payload.name),
+			);
+			break;
 		case "Scored":
 			run.scores.push(logged(e));
 			break;
@@ -566,8 +596,12 @@ function applyRunEvent(
 	run.wait = null;
 	if (e.type === "RunEnded") {
 		run.ends.push({ ...logged(e), openedAt: run.walk?.at ?? e.at });
+		// An ended run holds nothing: the engine let go of it.
+		run.endedHolding = run.holds;
+		run.holds = [];
 		return;
 	}
+	if (e.type === "RunResumed") run.endedHolding = [];
 	run.walk = { seq: e.seq, at: e.at };
 	run.stopAfterStep = false;
 	run.stepsSinceWalk = 0;

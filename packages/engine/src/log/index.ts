@@ -16,6 +16,7 @@ export type {
 	EventWrites,
 	GateChoice,
 	GateDeadline,
+	HoldSection,
 	InputValues,
 	ItemFacts,
 	KnowledgeVia,
@@ -45,6 +46,7 @@ export {
 	MissingProjectError,
 	type RunHistory,
 } from "./history";
+export { type Hold, holdCovers, leavingHolds } from "./holds";
 export {
 	createLandedFeed,
 	type LandedRunEvent,

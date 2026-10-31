@@ -8,8 +8,8 @@ import {
 import { spaceOfRun } from "../log";
 import type { LeaseStore } from "./store";
 
-/** How often the Walker renews the leases of its runs, in minutes. */
-const RENEW_EVERY_MINUTES = 5;
+/** How often the Walker renews the leases of its runs, in minutes. A lease's ttl is at least 2. */
+const RENEW_EVERY_MINUTES = 1;
 
 /** The run that asks, as the keeper reads it. */
 export type LeaseRun = { id: string; spaceId: string; title: string };
@@ -163,7 +163,7 @@ export function createLeaseKeeper(deps: {
 		renewAll,
 
 		/**
-		 * Renews the leases every 5 minutes until `signal` aborts. The ttl of a
+		 * Renews the leases every minute until `signal` aborts. The ttl of a
 		 * lease is longer than that, so a living run never loses one.
 		 */
 		start(signal: AbortSignal): void {

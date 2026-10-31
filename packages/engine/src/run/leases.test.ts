@@ -258,12 +258,14 @@ describe("the engine lets go of a lease on every end", () => {
 
 	test("given a run the daemon died in, when it does not continue on its own, then the lease is free", async () => {
 		const dying = scriptedHarness({ hang: true });
-		const first = makeEngine(dying.harness);
+		const dies = new AbortController();
+		const first = makeEngine(dying.harness, {}, { signal: dies.signal });
 		const run = await first.startRun({
 			projectId: await projectId(first),
 			flow: flowOf([lease(), work], [edge("own", "held", "work")]),
 		});
 		await waitFor(() => dying.sessions[0], { label: "the session" });
+		dies.abort();
 		expect(await holders()).toEqual({ "zac-docker-stack": run.id });
 
 		const second = makeEngine(
@@ -279,12 +281,14 @@ describe("the engine lets go of a lease on every end", () => {
 
 	test("given a run the daemon died in, when it continues on its own, then it keeps the lease", async () => {
 		const dying = scriptedHarness({ hang: true });
-		const first = makeEngine(dying.harness);
+		const dies = new AbortController();
+		const first = makeEngine(dying.harness, {}, { signal: dies.signal });
 		const run = await first.startRun({
 			projectId: await projectId(first),
 			flow: flowOf([lease(), work], [edge("own", "held", "work")]),
 		});
 		await waitFor(() => dying.sessions[0], { label: "the session" });
+		dies.abort();
 
 		const { harness, sessions } = scriptedHarness();
 		const second = makeEngine(harness, {}, { resumeGraceMs: 0 });
@@ -299,4 +303,123 @@ describe("the engine lets go of a lease on every end", () => {
 const settingsWith = (patch: Partial<RunSettings>) => (): RunSettings => ({
 	...defaultRunSettings(),
 	...patch,
+});
+
+describe("a lease holds for its scope", () => {
+	test("given a lease for a Section, when the run leaves the Section, then the lease is free while the run goes on", async () => {
+		const engine = makeEngine();
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: {
+				...flowOf(
+					[
+						lease({ scope: { section: "deploy" } }),
+						{
+							id: "up",
+							type: "command",
+							position: at,
+							command: "true",
+							output: "text",
+						},
+						waitFor_("go"),
+					],
+					[edge("own", "held", "up"), edge("up", "pass", "hold")],
+				),
+				sections: [{ id: "deploy", label: "Deploy", nodes: ["own", "up"] }],
+			},
+		});
+		await statusOf(engine, run.id, "sleeping");
+		expect(await holders()).toEqual({});
+		const events = await (runLogs[0] as RunLog).events(run.id);
+		expect(
+			events.flatMap((e) =>
+				e.type === "LeaseTaken" || e.type === "LeaseReleased"
+					? [[e.type, e.payload]]
+					: [],
+			),
+		).toEqual([
+			[
+				"LeaseTaken",
+				{
+					name: "zac-docker-stack",
+					nodeId: "own",
+					ttlMinutes: 30,
+					scope: null,
+					section: { id: "deploy", nodes: ["own", "up"] },
+				},
+			],
+			["LeaseReleased", { name: "zac-docker-stack", why: "scope" }],
+		]);
+	});
+});
+
+describe("a run that resumes takes its leases again", () => {
+	test("given a failed run that held a lease, when another run holds it, then the resume is refused; once free, the run takes it again before its next step", async () => {
+		const marker = `${sandbox.root}/go`;
+		const engine = makeEngine();
+		const first = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[
+					lease(),
+					{
+						id: "check",
+						type: "command",
+						position: at,
+						command: `test -f ${marker}`,
+						output: "text",
+					},
+				],
+				[edge("own", "held", "check")],
+			),
+		});
+		expect((await endOf(engine, first.id)).status).toBe("failed");
+		expect(await holders()).toEqual({});
+
+		const second = await holdingRun(engine);
+		await expect(engine.act(first.id, { kind: "resume" })).rejects.toThrow(
+			`holds the lease "zac-docker-stack" now. Resume this run when that run lets go of it.`,
+		);
+		expect((await engine.getRun(first.id)).status).toBe("failed");
+
+		await engine.act(second.id, { kind: "signal", name: "go" });
+		await endOf(engine, second.id);
+		await Bun.write(marker, "");
+		await engine.act(first.id, { kind: "resume" });
+		expect((await endOf(engine, first.id)).status).toBe("finished");
+		const events = await (runLogs[0] as RunLog).events(first.id);
+		const types = events.map((e) => e.type);
+		// Taken again before the resume, then the step ran.
+		expect(types.lastIndexOf("LeaseTaken")).toBeLessThan(
+			types.lastIndexOf("RunResumed"),
+		);
+		expect(
+			events.filter((e) => e.type === "LeaseTaken").map((e) => e.payload),
+		).toEqual([
+			{ name: "zac-docker-stack", nodeId: "own", ttlMinutes: 30, scope: null },
+			{
+				name: "zac-docker-stack",
+				nodeId: "own",
+				ttlMinutes: 30,
+				scope: null,
+				again: true,
+			},
+		]);
+		expect(await holders()).toEqual({});
+	});
+});
+
+describe("after a restart", () => {
+	test("given a run that sleeps holding a short lease, when a new daemon starts, then it renews the lease so it does not expire", async () => {
+		const dies = new AbortController();
+		const first = makeEngine(undefined, {}, { signal: dies.signal });
+		const run = await holdingRun(first, holdingFlow({ ttlMinutes: 2 }));
+		// The first daemon dies: its renewals go with it.
+		dies.abort();
+		const second = makeEngine();
+		expect((await second.getRun(run.id)).status).toBe("sleeping");
+		// Ten ttls later the lease is still the run's.
+		await Bun.sleep(20 * MINUTE_MS);
+		expect(await holders()).toEqual({ "zac-docker-stack": run.id });
+	});
 });

@@ -9,9 +9,14 @@ import {
 	type JsonValue,
 	nextEdge,
 } from "@nightshift/flows";
-import type { Scope, StepOutcome, StepOutputs } from "../log";
+import {
+	leavingHolds,
+	type Scope,
+	type StepOutcome,
+	type StepOutputs,
+} from "../log";
 import { arrive, openRound, outrun, placeOf } from "./branches";
-import type { NodeAction, StepContext } from "./context";
+import { messageOf, type NodeAction, type StepContext } from "./context";
 import { interruptNode } from "./interrupt";
 import { commitVisit, type DoneStep } from "./run-position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
@@ -236,6 +241,7 @@ async function routeOn(
 	const [first] = taken ?? [];
 	if (first && choice.kind !== "fan-out") {
 		// The walk took this edge before the commit was lost.
+		await leaveScopes(ctx, end, [{ from: node.id, to: first.to }], config);
 		return new Command({
 			update: {
 				...update,
@@ -256,6 +262,9 @@ async function routeOn(
 			);
 		}
 		if (kind.isChosenEnd(node, outcome)) {
+			// The end of a called flow goes on in its caller: a Call step that
+			// ends here ends the Sections of its own flow.
+			await leaveScopes(ctx, end, [], config);
 			const result = kind.endResult(node, outcome);
 			return new Command({
 				update: {
@@ -298,6 +307,7 @@ async function routeOn(
 			if (logged.has(edge.id)) continue;
 			await takeEdge(ctx, edge, outcome, config);
 		}
+		await leaveScopes(ctx, end, choice.edges, config);
 		return new Command({
 			update: {
 				...update,
@@ -309,6 +319,7 @@ async function routeOn(
 	}
 	const { edge } = choice;
 	await takeEdge(ctx, edge, outcome, config);
+	await leaveScopes(ctx, end, [edge], config);
 	return new Command({
 		update: {
 			...update,
@@ -337,6 +348,51 @@ async function takeEdge(
 			scope: scopeOf(config),
 		},
 	});
+}
+
+/**
+ * Lets go of what the run holds for a Section the step leaves
+ * (`leavingHolds`): it takes an edge out of the Section, or it is the Call
+ * step whose flow the hold was taken in. `LeaseReleased` goes in the log
+ * first, so a resume does not take the lease again. A lease that cannot be
+ * released at its keeper expires after its ttl: the walk goes on. A hold
+ * the log already let go of (an end whose commit was lost) is not let go
+ * of twice.
+ */
+async function leaveScopes(
+	ctx: StepContext,
+	end: StepEnd,
+	edges: readonly { from: string; to: string }[],
+	config: LangGraphRunnableConfig,
+): Promise<void> {
+	const { holds } = await ctx.log.state(ctx.run.id);
+	if (holds.length === 0) return;
+	const left = leavingHolds(holds, {
+		stepId: end.stepId,
+		scope: scopeOf(config),
+		edges,
+	});
+	if (left.length === 0) return;
+	const leases: string[] = [];
+	for (const hold of left) {
+		switch (hold.kind) {
+			case "lease":
+				await ctx.log.append({
+					type: "LeaseReleased",
+					runId: ctx.run.id,
+					payload: { name: hold.name, why: "scope" },
+				});
+				leases.push(hold.name);
+				break;
+		}
+	}
+	try {
+		await ctx.leases.release(ctx.run.id, leases);
+	} catch (error) {
+		console.warn(
+			`[engine] run ${ctx.run.id} could not let go of a lease: ${messageOf(error)}`,
+		);
+	}
 }
 
 /** A branch's arrival when the edge leads to a Join, else nothing (`arrive`). */

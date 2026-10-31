@@ -125,6 +125,7 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 		deviceName: "studio",
 	},
 	LeaseTaken: { name: "stack", nodeId: "own", ttlMinutes: 30, scope: null },
+	LeaseReleased: { name: "stack", why: "scope" },
 	WaitEnded: { early: false },
 	StopRequested: {},
 	StopAfterStepRequested: {},

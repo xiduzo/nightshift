@@ -243,6 +243,7 @@ export {
 	type ListSource,
 	type Login,
 	labelSchema,
+	leaseSection,
 	loginSchema,
 	type McpServer,
 	type ModelAddress,

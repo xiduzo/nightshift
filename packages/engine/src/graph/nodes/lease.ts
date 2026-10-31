@@ -1,12 +1,16 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
 	DEFAULT_LEASE_TTL_MINUTES,
+	type Flow,
 	type LeaseNode,
+	leaseSection,
+	nodesWithin,
 	renderTemplate,
+	sectionPath,
 } from "@nightshift/flows";
 
 import type { LeaseAnswer } from "../../contract";
-import type { StepOutputs } from "../../log";
+import type { HoldSection, StepOutputs } from "../../log";
 import {
 	type NodeAction,
 	type NodeKind,
@@ -28,8 +32,9 @@ export const LEASE_RETRY_MINUTES = 1;
  * through the engine's keeper (`ctx.leases`), which asks this Replica's
  * store or the Space's Host.
  *
- * - `held`: the run holds the lease (`LeaseTaken` in the log). The engine
- *   lets go of it when the run ends, whatever ends it (`RunHolds`).
+ * - `held`: the run holds the lease (`LeaseTaken` in the log, with its
+ *   Section). The engine lets go of it when the run leaves the Section
+ *   (`route.ts`), and when the run ends, whatever ends it (`RunHolds`).
  * - `busy`: another run holds it, and the node does not wait
  *   (`waitMinutes` unset or 0) or waited long enough. `holder` names that
  *   run.
@@ -115,6 +120,7 @@ async function askForLease(
 		...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
 	});
 	if (answer.kind === "held") {
+		const section = sectionOf(ctx.flow, node);
 		await ctx.log.append({
 			type: "LeaseTaken",
 			runId: ctx.run.id,
@@ -124,6 +130,7 @@ async function askForLease(
 				nodeId: node.id,
 				ttlMinutes: ttlMinutes ?? DEFAULT_LEASE_TTL_MINUTES,
 				scope: scopeOf(config),
+				...(section ? { section } : {}),
 			},
 		});
 		step.record(null, { type: "lease", name, held: true });
@@ -169,6 +176,19 @@ async function askForLease(
 		message: `Waits for the lease "${name}". The run "${holder.runTitle}" holds it.`,
 		lease: { name, holder: holder.runId, holderTitle: holder.runTitle },
 	});
+}
+
+/**
+ * The Section the node holds its lease for, with every node in it, as the
+ * run's flow has it: the engine reads it from the log when the run leaves
+ * it. Undefined for a lease of the whole run, and for a Section the flow
+ * no longer has (the validator refuses such a flow).
+ */
+function sectionOf(flow: Flow, node: LeaseNode): HoldSection | undefined {
+	const id = leaseSection(node);
+	if (id === null) return undefined;
+	const section = sectionPath(flow, id).at(-1);
+	return section ? { id, nodes: nodesWithin(flow, section) } : undefined;
 }
 
 function sleep(wait: Omit<OwnWait, "reason">): BodyResult {

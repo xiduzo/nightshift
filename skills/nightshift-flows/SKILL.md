@@ -147,7 +147,7 @@ Outcomes: `done`. Outputs: `outcome`, `data`, `visit`.
 
 ### lease
 
-Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.
+Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.
 
 Outcomes: `held`, `busy`. Outputs: `outcome`, `name`, `holder`, `holder_title`, `waited_minutes`, `visit`.
 
