@@ -1,7 +1,11 @@
 import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
-import type { KnowledgeSearch, SyncedDocuments } from "@nightshift/engine";
+import type {
+	KnowledgeSearch,
+	OllamaService,
+	SyncedDocuments,
+} from "@nightshift/engine";
 import type { GitHubClones, ProjectCopies } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 import type { Telemetry } from "@nightshift/telemetry";
@@ -23,8 +27,9 @@ import type { Lease } from "./lease";
  *   and it is bound to the newest daemon's closures). Bun reloads a
  *   listener of the same `id` in place;
  * - replaced, the one before stopped first: the notifier, the keep-awake,
- *   the export to monitoring, the project copies, the scheduler, the price
- *   list, the facts timer and the knowledge timers;
+ *   the export to monitoring, the Ollama (and the `ollama serve` it
+ *   started), the project copies, the scheduler, the price list, the facts
+ *   timer and the knowledge timers;
  * - handed over: the devices (`startDevices` fills `nightshiftDevices`
  *   itself: its engine lets go of its runs, and the work hub, the applied
  *   commands, the calls served for a Host, the Devices online and the
@@ -58,6 +63,8 @@ export type HotRegistry = KeptDevices &
 		/** The clones from GitHub that run, and how the last ones ended. */
 		nightshiftGitHubClones?: GitHubClones;
 		nightshiftKnowledgeSearch?: KnowledgeSearch;
+		/** The Ollama Night Shift uses: the `ollama serve` it started stops with it. */
+		nightshiftOllama?: OllamaService;
 		nightshiftProjectCopies?: ProjectCopies;
 		/** The daily update of the price list. */
 		nightshiftPrices?: PriceUpdates;

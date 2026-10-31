@@ -6,6 +6,7 @@ import {
 	connections,
 	deciders,
 	harnesses,
+	ollama,
 	profiles,
 	programs,
 	settings,
@@ -61,6 +62,7 @@ export const appRouter = {
 	programs,
 	harnesses,
 	deciders,
+	ollama,
 	profiles,
 	offers,
 	// A Person's Devices, and the work relay a paired Device calls.

@@ -17,5 +17,5 @@ export {
 export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
 
-export type { RunSettings } from "./settings";
-export { defaultRunSettings } from "./settings";
+export type { RunSettings, SettingsStore } from "./settings";
+export { defaultRunSettings, isLoopbackHost } from "./settings";

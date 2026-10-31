@@ -20,7 +20,7 @@ export {
 	type KnowledgeDocuments,
 } from "./knowledge-document";
 export { isLearningsFolder } from "./learnings";
-export { ollamaMeaning } from "./meaning";
+export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
 export {
 	createProjectKnowledge,
 	type KnowledgeRequest,

@@ -163,6 +163,11 @@ export const deciders = {
 		})
 		.output(output(z.array(deciderViewSchema)))
 		.handler(({ context }) =>
-			deciderViews((name) => context.connections.secretSource(name)),
+			deciderViews((name) => context.connections.secretSource(name), {
+				ollama: () => {
+					const at = context.ollama.endpoint();
+					return { host: at.address, headers: at.headers };
+				},
+			}),
 		),
 };

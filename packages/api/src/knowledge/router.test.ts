@@ -79,6 +79,8 @@ function context(personId: string, role: Role = "member") {
 				model: "qwen3-embedding:0.6b",
 				done: 3,
 				total: 10,
+				where: null,
+				percent: null,
 			}),
 		},
 	});
@@ -278,6 +280,8 @@ describe("knowledge.search and knowledge.read", () => {
 			model: "qwen3-embedding:0.6b",
 			done: 3,
 			total: 10,
+			where: null,
+			percent: null,
 		});
 		await expect(
 			call(appRouter.knowledge.meaning, { projectId: "p9" }, { context: ctx }),

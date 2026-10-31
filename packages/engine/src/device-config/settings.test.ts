@@ -117,6 +117,52 @@ describe("precedence", () => {
 	});
 });
 
+describe("Ollama", () => {
+	test.each([
+		["studio.local", "http://studio.local:11434"],
+		["studio.local:11500", "http://studio.local:11500"],
+		["0.0.0.0", "http://0.0.0.0:11434"],
+		["http://studio.local", "http://studio.local:11434"],
+		["https://gpu.example.com/ollama/", "https://gpu.example.com/ollama"],
+		["http://studio.local:80", "http://studio.local"],
+	])("OLLAMA_HOST=%p is the address %p", async (raw, address) => {
+		const s = await store({ OLLAMA_HOST: raw });
+		expect(s.current().ollamaAddress).toBe(address);
+		expect(s.view().fields.ollamaAddress.source).toBe("env");
+	});
+
+	test("a saved address wins over OLLAMA_HOST, and none is this computer's", async () => {
+		expect((await store()).current().ollamaAddress).toBe("");
+		const s = await store({ OLLAMA_HOST: "studio.local" });
+		await s.save({ ollamaAddress: "https://gpu.example.com" });
+		expect(s.current().ollamaAddress).toBe("https://gpu.example.com");
+		await expect(s.save({ ollamaAddress: "studio.local" })).rejects.toThrow();
+	});
+
+	test.each([
+		["off", "off"],
+		["false", "off"],
+		["on", "on"],
+		["auto", "auto"],
+		["maybe", "auto"],
+	])("NIGHTSHIFT_OLLAMA=%p is %p", async (raw, mode) => {
+		expect((await store({ NIGHTSHIFT_OLLAMA: raw })).current().ollama).toBe(
+			mode as "auto",
+		);
+	});
+
+	test("NIGHTSHIFT_EMBEDDING_MODEL picks the model, a saved one wins", async () => {
+		expect((await store()).current().embeddingModel).toBe(
+			"qwen3-embedding:0.6b",
+		);
+		const s = await store({ NIGHTSHIFT_EMBEDDING_MODEL: "nomic-embed-text" });
+		expect(s.current().embeddingModel).toBe("nomic-embed-text");
+		await s.save({ embeddingModel: "bge-m3" });
+		expect(s.current().embeddingModel).toBe("bge-m3");
+		await expect(s.save({ embeddingModel: "two words" })).rejects.toThrow();
+	});
+});
+
 describe("the scheduler switch", () => {
 	test("NIGHTSHIFT_SCHEDULER=off locks the scheduler off, even over a saved true", async () => {
 		const s = await store({ NIGHTSHIFT_SCHEDULER: " OFF " });

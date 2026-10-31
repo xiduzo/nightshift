@@ -32,6 +32,7 @@ const SERVICES: Record<keyof Services, true> = {
 	profiles: true,
 	knowledge: true,
 	knowledgeSearch: true,
+	ollama: true,
 	assistant: true,
 	checks: true,
 	projectSetup: true,

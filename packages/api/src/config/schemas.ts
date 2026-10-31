@@ -8,7 +8,13 @@ import type {
 	McpTestResult,
 	McpToolInfo,
 } from "@nightshift/agents";
-import type { DeviceProfile, FlowRef, SignInResult } from "@nightshift/engine";
+import type {
+	DeviceProfile,
+	FlowRef,
+	OllamaModel,
+	OllamaStatus,
+	SignInResult,
+} from "@nightshift/engine";
 import {
 	type CliTool,
 	type Connection,
@@ -325,4 +331,44 @@ export const profileListSchema = z.array(
 		agentProfileSchema.extend(profileUse),
 		modelProfileSchema.extend(profileUse),
 	]),
+);
+
+/** The Ollama Night Shift uses, for the Settings page. */
+export const ollamaStatusSchema = exact<OllamaStatus>()(
+	z.object({
+		/** Null: on this computer. Else the host name of its address. */
+		where: z.string().nullable(),
+		/** Who chose the address: the owner's setting, the environment, or neither. */
+		from: z.enum(["setting", "env", "local"]),
+		/** Whether Night Shift runs this Ollama itself. */
+		started: z.boolean(),
+		/** Whether an Ollama program is on this computer. */
+		installed: z.boolean(),
+		/** Whether Ollama answers now. */
+		answers: z.boolean(),
+		/** The embedding model search by meaning uses. */
+		model: z.string(),
+		/** Whether this Ollama has that model. */
+		hasModel: z.boolean(),
+		/** The download of the model, while it runs or when it failed. */
+		download: z
+			.object({
+				percent: z.number(),
+				running: z.boolean(),
+				error: z.string().nullable(),
+			})
+			.nullable(),
+		/** The secrets the headers name that have no value. */
+		missingSecrets: z.array(z.string()),
+	}),
+);
+
+/** A model the Ollama has. */
+export const ollamaModelSchema = exact<OllamaModel>()(
+	z.object({
+		name: z.string(),
+		size: z.number(),
+		/** Whether it makes embeddings. Null: this Ollama does not say. */
+		embedding: z.boolean().nullable(),
+	}),
 );

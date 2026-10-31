@@ -109,7 +109,6 @@ export {
 	type KnowledgeUseReport,
 	knowledgeFileUse,
 	LOCAL_ONLY_BYTES,
-	ollamaMeaning,
 	type ProjectKnowledge,
 	questionKey,
 } from "./knowledge";
@@ -134,6 +133,13 @@ export {
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,
 } from "./log";
+export {
+	createOllama,
+	type OllamaEndpoint,
+	type OllamaModel,
+	type OllamaService,
+	type OllamaStatus,
+} from "./ollama";
 export type {
 	FeedStep,
 	InboxGate,

@@ -112,6 +112,35 @@ function isHttpAddress(value: string): boolean {
 	}
 }
 
+/** Whether Night Shift searches by meaning, and when it starts Ollama for it. */
+const ollamaModeSchema = z.enum(["auto", "on", "off"]);
+type OllamaMode = z.infer<typeof ollamaModeSchema>;
+
+/**
+ * `OLLAMA_HOST` as an address, read as Ollama's CLI reads it: a scheme is
+ * optional (http), and so is the port (11434 over http).
+ */
+function ollamaHostAddress(raw: string): string | undefined {
+	const value = raw.trim();
+	if (value === "") return undefined;
+	const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
+	let url: URL;
+	try {
+		url = new URL(scheme ? value : `http://${value}`);
+	} catch {
+		return undefined;
+	}
+	if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+	if (
+		url.port === "" &&
+		url.protocol === "http:" &&
+		!/:\d+(\/|$)/.test(value)
+	) {
+		url.port = "11434";
+	}
+	return `${url.origin}${url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "")}`;
+}
+
 const list = (raw: string) => {
 	const items = raw
 		.split(/[\s,]+/)
@@ -395,6 +424,62 @@ const DEFS = {
 	 * document.
 	 */
 	telemetryHeaders: {
+		schema: telemetryHeadersSchema,
+		default: {},
+	} satisfies Def<Record<string, string>>,
+	/**
+	 * Search by meaning, and the Ollama Night Shift starts for it. `auto`:
+	 * a Host starts Ollama itself, another computer uses the Ollama that
+	 * answers. `on`: this computer starts it too. `off`: search finds by
+	 * words only, and Night Shift starts nothing (`ollama/`).
+	 */
+	ollama: {
+		schema: ollamaModeSchema,
+		default: "auto",
+		env: "NIGHTSHIFT_OLLAMA",
+		fromEnv: (raw: string) => {
+			const value = raw.trim().toLowerCase();
+			if (value === "auto") return "auto";
+			const on = onOff(value);
+			return on === undefined ? undefined : on ? "on" : "off";
+		},
+	} satisfies Def<OllamaMode>,
+	/** The embedding model of search by meaning: a model name as Ollama knows it. */
+	embeddingModel: {
+		schema: z
+			.string()
+			.trim()
+			.min(1, "Name a model, for example qwen3-embedding:0.6b.")
+			.max(200)
+			.regex(/^[\w.:/-]+$/, "Use a model name such as qwen3-embedding:0.6b."),
+		default: "qwen3-embedding:0.6b",
+		env: "NIGHTSHIFT_EMBEDDING_MODEL",
+		fromEnv: text,
+	} satisfies Def<string>,
+	/**
+	 * Where Night Shift finds Ollama. Empty: the Ollama on this computer,
+	 * the one Night Shift started or the one that answers there. The
+	 * fallback is `OLLAMA_HOST`, as Ollama's own CLI reads it.
+	 */
+	ollamaAddress: {
+		schema: z
+			.string()
+			.trim()
+			.max(2000)
+			.refine((value) => value === "" || isHttpAddress(value), {
+				message:
+					"Use an http:// or https:// address, for example http://studio.local:11434.",
+			}),
+		default: "",
+		env: "OLLAMA_HOST",
+		fromEnv: ollamaHostAddress,
+	} satisfies Def<string>,
+	/**
+	 * Sent with every request to Ollama at `ollamaAddress`, for an Ollama
+	 * behind a proxy. A secret value stays a `${NAME}` reference here, as
+	 * in `telemetryHeaders`.
+	 */
+	ollamaHeaders: {
 		schema: telemetryHeadersSchema,
 		default: {},
 	} satisfies Def<Record<string, string>>,

@@ -6,12 +6,18 @@ import { OllamaEmbeddings } from "@langchain/ollama";
  * knowledge, and a query, into a vector. Search finds the sections whose
  * vectors are close to the query's, besides the ones that have its words.
  *
- * It is on by itself when Ollama answers on this computer and has the
- * model. Without it, search finds words only, and nothing else changes.
+ * It is on by itself when Ollama answers and has the model: the model,
+ * Ollama's address and whether Night Shift starts Ollama are the Ollama
+ * vertical's (`ollama/`). Without it, search finds words only, and nothing
+ * else changes.
  */
 
-/** Whether this computer can embed now. */
-export type KnowledgeMeaningReady = "ready" | "no-ollama" | "no-model";
+/** Whether this computer can embed now. `downloading`: the model is on its way. */
+export type KnowledgeMeaningReady =
+	| "ready"
+	| "no-ollama"
+	| "no-model"
+	| "downloading";
 
 /** An embedding model for the knowledge search. Tests pass a fake one. */
 export type KnowledgeMeaning = {
@@ -21,8 +27,12 @@ export type KnowledgeMeaning = {
 	embeddings: EmbeddingsInterface;
 	/** A query as the model wants it, for example with an instruction in front. */
 	query(text: string): string;
-	/** Whether it can embed on this computer now. Never throws. */
+	/** Whether it can embed now. Never throws. */
 	ready(): Promise<KnowledgeMeaningReady>;
+	/** Where the model runs: null on this computer, else the host name of its Ollama. */
+	where?: string | null;
+	/** While it is `downloading`: how far the download is, in percent. */
+	downloaded?(): number | null;
 	/** The least similarity (cosine) of a hit found by meaning alone. Absent: no floor. */
 	floor?: number;
 };
@@ -31,26 +41,11 @@ export type KnowledgeMeaning = {
  * The floor of each model: a file found by meaning alone, and less
  * similar to the query than this, is no hit. Each model has its own
  * scale. How it was chosen: `docs/research/knowledge-vectors.md` §3.4.
+ * A model with no floor here (one picked in Settings) gets none.
  */
 const MEANING_FLOORS: Readonly<Record<string, number>> = {
 	"qwen3-embedding:0.6b": 0.5,
 };
-
-/**
- * The default model: small (639 MB), 1 024 dimensions, and it reads Dutch
- * as well as English. See `docs/research/knowledge-vectors.md` §2.2.
- */
-const KNOWLEDGE_MODEL = "qwen3-embedding:0.6b";
-
-/**
- * The embedding model search by meaning uses: the one place that decides
- * it, beside `ollamaAddress`. Another model works too: the index takes
- * its vector size from its first vector, and a change of model builds the
- * vectors again.
- */
-export function knowledgeModel(): string {
-	return KNOWLEDGE_MODEL;
-}
 
 /**
  * Ollama's context for the model. With its default of 32K tokens the model
@@ -70,27 +65,33 @@ const QUERY_INSTRUCTION =
 const queryFor = (model: string) => (text: string) =>
 	model.startsWith("qwen3-embedding") ? `${QUERY_INSTRUCTION}${text}` : text;
 
-/** Ollama's own default address. */
-const OLLAMA_DEFAULT = "http://127.0.0.1:11434";
-
 /**
- * Where search by meaning finds Ollama: `OLLAMA_HOST` when it is set (as
- * Ollama's own CLI reads it, `host:port` or a URL), else Ollama's default.
- * The one place that decides it for the knowledge search.
+ * Search by meaning through one Ollama. The Ollama vertical decides the
+ * model, the address and its headers, and makes a new one when they change
+ * (`createOllama().meaning()`).
  */
-export function ollamaAddress(env: NodeJS.ProcessEnv = process.env): string {
-	return env.OLLAMA_HOST?.trim() || OLLAMA_DEFAULT;
-}
-
-/** Search by meaning through Ollama at `ollamaAddress()`. */
-export function ollamaMeaning(model = knowledgeModel()): KnowledgeMeaning {
+export function ollamaMeaning(options: {
+	model: string;
+	/** Ollama's address, `http://127.0.0.1:11434`. */
+	address: string;
+	/** Sent with each request, for an Ollama behind a proxy. */
+	headers?: Record<string, string>;
+	/** Null on this computer, else the host name of the address. */
+	where?: string | null;
+	/** How far a download of the model is, in percent. Null: none runs. */
+	downloading?: () => number | null;
+	fetch?: typeof fetch;
+}): KnowledgeMeaning {
+	const { model, address, headers, where = null, downloading } = options;
 	const embeddings = new OllamaEmbeddings({
 		model,
-		baseUrl: ollamaAddress(),
+		baseUrl: address,
+		...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
 		keepAlive: "10m",
 		requestOptions: { numCtx: NUM_CTX },
 		// A refused connection is not tried six times: the search goes on without it.
 		maxRetries: 1,
+		...(options.fetch ? { fetch: options.fetch } : {}),
 	});
 	let checked: { at: number; ready: KnowledgeMeaningReady } | null = null;
 	async function check(): Promise<KnowledgeMeaningReady> {
@@ -106,9 +107,8 @@ export function ollamaMeaning(model = knowledgeModel()): KnowledgeMeaning {
 				timeout,
 			]);
 			const names = new Set(models.map((m) => m.name));
-			return names.has(model) || names.has(`${model}:latest`)
-				? "ready"
-				: "no-model";
+			if (names.has(model) || names.has(`${model}:latest`)) return "ready";
+			return downloading?.() != null ? "downloading" : "no-model";
 		} catch {
 			return "no-ollama";
 		}
@@ -119,9 +119,18 @@ export function ollamaMeaning(model = knowledgeModel()): KnowledgeMeaning {
 		embeddings,
 		query: queryFor(model),
 		...(floor !== undefined ? { floor } : {}),
+		where,
+		downloaded: () => downloading?.() ?? null,
 		async ready() {
 			const now = Date.now();
-			if (checked && now - checked.at < PROBE_TTL_MS) return checked.ready;
+			// A download moves on: its state is not kept.
+			if (
+				checked &&
+				checked.ready !== "downloading" &&
+				now - checked.at < PROBE_TTL_MS
+			) {
+				return checked.ready;
+			}
 			const ready = await check();
 			checked = { at: Date.now(), ready };
 			return ready;

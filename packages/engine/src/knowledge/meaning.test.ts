@@ -7,7 +7,6 @@ import { createKnowledgeFolders } from "./folder";
 import {
 	type KnowledgeMeaning,
 	type KnowledgeMeaningReady,
-	ollamaAddress,
 	ollamaMeaning,
 } from "./meaning";
 import {
@@ -74,6 +73,8 @@ describe("search by meaning", () => {
 			model: "fake-model",
 			done: 4,
 			total: 4,
+			where: null,
+			percent: null,
 		});
 
 		const hits = await search.search("p1", "vehicle storage");
@@ -129,6 +130,8 @@ describe("search by meaning", () => {
 			model: "fake-model",
 			done: 0,
 			total: 0,
+			where: null,
+			percent: null,
 		});
 		expect(await search.search("p1", "vehicle storage")).toEqual([]);
 		expect(paths(await search.search("p1", "kitten"))).toEqual(["pets.md"]);
@@ -163,6 +166,8 @@ describe("search by meaning", () => {
 				model: null,
 				done: 0,
 				total: 0,
+				where: null,
+				percent: null,
 			});
 			expect(await plain.search("p1", "kitten")).toMatchObject([
 				{ path: "pets.md", found: ["words"], section: "Pets", line: 1 },
@@ -180,6 +185,50 @@ describe("search by meaning", () => {
 		search = createKnowledgeSearch(dataDir, { meaning: fake("other-model") });
 		await prepared();
 		expect(embeddings.embedded).toBe(4);
+	});
+
+	test("a model picked while it runs builds the vectors again, and off turns it off", async () => {
+		let now: KnowledgeMeaning | null = fake();
+		search.close();
+		search = createKnowledgeSearch(dataDir, { meaning: () => now });
+		for (const [path, text] of Object.entries(FILES)) await put(path, text);
+		await prepared();
+		expect(embeddings.embedded).toBe(4);
+
+		embeddings.embedded = 0;
+		now = fake("other-model");
+		const status = await prepared();
+		expect(status.model).toBe("other-model");
+		expect(embeddings.embedded).toBe(4);
+		expect(paths(await search.search("p1", "vehicle storage"))[0]).toBe(
+			"cars.md",
+		);
+
+		now = null;
+		expect((await search.meaning("p1")).state).toBe("off");
+		expect(paths(await search.search("p1", "vehicle storage"))).toEqual([]);
+	});
+
+	test("while the model downloads, it says how far, and where Ollama is", async () => {
+		ready = "downloading";
+		search.close();
+		search = createKnowledgeSearch(dataDir, {
+			meaning: {
+				...fake(),
+				where: "studio.local",
+				downloaded: () => 42,
+			},
+		});
+		await put("pets.md", FILES["pets.md"]);
+		expect(await search.meaning("p1")).toEqual({
+			state: "downloading",
+			model: "fake-model",
+			done: 0,
+			total: 0,
+			where: "studio.local",
+			percent: 42,
+		});
+		expect(paths(await search.search("p1", "kitten"))).toEqual(["pets.md"]);
 	});
 });
 
@@ -205,8 +254,13 @@ describe("the floor of a model", () => {
 	});
 
 	test("qwen3-embedding has its floor, a model without one has none", () => {
-		expect(ollamaMeaning("qwen3-embedding:0.6b").floor).toBe(0.5);
-		expect(ollamaMeaning("some-other-model").floor).toBeUndefined();
+		const at = { address: "http://127.0.0.1:1" };
+		expect(ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).floor).toBe(
+			0.5,
+		);
+		expect(
+			ollamaMeaning({ ...at, model: "some-other-model" }).floor,
+		).toBeUndefined();
 	});
 });
 
@@ -229,21 +283,12 @@ describe("reciprocal rank fusion", () => {
 });
 
 describe("Ollama", () => {
-	test("is at OLLAMA_HOST, else at its default address", () => {
-		expect(ollamaAddress({})).toBe("http://127.0.0.1:11434");
-		expect(ollamaAddress({ OLLAMA_HOST: " http://studio.local:11500 " })).toBe(
-			"http://studio.local:11500",
-		);
-	});
-
 	test("that does not answer makes search by meaning say so, without a throw", async () => {
-		const host = process.env.OLLAMA_HOST;
-		process.env.OLLAMA_HOST = "http://127.0.0.1:1";
-		try {
-			expect(await ollamaMeaning().ready()).toBe("no-ollama");
-		} finally {
-			if (host === undefined) delete process.env.OLLAMA_HOST;
-			else process.env.OLLAMA_HOST = host;
-		}
+		const meaning = ollamaMeaning({
+			model: "qwen3-embedding:0.6b",
+			address: "http://127.0.0.1:1",
+		});
+		expect(await meaning.ready()).toBe("no-ollama");
+		expect(meaning.where).toBeNull();
 	});
 });

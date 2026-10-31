@@ -31,12 +31,12 @@ import {
 	createFlowDocuments,
 	createKnowledgeDocuments,
 	createKnowledgeSearch,
+	createOllama,
 	createProjectKnowledge,
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
 	localDevice,
-	ollamaMeaning,
 } from "@nightshift/engine";
 import {
 	openConfigStores,
@@ -384,17 +384,35 @@ export async function createDaemon(
 	);
 
 	/**
+	 * The Ollama search by meaning and Decision nodes use: the owner's
+	 * address, else OLLAMA_HOST, else this computer's. A Host (or a
+	 * computer whose owner turns it on) starts `ollama serve` itself when
+	 * none answers here, with its models in the data folder, and downloads
+	 * the embedding model. It follows the settings and the secrets.
+	 */
+	const ollama = await slots.replace(
+		"nightshiftOllama",
+		() =>
+			createOllama({
+				dataDir,
+				settings,
+				secrets: connections,
+				env: { ...process.env, ...env },
+			}),
+		(before) => before.stop(),
+	);
+	/**
 	 * Search over the projects' knowledge folders: this computer's own
 	 * index, built from the folders and never synced. By words, and by
-	 * meaning when Ollama on this computer has the embedding model, unless
-	 * a person turned it off for the project. One open index file across
-	 * reloads.
+	 * meaning when the Ollama above has the embedding model, unless a
+	 * person turned it off for the project. One open index file across
+	 * reloads: it asks the newest Ollama each time.
 	 */
 	const knowledgeSearch = await slots.keep(
 		"nightshiftKnowledgeSearch",
 		() =>
 			createKnowledgeSearch(dataDir, {
-				meaning: ollamaMeaning(),
+				meaning: () => hot.nightshiftOllama?.meaning() ?? null,
 				meaningOn: (projectId) => knowledge.meaningOn(projectId),
 			}),
 		(kept) => kept.close(),
@@ -427,7 +445,14 @@ export async function createDaemon(
 		name: device.name,
 		...harnesses,
 		// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
-		decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
+		decider: tanstackDecider({
+			secret: (name) => connections.secret(name),
+			// The same Ollama search by meaning uses, with its headers.
+			ollama: () => {
+				const at = ollama.endpoint();
+				return { host: at.address, headers: at.headers };
+			},
+		}),
 		mcpServersFor: (node) => connections.mcpServersFor(node),
 		// A Command node's secrets: the keychain, then the environment.
 		secretEnv: (names) => connections.secretEnv(names),
@@ -451,8 +476,11 @@ export async function createDaemon(
 		snapshots: true,
 		// A Claude Code session sends its own telemetry while the export is on.
 		sessionEnv: (session) => telemetry.sessionEnv(session),
-		// A session's output has every saved secret's value as •••.
-		secretValues: () => connections.secretValues(),
+		// A session's output has every saved secret's value as •••, and those of Ollama's headers.
+		secretValues: async () => [
+			...(await connections.secretValues()),
+			...ollama.endpoint().secretValues,
+		],
 	});
 
 	/**
@@ -693,6 +721,7 @@ export async function createDaemon(
 		checks: programChecks(),
 		knowledge,
 		knowledgeSearch,
+		ollama,
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),
 			setUpGit: (input) => setUpGit(input),

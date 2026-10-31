@@ -12,6 +12,7 @@ import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	Engine,
 	KnowledgeSearch,
+	OllamaService,
 	ProjectKnowledge,
 	ToolLaunchers,
 } from "@nightshift/engine";
@@ -102,6 +103,8 @@ export type Services = {
 	>;
 	/** Search over the projects' knowledge on this computer, by words and by meaning. */
 	knowledgeSearch: Pick<KnowledgeSearch, "search" | "meaning">;
+	/** The Ollama search by meaning and Decision nodes use: where it is, its models, a download. */
+	ollama: Pick<OllamaService, "endpoint" | "status" | "models" | "pull">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
 	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */

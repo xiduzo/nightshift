@@ -104,8 +104,9 @@ export type KnowledgeRefresh = {
  * Whether search by meaning works for a project on this computer.
  * `off`: no model is set up. `turned-off`: a person turned it off for the
  * project. `no-ollama`: Ollama does not answer. `no-model`: Ollama does
- * not have the model. `preparing`: the first vectors are on their way,
- * `done` of `total` sections. `on`: every section has its vector.
+ * not have the model. `downloading`: the model is on its way, `percent` of
+ * it. `preparing`: the first vectors are on their way, `done` of `total`
+ * sections. `on`: every section has its vector.
  */
 export type KnowledgeMeaningStatus = {
 	state:
@@ -118,6 +119,10 @@ export type KnowledgeMeaningStatus = {
 	model: string | null;
 	done: number;
 	total: number;
+	/** Where the model runs: null on this computer, else the host name of its Ollama. */
+	where: string | null;
+	/** While `downloading`: how far the download of the model is, in percent. */
+	percent: number | null;
 };
 
 /** The index file, hidden so no project id can name it. */
@@ -319,20 +324,25 @@ type MeaningHit = {
 export type KnowledgeSearch = ReturnType<typeof createKnowledgeSearch>;
 
 /**
- * `meaning`: the embedding model for search by meaning. Without it, search
- * finds by words only. `meaningOn`: whether a person left search by
- * meaning on for a project (the project's setting, `knowledge-document.ts`).
- * Off: the project is searched by words only, and its vectors are not
- * prepared. Default: on.
+ * `meaning`: the embedding model for search by meaning, or a function that
+ * gives the one to use now (the model or Ollama's address can change while
+ * Night Shift runs: another model builds the vectors again). Without it, or
+ * when it gives null, search finds by words only. `meaningOn`: whether a
+ * person left search by meaning on for a project (the project's setting,
+ * `knowledge-document.ts`). Off: the project is searched by words only,
+ * and its vectors are not prepared. Default: on.
  */
 export function createKnowledgeSearch(
 	dataDir: string,
 	options: {
-		meaning?: KnowledgeMeaning;
+		meaning?: KnowledgeMeaning | (() => KnowledgeMeaning | null);
 		meaningOn?: (projectId: string) => Promise<boolean>;
 	} = {},
 ) {
-	const { meaning } = options;
+	const given = options.meaning;
+	/** The embedding model now. Null: search by meaning is off. */
+	const current = (): KnowledgeMeaning | null =>
+		typeof given === "function" ? given() : (given ?? null);
 	/** Whether search by meaning is on for the project: a setting that cannot be read leaves it on. */
 	const meaningOn = (projectId: string): Promise<boolean> =>
 		options.meaningOn
@@ -346,8 +356,13 @@ export function createKnowledgeSearch(
 	/** One refresh per project at a time: a second search waits for it. */
 	const refreshing = new Map<string, Promise<KnowledgeRefresh>>();
 
-	/** The vector store of each project, on the open index file. */
-	const stores = new Map<string, BunSqliteVectorStore>();
+	/** The vector store of each project, on the open index file, with the model it embeds with. */
+	const stores = new Map<
+		string,
+		{ meaning: KnowledgeMeaning; store: BunSqliteVectorStore }
+	>();
+	/** The model the open index's vectors belong to. */
+	let indexModel: string | null = null;
 	/** Projects whose sections all have their vectors, since this index opened. */
 	const synced = new Set<string>();
 	/** A count per project that goes up when its sections change. */
@@ -406,30 +421,42 @@ export function createKnowledgeSearch(
 		sqlite.run(
 			"CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
 		);
-		if (meaning) {
-			// The model is part of the index: another model's vectors go.
-			const kept = sqlite
-				.query<{ value: string }, []>(
-					"SELECT value FROM meta WHERE key = 'model'",
-				)
-				.get()?.value;
-			if (kept !== meaning.model) {
-				for (const table of VECTOR_TABLES) sqlite.run(`DELETE FROM ${table}`);
-				sqlite
-					.query(
-						"INSERT INTO meta (key, value) VALUES ('model', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-					)
-					.run(meaning.model);
-			}
-		}
 		sqlite.run(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 		return sqlite;
+	}
+
+	/**
+	 * The model is part of the index: the vectors of another model go, and
+	 * every project prepares again. Runs when the index opens and when the
+	 * model changes while Night Shift runs.
+	 */
+	function align(sqlite: Database, model: string, force = false): void {
+		if (indexModel === model && !force) return;
+		const kept = sqlite
+			.query<{ value: string }, []>(
+				"SELECT value FROM meta WHERE key = 'model'",
+			)
+			.get()?.value;
+		if (kept !== model || force) {
+			for (const table of VECTOR_TABLES) sqlite.run(`DELETE FROM ${table}`);
+			sqlite
+				.query(
+					"INSERT INTO meta (key, value) VALUES ('model', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+				)
+				.run(model);
+			stores.clear();
+			synced.clear();
+			failedAt.clear();
+			for (const projectId of generation.keys()) stale(projectId);
+		}
+		indexModel = model;
 	}
 
 	/** Forgets what belongs to the open index file. */
 	function forget(): void {
 		stores.clear();
 		synced.clear();
+		indexModel = null;
 	}
 
 	/** Throws the index away: it is derived, the next call builds it again. */
@@ -476,17 +503,17 @@ export function createKnowledgeSearch(
 		return db;
 	}
 
-	/** The project's vector store on `sqlite`. */
+	/** The project's vector store on `sqlite`, for the model now. */
 	function storeOf(
 		sqlite: Database,
 		projectId: string,
 		model: KnowledgeMeaning,
 	): BunSqliteVectorStore {
-		let store = stores.get(projectId);
-		if (!store) {
-			store = new BunSqliteVectorStore(model.embeddings, sqlite, projectId);
-			stores.set(projectId, store);
-		}
+		align(sqlite, model.model);
+		const kept = stores.get(projectId);
+		if (kept?.meaning === model) return kept.store;
+		const store = new BunSqliteVectorStore(model.embeddings, sqlite, projectId);
+		stores.set(projectId, { meaning: model, store });
 		return store;
 	}
 
@@ -497,9 +524,11 @@ export function createKnowledgeSearch(
 			console.info(
 				ready === "ready"
 					? `Knowledge search finds by meaning again, with ${model.model}.`
-					: ready === "no-model"
-						? `Knowledge search finds by words only: Ollama does not have ${model.model}. Run: ollama pull ${model.model}`
-						: "Knowledge search finds by words only: Ollama does not answer on this computer.",
+					: ready === "downloading"
+						? `Knowledge search finds by words only while ${model.model} downloads.`
+						: ready === "no-model"
+							? `Knowledge search finds by words only: Ollama does not have ${model.model}. Run: ollama pull ${model.model}`
+							: `Knowledge search finds by words only: Ollama does not answer${model.where ? ` at ${model.where}` : " on this computer"}.`,
 			);
 		}
 		lastReady = ready;
@@ -518,6 +547,7 @@ export function createKnowledgeSearch(
 	 * uses the vectors there are.
 	 */
 	function prepare(projectId: string): void {
+		const meaning = current();
 		if (!meaning || closed) return;
 		if (synced.has(projectId) || queued.has(projectId)) return;
 		if (turnedOff.has(projectId)) return;
@@ -559,6 +589,9 @@ export function createKnowledgeSearch(
 		if ((await readyNow(model)) !== "ready" || closed) return false;
 		const at = generation.get(projectId) ?? 0;
 		const sqlite = await database();
+		// Before the generation is read again: a new model makes every project stale.
+		const store = storeOf(sqlite, projectId, model);
+		if ((generation.get(projectId) ?? 0) !== at) return true;
 		const docs = sqlite
 			.query<{ path: string; title: string; text: string }, [string]>(
 				`SELECT f.path AS path, f.title AS title, s.text AS text
@@ -581,13 +614,18 @@ export function createKnowledgeSearch(
 				sqlite,
 				`knowledge:${projectId}`,
 			),
-			vectorStore: storeOf(sqlite, projectId, model),
+			vectorStore: store,
 			options: {
 				cleanup: "full",
 				sourceIdKey: "path",
 				batchSize: EMBED_BATCH,
 			},
 		});
+		if (indexModel !== model.model) {
+			// The model changed while this one embedded: its vectors may be mixed in.
+			if (indexModel !== null) align(sqlite, indexModel, true);
+			return true;
+		}
 		if ((generation.get(projectId) ?? 0) !== at) return true;
 		synced.add(projectId);
 		return false;
@@ -821,6 +859,7 @@ export function createKnowledgeSearch(
 		text: string,
 		limit: number,
 	): Promise<MeaningHit[]> {
+		const meaning = current();
 		if (!meaning || (await readyNow(meaning)) !== "ready") return [];
 		const store = storeOf(sqlite, projectId, meaning);
 		if (store.count() === 0) return [];
@@ -935,7 +974,7 @@ export function createKnowledgeSearch(
 					meaning: new Map(meant.map((hit) => [hit.path, hit])),
 				};
 				// A file only the meaning found must be close enough to the query.
-				const floor = meaning?.floor ?? 0;
+				const floor = current()?.floor ?? 0;
 				const close = (path: string) =>
 					byPath.words.has(path) ||
 					(byPath.meaning.get(path)?.similarity ?? 0) >= floor;
@@ -974,13 +1013,39 @@ export function createKnowledgeSearch(
 		 * are behind.
 		 */
 		async meaning(projectId: string): Promise<KnowledgeMeaningStatus> {
-			if (!meaning) return { state: "off", model: null, done: 0, total: 0 };
+			const meaning = current();
+			if (!meaning) {
+				return {
+					state: "off",
+					model: null,
+					done: 0,
+					total: 0,
+					where: null,
+					percent: null,
+				};
+			}
+			const where = meaning.where ?? null;
 			if (!(await readSetting(projectId))) {
-				return { state: "turned-off", model: meaning.model, done: 0, total: 0 };
+				return {
+					state: "turned-off",
+					model: meaning.model,
+					done: 0,
+					total: 0,
+					where,
+					percent: null,
+				};
 			}
 			const ready = await readyNow(meaning);
 			if (ready !== "ready") {
-				return { state: ready, model: meaning.model, done: 0, total: 0 };
+				return {
+					state: ready,
+					model: meaning.model,
+					done: 0,
+					total: 0,
+					where,
+					percent:
+						ready === "downloading" ? (meaning.downloaded?.() ?? 0) : null,
+				};
 			}
 			return healing(async () => {
 				await refresh(projectId);
@@ -991,15 +1056,27 @@ export function createKnowledgeSearch(
 							"SELECT count(*) AS n FROM sections s JOIN files f ON f.id = s.file_id WHERE f.project_id = ? AND s.text != ''",
 						)
 						.get(projectId)?.n ?? 0;
+				const store = storeOf(sqlite, projectId, meaning);
 				if (synced.has(projectId)) {
-					return { state: "on", model: meaning.model, done: total, total };
+					return {
+						state: "on",
+						model: meaning.model,
+						done: total,
+						total,
+						where,
+						percent: null,
+					};
 				}
 				prepare(projectId);
-				const done = Math.min(
-					storeOf(sqlite, projectId, meaning).count(),
+				const done = Math.min(store.count(), total);
+				return {
+					state: "preparing",
+					model: meaning.model,
+					done,
 					total,
-				);
-				return { state: "preparing", model: meaning.model, done, total };
+					where,
+					percent: null,
+				};
 			});
 		},
 		/** Closes the index file. A later call opens it again. */

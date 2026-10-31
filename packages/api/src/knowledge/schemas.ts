@@ -105,16 +105,18 @@ export const knowledgeHitSchema = exact<KnowledgeHit>()(
 export const knowledgeMeaningSchema = exact<KnowledgeMeaningStatus>()(
 	z.object({
 		/**
-		 * `off`: no model is set up. `turned-off`: a person turned it off
-		 * for the project. `no-ollama`: Ollama does not answer.
-		 * `no-model`: Ollama does not have the model. `preparing`: the first
-		 * vectors are on their way. `on`: search finds by meaning.
+		 * `off`: search by meaning is off. `turned-off`: a person turned it
+		 * off for the project. `no-ollama`: Ollama does not answer.
+		 * `no-model`: Ollama does not have the model. `downloading`: the
+		 * model is on its way. `preparing`: the first vectors are on their
+		 * way. `on`: search finds by meaning.
 		 */
 		state: z.enum([
 			"off",
 			"turned-off",
 			"no-ollama",
 			"no-model",
+			"downloading",
 			"preparing",
 			"on",
 		]),
@@ -123,6 +125,10 @@ export const knowledgeMeaningSchema = exact<KnowledgeMeaningStatus>()(
 		/** Sections with a vector, of `total`. */
 		done: z.number(),
 		total: z.number(),
+		/** Where the model runs: null on this computer, else the host name of its Ollama. */
+		where: z.string().nullable(),
+		/** While `downloading`: how far the download of the model is, in percent. */
+		percent: z.number().nullable(),
 	}),
 );
 
