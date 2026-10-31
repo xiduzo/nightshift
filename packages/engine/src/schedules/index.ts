@@ -3,7 +3,7 @@
 export { createPullRequestScores } from "./pull-request-scores";
 export type { ScheduleFiles } from "./schedule-files";
 export { createScheduleFiles } from "./schedule-files";
-export type { ScheduleList } from "./scheduler";
+export type { ScheduleList, SchedulePause } from "./scheduler";
 export { createScheduler, DEFAULT_SCHEDULE_TICK_MS } from "./scheduler";
 export type { WebhookAnswer, WebhookRequest } from "./webhooks";
 export { createWebhooks } from "./webhooks";

@@ -340,6 +340,30 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.scheduleFiles.list(projectId);
 			},
 
+			async pauseScheduleTonight(projectId, scheduleId) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				return deps.scheduleFiles.pauseTonight(projectId, scheduleId);
+			},
+
+			async resumeScheduleTonight(projectId, scheduleId) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				return deps.scheduleFiles.resumeTonight(projectId, scheduleId);
+			},
+
+			async runScheduleNow(projectId, scheduleId) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				return (await deps.pathsFor(spaceId, actor))(
+					await deps.scheduleFiles.runNow(
+						projectId,
+						scheduleId,
+						actor?.personId ?? null,
+					),
+				);
+			},
+
 			async saveSchedules(projectId, schedules, timeZone) {
 				await ready;
 				// A project without a Clone here is refused before the Offers check.

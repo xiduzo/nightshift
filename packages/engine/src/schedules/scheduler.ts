@@ -46,7 +46,40 @@ import type { WebhookDelivery } from "./webhooks";
  * - A hold (`hold`, while a merge of Spaces moves rows) skips the ticks
  *   and changes nothing else: a cron time that came due meanwhile fires
  *   on the first tick after it, under the rules above.
+ * - A schedule paused tonight (`pausedUntil`) skips each cron time
+ *   before that moment (`ScheduleSkipped`), then fires as before. The
+ *   pause lives in the schedule in the flow document, so it survives a
+ *   restart and reaches the Host that fires it from any Device.
+ * - Run now (`runNow`) starts the schedule's run at once, as if it fired
+ *   now: the same flow, inputs, base ref, stop time, Device and Person,
+ *   with the schedule as its trigger (`at` is now). It refuses while an
+ *   earlier run of the schedule is still open, as a cron time skips.
  */
+
+/**
+ * The morning a pause tonight lasts until, on the schedule's clock.
+ *
+ * The rule: Pause tonight skips the schedule's next start and every
+ * start after it until the first 06:00 after that next start. So a
+ * 22:00 schedule paused at noon skips 22:00 and fires again the next
+ * evening. An hourly one paused at 23:00 skips 00:00 to 05:00 and fires
+ * at 06:00. It always skips at least the next start, also of a schedule
+ * that runs in the day.
+ */
+export const PAUSE_TONIGHT_UNTIL = "06:00";
+
+/** When a pause tonight ends for a schedule whose next start is `nextStart`. */
+export function pauseTonightEnds(
+	nextStart: number,
+	timeZone?: string,
+): number | null {
+	return nextTimeOfDay(PAUSE_TONIGHT_UNTIL, nextStart, timeZone);
+}
+
+/** Whether the schedule is paused at `at`: its pause has not ended. */
+export function pausedAt(schedule: Schedule, at: number): boolean {
+	return schedule.pausedUntil !== undefined && schedule.pausedUntil > at;
+}
 
 /** How late a cron time may still start. */
 export const SCHEDULE_GRACE_MS = 15 * 60_000;
@@ -108,8 +141,22 @@ export type Scheduler = {
 	 */
 	hold(): Promise<() => void>;
 	last(projectId: string, scheduleId: string): ScheduleRecord | null;
-	/** The next start: a due time that still starts on the next tick, else the next cron time. Null when paused. */
+	/**
+	 * The next start: a due time that still starts on the next tick, else
+	 * the next cron time. Paused tonight: the first cron time at or after
+	 * the pause ends. Null when off.
+	 */
 	nextAt(projectId: string, schedule: Schedule, now: number): number | null;
+	/**
+	 * Starts the schedule's run now, as if it fired now, for `personId`
+	 * when the schedule names no Person of its own. Refuses (`conflict`)
+	 * while an earlier run of it is open, and a schedule without a flow.
+	 */
+	runNow(
+		projectId: string,
+		schedule: Schedule,
+		personId: string | null,
+	): Promise<RunSummary>;
 };
 
 const SCHEDULE_EVENT_TYPES = [
@@ -281,6 +328,16 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			return;
 		}
 
+		if (schedule.pausedUntil !== undefined && due < schedule.pausedUntil) {
+			await skip(
+				projectId,
+				schedule.id,
+				due,
+				"You paused this schedule for tonight.",
+			);
+			return;
+		}
+
 		const open = await openRun(current);
 		if (open) {
 			await skip(
@@ -433,10 +490,65 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		last(projectId, scheduleId) {
 			return history.get(keyOf(projectId, scheduleId))?.last ?? null;
 		},
+		async runNow(projectId, schedule, personId) {
+			const { flow } = schedule;
+			if (flow === undefined) {
+				throw new Refusal("invalid", "This schedule starts no flow.");
+			}
+			await refresh();
+			const open = await openRun(history.get(keyOf(projectId, schedule.id)));
+			if (open) {
+				throw new Refusal(
+					"conflict",
+					`An earlier run of this schedule is still ${open.status}. Wait for it to end, or stop it.`,
+				);
+			}
+			const at = now();
+			const stopAt = schedule.stopAt
+				? (nextTimeOfDay(schedule.stopAt, at, schedule.timeZone) ?? undefined)
+				: undefined;
+			const startedBy = schedule.person ?? personId ?? undefined;
+			const run = await deps.startRun(
+				{
+					projectId,
+					flowName: flow,
+					inputs: schedule.inputs,
+					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
+					...(stopAt !== undefined ? { stopAt } : {}),
+					...(schedule.device ? { deviceName: schedule.device } : {}),
+					...(startedBy ? { startedBy } : {}),
+				},
+				{ kind: "schedule", scheduleId: schedule.id, at },
+			);
+			// A cron time before now counts as handled: it does not fire as well.
+			await deps.log.append({
+				type: "ScheduleFired",
+				payload: {
+					projectId,
+					scheduleId: schedule.id,
+					at,
+					runId: run.id,
+					error: null,
+				},
+			});
+			record(projectId, schedule.id, { kind: "fired", at, runId: run.id });
+			return run;
+		},
 		nextAt(projectId, schedule, at) {
 			const { cron } = schedule;
 			if (!schedule.enabled || cron === undefined || schedule.webhook) {
 				return null;
+			}
+			if (pausedAt(schedule, at) && schedule.pausedUntil !== undefined) {
+				// The first cron time at or after the pause ends.
+				return (
+					nextCronTimes(
+						cron,
+						schedule.pausedUntil - 1,
+						1,
+						schedule.timeZone,
+					)[0] ?? null
+				);
 			}
 			const due = latestCronTime(cron, at, schedule.timeZone);
 			const current = history.get(keyOf(projectId, schedule.id));
@@ -482,6 +594,14 @@ export type ScheduleSummary = Schedule & {
 	deliveries: WebhookDelivery[];
 	/** Problems of this schedule. One with an error fails to start. */
 	issues: ScheduleIssue[];
+};
+
+/** A schedule's pause tonight after a change, and its next start with it. */
+export type SchedulePause = {
+	/** When the pause ends (epoch ms). Null: not paused. */
+	pausedUntil: number | null;
+	/** The next start (epoch ms), after the pause. Null when off. */
+	nextAt: number | null;
 };
 
 export type ScheduleList = {

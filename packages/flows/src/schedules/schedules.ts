@@ -147,6 +147,12 @@ export const scheduleSchema = z.object({
 	/** A paused schedule stays in the file and starts nothing. */
 	enabled: z.boolean().default(true),
 	/**
+	 * Paused tonight: no cron time before this moment (epoch ms) starts a
+	 * run. Night Shift writes it on Pause tonight and clears it on resume.
+	 * A time in the past means nothing. An older Night Shift ignores it.
+	 */
+	pausedUntil: z.number().int().positive().optional(),
+	/**
 	 * The Device its runs run on, by name. The Space's Host fires every
 	 * schedule (or the one Device of a Space without a Host), so a schedule
 	 * every Clone has never fires twice, and starts the run there. Unset:

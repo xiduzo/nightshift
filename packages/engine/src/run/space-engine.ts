@@ -18,7 +18,7 @@ import type {
 	RunSummary,
 	StepDetail,
 } from "../read";
-import type { ScheduleList } from "../schedules";
+import type { ScheduleList, SchedulePause } from "../schedules";
 import type { KeptValue } from "../variables";
 import type { RunActionRequest } from "./actions";
 
@@ -118,6 +118,27 @@ export interface SpaceEngine {
 	 * start and how the last cron time went.
 	 */
 	listSchedules(projectId: string): Promise<ScheduleList>;
+	/**
+	 * Pauses one schedule tonight: its next start and every start until
+	 * 06:00 after it, on its clock, start no run. Then it starts as before.
+	 * Refuses a schedule that is off, has a webhook or has no next start.
+	 */
+	pauseScheduleTonight(
+		projectId: string,
+		scheduleId: string,
+	): Promise<SchedulePause>;
+	/** Ends one schedule's pause tonight. */
+	resumeScheduleTonight(
+		projectId: string,
+		scheduleId: string,
+	): Promise<SchedulePause>;
+	/**
+	 * Starts one schedule's run now, as if it fired now: its flow, inputs,
+	 * Device and Person, with the schedule as the trigger. For the actor
+	 * when the schedule names no Person. Refuses while an earlier run of
+	 * it is open.
+	 */
+	runScheduleNow(projectId: string, scheduleId: string): Promise<RunSummary>;
 	/**
 	 * Saves the schedules. Saves schedules with problems too; returns the
 	 * issues. The scheduler reads them on its next tick. `timeZone` is the

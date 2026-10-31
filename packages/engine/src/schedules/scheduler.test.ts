@@ -740,3 +740,185 @@ describe("the scheduler", () => {
 		});
 	});
 });
+
+describe("Pause tonight", () => {
+	test("skips tonight's start, with the reason, across a restart, then fires the next evening", async () => {
+		const first = startDaemon();
+		const project = await setup(first.engine, [nightly()]);
+		clock = at(16, 12);
+		const pause = await first.engine.pauseScheduleTonight(
+			project.id,
+			"nightly",
+		);
+		// Until the first 06:00 after its next start (22:00 on the 16th).
+		expect(pause).toEqual({ pausedUntil: at(17, 6), nextAt: at(17, 22) });
+		const [listed] = (await first.engine.listSchedules(project.id)).schedules;
+		expect(listed).toMatchObject({
+			pausedUntil: at(17, 6),
+			nextAt: at(17, 22),
+		});
+
+		// The pause is in the schedule: a restart keeps it.
+		first.die();
+		const { engine } = startDaemon();
+		clock = at(16, 22, 0, 20);
+		const [skipped] = await waitForFacts(1);
+		expect(skipped).toMatchObject({
+			type: "ScheduleSkipped",
+			payload: {
+				scheduleId: "nightly",
+				at: at(16, 22),
+				reason: "You paused this schedule for tonight.",
+				runId: null,
+			},
+		});
+		await settle();
+		expect(await engine.listRuns()).toEqual([]);
+
+		// After the morning the pause means nothing: the list drops it.
+		clock = at(17, 9);
+		const [after] = (await engine.listSchedules(project.id)).schedules;
+		expect(after?.pausedUntil).toBeUndefined();
+		expect(after?.nextAt).toBe(at(17, 22));
+		expect(after?.last).toMatchObject({ kind: "skipped", at: at(16, 22) });
+
+		clock = at(17, 22, 0, 20);
+		const facts = await waitForFacts(2);
+		expect(facts[1]).toMatchObject({
+			type: "ScheduleFired",
+			payload: { at: at(17, 22), error: null },
+		});
+		await waitForEnd(engine, firedRunId(facts[1]));
+	});
+
+	test("an hourly schedule skips the night and fires again at 06:00", async () => {
+		const { engine } = startDaemon();
+		const project = await setup(engine, [nightly({ cron: "0 * * * *" })]);
+		clock = at(16, 23, 30);
+		expect(await engine.pauseScheduleTonight(project.id, "nightly")).toEqual({
+			pausedUntil: at(17, 6),
+			nextAt: at(17, 6),
+		});
+		clock = at(17, 5, 0, 20);
+		const [skipped] = await waitForFacts(1);
+		expect(skipped).toMatchObject({
+			type: "ScheduleSkipped",
+			payload: { at: at(17, 5) },
+		});
+		clock = at(17, 6, 0, 20);
+		const facts = await waitForFacts(2);
+		expect(facts[1]).toMatchObject({
+			type: "ScheduleFired",
+			payload: { at: at(17, 6) },
+		});
+		await waitForEnd(engine, firedRunId(facts[1]));
+	});
+
+	test("resume ends the pause: tonight's start fires", async () => {
+		const { engine } = startDaemon();
+		const project = await setup(engine, [nightly()]);
+		clock = at(16, 12);
+		await engine.pauseScheduleTonight(project.id, "nightly");
+		expect(await engine.resumeScheduleTonight(project.id, "nightly")).toEqual({
+			pausedUntil: null,
+			nextAt: at(16, 22),
+		});
+		const [listed] = (await engine.listSchedules(project.id)).schedules;
+		expect(listed).toEqual({
+			...nightly(),
+			nextAt: at(16, 22),
+			last: null,
+			deliveries: [],
+			issues: [],
+		});
+		clock = at(16, 22, 0, 20);
+		const [fired] = await waitForFacts(1);
+		expect(fired?.type).toBe("ScheduleFired");
+		await waitForEnd(engine, firedRunId(fired));
+	});
+
+	test("refuses a schedule that is off, has a webhook or does not exist", async () => {
+		const { engine } = startDaemon({ scheduler: false });
+		const project = await setup(engine, [
+			nightly({ id: "off", enabled: false }),
+			{
+				id: "hook",
+				flow: "night",
+				inputs: {},
+				enabled: true,
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+				webhook: { secret: "${HOOK_SECRET}" },
+			},
+		]);
+		await expect(
+			engine.pauseScheduleTonight(project.id, "off"),
+		).rejects.toMatchObject({
+			kind: "invalid",
+			message: "This schedule is off. It starts nothing tonight.",
+		});
+		await expect(
+			engine.pauseScheduleTonight(project.id, "hook"),
+		).rejects.toMatchObject({ kind: "invalid" });
+		await expect(
+			engine.pauseScheduleTonight(project.id, "gone"),
+		).rejects.toMatchObject({ kind: "not-found" });
+	});
+});
+
+describe("Run now", () => {
+	test("starts the schedule's run at once, with its inputs and the schedule as the trigger", async () => {
+		const { engine } = startDaemon();
+		const project = await setup(engine, [
+			nightly({ inputs: { epic: "42" }, stopAt: "07:00" }),
+		]);
+		clock = at(16, 12);
+		const run = await engine.runScheduleNow(project.id, "nightly");
+		expect(run.trigger).toEqual({
+			kind: "schedule",
+			scheduleId: "nightly",
+			at: at(16, 12),
+		});
+		expect(run.flowName).toBe("night");
+		expect(run.inputs).toEqual({ epic: "42" });
+		expect(run.stopAt).toBe(at(17, 7));
+		expect(await scheduleFacts()).toMatchObject([
+			{ type: "ScheduleFired", payload: { at: at(16, 12), runId: run.id } },
+		]);
+		await waitForEnd(engine, run.id);
+		const [listed] = (await engine.listSchedules(project.id)).schedules;
+		expect(listed?.last).toMatchObject({ kind: "fired", runId: run.id });
+		// Tonight's start still fires.
+		expect(listed?.nextAt).toBe(at(16, 22));
+		clock = at(16, 22, 0, 20);
+		const facts = await waitForFacts(2);
+		expect(facts[1]).toMatchObject({
+			type: "ScheduleFired",
+			payload: { at: at(16, 22), error: null },
+		});
+		await waitForEnd(engine, firedRunId(facts[1]));
+	});
+
+	test("refuses while an earlier run of the schedule is open", async () => {
+		const { engine } = startDaemon({ scheduler: false });
+		const project = await setup(engine, [nightly()], gateFlow());
+		const run = await engine.runScheduleNow(project.id, "nightly");
+		await waitFor(
+			async () =>
+				(await engine.listRuns()).find((r) => r.id === run.id)?.status ===
+				"waiting",
+			{ label: "the run to wait at its Gate" },
+		);
+		await expect(
+			engine.runScheduleNow(project.id, "nightly"),
+		).rejects.toMatchObject({ kind: "conflict" });
+		await engine.act(run.id, { kind: "stop" });
+	});
+
+	test("refuses a schedule that does not exist", async () => {
+		const { engine } = startDaemon({ scheduler: false });
+		const project = await setup(engine, []);
+		await expect(
+			engine.runScheduleNow(project.id, "gone"),
+		).rejects.toMatchObject({ kind: "not-found" });
+	});
+});

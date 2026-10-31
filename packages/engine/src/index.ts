@@ -181,5 +181,9 @@ export {
 	planNodes,
 	UNREACHABLE_DEVICE,
 } from "./run";
-export type { ScheduleList, WebhookAnswer } from "./schedules";
+export type {
+	ScheduleList,
+	SchedulePause,
+	WebhookAnswer,
+} from "./schedules";
 export type { KeptValue } from "./variables";
