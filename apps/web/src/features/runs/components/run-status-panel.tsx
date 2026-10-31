@@ -272,7 +272,7 @@ function noticeOf({
 				body: (
 					<>
 						{reason}{" "}
-						{wait?.reason === "command"
+						{wait?.reason === "command" || wait?.reason === "any"
 							? "It tries the command again"
 							: wait?.reason === "device-offline"
 								? "It checks for the device again"

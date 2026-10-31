@@ -25,6 +25,7 @@ const KIND_HINT: Record<WaitUntil["kind"], string> = {
 	command: "The step runs the command until it succeeds, then continues.",
 	signal:
 		"The step waits until someone sends the run this signal, or a webhook of this project does.",
+	any: "The step waits for the signal, and runs the command now and then in case the signal does not come.",
 };
 
 /** What a Wait node waits for, and the fields of that kind. */

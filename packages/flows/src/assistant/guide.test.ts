@@ -102,8 +102,9 @@ describe("flowAuthoringGuide", () => {
 		// the turn and idle limits of an Agent step. 3400: the knowledge
 		// kits (one line each), the Agent's knowledge, $NS_KNOWLEDGE and
 		// the review of learnings. 3450: the folder kit (one line) and the
-		// number, boolean and choice inputs.
-		expect(words).toBeLessThan(3450);
+		// number, boolean and choice inputs. 3600: the outcomes, rules and
+		// `any` of a Wait (ADR 8), and the watch-pr kit (one line).
+		expect(words).toBeLessThan(3600);
 	});
 });
 

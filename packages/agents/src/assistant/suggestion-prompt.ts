@@ -15,6 +15,7 @@ import {
 	nodeOutcomes,
 	type SuggestionKind,
 	type SuggestionRequest,
+	waitCommandOf,
 } from "@nightshift/flows";
 import type { ProjectFacts } from "./project-facts";
 import { dataReaders, draftSummary, flowJson, scopeList } from "./prompts";
@@ -418,15 +419,12 @@ const commandKind: KindPrompt = {
 		if (node.type === "call" && node.each)
 			return listCommandTask({ ...node, each: node.each }, facts);
 		const wait = node.type === "wait";
+		const polled = node.type === "wait" ? waitCommandOf(node.until) : null;
 		const current =
-			node.type === "command"
-				? node.command
-				: node.type === "wait" && node.until.kind === "command"
-					? node.until.command
-					: "";
+			node.type === "command" ? node.command : (polled?.command ?? "");
 		const lines = [
 			wait
-				? `Write the command a Wait node runs every ${node.type === "wait" && node.until.kind === "command" ? node.until.everyMinutes : "few"} minutes until it exits 0. Exit 0 means the wait is over; any other code means try again later.`
+				? `Write the command a Wait node runs every ${polled?.everyMinutes ?? "few"} minutes until it exits 0. Exit 0 means the wait is over; any other code means try again later.`
 				: "Write the Command node's command. It runs with `sh -c` in the project's folder, and its exit code picks the outcome.",
 			"",
 			"Rules:",

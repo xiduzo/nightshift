@@ -1,5 +1,6 @@
 /** Programs that a command calls by their own name while only other CLI tools sign in to them. */
 import type { FlowNode } from "../flow";
+import { waitCommandOf } from "../nodes";
 
 /** A CLI tool, as a check reads it. `program` null: the tool runs the program of its own name. */
 export type CliToolRef = {
@@ -18,8 +19,9 @@ export type ProgramWithoutLogin = { program: string; tools: string[] };
  */
 export function commandOf(node: FlowNode): string | undefined {
 	if (node.type === "command") return node.command;
-	if (node.type === "wait" && node.until.kind === "command") {
-		return node.until.command;
+	if (node.type === "wait") {
+		const polled = waitCommandOf(node.until);
+		if (polled) return polled.command;
 	}
 	if (node.type === "call" && node.each?.source.kind === "command") {
 		return node.each.source.command;

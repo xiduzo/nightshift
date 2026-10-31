@@ -4,16 +4,30 @@ import { checkOptions, type Option, option } from "./outcomes";
 
 /** The Wait node: it sleeps until a time, a command passes, or a signal arrives. */
 
+/** A command a Wait runs every `everyMinutes`. */
+const waitCommandFields = {
+	command: z.string().min(1),
+	everyMinutes: z.number().int().positive(),
+};
+
+/** A signal a Wait waits for, with an optional key. */
+const waitSignalFields = {
+	name: labelSchema,
+	key: z.string().min(1).optional(),
+};
+
 /**
  * What a Wait node waits for. `duration`: a number of minutes. `time`: a
  * template that renders a date and time (`2026-10-18T07:00`, with an
  * optional zone) or a time of day (`07:00`: the next one on this computer's
  * clock). `command`: a command (`sh -c` in the worktree, template values as
  * environment variables, as in a Command node) run every `everyMinutes`
- * until it exits 0, or picks one of the node's `outcomes`. `signal`: a name someone sends to the run, or a webhook
- * schedule sends to the project's runs. With `key` (a template), only a
- * webhook signal whose key is the rendered text wakes it; a signal sent to
- * the run by its id always does.
+ * until it exits 0, or picks one of the node's `outcomes`. `signal`: a
+ * name someone sends to the run, or a webhook schedule sends to the
+ * project's runs. With `key` (a template), only a webhook signal whose key
+ * is the rendered text wakes it; a signal sent to the run by its id always
+ * does. `any`: a signal and a command, whichever ends the wait first, such
+ * as a webhook with a command every 10 minutes as a backup.
  */
 export const waitUntilSchema = z.discriminatedUnion("kind", [
 	z.object({
@@ -21,18 +35,34 @@ export const waitUntilSchema = z.discriminatedUnion("kind", [
 		minutes: z.number().int().positive(),
 	}),
 	z.object({ kind: z.literal("time"), at: z.string().min(1) }),
+	z.object({ kind: z.literal("command"), ...waitCommandFields }),
+	z.object({ kind: z.literal("signal"), ...waitSignalFields }),
 	z.object({
-		kind: z.literal("command"),
-		command: z.string().min(1),
-		everyMinutes: z.number().int().positive(),
-	}),
-	z.object({
-		kind: z.literal("signal"),
-		name: labelSchema,
-		key: z.string().min(1).optional(),
+		kind: z.literal("any"),
+		signal: z.object(waitSignalFields),
+		command: z.object(waitCommandFields),
 	}),
 ]);
 export type WaitUntil = z.infer<typeof waitUntilSchema>;
+
+/** The command a Wait polls: its own, or the one of an `any` wait. */
+export type WaitCommand = { command: string; everyMinutes: number };
+/** The signal a Wait waits for: its own, or the one of an `any` wait. */
+type WaitSignal = { name: string; key?: string };
+
+/** The command the Wait polls, or null when it polls none. */
+export function waitCommandOf(until: WaitUntil): WaitCommand | null {
+	if (until.kind === "command") return until;
+	if (until.kind === "any") return until.command;
+	return null;
+}
+
+/** The signal the Wait waits for, or null when it waits for none. */
+export function waitSignalOf(until: WaitUntil): WaitSignal | null {
+	if (until.kind === "signal") return until;
+	if (until.kind === "any") return until.signal;
+	return null;
+}
 
 /**
  * Sleeps until a time, a command passes, or a signal arrives, then ends
@@ -131,28 +161,30 @@ export function checkWaitNode(node: WaitNode, check: NodeCheck): void {
 	const until = node.until;
 	checkWaitOutcomes(node, check);
 	if (until.kind === "time") check.template(until.at, "time");
-	if (until.kind === "signal" && until.key !== undefined)
-		check.template(until.key, "key");
-	if (until.kind === "command") {
-		check.template(until.command, "command");
+	const signal = waitSignalOf(until);
+	if (signal?.key !== undefined) check.template(signal.key, "key");
+	const polled = waitCommandOf(until);
+	if (polled) {
+		check.template(polled.command, "command");
 		if (
 			node.timeoutMinutes !== undefined &&
-			node.timeoutMinutes <= until.everyMinutes
+			node.timeoutMinutes <= polled.everyMinutes
 		) {
 			check.error(
-				`Wait node "${node.id}" runs its command every ${until.everyMinutes} min but times out after ${node.timeoutMinutes} min. Give it a longer timeout than the interval.`,
+				`Wait node "${node.id}" runs its command every ${polled.everyMinutes} min but times out after ${node.timeoutMinutes} min. Give it a longer timeout than the interval.`,
 			);
 		}
 	}
 }
 
 /**
- * A Wait's own outcomes: only on a wait that can pick one (a command or a
- * signal), each a valid, unique label that is not `done` or `timeout`. A
- * command picks by its data, so its outcomes take no rule. A signal picks
- * by rule: each rule is valid and reads only `event`, and an outcome
- * without one is never picked. One without an edge ends the run there: a
- * warning.
+ * A Wait's own outcomes: only on a wait that can pick one (a command, a
+ * signal or both), each a valid, unique label that is not `done` or
+ * `timeout`. A command picks by its data, so on a command wait an outcome
+ * takes no rule. A signal picks by rule: each rule is valid and reads only
+ * `event`, and on a signal wait an outcome without one is never picked.
+ * On an `any` wait, the command picks any outcome and the signal picks the
+ * ones with a rule. One without an edge ends the run there: a warning.
  */
 function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 	if (node.outcomes === undefined) return;

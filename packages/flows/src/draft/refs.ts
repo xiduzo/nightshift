@@ -246,6 +246,20 @@ export function rewriteOwnTemplates(
 						...node,
 						until: { ...node.until, command: rewrite(node.until.command) },
 					};
+				case "any": {
+					const { signal, command } = node.until;
+					return {
+						...node,
+						until: {
+							...node.until,
+							signal:
+								signal.key === undefined
+									? signal
+									: { ...signal, key: rewrite(signal.key) },
+							command: { ...command, command: rewrite(command.command) },
+						},
+					};
+				}
 				default:
 					return node;
 			}

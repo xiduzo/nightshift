@@ -128,9 +128,12 @@ export {
 	commandWaitOutcome,
 	isOwnWaitOutcome,
 	signalRules,
+	type WaitCommand,
 	type WaitNode,
 	type WaitUntil,
+	waitCommandOf,
 	waitNodeSchema,
 	waitOutcomes,
 	waitOutputFields,
+	waitSignalOf,
 } from "./wait";

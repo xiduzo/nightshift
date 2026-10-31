@@ -262,8 +262,11 @@ export {
 	type VariableWrite,
 	valueDecider,
 	valueDeciderNameSchema,
+	type WaitCommand,
 	type WaitNode,
 	type WaitUntil,
+	waitCommandOf,
+	waitSignalOf,
 } from "./nodes";
 export {
 	type AgentProfile,

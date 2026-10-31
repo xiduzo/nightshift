@@ -159,6 +159,7 @@ const WAIT_DONE: Record<WaitUntil["kind"], string> = {
 	time: "The time came",
 	command: "The command passed",
 	signal: "The signal came",
+	any: "The signal came, or the command passed",
 };
 
 /** Below this zoom a node's text is too small to read, so the node shows its

@@ -2324,6 +2324,11 @@ describe("validateFlow: wait nodes", () => {
 			{ kind: "command", command: "gh pr checks 1", everyMinutes: 5 },
 			{ kind: "signal", name: "deploy-finished" },
 			{ kind: "signal", name: "pr-checked", key: "{{deploy_window}}" },
+			{
+				kind: "any",
+				signal: { name: "ci-done", key: "{{deploy_window}}" },
+				command: { command: "gh pr checks 1", everyMinutes: 10 },
+			},
 		]) {
 			const parsed = parseFlow({
 				...base,
@@ -2340,6 +2345,7 @@ describe("validateFlow: wait nodes", () => {
 			{ kind: "command", command: "", everyMinutes: 5 },
 			{ kind: "command", command: "true", everyMinutes: 0 },
 			{ kind: "signal", name: "Deploy Finished" },
+			{ kind: "any", signal: { name: "ci-done" } },
 			{ kind: "webhook" },
 		]) {
 			const parsed = parseFlow({
@@ -2533,6 +2539,49 @@ describe("validateFlow: wait nodes", () => {
 		]);
 		expect(warnings(issues).map((issue) => issue.message)).toContain(
 			'Wait node "ci" has no rule for "closed": a signal never ends the wait there. Give it a rule.',
+		);
+	});
+
+	test("any: its key and command are templates over known names, its command needs a shorter interval than the timeout, and the command picks an outcome without a rule", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					wait(
+						"ci",
+						{
+							kind: "any",
+							signal: { name: "ci-done", key: "{{ghost.sha}}" },
+							command: {
+								command: "gh pr view {{ghost.pr}}",
+								everyMinutes: 10,
+							},
+						},
+						{
+							timeoutMinutes: 10,
+							outcomes: [
+								{ name: "green", when: "event.body.ok" },
+								{ name: "merged" },
+							],
+						},
+					),
+					command("next"),
+				],
+				[edge("a", "ci", "green", "next"), edge("b", "ci", "merged", "next")],
+				"ci",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			["ci", expect.stringContaining("{{ghost.sha}}")],
+			["ci", expect.stringContaining("{{ghost.pr}}")],
+			[
+				"ci",
+				'Wait node "ci" runs its command every 10 min but times out after 10 min. Give it a longer timeout than the interval.',
+			],
+		]);
+		expect(warnings(issues).map((issue) => issue.message)).not.toContain(
+			expect.stringContaining('no rule for "merged"'),
 		);
 	});
 });
