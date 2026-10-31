@@ -1,8 +1,9 @@
 # Next phase: doors, guards, eyes and knowledge
 
-**Status:** Sprints 1 to 3 on main except the pitch. Sprint 4 on main on
-2026-10-31 except the proof on real nights (5.6), the pitch (5.7), a
-scheduled evaluation kit and a few 5.8 items.
+**Status (2026-10-31):** Sprints 1 to 4 are on main (e0a2f382), except the
+proof on real nights (5.6), the pitch (5.7), a scheduled evaluation kit and
+some 5.8 items. The Host still runs an older build. "Progress" below lists
+each item and where it landed.
 Sprint 3 changed after sprint 2: knowledge moves into the Space
 ([ADR 4](../adr/0004-knowledge-belongs-to-the-space.md)) before search. Follows the product and market
 review of 2026-10-30 (items 08 "What to integrate" and 09 "Next 90 days").
@@ -17,6 +18,57 @@ more than the repo.
 Eight weeks, four sprints. Each sprint ends with something a night uses. The
 daemon on port 3000 runs real nights, so every change here is built in a git
 worktree and lands on main between nights.
+
+## Progress (2026-10-31)
+
+One line per item. A sha is the commit on main. "Open" says what is left.
+
+| Item | State | Where |
+| --- | --- | --- |
+| 2.1 Truth up the docs | Done | b346b0d5, cdb82da8 |
+| 2.2 Run budgets | Done | 185682f8, 3a2c59c0, c9cfa669, 4f111128 |
+| 2.3 Run metrics as a read model | Done | bf59cc61, bdb5df60, 44ea20d8 |
+| 2.4 Morning digest | Done. In the web inbox since 7160bba3 | c7163a47, 1ea8ffbb, f6bc5243 |
+| 3.1 MCP server as the public door | Done | 4fe44e97, 6ac18fbe, 2f500800 |
+| 3.2 Webhook and GitHub Actions recipe | Done | 73a44804 |
+| 3.3 Knowledge folder, phase 1 | Done | 12f524d5, 34c574a6, 435e3101 |
+| 3.4 Learnings behind a Gate | Done. In the step console since 3f30bbc3 | 81aee1cf |
+| 3.5 Onboarding | Done | d20da741, aac01dbc |
+| 4.0 Knowledge in the Space (ADR 4) | Done | ba030cf1, 1818c1c2 |
+| 4.1 OpenTelemetry export | Done. Headers are a secret reference since cf151e91 | 1818c1c2 |
+| 4.2 Feedback scores | Done. Gate scores in 1818c1c2, PR scores in 5.5 | 72fdd800 |
+| 4.3 Knowledge search, phase 2 | Done. MCP resources came in 5.3 | 1818c1c2, c641fae4 |
+| 4.4 The pitch | Moved to 5.7 | |
+| Architecture review | Done: knowledge, sources, documents, archive and the run fold as engine modules | 55bcec2e, d2e3aa7d, 885102e0, 996965c2, 9bcfbe70 |
+| 5.0 Add source, `kit:knowledge/folder` | Done | 2ce3cbf9, 397c86c7, 4395f02b |
+| 5.0 Search in every Agent step | Done | 5e243b05, d1476042 |
+| 5.0 PDF and Word, through LangChain loaders | Done | b10560eb, cc014a15 |
+| 5.0 Vectors spike | Done | 19a77025, aab2a962 |
+| 5.1 Search events | Done | 6eb654ed |
+| 5.1 Questions agents asked | Done | 6d7832f8, 9852d15a |
+| 5.1 Evaluation and the per-project switch | Done from the page. Open: a kit that a schedule repeats | 9e94f2a3 |
+| 5.1 Floor for meaning-only hits | Done, 0.50 for qwen3 | 28c466fb |
+| 5.2 Find by meaning | Done, ahead of 5.1 | 56a848c4, 3efa0236 |
+| 5.2 Ollama in the public image, model and address settings | Done. Open: CPU threads on the real Host | 1355241a, 9fcb1ea9, 31f56339 |
+| 5.3 MCP resources | Done | c641fae4 |
+| 5.3 `read_knowledge` from a section | Done | 075f85a1 |
+| 5.3 `sources` under the step | Done | 3491f92d, 4c7adc9e |
+| 5.3 File use on the Knowledge page | Done | 7abc17d2 |
+| 5.4 Garbage collection | Done | 17222b8f |
+| 5.4 Knowledge moves with a new project id | Done | 0fc0f25c |
+| 5.4 Learnings from two steps | Done | ca0f2f3b |
+| 5.4 Older Host gets a plain message | Done | c65d9e47 |
+| 5.4 Source health | Done. Open: the phone shows no per-source lines | 5d888105 |
+| 5.4 jq and curl | Done: readiness check and image | 93c066a9, 244fd1cb |
+| 5.5 PR scores | Done. Open: runs that another Device walks | 72fdd800 |
+| 5.5 Codex spans and cost | Done. Open: check on a real Codex | ff0055c7 |
+| 5.5 API request spans | Done | d09b27ec |
+| 5.5 OTLP headers out of commands | Done. Open: `/proc` on Linux | 26cfcb4b |
+| 5.6 Proof on real nights | Open | |
+| 5.7 The pitch | Open | |
+| 5.8 Subflow **Runs on** a computer | Done | e66dbeb7, 6bdad4cb, ac3d7dde, 839da78d |
+| 5.8 OpenCode problem, `{{` guard, `can`, score 0, `evals/` guard | Done | a02d3469, d196414b, f4a3d658, 56a848c4, 26f0a38b |
+| 5.8 Past runs as knowledge, learnings that expire, gh-aw, ACP registry | Open | |
 
 ## 1. What is settled
 
@@ -307,7 +359,7 @@ embeddings, the indexing API, `EnsembleRetriever`). LangSmith helps to
 measure, not to store. The vendor loaders and the LangGraph memory store do
 not fit (see "Not in this sprint").
 
-### 5.0 Landing first (sprint 3 follow-ups, in progress on 2026-10-30)
+### 5.0 Landing first (sprint 3 follow-ups, done 2026-10-31)
 
 - **Add source** on the Knowledge page: one Dialog for a folder on this
   computer, project files, web pages, a GitHub wiki, Jira or Confluence. It
@@ -402,7 +454,8 @@ keyword search, and 11 of 13 against 7 on paraphrases.
   keyword recall at 5 is under 80 % on at least 20 marked questions. Keep
   them only when hybrid beats keyword by at least 10 points.
 - Before it lands: run the Linux binary in the Host image, and measure
-  embedding speed on the Host's CPU.
+  embedding speed on the Host's CPU. Done in Docker on 2026-10-31 (see the
+  status above). The real Host is still to measure.
 - The model name is part of the index
   version, so a new model rebuilds the index.
 - Open question for an ADR 4 amendment: share embeddings by content hash
