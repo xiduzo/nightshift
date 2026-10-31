@@ -282,4 +282,10 @@ function refuse(message: string): never {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
-export type Session = Auth["$Infer"]["Session"];
+/**
+ * A signed-in session, as Better Auth reads it. An interface, so a
+ * declaration names it instead of writing it out: the API router's type
+ * stays within what the compiler serializes.
+ */
+export interface Session extends InferredSession {}
+type InferredSession = Auth["$Infer"]["Session"];
