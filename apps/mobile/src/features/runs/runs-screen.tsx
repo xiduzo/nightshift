@@ -1,11 +1,16 @@
-import { createProjectQueries, createRunQueries } from "@nightshift/client";
+import {
+	createProjectQueries,
+	createRunQueries,
+	type RunSummary,
+} from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
+import type { ListRenderItemInfo } from "@shopify/flash-list";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { History, X } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useHostQueries } from "@/features/host";
 import { SearchResults } from "@/features/search";
@@ -14,8 +19,8 @@ import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { HeaderSearch, HeaderToolbar } from "@/shared/header";
-import { ListGroup } from "@/shared/list";
-import { Screen } from "@/shared/page";
+import { type Cell, CellSeparator, cellsOf, ListCell } from "@/shared/list";
+import { ScreenList } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { RunRow } from "./run-row";
 import {
@@ -73,6 +78,7 @@ function useRunsParams(): {
  * The runs of the Space you chose in the header, newest first. Chips show
  * the runs on their way, the runs that need you, the failed and the
  * finished ones. Pull down, or come back to the tab, to read them again.
+ * The next page reads as you scroll near the end.
  */
 export function RunsScreen() {
 	const { filter, projectId, setFilter, clearProject } = useRunsParams();
@@ -113,147 +119,145 @@ export function RunsScreen() {
 		? (projectNames.get(projectId) ?? "This project")
 		: null;
 	const [query, setQuery] = useState("");
-	const header = <RunsHeader onSearch={setQuery} />;
+	const searching = query.trim() !== "";
 
-	if (query.trim() !== "") {
-		return (
-			<Screen>
-				{header}
-				<SearchResults query={query} />
-			</Screen>
-		);
-	}
-
-	if (runs.isPending) {
-		return (
-			<Screen>
-				{header}
-				<Skeleton className="h-11 w-full rounded-full" />
-				<Skeleton className="h-72 w-full rounded-xl" />
-			</Screen>
-		);
-	}
-
-	// A failed read again keeps the list it has.
-	if (runs.isError && runs.data === undefined) {
-		return (
-			<Screen onRefresh={refresh}>
-				{header}
-				<ErrorAlert
-					title="The runs did not load"
-					message={runs.error.message}
-					fix="Check that this phone is online, then try again."
-					onRetry={() => void runs.refetch()}
+	const cells = useMemo(() => cellsOf(shown), [shown]);
+	const renderRun = useCallback(
+		({ item }: ListRenderItemInfo<Cell<RunSummary>>) => (
+			<ListCell first={item.first} last={item.last}>
+				<RunRow
+					run={item.item}
+					projectName={projectNames.get(item.item.projectId) ?? null}
 				/>
-			</Screen>
-		);
-	}
+			</ListCell>
+		),
+		[projectNames],
+	);
+	const { hasNextPage, isFetchingNextPage, fetchNextPage } = runs;
+	const readMore = useCallback(() => {
+		if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
 	// An older Host sends no counts but every run.
 	const spaceRuns =
 		countedFilters(projects.data, null)?.all ?? loaded?.length ?? 0;
-	if (projects.data !== undefined && spaceRuns === 0) {
-		return (
-			<Screen onRefresh={refresh}>
-				{header}
-				<EmptyState
-					icon={History}
-					title="No runs yet"
-					description="Start a flow to make the first run."
-				>
-					<Button
-						size="lg"
-						onPress={() => router.push("/start")}
-						className="h-auto min-h-11 py-2"
-					>
-						<Text>New run</Text>
-					</Button>
-				</EmptyState>
-			</Screen>
-		);
-	}
+	const listed =
+		!searching &&
+		!runs.isPending &&
+		!(runs.isError && runs.data === undefined) &&
+		!(projects.data !== undefined && spaceRuns === 0);
 
+	// Every state keeps the same list as the root of the screen: the large
+	// title collapses with it, and search results swap in place of the rows.
 	return (
-		<Screen
-			onRefresh={refresh}
-			summary={runsSummary(counts[filter], projectName)}
-		>
-			{header}
-			<ChipRail>
-				{projectName ? (
-					<Chip
-						label={projectName}
-						icon={X}
-						selected
-						onPress={clearProject}
-						role="button"
-						accessibilityHint="Shows the runs of every project"
-					/>
-				) : null}
-				{RUN_FILTERS.map(({ key, label }) => (
-					<Chip
-						key={key}
-						label={label}
-						count={counts[key]}
-						selected={filter === key}
-						onPress={() => setFilter(key)}
-					/>
-				))}
-			</ChipRail>
-			{shown.length > 0 ? (
+		<ScreenList
+			data={listed ? cells : []}
+			renderItem={renderRun}
+			keyExtractor={runKey}
+			ItemSeparatorComponent={CellSeparator}
+			onEndReached={listed ? readMore : undefined}
+			onEndReachedThreshold={1}
+			ListFooterComponent={
+				listed && isFetchingNextPage ? (
+					<Skeleton className="mt-4 h-14 w-full rounded-xl" />
+				) : null
+			}
+			onRefresh={searching || runs.isPending ? undefined : refresh}
+			summary={listed ? runsSummary(counts[filter], projectName) : undefined}
+			header={
 				<>
-					<ListGroup>
-						{shown.map((run) => (
-							<RunRow
-								key={run.id}
-								run={run}
-								projectName={projectNames.get(run.projectId) ?? null}
-							/>
-						))}
-					</ListGroup>
-					{runs.hasNextPage ? (
-						<Button
-							size="lg"
-							variant="outline"
-							className="h-auto min-h-11 self-center py-2"
-							disabled={runs.isFetchingNextPage}
-							onPress={() => void runs.fetchNextPage()}
+					<RunsHeader onSearch={setQuery} />
+					{searching ? (
+						<SearchResults query={query} />
+					) : runs.isPending ? (
+						<>
+							<Skeleton className="h-11 w-full rounded-full" />
+							<Skeleton className="h-72 w-full rounded-xl" />
+						</>
+					) : runs.isError && runs.data === undefined ? (
+						// A failed read again keeps the list it has.
+						<ErrorAlert
+							title="The runs did not load"
+							message={runs.error.message}
+							fix="Check that this phone is online, then try again."
+							onRetry={() => void runs.refetch()}
+						/>
+					) : !listed ? (
+						<EmptyState
+							icon={History}
+							title="No runs yet"
+							description="Start a flow to make the first run."
 						>
-							<Text>Show more runs</Text>
-						</Button>
-					) : null}
+							<Button
+								size="lg"
+								onPress={() => router.push("/start")}
+								className="h-auto min-h-11 py-2"
+							>
+								<Text>New run</Text>
+							</Button>
+						</EmptyState>
+					) : (
+						<>
+							<ChipRail>
+								{projectName ? (
+									<Chip
+										label={projectName}
+										icon={X}
+										selected
+										onPress={clearProject}
+										role="button"
+										accessibilityHint="Shows the runs of every project"
+									/>
+								) : null}
+								{RUN_FILTERS.map(({ key, label }) => (
+									<Chip
+										key={key}
+										label={label}
+										count={counts[key]}
+										selected={filter === key}
+										onPress={() => setFilter(key)}
+									/>
+								))}
+							</ChipRail>
+							{shown.length > 0 ? null : filter === "all" ? (
+								<EmptyState
+									icon={History}
+									title="No runs in this project"
+									description="Show every project to see the other runs."
+								>
+									<Button
+										size="lg"
+										variant="outline"
+										onPress={clearProject}
+										className="h-auto min-h-11 py-2"
+									>
+										<Text>Show every project</Text>
+									</Button>
+								</EmptyState>
+							) : (
+								<EmptyState
+									icon={History}
+									title={emptyFilterTitle(filter)}
+									description="Choose another filter, or show all runs."
+								>
+									<Button
+										size="lg"
+										variant="outline"
+										onPress={() => setFilter("all")}
+										className="h-auto min-h-11 py-2"
+									>
+										<Text>Show all runs</Text>
+									</Button>
+								</EmptyState>
+							)}
+						</>
+					)}
 				</>
-			) : filter === "all" ? (
-				<EmptyState
-					icon={History}
-					title="No runs in this project"
-					description="Show every project to see the other runs."
-				>
-					<Button
-						size="lg"
-						variant="outline"
-						onPress={clearProject}
-						className="h-auto min-h-11 py-2"
-					>
-						<Text>Show every project</Text>
-					</Button>
-				</EmptyState>
-			) : (
-				<EmptyState
-					icon={History}
-					title={emptyFilterTitle(filter)}
-					description="Choose another filter, or show all runs."
-				>
-					<Button
-						size="lg"
-						variant="outline"
-						onPress={() => setFilter("all")}
-						className="h-auto min-h-11 py-2"
-					>
-						<Text>Show all runs</Text>
-					</Button>
-				</EmptyState>
-			)}
-		</Screen>
+			}
+		/>
 	);
+}
+
+function runKey(cell: Cell<RunSummary>): string {
+	return cell.item.id;
 }

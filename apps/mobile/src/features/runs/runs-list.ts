@@ -127,7 +127,7 @@ export function filterRuns<T extends Pick<RunSummary, "status" | "createdAt">>(
 		.sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** How many runs the list reads at first, and how many more each "Show more" reads. */
+/** How many runs the list reads at first, and how many more it reads each time you scroll near the end. */
 export const RUNS_PAGE = 30;
 
 const MINUTE = 60_000;

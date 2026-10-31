@@ -1,5 +1,6 @@
 import { type RunSummary, useRunPrefetch } from "@nightshift/client";
 import { type Href, router } from "expo-router";
+import { memo } from "react";
 
 import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
@@ -18,10 +19,12 @@ export function openRun(runId: string): void {
 }
 
 /**
- * One run in a ListGroup: its status icon, its title, "Running · website",
+ * One run in a list: its status icon, its title, "Running · website",
  * and how long it has run, or when it started, kept current. Tap opens it.
+ * It renders again only when its run or project name changes, or the
+ * clock ticks.
  */
-export function RunRow({
+export const RunRow = memo(function RunRow({
 	run,
 	projectName,
 }: {
@@ -45,4 +48,4 @@ export function RunRow({
 			accessibilityHint="Opens the run"
 		/>
 	);
-}
+});
