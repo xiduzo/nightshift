@@ -82,6 +82,12 @@ export type KnowledgeHit = {
 	found: KnowledgeFound[];
 };
 
+/**
+ * How a search finds: by the words of the query, by its meaning, or both
+ * fused (the default). The evaluation (`evaluate.ts`) compares them.
+ */
+export type KnowledgeSearchMode = "words" | "meaning" | "both";
+
 /** What a refresh did. */
 export type KnowledgeRefresh = {
 	/** Text files the folder has now. */
@@ -94,13 +100,18 @@ export type KnowledgeRefresh = {
 
 /**
  * Whether search by meaning works for a project on this computer.
- * `off`: no model is set up. `no-ollama`: Ollama does not answer.
- * `no-model`: Ollama does not have the model. `preparing`: the first
- * vectors are on their way, `done` of `total` sections. `on`: every
- * section has its vector.
+ * `off`: no model is set up. `turned-off`: a person turned it off for the
+ * project. `no-ollama`: Ollama does not answer. `no-model`: Ollama does
+ * not have the model. `preparing`: the first vectors are on their way,
+ * `done` of `total` sections. `on`: every section has its vector.
  */
 export type KnowledgeMeaningStatus = {
-	state: "off" | Exclude<KnowledgeMeaningReady, "ready"> | "preparing" | "on";
+	state:
+		| "off"
+		| "turned-off"
+		| Exclude<KnowledgeMeaningReady, "ready">
+		| "preparing"
+		| "on";
 	/** The embedding model. Null when it is off. */
 	model: string | null;
 	done: number;
@@ -305,13 +316,24 @@ export type KnowledgeSearch = ReturnType<typeof createKnowledgeSearch>;
 
 /**
  * `meaning`: the embedding model for search by meaning. Without it, search
- * finds by words only.
+ * finds by words only. `meaningOn`: whether a person left search by
+ * meaning on for a project (the project's setting, `knowledge-document.ts`).
+ * Off: the project is searched by words only, and its vectors are not
+ * prepared. Default: on.
  */
 export function createKnowledgeSearch(
 	dataDir: string,
-	options: { meaning?: KnowledgeMeaning } = {},
+	options: {
+		meaning?: KnowledgeMeaning;
+		meaningOn?: (projectId: string) => Promise<boolean>;
+	} = {},
 ) {
 	const { meaning } = options;
+	/** Whether search by meaning is on for the project: a setting that cannot be read leaves it on. */
+	const meaningOn = (projectId: string): Promise<boolean> =>
+		options.meaningOn
+			? options.meaningOn(projectId).catch(() => true)
+			: Promise.resolve(true);
 	const folders = createKnowledgeFolders(dataDir);
 	const root = join(dataDir, "knowledge");
 	const file = join(root, SEARCH_FILE);
@@ -330,6 +352,15 @@ export function createKnowledgeSearch(
 	const queued = new Set<string>();
 	/** When a preparation of a project last failed. */
 	const failedAt = new Map<string, number>();
+	/** Projects whose setting turned search by meaning off, as last read. */
+	const turnedOff = new Set<string>();
+	/** Reads the project's setting again: off, its vectors are not prepared. */
+	async function readSetting(projectId: string): Promise<boolean> {
+		const on = await meaningOn(projectId);
+		if (on) turnedOff.delete(projectId);
+		else turnedOff.add(projectId);
+		return on;
+	}
 	/** Preparations run one project at a time, in the background. */
 	let preparing: Promise<void> = Promise.resolve();
 	/** What the last check of the model said, to log a change once. */
@@ -485,6 +516,7 @@ export function createKnowledgeSearch(
 	function prepare(projectId: string): void {
 		if (!meaning || closed) return;
 		if (synced.has(projectId) || queued.has(projectId)) return;
+		if (turnedOff.has(projectId)) return;
 		const failed = failedAt.get(projectId);
 		if (failed !== undefined && Date.now() - failed < RETRY_MS) return;
 		queued.add(projectId);
@@ -712,13 +744,16 @@ export function createKnowledgeSearch(
 		};
 	}
 
-	/** The project's index brought up to date with its folder, then its vectors in the background. */
+	/**
+	 * The project's index brought up to date with its folder, then its
+	 * vectors in the background, unless search by meaning is off for it.
+	 */
 	function refresh(projectId: string): Promise<KnowledgeRefresh> {
 		const running = refreshing.get(projectId);
 		if (running) return running;
-		const next = update(projectId)
-			.then((result) => {
-				prepare(projectId);
+		const next = Promise.all([update(projectId), readSetting(projectId)])
+			.then(([result, on]) => {
+				if (on) prepare(projectId);
 				return result;
 			})
 			.finally(() => refreshing.delete(projectId));
@@ -863,26 +898,33 @@ export function createKnowledgeSearch(
 		async search(
 			projectId: string,
 			text: string,
-			options: { limit?: number } = {},
+			options: { limit?: number; mode?: KnowledgeSearchMode } = {},
 		): Promise<KnowledgeHit[]> {
 			const limit = Math.min(
 				Math.max(1, Math.floor(options.limit ?? LIMIT_DEFAULT)),
 				LIMIT_MAX,
 			);
+			const mode = options.mode ?? "both";
 			const all = matchQuery(text, "all");
 			if (all === null) return [];
 			const depth = Math.max(limit, FUSE_DEPTH);
+			const on = mode !== "words" && (await readSetting(projectId));
 			return healing(async () => {
 				await refresh(projectId);
 				const sqlite = await database();
-				let words = byWords(sqlite, projectId, all, depth);
-				if (words.length === 0) {
-					const any = matchQuery(text, "any");
-					if (any !== null && any !== all) {
-						words = byWords(sqlite, projectId, any, depth);
+				let words: WordsHit[] = [];
+				if (mode !== "meaning") {
+					words = byWords(sqlite, projectId, all, depth);
+					if (words.length === 0) {
+						const any = matchQuery(text, "any");
+						if (any !== null && any !== all) {
+							words = byWords(sqlite, projectId, any, depth);
+						}
 					}
 				}
-				const meant = await byMeaning(sqlite, projectId, text.trim(), depth);
+				const meant = on
+					? await byMeaning(sqlite, projectId, text.trim(), depth)
+					: [];
 				const byPath = {
 					words: new Map(words.map((hit) => [hit.path, hit])),
 					meaning: new Map(meant.map((hit) => [hit.path, hit])),
@@ -922,6 +964,9 @@ export function createKnowledgeSearch(
 		 */
 		async meaning(projectId: string): Promise<KnowledgeMeaningStatus> {
 			if (!meaning) return { state: "off", model: null, done: 0, total: 0 };
+			if (!(await readSetting(projectId))) {
+				return { state: "turned-off", model: meaning.model, done: 0, total: 0 };
+			}
 			const ready = await readyNow(meaning);
 			if (ready !== "ready") {
 				return { state: ready, model: meaning.model, done: 0, total: 0 };

@@ -395,3 +395,37 @@ describe("knowledge.questions and knowledge.markQuestion", () => {
 		expect(after.set).toHaveLength(1);
 	});
 });
+
+describe("knowledge.evaluate and knowledge.setMeaning", () => {
+	test("the question set runs by words while search by meaning is not ready; turning it off asks a role that may start runs", async () => {
+		await putFile("wiki/deploy.md", "# Deploy\n");
+		await built.knowledge.markQuestion(projectId, {
+			query: "deploy",
+			answers: ["wiki/deploy.md"],
+			by: "member",
+		});
+		const result = await call(
+			appRouter.knowledge.evaluate,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(result).toMatchObject({
+			questions: 1,
+			advice: "unavailable",
+			modes: { words: { found: 1, recall: 1 }, meaning: null, both: null },
+		});
+		await expect(
+			call(
+				appRouter.knowledge.setMeaning,
+				{ projectId, on: false },
+				{ context: context("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+		await call(
+			appRouter.knowledge.setMeaning,
+			{ projectId, on: false },
+			{ context: context("member") },
+		);
+		expect(await built.knowledge.meaningOn(projectId)).toBe(false);
+	});
+});

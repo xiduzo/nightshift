@@ -10,7 +10,11 @@ import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
 import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
 import { createKnowledgeFolders, INDEX_FILE, isReadable } from "./folder";
-import type { KnowledgeDocuments } from "./knowledge-document";
+import {
+	type KnowledgeDocuments,
+	meaningIsOn,
+	setMeaning,
+} from "./knowledge-document";
 import { keepLearnings, withLearnings } from "./learnings";
 import {
 	formatQuestions,
@@ -347,6 +351,14 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 			} finally {
 				await hold.done();
 			}
+		},
+		/** Whether search by meaning is on for the project, in every Device of its Space. */
+		async meaningOn(projectId: string): Promise<boolean> {
+			return meaningIsOn(await deps.documents.open(projectId));
+		},
+		/** Turns search by meaning on or off for the project, for every Device of its Space. */
+		async setMeaning(projectId: string, on: boolean): Promise<void> {
+			await setMeaning(await deps.documents.open(projectId), on);
 		},
 		listing: sync.listing,
 		read: sync.read,

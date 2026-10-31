@@ -386,12 +386,17 @@ export async function createDaemon(
 	/**
 	 * Search over the projects' knowledge folders: this computer's own
 	 * index, built from the folders and never synced. By words, and by
-	 * meaning when Ollama on this computer has the embedding model. One
-	 * open index file across reloads.
+	 * meaning when Ollama on this computer has the embedding model, unless
+	 * a person turned it off for the project. One open index file across
+	 * reloads.
 	 */
 	const knowledgeSearch = await slots.keep(
 		"nightshiftKnowledgeSearch",
-		() => createKnowledgeSearch(dataDir, { meaning: ollamaMeaning() }),
+		() =>
+			createKnowledgeSearch(dataDir, {
+				meaning: ollamaMeaning(),
+				meaningOn: (projectId) => knowledge.meaningOn(projectId),
+			}),
 		(kept) => kept.close(),
 	);
 	/**

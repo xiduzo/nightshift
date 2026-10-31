@@ -21,6 +21,10 @@ import { isKnowledgePath } from "./folder";
  * one path, Yjs keeps one of them, and the next reconcile makes the later
  * change win (`createKnowledgeSync`). `local`: the file is larger than
  * 10 MB and stays on the Device that has it.
+ *
+ * `settings`: the project's knowledge settings, one plain value per name,
+ * so every Device of the Space searches the same way. `meaning: false`:
+ * search finds by words only for this project, though Ollama is there.
  */
 
 /** One file of the knowledge, as the document lists it. */
@@ -63,6 +67,29 @@ export function knowledgeEntries(
 		entries.set(path, local ? { ...entry, local } : entry);
 	}
 	return entries;
+}
+
+/** The document's `settings`: name → value. */
+function knowledgeSettings(document: PersistedDocument) {
+	return document.doc.getMap<unknown>("settings");
+}
+
+/** Whether search by meaning is on for the project: on unless a person turned it off. */
+export function meaningIsOn(document: PersistedDocument): boolean {
+	return knowledgeSettings(document).get("meaning") !== false;
+}
+
+/** Turns search by meaning on or off for the project, for every Device of its Space. */
+export async function setMeaning(
+	document: PersistedDocument,
+	on: boolean,
+): Promise<void> {
+	if (meaningIsOn(document) === on) return;
+	const settings = knowledgeSettings(document);
+	await document.change(() => {
+		if (on) settings.delete("meaning");
+		else settings.set("meaning", false);
+	});
 }
 
 /** The knowledge documents of this Replica's Projects: views of its synced documents. */

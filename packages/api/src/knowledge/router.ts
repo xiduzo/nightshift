@@ -2,6 +2,7 @@ import { useHit } from "@nightshift/agents/tools";
 import { type Permissions, ROLE_REFUSAL } from "@nightshift/auth";
 import {
 	askedQuestions,
+	evaluateKnowledge,
 	knowledgeSources,
 	questionKey,
 } from "@nightshift/engine";
@@ -20,6 +21,7 @@ import { permitted, protectedProcedure, refusalError } from "../procedures";
 import { runSummarySchema } from "../runs";
 import {
 	type KnowledgeView,
+	knowledgeEvaluationSchema,
 	knowledgeHitSchema,
 	knowledgeMeaningSchema,
 	knowledgeQuestionsSchema,
@@ -369,5 +371,44 @@ export const knowledge = {
 				answers: input.answers,
 				by: context.session.user.id,
 			});
+		}),
+	/**
+	 * Runs the project's question set against each way to search on this
+	 * computer: by words, by meaning, and both. Recall at 5, the rank of
+	 * each question's first right file, and what that says about search
+	 * by meaning for the project.
+	 */
+	evaluate: protectedProcedure
+		.route({
+			summary:
+				"Runs a project's question set against knowledge search by words, by meaning and both, and reports recall at 5.",
+		})
+		.output(output(knowledgeEvaluationSchema))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			const questions = await context.knowledge.questions(input.projectId);
+			return evaluateKnowledge(
+				context.knowledgeSearch,
+				input.projectId,
+				questions,
+			);
+		}),
+	/**
+	 * Turns search by meaning on or off for the project, on every computer
+	 * of its Space. It changes the knowledge, so it asks a role that may
+	 * start runs (ADR 4).
+	 */
+	setMeaning: permitted({ run: ["start"] })
+		.route({
+			summary:
+				"Turns knowledge search by meaning on or off for a project, on every computer of its Space.",
+		})
+		.output(output(knowledgeMeaningSchema))
+		.input(z.object({ projectId: z.string(), on: z.boolean() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			await context.knowledge.setMeaning(input.projectId, input.on);
+			return context.knowledgeSearch.meaning(input.projectId);
 		}),
 };

@@ -50,3 +50,5 @@ export type SettingsView = ApiOutputs["settings"]["get"];
 /** A project's knowledge on this computer, and the flows that fill it. */
 export type Knowledge = ApiOutputs["knowledge"]["get"];
 export type KnowledgeFile = Knowledge["files"][number];
+/** The question set against each way to search. */
+export type KnowledgeEvaluation = ApiOutputs["knowledge"]["evaluate"];

@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { orpc } from "@/shared/api";
 import { formatDateTime, formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
+import { SearchEvaluation } from "./evaluation";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
 
 /** The files a search found that the table shows, best first. */
@@ -76,6 +77,9 @@ export function AskedQuestions({
 					: "Mark the file that answers a question. Marked questions test how well search finds answers."
 			}
 		>
+			{marked > 0 ? (
+				<SearchEvaluation projectId={projectId} marked={marked} />
+			) : null}
 			<Card className="py-0">
 				<CardContent className="px-0">
 					{questions.isLoading ? (

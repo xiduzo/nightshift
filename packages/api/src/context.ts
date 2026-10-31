@@ -93,7 +93,12 @@ export type Services = {
 	 */
 	knowledge: Pick<
 		ProjectKnowledge,
-		"listing" | "read" | "removeFolder" | "questions" | "markQuestion"
+		| "listing"
+		| "read"
+		| "removeFolder"
+		| "questions"
+		| "markQuestion"
+		| "setMeaning"
 	>;
 	/** Search over the projects' knowledge on this computer, by words and by meaning. */
 	knowledgeSearch: Pick<KnowledgeSearch, "search" | "meaning">;

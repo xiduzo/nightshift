@@ -68,6 +68,7 @@ export type {
 	HarnessRow,
 	HarnessRowName,
 	Knowledge,
+	KnowledgeEvaluation,
 	KnowledgeFile,
 	McpServer,
 	McpTestResult,

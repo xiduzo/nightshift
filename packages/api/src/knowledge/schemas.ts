@@ -1,5 +1,6 @@
 import type {
 	AskedQuestion,
+	KnowledgeEvaluation,
 	KnowledgeFile,
 	KnowledgeHit,
 	KnowledgeMeaningStatus,
@@ -103,11 +104,19 @@ export const knowledgeHitSchema = exact<KnowledgeHit>()(
 export const knowledgeMeaningSchema = exact<KnowledgeMeaningStatus>()(
 	z.object({
 		/**
-		 * `off`: no model is set up. `no-ollama`: Ollama does not answer.
+		 * `off`: no model is set up. `turned-off`: a person turned it off
+		 * for the project. `no-ollama`: Ollama does not answer.
 		 * `no-model`: Ollama does not have the model. `preparing`: the first
 		 * vectors are on their way. `on`: search finds by meaning.
 		 */
-		state: z.enum(["off", "no-ollama", "no-model", "preparing", "on"]),
+		state: z.enum([
+			"off",
+			"turned-off",
+			"no-ollama",
+			"no-model",
+			"preparing",
+			"on",
+		]),
 		/** The embedding model. Null when it is off. */
 		model: z.string().nullable(),
 		/** Sections with a vector, of `total`. */
@@ -168,3 +177,46 @@ export const knowledgeQuestionsSchema = z.object({
 	asked: z.array(askedQuestionSchema),
 	set: z.array(knowledgeQuestionSchema),
 });
+
+const modeResultSchema = z
+	.object({
+		/** Questions with a right file in the top `k`. */
+		found: z.number(),
+		/** `found` of all questions, 0 to 1. */
+		recall: z.number(),
+		/** The mean of 1 / rank of the first right file. */
+		mrr: z.number(),
+	})
+	.nullable();
+
+const rankSchema = z.number().nullable();
+
+/** The question set against each way to search: recall at 5, and the rank of each question's first right file. */
+export const knowledgeEvaluationSchema = exact<KnowledgeEvaluation>()(
+	z.object({
+		at: z.number(),
+		questions: z.number(),
+		k: z.number(),
+		minQuestions: z.number(),
+		minGainPoints: z.number(),
+		meaning: knowledgeMeaningSchema,
+		modes: z.object({
+			words: modeResultSchema,
+			meaning: modeResultSchema,
+			both: modeResultSchema,
+		}),
+		rows: z.array(
+			z.object({
+				query: z.string(),
+				answers: z.array(z.string()),
+				ranks: z.object({
+					words: rankSchema,
+					meaning: rankSchema,
+					both: rankSchema,
+				}),
+			}),
+		),
+		/** `too-few`: fewer marked questions than `minQuestions`. `keep`: search by meaning finds more. `turn-off`: words alone find as much. `unavailable`: search by meaning does not work now. */
+		advice: z.enum(["too-few", "keep", "turn-off", "unavailable"]),
+	}),
+);

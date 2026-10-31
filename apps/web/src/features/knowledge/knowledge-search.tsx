@@ -184,6 +184,8 @@ function MeaningLine({ projectId }: { projectId: string }) {
 						: 0}
 					% done.
 				</>
+			) : status.state === "turned-off" ? (
+				"Search finds words only. Search by meaning is off for this project."
 			) : status.state === "no-model" ? (
 				<>
 					Search finds words only. To find files by their meaning too, run{" "}

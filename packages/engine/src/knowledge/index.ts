@@ -7,6 +7,10 @@
 
 export { LOCAL_ONLY_BYTES } from "./documents";
 export {
+	evaluateKnowledge,
+	type KnowledgeEvaluation,
+} from "./evaluate";
+export {
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeFile,
 	type KnowledgeText,

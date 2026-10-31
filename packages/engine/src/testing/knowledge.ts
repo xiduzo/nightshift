@@ -3,6 +3,7 @@ import { createSpaceArchive, type SpaceArchive } from "../archive";
 import type { SyncedDocuments } from "../documents";
 import { createKnowledgeFolders } from "../knowledge/folder";
 import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
+import type { KnowledgeMeaning } from "../knowledge/meaning";
 import { createProjectKnowledge } from "../knowledge/project-knowledge";
 import { createKnowledgeSearch } from "../knowledge/search";
 
@@ -20,17 +21,23 @@ export function testKnowledge(
 		archive?: SpaceArchive;
 		/** The Replica's synced documents, as its Link syncs them. Default: its own over `db`. */
 		synced?: SyncedDocuments;
+		/** Search by meaning with this model. Default: by words only. */
+		meaning?: KnowledgeMeaning;
 	} = {},
 ) {
 	const {
 		archive = createSpaceArchive(sandbox.dataDir),
 		synced,
+		meaning,
 		...rest
 	} = options;
-	const search = createKnowledgeSearch(sandbox.dataDir);
 	const documents = createKnowledgeDocuments({
 		db: sandbox.db,
 		...(synced ? { documents: synced } : {}),
+	});
+	const search = createKnowledgeSearch(sandbox.dataDir, {
+		...(meaning ? { meaning } : {}),
+		meaningOn: (projectId) => knowledge.meaningOn(projectId),
 	});
 	const knowledge = createProjectKnowledge({
 		db: sandbox.db,
