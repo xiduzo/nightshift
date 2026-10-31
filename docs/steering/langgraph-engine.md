@@ -935,18 +935,20 @@ wait node, the park node and the Gate's ask node give it only the copy
 the interrupt carries and what the answer does. The interrupt payloads
 (`Parked`) did not change.
 
-## What a run holds (`graph/holds.ts`, `log/holds.ts`, `leases/`)
+## What a run holds (`graph/holds.ts`, `log/holds.ts`, `leases/`, `services/`)
 
-A run can hold something for a scope: a lease (ADR 7), later a service
+A run can hold something for a scope: a lease (ADR 7) or a service
 (ADR 9). The scope is the run, or a Section of the flow the node is in.
 The engine, not the flow, lets go of it.
 
-- The log says what a run holds. `LeaseTaken` (with the Section and its
-  nodes) adds a `Hold` to `RunState.holds`, `LeaseReleased` takes it away,
-  and `RunEnded` moves the holds to `RunState.endedHolding`.
+- The log says what a run holds. `LeaseTaken` and `ServiceStarted` (with
+  the Section and its nodes) add a `Hold` to `RunState.holds`.
+  `LeaseReleased` and `ServiceStopped` take it away, and `RunEnded` moves
+  the holds to `RunState.endedHolding`.
 - A step that routes out of a Section, or the Call step whose flow took
   the hold, leaves it (`leavingHolds`). `route.ts` logs the release
-  (`LeaseReleased`, why `scope`) and frees the lease.
+  (`LeaseReleased` or `ServiceStopped`, why `scope`), then frees the lease
+  or stops the service.
 - `RunHolds` is the runner's port, with one part per kind
   (`combineHolds`). `ended` runs on every `RunEnded`: `endRun`, a failed
   re-entry and `closeOpenWork`. An `interrupted` run keeps its holds, and
@@ -958,12 +960,30 @@ The engine, not the flow, lets go of it.
   Space it keeps, else the Space's Host through `Relay.leases`. It renews
   the leases of the runs it walks every minute. A new daemon reads them
   from the logs before recovery (`trackHeldLeases`).
+- The service keeper (`services/keeper.ts`) starts a service as a long
+  `Device.exec` with `pid`, which the step does not wait for, and writes
+  its output to `logs/<run>/<step>.service.log` on the Walker. It tries
+  the ready check until it passes or the time runs out. `ServiceStarted`
+  is logged as soon as the process runs, with the Device, the folder, the
+  pid, its start time (`ps -o lstart=`) and the rendered commands
+  (`ServiceSpec`). A stop runs the node's `stop`, then ends the process
+  group. A service another daemon started is stopped on its Device by its
+  pid, only when the start time still matches.
+- `serviceHolds` is the second part of `combineHolds`. A resume starts the
+  services again whose scope holds the re-entry node, with the logged
+  commands, and waits until they are ready (`ServiceStarted` with
+  `again`). A service that does not get ready refuses the resume, and the
+  parts before it let go again.
+- The step runner gives a later step the live `log_tail` of each running
+  service of its scope (`withServiceTails`). Run start refuses a plan that
+  places a working step of a service's scope on another Device
+  (`run/service-devices.ts`).
 
 ## The node-kind descriptor (`graph/node-kinds.ts`)
 
 One module per node kind says what the engine must know about that kind.
 Each node module exports one `NodeKind<N>` next to its factory (`AGENT`,
-`COMMAND`, `TOOL`, `DECISION`, `VALUE`, `WAIT`, `CALL`, `LEASE`). `NODE_KINDS` lists
+`COMMAND`, `TOOL`, `DECISION`, `VALUE`, `WAIT`, `CALL`, `LEASE`, `SERVICE`). `NODE_KINDS` lists
 them by type. `kindOf(node)` or `kindOfType(type)` gives a caller the
 descriptor. The interface is in `context.ts`, next to `StepContext`: what
 a node factory gets, and what a node module gives back. `PLAIN_KIND` holds

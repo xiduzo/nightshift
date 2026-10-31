@@ -222,6 +222,7 @@ The concept, the decisions, and the delivery order are in [docs/PLAN.md](docs/PL
 | [docs/adr/](docs/adr/) | The architecture decisions, one record each. |
 | [docs/deploy/](docs/deploy/) | Run Night Shift on a server and reach it from your other computers. |
 | [docs/deploy/triggers.md](docs/deploy/triggers.md) | Start a flow from GitHub Actions, n8n, Zapier or a script, with a signed webhook. |
+| [docs/deploy/services.md](docs/deploy/services.md) | Start a Docker Compose stack or a dev server for the steps of a run, and let Night Shift stop it. |
 | [docs/releasing.md](docs/releasing.md) | Release the desktop app and the phone app. |
 | [docs/research/](docs/research/) | Spikes and design notes behind the bigger decisions. |
 
