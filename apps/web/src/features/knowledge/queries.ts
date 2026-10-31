@@ -21,6 +21,6 @@ export const knowledgeMutations = {
 	saveSource: orpc.knowledge.saveSource.mutationOptions,
 	/** Removes a source, and its files if asked. */
 	removeSource: orpc.knowledge.removeSource.mutationOptions,
-	/** Runs a source now: a run of its flow. */
-	sync: orpc.runs.start.mutationOptions,
+	/** Runs a source the page added now, where its schedule runs it. */
+	syncSource: orpc.knowledge.syncSource.mutationOptions,
 };

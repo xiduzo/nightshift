@@ -15,6 +15,7 @@ export {
 	type KnowledgeDocuments,
 	knowledgeDocumentProject,
 } from "./knowledge-document";
+export { isLearningsFolder } from "./learnings";
 export {
 	createProjectKnowledge,
 	type KnowledgeRequest,

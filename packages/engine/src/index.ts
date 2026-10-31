@@ -79,7 +79,6 @@ export {
 	createKnowledgeSearch,
 	createKnowledgeStore,
 	createProjectKnowledge,
-	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeDocuments,
 	type KnowledgeFile,
 	type KnowledgeHit,
@@ -90,6 +89,7 @@ export {
 	LOCAL_ONLY_BYTES,
 	type ProjectKnowledge,
 } from "./knowledge";
+export { knowledgeSources } from "./knowledge-sources";
 export type {
 	CopyStamp,
 	LoggedEvent,

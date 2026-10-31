@@ -10,13 +10,14 @@ export {
 	REVIEW_LEARNINGS_KIT,
 } from "./kits";
 export {
+	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSource,
 	type KnowledgeSourceKind,
-	knowledgeFoldersOf,
+	type KnowledgeSourceKit,
+	knowledgeKitInputs,
+	knowledgeSourceFields,
 	knowledgeSourceKind,
-	knowledgeSourceOf,
+	knowledgeSourceKitSchema,
 	knowledgeSourceSchema,
-	saveKnowledgeSource,
-	withKnowledgeSourceSchedule,
 } from "./knowledge/sources";

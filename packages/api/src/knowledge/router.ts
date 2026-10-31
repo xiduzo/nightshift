@@ -1,21 +1,10 @@
 import { ROLE_REFUSAL } from "@nightshift/auth";
-import { KNOWLEDGE_FILES_WARNING, type SpaceEngine } from "@nightshift/engine";
+import { knowledgeSources } from "@nightshift/engine";
 import {
-	cronError,
 	flowNameSchema,
 	isTimeZone,
-	knowledgeFoldersOf,
-	knowledgeKitsOf,
-	knowledgeSourceKind,
-	knowledgeSourceOf,
 	knowledgeSourceSchema,
-	REVIEW_LEARNINGS_KIT,
-	type Schedule,
-	saveKnowledgeSource,
-	scheduleSchema,
-	withKnowledgeSourceSchedule,
 } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -23,6 +12,7 @@ import type { Context } from "../context";
 import { flowIssueSchema } from "../flows";
 import { output } from "../output";
 import { permitted, protectedProcedure, refusalError } from "../procedures";
+import { runSummarySchema } from "../runs";
 import {
 	type KnowledgeView,
 	knowledgeHitSchema,
@@ -30,29 +20,25 @@ import {
 	knowledgeTextSchema,
 } from "./schemas";
 
-/** How many of the project's latest runs `knowledge.get` reads for each source's last sync. */
-const LAST_RUNS = 200;
-
-/** The project's schedules as its file holds them: what a save writes back. */
-async function savedSchedules(
-	space: SpaceEngine,
-	projectId: string,
-): Promise<Schedule[]> {
-	const list = await space.listSchedules(projectId);
-	return list.schedules.map((schedule) => scheduleSchema.parse(schedule));
+/** The knowledge sources of the Space the person works in, from this computer. */
+function sourcesOf(
+	context: Pick<Context, "knowledge" | "daemon"> & {
+		space: Parameters<typeof knowledgeSources>[0]["space"];
+	},
+) {
+	return knowledgeSources({
+		space: context.space,
+		files: context.knowledge,
+		deviceName: context.daemon.device.name,
+	});
 }
 
-/**
- * The schedules of a project are this computer's owner's to change
- * (`schedules.save`): a source that changes one asks the same.
- */
-function refuseUnlessOwner(context: Pick<Context, "access" | "daemon">) {
-	if (context.access.session?.user.id !== context.daemon.device.ownerId) {
-		throw new ORPCError("FORBIDDEN", {
-			message:
-				"Only the owner of this computer can change its schedules. Save it without Keep it up to date, or ask the owner.",
-		});
-	}
+/** What the person may change: this computer's schedules are its owner's. */
+function rightsOf(context: Pick<Context, "access" | "daemon">) {
+	return {
+		schedules:
+			context.access.session?.user.id === context.daemon.device.ownerId,
+	};
 }
 
 /** The clock of the person who saves a schedule, such as `Europe/Amsterdam`. */
@@ -94,72 +80,10 @@ export const knowledge = {
 		})
 		.output(output(knowledgeSchema))
 		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }): Promise<KnowledgeView> => {
-			// The project is the Space's: an unknown one refuses here.
-			const flows = await context.space.flows.map(input.projectId);
-			const { files, proposed, shared } = await context.knowledge.listing(
-				input.projectId,
-			);
-			const [schedules, runs] = await Promise.all([
-				context.space
-					.listSchedules(input.projectId)
-					.then((list) => list.schedules)
-					// A project without a copy on this computer lists none here.
-					.catch((error: unknown) => {
-						if (error instanceof Refusal) return [];
-						throw error;
-					}),
-				context.space.listRuns({
-					projectId: input.projectId,
-					limit: LAST_RUNS,
-				}),
-			]);
-			const used = Object.entries(flows)
-				.map(([flow, parsed]) => ({
-					flow,
-					kits: parsed ? knowledgeKitsOf(parsed) : [],
-				}))
-				.sort((a, b) => a.flow.localeCompare(b.flow));
-			return {
-				files,
-				tooLarge: files.length > KNOWLEDGE_FILES_WARNING,
-				syncs: used.flatMap(({ flow, kits }) => {
-					const fills = kits.filter((kit) => kit !== REVIEW_LEARNINGS_KIT);
-					if (fills.length === 0) return [];
-					const parsed = flows[flow];
-					const schedule = schedules.find(
-						(item) => item.flow === flow && item.cron !== undefined,
-					);
-					const last = runs.find((run) => run.flowName === flow);
-					return [
-						{
-							flow,
-							kits: fills,
-							source: parsed ? knowledgeSourceOf(parsed) : null,
-							schedule: schedule?.cron
-								? {
-										cron: schedule.cron,
-										enabled: schedule.enabled,
-										...(schedule.device ? { device: schedule.device } : {}),
-									}
-								: null,
-							lastRun: last
-								? {
-										id: last.id,
-										status: last.status,
-										at: last.endedAt ?? last.createdAt,
-									}
-								: null,
-						},
-					];
-				}),
-				proposed,
-				reviews: used
-					.filter(({ kits }) => kits.includes(REVIEW_LEARNINGS_KIT))
-					.map(({ flow }) => flow),
-				shared,
-			};
-		}),
+		.handler(
+			({ context, input }): Promise<KnowledgeView> =>
+				sourcesOf(context).list(input.projectId),
+		),
 	/**
 	 * Adds a source to the project's knowledge, or changes one the page
 	 * added (`name`): its flow, which calls the kit with the values given
@@ -191,41 +115,9 @@ export const knowledge = {
 				timeZone: timeZoneSchema.optional(),
 			}),
 		)
-		.handler(async ({ context, input }) => {
-			const { space } = context;
-			if (input.keepUpToDate !== undefined) refuseUnlessOwner(context);
-			const cron = input.keepUpToDate?.cron;
-			const problem = cron === undefined ? null : cronError(cron);
-			if (problem) {
-				throw new ORPCError("BAD_REQUEST", {
-					message: `This schedule is not valid: ${problem}`,
-				});
-			}
-			const saved = saveKnowledgeSource({
-				source: input.source,
-				...(input.name !== undefined ? { name: input.name } : {}),
-				flows: await space.flows.map(input.projectId),
-			});
-			const issues = await space.flows.save(
-				input.projectId,
-				saved.name,
-				saved.flow,
-			);
-			if (input.keepUpToDate !== undefined) {
-				const local = knowledgeSourceKind(input.source.kit).local;
-				const schedules = withKnowledgeSourceSchedule(
-					await savedSchedules(space, input.projectId),
-					saved.name,
-					cron === undefined
-						? null
-						: {
-								cron,
-								...(local ? { device: context.daemon.device.name } : {}),
-							},
-				);
-				await space.saveSchedules(input.projectId, schedules, input.timeZone);
-			}
-			return { name: saved.name, issues };
+		.handler(({ context, input }) => {
+			const { projectId, ...source } = input;
+			return sourcesOf(context).save(projectId, source, rightsOf(context));
 		}),
 	/**
 	 * Removes a source the page added: its flow and its schedules, and with
@@ -248,49 +140,38 @@ export const knowledge = {
 			}),
 		)
 		.handler(async ({ context, input }) => {
-			const { space } = context;
-			const flows = await space.flows.map(input.projectId);
-			const flow = flows[input.name];
-			if (!flow || !knowledgeSourceOf(flow)) {
-				throw new ORPCError("NOT_FOUND", {
-					message: "This project has no such source. It may have been removed.",
-				});
-			}
+			// Removing files changes the knowledge: a role that may start runs (ADR 4).
 			if (
 				input.removeFiles &&
 				!(await context.access.can({ run: ["start"] }))
 			) {
 				throw refusalError(ROLE_REFUSAL);
 			}
-			const schedules = await savedSchedules(space, input.projectId).catch(
-				(error: unknown) => {
-					if (error instanceof Refusal) return [];
-					throw error;
-				},
+			return sourcesOf(context).remove(
+				input.projectId,
+				input.name,
+				{ files: input.removeFiles },
+				rightsOf(context),
 			);
-			const kept = schedules.filter((schedule) => schedule.flow !== input.name);
-			if (kept.length < schedules.length) {
-				refuseUnlessOwner(context);
-				await space.saveSchedules(input.projectId, kept);
-			}
-			let removedFiles = 0;
-			if (input.removeFiles) {
-				const others = new Set(
-					Object.entries(flows).flatMap(([name, other]) =>
-						name === input.name || !other ? [] : knowledgeFoldersOf(other),
-					),
-				);
-				for (const folder of knowledgeFoldersOf(flow)) {
-					if (others.has(folder)) continue;
-					removedFiles += await context.knowledge.removeFolder(
-						input.projectId,
-						folder,
-					);
-				}
-			}
-			await space.flows.remove(input.projectId, input.name);
-			return { removedFiles };
 		}),
+	/**
+	 * Syncs a source the page added now: a run of its flow, on the computer
+	 * its schedule names when it reads a folder there.
+	 */
+	syncSource: permitted({ run: ["start"] })
+		.route({
+			summary:
+				"Syncs a knowledge source now: starts a run of its flow where its schedule runs it.",
+		})
+		.output(output(runSummarySchema))
+		.input(z.object({ projectId: z.string(), name: flowNameSchema }))
+		.handler(({ context, input }) =>
+			sourcesOf(context).sync(
+				input.projectId,
+				input.name,
+				context.session.user.id,
+			),
+		),
 	/**
 	 * The files of a project's knowledge on this computer that best match
 	 * the words, best first, each with an excerpt. Keyword search (BM25):

@@ -47,7 +47,6 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { flowQueries, StartRunDialog } from "@/features/flows";
-import { runQueries } from "@/features/runs";
 import { type Knowledge, orpc } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
@@ -231,28 +230,21 @@ function SourceItem({
 }
 
 /**
- * Runs a source now. A source the page added starts at once, on the
- * computer its schedule names when it reads a folder there. A drawn flow
- * asks for its inputs first.
+ * Runs a source now. A source the page added starts at once: Night Shift
+ * runs it where its schedule runs it. A drawn flow asks for its inputs
+ * first.
  */
 function SyncNowButton({ projectId, sync }: { projectId: string; sync: Sync }) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [asking, setAsking] = useState(false);
-	const local = sync.source
-		? knowledgeSourceKind(sync.source.kit).local
-		: false;
-	const placements = useQuery({
-		...runQueries.placements(projectId),
-		enabled: local && sync.schedule?.device !== undefined,
-	});
 	const flows = useQuery({
 		...flowQueries.list(projectId),
 		enabled: !sync.source,
 		meta: { quietErrors: true },
 	});
 	const start = useMutation(
-		knowledgeMutations.sync({
+		knowledgeMutations.syncSource({
 			onSuccess: (run) => {
 				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
 				toast.success("Night Shift syncs it now", {
@@ -277,14 +269,7 @@ function SyncNowButton({ projectId, sync }: { projectId: string; sync: Sync }) {
 			setAsking(true);
 			return;
 		}
-		const device = placements.data?.find(
-			(placement) => placement.name === sync.schedule?.device,
-		);
-		start.mutate({
-			projectId,
-			flowName: sync.flow,
-			...(device && !device.thisDevice ? { deviceId: device.deviceId } : {}),
-		});
+		start.mutate({ projectId, name: sync.flow });
 	};
 
 	return (

@@ -75,6 +75,7 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		cliToolsFor,
 		clonePath,
 		git,
+		knowledge,
 		deviceId,
 		peers,
 		directory = aloneDirectory(options.db),
@@ -100,6 +101,7 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				// The Clones of the database's own Device, as the daemon wires it.
 				clonePath: clonePath ?? clonePathOf(engine.db, directory.selfId),
 				git,
+				...(knowledge ? { knowledge } : {}),
 			},
 			deviceId,
 		),

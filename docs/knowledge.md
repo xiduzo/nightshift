@@ -125,8 +125,9 @@ Night Shift then:
 - saves a flow that calls the kit from one Subflow node, with your values
   (`knowledge-web-pages`, then `knowledge-web-pages-2`). A source is that
   flow ([ADR 4](adr/0004-knowledge-belongs-to-the-space.md), decision 6):
-  no other store holds it. `knowledge.saveSource` builds it with
-  `saveKnowledgeSource` in `@nightshift/flows`.
+  no other store holds it. The engine module `knowledgeSources`
+  (`packages/engine/src/knowledge-sources`) owns every rule of a source:
+  the API only checks who asks.
 - gives each source its own folder in the knowledge: the kit's folder, or
   `web-2` when another flow fills `web`. A sync replaces its folder, so two
   sources never share one. The dialog does not ask for it.
@@ -142,11 +143,14 @@ leave **Also remove the files it added** on, Night Shift also removes the
 source's folder from the knowledge, on every computer of the Space
 (`removeFolder`: its entries leave the knowledge document, and each
 computer's next reconcile removes the files). A folder that another flow
-fills stays. Removing files needs a role that may start runs.
+fills stays. Removing files needs a role that may start runs. Night Shift
+checks everything first and removes the files first. While a run changes
+the knowledge, it refuses: the source stays, and you can try again.
 
 A folder exists on one computer only. A Subflow node cannot name a Device, so a
 folder source keeps its runs on the computer where you added it through
-its schedule (`device`) and through **Sync now** on the Knowledge page.
+its schedule (`device`) and through **Sync now** on the Knowledge page
+(`knowledge.syncSource` starts it where its schedule runs it).
 A run of it started elsewhere, from the Flows page, does not find the
 folder and ends with "No files to copy".
 

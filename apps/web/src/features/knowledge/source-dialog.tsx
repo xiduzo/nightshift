@@ -4,7 +4,7 @@ import {
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSource,
 	type KnowledgeSourceKind,
-	kitFlow,
+	knowledgeSourceFields,
 	timeAndDaysToCron,
 } from "@nightshift/flows";
 import {
@@ -59,8 +59,6 @@ const KIND_HINTS: Record<KnowledgeSourceKind["kit"], string> = {
 		"Pages by id, with an API token you save as a secret.",
 };
 
-/** The input every knowledge kit has: Night Shift picks it, so the dialog does not ask. */
-const FOLDER_INPUT = "folder";
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 const DEFAULT_TIME = "06:00";
 
@@ -164,9 +162,8 @@ function SourceForm({
 	);
 	const [syncNow, setSyncNow] = useState(true);
 	const kind = KNOWLEDGE_SOURCE_KINDS.find((k) => k.kit === kit);
-	const inputs = (kitFlow(kit)?.inputs ?? []).filter(
-		(input) => input.name !== FOLDER_INPUT,
-	);
+	// The kit's folder is Night Shift's to pick: the dialog does not ask.
+	const inputs = knowledgeSourceFields(kit);
 	const missing = missingInputs(inputs, values);
 	const badTime =
 		times.on &&
@@ -180,7 +177,7 @@ function SourceForm({
 			queryClient.invalidateQueries({ queryKey: orpc.flows.key() }),
 			queryClient.invalidateQueries({ queryKey: orpc.schedules.key() }),
 		]);
-	const sync = useMutation(knowledgeMutations.sync());
+	const sync = useMutation(knowledgeMutations.syncSource());
 	const save = useMutation(
 		knowledgeMutations.saveSource({
 			onSuccess: async ({ name, issues }) => {
@@ -196,7 +193,7 @@ function SourceForm({
 					return;
 				}
 				try {
-					await sync.mutateAsync({ projectId, flowName: name });
+					await sync.mutateAsync({ projectId, name });
 					toast.success(
 						edited
 							? "Source saved. Night Shift syncs it now."
@@ -219,11 +216,6 @@ function SourceForm({
 		for (const input of inputs) {
 			const text = values[input.name]?.trim() ?? "";
 			if (text !== "") filled[input.name] = text;
-		}
-		// An edited source keeps its folder in the knowledge.
-		const folder = edited?.source.inputs[FOLDER_INPUT];
-		if (edited?.source.kit === kit && folder !== undefined) {
-			filled[FOLDER_INPUT] = folder;
 		}
 		const schedule = keepUpToDate(times, edited?.schedule ?? null);
 		save.mutate({
