@@ -42,7 +42,7 @@ export default function RootLayout() {
 					name="connect"
 					options={{ title: "Connect", headerLargeTitleEnabled: true }}
 				/>
-				<Stack.Screen name="runs/[runId]" options={{ title: "Run" }} />{" "}
+				<Stack.Screen name="runs/[runId]" options={{ title: "Run" }} />
 				<Stack.Screen
 					name="changes/[runId]"
 					options={{ title: "Changed files" }}
