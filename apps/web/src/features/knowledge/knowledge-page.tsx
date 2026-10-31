@@ -206,6 +206,7 @@ function KnowledgeView({
 			{files.length > 0 ? (
 				<AskedQuestions
 					projectId={projectId}
+					mayChange={can.startRuns}
 					files={files.map((file) => file.path)}
 				/>
 			) : null}

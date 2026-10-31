@@ -69,7 +69,7 @@ export const knowledgeSchema = z.object({
 		save: z.boolean(),
 		/** Remove a source. */
 		remove: z.boolean(),
-		/** Start runs: sync a source now, review the learnings, remove a source's files. */
+		/** Start runs: sync a source now, review the learnings, remove a source's files, mark questions, turn search by meaning on or off. */
 		startRuns: z.boolean(),
 		/** Change when a source syncs on its own: this computer's owner only. */
 		schedules: z.boolean(),

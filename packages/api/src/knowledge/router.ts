@@ -351,7 +351,7 @@ export const knowledge = {
 	 * No files takes it out. It changes the knowledge, so it asks a role
 	 * that may start runs (ADR 4). Returns the set.
 	 */
-	markQuestion: permitted({ run: ["start"] })
+	markQuestion: permitted(MAY.changeKnowledge)
 		.route({
 			summary:
 				"Marks the files that answer a question agents asked, for the project's question set. No files takes the question out.",
@@ -399,7 +399,7 @@ export const knowledge = {
 	 * of its Space. It changes the knowledge, so it asks a role that may
 	 * start runs (ADR 4).
 	 */
-	setMeaning: permitted({ run: ["start"] })
+	setMeaning: permitted(MAY.changeKnowledge)
 		.route({
 			summary:
 				"Turns knowledge search by meaning on or off for a project, on every computer of its Space.",

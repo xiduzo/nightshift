@@ -51,10 +51,13 @@ const SHOWN_HITS = 3;
 export function AskedQuestions({
 	projectId,
 	files,
+	mayChange,
 }: {
 	projectId: string;
 	/** Every file of the knowledge, by path: what can answer. */
 	files: string[];
+	/** The person may mark questions and turn search by meaning on or off. */
+	mayChange: boolean;
 }) {
 	const questions = useQuery(knowledgeQueries.questions(projectId));
 	if (questions.error) {
@@ -72,13 +75,19 @@ export function AskedQuestions({
 		<PageSection
 			title="Questions agents asked"
 			description={
-				marked > 0
-					? `Mark the file that answers a question. ${marked} marked ${marked === 1 ? "question is" : "questions are"} in your question set.`
-					: "Mark the file that answers a question. Marked questions test how well search finds answers."
+				!mayChange
+					? "What agents searched for, and what they found."
+					: marked > 0
+						? `Mark the file that answers a question. ${marked} marked ${marked === 1 ? "question is" : "questions are"} in your question set.`
+						: "Mark the file that answers a question. Marked questions test how well search finds answers."
 			}
 		>
 			{marked > 0 ? (
-				<SearchEvaluation projectId={projectId} marked={marked} />
+				<SearchEvaluation
+					projectId={projectId}
+					marked={marked}
+					mayChange={mayChange}
+				/>
 			) : null}
 			<Card className="py-0">
 				<CardContent className="px-0">
@@ -132,6 +141,7 @@ export function AskedQuestions({
 												query={question.query}
 												answers={question.answers}
 												choices={choicesFor(question.hits, files)}
+												mayChange={mayChange}
 											/>
 										</TableCell>
 									</TableRow>
@@ -182,11 +192,13 @@ function Answer({
 	query,
 	answers,
 	choices,
+	mayChange,
 }: {
 	projectId: string;
 	query: string;
 	answers: string[] | null;
 	choices: string[];
+	mayChange: boolean;
 }) {
 	const queryClient = useQueryClient();
 	const [typed, setTyped] = useState("");
@@ -214,17 +226,22 @@ function Answer({
 					))}
 					<Badge variant="secondary">In question set</Badge>
 				</div>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Take this question out of the question set"
-					disabled={mark.isPending}
-					onClick={() => mark.mutate({ projectId, query, answers: [] })}
-				>
-					<XIcon />
-				</Button>
+				{mayChange ? (
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Take this question out of the question set"
+						disabled={mark.isPending}
+						onClick={() => mark.mutate({ projectId, query, answers: [] })}
+					>
+						<XIcon />
+					</Button>
+				) : null}
 			</div>
 		);
+	}
+	if (!mayChange) {
+		return <span className="text-muted-foreground text-sm">Not marked</span>;
 	}
 	const needle = typed.trim().toLowerCase();
 	const shown = needle

@@ -59,10 +59,13 @@ const percent = (recall: number) => `${Math.round(recall * 100)}%`;
 export function SearchEvaluation({
 	projectId,
 	marked,
+	mayChange,
 }: {
 	projectId: string;
 	/** How many questions the set has. */
 	marked: number;
+	/** The person may turn search by meaning on or off. */
+	mayChange: boolean;
 }) {
 	const evaluation = useQuery({
 		...knowledgeQueries.evaluate(projectId),
@@ -105,7 +108,11 @@ export function SearchEvaluation({
 				</CardContent>
 			) : result ? (
 				<CardContent className="flex flex-col gap-4">
-					<Advice projectId={projectId} evaluation={result} />
+					<Advice
+						projectId={projectId}
+						evaluation={result}
+						mayChange={mayChange}
+					/>
 					<Table>
 						<TableHeader>
 							<TableRow>
@@ -147,9 +154,11 @@ type Evaluation = KnowledgeEvaluation;
 function Advice({
 	projectId,
 	evaluation,
+	mayChange,
 }: {
 	projectId: string;
 	evaluation: Evaluation;
+	mayChange: boolean;
 }) {
 	const queryClient = useQueryClient();
 	const setMeaning = useMutation(
@@ -185,7 +194,7 @@ function Advice({
 						? "Only words were tested. Turn it on to compare. It gets ready again first."
 						: "Only words were tested. Test again when search by meaning is ready."}
 				</AlertDescription>
-				{off ? (
+				{off && mayChange ? (
 					<AlertAction>
 						<Button
 							size="sm"
@@ -229,16 +238,18 @@ function Advice({
 				{numbers} That is less than {evaluation.minGainPoints} points better.
 				Turn off search by meaning to save the work of this computer.
 			</AlertDescription>
-			<AlertAction>
-				<Button
-					size="sm"
-					variant="outline"
-					disabled={setMeaning.isPending}
-					onClick={() => setMeaning.mutate({ projectId, on: false })}
-				>
-					Turn off
-				</Button>
-			</AlertAction>
+			{mayChange ? (
+				<AlertAction>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={setMeaning.isPending}
+						onClick={() => setMeaning.mutate({ projectId, on: false })}
+					>
+						Turn off
+					</Button>
+				</AlertAction>
+			) : null}
 		</Alert>
 	);
 }
