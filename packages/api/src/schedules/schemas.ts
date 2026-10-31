@@ -1,4 +1,4 @@
-import type { ScheduleList } from "@nightshift/engine";
+import type { ScheduleList, SchedulePause } from "@nightshift/engine";
 import { type ScheduleIssue, scheduleSchema } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -56,6 +56,16 @@ export const scheduleListSchema = exact<ScheduleList>()(
 			}),
 		),
 		issues: z.array(scheduleIssueSchema),
+	}),
+);
+
+/** A schedule's pause tonight after a change, and its next start with it. */
+export const schedulePauseSchema = exact<SchedulePause>()(
+	z.object({
+		/** When the pause ends (epoch ms). Null: not paused. */
+		pausedUntil: z.number().nullable(),
+		/** The next start (epoch ms), after the pause. Null when off. */
+		nextAt: z.number().nullable(),
 	}),
 );
 

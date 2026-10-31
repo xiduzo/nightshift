@@ -85,6 +85,16 @@ export const notificationItemSchema = exact<InAppItem>()(
 			runId: z.string(),
 			at: z.number(),
 		}),
+		/**
+		 * A project's schedules changed without a run: a pause tonight began
+		 * or ended. Quiet: an older screen reads everything again.
+		 */
+		z.object({
+			kind: z.literal("schedules-changed"),
+			spaceId: z.string(),
+			projectId: z.string(),
+			at: z.number(),
+		}),
 	]),
 );
 

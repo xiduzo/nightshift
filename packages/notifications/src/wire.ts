@@ -135,6 +135,11 @@ export type Notifications = {
 		 */
 		since(personId: string, from?: number): Promise<Digest | null>;
 	};
+	/**
+	 * Tells the open screens of every Member of the Space that a project's
+	 * schedules changed without a run (a pause tonight). Quiet: no push.
+	 */
+	schedulesChanged(spaceId: string, projectId: string): Promise<void>;
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
 	stop(): void;
@@ -161,9 +166,10 @@ export function createNotifications(
 		});
 	}
 	const deliveries = createDeliveryLog(db);
+	const audience = spaceAudience(db);
 	const notifier = createNotifier({
 		events: options.events,
-		audience: spaceAudience(db),
+		audience,
 		spaces: () => spaceIds(db),
 		sendsFor: options.sendsFor,
 		mayAnswer: async (spaceId, personId) => {
@@ -238,6 +244,14 @@ export function createNotifications(
 					time: digestTime(await settings.get(personId)),
 				});
 			},
+		},
+		async schedulesChanged(spaceId, projectId) {
+			for (const personId of await audience(spaceId)) {
+				options.inApp.schedulesChanged(
+					{ kind: "in-app", personId },
+					{ spaceId, projectId },
+				);
+			}
 		},
 		start: () => notifier.start(),
 		stop: () => {

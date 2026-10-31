@@ -531,6 +531,50 @@ describe("procedures", () => {
 		expect(calls).toHaveLength(3);
 	});
 
+	test("a member pauses a schedule tonight, resumes it and runs it now; a viewer may not", async () => {
+		const { bob, cy, spaceId } = await platform();
+		const told: [string, string][] = [];
+		const notifications = {
+			schedulesChanged: async (space: string, projectId: string) => {
+				told.push([space, projectId]);
+			},
+		};
+		const one = { projectId: "p1", scheduleId: "nightly" };
+		const member = await contextFor(bob.headers, { notifications });
+		await call(appRouter.schedules.pauseTonight, one, { context: member });
+		await call(appRouter.schedules.resumeTonight, one, { context: member });
+		await call(appRouter.schedules.runNow, one, { context: member });
+		expect(calls).toEqual([
+			{ space: spaceId, method: "pauseScheduleTonight" },
+			{ space: spaceId, method: "resumeScheduleTonight" },
+			{ space: spaceId, method: "runScheduleNow" },
+		]);
+		expect(args).toEqual([
+			["p1", "nightly"],
+			["p1", "nightly"],
+			["p1", "nightly"],
+		]);
+		// The pause and its end reach every open screen; a run tells of itself.
+		expect(told).toEqual([
+			[spaceId, "p1"],
+			[spaceId, "p1"],
+		]);
+
+		const viewer = await contextFor(cy.headers, { notifications });
+		const { pauseTonight, resumeTonight, runNow } = appRouter.schedules;
+		expect(await errorOf(call(pauseTonight, one, { context: viewer }))).toBe(
+			"FORBIDDEN",
+		);
+		expect(await errorOf(call(resumeTonight, one, { context: viewer }))).toBe(
+			"FORBIDDEN",
+		);
+		expect(await errorOf(call(runNow, one, { context: viewer }))).toBe(
+			"FORBIDDEN",
+		);
+		expect(calls).toHaveLength(3);
+		expect(told).toHaveLength(2);
+	});
+
 	test("a member renames a project; a viewer may not", async () => {
 		const { bob, cy, spaceId } = await platform();
 		const rename = { projectId: "p1", name: "App" };

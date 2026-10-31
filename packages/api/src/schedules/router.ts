@@ -8,16 +8,24 @@ import {
 import { z } from "zod";
 
 import { output } from "../output";
-import { ownerProcedure, protectedProcedure } from "../procedures";
+import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
+import { runSummarySchema } from "../runs";
 import {
 	cronPreviewSchema,
 	scheduleIssueSchema,
 	scheduleListSchema,
+	schedulePauseSchema,
 } from "./schemas";
 
 /** The clock of the person who saves or reads a schedule, such as `Europe/Amsterdam`. */
 const timeZoneSchema = z.string().refine(isTimeZone, {
 	message: "Choose a time zone such as Europe/Amsterdam.",
+});
+
+/** One schedule of a project. */
+const oneScheduleSchema = z.object({
+	projectId: z.string(),
+	scheduleId: z.string(),
 });
 
 /** A project's schedules: runs Night Shift starts at a cron time or on a webhook. */
@@ -56,6 +64,65 @@ export const schedules = {
 				input.schedules,
 				input.timeZone,
 			),
+		),
+	/**
+	 * Pause tonight, a nudge and not an edit: the schedule's next start
+	 * and every start until 06:00 after it, on the schedule's clock, start
+	 * no run. Then it starts as before. A person who may stop runs may do
+	 * it. The pause is in the schedule, so every Device and the Host see it.
+	 */
+	pauseTonight: permitted({ run: ["stop"] })
+		.route({
+			summary:
+				"Skips a schedule's starts tonight, until the next morning, then it starts as before.",
+		})
+		.output(output(schedulePauseSchema))
+		.input(oneScheduleSchema)
+		.handler(async ({ context, input }) => {
+			const pause = await context.space.pauseScheduleTonight(
+				input.projectId,
+				input.scheduleId,
+			);
+			await context.notifications.schedulesChanged(
+				context.spaceId,
+				input.projectId,
+			);
+			return pause;
+		}),
+	/** Ends a pause tonight: the schedule starts at its next time again. */
+	resumeTonight: permitted({ run: ["stop"] })
+		.route({
+			summary:
+				"Ends a schedule's pause tonight, so it starts at its next time again.",
+		})
+		.output(output(schedulePauseSchema))
+		.input(oneScheduleSchema)
+		.handler(async ({ context, input }) => {
+			const pause = await context.space.resumeScheduleTonight(
+				input.projectId,
+				input.scheduleId,
+			);
+			await context.notifications.schedulesChanged(
+				context.spaceId,
+				input.projectId,
+			);
+			return pause;
+		}),
+	/**
+	 * Run now, a nudge and not an edit: starts the schedule's run at once,
+	 * as if it fired now, with the schedule as its trigger. A person who
+	 * may start runs may do it. The run is the schedule's Person's, else
+	 * the person's who asks. A pause tonight stays.
+	 */
+	runNow: permitted({ run: ["start"] })
+		.route({
+			summary:
+				"Starts a schedule's run now, with its own inputs and Device, as if it fired.",
+		})
+		.output(output(runSummarySchema))
+		.input(oneScheduleSchema)
+		.handler(({ context, input }) =>
+			context.space.runScheduleNow(input.projectId, input.scheduleId),
 		),
 	/** The next times of a cron line on the clock of `timeZone` (default: this computer's), and how it reads. */
 	preview: protectedProcedure

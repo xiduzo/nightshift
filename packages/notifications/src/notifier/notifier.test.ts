@@ -700,7 +700,7 @@ describe("the open screens hear when a run changes", () => {
 		]);
 		await notifier.idle();
 
-		expect(ada.map((i) => [i.kind, i.runId])).toEqual([
+		expect(ada.map((i) => [i.kind, "runId" in i ? i.runId : null])).toEqual([
 			["gate-opened", "run-2"],
 			["run-finished", "run-3"],
 			["run-changed", "run-1"],

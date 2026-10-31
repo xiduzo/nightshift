@@ -57,6 +57,17 @@ export type InAppItem =
 			spaceId: string;
 			runId: string;
 			at: number;
+	  }
+	/**
+	 * A project's schedules changed without a run: a person paused one
+	 * tonight, or ended that pause. Quiet, like `run-changed`: a screen
+	 * reads the schedules again. An older screen reads everything again.
+	 */
+	| {
+			kind: "schedules-changed";
+			spaceId: string;
+			projectId: string;
+			at: number;
 	  };
 
 /** A page counts as open this long after its stream ended: a page that reloads. */
@@ -87,6 +98,11 @@ export type InAppChannel = NotificationChannel<InAppTarget> & {
 	runChanged(
 		target: InAppTarget,
 		run: { spaceId: string; runId: string },
+	): void;
+	/** Tells the Person's open screens that a project's schedules changed. No push, no notification. */
+	schedulesChanged(
+		target: InAppTarget,
+		change: { spaceId: string; projectId: string },
 	): void;
 	/**
 	 * Whether the Person has a screen open, or closed a page a moment ago.
@@ -167,6 +183,14 @@ export function createInAppChannel(
 
 		runChanged(target, run) {
 			publish(target.personId, { kind: "run-changed", ...run, at: now() });
+		},
+
+		schedulesChanged(target, change) {
+			publish(target.personId, {
+				kind: "schedules-changed",
+				...change,
+				at: now(),
+			});
 		},
 
 		isActive(personId) {
