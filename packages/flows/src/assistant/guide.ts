@@ -160,7 +160,7 @@ const nodeText: Record<FlowNodeType, string> = {
 	command: `A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by \`$NS_OUTPUT\`, which becomes \`data\`: \`echo '{"count": 3}' > "$NS_OUTPUT"\`. Data with an \`outcome\` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. \`exits\` lists \`{ name, code }\`; an exit with \`"code": "data"\` is picked by the data only; one exit without \`code\` catches every other code and goes last. Without \`exits\`: \`pass\` on 0, \`fail\` on any other code. \`output: "json"\` reads the JSON printed on stdout instead, when \`$NS_OUTPUT\` stays empty. \`secrets\` names secrets that reach the command as environment variables. \`$NS_KNOWLEDGE\` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: \`echo "{{build.summary}}"\`. Use double quotes or a heredoc without quotes (\`<<EOF\`). Single quotes and a quoted heredoc (\`<<'EOF'\`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (\`signsIn\` in list_tools) by its name to run its program signed in: \`acli-dimpact jira\`, not \`acli jira\`.`,
 	tool: "Calls one tool of a connection (an MCP server of this computer), with no model. `connection`, `tool`, and `arguments` (a template per argument). `data` is the structured result.",
 	decision: `Picks one of its \`options\` (each \`{ name, description }\`); the option is the outcome. \`by\`: ${decisionNodeSchema.shape.by.options.map((by) => `\`${by}\``).join(", ")}. \`person\` is a Gate: \`prompt\` is the question, and the run waits for the answer. A Gate may have \`deadline: { at: "07:00", choose: "keep" }\` (or \`minutes\` instead of \`at\`, counted from when it opens): when nobody answered by then, it takes the option \`choose\`. \`rule\` is a Branch: each option but the last has \`when\`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. \`model\`: a small model reads \`prompt\` and picks; it reads \`profile\`, or \`decider\` (${deciderNameSchema.options.join(", ")}) and \`model\`, all optional.`,
-	value: `Makes \`data\` that matches \`output\` (a JSON Schema for an object). \`by: "rule"\` with \`expression\` (JSONata over the run's values), or \`by: "model"\` with \`prompt\` and optionally a \`profile\` or a \`decider\` that can make a value (${valueDeciderNameSchema.options.join(", ")}). Use it to compute or reshape a value, often with \`set\`.`,
+	value: `Makes \`data\` that matches \`output\` (a JSON Schema for an object). \`by: "rule"\` with \`expression\` (JSONata over the run's values), \`by: "model"\` with \`prompt\` and optionally a \`profile\` or a \`decider\` that can make a value (${valueDeciderNameSchema.options.join(", ")}), or \`by: "person"\` (an Ask, see Asks) with \`prompt\` as the question. Use it to compute or reshape a value, often with \`set\`.`,
 	wait: `Waits, then ends \`done\`. \`until\` is one of: ${waitNodeSchema.shape.until.options
 		.map((option) => `\`${option.shape.kind.value}\``)
 		.join(
@@ -429,9 +429,19 @@ Climb from a cheap try to a strong one with a \`cascade\`, not with a loop of no
 - Decision tier: \`profile\` and \`minConfidence\` (0 to 1). \`ollama\` and \`compatible\` give no probability: last model tier only.
 - Value tier: \`profile\` and \`accept\`, JSONata over \`data\`.
 - Subflow tier: \`flow\` and \`inputs\`.
-- The last tier can be \`{ "person": true, "deadline"? }\`: a Gate. Not on a Value.
+- The last tier can be \`{ "person": true, "deadline"? }\`: a Gate. On a Value it is an Ask that starts with the best answer of the models; its deadline \`choose\` is \`accept\` (that answer) or \`fail\`.
 
 \`{{cascade.tier}}\`, \`{{cascade.try}}\` and \`{{cascade.previous.summary}}\` read in the node's own templates. Later nodes read \`tier\` and \`tries\` (a Decision also \`confidence\`). A Decision with a cascade and no person tier can end \`fail\`.
+
+## Asks
+
+A Value with \`by: "person"\` is an Ask: a form in the Needs-you inbox, drawn from \`output\`. A string is a text field, an \`enum\` a choice, an array of \`enum\` a choice of several, a boolean a switch, a number a number field. Each \`description\` is the hint under its field. The answer must match the schema, and it is the step's \`data\`. A Gate stays the router: put a Decision by a rule after an Ask to route on its data, or a Subflow with \`each\` to work on each chosen item.
+
+- \`choices: { from, field }\`: \`from\` is a template that renders a list of \`{ name, label, description?, attachments? }\`, such as \`{{designer.data.variants}}\`. The names become the \`enum\` of the output field \`field\`: a string field is one choice, an array of strings a choice of several.
+- \`attachments\`: \`[{ path | url, label? }]\`. A \`path\` is a file in the run's copy of the project: Night Shift keeps it with the run, so the web and the phone show it. A \`url\` is a link. A choice's \`attachments\` take the same shape.
+- \`deadline: { at | minutes }\` and \`default\`: the data the Ask takes when nobody answers. The default must match the schema.
+
+The phone answers a form of text, choices, switches and numbers. Any other field opens the form on the web.
 
 ## Parallel branches
 
