@@ -176,7 +176,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 
 ## Schedules and webhooks
 
-A schedule starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls: the kit `kit:github/wait-for-checks` does it.
+A schedule starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, or with `any` and a command as a backup, not with a command alone: the kits `kit:github/wait-for-checks` and `kit:github/watch-pr` do it.
 
 ## Kits
 
@@ -186,6 +186,7 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. 
 - `kit:github/finish-pr` (pr*, action, comment) → number, url, state: Marks a pull request ready for review, or closes it.
 - `kit:github/publish-draft-pr` (title*, body, base) → number, url, created, branch, base: Pushes the current branch to GitHub and opens a draft pull request for it.
 - `kit:github/wait-for-checks` (ref) → state, sha, failed, total: Waits until the checks of a commit on GitHub are done, for at most 3 hours.
+- `kit:github/watch-pr` (pr) → state, number, url, failed, review: Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue.
 - `kit:jira/assign` (key*, assignee, tool): Assigns a Jira work item to a person, or to you.
 - `kit:jira/move` (key*, status*, tool): Moves a Jira work item to another status, for example In Progress.
 - `kit:knowledge/confluence` (site*, email*, pages*, folder) → files: Copies Confluence pages into the project's knowledge as markdown, one file each.
@@ -196,7 +197,7 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. 
 - `kit:knowledge/review-learnings` (): Shows what agents proposed to learn about the project, and asks you to keep or delete it.
 - `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.
 
-A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`.
+A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`. It wakes `watch-pr` with `signal: { name: "pr-changed", key: "event.body.pull_request.number" }`.
 
 ## Profiles
 

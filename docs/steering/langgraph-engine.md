@@ -365,11 +365,13 @@ packages/engine/src/
 
    A Wait node sleeps the same way with its own `until`
    (`graph/nodes/wait.ts`, below). Its body returns `{ kind: "sleep" }`
-   with the time and its deadline. Its four kinds are `WaitReason`s next to
+   with the time and its deadline. Its five kinds are `WaitReason`s next to
    the policy's two. A wait with no time (a signal with no timeout) has
    `until: null` and no timer. A signal is
    `Command({ resume: { kind: "signal", name } })`, through the same wake
-   Turn (`act` with `kind: "signal"`).
+   Turn (`act` with `kind: "signal"`). A signal Wait with rules on its
+   outcomes logs them in `WaitStarted.signalRules`: a webhook that matches
+   no rule wakes no run (`run/signals.ts`, ADR 8).
 9. **Resume mapping** (`act` with `kind: "resume"`). The engine appends
    `RunResumed` before each of these:
    - Stopped or failed: the thread is parked, so
@@ -870,7 +872,7 @@ request is one of two kinds:
 - a policy wait (`{ kind: "policy" }`): the reason, the message,
   `resetAt`, the harness session
 - a Wait node's own wait (`{ kind: "own" }`): the reason, `until`, the
-  deadline, the message, a signal name
+  deadline, the message, a signal name, its key and its rules
 
 The module:
 

@@ -38,6 +38,38 @@ without a new run. Turn on **Wake waiting runs** and give the signal's
 name. A Wait node that waits for that name then continues, with the
 webhook as its data. Use it to let a run wait until CI is done.
 
+### Let the webhook pick how a Wait ends
+
+A Wait node can list its own outcomes, each with its own edge. On a Wait
+for a signal, each outcome takes a rule. The rule is JSONata over
+`event`, as in **Only when**. The first rule that holds ends the wait on
+that outcome. A webhook that matches no rule does not wake the run.
+Example: `event.body.check_suite.conclusion = "failure"`.
+
+A webhook can go missing. Then choose **A signal or a command** as what
+the Wait waits for. The command runs at once and then at its interval,
+and the signal wakes the run before the next try. The command picks an
+outcome when it writes `{"outcome": "red"}` to `"$NS_OUTPUT"` and exits
+0. When it exits 0 without an outcome, the Wait ends `done`. Any other
+exit code, or an outcome that the Wait does not list, means try again.
+
+### Watch a pull request
+
+The kit `kit:github/watch-pr` waits until a pull request is green, red,
+merged, closed, or ejected from the merge queue. It reads the pull
+request with `gh` every 10 minutes. To wake it as soon as GitHub reports
+a change:
+
+1. Add a webhook schedule with **Wake waiting runs** on, and the signal
+   name `pr-changed`.
+2. Give this signal key:
+   `$exists(event.body.pull_request) ? event.body.pull_request.number : event.body.check_suite.pull_requests[0].number`.
+3. In the repository on GitHub, send **Pull requests** and **Check
+   suites** to the schedule's address.
+
+The webhook only wakes the kit. The kit then reads the pull request to
+find out how it ends.
+
 ### Score runs by their pull requests
 
 A webhook schedule can also record what became of the pull requests that
