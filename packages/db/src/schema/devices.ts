@@ -154,9 +154,15 @@ export const runCommand = sqliteTable(
 		/** The Device that walks the run and applies the command. */
 		walkerId: text("walker_id").notNull(),
 		kind: text("kind", {
-			enum: ["gate.resolve", "signal.send", "run.stop", "run.move"],
+			enum: [
+				"gate.resolve",
+				"signal.send",
+				"run.stop",
+				"run.move",
+				"lease.release",
+			],
 		}).notNull(),
-		/** JSON: the action's input (the Gate's step, choice and note; the signal; when to stop). */
+		/** JSON: the action's input (the Gate's step, choice and note; the signal; when to stop; the lease). */
 		payload: text("payload").notNull(),
 		/** The Person who asked, on the Host. The Walker checks their role again. */
 		personId: text("person_id").notNull(),

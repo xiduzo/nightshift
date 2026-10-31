@@ -95,6 +95,11 @@ const runCommandSchema = exact<RunCommand>()(
 			payload: z.object({ to: z.string() }),
 			...commandFields,
 		}),
+		z.object({
+			kind: z.literal("lease.release"),
+			payload: z.object({ name: z.string() }),
+			...commandFields,
+		}),
 	]),
 );
 
