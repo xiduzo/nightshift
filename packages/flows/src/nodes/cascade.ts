@@ -62,6 +62,13 @@ export const personTierSchema: z.ZodType<PersonTier> = z.object({
 /** The choices of the person tier of an Agent or a Call. */
 export const RETRY_CHOICES = ["try-again", "stop"] as const;
 
+/**
+ * What the deadline of a Value's person tier (an Ask, ADR 10) may take:
+ * `accept` takes the best answer of the models when it matches the
+ * schema, `fail` ends the step `fail`.
+ */
+export const ASK_TIER_CHOICES = ["accept", "fail"] as const;
+
 /** The tier is a person, not a model, an agent or a flow. */
 export function isPersonTier<T extends object>(
 	tier: T | PersonTier,
@@ -88,17 +95,15 @@ export type CascadeWords = {
 	/** "Agent". */
 	title: string;
 	/**
-	 * What a person tier may choose: the Decision's options, the retry
-	 * choices of an Agent or a Call, or null when the node cannot ask a
-	 * person (a Value, until ADR 10).
+	 * What a person tier's deadline may choose: the Decision's options,
+	 * the retry choices of an Agent or a Call, or what a Value's Ask takes.
 	 */
-	personChoices: readonly string[] | null;
+	personChoices: readonly string[];
 };
 
 /**
  * The checks every cascade shares: unique tier names, at most one person
- * tier and only last, and a person tier's deadline. A Value cannot ask a
- * person yet.
+ * tier and only last, and a person tier's deadline.
  */
 export function checkCascade(
 	node: { id: string; cascade?: readonly ({ label?: string } | PersonTier)[] },
@@ -118,12 +123,6 @@ export function checkCascade(
 		}
 		labels.add(label);
 		if (!isPersonTier(tier)) return;
-		if (words.personChoices === null) {
-			check.error(
-				`${title} node "${node.id}" ends its cascade with a person, but a Value cannot ask a person yet. Remove the person tier.`,
-			);
-			return;
-		}
 		if (index !== tiers.length - 1) {
 			check.error(
 				`${title} node "${node.id}" has a person tier before other tiers. Only the last tier can be a person.`,

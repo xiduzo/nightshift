@@ -369,4 +369,59 @@ describe("a Value climbs its cascade", () => {
 		expect(parked[0]).toMatchObject({ kind: "parked", nodeId: "plan" });
 		expect(state.nodes.plan).toMatchObject({ outcome: "fail", tries: 2 });
 	});
+
+	test("the person tier is an Ask that starts with the best answer of the models", async () => {
+		const { decider } = makes([{ tasks: [] }, { nope: 2 }]);
+		const node = plan({
+			prompt: "Plan it.",
+			cascade: [
+				{ label: "local", decider: "ollama", accept: "$count(data.tasks) > 0" },
+				{ label: "strong", decider: "openrouter" },
+				{ person: true, deadline: { minutes: 30, choose: "accept" } },
+			],
+		});
+		const h = await startRun(sandbox, flowWith(node), { decider });
+		const first = await drive(h, { inputs: {} });
+		expect(first.parked).toEqual([
+			{
+				kind: "gate",
+				stepId: expect.any(String),
+				nodeId: "plan",
+				question: expect.stringContaining(
+					"Plan it.\n\nThe models did not make a value that holds:\n- local ended fail",
+				),
+				choices: [
+					{ name: "answer", description: "Fill in the form to answer." },
+				],
+				deadline: expect.objectContaining({ choose: "answer" }),
+			},
+		]);
+		// The answer of the first tier matched the schema; the second did not.
+		const opened = (await h.events()).find((e) => e.type === "GateOpened");
+		expect(opened?.payload).toMatchObject({
+			form: {
+				schema: node.output,
+				prefill: { tasks: [] },
+				default: { tasks: [] },
+			},
+		});
+		expect(held(first.state)).toMatchObject({ kind: "gate", climb: true });
+
+		const second = await drive(
+			h,
+			new Command({
+				resume: { kind: "gate", choice: "answer", data: { tasks: ["b"] } },
+			}),
+			h.graph(),
+		);
+		expect(second.state.ended?.nodeId).toBe("bugs");
+		expect(second.state.nodes.plan).toEqual({
+			outcome: "pass",
+			data: { tasks: ["b"] },
+			note: "",
+			visit: 3,
+			tier: "person",
+			tries: 3,
+		});
+	});
 });
