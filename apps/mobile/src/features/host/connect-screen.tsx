@@ -8,12 +8,11 @@ import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Input } from "@nightshift/ui-native/components/ui/input";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { CircleAlert, ScanQrCode } from "lucide-react-native";
 import { type ReactNode, useRef, useState } from "react";
 import { type TextInput, View } from "react-native";
 import { ENV } from "@/env";
-import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { CodeScanner } from "./code-scanner";
@@ -74,16 +73,17 @@ export function ConnectScreen() {
 				: "Verify code";
 
 	return (
-		<Screen>
-			<LargeTitleHeader
-				title={
-					step === "code" ? "Check that it is you" : "Connect to your Host"
-				}
-				summary={
-					step === "code"
-						? "Your Host asks for a second code before you sign in."
-						: "Sign in to the Host that runs your flows. Then answer Gates and follow runs from this phone."
-				}
+		<Screen
+			summary={
+				step === "code"
+					? "Your Host asks for a second code before you sign in."
+					: "Sign in to the Host that runs your flows. Then answer Gates and follow runs from this phone."
+			}
+		>
+			<Stack.Screen
+				options={{
+					title: step === "code" ? "Second code" : "Connect",
+				}}
 			/>
 			{step === "scan" ? (
 				<CodeScanner

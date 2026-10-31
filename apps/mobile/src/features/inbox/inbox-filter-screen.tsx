@@ -7,7 +7,6 @@ import { FolderGit2, Inbox, Users } from "lucide-react-native";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
-import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
@@ -40,11 +39,6 @@ export function InboxFilterScreen() {
 
 	return (
 		<Screen>
-			<LargeTitleHeader
-				compact
-				title="Show Gates from"
-				summary="Choose a project or a Space."
-			/>
 			<ListGroup>
 				{options.map((option) => {
 					const shown = samePlace(option.place, view.place);

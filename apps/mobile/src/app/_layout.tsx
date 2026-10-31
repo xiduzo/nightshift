@@ -2,10 +2,9 @@ import "../../global.css";
 
 import { Stack } from "expo-router";
 import type { ComponentProps } from "react";
+import { Platform } from "react-native";
 
-import { SignedInOnly } from "@/features/host";
 import { startPushHandling } from "@/features/push";
-import { SpacePicker } from "@/features/spaces";
 import { AppShell } from "@/shared/shell";
 
 // Before any screen: iOS and Android start the app for a push in the
@@ -16,42 +15,33 @@ export const unstable_settings = {
 	anchor: "(tabs)",
 };
 
-/** A secondary view as a native sheet: half the screen, or all of it. */
-const sheet = {
-	presentation: "formSheet",
-	sheetAllowedDetents: [0.6, 1],
-	sheetGrabberVisible: true,
-	headerShown: false,
-} satisfies ComponentProps<typeof Stack.Screen>["options"];
+type Options = NonNullable<ComponentProps<typeof Stack.Screen>["options"]>;
 
 /**
- * Starting a run is per Space: its header chooses it. Signed out, the
- * header shows nothing while the screen goes to the connect screen.
+ * A secondary view with its title in the native header. On iOS a sheet:
+ * half the screen, or all of it. Android shows no header in a sheet, so
+ * there it is a modal with a top app bar and a back arrow.
  */
-const signedInPicker = (
-	<SignedInOnly signedOut={null}>
-		<SpacePicker />
-	</SignedInOnly>
-);
-const spacePicker = () => signedInPicker;
-/**
- * iOS 26 puts a glass pill behind a header item. The picker is a bordered
- * Select already, so it goes without the pill.
- */
-const spacePickerItems = () => [
-	{
-		type: "custom" as const,
-		element: signedInPicker,
-		hidesSharedBackground: true,
-	},
-];
+function sheet(title: string, detents: number[] = [0.6, 1]): Options {
+	return Platform.OS === "ios"
+		? {
+				title,
+				presentation: "formSheet",
+				sheetAllowedDetents: detents,
+				sheetGrabberVisible: true,
+			}
+		: { title, presentation: "modal" };
+}
 
 export default function RootLayout() {
 	return (
 		<AppShell>
 			<Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-				<Stack.Screen name="connect" options={{ title: "Connect" }} />
+				<Stack.Screen
+					name="connect"
+					options={{ title: "Connect", headerLargeTitleEnabled: true }}
+				/>
 				<Stack.Screen name="runs/[runId]" options={{ title: "Run" }} />
 				<Stack.Screen
 					name="gates/[runId]/[stepId]"
@@ -59,28 +49,22 @@ export default function RootLayout() {
 				/>
 				<Stack.Screen
 					name="projects/[projectId]"
-					options={{ title: "Project" }}
+					options={{ title: "Project", headerLargeTitleEnabled: true }}
 				/>
-				<Stack.Screen name="settings" options={{ title: "Settings" }} />
+				<Stack.Screen
+					name="settings"
+					options={{ title: "Settings", headerLargeTitleEnabled: true }}
+				/>
 				<Stack.Screen
 					name="start"
-					options={{
-						title: "New run",
-						presentation: "modal",
-						headerRight: spacePicker,
-						unstable_headerRightItems: spacePickerItems,
-					}}
+					options={{ title: "New run", presentation: "modal" }}
 				/>
-				<Stack.Screen
-					name="search"
-					options={{ ...sheet, sheetAllowedDetents: [1] }}
-				/>
-				<Stack.Screen name="flows" options={sheet} />
-				<Stack.Screen name="computers" options={sheet} />
-				<Stack.Screen name="inbox-filter" options={sheet} />
-				<Stack.Screen name="gate-link" options={sheet} />
-				<Stack.Screen name="gate-actions" options={sheet} />
-				<Stack.Screen name="transcript/[runId]" options={sheet} />
+				<Stack.Screen name="flows" options={sheet("Flows")} />
+				<Stack.Screen name="computers" options={sheet("Computers")} />
+				<Stack.Screen name="inbox-filter" options={sheet("Show Gates from")} />
+				<Stack.Screen name="gate-link" options={sheet("Link")} />
+				<Stack.Screen name="gate-actions" options={sheet("Gate actions")} />
+				<Stack.Screen name="transcript/[runId]" options={sheet("Transcript")} />
 			</Stack>
 		</AppShell>
 	);

@@ -1,9 +1,8 @@
 import type { GateLink } from "@nightshift/client";
-import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { ExternalLink } from "lucide-react-native";
 import { View } from "react-native";
@@ -31,10 +30,8 @@ export function GateLinkScreen() {
 	const link = { url: params.url, kind };
 	return (
 		<Screen>
+			<Stack.Screen options={{ title: LINK_WORD[kind] }} />
 			<View className="gap-2">
-				<Badge variant="secondary" className="self-start">
-					<Text>{LINK_WORD[kind]}</Text>
-				</Badge>
 				<Text className="font-mono text-muted-foreground text-sm">
 					{params.short}
 				</Text>

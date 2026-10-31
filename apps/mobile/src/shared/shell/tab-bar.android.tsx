@@ -7,7 +7,6 @@ import {
 	Play,
 } from "lucide-react-native";
 import type { ColorValue } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useThemeColors } from "@/shared/theme";
 import { inboxTabLabel, type TabBarProps } from "./tabs";
@@ -21,27 +20,22 @@ function icon(Icon: LucideIcon) {
 /**
  * The four tabs on Android: the JavaScript tab bar with lucide icons. The
  * native tabs of Android need `expo-symbols` or drawables for their icons,
- * which this app does not ship. Each screen draws its own large title.
- * Android draws the app under the status bar, and no header sits above
- * the tabs, so each tab starts below the status bar.
+ * which this app does not ship. Each tab is a stack with its own native
+ * header (`TabStack`), which keeps the page below the status bar.
  */
 export function TabBar({ waiting }: TabBarProps) {
 	const { colors } = useThemeColors();
-	const insets = useSafeAreaInsets();
 	return (
 		<Tabs
 			screenOptions={{
 				headerShown: false,
-				sceneStyle: {
-					paddingTop: insets.top,
-					backgroundColor: colors.background,
-				},
+				sceneStyle: { backgroundColor: colors.background },
 				tabBarActiveTintColor: colors.primary,
 				tabBarInactiveTintColor: colors.mutedForeground,
 			}}
 		>
 			<Tabs.Screen
-				name="index"
+				name="(home)"
 				options={{ title: "Home", tabBarIcon: icon(House) }}
 			/>
 			<Tabs.Screen

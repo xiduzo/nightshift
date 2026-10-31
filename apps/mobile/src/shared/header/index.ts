@@ -1,4 +1,5 @@
-/** The top of a tab or a sheet: a large title, a summary line and round header buttons. */
+/** The native header of a screen: its actions (system buttons, the Space picker, the avatar) and its search field. */
 
-export { AvatarButton, HeaderButton } from "./header-button";
-export { LargeTitleHeader } from "./large-title-header";
+export { AvatarButton } from "./header-button";
+export { HeaderSearch } from "./header-search";
+export { HeaderToolbar } from "./header-toolbar";

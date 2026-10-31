@@ -13,7 +13,7 @@ import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
-import { Link, Stack } from "expo-router";
+import { Link, router, Stack } from "expo-router";
 import {
 	ExternalLink,
 	Hand,
@@ -29,7 +29,7 @@ import { GateRow } from "@/features/inbox";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ErrorAlert } from "@/shared/feedback";
 import { useNow } from "@/shared/format";
-import { HeaderButton, LargeTitleHeader } from "@/shared/header";
+import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
@@ -82,7 +82,10 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 	const now = useNow();
 
 	return (
-		<Screen onRefresh={refresh}>
+		<Screen
+			onRefresh={refresh}
+			summary={project ? (clonesText(project.clones) ?? undefined) : undefined}
+		>
 			<Stack.Screen options={{ title: project?.name ?? "Project" }} />
 			{project ? (
 				<>
@@ -219,33 +222,34 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 	);
 }
 
-/** Who owns the project, its name, the computers with a copy, its remote and New run. */
+/**
+ * Who owns the project and its remote. The native header holds its name
+ * and New run.
+ */
 function ProjectHeader({ project }: { project: Project }) {
 	const remote = remoteParts(project.remote);
 	return (
 		<View className="gap-1">
-			<LargeTitleHeader
-				title={project.name}
-				summary={clonesText(project.clones) ?? undefined}
-				leading={
-					remote?.owner ? (
-						<>
-							<InitialsAvatar name={remote.owner} />
-							<Text className="text-muted-foreground text-sm">
-								{remote.owner}
-							</Text>
-						</>
-					) : undefined
-				}
-				actions={
-					<HeaderButton
-						icon={Plus}
-						label="New run"
-						hint="Starts one of the flows of this project"
-						href={projectLinks.start(project.id)}
-					/>
-				}
+			<HeaderToolbar
+				placement="right"
+				items={[
+					{
+						kind: "button",
+						key: "start",
+						label: "New run",
+						hint: "Starts one of the flows of this project",
+						sf: "plus",
+						icon: Plus,
+						onPress: () => router.push(projectLinks.start(project.id)),
+					},
+				]}
 			/>
+			{remote?.owner ? (
+				<View className="flex-row items-center gap-2">
+					<InitialsAvatar name={remote.owner} />
+					<Text className="text-muted-foreground text-sm">{remote.owner}</Text>
+				</View>
+			) : null}
 			{remote && project.remote ? (
 				<Button
 					size="lg"

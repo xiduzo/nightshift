@@ -5,29 +5,26 @@ import {
 	type RunSummary,
 	whenLabel,
 } from "@nightshift/client";
-import { Input } from "@nightshift/ui-native/components/ui/input";
+import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { View } from "react-native";
 import { useHostQueries } from "@/features/host";
 import { GateRow } from "@/features/inbox";
-import { EmptyState } from "@/shared/empty";
-import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
-import { Screen } from "@/shared/page";
+import { searchGates } from "@/shared/match";
 import { useWhileFocused } from "@/shared/refresh";
 import { runStatusLook } from "@/shared/tone";
-import { resultsText, searchGates, searchRuns } from "./search";
+import { resultsText, searchRuns } from "./search";
 
 /**
- * Search the Gates and runs this phone has: the open Gates of every Space
- * you are in, and the runs of the Space you work in. A sheet from the
- * headers of Home, Inbox and Runs.
+ * What the search field in the header of Home and Runs finds: the open
+ * Gates of every Space you are in, and the runs of the Space you work
+ * in, from what this phone has. The screen shows it in place of its body
+ * while the field holds a query.
  */
-export function SearchScreen() {
-	const [query, setQuery] = useState("");
+export function SearchResults({ query }: { query: string }) {
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
@@ -49,28 +46,15 @@ export function SearchScreen() {
 	const loaded = gates.data !== undefined || runs.data !== undefined;
 	const now = Date.now();
 
+	if (!loaded) return <Skeleton className="h-40 w-full rounded-xl" />;
 	return (
-		<Screen>
-			<LargeTitleHeader compact title="Search" />
-			<Input
-				value={query}
-				onChangeText={setQuery}
-				placeholder="A question, a flow, a project or a branch"
-				accessibilityLabel="Search Gates and runs"
-				autoFocus
-				autoCorrect={false}
-				autoCapitalize="none"
-				returnKeyType="search"
-				clearButtonMode="while-editing"
-			/>
-			{loaded ? (
-				<Text
-					className="text-muted-foreground text-sm"
-					accessibilityLiveRegion="polite"
-				>
-					{resultsText(query, foundGates.length, foundRuns.length)}
-				</Text>
-			) : null}
+		<>
+			<Text
+				className="text-muted-foreground text-sm"
+				accessibilityLiveRegion="polite"
+			>
+				{resultsText(query, foundGates.length, foundRuns.length)}
+			</Text>
 			{foundGates.length > 0 ? (
 				<View className="gap-3">
 					<SectionHead title="Gates" hint="Oldest first" />
@@ -100,14 +84,7 @@ export function SearchScreen() {
 					</ListGroup>
 				</View>
 			) : null}
-			{!loaded ? (
-				<EmptyState
-					icon={Search}
-					title="Find a Gate or a run"
-					description="Type a word from its question, its flow, its project or its branch."
-				/>
-			) : null}
-		</Screen>
+		</>
 	);
 }
 

@@ -10,7 +10,7 @@ type Opens =
 	| { href: Href; onPress?: never }
 	| { onPress: () => void; href?: never };
 
-/** A round icon button of 44 pt in a LargeTitleHeader: "+" for a new run, search. */
+/** A round icon button of 44 pt in the header on Android: "+" for a new run. */
 export function HeaderButton({
 	icon,
 	label,
@@ -43,7 +43,7 @@ export function HeaderButton({
 	);
 }
 
-/** The person's initials as a 44 pt button: opens Settings on Home. */
+/** The person's initials as a round button in the header: opens Settings on Home. */
 export function AvatarButton({
 	name,
 	label,

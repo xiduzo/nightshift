@@ -23,7 +23,6 @@ import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
-import { LargeTitleHeader } from "@/shared/header";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { type TranscriptLine, transcriptLines } from "./transcript-lines";
@@ -52,16 +51,13 @@ export function TranscriptScreen() {
 	}, [entries, run.data]);
 
 	return (
-		<Screen>
-			<LargeTitleHeader
-				compact
-				title="Transcript"
-				summary={
-					connection === "reconnecting"
-						? "Reconnecting…"
-						: (run.data?.title ?? undefined)
-				}
-			/>
+		<Screen
+			summary={
+				connection === "reconnecting"
+					? "Reconnecting…"
+					: (run.data?.title ?? undefined)
+			}
+		>
 			{lines.length > 0 ? (
 				lines.map((line, index) => (
 					<Fragment key={line.key}>

@@ -4,12 +4,12 @@ import {
 } from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
+import { Stack } from "expo-router";
 import { Workflow } from "lucide-react-native";
 
 import { useHostQueries } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { LargeTitleHeader } from "@/shared/header";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { healthOf } from "./health";
@@ -40,11 +40,12 @@ export function FlowHealthScreen({ projectId }: { projectId?: string }) {
 	const now = summary.data?.at ?? Date.now();
 
 	return (
-		<Screen onRefresh={() => summary.refetch()}>
-			<LargeTitleHeader
-				compact
-				title={project ? `Flows in ${project.name}` : "Flows"}
-				summary="How often their runs finish."
+		<Screen
+			onRefresh={() => summary.refetch()}
+			summary="How often their runs finish."
+		>
+			<Stack.Screen
+				options={{ title: project ? `Flows in ${project.name}` : "Flows" }}
 			/>
 			{summary.data ? (
 				health ? (

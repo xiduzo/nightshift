@@ -13,7 +13,7 @@ import { SpacePicker } from "@/features/spaces";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { useNow } from "@/shared/format";
-import { LargeTitleHeader } from "@/shared/header";
+import { HeaderToolbar } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
@@ -65,11 +65,13 @@ export function ProjectsScreen() {
 	const now = useNow();
 
 	return (
-		<Screen onRefresh={refresh}>
-			<LargeTitleHeader
-				title="Projects"
-				summary={list ? projectsSummary(list.length, needsYou) : undefined}
-				actions={<SpacePicker />}
+		<Screen
+			onRefresh={refresh}
+			summary={list ? projectsSummary(list.length, needsYou) : undefined}
+		>
+			<HeaderToolbar
+				placement="right"
+				items={[{ kind: "view", key: "space", element: <SpacePicker /> }]}
 			/>
 			{list ? (
 				list.length === 0 ? (

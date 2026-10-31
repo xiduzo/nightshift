@@ -8,7 +8,7 @@ import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, Link } from "expo-router";
+import { type Href, Link, router } from "expo-router";
 import {
 	CircleCheck,
 	FolderGit2,
@@ -17,18 +17,18 @@ import {
 	Moon,
 	MoonStar,
 	Plus,
-	Search,
 	Settings,
 	Workflow,
 } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
+import { SearchResults } from "@/features/search";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { AvatarButton, HeaderButton, LargeTitleHeader } from "@/shared/header";
+import { AvatarButton, HeaderSearch, HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
@@ -50,8 +50,9 @@ const RUNNING_RUNS: Href = { pathname: "/runs", params: { filter: "running" } };
 
 /**
  * Home: what happened last night over every Space you are in, what needs
- * you, what runs now, and the way to the rest of your work. The avatar
- * opens Settings, + starts a run, the magnifier searches.
+ * you, what runs now, and the way to the rest of your work. In the
+ * header, the avatar opens Settings, + starts a run, and the search field
+ * finds a Gate or a run.
  */
 export function HomeScreen() {
 	const { person } = useSignedIn();
@@ -63,6 +64,8 @@ export function HomeScreen() {
 	});
 	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
 	const refresh = useScreenRefresh([summary.refetch, gates.refetch]);
+	const [query, setQuery] = useState("");
+	const searching = query.trim() !== "";
 
 	const now = Date.now();
 	const data = summary.data;
@@ -74,97 +77,120 @@ export function HomeScreen() {
 			: undefined;
 
 	return (
-		<Screen onRefresh={refresh}>
-			<LargeTitleHeader
-				title="Last night"
-				summary={
-					data?.lastNight
+		<Screen
+			onRefresh={refresh}
+			summary={
+				searching
+					? undefined
+					: data?.lastNight
 						? nightLine(data.lastNight)
 						: noRuns
 							? "No runs yet"
 							: undefined
-				}
-				leading={
-					<AvatarButton
-						name={person.name}
-						label="Settings"
-						hint={`Signed in as ${person.name}`}
-						href="/settings"
-					/>
-				}
-				actions={
-					<>
-						<HeaderButton icon={Plus} label="New run" href="/start" />
-						<HeaderButton icon={Search} label="Search" href="/search" />
-					</>
-				}
+			}
+		>
+			<HeaderToolbar
+				placement="left"
+				items={[
+					{
+						kind: "view",
+						key: "settings",
+						element: (
+							<AvatarButton
+								name={person.name}
+								label="Settings"
+								hint={`Signed in as ${person.name}`}
+								href="/settings"
+							/>
+						),
+					},
+				]}
 			/>
-
-			{summary.isError && !data ? (
-				<ErrorAlert
-					title="Last night did not load"
-					message={summary.error.message}
-					fix="Check that this phone is online, then try again."
-					onRetry={() => void summary.refetch()}
-				/>
-			) : noRuns ? (
-				<EmptyState
-					icon={MoonStar}
-					title="No runs yet"
-					description="Start a flow tonight. In the morning you see here what it did and what it cost."
-				>
-					<Link href="/start" asChild>
-						<Button size="lg" className="h-auto min-h-11 py-2">
-							<Text>New run</Text>
-						</Button>
-					</Link>
-				</EmptyState>
+			<HeaderToolbar
+				placement="right"
+				items={[
+					{
+						kind: "button",
+						key: "start",
+						label: "New run",
+						sf: "plus",
+						icon: Plus,
+						onPress: () => router.push("/start"),
+					},
+				]}
+			/>
+			<HeaderSearch placeholder="Gates and runs" onChange={setQuery} />
+			{searching ? (
+				<SearchResults query={query} />
 			) : (
-				<NightTiles
-					numbers={data ? (nightNumbers(data) ?? undefined) : undefined}
-					waiting={waiting}
-				/>
-			)}
-
-			<NeedsYouSection gates={gates} now={now} />
-
-			{data && !noRuns ? (
 				<>
-					<RunningSection
-						runs={runningNow(data)}
-						count={data.open.running}
-						now={now}
-					/>
-					<NightOutputSection
-						runs={nightOutput(data)}
-						ended={endedCount(data)}
-						now={now}
-					/>
-				</>
-			) : !data && !summary.isError ? (
-				<Skeleton className="h-32 w-full rounded-xl" />
-			) : null}
+					{summary.isError && !data ? (
+						<ErrorAlert
+							title="Last night did not load"
+							message={summary.error.message}
+							fix="Check that this phone is online, then try again."
+							onRetry={() => void summary.refetch()}
+						/>
+					) : noRuns ? (
+						<EmptyState
+							icon={MoonStar}
+							title="No runs yet"
+							description="Start a flow tonight. In the morning you see here what it did and what it cost."
+						>
+							<Link href="/start" asChild>
+								<Button size="lg" className="h-auto min-h-11 py-2">
+									<Text>New run</Text>
+								</Button>
+							</Link>
+						</EmptyState>
+					) : (
+						<NightTiles
+							numbers={data ? (nightNumbers(data) ?? undefined) : undefined}
+							waiting={waiting}
+						/>
+					)}
 
-			<Section>
-				<SectionHead title="Your work" />
-				<ListGroup>
-					<ListRow icon={History} title="Runs" href="/runs" />
-					<ListRow
-						icon={Workflow}
-						title="Flows"
-						caption="How often their runs finish"
-						href="/flows"
-					/>
-					<ListRow icon={FolderGit2} title="Projects" href="/projects" />
-					<ListRow
-						icon={Laptop}
-						title="Computers"
-						caption="Where your flows run"
-						href="/computers"
-					/>
-					<ListRow icon={Settings} title="Settings" href="/settings" />
-				</ListGroup>
-			</Section>
+					<NeedsYouSection gates={gates} now={now} />
+
+					{data && !noRuns ? (
+						<>
+							<RunningSection
+								runs={runningNow(data)}
+								count={data.open.running}
+								now={now}
+							/>
+							<NightOutputSection
+								runs={nightOutput(data)}
+								ended={endedCount(data)}
+								now={now}
+							/>
+						</>
+					) : !data && !summary.isError ? (
+						<Skeleton className="h-32 w-full rounded-xl" />
+					) : null}
+
+					<Section>
+						<SectionHead title="Your work" />
+						<ListGroup>
+							<ListRow icon={History} title="Runs" href="/runs" />
+							<ListRow
+								icon={Workflow}
+								title="Flows"
+								caption="How often their runs finish"
+								href="/flows"
+							/>
+							<ListRow icon={FolderGit2} title="Projects" href="/projects" />
+							<ListRow
+								icon={Laptop}
+								title="Computers"
+								caption="Where your flows run"
+								href="/computers"
+							/>
+							<ListRow icon={Settings} title="Settings" href="/settings" />
+						</ListGroup>
+					</Section>
+				</>
+			)}
 		</Screen>
 	);
 }

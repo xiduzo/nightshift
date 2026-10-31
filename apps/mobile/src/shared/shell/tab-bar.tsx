@@ -16,7 +16,7 @@ export function TabBar({ waiting }: TabBarProps) {
 			// The badge keeps the system's color: waiting Gates are no error.
 			tintColor={colors.primary}
 		>
-			<NativeTabs.Trigger name="index">
+			<NativeTabs.Trigger name="(home)">
 				<NativeTabs.Trigger.Icon
 					sf={{ default: "house", selected: "house.fill" }}
 				/>

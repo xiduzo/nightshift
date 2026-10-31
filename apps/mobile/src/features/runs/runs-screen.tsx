@@ -4,16 +4,17 @@ import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { History, Search, X } from "lucide-react-native";
-import { useMemo } from "react";
+import { History, X } from "lucide-react-native";
+import { useMemo, useState } from "react";
 
 import { useHostQueries } from "@/features/host";
+import { SearchResults } from "@/features/search";
 import { SpacePicker } from "@/features/spaces";
 import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { useNow } from "@/shared/format";
-import { HeaderButton, LargeTitleHeader } from "@/shared/header";
+import { HeaderSearch, HeaderToolbar } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
@@ -32,23 +33,16 @@ import {
 	runsSummary,
 } from "./runs-list";
 
-function RunsHeader({ summary }: { summary?: string }) {
+/** The Space picker and the search field in the native header. */
+function RunsHeader({ onSearch }: { onSearch: (query: string) => void }) {
 	return (
-		<LargeTitleHeader
-			title="Runs"
-			summary={summary}
-			actions={
-				<>
-					<SpacePicker />
-					<HeaderButton
-						icon={Search}
-						label="Search"
-						hint="Finds a run or a Gate"
-						href="/search"
-					/>
-				</>
-			}
-		/>
+		<>
+			<HeaderToolbar
+				placement="right"
+				items={[{ kind: "view", key: "space", element: <SpacePicker /> }]}
+			/>
+			<HeaderSearch placeholder="Runs and Gates" onChange={onSearch} />
+		</>
 	);
 }
 
@@ -121,11 +115,22 @@ export function RunsScreen() {
 		: null;
 	// Again every 30 s: often enough for "12 min".
 	const now = useNow();
+	const [query, setQuery] = useState("");
+	const header = <RunsHeader onSearch={setQuery} />;
+
+	if (query.trim() !== "") {
+		return (
+			<Screen>
+				{header}
+				<SearchResults query={query} />
+			</Screen>
+		);
+	}
 
 	if (runs.isPending) {
 		return (
 			<Screen>
-				<RunsHeader />
+				{header}
 				<Skeleton className="h-11 w-full rounded-full" />
 				<Skeleton className="h-72 w-full rounded-xl" />
 			</Screen>
@@ -136,7 +141,7 @@ export function RunsScreen() {
 	if (runs.isError && runs.data === undefined) {
 		return (
 			<Screen onRefresh={refresh}>
-				<RunsHeader />
+				{header}
 				<ErrorAlert
 					title="The runs did not load"
 					message={runs.error.message}
@@ -153,7 +158,7 @@ export function RunsScreen() {
 	if (projects.data !== undefined && spaceRuns === 0) {
 		return (
 			<Screen onRefresh={refresh}>
-				<RunsHeader />
+				{header}
 				<EmptyState
 					icon={History}
 					title="No runs yet"
@@ -172,8 +177,11 @@ export function RunsScreen() {
 	}
 
 	return (
-		<Screen onRefresh={refresh}>
-			<RunsHeader summary={runsSummary(counts[filter], projectName)} />
+		<Screen
+			onRefresh={refresh}
+			summary={runsSummary(counts[filter], projectName)}
+		>
+			{header}
 			<ChipRail>
 				{projectName ? (
 					<Chip

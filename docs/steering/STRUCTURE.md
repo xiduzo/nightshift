@@ -235,7 +235,7 @@ apps/mobile/src/
   app/                     thin Expo Router files: one screen from a vertical
   shared/
     api/                   the auth client per Host, the Host address, the transport (expo/fetch + cookie), the query client (app focus, network), the reads kept between starts
-    page/  empty/          the screen body (Screen, with an optional footer) and the empty state
+    page/  empty/          the screen body (Screen: the one scroll view under the native header, a summary line, an optional footer) and the empty state
     feedback/              ErrorAlert: what went wrong on a screen, and how to try again
     format/                a time of day (formatTime); the time now for "12 min ago" (useNow), costs and the words of "5 min ago" come from @nightshift/client
     in-front/              whether the app is in front (useInFront): the streams follow only then
@@ -244,10 +244,11 @@ apps/mobile/src/
     tone/                  the status map, pure: tone, icon name and word of a run status, a step, a step kind
     status/                StatusBadge and StatusText: a tone drawn with its icon and word
     list/                  ListGroup, ListRow, SectionHead: lists in a card
-    header/  avatar/       LargeTitleHeader, HeaderButton, AvatarButton; InitialsAvatar
+    match/                 matching a typed query, pure: its words, and the Gates that hold them all (the Inbox search and Search)
+    header/  avatar/       the native header's actions (HeaderToolbar on Stack.Toolbar), its search field (HeaderSearch) and AvatarButton; InitialsAvatar
     tiles/  chips/         StatTile and FactTile two by two; filter chips (ChipRail, Chip)
     trail/  action-bar/    a run's steps as a timeline (StepTrail); the bar at the bottom of a screen (ActionBar)
-    shell/                 the app frame (AppShell) and the tabs (AppTabs: native tabs on iOS, JS tabs on Android)
+    shell/                 the app frame (AppShell), the tabs (AppTabs: native tabs on iOS, JS tabs on Android) and the stack of each tab (TabStack: large titles)
   features/
     host/                  sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
     spaces/                the Space picker of Runs, Projects and New run, the Space remembered per Host

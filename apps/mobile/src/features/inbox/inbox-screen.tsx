@@ -6,7 +6,7 @@ import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { ArrowDownUp, Inbox, ListFilter, Search } from "lucide-react-native";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
@@ -15,8 +15,9 @@ import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { useNow } from "@/shared/format";
-import { HeaderButton, LargeTitleHeader } from "@/shared/header";
+import { HeaderSearch } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
+import { searchGates } from "@/shared/match";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { DigestCard } from "./digest-card";
@@ -35,6 +36,8 @@ import { useInbox } from "./use-inbox";
 /**
  * The Inbox tab: your last morning digest, then the open Gates of every
  * Space you are in, grouped by project, oldest first. Chips choose a project or Space and the order.
+ * The search field in the header finds a Gate by a word of its question,
+ * flow, run, project or Space.
  * `/inbox?project=<id>` opens it on one project.
  */
 export function InboxScreen() {
@@ -43,16 +46,17 @@ export function InboxScreen() {
 	const now = useNow();
 	const manySpaces = useManySpaces(inbox.data);
 	useProjectParam();
+	const [query, setQuery] = useState("");
+	const searching = query.trim() !== "";
 
 	const gates = inbox.data;
 	return (
-		<Screen onRefresh={() => inbox.refetch()}>
-			<LargeTitleHeader
-				title="Inbox"
-				summary={gates ? inboxSummary(gates) : undefined}
-				actions={<HeaderButton icon={Search} label="Search" href="/search" />}
-			/>
-			<DigestCard now={now} />
+		<Screen
+			onRefresh={() => inbox.refetch()}
+			summary={gates ? inboxSummary(gates) : undefined}
+		>
+			<HeaderSearch placeholder="Your Gates" onChange={setQuery} />
+			{searching ? null : <DigestCard now={now} />}
 			{gates && gates.length > 0 ? (
 				<FilterChips gates={gates} view={view} />
 			) : null}
@@ -78,6 +82,7 @@ export function InboxScreen() {
 				) : (
 					<GateGroups
 						gates={gates}
+						query={query}
 						view={view}
 						manySpaces={manySpaces}
 						now={now}
@@ -155,16 +160,28 @@ function FilterChips({ gates, view }: { gates: OpenGate[]; view: InboxView }) {
 
 function GateGroups({
 	gates,
+	query,
 	view,
 	manySpaces,
 	now,
 }: {
 	gates: OpenGate[];
+	/** What the search field holds: only the Gates that match show. */
+	query: string;
 	view: InboxView;
 	manySpaces: boolean;
 	now: number;
 }) {
-	const groups = inboxGroups(gates, view, manySpaces);
+	const groups = inboxGroups(searchGates(gates, query), view, manySpaces);
+	if (groups.length === 0 && query.trim() !== "") {
+		return (
+			<EmptyState
+				icon={Search}
+				title="No Gate matches"
+				description={`Nothing here matches "${query.trim()}". Try another word from its question, flow or project.`}
+			/>
+		);
+	}
 	if (groups.length === 0) {
 		return (
 			<EmptyState

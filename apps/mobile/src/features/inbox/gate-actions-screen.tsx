@@ -5,7 +5,6 @@ import { CirclePlay, Share2, SquareTerminal } from "lucide-react-native";
 import { Share } from "react-native";
 
 import { useHostQueries } from "@/features/host";
-import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
@@ -21,12 +20,7 @@ export function GateActionsScreen() {
 	const command = run.data?.takeOverCommand ?? null;
 
 	return (
-		<Screen>
-			<LargeTitleHeader
-				compact
-				title="Gate actions"
-				summary={run.data?.title}
-			/>
+		<Screen summary={run.data?.title}>
 			<ListGroup>
 				<ListRow
 					icon={CirclePlay}

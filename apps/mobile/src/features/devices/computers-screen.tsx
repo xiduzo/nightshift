@@ -6,7 +6,6 @@ import { Laptop, Server } from "lucide-react-native";
 import { useHostQueries } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
@@ -20,16 +19,14 @@ export function ComputersScreen() {
 	const now = overview.dataUpdatedAt || Date.now();
 
 	return (
-		<Screen onRefresh={() => overview.refetch()}>
-			<LargeTitleHeader
-				compact
-				title="Computers"
-				summary={
-					computers && computers.length > 0
-						? onlineSummary(computers)
-						: "A flow runs on a computer that is online."
-				}
-			/>
+		<Screen
+			onRefresh={() => overview.refetch()}
+			summary={
+				computers && computers.length > 0
+					? onlineSummary(computers)
+					: "A flow runs on a computer that is online."
+			}
+		>
 			{computers ? (
 				computers.length === 0 ? (
 					<EmptyState

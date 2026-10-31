@@ -1,3 +1,3 @@
-/** Search on this phone: the Gates and runs it has loaded. */
+/** Search on this phone: the Gates and runs it has loaded, found from the search field in a header. */
 
-export { SearchScreen } from "./search-screen";
+export { SearchResults } from "./search-results";

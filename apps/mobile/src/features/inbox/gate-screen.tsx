@@ -51,7 +51,6 @@ import {
 	Link,
 	Redirect,
 	router,
-	Stack,
 	useLocalSearchParams,
 } from "expo-router";
 import {
@@ -77,6 +76,7 @@ import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { useNow } from "@/shared/format";
+import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
@@ -277,25 +277,22 @@ function OpenGateScreen({
 				) : undefined
 			}
 		>
-			<Stack.Screen
-				options={{
-					headerRight: () => (
-						<Button
-							variant="ghost"
-							size="icon"
-							className="size-11"
-							onPress={() =>
-								router.push({
-									pathname: "/gate-actions",
-									params: { runId: gate.runId, stepId: gate.stepId },
-								})
-							}
-							accessibilityLabel="More actions"
-						>
-							<Icon as={Ellipsis} className="size-5" />
-						</Button>
-					),
-				}}
+			<HeaderToolbar
+				placement="right"
+				items={[
+					{
+						kind: "button",
+						key: "more",
+						label: "More actions",
+						sf: "ellipsis",
+						icon: Ellipsis,
+						onPress: () =>
+							router.push({
+								pathname: "/gate-actions",
+								params: { runId: gate.runId, stepId: gate.stepId },
+							}),
+					},
+				]}
 			/>
 
 			<View className="gap-3">
