@@ -9,6 +9,7 @@ import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Separator } from "@nightshift/ui-native/components/ui/separator";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
+import type { ListRenderItemInfo } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import {
@@ -18,12 +19,12 @@ import {
 	type LucideIcon,
 	SquareTerminal,
 } from "lucide-react-native";
-import { Fragment, useMemo } from "react";
+import { memo, useMemo } from "react";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
-import { Screen } from "@/shared/page";
+import { ScreenList } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { type TranscriptLine, transcriptLines } from "./transcript-lines";
 import { useRunTranscript } from "./use-run-transcript";
@@ -51,35 +52,66 @@ export function TranscriptScreen() {
 	}, [entries, run.data]);
 
 	return (
-		<Screen
+		<ScreenList
+			data={lines}
+			renderItem={renderLine}
+			keyExtractor={lineKey}
+			getItemType={lineType}
+			ItemSeparatorComponent={Gap}
+			// New lines scroll into view while you read the end. Scrolled up,
+			// the lines you read stay where they are.
+			maintainVisibleContentPosition={FOLLOW_END}
 			summary={
 				connection === "reconnecting"
 					? "Reconnecting…"
 					: (run.data?.title ?? undefined)
 			}
-		>
-			{lines.length > 0 ? (
-				lines.map((line, index) => (
-					<Fragment key={line.key}>
-						{line.kind === "step" && index > 0 ? <Separator /> : null}
-						<Line line={line} />
-					</Fragment>
-				))
-			) : connection === "connecting" ? (
-				<>
-					<Skeleton className="h-5 w-1/3" />
-					<Skeleton className="h-20 w-full rounded-xl" />
-					<Skeleton className="h-12 w-full rounded-md" />
-				</>
-			) : (
-				<EmptyState
-					icon={SquareTerminal}
-					title="Nothing here yet"
-					description="New lines show here while the run works."
-				/>
-			)}
-		</Screen>
+			header={
+				lines.length > 0 ? null : connection === "connecting" ? (
+					<>
+						<Skeleton className="h-5 w-1/3" />
+						<Skeleton className="h-20 w-full rounded-xl" />
+						<Skeleton className="h-12 w-full rounded-md" />
+					</>
+				) : (
+					<EmptyState
+						icon={SquareTerminal}
+						title="Nothing here yet"
+						description="New lines show here while the run works."
+					/>
+				)
+			}
+		/>
 	);
+}
+
+/** Follow the end while you are near it: within a fifth of the screen. */
+const FOLLOW_END = {
+	autoscrollToBottomThreshold: 0.2,
+	startRenderingFromBottom: true,
+};
+
+function lineKey(line: TranscriptLine): string {
+	return line.key;
+}
+
+function lineType(line: TranscriptLine): TranscriptLine["kind"] {
+	return line.kind;
+}
+
+function renderLine({ item, index }: ListRenderItemInfo<TranscriptLine>) {
+	return (
+		<Line
+			kind={item.kind}
+			text={item.text}
+			divided={item.kind === "step" && index > 0}
+		/>
+	);
+}
+
+/** The space between two lines. */
+function Gap() {
+	return <View className="h-4" />;
 }
 
 const WHO: Record<
@@ -91,36 +123,50 @@ const WHO: Record<
 	"night-shift": { icon: Info, label: "Night Shift" },
 };
 
-function Line({ line }: { line: TranscriptLine }) {
-	switch (line.kind) {
+/**
+ * One line of the transcript. It renders again only when its words change:
+ * the line that grows while an agent talks, not the lines above it.
+ * `divided`: a step after another one, with a Separator above it.
+ */
+const Line = memo(function Line({
+	kind,
+	text,
+	divided,
+}: {
+	kind: TranscriptLine["kind"];
+	text: string;
+	divided: boolean;
+}) {
+	switch (kind) {
 		case "step":
 			return (
-				<Text
-					accessibilityRole="header"
-					className="font-mono font-semibold text-sm"
-				>
-					{line.text}
-				</Text>
+				<View className="gap-4">
+					{divided ? <Separator /> : null}
+					<Text
+						accessibilityRole="header"
+						className="font-mono font-semibold text-sm"
+					>
+						{text}
+					</Text>
+				</View>
 			);
 		case "tools":
 			return (
 				<View className="flex-row items-center gap-1.5" accessible>
 					<Icon as={ListChecks} className="size-4 text-muted-foreground" />
-					<Text className="flex-1 text-muted-foreground text-sm">
-						{line.text}
-					</Text>
+					<Text className="flex-1 text-muted-foreground text-sm">{text}</Text>
 				</View>
 			);
 		case "output":
 			return (
 				<View className="rounded-md bg-muted p-3">
 					<Text selectable className="font-mono text-muted-foreground text-xs">
-						{line.text.trimEnd()}
+						{text.trimEnd()}
 					</Text>
 				</View>
 			);
 		default: {
-			const who = WHO[line.kind];
+			const who = WHO[kind];
 			return (
 				<View className="gap-1" accessible>
 					<View className="flex-row items-center gap-1.5">
@@ -129,25 +175,25 @@ function Line({ line }: { line: TranscriptLine }) {
 							{who.label}
 						</Text>
 					</View>
-					{line.kind === "agent" ? (
+					{kind === "agent" ? (
 						<Card className="gap-0 px-3 py-2.5">
 							<Text selectable className="text-sm">
-								{line.text}
+								{text}
 							</Text>
 						</Card>
-					) : line.kind === "command" ? (
+					) : kind === "command" ? (
 						<View className="rounded-md bg-muted p-3">
 							<Text selectable className="font-mono text-xs">
-								{line.text}
+								{text}
 							</Text>
 						</View>
 					) : (
 						<Text selectable className="text-muted-foreground text-sm">
-							{line.text}
+							{text}
 						</Text>
 					)}
 				</View>
 			);
 		}
 	}
-}
+});
