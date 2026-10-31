@@ -120,7 +120,7 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			});
 		}
 
-		graph ??= bodyGraph(ctx, called, node.flow);
+		graph ??= bodyGraph(ctx, node, called);
 		const body = {
 			called,
 			flowName: node.flow,

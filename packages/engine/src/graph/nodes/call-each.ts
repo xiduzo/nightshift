@@ -397,7 +397,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				index: String(element.index - 1),
 			},
 		};
-		graph ??= bodyGraph(ctx, called, node.flow);
+		graph ??= bodyGraph(ctx, node, called);
 		const ended = await runBody({
 			graph,
 			config,

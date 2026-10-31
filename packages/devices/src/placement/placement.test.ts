@@ -742,6 +742,66 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
 	}, 20_000);
 
+	test("a Subflow on B runs its steps there, whoever walks the run, and waits for B while it is offline", async () => {
+		await shareRemote();
+		await seedFlows(space(), projectId, {
+			sync: flow([command("inside", "echo from B")]),
+		});
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					command("first", "sleep 0.3"),
+					{
+						id: "copy",
+						type: "call",
+						position: { x: 0, y: 0 },
+						flow: "sync",
+						inputs: {},
+						device: "studio-b",
+					},
+					command("after", "echo from A"),
+				] as Flow["nodes"],
+				[
+					{ id: "e1", from: "first", outcome: "pass", to: "copy" },
+					{ id: "e2", from: "copy", outcome: "pass", to: "after" },
+				],
+			),
+			startedBy: personId,
+		});
+		online.delete(B);
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps.at(-1)?.nodeId).toBe("inside");
+		const waited = (await a.db.select().from(event)).find(
+			(e) => e.type === "WaitStarted",
+		);
+		expect(JSON.parse(waited?.payload ?? "{}")).toMatchObject({
+			reason: "device-offline",
+			deviceId: B,
+			message: "studio-b is offline. The step starts when it is back.",
+		});
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		expect(
+			run.steps.map((s) => [
+				s.nodeId,
+				s.device?.id === B
+					? "B"
+					: s.device?.id === run.device.id
+						? "run"
+						: s.device?.id,
+			]),
+		).toEqual([
+			["first", "run"],
+			["copy", "B"],
+			["inside", "B"],
+			["after", "run"],
+		]);
+		const inside = run.steps.find((s) => s.nodeId === "inside");
+		expect(String(inside?.outputs.log_tail).trim()).toBe("from B");
+	}, 20_000);
+
 	test("a node whose Device is offline at the start: the run starts, the step waits, and continues when it is back", async () => {
 		await shareRemote();
 		online.delete(B);

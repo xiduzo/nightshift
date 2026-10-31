@@ -3,12 +3,14 @@ import {
 	isGraphInterrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import type {
-	Flow,
-	FlowNode,
-	JsonValue,
-	NodeOutputs,
-	Outcome,
+import {
+	type CallNode,
+	type Flow,
+	type FlowNode,
+	type JsonValue,
+	type NodeOutputs,
+	type Outcome,
+	placesItself,
 } from "@nightshift/flows";
 import {
 	type InputValues,
@@ -30,7 +32,8 @@ import type { Parked, RunStateValues } from "../state";
  * The body is compiled once per node (`bodyGraph`) and invoked with the
  * node's config passed through, so it checkpoints under the node's task
  * namespace and an interrupt inside it resumes inside it. The body's own
- * `StepContext` is the caller's with `flow` and `flowName` replaced.
+ * `StepContext` is the caller's with `flow` and `flowName` replaced, and
+ * `deviceFor` when the Subflow names a computer.
  *
  * How a body ends, in the walk's terms (`ScopeEnd` in engine.ts):
  *
@@ -81,13 +84,34 @@ export type BodyEnd =
 
 export type BodyGraph = ReturnType<ReturnType<typeof compileFlow>["compile"]>;
 
-/** The called flow compiled for the caller's run, with its own `flow` and `flowName`. */
+/**
+ * The called flow compiled for the caller's run, with its own `flow` and
+ * `flowName`. A Subflow that names a computer (`device`) runs its steps
+ * there: a body node that does not say where it runs (`placesItself`)
+ * gets the Call node's Device, as the run's plan placed it. A Subflow
+ * inside it asks the same `deviceFor`, so the nearest one that names a
+ * computer wins. The run's plan grouped the body's nodes on that Device,
+ * so run start checked it has what they need (`planNodes`). Nothing else
+ * is new: a step placed on another Device runs there as any placed
+ * Command or Agent does, through the work relay, with the run's work
+ * moved by a Hand-off (`readyDevice`), and it waits while that Device is
+ * offline. Its knowledge is that Device's working copy, reconciled there.
+ */
 export function bodyGraph(
 	ctx: StepContext,
+	caller: CallNode,
 	called: Flow,
-	flowName: string,
 ): BodyGraph {
-	return compileFlow(called, { ...ctx, flow: called, flowName }).compile();
+	const deviceFor: StepContext["deviceFor"] =
+		caller.device === undefined
+			? ctx.deviceFor
+			: (node, run) => ctx.deviceFor(placesItself(node) ? node : caller, run);
+	return compileFlow(called, {
+		...ctx,
+		flow: called,
+		flowName: caller.flow,
+		deviceFor,
+	}).compile();
 }
 
 /**

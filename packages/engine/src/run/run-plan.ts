@@ -18,7 +18,10 @@ import type { PlacedDevice, PlannedRun } from "./peers";
 /**
  * The node walk of a run's plan: where each node runs, and its profile.
  * The Placement rule is written once here: a node's profile names its
- * Device (ADR 3), else the node's `device`, else the run's Device. Who the
+ * Device (ADR 3), else the node's `device`, else the `device` of the
+ * nearest Subflow around it (a Call node's, so a folder on one computer
+ * syncs there whoever starts the run), else the run's Device. The walk
+ * applies the Subflow's part (`bodyGraph`). Who the
  * Devices are (the Person's own or offered, online, by id or by name) is
  * the caller's: the devices' planner (`PlacementPort.plan`) passes its
  * lookups, and so does the engine's own fake of a computer alone.
@@ -340,17 +343,33 @@ export async function planNodes(
 		devices,
 	);
 	const [flow, ...called] = flows as [Flow, ...Flow[]];
-	const groups = new Map<PlacedDevice, FlowNode[]>();
-	for (const node of flows.flatMap((f) => f.nodes)) {
-		const ref = profileOf(node);
-		const name = namedDevice(node);
-		const at = isProfileRef(ref)
-			? (byId.get(ref.device) ?? run)
-			: name !== undefined
-				? (named.get(name) ?? run)
-				: run;
-		groups.set(at, [...(groups.get(at) ?? []), node]);
-	}
+	const calledByName = new Map(
+		calledNames.map((name, i) => [name, called[i] as Flow]),
+	);
+	// Each node on its Device: its profile's, else its own, else the one
+	// of the Subflow it runs in (a Call node that names a computer, the
+	// nearest one), else the run's. A flow that two Subflows call on two
+	// Devices has its nodes in both groups: each Device checks them.
+	const groups = new Map<PlacedDevice, Set<FlowNode>>();
+	const seen = new Set<string>();
+	const group = (body: Flow, key: string, around: PlacedDevice) => {
+		if (seen.has(`${key}\u0000${around.id}`)) return;
+		seen.add(`${key}\u0000${around.id}`);
+		for (const node of body.nodes) {
+			const ref = profileOf(node);
+			const name = namedDevice(node);
+			const at = isProfileRef(ref)
+				? (byId.get(ref.device) ?? run)
+				: name !== undefined
+					? (named.get(name) ?? run)
+					: around;
+			groups.set(at, (groups.get(at) ?? new Set()).add(node));
+			if (node.type !== "call") continue;
+			const inner = calledByName.get(node.flow);
+			if (inner) group(inner, node.flow, at);
+		}
+	};
+	group(flow, "", run);
 	return {
 		plan: {
 			device: planned(run),
@@ -370,9 +389,7 @@ export async function planNodes(
 		flowName: loaded.flowName,
 		flowRevision: loaded.flowRevision,
 		calledFlowRevisions: loaded.calledFlowRevisions,
-		calledFlows: Object.fromEntries(
-			calledNames.map((name, i) => [name, called[i] as Flow]),
-		),
-		groups: [...groups].map(([at, nodes]) => ({ at, nodes })),
+		calledFlows: Object.fromEntries(calledByName),
+		groups: [...groups].map(([at, nodes]) => ({ at, nodes: [...nodes] })),
 	};
 }

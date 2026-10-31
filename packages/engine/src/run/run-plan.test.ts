@@ -141,6 +141,55 @@ describe("the node walk of a run's plan", () => {
 		]);
 	});
 
+	test("a Subflow that names a computer places its flow's nodes there, the nearest one wins, and a node's own device stays", async () => {
+		const call = (id: string, called: string, device?: string) =>
+			({
+				id,
+				type: "call",
+				position: { x: 0, y: 0 },
+				flow: called,
+				inputs: {},
+				...(device ? { device } : {}),
+			}) as FlowNode;
+		const sources = {
+			body: {
+				json: flow([
+					command("copy"),
+					command("own", "studio"),
+					call("inner", "leaf"),
+					call("elsewhere", "other", "this"),
+				]),
+			},
+			leaf: { json: flow([command("deep")]) },
+			other: { json: flow([command("far")]) },
+		};
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				flow: flow([
+					command("first"),
+					call("sync", "body", "hetzner-1"),
+					call("plain", "leaf"),
+				]),
+			},
+			{ ...devices(), flows: async () => sources },
+			"the-person",
+		);
+		expect(planned.plan.named).toEqual({
+			"hetzner-1": { id: "hetzner-1", name: "hetzner-1" },
+			studio: { id: "studio", name: "studio" },
+			this: { id: "this", name: "this" },
+		});
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([
+			// The leaf runs where the run runs from "plain", and on hetzner-1 inside "sync".
+			["this", ["first", "elsewhere", "far", "plain", "deep"]],
+			["hetzner-1", ["sync", "copy", "inner", "deep"]],
+			["studio", ["own"]],
+		]);
+	});
+
 	test("a node's profile names its Device: the node runs there with the profile's settings, by the Device's id", async () => {
 		const planned = await planNodes(
 			{

@@ -75,7 +75,8 @@ export type Recorder = {
 /**
  * What a node factory gets. One per run and per compiled flow: a Call
  * node compiles its called flow with `flow` and `flowName`
- * replaced, everything else shared. Per-invocation facts (the scope, the
+ * replaced (and `deviceFor`, for a Subflow that names a computer),
+ * everything else shared. Per-invocation facts (the scope, the
  * element's `run` template fields) travel in `config.configurable`:
  *
  * - `configurable.scope: Scope | null`: the calling step and element, null
