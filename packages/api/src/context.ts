@@ -12,7 +12,7 @@ import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	Engine,
 	KnowledgeSearch,
-	KnowledgeSync,
+	ProjectKnowledge,
 	ToolLaunchers,
 } from "@nightshift/engine";
 import type {
@@ -91,7 +91,7 @@ export type Services = {
 	 * knowledge document lists, and one file's content by its hash for a
 	 * computer whose folder lacks it, and the removal of a source's folder.
 	 */
-	knowledge: Pick<KnowledgeSync, "listing" | "read" | "removeFolder">;
+	knowledge: Pick<ProjectKnowledge, "listing" | "read" | "removeFolder">;
 	/** Keyword search over the projects' knowledge on this computer. */
 	knowledgeSearch: Pick<KnowledgeSearch, "search">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */

@@ -13,7 +13,6 @@ import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import { createKnowledgeFolders } from "../knowledge";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveOpenGate } from "../read/derive-run";
 import { deriveSteps } from "../read/derive-steps";
@@ -26,6 +25,7 @@ import {
 	payloads,
 	startRun,
 } from "../testing/graph";
+import { testKnowledge } from "../testing/knowledge";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { ASK_CHOICES } from "./nodes/agent-ask";
@@ -47,7 +47,10 @@ let sandbox: Sandbox;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 });
+/** The knowledge search indexes a test opened. */
+const closes: (() => void)[] = [];
 afterEach(async () => {
+	for (const close of closes.splice(0)) close();
 	await sandbox.cleanup();
 });
 
@@ -78,9 +81,10 @@ describe("the Agent node", () => {
 	});
 
 	test("the agent gets the project's knowledge when the folder has files, unless the node says no", async () => {
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
-		await mkdir(knowledge.folder("project-1"), { recursive: true });
-		await writeFile(join(knowledge.folder("project-1"), "a.md"), "# A\n");
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
+		await mkdir(folder("project-1"), { recursive: true });
+		await writeFile(join(folder("project-1"), "a.md"), "# A\n");
 		const harness = fakeHarness(reportingScript("pass"));
 		const h = await startRun(
 			sandbox,
@@ -93,9 +97,9 @@ describe("the Agent node", () => {
 		);
 		await drive(h, { inputs: {} });
 		const [reader, blind] = harness.calls;
-		expect(reader?.addDirs).toEqual([knowledge.folder("project-1")]);
-		expect(reader?.instructions).toContain(knowledge.folder("project-1"));
-		expect(reader?.env?.NS_KNOWLEDGE).toBe(knowledge.folder("project-1"));
+		expect(reader?.addDirs).toEqual([folder("project-1")]);
+		expect(reader?.instructions).toContain(folder("project-1"));
+		expect(reader?.env?.NS_KNOWLEDGE).toBe(folder("project-1"));
 		expect(blind?.addDirs).toBeUndefined();
 		expect(blind?.instructions).toBeUndefined();
 		expect(blind?.env?.NS_KNOWLEDGE).toBeUndefined();

@@ -15,7 +15,6 @@ import {
 	describeDocumentText,
 	describeText,
 } from "./folder";
-import { KNOWLEDGE_ENV, sessionKnowledge } from "./handoff";
 
 let dataDir: string;
 beforeEach(async () => {
@@ -195,32 +194,5 @@ describe("describeText", () => {
 		expect(describeText("- a list item. Then.", "f").sentence).toBe(
 			"a list item",
 		);
-	});
-});
-
-describe("sessionKnowledge", () => {
-	test("an empty folder: only the variable, unless the node asks for it", async () => {
-		const folders = createKnowledgeFolders(dataDir);
-		const path = folders.folder("p1");
-		expect(await sessionKnowledge(folders, { projectId: "p1" })).toEqual({
-			env: { [KNOWLEDGE_ENV]: path },
-		});
-		const always = await sessionKnowledge(folders, {
-			projectId: "p1",
-			always: true,
-		});
-		expect(always.addDirs).toEqual([path]);
-		expect(always.instructions).toStartWith(`Project knowledge is in ${path}.`);
-	});
-
-	test("a folder with files: the folder, the line and a fresh index", async () => {
-		const folders = createKnowledgeFolders(dataDir);
-		await put(await folders.ensure("p1"), "a.md", "# A\n");
-		const given = await sessionKnowledge(folders, { projectId: "p1" });
-		expect(given.addDirs).toEqual([folders.folder("p1")]);
-		expect(given.instructions).toContain("Read INDEX.md there first");
-		expect(
-			await readFile(join(folders.folder("p1"), "INDEX.md"), "utf8"),
-		).toContain("- `a.md`: A");
 	});
 });

@@ -6,31 +6,21 @@
  */
 
 export {
-	createKnowledgeFolders,
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeFile,
-	type KnowledgeFolders,
 	type KnowledgeText,
 } from "./folder";
-export {
-	commandKnowledge,
-	type KnowledgeRequest,
-	keepLearnings,
-	sessionKnowledge,
-	sessionKnowledgeTools,
-	withLearnings,
-} from "./handoff";
 export {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,
 	knowledgeDocumentProject,
 } from "./knowledge-document";
 export {
-	createKnowledgeSync,
-	type KnowledgeHost,
-	type KnowledgeListing,
-	type KnowledgeSync,
-} from "./reconcile";
+	createProjectKnowledge,
+	type KnowledgeRequest,
+	type ProjectKnowledge,
+} from "./project-knowledge";
+export type { KnowledgeHost } from "./reconcile";
 export {
 	createKnowledgeSearch,
 	type KnowledgeHit,

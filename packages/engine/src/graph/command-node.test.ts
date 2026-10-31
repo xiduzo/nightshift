@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
-import { createKnowledgeFolders } from "../knowledge";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read/derive-steps";
 import { drive, flowOf, held, payloads, startRun } from "../testing/graph";
+import { testKnowledge } from "../testing/knowledge";
 import {
 	createSandbox,
 	type Sandbox,
@@ -37,7 +37,10 @@ let sandbox: Sandbox;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 });
+/** The knowledge search indexes a test opened. */
+const closes: (() => void)[] = [];
 afterEach(async () => {
+	for (const close of closes.splice(0)) close();
 	await sandbox.cleanup();
 });
 
@@ -378,7 +381,8 @@ describe("the Command node", () => {
 	});
 
 	test("the command gets the project's knowledge folder in NS_KNOWLEDGE", async () => {
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
 		const h = await startRun(
 			sandbox,
 			flowOf({
@@ -391,9 +395,9 @@ describe("the Command node", () => {
 			{ knowledge },
 		);
 		await drive(h, { inputs: {} });
-		expect(
-			await readFile(join(knowledge.folder("project-1"), "home.md"), "utf8"),
-		).toBe("# Home\n");
+		expect(await readFile(join(folder("project-1"), "home.md"), "utf8")).toBe(
+			"# Home\n",
+		);
 	});
 
 	describe("secrets", () => {

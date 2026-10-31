@@ -29,17 +29,7 @@ import {
 	type McpExpansion,
 	type SecretEnv,
 } from "../device-config";
-import {
-	commandKnowledge,
-	type KnowledgeFolders,
-	type KnowledgeRequest,
-	type KnowledgeSearch,
-	type KnowledgeSync,
-	keepLearnings,
-	sessionKnowledge,
-	sessionKnowledgeTools,
-	withLearnings,
-} from "../knowledge";
+import type { ProjectKnowledge } from "../knowledge";
 import {
 	checkProjectFolder,
 	createWorktreeSnapshots,
@@ -144,10 +134,11 @@ export type LocalDeviceDeps = {
 	/** Where a session keeps its artifacts. Without it, sessions keep none. */
 	artifacts?: Pick<ArtifactStore, "save">;
 	/**
-	 * The projects' knowledge folders on this computer. Without it, a step
-	 * gets none.
+	 * The projects' knowledge on this computer, in step with their Spaces
+	 * (ADR 4). A step that asks for it gets it here, and gives it back when
+	 * it ends. Without it, a step gets none.
 	 */
-	knowledge?: KnowledgeFolders;
+	knowledge?: Pick<ProjectKnowledge, "forCommand" | "forSession">;
 	/**
 	 * What a run step's harness session adds to its environment, read as
 	 * the session starts: the export to monitoring gives Claude Code its
@@ -168,18 +159,6 @@ export type LocalDeviceDeps = {
 	 * given (its CLI tools' logins, its MCP servers' and `sessionEnv`'s).
 	 */
 	secretValues?: () => Promise<readonly string[]>;
-	/**
-	 * Keeps a project's folder in step with its Space (ADR 4): before and
-	 * after each step that gets it. Without it, the folder is this
-	 * computer's alone.
-	 */
-	knowledgeSync?: Pick<KnowledgeSync, "startStep" | "read">;
-	/**
-	 * Keyword search over the folders: this Device's own index. With it, an
-	 * agent that gets the folder also gets `search_knowledge` and
-	 * `read_knowledge`, where its harness takes Night Shift's own tools.
-	 */
-	knowledgeSearch?: Pick<KnowledgeSearch, "search" | "refresh">;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -213,22 +192,6 @@ function keepArtifact(
 		const artifact = await store.save({ ...step, cwd, ...file });
 		return `Kept "${artifact.title}" as an artifact of this run.`;
 	};
-}
-
-/**
- * Brings the project's folder in step with its Space, when this computer
- * syncs it, and holds it for the step: nothing else reconciles it until
- * `done`, which publishes what the step changed. A reconcile that fails
- * leaves the folder as it is: the step goes on.
- */
-async function holdKnowledge(
-	deps: LocalDeviceDeps,
-	request: KnowledgeRequest | undefined,
-): Promise<{ done(): Promise<void> }> {
-	if (!request || !deps.knowledge || !deps.knowledgeSync) {
-		return { done: async () => {} };
-	}
-	return deps.knowledgeSync.startStep(request.projectId);
 }
 
 /** This computer as a Device. */
@@ -290,13 +253,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			}
 		: null;
 
-	/** One file of a project's knowledge: this computer's copy, else the Space's. */
-	const readKnowledge = (projectId: string, path: string, maxBytes: number) =>
-		deps.knowledgeSync
-			? deps.knowledgeSync.read(projectId, path, maxBytes)
-			: (deps.knowledge?.read(projectId, path, maxBytes) ??
-				Promise.resolve(null));
-
 	async function* session(
 		input: SessionInput | OfferedSessionInput,
 	): AsyncGenerator<SessionEvent> {
@@ -344,7 +300,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "refused", message: tools.message };
 			return;
 		}
-		let hold: { done(): Promise<void> } | null = null;
+		let known: Awaited<ReturnType<ProjectKnowledge["forSession"]>> | null =
+			null;
 		try {
 			// A new session learns its CLI tools after the prompt. A resumed
 			// session has them already.
@@ -354,12 +311,11 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					: "";
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
 			// The knowledge as the Space has it now, before the agent reads it.
-			hold = await holdKnowledge(deps, knowledge);
-			const known =
+			known =
 				knowledge && deps.knowledge
-					? await sessionKnowledge(deps.knowledge, knowledge).catch((error) => {
-							console.warn("The knowledge folder was left out:", error);
-							return null;
+					? await deps.knowledge.forSession(knowledge, {
+							...(artifacts ? { runId: artifacts.runId } : {}),
+							...(rest.stepReport ? { stepReport: rest.stepReport } : {}),
 						})
 					: null;
 			const added = artifacts
@@ -370,33 +326,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...known?.env,
 				...tools?.env,
 			};
-			// An agent that reads the knowledge may search it. The index
-			// starts to catch up with the folder now, not at the first search.
-			const search =
-				known?.addDirs && knowledge && deps.knowledgeSearch
-					? sessionKnowledgeTools(
-							deps.knowledgeSearch,
-							readKnowledge,
-							knowledge.projectId,
-						)
-					: null;
-			if (search && knowledge) {
-				deps.knowledgeSearch?.refresh(knowledge.projectId).catch((error) => {
-					console.warn(
-						"The knowledge search index was not brought up to date:",
-						error,
-					);
-				});
-			}
-			// An agent that reads the knowledge may propose to add to it.
-			const learn =
-				known?.addDirs && knowledge && artifacts && deps.knowledge
-					? { projectId: knowledge.projectId, runId: artifacts.runId }
-					: null;
 			yield { type: "ready", harness: name };
 			const run = harness.run({
 				...rest,
-				...(learn ? { stepReport: withLearnings(rest.stepReport) } : {}),
 				prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,
 				...(clis && clis.length > 0 ? { clis } : {}),
 				...(Object.keys(mcp.servers).length > 0
@@ -409,15 +341,11 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					: {}),
 				...(tools?.toolsPath ? { toolsPath: tools.toolsPath } : {}),
 				...(Object.keys(env).length > 0 ? { env } : {}),
-				...(known?.addDirs ? { addDirs: known.addDirs } : {}),
-				...(known?.instructions ? { instructions: known.instructions } : {}),
-				...(search ?? {}),
+				// The folder, the line, the tools and the learnings.
+				...known?.input,
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
 			});
-			const events =
-				learn && deps.knowledge
-					? keepLearnings(run, deps.knowledge, learn)
-					: run;
+			const events = known ? known.events(run) : run;
 			// Every secret value the session could see comes back as `•••`.
 			const hidden = [
 				...(tools?.values ?? []),
@@ -432,7 +360,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		} finally {
 			await tools?.cleanup();
 			// What the step changed, and the learnings it proposed, go to the Space.
-			await hold?.done();
+			await known?.done();
 		}
 	}
 
@@ -473,17 +401,16 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return;
 		}
 		// The knowledge as the Space has it now, before the command reads it.
-		const hold = await holdKnowledge(deps, knowledge);
+		// The sync flows write in its folder.
+		const known =
+			knowledge && deps.knowledge
+				? await deps.knowledge.forCommand(knowledge)
+				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		try {
-			// The sync flows write here. A folder that cannot be made is left out.
-			const known =
-				knowledge && deps.knowledge
-					? await commandKnowledge(deps.knowledge, knowledge).catch(() => ({}))
-					: {};
 			tools = (await deps.toolLaunchers?.forCommand()) ?? null;
 			const env: Record<string, string> = {
-				...known,
+				...known?.env,
 				...command.env,
 				...tools?.env,
 				...found.env,
@@ -499,7 +426,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		} finally {
 			await tools?.cleanup();
 			// What the command changed, a sync's files, go to the Space.
-			await hold.done();
+			await known?.done();
 		}
 	}
 

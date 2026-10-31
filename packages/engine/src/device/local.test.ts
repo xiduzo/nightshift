@@ -9,7 +9,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 
-import { createKnowledgeFolders, createKnowledgeSearch } from "../knowledge";
+import { testKnowledge } from "../testing/knowledge";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";
 import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
@@ -30,7 +30,10 @@ let sandbox: Sandbox;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 });
+/** The knowledge search indexes a test opened. */
+const closes: (() => void)[] = [];
 afterEach(async () => {
+	for (const close of closes.splice(0)) close();
 	await sandbox.cleanup();
 });
 
@@ -397,9 +400,10 @@ describe("session", () => {
 describe("the project's knowledge", () => {
 	test("a session gets the folder when it has files, or when the node asks; never when it is off", async () => {
 		const harness = fakeHarness();
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const { knowledge, folder: folderOf, close } = testKnowledge(sandbox);
+		closes.push(close);
 		const d = device({ harnesses: { "claude-code": harness }, knowledge });
-		const folder = knowledge.folder("p1");
+		const folder = folderOf("p1");
 		await collect(d.session(sessionInput({ knowledge: { projectId: "p1" } })));
 		await collect(
 			d.session(sessionInput({ knowledge: { projectId: "p1", always: true } })),
@@ -430,18 +434,13 @@ describe("the project's knowledge", () => {
 				{ type: "tool", name: "read_knowledge", input: { path: "wiki/a.md" } },
 			],
 		});
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
-		const knowledgeSearch = createKnowledgeSearch(sandbox.dataDir);
+		const { knowledge, folder, close } = testKnowledge(sandbox);
 		try {
 			await Bun.write(
-				join(knowledge.folder("p1"), "wiki/a.md"),
+				join(folder("p1"), "wiki/a.md"),
 				"# Animals\n\nThe quokka lives here.\n",
 			);
-			const d = device({
-				harnesses: { "claude-code": harness },
-				knowledge,
-				knowledgeSearch,
-			});
+			const d = device({ harnesses: { "claude-code": harness }, knowledge });
 			const events = await collect(
 				d.session(sessionInput({ knowledge: { projectId: "p1" } })),
 			);
@@ -467,7 +466,7 @@ describe("the project's knowledge", () => {
 			expect(off?.tools).toBeUndefined();
 			expect(off?.toolsInstruction).toBeUndefined();
 		} finally {
-			knowledgeSearch.close();
+			close();
 		}
 	});
 
@@ -482,8 +481,9 @@ describe("the project's knowledge", () => {
 			},
 		};
 		const harness = fakeHarness({ steps: [learned] });
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
-		await Bun.write(join(knowledge.folder("p1"), "a.md"), "# A\n");
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
+		await Bun.write(join(folder("p1"), "a.md"), "# A\n");
 		const d = device({ harnesses: { "claude-code": harness }, knowledge });
 		const forStep = {
 			knowledge: { projectId: "p1" },
@@ -500,32 +500,34 @@ describe("the project's knowledge", () => {
 		expect(first?.stepReport).toEqual({ learnings: true });
 		expect(off?.stepReport).toBe(true);
 		const proposed = await Bun.file(
-			join(knowledge.folder("p1"), "learnings/proposed/run-1.md"),
+			join(folder("p1"), "learnings/proposed/run-1.md"),
 		).text();
 		expect(proposed).toStartWith("# Learnings of run run-1\n");
 		expect(
 			proposed.split("\n").filter((line) => line.startsWith("- ")),
 		).toEqual(["- The tests need a database.", "- The tests need a database."]);
-		expect(await knowledge.proposed("p1")).toBe(2);
 		// The index lists accepted learnings only.
-		await knowledge.index("p1");
-		expect(
-			await Bun.file(join(knowledge.folder("p1"), "INDEX.md")).text(),
-		).not.toContain("learnings/proposed");
+		expect(await Bun.file(join(folder("p1"), "INDEX.md")).text()).not.toContain(
+			"learnings/proposed",
+		);
 	});
 
 	test("a step holds the project's folder from its start to its end, also when it fails to start", async () => {
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
 		const seen: string[] = [];
-		const knowledgeSync = {
-			startStep: async (projectId: string) => {
+		const knowledge = {
+			forCommand: async ({ projectId }: { projectId: string }) => {
 				seen.push(`start ${projectId}`);
-				return { done: async () => void seen.push(`done ${projectId}`) };
+				return {
+					env: { NS_KNOWLEDGE: "/k" },
+					done: async () => void seen.push(`done ${projectId}`),
+				};
 			},
-			read: async () => null,
+			forSession: async () => {
+				throw new Error("Not a session.");
+			},
 		};
 		await collect(
-			device({ knowledge, knowledgeSync }).exec({
+			device({ knowledge }).exec({
 				command: "echo writing",
 				cwd: sandbox.repoPath,
 				knowledge: { projectId: "p1" },
@@ -535,7 +537,6 @@ describe("the project's knowledge", () => {
 		expect(seen).toEqual(["start p1", "done p1"]);
 		const broken = device({
 			knowledge,
-			knowledgeSync,
 			toolLaunchers: {
 				prepare: async () => ({ ok: true, ...noTools }),
 				guarded: () => [],
@@ -558,7 +559,8 @@ describe("the project's knowledge", () => {
 	});
 
 	test("a command gets the folder in NS_KNOWLEDGE, made for it", async () => {
-		const knowledge = createKnowledgeFolders(sandbox.dataDir);
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
 		const events = await collect(
 			device({ knowledge }).exec({
 				command: 'test -d "$NS_KNOWLEDGE" && printf "%s" "$NS_KNOWLEDGE"',
@@ -570,7 +572,7 @@ describe("the project's knowledge", () => {
 		expect(events[0]).toEqual({
 			type: "output",
 			stream: "stdout",
-			text: knowledge.folder("p1"),
+			text: folder("p1"),
 		});
 	});
 });

@@ -76,22 +76,19 @@ export {
 export type { WalkFile, WalkRef } from "./graph";
 export {
 	createKnowledgeDocuments,
-	createKnowledgeFolders,
 	createKnowledgeSearch,
 	createKnowledgeStore,
-	createKnowledgeSync,
+	createProjectKnowledge,
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeDocuments,
 	type KnowledgeFile,
-	type KnowledgeFolders,
 	type KnowledgeHit,
 	type KnowledgeHost,
-	type KnowledgeListing,
 	type KnowledgeSearch,
 	type KnowledgeStore,
-	type KnowledgeSync,
 	type KnowledgeText,
 	LOCAL_ONLY_BYTES,
+	type ProjectKnowledge,
 } from "./knowledge";
 export type {
 	CopyStamp,

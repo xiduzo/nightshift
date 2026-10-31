@@ -17,7 +17,6 @@ import { eq } from "drizzle-orm";
 import type { PersistedDocument } from "../device-config";
 import {
 	isKnowledgePath,
-	isProposal,
 	isReadable,
 	type KnowledgeFile,
 	type KnowledgeFolders,
@@ -31,6 +30,12 @@ import {
 	knowledgeEntries,
 	knowledgeFiles,
 } from "./knowledge-document";
+import {
+	isLearningsFolder,
+	isProposal,
+	isProposalFile,
+	notesIn,
+} from "./learnings";
 import {
 	type KnowledgeStore,
 	LOCAL_ONLY_BYTES,
@@ -467,7 +472,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 
 	return {
 		reconcile,
-		busy,
 		/**
 		 * A step that gets the project's folder starts: the folder is brought
 		 * in step with the Space first, and nothing else reconciles it until
@@ -526,7 +530,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					});
 					continue;
 				}
-				if (!path.endsWith(".md") || path.split("/").length !== 3) continue;
+				if (!isProposalFile(path)) continue;
 				const content = spaceId
 					? await contentOf(spaceId, entry.sha256, host).catch(() => null)
 					: null;
@@ -589,8 +593,9 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		 * folder's files here at once. Returns how many files it removed.
 		 */
 		async removeFolder(projectId: string, folder: string): Promise<number> {
-			const prefix = `${folder.replace(/\/+$/, "")}/`;
-			if (!isKnowledgePath(`${prefix}x`) || prefix.startsWith("learnings/")) {
+			const name = folder.replace(/\/+$/, "");
+			const prefix = `${name}/`;
+			if (!isKnowledgePath(`${prefix}x`) || isLearningsFolder(name)) {
 				throw new Refusal(
 					"invalid",
 					"Choose a folder inside the knowledge. learnings is Night Shift's own.",
@@ -748,12 +753,4 @@ async function inTurns<T>(
 	await Promise.all(
 		Array.from({ length: Math.min(limit, items.length) }, worker),
 	);
-}
-
-/** How many notes a proposal holds: one per `- ` line. */
-function notesIn(content: Uint8Array): number {
-	return new TextDecoder()
-		.decode(content)
-		.split("\n")
-		.filter((line) => line.startsWith("- ")).length;
 }

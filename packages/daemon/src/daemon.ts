@@ -18,7 +18,6 @@ import {
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
-	type DevicesRuntime,
 	deviceDirectory,
 	type HostClient,
 	selfDevice,
@@ -30,10 +29,8 @@ import {
 	createArtifactStore,
 	createFlowDocuments,
 	createKnowledgeDocuments,
-	createKnowledgeFolders,
 	createKnowledgeSearch,
-	createKnowledgeStore,
-	createKnowledgeSync,
+	createProjectKnowledge,
 	createToolLaunchers,
 	documentSpace,
 	localDevice,
@@ -385,35 +382,29 @@ export async function createDaemon(
 		(before) => before.stop(),
 	);
 
-	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
-	const knowledge = createKnowledgeFolders(dataDir);
 	/**
-	 * Keyword search over them: this computer's own index, built from the
-	 * folders and never synced. One open index file across reloads.
+	 * Keyword search over the projects' knowledge folders: this computer's
+	 * own index, built from the folders and never synced. One open index
+	 * file across reloads.
 	 */
 	const knowledgeSearch = await slots.keep(
 		"nightshiftKnowledgeSearch",
 		() => createKnowledgeSearch(dataDir),
 		(kept) => kept.close(),
 	);
-	/** The devices runtime, once it is made below: the Hosts of the Spaces. */
-	let devicesRuntime: Pick<DevicesRuntime, "knowledge" | "inStep"> | null =
-		null;
 	/**
-	 * Each folder is a working copy of its Project's knowledge in the
-	 * Space (ADR 4): reconciled before and after each step that gets it,
-	 * and when the Knowledge page reads it. The content travels by hash
-	 * through the Space's Host.
+	 * The projects' knowledge on this computer (`<dataDir>/knowledge`):
+	 * each folder a working copy of its Project's knowledge in the Space
+	 * (ADR 4), in step before and after each step that gets it, and when
+	 * the Knowledge page reads it. The content travels by hash through the
+	 * Space's Host, once the devices runtime below connects it.
 	 */
-	const knowledgeSync = createKnowledgeSync({
+	const knowledge = createProjectKnowledge({
 		db,
-		folders: knowledge,
+		dataDir,
 		documents: knowledgeDocuments,
-		store: createKnowledgeStore(dataDir),
 		deviceId: device.id,
-		host: () => devicesRuntime?.knowledge ?? null,
-		inStep: async (spaceId, names, options) =>
-			devicesRuntime?.inStep(spaceId, names, options),
+		search: knowledgeSearch,
 	});
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
@@ -441,9 +432,6 @@ export async function createDaemon(
 		artifacts: createArtifactStore(dataDir),
 		// The projects' knowledge, outside every repository, in step with the Space.
 		knowledge,
-		knowledgeSync,
-		// Agents that read the knowledge search it with this computer's index.
-		knowledgeSearch,
 		// What each step changed in the run's copy of the project, also by commands.
 		snapshots: true,
 		// A Claude Code session sends its own telemetry while the export is on.
@@ -515,7 +503,7 @@ export async function createDaemon(
 	const { engine } = devices;
 	// The runs this engine walks go to the monitoring while the export is on.
 	telemetry.follow(engine);
-	devicesRuntime = devices;
+	knowledge.connect(devices);
 
 	/**
 	 * The relay's document half: the owner's clients sync this Device's
@@ -619,12 +607,12 @@ export async function createDaemon(
 		"nightshiftKnowledgeTimers",
 		() => {
 			const first = setTimeout(() => {
-				knowledgeSync.reconcileAll().catch((error) => {
+				knowledge.reconcileAll().catch((error) => {
 					console.warn("The knowledge was not brought in step:", error);
 				});
 			}, 15_000);
 			const retry = setInterval(() => {
-				knowledgeSync.retryPending().catch(() => {});
+				knowledge.retryPending().catch(() => {});
 			}, 60_000);
 			first.unref();
 			retry.unref();
@@ -679,7 +667,7 @@ export async function createDaemon(
 			connections,
 		}),
 		checks: programChecks(),
-		knowledge: knowledgeSync,
+		knowledge,
 		knowledgeSearch,
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),

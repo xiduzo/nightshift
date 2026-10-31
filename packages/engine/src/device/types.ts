@@ -201,7 +201,7 @@ export type SessionInput = Omit<
 	/**
 	 * The project whose knowledge folder the session gets on the Device
 	 * that runs it: in `NS_KNOWLEDGE`, and to read with a line that says
-	 * where, when it has files or `always` (`knowledge/handoff.ts`).
+	 * where, when it has files or `always` (`knowledge/project-knowledge.ts`).
 	 * Absent: the node turned it off (`knowledge: false`).
 	 */
 	knowledge?: KnowledgeRequest;

@@ -5,15 +5,15 @@ import { dirname, join } from "node:path";
 import { member } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
-	createKnowledgeDocuments,
-	createKnowledgeFolders,
-	createKnowledgeStore,
-	createKnowledgeSync,
 	type ExecEvent,
 	type KnowledgeHost,
 	localDevice,
 } from "@nightshift/engine";
-import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import {
+	createSandbox,
+	type Sandbox,
+	testKnowledge,
+} from "@nightshift/engine/testing";
 import { kitFlow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
@@ -53,31 +53,35 @@ afterEach(async () => {
 	await Promise.all([a, b, c].map((s) => s.cleanup()));
 });
 
-/** A Replica's knowledge: its folder, document and reconcile, and itself as a Device that runs commands. */
+/** The search indexes the tests opened, closed after each. */
+const closes: (() => void)[] = [];
+afterEach(() => {
+	for (const close of closes.splice(0)) close();
+});
+
+/**
+ * A Replica's knowledge, as the daemon assembles it: its folder, document
+ * and reconcile, connected to `host`, and itself as a Device that runs
+ * commands.
+ */
 function knowledgeOn(sandbox: Sandbox, host: KnowledgeHost) {
-	const folders = createKnowledgeFolders(sandbox.dataDir);
-	const documents = createKnowledgeDocuments({ db: sandbox.db });
-	const sync = createKnowledgeSync({
-		db: sandbox.db,
-		folders,
-		documents,
-		store: createKnowledgeStore(sandbox.dataDir),
-		deviceId: sandbox.deviceId,
-		host: () => host,
+	const { knowledge, documents, folder, close } = testKnowledge(sandbox, {
 		pageWaitMs: 10_000,
 	});
+	closes.push(close);
+	knowledge.connect({ knowledge: host, inStep: async () => {} });
 	const device = localDevice({
 		id: sandbox.deviceId,
 		name: sandbox.deviceId,
 		harnesses: {},
-		knowledge: folders,
-		knowledgeSync: sync,
+		knowledge,
 	});
-	const dir = () => folders.folder(projectId);
+	const dir = () => folder(projectId);
 	return {
-		folders,
 		documents,
-		sync,
+		knowledge,
+		/** The folder in step with the Space, as the Knowledge page asks for it. */
+		reconcile: () => knowledge.listing(projectId),
 		dir,
 		/** A command step on this Device, with the project's knowledge. */
 		async exec(command: string): Promise<ExecEvent[]> {
@@ -155,7 +159,7 @@ describe("knowledge in the Space, across paired Devices", () => {
 
 		await linked(onA, onB, onC);
 		// A run on A, and a command on C: each reconciles before it reads.
-		expect(await onA.sync.reconcile(projectId)).toMatchObject({ written: 1 });
+		await onA.reconcile();
 		const onCRead = await onC.exec('cat "$NS_KNOWLEDGE/wiki/Home.md"');
 		expect(onCRead[0]).toMatchObject({
 			type: "output",
@@ -163,7 +167,7 @@ describe("knowledge in the Space, across paired Devices", () => {
 		});
 		expect(await onA.read("wiki/Home.md")).toBe("# Home\n\nThe wiki.\n");
 		// The Knowledge page on A lists it for any Member.
-		const listing = await onA.sync.listing(projectId);
+		const listing = await onA.reconcile();
 		expect(listing.files.map((f) => f.path)).toEqual(["wiki/Home.md"]);
 	});
 
@@ -175,14 +179,15 @@ describe("knowledge in the Space, across paired Devices", () => {
 		const onC = knowledgeOn(c, third.knowledge);
 
 		// An agent's step on B proposed two learnings; its reconcile after the step publishes them.
-		await onB.folders.propose(projectId, "run-1", [
-			"Run the tests with bun.",
-			"The API lives in packages/api.",
-		]);
-		await onB.sync.reconcile(projectId);
+		await put(
+			onB.dir(),
+			"learnings/proposed/run-1.md",
+			"# Learnings of run run-1\n\n- Run the tests with bun.\n- The API lives in packages/api.\n",
+		);
+		await onB.reconcile();
 		await linked(onA, onB, onC);
 		// The Knowledge page on A counts them.
-		expect((await onA.sync.listing(projectId)).proposed).toBe(2);
+		expect((await onA.reconcile()).proposed).toBe(2);
 
 		// The review runs on C: the kit's own Keep command, unchanged.
 		const kit = kitFlow("kit:knowledge/review-learnings");
@@ -195,37 +200,37 @@ describe("knowledge in the Space, across paired Devices", () => {
 		expect(await onC.has("learnings/proposed/run-1.md")).toBe(false);
 
 		await linked(onA, onB, onC);
-		await onB.sync.reconcile(projectId);
-		await onA.sync.reconcile(projectId);
+		await onB.reconcile();
+		await onA.reconcile();
 		for (const knowledge of [onA, onB]) {
 			expect(await knowledge.has("learnings/proposed/run-1.md")).toBe(false);
 			expect(await knowledge.read("learnings/accepted/run-1.md")).toContain(
 				"- Run the tests with bun.\n- The API lives in packages/api.\n",
 			);
 		}
-		expect((await onA.sync.listing(projectId)).proposed).toBe(0);
+		expect((await onA.reconcile()).proposed).toBe(0);
 	});
 
 	test("a Device that cannot reach its Host works on its own copy; its change reaches the others when the Host is back", async () => {
 		const onA = hostKnowledge();
 		const onB = knowledgeOn(b, paired.knowledge);
 		await put(onB.dir(), "notes.md", "first\n");
-		await onB.sync.reconcile(projectId);
+		await onB.reconcile();
 		await linked(onA, onB);
-		await onA.sync.reconcile(projectId);
+		await onA.reconcile();
 
 		paired.memory.down();
 		await put(onB.dir(), "notes.md", "written offline\n");
 		// The step goes on: its change waits for the Host.
-		expect(await onB.sync.reconcile(projectId)).toMatchObject({
-			published: 1,
-			unpushed: 1,
-		});
-
-		paired.memory.up();
-		await onB.sync.reconcile(projectId);
+		await onB.reconcile();
 		await linked(onA, onB);
-		expect(await onA.sync.reconcile(projectId)).toMatchObject({ written: 1 });
+		await onA.reconcile();
+		expect(await onA.read("notes.md")).toBe("first\n");
+
+		// The retry each minute copies what waited.
+		paired.memory.up();
+		await onB.knowledge.retryPending();
+		await onA.reconcile();
 		expect(await onA.read("notes.md")).toBe("written offline\n");
 	});
 

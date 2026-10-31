@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import {
-	appendFile,
 	lstat,
 	mkdir,
 	open,
@@ -21,6 +20,7 @@ import {
 	loadDocumentContent,
 	textOf,
 } from "./documents";
+import { isProposal } from "./learnings";
 import { LOCAL_ONLY_BYTES } from "./store";
 
 /**
@@ -39,9 +39,8 @@ import { LOCAL_ONLY_BYTES } from "./store";
  * files into a prompt: the agent reads `INDEX.md`, then searches or greps.
  * A PDF or Word file shows with the title and first sentence of its text.
  *
- * `learnings/` is Night Shift's own: what agents proposed to learn wait in
- * `learnings/proposed/` until a person accepts them into
- * `learnings/accepted/`. The index lists the accepted ones only.
+ * `learnings/` is Night Shift's own (`learnings.ts`): the index lists the
+ * learnings a person kept, never the proposals that wait.
  *
  * Which files count, and how one is read, is decided here once: the
  * reconcile, `INDEX.md`, the search index and every read take the same
@@ -81,8 +80,6 @@ export type KnowledgeText = {
 
 /** The file Night Shift writes at the top of the folder. */
 export const INDEX_FILE = "INDEX.md";
-/** The proposals that wait for a person: never in the index. */
-export const PROPOSED_DIR = "learnings/proposed";
 /**
  * What the sync kits name a file or folder while they write it, before a
  * rename makes it whole (`$dest.part`, `page.md.part`): never knowledge.
@@ -118,11 +115,6 @@ export function isKnowledgePath(path: string): boolean {
 			(part) =>
 				part !== "" && !part.startsWith(".") && !part.endsWith(STAGING_SUFFIX),
 		);
-}
-
-/** Whether a path is a proposal that waits for a person. */
-export function isProposal(path: string): boolean {
-	return path === PROPOSED_DIR || path.startsWith(`${PROPOSED_DIR}/`);
 }
 
 /**
@@ -176,46 +168,6 @@ export function createKnowledgeFolders(dataDir: string) {
 				.filter((entry) => entry.isDirectory() && isId(entry.name))
 				.map((entry) => entry.name)
 				.sort();
-		},
-		/**
-		 * Adds what an agent of the run proposes to learn to
-		 * `learnings/proposed/<runId>.md`, one note per line, for a person
-		 * to accept or reject (`kit:knowledge/review-learnings`).
-		 */
-		async propose(
-			projectId: string,
-			runId: string,
-			notes: readonly string[],
-		): Promise<void> {
-			const lines = notes
-				.map((note) => note.replace(/\s+/g, " ").trim())
-				.filter((note) => note !== "");
-			if (lines.length === 0) return;
-			const dir = join(folder(projectId), PROPOSED_DIR);
-			await mkdir(dir, { recursive: true });
-			const file = join(dir, `${folderName(runId)}.md`);
-			const isNew = (await stat(file).catch(() => null)) === null;
-			const head = isNew
-				? `# Learnings of run ${runId.slice(0, 8)}\n\nWhat the agents of run ${runId} proposed to learn about this project.\n\n`
-				: "";
-			await appendFile(
-				file,
-				`${head}${lines.map((line) => `- ${line}`).join("\n")}\n`,
-			);
-		},
-		/** How many notes wait for a person in `learnings/proposed/`. */
-		async proposed(projectId: string): Promise<number> {
-			const dir = join(folder(projectId), PROPOSED_DIR);
-			const names = await readdir(dir).catch(() => [] as string[]);
-			let count = 0;
-			for (const name of names) {
-				if (!name.endsWith(".md")) continue;
-				const text = await readFile(join(dir, name), "utf8").catch(() => "");
-				count += text
-					.split("\n")
-					.filter((line) => line.startsWith("- ")).length;
-			}
-			return count;
 		},
 		/**
 		 * The files a person or an agent reads (`isReadable`), by path, at
