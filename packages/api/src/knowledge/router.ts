@@ -16,6 +16,7 @@ import { runSummarySchema } from "../runs";
 import {
 	type KnowledgeView,
 	knowledgeHitSchema,
+	knowledgeMeaningSchema,
 	knowledgeSchema,
 	knowledgeTextSchema,
 } from "./schemas";
@@ -174,14 +175,16 @@ export const knowledge = {
 		),
 	/**
 	 * The files of a project's knowledge on this computer that best match
-	 * the words, best first, each with an excerpt. Keyword search (BM25):
-	 * every word must match, else some of them. "a phrase" in quotes keeps
-	 * its words together, and a word ending in `*` matches as a prefix.
+	 * the words, best first, each at its best section with an excerpt. By
+	 * keyword (BM25): every word must match, else some of them. "a phrase"
+	 * in quotes keeps its words together, and a word ending in `*` matches
+	 * as a prefix. By meaning too, when Ollama on this computer has the
+	 * embedding model: both lists are fused by reciprocal rank.
 	 */
 	search: protectedProcedure
 		.route({
 			summary:
-				"Searches the files of a project's knowledge on this computer by keyword, best match first.",
+				"Searches the files of a project's knowledge on this computer by keyword, and by meaning when it can, best match first.",
 		})
 		.output(output(z.array(knowledgeHitSchema)))
 		.input(
@@ -196,6 +199,21 @@ export const knowledge = {
 			return context.knowledgeSearch.search(input.projectId, input.query, {
 				...(input.limit !== undefined ? { limit: input.limit } : {}),
 			});
+		}),
+	/**
+	 * Whether search by meaning works for the project on this computer:
+	 * off, waiting for Ollama or its model, preparing, or on.
+	 */
+	meaning: protectedProcedure
+		.route({
+			summary:
+				"Says whether knowledge search finds by meaning on this computer, and how far its preparation is.",
+		})
+		.output(output(knowledgeMeaningSchema))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return context.knowledgeSearch.meaning(input.projectId);
 		}),
 	/**
 	 * One file of a project's knowledge, by its path: this computer's copy,

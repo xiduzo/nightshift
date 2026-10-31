@@ -1,6 +1,7 @@
 import type {
 	KnowledgeFile,
 	KnowledgeHit,
+	KnowledgeMeaningStatus,
 	KnowledgeText,
 } from "@nightshift/engine";
 import { knowledgeSourceSchema } from "@nightshift/flows";
@@ -66,10 +67,35 @@ export const knowledgeHitSchema = exact<KnowledgeHit>()(
 		/** Relative to the folder, with `/` between its parts. */
 		path: z.string(),
 		title: z.string(),
-		/** A short excerpt around the best match. `match` parts are the words found. */
+		/** The heading of the section the hit is in. Null: no heading above it. */
+		section: z.string().nullable(),
+		/** The line where that section starts, from 1: of the file, or of its page. */
+		line: z.number(),
+		/** The page of a PDF that section is on, from 1. Null: the file has no pages. */
+		page: z.number().nullable(),
+		/** A short excerpt of the section. `match` parts are the words found. */
 		snippet: z.array(z.object({ text: z.string(), match: z.boolean() })),
 		/** How well it matches: higher is better, within one search. */
 		score: z.number(),
+		/** How the search found it: by its words, by its meaning, or both. */
+		found: z.array(z.enum(["words", "meaning"])),
+	}),
+);
+
+/** Whether search by meaning works for a project on this computer. */
+export const knowledgeMeaningSchema = exact<KnowledgeMeaningStatus>()(
+	z.object({
+		/**
+		 * `off`: no model is set up. `no-ollama`: Ollama does not answer.
+		 * `no-model`: Ollama does not have the model. `preparing`: the first
+		 * vectors are on their way. `on`: search finds by meaning.
+		 */
+		state: z.enum(["off", "no-ollama", "no-model", "preparing", "on"]),
+		/** The embedding model. Null when it is off. */
+		model: z.string().nullable(),
+		/** Sections with a vector, of `total`. */
+		done: z.number(),
+		total: z.number(),
 	}),
 );
 

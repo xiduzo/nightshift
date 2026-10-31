@@ -1,6 +1,6 @@
 /**
- * The knowledge tools: keyword search over a project's knowledge on this
- * computer (`search_knowledge`), and reading one file of it
+ * The knowledge tools: search over a project's knowledge on this computer,
+ * by keyword and by meaning when it can (`search_knowledge`), and reading one file of it
  * (`read_knowledge`). The knowledge is the files besides the code that
  * agents read: a wiki, web pages, work items, PDF and Word files.
  *
@@ -21,13 +21,21 @@ export const KNOWLEDGE_TOOLS = {
 } as const;
 
 /** What an Agent step is told when it gets the knowledge tools. */
-export const KNOWLEDGE_TOOLS_INSTRUCTION = `To find something in the project knowledge, call \`${KNOWLEDGE_TOOLS.searchKnowledge}\` with a few keywords. It finds files by their words, PDF and Word files too. Then read a file it gives with \`${KNOWLEDGE_TOOLS.readKnowledge}\`.`;
+export const KNOWLEDGE_TOOLS_INSTRUCTION = `To find something in the project knowledge, call \`${KNOWLEDGE_TOOLS.searchKnowledge}\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`${KNOWLEDGE_TOOLS.readKnowledge}\`.`;
 
-/** A file a search found. `match` parts of the excerpt are the words found. */
+/** A file a search found, at its best section. `match` parts of the excerpt are the words found. */
 export type KnowledgeToolHit = {
 	path: string;
 	title: string;
+	/** The heading of the section. Null or absent: none. */
+	section?: string | null;
+	/** The line where the section starts, from 1: of the file, or of its page. */
+	line?: number;
+	/** The page of a PDF the section is on. */
+	page?: number | null;
 	snippet: { text: string; match: boolean }[];
+	/** How the search found it. Only by meaning: the excerpt has no bold words. */
+	found?: ("words" | "meaning")[];
 };
 
 /** One file of the knowledge, its text cut at the size asked for. */
@@ -119,7 +127,7 @@ export function knowledgeTools(
 		toolDefinition({
 			name: KNOWLEDGE_TOOLS.searchKnowledge,
 			description:
-				"Search the project's knowledge by keyword: the files besides the code that agents read, such as a wiki, web pages, work items, PDF and Word files. Returns the best files first, each with its path, title and an excerpt with the words found in bold. Every word must match, else some of them. Keep a phrase together in quotes. End a word with * to match its start. Read a whole file with read_knowledge.",
+				"Search the project's knowledge: the files besides the code that agents read, such as a wiki, web pages, work items, PDF and Word files. It finds by keyword, and also by meaning when this computer can, so a question in other words finds an answer too. Returns the best files first, each with its path, title, the section (its heading and line, and page for a PDF) and an excerpt with the words found in bold. Every word must match, else some of them. Keep a phrase together in quotes. End a word with * to match its start. Read a whole file with read_knowledge.",
 			inputSchema: {
 				type: "object",
 				properties: withProject({
@@ -158,6 +166,12 @@ export function knowledgeTools(
 				hits.map((hit) => ({
 					path: hit.path,
 					title: hit.title,
+					...(hit.section ? { section: hit.section } : {}),
+					...(hit.page ? { page: hit.page } : {}),
+					...(hit.line !== undefined && hit.line > 1 ? { line: hit.line } : {}),
+					...(hit.found?.length === 1 && hit.found[0] === "meaning"
+						? { foundBy: "meaning" }
+						: {}),
 					excerpt: excerpt(hit),
 				})),
 				null,

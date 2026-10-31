@@ -36,6 +36,7 @@ import {
 	createSyncedDocuments,
 	createToolLaunchers,
 	localDevice,
+	ollamaMeaning,
 } from "@nightshift/engine";
 import {
 	openConfigStores,
@@ -383,13 +384,14 @@ export async function createDaemon(
 	);
 
 	/**
-	 * Keyword search over the projects' knowledge folders: this computer's
-	 * own index, built from the folders and never synced. One open index
-	 * file across reloads.
+	 * Search over the projects' knowledge folders: this computer's own
+	 * index, built from the folders and never synced. By words, and by
+	 * meaning when Ollama on this computer has the embedding model. One
+	 * open index file across reloads.
 	 */
 	const knowledgeSearch = await slots.keep(
 		"nightshiftKnowledgeSearch",
-		() => createKnowledgeSearch(dataDir),
+		() => createKnowledgeSearch(dataDir, { meaning: ollamaMeaning() }),
 		(kept) => kept.close(),
 	);
 	/**

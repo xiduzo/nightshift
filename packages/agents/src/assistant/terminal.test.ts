@@ -517,7 +517,7 @@ describe("the run tools of nightshift mcp", () => {
 });
 
 describe("the knowledge tools", () => {
-	test("search_knowledge gives the paths, titles and excerpts in the folder's project", async () => {
+	test("search_knowledge gives the paths, titles, sections and excerpts in the folder's project", async () => {
 		const asked: unknown[] = [];
 		const { call } = await connect(
 			fakePort({
@@ -532,6 +532,15 @@ describe("the knowledge tools", () => {
 								{ text: "deploy", match: true },
 								{ text: " at night.", match: false },
 							],
+						},
+						{
+							path: "docs/handbook.pdf",
+							title: "Handbook",
+							section: "Releases",
+							line: 4,
+							page: 7,
+							snippet: [{ text: "Ship when the tests pass.", match: false }],
+							found: ["meaning"],
 						},
 					];
 				},
@@ -548,6 +557,15 @@ describe("the knowledge tools", () => {
 				path: "wiki/deploy.md",
 				title: "Deploy",
 				excerpt: "We **deploy** at night.",
+			},
+			{
+				path: "docs/handbook.pdf",
+				title: "Handbook",
+				section: "Releases",
+				page: 7,
+				line: 4,
+				foundBy: "meaning",
+				excerpt: "Ship when the tests pass.",
 			},
 		]);
 		expect(asked).toEqual([{ projectId: "p2", query: "deploy", limit: 50 }]);

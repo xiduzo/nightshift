@@ -221,7 +221,7 @@ describe("PDF and Word files", () => {
 		await writeFile(join(dir, path), bytes);
 	};
 
-	test("are found by the words of their text, with a title", async () => {
+	test("are found by the words of their text, with a title and the page", async () => {
 		await putBytes(
 			"docs/release.pdf",
 			tinyPdf(["Release checklist", "We ship the quokka service on Fridays."]),
@@ -234,9 +234,11 @@ describe("PDF and Word files", () => {
 		expect(pdf?.path).toBe("docs/release.pdf");
 		expect(pdf?.title).toBe("Release checklist");
 		expect(snippet(pdf)).toContain("[quokka]");
+		expect(pdf?.page).toBe(1);
 		const [docx] = await search.search("p1", "wombat");
 		expect(docx?.path).toBe("docs/onboarding.docx");
 		expect(docx?.title).toBe("Onboarding guide");
+		expect(docx?.page).toBeNull();
 	});
 
 	test("one that does not open is found by its path", async () => {

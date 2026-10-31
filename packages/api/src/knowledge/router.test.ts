@@ -63,11 +63,21 @@ function context(personId: string, role: Role = "member") {
 							{
 								path: "wiki/deploy.md",
 								title: "Deploy",
+								section: "Rolling updates",
+								line: 12,
+								page: null,
 								snippet: [{ text: "deploy", match: true }],
-								score: 1.5,
+								score: 0.0328,
+								found: ["words", "meaning"],
 							},
 						]
 					: [],
+			meaning: async () => ({
+				state: "preparing",
+				model: "qwen3-embedding:0.6b",
+				done: 3,
+				total: 10,
+			}),
 		},
 	});
 }
@@ -216,12 +226,32 @@ describe("knowledge.search and knowledge.read", () => {
 			{ context: context("viewer", "viewer") },
 		);
 		expect(hits.map((h) => h.path)).toEqual(["wiki/deploy.md"]);
+		expect(hits[0]).toMatchObject({
+			section: "Rolling updates",
+			line: 12,
+			found: ["words", "meaning"],
+		});
 		await expect(
 			call(
 				appRouter.knowledge.search,
 				{ projectId: "p9", query: "x" },
 				{ context: context("viewer", "viewer") },
 			),
+		).rejects.toBeInstanceOf(ORPCError);
+	});
+
+	test("meaning says whether search finds by meaning on this computer, and refuses another project", async () => {
+		const ctx = context("viewer", "viewer");
+		expect(
+			await call(appRouter.knowledge.meaning, { projectId }, { context: ctx }),
+		).toEqual({
+			state: "preparing",
+			model: "qwen3-embedding:0.6b",
+			done: 3,
+			total: 10,
+		});
+		await expect(
+			call(appRouter.knowledge.meaning, { projectId: "p9" }, { context: ctx }),
 		).rejects.toBeInstanceOf(ORPCError);
 	});
 

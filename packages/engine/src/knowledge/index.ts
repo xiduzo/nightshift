@@ -16,6 +16,7 @@ export {
 	type KnowledgeDocuments,
 } from "./knowledge-document";
 export { isLearningsFolder } from "./learnings";
+export { ollamaMeaning } from "./meaning";
 export {
 	createProjectKnowledge,
 	type KnowledgeRequest,
@@ -24,5 +25,6 @@ export {
 export {
 	createKnowledgeSearch,
 	type KnowledgeHit,
+	type KnowledgeMeaningStatus,
 	type KnowledgeSearch,
 } from "./search";

@@ -97,9 +97,11 @@ export {
 	type KnowledgeDocuments,
 	type KnowledgeFile,
 	type KnowledgeHit,
+	type KnowledgeMeaningStatus,
 	type KnowledgeSearch,
 	type KnowledgeText,
 	LOCAL_ONLY_BYTES,
+	ollamaMeaning,
 	type ProjectKnowledge,
 } from "./knowledge";
 export { knowledgeSources } from "./knowledge-sources";
