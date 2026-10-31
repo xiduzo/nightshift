@@ -14,3 +14,15 @@ export type RunStatus =
 	| "stopped" // a person stopped the run
 	| "failed" // a step errored, a `fail`/`needs-input` had no edge, or a loop hit its max
 	| "interrupted"; // the daemon died while a step ran
+
+/** The statuses of a run that ended before its end: a person may ask why. */
+const ENDED_EARLY: ReadonlySet<RunStatus> = new Set([
+	"failed",
+	"stopped",
+	"interrupted",
+]);
+
+/** Whether the run ended before its end (failed, stopped or interrupted): "Ask why" explains it. */
+export function endedEarly(status: RunStatus): boolean {
+	return ENDED_EARLY.has(status);
+}

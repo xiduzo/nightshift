@@ -12,6 +12,7 @@ export {
 	chatCanUseTools,
 	chatTurn,
 	chooseProject,
+	explainRun,
 	resumesOnAnotherModel,
 	type SuggestFieldInput,
 	serveTools,

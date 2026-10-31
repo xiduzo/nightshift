@@ -13,6 +13,7 @@ export {
 	chatRequestSchema,
 	citedStepId,
 	diffFlows,
+	type ExplanationEvent,
 	type FlowDiff,
 	type FlowDiffSummary,
 	type FlowProposal,

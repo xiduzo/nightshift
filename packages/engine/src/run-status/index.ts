@@ -19,4 +19,4 @@ export {
 	whyNot,
 } from "./actions";
 export { finishedShare } from "./share";
-export type { RunResult, RunStatus } from "./status";
+export { endedEarly, type RunResult, type RunStatus } from "./status";

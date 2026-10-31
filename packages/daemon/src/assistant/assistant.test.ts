@@ -12,9 +12,11 @@ import type {
 	AgentProfileSettings,
 	ChatEvent,
 	ChatRequest,
+	ExplanationEvent,
 	SuggestionEvent,
 	SuggestionRequest,
 } from "@nightshift/flows";
+import { flowSchema } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { call } from "@orpc/server";
 
@@ -24,6 +26,7 @@ import {
 	createAssistant,
 	NO_CLONE,
 	NO_PROFILE,
+	NOT_ENDED_EARLY,
 	pickAgent,
 } from "./assistant";
 import { type ChatSpace, chatRun } from "./authoring";
@@ -636,5 +639,149 @@ describe("chatRun", () => {
 		const signal = new AbortController().signal;
 		expect(await chatRun(space(), "p2", "r1", { signal })).toBeNull();
 		expect(await chatRun(space(), "p1", "nope", { signal })).toBeNull();
+	});
+});
+
+describe("assistant.explain", () => {
+	const failed = {
+		id: "r1",
+		projectId: "p1",
+		status: "failed",
+		reason: "The step `test` failed.",
+		inputs: {},
+		flow: flowSchema.parse(withTests),
+		steps: [
+			{
+				id: "s2",
+				nodeId: "test",
+				nodeType: "command",
+				visit: 1,
+				outcome: "fail",
+				error: null,
+				outputs: {},
+			},
+		],
+	};
+	const runSpace = (run: typeof failed) => () => ({
+		flows: { map: async () => ({}) },
+		getRun: async (id: string) => {
+			if (id !== run.id) throw new Error("No such run");
+			return run as never;
+		},
+		watchRun: async function* () {
+			yield {
+				kind: "transcript",
+				entry: {
+					seq: 1,
+					stepId: "s2",
+					sessionId: null,
+					at: 1,
+					event: { type: "command-exit", exitCode: 1 },
+				},
+			} as never;
+		},
+		listDevices: async () => [],
+	});
+
+	/** A Person who does not own this computer, with `role` in the run's Space. */
+	function asked(role: "member" | "viewer", assistant: Context["assistant"]) {
+		return testContext({
+			access: accessAs({ personId: "ann", spaceId: "space", role }),
+			daemon: { device: { id: "d", name: "test", ownerId: "owner" } },
+			engine: { spaceOfRun: async () => "space" },
+			assistant,
+		});
+	}
+
+	async function explain(context: Context): Promise<ExplanationEvent[]> {
+		const stream = await call(
+			appRouter.assistant.explain,
+			{ runId: "r1" },
+			{ context, path: ["assistant", "explain"] },
+		);
+		const events: ExplanationEvent[] = [];
+		for await (const event of stream) events.push(event as ExplanationEvent);
+		return events;
+	}
+
+	test("a Member who does not own this computer gets one answer, read only in the Clone", async () => {
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "report",
+					outcome: "",
+					summary: "The **tests** failed. Try the run again.",
+				},
+			],
+		});
+		const events = await explain(
+			asked(
+				"member",
+				createAssistant(
+					deps({ harnessFor: () => harness, space: runSpace(failed) }),
+				),
+			),
+		);
+		expect(events.filter((e) => e.type !== "usage")).toEqual([
+			{ type: "activity", text: "Reads the run" },
+			{ type: "answer", answer: "The tests failed. Try the run again." },
+			{ type: "done" },
+		]);
+		const input = harness.calls[0];
+		expect(input?.cwd).toBe("/repo");
+		expect(input?.readOnly).toBe(true);
+		expect(input?.tools).toBeUndefined();
+		expect(input?.prompt).toContain("Status: failed");
+		expect(input?.prompt).toContain("Exit code: 1");
+		expect(input?.prompt).toContain('Address the person as "you".');
+	});
+
+	test("a viewer may not ask: the answer costs this computer's agent", async () => {
+		const harness = fakeHarness();
+		await expect(
+			explain(
+				asked(
+					"viewer",
+					createAssistant(
+						deps({ harnessFor: () => harness, space: runSpace(failed) }),
+					),
+				),
+			),
+		).rejects.toMatchObject({ code: "FORBIDDEN" });
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("a run that did not stop early has nothing to explain", async () => {
+		const harness = fakeHarness();
+		const events = await explain(
+			asked(
+				"member",
+				createAssistant(
+					deps({
+						harnessFor: () => harness,
+						space: runSpace({ ...failed, status: "finished" }),
+					}),
+				),
+			),
+		);
+		expect(events).toEqual([{ type: "error", message: NOT_ENDED_EARLY }]);
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("a project without a Clone here: the agent works in a folder of its own", async () => {
+		const harness = fakeHarness({
+			steps: [{ type: "report", outcome: "", summary: "Sign in again." }],
+		});
+		const assistant = createAssistant(
+			deps({
+				harnessFor: () => harness,
+				space: runSpace(failed),
+				clonePath: async () => null,
+				ownFolder: async () => "/data/assistant",
+			}),
+		);
+		const events = await explain(asked("member", assistant));
+		expect(events.at(-1)).toEqual({ type: "done" });
+		expect(harness.calls[0]?.cwd).toBe("/data/assistant");
 	});
 });

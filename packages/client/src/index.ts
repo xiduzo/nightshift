@@ -105,6 +105,7 @@ export {
 	sameProgress,
 	waitingText,
 } from "./glance";
+export { createKnowledgeQueries } from "./knowledge";
 export {
 	type EntryFold,
 	type HostApi,
@@ -152,15 +153,20 @@ export {
 	type AgentMessages,
 	type AgentUsage,
 	type Artifact,
+	type AskWhy,
 	actedRunStatus,
 	addsFiles,
 	agoLabel,
 	applyAgentMessages,
+	askWhy,
+	askWhyAnswer,
+	askWhyMutation,
 	type ChangedFile,
 	changedFiles,
 	costLabel,
 	createRunQueries,
 	defaultPlacement,
+	explainRun,
 	type FileChange,
 	type FileTreeNode,
 	fileTree,

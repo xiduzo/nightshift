@@ -1,5 +1,6 @@
 import {
 	type ChatEvent,
+	type ExplanationEvent,
 	flowSchema,
 	type SuggestionEvent,
 	suggestionSchema,
@@ -27,6 +28,14 @@ export const suggestionEventSchema = exact<SuggestionEvent>()(
 	z.discriminatedUnion("type", [
 		...commonEvents,
 		z.object({ type: z.literal("suggestion"), suggestion: suggestionSchema }),
+	]),
+);
+
+/** What an explanation of a run streams: what the agent does, then the answer. */
+export const explanationEventSchema = exact<ExplanationEvent>()(
+	z.discriminatedUnion("type", [
+		...commonEvents,
+		z.object({ type: z.literal("answer"), answer: z.string() }),
 	]),
 );
 

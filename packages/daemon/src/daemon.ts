@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { startPriceUpdates, tanstackDecider } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
@@ -717,6 +718,11 @@ export async function createDaemon(
 			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
 			cliTools,
 			connections,
+			ownFolder: async () => {
+				const folder = join(dataDir, "assistant");
+				await mkdir(folder, { recursive: true });
+				return folder;
+			},
 		}),
 		checks: programChecks(),
 		knowledge,

@@ -1,14 +1,9 @@
-import type { RunStatus } from "@/shared/api";
+import { endedEarly } from "@nightshift/engine/run-status";
 
-/** The run statuses an agent can explain: the run ended before its end. */
-const ENDED_EARLY: ReadonlySet<RunStatus> = new Set([
-	"failed",
-	"stopped",
-	"interrupted",
-]);
+import type { RunStatus } from "./types";
 
 /**
- * Whether "Ask an agent why" shows for a run, and if it works:
+ * "Ask an agent why" on the desktop, and if it works:
  * - `hidden`: the run did not end early, it has no flow file, or its
  *   project is not in the Space you work in.
  * - `disabled`: it shows with the reason it cannot work here.
@@ -19,6 +14,11 @@ export type AskWhy =
 	| { kind: "disabled"; reason: string }
 	| { kind: "ready"; projectId: string; flowName: string };
 
+/**
+ * The chat about the run runs on this computer's own profiles, in its copy
+ * of the project, and may propose a change to the flow: only for the owner
+ * of this computer, for a run of a flow file of a project here.
+ */
 export function askWhy({
 	status,
 	flowName,
@@ -33,7 +33,7 @@ export function askWhy({
 	/** You own this computer. Undefined while that loads. */
 	owner: boolean | undefined;
 }): AskWhy {
-	if (!ENDED_EARLY.has(status) || flowName === null || !project)
+	if (!endedEarly(status) || flowName === null || !project)
 		return { kind: "hidden" };
 	if (owner === false)
 		return {
@@ -48,4 +48,14 @@ export function askWhy({
 		};
 	if (owner === undefined) return { kind: "hidden" };
 	return { kind: "ready", projectId: project.id, flowName };
+}
+
+/**
+ * "Ask why" on the phone: one answer, no chat, from the computer the phone
+ * talks to (`assistant.explain`). It needs no flow file, no copy of the
+ * project here and no ownership, so it shows for every run that ended
+ * early. Your role decides on the server: a viewer gets a refusal.
+ */
+export function askWhyAnswer(status: RunStatus): boolean {
+	return endedEarly(status);
 }

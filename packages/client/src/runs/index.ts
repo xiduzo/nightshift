@@ -7,6 +7,7 @@ export {
 	runActions,
 	whyNot,
 } from "./actions";
+export { type AskWhy, askWhy, askWhyAnswer } from "./ask-why";
 export {
 	addsFiles,
 	type ChangedFile,
@@ -27,6 +28,7 @@ export {
 	type TestSuite,
 	testCountsText,
 } from "./command-output/test-run";
+export { askWhyMutation, explainRun } from "./explain";
 export {
 	agoLabel,
 	costLabel,

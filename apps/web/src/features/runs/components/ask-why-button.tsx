@@ -1,8 +1,8 @@
+import type { AskWhy } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Link } from "@tanstack/react-router";
 import { SparklesIcon } from "lucide-react";
 import { chatAboutRun } from "@/features/flows";
-import type { AskWhy } from "../lib/ask-why";
 
 /**
  * "Ask an agent why": opens the run's flow with a chat about the run. The

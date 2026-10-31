@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { askWhy } from "./ask-why";
+import { askWhy, askWhyAnswer } from "./ask-why";
 
 const project = { id: "p1", repoPath: "/work/app" };
 const base = {
@@ -55,5 +55,21 @@ describe("askWhy", () => {
 
 	test("waits for the owner check before it offers the action", () => {
 		expect(askWhy({ ...base, owner: undefined }).kind).toBe("hidden");
+	});
+});
+
+describe("askWhyAnswer", () => {
+	test("the phone asks for one answer about every run that ended early, and nothing else", () => {
+		for (const status of ["failed", "stopped", "interrupted"] as const) {
+			expect(askWhyAnswer(status)).toBe(true);
+		}
+		for (const status of [
+			"running",
+			"waiting",
+			"sleeping",
+			"finished",
+		] as const) {
+			expect(askWhyAnswer(status)).toBe(false);
+		}
 	});
 });

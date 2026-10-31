@@ -11,6 +11,7 @@ export {
 	chatTurn,
 	resumesOnAnotherModel,
 } from "./chat";
+export { explainRun } from "./explain";
 export { serveTools } from "./mcp";
 export type { ChatExchange } from "./prompts";
 export { type SuggestFieldInput, suggestField } from "./suggest";

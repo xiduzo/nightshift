@@ -24,6 +24,7 @@ const READS_HEADER = "x-nightshift-reads";
 export const STREAMING_PROCEDURES: readonly string[] = [
 	"assistant.suggest",
 	"assistant.chat",
+	"assistant.explain",
 	"runs.watch",
 	"notifications.watch",
 	"devices.join",

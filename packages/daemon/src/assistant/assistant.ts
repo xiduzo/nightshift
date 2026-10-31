@@ -2,6 +2,7 @@ import {
 	type AgentHarness,
 	chatCanUseTools,
 	chatTurn,
+	explainRun,
 	installedSkills,
 	resumesOnAnotherModel,
 	suggestField,
@@ -13,6 +14,7 @@ import type {
 	ProfileStore,
 	SettingsStore,
 } from "@nightshift/engine/device-config";
+import { endedEarly } from "@nightshift/engine/run-status";
 import {
 	type AgentHarnessName,
 	type AssistantAgent,
@@ -20,9 +22,10 @@ import {
 	type AssistantService,
 	type ChatEvent,
 	type ChatRequest,
+	type ExplanationEvent,
 	isAgentProfile,
 } from "@nightshift/flows";
-import { type AuthoringSpace, authoringPort } from "./authoring";
+import { type AuthoringSpace, authoringPort, chatRun } from "./authoring";
 import {
 	type ChatThread,
 	createThreadStore,
@@ -49,6 +52,12 @@ export type AssistantDeps = {
 	skills?: typeof installedSkills;
 	/** The chats. Default: a new store in memory. */
 	threads?: ThreadStore;
+	/**
+	 * An empty folder of the assistant's own, for an explanation of a run
+	 * whose project has no Clone here: the run says most of it. Without
+	 * it, such a run cannot be explained here.
+	 */
+	ownFolder?: () => Promise<string>;
 };
 
 /**
@@ -66,6 +75,14 @@ export const NO_CHAT_PROFILE =
 
 export const NO_CLONE =
 	"This project is not on this computer. Add its folder here, then ask again.";
+
+export const NO_EXPLAIN_PROFILE =
+	"No profile can answer on this computer. Add a profile on the Agents page, with a harness that is installed here.";
+
+export const NOT_ENDED_EARLY =
+	"This run did not stop early, so there is nothing to explain.";
+
+export const NO_RUN = "This run is not in one of your Spaces.";
 
 export const BUSY =
 	"The agent still answers your last message. Wait for it, or stop it first.";
@@ -341,6 +358,51 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				keepExchange(thread, { message: request.message, answer });
 				thread.busy = false;
 			}
+		},
+
+		async *explain(runId, signal, scope): AsyncGenerator<ExplanationEvent> {
+			const space = deps.space(scope);
+			const detail = await space.getRun(runId).catch(() => null);
+			if (!detail) {
+				yield { type: "error", message: NO_RUN };
+				return;
+			}
+			if (!endedEarly(detail.status)) {
+				yield { type: "error", message: NOT_ENDED_EARLY };
+				return;
+			}
+			// Any agent that works here: the explanation needs no tools.
+			const picked = pickAgent({}, deps, { none: NO_EXPLAIN_PROFILE });
+			if ("error" in picked) {
+				yield { type: "error", message: picked.error };
+				return;
+			}
+			const harness = harnessOf(picked, {}, deps);
+			if ("error" in harness) {
+				yield { type: "error", message: harness.error };
+				return;
+			}
+			const cwd =
+				(await deps.clonePath(detail.projectId, scope.spaceId)) ??
+				(await deps.ownFolder?.()) ??
+				null;
+			if (cwd === null) {
+				yield { type: "error", message: NO_CLONE };
+				return;
+			}
+			yield { type: "activity", text: "Reads the run" };
+			const run = await chatRun(space, detail.projectId, runId, { signal });
+			if (!run) {
+				yield { type: "error", message: NO_RUN };
+				return;
+			}
+			yield* explainRun({
+				run,
+				harness,
+				profile: picked.settings,
+				cwd,
+				signal,
+			});
 		},
 	};
 }

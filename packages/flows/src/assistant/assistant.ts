@@ -268,6 +268,12 @@ export type ChatEvent =
 	| { type: "text"; delta: string }
 	| { type: "proposal"; proposal: FlowProposal };
 
+/** What an explanation of a run streams: what the agent does, then one answer. */
+export type ExplanationEvent =
+	| CommonEvent
+	/** The answer, in plain text: what went wrong and what the person can do. */
+	| { type: "answer"; answer: string };
+
 /**
  * Who asks, and in which Space: the chat reads the project's other flows
  * and its runs as this Person sees them in that Space.
@@ -285,4 +291,13 @@ export interface AssistantService {
 		signal: AbortSignal,
 		scope: AssistantScope,
 	): AsyncIterable<ChatEvent>;
+	/**
+	 * Why a run of the Space did not finish, in one short answer, on the
+	 * profile for help. No thread: each call asks again.
+	 */
+	explain(
+		runId: string,
+		signal: AbortSignal,
+		scope: AssistantScope,
+	): AsyncIterable<ExplanationEvent>;
 }

@@ -28,6 +28,7 @@ export {
 	type ChatEvent,
 	type ChatRequest,
 	chatRequestSchema,
+	type ExplanationEvent,
 	type FlowProposal,
 	isFlowSuggestion,
 	type SuggestedOutcome,
