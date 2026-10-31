@@ -29,7 +29,11 @@ import {
 	STILL_RUNNING,
 	WALKED_ELSEWHERE,
 } from "../run-status";
-import { createRecorders, type LeaseTaker } from "./context";
+import {
+	createRecorders,
+	type LeaseTaker,
+	type ServiceRunner,
+} from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
 import { letGo, NO_HOLDS, type RunHolds } from "./holds";
@@ -156,6 +160,8 @@ export type RunnerDeps = {
 	holds?: RunHolds;
 	/** Takes the leases of Lease nodes. Default: none can be taken. */
 	leases?: LeaseTaker;
+	/** Starts and stops the services of Service nodes. Default: none. */
+	services?: ServiceRunner;
 };
 
 /** What a start's Turn prepares once its slot is held: the run row, its inputs and its stop time. */
@@ -303,6 +309,7 @@ export function createRunner(deps: RunnerDeps) {
 		calledFlowsOf: deps.calledFlowsOf,
 		policyFor: deps.policyFor,
 		...(deps.leases ? { leases: deps.leases } : {}),
+		...(deps.services ? { services: deps.services } : {}),
 	};
 	const holds = deps.holds ?? NO_HOLDS;
 	const closeDeps: CloseDeps = {

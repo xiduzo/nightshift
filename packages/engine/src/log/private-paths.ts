@@ -70,6 +70,8 @@ export const PATH_FIELDS = {
 	WaitStarted: [],
 	LeaseTaken: [],
 	LeaseReleased: [],
+	ServiceStarted: ["cwd", "logPath"],
+	ServiceStopped: [],
 	WaitEnded: [],
 	StopRequested: [],
 	StopAfterStepRequested: [],

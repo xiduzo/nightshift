@@ -1,27 +1,56 @@
-import type { HoldSection, Scope } from "./events";
+import type { HoldSection, Scope, ServiceSpec } from "./events";
 import { scopeKey } from "./events";
 
 /**
- * What a run holds for a scope (ADR 7), as its log says: a lease, and
- * later a service (ADR 9). The scope is the run, or a Section of the flow
- * the node is in (`section`). The fold of the run state keeps them
+ * What a run holds for a scope, as its log says: a lease (ADR 7) or a
+ * service (ADR 9). The scope is the run, or a Section of the flow the node
+ * is in (`section`). The fold of the run state keeps them
  * (`RunState.holds`), and the engine lets go of them when the run leaves
  * the scope (`leavingHolds`) and when it ends.
  */
-export type Hold = {
-	kind: "lease";
-	/** The lease's name. */
-	name: string;
+export type Hold = LeaseHold | ServiceHold;
+
+/** What every hold has: the node that took it, and its scope. */
+type HoldBase = {
 	/** The node that took it. */
 	nodeId: string;
 	/** The scope of the flow the node is in. Null at the top level. */
 	scope: Scope | null;
 	/** The Section it holds for. Null: the run. */
 	section: HoldSection | null;
-	ttlMinutes: number;
 	/** When it was taken. */
 	at: number;
 };
+
+export type LeaseHold = HoldBase & {
+	kind: "lease";
+	/** The lease's name. */
+	name: string;
+	ttlMinutes: number;
+};
+
+/** A service that runs (`ServiceStarted`): one per node and scope. */
+export type ServiceHold = HoldBase & {
+	kind: "service";
+	deviceId: string;
+	cwd: string;
+	logPath: string;
+	pid: number | null;
+	startedAt: string | null;
+	spec: ServiceSpec;
+};
+
+/** Whether two holds are the same service: one node in one scope. */
+export function sameService(
+	hold: Hold,
+	service: { nodeId: string; scope: Scope | null },
+): hold is ServiceHold {
+	return (
+		hold.kind === "service" &&
+		hold.nodeId === service.nodeId &&
+		scopeKey(hold.scope) === scopeKey(service.scope)
+	);
+}
 
 /** A step that routes on: what it ended in, and the edges it takes. */
 export type ScopeExit = {

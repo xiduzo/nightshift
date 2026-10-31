@@ -19,6 +19,7 @@ import { compileFlow } from "../graph/compile";
 import {
 	createRecorders,
 	type LeaseTaker,
+	type ServiceRunner,
 	type StepContext,
 } from "../graph/context";
 import { resolvePolicy } from "../graph/policy";
@@ -180,6 +181,8 @@ export type StartOptions = {
 	knowledge?: TestDeviceDeps["knowledge"];
 	/** Takes the leases of Lease nodes; default: none can be taken. */
 	leases?: LeaseTaker;
+	/** Starts and stops the services of Service nodes; default: none. */
+	services?: ServiceRunner;
 };
 
 let runs = 0;
@@ -253,6 +256,7 @@ export async function startRun(
 		// The flow's own numbers, else the built-in settings: as the engine does.
 		policyFor: (f) => resolvePolicy(f.policy, defaultRunSettings().policy),
 		...(options.leases ? { leases: options.leases } : {}),
+		...(options.services ? { services: options.services } : {}),
 	};
 	const thread = openThread(row, deps);
 	const { ctx, saver } = thread;

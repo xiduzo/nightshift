@@ -62,6 +62,8 @@ export const PERSON_FIELDS = {
 	WaitStarted: [],
 	LeaseTaken: [],
 	LeaseReleased: [],
+	ServiceStarted: [],
+	ServiceStopped: [],
 	WaitEnded: [],
 	StopRequested: [],
 	StopAfterStepRequested: [],

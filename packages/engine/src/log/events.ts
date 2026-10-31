@@ -113,6 +113,23 @@ export type WaitReason =
 /** The Section a lease holds for (`LeaseTaken.section`): its id, and every node in it. */
 export type HoldSection = { id: string; nodes: readonly string[] };
 
+/**
+ * A service as its node rendered it (ADR 9): the commands get their
+ * template values as environment variables (`env`), and the Device adds
+ * the `secrets` by name. What a resume starts again and what stops it.
+ */
+export type ServiceSpec = {
+	start: string;
+	/** Ready when this command exits 0, or when this URL answers 2xx. */
+	ready: { command: string } | { url: string };
+	everySeconds: number;
+	timeoutMinutes: number;
+	/** Null: the engine ends the process group. */
+	stop: string | null;
+	env: Record<string, string>;
+	secrets?: string[];
+};
+
 /** The lease a Lease node waits for (`WaitStarted.lease`). */
 export type LeaseWait = {
 	name: string;
@@ -501,6 +518,43 @@ export type EnginePayloads = {
 	 * did not hear from this Device for its ttl.
 	 */
 	LeaseReleased: { name: string; why: "scope" | "person" | "expired" };
+	/**
+	 * A Service node's step started its service (ADR 9): a process that
+	 * runs in the background on the step's Device until the run leaves the
+	 * scope. Logged on the step, before the probe says it is ready, so the
+	 * engine can stop it whatever happens next. `spec` holds what a resume
+	 * runs again and what stops it. A run that resumes starts its services
+	 * again: then on no step, with `again`.
+	 */
+	ServiceStarted: {
+		nodeId: string;
+		/** The scope of the flow the node is in. Null at the top level. */
+		scope: Scope | null;
+		/** The Section the service lives for, with every node in it. Absent: the run. */
+		section?: HoldSection;
+		/** The Device the service runs on. */
+		deviceId: string;
+		/** Where it runs: the run's worktree on that Device. */
+		cwd: string;
+		/** The service's log, on the computer that walks the run. */
+		logPath: string;
+		/** The process id, which is its process group's too. Null: the Device did not say. */
+		pid: number | null;
+		/** When the process started, as `ps -o lstart=` says: a stop after a restart checks it. */
+		startedAt: string | null;
+		spec: ServiceSpec;
+		/** A resumed run started the service again. */
+		again?: true;
+	};
+	/**
+	 * The run stopped a service before its end. `scope`: it left the
+	 * service's Section. `failed`: the service did not get ready.
+	 */
+	ServiceStopped: {
+		nodeId: string;
+		scope: Scope | null;
+		why: "scope" | "failed";
+	};
 	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
 	WaitEnded: { early: boolean; signal?: string };
 	StopRequested: Record<string, never>;

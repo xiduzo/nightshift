@@ -84,6 +84,7 @@ import {
 	type WebhookAnswer,
 	type WebhookRequest,
 } from "../schedules";
+import { createServiceKeeper, serviceHolds } from "../services";
 import { listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
@@ -271,6 +272,8 @@ export interface Engine {
 export type EngineInternals = {
 	/** How long one minute of a node's `timeoutMinutes`, `idleMinutes` or a policy wait lasts. Default 60 000 ms. */
 	minuteMs?: number;
+	/** How long one second of a service's probe (`everySeconds`, `timeoutMinutes`) lasts. Default 1 000 ms. */
+	secondMs?: number;
 	/** The clock for waits and the stop time. Default `Date.now`. */
 	now?: () => number;
 	/** Aborting it clears the engine's wake timers and stops its scheduler: a test's way to let a daemon die. */
@@ -476,8 +479,25 @@ export function createEngine(
 		onLost: (runId, names) => leasesLost({ log: runLog }, runId, names),
 	});
 	leases.start(signal);
+	/** The services of the runs this computer walks (ADR 9). */
+	const services = createServiceKeeper({
+		now,
+		...(internals.secondMs !== undefined
+			? { secondMs: internals.secondMs }
+			: {}),
+	});
 	/** What runs hold for a scope: the engine lets go of it when a run ends. */
-	const runHolds = combineHolds([leaseHolds({ keeper: leases, log: runLog })]);
+	const runHolds = combineHolds([
+		leaseHolds({ keeper: leases, log: runLog }),
+		serviceHolds({
+			keeper: services,
+			log: runLog,
+			deviceOf: async (runId, deviceId) => {
+				const row = await getRunRow(db, runId);
+				return placement.deviceById(deviceId, placedRun(row));
+			},
+		}),
+	]);
 
 	const runner = createRunner({
 		db,
@@ -495,6 +515,7 @@ export function createEngine(
 		signal,
 		holds: runHolds,
 		leases,
+		services,
 		...(internals.overdueSweepMs !== undefined
 			? { overdueSweepMs: internals.overdueSweepMs }
 			: {}),

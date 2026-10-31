@@ -1,7 +1,14 @@
 /** A flow compiled to a graph and walked: the nodes, the step runner, sleeps, the checkpointer, and the input, output and policy rules a step follows. */
 
 export { pruneCheckpoints } from "./checkpointer";
-export type { NodeKind, Requirement } from "./context";
+export type {
+	NodeKind,
+	Requirement,
+	ServiceBringUp,
+	ServiceBroughtUp,
+	ServiceRunner,
+	StopService,
+} from "./context";
 export { messageOf, onDevice } from "./context";
 export { combineHolds, type RunHolds } from "./holds";
 export { resolveInputs } from "./inputs";
