@@ -8,6 +8,7 @@ export {
 export { createQueryClient } from "./query-client";
 export {
 	isHostUnreachable,
+	isMissingOnHost,
 	isSignInRequired,
 	isTwoFactorRequired,
 } from "./refusals";

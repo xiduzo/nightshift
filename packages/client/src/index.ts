@@ -20,6 +20,7 @@ export {
 	createApiClient,
 	createQueryClient,
 	createQueryUtils,
+	isMissingOnHost,
 	isSignInRequired,
 	isTwoFactorRequired,
 } from "./api";

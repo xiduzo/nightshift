@@ -2,8 +2,11 @@
  * How Night Shift refuses a call that needs a person first: nobody is
  * signed in, or two-factor sign-in must be on. Each app reads
  * these to send the person to the right page. And how it refuses an
- * action it cannot take to the Host of the Space now.
+ * action it cannot take to the Host of the Space now, and how a Host of
+ * an older version answers a procedure it does not have yet.
  */
+
+import { ORPCError } from "@orpc/client";
 
 /** The oRPC code Night Shift refuses a call with when nobody is signed in. */
 export const SIGN_IN_REQUIRED = "UNAUTHORIZED";
@@ -38,5 +41,23 @@ export function isHostUnreachable(error: unknown): boolean {
 		typeof error === "object" &&
 		error !== null &&
 		(error as { code?: unknown }).code === HOST_UNREACHABLE
+	);
+}
+
+/**
+ * Whether the Host does not have the procedure at all: a Night Shift of
+ * an older version, which a redeploy brings up to date. It answers a
+ * plain 404 that is not an oRPC error, and the client keeps that raw
+ * response as `data`. A procedure that refuses with NOT_FOUND itself
+ * ("This learning no longer waits") sends an oRPC error without it.
+ */
+export function isMissingOnHost(error: unknown): boolean {
+	if (!(error instanceof ORPCError)) return false;
+	if (error.defined || error.status !== 404) return false;
+	const data: unknown = error.data;
+	return (
+		typeof data === "object" &&
+		data !== null &&
+		(data as { status?: unknown }).status === 404
 	);
 }

@@ -1113,12 +1113,7 @@ function allWorkspaces(root: string): string[] {
  */
 export const PENDING_NAMES: Record<string, string[]> = {
 	// Ask why and the learnings that wait, for the phone (STRUCTURE.md section 8).
-	"@nightshift/client": [
-		"askWhyAnswer",
-		"askWhyMutation",
-		"createKnowledgeQueries",
-		"explainRun",
-	],
+	"@nightshift/client": ["createKnowledgeQueries"],
 };
 
 type Entry = {

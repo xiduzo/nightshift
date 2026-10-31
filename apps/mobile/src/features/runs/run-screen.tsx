@@ -50,6 +50,7 @@ import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { FactGrid, FactTile } from "@/shared/tiles";
 import { StepTrail, trailItemOf } from "@/shared/trail";
+import { AskWhyCard } from "./ask-why-card";
 import { RunActions, useRunAct } from "./run-actions";
 import {
 	itemStateLabel,
@@ -231,6 +232,8 @@ function RunBody({
 					<FollowOnLockScreen runId={run.id} ended={ended} />
 				</Card>
 			) : null}
+
+			<AskWhyCard runId={run.id} status={status} />
 
 			{talking.map((step) => {
 				const message = live.entries.messages.get(step.id);

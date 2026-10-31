@@ -303,4 +303,4 @@ The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). 
 
 When code must break a rule for a while, add an entry here: the rule it breaks, the files, and the change that removes it. Remove the entry in the change that fixes it. Do not copy a deviation into new code. A check lists each entry too, and that check fails once the deviation is gone.
 
-- **Names on `@nightshift/client` without an importer yet** (section 3: every name on an entry has an importer). `askWhyAnswer`, `askWhyMutation`, `explainRun` (`packages/client/src/runs/`) and `createKnowledgeQueries` (`packages/client/src/knowledge/`) are for Ask why and the learnings that wait on the phone. The phone screens that import them remove the entry. `PENDING_NAMES` in `scripts/check-verticals.ts` lists them.
+- **Names on `@nightshift/client` without an importer yet** (section 3: every name on an entry has an importer). `createKnowledgeQueries` (`packages/client/src/knowledge/`) is for the learnings that wait on the phone. The phone screen that imports it removes the entry. `PENDING_NAMES` in `scripts/check-verticals.ts` lists them.
