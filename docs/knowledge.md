@@ -112,7 +112,8 @@ run's project only, and one more line after its prompt:
 > To find something in the project knowledge, call `search_knowledge` with
 > a few keywords or a question. It finds sections of files by their words,
 > and by their meaning when this computer can. PDF and Word files too.
-> Then read a file it gives with `read_knowledge`.
+> Then read a file it gives with `read_knowledge`: give the hit's section,
+> page or line to read from there.
 
 | Harness | The folder | The line | Search tools |
 | --- | --- | --- | --- |
@@ -237,8 +238,16 @@ has two tools (where its harness takes them), and so does `nightshift mcp`:
 - `search_knowledge` (`query`, `limit`): the best files first, each with
   its path, title, the section it found (heading, line, page of a PDF) and
   an excerpt with the words found in bold.
-- `read_knowledge` (`path`): one file, at most its first 100 KB. For a PDF
-  or Word file, its text.
+- `read_knowledge` (`path`, and `section`, `page` or `line` from a hit):
+  one file, at most 100 KB: from its start, or from the spot the hit names.
+  A section starts at its heading, else at the first line with its words.
+  A line counts in the page given. The answer says where the text starts.
+  For a PDF or Word file, its text.
+
+`nightshift mcp` also lists the files as MCP resources (spec 2025-11-25):
+`nightshift://knowledge/<project id>/<path>`, for the project it works in,
+else for every project. A resource read is the same read as
+`read_knowledge`.
 
 A step and `nightshift mcp` read a file in the same way. Night Shift
 reads the copy on this computer first. When this computer does not have
@@ -289,8 +298,12 @@ preparation of 1 100 sections takes about one minute. Later ones embed
 only the sections that changed.
 
 The search fuses the two lists by reciprocal rank (each list adds
-1 / (60 + rank) to a file). Without Ollama, search finds by words only,
-and nothing else changes. On this repository's `docs/` (26 questions),
+1 / (60 + rank) to a file). A file only the meaning found must pass the
+model's floor: a cosine similarity of 0.50 for `qwen3-embedding:0.6b`. So a
+query that nothing answers finds nothing, not the 20 nearest files. A model
+without a floor in `meaning.ts` has none. How the floor was chosen:
+[knowledge-vectors.md](research/knowledge-vectors.md) §3.4. Without
+Ollama, search finds by words only, and nothing else changes. On this repository's `docs/` (26 questions),
 search by words found 18 to 20 answers in the top 5, search by words and
 meaning 21 to 22, and search by meaning alone 23.
 
@@ -310,6 +323,44 @@ An agent that gets the folder can still read `INDEX.md` and grep the
 folder. In `nightshift mcp` the tools take a `project` too. In a step they
 work in the run's project only.
 
+## Measure the search
+
+Every `search_knowledge` and `read_knowledge` call of an agent is an
+event: `KnowledgeSearched` (the query, and each file it returned with its
+section and how it was found) and `KnowledgeRead` (the path, and the spot
+it read from). An Agent step logs them on its step. `nightshift mcp` logs
+them with no run. The search box of the Knowledge page logs nothing. The
+run's metrics count them, and the OpenTelemetry export puts
+`nightshift.knowledge.searches` and `nightshift.knowledge.reads` on the
+step's span.
+
+From these events:
+
+- **Sources.** The step console shows the knowledge files an agent used:
+  the files it read, then the top 3 hits of its searches that it did not
+  read. The agent does nothing extra for it.
+- **Questions agents asked.** The Knowledge page lists recent questions,
+  each with what it found. Mark the file that answers a question. Marked
+  questions are the project's question set: `evals/questions.json` in the
+  knowledge. It syncs like the learnings. `evals/` is Night Shift's own: no
+  index, search, read or file list shows it.
+- **Test search.** With one marked question or more, the page tests the
+  set against search by words, by meaning, and both. It shows recall at 5
+  and the rank of each question's first right file. From 20 marked
+  questions, it offers to turn search by meaning off for the project when
+  both do not beat words by 10 points. The thresholds are `EVALUATION` in
+  `packages/engine/src/knowledge/evaluate.ts`. The setting is the
+  project's, in the knowledge document, so every computer of the Space
+  follows it. Off, search finds by words only and prepares no vectors.
+- **Use.** The file list shows how often agents found and read each file
+  in the last 90 days. It marks the files that no run used in 30 days, once
+  runs use the knowledge at all. Those are files you may stop syncing.
+
+On this repository's `docs/` with the 26 questions of the vectors spike
+(2026-10-31, with the floor): words found 20 in the top 5, meaning 23,
+both 22. That is 7.7 points, so the page would offer to turn meaning off.
+With the agents' keyword forms: words 18, meaning 18, both 20.
+
 ## Size
 
 The Knowledge page warns above 2 000 files. Nothing loads the folder into
@@ -325,5 +376,10 @@ agents need.
   propose learnings write one file: the later change wins.
 - A project that joins another one when a computer joins its home Host
   keeps its knowledge folder under its old id.
+- The evaluation runs from the page only. `kit:knowledge/evaluate`, so a
+  schedule can repeat it, waits for a way for a Command step to call Night
+  Shift.
+- A source can still write into `evals/`: the kits refuse only
+  `learnings/`.
 - Search by meaning needs Ollama on each computer. Each computer embeds
   its own copy of the knowledge. The Host image has no Ollama yet.

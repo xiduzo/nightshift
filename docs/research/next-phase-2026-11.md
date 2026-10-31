@@ -331,19 +331,23 @@ only where a measurement says keyword search misses.
 
 - Every `search_knowledge` call becomes an event on the run: the query, the
   files it returned, the step. The metrics read model and the OTel export
-  pick it up.
+  pick it up. **Done** (6eb654ed): reads too, and MCP calls with no run.
 - The Knowledge page gets "Questions agents asked": recent queries and what
   they found. A person marks the file that answers a question. Marked
   questions become the project's question set, kept in the knowledge
   document under a reserved `evals/` path, so it syncs like learnings and is
-  never indexed.
+  never indexed. **Done** (6d7832f8, gated in 9852d15a).
 - An evaluation runs the question set against keyword, vector and hybrid
   search and reports recall at 5 and the rank of the first right file. It
   runs from the page and as a kit, so a schedule can repeat it. The
   `openevals` evaluators or a plain script compute it. LangSmith is an
-  opt-in place to send the results, not a requirement.
+  opt-in place to send the results, not a requirement. **Done from the
+  page** (9e94f2a3, a plain loop). Left: `kit:knowledge/evaluate` needs a
+  way for a Command step to call Night Shift.
 - The threshold that turns vectors on comes from the spike (5.0). Below it,
-  the page says keyword search finds enough.
+  the page says keyword search finds enough. **Done** (9e94f2a3): meaning is
+  on by default, and the page offers to turn it off per project. A floor
+  for meaning-only hits landed too (28c466fb, 0.50 for qwen3).
 
 ### 5.2 Find by meaning, phase 3 (engine, 5 days, only after 5.1)
 
@@ -400,12 +404,13 @@ keyword search, and 11 of 13 against 7 on paraphrases.
 ### 5.3 Sections, citations and use (engine + agents + web, 2 days)
 
 - The nightshift MCP server lists the knowledge files as MCP resources.
-  Sprint 3 promised this (4.3) and did not ship it.
+  Sprint 3 promised this (4.3) and did not ship it. **Done** (c641fae4).
 - The step report gets `sources`: the knowledge files the agent used. The
-  run view shows them under the step.
+  run view shows them under the step. **Done** (3491f92d, 4c7adc9e).
+  `read_knowledge` reads from a hit's section too (075f85a1).
 - The Knowledge page shows how often each file was searched or cited, and
   marks files no run used in 30 days. That tells a person what to stop
-  syncing.
+  syncing. **Done** (7abc17d2).
 
 ### 5.4 Knowledge that stays healthy (engine + devices + web, 2 days)
 
