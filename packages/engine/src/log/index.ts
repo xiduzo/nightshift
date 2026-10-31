@@ -29,6 +29,7 @@ export type {
 	RunTrigger,
 	RunWarningKind,
 	Scope,
+	ScoreName,
 	SessionOutcome,
 	StepBudget,
 	StepOutcome,
@@ -79,7 +80,12 @@ export {
 	type VariableChange,
 	visitKey,
 } from "./run-state";
-export { type AnsweredBy, type RunScore, runScore } from "./scores";
+export {
+	type AnsweredBy,
+	pullRequestOutcome,
+	type RunScore,
+	runScore,
+} from "./scores";
 export type {
 	StepEvent,
 	TranscriptEntry,

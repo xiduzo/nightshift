@@ -102,6 +102,7 @@ function initialWebhook(schedule: Schedule | null): WebhookForm {
 			name: schedule?.signal?.name ?? "",
 			key: schedule?.signal?.key ?? "",
 		},
+		scorePullRequests: schedule?.scorePullRequests === true,
 	};
 }
 
@@ -223,8 +224,8 @@ function webhookProblem(webhook: WebhookForm, startsFlow: boolean) {
 	) {
 		return "Name the signal with lowercase letters, digits and -, for example ci-done.";
 	}
-	if (!startsFlow && !webhook.signal.on) {
-		return "Choose a flow, or wake waiting runs.";
+	if (!startsFlow && !webhook.signal.on && !webhook.scorePullRequests) {
+		return "Choose a flow, wake waiting runs, or score pull requests.";
 	}
 	return null;
 }
@@ -335,7 +336,13 @@ function ScheduleForm({
 
 	const scheduleId =
 		schedule?.id ??
-		freeId(startsFlow ? chosen : webhook.signal.name || "webhook", takenIds);
+		freeId(
+			startsFlow
+				? chosen
+				: webhook.signal.name ||
+						(webhook.scorePullRequests ? "pull-requests" : "webhook"),
+			takenIds,
+		);
 
 	const save = () => {
 		if (problem !== null || saving) return;
@@ -375,6 +382,7 @@ function ScheduleForm({
 						},
 					}
 				: {}),
+			...(webhook.scorePullRequests ? { scorePullRequests: true } : {}),
 		});
 	};
 

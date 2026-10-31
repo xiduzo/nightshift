@@ -141,7 +141,8 @@ conventions of OpenTelemetry, which are still in development.
 | `nightshift.retries` | counter | `nightshift.node.kind`: a step that ran again |
 | `nightshift.gate.wait` (s) | histogram | how long Gates waited for a person |
 | `nightshift.run.outcome` | counter | `nightshift.run.status` (`finished`, `failed`, `stopped`, ...) |
-| `nightshift.score` | counter | `nightshift.score.name`, `nightshift.score.label`, `nightshift.score.by` (`person`, `deadline`): a Gate answered |
+| `nightshift.score` | counter | `nightshift.score.name`, `nightshift.score.label`, `nightshift.score.by` (`person`, `deadline`): a Gate answered, a pull request outcome |
+| `nightshift.pr.outcome` | counter | `outcome` (`merged`, `closed`, `reverted`): what became of a run's pull request, from a schedule that [scores pull requests](triggers.md#score-runs-by-their-pull-requests) |
 
 Each point also has `nightshift.project.id`, `nightshift.flow.id` and
 `nightshift.device.id`. No point has the id of one run or step, so there are

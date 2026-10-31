@@ -25,6 +25,8 @@ export type WebhookForm = {
 	/** The JSONata rule, or "" for every webhook. */
 	when: string;
 	signal: { on: boolean; name: string; key: string };
+	/** GitHub's pull request and push events score the runs that opened those pull requests. */
+	scorePullRequests: boolean;
 };
 
 /** The address a schedule's webhook goes to, on the Night Shift this page talks to. */
@@ -79,7 +81,8 @@ export function WebhookAddress({
 
 /**
  * The webhook of a schedule: its address, the secret the sender proves it
- * knows, an optional rule, and the signal it sends to waiting runs.
+ * knows, an optional rule, the signal it sends to waiting runs, and
+ * whether it scores runs by their pull requests.
  */
 export function WebhookFields({
 	idPrefix,
@@ -198,6 +201,26 @@ export function WebhookFields({
 					</FieldDescription>
 				</div>
 			) : null}
+			<Field orientation="horizontal" className="items-start">
+				<Switch
+					id={`${idPrefix}-scores`}
+					checked={value.scorePullRequests}
+					className="mt-0.5"
+					onCheckedChange={(on) =>
+						onChange({ ...value, scorePullRequests: on === true })
+					}
+				/>
+				<FieldContent>
+					<FieldLabel htmlFor={`${idPrefix}-scores`}>
+						Score pull requests
+					</FieldLabel>
+					<FieldDescription>
+						Night Shift notes on each run if its pull request merged, closed or
+						got reverted within 7 days. In GitHub, send the pull request and
+						push events.
+					</FieldDescription>
+				</FieldContent>
+			</Field>
 		</FieldGroup>
 	);
 }

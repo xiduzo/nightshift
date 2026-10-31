@@ -27,10 +27,11 @@ import { parseEventRow, type RunLog, type RunTrigger } from "../log";
 import type { RunSummary } from "../read";
 
 /**
- * Webhooks: a schedule with `webhook` starts its flow, sends its signal, or
- * both, when a request arrives at `/hooks/<project id>/<schedule id>`. The
- * daemon's HTTP server reads the request (its body capped) and hands it
- * here; this module decides, and answers before the run starts.
+ * Webhooks: a schedule with `webhook` starts its flow, sends its signal,
+ * scores runs by their pull requests, or more than one, when a request
+ * arrives at `/hooks/<project id>/<schedule id>`. The daemon's HTTP
+ * server reads the request (its body capped) and hands it here; this
+ * module decides, and answers before the run starts.
  *
  * The address is public on a Host, so the rules are strict:
  * - The sender proves it knows the schedule's secret: GitHub's
@@ -109,6 +110,11 @@ export type WebhooksDeps = {
 	enabled(): boolean;
 	/** Starts a run of a flow file, with the trigger stored in `RunStarted`. */
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
+	/**
+	 * Scores the project's runs by what a GitHub webhook says about their
+	 * pull requests (`pull-request-scores.ts`); how many scores it wrote.
+	 */
+	scorePullRequests(projectId: string, webhook: WebhookEvent): Promise<number>;
 	/** Wakes the project's runs that wait for the signal; how many woke. */
 	signal(
 		projectId: string,
@@ -225,6 +231,17 @@ export function createWebhooks(deps: WebhooksDeps) {
 					);
 					errors.push(wordsFor(cause));
 				}
+			}
+		}
+		if (schedule.scorePullRequests === true) {
+			try {
+				await deps.scorePullRequests(projectId, webhook);
+			} catch (cause) {
+				console.error(
+					`[webhooks] ${schedule.id} could not score pull requests`,
+					cause,
+				);
+				errors.push(wordsFor(cause));
 			}
 		}
 		if (schedule.flow !== undefined) {

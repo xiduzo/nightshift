@@ -59,6 +59,7 @@ import {
 	type RunTrace,
 } from "../read";
 import {
+	createPullRequestScores,
 	createScheduleFiles,
 	createScheduler,
 	createWebhooks,
@@ -633,6 +634,9 @@ export function createEngine(
 	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
 	const signals = createSignals({ db, log: runLog, runner });
 
+	/** A webhook schedule's pull request scores: the project's runs this computer walks. */
+	const pullRequestScores = createPullRequestScores({ db, log: runLog, now });
+
 	const webhooks = createWebhooks({
 		db,
 		now,
@@ -643,6 +647,8 @@ export function createEngine(
 		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
 		enabled: () => options.scheduler !== false && runSettings().scheduler,
 		startRun: startForSchedule,
+		scorePullRequests: (projectId, webhook) =>
+			pullRequestScores.take(projectId, webhook),
 		signal: (projectId, signal) => signals.send(projectId, signal),
 	});
 

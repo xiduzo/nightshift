@@ -399,6 +399,32 @@ describe("the export to monitoring", () => {
 		).toBe(1);
 	});
 
+	test("a pull request's scores count, and as what became of it", async () => {
+		const run = nightRun()
+			.push("Scored", {
+				score: "pr_merged",
+				value: 1,
+				label: "0123456789abcdef0123456789abcdef01234567",
+			})
+			.push("Scored", {
+				score: "reverted_within_7d",
+				value: 1,
+				label: "0123456789ab",
+			});
+		const h = await setup({}, run);
+		h.landRun();
+		await h.done();
+		const outcomes = h.points().get("nightshift.pr.outcome");
+		expect(sum(outcomes, { outcome: "merged" })).toBe(1);
+		expect(sum(outcomes, { outcome: "reverted" })).toBe(1);
+		expect(sum(outcomes, { outcome: "closed" })).toBe(0);
+		expect(
+			sum(h.points().get("nightshift.score"), {
+				"nightshift.score.name": "pr_merged",
+			}),
+		).toBe(1);
+	});
+
 	test("a Claude Code session gets its telemetry under the step, with no content", async () => {
 		const h = await setup({
 			telemetryHeaders: {

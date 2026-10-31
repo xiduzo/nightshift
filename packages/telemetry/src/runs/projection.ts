@@ -1,4 +1,8 @@
-import type { LandedFact, RunTrace } from "@nightshift/engine";
+import {
+	type LandedFact,
+	pullRequestOutcome,
+	type RunTrace,
+} from "@nightshift/engine";
 import type { Attributes, Counter, Histogram } from "@opentelemetry/api";
 
 import {
@@ -35,7 +39,8 @@ import { meterOf, type RunningExport } from "../otlp";
  * - `run-ended`: the run's span (`invoke_workflow {flow}`), the trace's
  *   root; a resumed run's later end is a span under it. Its time and how
  *   it ended.
- * - `scored`: a score, with its name, label and who answered a Gate.
+ * - `scored`: a score, with its name, label and who answered a Gate, and
+ *   for a pull request what became of it (`nightshift.pr.outcome`).
  */
 
 /** The run as the engine derives it, or null when it has none. */
@@ -52,6 +57,7 @@ type Instruments = {
 	retries: Counter;
 	gateWait: Histogram;
 	runOutcome: Counter;
+	prOutcome: Counter;
 	score: Counter;
 };
 
@@ -81,9 +87,13 @@ function instruments(running: RunningExport): Instruments {
 			METRIC.runOutcome,
 			"Runs that ended, by how they ended.",
 		),
+		prOutcome: counter(
+			METRIC.prOutcome,
+			"What became of the pull requests runs opened.",
+		),
 		score: counter(
 			METRIC.score,
-			"Feedback on runs: Gate answers, and later pull request outcomes.",
+			"Feedback on runs: Gate answers, pull request outcomes.",
 		),
 	};
 }
@@ -300,6 +310,8 @@ export function createRunProjection(deps: {
 			...(fact.label ? { [ATTR.scoreLabel]: fact.label } : {}),
 			...(fact.by ? { [ATTR.scoreBy]: fact.by } : {}),
 		});
+		const outcome = pullRequestOutcome(fact.score);
+		if (outcome) m.prOutcome.add(1, { ...point, [ATTR.prOutcome]: outcome });
 	}
 
 	async function one(fact: LandedFact): Promise<void> {

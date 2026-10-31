@@ -658,7 +658,7 @@
 			"gridPos": {
 				"x": 0,
 				"y": 36,
-				"w": 24,
+				"w": 12,
 				"h": 8
 			},
 			"targets": [
@@ -670,6 +670,48 @@
 					},
 					"expr": "sum by (nightshift_score_label) (increase(nightshift_score_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_score_name=\"gate_decision\"}[$__range]))",
 					"legendFormat": "{{nightshift_score_label}}",
+					"instant": true,
+					"format": "table"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"orientation": "horizontal",
+				"showValue": "auto",
+				"xTickLabelRotation": 0
+			}
+		},
+		{
+			"id": 14,
+			"type": "barchart",
+			"title": "Pull requests",
+			"description": "What became of the pull requests runs opened, as GitHub's webhook told it.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 36,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (outcome) (increase(nightshift_pr_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "{{outcome}}",
 					"instant": true,
 					"format": "table"
 				}

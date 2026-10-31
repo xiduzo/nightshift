@@ -473,10 +473,11 @@ export type EnginePayloads = {
 	 */
 	RunWarned: { kind: RunWarningKind; message: string };
 	/**
-	 * Feedback on what a run did: a Gate was answered, on the Gate's step.
-	 * What each name, value and `by` means is in `scores.ts`. The metrics
-	 * and the export count them, so a later read tells which flow version
-	 * merges.
+	 * Feedback on what a run did: a Gate was answered, on the Gate's step,
+	 * or a GitHub webhook told what became of the run's pull request, on
+	 * the run. What each name, value and `by` means is in `scores.ts`.
+	 * The metrics and the export count them, so a later read tells which
+	 * flow version merges.
 	 */
 	Scored: {
 		score: ScoreName;

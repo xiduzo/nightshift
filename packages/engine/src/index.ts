@@ -128,6 +128,7 @@ export {
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
+	pullRequestOutcome,
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,
 } from "./log";

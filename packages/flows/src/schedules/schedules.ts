@@ -127,6 +127,12 @@ export const scheduleSchema = z.object({
 	webhook: scheduleWebhookSchema.optional(),
 	/** With `webhook`: a signal it sends as well as, or instead of, a run. */
 	signal: scheduleSignalSchema.optional(),
+	/**
+	 * With `webhook`: GitHub's `pull_request` and `push` events score the
+	 * runs that opened those pull requests (`pr_merged`, `pr_closed`,
+	 * `reverted_within_7d`), as well as, or instead of, a run and a signal.
+	 */
+	scorePullRequests: z.boolean().optional(),
 	/** The stop time: the first such time of day after the run starts. */
 	stopAt: timeOfDaySchema.optional(),
 	/**
@@ -385,8 +391,8 @@ function isEmpty(value: unknown): boolean {
 
 /**
  * The problems of each schedule: a duplicate id, neither or both of a cron
- * line and a webhook, a flow that does not exist, does not load or has
- * errors, a cron line, a webhook rule or a signal key that does not parse,
+ * line and a webhook, a signal or pull request scores without a webhook,
+ * a flow that does not exist, does not load or has errors, a cron line, a webhook rule or a signal key that does not parse,
  * and input values the flow does not take or lacks (a required input
  * without a value or a default), JSON text that does not parse, or a
  * webhook's template that reads something else than `event`. `flows` holds
@@ -429,14 +435,22 @@ export function validateSchedules(
 		if (signal !== undefined && webhook === undefined) {
 			error("Only a schedule that waits for a webhook can send a signal.");
 		}
+		if (schedule.scorePullRequests === true && webhook === undefined) {
+			error(
+				"Only a schedule that waits for a webhook can score pull requests.",
+			);
+		}
 		const whenProblem = webhook?.when ? ruleProblem(webhook.when) : null;
 		if (whenProblem) error(`The webhook's rule is not valid: ${whenProblem}`);
 		const keyProblem = signal?.key ? ruleProblem(signal.key) : null;
 		if (keyProblem) error(`The signal's key is not valid: ${keyProblem}`);
 
 		if (schedule.flow === undefined) {
-			// A webhook that only wakes Waits starts no flow.
-			if (webhook === undefined || signal === undefined) {
+			// A webhook that only wakes Waits, or only scores, starts no flow.
+			if (
+				webhook === undefined ||
+				(signal === undefined && schedule.scorePullRequests !== true)
+			) {
 				error("Choose a flow.");
 			} else if (Object.keys(schedule.inputs).length > 0) {
 				error("A schedule without a flow has no inputs.");

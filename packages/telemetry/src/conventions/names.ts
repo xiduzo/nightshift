@@ -42,6 +42,8 @@ export const ATTR = {
 	scoreLabel: "nightshift.score.label",
 	/** On `nightshift.score` for a Gate's answer: who chose, `person` or `deadline`. */
 	scoreBy: "nightshift.score.by",
+	/** On `nightshift.pr.outcome`: `merged`, `closed` or `reverted`. */
+	prOutcome: "outcome",
 	serviceName: "service.name",
 	serviceInstance: "service.instance.id",
 } as const;
@@ -62,6 +64,7 @@ export const METRIC = {
 	retries: { name: "nightshift.retries", unit: "{step}" },
 	gateWait: { name: "nightshift.gate.wait", unit: "s" },
 	runOutcome: { name: "nightshift.run.outcome", unit: "{run}" },
+	prOutcome: { name: "nightshift.pr.outcome", unit: "{pull_request}" },
 	score: { name: "nightshift.score", unit: "{score}" },
 } as const;
 

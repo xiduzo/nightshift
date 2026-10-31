@@ -257,6 +257,14 @@ describe("validateSchedules", () => {
 						webhook: { secret: HOOK_SECRET },
 						signal: { name: "ci-done" },
 					},
+					// Pull request scores alone start no flow either.
+					{
+						id: "scores",
+						inputs: {},
+						enabled: true,
+						webhook: { secret: HOOK_SECRET },
+						scorePullRequests: true,
+					},
 				],
 				flows,
 			),
@@ -278,6 +286,11 @@ describe("validateSchedules", () => {
 					id: "cron-signal",
 					inputs: { epic: "1" },
 					signal: { name: "go" },
+				}),
+				schedule({
+					id: "cron-scores",
+					inputs: { epic: "1" },
+					scorePullRequests: true,
 				}),
 				{ ...hook({ id: "no-flow" }), flow: undefined },
 			],
@@ -301,6 +314,10 @@ describe("validateSchedules", () => {
 			[
 				"cron-signal",
 				"Only a schedule that waits for a webhook can send a signal.",
+			],
+			[
+				"cron-scores",
+				"Only a schedule that waits for a webhook can score pull requests.",
 			],
 			["no-flow", "Choose a flow."],
 		]);

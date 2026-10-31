@@ -8,8 +8,10 @@ import type { EnginePayloads } from "./events";
  * - `gate_decision`: a Gate was answered, on the Gate's step. `label` is
  *   the option it took, `by` who chose it: a person, or its deadline.
  * - `pr_merged`, `pr_closed`, `reverted_within_7d`: what became of the
- *   pull request the run opened. Reserved: nothing writes them yet
- *   (next phase 5.5, a kit's GitHub webhook).
+ *   pull request the run opened, from a GitHub webhook of a schedule with
+ *   `scorePullRequests` (`schedules/pull-request-scores.ts`). On the run,
+ *   not on a step. `pr_merged`'s label is the merge commit's sha, a
+ *   revert's the commit or the pull request that reverted it.
  *
  * `value` is 1 for a fact that happened. The names are an open list: a
  * score of a newer Walker passes through with its name, and means nothing
@@ -53,4 +55,18 @@ export function runScore(e: {
 		at: e.at,
 		by: answeredBy(e.payload),
 	};
+}
+
+/** What became of a pull request, as a score of it says. */
+export type PullRequestOutcome = "merged" | "closed" | "reverted";
+
+const PULL_REQUEST_OUTCOMES: Readonly<Record<string, PullRequestOutcome>> = {
+	pr_merged: "merged",
+	pr_closed: "closed",
+	reverted_within_7d: "reverted",
+};
+
+/** What became of the run's pull request, when the score tells it. Else null. */
+export function pullRequestOutcome(score: string): PullRequestOutcome | null {
+	return PULL_REQUEST_OUTCOMES[score] ?? null;
 }

@@ -38,6 +38,44 @@ without a new run. Turn on **Wake waiting runs** and give the signal's
 name. A Wait node that waits for that name then continues, with the
 webhook as its data. Use it to let a run wait until CI is done.
 
+### Score runs by their pull requests
+
+A webhook schedule can also record what became of the pull requests that
+your runs opened. Turn on **Score pull requests**. A schedule that only
+scores starts no flow.
+
+1. In the repository on GitHub, open **Settings → Webhooks**.
+2. Paste the schedule's address as the payload URL, and choose
+   `application/json`.
+3. Give the secret's value.
+4. Choose **Let me select individual events**, then **Pull requests** and
+   **Pushes**.
+
+Night Shift then writes these scores on the run whose pull request it is:
+
+| Score | When |
+| --- | --- |
+| `pr_merged` | The pull request merged. The label is the merge commit. |
+| `pr_closed` | The pull request closed without a merge. |
+| `reverted_within_7d` | A revert merged within 7 days of the merge. |
+
+Night Shift finds the run by the pull request's address: the address the
+run's metrics show. A run gets each score once. GitHub sends no event for
+a revert, so Night Shift reads two facts that GitHub sends anyway:
+
+- A push to the default branch with a commit that says
+  `This reverts commit <sha>.`, where the sha is the merge commit.
+  `git revert` writes this line.
+- A merged pull request whose description starts with
+  `Reverts <owner>/<repo>#<number>`. The **Revert** button of GitHub writes
+  this line.
+
+Night Shift never asks GitHub. Only the runs that the computer which takes
+the webhook walks get a score. In a Space with a Host, that is the Host.
+The scores show on the run, and they go to your
+[monitoring](monitoring.md) as `nightshift.score` and
+`nightshift.pr.outcome`.
+
 ## 2. Prove that you know the secret
 
 Night Shift takes a webhook only from a sender that knows the schedule's

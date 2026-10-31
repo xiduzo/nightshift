@@ -127,6 +127,8 @@ export function ScheduleCard({
 							Wakes the runs that wait for{" "}
 							<span className="font-mono">{schedule.signal.name}</span>
 						</>
+					) : !schedule.flow && schedule.scorePullRequests ? (
+						"Scores runs by what became of their pull requests"
 					) : (
 						(description ?? "No description")
 					)}
