@@ -1,4 +1,7 @@
+import type { QueryClient } from "@tanstack/react-query";
+
 import type { ApiQueryUtils } from "../api";
+import { runPlaceholder } from "./placeholder";
 import type { RunStatus, RunSummary } from "./types";
 
 /**
@@ -105,8 +108,17 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 					nextRunCursor(page, pageSize, cursor),
 				meta: { quietRefetchErrors: true },
 			}),
-		/** One run with its steps. */
-		get: (runId: string) => orpc.runs.get.queryOptions({ input: { runId } }),
+		/**
+		 * One run with its steps. With the screen's `queryClient`, it shows at
+		 * once what a list in the cache knows of the run (`placeholderData`):
+		 * its title, status and project. The steps follow.
+		 */
+		get: (runId: string, queryClient?: QueryClient) => ({
+			...orpc.runs.get.queryOptions({ input: { runId } }),
+			...(queryClient
+				? { placeholderData: () => runPlaceholder(queryClient, orpc, runId) }
+				: {}),
+		}),
 		/** One step with the prompt of each session and each item it ran: read when a person opens it. */
 		step: (runId: string, stepId: string) =>
 			orpc.runs.step.queryOptions({ input: { runId, stepId } }),
