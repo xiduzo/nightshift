@@ -85,6 +85,26 @@ export const runs = {
 		.handler(({ context, input }) =>
 			context.space.getStep(input.runId, input.stepId),
 		),
+	/**
+	 * The end of a service's log (ADR 9), by its node and scope
+	 * (`RunService.scopeKey`). Null when this computer does not walk the
+	 * run, or the service printed nothing yet.
+	 */
+	serviceLog: runProcedure(
+		z.object({
+			runId: z.string(),
+			nodeId: z.string(),
+			scopeKey: z.string(),
+		}),
+	)
+		.route({ summary: "Reads the end of the log of a service of a run." })
+		.output(output(z.object({ text: z.string().nullable() })))
+		.handler(async ({ context, input }) => ({
+			text: await context.space.serviceLog(input.runId, {
+				nodeId: input.nodeId,
+				scopeKey: input.scopeKey,
+			}),
+		})),
 	/** The files the run's agents kept, oldest first. Fetch one at `GET /api/runs/:id/artifacts/:artifactId`. */
 	artifacts: runProcedure(z.object({ runId: z.string() }))
 		.route({ summary: "Lists the files the agents of a run kept." })

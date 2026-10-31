@@ -6,3 +6,4 @@
 
 export { serviceHolds } from "./holds";
 export { createServiceKeeper } from "./keeper";
+export { readServiceLog } from "./log";

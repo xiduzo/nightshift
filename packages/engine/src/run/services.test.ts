@@ -253,12 +253,28 @@ describe("the engine stops a service on every end", () => {
 			engine,
 			flowOf([stack(), waitForSignal], [edge("stack", "ready", "hold")]),
 		);
-		await statusOf(engine, run.id, "sleeping");
+		const sleeping = await statusOf(engine, run.id, "sleeping");
 		expect(await answers(stackUrl())).toBe(true);
+		expect(sleeping.services).toEqual([
+			expect.objectContaining({
+				nodeId: "stack",
+				scopeKey: "",
+				state: "running",
+				section: null,
+				deviceId: sandbox.deviceId,
+			}),
+		]);
+		expect(
+			await engine.serviceLog(run.id, { nodeId: "stack", scopeKey: "" }),
+		).toContain("listening on");
 
 		await engine.act(run.id, { kind: "stop" });
 
-		expect((await endOf(engine, run.id)).status).toBe("stopped");
+		const ended = await endOf(engine, run.id);
+		expect(ended.status).toBe("stopped");
+		expect(ended.services).toEqual([
+			expect.objectContaining({ nodeId: "stack", state: "stopped" }),
+		]);
 		await stopsAnswering(stackUrl());
 	});
 
