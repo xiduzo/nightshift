@@ -62,7 +62,7 @@ Steps are nodes. Each node type does one job:
 | **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. `$NS_KNOWLEDGE` is the project's [knowledge](docs/knowledge.md) folder. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
 | **Decision** | Picks one of its options. You choose who picks: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. A model's pick below a confidence you set goes to a stronger model, or to you. |
-| **Value** | Makes data that matches a JSON schema, from a rule or a model. |
+| **Value** | Makes data that matches a JSON schema, from a rule, a model or a person. A person gets an **Ask**: a form in your inbox, with choices that an earlier step made, and their screenshots and links. |
 | **Wait** | Waits for a duration, a time, a command that passes, or a signal, for example from a webhook. |
 | **Subflow** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
 | **Join** | Waits for the branches that run at once, all of them or the first. |

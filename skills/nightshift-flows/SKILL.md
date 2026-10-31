@@ -107,7 +107,7 @@ Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. O
 
 ### value
 
-Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and optionally a `profile` or a `decider` that can make a value (openrouter, openai, ollama, compatible). Use it to compute or reshape a value, often with `set`.
+Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), `by: "model"` with `prompt` and optionally a `profile` or a `decider` that can make a value (openrouter, openai, ollama, compatible), or `by: "person"` (an Ask, see Asks) with `prompt` as the question. Use it to compute or reshape a value, often with `set`.
 
 Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 
@@ -175,9 +175,19 @@ Climb from a cheap try to a strong one with a `cascade`, not with a loop of node
 - Decision tier: `profile` and `minConfidence` (0 to 1). `ollama` and `compatible` give no probability: last model tier only.
 - Value tier: `profile` and `accept`, JSONata over `data`.
 - Subflow tier: `flow` and `inputs`.
-- The last tier can be `{ "person": true, "deadline"? }`: a Gate. Not on a Value.
+- The last tier can be `{ "person": true, "deadline"? }`: a Gate. On a Value it is an Ask that starts with the best answer of the models; its deadline `choose` is `accept` (that answer) or `fail`.
 
 `{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous.summary}}` read in the node's own templates. Later nodes read `tier` and `tries` (a Decision also `confidence`). A Decision with a cascade and no person tier can end `fail`.
+
+## Asks
+
+A Value with `by: "person"` is an Ask: a form in the Needs-you inbox, drawn from `output`. A string is a text field, an `enum` a choice, an array of `enum` a choice of several, a boolean a switch, a number a number field. Each `description` is the hint under its field. The answer must match the schema, and it is the step's `data`. A Gate stays the router: put a Decision by a rule after an Ask to route on its data, or a Subflow with `each` to work on each chosen item.
+
+- `choices: { from, field }`: `from` is a template that renders a list of `{ name, label, description?, attachments? }`, such as `{{designer.data.variants}}`. The names become the `enum` of the output field `field`: a string field is one choice, an array of strings a choice of several.
+- `attachments`: `[{ path | url, label? }]`. A `path` is a file in the run's copy of the project: Night Shift keeps it with the run, so the web and the phone show it. A `url` is a link. A choice's `attachments` take the same shape.
+- `deadline: { at | minutes }` and `default`: the data the Ask takes when nobody answers. The default must match the schema.
+
+The phone answers a form of text, choices, switches and numbers. Any other field opens the form on the web.
 
 ## Parallel branches
 
