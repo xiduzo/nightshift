@@ -270,6 +270,12 @@ function lineOf(event: TranscriptEntry["event"]): string {
 			return event.reason ? `Item ${event.state}: ${event.reason}` : "";
 		case "end":
 			return `End: ${event.status}${event.message ? `. ${event.message}` : ""}`;
+		case "service":
+			return event.state === "starting"
+				? `Service: start ${event.command ?? ""}`.trim()
+				: event.state === "ready"
+					? "Service: ready"
+					: `Service: failed${event.reason ? `. ${event.reason}` : ""}`;
 		case "lease":
 			return event.held
 				? `Lease: took ${event.name}`

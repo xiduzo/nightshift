@@ -16,8 +16,10 @@ import {
 	type DerivedStep,
 	type EnginePayloads,
 	type GateChoice,
+	type Hold,
 	type RunState,
 	type RunWarningKind,
+	type Scope,
 	type StepBudget,
 	type StepEvent,
 	type StepOutcome,
@@ -802,7 +804,12 @@ export async function beginStep(
 		worktree: worktreeOn(ctx, logged, device) ?? ctx.run.worktreePath,
 		existing,
 		runState: logged,
-		tctx: templateContext(ctx, state, config),
+		tctx: withServiceTails(
+			ctx,
+			templateContext(ctx, state, config),
+			logged.holds,
+			scope,
+		),
 		signal: stepController.signal,
 		opened: start.kind,
 		record(sessionId, stepEvent) {
@@ -1126,4 +1133,30 @@ export async function readyDevice(
 	});
 	step.worktree = worktree.worktreePath;
 	return null;
+}
+
+/**
+ * `{{stack.log_tail}}` of a service that runs: the end of its log as it is
+ * now, not as it was when the service got ready. Only the services of this
+ * flow's scope, by their node.
+ */
+function withServiceTails(
+	ctx: StepContext,
+	tctx: TemplateContext,
+	holds: readonly Hold[],
+	scope: Scope | null,
+): TemplateContext {
+	const key = scopeKey(scope);
+	let nodes: TemplateContext["nodes"] | null = null;
+	for (const hold of holds) {
+		if (hold.kind !== "service" || scopeKey(hold.scope) !== key) continue;
+		const outputs = tctx.nodes[hold.nodeId];
+		if (outputs === undefined) continue;
+		nodes ??= { ...tctx.nodes };
+		nodes[hold.nodeId] = {
+			...outputs,
+			log_tail: ctx.services.tail(hold.logPath),
+		};
+	}
+	return nodes === null ? tctx : { ...tctx, nodes };
 }

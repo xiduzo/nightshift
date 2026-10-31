@@ -11,6 +11,7 @@ import {
 	leaseNodeSchema,
 	nameSchema,
 	nodeIdSchema,
+	serviceNodeSchema,
 	toolNodeSchema,
 	valueNodeSchema,
 	waitNodeSchema,
@@ -43,6 +44,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	endNodeSchema,
 	joinNodeSchema,
 	leaseNodeSchema,
+	serviceNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -205,8 +207,9 @@ export const sectionColorSchema = z.enum(sectionColors);
 
 /**
  * A named, coloured group of nodes of this flow, in the editor. The engine
- * reads one only where a Lease node holds its lease for it: the run lets
- * go of the lease when it leaves the Section. Its nodes should form one connected
+ * reads one only where a Lease node holds its lease for it, or a Service
+ * node runs its service for it: the run lets go of the lease, or stops the
+ * service, when it leaves the Section. Its nodes should form one connected
  * part that the flow enters at one node (`validateFlow` warns when they do
  * not). The canvas shows it as one box. You open the box to see its nodes,
  * and the Sections inside it as boxes of their own.

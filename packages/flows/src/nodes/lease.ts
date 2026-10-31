@@ -1,23 +1,11 @@
 import { z } from "zod";
-import { type NodeCheck, nodeBase } from "./base";
+import { holdScopeSchema, type NodeCheck, nodeBase } from "./base";
 
 /**
  * The Lease node (ADR 7): it takes a named lease of the Space, so only one
  * run at a time does the steps after it. The engine keeps the lease until
  * the run ends, whatever ends it, and lets the next run have it then.
  */
-
-/**
- * How long a run holds the lease. `run` (the default): until the run
- * ends. `{ section }`: until the run leaves the Section with that id,
- * which holds the Lease node. A Section, here, only marks where the
- * scope ends.
- */
-export const leaseScopeSchema = z.union([
-	z.literal("run"),
-	z.object({ section: z.string().min(1) }),
-]);
-export type LeaseScope = z.infer<typeof leaseScopeSchema>;
 
 /**
  * Takes the lease `name`, a template (`branch:{{pr.data.head}}`,
@@ -46,7 +34,7 @@ export const leaseNodeSchema = z.object({
 	 */
 	ttlMinutes: z.number().int().min(2).optional(),
 	/** Until when the run holds the lease. Unset: `run`. */
-	scope: leaseScopeSchema.optional(),
+	scope: holdScopeSchema.optional(),
 });
 export type LeaseNode = z.infer<typeof leaseNodeSchema>;
 

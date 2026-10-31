@@ -110,6 +110,7 @@ export {
 	parseTranscript,
 	readRunTranscript,
 	readTranscriptFile,
+	serviceLogPath,
 	transcriptPath,
 	transcriptToRead,
 } from "./transcripts";

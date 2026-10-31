@@ -2149,6 +2149,140 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
               ],
               "type": "object",
             },
+            {
+              "properties": {
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "ready": {
+                  "properties": {
+                    "command": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "everySeconds": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "timeoutMinutes": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "url": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "scope": {
+                  "anyOf": [
+                    {
+                      "const": "run",
+                      "type": "string",
+                    },
+                    {
+                      "properties": {
+                        "section": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "section",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                "secrets": {
+                  "items": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "start": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "stop": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "service",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "start",
+                "ready",
+              ],
+              "type": "object",
+            },
           ],
         },
         "type": "array",
@@ -4562,6 +4696,145 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
               ],
               "type": "object",
             },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "ready": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "command": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "everySeconds": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "timeoutMinutes": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "url": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "scope": {
+                  "anyOf": [
+                    {
+                      "const": "run",
+                      "type": "string",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "section": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "section",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                "secrets": {
+                  "items": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "start": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "stop": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "service",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "start",
+                "ready",
+              ],
+              "type": "object",
+            },
           ],
         },
         "type": "array",
@@ -5712,7 +5985,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callNodeSchema": "cc57048a2024ee5bc09a3896327429864259bbdf3e7ec92ef11e118654966522",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "18c801ddfe8ae3e0f116a28eb2e6afc5afdd97532a0f1c20f9a79a77df9539ba",
+  "chatRequestSchema": "f6a13fce41fde1ce732108fb4fc89b93914c2c5b545519c44ee0af3a59289279",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -5732,13 +6005,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "b158e37247b42230de8a96c2dcf0a5fd3fa23c73c824195cb818e3938e458354",
+  "flowNodeSchema": "ec2f938aecd080883adbbdf3ae278517d834f5bfffdd565cee6c0bcc22faddc2",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "93342ec4c354c62bef45c2b401ed3749d6ea9f8b4b96e9b973a54e9952694e32",
+  "flowSchema": "0f3f4647a56f5a44405b277faef44f3dba4cf22e65e9f524a1a80c2fa2866943",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
+  "holdScopeSchema": "47fd66656ee0ff7df34c3f1528163054d56c860ff60f82a5b6f35d5a67457347",
   "joinNodeSchema": "149611b69a818d7b5837bd61e50478be6ebf8529b579f81e68f766a3e874e75d",
   "joinWaitSchema": "0351e82bc6f4c4247c9a58fe4d4a478ddb7fbd0139f8b3e14a4123b23b4d5f9a",
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
@@ -5748,7 +6022,6 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "knowledgeSourceSchema": "35d4f3af87133efd99b0209a5efb561c2e3f0e31143a430673b807c558af711a",
   "labelSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "leaseNodeSchema": "631e5170bacf39f9ba39b47a0c24dbaeee46056e29b506d168ca89dad7b771a6",
-  "leaseScopeSchema": "47fd66656ee0ff7df34c3f1528163054d56c860ff60f82a5b6f35d5a67457347",
   "listSourceSchema": "bd777218a3c3b14d1c54cb33fe527fe2e9e6055bcac39c002184e8a17fd9665e",
   "loginSchema": "23ccb4d365d96d062435a2ef12ff312587d07237ee383dfa9c7330e9db6ad64d",
   "mcpServerSchema": "a26196da9adb9b7777c1554b9c04c2be3e49961c1dc5b9a2b94ed1d9b1253727",
@@ -5774,8 +6047,10 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "schedulesFileSchema": "703158f80670e9a6dc0b5187f3a6239e785e3faa5799b0db9ac43951d8e225e9",
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
+  "serviceNodeSchema": "3c31613b202951fdda89a7ea10c565a72c597db774e77cb52305bf735407d90e",
+  "serviceReadySchema": "6844b7f89e0f30cfd776eb620d2ff7ad2f06ac7f4e908b6752b84ca055ebe2da",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "25681e427c88ad4905a1694e6a8e91ee51da24b67f34e6849bdad78e78152cd2",
+  "suggestionRequestSchema": "073d5f50fefa4eb76baee707c56d0690632c926264d54a1069ed6051b0162e1b",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",

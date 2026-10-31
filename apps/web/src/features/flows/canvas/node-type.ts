@@ -19,6 +19,7 @@ import {
 	MergeIcon,
 	PlugIcon,
 	RepeatIcon,
+	ServerIcon,
 	SparklesIcon,
 	SplitIcon,
 	SquareFunctionIcon,
@@ -79,6 +80,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: NODE_TYPE_LABEL.lease,
 		icon: LockIcon,
 		blurb: "Lets one run at a time do the next steps.",
+	},
+	service: {
+		label: NODE_TYPE_LABEL.service,
+		icon: ServerIcon,
+		blurb: "Starts a stack or server for the next steps, and stops it after.",
 	},
 };
 

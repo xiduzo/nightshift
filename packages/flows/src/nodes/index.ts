@@ -133,6 +133,16 @@ export {
 	outcomeColors,
 } from "./outcomes";
 export {
+	checkServiceNode,
+	DEFAULT_SERVICE_EVERY_SECONDS,
+	DEFAULT_SERVICE_TIMEOUT_MINUTES,
+	type ServiceNode,
+	serviceNodeSchema,
+	serviceOutcomes,
+	serviceOutputFields,
+	serviceSection,
+} from "./service";
+export {
 	checkToolNode,
 	type ToolNode,
 	toolNodeSchema,

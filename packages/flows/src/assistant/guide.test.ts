@@ -106,7 +106,8 @@ describe("flowAuthoringGuide", () => {
 		// `any` of a Wait (ADR 8), and the watch-pr kit (one line). 3700:
 		// the Lease node (ADR 7). 3950: cascades (ADR 6), which replace the
 		// loops of nodes that climbed from a cheap try to a strong one.
-		expect(words).toBeLessThan(3950);
+		// 4100: the Service node (ADR 9).
+		expect(words).toBeLessThan(4100);
 	});
 });
 

@@ -16,6 +16,7 @@ import {
 	MessageCircleQuestion,
 	Moon,
 	Plug,
+	Server,
 	Split,
 	SquareFunction,
 	SquareTerminal,
@@ -47,6 +48,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	flag: Flag,
 	merge: Merge,
 	lock: Lock,
+	server: Server,
 };
 
 /** The lucide icon of a status or a step kind. */

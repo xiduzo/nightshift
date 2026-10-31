@@ -71,7 +71,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -152,6 +152,14 @@ Lets one run of the Space at a time do the steps after it, also across computers
 Outcomes: `held`, `busy`. Outputs: `outcome`, `name`, `holder`, `holder_title`, `waited_minutes`, `visit`.
 
 `{"id":"own_branch","type":"lease","position":{"x":0,"y":0},"name":"branch:{{pr.data.head}}","waitMinutes":30}`
+
+### service
+
+Starts a process that keeps running while the steps after it work: a Docker Compose stack, a dev server. `start` runs in the background in the project. `ready` is a `command` (exit 0) or a `url` (answers 2xx), tried every `everySeconds` (default 2) up to `timeoutMinutes` (default 5). A ready command can write JSON to `$NS_OUTPUT`, read later as `{{stack.data.url}}`. `{{stack.log_tail}}` gives the last lines of its log. Night Shift stops it when the run ends, however it ends: with `stop` when it has one (`docker compose down`), else by ending its processes. `scope: { section: <id> }` stops it when the run leaves that Section, which holds the node. Every step in its scope runs on its computer. A service on a fixed port goes after a Lease on that port. `secrets` as on a Command. Without a `failed` edge, a service that does not get ready fails the run.
+
+Outcomes: `ready`, `failed`. Outputs: `outcome`, `data`, `log_tail`, `visit`.
+
+`{"id":"stack","type":"service","position":{"x":0,"y":0},"start":"docker compose up -d","ready":{"url":"http://127.0.0.1:8080/health","timeoutMinutes":5},"stop":"docker compose down"}`
 
 ## Edges, outcomes and loops
 

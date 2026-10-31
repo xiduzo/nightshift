@@ -46,6 +46,15 @@ export function commandLogPath(
 	return join(dataDir, "logs", runId, `${stepId}.log`);
 }
 
+/** A service's log: what the process of a Service step prints while it runs. */
+export function serviceLogPath(
+	dataDir: string,
+	runId: string,
+	stepId: string,
+): string {
+	return join(dataDir, "logs", runId, `${stepId}.service.log`);
+}
+
 /**
  * Reads one transcript file. A missing file is empty. A line that does not
  * parse (a write cut short by a crash, or a write in progress) is skipped.

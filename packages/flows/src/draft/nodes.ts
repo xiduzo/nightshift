@@ -15,6 +15,7 @@ import {
 	type JoinNode,
 	type LeaseNode,
 	type ListSource,
+	type ServiceNode,
 	type ToolNode,
 	type ValueBy,
 	type ValueDeciderName,
@@ -253,6 +254,14 @@ export function toolNode(id: string, position: Position): ToolNode {
 /** The name starts empty; the issues panel asks for it. It does not wait. */
 export function leaseNode(id: string, position: Position): LeaseNode {
 	return { id, type: "lease", position, name: "" };
+}
+
+/**
+ * A service starts with empty commands and a URL to check; the issues
+ * panel asks for them. It runs for the whole run.
+ */
+export function serviceNode(id: string, position: Position): ServiceNode {
+	return { id, type: "service", position, start: "", ready: { url: "" } };
 }
 
 /** A Join waits for every branch until the person picks `first`. */

@@ -248,6 +248,7 @@ function touchesDevice(node: FlowNode): boolean {
 		case "agent":
 		case "command":
 		case "tool":
+		case "service":
 			return true;
 		case "decision":
 		case "value":
