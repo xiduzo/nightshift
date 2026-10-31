@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { lastSyncText, scheduleText, sourceSummary } from "./source-words";
+import {
+	lastSyncText,
+	scheduleText,
+	sourceActions,
+	sourceSummary,
+} from "./source-words";
 
 const ago = () => "2 hours ago";
 
@@ -38,5 +43,47 @@ describe("source words", () => {
 			"Its schedule is paused",
 		);
 		expect(scheduleText(null)).toBeNull();
+	});
+});
+
+describe("what you may do with a source", () => {
+	const source = { kit: "kit:knowledge/web" as const, inputs: { urls: "x" } };
+	const schedule = { cron: "0 6 * * *", enabled: true };
+	const all = { save: true, remove: true, startRuns: true, schedules: true };
+	const none = {
+		save: false,
+		remove: false,
+		startRuns: false,
+		schedules: false,
+	};
+
+	test("a viewer gets none of the actions", () => {
+		expect(sourceActions({ source, schedule }, none)).toEqual({
+			sync: false,
+			edit: false,
+			remove: false,
+			removeFiles: false,
+		});
+	});
+
+	test("a Member edits and syncs, and removes a source without a schedule", () => {
+		const member = { ...all, schedules: false };
+		expect(sourceActions({ source, schedule: null }, member)).toEqual({
+			sync: true,
+			edit: true,
+			remove: true,
+			removeFiles: true,
+		});
+		expect(sourceActions({ source, schedule }, member).remove).toBe(false);
+		expect(sourceActions({ source, schedule }, all).remove).toBe(true);
+	});
+
+	test("a flow someone drew only syncs here", () => {
+		expect(sourceActions({ source: null, schedule: null }, all)).toEqual({
+			sync: true,
+			edit: false,
+			remove: false,
+			removeFiles: true,
+		});
 	});
 });

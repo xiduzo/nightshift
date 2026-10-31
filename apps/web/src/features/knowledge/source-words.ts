@@ -4,6 +4,7 @@ import {
 	type KnowledgeSource,
 	knowledgeSourceKind,
 } from "@nightshift/flows";
+import type { Knowledge } from "@/shared/api";
 
 /** What a source fills the knowledge from, in a short line: its first value, and how many more. */
 export function sourceSummary(source: KnowledgeSource): string {
@@ -44,4 +45,22 @@ export function scheduleText(
 	if (schedule === null) return null;
 	if (!schedule.enabled) return "Its schedule is paused";
 	return `Syncs ${describeCron(schedule.cron)}`;
+}
+
+/**
+ * What the person may do with one source, as the server allows it: Sync
+ * now starts a run, Edit saves its flow, Remove removes its flow and, for
+ * a source with a schedule, the schedule, which is this computer's owner's.
+ */
+export function sourceActions(
+	sync: Pick<Knowledge["syncs"][number], "source" | "schedule">,
+	can: Knowledge["can"],
+): { sync: boolean; edit: boolean; remove: boolean; removeFiles: boolean } {
+	const made = sync.source !== null;
+	return {
+		sync: can.startRuns,
+		edit: made && can.save,
+		remove: made && can.remove && (sync.schedule === null || can.schedules),
+		removeFiles: can.startRuns,
+	};
 }

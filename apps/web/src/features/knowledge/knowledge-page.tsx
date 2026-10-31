@@ -59,9 +59,13 @@ export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
 	);
 }
 
-/** The page's heading with Add source, the view, and the source dialog. */
+/**
+ * The page's heading with Add source, the view, and the source dialog. A
+ * person who may not save flows does not get Add source.
+ */
 function KnowledgeSection({ projectId }: { projectId: string }) {
 	const knowledge = useQuery(knowledgeQueries.get(projectId));
+	const can = knowledge.data?.can;
 	// Null: closed. "new": a new source. Else the source to edit.
 	const [dialog, setDialog] = useState<EditedSource | "new" | null>(null);
 	const [shown, setShown] = useState<EditedSource | null>(null);
@@ -79,15 +83,17 @@ function KnowledgeSection({ projectId }: { projectId: string }) {
 				title="Knowledge"
 				description="Files your agents read before they work. Every computer in this Space gets the same files."
 				actions={
-					<Button onClick={() => open("new")}>
-						<PlusIcon data-icon="inline-start" />
-						Add source
-					</Button>
+					can?.save ? (
+						<Button onClick={() => open("new")}>
+							<PlusIcon data-icon="inline-start" />
+							Add source
+						</Button>
+					) : undefined
 				}
 			/>
 			<KnowledgeView
 				projectId={projectId}
-				onAdd={() => open("new")}
+				onAdd={can?.save ? () => open("new") : undefined}
 				onEdit={open}
 			/>
 			<SourceDialog
@@ -98,6 +104,8 @@ function KnowledgeSection({ projectId }: { projectId: string }) {
 				projectId={projectId}
 				edited={shown}
 				shared={knowledge.data?.shared ?? false}
+				schedules={can?.schedules ?? false}
+				startRuns={can?.startRuns ?? false}
 			/>
 		</section>
 	);
@@ -109,7 +117,8 @@ function KnowledgeView({
 	onEdit,
 }: {
 	projectId: string;
-	onAdd: () => void;
+	/** Unset: the person may not add a source. */
+	onAdd: (() => void) | undefined;
 	onEdit: (source: EditedSource) => void;
 }) {
 	const knowledge = useQuery({
@@ -142,7 +151,8 @@ function KnowledgeView({
 			</div>
 		);
 	}
-	const { files, syncs, tooLarge, proposed, reviews, shared } = knowledge.data;
+	const { files, syncs, tooLarge, proposed, reviews, shared, can } =
+		knowledge.data;
 	if (files.length === 0 && syncs.length === 0 && proposed === 0) {
 		return <NoKnowledge onAdd={onAdd} />;
 	}
@@ -153,6 +163,7 @@ function KnowledgeView({
 					projectId={projectId}
 					proposed={proposed}
 					reviews={reviews}
+					mayReview={can.startRuns}
 				/>
 			) : null}
 			{syncs.length > 0 ? (
@@ -160,6 +171,7 @@ function KnowledgeView({
 					projectId={projectId}
 					syncs={syncs}
 					shared={shared}
+					can={can}
 					onEdit={onEdit}
 				/>
 			) : (
@@ -169,11 +181,13 @@ function KnowledgeView({
 					<AlertDescription>
 						Add a source, such as a folder or web pages, to keep it up to date.
 					</AlertDescription>
-					<AlertAction>
-						<Button size="sm" variant="outline" onClick={onAdd}>
-							Add source
-						</Button>
-					</AlertAction>
+					{onAdd ? (
+						<AlertAction>
+							<Button size="sm" variant="outline" onClick={onAdd}>
+								Add source
+							</Button>
+						</AlertAction>
+					) : null}
 				</Alert>
 			)}
 			{files.length > 0 ? <KnowledgeSearch projectId={projectId} /> : null}
@@ -223,7 +237,7 @@ function KnowledgeView({
 }
 
 /** Nothing yet: what knowledge is, and how to start. */
-function NoKnowledge({ onAdd }: { onAdd: () => void }) {
+function NoKnowledge({ onAdd }: { onAdd: (() => void) | undefined }) {
 	return (
 		<Empty className="border">
 			<EmptyHeader>
@@ -236,12 +250,14 @@ function NoKnowledge({ onAdd }: { onAdd: () => void }) {
 					notes, web pages or a wiki, and Night Shift keeps a copy here.
 				</EmptyDescription>
 			</EmptyHeader>
-			<EmptyContent>
-				<Button onClick={onAdd}>
-					<PlusIcon data-icon="inline-start" />
-					Add source
-				</Button>
-			</EmptyContent>
+			{onAdd ? (
+				<EmptyContent>
+					<Button onClick={onAdd}>
+						<PlusIcon data-icon="inline-start" />
+						Add source
+					</Button>
+				</EmptyContent>
+			) : null}
 		</Empty>
 	);
 }
@@ -254,10 +270,13 @@ function Learnings({
 	projectId,
 	proposed,
 	reviews,
+	mayReview,
 }: {
 	projectId: string;
 	proposed: number;
 	reviews: string[];
+	/** The person may start the review: a role that may start runs. */
+	mayReview: boolean;
 }) {
 	const [open, setOpen] = useState(false);
 	const review = reviews[0];
@@ -267,11 +286,13 @@ function Learnings({
 			<LightbulbIcon />
 			<AlertTitle>{notes}</AlertTitle>
 			<AlertDescription>
-				{review
-					? "Agents learned something about this project. Keep what is right. Agents read it in later runs."
-					: "Agents learned something about this project. Add the review-learnings starter flow to keep or delete it."}
+				{!mayReview
+					? "Agents learned something about this project. Ask a Member of this Space to review it."
+					: review
+						? "Agents learned something about this project. Keep what is right. Agents read it in later runs."
+						: "Agents learned something about this project. Add the review-learnings starter flow to keep or delete it."}
 			</AlertDescription>
-			{review ? (
+			{review && mayReview ? (
 				<AlertAction>
 					<Button size="sm" onClick={() => setOpen(true)}>
 						Review learnings

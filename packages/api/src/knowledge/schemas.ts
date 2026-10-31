@@ -58,6 +58,17 @@ export const knowledgeSchema = z.object({
 	reviews: z.array(z.string()),
 	/** The project's Space is not a personal one: each of its Members reads the knowledge. */
 	shared: z.boolean(),
+	/** What the person may do with the sources: the server refuses the rest. */
+	can: z.object({
+		/** Add a source, or edit one. */
+		save: z.boolean(),
+		/** Remove a source. */
+		remove: z.boolean(),
+		/** Start runs: sync a source now, review the learnings, remove a source's files. */
+		startRuns: z.boolean(),
+		/** Change when a source syncs on its own: this computer's owner only. */
+		schedules: z.boolean(),
+	}),
 });
 export type KnowledgeView = z.infer<typeof knowledgeSchema>;
 

@@ -94,6 +94,26 @@ const webSource = {
 };
 
 describe("knowledge.get", () => {
+	test("says what the person may do: by role, and schedules for this computer's owner", async () => {
+		const asMember = await call(
+			appRouter.knowledge.get,
+			{ projectId },
+			{ context: context("member", "member") },
+		);
+		expect(asMember.can).toEqual({
+			save: true,
+			remove: true,
+			startRuns: true,
+			schedules: false,
+		});
+		const asOwner = await call(
+			appRouter.knowledge.get,
+			{ projectId },
+			{ context: context("owner", "owner") },
+		);
+		expect(asOwner.can.schedules).toBe(true);
+	});
+
 	test("any Member of the Space reads the files and the sources, and only of its projects", async () => {
 		await call(
 			appRouter.knowledge.saveSource,
@@ -119,6 +139,12 @@ describe("knowledge.get", () => {
 				lastRun: null,
 			},
 		]);
+		expect(got.can).toEqual({
+			save: false,
+			remove: false,
+			startRuns: false,
+			schedules: false,
+		});
 		await expect(
 			call(
 				appRouter.knowledge.get,

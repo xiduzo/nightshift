@@ -79,6 +79,8 @@ export function SourceDialog({
 	projectId,
 	edited,
 	shared,
+	schedules,
+	startRuns,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -87,6 +89,10 @@ export function SourceDialog({
 	edited: EditedSource | null;
 	/** Every Member of the Space reads the knowledge. */
 	shared: boolean;
+	/** The person may change when it syncs: this computer's owner. */
+	schedules: boolean;
+	/** The person may start a sync. */
+	startRuns: boolean;
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,6 +102,8 @@ export function SourceDialog({
 						projectId={projectId}
 						edited={edited}
 						shared={shared}
+						schedules={schedules}
+						startRuns={startRuns}
 						onDone={() => onOpenChange(false)}
 					/>
 				) : null}
@@ -142,11 +150,15 @@ function SourceForm({
 	projectId,
 	edited,
 	shared,
+	schedules,
+	startRuns,
 	onDone,
 }: {
 	projectId: string;
 	edited: EditedSource | null;
 	shared: boolean;
+	schedules: boolean;
+	startRuns: boolean;
 	onDone: () => void;
 }) {
 	const id = useId();
@@ -160,7 +172,7 @@ function SourceForm({
 	const [times, setTimes] = useState<Times>(() =>
 		initialTimes(edited?.schedule ?? null),
 	);
-	const [syncNow, setSyncNow] = useState(true);
+	const [syncNow, setSyncNow] = useState(startRuns);
 	const kind = KNOWLEDGE_SOURCE_KINDS.find((k) => k.kit === kit);
 	// The kit's folder is Night Shift's to pick: the dialog does not ask.
 	const inputs = knowledgeSourceFields(kit);
@@ -312,6 +324,7 @@ function SourceForm({
 					<Switch
 						id={`${id}-keep`}
 						checked={times.on}
+						disabled={!schedules}
 						className="mt-0.5"
 						onCheckedChange={(on) =>
 							setTimes((current) => ({ ...current, on }))
@@ -320,13 +333,15 @@ function SourceForm({
 					<FieldContent>
 						<FieldLabel htmlFor={`${id}-keep`}>Keep it up to date</FieldLabel>
 						<FieldDescription id={`${id}-keep-hint`}>
-							{!times.on
-								? "Sync it only when you choose Sync now."
-								: times.kind === "own"
-									? "It has its own schedule. Change it on the Schedules page."
-									: badTime
-										? "Enter a time, for example 06:00."
-										: "Night Shift syncs it at this time."}
+							{!schedules
+								? "Only the owner of this computer can change when it syncs."
+								: !times.on
+									? "Sync it only when you choose Sync now."
+									: times.kind === "own"
+										? "It has its own schedule. Change it on the Schedules page."
+										: badTime
+											? "Enter a time, for example 06:00."
+											: "Night Shift syncs it at this time."}
 						</FieldDescription>
 					</FieldContent>
 					{times.kind === "daily" ? (
@@ -334,7 +349,7 @@ function SourceForm({
 							id={`${id}-time`}
 							type="time"
 							value={times.time}
-							disabled={!times.on}
+							disabled={!times.on || !schedules}
 							aria-label="Sync time"
 							aria-invalid={badTime}
 							aria-describedby={`${id}-keep-hint`}
@@ -350,20 +365,22 @@ function SourceForm({
 					) : null}
 				</Field>
 
-				<Field orientation="horizontal" className="items-start">
-					<Switch
-						id={`${id}-now`}
-						checked={syncNow}
-						className="mt-0.5"
-						onCheckedChange={setSyncNow}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor={`${id}-now`}>Sync now</FieldLabel>
-						<FieldDescription>
-							Night Shift starts a sync when you save.
-						</FieldDescription>
-					</FieldContent>
-				</Field>
+				{startRuns ? (
+					<Field orientation="horizontal" className="items-start">
+						<Switch
+							id={`${id}-now`}
+							checked={syncNow}
+							className="mt-0.5"
+							onCheckedChange={setSyncNow}
+						/>
+						<FieldContent>
+							<FieldLabel htmlFor={`${id}-now`}>Sync now</FieldLabel>
+							<FieldDescription>
+								Night Shift starts a sync when you save.
+							</FieldDescription>
+						</FieldContent>
+					</Field>
+				) : null}
 			</FieldGroup>
 
 			<DialogFooter>

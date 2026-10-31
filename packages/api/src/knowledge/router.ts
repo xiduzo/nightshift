@@ -1,4 +1,4 @@
-import { ROLE_REFUSAL } from "@nightshift/auth";
+import { type Permissions, ROLE_REFUSAL } from "@nightshift/auth";
 import { knowledgeSources } from "@nightshift/engine";
 import {
 	flowNameSchema,
@@ -42,6 +42,18 @@ function rightsOf(context: Pick<Context, "access" | "daemon">) {
 	};
 }
 
+/**
+ * The roles each change of a source needs, for its procedure and for what
+ * `knowledge.get` says the person may do. Adding or editing a source saves
+ * a flow. Removing one removes a flow. Syncing one, and removing its
+ * files, changes the knowledge: a role that may start runs (ADR 4).
+ */
+const MAY = {
+	save: { flow: ["save"] },
+	remove: { flow: ["remove"] },
+	changeKnowledge: { run: ["start"] },
+} satisfies Record<string, Permissions>;
+
 /** The clock of the person who saves a schedule, such as `Europe/Amsterdam`. */
 const timeZoneSchema = z.string().refine(isTimeZone, {
 	message: "Choose a time zone such as Europe/Amsterdam.",
@@ -81,10 +93,23 @@ export const knowledge = {
 		})
 		.output(output(knowledgeSchema))
 		.input(z.object({ projectId: z.string() }))
-		.handler(
-			({ context, input }): Promise<KnowledgeView> =>
+		.handler(async ({ context, input }): Promise<KnowledgeView> => {
+			const [view, save, remove, changeKnowledge] = await Promise.all([
 				sourcesOf(context).list(input.projectId),
-		),
+				context.access.can(MAY.save),
+				context.access.can(MAY.remove),
+				context.access.can(MAY.changeKnowledge),
+			]);
+			return {
+				...view,
+				can: {
+					save,
+					remove,
+					startRuns: changeKnowledge,
+					schedules: rightsOf(context).schedules,
+				},
+			};
+		}),
 	/**
 	 * Adds a source to the project's knowledge, or changes one the page
 	 * added (`name`): its flow, which calls the kit with the values given
@@ -94,7 +119,7 @@ export const knowledge = {
 	 * schedule is this computer's owner's. Returns the flow's name and its
 	 * problems.
 	 */
-	saveSource: permitted({ flow: ["save"] })
+	saveSource: permitted(MAY.save)
 		.route({
 			summary:
 				"Adds a source to a project's knowledge, or changes one: a flow that calls a knowledge kit, and its schedule.",
@@ -127,7 +152,7 @@ export const knowledge = {
 	 * files changes the knowledge, so it asks a role that may start runs
 	 * (ADR 4). Returns how many files it removed.
 	 */
-	removeSource: permitted({ flow: ["remove"] })
+	removeSource: permitted(MAY.remove)
 		.route({
 			summary:
 				"Removes a source from a project's knowledge: its flow, its schedules and, if asked, its files.",
@@ -144,7 +169,7 @@ export const knowledge = {
 			// Removing files changes the knowledge: a role that may start runs (ADR 4).
 			if (
 				input.removeFiles &&
-				!(await context.access.can({ run: ["start"] }))
+				!(await context.access.can(MAY.changeKnowledge))
 			) {
 				throw refusalError(ROLE_REFUSAL);
 			}
@@ -159,7 +184,7 @@ export const knowledge = {
 	 * Syncs a source the page added now: a run of its flow, on the computer
 	 * its schedule names when it reads a folder there.
 	 */
-	syncSource: permitted({ run: ["start"] })
+	syncSource: permitted(MAY.changeKnowledge)
 		.route({
 			summary:
 				"Syncs a knowledge source now: starts a run of its flow where its schedule runs it.",

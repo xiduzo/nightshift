@@ -52,7 +52,12 @@ import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { knowledgeMutations } from "./queries";
 import type { EditedSource } from "./source-dialog";
-import { lastSyncText, scheduleText, sourceSummary } from "./source-words";
+import {
+	lastSyncText,
+	scheduleText,
+	sourceActions,
+	sourceSummary,
+} from "./source-words";
 
 type Sync = Knowledge["syncs"][number];
 
@@ -64,17 +69,20 @@ function kitLabel(kit: string): string {
 /**
  * Where the knowledge comes from: each source with what it copies, its
  * last sync and Sync now. A source the page added has Edit and Remove. A
- * sync flow someone drew opens in the editor.
+ * sync flow someone drew opens in the editor. Each action shows only to a
+ * person who may use it.
  */
 export function Sources({
 	projectId,
 	syncs,
 	shared,
+	can,
 	onEdit,
 }: {
 	projectId: string;
 	syncs: Knowledge["syncs"];
 	shared: boolean;
+	can: Knowledge["can"];
 	onEdit: (source: EditedSource) => void;
 }) {
 	const [removing, setRemoving] = useState<Sync | null>(null);
@@ -101,6 +109,7 @@ export function Sources({
 						key={sync.flow}
 						projectId={projectId}
 						sync={sync}
+						may={sourceActions(sync, can)}
 						onEdit={onEdit}
 						onRemove={() => setRemoving(sync)}
 					/>
@@ -109,6 +118,7 @@ export function Sources({
 			<RemoveSourceDialog
 				projectId={projectId}
 				sync={removing}
+				removesFiles={can.startRuns}
 				onClose={() => setRemoving(null)}
 			/>
 		</PageSection>
@@ -118,11 +128,13 @@ export function Sources({
 function SourceItem({
 	projectId,
 	sync,
+	may,
 	onEdit,
 	onRemove,
 }: {
 	projectId: string;
 	sync: Sync;
+	may: ReturnType<typeof sourceActions>;
 	onEdit: (source: EditedSource) => void;
 	onRemove: () => void;
 }) {
@@ -174,7 +186,7 @@ function SourceItem({
 				</ItemDescription>
 			</ItemContent>
 			<ItemActions>
-				<SyncNowButton projectId={projectId} sync={sync} />
+				{may.sync ? <SyncNowButton projectId={projectId} sync={sync} /> : null}
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
@@ -188,7 +200,7 @@ function SourceItem({
 						<EllipsisIcon aria-hidden="true" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
-						{source ? (
+						{source && may.edit ? (
 							<DropdownMenuItem
 								onClick={() =>
 									onEdit({
@@ -213,7 +225,7 @@ function SourceItem({
 							<WorkflowIcon aria-hidden="true" />
 							Open flow
 						</DropdownMenuItem>
-						{source ? (
+						{source && may.remove ? (
 							<>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem variant="destructive" onClick={onRemove}>
@@ -301,15 +313,18 @@ function SyncNowButton({ projectId, sync }: { projectId: string; sync: Sync }) {
 function RemoveSourceDialog({
 	projectId,
 	sync,
+	removesFiles,
 	onClose,
 }: {
 	projectId: string;
 	sync: Sync | null;
+	/** The person may remove the files too. */
+	removesFiles: boolean;
 	onClose: () => void;
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
-	const [removeFiles, setRemoveFiles] = useState(true);
+	const [removeFiles, setRemoveFiles] = useState(removesFiles);
 	const label = sync?.source ? knowledgeSourceKind(sync.source.kit).label : "";
 	const remove = useMutation(
 		knowledgeMutations.removeSource({
@@ -345,16 +360,18 @@ function RemoveSourceDialog({
 							: "Night Shift stops syncing this source."}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
-				<Field orientation="horizontal">
-					<Checkbox
-						id={`${id}-files`}
-						checked={removeFiles}
-						onCheckedChange={(checked) => setRemoveFiles(checked === true)}
-					/>
-					<FieldLabel htmlFor={`${id}-files`} className="font-normal">
-						Also remove the files it added, on every computer of this Space
-					</FieldLabel>
-				</Field>
+				{removesFiles ? (
+					<Field orientation="horizontal">
+						<Checkbox
+							id={`${id}-files`}
+							checked={removeFiles}
+							onCheckedChange={(checked) => setRemoveFiles(checked === true)}
+						/>
+						<FieldLabel htmlFor={`${id}-files`} className="font-normal">
+							Also remove the files it added, on every computer of this Space
+						</FieldLabel>
+					</Field>
+				) : null}
 				<AlertDialogFooter>
 					<AlertDialogCancel>Cancel</AlertDialogCancel>
 					<AlertDialogAction
@@ -362,7 +379,11 @@ function RemoveSourceDialog({
 						disabled={remove.isPending}
 						onClick={() => {
 							if (!sync) return;
-							remove.mutate({ projectId, name: sync.flow, removeFiles });
+							remove.mutate({
+								projectId,
+								name: sync.flow,
+								removeFiles: removesFiles && removeFiles,
+							});
 						}}
 					>
 						{remove.isPending ? <Spinner data-icon="inline-start" /> : null}
