@@ -454,9 +454,14 @@ Moved from 4.4, unchanged. It goes last, when the proof of 5.6 is in.
   `delta.md`).
 - Learnings that expire or merge: an accepted learning older than 90 days
   comes back to a Gate.
-- Learnings in the step console, and the digest in the web inbox.
+- Learnings in the step console, and the digest in the web inbox. Done:
+  the step console (3f30bbc3), the web inbox (7160bba3).
 - The Agents page shows OpenCode as found while it reports a problem. Fix
-  that.
+  that. Done: a found agent CLI shows its check's problem (a02d3469).
+- The Knowledge page hides the source actions a person may not use. Done:
+  `knowledge.get` says `can` (f4a3d658).
+- A source value with `{{` made its flow impossible to edit. Done: it is
+  refused, in the dialog and the engine (d196414b).
 - A search snippet shows a score of 0. Fixed 2026-10-31 (5.2): the score is the fused rank score, never 0.
 - gh-aw lock file export and the ACP registry listing, an afternoon each.
 
