@@ -109,6 +109,7 @@ export {
 	leaseNodeSchema,
 	leaseOutcomes,
 	leaseOutputFields,
+	leaseSection,
 } from "./lease";
 export {
 	type Option,

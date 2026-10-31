@@ -1,5 +1,6 @@
 /**
- * Sections: named frames around nodes of one flow, for the editor only.
+ * Sections: named frames around nodes of one flow, for the editor. A
+ * Lease node may hold its lease for one: the engine reads it then.
  * Whether nodes can form a Section, and the edges that cross its frame.
  * The edits that add, change and remove Sections are in `draft/`.
  */

@@ -353,4 +353,9 @@ export type NodeCheck = {
 	eventRule: (expr: string, subject: string) => void;
 	/** Whether an edge leaves the node on this outcome. */
 	routed: (outcome: string) => boolean;
+	/**
+	 * Every node in the Section `id` of the flow, at any depth, or null
+	 * when the flow has no such Section.
+	 */
+	section: (id: string) => readonly string[] | null;
 };

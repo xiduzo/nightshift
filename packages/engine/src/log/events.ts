@@ -110,6 +110,9 @@ export type WaitReason =
 	/** A Lease node waits for a lease another run holds, or for the Host that keeps it. */
 	| "lease";
 
+/** The Section a lease holds for (`LeaseTaken.section`): its id, and every node in it. */
+export type HoldSection = { id: string; nodes: readonly string[] };
+
 /** The lease a Lease node waits for (`WaitStarted.lease`). */
 export type LeaseWait = {
 	name: string;
@@ -476,8 +479,9 @@ export type EnginePayloads = {
 	};
 	/**
 	 * A Lease node's step took the lease `name` of the run's Space (ADR 7).
-	 * The run holds it until it ends. Logged on the step, in the scope of
-	 * the flow the node is in.
+	 * The run holds it until it leaves its Section, or until it ends.
+	 * Logged on the step, in the scope of the flow the node is in. A run
+	 * that resumes takes its leases again: then on no step, with `again`.
 	 */
 	LeaseTaken: {
 		name: string;
@@ -485,7 +489,18 @@ export type EnginePayloads = {
 		ttlMinutes: number;
 		/** The scope of the flow the node is in. Null at the top level. */
 		scope: Scope | null;
+		/** The Section the lease holds for, with every node in it. Absent: the run. */
+		section?: HoldSection;
+		/** A resumed run took the lease again. */
+		again?: true;
 	};
+	/**
+	 * The run let go of the lease `name` before its end. `scope`: it left
+	 * the lease's Section. `person`: a person released it by hand.
+	 * `expired`: the lease expired while the run lived, because its Host
+	 * did not hear from this Device for its ttl.
+	 */
+	LeaseReleased: { name: string; why: "scope" | "person" | "expired" };
 	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
 	WaitEnded: { early: boolean; signal?: string };
 	StopRequested: Record<string, never>;

@@ -103,7 +103,10 @@ describe("the lease keeper", () => {
 		const keeper = keeperFor();
 		await keeper.take(run("run-a"), { name: "stack" });
 		await keeper.take(run("run-a"), { name: "branch:x" });
-		await leaseHolds(keeper).ended("run-a", "finished");
+		await leaseHolds({
+			keeper,
+			log: { append: async () => ({}) as never },
+		}).ended("run-a", "finished");
 		expect(await store.list("space-1")).toEqual([]);
 		expect(freed).toBe(1);
 	});
@@ -113,7 +116,10 @@ describe("the lease keeper", () => {
 		async (status) => {
 			const keeper = keeperFor();
 			await keeper.take(run("run-a"), { name: "stack" });
-			await leaseHolds(keeper).ended("run-a", status);
+			await leaseHolds({
+				keeper,
+				log: { append: async () => ({}) as never },
+			}).ended("run-a", status);
 			expect(await store.list("space-1")).toEqual([]);
 		},
 	);
@@ -121,7 +127,10 @@ describe("the lease keeper", () => {
 	test("given an interrupted run, then it keeps its leases until it does not continue", async () => {
 		const keeper = keeperFor();
 		await keeper.take(run("run-a"), { name: "stack" });
-		const holds = leaseHolds(keeper);
+		const holds = leaseHolds({
+			keeper,
+			log: { append: async () => ({}) as never },
+		});
 		await holds.ended("run-a", "interrupted");
 		expect(await store.list("space-1")).toHaveLength(1);
 		await holds.notContinuing("run-a");

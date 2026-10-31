@@ -147,12 +147,14 @@ export type StepContext = {
 	leases: LeaseTaker;
 };
 
-/** How a Lease node takes its lease (`StepContext.leases`). */
+/** How a Lease node takes its lease, and how a run lets go of one when it leaves its Section (`StepContext.leases`). */
 export type LeaseTaker = {
 	take(
 		run: Pick<RunRow, "id" | "spaceId" | "title">,
 		input: { name: string; ttlMinutes?: number },
 	): Promise<LeaseAnswer>;
+	/** Lets go of the run's leases of these names. */
+	release(runId: string, names: readonly string[]): Promise<void>;
 };
 
 /** A node of the compiled graph: runs one visit and returns where to go next. */

@@ -2949,6 +2949,38 @@ describe("the Lease node", () => {
 		]);
 	});
 
+	test("given a Section scope, then the Section must exist and hold the node", () => {
+		const nodes = [lease({ name: "stack" }), command("work"), stop("skip")];
+		const edges = [
+			edge("a", "own", "held", "work"),
+			edge("b", "own", "busy", "skip"),
+		];
+		const scoped = (section: string, members: string[]) =>
+			validateFlow({
+				...flow(
+					[lease({ name: "stack", scope: { section } }), ...nodes.slice(1)],
+					edges,
+					"own",
+				),
+				sections: [{ id: "deploy", label: "Deploy", nodes: members }],
+			});
+		expect(errors(scoped("deploy", ["own", "work"]))).toEqual([]);
+		expect(
+			errors(scoped("ghost", ["own", "work"])).map((i) => i.message),
+		).toEqual([
+			'Lease node "own" holds its lease until the run leaves the Section "ghost", but the flow has no such Section. Pick a Section, or hold the lease for the whole run.',
+		]);
+		expect(errors(scoped("deploy", ["work"])).map((i) => i.message)).toEqual([
+			'Lease node "own" holds its lease for the Section "deploy", but it is not in that Section. Move the node into the Section, or pick the Section it is in.',
+		]);
+	});
+
+	test("a ttl under 2 minutes does not parse: the run renews the lease every minute", () => {
+		expect(() =>
+			flowSchema.parse(flow([lease({ ttlMinutes: 1 })], [], "own")),
+		).toThrow();
+	});
+
 	test("a negative wait does not parse", () => {
 		expect(() =>
 			flowSchema.parse(flow([lease({ waitMinutes: -1 })], [], "own")),

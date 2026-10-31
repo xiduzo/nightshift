@@ -775,6 +775,11 @@ export function createRunner(deps: RunnerDeps) {
 			now: deps.now(),
 		});
 		if (released) throw new Refusal("unavailable", RELEASED);
+		// What it held, it takes again before its next step, or it stays where it is.
+		await holds.resuming(row, await log.state(runId), {
+			nodeId: plan.resumed.nodeId,
+			scope: plan.resumed.scope ?? null,
+		});
 		await log.append({ type: "RunResumed", runId, payload: plan.resumed });
 		try {
 			if (plan.clearTasks) await thread.clearTasks();
