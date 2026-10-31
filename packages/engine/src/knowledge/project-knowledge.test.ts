@@ -13,6 +13,7 @@ import { project } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import type { ArchiveHost } from "../archive";
+import { OLDER_HOST, OlderHostError } from "../contract";
 import { createSandbox, type Sandbox } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import { otherSpace } from "../testing/test-support";
@@ -148,6 +149,45 @@ describe("a step's knowledge", () => {
 			title: "Home",
 			text: "# Home\n\nThe wiki.\n",
 		});
+	});
+});
+
+describe("a Host of an older version", () => {
+	test("gets a plain message, not a failed sync: the Device works on its own copy and does not ask again for a while", async () => {
+		let calls = 0;
+		const older: ArchiveHost = {
+			async archivePut() {
+				calls++;
+				throw new OlderHostError();
+			},
+			async archiveGet() {
+				calls++;
+				throw new OlderHostError();
+			},
+		};
+		const a = await device(older);
+		await a.put("wiki/Home.md", "# Home\n");
+		const first = await a.knowledge.listing("p1");
+		expect(first.olderHost).toBe(true);
+		// The step goes on: its files are in the document of this Device.
+		expect(first.files.map((f) => f.path)).toEqual(["wiki/Home.md"]);
+		expect(calls).toBe(1);
+
+		await a.put("wiki/Next.md", "# Next\n");
+		const step = await a.knowledge.forCommand({ projectId: "p1" });
+		await step.done();
+		expect(calls).toBe(1);
+		expect(await a.paths()).toContain("wiki/Next.md");
+
+		// A file another Device listed cannot come from that Host: it says why.
+		const b = await device(older);
+		applyUpdate(
+			(await b.documents.open("p1")).doc,
+			encodeStateAsUpdate((await a.documents.open("p1")).doc),
+		);
+		await expect(b.knowledge.read("p1", "wiki/Home.md", 1024)).rejects.toThrow(
+			OLDER_HOST,
+		);
 	});
 });
 

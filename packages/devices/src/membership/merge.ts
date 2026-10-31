@@ -12,7 +12,6 @@ import {
 	type PeerProjects,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import { ORPCError } from "@orpc/client";
 import { and, eq, isNull } from "drizzle-orm";
 import type {
 	PersonalMerge as HostAnswer,
@@ -28,6 +27,7 @@ import {
 	fromHost,
 	type HostLinks,
 	type HostSpaces,
+	isOlderHost,
 	type Link,
 } from "../links";
 import { backupDatabase } from "./backup";
@@ -261,10 +261,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 				}),
 			);
 		} catch (error) {
-			if (
-				error instanceof ORPCError &&
-				(error.code === "NOT_FOUND" || error.status === 404)
-			) {
+			if (isOlderHost(error)) {
 				throw new Refusal("unavailable", MERGE_WORDS.olderHost, {
 					cause: error,
 				});

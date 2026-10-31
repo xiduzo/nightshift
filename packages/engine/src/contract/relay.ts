@@ -18,6 +18,22 @@ export class HostUnreachableError extends Refusal {
 	}
 }
 
+/** What a person reads when the Host that keeps a Space cannot exchange knowledge yet. */
+export const OLDER_HOST =
+	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to share this knowledge with your other devices.";
+
+/**
+ * The Host that keeps the Space runs an older version of Night Shift: it
+ * does not know the procedures of a call, so it answers that it has none.
+ * Not a failure: this computer works on its own copy and asks again later.
+ */
+export class OlderHostError extends Refusal {
+	constructor() {
+		super("unavailable", OLDER_HOST);
+		this.name = "OlderHostError";
+	}
+}
+
 /**
  * What the engine asks of the Hosts this Device links to: the actions on
  * rows another Device owns. `@nightshift/devices` gives it (with more, for

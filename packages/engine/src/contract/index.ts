@@ -20,6 +20,8 @@ export type {
 export {
 	HOST_UNREACHABLE,
 	HostUnreachableError,
+	OLDER_HOST,
+	OlderHostError,
 	type Relay,
 	type RunCommandInput,
 	type RunCommandKind,

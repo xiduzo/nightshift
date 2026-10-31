@@ -69,6 +69,8 @@ export const knowledgeSchema = z.object({
 		/** Change when a source syncs on its own: this computer's owner only. */
 		schedules: z.boolean(),
 	}),
+	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
+	olderHost: z.boolean(),
 });
 export type KnowledgeView = z.infer<typeof knowledgeSchema>;
 

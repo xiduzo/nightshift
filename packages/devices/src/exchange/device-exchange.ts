@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
 import { documentName, type Engine } from "@nightshift/engine";
-import { ORPCError } from "@orpc/client";
 import type { HostClient, RunCommand, RunRows } from "../contract";
-import { type HostSpaces, type Link, pause } from "../links";
+import { type HostSpaces, isOlderHost, type Link, pause } from "../links";
 import { isEmpty, MissingProjectError, mergeCursors } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
 
@@ -274,7 +273,7 @@ export function createDeviceExchange(deps: {
 		try {
 			stream = await client.sync.commands({}, { signal });
 		} catch (error) {
-			if (!olderHost(error)) throw error;
+			if (!isOlderHost(error)) throw error;
 			// Its Commands come with the rows. It may be updated meanwhile:
 			// ask again in an hour.
 			await pause(OLDER_HOST_WAIT_MS, signal);
@@ -366,11 +365,3 @@ export function createDeviceExchange(deps: {
 
 /** How long the Commands stream waits before it asks a Host of an older version again. */
 const OLDER_HOST_WAIT_MS = 60 * 60_000;
-
-/** A Host of a version before `sync.commands`: it does not know the procedure. */
-function olderHost(error: unknown): boolean {
-	return (
-		error instanceof ORPCError &&
-		(error.code === "NOT_FOUND" || error.status === 404)
-	);
-}

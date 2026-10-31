@@ -151,13 +151,24 @@ function KnowledgeView({
 			</div>
 		);
 	}
-	const { files, syncs, tooLarge, proposed, reviews, shared, can } =
+	const { files, syncs, tooLarge, proposed, reviews, shared, can, olderHost } =
 		knowledge.data;
 	if (files.length === 0 && syncs.length === 0 && proposed === 0) {
 		return <NoKnowledge onAdd={onAdd} />;
 	}
 	return (
 		<>
+			{olderHost ? (
+				<Alert>
+					<TriangleAlertIcon />
+					<AlertTitle>This knowledge stays on this computer for now</AlertTitle>
+					<AlertDescription>
+						The computer that keeps this Space runs an older version of Night
+						Shift. Update Night Shift there to share this knowledge with your
+						other devices.
+					</AlertDescription>
+				</Alert>
+			) : null}
 			{proposed > 0 ? (
 				<Learnings
 					projectId={projectId}

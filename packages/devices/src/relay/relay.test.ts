@@ -1,6 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import {
 	HostUnreachableError,
+	OlderHostError,
 	type OwnDevice,
 	type TranscriptEntry,
 	HOST_UNREACHABLE as UNREACHABLE,
@@ -475,6 +476,34 @@ describe("the relay, for a Space a Host keeps", () => {
 			},
 		]);
 		expect(enqueued).toEqual([]);
+	});
+
+	test("a Host of an older version, which does not know the knowledge procedures, says so: not a failed sync", async () => {
+		const host = fakeHost();
+		const archive = (
+			host.client as unknown as { archive: Record<string, unknown> }
+		).archive;
+		const unknown = async () => {
+			throw new ORPCError("NOT_FOUND", { message: "Not found" });
+		};
+		archive.knowledgePut = unknown;
+		archive.knowledgeGet = unknown;
+		const { relay } = relayWith(host);
+		const act = actions(relay, "space-team");
+		await expect(act.contentPut()).rejects.toBeInstanceOf(OlderHostError);
+		await expect(act.contentGet()).rejects.toBeInstanceOf(OlderHostError);
+
+		// A refusal of a Host of this version keeps its words.
+		archive.knowledgePut = async () => {
+			throw new ORPCError("BAD_REQUEST", {
+				message: "That Space does not exist.",
+				data: { kind: "not-found" },
+			});
+		};
+		await expect(act.contentPut()).rejects.toMatchObject({
+			kind: "not-found",
+			message: "That Space does not exist.",
+		});
 	});
 
 	test("a run starts on the Host once the project's flows are in step with it", async () => {

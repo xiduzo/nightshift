@@ -69,7 +69,8 @@ export type ArchiveHost = {
 	/**
 	 * Keeps a file in the archive of the Host that keeps its Space. False
 	 * for a Space this Replica keeps: nothing went. Throws
-	 * `HostUnreachableError` when that Host cannot be reached, and the
+	 * `HostUnreachableError` when that Host cannot be reached,
+	 * `OlderHostError` when it cannot keep knowledge content yet, and the
 	 * Host's refusal.
 	 */
 	archivePut(entry: ArchiveEntry): Promise<boolean>;
@@ -77,7 +78,8 @@ export type ArchiveHost = {
 	 * A file from the archive of the Host that keeps its Space: the Host
 	 * checks a step's file against its own log. Null for a Space this
 	 * Replica keeps, and when that Host has none. Throws when that Host
-	 * cannot be reached.
+	 * cannot be reached, and `OlderHostError` for knowledge content it
+	 * cannot keep yet.
 	 */
 	archiveGet(ref: ArchiveRef): Promise<string | Uint8Array | null>;
 };

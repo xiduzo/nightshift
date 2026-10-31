@@ -18,6 +18,7 @@ import {
 	sha256OfFile,
 	writeWhole,
 } from "../archive";
+import { OLDER_HOST, OlderHostError } from "../contract";
 import type { PersistedDocument } from "../documents";
 import { LOCAL_ONLY_BYTES } from "./documents";
 import {
@@ -97,6 +98,11 @@ export type KnowledgeListing = {
 	proposed: number;
 	/** The Project's Space is not a personal one: each of its Members reads the knowledge. */
 	shared: boolean;
+	/**
+	 * The Host that keeps the Space runs an older version of Night Shift:
+	 * it cannot take this knowledge yet. This Device works on its own copy.
+	 */
+	olderHost: boolean;
 };
 
 export type KnowledgeSyncDeps = {
@@ -126,6 +132,11 @@ const STATE_FILE = ".reconciled.json";
 /** How long a reconcile waits for the document to be in step with the Host: before it, and after a change. */
 const IN_STEP_BEFORE_MS = 3_000;
 const IN_STEP_AFTER_MS = 10_000;
+/**
+ * How long a Device works on its own copy after the Host of a Space said
+ * it runs an older version: then it asks again. As the run exchange does.
+ */
+const OLDER_HOST_WAIT_MS = 60 * 60_000;
 /** How many files a reconcile reads, writes or fetches at once. */
 const AT_ONCE = 8;
 
@@ -170,6 +181,20 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 	const { db, folders, archive, deviceId } = deps;
 	/** The projects whose content waits for the Host. */
 	const pending = new Set<string>();
+	/**
+	 * The Spaces whose Host runs an older version of Night Shift, until
+	 * when this Device asks it again. Its first knowledge call tells: then
+	 * no reconcile waits for its documents or calls it until that time.
+	 */
+	const olderHosts = new Map<string, number>();
+	const isOlder = (spaceId: string) =>
+		(olderHosts.get(spaceId) ?? 0) > Date.now();
+	/** What a failed knowledge call to the Host says about it. */
+	function heard(spaceId: string, error: unknown): void {
+		if (error instanceof OlderHostError) {
+			olderHosts.set(spaceId, Date.now() + OLDER_HOST_WAIT_MS);
+		}
+	}
 
 	async function spaceOf(projectId: string): Promise<string | null> {
 		const [row] = await db
@@ -202,10 +227,14 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		const spaceId: string = space;
 		const root = folders.folder(projectId);
 		const document = await deps.documents.open(projectId);
+		// A Host of an older version takes no knowledge: no wait, no call.
+		const older = isOlder(spaceId);
 		// The Host's changes first, a short while: the step must not wait long.
-		await deps
-			.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_BEFORE_MS })
-			.catch(() => {});
+		if (!older) {
+			await deps
+				.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_BEFORE_MS })
+				.catch(() => {});
+		}
 		await mkdir(root, { recursive: true });
 
 		const state = await readState(root);
@@ -216,7 +245,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		);
 		const unpushed = new Set(state?.unpushed ?? []);
 		/** The Host failed once: the rest waits for the next reconcile. */
-		let offline = false;
+		let offline = older;
 		const ref = (sha256: string) => ({
 			kind: "content" as const,
 			spaceId,
@@ -229,8 +258,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				try {
 					await archive.put({ ref: ref(sha256), content });
 					unpushed.delete(sha256);
+					olderHosts.delete(spaceId);
 					return;
-				} catch {
+				} catch (error) {
+					heard(spaceId, error);
 					offline = true;
 				}
 			}
@@ -251,7 +282,8 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			if (offline) return archive.here.read(ref(sha256));
 			try {
 				return await archive.read(ref(sha256));
-			} catch {
+			} catch (error) {
+				heard(spaceId, error);
 				offline = true;
 				return null;
 			}
@@ -426,7 +458,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		});
 		if (unpushed.size > 0) pending.add(projectId);
 		else pending.delete(projectId);
-		if (sets.length > 0 || deletes.length > 0) {
+		if ((sets.length > 0 || deletes.length > 0) && !isOlder(spaceId)) {
 			// This Device's changes reach the Host before the step ends: the
 			// next step on another Device reads them.
 			await deps
@@ -583,6 +615,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				files,
 				proposed,
 				shared: spaceId ? await isShared(spaceId) : false,
+				olderHost: spaceId ? isOlder(spaceId) : false,
 			};
 		},
 		/**
@@ -616,7 +649,13 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			}
 			const content = await archive
 				.read({ kind: "content", spaceId, sha256: entry.sha256 })
-				.catch(() => null);
+				.catch((error: unknown) => {
+					heard(spaceId, error);
+					return null;
+				});
+			if (!content && isOlder(spaceId)) {
+				throw new Refusal("unavailable", OLDER_HOST);
+			}
 			if (!content) {
 				throw new Refusal(
 					"unavailable",

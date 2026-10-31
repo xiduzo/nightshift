@@ -2,7 +2,7 @@
 
 export { backoff, pause } from "./backoff";
 export type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
-export { fromHost } from "./from-host";
+export { fromHost, isOlderHost } from "./from-host";
 export {
 	createHostLinks,
 	type DeviceKeyStore,

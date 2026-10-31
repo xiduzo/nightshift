@@ -67,6 +67,8 @@ export type KnowledgeOverview = {
 	reviews: string[];
 	/** The Space is not a personal one: each of its Members reads the knowledge. */
 	shared: boolean;
+	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
+	olderHost: boolean;
 };
 
 /** What the person who asks may do, as the API checked it. */
@@ -137,11 +139,12 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 		 */
 		async list(projectId: string): Promise<KnowledgeOverview> {
 			const flows = await space.flows.map(projectId);
-			const [{ files, proposed, shared }, schedules, runs] = await Promise.all([
-				deps.files.listing(projectId),
-				savedSchedules(projectId),
-				space.listRuns({ projectId, limit: LAST_RUNS }),
-			]);
+			const [{ files, proposed, shared, olderHost }, schedules, runs] =
+				await Promise.all([
+					deps.files.listing(projectId),
+					savedSchedules(projectId),
+					space.listRuns({ projectId, limit: LAST_RUNS }),
+				]);
 			const used = Object.entries(flows)
 				.map(([flow, parsed]) => ({
 					flow,
@@ -186,6 +189,7 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 					.filter(({ kits }) => kits.includes(REVIEW_LEARNINGS_KIT))
 					.map(({ flow }) => flow),
 				shared,
+				olderHost,
 			};
 		},
 		/**

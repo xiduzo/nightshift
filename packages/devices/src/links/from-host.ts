@@ -11,6 +11,19 @@ import { refusalDataSchema } from "../contract";
 export const NOT_PAIRED =
 	"This computer is no longer paired with the Host of this Space. Choose Join a Host in Settings to pair it again.";
 
+/**
+ * Whether a Host answered a call as a Host of an older version does: it
+ * does not know the procedure (NOT_FOUND). A refusal of this version's
+ * Host comes as BAD_REQUEST with its kind, never as NOT_FOUND. This is
+ * the one test of a Host's version: the link has no other.
+ */
+export function isOlderHost(error: unknown): boolean {
+	return (
+		error instanceof ORPCError &&
+		(error.code === "NOT_FOUND" || error.status === 404)
+	);
+}
+
 /** The kind of refusal each code of the peer protocol is (`hostContract`). */
 const KIND_OF_CODE: Record<string, RefusalKind> = {
 	BAD_REQUEST: "invalid",

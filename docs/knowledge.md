@@ -52,6 +52,11 @@ cannot copy waits. Night Shift tries again each minute and at the next
 reconcile. A file whose content it cannot fetch keeps its old version
 until the next reconcile. The step continues.
 
+A Host of an older version does not know the knowledge procedures. Its
+first answer tells the computer so, as it tells the run exchange. Then the
+computer works on its own copy and asks again after an hour. The Knowledge
+page says that the Host needs an update.
+
 The first start after the upgrade reconciles each folder a computer has,
 and so publishes its files. When two computers have one path, the later
 change wins.

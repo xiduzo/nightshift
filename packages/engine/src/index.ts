@@ -36,6 +36,7 @@ export type {
 export {
 	HOST_UNREACHABLE,
 	HostUnreachableError,
+	OlderHostError,
 	startRunInputSchema,
 } from "./contract";
 export {

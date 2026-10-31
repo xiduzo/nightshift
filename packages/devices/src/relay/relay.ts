@@ -1,12 +1,18 @@
 import {
 	type FlowDocuments,
 	HostUnreachableError,
+	OlderHostError,
 	type WalkFile,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import type { HostRelay, InStep } from "../contract";
+import type { HostClient, HostRelay, InStep } from "../contract";
 import type { RunCommands } from "../exchange";
-import { type DeviceLinks, fromHost, type HostSpaces } from "../links";
+import {
+	type DeviceLinks,
+	fromHost,
+	type HostSpaces,
+	isOlderHost,
+} from "../links";
 import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
 
@@ -26,6 +32,24 @@ import { createSpaceRoutes } from "./route";
  * refusals keep their words and their kind, and a key the Host no longer
  * knows asks the person to pair this computer again.
  */
+/**
+ * A knowledge call to a Host: a Host of a version before knowledge in the
+ * Space (ADR 4) does not know the procedure, and says so as a Host of an
+ * older version does (`isOlderHost`). That is `OlderHostError`, not a
+ * failed sync. Its other errors in this computer's words (`fromHost`).
+ */
+async function knowledgeCall<T>(
+	client: HostClient,
+	use: (client: HostClient) => Promise<T>,
+): Promise<T> {
+	try {
+		return await use(client);
+	} catch (error) {
+		if (isOlderHost(error)) throw new OlderHostError();
+		throw fromHost(error);
+	}
+}
+
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
 	engine(): {
@@ -99,7 +123,7 @@ export function createRelay(deps: {
 			}
 			// Knowledge content travels in base64.
 			const { spaceId, sha256 } = ref;
-			const content = await to.ask((client) =>
+			const content = await knowledgeCall(to.client, (client) =>
 				client.archive.knowledgeGet({ spaceId, sha256 }),
 			);
 			return content === null
@@ -116,7 +140,7 @@ export function createRelay(deps: {
 				const content = Buffer.from(entry.content as Uint8Array).toString(
 					"base64",
 				);
-				await to.ask((client) =>
+				await knowledgeCall(to.client, (client) =>
 					client.archive.knowledgePut({ spaceId, sha256, content }),
 				);
 			} else {
