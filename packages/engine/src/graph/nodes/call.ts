@@ -1,5 +1,18 @@
-import { type CallNode, type Outcome, runsEach } from "@nightshift/flows";
+import type { Command } from "@langchain/langgraph";
+import {
+	type CallNode,
+	type Outcome,
+	personTierIndex,
+	runsEach,
+} from "@nightshift/flows";
 import type { InputValues, StepOutputs } from "../../log";
+import {
+	climbAt,
+	climbOutputs,
+	climbSpec,
+	climbValues,
+	tierAt,
+} from "../cascade";
 import {
 	endedAtReason,
 	messageOf,
@@ -12,7 +25,8 @@ import {
 import { eachOutputs } from "../each";
 import { renderBindings, resolveInputs } from "../inputs";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
-import { route, routeDone, scopeOf } from "../route";
+import { route, routeDone, type StepEnd, scopeOf } from "../route";
+import type { CascadePosition, RunStateUpdate } from "../state";
 import { beginStep } from "../step-runner";
 import {
 	type BodyGraph,
@@ -23,6 +37,7 @@ import {
 	runBody,
 } from "./body";
 import { callEachNode } from "./call-each";
+import { climbAskNode, retryGate } from "./climb-gate";
 
 /**
  * The Call node: runs another flow as a subgraph of the node (design rule
@@ -51,134 +66,208 @@ import { callEachNode } from "./call-each";
  */
 export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 	if (runsEach(node)) return callEachNode(node, ctx);
-	let graph: BodyGraph | null = null;
-	return async (state, config) => {
-		const runId = ctx.run.id;
-		const runState = await ctx.log.state(runId);
-		const point = resumePoint(
-			node,
-			state,
-			runState,
-			scopeOf(config),
-			CALL.resumeRules(node),
-		);
-		if (point.kind === "done") {
-			return routeDone(ctx, state, node, point, config);
-		}
-		const begun = await beginStep(
-			ctx,
-			node,
-			state,
-			config,
-			entryOf(point),
-			runState,
-		);
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-		const { stepId, visit } = step;
+	// One compiled body per flow: a cascade's tiers may call other flows.
+	const graphs = new Map<string, BodyGraph>();
+	if (node.cascade !== undefined) return climbingCall(node, ctx, graphs);
+	return (state, config) => callOnce(ctx, node, graphs, state, config);
+}
 
-		const end = async (
-			outcome: "pass" | "fail" | "error" | "stopped",
-			outputs: StepOutputs,
-			error: string | null,
-		) =>
-			step.end(
-				outcome,
-				{ ...outputs, ended: outputs.ended ?? "", outcome, visit },
-				error,
+/**
+ * A Call with a cascade (ADR 6): each try runs the flow of its tier with
+ * its inputs, which may read `{{cascade.previous}}`. A try holds when the
+ * called flow ends `pass`; any other end climbs to the next try. The
+ * person tier is a Gate with "try-again" and "stop" (`climb-gate.ts`).
+ */
+function climbingCall(
+	node: CallNode,
+	ctx: StepContext,
+	graphs: Map<string, BodyGraph>,
+): NodeAction {
+	return (state, config) => {
+		const at = climbAt(state, node);
+		const tier = tierAt(node, at);
+		if (tier === null) {
+			throw new Error(
+				`Subflow node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
 			);
-
-		const called = ctx.flows[node.flow];
-		if (!called) {
-			const result = await end(
-				"error",
-				{},
-				`The flow "${node.flow}" is not in the run's snapshot.`,
-			);
-			return route(ctx, state, node, result, config);
 		}
-
-		let inputs: InputValues;
-		if (step.existing?.call) {
-			inputs = step.existing.call.inputs;
-		} else {
-			try {
-				inputs = resolveInputs(
-					called.inputs ?? [],
-					renderBindings(node.inputs, step.tctx),
-					{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
-				);
-			} catch (error) {
-				const result = await end("error", {}, messageOf(error));
-				return route(ctx, state, node, result, config);
-			}
-			await ctx.log.append({
-				type: "FlowCalled",
-				runId,
-				stepId,
-				payload: { flow: node.flow, inputs },
-			});
+		if (tier.kind === "person") {
+			return retryGate(node, ctx, at, tier.tier)(state, config);
 		}
-
-		graph ??= bodyGraph(ctx, node, called);
-		const body = {
-			called,
-			flowName: node.flow,
-			inputs,
-			scope: { parentStepId: stepId, itemId: null },
-			run: { branch: step.tctx.run.branch, base_branch: "", index: "" },
-		};
-		const ended = await runBody({
-			graph,
-			config,
-			stopAt: stopAtOf(state, config),
-			...body,
+		return callOnce(ctx, tier.node as CallNode, graphs, state, config, {
+			root: node,
+			at,
 		});
-		switch (ended.kind) {
-			case "paused":
-				// The step stays open: the called flow continues after the wait.
-				step.leaveOpen();
-				throw ended.interrupt;
-			case "stopped": {
-				if (ended.atStopTime && hasStoppedEdge(ctx.flow, node)) {
-					// The stop time ended the called flow: wrap the run up along the edge.
-					const outputs = await bodyOutputs(ctx, body);
-					const result = await end("stopped", outputs, null);
-					return route(ctx, state, node, result, config, {
-						wrappingUp: true,
-					});
-				}
-				await end("stopped", {}, null);
-				throw ended.interrupt;
-			}
-			case "aborted":
-				await end("error", {}, ended.reason);
-				throw ended.interrupt;
-			case "failed": {
-				const outputs = await bodyOutputs(ctx, body);
-				const result = await end("fail", outputs, ended.reason);
-				return route(ctx, state, node, result, config);
-			}
-			case "finished": {
-				const outputs = await bodyOutputs(ctx, body, ended);
-				const label = ctx
-					.kindOf(ended.node)
-					.endedLabel(ended.node, ended.outcome);
-				// An End node: its status is the label, its message the end_message.
-				const own: StepOutputs =
-					ended.result !== undefined
-						? { ended: label, end_message: ended.reason ?? "" }
-						: { ended: label };
-				const failed = ended.result === "failed";
-				const result = await end(
-					failed ? "fail" : "pass",
-					{ ...outputs, ...own },
-					failed ? failedEndReason(ended) : null,
-				);
-				return route(ctx, state, node, result, config);
-			}
-		}
 	};
+}
+
+/** One run of the called flow: a step that opens, runs the body and ends. */
+async function callOnce(
+	ctx: StepContext,
+	node: CallNode,
+	graphs: Map<string, BodyGraph>,
+	state: Parameters<NodeAction>[0],
+	config: Parameters<NodeAction>[1],
+	climb?: { root: CallNode; at: CascadePosition },
+): Promise<Command> {
+	const runId = ctx.run.id;
+	const runState = await ctx.log.state(runId);
+	const point = resumePoint(
+		node,
+		state,
+		runState,
+		scopeOf(config),
+		CALL.resumeRules(node),
+	);
+	const climbing = climb ? climbSpec(climb.root, climb.at) : null;
+	if (point.kind === "done") {
+		const logged: StepEnd = {
+			stepId: point.step.id,
+			visit: point.step.visit,
+			outcome: point.ended.outcome,
+			outputs: point.ended.outputs,
+			error: point.ended.error,
+		};
+		if (climbing?.climbs(logged)) return climbing.command(logged);
+		return routeDone(ctx, state, node, point, config);
+	}
+	const begun = await beginStep(
+		ctx,
+		node,
+		state,
+		config,
+		entryOf(point),
+		runState,
+	);
+	if (begun.kind === "parked") return begun.command;
+	const step = begun.step;
+	const { stepId, visit } = step;
+	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
+	const own = climb ? climbOutputs(climb.root, climb.at) : {};
+
+	/** Ends the step, then climbs (a try that did not hold, with a try left) or routes. */
+	const end = async (
+		outcome: "pass" | "fail" | "error" | "stopped",
+		outputs: StepOutputs,
+		error: string | null,
+		extra?: RunStateUpdate,
+	): Promise<Command> => {
+		const all = {
+			...outputs,
+			...own,
+			ended: outputs.ended ?? "",
+			outcome,
+			visit,
+		};
+		const climbs = climbing?.climbs({ outcome, outputs: all, error }) ?? false;
+		const ended = await step.end(
+			outcome,
+			all,
+			error,
+			climbs ? { skipWrites: true } : undefined,
+		);
+		if (climbs && climbing) return climbing.command(ended);
+		return route(ctx, state, node, ended, config, extra);
+	};
+	/** Ends the step and goes nowhere: the run parks on the interrupt that follows. */
+	const close = (
+		outcome: "error" | "stopped",
+		outputs: StepOutputs,
+		error: string | null,
+	) =>
+		step.end(
+			outcome,
+			{ ...outputs, ...own, ended: outputs.ended ?? "", outcome, visit },
+			error,
+		);
+
+	const called = ctx.flows[node.flow];
+	if (!called) {
+		return end(
+			"error",
+			{},
+			`The flow "${node.flow}" is not in the run's snapshot.`,
+		);
+	}
+
+	let inputs: InputValues;
+	if (step.existing?.call) {
+		inputs = step.existing.call.inputs;
+	} else {
+		try {
+			inputs = resolveInputs(
+				called.inputs ?? [],
+				renderBindings(node.inputs, step.tctx),
+				{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
+			);
+		} catch (error) {
+			return end("error", {}, messageOf(error));
+		}
+		await ctx.log.append({
+			type: "FlowCalled",
+			runId,
+			stepId,
+			payload: { flow: node.flow, inputs },
+		});
+	}
+
+	let graph = graphs.get(node.flow);
+	if (!graph) {
+		graph = bodyGraph(ctx, node, called);
+		graphs.set(node.flow, graph);
+	}
+	const body = {
+		called,
+		flowName: node.flow,
+		inputs,
+		scope: { parentStepId: stepId, itemId: null },
+		run: { branch: step.tctx.run.branch, base_branch: "", index: "" },
+	};
+	const ended = await runBody({
+		graph,
+		config,
+		stopAt: stopAtOf(state, config),
+		...body,
+	});
+	switch (ended.kind) {
+		case "paused":
+			// The step stays open: the called flow continues after the wait.
+			step.leaveOpen();
+			throw ended.interrupt;
+		case "stopped": {
+			if (ended.atStopTime && hasStoppedEdge(ctx.flow, node)) {
+				// The stop time ended the called flow: wrap the run up along the edge.
+				const outputs = await bodyOutputs(ctx, body);
+				return end("stopped", outputs, null, { wrappingUp: true });
+			}
+			await close("stopped", {}, null);
+			throw ended.interrupt;
+		}
+		case "aborted":
+			await close("error", {}, ended.reason);
+			throw ended.interrupt;
+		case "failed": {
+			const outputs = await bodyOutputs(ctx, body);
+			return end("fail", outputs, ended.reason);
+		}
+		case "finished": {
+			const outputs = await bodyOutputs(ctx, body, ended);
+			const label = ctx
+				.kindOf(ended.node)
+				.endedLabel(ended.node, ended.outcome);
+			// An End node: its status is the label, its message the end_message.
+			const own: StepOutputs =
+				ended.result !== undefined
+					? { ended: label, end_message: ended.reason ?? "" }
+					: { ended: label };
+			const failed = ended.result === "failed";
+			return end(
+				failed ? "fail" : "pass",
+				{ ...outputs, ...own },
+				failed ? failedEndReason(ended) : null,
+			);
+		}
+	}
 }
 
 /** A chosen end of a Call: `pass` once, and whatever outcome a Call with `each` ends on. */
@@ -214,6 +303,9 @@ export const CALL: NodeKind<CallNode> = {
 			? null
 			: endedAtReason(node, outcome),
 	logsCommandOutput: (node) => node.each?.source.kind === "command",
+	// A cascade's person tier is a Gate: its ask node.
+	aux: (node) =>
+		personTierIndex(node) !== null ? [{ kind: "ask", make: climbAskNode }] : [],
 	cutShortOutputs: (open, node, outcome) => {
 		const each = node ? runsEach(node) : open.items.length > 0;
 		return each

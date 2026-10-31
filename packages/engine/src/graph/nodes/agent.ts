@@ -16,12 +16,15 @@ import {
 	type FlowNode,
 	type JsonValue,
 	type Outcome,
+	personTierIndex,
 	profileLabel,
+	renderCommand,
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
-import type { SessionEvent } from "../../device";
+import { runCommand, type SessionEvent } from "../../device";
 import {
+	commandLogPath,
 	type EnginePayloads,
 	type RunState,
 	type StepOutputs,
@@ -29,6 +32,13 @@ import {
 } from "../../log";
 import { deriveBudgetSpend, lastHarnessSessionOfNode } from "../../read";
 import { budgetPassed, guardMessage, runBudget, turnLimit } from "../budget";
+import {
+	climbAt,
+	climbOutputs,
+	climbSpec,
+	climbValues,
+	tierAt,
+} from "../cascade";
 import { consumeStream } from "../consume";
 import {
 	harnessLabel,
@@ -51,6 +61,7 @@ import { sessionGuards } from "../session-guards";
 import type { RunStateValues } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 import { ASK_CHOICES, agentAskNode } from "./agent-ask";
+import { previousFailure, retryGate } from "./climb-gate";
 
 /**
  * The Agent node: one harness session per visit, ported from `runAgentStep`
@@ -80,6 +91,7 @@ import { ASK_CHOICES, agentAskNode } from "./agent-ask";
  * 4), and `runSession` is one harness session from its start to its end.
  */
 export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
+	if (node.cascade !== undefined) return climbingAgent(node, ctx);
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: AGENT.resumeRules(node),
@@ -111,6 +123,139 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 				});
 			},
 		});
+}
+
+/**
+ * An Agent with a cascade (ADR 6): each try runs the agent of its tier
+ * (the tier's node, `tierNode`), up to the tier's `tries`, then the next
+ * tier's. A try holds when the agent ends `pass` (or an own outcome) and
+ * the node's `check` exits 0. The next try gets the failure in its prompt;
+ * `session: "resume"` continues the session of the try before within a
+ * tier, and a new tier starts a new session. `ask: "person"` works inside
+ * a try as without a cascade. The person tier is a Gate with "try-again"
+ * and "stop" (`climb-gate.ts`).
+ */
+function climbingAgent(node: AgentNode, ctx: StepContext): NodeAction {
+	return (state, config) => {
+		const at = climbAt(state, node);
+		const tier = tierAt(node, at);
+		if (tier === null) {
+			throw new Error(
+				`Agent node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
+			);
+		}
+		if (tier.kind === "person") {
+			return retryGate(node, ctx, at, tier.tier)(state, config);
+		}
+		const own = tier.node as AgentNode;
+		const previous = at.trail.at(-1);
+		// Within a tier, `session: "resume"` goes on with the try before.
+		const resumed =
+			at.try > 1 && own.session === "resume" && previous?.session_id
+				? previous.session_id
+				: null;
+		return runStep(ctx, own, state, config, {
+			rules: AGENT.resumeRules(own),
+			outputs: (step) => ({ visit: step.visit, ...climbOutputs(node, at) }),
+			body: async (step, entry) => {
+				step.tctx.cascade = climbValues(node, at);
+				const asked = heldStep(state, node.id);
+				const answer =
+					asked?.kind === "gate" && asked.answer !== undefined
+						? asked.answer
+						: null;
+				const told =
+					previous === undefined
+						? null
+						: previousFailure(previous, node.check, at.note);
+				const prompt =
+					entry.kind !== "new"
+						? entry.prompt
+						: told === null
+							? null
+							: resumed !== null
+								? told
+								: `${agentPrompt(own, step.tctx)}\n\n${told}`;
+				const result = await runSession(ctx, own, step, {
+					note: answer,
+					prompt,
+					resumeSessionId:
+						entry.kind !== "new" ? entry.harnessSessionId : resumed,
+				});
+				return checkTry(ctx, node, step, result, climbOutputs(node, at));
+			},
+			climb: climbSpec(node, at),
+		});
+	};
+}
+
+/**
+ * A try's end with the climb's fields, and the node's check run after an
+ * end that holds so far: an exit other than 0 ends the try `fail`, with
+ * the check's log tail. The check's output goes to the step's transcript
+ * and its command log, as a Command node's does.
+ */
+async function checkTry(
+	ctx: StepContext,
+	node: AgentNode,
+	step: StepHandle,
+	result: BodyResult,
+	climbing: StepOutputs,
+): Promise<BodyResult> {
+	if (result.kind === "aborted") {
+		return { ...result, outputs: { ...result.outputs, ...climbing } };
+	}
+	if (result.kind !== "end") return result;
+	const ended = { ...result, outputs: { ...result.outputs, ...climbing } };
+	const check = node.check;
+	if (
+		check === undefined ||
+		result.outcome === "fail" ||
+		result.outcome === "needs-input" ||
+		result.outcome === "error"
+	) {
+		return ended;
+	}
+	const { command, env } = renderCommand(check, step.tctx);
+	step.record(null, { type: "command-start", command });
+	const run = await runCommand(step.device, {
+		command,
+		cwd: step.worktree,
+		env,
+		logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
+		signal: step.signal,
+		onOutput: (stream, text) =>
+			step.record(null, { type: "command-output", stream, text }),
+	});
+	if (run.refused === null) {
+		step.record(null, { type: "command-exit", exitCode: run.exitCode });
+	}
+	const outputs = { ...ended.outputs, log_tail: run.logTail };
+	if (step.signal.aborted) {
+		return {
+			kind: "aborted",
+			outputs,
+			harnessSessionId: result.harnessSessionId ?? null,
+		};
+	}
+	if (run.exitCode === 0) return { ...ended, outputs };
+	const why =
+		run.refused ??
+		(run.spawnError !== null
+			? `The check could not start: ${run.spawnError}`
+			: `The check \`${check}\` exited with code ${run.exitCode ?? "none"}.`);
+	return {
+		...ended,
+		outcome: "fail",
+		outputs: { ...outputs, outcome: "fail" },
+		error: why,
+	};
+}
+
+/** The prompt a new session gets: the node's prompt rendered, as `/<skill> <prompt>` with a skill. */
+function agentPrompt(node: AgentNode, tctx: StepHandle["tctx"]): string {
+	const rendered = renderTemplate(node.prompt, tctx);
+	return node.skill ? `/${node.skill} ${rendered}`.trim() : rendered;
 }
 
 /** An Agent's own outcome, other than one named `fail` or `needs-input`. */
@@ -204,8 +349,9 @@ export const AGENT: NodeKind<AgentNode> = {
 	make: agentNode,
 	works: () => "worktree",
 	resumeRules: () => RESUME_RULES.agent,
+	// The ask node serves `ask` and a cascade's person tier alike.
 	aux: (node) =>
-		node.ask === "person"
+		node.ask === "person" || personTierIndex(node) !== null
 			? [{ kind: "wait" }, { kind: "ask", make: agentAskNode }]
 			: [{ kind: "wait" }],
 	isChosenEnd: (node, outcome) =>
@@ -217,6 +363,8 @@ export const AGENT: NodeKind<AgentNode> = {
 		timeoutMinutes: node.timeoutMinutes,
 		idleMinutes: node.idleMinutes ?? policy.idleMinutes,
 	}),
+	// The check of a cascade writes the step's command log.
+	logsCommandOutput: (node) => node.check !== undefined,
 	connections: (node) => node.connections ?? [],
 	programs: programsOf,
 	requirements: [cliToolsInstalled, harnessesAdded],
@@ -337,12 +485,7 @@ async function runSession(
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const { resumeSessionId } = input;
-	const prompt =
-		input.prompt ??
-		(() => {
-			const rendered = renderTemplate(node.prompt, step.tctx);
-			return node.skill ? `/${node.skill} ${rendered}`.trim() : rendered;
-		})();
+	const prompt = input.prompt ?? agentPrompt(node, step.tctx);
 
 	const end = (
 		outcome: string,

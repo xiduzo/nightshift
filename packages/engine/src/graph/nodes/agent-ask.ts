@@ -14,6 +14,7 @@ import { parkCommand, route, type StepEnd } from "../route";
 import { commitVisit } from "../run-position";
 import type { PendingGate, PendingParked, RunStateUpdate } from "../state";
 import { beginStep } from "../step-runner";
+import { answerRetryGate } from "./climb-gate";
 
 /**
  * An Agent that asks a person (`ask: "person"`). When its agent reports
@@ -50,8 +51,13 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 			nodeId: node.id,
 			question: pending.question,
 			choices: pending.choices,
+			...(pending.deadline ? { deadline: pending.deadline } : {}),
 		}),
 		async answer(pending, answer, state, config) {
+			// The person tier of a cascade (ADR 6): try again, or stop.
+			if (pending.climb) {
+				return answerRetryGate(ctx, node, pending, answer, state, config);
+			}
 			if (answer?.kind !== "gate") return resumeOnStep(ctx, node, pending);
 			const begun = await beginStep(ctx, node, state, config, {
 				kind: "continue",
@@ -85,7 +91,16 @@ export function agentAskNode(node: AgentNode, ctx: StepContext): NodeAction {
 			};
 			return new Command({ update: { pending: asked }, goto: node.id });
 		},
-		stale: { ctx, letGo: (pending) => parkOnStep(ctx, node, pending) },
+		stale: {
+			ctx,
+			letGo: (pending) =>
+				pending.climb
+					? new Command({
+							update: { pending: { [node.id]: null } },
+							goto: node.id,
+						})
+					: parkOnStep(ctx, node, pending),
+		},
 	});
 }
 
