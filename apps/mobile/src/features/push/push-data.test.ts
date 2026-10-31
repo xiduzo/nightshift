@@ -7,6 +7,7 @@ import {
 	answerOfAction,
 	permissionOf,
 	phoneRouteOf,
+	pushReadsOf,
 	showInFront,
 	shownAtMs,
 	shownWithKey,
@@ -202,5 +203,25 @@ describe("the permission", () => {
 		expect(
 			permissionOf({ granted: false, canAskAgain: false, iosStatus: 1 }),
 		).toBe("off");
+	});
+});
+
+describe("what a push reads as it comes", () => {
+	test("a Gate reads its run and the open Gates", () => {
+		expect(pushReadsOf({ to: "gate", runId: "r1", stepId: "review" })).toEqual({
+			runId: "r1",
+			gates: true,
+		});
+	});
+
+	test("a run reads the run, the inbox the open Gates", () => {
+		expect(pushReadsOf({ to: "run", runId: "r1" })).toEqual({
+			runId: "r1",
+			gates: false,
+		});
+		expect(pushReadsOf({ to: "inbox" })).toEqual({
+			runId: null,
+			gates: true,
+		});
 	});
 });

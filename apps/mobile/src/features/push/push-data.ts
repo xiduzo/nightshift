@@ -138,6 +138,23 @@ export function phoneRouteOf(route: PushRoute): PhoneRoute {
 }
 
 /**
+ * What a push opens, to read as it comes: the run, and the open Gates for
+ * a Gate or the inbox. Its screen then shows at once.
+ */
+export type PushReads = { runId: string | null; gates: boolean };
+
+export function pushReadsOf(route: PushRoute): PushReads {
+	switch (route.to) {
+		case "gate":
+			return { runId: route.runId, gates: true };
+		case "run":
+			return { runId: route.runId, gates: false };
+		case "inbox":
+			return { runId: null, gates: true };
+	}
+}
+
+/**
  * Whether this phone may show Night Shift's notifications:
  * - `ask`: the person did not choose yet. The app explains, then asks.
  * - `on`: allowed (on iOS also "deliver quietly").
