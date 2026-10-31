@@ -1,4 +1,7 @@
-import type { EmbeddingsInterface } from "@langchain/core/embeddings";
+import {
+	Embeddings,
+	type EmbeddingsInterface,
+} from "@langchain/core/embeddings";
 import { OllamaEmbeddings } from "@langchain/ollama";
 
 /**
@@ -65,6 +68,59 @@ const QUERY_INSTRUCTION =
 const queryFor = (model: string) => (text: string) =>
 	model.startsWith("qwen3-embedding") ? `${QUERY_INSTRUCTION}${text}` : text;
 
+/** How long one request of a preparation may hold Ollama, about. */
+const PACE_MS = 1_500;
+/** Sections in one request, at most: `index()` hands over its batch of 32. */
+const PACE_MAX = 32;
+
+/**
+ * Embeddings that send a preparation's sections in requests of about
+ * `PACE_MS` each, and learn how many sections that is. Ollama answers one
+ * request at a time: a batch of 32 sections holds it for minutes on a
+ * Host's CPU (about 4 s a section with qwen3-embedding:0.6b), and a query
+ * that waits behind it times out. A query goes first: the preparation
+ * sends its next request only once the queries have their answer. A LangChain `Embeddings`, so `index()` and the vector
+ * store take it as they take any other.
+ */
+export class PacedEmbeddings extends Embeddings {
+	/** Sections in the next request. */
+	private size = 4;
+	/** Queries on their way: a preparation sends nothing new until they are answered. */
+	private queries: Promise<unknown>[] = [];
+	constructor(
+		readonly inner: EmbeddingsInterface,
+		private readonly paceMs = PACE_MS,
+		private readonly now: () => number = Date.now,
+	) {
+		super({});
+	}
+	async embedDocuments(texts: string[]): Promise<number[][]> {
+		const out: number[][] = [];
+		for (let at = 0; at < texts.length; ) {
+			while (this.queries.length > 0) await Promise.allSettled(this.queries);
+			const part = texts.slice(at, at + this.size);
+			const started = this.now();
+			out.push(...(await this.inner.embedDocuments(part)));
+			at += part.length;
+			const each = Math.max(1, (this.now() - started) / part.length);
+			this.size = Math.max(
+				1,
+				Math.min(PACE_MAX, Math.floor(this.paceMs / each)),
+			);
+		}
+		return out;
+	}
+	embedQuery(text: string): Promise<number[]> {
+		const query = this.inner.embedQuery(text);
+		this.queries.push(query);
+		const done = () => {
+			this.queries = this.queries.filter((q) => q !== query);
+		};
+		query.then(done, done);
+		return query;
+	}
+}
+
 /**
  * Search by meaning through one Ollama. The Ollama vertical decides the
  * model, the address and its headers, and makes a new one when they change
@@ -83,7 +139,7 @@ export function ollamaMeaning(options: {
 	fetch?: typeof fetch;
 }): KnowledgeMeaning {
 	const { model, address, headers, where = null, downloading } = options;
-	const embeddings = new OllamaEmbeddings({
+	const ollama = new OllamaEmbeddings({
 		model,
 		baseUrl: address,
 		...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
@@ -93,6 +149,7 @@ export function ollamaMeaning(options: {
 		maxRetries: 1,
 		...(options.fetch ? { fetch: options.fetch } : {}),
 	});
+	const embeddings = new PacedEmbeddings(ollama);
 	let checked: { at: number; ready: KnowledgeMeaningReady } | null = null;
 	async function check(): Promise<KnowledgeMeaningReady> {
 		try {
@@ -102,10 +159,7 @@ export function ollamaMeaning(options: {
 					PROBE_TIMEOUT_MS,
 				).unref?.();
 			});
-			const { models } = await Promise.race([
-				embeddings.client.list(),
-				timeout,
-			]);
+			const { models } = await Promise.race([ollama.client.list(), timeout]);
 			const names = new Set(models.map((m) => m.name));
 			if (names.has(model) || names.has(`${model}:latest`)) return "ready";
 			return downloading?.() != null ? "downloading" : "no-model";
