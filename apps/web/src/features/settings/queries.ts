@@ -13,13 +13,9 @@ export const settingsQueries = {
 	all: () => orpc.settings.key(),
 	/** The settings view: the values, where each comes from, and the daemon facts. */
 	get: () => orpc.settings.get.queryOptions(),
-	/** The names of the headers sent to your monitoring. Their values never come back. */
-	telemetryHeaders: () => orpc.settings.telemetryHeaders.queryOptions(),
 };
 
 export const settingsMutations = {
 	/** Saves a patch. A `null` value forgets the saved value. Answers with the new view. */
 	save: orpc.settings.save.mutationOptions,
-	/** Saves or forgets the headers sent to your monitoring. Answers with their names. */
-	saveTelemetryHeaders: orpc.settings.saveTelemetryHeaders.mutationOptions,
 };

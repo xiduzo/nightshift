@@ -2,6 +2,11 @@
 
 export { EFFORTS, PERMISSION_MODES, permissionLabel } from "./agent-options";
 export { AgentsPage } from "./agents-page";
+export {
+	KeyValueRows,
+	recordFrom,
+	rowsFrom,
+} from "./connections/key-value-rows";
 export type { HarnessName } from "./harnesses";
 export {
 	HARNESSES,

@@ -3,29 +3,31 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Field,
 	FieldContent,
 	FieldDescription,
-	FieldError,
 	FieldGroup,
 	FieldLabel,
+	FieldLegend,
 	FieldSeparator,
+	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { Textarea } from "@nightshift/ui/components/textarea";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InfoIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
 import { PageSection } from "@/shared/page";
-import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
-import { settingsMutations, settingsQueries } from "../queries";
+import {
+	useSaveSettings,
+	useSettingsForm,
+	useToggleSetting,
+} from "../hooks/use-settings-form";
 import {
 	CardForm,
 	ResetSection,
@@ -112,29 +114,24 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 					</CardContent>
 				</CardForm>
 			</Card>
-			<HeadersCard />
+			{/* A new saved value, from here or another screen, starts a new draft. */}
+			<HeadersCard
+				key={JSON.stringify(data.values.telemetryHeaders)}
+				saved={data.values.telemetryHeaders}
+			/>
 		</PageSection>
 	);
 }
 
-/** The headers sent with the data: written once, then shown by name only. */
-function HeadersCard() {
-	const id = useId();
-	const queryClient = useQueryClient();
-	const headers = useQuery(settingsQueries.telemetryHeaders());
-	const [draft, setDraft] = useState("");
-	const save = useMutation(
-		settingsMutations.saveTelemetryHeaders({
-			onSuccess: (data) => {
-				queryClient.setQueryData(
-					settingsQueries.telemetryHeaders().queryKey,
-					data,
-				);
-				setDraft("");
-			},
-		}),
-	);
-	const names = headers.data?.names ?? [];
+/**
+ * The headers sent with the data. A key is a `${NAME}` reference to a
+ * secret, as in a connection: its value stays on the Secrets page.
+ */
+function HeadersCard({ saved }: { saved: Record<string, string> }) {
+	const [rows, setRows] = useState(() => rowsFrom(saved));
+	const save = useSaveSettings();
+	const draft = recordFrom(rows);
+	const changed = JSON.stringify(draft) !== JSON.stringify(saved);
 
 	return (
 		<Card>
@@ -143,78 +140,37 @@ function HeadersCard() {
 				noValidate
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (draft.trim() === "" || save.isPending) return;
+					if (!changed || save.isPending) return;
 					save.mutate(
-						{ headers: draft },
+						{ telemetryHeaders: draft },
 						{ onSuccess: () => toast.success("Headers saved") },
 					);
 				}}
 			>
 				<CardContent>
 					<FieldGroup>
-						<Field data-invalid={save.error ? true : undefined}>
-							<FieldLabel htmlFor={`${id}-headers`}>Headers</FieldLabel>
-							<Textarea
-								id={`${id}-headers`}
-								value={draft}
-								onChange={(event) => {
-									save.reset();
-									setDraft(event.target.value);
-								}}
-								placeholder="Authorization=Bearer abc123"
-								className="font-mono"
-								autoComplete="off"
-								spellCheck={false}
-								aria-invalid={save.error ? true : undefined}
-								aria-describedby={`${id}-headers-description`}
-							/>
-							{save.error ? (
-								<FieldError>{save.error.message}</FieldError>
-							) : null}
-							<FieldDescription id={`${id}-headers-description`}>
-								Add the API key or other headers your tool needs, one per line.
-								Night Shift keeps them like a secret and does not show them
-								again. Saving replaces the headers you saved before.
+						<FieldSet className="gap-3">
+							<FieldLegend variant="label">Headers</FieldLegend>
+							<FieldDescription>
+								Add the headers your tool needs, such as an API key. Write a key
+								as <span className="font-mono">${"{NAME}"}</span> and save its
+								value on the Secrets page.
 							</FieldDescription>
-							<div className="flex min-h-6 flex-wrap items-center gap-2">
-								{names.length > 0 ? (
-									<>
-										{names.map((name) => (
-											<Badge
-												key={name}
-												variant="secondary"
-												className="font-mono"
-											>
-												{name}
-											</Badge>
-										))}
-										<Button
-											type="button"
-											variant="ghost"
-											size="xs"
-											disabled={save.isPending}
-											onClick={() =>
-												save.mutate(
-													{ headers: null },
-													{ onSuccess: () => toast.success("Headers removed") },
-												)
-											}
-										>
-											Remove headers
-										</Button>
-									</>
-								) : (
-									<Badge variant="outline" className="text-muted-foreground">
-										No headers
-									</Badge>
-								)}
-							</div>
-						</Field>
+							<KeyValueRows
+								rows={rows}
+								onChange={(next) => {
+									save.reset();
+									setRows(next);
+								}}
+								keyLabel="Header"
+								keyPlaceholder="Authorization"
+								valuePlaceholder="Bearer ${GRAFANA_TOKEN}"
+								addLabel="Add header"
+							/>
+						</FieldSet>
+						<SaveError error={save.error} />
 						<div className="flex justify-end">
-							<Button
-								type="submit"
-								disabled={draft.trim() === "" || save.isPending}
-							>
+							<Button type="submit" disabled={!changed || save.isPending}>
 								{save.isPending ? <Spinner data-icon="inline-start" /> : null}
 								Save headers
 							</Button>
