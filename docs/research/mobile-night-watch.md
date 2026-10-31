@@ -39,8 +39,10 @@ A feature that needs a keyboard or a canvas stays on the desktop.
 Pause tonight and Run now are nudges, not edits. Editing a schedule
 stays out of scope, as [mobile.md](mobile.md) says.
 
-The tabs stay Home, Inbox, Runs and Projects. The Inbox does not take the
-learnings for now. We look at the tabs again when the new features are in.
+Update, 2026-10-31: the tabs are Watch, Needs you and Runs. Watch answers
+question 2, Needs you question 1. Needs you holds the Gates, the runs that
+stopped and the learnings to check. A project opens from Runs and from a
+run. The avatar opens Settings and + starts a run, on every tab.
 
 ## What is true today
 
