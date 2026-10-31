@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { AskForm } from "@nightshift/flows";
-import { askAnswerOf, askFormFields, askOptions, askStartValues } from "./ask";
+import {
+	askAnswerOf,
+	askFormFields,
+	askOptions,
+	askStartValues,
+	phoneCanAnswer,
+} from "./ask";
 
 const form: AskForm = {
 	schema: {
@@ -96,5 +102,19 @@ describe("the form of an Ask on a screen", () => {
 		expect(askAnswerOf(form, { variant: "calm", extra: "{" })).toEqual({
 			problem: 'Check the format of "extra".',
 		});
+	});
+
+	test("the phone answers a form of text, choices, switches and numbers only", () => {
+		expect(phoneCanAnswer(form)).toBe(false);
+		const { extra: _extra, ...simple } = form.schema.properties as Record<
+			string,
+			unknown
+		>;
+		expect(
+			phoneCanAnswer({
+				...form,
+				schema: { ...form.schema, properties: simple } as typeof form.schema,
+			}),
+		).toBe(true);
 	});
 });

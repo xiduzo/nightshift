@@ -4,6 +4,7 @@ import {
 	unreachableAnswerText,
 	useAnswerGate,
 } from "@nightshift/client";
+import type { JsonValue } from "@nightshift/flows";
 import { useState } from "react";
 
 import { useSignedIn } from "@/features/host";
@@ -18,8 +19,12 @@ export type Problem =
 	| { kind: "unreachable"; text: { title: string; description: string } }
 	| { kind: "failed"; message: string };
 
-/** The answer that went out. */
-export type SentAnswer = { choice: string; note: string | null };
+/** The answer that went out: the choice and the note, or the data of an Ask's form. */
+export type SentAnswer = {
+	choice: string;
+	note: string | null;
+	data?: JsonValue;
+};
 
 /** Why the Gate left: it closed in the meantime, or it is not in your Spaces. */
 export type GoneRefusal = Extract<GateRefusal, "closed" | "not-found">;
@@ -51,7 +56,11 @@ export function useGateAnswer(
 	const resolve = useAnswerGate(host, {
 		onSuccess: (result, input) => {
 			if (result.kind === "answered") {
-				setSent({ choice: input.choice, note: input.note ?? null });
+				setSent({
+					choice: input.choice,
+					note: input.note ?? null,
+					...(input.data !== undefined ? { data: input.data } : {}),
+				});
 				onSent();
 			} else if (
 				result.refusal === "closed" ||
@@ -80,18 +89,21 @@ export function useGateAnswer(
 		setChoice(name);
 	}
 
-	/** Checks that it is you (unless the Gate is for the lock screen), then sends. */
-	async function send() {
-		if (busy || choice === null) return;
+	/** Checks that it is you (unless the Gate is for the lock screen). */
+	async function checked(): Promise<boolean> {
 		setProblem(null);
 		setChecking(true);
 		const failure = await checkBeforeAnswer(gate).finally(() =>
 			setChecking(false),
 		);
-		if (failure) {
-			setProblem({ kind: "check", failure });
-			return;
-		}
+		if (failure) setProblem({ kind: "check", failure });
+		return failure === null;
+	}
+
+	/** Checks that it is you, then sends the choice and the note. */
+	async function send() {
+		if (busy || choice === null) return;
+		if (!(await checked())) return;
 		const trimmed = note.trim();
 		resolve.mutate({
 			runId: gate.runId,
@@ -101,12 +113,25 @@ export function useGateAnswer(
 		});
 	}
 
+	/** Checks that it is you, then sends the data of an Ask's form (ADR 10). */
+	async function sendForm(data: JsonValue) {
+		if (busy) return;
+		if (!(await checked())) return;
+		resolve.mutate({
+			runId: gate.runId,
+			stepId: gate.stepId,
+			choice: "answer",
+			data,
+		});
+	}
+
 	return {
 		choice,
 		choose,
 		note,
 		setNote,
 		send,
+		sendForm,
 		checking,
 		sending: resolve.isPending,
 		busy,

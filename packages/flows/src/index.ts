@@ -265,6 +265,7 @@ export {
 	isOwnWaitOutcome,
 	isPersonTier,
 	isProfileRef,
+	isSimpleForm,
 	type JoinNode,
 	type JoinWait,
 	type JsonValue,

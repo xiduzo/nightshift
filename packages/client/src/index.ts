@@ -98,6 +98,7 @@ export {
 	gateRun,
 	type OpenGate,
 	parseGateQuestion,
+	phoneCanAnswer,
 	plainText,
 	unreachableAnswerText,
 	waitedText,

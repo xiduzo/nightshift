@@ -33,7 +33,7 @@ export const GateRow = memo(function GateRow({
 }) {
 	const now = useClock();
 	const row = gateRowText(gate, now);
-	const soon = deadlineSoon(gate.deadline, now);
+	const soon = deadlineSoon(gate.deadline, now, gate.form);
 	const look = gateLook(gate);
 	const needsYou = look === NEEDS_YOU;
 	// The Gate itself is in the list of open Gates already: the steps of its run are not.
