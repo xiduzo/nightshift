@@ -35,6 +35,7 @@ describe("kits", () => {
 			"kit:github/finish-pr",
 			"kit:github/publish-draft-pr",
 			"kit:github/wait-for-checks",
+			"kit:github/watch-pr",
 			"kit:jira/assign",
 			"kit:jira/move",
 			"kit:knowledge/confluence",

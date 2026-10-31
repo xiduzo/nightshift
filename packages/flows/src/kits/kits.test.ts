@@ -14,9 +14,12 @@ import { join } from "node:path";
 import type { Flow } from "../flow";
 import {
 	type CommandNode,
+	commandWaitOutcome,
 	dataExitFor,
 	exitFor,
 	type JsonValue,
+	type WaitNode,
+	waitCommandOf,
 } from "../nodes";
 import { chooseByRule, renderCommand, runFields } from "../template";
 import {
@@ -151,9 +154,10 @@ function kit(name: string): Flow {
 type Ran = { outcome: string | undefined; data: JsonValue; log: string };
 
 /**
- * Runs one Command node of a kit with the kit's input defaults under
- * `inputs`, and earlier steps' outputs as `nodes`. The outcome is the one
- * the engine picks: the data's, else the exit code's.
+ * Runs one Command node of a kit, or the command a Wait polls, with the
+ * kit's input defaults under `inputs`, and earlier steps' outputs as
+ * `nodes`. The outcome is the one the engine picks: the data's, else the
+ * exit code's. A Wait's poll that does not end the wait is `again`.
  */
 async function step(
 	flow: Flow,
@@ -163,15 +167,18 @@ async function step(
 	where: { cwd?: string; env?: Record<string, string> } = {},
 ): Promise<Ran> {
 	const node = flow.nodes.find(
-		(candidate): candidate is CommandNode =>
-			candidate.id === nodeId && candidate.type === "command",
+		(candidate): candidate is CommandNode | WaitNode =>
+			candidate.id === nodeId &&
+			(candidate.type === "command" || candidate.type === "wait"),
 	);
-	if (!node) throw new Error(`no command ${nodeId}`);
+	const text =
+		node?.type === "wait" ? waitCommandOf(node.until)?.command : node?.command;
+	if (!node || text === undefined) throw new Error(`no command ${nodeId}`);
 	const values: Record<string, JsonValue> = {};
 	for (const input of flow.inputs) values[input.name] = input.default ?? "";
 	Object.assign(values, inputs);
 	const run = Object.fromEntries(runFields.map((field) => [field, ""]));
-	const { command, env } = renderCommand(node.command, {
+	const { command, env } = renderCommand(text, {
 		nodes,
 		inputs: values,
 		run: run as Record<(typeof runFields)[number], string>,
@@ -199,8 +206,16 @@ async function step(
 		new Response(proc.stderr).text(),
 		proc.exited,
 	]);
-	const text = (await readFile(output, "utf8")).trim();
-	const data = text === "" ? null : (JSON.parse(text) as JsonValue);
+	const written = (await readFile(output, "utf8")).trim();
+	const data = written === "" ? null : (JSON.parse(written) as JsonValue);
+	if (node.type === "wait") {
+		const picked = commandWaitOutcome(node, code, data);
+		return {
+			outcome: picked.kind === "outcome" ? picked.outcome : "again",
+			data,
+			log: `${out}${err}`,
+		};
+	}
 	const outcome = (dataExitFor(node, data) ?? exitFor(node, code))?.name;
 	return { outcome, data, log: `${out}${err}` };
 }
@@ -540,6 +555,167 @@ describe("kit:github/wait-for-checks", () => {
 			type: "wait",
 			until: { kind: "signal", name: "ci-done", key: "{{look.data.sha}}" },
 		});
+	});
+});
+
+describe("kit:github/watch-pr", () => {
+	const flow = () => kit("kit:github/watch-pr");
+	const since = "2026-10-31T10:00:00Z";
+	const started = { start: { data: { number: 7, since } } };
+	/** A pull request as the GraphQL query answers it. */
+	const pr = (fields: {
+		state?: string;
+		isInMergeQueue?: boolean;
+		reviewDecision?: string | null;
+		rollup?: string | null;
+		checks?: { name: string; conclusion: string | null }[];
+		removedAt?: string[];
+	}) => ({
+		data: {
+			repository: {
+				pullRequest: {
+					number: 7,
+					url: "https://github.com/acme/repo/pull/7",
+					state: fields.state ?? "OPEN",
+					isInMergeQueue: fields.isInMergeQueue ?? false,
+					reviewDecision: fields.reviewDecision ?? null,
+					headRefOid: "abc123",
+					commits: {
+						nodes: [
+							{
+								commit: {
+									statusCheckRollup:
+										fields.rollup === null
+											? null
+											: {
+													state: fields.rollup ?? "SUCCESS",
+													contexts: { nodes: fields.checks ?? [] },
+												},
+								},
+							},
+						],
+					},
+					timelineItems: {
+						nodes: (fields.removedAt ?? []).map((createdAt) => ({ createdAt })),
+					},
+				},
+			},
+		},
+	});
+	const watch = async (fields: Parameters<typeof pr>[0]) => {
+		await fixture("api", pr(fields));
+		return step(flow(), "watch", {}, started);
+	};
+
+	test("finds the pull request of the branch, and notes when the watch began", async () => {
+		await fixture("pr-view", { number: 7 });
+		const ran = await step(flow(), "start", {});
+		expect(ran.outcome).toBe("pass");
+		expect(ran.data).toMatchObject({ number: 7 });
+		expect((await calls())[0]).toBe("gh pr view --json number --jq .number");
+		await step(flow(), "start", { pr: "42" });
+		expect((await calls())[1]).toBe("gh pr view 42 --json number --jq .number");
+	});
+
+	test("checks that all passed, with no review that holds it back, are green", async () => {
+		const ran = await watch({
+			checks: [{ name: "build", conclusion: "SUCCESS" }],
+		});
+		expect(ran.outcome).toBe("green");
+		expect(ran.data).toEqual({
+			outcome: "green",
+			number: 7,
+			url: "https://github.com/acme/repo/pull/7",
+			sha: "abc123",
+			review: "",
+			failed: [],
+			failed_names: "",
+		});
+		expect((await calls())[0]).toStartWith(
+			"gh api graphql -F owner={owner} -F repo={repo} -F number=7 -f query=",
+		);
+		expect(
+			(await watch({ rollup: "SUCCESS", reviewDecision: "APPROVED" })).outcome,
+		).toBe("green");
+	});
+
+	test("a failed check, or a review that asks for changes, is red", async () => {
+		const failed = await watch({
+			rollup: "FAILURE",
+			checks: [
+				{ name: "build", conclusion: "FAILURE" },
+				{ name: "lint", conclusion: "SUCCESS" },
+				{ name: "test", conclusion: "TIMED_OUT" },
+			],
+		});
+		expect(failed.outcome).toBe("red");
+		expect(failed.data).toMatchObject({
+			failed: ["build", "test"],
+			failed_names: "build, test",
+		});
+		expect((await watch({ reviewDecision: "CHANGES_REQUESTED" })).outcome).toBe(
+			"red",
+		);
+	});
+
+	test("merged and closed end it, whatever the checks say", async () => {
+		expect((await watch({ state: "MERGED", rollup: "FAILURE" })).outcome).toBe(
+			"merged",
+		);
+		expect((await watch({ state: "CLOSED" })).outcome).toBe("closed");
+	});
+
+	test("in the merge queue it waits for the queue, and a removal since the watch began is ejected", async () => {
+		expect(
+			(
+				await watch({
+					isInMergeQueue: true,
+					removedAt: ["2026-10-31T11:00:00Z"],
+				})
+			).outcome,
+		).toBe("again");
+		expect((await watch({ removedAt: ["2026-10-31T11:00:00Z"] })).outcome).toBe(
+			"ejected",
+		);
+		expect((await watch({ removedAt: ["2026-10-30T09:00:00Z"] })).outcome).toBe(
+			"green",
+		);
+	});
+
+	test("running checks, no checks yet, or a review that is still required read again later", async () => {
+		expect(
+			(
+				await watch({
+					rollup: "PENDING",
+					checks: [{ name: "build", conclusion: null }],
+				})
+			).outcome,
+		).toBe("again");
+		expect((await watch({ rollup: null })).outcome).toBe("again");
+		expect((await watch({ reviewDecision: "REVIEW_REQUIRED" })).outcome).toBe(
+			"again",
+		);
+	});
+
+	test("reads again when GitHub does not answer", async () => {
+		await fixture("api", {}, 1);
+		expect((await step(flow(), "watch", {}, started)).outcome).toBe("again");
+	});
+
+	test("a webhook with the number as its key wakes it, and it waits again to read the pull request", () => {
+		const node = flow().nodes.find((candidate) => candidate.id === "watch");
+		expect(node).toMatchObject({
+			type: "wait",
+			until: {
+				kind: "any",
+				signal: { name: "pr-changed", key: "{{start.data.number}}" },
+			},
+		});
+		expect(
+			flow().edges.filter(
+				(edge) => edge.from === "watch" && edge.outcome === "done",
+			),
+		).toMatchObject([{ to: "watch" }, { to: "too_long" }]);
 	});
 });
 

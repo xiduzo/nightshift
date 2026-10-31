@@ -427,7 +427,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in \
 
 ## Schedules and webhooks
 
-A schedule starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, not with a command that polls: the kit \`kit:github/wait-for-checks\` does it.
+A schedule starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, or with \`any\` and a command as a backup, not with a command alone: the kits \`kit:github/wait-for-checks\` and \`kit:github/watch-pr\` do it.
 
 ## Kits
 
@@ -435,7 +435,7 @@ A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\` or \`ac
 
 ${kitList().map(kitLine).join("\n")}
 
-A webhook schedule wakes \`wait-for-checks\` when CI is done: \`signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }\`.
+A webhook schedule wakes \`wait-for-checks\` when CI is done: \`signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }\`. It wakes \`watch-pr\` with \`signal: { name: "pr-changed", key: "event.body.pull_request.number" }\`.
 
 ## Profiles
 

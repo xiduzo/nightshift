@@ -4,6 +4,7 @@ import { createBranchKit } from "./github/create-branch";
 import { finishPrKit } from "./github/finish-pr";
 import { publishDraftPrKit } from "./github/publish-draft-pr";
 import { waitForChecksKit } from "./github/wait-for-checks";
+import { watchPrKit } from "./github/watch-pr";
 import { jiraAssignKit } from "./jira/assign";
 import { jiraMoveKit } from "./jira/move";
 import { knowledgeConfluenceKit } from "./knowledge/confluence";
@@ -33,6 +34,7 @@ const SOURCES: Readonly<Record<string, FlowInput>> = {
 	"kit:github/publish-draft-pr": publishDraftPrKit,
 	"kit:github/finish-pr": finishPrKit,
 	"kit:github/wait-for-checks": waitForChecksKit,
+	"kit:github/watch-pr": watchPrKit,
 	"kit:jira/assign": jiraAssignKit,
 	"kit:jira/move": jiraMoveKit,
 	"kit:knowledge/confluence": knowledgeConfluenceKit,
