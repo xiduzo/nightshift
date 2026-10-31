@@ -91,6 +91,8 @@ const messages: DraftMessages = {
 		`This computer has no connection "${name}". Use one it has, or leave it out.`,
 	missingProfile: (profile) =>
 		`There is no profile "${profile.profile}" on the device "${profile.device}". Use a device and a profile from list_profiles.`,
+	missingDevice: (name) =>
+		`There is no device named "${name}". Use a device name from list_profiles, or leave device out.`,
 	programWithoutLogin: (program, tools) =>
 		`The command calls ${program}, which runs without a login. Call ${tools.join(" or ")} instead: ${tools.length === 1 ? "that CLI tool runs" : "those CLI tools run"} ${program} signed in. list_tools names them.`,
 };

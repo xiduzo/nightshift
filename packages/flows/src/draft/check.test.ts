@@ -7,6 +7,7 @@ const messages: DraftMessages = {
 	schemaIssue: (_flow, issue) => `schema ${issue.path.map(String).join(".")}`,
 	missingConnection: (name) => `connection ${name}`,
 	missingProfile: (profile) => `profile ${profile.profile}`,
+	missingDevice: (name, node) => `${node.type} on ${name}`,
 	programWithoutLogin: (program, tools) =>
 		`${program} without ${tools.join(",")}`,
 };
@@ -113,6 +114,36 @@ describe("checkDraft", () => {
 				message: "acli without acli-dimpact",
 				nodeId: "list",
 			},
+		]);
+	});
+
+	test("a node that names a device nobody has is an error, once the devices load", () => {
+		const draft: Flow = {
+			...flow,
+			start: "sync",
+			nodes: [
+				{
+					id: "sync",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "kit:knowledge/folder",
+					inputs: {},
+					device: "old-mac",
+				},
+				{
+					...commandNode("build", { x: 0, y: 0 }),
+					command: "make",
+					device: "studio",
+				},
+			],
+		};
+		const marked = (devices?: string[]) =>
+			checkDraft(draft, messages, devices ? { devices } : {}).issues.filter(
+				(issue) => issue.message.includes(" on "),
+			);
+		expect(marked()).toEqual([]);
+		expect(marked(["studio"])).toEqual([
+			{ severity: "error", message: "call on old-mac", nodeId: "sync" },
 		]);
 	});
 });

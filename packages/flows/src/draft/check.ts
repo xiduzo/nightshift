@@ -1,5 +1,5 @@
-/** Checks a draft: the schema, the connections, profiles and CLI programs it names, and `validateFlow`. */
-import { type Flow, flowSchema } from "../flow";
+/** Checks a draft: the schema, the connections, profiles, Devices and CLI programs it names, and `validateFlow`. */
+import { type Flow, type FlowNode, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
 import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
@@ -27,6 +27,8 @@ export type DraftMessages = {
 	missingConnection: (name: string) => string;
 	/** A profile the node names that its Device does not have, as far as this computer knows. */
 	missingProfile: (profile: ProfileRef) => string;
+	/** A Device the node names (`device`) that no Device of the list has as its name. */
+	missingDevice: (name: string, node: FlowNode) => string;
 	/** A program a command calls by its own name, such as `acli`, that only `tools` sign in to. */
 	programWithoutLogin: (program: string, tools: readonly string[]) => string;
 };
@@ -45,6 +47,12 @@ export type DraftCheckOptions = {
 	profiles?: readonly ProfileRef[];
 	/** The Devices whose profiles this computer cannot tell: a profile on one is not checked. */
 	untoldDevices?: readonly string[];
+	/**
+	 * The names of the Devices a run of the project may use: the person's
+	 * own and those that offer profiles to the Space. A node that names
+	 * another does not start. Leave it out while they load.
+	 */
+	devices?: readonly string[];
 	/** The CLI tools, to find a command that calls a program without its login. Leave it out while they load. */
 	cliTools?: readonly CliToolRef[];
 };
@@ -64,6 +72,7 @@ export function checkDraft(
 		connections,
 		profiles,
 		untoldDevices,
+		devices,
 		cliTools,
 	}: DraftCheckOptions = {},
 ): FlowCheck {
@@ -113,6 +122,18 @@ export function checkDraft(
 			issues.push({
 				severity: "error",
 				message: messages.missingProfile(profile),
+				nodeId: node.id,
+			});
+		}
+	}
+
+	if (devices) {
+		for (const node of flow.nodes) {
+			const name = "device" in node ? node.device : undefined;
+			if (name === undefined || devices.includes(name)) continue;
+			issues.push({
+				severity: "error",
+				message: messages.missingDevice(name, node),
 				nodeId: node.id,
 			});
 		}
