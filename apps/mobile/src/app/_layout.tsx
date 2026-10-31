@@ -59,6 +59,11 @@ export default function RootLayout() {
 					name="start"
 					options={{ title: "New run", presentation: "modal" }}
 				/>
+				<Stack.Screen
+					name="schedules"
+					options={{ title: "Schedules", headerLargeTitleEnabled: true }}
+				/>
+				<Stack.Screen name="schedule" options={sheet("Schedule")} />
 				<Stack.Screen name="flows" options={sheet("Flows")} />
 				<Stack.Screen name="computers" options={sheet("Computers")} />
 				<Stack.Screen name="inbox-filter" options={sheet("Show Gates from")} />

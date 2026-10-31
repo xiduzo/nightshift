@@ -28,6 +28,7 @@ import { Linking, View } from "react-native";
 import { offlineAlert, useOfflineNeeds } from "@/features/dashboard";
 import { useHostQueries } from "@/features/host";
 import { GateRow } from "@/features/inbox";
+import { SchedulesRow } from "@/features/schedules";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ErrorAlert } from "@/shared/feedback";
 import { HeaderToolbar } from "@/shared/header";
@@ -128,6 +129,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							href={projectLinks.flows(projectId)}
 							accessibilityHint="Shows how the flows of this project do"
 						/>
+						<SchedulesRow projectId={projectId} />
 					</ListGroup>
 
 					<View className="gap-3">

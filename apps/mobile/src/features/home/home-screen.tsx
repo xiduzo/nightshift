@@ -25,6 +25,7 @@ import { View } from "react-native";
 import { ComputersRow } from "@/features/devices";
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
+import { SchedulesRow } from "@/features/schedules";
 import { SearchResults } from "@/features/search";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
@@ -179,6 +180,7 @@ export function HomeScreen() {
 								caption="How often their runs finish"
 								href="/flows"
 							/>
+							<SchedulesRow />
 							<ListRow icon={FolderGit2} title="Projects" href="/projects" />
 							<ComputersRow />
 							<ListRow icon={Settings} title="Settings" href="/settings" />
