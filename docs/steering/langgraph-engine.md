@@ -371,7 +371,10 @@ packages/engine/src/
    `Command({ resume: { kind: "signal", name } })`, through the same wake
    Turn (`act` with `kind: "signal"`). A signal Wait with rules on its
    outcomes logs them in `WaitStarted.signalRules`: a webhook that matches
-   no rule wakes no run (`run/signals.ts`, ADR 8).
+   no rule wakes no run (`run/signals.ts`, ADR 8). A Lease node that waits
+   for a busy lease sleeps the same way, with the reason `lease` and the
+   lease in `WaitStarted.lease`. It asks again every minute, and a lease
+   that goes on this Replica wakes it at once (`run/wake.ts`, ADR 7).
 9. **Resume mapping** (`act` with `kind: "resume"`). The engine appends
    `RunResumed` before each of these:
    - Stopped or failed: the thread is parked, so
@@ -932,11 +935,35 @@ wait node, the park node and the Gate's ask node give it only the copy
 the interrupt carries and what the answer does. The interrupt payloads
 (`Parked`) did not change.
 
+## What a run holds (`graph/holds.ts`, `log/holds.ts`, `leases/`)
+
+A run can hold something for a scope: a lease (ADR 7), later a service
+(ADR 9). The scope is the run, or a Section of the flow the node is in.
+The engine, not the flow, lets go of it.
+
+- The log says what a run holds. `LeaseTaken` (with the Section and its
+  nodes) adds a `Hold` to `RunState.holds`, `LeaseReleased` takes it away,
+  and `RunEnded` moves the holds to `RunState.endedHolding`.
+- A step that routes out of a Section, or the Call step whose flow took
+  the hold, leaves it (`leavingHolds`). `route.ts` logs the release
+  (`LeaseReleased`, why `scope`) and frees the lease.
+- `RunHolds` is the runner's port, with one part per kind
+  (`combineHolds`). `ended` runs on every `RunEnded`: `endRun`, a failed
+  re-entry and `closeOpenWork`. An `interrupted` run keeps its holds, and
+  recovery tells `notContinuing` for a run that does not continue.
+  `resuming` runs in `reenter` before `RunResumed`: the run takes back
+  what it held at its end and its re-entry node is inside (`holdCovers`),
+  or the resume is refused.
+- The lease keeper (`leases/keeper.ts`) asks this Replica's store for a
+  Space it keeps, else the Space's Host through `Relay.leases`. It renews
+  the leases of the runs it walks every minute. A new daemon reads them
+  from the logs before recovery (`trackHeldLeases`).
+
 ## The node-kind descriptor (`graph/node-kinds.ts`)
 
 One module per node kind says what the engine must know about that kind.
 Each node module exports one `NodeKind<N>` next to its factory (`AGENT`,
-`COMMAND`, `TOOL`, `DECISION`, `VALUE`, `WAIT`, `CALL`). `NODE_KINDS` lists
+`COMMAND`, `TOOL`, `DECISION`, `VALUE`, `WAIT`, `CALL`, `LEASE`). `NODE_KINDS` lists
 them by type. `kindOf(node)` or `kindOfType(type)` gives a caller the
 descriptor. The interface is in `context.ts`, next to `StepContext`: what
 a node factory gets, and what a node module gives back. `PLAIN_KIND` holds
