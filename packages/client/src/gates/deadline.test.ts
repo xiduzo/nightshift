@@ -68,3 +68,21 @@ describe("deadlineSoon", () => {
 		expect(deadlineSoon(null, NOW)).toBeNull();
 	});
 });
+
+describe("the deadline of an Ask", () => {
+	const form = { schema: { type: "object" } };
+	test("takes the default, or the step fails without one", () => {
+		const at = new Date(2026, 9, 31, 7, 0).getTime();
+		const now = new Date(2026, 9, 31, 6, 50).getTime();
+		const deadline = { at, choose: "answer" };
+		expect(deadlineText(deadline, now, { ...form, default: {} })).toStartWith(
+			"If nobody answers, Night Shift takes the default at ",
+		);
+		expect(deadlineText(deadline, now, form)).toStartWith(
+			"If nobody answers, the step fails at ",
+		);
+		expect(deadlineSoon(deadline, now, { ...form, default: {} })).toBe(
+			"Takes the default in 10 min",
+		);
+	});
+});

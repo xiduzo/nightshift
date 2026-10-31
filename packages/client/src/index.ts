@@ -75,7 +75,14 @@ export {
 	missingInputs,
 } from "./flows";
 export {
+	type AskOption,
+	type AskValue,
+	type AskValues,
 	answerGate,
+	askAnswerOf,
+	askFormFields,
+	askOptions,
+	askStartValues,
 	type ChoiceRoute,
 	type ContextItem,
 	choiceRoutes,

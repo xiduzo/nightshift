@@ -9,6 +9,15 @@ export {
 	leavesInbox,
 	unreachableAnswerText,
 } from "./answer";
+export {
+	type AskOption,
+	type AskValue,
+	type AskValues,
+	askAnswerOf,
+	askFormFields,
+	askOptions,
+	askStartValues,
+} from "./ask";
 export { deadlineSoon, deadlineText, deadlineWhen } from "./deadline";
 export {
 	gateRun,
