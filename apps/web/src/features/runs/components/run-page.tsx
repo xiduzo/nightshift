@@ -62,6 +62,7 @@ import { FocusBreadcrumb, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
 import { RunActions, RunTitle } from "./run-header";
 import { RunLeases } from "./run-leases";
+import { RunServices } from "./run-services";
 import { RunStatusPanel } from "./run-status-panel";
 import { RunVariables, variableCount } from "./run-variables";
 import { RunWarnings } from "./run-warnings";
@@ -454,6 +455,7 @@ export function RunPage({
 				}
 			/>
 			<RunLeases run={runData} />
+			<RunServices run={runData} />
 			<RunWarnings warnings={runData.warnings} onShowStep={setPickedStepId} />
 		</>
 	);

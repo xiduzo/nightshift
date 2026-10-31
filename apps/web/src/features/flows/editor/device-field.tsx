@@ -31,6 +31,7 @@ export function runsOnDevice(node: FlowNode): boolean {
 		case "command":
 		case "tool":
 		case "call":
+		case "service":
 			return true;
 		case "decision":
 		case "value":

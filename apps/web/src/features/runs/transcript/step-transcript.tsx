@@ -55,6 +55,7 @@ import { EndCard } from "./items/end-items";
 import { LeaseCard } from "./items/lease-items";
 import { ItemEnd, ItemStart, ItemsRead } from "./items/list-items";
 import { Reasoning } from "./items/reasoning";
+import { ServiceCard } from "./items/service-items";
 import {
 	MessageBlock,
 	ReportCard,
@@ -534,5 +535,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <EndCard item={item} />;
 		case "lease":
 			return <LeaseCard item={item} />;
+		case "service":
+			return <ServiceCard item={item} />;
 	}
 });

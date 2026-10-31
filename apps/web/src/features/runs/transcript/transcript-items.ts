@@ -150,6 +150,16 @@ export type LeaseItem = ItemBase & {
 	holderTitle: string | null;
 };
 
+/** A Service step starts its service, it is ready, or it did not get ready. */
+export type ServiceItem = ItemBase & {
+	kind: "service";
+	state: "starting" | "ready" | "failed";
+	/** The start command, while it starts. */
+	command: string | null;
+	/** Why it did not get ready. */
+	reason: string | null;
+};
+
 /** A Call step with `each` read its source. */
 export type ItemsReadItem = ItemBase & {
 	kind: "items-read";
@@ -229,4 +239,5 @@ export type TranscriptItem =
 	| LogItem
 	| ExitItem
 	| EndItem
-	| LeaseItem;
+	| LeaseItem
+	| ServiceItem;

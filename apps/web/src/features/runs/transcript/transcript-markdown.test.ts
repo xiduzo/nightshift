@@ -52,6 +52,29 @@ describe("itemToMarkdown", () => {
 		).toBe("**Lease:** `branch:x` is busy. Fix red PRs holds it.");
 	});
 
+	test("a Service step says what it starts, and whether the service got ready", () => {
+		const starting: TranscriptItem = {
+			...base,
+			key: "s1",
+			kind: "service",
+			state: "starting",
+			command: "docker compose up -d",
+			reason: null,
+		};
+		expect(itemToMarkdown(starting, context)).toBe(
+			"**Service:** starts `docker compose up -d`",
+		);
+		expect(itemToMarkdown({ ...starting, state: "ready" }, context)).toBe(
+			"**Service:** ready",
+		);
+		expect(
+			itemToMarkdown(
+				{ ...starting, state: "failed", reason: "Port 8080 is taken." },
+				context,
+			),
+		).toBe("**Service:** not ready. Port 8080 is taken.");
+	});
+
 	test("a thought says how long it took and quotes its text", () => {
 		const item: TranscriptItem = {
 			...base,
