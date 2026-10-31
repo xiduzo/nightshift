@@ -39,10 +39,11 @@ import {
 	useCustomAgents,
 } from "@/features/agents";
 import type { Effort, PermissionMode } from "@/shared/api";
-import { Field, InspectorSection } from "../fields";
+import { Field, InspectorSection, Note } from "../fields";
 import { SkillCombobox } from "../skill-combobox";
 import { TemplateField } from "../template-field";
 import { AgentOutcomeSection } from "./agent-outcomes";
+import { CascadeSection } from "./cascade-fields";
 import { withoutField } from "./model-defaults";
 import {
 	type ProfileChoice,
@@ -322,8 +323,14 @@ export function AgentFields({
 	return (
 		<>
 			<InspectorSection title="Agent" tab="setup">
+				{node.cascade !== undefined ? (
+					<Note>
+						The tiers of the cascade choose the agent and its computer.
+					</Note>
+				) : null}
 				<Field
 					id={`${id}-profile`}
+					className={node.cascade !== undefined ? "hidden" : undefined}
 					label="Profile"
 					error={problem}
 					hint={
@@ -347,7 +354,7 @@ export function AgentFields({
 					/>
 				</Field>
 
-				{node.profile !== undefined ? (
+				{node.cascade !== undefined ? null : node.profile !== undefined ? (
 					<Collapsible
 						defaultOpen={overrides > 0}
 						className="flex flex-col gap-4"
@@ -513,6 +520,8 @@ export function AgentFields({
 				onRemoveOutcome={onRemoveOutcome}
 				onSetOutcomes={onSetOutcomes}
 			/>
+
+			<CascadeSection projectId={projectId} node={node} onChange={onChange} />
 		</>
 	);
 }

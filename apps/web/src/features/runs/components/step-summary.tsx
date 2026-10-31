@@ -13,6 +13,7 @@ import { type ItemScope, stepRunsEach } from "../lib/run-steps";
 import { stepProse } from "../lib/step-gist";
 import { CallDetail } from "./call-detail";
 import { ItemList } from "./item-list";
+import { StepClimb } from "./step-climb";
 
 /**
  * What a step did, without the transcript: why it failed, what it said it
@@ -60,6 +61,7 @@ export function StepSummary({
 			{context ? (
 				<div className="min-w-0 text-muted-foreground text-xs">{context}</div>
 			) : null}
+			<StepClimb steps={steps} step={step} runStatus={run.status} />
 			{step.error ? (
 				<Alert variant="destructive">
 					<CircleXIcon aria-hidden="true" />

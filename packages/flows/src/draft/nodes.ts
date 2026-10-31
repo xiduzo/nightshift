@@ -116,6 +116,8 @@ export function withDecidedBy(
 		decider: _decider,
 		model: _model,
 		profile: _profile,
+		// Only a model climbs a cascade: a switch drops it.
+		cascade: _cascade,
 		...rest
 	} = node;
 	if (by === "model") {
@@ -188,7 +190,13 @@ export function valueNode(id: string, position: Position): ValueNode {
  */
 export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 	if (by === node.by) return node;
-	const { decider, model: _model, profile: _profile, ...rest } = node;
+	const {
+		decider,
+		model: _model,
+		profile: _profile,
+		cascade: _cascade,
+		...rest
+	} = node;
 	if (by === "rule") return { ...rest, by };
 	return {
 		...node,

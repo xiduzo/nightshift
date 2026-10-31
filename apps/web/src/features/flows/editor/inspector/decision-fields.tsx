@@ -18,6 +18,7 @@ import { OutcomesSuggest, RulesSuggest } from "../../assistant/field-helpers";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
+import { CascadeSection } from "./cascade-fields";
 import { GateDeadlineSection } from "./gate-deadline-fields";
 import { lockScreenHint } from "./lock-screen-hint";
 import { ModelSettings } from "./model-settings";
@@ -214,8 +215,11 @@ export function DecisionFields({
 				<GateDeadlineSection flow={flow} node={node} onChange={onChange} />
 			) : null}
 
-			{by === "model" ? (
+			{by === "model" && node.cascade === undefined ? (
 				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
+			) : null}
+			{by === "model" ? (
+				<CascadeSection projectId={projectId} node={node} onChange={onChange} />
 			) : null}
 		</>
 	);

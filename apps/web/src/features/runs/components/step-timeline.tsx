@@ -405,6 +405,11 @@ function StepRow({
 						visit {step.visit}
 					</span>
 				) : null}
+				{typeof step.outputs.tier === "string" ? (
+					<span className="hidden shrink-0 text-muted-foreground sm:inline">
+						tier {step.outputs.tier}
+					</span>
+				) : null}
 				{step.nodeType === "call" && step.items.length > 0 ? (
 					<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
 						{step.items.filter((item) => item.state === "done").length}/
