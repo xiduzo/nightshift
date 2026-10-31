@@ -472,6 +472,7 @@ export function toStepSummary(
 					choices: derived.gate.choices,
 					openedAt: derived.gate.openedAt,
 					deadline: derived.gate.deadline,
+					...(derived.gate.form ? { form: derived.gate.form } : {}),
 				}
 			: null,
 		sleeps: derived.sleeps.map(({ from, to }) => ({ from, to })),
@@ -845,6 +846,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				lockScreen: gate.lockScreen,
 				openedAt: gate.openedAt,
 				deadline: gate.deadline,
+				form: gate.form,
 				walker,
 				answerPending,
 			});

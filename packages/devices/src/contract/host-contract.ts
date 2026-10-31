@@ -135,6 +135,8 @@ const runCommandInput = z.discriminatedUnion("kind", [
 			stepId: z.string().min(1),
 			choice: z.string().min(1),
 			note: z.string().optional(),
+			/** The answer to an Ask (ADR 10): the data of its form. */
+			data: z.json().optional(),
 		}),
 	}),
 	z.object({

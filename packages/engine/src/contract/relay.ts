@@ -1,3 +1,4 @@
+import type { JsonValue } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { LeaseHost } from "./leases";
 import type { StartRunInput } from "./start-run";
@@ -87,7 +88,13 @@ export type Relay = {
 export type RunCommandInput =
 	| {
 			kind: "gate.resolve";
-			payload: { stepId: string; choice: string; note?: string };
+			payload: {
+				stepId: string;
+				choice: string;
+				note?: string;
+				/** The answer to an Ask (ADR 10): the data of its form. */
+				data?: JsonValue;
+			};
 	  }
 	| { kind: "signal.send"; payload: { name: string } }
 	| {

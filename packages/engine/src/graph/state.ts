@@ -152,6 +152,8 @@ const pendingGateSchema = z.object({
 	 * option (a Decision), or tries once more or stops (an Agent, a Call).
 	 */
 	climb: z.literal(true).optional(),
+	/** An Ask (ADR 10): the form its answer fills in (an `AskForm`). */
+	form: z.record(z.string(), z.any()).optional(),
 });
 const pendingSchema = z.discriminatedUnion("kind", [
 	pendingWaitSchema,
@@ -451,14 +453,21 @@ export type Parked =
  * - `reopen`: a person resumed a run that was stopped at a Gate: the gate
  *   node asks again.
  * - `gate`: the answer to a Gate. `byDeadline`: nobody answered, and the
- *   deadline took its option.
+ *   deadline took its option. `data`: the answer to an Ask (ADR 10), the
+ *   data of its form.
  * - `signal`: someone sent the run a signal; a Wait node on it ends `done`.
  */
 export type ResumeValue =
 	| { kind: "wake"; early: boolean; prompt?: string }
 	| { kind: "resume"; prompt?: string }
 	| { kind: "reopen" }
-	| { kind: "gate"; choice: string; note?: string; byDeadline?: true }
+	| {
+			kind: "gate";
+			choice: string;
+			note?: string;
+			byDeadline?: true;
+			data?: JsonValue;
+	  }
 	/** A signal ended the wait. `data`: the webhook event that sent it, if one did. */
 	| { kind: "signal"; name: string; data?: JsonValue };
 

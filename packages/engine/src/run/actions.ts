@@ -1,8 +1,13 @@
 import type { Database } from "@nightshift/db";
-import { type Flow, optionProblem } from "@nightshift/flows";
+import { type Flow, type JsonValue, optionProblem } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor, OwnDevice } from "../contract";
-import { type Runner, type RunWalks, rerunNodeRefusal } from "../graph";
+import {
+	askAnswerProblem,
+	type Runner,
+	type RunWalks,
+	rerunNodeRefusal,
+} from "../graph";
 import {
 	applyWalkerMoves,
 	placedRun,
@@ -54,9 +59,16 @@ export type RunActionRequest =
 	/**
 	 * Answers an open Gate with one of its choices and continues the walk
 	 * on that outcome. Fails when the step is not an open Gate or the
-	 * choice is not one of its choices.
+	 * choice is not one of its choices. An Ask (ADR 10) takes `data`, the
+	 * data of its form: it fails when the data does not match the form.
 	 */
-	| { kind: "answer"; stepId: string; choice: string; note?: string }
+	| {
+			kind: "answer";
+			stepId: string;
+			choice: string;
+			note?: string;
+			data?: JsonValue;
+	  }
 	/**
 	 * A signal to a run whose Wait node waits for it: the step ends `done`
 	 * and the walk goes on. Fails when the run does not wait for a signal
@@ -149,11 +161,17 @@ const signedOut = () =>
 /**
  * Throws when `answer` cannot answer the run's open Gate, as the log says:
  * no Gate is open, another step is, the choice is not one of its options,
- * or the choice needs a note and has none (the answer to an Agent).
+ * the choice needs a note and has none (the answer to an Agent), or the
+ * data does not match the form of an Ask.
  */
 function refuseAnswer(
 	runState: RunState,
-	{ stepId, choice, note }: { stepId: string; choice: string; note?: string },
+	{
+		stepId,
+		choice,
+		note,
+		data,
+	}: { stepId: string; choice: string; note?: string; data?: JsonValue },
 ): void {
 	const why = whyNot("answer", deriveRunState(runState).status, true);
 	const gate = deriveOpenGate(runState);
@@ -171,6 +189,10 @@ function refuseAnswer(
 			"invalid-answer",
 			`Write a note to choose "${choice}". The agent continues with it.`,
 		);
+	}
+	if (gate.form !== null) {
+		const wrong = askAnswerProblem(gate.form, data);
+		if (wrong !== null) throw new RunRefusal("invalid-answer", wrong);
 	}
 }
 
@@ -260,10 +282,15 @@ export function createRunActions(deps: RunActionsDeps) {
 						"An answer to this Gate is already on its way to the device that runs it.",
 					);
 				}
-				const { stepId, choice, note } = request;
+				const { stepId, choice, note, data } = request;
 				return relay.send(row, actor, {
 					kind: "gate.resolve",
-					payload: { stepId, choice, ...(note ? { note } : {}) },
+					payload: {
+						stepId,
+						choice,
+						...(note ? { note } : {}),
+						...(data !== undefined ? { data } : {}),
+					},
 				});
 			}
 			case "signal":
@@ -397,6 +424,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						stepId: request.stepId,
 						choice: request.choice,
 						note: request.note ?? "",
+						...(request.data !== undefined ? { data: request.data } : {}),
 					},
 					{ check: (runState) => refuseAnswer(runState, request) },
 				);

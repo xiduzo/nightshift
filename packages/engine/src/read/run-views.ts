@@ -1,5 +1,10 @@
 import type { AgentHarnessName } from "@nightshift/agents/types";
-import type { ItemState, JsonValue, NodeOutputs } from "@nightshift/flows";
+import type {
+	AskForm,
+	ItemState,
+	JsonValue,
+	NodeOutputs,
+} from "@nightshift/flows";
 import {
 	addCost,
 	type CostTally,
@@ -316,6 +321,8 @@ export type OpenGateFact = {
 	openedAt: number;
 	/** When nobody answered by then, the Gate takes an option. Null without one. */
 	deadline: GateDeadline | null;
+	/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
+	form: AskForm | null;
 };
 
 /**
@@ -351,6 +358,7 @@ export function deriveOpenGates(run: RunState): OpenGateFact[] {
 				lockScreen: gate.lockScreen,
 				openedAt: gate.openedAt,
 				deadline: gate.deadline,
+				form: gate.form,
 			});
 		}
 	}

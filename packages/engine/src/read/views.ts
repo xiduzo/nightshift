@@ -1,4 +1,5 @@
 import type {
+	AskForm,
 	Flow,
 	FlowNodeType,
 	ItemState,
@@ -94,6 +95,8 @@ export type StepSummary = {
 		openedAt: number;
 		/** When nobody answered by `at`, the Gate takes `choose`. Null without a deadline. */
 		deadline: GateDeadline | null;
+		/** An Ask (ADR 10): the form the answer fills in. Absent on every other Gate. */
+		form?: AskForm;
 	} | null;
 	/**
 	 * When the step slept (a Wait node, a usage limit, the network), oldest
@@ -415,6 +418,11 @@ export type OpenGate = {
 	openedAt: number;
 	/** When nobody answered by `at`, Night Shift takes `choose`. Null without a deadline. */
 	deadline: GateDeadline | null;
+	/**
+	 * An Ask (ADR 10): the form the answer fills in, with the data it
+	 * starts with. Its one choice is `answer`. Null on every other Gate.
+	 */
+	form: AskForm | null;
 	walker: RunWalker;
 	/** An answer is on its way to the Walker. */
 	answerPending: boolean;

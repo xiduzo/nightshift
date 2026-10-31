@@ -11,6 +11,7 @@ import type {
 import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
 import type {
+	AskForm,
 	FlowNodeType,
 	ItemState,
 	JsonValue,
@@ -393,6 +394,12 @@ export type EnginePayloads = {
 		 * rendered when it opened, so a restart keeps the same deadline.
 		 */
 		deadline?: GateDeadline;
+		/**
+		 * An Ask (a Value made by a person, ADR 10): the form the answer
+		 * fills in. Its one choice is `answer`, and the answer's data is the
+		 * step's `data`. Absent on every other Gate.
+		 */
+		form?: AskForm;
 	};
 	SessionStarted: {
 		prompt: string;

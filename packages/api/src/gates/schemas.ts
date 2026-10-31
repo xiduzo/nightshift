@@ -1,4 +1,5 @@
 import type { InboxGate, OpenGate } from "@nightshift/engine";
+import { askFormSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { exact } from "../output";
@@ -29,6 +30,11 @@ export const openGateSchema = exact<OpenGate>()(
 		openedAt: z.number(),
 		/** When nobody answered by `at`, Night Shift takes `choose`. */
 		deadline: gateDeadlineSchema.nullable(),
+		/**
+		 * An Ask: the form the answer fills in, with its choices and
+		 * attachments. Its one choice is `answer`. Null on every other Gate.
+		 */
+		form: askFormSchema.nullable(),
 		walker: runWalkerSchema,
 		/** An answer is on its way to the Walker. */
 		answerPending: z.boolean(),
@@ -50,6 +56,8 @@ export const gateAnswerSchema = z.object({
 	stepId: z.string().min(1),
 	choice: z.string().min(1),
 	note: z.string().optional(),
+	/** The answer to an Ask: the data of its form. It must match the form. */
+	data: z.json().optional(),
 	/**
 	 * `lock-screen`: the answer comes from a button on a notification,
 	 * without an unlock. Only a Gate its author marked for the lock screen

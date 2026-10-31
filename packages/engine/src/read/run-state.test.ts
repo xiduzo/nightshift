@@ -440,6 +440,7 @@ describe("gates", () => {
 			lockScreen: false,
 			openedAt: b.events.at(-1)?.at ?? 0,
 			deadline: null,
+			form: null,
 		});
 		expect(deriveSteps(foldRun(b.events))[0]?.gate?.question).toBe(
 			"Ship PR 12?",

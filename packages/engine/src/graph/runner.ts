@@ -186,6 +186,8 @@ export type Intent =
 			note: string;
 			/** Nobody answered: the Gate's deadline chose (`deadlineTurn`). */
 			byDeadline?: true;
+			/** The answer to an Ask (ADR 10): the data of its form. */
+			data?: JsonValue;
 	  }
 	/** Ends the sleep of a sleeping run (`planWake`): its timer, a person early, or a signal. */
 	| ({ kind: "wake" } & Wake)
@@ -838,7 +840,7 @@ export function createRunner(deps: RunnerDeps) {
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		// The Gate's deadline, if it has one, no longer applies.
 		sleeps.forget(row.id);
-		const { choice, note, byDeadline } = intent;
+		const { choice, note, byDeadline, data } = intent;
 		const asked =
 			deriveSteps(await log.state(row.id)).find((s) => s.id === intent.stepId)
 				?.gate?.openedSeq ?? 0;
@@ -847,6 +849,7 @@ export function createRunner(deps: RunnerDeps) {
 			choice,
 			note,
 			...(byDeadline ? { byDeadline } : {}),
+			...(data !== undefined ? { data } : {}),
 		};
 		// Parallel branches may hold several Gates: the answer goes to its own.
 		const each = resumeEach(await threadOf(row).state(), (parked) =>

@@ -28,7 +28,17 @@ export {
 	mcpServerSchema,
 	permissionModeSchema,
 } from "./agent";
-export type { AttachmentSource } from "./ask";
+export {
+	ASK_ANSWER,
+	type AskAttachment,
+	type AskChoice,
+	type AskForm,
+	type AttachmentSource,
+	askFormSchema,
+	type ChoiceItem,
+	choiceItemSchema,
+	withChoices,
+} from "./ask";
 export {
 	addressRoot,
 	type DeciderName,
