@@ -186,8 +186,9 @@ export function valueNode(id: string, position: Position): ValueNode {
 /**
  * Changes who makes the value. The expression and the prompt both stay, for
  * when their mode comes back. A model starts on the first decider that can
- * make a value; a rule drops the profile, the decider and the model, as
- * only a model reads them.
+ * make a value; a rule or a person drops the profile, the decider and the
+ * model, as only a model reads them. Only a person reads the choices, the
+ * attachments, the deadline and the default: another maker drops them.
  */
 export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 	if (by === node.by) return node;
@@ -196,11 +197,18 @@ export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 		model: _model,
 		profile: _profile,
 		cascade: _cascade,
+		choices: _choices,
+		attachments: _attachments,
+		deadline: _deadline,
+		default: _default,
 		...rest
 	} = node;
-	if (by === "rule") return { ...rest, by };
+	if (by !== "model") return { ...rest, by };
 	return {
-		...node,
+		...rest,
+		...(node.cascade === undefined ? {} : { cascade: node.cascade }),
+		...(node.profile === undefined ? {} : { profile: node.profile }),
+		...(node.model === undefined ? {} : { model: node.model }),
 		by,
 		decider:
 			decider !== undefined && canMakeValue(decider)

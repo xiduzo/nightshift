@@ -64,8 +64,18 @@ function producerFor(node: ValueNode, ctx: StepContext): Producer {
 			return ruleProducer(node, ctx);
 		case "model":
 			return modelProducer(node, ctx);
+		case "person":
+			throw new Error(
+				`Value node "${node.id}" is made by a person, which this Night Shift cannot run yet.`,
+			);
 	}
 }
+
+/** A Value made by a person (an Ask) needs the Ask's producer, which comes next. */
+const personValuesNotYet: Requirement<ValueNode> = (nodes) =>
+	nodes.some((n) => n.by === "person")
+		? "The flow has a Value node made by a person, which this Night Shift cannot run yet."
+		: null;
 
 /** A Value made by a model needs a decider with a text adapter. */
 export const modelValuesHaveDecider: Requirement<ValueNode> = (nodes, has) =>
@@ -85,5 +95,5 @@ export const VALUE: NodeKind<ValueNode> = {
 	resumeRules: (node) =>
 		node.by === "model" ? RESUME_RULES.model : RESUME_RULES.fresh,
 	aux: (node) => (node.by === "model" ? [{ kind: "wait" }] : []),
-	requirements: [modelValuesHaveDecider],
+	requirements: [modelValuesHaveDecider, personValuesNotYet],
 };
