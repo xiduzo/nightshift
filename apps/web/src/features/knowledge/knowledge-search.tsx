@@ -162,20 +162,28 @@ export function KnowledgeSearch({ projectId }: { projectId: string }) {
 	);
 }
 
-/** What the page says about search by meaning on this computer. Nothing when it is off. */
+/** What the page says about search by meaning, and which Ollama does it. Nothing when it is off. */
 function MeaningLine({ projectId }: { projectId: string }) {
 	const meaning = useQuery({
 		...knowledgeQueries.meaning(projectId),
-		refetchInterval: (query) =>
-			query.state.data?.state === "preparing" ? PREPARING_POLL : false,
+		refetchInterval: (query) => {
+			const state = query.state.data?.state;
+			return state === "preparing" || state === "downloading"
+				? PREPARING_POLL
+				: false;
+		},
 	});
 	const status = meaning.data;
 	if (!status || status.state === "off") return null;
+	const where = status.where ? `at ${status.where}` : "on this computer";
 	const pull = <code className="font-mono">ollama pull {status.model}</code>;
 	return (
 		<p className="text-muted-foreground text-sm">
 			{status.state === "on" ? (
-				"Search finds files by their words and by their meaning."
+				<>
+					Search finds files by their words and by their meaning, with Ollama{" "}
+					{where}.
+				</>
 			) : status.state === "preparing" ? (
 				<>
 					Search by meaning gets ready:{" "}
@@ -186,15 +194,25 @@ function MeaningLine({ projectId }: { projectId: string }) {
 				</>
 			) : status.state === "turned-off" ? (
 				"Search finds words only. Search by meaning is off for this project."
+			) : status.state === "downloading" ? (
+				<>
+					Ollama {where} downloads {status.model}: {status.percent ?? 0}% done.
+					Search finds words until then.
+				</>
 			) : status.state === "no-model" ? (
 				<>
-					Search finds words only. To find files by their meaning too, run{" "}
-					{pull}.
+					Search finds words only. Ollama {where} does not have {status.model}.
+					Download it on the Settings page, or run {pull}.
+				</>
+			) : status.where ? (
+				<>
+					Search finds words only. Ollama at {status.where} does not answer.
+					Check the Ollama address on the Settings page.
 				</>
 			) : (
 				<>
-					Search finds words only. To find files by their meaning too, install
-					Ollama, then run {pull}.
+					Search finds words only. Ollama does not answer on this computer. To
+					find files by their meaning too, install Ollama, then run {pull}.
 				</>
 			)}
 		</p>

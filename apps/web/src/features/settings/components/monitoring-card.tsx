@@ -3,7 +3,6 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Field,
@@ -11,25 +10,17 @@ import {
 	FieldDescription,
 	FieldGroup,
 	FieldLabel,
-	FieldLegend,
 	FieldSeparator,
-	FieldSet,
 } from "@nightshift/ui/components/field";
-import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { InfoIcon } from "lucide-react";
-import { useId, useState } from "react";
-import { toast } from "sonner";
-import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
+import { useId } from "react";
 import type { SettingsView } from "@/shared/api";
 import { PageSection } from "@/shared/page";
-import {
-	useSaveSettings,
-	useSettingsForm,
-	useToggleSetting,
-} from "../hooks/use-settings-form";
+import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import {
 	CardForm,
+	HeadersCard,
 	ResetSection,
 	SaveError,
 	SelectSetting,
@@ -117,67 +108,17 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 			{/* A new saved value, from here or another screen, starts a new draft. */}
 			<HeadersCard
 				key={JSON.stringify(data.values.telemetryHeaders)}
+				settingKey="telemetryHeaders"
 				saved={data.values.telemetryHeaders}
+				description={
+					<>
+						Add the headers your tool needs, such as an API key. Write a key as{" "}
+						<span className="font-mono">${"{NAME}"}</span> and save its value on
+						the Secrets page.
+					</>
+				}
+				valuePlaceholder="Bearer ${GRAFANA_TOKEN}"
 			/>
 		</PageSection>
-	);
-}
-
-/**
- * The headers sent with the data. A key is a `${NAME}` reference to a
- * secret, as in a connection: its value stays on the Secrets page.
- */
-function HeadersCard({ saved }: { saved: Record<string, string> }) {
-	const [rows, setRows] = useState(() => rowsFrom(saved));
-	const save = useSaveSettings();
-	const draft = recordFrom(rows);
-	const changed = JSON.stringify(draft) !== JSON.stringify(saved);
-
-	return (
-		<Card>
-			<form
-				className="contents"
-				noValidate
-				onSubmit={(event) => {
-					event.preventDefault();
-					if (!changed || save.isPending) return;
-					save.mutate(
-						{ telemetryHeaders: draft },
-						{ onSuccess: () => toast.success("Headers saved") },
-					);
-				}}
-			>
-				<CardContent>
-					<FieldGroup>
-						<FieldSet className="gap-3">
-							<FieldLegend variant="label">Headers</FieldLegend>
-							<FieldDescription>
-								Add the headers your tool needs, such as an API key. Write a key
-								as <span className="font-mono">${"{NAME}"}</span> and save its
-								value on the Secrets page.
-							</FieldDescription>
-							<KeyValueRows
-								rows={rows}
-								onChange={(next) => {
-									save.reset();
-									setRows(next);
-								}}
-								keyLabel="Header"
-								keyPlaceholder="Authorization"
-								valuePlaceholder="Bearer ${GRAFANA_TOKEN}"
-								addLabel="Add header"
-							/>
-						</FieldSet>
-						<SaveError error={save.error} />
-						<div className="flex justify-end">
-							<Button type="submit" disabled={!changed || save.isPending}>
-								{save.isPending ? <Spinner data-icon="inline-start" /> : null}
-								Save headers
-							</Button>
-						</div>
-					</FieldGroup>
-				</CardContent>
-			</form>
-		</Card>
 	);
 }

@@ -19,3 +19,16 @@ export const settingsMutations = {
 	/** Saves a patch. A `null` value forgets the saved value. Answers with the new view. */
 	save: orpc.settings.save.mutationOptions,
 };
+
+/** The Ollama search by meaning uses: where it is, its models, a download. */
+export const ollamaQueries = {
+	/** Whether it answers, has the model, and how far a download is. */
+	status: () => orpc.ollama.status.queryOptions(),
+	/** The embedding models it has. */
+	models: () => orpc.ollama.models.queryOptions(),
+};
+
+export const ollamaMutations = {
+	/** Starts a download of a model, in the background. */
+	pull: orpc.ollama.pull.mutationOptions,
+};

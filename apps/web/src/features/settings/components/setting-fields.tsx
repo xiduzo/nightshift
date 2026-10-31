@@ -4,11 +4,15 @@ import {
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Field,
 	FieldDescription,
 	FieldError,
+	FieldGroup,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
@@ -27,8 +31,14 @@ import {
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { CircleAlertIcon, RotateCcwIcon } from "lucide-react";
-import { type ReactNode, useId } from "react";
-import type { SettingKey, SettingsForm } from "../hooks/use-settings-form";
+import { type ReactNode, useId, useState } from "react";
+import { toast } from "sonner";
+import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
+import {
+	type SettingKey,
+	type SettingsForm,
+	useSaveSettings,
+} from "../hooks/use-settings-form";
 
 /** The daemon's answer when it refused a save. */
 export function SaveError({ error }: { error: Error | null }) {
@@ -212,5 +222,72 @@ export function CardForm({
 		>
 			{children}
 		</form>
+	);
+}
+
+/**
+ * Headers a setting sends with each request, name → value. A value is a
+ * `${NAME}` reference to a secret, as in a connection: the value itself
+ * stays on the Secrets page. Give it a `key` of the saved value, so a new
+ * saved value starts a new draft.
+ */
+export function HeadersCard({
+	settingKey,
+	saved,
+	description,
+	valuePlaceholder,
+}: {
+	settingKey: "telemetryHeaders" | "ollamaHeaders";
+	saved: Record<string, string>;
+	description: ReactNode;
+	valuePlaceholder: string;
+}) {
+	const [rows, setRows] = useState(() => rowsFrom(saved));
+	const save = useSaveSettings();
+	const draft = recordFrom(rows);
+	const changed = JSON.stringify(draft) !== JSON.stringify(saved);
+
+	return (
+		<Card>
+			<form
+				className="contents"
+				noValidate
+				onSubmit={(event) => {
+					event.preventDefault();
+					if (!changed || save.isPending) return;
+					save.mutate(
+						{ [settingKey]: draft },
+						{ onSuccess: () => toast.success("Headers saved") },
+					);
+				}}
+			>
+				<CardContent>
+					<FieldGroup>
+						<FieldSet className="gap-3">
+							<FieldLegend variant="label">Headers</FieldLegend>
+							<FieldDescription>{description}</FieldDescription>
+							<KeyValueRows
+								rows={rows}
+								onChange={(next) => {
+									save.reset();
+									setRows(next);
+								}}
+								keyLabel="Header"
+								keyPlaceholder="Authorization"
+								valuePlaceholder={valuePlaceholder}
+								addLabel="Add header"
+							/>
+						</FieldSet>
+						<SaveError error={save.error} />
+						<div className="flex justify-end">
+							<Button type="submit" disabled={!changed || save.isPending}>
+								{save.isPending ? <Spinner data-icon="inline-start" /> : null}
+								Save headers
+							</Button>
+						</div>
+					</FieldGroup>
+				</CardContent>
+			</form>
+		</Card>
 	);
 }

@@ -39,6 +39,9 @@ const KINDS: Partial<Record<SettingKey, Kind>> = {
 	assistantProfile: { type: "choice" },
 	telemetryEndpoint: { type: "address" },
 	telemetryProtocol: { type: "choice" },
+	ollama: { type: "choice" },
+	embeddingModel: { type: "text" },
+	ollamaAddress: { type: "address" },
 };
 
 const MAX_MINUTES = 10_080;
@@ -83,7 +86,7 @@ function parseDraft(
 				if (protocol === "http:" || protocol === "https:")
 					return { value: text };
 			} catch {}
-			return { error: "Use an address like http://localhost:4318." };
+			return { error: "Use an address that starts with http:// or https://." };
 		}
 		case "choice":
 			return { value: text };
