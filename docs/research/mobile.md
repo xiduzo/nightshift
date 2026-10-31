@@ -5,6 +5,11 @@ Home Host merges its personal Space into the Host's, so the Phone sees all
 personal work ([ADR 1](../adr/0001-one-personal-space-per-home-host.md),
 built). The text below about "Personal on <Host>" is history.
 
+Note, 2026-10-31: [mobile-night-watch.md](mobile-night-watch.md) sets
+which desktop features come to the phone. It also gives the plan for
+native pages and speed. Pause tonight and Run now on a schedule are
+nudges, not edits: editing stays out of scope.
+
 Status: decided 2026-10-21, built since. The phone app ships (`apps/mobile`),
 with the notifier and the shared inbox. The shape is decided:
 **the phone is a Person's client of a Host**, not a Device. A notifier on
