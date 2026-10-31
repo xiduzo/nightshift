@@ -8,6 +8,7 @@ import {
 
 import { useSignedIn } from "@/features/host";
 import { useInFront } from "@/shared/in-front";
+import { useWhileFocused } from "@/shared/refresh";
 
 /** The run screen keeps the latest agent message of each step. */
 const MESSAGES: EntryFold<AgentMessages> = {
@@ -21,7 +22,9 @@ export type PhoneLiveRun = LiveRun<AgentMessages>;
 /**
  * Follows one run live through the live cache, in batches of 100 ms.
  * While the app is in the background it stops and keeps what came; when
- * the app comes back it follows on after the last entry it has.
+ * the app comes back it follows on after the last entry it has. While
+ * another screen covers it, it keeps what comes but does not render for
+ * it, and shows it all on focus.
  */
 export function usePhoneLiveRun(runId: string): PhoneLiveRun {
 	const { host } = useSignedIn();
@@ -30,5 +33,6 @@ export function usePhoneLiveRun(runId: string): PhoneLiveRun {
 		entries: MESSAGES,
 		paused: !inFront,
 		flushMs: 100,
+		...useWhileFocused(),
 	});
 }

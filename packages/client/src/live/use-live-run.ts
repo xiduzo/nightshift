@@ -17,6 +17,13 @@ export type LiveRunOptions<T> = {
 	paused?: boolean;
 	/** How long items gather before the screen renders them. Default 50 ms. */
 	flushMs?: number;
+	/**
+	 * Render on each batch. False keeps the stream on and every entry in
+	 * the query client, but the screen does not render for them. When it is
+	 * true again, the screen shows all that came. The phone sets it false
+	 * while the screen has no focus. Default true.
+	 */
+	subscribed?: boolean;
 };
 
 /**
@@ -31,12 +38,12 @@ export type LiveRunOptions<T> = {
 export function useLiveRun<T>(
 	host: HostApi,
 	runId: string,
-	{ entries, paused = false, flushMs }: LiveRunOptions<T>,
+	{ entries, paused = false, flushMs, subscribed = true }: LiveRunOptions<T>,
 ): LiveRun<T> {
 	const { client, orpc } = host;
 	const live = useLiveCache(orpc);
 	const queryClient = useQueryClient();
-	const kept = useQuery(keptRunQuery(runId, entries));
+	const kept = useQuery({ ...keptRunQuery(runId, entries), subscribed });
 	const empty = useMemo(() => emptyLiveRun(entries), [entries]);
 	const [connection, setConnection] =
 		useState<RunStreamConnection>("connecting");

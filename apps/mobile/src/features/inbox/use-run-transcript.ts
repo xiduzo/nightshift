@@ -6,6 +6,7 @@ import {
 } from "@nightshift/client";
 
 import { useSignedIn } from "@/features/host";
+import { useWhileFocused } from "@/shared/refresh";
 
 /** The most entries the sheet keeps: the newest ones. */
 const MAX_ENTRIES = 5000;
@@ -19,6 +20,7 @@ const NEWEST: EntryFold<TranscriptEntry[]> = {
 /**
  * The transcript entries of one run while the transcript sheet is open:
  * what the run saved first, then live. It stops when the sheet closes.
+ * Under another screen it keeps what comes without rendering for it.
  */
 export function useRunTranscript(runId: string): {
 	entries: TranscriptEntry[];
@@ -28,6 +30,7 @@ export function useRunTranscript(runId: string): {
 	const { entries, connection } = useLiveRun(host, runId, {
 		entries: NEWEST,
 		flushMs: 150,
+		...useWhileFocused(),
 	});
 	return { entries, connection };
 }
