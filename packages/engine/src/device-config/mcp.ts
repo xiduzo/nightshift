@@ -5,7 +5,12 @@ import type { McpServer } from "@nightshift/flows";
 const REFERENCE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
 export type McpExpansion =
-	| { ok: true; servers: Record<string, McpServerConfig> }
+	| {
+			ok: true;
+			servers: Record<string, McpServerConfig>;
+			/** The secret values put in for `${NAME}`: what a session's output hides. */
+			values?: string[];
+	  }
 	/** `message` names the server and the variable, never a value. */
 	| { ok: false; message: string };
 
@@ -20,6 +25,7 @@ export function expandMcpServers(
 	env: Readonly<Record<string, string | undefined>>,
 ): McpExpansion {
 	const expanded: Record<string, McpServerConfig> = {};
+	const used = new Set<string>();
 	for (const [name, server] of Object.entries(servers ?? {})) {
 		const missing: string[] = [];
 		const expand = (values: Record<string, string> | undefined) => {
@@ -31,6 +37,7 @@ export function expandMcpServers(
 						missing.push(variable);
 						return whole;
 					}
+					if (found !== "") used.add(found);
 					return found;
 				});
 			}
@@ -57,5 +64,5 @@ export function expandMcpServers(
 		}
 		expanded[name] = config;
 	}
-	return { ok: true, servers: expanded };
+	return { ok: true, servers: expanded, values: [...used] };
 }

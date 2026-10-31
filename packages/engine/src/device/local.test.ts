@@ -331,7 +331,10 @@ describe("session", () => {
 			harnesses: { "claude-code": harness },
 			sessionEnv: (session) => {
 				asked.push(session);
-				return { TRACEPARENT: `00-${session.runId}-${session.stepId}-01` };
+				return {
+					env: { TRACEPARENT: `00-${session.runId}-${session.stepId}-01` },
+					values: [],
+				};
 			},
 		});
 		await collect(
@@ -345,6 +348,49 @@ describe("session", () => {
 		]);
 		// A session of no step (the assistant's) gets nothing.
 		expect(plain?.env).toBeUndefined();
+	});
+
+	test("every secret value the session could see comes back as •••: the export's headers, its MCP servers' and the saved secrets", async () => {
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "tool",
+					name: "Bash",
+					input: { command: "env" },
+					result:
+						"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20glc-otlp-key mcp-key-123 saved-key-456",
+				},
+				{ type: "text", text: "The key is glc-otlp-key." },
+			],
+		});
+		const d = device({
+			harnesses: { "claude-code": harness },
+			sessionEnv: () => ({
+				env: {
+					OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer%20glc-otlp-key",
+				},
+				values: ["glc-otlp-key"],
+			}),
+			mcpServersFor: async () => ({
+				ok: true,
+				servers: { tracker: fakeMcp },
+				values: ["mcp-key-123"],
+			}),
+			secretValues: async () => ["saved-key-456"],
+		});
+		const events = await collect(
+			d.session(
+				sessionInput({
+					connections: ["tracker"],
+					artifacts: { runId: "r1", stepId: "s1" },
+				}),
+			),
+		);
+		const out = JSON.stringify(events);
+		expect(out).toContain("•••");
+		for (const value of ["glc-otlp-key", "mcp-key-123", "saved-key-456"]) {
+			expect(out).not.toContain(value);
+		}
 	});
 });
 

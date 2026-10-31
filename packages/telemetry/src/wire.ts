@@ -31,12 +31,15 @@ export type TelemetrySettings = {
 };
 
 export type Telemetry = {
-	/** What a run step's harness session adds to its environment. Nothing while the export is off. */
-	sessionEnv(session: {
-		harness: string;
-		runId: string;
-		stepId: string;
-	}): Record<string, string>;
+	/**
+	 * What a run step's harness session adds to its environment, and the
+	 * secret values in it (the headers' values), to take out of the
+	 * session's output. Nothing while the export is off.
+	 */
+	sessionEnv(session: { harness: string; runId: string; stepId: string }): {
+		env: Record<string, string>;
+		values: string[];
+	};
 	/** The export's headers: their names only, never their values. */
 	headers: {
 		names(): Promise<string[]>;
@@ -140,12 +143,16 @@ export function createTelemetry(deps: {
 
 	return {
 		sessionEnv(session) {
-			if (!current || session.harness !== "claude-code") return {};
-			return claudeCodeEnv(current.target, {
-				runId: session.runId,
-				stepId: session.stepId,
-				deviceId: deps.deviceId,
-			});
+			if (!current || session.harness !== "claude-code")
+				return { env: {}, values: [] };
+			return {
+				env: claudeCodeEnv(current.target, {
+					runId: session.runId,
+					stepId: session.stepId,
+					deviceId: deps.deviceId,
+				}),
+				values: Object.values(current.target.headers),
+			};
 		},
 		headers: {
 			async names() {

@@ -151,14 +151,23 @@ export type LocalDeviceDeps = {
 	/**
 	 * What a run step's harness session adds to its environment, read as
 	 * the session starts: the export to monitoring gives Claude Code its
-	 * own telemetry under the step (`@nightshift/telemetry`). Without it,
-	 * or when it gives nothing: nothing.
+	 * own telemetry under the step (`@nightshift/telemetry`). `values` are
+	 * the secret values in `env` (an API key in its headers): the session's
+	 * output has them as `•••`. Without it, or when it gives nothing:
+	 * nothing.
 	 */
 	sessionEnv?: (session: {
 		harness: AgentHarnessName;
 		runId: string;
 		stepId: string;
-	}) => Record<string, string>;
+	}) => { env: Record<string, string>; values: readonly string[] };
+	/**
+	 * The values of the saved secrets and of the ones the connections
+	 * reference, read as a session starts: its output has each as `•••`,
+	 * as an exported run has. Without it: only the values the session was
+	 * given (its CLI tools' logins, its MCP servers' and `sessionEnv`'s).
+	 */
+	secretValues?: () => Promise<readonly string[]>;
 	/**
 	 * Keeps a project's folder in step with its Space (ADR 4): before and
 	 * after each step that gets it. Without it, the folder is this
@@ -346,10 +355,11 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 							return null;
 						})
 					: null;
+			const added = artifacts
+				? deps.sessionEnv?.({ harness: name, ...artifacts })
+				: undefined;
 			const env = {
-				...(artifacts
-					? deps.sessionEnv?.({ harness: name, ...artifacts })
-					: {}),
+				...added?.env,
 				...known?.env,
 				...tools?.env,
 			};
@@ -397,9 +407,17 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				learn && deps.knowledge
 					? keepLearnings(run, deps.knowledge, learn)
 					: run;
-			yield* tools && tools.values.length > 0
-				? redactSession(events, tools.values)
-				: events;
+			// Every secret value the session could see comes back as `•••`.
+			const hidden = [
+				...(tools?.values ?? []),
+				...(mcp.values ?? []),
+				...(added?.values ?? []),
+				...((await deps.secretValues?.().catch((error) => {
+					console.warn("The saved secrets were not read:", error);
+					return [];
+				})) ?? []),
+			];
+			yield* hidden.length > 0 ? redactSession(events, hidden) : events;
 		} finally {
 			await tools?.cleanup();
 			// What the step changed, and the learnings it proposed, go to the Space.

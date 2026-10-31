@@ -254,6 +254,7 @@ describe("expandMcpServers", () => {
 					env: { PAIR: "a:b", PLAIN: "$HOME and {NAME}" },
 				},
 			},
+			values: ["a", "b"],
 		});
 	});
 
@@ -266,6 +267,7 @@ describe("expandMcpServers", () => {
 		).toEqual({
 			ok: true,
 			servers: { a: { url: "https://x.test/", headers: { H: "" } } },
+			values: [],
 		});
 	});
 
@@ -291,6 +293,10 @@ describe("expandMcpServers", () => {
 	});
 
 	test("no servers is an empty set", () => {
-		expect(expandMcpServers(undefined, {})).toEqual({ ok: true, servers: {} });
+		expect(expandMcpServers(undefined, {})).toEqual({
+			ok: true,
+			servers: {},
+			values: [],
+		});
 	});
 });

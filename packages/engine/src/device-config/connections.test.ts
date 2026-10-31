@@ -583,6 +583,7 @@ describe("mcpServersFor", () => {
 					},
 				},
 			},
+			values: ["env-tracker", "keychain-docs", "night"],
 		});
 	});
 
@@ -623,7 +624,11 @@ describe("mcpServersFor", () => {
 
 	test("no connections is an empty set", async () => {
 		const { store } = await makeStore();
-		expect(await store.mcpServersFor({})).toEqual({ ok: true, servers: {} });
+		expect(await store.mcpServersFor({})).toEqual({
+			ok: true,
+			servers: {},
+			values: [],
+		});
 	});
 });
 
@@ -644,6 +649,7 @@ describe("expandForTest", () => {
 					},
 				},
 			},
+			values: ["docs-secret", "night"],
 		});
 		expect(values.sort()).toEqual(["docs-secret", "night"]);
 	});
@@ -662,6 +668,7 @@ describe("expandForTest", () => {
 			servers: {
 				draft: { command: "draft-mcp", args: [], env: { T: "env-token" } },
 			},
+			values: ["env-token"],
 		});
 		expect(values).toEqual(["env-token"]);
 		expect(store.list()).toEqual([]);

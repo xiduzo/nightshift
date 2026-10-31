@@ -296,7 +296,7 @@ describe("the export to monitoring", () => {
 				runId: "run-1",
 				stepId: "s-agent",
 			}),
-		).toEqual({});
+		).toEqual({ env: {}, values: [] });
 	});
 
 	test("on without an endpoint, it stays off", async () => {
@@ -430,11 +430,13 @@ describe("the export to monitoring", () => {
 		await h.telemetry.headers.save(
 			"Authorization=Bearer abc 123\nX-Scope-OrgID: night",
 		);
-		const env = h.telemetry.sessionEnv({
+		const { env, values } = h.telemetry.sessionEnv({
 			harness: "claude-code",
 			runId: "run-1",
 			stepId: "s-agent",
 		});
+		// The headers' values come back as ••• in the session's output.
+		expect(values.sort()).toEqual(["Bearer abc 123", "night"]);
 		expect(env).toMatchObject({
 			CLAUDE_CODE_ENABLE_TELEMETRY: "1",
 			OTEL_METRICS_EXPORTER: "otlp",
@@ -456,7 +458,7 @@ describe("the export to monitoring", () => {
 				runId: "run-1",
 				stepId: "s-agent",
 			}),
-		).toEqual({});
+		).toEqual({ env: {}, values: [] });
 		await h.telemetry.stop();
 	});
 

@@ -370,7 +370,10 @@ export async function createDaemon(
 		harness: string;
 		runId: string;
 		stepId: string;
-	}): Record<string, string> => ({});
+	}): { env: Record<string, string>; values: readonly string[] } => ({
+		env: {},
+		values: [],
+	});
 
 	/** The projects' knowledge folders on this computer (`<dataDir>/knowledge`). */
 	const knowledge = createKnowledgeFolders(dataDir);
@@ -432,6 +435,8 @@ export async function createDaemon(
 		snapshots: true,
 		// A Claude Code session sends its own telemetry while the export is on.
 		sessionEnv: (session) => sessionEnv(session),
+		// A session's output has every saved secret's value as •••.
+		secretValues: () => connections.secretValues(),
 	});
 
 	/**
