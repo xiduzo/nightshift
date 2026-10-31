@@ -4,6 +4,7 @@ import {
 	useRunPrefetch,
 } from "@nightshift/client";
 import { GitPullRequest } from "lucide-react-native";
+import { memo } from "react";
 
 import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
@@ -20,9 +21,10 @@ import { gateRowText } from "./inbox-view";
  * hour shows first: "Picks keep in 12 min". A pull-request icon when the
  * Gate links one. Tap opens it. The row keeps its times current itself,
  * so the screen does not re-render for them. `overline` replaces "project · flow" where the screen says it
- * already, or hides it (null).
+ * already, or hides it (null). It renders again only when its Gate
+ * changes, or the clock ticks.
  */
-export function GateRow({
+export const GateRow = memo(function GateRow({
 	gate,
 	overline,
 }: {
@@ -60,4 +62,4 @@ export function GateRow({
 			}
 		/>
 	);
-}
+});

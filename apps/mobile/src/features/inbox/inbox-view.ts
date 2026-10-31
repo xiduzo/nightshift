@@ -105,6 +105,50 @@ export function inboxGroups<G extends Placed>(
 	return [...groups.values()];
 }
 
+/**
+ * One item of the Inbox list: the head of a project's group, or one of
+ * its Gates. A Gate knows whether it starts or ends its group's card.
+ */
+export type InboxItem<G> =
+	| {
+			kind: "head";
+			key: string;
+			title: string;
+			count: number;
+			/** The first group: no space above its head. */
+			top: boolean;
+	  }
+	| { kind: "gate"; key: string; gate: G; first: boolean; last: boolean };
+
+/** The groups as one flat list: each head, then its Gates. */
+export function inboxItems<G extends Placed>(
+	groups: readonly InboxGroup<G>[],
+): InboxItem<G>[] {
+	return groups.flatMap((group, index): InboxItem<G>[] => [
+		{
+			kind: "head",
+			key: `head:${group.key}`,
+			title: group.title,
+			count: group.gates.length,
+			top: index === 0,
+		},
+		...group.gates.map(
+			(gate, at): InboxItem<G> => ({
+				kind: "gate",
+				key: `${gate.runId}:${gate.stepId}`,
+				gate,
+				first: at === 0,
+				last: at === group.gates.length - 1,
+			}),
+		),
+	]);
+}
+
+/** Where the heads are in the list: they stick to the top while their Gates scroll. */
+export function headIndices(items: readonly InboxItem<unknown>[]): number[] {
+	return items.flatMap((item, index) => (item.kind === "head" ? [index] : []));
+}
+
 /** One choice of the place picker. */
 export type PlaceOption = {
 	place: InboxPlace;

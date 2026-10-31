@@ -3,10 +3,12 @@ import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
+import { cn } from "@nightshift/ui-native/lib/utils";
+import type { ListRenderItemInfo } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { ArrowDownUp, Inbox, ListFilter, Search } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
@@ -15,17 +17,20 @@ import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { HeaderSearch } from "@/shared/header";
-import { ListGroup } from "@/shared/list";
+import { CellSeparator, ListCell } from "@/shared/list";
 import { searchGates } from "@/shared/match";
-import { Screen } from "@/shared/page";
+import { ScreenList } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { DigestCard } from "./digest-card";
 import { GateRow } from "./gate-row";
 import { setInboxView, useInboxView } from "./inbox-filter";
 import {
 	ALL_GATES,
+	headIndices,
+	type InboxItem,
 	type InboxView,
 	inboxGroups,
+	inboxItems,
 	inboxSummary,
 	placeLabel,
 	spaceCount,
@@ -36,7 +41,8 @@ import { useInbox } from "./use-inbox";
  * The Inbox tab: your last morning digest, then the open Gates of every
  * Space you are in, grouped by project, oldest first. Chips choose a project or Space and the order.
  * The search field in the header finds a Gate by a word of its question,
- * flow, run, project or Space.
+ * flow, run, project or Space. A project's head stays at the top while
+ * its Gates scroll under it.
  * `/inbox?project=<id>` opens it on one project.
  */
 export function InboxScreen() {
@@ -48,59 +54,122 @@ export function InboxScreen() {
 	const searching = query.trim() !== "";
 
 	const gates = inbox.data;
+	const items = useMemo(
+		() =>
+			gates
+				? inboxItems(inboxGroups(searchGates(gates, query), view, manySpaces))
+				: [],
+		[gates, query, view, manySpaces],
+	);
+	const heads = useMemo(() => headIndices(items), [items]);
 	return (
-		<Screen
+		<ScreenList
+			data={items}
+			renderItem={renderItem}
+			keyExtractor={itemKey}
+			getItemType={itemType}
+			ItemSeparatorComponent={CellSeparator}
+			stickyHeaderIndices={heads}
 			onRefresh={() => inbox.refetch()}
 			summary={gates ? inboxSummary(gates) : undefined}
-		>
-			<HeaderSearch placeholder="Your Gates" onChange={setQuery} />
-			{searching ? null : <DigestCard />}
-			{gates && gates.length > 0 ? (
-				<FilterChips gates={gates} view={view} />
-			) : null}
-			{gates ? (
-				gates.length === 0 ? (
-					<>
-						<EmptyState
-							icon={Inbox}
-							title="Nothing needs you"
-							description="When a run waits for your answer, it shows here. This covers every Space you are in."
-						>
-							<Button
-								size="lg"
-								variant="outline"
-								onPress={() => router.navigate("/runs")}
-								className="h-auto min-h-11 py-2"
-							>
-								<Text>Go to Runs</Text>
-							</Button>
-						</EmptyState>
-						<PushCard />
-					</>
-				) : (
-					<GateGroups
-						gates={gates}
-						query={query}
-						view={view}
-						manySpaces={manySpaces}
-					/>
-				)
-			) : inbox.error ? (
-				<ErrorAlert
-					title="The inbox did not load"
-					message="Check that this phone is online. Then pull down or try again."
-					onRetry={() => void inbox.refetch()}
-				/>
-			) : (
+			header={
 				<>
-					<Skeleton className="h-11 w-2/3 rounded-full" />
-					<Skeleton className="h-24 w-full rounded-xl" />
-					<Skeleton className="h-24 w-full rounded-xl" />
+					<HeaderSearch placeholder="Your Gates" onChange={setQuery} />
+					{searching ? null : <DigestCard />}
+					{gates && gates.length > 0 ? (
+						<FilterChips gates={gates} view={view} />
+					) : null}
+					{gates ? (
+						gates.length === 0 ? (
+							<>
+								<EmptyState
+									icon={Inbox}
+									title="Nothing needs you"
+									description="When a run waits for your answer, it shows here. This covers every Space you are in."
+								>
+									<Button
+										size="lg"
+										variant="outline"
+										onPress={() => router.navigate("/runs")}
+										className="h-auto min-h-11 py-2"
+									>
+										<Text>Go to Runs</Text>
+									</Button>
+								</EmptyState>
+								<PushCard />
+							</>
+						) : items.length === 0 ? (
+							<NoGates gates={gates} query={query} view={view} />
+						) : null
+					) : inbox.error ? (
+						<ErrorAlert
+							title="The inbox did not load"
+							message="Check that this phone is online. Then pull down or try again."
+							onRetry={() => void inbox.refetch()}
+						/>
+					) : (
+						<>
+							<Skeleton className="h-11 w-2/3 rounded-full" />
+							<Skeleton className="h-24 w-full rounded-xl" />
+							<Skeleton className="h-24 w-full rounded-xl" />
+						</>
+					)}
 				</>
-			)}
-		</Screen>
+			}
+		/>
 	);
 }
+
+type Item = InboxItem<OpenGate>;
+
+function itemKey(item: Item): string {
+	return item.key;
+}
+
+function itemType(item: Item): Item["kind"] {
+	return item.kind;
+}
+
+function renderItem({ item }: ListRenderItemInfo<Item>) {
+	return item.kind === "head" ? (
+		<GroupHead title={item.title} count={item.count} top={item.top} />
+	) : (
+		<ListCell first={item.first} last={item.last}>
+			<GateRow gate={item.gate} />
+		</ListCell>
+	);
+}
+
+/** The head of a project's Gates: its name and how many are open. It sticks to the top. */
+const GroupHead = memo(function GroupHead({
+	title,
+	count,
+	top,
+}: {
+	title: string;
+	count: number;
+	top: boolean;
+}) {
+	return (
+		<View
+			className={cn(
+				"flex-row items-center gap-2 bg-background pb-2",
+				top ? "pt-0" : "pt-4",
+			)}
+		>
+			<Text
+				accessibilityRole="header"
+				className="flex-shrink font-semibold text-base"
+				numberOfLines={1}
+			>
+				{title}
+			</Text>
+			<Badge variant="secondary" accessibilityLabel={`${count} open`}>
+				<Text className="tabular-nums">{count}</Text>
+			</Badge>
+		</View>
+	);
+});
 
 /** You are in more than one Space: each group names its Space. */
 function useManySpaces(gates: readonly OpenGate[] | undefined): boolean {
@@ -155,20 +224,17 @@ function FilterChips({ gates, view }: { gates: OpenGate[]; view: InboxView }) {
 	);
 }
 
-function GateGroups({
+/** No Gate shows: none matches the search, or none waits in this place. */
+function NoGates({
 	gates,
 	query,
 	view,
-	manySpaces,
 }: {
 	gates: OpenGate[];
-	/** What the search field holds: only the Gates that match show. */
 	query: string;
 	view: InboxView;
-	manySpaces: boolean;
 }) {
-	const groups = inboxGroups(searchGates(gates, query), view, manySpaces);
-	if (groups.length === 0 && query.trim() !== "") {
+	if (query.trim() !== "") {
 		return (
 			<EmptyState
 				icon={Search}
@@ -177,46 +243,20 @@ function GateGroups({
 			/>
 		);
 	}
-	if (groups.length === 0) {
-		return (
-			<EmptyState
-				icon={Inbox}
-				title="No Gates here"
-				description={`Nothing waits for you in ${placeLabel(view.place, gates)}. ${gates.length === 1 ? "1 Gate waits" : `${gates.length} Gates wait`} elsewhere.`}
+	return (
+		<EmptyState
+			icon={Inbox}
+			title="No Gates here"
+			description={`Nothing waits for you in ${placeLabel(view.place, gates)}. ${gates.length === 1 ? "1 Gate waits" : `${gates.length} Gates wait`} elsewhere.`}
+		>
+			<Button
+				size="lg"
+				variant="outline"
+				onPress={() => setInboxView({ place: ALL_GATES.place })}
+				className="h-auto min-h-11 py-2"
 			>
-				<Button
-					size="lg"
-					variant="outline"
-					onPress={() => setInboxView({ place: ALL_GATES.place })}
-					className="h-auto min-h-11 py-2"
-				>
-					<Text>Show all Gates</Text>
-				</Button>
-			</EmptyState>
-		);
-	}
-	return groups.map((group) => (
-		<View key={group.key} className="gap-2">
-			<View className="flex-row items-center gap-2">
-				<Text
-					accessibilityRole="header"
-					className="flex-shrink font-semibold text-base"
-					numberOfLines={1}
-				>
-					{group.title}
-				</Text>
-				<Badge
-					variant="secondary"
-					accessibilityLabel={`${group.gates.length} open`}
-				>
-					<Text className="tabular-nums">{group.gates.length}</Text>
-				</Badge>
-			</View>
-			<ListGroup>
-				{group.gates.map((gate) => (
-					<GateRow key={`${gate.runId}:${gate.stepId}`} gate={gate} />
-				))}
-			</ListGroup>
-		</View>
-	));
+				<Text>Show all Gates</Text>
+			</Button>
+		</EmptyState>
+	);
 }

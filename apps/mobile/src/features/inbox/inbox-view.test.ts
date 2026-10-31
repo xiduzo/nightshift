@@ -6,7 +6,9 @@ import {
 	ALL_GATES,
 	choicesText,
 	gateRowText,
+	headIndices,
 	inboxGroups,
+	inboxItems,
 	inboxSummary,
 	inPlace,
 	nextGate,
@@ -97,6 +99,34 @@ describe("inboxGroups", () => {
 		expect(
 			space.flatMap((group) => group.gates.map((one) => one.runId)),
 		).toEqual(["d"]);
+	});
+});
+
+describe("inboxItems", () => {
+	test("each group is its head, then its Gates, the first and last marked", () => {
+		const a1 = gate({ runId: "a1", projectId: "a", projectName: "api" });
+		const a2 = gate({ runId: "a2", projectId: "a", projectName: "api" });
+		const w1 = gate({ runId: "w1" });
+		const items = inboxItems(inboxGroups([a1, a2, w1], ALL_GATES, false));
+		expect(
+			items.map((item) =>
+				item.kind === "head"
+					? [item.key, item.title, item.count, item.top]
+					: [item.key, item.first, item.last],
+			),
+		).toEqual([
+			["head:home:a", "api", 2, true],
+			["a1:s1", true, false],
+			["a2:s1", false, true],
+			["head:home:web", "website", 1, false],
+			["w1:s1", true, true],
+		]);
+		expect(headIndices(items)).toEqual([0, 3]);
+	});
+
+	test("no groups, no items", () => {
+		expect(inboxItems([])).toEqual([]);
+		expect(headIndices([])).toEqual([]);
 	});
 });
 
