@@ -125,8 +125,11 @@ export {
 } from "./value";
 export {
 	checkWaitNode,
+	commandWaitOutcome,
+	isOwnWaitOutcome,
 	type WaitNode,
 	type WaitUntil,
 	waitNodeSchema,
+	waitOutcomes,
 	waitOutputFields,
 } from "./wait";

@@ -2437,6 +2437,66 @@ describe("validateFlow: wait nodes", () => {
 		);
 		expect(errors(good)).toEqual([]);
 	});
+
+	test("a command wait lists outcomes: each one is a handle before done and timeout, and one without an edge is a warning", () => {
+		const poll = wait(
+			"ci",
+			{ kind: "command", command: "gh pr checks 1", everyMinutes: 5 },
+			{ outcomes: [{ name: "green" }, { name: "red", color: "red" }] },
+		);
+		expect(nodeOutcomes(poll)).toEqual(["green", "red", "done", "timeout"]);
+		const issues = validateFlow(
+			flow([poll, command("fix")], [edge("a", "ci", "red", "fix")], "ci"),
+		);
+		expect(errors(issues)).toEqual([]);
+		expect(warnings(issues).map((issue) => issue.message)).toContain(
+			'Wait node "ci" has no edge for "green": the run ends there when the wait ends on "green".',
+		);
+	});
+
+	test("outcomes need a command, a name of their own and no rule", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					wait(
+						"later",
+						{ kind: "duration", minutes: 5 },
+						{ outcomes: [{ name: "early" }] },
+					),
+					wait(
+						"ci",
+						{ kind: "command", command: "true", everyMinutes: 5 },
+						{
+							outcomes: [
+								{ name: "done" },
+								{ name: "green", when: "event.body.ok" },
+								{ name: "green" },
+							],
+						},
+					),
+				],
+				[edge("a", "later", "done", "ci")],
+				"later",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			[
+				"later",
+				'Wait node "later" lists outcomes, but only a command can pick one. Remove the outcomes, or wait for a command.',
+			],
+			[
+				"ci",
+				'Wait node "ci" lists the outcome "done", which every Wait has. Give it another name.',
+			],
+			[
+				"ci",
+				'Wait node "ci" has a rule on "green", but its command picks the outcome. Remove the rule.',
+			],
+			["ci", 'Wait node "ci" has the outcome "green" more than once.'],
+		]);
+	});
 });
 
 describe("validateFlow: devices", () => {

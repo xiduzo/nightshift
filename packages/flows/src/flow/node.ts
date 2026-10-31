@@ -12,6 +12,7 @@ import {
 	type OutcomeColor,
 	toolOutputFields,
 	valueOutputFields,
+	waitOutcomes,
 	waitOutputFields,
 } from "../nodes";
 import type { Flow, FlowNode, FlowNodeType, Outcome } from "./flow";
@@ -94,7 +95,11 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 		case "value":
 			return ["pass", "fail"] satisfies BuiltInOutcome[];
 		case "wait":
-			return ["done", "timeout"] satisfies BuiltInOutcome[];
+			// Its own outcomes first: a done or a timeout is the plain way out.
+			return [
+				...waitOutcomes(node).map((outcome) => outcome.name),
+				...(["done", "timeout"] satisfies BuiltInOutcome[]),
+			];
 		case "tool":
 			return ["pass", "fail"] satisfies BuiltInOutcome[];
 		case "end":
@@ -117,6 +122,8 @@ export function outcomeColor(
 			return commandExits(node).find((exit) => exit.name === outcome)?.color;
 		case "decision":
 			return node.options.find((option) => option.name === outcome)?.color;
+		case "wait":
+			return waitOutcomes(node).find((own) => own.name === outcome)?.color;
 		default:
 			return undefined;
 	}

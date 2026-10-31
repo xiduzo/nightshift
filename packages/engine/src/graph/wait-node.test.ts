@@ -259,6 +259,106 @@ describe("the Wait node", () => {
 		).toBe("checking green\nchecking green\nchecking green\n");
 	});
 
+	test("a command with outcomes: an outcome it does not list polls again, a listed one ends the wait there with the data", async () => {
+		const time = clock();
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "ci",
+				nodes: [
+					wait(
+						"ci",
+						{
+							kind: "command",
+							command:
+								'if [ -f red ]; then echo \'{"outcome": "red", "failed": ["lint"]}\' > "$NS_OUTPUT"; else echo \'{"outcome": "pending"}\' > "$NS_OUTPUT"; fi',
+							everyMinutes: 5,
+						},
+						{ outcomes: [{ name: "green" }, { name: "red" }] },
+					),
+					command("fix", "echo fix"),
+				],
+				edges: [{ id: "e1", from: "ci", outcome: "red", to: "fix" }],
+			}),
+		);
+		h.ctx.now = time.now;
+		const first = await drive(h, { inputs: {} });
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
+		expect(first.parked[0]).toMatchObject({
+			kind: "wait",
+			reason: "command",
+			message:
+				'The command picked "pending", which is not an outcome of this Wait. Tries again in 5 min.',
+		});
+
+		await Bun.write(join(sandbox.repoPath, "red"), "");
+		time.advance(5);
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: false },
+		});
+		const second = await drive(
+			h,
+			new Command({ resume: { kind: "wake", early: false } }),
+			h.graph(),
+		);
+		expect(second.parked).toEqual([]);
+		expect(second.state.nodes.ci).toEqual({
+			outcome: "red",
+			waited_minutes: 5,
+			log_tail: "",
+			data: { outcome: "red", failed: ["lint"] },
+			visit: 1,
+		});
+		expect(second.state.ended?.nodeId).toBe("fix");
+	});
+
+	test("a command with outcomes: exit 0 without an outcome ends done, a failing exit polls again whatever it picked", async () => {
+		const time = clock();
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "ci",
+				nodes: [
+					wait(
+						"ci",
+						{
+							kind: "command",
+							command:
+								'if [ -f ok ]; then exit 0; fi; echo \'{"outcome": "green"}\' > "$NS_OUTPUT"; exit 1',
+							everyMinutes: 5,
+						},
+						{ outcomes: [{ name: "green" }] },
+					),
+				],
+				edges: [],
+			}),
+		);
+		h.ctx.now = time.now;
+		const first = await drive(h, { inputs: {} });
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
+		expect(first.parked[0]).toMatchObject({
+			message: "The command did not pass yet. Tries again in 5 min.",
+		});
+		await Bun.write(join(sandbox.repoPath, "ok"), "");
+		time.advance(5);
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: false },
+		});
+		const second = await drive(
+			h,
+			new Command({ resume: { kind: "wake", early: false } }),
+			h.graph(),
+		);
+		expect(second.state.nodes.ci).toMatchObject({ outcome: "done" });
+		expect(second.state.ended?.status).toBe("finished");
+	});
+
 	test("a signal: no wake time, a timer wake keeps waiting, the wrong name is refused before the thread, and the right one ends it done", async () => {
 		const time = clock();
 		const h = await startRun(
