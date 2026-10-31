@@ -106,6 +106,8 @@ export {
 	type KnowledgeQuestion,
 	type KnowledgeSearch,
 	type KnowledgeText,
+	type KnowledgeUseReport,
+	knowledgeFileUse,
 	LOCAL_ONLY_BYTES,
 	ollamaMeaning,
 	type ProjectKnowledge,

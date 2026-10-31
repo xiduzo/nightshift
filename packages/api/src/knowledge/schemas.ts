@@ -6,6 +6,7 @@ import type {
 	KnowledgeMeaningStatus,
 	KnowledgeQuestion,
 	KnowledgeText,
+	KnowledgeUseReport,
 } from "@nightshift/engine";
 import { knowledgeSourceSchema } from "@nightshift/flows";
 import { z } from "zod";
@@ -222,5 +223,23 @@ export const knowledgeEvaluationSchema = exact<KnowledgeEvaluation>()(
 		),
 		/** `too-few`: fewer marked questions than `minQuestions`. `keep`: search by meaning finds more. `turn-off`: words alone find as much. `unavailable`: search by meaning does not work now. */
 		advice: z.enum(["too-few", "keep", "turn-off", "unavailable"]),
+	}),
+);
+
+/** How agents used each file of a project's knowledge, and which files no run used lately. */
+export const knowledgeUseSchema = exact<KnowledgeUseReport>()(
+	z.object({
+		since: z.number(),
+		unusedDays: z.number(),
+		runsUsedIt: z.boolean(),
+		files: z.array(
+			z.object({
+				path: z.string(),
+				found: z.number(),
+				read: z.number(),
+				lastAt: z.number(),
+				lastRunAt: z.number().nullable(),
+			}),
+		),
 	}),
 );

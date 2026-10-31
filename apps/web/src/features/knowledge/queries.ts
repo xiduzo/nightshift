@@ -20,6 +20,9 @@ export const knowledgeQueries = {
 	/** The question set against each way to search, run on this computer. */
 	evaluate: (projectId: string) =>
 		orpc.knowledge.evaluate.queryOptions({ input: { projectId } }),
+	/** How often agents found and read each file, and which no run used lately. */
+	use: (projectId: string) =>
+		orpc.knowledge.use.queryOptions({ input: { projectId } }),
 	/** One file, by its path in the knowledge. */
 	read: (projectId: string, path: string) =>
 		orpc.knowledge.read.queryOptions({ input: { projectId, path } }),

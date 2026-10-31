@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { project } from "@nightshift/db/schema";
 import { createRunLog, type KnowledgeUseFact } from "../log";
 import { createSandbox, type Sandbox } from "../testing";
-import { askedQuestions, logKnowledgeUse, stepSources } from "./use";
+import {
+	askedQuestions,
+	knowledgeFileUse,
+	logKnowledgeUse,
+	stepSources,
+} from "./use";
 
 /** How agents used a project's knowledge, read back from the event log. */
 
@@ -111,5 +116,44 @@ describe("stepSources", () => {
 			{ path: "c.md", section: "S2", page: null, line: 1, read: false },
 		]);
 		expect(stepSources([])).toEqual([]);
+	});
+});
+
+describe("knowledgeFileUse", () => {
+	test("counts each file found in a top 5 and read, and when a run last used it", async () => {
+		const { db, log } = await setup();
+		await logKnowledgeUse(log, "p1", {
+			kind: "search",
+			query: "deploy",
+			hits: ["a.md", "b.md", "c.md", "d.md", "e.md", "f.md"].map(hit),
+		});
+		await logKnowledgeUse(log, "p1", {
+			kind: "read",
+			path: "a.md",
+			found: true,
+		});
+		await logKnowledgeUse(log, "p1", {
+			kind: "read",
+			path: "x.md",
+			found: false,
+		});
+		const now = Date.now() + 1000;
+		const report = await knowledgeFileUse(db, "p1", now);
+		expect(report.unusedDays).toBe(30);
+		// Only the MCP server used it: no run did.
+		expect(report.runsUsedIt).toBe(false);
+		expect(
+			report.files.map((f) => [f.path, f.found, f.read, f.lastRunAt]),
+		).toEqual([
+			["a.md", 1, 1, null],
+			["b.md", 1, 0, null],
+			["c.md", 1, 0, null],
+			["d.md", 1, 0, null],
+			["e.md", 1, 0, null],
+		]);
+		// Past the window, nothing counts.
+		expect(
+			(await knowledgeFileUse(db, "p1", now + 91 * 86_400_000)).files,
+		).toEqual([]);
 	});
 });

@@ -33,7 +33,7 @@ import {
 import { useMemo, useState } from "react";
 import { StartRunDialog } from "@/features/flows";
 import { ProjectPage } from "@/features/projects";
-import type { KnowledgeFile } from "@/shared/api";
+import type { KnowledgeFile, KnowledgeUse } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, formatSize } from "@/shared/format";
 import { PageHeading, PageSection } from "@/shared/page";
@@ -133,7 +133,11 @@ function KnowledgeView({
 				: false,
 	});
 	const [open, setOpen] = useState<string | null>(null);
-	const columns = useMemo(() => fileColumns(setOpen), []);
+	const use = useQuery(knowledgeQueries.use(projectId));
+	const columns = useMemo(
+		() => fileColumns(setOpen, fileUse(use.data)),
+		[use.data],
+	);
 
 	if (knowledge.error) {
 		return (
@@ -330,8 +334,24 @@ function Learnings({
 
 const column = dataTableColumns<KnowledgeFile>();
 
+/** How agents used each file, by path, and whether to mark the ones no run used. */
+function fileUse(report: KnowledgeUse | undefined) {
+	return {
+		byPath: new Map((report?.files ?? []).map((file) => [file.path, file])),
+		/** Files no run used since then are marked. Null: mark none. */
+		unusedBefore:
+			report?.runsUsedIt === true
+				? Date.now() - report.unusedDays * 24 * 60 * 60 * 1000
+				: null,
+		unusedDays: report?.unusedDays ?? 30,
+	};
+}
+
 /** The columns of the file list. A file's path opens it. */
-function fileColumns(open: (path: string) => void) {
+function fileColumns(
+	open: (path: string) => void,
+	use: ReturnType<typeof fileUse>,
+) {
 	return column.columns([
 		column.accessor("path", {
 			header: "File",
@@ -360,6 +380,40 @@ function fileColumns(open: (path: string) => void) {
 				headClassName: "pl-6",
 				cellClassName: "w-full max-w-0 py-3 pl-6",
 			},
+		}),
+		column.display({
+			id: "used",
+			header: "Used",
+			cell: ({ row }) => {
+				const used = use.byPath.get(row.original.path);
+				const unused =
+					use.unusedBefore !== null &&
+					(used?.lastRunAt ?? 0) < use.unusedBefore;
+				return (
+					<div className="flex flex-wrap items-center gap-2">
+						{used ? (
+							<span
+								className="whitespace-nowrap text-muted-foreground text-sm tabular-nums"
+								title={`Last used ${formatDateTime(used.lastAt)}`}
+							>
+								Found {used.found}, read {used.read}
+							</span>
+						) : null}
+						{unused ? (
+							<Tooltip>
+								<TooltipTrigger render={<Badge variant="outline" />}>
+									Not used
+								</TooltipTrigger>
+								<TooltipContent>
+									No run used this file in {use.unusedDays} days. Stop syncing
+									it if your agents do not need it.
+								</TooltipContent>
+							</Tooltip>
+						) : null}
+					</div>
+				);
+			},
+			meta: { cellClassName: "py-3" },
 		}),
 		column.accessor("changedAt", {
 			header: "Changed",

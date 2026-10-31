@@ -192,3 +192,87 @@ export function stepSources(
 		...[...found.values()].filter((source) => !read.has(source.path)),
 	].slice(0, MAX_SOURCES);
 }
+
+/** How agents used one file of the knowledge. */
+export type KnowledgeFileUse = {
+	path: string;
+	/** Searches that returned it in their top 5. */
+	found: number;
+	/** Reads of it that found it. */
+	read: number;
+	/** Epoch ms: its latest use. */
+	lastAt: number;
+	/** Epoch ms: its latest use in a run. Null: none in the window. */
+	lastRunAt: number | null;
+};
+
+/** How agents used a project's knowledge, file by file. */
+export type KnowledgeUseReport = {
+	/** Epoch ms: the uses counted start here. */
+	since: number;
+	/** A file no run used for this long is marked, in days. */
+	unusedDays: number;
+	/** Whether any run used the knowledge since `now - unusedDays`: else no file is marked. */
+	runsUsedIt: boolean;
+	files: KnowledgeFileUse[];
+};
+
+const DAY = 24 * 60 * 60 * 1000;
+/** How far back the use counts. */
+const USE_WINDOW_DAYS = 90;
+/** The most events the use reads, newest first. */
+const USE_EVENTS = 20_000;
+/** A search counts as finding a file in its top this many. */
+const FOUND_IN_TOP = 5;
+/** A file no run used for this long is marked: a source may sync it for nothing. */
+export const UNUSED_DAYS = 30;
+
+/**
+ * How often agents found and read each file of a project's knowledge in
+ * the last 90 days, in runs and through the MCP server, and when a run
+ * last used it. The Knowledge page marks the files no run used in 30
+ * days, once runs use the knowledge at all.
+ */
+export async function knowledgeFileUse(
+	db: Database,
+	projectId: string,
+	now: number = Date.now(),
+): Promise<KnowledgeUseReport> {
+	const since = now - USE_WINDOW_DAYS * DAY;
+	const rows = await projectEvents(
+		db,
+		projectId,
+		["KnowledgeSearched", "KnowledgeRead"],
+		{ limit: USE_EVENTS, since },
+	);
+	const files = new Map<string, KnowledgeFileUse>();
+	const use = (path: string, at: number, inRun: boolean) => {
+		let file = files.get(path);
+		if (!file) {
+			file = { path, found: 0, read: 0, lastAt: at, lastRunAt: null };
+			files.set(path, file);
+		}
+		file.lastAt = Math.max(file.lastAt, at);
+		if (inRun) file.lastRunAt = Math.max(file.lastRunAt ?? at, at);
+		return file;
+	};
+	const recent = now - UNUSED_DAYS * DAY;
+	let runsUsedIt = false;
+	for (const row of rows) {
+		const inRun = row.runId !== null;
+		if (inRun && row.at >= recent) runsUsedIt = true;
+		if (row.type === "KnowledgeSearched") {
+			for (const hit of row.payload.hits.slice(0, FOUND_IN_TOP)) {
+				use(hit.path, row.at, inRun).found++;
+			}
+		} else if (row.type === "KnowledgeRead" && row.payload.found) {
+			use(row.payload.path, row.at, inRun).read++;
+		}
+	}
+	return {
+		since,
+		unusedDays: UNUSED_DAYS,
+		runsUsedIt,
+		files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path)),
+	};
+}

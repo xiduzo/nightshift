@@ -3,6 +3,7 @@ import { type Permissions, ROLE_REFUSAL } from "@nightshift/auth";
 import {
 	askedQuestions,
 	evaluateKnowledge,
+	knowledgeFileUse,
 	knowledgeSources,
 	questionKey,
 } from "@nightshift/engine";
@@ -27,6 +28,7 @@ import {
 	knowledgeQuestionsSchema,
 	knowledgeSchema,
 	knowledgeTextSchema,
+	knowledgeUseSchema,
 } from "./schemas";
 
 /** The knowledge sources of the Space the person works in, from this computer. */
@@ -420,5 +422,21 @@ export const knowledge = {
 			await knownProject(context.space, input.projectId);
 			await context.knowledge.setMeaning(input.projectId, input.on);
 			return context.knowledgeSearch.meaning(input.projectId);
+		}),
+	/**
+	 * How often agents found and read each file of the project's knowledge
+	 * in the last 90 days, and when a run last used it: the page marks the
+	 * files no run used in 30 days.
+	 */
+	use: protectedProcedure
+		.route({
+			summary:
+				"Says how often agents found and read each file of a project's knowledge, and when a run last used it.",
+		})
+		.output(output(knowledgeUseSchema))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return knowledgeFileUse(context.db, input.projectId);
 		}),
 };

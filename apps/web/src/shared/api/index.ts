@@ -70,6 +70,7 @@ export type {
 	Knowledge,
 	KnowledgeEvaluation,
 	KnowledgeFile,
+	KnowledgeUse,
 	McpServer,
 	McpTestResult,
 	MergePreview,

@@ -38,6 +38,8 @@ export {
 	type AskedQuestion,
 	askedQuestions,
 	type KnowledgeSource,
+	type KnowledgeUseReport,
+	knowledgeFileUse,
 	knowledgeUseEvent,
 	logKnowledgeUse,
 	stepSources,
