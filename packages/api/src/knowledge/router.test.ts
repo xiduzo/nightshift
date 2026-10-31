@@ -55,6 +55,7 @@ function context(personId: string, role: Role = "member") {
 		daemon: {
 			device: { id: sandbox.deviceId, name: "test", ownerId: "owner" },
 		},
+		db: sandbox.db,
 		engine,
 		knowledge: built.knowledge,
 		knowledgeSearch: {
@@ -350,5 +351,47 @@ describe("knowledge.search and knowledge.read", () => {
 			},
 			{ projectId, path: "nope.md", found: false, via: "mcp" },
 		]);
+	});
+});
+
+describe("knowledge.questions and knowledge.markQuestion", () => {
+	test("lists what agents asked with its answers once marked; marking asks a role that may start runs", async () => {
+		await putFile("wiki/deploy.md", "# Deploy\n");
+		await call(
+			appRouter.knowledge.search,
+			{ projectId, query: "deploy", agent: true },
+			{ context: context("viewer", "viewer") },
+		);
+		const asked = await call(
+			appRouter.knowledge.questions,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(asked.set).toEqual([]);
+		expect(asked.asked).toMatchObject([
+			{ query: "deploy", times: 1, runId: null, answers: null },
+		]);
+		await expect(
+			call(
+				appRouter.knowledge.markQuestion,
+				{ projectId, query: "deploy", answers: ["wiki/deploy.md"] },
+				{ context: context("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+		const set = await call(
+			appRouter.knowledge.markQuestion,
+			{ projectId, query: "deploy", answers: ["wiki/deploy.md"] },
+			{ context: context("member") },
+		);
+		expect(set).toMatchObject([
+			{ query: "deploy", answers: ["wiki/deploy.md"], by: "member" },
+		]);
+		const after = await call(
+			appRouter.knowledge.questions,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(after.asked[0]?.answers).toEqual(["wiki/deploy.md"]);
+		expect(after.set).toHaveLength(1);
 	});
 });

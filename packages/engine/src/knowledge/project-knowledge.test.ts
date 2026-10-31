@@ -412,3 +412,55 @@ describe("a project that moves to another Space", () => {
 		expect(await stat(a.dir).catch(() => null)).toBeNull();
 	});
 });
+
+describe("the question set", () => {
+	test("a marked question syncs through the knowledge to another computer, and never shows as a file", async () => {
+		const host = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		await a.put("wiki/deploy.md", "# Deploy\n");
+		expect(await a.knowledge.questions("p1")).toEqual([]);
+		const set = await a.knowledge.markQuestion("p1", {
+			query: "  How do we  deploy? ",
+			answers: ["wiki/deploy.md", "learnings/proposed/run-1.md", "evals/x"],
+			by: "ann",
+		});
+		expect(set).toEqual([
+			{
+				query: "How do we  deploy?",
+				answers: ["wiki/deploy.md"],
+				markedAt: expect.any(Number),
+				by: "ann",
+			},
+		]);
+		expect((await a.paths()).sort()).toEqual([
+			"evals/questions.json",
+			"wiki/deploy.md",
+		]);
+		const listing = await a.knowledge.listing("p1");
+		expect(listing.files.map((f) => f.path)).toEqual(["wiki/deploy.md"]);
+		expect(
+			await a.knowledge.read("p1", "evals/questions.json", 1024),
+		).toBeNull();
+
+		// B gets the set as a Link brings the document.
+		applyUpdate(
+			(await b.documents.open("p1")).doc,
+			encodeStateAsUpdate((await a.documents.open("p1")).doc),
+		);
+		expect((await b.knowledge.questions("p1")).map((q) => q.query)).toEqual([
+			"How do we  deploy?",
+		]);
+		// The same words, written another way, are the same question: no files takes it out.
+		expect(
+			await b.knowledge.markQuestion("p1", {
+				query: "how do we deploy?",
+				answers: [],
+				by: "bob",
+			}),
+		).toEqual([]);
+		await expect(b.knowledge.removeFolder("p1", "evals")).rejects.toThrow(
+			"evals are Night Shift's own",
+		);
+	});
+});

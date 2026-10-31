@@ -1,6 +1,10 @@
 import { useHit } from "@nightshift/agents/tools";
 import { type Permissions, ROLE_REFUSAL } from "@nightshift/auth";
-import { knowledgeSources } from "@nightshift/engine";
+import {
+	askedQuestions,
+	knowledgeSources,
+	questionKey,
+} from "@nightshift/engine";
 import {
 	flowNameSchema,
 	isTimeZone,
@@ -18,6 +22,7 @@ import {
 	type KnowledgeView,
 	knowledgeHitSchema,
 	knowledgeMeaningSchema,
+	knowledgeQuestionsSchema,
 	knowledgeSchema,
 	knowledgeTextSchema,
 } from "./schemas";
@@ -301,5 +306,68 @@ export const knowledge = {
 				});
 			}
 			return file;
+		}),
+	/**
+	 * The questions agents asked the project's knowledge, newest first, with
+	 * what each last asking found, and the project's question set: the
+	 * questions a person marked with the files that answer them.
+	 */
+	questions: protectedProcedure
+		.route({
+			summary:
+				"Lists the questions agents asked a project's knowledge, what they found, and the project's question set.",
+		})
+		.output(output(knowledgeQuestionsSchema))
+		.input(
+			z.object({
+				projectId: z.string(),
+				limit: z.number().int().min(1).max(200).optional(),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			const [asked, set] = await Promise.all([
+				askedQuestions(context.db, input.projectId, {
+					...(input.limit !== undefined ? { limit: input.limit } : {}),
+				}),
+				context.knowledge.questions(input.projectId),
+			]);
+			const answers = new Map(
+				set.map((q) => [questionKey(q.query), q.answers]),
+			);
+			return {
+				asked: asked.map((question) => ({
+					...question,
+					answers: answers.get(questionKey(question.query)) ?? null,
+				})),
+				set,
+			};
+		}),
+	/**
+	 * Marks the files that answer a question an agent asked: the question
+	 * joins the project's question set, which syncs with the knowledge.
+	 * No files takes it out. It changes the knowledge, so it asks a role
+	 * that may start runs (ADR 4). Returns the set.
+	 */
+	markQuestion: permitted({ run: ["start"] })
+		.route({
+			summary:
+				"Marks the files that answer a question agents asked, for the project's question set. No files takes the question out.",
+		})
+		.output(output(knowledgeQuestionsSchema.shape.set))
+		.input(
+			z.object({
+				projectId: z.string(),
+				query: z.string().trim().min(1).max(1000),
+				answers: z.array(z.string().min(1).max(1000)).max(20),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return context.knowledge.markQuestion(input.projectId, {
+				query: input.query,
+				answers: input.answers,
+				by: context.session.user.id,
+			});
 		}),
 };

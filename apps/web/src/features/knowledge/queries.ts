@@ -14,6 +14,9 @@ export const knowledgeQueries = {
 	/** Whether search finds by meaning on this computer. */
 	meaning: (projectId: string) =>
 		orpc.knowledge.meaning.queryOptions({ input: { projectId } }),
+	/** What agents asked the knowledge, and the project's question set. */
+	questions: (projectId: string) =>
+		orpc.knowledge.questions.queryOptions({ input: { projectId } }),
 	/** One file, by its path in the knowledge. */
 	read: (projectId: string, path: string) =>
 		orpc.knowledge.read.queryOptions({ input: { projectId, path } }),
@@ -26,4 +29,6 @@ export const knowledgeMutations = {
 	removeSource: orpc.knowledge.removeSource.mutationOptions,
 	/** Runs a source the page added now, where its schedule runs it. */
 	syncSource: orpc.knowledge.syncSource.mutationOptions,
+	/** Marks the files that answer a question, or with none takes it out of the set. */
+	markQuestion: orpc.knowledge.markQuestion.mutationOptions,
 };

@@ -40,6 +40,7 @@ import { PageHeading, PageSection } from "@/shared/page";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
+import { AskedQuestions } from "./questions";
 import { type EditedSource, SourceDialog } from "./source-dialog";
 import { Sources } from "./sources";
 
@@ -202,6 +203,12 @@ function KnowledgeView({
 				</Alert>
 			)}
 			{files.length > 0 ? <KnowledgeSearch projectId={projectId} /> : null}
+			{files.length > 0 ? (
+				<AskedQuestions
+					projectId={projectId}
+					files={files.map((file) => file.path)}
+				/>
+			) : null}
 			<PageSection
 				title="Files"
 				description={`${files.length} ${files.length === 1 ? "file" : "files"}.`}

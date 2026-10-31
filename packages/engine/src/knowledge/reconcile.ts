@@ -22,6 +22,7 @@ import { OLDER_HOST, OlderHostError } from "../contract";
 import type { PersistedDocument } from "../documents";
 import { LOCAL_ONLY_BYTES } from "./documents";
 import {
+	isEvalsPath,
 	isKnowledgePath,
 	isReadable,
 	type KnowledgeFile,
@@ -593,6 +594,8 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			for (const [path, entry] of [...entries].sort(([a], [b]) =>
 				a.localeCompare(b),
 			)) {
+				// The question set is Night Shift's own: the page shows it elsewhere.
+				if (isEvalsPath(path)) continue;
 				if (!isProposal(path)) {
 					files.push({
 						path,
@@ -674,10 +677,14 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		async removeFolder(projectId: string, folder: string): Promise<number> {
 			const name = folder.replace(/\/+$/, "");
 			const prefix = `${name}/`;
-			if (!isKnowledgePath(`${prefix}x`) || isLearningsFolder(name)) {
+			if (
+				!isKnowledgePath(`${prefix}x`) ||
+				isLearningsFolder(name) ||
+				isEvalsPath(name)
+			) {
 				throw new Refusal(
 					"invalid",
-					"Choose a folder inside the knowledge. learnings is Night Shift's own.",
+					"Choose a folder inside the knowledge. learnings and evals are Night Shift's own.",
 				);
 			}
 			if (busy(projectId)) {

@@ -23,10 +23,16 @@ export {
 	type KnowledgeUseEvent,
 	type ProjectKnowledge,
 } from "./project-knowledge";
+export { type KnowledgeQuestion, questionKey } from "./questions";
 export {
 	createKnowledgeSearch,
 	type KnowledgeHit,
 	type KnowledgeMeaningStatus,
 	type KnowledgeSearch,
 } from "./search";
-export { knowledgeUseEvent, logKnowledgeUse } from "./use";
+export {
+	type AskedQuestion,
+	askedQuestions,
+	knowledgeUseEvent,
+	logKnowledgeUse,
+} from "./use";

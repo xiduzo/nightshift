@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
 	KNOWLEDGE_TOOLS_INSTRUCTION,
 	type KnowledgePort,
@@ -5,10 +7,18 @@ import {
 	knowledgeTools,
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
+import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
-import { createKnowledgeFolders, INDEX_FILE } from "./folder";
+import { createKnowledgeFolders, INDEX_FILE, isReadable } from "./folder";
 import type { KnowledgeDocuments } from "./knowledge-document";
 import { keepLearnings, withLearnings } from "./learnings";
+import {
+	formatQuestions,
+	type KnowledgeQuestion,
+	markQuestion,
+	parseQuestions,
+	QUESTIONS_FILE,
+} from "./questions";
 import { createKnowledgeSync, type KnowledgeSyncDeps } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
 
@@ -140,6 +150,12 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 			hosts?.inStep(spaceId, names, options),
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
 	});
+
+	/** The question set's file in this computer's folder, or null. */
+	function readQuestions(projectId: string): Promise<string | null> {
+		const file = join(folders.folder(projectId), ...QUESTIONS_FILE.split("/"));
+		return readFile(file, "utf8").catch(() => null);
+	}
 
 	/** The step holds the folder: a reconcile first, and `done` for the one after. */
 	async function begin(projectId: string) {
@@ -288,6 +304,48 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 			}
 			for (const to of Object.values(move.projects)) {
 				sync.reconcile(to.projectId).catch(() => {});
+			}
+		},
+		/**
+		 * The project's question set (`questions.ts`), as the Space has it:
+		 * the folder is brought in step first, as for a step.
+		 */
+		async questions(projectId: string): Promise<KnowledgeQuestion[]> {
+			const hold = await sync.startStep(projectId);
+			try {
+				return parseQuestions(await readQuestions(projectId));
+			} finally {
+				await hold.done();
+			}
+		},
+		/**
+		 * Marks the files that answer a question an agent asked, or with no
+		 * files (or none an agent reads) takes it out of the set. The set goes to the Space as a
+		 * step's changes do. Returns the set.
+		 */
+		async markQuestion(
+			projectId: string,
+			mark: { query: string; answers: readonly string[]; by: string | null },
+		): Promise<KnowledgeQuestion[]> {
+			const hold = await sync.startStep(projectId);
+			try {
+				const next = markQuestion(
+					parseQuestions(await readQuestions(projectId)),
+					{
+						...mark,
+						// Only a file an agent reads can answer.
+						answers: mark.answers.filter(isReadable),
+						at: Date.now(),
+					},
+				);
+				const file = join(
+					await folders.ensure(projectId),
+					...QUESTIONS_FILE.split("/"),
+				);
+				await writeWhole(file, formatQuestions(next));
+				return next;
+			} finally {
+				await hold.done();
 			}
 		},
 		listing: sync.listing,

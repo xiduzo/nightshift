@@ -91,7 +91,10 @@ export type Services = {
 	 * knowledge document lists, and one file's content by its hash for a
 	 * computer whose folder lacks it, and the removal of a source's folder.
 	 */
-	knowledge: Pick<ProjectKnowledge, "listing" | "read" | "removeFolder">;
+	knowledge: Pick<
+		ProjectKnowledge,
+		"listing" | "read" | "removeFolder" | "questions" | "markQuestion"
+	>;
 	/** Search over the projects' knowledge on this computer, by words and by meaning. */
 	knowledgeSearch: Pick<KnowledgeSearch, "search" | "meaning">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */

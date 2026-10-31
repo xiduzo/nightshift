@@ -1,7 +1,9 @@
 import type {
+	AskedQuestion,
 	KnowledgeFile,
 	KnowledgeHit,
 	KnowledgeMeaningStatus,
+	KnowledgeQuestion,
 	KnowledgeText,
 } from "@nightshift/engine";
 import { knowledgeSourceSchema } from "@nightshift/flows";
@@ -126,3 +128,43 @@ export const knowledgeTextSchema = exact<KnowledgeText>()(
 		truncated: z.boolean(),
 	}),
 );
+
+/** Where a search put a file: its section, and how it found it. */
+const useHitSchema = z.object({
+	path: z.string(),
+	section: z.string().nullable(),
+	line: z.number(),
+	page: z.number().nullable(),
+	found: z.array(z.enum(["words", "meaning"])),
+});
+
+/** A question of the project's question set, and the files that answer it. */
+const knowledgeQuestionSchema = exact<KnowledgeQuestion>()(
+	z.object({
+		query: z.string(),
+		answers: z.array(z.string()),
+		markedAt: z.number(),
+		by: z.string().nullable(),
+	}),
+);
+
+/** A question agents asked, what its last asking found, and its answers when it is in the set. */
+const askedQuestionSchema = exact<AskedQuestion>()(
+	z.object({
+		query: z.string(),
+		times: z.number(),
+		lastAt: z.number(),
+		runId: z.string().nullable(),
+		stepId: z.string().nullable(),
+		hits: z.array(useHitSchema),
+	}),
+).extend({
+	/** The files a person marked as its answer. Null: not in the question set. */
+	answers: z.array(z.string()).nullable(),
+});
+
+/** The questions agents asked a project's knowledge, and its question set. */
+export const knowledgeQuestionsSchema = z.object({
+	asked: z.array(askedQuestionSchema),
+	set: z.array(knowledgeQuestionSchema),
+});

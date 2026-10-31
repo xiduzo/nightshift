@@ -92,6 +92,8 @@ export {
 	revisionKinds,
 } from "./flows";
 export {
+	type AskedQuestion,
+	askedQuestions,
 	createKnowledgeDocuments,
 	createKnowledgeSearch,
 	createProjectKnowledge,
@@ -99,11 +101,13 @@ export {
 	type KnowledgeFile,
 	type KnowledgeHit,
 	type KnowledgeMeaningStatus,
+	type KnowledgeQuestion,
 	type KnowledgeSearch,
 	type KnowledgeText,
 	LOCAL_ONLY_BYTES,
 	ollamaMeaning,
 	type ProjectKnowledge,
+	questionKey,
 } from "./knowledge";
 export {
 	knowledgeSourceProblems,

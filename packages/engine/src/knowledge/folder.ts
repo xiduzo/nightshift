@@ -37,6 +37,9 @@ import { isProposal } from "./learnings";
  * files into a prompt: the agent reads `INDEX.md`, then searches or greps.
  * A PDF or Word file shows with the title and first sentence of its text.
  *
+ * `evals/` is Night Shift's own too (`questions.ts`): the question set
+ * syncs, but no index, search or read shows it.
+ *
  * `learnings/` is Night Shift's own (`learnings.ts`): the index lists the
  * learnings a person kept, never the proposals that wait.
  *
@@ -116,11 +119,24 @@ export function isKnowledgePath(path: string): boolean {
 }
 
 /**
+ * Night Shift's own folder for the project's question set
+ * (`questions.ts`): it syncs with the knowledge, like the learnings, but no
+ * agent reads it and no source fills it.
+ */
+export const EVALS_DIR = "evals";
+
+/** Whether a path of the knowledge is in the question set's folder, or is it. */
+export function isEvalsPath(path: string): boolean {
+	return path === EVALS_DIR || path.startsWith(`${EVALS_DIR}/`);
+}
+
+/**
  * Whether a person or an agent reads a path: one of the knowledge, but no
- * proposal. The index, search and `read_knowledge` take these only.
+ * proposal and nothing of the question set. The index, search and
+ * `read_knowledge` take these only.
  */
 export function isReadable(path: string): boolean {
-	return isKnowledgePath(path) && !isProposal(path);
+	return isKnowledgePath(path) && !isProposal(path) && !isEvalsPath(path);
 }
 
 /** A file's title when its text gives none: its name without the extension. */
