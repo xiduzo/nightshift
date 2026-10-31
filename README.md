@@ -35,30 +35,33 @@ Night Shift turns the pipeline into a flow that you draw. The engine owns the or
 
 ## How it works
 
-A flow is a graph of steps. Each edge leaves a step on a named outcome. This is the [`implement-and-check`](packages/flows/src/starters/flows/implement-and-check.json) starter:
+A flow is a graph of steps. Each edge leaves a step on a named outcome. This is the [`plan-and-build`](packages/flows/src/starters/flows/plan-and-build.json) starter:
 
 ```mermaid
 flowchart LR
-  implement["🤖 Implement<br/><sub>Claude Code · Sonnet</sub>"]
-  verify["▶ Check<br/><sub>bun test</sub>"]
-  rescue["🤖 Rescue<br/><sub>Claude Code · Opus</sub>"]
-  reverify["▶ Check the rescue"]
+  planner["🤖 Plan"]
+  clarify["✋ Gate<br/><sub>the goal is unclear</sub>"]
+  any_tasks["⑂ Any tasks?"]
+  build["⤵ Build each task<br/><sub>build-task</sub>"]
+  review["🤖 Review"]
 
-  implement -- pass --> verify
-  verify -- "fail (max 2)" --> implement
-  verify -- fail --> rescue
-  implement -- "fail / needs-input" --> rescue
-  rescue -- pass --> reverify
+  planner -- planned --> any_tasks
+  planner -- unclear --> clarify
+  clarify -- answered --> planner
+  any_tasks -- has-tasks --> build
+  build -- "done / halted" --> review
 ```
+
+A step can climb a **cascade**: it tries a cheap tier first, and moves up when a try does not hold. The [`implement-and-check`](packages/flows/src/starters/flows/implement-and-check.json) starter is one Agent with a cascade. Sonnet tries up to 3 times, then Opus. After each try, the check `bun test` runs. A try holds only when the check passes. Each try gets the failure of the try before.
 
 Steps are nodes. Each node type does one job:
 
 | Node | Does |
 | --- | --- |
-| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue with your answer. |
+| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue with your answer. A cascade tries cheap agents first, with a check after each try. |
 | **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. `$NS_KNOWLEDGE` is the project's [knowledge](docs/knowledge.md) folder. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
-| **Decision** | Picks one of its options. You choose who picks: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. |
+| **Decision** | Picks one of its options. You choose who picks: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. A model's pick below a confidence you set goes to a stronger model, or to you. |
 | **Value** | Makes data that matches a JSON schema, from a rule or a model. |
 | **Wait** | Waits for a duration, a time, a command that passes, or a signal, for example from a webhook. |
 | **Subflow** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
@@ -138,7 +141,7 @@ Then, in the web UI at http://localhost:3001:
 
 | Flow | Does |
 | --- | --- |
-| `implement-and-check` | An agent builds a task, a command checks it, retries with the log, then a rescue on a stronger model. |
+| `implement-and-check` | One Agent with a cascade: Sonnet up to 3 tries, then Opus. A check runs after each try. |
 | `plan-and-build` | A planner splits a goal into tasks. Each task gets its own stacked branch, in dependency order. A reviewer ends it. |
 | `build-task` | Builds one task of `plan-and-build`. |
 | `review-pr` | An agent reviews a pull request. A gate asks you before the agent posts the review. |

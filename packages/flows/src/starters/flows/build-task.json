@@ -24,9 +24,9 @@
 			"description": "What the agent reports it did."
 		},
 		{
-			"name": "rescue",
-			"value": "{{implement.rescue}}",
-			"description": "What the rescue did. Empty when the work needed no rescue."
+			"name": "tier",
+			"value": "{{implement.tier}}",
+			"description": "The tier that finished the task: sonnet or opus."
 		}
 	],
 	"start": "implement",

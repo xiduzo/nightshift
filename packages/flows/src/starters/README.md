@@ -4,7 +4,7 @@ Small, self-contained flows that ship with Night Shift. Change them to fit a pro
 
 | Flow | Inputs | Does |
 | --- | --- | --- |
-| `implement-and-check` | `task`, `check` (default `bun test`) | An agent implements the task, and a command runs `check`. A failed check goes back to a fresh agent with the log (3 tries in all), then a rescue on Opus. |
+| `implement-and-check` | `task`, `check` (default `bun test`) | One Agent with a cascade: Sonnet up to 3 tries, then Opus. After each try, its check runs `check` and fails on uncommitted changes. The next try gets the failure. The output `tier` says which tier finished. |
 | `plan-and-build` | `goal`, `check` (default `bun test`) | A planner returns tasks (`{ id, title, details, dependsOn }`) or asks you through a Gate when the goal is unclear. Each task runs `build-task` on its own branch, stacked on the last one, in `dependsOn` order. A reviewer ends on `approved` or `changes-requested` with a list of `issues`. |
 | `build-task` | `item` (a task), `check` | The body of `plan-and-build`: calls `implement-and-check` with `task` bound to `{{item.title}}: {{item.details}}`. |
 | `review-pr` | `pr` (number or URL) | An agent with the CLI tool `gh` reviews the pull request: `approve` or `request-changes`, a summary, and comments per line. A Gate asks you before `gh pr review` posts it. |

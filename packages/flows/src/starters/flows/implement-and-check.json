@@ -1,6 +1,6 @@
 {
 	"version": 6,
-	"description": "An agent builds a task and a command checks it. A failed check goes back to an agent with the log, up to 3 tries. Then Opus tries to rescue it.",
+	"description": "An agent builds a task, and a check proves it after each try. Sonnet tries up to 3 times, each try with the last failure. Then Opus tries.",
 	"inputs": [
 		{
 			"name": "task",
@@ -24,9 +24,9 @@
 			"description": "What the agent reports it did."
 		},
 		{
-			"name": "rescue",
-			"value": "{{rescue.summary}}",
-			"description": "What the rescue did. Empty when the work needed no rescue."
+			"name": "tier",
+			"value": "{{implement.tier}}",
+			"description": "The tier that finished the task: sonnet or opus."
 		}
 	],
 	"start": "implement",
@@ -39,90 +39,27 @@
 				"y": 0
 			},
 			"type": "agent",
-			"prompt": "Implement this task in the repository of your working directory:\n\n{{task}}\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. Keep the change small and focused, and commit it with a clear message. The check also fails when changes are not committed.\n\nThe last check failed with this log (empty on the first try):\n\n{{verify.log_tail}}",
-			"harness": "claude-code",
-			"model": "sonnet",
+			"prompt": "Implement this task in the repository of your working directory:\n\n{{task}}\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. Keep the change small and focused, and commit it with a clear message. The check also fails when changes are not committed. Nobody is awake: do not ask a question, decide.",
 			"permissionMode": "auto",
 			"effort": "high",
+			"session": "fresh",
 			"timeoutMinutes": 60,
-			"idleMinutes": 20
-		},
-		{
-			"id": "verify",
-			"label": "Check",
-			"position": {
-				"x": 320,
-				"y": 0
-			},
-			"type": "command",
-			"command": "# The input `check` arrives as an environment variable: run it as a shell command.\nsh -c \"{{check}}\" || exit 1\nif [ -n \"$(git status --porcelain)\" ]; then\n\techo 'Commit your changes. Not committed:'\n\tgit status --short\n\texit 1\nfi",
-			"timeoutMinutes": 30
-		},
-		{
-			"id": "rescue",
-			"label": "Rescue",
-			"position": {
-				"x": 320,
-				"y": 200
-			},
-			"type": "agent",
-			"prompt": "Another agent could not finish this task: it gave up, or the check still failed after 3 tries. Nobody is awake: do not ask a question, decide.\n\nThe task:\n\n{{task}}\n\nThe check: `{{check}}`. Its last log:\n\n{{verify.log_tail}}\n\nFind the cause, fix it, run the check until it passes, and commit all changes. Report `fail` when you cannot get it to pass.",
-			"harness": "claude-code",
-			"model": "opus",
-			"permissionMode": "auto",
-			"effort": "high",
-			"timeoutMinutes": 60,
-			"idleMinutes": 20
-		},
-		{
-			"id": "reverify",
-			"label": "Check the rescue",
-			"position": {
-				"x": 640,
-				"y": 200
-			},
-			"type": "command",
-			"command": "sh -c \"{{check}}\" || exit 1\nif [ -n \"$(git status --porcelain)\" ]; then\n\techo 'Commit your changes. Not committed:'\n\tgit status --short\n\texit 1\nfi",
-			"timeoutMinutes": 30
+			"idleMinutes": 20,
+			"cascade": [
+				{
+					"label": "sonnet",
+					"harness": "claude-code",
+					"model": "sonnet",
+					"tries": 3
+				},
+				{
+					"label": "opus",
+					"harness": "claude-code",
+					"model": "opus"
+				}
+			],
+			"check": "sh -c \"{{check}}\" || exit 1\nif [ -n \"$(git status --porcelain)\" ]; then\n\techo 'Commit your changes. Not committed:'\n\tgit status --short\n\texit 1\nfi"
 		}
 	],
-	"edges": [
-		{
-			"id": "implement-pass-verify",
-			"from": "implement",
-			"outcome": "pass",
-			"to": "verify"
-		},
-		{
-			"id": "implement-fail-rescue",
-			"from": "implement",
-			"outcome": "fail",
-			"to": "rescue"
-		},
-		{
-			"id": "implement-needs-input-rescue",
-			"from": "implement",
-			"outcome": "needs-input",
-			"to": "rescue"
-		},
-		{
-			"id": "verify-fail-implement",
-			"from": "verify",
-			"outcome": "fail",
-			"to": "implement",
-			"max": 2
-		},
-		{
-			"id": "verify-fail-rescue",
-			"from": "verify",
-			"outcome": "fail",
-			"to": "rescue"
-		},
-		{
-			"id": "rescue-pass-reverify",
-			"from": "rescue",
-			"outcome": "pass",
-			"to": "reverify"
-		}
-	]
+	"edges": []
 }

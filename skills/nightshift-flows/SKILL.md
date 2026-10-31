@@ -159,6 +159,18 @@ An edge is `{ id, from, outcome, to, max? }`. It leaves `from` when its step end
 
 Every loop needs at least one edge with `max`: how often a run may take that edge. A Gate in a loop needs one too. Put `max` on the edge that goes back (`check-fail-fix`, max 3). When every edge for an outcome reached its max, the run fails there. Several edges with `max` may leave on one outcome: the run takes the first, in file order, that has not reached its max, and one last edge without `max` is the way on after them (fix three times, then ask a person). Every node must be reachable from `start`.
 
+## Cascades
+
+Climb from a cheap try to a strong one with a `cascade`, not with a loop of nodes. An Agent, a Decision or a Value by a model, and a Subflow (without `each`) take one: a list of tiers, cheap first. A try that does not hold tries again in its tier, up to `tries` (default 1), then the next tier. The cascade replaces the node's `profile`, `decider` and `model`. Every tier has an optional `label`.
+
+- Agent tier: `profile` (or `harness`, `model`), `session: "resume"` to go on with the try before. The node's `check` (a command) runs after each try: a try holds when the agent ends `pass` and the check exits 0. The next try gets the failure in its prompt.
+- Decision tier: `profile` and `minConfidence` (0 to 1). `ollama` and `compatible` give no probability: last model tier only.
+- Value tier: `profile` and `accept`, JSONata over `data`.
+- Subflow tier: `flow` and `inputs`.
+- The last tier can be `{ "person": true, "deadline"? }`: a Gate. Not on a Value.
+
+`{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous.summary}}` read in the node's own templates. Later nodes read `tier` and `tries` (a Decision also `confidence`). A Decision with a cascade and no person tier can end `fail`.
+
 ## Parallel branches
 
 Two or more edges without `max` on one outcome are a fan-out: each starts a branch, and all run at once. The branches share no node and all end at one `join` node, never at an `end`. No fan-out inside a branch: use a called flow. Branches share one copy of the project: give all but one `permissionMode: "plan"`. While one branch waits for a person or a Wait, the others pause.
