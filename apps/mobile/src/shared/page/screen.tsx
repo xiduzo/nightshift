@@ -34,7 +34,7 @@ type ScreenProps = {
  * over a page (FlashList) takes the same props and the same refresh
  * control, and is the first child too.
  */
-const PAGE_SCROLL = {
+export const PAGE_SCROLL = {
 	contentInsetAdjustmentBehavior: "automatic",
 	keyboardShouldPersistTaps: "handled",
 	// Drag the page down to put the keyboard away.
@@ -42,7 +42,9 @@ const PAGE_SCROLL = {
 } as const;
 
 /** Pull to refresh in the theme's muted color, while `onRefresh` works. */
-function useRefreshControl(onRefresh: (() => Promise<unknown>) | undefined) {
+export function useRefreshControl(
+	onRefresh: (() => Promise<unknown>) | undefined,
+) {
 	const [refreshing, setRefreshing] = useState(false);
 	const { colors } = useThemeColors();
 	if (!onRefresh) return undefined;
@@ -64,7 +66,7 @@ function useRefreshControl(onRefresh: (() => Promise<unknown>) | undefined) {
 }
 
 /** The muted line under the native title. */
-function Summary({ text }: { text: string | undefined }) {
+export function Summary({ text }: { text: string | undefined }) {
 	if (!text) return null;
 	return <Text className="text-muted-foreground text-sm">{text}</Text>;
 }
