@@ -1,7 +1,7 @@
 /** Checks a draft: the schema, the connections, profiles, Devices and CLI programs it names, and `validateFlow`. */
 import { type Flow, type FlowNode, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
-import { profileOf } from "../profiles";
+import { nodeProfiles } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 import { validateFlow } from "../validate";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
@@ -114,16 +114,16 @@ export function checkDraft(
 
 	if (profiles) {
 		for (const node of flow.nodes) {
-			const profile = profileOf(node);
 			// A name left from format 6: `validateFlow` asks to pick it again.
-			if (!isProfileRef(profile)) continue;
-			if (untoldDevices?.includes(profile.device)) continue;
-			if (profiles.some((known) => sameProfileRef(known, profile))) continue;
-			issues.push({
-				severity: "error",
-				message: messages.missingProfile(profile),
-				nodeId: node.id,
-			});
+			for (const profile of nodeProfiles(node).filter(isProfileRef)) {
+				if (untoldDevices?.includes(profile.device)) continue;
+				if (profiles.some((known) => sameProfileRef(known, profile))) continue;
+				issues.push({
+					severity: "error",
+					message: messages.missingProfile(profile),
+					nodeId: node.id,
+				});
+			}
 		}
 	}
 

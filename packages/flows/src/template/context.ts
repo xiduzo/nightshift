@@ -27,6 +27,11 @@ export type TemplateContext = {
 	run: Record<RunField, string>;
 	/** The flow's variables, by name: `{{vars.tries}}`. Absent: the flow has none. */
 	vars?: Record<string, JsonValue>;
+	/**
+	 * The try of a cascade the step runs (ADR 6): `{{cascade.tier}}`,
+	 * `{{cascade.try}}` and `{{cascade.previous}}`. Absent outside one.
+	 */
+	cascade?: Record<string, JsonValue>;
 };
 
 /**

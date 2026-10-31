@@ -12,6 +12,14 @@ import {
 	nodeProfileSchema,
 	placed,
 } from "./base";
+import {
+	checkCascade,
+	checkModelTier,
+	isPersonTier,
+	personTierSchema,
+	tierBase,
+	tierLabel,
+} from "./cascade";
 
 /** The Value node: it makes `data` that matches its output schema, by a rule or a model. */
 
@@ -44,6 +52,23 @@ export function canMakeValue(name: DeciderName): name is ValueDeciderName {
  */
 export const valueBySchema = z.enum(["rule", "model"]);
 export type ValueBy = z.infer<typeof valueBySchema>;
+
+/**
+ * A tier of a Value's cascade (ADR 6): a Model Profile, or its own decider
+ * and model, and an `accept` rule. A try holds when the data matches the
+ * output schema and the rule holds. A run copies the profile's address
+ * onto the tier, as onto a node.
+ */
+export const valueTierSchema = z.object({
+	...tierBase,
+	profile: nodeProfileSchema.optional(),
+	decider: deciderNameSchema.optional(),
+	model: z.string().min(1).optional(),
+	address: modelAddressSchema.optional(),
+	/** A JSONata rule over the value as `data`: `$count(data.tasks) > 0`. Unset: data that matches holds. */
+	accept: z.string().optional(),
+});
+export type ValueTier = z.infer<typeof valueTierSchema>;
 
 /**
  * The twin of a Decision: a Decision picks a label, a Value makes `data`
@@ -88,6 +113,17 @@ export const valueNodeSchema = z.object({
 	 * it. A flow does not set it: validation refuses one.
 	 */
 	address: modelAddressSchema.optional(),
+	/**
+	 * `by: "model"` only: the tiers a model climbs (ADR 6). It replaces the
+	 * node's `profile`, `decider` and `model`. The step ends `fail` when
+	 * the last tier does not hold. A person tier (an Ask, ADR 10) is not
+	 * there yet: the checks refuse one.
+	 */
+	cascade: z
+		.array(z.union([personTierSchema, valueTierSchema]))
+		.min(1)
+		.max(8)
+		.optional(),
 });
 export type ValueNode = z.infer<typeof valueNodeSchema>;
 
@@ -103,7 +139,53 @@ export const valueOutputFields = ["outcome", "data", "note", "visit"] as const;
 export function checkValueNode(node: ValueNode, check: NodeCheck): void {
 	checkMaker(node, check);
 	checkModelAddress(node, "Value", check);
+	checkValueCascade(node, check);
 	if (node.prompt !== undefined) check.template(node.prompt, "prompt");
+}
+
+/**
+ * A Value's cascade belongs to a model and replaces its profile, decider
+ * and model. Each tier's decider must make a value, and its `accept` rule
+ * reads only `data`. No person tier yet (ADR 10): `checkCascade` refuses it.
+ */
+function checkValueCascade(node: ValueNode, check: NodeCheck): void {
+	const tiers = node.cascade;
+	if (tiers === undefined) return;
+	if (node.by !== "model") {
+		check.error(
+			`Value node "${node.id}" has a cascade, but a rule makes it. Only a model climbs a cascade. Remove the cascade, or let a model make it.`,
+		);
+		return;
+	}
+	const replaced = [
+		node.profile !== undefined ? "a profile" : null,
+		node.decider !== undefined ? "a decider" : null,
+		node.model !== undefined ? "a model" : null,
+	].filter((name) => name !== null);
+	if (replaced.length > 0) {
+		check.error(
+			`Value node "${node.id}" has a cascade and ${replaced.join(" and ")}. The tiers of the cascade name the models. Remove ${replaced.length === 1 ? "it" : "them"} from the node.`,
+		);
+	}
+	checkCascade(node, { title: "Value", personChoices: null }, check);
+	tiers.forEach((tier, index) => {
+		if (isPersonTier(tier)) return;
+		const label = tierLabel(tier, index);
+		checkModelTier(node.id, tier, label, "Value", check);
+		const decider =
+			tier.decider ?? (tier.profile === undefined ? "openrouter" : undefined);
+		if (decider !== undefined && !canMakeValue(decider)) {
+			check.error(
+				`The tier "${label}" of Value node "${node.id}" uses the decider "${decider}", which cannot make a value. Choose one of: ${valueDeciderNameSchema.options.join(", ")}.`,
+			);
+		}
+		if (tier.accept !== undefined && tier.accept.trim() !== "") {
+			check.dataRule(
+				tier.accept,
+				`The accept rule of the tier "${label}" of "${node.id}"`,
+			);
+		}
+	});
 }
 
 /**
@@ -125,9 +207,11 @@ function checkMaker(node: ValueNode, check: NodeCheck): void {
 			check.error(`Value node "${node.id}" needs a prompt for the model.`);
 		}
 		const decider = valueDecider(node);
-		// A profile gives the decider when the node names none.
+		// A profile gives the decider when the node names none; a cascade's
+		// tiers give it then (`checkValueCascade`).
 		const fromProfile =
-			node.profile !== undefined && node.decider === undefined;
+			(node.profile !== undefined || node.cascade !== undefined) &&
+			node.decider === undefined;
 		checkNodeProfile(node, "Value", check);
 		if (!fromProfile && !canMakeValue(decider)) {
 			check.error(

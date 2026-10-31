@@ -9,6 +9,14 @@ import {
 	nodeProfileSchema,
 	placed,
 } from "./base";
+import {
+	checkCascade,
+	isPersonTier,
+	personTierSchema,
+	RETRY_CHOICES,
+	tierBase,
+	tierLabel,
+} from "./cascade";
 import { checkOptions, option } from "./outcomes";
 
 /**
@@ -178,6 +186,25 @@ export const mcpServerSchema = z.union([
 ]);
 export type McpServer = z.infer<typeof mcpServerSchema>;
 
+/**
+ * A tier of an Agent's cascade (ADR 6): an Agent Profile, or its own
+ * harness, model and permission mode, as on a node. A field the tier sets
+ * wins over its profile. `session: "resume"` continues the session of the
+ * try before within the tier; a new tier starts a new session.
+ */
+export const agentTierSchema = z.object({
+	...tierBase,
+	profile: nodeProfileSchema.optional(),
+	harness: agentHarnessSchema.optional(),
+	model: z.string().min(1).optional(),
+	effort: effortSchema.optional(),
+	permissionMode: permissionModeSchema.optional(),
+	clis: z.array(cliNameSchema).optional(),
+	connections: z.array(nameSchema).optional(),
+	session: z.enum(["fresh", "resume"]).optional(),
+});
+export type AgentTier = z.infer<typeof agentTierSchema>;
+
 export const agentNodeSchema = z.object({
 	...nodeBase,
 	...placed,
@@ -262,6 +289,26 @@ export const agentNodeSchema = z.object({
 	 * it as `{{<node>.data}}` or a path into it, for example `{{planner.data.tasks}}`.
 	 */
 	output: jsonSchemaSchema.optional(),
+	/**
+	 * The tiers the agent climbs (ADR 6): each tier's agent is tried up to
+	 * its `tries`, then the next tier's. A try holds when the agent ends
+	 * `pass` (or one of its own outcomes) and `check` exits 0. The next try
+	 * gets the failure in its prompt. The last tier can be a person: a Gate
+	 * with "try-again" and "stop". It replaces the node's `profile`,
+	 * `harness` and `model`; its other fields apply to every tier.
+	 */
+	cascade: z
+		.array(z.union([personTierSchema, agentTierSchema]))
+		.min(1)
+		.max(8)
+		.optional(),
+	/**
+	 * With a cascade only: a command in the run's copy of the project, run
+	 * after each try that ends `pass`, for example `bun test`. A try holds
+	 * only when it exits 0. Template values arrive as environment
+	 * variables, as in a Command node.
+	 */
+	check: z.string().trim().min(1).max(2000).optional(),
 });
 export type AgentNode = z.infer<typeof agentNodeSchema>;
 
@@ -289,7 +336,14 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 	if (node.prompt.trim() === "" && node.skill === undefined) {
 		check.error(`Agent node "${node.id}" needs a prompt or a skill.`);
 	}
-	if (node.profile === undefined) {
+	if (node.cascade !== undefined) {
+		checkAgentCascade(node, check);
+	} else if (node.check !== undefined) {
+		check.error(
+			`Agent node "${node.id}" has a check, but no cascade. Only a cascade runs a check after each try. Add a cascade, or remove the check.`,
+		);
+	}
+	if (node.profile === undefined && node.cascade === undefined) {
 		const unset = [
 			node.harness === undefined ? "harness" : null,
 			node.model === undefined ? "model" : null,
@@ -307,6 +361,7 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 	}
 	checkNodeProfile(node, "Agent", check);
 	check.template(node.prompt, "prompt");
+	if (node.check !== undefined) check.template(node.check, "check");
 	if (node.outcomes !== undefined) {
 		checkOptions(
 			node.id,
@@ -322,4 +377,53 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 			`The output schema of agent node "${node.id}" must describe an object: give it "type": "object" or "properties".`,
 		);
 	}
+}
+
+/**
+ * An Agent's cascade replaces its profile, harness and model. Each tier
+ * needs a profile, or its own harness, model and permission mode (the
+ * node's permission mode counts). A tier's profile runs the try on its
+ * Device, so the node names no Device of its own then.
+ */
+function checkAgentCascade(node: AgentNode, check: NodeCheck): void {
+	const tiers = node.cascade ?? [];
+	const replaced = [
+		node.profile !== undefined ? "a profile" : null,
+		node.harness !== undefined ? "a harness" : null,
+		node.model !== undefined ? "a model" : null,
+	].filter((name) => name !== null);
+	if (replaced.length > 0) {
+		check.error(
+			`Agent node "${node.id}" has a cascade and ${replaced.join(" and ")}. The tiers of the cascade name the agents. Remove ${replaced.length === 1 ? "it" : "them"} from the node.`,
+		);
+	}
+	checkCascade(node, { title: "Agent", personChoices: RETRY_CHOICES }, check);
+	tiers.forEach((tier, index) => {
+		if (isPersonTier(tier)) return;
+		const label = tierLabel(tier, index);
+		if (tier.profile !== undefined) {
+			if (typeof tier.profile !== "object") {
+				check.error(
+					`The tier "${label}" of Agent node "${node.id}" names the profile "${tier.profile}", but Night Shift cannot tell which computer's profile it is. Pick the profile again.`,
+				);
+			} else if (node.device !== undefined) {
+				check.error(
+					`Agent node "${node.id}" names a device, and its tier "${label}" a profile. The try runs on the profile's device. Remove the device, or the profile.`,
+				);
+			}
+			return;
+		}
+		const unset = [
+			tier.harness === undefined ? "harness" : null,
+			tier.model === undefined ? "model" : null,
+			tier.permissionMode === undefined && node.permissionMode === undefined
+				? "permission mode"
+				: null,
+		].filter((x) => x !== null);
+		if (unset.length > 0) {
+			check.error(
+				`The tier "${label}" of Agent node "${node.id}" needs a profile, or its own ${unset.join(", ")}.`,
+			);
+		}
+	});
 }

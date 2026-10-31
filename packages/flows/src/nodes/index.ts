@@ -6,6 +6,7 @@
 export {
 	type AgentHarnessName,
 	type AgentNode,
+	type AgentTier,
 	agentHarnessSchema,
 	agentNodeSchema,
 	agentOutputFields,
@@ -31,6 +32,7 @@ export {
 	addressRoot,
 	type DeciderName,
 	deciderAddress,
+	deciderMeasuresProbability,
 	deciderNameSchema,
 	deviceNameSchema,
 	flowNameSchema,
@@ -57,12 +59,22 @@ export {
 	type CallEach,
 	type CallEachNode,
 	type CallNode,
+	type CallTier,
 	callEachOutputFields,
+	calledFlowNames,
 	callNodeSchema,
 	callOutputFields,
 	checkCallNode,
 	type ListSource,
 } from "./call";
+export {
+	CASCADE_TEMPLATE_FIELDS,
+	cascadeOutputFields,
+	type GateDeadline,
+	isPersonTier,
+	type PersonTier,
+	tierLabel,
+} from "./cascade";
 export {
 	type CommandExit,
 	type CommandNode,
@@ -80,12 +92,13 @@ export {
 } from "./command";
 export {
 	checkDecisionNode,
+	confidenceField,
 	type DecidedBy,
 	type DecisionNode,
+	type DecisionTier,
 	decisionDecider,
 	decisionNodeSchema,
 	decisionOutputFields,
-	type GateDeadline,
 } from "./decision";
 export {
 	checkEndNode,
@@ -131,6 +144,7 @@ export {
 	type ValueBy,
 	type ValueDeciderName,
 	type ValueNode,
+	type ValueTier,
 	valueDecider,
 	valueDeciderNameSchema,
 	valueNodeSchema,

@@ -1,5 +1,5 @@
 import { type Flow, type FlowInput, flowSchema } from "../flow";
-import { kitNameSchema } from "../nodes";
+import { calledFlowNames, kitNameSchema } from "../nodes";
 import { createBranchKit } from "./github/create-branch";
 import { finishPrKit } from "./github/finish-pr";
 import { publishDraftPrKit } from "./github/publish-draft-pr";
@@ -103,8 +103,9 @@ export const REVIEW_LEARNINGS_KIT = `${KNOWLEDGE_KITS}review-learnings`;
 export function knowledgeKitsOf(flow: Flow): string[] {
 	const names = new Set<string>();
 	for (const node of flow.nodes) {
-		if (node.type === "call" && node.flow.startsWith(KNOWLEDGE_KITS)) {
-			names.add(node.flow);
+		if (node.type !== "call") continue;
+		for (const name of calledFlowNames(node)) {
+			if (name.startsWith(KNOWLEDGE_KITS)) names.add(name);
 		}
 	}
 	return [...names].sort();

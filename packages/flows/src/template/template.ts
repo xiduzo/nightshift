@@ -8,7 +8,9 @@ import type { TemplateContext, TemplateRef } from "./context";
  * index). Anything else between braces is left as it is.
  *
  * Lookup: `run` → `context.run`; `vars` → `context.vars` (the flow's
- * variables); an input name → `context.inputs`; a node id → `context.nodes`. A missing value renders as "". A string renders as is,
+ * variables); an input name → `context.inputs`; a node id → `context.nodes`;
+ * `cascade` → `context.cascade`, in the step of a cascade, when no input
+ * or node has that name. A missing value renders as "". A string renders as is,
  * a number or boolean with String(), an object or array as JSON.
  */
 
@@ -50,6 +52,8 @@ export function lookupRef(
 		value = context.inputs[ref.name];
 	else if (Object.hasOwn(context.nodes, ref.name))
 		value = context.nodes[ref.name];
+	else if (ref.name === "cascade" && context.cascade !== undefined)
+		value = context.cascade;
 	for (const key of ref.path) {
 		if (value === undefined) return undefined;
 		value = child(value, key);

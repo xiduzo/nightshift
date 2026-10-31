@@ -9,6 +9,7 @@ export {
 	type ModelProfileSettings,
 	modelAddressProblem,
 	modelProfileSchema,
+	nodeProfiles,
 	type Profile,
 	type ProfileSettings,
 	placesItself,
