@@ -130,17 +130,6 @@ export function dayWord(epochMs: number, now = Date.now()): string {
 	return new Date(epochMs).toLocaleDateString(undefined, { weekday: "long" });
 }
 
-/** A countdown: "4:05", "1:02:09". Zero when the moment has passed. */
-export function formatCountdown(ms: number): string {
-	const total = Math.max(0, Math.ceil(ms / 1000));
-	const hours = Math.floor(total / 3600);
-	const minutes = Math.floor((total % 3600) / 60);
-	const seconds = String(total % 60).padStart(2, "0");
-	return hours > 0
-		? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
-		: `${minutes}:${seconds}`;
-}
-
 /**
  * The next time the clock shows `hhmm` ("07:00"): later today, else tomorrow.
  * Null when the text is not a time.

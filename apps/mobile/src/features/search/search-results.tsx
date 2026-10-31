@@ -60,11 +60,7 @@ export function SearchResults({ query }: { query: string }) {
 					<SectionHead title="Gates" hint="Oldest first" />
 					<ListGroup>
 						{foundGates.map((gate) => (
-							<GateRow
-								key={`${gate.runId}:${gate.stepId}`}
-								gate={gate}
-								now={now}
-							/>
+							<GateRow key={`${gate.runId}:${gate.stepId}`} gate={gate} />
 						))}
 					</ListGroup>
 				</View>

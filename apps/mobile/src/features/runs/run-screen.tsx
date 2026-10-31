@@ -180,7 +180,7 @@ function RunBody({
 				) : null}
 			</View>
 
-			{gates.length > 0 ? <GateRows gates={gates} now={now} /> : null}
+			{gates.length > 0 ? <GateRows gates={gates} /> : null}
 
 			{allows.stop || allows.resume ? (
 				<Card className="gap-4 py-4">
@@ -241,11 +241,11 @@ function projectHref(projectId: string): Href {
 }
 
 /** The Gates of this run that wait for a person. A tap opens the Gate. */
-function GateRows({ gates, now }: { gates: OpenGate[]; now: number }) {
+function GateRows({ gates }: { gates: OpenGate[] }) {
 	return (
 		<ListGroup>
 			{gates.map((gate) => (
-				<GateRow key={gate.stepId} gate={gate} now={now} overline={null} />
+				<GateRow key={gate.stepId} gate={gate} overline={null} />
 			))}
 		</ListGroup>
 	);

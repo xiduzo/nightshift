@@ -13,7 +13,6 @@ import { SpacePicker } from "@/features/spaces";
 import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { HeaderSearch, HeaderToolbar } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -113,8 +112,6 @@ export function RunsScreen() {
 	const projectName = projectId
 		? (projectNames.get(projectId) ?? "This project")
 		: null;
-	// Again every 30 s: often enough for "12 min".
-	const now = useNow();
 	const [query, setQuery] = useState("");
 	const header = <RunsHeader onSearch={setQuery} />;
 
@@ -211,7 +208,6 @@ export function RunsScreen() {
 								key={run.id}
 								run={run}
 								projectName={projectNames.get(run.projectId) ?? null}
-								now={now}
 							/>
 						))}
 					</ListGroup>

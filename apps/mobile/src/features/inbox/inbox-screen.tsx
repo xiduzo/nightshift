@@ -14,7 +14,6 @@ import { PushCard } from "@/features/push";
 import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { HeaderSearch } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { searchGates } from "@/shared/match";
@@ -43,7 +42,6 @@ import { useInbox } from "./use-inbox";
 export function InboxScreen() {
 	const inbox = useInbox();
 	const view = useInboxView();
-	const now = useNow();
 	const manySpaces = useManySpaces(inbox.data);
 	useProjectParam();
 	const [query, setQuery] = useState("");
@@ -56,7 +54,7 @@ export function InboxScreen() {
 			summary={gates ? inboxSummary(gates) : undefined}
 		>
 			<HeaderSearch placeholder="Your Gates" onChange={setQuery} />
-			{searching ? null : <DigestCard now={now} />}
+			{searching ? null : <DigestCard />}
 			{gates && gates.length > 0 ? (
 				<FilterChips gates={gates} view={view} />
 			) : null}
@@ -85,7 +83,6 @@ export function InboxScreen() {
 						query={query}
 						view={view}
 						manySpaces={manySpaces}
-						now={now}
 					/>
 				)
 			) : inbox.error ? (
@@ -163,14 +160,12 @@ function GateGroups({
 	query,
 	view,
 	manySpaces,
-	now,
 }: {
 	gates: OpenGate[];
 	/** What the search field holds: only the Gates that match show. */
 	query: string;
 	view: InboxView;
 	manySpaces: boolean;
-	now: number;
 }) {
 	const groups = inboxGroups(searchGates(gates, query), view, manySpaces);
 	if (groups.length === 0 && query.trim() !== "") {
@@ -219,7 +214,7 @@ function GateGroups({
 			</View>
 			<ListGroup>
 				{group.gates.map((gate) => (
-					<GateRow key={`${gate.runId}:${gate.stepId}`} gate={gate} now={now} />
+					<GateRow key={`${gate.runId}:${gate.stepId}`} gate={gate} />
 				))}
 			</ListGroup>
 		</View>

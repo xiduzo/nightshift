@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
+import { useClock } from "@/shared/clock";
 import { formatTime } from "@/shared/format";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
@@ -17,7 +18,8 @@ import { runStatusLook } from "@/shared/tone";
  * run that ended before it, with its status, cost and why it ended. A tap
  * opens the run. Nothing when no digest went out in the last day.
  */
-export function DigestCard({ now }: { now: number }) {
+export function DigestCard() {
+	const now = useClock();
 	const queries = useHostQueries(createNotificationQueries);
 	const digest = useQuery(queries.digest());
 	const data = digest.data;

@@ -1,6 +1,7 @@
 import type { RunSummary } from "@nightshift/client";
 import { type Href, router } from "expo-router";
 
+import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
 import { rowValue, runRowLabel } from "./runs-list";
@@ -17,17 +18,16 @@ export function openRun(runId: string): void {
 
 /**
  * One run in a ListGroup: its status icon, its title, "Running · website",
- * and how long it has run, or when it started. Tap opens it.
+ * and how long it has run, or when it started, kept current. Tap opens it.
  */
 export function RunRow({
 	run,
 	projectName,
-	now,
 }: {
 	run: RunSummary;
 	projectName: string | null;
-	now: number;
 }) {
+	const now = useClock();
 	const look = runStatusLook(run.status, run.result);
 	const { value, valueLabel } = rowValue(run, now);
 	return (

@@ -26,6 +26,7 @@ export {
 	costLabel,
 	flowLabel,
 	formatCost,
+	formatCountdown,
 	formatKnownCost,
 	type KnownCost,
 	runEndLine,

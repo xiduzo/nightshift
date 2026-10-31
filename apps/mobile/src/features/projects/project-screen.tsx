@@ -28,7 +28,6 @@ import { useHostQueries } from "@/features/host";
 import { GateRow } from "@/features/inbox";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -78,8 +77,6 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 	const project = projects.data?.find((p) => p.id === projectId);
 	// An older Host sends no counts, and every run whatever the limit.
 	const runCount = project?.runs?.total ?? runs.data?.length;
-	// Again every 30 s: often enough for "waited 12 min".
-	const now = useNow();
 
 	return (
 		<Screen
@@ -137,7 +134,6 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 										<GateRow
 											key={`${gate.runId}:${gate.stepId}`}
 											gate={gate}
-											now={now}
 											overline={gateOverline(gate)}
 										/>
 									))}
@@ -173,7 +169,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							runs.data.length > 0 ? (
 								<ListGroup>
 									{runs.data.slice(0, SHOWN).map((run) => (
-										<ProjectRunRow key={run.id} run={run} now={now} />
+										<ProjectRunRow key={run.id} run={run} />
 									))}
 								</ListGroup>
 							) : (

@@ -36,6 +36,17 @@ export function agoLabel(at: number, now = Date.now()): string {
 	});
 }
 
+/** A countdown: "4:05", "1:02:09". Zero when the moment has passed. */
+export function formatCountdown(ms: number): string {
+	const total = Math.max(0, Math.ceil(ms / 1000));
+	const hours = Math.floor(total / 3600);
+	const minutes = Math.floor((total % 3600) / 60);
+	const seconds = String(total % 60).padStart(2, "0");
+	return hours > 0
+		? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
+		: `${minutes}:${seconds}`;
+}
+
 /** When something started, short: "Just now", "12 min ago", "Today 09:41", "Yesterday 23:05", "3 Oct 14:20". */
 export function whenLabel(at: number, now = Date.now()): string {
 	const ago = now - at;

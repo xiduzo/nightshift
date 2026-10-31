@@ -1,6 +1,7 @@
 import type { RunSummary } from "@nightshift/client";
 
 import { InitialsAvatar } from "@/shared/avatar";
+import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
 import { projectLinks } from "./links";
@@ -11,17 +12,16 @@ import {
 	runTime,
 } from "./overview";
 
-/** One project of the Projects tab: its initials, name, what needs you and its last run. */
+/** One project of the Projects tab: its initials, name, what needs you and its last run. It keeps "3 h ago" current itself. */
 export function ProjectRow({
 	overview: { project, needsYou, lastRun },
-	now,
 }: {
 	overview: ProjectOverview<
 		{ id: string; name: string },
 		Pick<RunSummary, "id" | "projectId" | "title" | "createdAt">
 	>;
-	now: number;
 }) {
+	const now = useClock();
 	return (
 		<ListRow
 			leading={<InitialsAvatar name={project.name} />}
@@ -39,8 +39,9 @@ export function ProjectRow({
 	);
 }
 
-/** A run of a project: its status, title and when it started (or how long it has run). */
-export function ProjectRunRow({ run, now }: { run: RunSummary; now: number }) {
+/** A run of a project: its status, title and when it started (or how long it has run), kept current. */
+export function ProjectRunRow({ run }: { run: RunSummary }) {
+	const now = useClock();
 	const look = runStatusLook(run.status, run.result);
 	const time = runTime(run, now);
 	return (

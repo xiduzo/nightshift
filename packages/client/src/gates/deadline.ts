@@ -1,9 +1,13 @@
+import { waitedText } from "./inbox";
 import type { OpenGate } from "./types";
 
 /** A Gate's deadline: when it falls, and the choice Night Shift picks then. */
 type GateDeadline = NonNullable<OpenGate["deadline"]>;
 
 const DAY = 86_400_000;
+
+/** A deadline this close shows in the Gate's row. */
+const SOON_MS = 60 * 60_000;
 
 /** The start of the day of a moment, on this device's clock. */
 function dayOf(epochMs: number): number {
@@ -45,4 +49,19 @@ export function deadlineWhen(
 export function deadlineText(deadline: GateDeadline, now: number): string {
 	const { time, day } = deadlineWhen(deadline.at, now);
 	return `If nobody answers, Night Shift picks ${deadline.choose} at ${time}${day}.`;
+}
+
+/**
+ * A deadline in the next hour, short, for a Gate's row: "Picks keep in
+ * 12 min". Null when the Gate has no deadline, the deadline is further
+ * away, or it has passed.
+ */
+export function deadlineSoon(
+	deadline: GateDeadline | null,
+	now: number,
+): string | null {
+	if (!deadline) return null;
+	const left = deadline.at - now;
+	if (left <= 0 || left > SOON_MS) return null;
+	return `Picks ${deadline.choose} in ${waitedText(left)}`;
 }

@@ -12,7 +12,6 @@ import { useHostQueries } from "@/features/host";
 import { SpacePicker } from "@/features/spaces";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { HeaderToolbar } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -61,8 +60,6 @@ export function ProjectsScreen() {
 		[list, gates.data, lastRuns],
 	);
 	const needsYou = overviews.reduce((sum, row) => sum + row.needsYou, 0);
-	// Again every 30 s: often enough for "3 h ago".
-	const now = useNow();
 
 	return (
 		<Screen
@@ -83,11 +80,7 @@ export function ProjectsScreen() {
 				) : (
 					<ListGroup>
 						{overviews.map((overview) => (
-							<ProjectRow
-								key={overview.project.id}
-								overview={overview}
-								now={now}
-							/>
+							<ProjectRow key={overview.project.id} overview={overview} />
 						))}
 					</ListGroup>
 				)

@@ -5,7 +5,6 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	createSpaceQueries,
-	deadlineText,
 	type GateChoice,
 	type GateLink,
 	gateParts,
@@ -13,7 +12,6 @@ import {
 	gateRun,
 	nodeLabels,
 	type OpenGate,
-	waitedText,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -36,7 +34,6 @@ import {
 	buttonTextVariants,
 	buttonVariants,
 } from "@nightshift/ui-native/components/ui/button";
-import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
@@ -75,16 +72,13 @@ import { useHost, useHostQueries } from "@/features/host";
 import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { useNow } from "@/shared/format";
 import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
-import { StatusBadge } from "@/shared/status";
-import { type Look, NEEDS_YOU } from "@/shared/tone";
-import { StepTrail, trailItemOf } from "@/shared/trail";
 import { CHECK_COPY } from "./answer-check";
 import { ChoiceCards } from "./choice-cards";
+import { GateDeadline, GateStatus, RunSteps } from "./gate-times";
 import {
 	confirmText,
 	isDestructive,
@@ -210,7 +204,6 @@ function OpenGateScreen({
 	onSent: () => void;
 	onGone: (refusal: GoneRefusal) => void;
 }) {
-	const now = useNow();
 	const { headline, context, links } = gateParts(gate.question);
 	const { flow } = gateRun(gate);
 	const spaceQueries = useHostQueries(createSpaceQueries);
@@ -236,19 +229,12 @@ function OpenGateScreen({
 	const answerable = gate.canAnswer && !gate.answerPending;
 	const elsewhere =
 		!gate.walker.thisDevice && gate.walker.name ? gate.walker.name : null;
-	const waited = waitedText(now - gate.openedAt);
 
 	function send() {
 		if (!chosen) return;
 		if (needsConfirm(chosen, chosenRoute)) setConfirming(true);
 		else void answer.send();
 	}
-
-	const status: Look = answer.sent
-		? { tone: "finished", icon: "circle-check", label: "Answered" }
-		: answerable
-			? { ...NEEDS_YOU, label: `Needs you · ${waited}` }
-			: { tone: "neutral", icon: "hourglass", label: `Waiting ${waited}` };
 
 	const runHref: Href = {
 		pathname: "/runs/[runId]",
@@ -310,7 +296,11 @@ function OpenGateScreen({
 					<InlineMarkdown text={headline} />
 				</Text>
 				<View className="flex-row flex-wrap items-center gap-2">
-					<StatusBadge look={status} />
+					<GateStatus
+						openedAt={gate.openedAt}
+						sent={answer.sent !== null}
+						answerable={answerable}
+					/>
 					<Badge variant="outline">
 						<Icon as={Workflow} className="size-3 text-muted-foreground" />
 						<Text numberOfLines={1}>{flow}</Text>
@@ -351,19 +341,7 @@ function OpenGateScreen({
 					}
 				/>
 				{run.data ? (
-					<Card className="px-4 py-4">
-						<StepTrail
-							items={run.data.steps
-								.filter((step) => step.scope === null)
-								.map((step) =>
-									trailItemOf(step, {
-										labels,
-										runStatus: run.data.status,
-										now,
-									}),
-								)}
-						/>
-					</Card>
+					<RunSteps run={run.data} labels={labels} />
 				) : run.isError ? (
 					<Text className="text-muted-foreground text-sm">
 						The steps of this run did not load. Pull down to try again.
@@ -415,11 +393,7 @@ function OpenGateScreen({
 								onChoose={answer.choose}
 								disabled={answer.busy}
 							/>
-							{gate.deadline ? (
-								<Text className="text-muted-foreground text-sm">
-									{deadlineText(gate.deadline, now)}
-								</Text>
-							) : null}
+							{gate.deadline ? <GateDeadline deadline={gate.deadline} /> : null}
 							<View className="gap-2">
 								<Label nativeID="gate-note">
 									{answersAgent

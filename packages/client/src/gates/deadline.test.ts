@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { deadlineText, deadlineWhen } from "./deadline";
+import { deadlineSoon, deadlineText, deadlineWhen } from "./deadline";
 
 /** A moment on this machine's clock, in October 2026 (the 29th is a Thursday). */
 function at(day: number, hour: number): number {
@@ -47,5 +47,24 @@ describe("deadlineText", () => {
 		expect(deadlineText(deadline, NOW)).toBe(
 			`If nobody answers, Night Shift picks keep at ${clock(deadline.at)} tomorrow.`,
 		);
+	});
+});
+
+describe("deadlineSoon", () => {
+	const deadline = { at: at(30, 7), choose: "keep" };
+	const before = (minutes: number) => deadline.at - minutes * 60_000;
+
+	test("says what Night Shift picks, and how soon, in the last hour", () => {
+		expect(deadlineSoon(deadline, before(12))).toBe("Picks keep in 12 min");
+		expect(deadlineSoon(deadline, before(60))).toBe("Picks keep in 1 h");
+		expect(deadlineSoon(deadline, deadline.at - 20_000)).toBe(
+			"Picks keep in under a minute",
+		);
+	});
+
+	test("says nothing further away, after the deadline, or without one", () => {
+		expect(deadlineSoon(deadline, before(61))).toBeNull();
+		expect(deadlineSoon(deadline, deadline.at)).toBeNull();
+		expect(deadlineSoon(null, NOW)).toBeNull();
 	});
 });

@@ -150,7 +150,7 @@ export function HomeScreen() {
 						/>
 					)}
 
-					<NeedsYouSection gates={gates} now={now} />
+					<NeedsYouSection gates={gates} />
 
 					{data && !noRuns ? (
 						<>
@@ -202,7 +202,6 @@ function Section({ children }: { children: ReactNode }) {
 
 function NeedsYouSection({
 	gates,
-	now,
 }: {
 	gates: {
 		data: OpenGate[] | undefined;
@@ -210,7 +209,6 @@ function NeedsYouSection({
 		error: Error | null;
 		refetch: () => Promise<unknown>;
 	};
-	now: number;
 }) {
 	const open = gates.data ? waitingForYou(gates.data) : 0;
 	const shown = gates.data ? needsYou(gates.data) : [];
@@ -225,11 +223,7 @@ function NeedsYouSection({
 				shown.length > 0 ? (
 					<ListGroup>
 						{shown.map((gate) => (
-							<GateRow
-								key={`${gate.runId}:${gate.stepId}`}
-								gate={gate}
-								now={now}
-							/>
+							<GateRow key={`${gate.runId}:${gate.stepId}`} gate={gate} />
 						))}
 					</ListGroup>
 				) : (

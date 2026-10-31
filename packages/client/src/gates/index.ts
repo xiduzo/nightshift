@@ -9,7 +9,7 @@ export {
 	leavesInbox,
 	unreachableAnswerText,
 } from "./answer";
-export { deadlineText, deadlineWhen } from "./deadline";
+export { deadlineSoon, deadlineText, deadlineWhen } from "./deadline";
 export {
 	gateRun,
 	waitedText,

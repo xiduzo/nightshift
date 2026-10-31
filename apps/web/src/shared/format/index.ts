@@ -1,12 +1,11 @@
-/** How times, durations, costs and counts read, and useNow (from `@nightshift/client`) that keeps them current. */
+/** How times, durations, costs and counts read, and useNow and formatCountdown (from `@nightshift/client`). */
 
-export { useNow } from "@nightshift/client";
+export { formatCountdown, useNow } from "@nightshift/client";
 export type { KnownCost } from "./format";
 export {
 	costNote,
 	dayWord,
 	formatCost,
-	formatCountdown,
 	formatDateTime,
 	formatDayTime,
 	formatDuration,

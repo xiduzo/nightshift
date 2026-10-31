@@ -4,6 +4,7 @@ import {
 	agoLabel,
 	costLabel,
 	formatCost,
+	formatCountdown,
 	formatKnownCost,
 	stepOutcomeLabel,
 	whenLabel,
@@ -111,5 +112,17 @@ describe("an outcome in words, on every screen", () => {
 		expect(stepOutcomeLabel("approve")).toBe("approve");
 		// Not a key of Object.prototype either.
 		expect(stepOutcomeLabel("constructor")).toBe("constructor");
+	});
+});
+
+describe("a countdown", () => {
+	test("minutes and seconds, then hours in front", () => {
+		expect(formatCountdown(245_000)).toBe("4:05");
+		expect(formatCountdown(3_729_000)).toBe("1:02:09");
+	});
+
+	test("rounds a part second up, and stops at zero", () => {
+		expect(formatCountdown(59_001)).toBe("1:00");
+		expect(formatCountdown(-5_000)).toBe("0:00");
 	});
 });
