@@ -13,9 +13,9 @@
 # and to Docker Hub when the repository variable DOCKERHUB_USERNAME and the
 # secret DOCKERHUB_TOKEN are set (docker.io/<DOCKERHUB_USERNAME>/nightshift).
 #
-# The image holds Night Shift, git, ssh, jq and curl, and nothing else: it is
-# a base to build on. Each platform builds on its own runner, not under
-# emulation.
+# The image holds Night Shift, git, ssh, jq, curl and Ollama (on the CPU, for
+# knowledge search by meaning), and nothing else: it is a base to build on.
+# Each platform builds on its own runner, not under emulation.
 name: Docker image
 
 on:
@@ -109,8 +109,9 @@ jobs:
             -p 127.0.0.1:3000:3000 nightshift:test
           for _ in $(seq 60); do
             if curl -fsS -o /dev/null http://127.0.0.1:3000/ \
-              && docker exec nightshift nightshift health; then
-              echo "Night Shift runs."
+              && docker exec nightshift nightshift health \
+              && docker exec nightshift ollama --version; then
+              echo "Night Shift runs, with Ollama."
               exit 0
             fi
             if [ "$(docker inspect -f '{{.State.Running}}' nightshift)" != true ]; then

@@ -12,11 +12,17 @@
 # The Host's name is NIGHTSHIFT_DEVICE_NAME, else the host name. A host name
 # that is the container id gives the domain of the first Host address.
 #
+# Knowledge search finds by meaning out of the box: Night Shift starts the
+# image's Ollama itself and downloads NIGHTSHIFT_EMBEDDING_MODEL into the
+# volume (/data/ollama) on its first start, about 640 MB. While it embeds,
+# Ollama takes about 1 GB of memory. OLLAMA_HOST=<address> uses another
+# Ollama instead, NIGHTSHIFT_OLLAMA=off finds by words only.
+#
 # CI publishes the second stage as xiduzo/nightshift on Docker Hub and as
 # ghcr.io/xiduzo/nightshift (.github/workflows/docker.yml). It holds Night
-# Shift, git, ssh, jq and curl: no agent CLIs, no vendor tools. Build your own
-# image on it with the CLIs your flows use (docs/deploy/README.md, "Add your
-# tools").
+# Shift, git, ssh, jq, curl and Ollama (on the CPU): no agent CLIs, no vendor
+# tools. Build your own image on it with the CLIs your flows use
+# (docs/deploy/README.md, "Add your tools").
 
 # The web build runs Vite on Node: Vite's prerender does not run under Bun alone.
 FROM node:22-bookworm-slim AS build
@@ -36,11 +42,13 @@ RUN bun install --frozen-lockfile --ignore-scripts \
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 # git for the projects and their worktrees, ssh for git remotes over SSH.
 # jq and curl for the built-in kits: the GitHub and knowledge kits read JSON
-# with jq, the web and Confluence kits fetch with curl.
+# with jq, the web and Confluence kits fetch with curl. ollama and its CPU
+# runner (about 70 MB) for search by meaning: Night Shift runs `ollama serve`
+# as its child, no second container and no entrypoint script.
 # The `bun` user (uid 1000) stays, for the images built on this one. No file
 # keeps a setuid or setgid bit: no program lets `bun` become root.
 RUN apk upgrade --no-cache \
-	&& apk add --no-cache git openssh-client jq curl \
+	&& apk add --no-cache git openssh-client jq curl ollama ollama-cpu \
 	&& addgroup -g 1000 bun \
 	&& adduser -u 1000 -G bun -D -s /bin/sh bun \
 	&& find / -xdev -perm /6000 -type f -exec chmod a-s {} + \
@@ -50,9 +58,12 @@ COPY --from=build /nightshift /usr/local/bin/nightshift
 
 USER bun
 WORKDIR /home/bun
+# NIGHTSHIFT_EMBEDDING_MODEL: the model search by meaning downloads and uses.
+# Override it with -e, or pick another on the Settings page (that wins).
 ENV NIGHTSHIFT_DATA_DIR=/data \
 	PORT=3000 \
-	NIGHTSHIFT_HOST=on
+	NIGHTSHIFT_HOST=on \
+	NIGHTSHIFT_EMBEDDING_MODEL=qwen3-embedding:0.6b
 VOLUME /data
 EXPOSE 3000
 # Healthy while Night Shift's heartbeat in the database is fresh. It reads

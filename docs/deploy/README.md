@@ -98,10 +98,29 @@ Its name is then the domain of its first Host address, else "Host". A Host
 with an earlier default name (a container id, or "Host") gets the new name
 when it starts.
 
+### Search by meaning in the image
+
+The image holds Ollama for the CPU (about 70 MB), so knowledge search finds
+by meaning with no other setup. On its first start, Night Shift starts
+`ollama serve` as its child. Then it downloads the embedding model into the
+volume (`/data/ollama`, about 640 MB). Search finds by words while the
+model downloads and while the first sections embed. Ollama takes about
+1 GB of memory while it embeds. Give the container at least 2 GB.
+
+- `-e NIGHTSHIFT_EMBEDDING_MODEL=nomic-embed-text` uses another model. The
+  owner can also pick one on the Settings page, under Meaning search. A
+  saved choice wins.
+- `-e OLLAMA_HOST=http://gpu-box:11434` uses an Ollama on another computer.
+  Then the container starts no Ollama, and your knowledge text goes to that
+  computer to be embedded.
+- `-e NIGHTSHIFT_OLLAMA=off` starts no Ollama: search finds by words only.
+
+See [knowledge.md](../knowledge.md#by-meaning) for the details.
+
 ### Add your tools
 
-The image holds Night Shift, git, ssh, and the jq and curl that the built-in
-kits use. It has no agent CLIs and no other tools. You choose them: build
+The image holds Night Shift, git, ssh, Ollama, and the jq and curl that the
+built-in kits use. It has no agent CLIs and no other tools. You choose them: build
 your own image on it, with the CLIs your flows use. The image is
 [Wolfi](https://github.com/wolfi-dev), so add packages with `apk add`. For example:
 
