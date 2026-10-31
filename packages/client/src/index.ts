@@ -213,6 +213,7 @@ export {
 } from "./runs";
 export {
 	createScheduleQueries,
+	isPausedTonight,
 	type ScheduleIssue,
 	type ScheduleLastRuns,
 	type ScheduleResult,

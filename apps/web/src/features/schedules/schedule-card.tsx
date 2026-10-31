@@ -1,4 +1,8 @@
-import { type ScheduleLastRuns, waitedText } from "@nightshift/client";
+import {
+	isPausedTonight,
+	type ScheduleLastRuns,
+	waitedText,
+} from "@nightshift/client";
 import { describeCron, type Schedule } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -244,7 +248,11 @@ function NextStart({
 						: null;
 	return (
 		<div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
-			<span className="text-muted-foreground text-xs">Next</span>
+			<span className="text-muted-foreground text-xs">
+				{schedule.enabled && isPausedTonight(schedule, now)
+					? "Paused tonight"
+					: "Next"}
+			</span>
 			{main !== null || nextAt === null ? (
 				<span className="font-medium text-sm">{main}</span>
 			) : (

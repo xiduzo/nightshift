@@ -51,12 +51,14 @@ import type { Notice, ShownNotifications } from "./shown";
  * What a screen reads again. `gates`: the open Gates. `run`: what one run
  * changes, its detail and files, the lists of runs, the dashboard's
  * numbers, a schedule's last start and the run counts of the projects. `runs`: the same for every run.
+ * `schedules`: the lists of schedules, after a pause tonight began or ended.
  * The Devices a run can run on or move to do not change with a run.
  */
 type Read =
 	| { kind: "gates" }
 	| { kind: "runs" }
-	| { kind: "run"; runId: string };
+	| { kind: "run"; runId: string }
+	| { kind: "schedules" };
 
 const GATES: Read = { kind: "gates" };
 const ofRun = (runId: string): Read => ({ kind: "run", runId });
@@ -82,6 +84,8 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 		case "gate-opened":
 		case "gate-closed":
 			return [GATES, ofRun(item.runId)];
+		case "schedules-changed":
+			return [{ kind: "schedules" }];
 		default:
 			return EVERYTHING;
 	}
@@ -191,6 +195,8 @@ export function createLiveCache({
 		files: new Set<string>(),
 		/** A run changed: the lists of runs, the dashboard, the schedules and the projects. */
 		lists: false,
+		/** The schedules only: a pause tonight began or ended. */
+		schedules: false,
 	};
 	let waiting = false;
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
@@ -207,6 +213,10 @@ export function createLiveCache({
 				pending.gates = true;
 				continue;
 			}
+			if (one.kind === "schedules") {
+				pending.schedules = true;
+				continue;
+			}
 			pending.lists = true;
 			if (one.kind === "runs") {
 				pending.everyRun = true;
@@ -221,12 +231,14 @@ export function createLiveCache({
 		schedule(() => {
 			waiting = false;
 			const { gates: readGates, everyRun, lists } = pending;
+			const readSchedules = pending.schedules && !lists;
 			const details = [...pending.details];
 			const steps = [...pending.steps];
 			const files = [...pending.files];
 			pending.gates = false;
 			pending.everyRun = false;
 			pending.lists = false;
+			pending.schedules = false;
 			pending.details.clear();
 			pending.steps.clear();
 			pending.files.clear();
@@ -247,6 +259,7 @@ export function createLiveCache({
 				// Each project carries the counts of its runs (the sidebar, the phone's Projects).
 				invalidate(projects.lists());
 			}
+			if (readSchedules) invalidate(schedules.lists());
 		}, READ_MS);
 	}
 

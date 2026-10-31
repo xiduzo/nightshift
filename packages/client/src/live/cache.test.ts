@@ -306,6 +306,20 @@ describe("the live cache follows the Host", () => {
 		}
 	});
 
+	test("a pause tonight that begins or ends reads the schedules again, and nothing else", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({
+			kind: "schedules-changed",
+			spaceId: "s1",
+			projectId: "p1",
+			at: 4,
+		});
+		expect(stale()).toEqual(NOTHING);
+		timers.due(300);
+		expect(stale()).toEqual(["schedules"]);
+	});
+
 	test("a burst of items of two runs reads each run once, and the lists once", async () => {
 		const { live, stale, timers, queryClient } = setUp();
 		const { host } = follow(live);
