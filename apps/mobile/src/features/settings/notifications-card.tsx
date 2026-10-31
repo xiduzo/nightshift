@@ -1,6 +1,8 @@
 import {
 	applySettingsPatch,
 	createNotificationQueries,
+	DIGEST_CHOICES,
+	digestAtTime,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 	PHONE_DELAYS,
@@ -31,8 +33,8 @@ const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
 
 /**
  * The person's notification settings, the same on every screen: which
- * events, the phones, quiet hours and the phone delay. Each change saves
- * at once.
+ * events, the phones, quiet hours, the morning digest and the phone
+ * delay. Each change saves at once.
  */
 export function NotificationsCard() {
 	const queries = useHostQueries(createNotificationQueries);
@@ -159,6 +161,11 @@ function NotificationFields({
 			</ListGroup>
 			<Card className="py-4">
 				<CardContent className="px-4">
+					<DigestFields value={value} onChange={onChange} />
+				</CardContent>
+			</Card>
+			<Card className="py-4">
+				<CardContent className="px-4">
 					<DelaySelect
 						value={value.holdMinutes}
 						onChange={(holdMinutes) => onChange({ holdMinutes })}
@@ -200,6 +207,80 @@ function TimeSelect({
 			</Select>
 		</View>
 	);
+}
+
+/**
+ * The morning digest: off, when quiet hours end, or at a time. Without
+ * quiet hours it comes at its time, so the time shows then too. Without
+ * quiet hours, the time zone comes from the phone with each change, as it
+ * does when you turn quiet hours on.
+ */
+function DigestFields({
+	value,
+	onChange,
+}: {
+	value: NotificationSettings;
+	onChange(patch: NotificationSettingsPatch): void;
+}) {
+	const insets = useSafeAreaInsets();
+	const zone = value.quietHours ? {} : { timeZone: phoneTimeZone() };
+	const chosen =
+		DIGEST_CHOICES.find((choice) => choice.value === value.digest.when) ??
+		DIGEST_CHOICES[0];
+	const atTime = digestAtTime(value);
+	return (
+		<View className="gap-4">
+			<View className="gap-2">
+				<Label>Morning digest</Label>
+				<Select
+					value={
+						chosen ? { value: chosen.value, label: chosen.label } : undefined
+					}
+					onValueChange={(option) => {
+						const next = DIGEST_CHOICES.find(
+							(choice) => choice.value === option?.value,
+						);
+						if (next) onChange({ digest: { when: next.value }, ...zone });
+					}}
+				>
+					<SelectTrigger accessibilityLabel="Morning digest">
+						<SelectValue placeholder="Choose when" />
+					</SelectTrigger>
+					<SelectContent insets={{ top: insets.top, bottom: insets.bottom }}>
+						{DIGEST_CHOICES.map((choice) => (
+							<SelectItem
+								key={choice.value}
+								value={choice.value}
+								label={choice.label}
+							/>
+						))}
+					</SelectContent>
+				</Select>
+			</View>
+			{atTime ? (
+				<TimeSelect
+					label="Time"
+					value={value.digest.time}
+					onChange={(time) => onChange({ digest: { time }, ...zone })}
+				/>
+			) : null}
+			<Text variant="muted" className="text-muted-foreground">
+				{digestHint(value, atTime)}
+			</Text>
+		</View>
+	);
+}
+
+/** What the digest is, and when it comes when the choice does not say it. */
+function digestHint(value: NotificationSettings, atTime: boolean): string {
+	const about =
+		"One notification a day about ended runs and waiting Gates. It skips days with nothing new.";
+	if (!atTime) return about;
+	const noQuiet =
+		value.digest.when === "quiet-hours-end"
+			? ` You have no quiet hours, so it comes at ${value.digest.time}.`
+			: "";
+	return `${about}${noQuiet} The time is in ${value.timeZone}.`;
 }
 
 /** How long a phone waits while another screen is open. */

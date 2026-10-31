@@ -4,7 +4,7 @@
  * contract (keys, push data, where a tap goes).
  */
 
-export { digestShown } from "./digest";
+export { DIGEST_CHOICES, digestAtTime, digestShown } from "./digest";
 export { PHONE_DELAYS, phoneDelayLabel } from "./phone-delay";
 export {
 	gateKey,

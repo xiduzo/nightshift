@@ -1,4 +1,9 @@
-import { PHONE_DELAYS, phoneDelayLabel } from "@nightshift/client";
+import {
+	DIGEST_CHOICES,
+	digestAtTime,
+	PHONE_DELAYS,
+	phoneDelayLabel,
+} from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -83,15 +88,6 @@ const SCREENS: {
 		label: "Phones",
 		description: "The Night Shift app on your phones.",
 	},
-];
-
-const DIGEST_WHEN: {
-	value: NotificationSettings["digest"]["when"];
-	label: string;
-}[] = [
-	{ value: "quiet-hours-end", label: "When quiet hours end" },
-	{ value: "time", label: "At a set time" },
-	{ value: "off", label: "Off" },
 ];
 
 /** Quiet hours when you turn them on. */
@@ -309,15 +305,14 @@ function DigestField({ data }: { data: NotificationSettings }) {
 	const id = useId();
 	const save = useSaveSettings();
 	const { when, time } = data.digest;
-	const atTime =
-		when === "time" || (when === "quiet-hours-end" && !data.quietHours);
+	const atTime = digestAtTime(data);
 	return (
 		<FieldSet>
 			<FieldGroup>
 				<Field>
 					<FieldLabel htmlFor={`${id}-digest`}>Morning digest</FieldLabel>
 					<Select
-						items={DIGEST_WHEN}
+						items={DIGEST_CHOICES}
 						value={when}
 						onValueChange={(next) => {
 							if (next) save.mutate({ digest: { when: next } });
@@ -332,7 +327,7 @@ function DigestField({ data }: { data: NotificationSettings }) {
 						</SelectTrigger>
 						<SelectContent>
 							<SelectGroup>
-								{DIGEST_WHEN.map((item) => (
+								{DIGEST_CHOICES.map((item) => (
 									<SelectItem key={item.value} value={item.value}>
 										{item.label}
 									</SelectItem>
