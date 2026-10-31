@@ -33,6 +33,14 @@ import { toast } from "sonner";
 import type { ModelProfileRow, ProfileRow } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { LargerTextarea } from "@/shared/larger-window";
+import { ModelAddressSection } from "./model-address";
+import {
+	type AddressDraft,
+	addressDraftFrom,
+	addressFrom,
+	addressProblems,
+	sameAddress,
+} from "./model-address-draft";
 import { ProfileUsedIn } from "./profile-sections";
 import { deciderQueries, profileMutations, profileQueries } from "./queries";
 
@@ -44,6 +52,8 @@ type Draft = {
 	decider: DeciderName;
 	/** Empty: each node uses the decider's default model. */
 	model: string;
+	/** Where its server is (ADR 5). An empty base URL: the decider's default. */
+	address: AddressDraft;
 };
 
 function draftFrom(profile: ModelProfileRow): Draft {
@@ -52,19 +62,27 @@ function draftFrom(profile: ModelProfileRow): Draft {
 		description: profile.description ?? "",
 		decider: profile.decider,
 		model: profile.model ?? "",
+		address: addressDraftFrom(profile.address),
 	};
 }
 
 /** A new Model Profile: the decider new Decision nodes start on, its default model. */
 export function newModelProfileDraft(decider: DeciderName): Draft {
-	return { name: "", description: "", decider, model: "" };
+	return {
+		name: "",
+		description: "",
+		decider,
+		model: "",
+		address: addressDraftFrom(undefined),
+	};
 }
 
 const same = (a: Draft, b: Draft) =>
 	a.name === b.name &&
 	a.description.trim() === b.description.trim() &&
 	a.decider === b.decider &&
-	a.model.trim() === b.model.trim();
+	a.model.trim() === b.model.trim() &&
+	sameAddress(a.address, b.address);
 
 export function ModelProfileDetail({
 	profile,
@@ -92,6 +110,8 @@ export function ModelProfileDetail({
 	const saved = profile ? draftFrom(profile) : initial;
 	const [draft, setDraft] = useState<Draft>(saved);
 	const [deleting, setDeleting] = useState(false);
+	/** The models the address listed in its last test. */
+	const [listedAt, setListedAt] = useState<string[]>([]);
 	const deciders = useQuery(deciderQueries.list());
 	const decider = deciders.data?.find((d) => d.name === draft.decider);
 	const set = (patch: Partial<Draft>) =>
@@ -131,7 +151,13 @@ export function ModelProfileDetail({
 		onDirtyChange(dirty);
 	}, [dirty, onDirtyChange]);
 	useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
-	const canSave = NAME.test(name) && !nameTaken && dirty;
+	const takesAddress = decider?.address ?? null;
+	const addressOk =
+		takesAddress === null ||
+		Object.keys(addressProblems(draft.address, takesAddress === "required"))
+			.length === 0;
+	const canSave = NAME.test(name) && !nameTaken && dirty && addressOk;
+	const address = takesAddress ? addressFrom(draft.address) : undefined;
 	const keyMissing = decider?.apiKeySource === "missing";
 	const defaults = decider
 		? decider.value && decider.value.defaultModel !== decider.defaultModel
@@ -175,6 +201,7 @@ export function ModelProfileDetail({
 						name,
 						decider: draft.decider,
 						...(draft.model.trim() ? { model: draft.model.trim() } : {}),
+						...(address ? { address } : {}),
 						description: draft.description.trim() || undefined,
 						id: profile?.id,
 					}),
@@ -249,36 +276,34 @@ export function ModelProfileDetail({
 						onValueChange={(next) => {
 							const to = next as DeciderName;
 							// A model belongs to its decider: the new one starts on its default.
-							if (to !== draft.decider) set({ decider: to, model: "" });
+							if (to !== draft.decider) {
+								set({ decider: to, model: "" });
+								setListedAt([]);
+							}
 						}}
 						className="grid gap-2 sm:grid-cols-2"
 						aria-label="Decider"
 					>
-						{(deciders.data ?? [])
-							// The address fields come with the next change.
-							.filter(
-								(d) => d.address !== "required" || d.name === draft.decider,
-							)
-							.map((d) => (
-								<FieldLabel key={d.name} htmlFor={`${id}-d-${d.name}`}>
-									<Field orientation="horizontal">
-										<FieldContent>
-											<FieldTitle>
-												{d.label}
-												{d.value ? null : (
-													<Badge variant="outline">Decisions only</Badge>
-												)}
-											</FieldTitle>
-											{d.apiKeySource === "missing" ? (
-												<FieldDescription className="text-status-waiting text-xs">
-													Needs the secret {d.apiKey}
-												</FieldDescription>
-											) : null}
-										</FieldContent>
-										<RadioGroupItem value={d.name} id={`${id}-d-${d.name}`} />
-									</Field>
-								</FieldLabel>
-							))}
+						{(deciders.data ?? []).map((d) => (
+							<FieldLabel key={d.name} htmlFor={`${id}-d-${d.name}`}>
+								<Field orientation="horizontal">
+									<FieldContent>
+										<FieldTitle>
+											{d.label}
+											{d.value ? null : (
+												<Badge variant="outline">Decisions only</Badge>
+											)}
+										</FieldTitle>
+										{d.apiKeySource === "missing" ? (
+											<FieldDescription className="text-status-waiting text-xs">
+												Needs the secret {d.apiKey}
+											</FieldDescription>
+										) : null}
+									</FieldContent>
+									<RadioGroupItem value={d.name} id={`${id}-d-${d.name}`} />
+								</Field>
+							</FieldLabel>
+						))}
 					</RadioGroup>
 					{keyMissing && decider?.apiKey ? (
 						<Alert>
@@ -306,6 +331,7 @@ export function ModelProfileDetail({
 						<datalist id={`${id}-models`}>
 							{[
 								...new Set([
+									...listedAt,
 									...(decider?.models ?? []),
 									...(decider?.value?.models ?? []),
 								]),
@@ -321,6 +347,21 @@ export function ModelProfileDetail({
 					</Field>
 				</FieldGroup>
 			</DetailSection>
+
+			{takesAddress ? (
+				<ModelAddressSection
+					decider={draft.decider}
+					required={takesAddress === "required"}
+					draft={draft.address}
+					onChange={(patch) =>
+						setDraft((current) => ({
+							...current,
+							address: { ...current.address, ...patch },
+						}))
+					}
+					onModels={setListedAt}
+				/>
+			) : null}
 
 			<ProfileUsedIn usedBy={usedBy} />
 

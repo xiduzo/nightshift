@@ -120,3 +120,8 @@ export const deciderQueries = {
 	/** The deciders of this computer: who decides a Decision node, and whether its key is set. */
 	list: () => orpc.deciders.list.queryOptions(),
 };
+
+export const deciderMutations = {
+	/** Asks the server at a Model Profile's address for its models: the test of the address. */
+	modelsAt: orpc.deciders.modelsAt.mutationOptions,
+};

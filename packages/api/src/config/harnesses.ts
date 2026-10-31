@@ -1,5 +1,6 @@
 import {
 	ACP_DEFAULT_MODEL,
+	deciderModelsAt,
 	deciderViews,
 	harnessViews,
 	installedSkills,
@@ -15,9 +16,11 @@ import {
 import {
 	agentHarnessSchema,
 	customAgentSchema,
+	deciderNameSchema,
 	harnessNameSchema,
 	isAgentProfile,
 	isCustomHarness,
+	modelAddressSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -25,6 +28,7 @@ import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import {
 	customAgentViewSchema,
+	deciderModelsSchema,
 	deciderViewSchema,
 	harnessModelsSchema,
 	harnessViewSchema,
@@ -168,6 +172,26 @@ export const deciders = {
 					const at = context.ollama.endpoint();
 					return { host: at.address, headers: at.headers };
 				},
+			}),
+		),
+	/**
+	 * The models of the server at a Model Profile's address, read from this
+	 * computer with its secrets: the profile's page lists them, and the
+	 * answer tests the address. Never throws: `problem` says why it did not
+	 * answer.
+	 */
+	modelsAt: ownerProcedure
+		.route({
+			summary:
+				"Lists the models of the server at a Model Profile's address, and says why it does not answer.",
+		})
+		.output(output(deciderModelsSchema))
+		.input(
+			z.object({ decider: deciderNameSchema, address: modelAddressSchema }),
+		)
+		.handler(({ context, input }) =>
+			deciderModelsAt(input.decider, input.address, {
+				secret: (name) => context.connections.secret(name),
 			}),
 		),
 };
