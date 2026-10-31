@@ -22,6 +22,7 @@ const PALETTE: PaletteItem[] = [
 	"value",
 	"wait",
 	"lease",
+	"service",
 	"call",
 	"join",
 	"end",

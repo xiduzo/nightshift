@@ -434,6 +434,16 @@ function applyStepEntries(
 					message: event.message,
 				});
 				break;
+			case "service":
+				push({
+					...base,
+					kind: "service",
+					key: `service:${entry.seq}`,
+					state: event.state,
+					command: event.command ?? null,
+					reason: event.reason ?? null,
+				});
+				break;
 			case "lease":
 				push({
 					...base,

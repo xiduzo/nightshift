@@ -38,6 +38,7 @@ import { DecisionFields } from "./decision-fields";
 import { EndFields } from "./end-fields";
 import { JoinFields } from "./join-fields";
 import { LeaseFields } from "./lease-fields";
+import { ServiceFields } from "./service-fields";
 import { ToolFields } from "./tool-fields";
 import { ValueFields } from "./value-fields";
 import { WaitFields } from "./wait-fields";
@@ -291,6 +292,18 @@ export function NodeInspector({
 					/>
 				) : null}
 
+				{node.type === "service" ? (
+					<ServiceFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "service" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
 				{node.type === "agent" ? (
 					<AgentAdvanced
 						projectId={projectId}
@@ -324,11 +337,12 @@ export function NodeInspector({
 					</InspectorSection>
 				) : null}
 
-				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End and a Join take no time; a Lease waits as long as it says. */}
+				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End and a Join take no time; a Lease waits as long as it says, and a Service as its ready check says. */}
 				{(node.type === "decision" && node.by === "person") ||
 				node.type === "end" ||
 				node.type === "join" ||
-				node.type === "lease" ? null : (
+				node.type === "lease" ||
+				node.type === "service" ? null : (
 					<InspectorSection
 						title="Limits"
 						tab="setup"

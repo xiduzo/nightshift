@@ -32,6 +32,7 @@ import {
 	LockIcon,
 	MonitorIcon,
 	PlayIcon,
+	ServerIcon,
 	TriangleAlertIcon,
 	VariableIcon,
 } from "lucide-react";
@@ -125,6 +126,12 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 		return new Map([
 			["pass", "The tool answered"],
 			["fail", "It reported an error"],
+		]);
+	}
+	if (node.type === "service") {
+		return new Map([
+			["ready", "The service is ready"],
+			["failed", "It ended, or was not ready in time"],
 		]);
 	}
 	if (node.type === "lease") {
@@ -478,6 +485,15 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						<LockIcon className="size-3 shrink-0" aria-hidden="true" />
 						<span className="truncate font-mono" title={node.name}>
 							{node.name || "No name yet"}
+						</span>
+					</div>
+				) : null}
+
+				{node.type === "service" ? (
+					<div className="-mt-1 flex min-w-0 items-center gap-1 px-2.5 pb-2 text-[11px] text-muted-foreground">
+						<ServerIcon className="size-3 shrink-0" aria-hidden="true" />
+						<span className="truncate font-mono" title={node.start}>
+							{node.start || "No start command yet"}
 						</span>
 					</div>
 				) : null}

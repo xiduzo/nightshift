@@ -43,6 +43,9 @@ export function nextRunCursor(
  * step that starts or ends, reads the runs again (`run-changed`). After a
  * drop of the stream it reads them again too.
  */
+/** How often a service's log reads again while the service runs. */
+const SERVICE_LOG_POLL_MS = 2_000;
+
 export function createRunQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every list of runs. The live cache reads them again after a run changes. */
@@ -56,6 +59,21 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		/** The files of one run, or of every run without `runId`: to read them again. */
 		artifactsKey: (runId?: string) =>
 			orpc.runs.artifacts.key(runId === undefined ? {} : { input: { runId } }),
+		/**
+		 * The end of a service's log (ADR 9). It reads again every 2 s while
+		 * the service runs. A failed read does not toast.
+		 */
+		serviceLog: (
+			runId: string,
+			service: { nodeId: string; scopeKey: string },
+			running: boolean,
+		) => ({
+			...orpc.runs.serviceLog.queryOptions({
+				input: { runId, nodeId: service.nodeId, scopeKey: service.scopeKey },
+			}),
+			refetchInterval: running ? SERVICE_LOG_POLL_MS : (false as const),
+			meta: { quietErrors: true },
+		}),
 		/** The runs of the Space, of every project. A failed read again keeps the list. */
 		everyRun: () => ({
 			...orpc.runs.list.queryOptions({ input: {} }),

@@ -122,6 +122,12 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 			return `**${item.byDeadline ? "Picked at the deadline" : "Answer"}:** \`${item.choice}\`${item.note.trim() ? `\n\n${quote(item.note)}` : ""}`;
 		case "end":
 			return `**Ended:** ${END_WORDS[item.status]}${item.message ? `. ${item.message}` : ""}`;
+		case "service":
+			return item.state === "starting"
+				? `**Service:** starts \`${item.command ?? ""}\``
+				: item.state === "ready"
+					? "**Service:** ready"
+					: `**Service:** not ready${item.reason ? `. ${item.reason}` : ""}`;
 		case "lease":
 			return item.held
 				? `**Lease:** took \`${item.name}\``
