@@ -1,6 +1,7 @@
 import { KNOWLEDGE_SOURCE_KINDS, knowledgeSourceKind } from "@nightshift/flows";
 import {
 	Alert,
+	AlertAction,
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
@@ -37,6 +38,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+	CircleAlertIcon,
 	EllipsisIcon,
 	PencilIcon,
 	RefreshCwIcon,
@@ -64,6 +66,11 @@ type Sync = Knowledge["syncs"][number];
 /** A kit's name for a person, for a sync flow someone drew on the canvas. */
 function kitLabel(kit: string): string {
 	return KNOWLEDGE_SOURCE_KINDS.find((kind) => kind.kit === kit)?.label ?? kit;
+}
+
+/** A source's name for a person: its kind, or the name of the flow someone drew. */
+function sourceLabel(sync: Sync): string {
+	return sync.source ? knowledgeSourceKind(sync.source.kit).label : sync.flow;
 }
 
 /**
@@ -103,6 +110,7 @@ export function Sources({
 					</AlertDescription>
 				</Alert>
 			) : null}
+			<FailedSyncs syncs={syncs} />
 			<ItemGroup className="gap-2">
 				{syncs.map((sync) => (
 					<SourceItem
@@ -122,6 +130,44 @@ export function Sources({
 				onClose={() => setRemoving(null)}
 			/>
 		</PageSection>
+	);
+}
+
+/**
+ * The sources whose last sync failed, in one Alert: what failed, and how
+ * to see why. One source links to its last run.
+ */
+function FailedSyncs({ syncs }: { syncs: Knowledge["syncs"] }) {
+	const failed = syncs.filter((sync) => sync.health === "failed");
+	const [only] = failed;
+	if (!only) return null;
+	return (
+		<Alert variant="destructive">
+			<CircleAlertIcon />
+			<AlertTitle>
+				{failed.length === 1
+					? `${sourceLabel(only)} did not sync`
+					: `${failed.length} sources did not sync`}
+			</AlertTitle>
+			<AlertDescription>
+				{failed.length === 1
+					? "Your agents read what it copied before. Open the last run to see what went wrong."
+					: "Your agents read what these sources copied before. Open the last run of each to see what went wrong."}
+			</AlertDescription>
+			{failed.length === 1 && only.lastRun ? (
+				<AlertAction>
+					<Button
+						size="sm"
+						variant="outline"
+						render={
+							<Link to="/runs/$runId" params={{ runId: only.lastRun.id }} />
+						}
+					>
+						Open run
+					</Button>
+				</AlertAction>
+			) : null}
+		</Alert>
 	);
 }
 
@@ -156,6 +202,9 @@ function SourceItem({
 							{sync.flow}
 						</Link>
 					)}
+					{sync.health === "stale" ? (
+						<Badge variant="outline">Out of date</Badge>
+					) : null}
 				</ItemTitle>
 				<ItemDescription className="flex flex-col gap-1">
 					{source ? (

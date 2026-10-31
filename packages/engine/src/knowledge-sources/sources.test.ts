@@ -11,7 +11,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { knowledgeSources } from "./sources";
+import { knowledgeSourceProblems, knowledgeSources } from "./sources";
 
 /**
  * Knowledge sources over a real Space: the flows, schedules and files a
@@ -274,6 +274,7 @@ describe("list", () => {
 				},
 				schedule: { cron: "0 6 * * *", enabled: true },
 				lastRun: null,
+				health: null,
 			},
 		]);
 		expect(listed.reviews).toEqual(["review"]);
@@ -380,6 +381,66 @@ describe("sync", () => {
 		expect(detail.status).toBe("finished");
 		expect((await sources().list(projectId)).files.map((f) => f.path)).toEqual([
 			"folder/a.md",
+		]);
+	});
+});
+
+describe("the sources that need a person", () => {
+	const DAY = 24 * 60 * 60_000;
+	const now = 100 * DAY;
+	/** A Space as the digest reads it: one project, these flows, these runs. */
+	function spaceWith(
+		runs: { flowName: string; status: string; endedAt: number | null }[],
+	) {
+		const flows: Record<string, Flow> = {
+			"knowledge-jira": callFlow("kit:knowledge/jira", { keys: "A-1" }),
+			web: drawnFlow("kit:knowledge/web"),
+			wiki: drawnFlow("kit:knowledge/github-wiki"),
+			fresh: drawnFlow("kit:knowledge/files"),
+			review: callFlow("kit:knowledge/review-learnings", {}),
+		};
+		return {
+			listProjects: async () => [{ id: "p1", name: "Lighthouse" }],
+			flows: { map: async () => flows },
+			listRuns: async () =>
+				runs.map((run, index) => ({
+					...run,
+					id: `run-${index}`,
+					createdAt: now - 30 * DAY,
+				})),
+		} as unknown as Parameters<typeof knowledgeSourceProblems>[0];
+	}
+
+	test("a failed last sync, and one that ended more than a week ago; not one that runs or synced lately", async () => {
+		const problems = await knowledgeSourceProblems(
+			spaceWith([
+				{ flowName: "knowledge-jira", status: "failed", endedAt: now - DAY },
+				{ flowName: "web", status: "finished", endedAt: now - 8 * DAY },
+				{ flowName: "wiki", status: "running", endedAt: null },
+				{ flowName: "fresh", status: "finished", endedAt: now - DAY },
+				{ flowName: "review", status: "failed", endedAt: now - DAY },
+				// An older run of a flow: its latest run counts.
+				{ flowName: "fresh", status: "failed", endedAt: now - 9 * DAY },
+			]),
+			now,
+		);
+		expect(problems).toEqual([
+			{
+				projectId: "p1",
+				projectName: "Lighthouse",
+				flow: "knowledge-jira",
+				label: "Jira",
+				health: "failed",
+				lastRun: { id: "run-0", status: "failed", at: now - DAY },
+			},
+			{
+				projectId: "p1",
+				projectName: "Lighthouse",
+				flow: "web",
+				label: "web",
+				health: "stale",
+				lastRun: { id: "run-1", status: "finished", at: now - 8 * DAY },
+			},
 		]);
 	});
 });

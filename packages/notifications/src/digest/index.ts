@@ -3,6 +3,7 @@
 export {
 	type Digest,
 	type DigestGate,
+	type DigestKnowledgeSource,
 	type DigestRun,
 	type DigestSource,
 	digestFrom,

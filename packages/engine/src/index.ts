@@ -105,7 +105,11 @@ export {
 	ollamaMeaning,
 	type ProjectKnowledge,
 } from "./knowledge";
-export { knowledgeSources } from "./knowledge-sources";
+export {
+	knowledgeSourceProblems,
+	knowledgeSources,
+	type SourceProblem,
+} from "./knowledge-sources";
 export type {
 	CopyStamp,
 	LoggedEvent,

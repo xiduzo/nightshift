@@ -14,8 +14,9 @@ import { formatTime } from "@/shared/format";
 
 /**
  * The last morning digest on top of the inbox, as the phone shows it: its
- * sum, and one row per run that ended before it, with its status, cost and
- * why it ended. Nothing when no digest went out in the last day.
+ * sum, one row per run that ended before it, with its status, cost and
+ * why it ended, and one per knowledge source that did not sync or is out
+ * of date. Nothing when no digest went out in the last day.
  */
 export function DigestGroup({ now }: { now: number }) {
 	const digest = useQuery(notificationQueries.digest());
@@ -31,10 +32,16 @@ export function DigestGroup({ now }: { now: number }) {
 					</p>
 				</div>
 				<p className="px-2 text-muted-foreground text-xs">{data.body}</p>
-				{data.runs.length > 0 ? (
+				{data.runs.length > 0 || data.sources.length > 0 ? (
 					<ItemGroup className="gap-0.5">
 						{data.runs.map((run) => (
 							<DigestRun key={run.runId} run={run} />
+						))}
+						{data.sources.map((source) => (
+							<DigestKnowledgeSource
+								key={`${source.projectId} ${source.title}`}
+								source={source}
+							/>
 						))}
 					</ItemGroup>
 				) : null}
@@ -64,6 +71,31 @@ function DigestRun({ run }: { run: Digest["runs"][number] }) {
 				</ItemTitle>
 				<ItemDescription className="line-clamp-2 text-xs">
 					{facts.join(" · ")}
+				</ItemDescription>
+			</ItemContent>
+		</Item>
+	);
+}
+
+function DigestKnowledgeSource({
+	source,
+}: {
+	source: Digest["sources"][number];
+}) {
+	return (
+		<Item size="xs">
+			<ItemContent className="min-w-0">
+				<ItemTitle className="w-full min-w-0">
+					<Link
+						to="/runs/$runId"
+						params={{ runId: source.runId }}
+						className="truncate underline-offset-3 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+					>
+						{source.title}
+					</Link>
+				</ItemTitle>
+				<ItemDescription className="text-xs">
+					{source.statusText}
 				</ItemDescription>
 			</ItemContent>
 		</Item>

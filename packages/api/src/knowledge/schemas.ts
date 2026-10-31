@@ -50,6 +50,8 @@ export const knowledgeSchema = z.object({
 			lastRun: z
 				.object({ id: z.string(), status: runStatusSchema, at: z.number() })
 				.nullable(),
+			/** Its last sync failed, or it has not synced in a week. Null: nothing to do. */
+			health: z.enum(["failed", "stale"]).nullable(),
 		}),
 	),
 	/** How many learnings agents proposed that wait for a person. */

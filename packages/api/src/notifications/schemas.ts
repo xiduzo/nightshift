@@ -1,6 +1,7 @@
 import {
 	type Digest,
 	type DigestGate,
+	type DigestKnowledgeSource,
 	type DigestRun,
 	type InAppItem,
 	type NotificationSettings,
@@ -112,7 +113,20 @@ const digestGateSchema = exact<DigestGate>()(
 	}),
 );
 
-/** The last morning digest: the runs that ended before it, and the Gates that wait now. */
+const digestKnowledgeSourceSchema = exact<DigestKnowledgeSource>()(
+	z.object({
+		spaceId: z.string(),
+		projectId: z.string(),
+		/** The source and its project. */
+		title: z.string(),
+		/** "Last sync failed", "Not synced in a week". */
+		statusText: z.string(),
+		/** Its last run. */
+		runId: z.string(),
+	}),
+);
+
+/** The last morning digest: the runs that ended before it, the Gates that wait now, and the knowledge sources that need you. */
 export const digestSchema = exact<Digest>()(
 	z.object({
 		from: z.number(),
@@ -121,6 +135,7 @@ export const digestSchema = exact<Digest>()(
 		body: z.string(),
 		runs: z.array(digestRunSchema),
 		gates: z.array(digestGateSchema),
+		sources: z.array(digestKnowledgeSourceSchema),
 	}),
 );
 

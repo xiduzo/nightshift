@@ -1,11 +1,13 @@
-import type { OpenGate, RunSummary } from "@nightshift/engine";
+import type { OpenGate, RunSummary, SourceProblem } from "@nightshift/engine";
 
 /**
  * The morning digest: one line per run that ended since the last digest
  * (its status, its cost, and the pull request it opened or why it ended),
- * and the Gates that still wait. A push says the sum ("3 runs finished, 1
- * failed. $4.20 spent. 1 Gate waits for you."). The phone's inbox shows
- * the lines and links each to its run. Nothing to say: no digest.
+ * the Gates that still wait, and the knowledge sources whose last sync
+ * failed or is more than a week old. A push says the sum ("3 runs
+ * finished, 1 failed. $4.20 spent. 1 Gate waits for you."). The phone's
+ * inbox shows the lines and links each to its run. Nothing to say: no
+ * digest. A source that is only out of date makes no digest of its own.
  */
 
 /** A run that ended, as the digest reads it from the run list. */
@@ -60,6 +62,21 @@ export type DigestGate = {
 	title: string;
 };
 
+/** A knowledge source of a Space, as the digest reads it: its last sync needs a person. */
+export type KnowledgeSourceProblem = SourceProblem & { spaceId: string };
+
+/** One line of the digest: a knowledge source whose last sync needs a person. */
+export type DigestKnowledgeSource = {
+	spaceId: string;
+	projectId: string;
+	/** The source and its project ("Jira · Lighthouse"). */
+	title: string;
+	/** "Last sync failed", "Not synced in a week". */
+	statusText: string;
+	/** Its last run. */
+	runId: string;
+};
+
 /** One digest. */
 export type Digest = {
 	/** The runs that ended after `from` and by `to`, epoch ms. */
@@ -73,14 +90,18 @@ export type Digest = {
 	runs: DigestRun[];
 	/** Oldest first: the Gate that waited longest on top. */
 	gates: DigestGate[];
+	/** The failed sources first, then the ones that are out of date. */
+	sources: DigestKnowledgeSource[];
 };
 
-/** What a digest reads: the runs of a Space that ended, and its open Gates. */
+/** What a digest reads: the runs of a Space that ended, its open Gates and its knowledge sources. */
 export type DigestSource = {
 	/** The runs of the Space that ended after `since`, newest first. */
 	endedRuns(spaceId: string, since: number): Promise<EndedRun[]>;
 	/** The Gates of the Space that wait for an answer. */
 	waitingGates(spaceId: string): Promise<WaitingGate[]>;
+	/** The knowledge sources of the Space whose last sync needs a person. Without it: none. */
+	sourceProblems?(spaceId: string): Promise<SourceProblem[]>;
 };
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -235,13 +256,45 @@ export function digestTitle(time: string | null): string {
 	return hour < 12 ? "Night Shift: last night" : "Night Shift: your digest";
 }
 
+/** "1 knowledge source did not sync. 2 have not synced in a week." */
+function sourcesSentence(
+	sources: readonly KnowledgeSourceProblem[],
+): string | null {
+	const failed = sources.filter((s) => s.health === "failed").length;
+	const stale = sources.length - failed;
+	const parts = [
+		failed > 0
+			? `${plural(failed, "knowledge source", "knowledge sources")} did not sync.`
+			: null,
+		stale > 0
+			? failed > 0
+				? `${stale} ${stale === 1 ? "has" : "have"} not synced in a week.`
+				: `${plural(stale, "knowledge source has", "knowledge sources have")} not synced in a week.`
+			: null,
+	].filter((part): part is string => part !== null);
+	return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function sourceLine(source: KnowledgeSourceProblem): DigestKnowledgeSource {
+	return {
+		spaceId: source.spaceId,
+		projectId: source.projectId,
+		title: `${source.label} · ${source.projectName}`,
+		statusText:
+			source.health === "failed" ? "Last sync failed" : "Not synced in a week",
+		runId: source.lastRun.id,
+	};
+}
+
 /**
- * The digest of these runs and Gates. Only the runs that ended after
- * `from` and by `to` count. Null: no run ended and no Gate waits.
+ * The digest of these runs, Gates and knowledge sources. Only the runs
+ * that ended after `from` and by `to` count. Null: no run ended, no Gate
+ * waits and no source failed.
  */
 export function digestOf(input: {
 	runs: readonly EndedRun[];
 	gates: readonly WaitingGate[];
+	sources?: readonly KnowledgeSourceProblem[];
 	from: number;
 	to: number;
 	/** The time of day the digest goes out (`digestTime`): it picks the title. */
@@ -250,11 +303,25 @@ export function digestOf(input: {
 	const runs = input.runs
 		.filter((run) => run.endedAt > input.from && run.endedAt <= input.to)
 		.sort((a, b) => b.endedAt - a.endedAt);
-	if (runs.length === 0 && input.gates.length === 0) return null;
+	const sources = [...(input.sources ?? [])].sort(
+		(a, b) =>
+			Number(b.health === "failed") - Number(a.health === "failed") ||
+			a.projectName.localeCompare(b.projectName) ||
+			a.label.localeCompare(b.label),
+	);
+	const failedSources = sources.some((s) => s.health === "failed");
+	if (runs.length === 0 && input.gates.length === 0 && !failedSources) {
+		return null;
+	}
 	const gates = input.gates.length
 		? `${input.gates.length === 1 ? "1 Gate waits" : `${input.gates.length} Gates wait`} for you.`
 		: null;
-	const body = [runsSentence(runs), costSentence(runs), gates]
+	const body = [
+		runsSentence(runs),
+		costSentence(runs),
+		gates,
+		sourcesSentence(sources),
+	]
 		.filter((part): part is string => part !== null)
 		.join(" ");
 	return {
@@ -269,6 +336,7 @@ export function digestOf(input: {
 			stepId: gate.stepId,
 			title: titleOf({ flowName: gate.flowName, title: gate.runTitle }),
 		})),
+		sources: sources.map(sourceLine),
 	};
 }
 
@@ -280,9 +348,12 @@ export async function readDigest(
 ): Promise<Digest | null> {
 	const runs: EndedRun[] = [];
 	const gates: WaitingGate[] = [];
+	const sources: KnowledgeSourceProblem[] = [];
 	for (const spaceId of spaceIds) {
 		runs.push(...(await source.endedRuns(spaceId, window.from)));
 		gates.push(...(await source.waitingGates(spaceId)));
+		const problems = (await source.sourceProblems?.(spaceId)) ?? [];
+		sources.push(...problems.map((problem) => ({ ...problem, spaceId })));
 	}
-	return digestOf({ runs, gates, ...window });
+	return digestOf({ runs, gates, sources, ...window });
 }

@@ -174,3 +174,70 @@ describe("where a digest starts", () => {
 		expect(digestFrom(TO - 30 * 24 * HOUR, TO)).toBe(TO - 7 * 24 * HOUR);
 	});
 });
+
+describe("the knowledge sources in the digest", () => {
+	type Problem = Awaited<
+		ReturnType<NonNullable<DigestSource["sourceProblems"]>>
+	>[number];
+	const problem = (over: Partial<Problem>): Problem => ({
+		projectId: "p1",
+		projectName: "Lighthouse",
+		flow: "knowledge-jira",
+		label: "Jira",
+		health: "failed",
+		lastRun: { id: "run-9", status: "failed", at: TO - 2 * HOUR },
+		...over,
+	});
+	const withSources = (runs: EndedRun[], problems: Problem[]) => ({
+		...sourceOf(runs),
+		sourceProblems: async () => problems,
+	});
+
+	test("says which source did not sync and which is out of date, the failed ones first", async () => {
+		const digest = await read(
+			withSources(
+				[ended("a")],
+				[
+					problem({
+						flow: "web",
+						label: "Web pages",
+						health: "stale",
+						lastRun: { id: "run-1", status: "finished", at: TO - 200 * HOUR },
+					}),
+					problem({}),
+				],
+			),
+		);
+		expect(digest?.body).toBe(
+			"1 run finished. $1.00 spent. 1 knowledge source did not sync. 1 has not synced in a week.",
+		);
+		expect(digest?.sources).toEqual([
+			{
+				spaceId: "space-1",
+				projectId: "p1",
+				title: "Jira · Lighthouse",
+				statusText: "Last sync failed",
+				runId: "run-9",
+			},
+			{
+				spaceId: "space-1",
+				projectId: "p1",
+				title: "Web pages · Lighthouse",
+				statusText: "Not synced in a week",
+				runId: "run-1",
+			},
+		]);
+	});
+
+	test("a failed source makes a digest on a quiet night; one that is only out of date does not", async () => {
+		const failed = await read(withSources([], [problem({})]));
+		expect(failed?.body).toBe("1 knowledge source did not sync.");
+		const stale = await read(
+			withSources(
+				[],
+				[problem({ health: "stale" }), problem({ health: "stale" })],
+			),
+		);
+		expect(stale).toBeNull();
+	});
+});

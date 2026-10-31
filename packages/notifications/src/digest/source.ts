@@ -1,4 +1,4 @@
-import type { Engine } from "@nightshift/engine";
+import { type Engine, knowledgeSourceProblems } from "@nightshift/engine";
 
 import type { DigestSource } from "./digest";
 
@@ -8,7 +8,7 @@ import type { DigestSource } from "./digest";
  */
 const RUNS_READ = 300;
 
-/** The engine's runs and open Gates, as the digest reads them. */
+/** The engine's runs, open Gates and knowledge sources, as the digest reads them. */
 export function engineDigestSource(
 	engine: Pick<Engine, "space">,
 ): DigestSource {
@@ -23,6 +23,9 @@ export function engineDigestSource(
 		},
 		async waitingGates(spaceId) {
 			return engine.space(spaceId).listGates();
+		},
+		async sourceProblems(spaceId) {
+			return knowledgeSourceProblems(engine.space(spaceId));
 		},
 	};
 }

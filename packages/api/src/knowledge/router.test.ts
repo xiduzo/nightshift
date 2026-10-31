@@ -137,6 +137,7 @@ describe("knowledge.get", () => {
 				},
 				schedule: { cron: "0 6 * * *", enabled: true },
 				lastRun: null,
+				health: null,
 			},
 		]);
 		expect(got.can).toEqual({

@@ -164,6 +164,11 @@ fills stays. Removing files needs a role that may start runs. Night Shift
 checks everything first and removes the files first. While a run changes
 the knowledge, it refuses: the source stays, and you can try again.
 
+When the last sync of a source failed, the page shows an alert above the
+sources, and the morning digest has a line for it. A source whose last
+sync ended more than 7 days ago shows **Out of date**. The digest names
+it too, but such a source alone sends no digest.
+
 A folder exists on one computer only. A Subflow node cannot name a Device, so a
 folder source keeps its runs on the computer where you added it through
 its schedule (`device`) and through **Sync now** on the Knowledge page

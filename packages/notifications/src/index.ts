@@ -28,6 +28,7 @@ export {
 export {
 	type Digest,
 	type DigestGate,
+	type DigestKnowledgeSource,
 	type DigestRun,
 	engineDigestSource,
 } from "./digest";
