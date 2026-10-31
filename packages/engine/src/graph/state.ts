@@ -207,6 +207,11 @@ export type CascadeTry = {
 	log_tail?: string;
 	/** An Agent's harness session: the next try of the tier resumes it with `session: "resume"`. */
 	session_id?: string;
+	/**
+	 * A Value's answer of the model, when it is small: the person tier (an
+	 * Ask, ADR 10) starts its form with the best one.
+	 */
+	data?: JsonValue;
 };
 
 /**

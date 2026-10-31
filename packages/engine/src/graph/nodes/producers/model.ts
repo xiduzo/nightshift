@@ -13,6 +13,7 @@ import {
 	climbOutputs,
 	climbSpec,
 	climbValues,
+	trailData,
 } from "../../cascade";
 import { isWaitKind, type StepContext, stepFailure } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
@@ -55,19 +56,28 @@ export function modelProducer(
 	 */
 	climb?: Climb<ValueTier>,
 ): Producer {
-	return (state, config) =>
-		runStep(ctx, node, state, config, {
+	return (state, config) => {
+		// The model's answer of this try, for the person tier's form.
+		let answered: JsonValue | undefined;
+		return runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
 			outputs: (step) => ({
 				...valueOutputs("", null, "", step.visit),
 				...(climb ? climbOutputs(climb.root, climb.at) : {}),
 			}),
 			body: async (step) => {
-				const made = await make(node, step, climb);
+				const made = await make(node, step, climb, (data) => {
+					answered = data;
+				});
 				return climb ? withClimb(made, climb, step) : made;
 			},
-			...(climb ? { climb: climbSpec(climb.root, climb.at) } : {}),
+			...(climb
+				? {
+						climb: climbSpec(climb.root, climb.at, () => trailData(answered)),
+					}
+				: {}),
 		});
+	};
 }
 
 /**
@@ -111,6 +121,8 @@ async function make(
 	node: ValueNode,
 	step: StepHandle,
 	climb?: Climb<ValueTier>,
+	/** The model answered with this data, before it is held to the schema. */
+	onAnswer?: (data: JsonValue) => void,
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
 	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
@@ -183,6 +195,7 @@ async function make(
 		}
 		return endWithoutValue(step, `The model failed: ${result.message}`, cost);
 	}
+	onAnswer?.(result.data as JsonValue);
 	return endWithValue(step, node, result.data, "", cost);
 }
 

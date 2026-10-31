@@ -256,7 +256,7 @@ describe("a cascade on a node (ADR 6)", () => {
 		]);
 	});
 
-	test("a Value cannot ask a person yet, and its accept rule reads data only", () => {
+	test("a Value can end its cascade with a person, and its accept rule reads data only", () => {
 		expect(errors(validateFlow(flow([value()])))).toEqual([]);
 		const issues = errors(
 			validateFlow(
@@ -271,7 +271,6 @@ describe("a cascade on a node (ADR 6)", () => {
 			),
 		);
 		expect(issues).toEqual([
-			'Value node "plan" ends its cascade with a person, but a Value cannot ask a person yet. Remove the person tier.',
 			'The accept rule of the tier "1" of "plan" reads "issue", but it can only read the value as data: $count(data.tasks) > 0.',
 		]);
 	});
@@ -373,6 +372,27 @@ describe("a cascade on a node (ADR 6)", () => {
 		expect(errors(validateFlow(flow([wrong])))).toEqual([
 			'The prompt of "worker" uses {{cascade.tier.name}}, but cascade.tier takes no path.',
 			'The prompt of "worker" uses {{cascade.round}}, but the cascade has no field "round". Use one of: tier, try, previous.',
+		]);
+	});
+
+	test("a Value's person tier is an Ask: its deadline accepts the best answer or fails", () => {
+		const asked = (choose: string) =>
+			errors(
+				validateFlow(
+					flow([
+						value({
+							cascade: [
+								{ decider: "openrouter" },
+								{ person: true, deadline: { minutes: 30, choose } },
+							],
+						}),
+					]),
+				),
+			);
+		expect(asked("accept")).toEqual([]);
+		expect(asked("fail")).toEqual([]);
+		expect(asked("stop")).toEqual([
+			'The deadline of the person tier of "plan" chooses "stop", which the person cannot choose. Choose one of: accept, fail.',
 		]);
 	});
 });

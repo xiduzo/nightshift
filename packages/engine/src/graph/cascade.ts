@@ -219,16 +219,27 @@ export function climbCommand(
 	});
 }
 
+/** At most this many characters of a Value's answer in the trail: a larger one is left out. */
+const TRAIL_DATA = 16_000;
+
+/** A Value's answer, for the trail: left out when it is too large. */
+export function trailData(data: JsonValue | undefined): Partial<CascadeTry> {
+	if (data === undefined || data === null) return {};
+	return JSON.stringify(data).length > TRAIL_DATA ? {} : { data };
+}
+
 /**
  * The climb of a node whose try runs through the step runner (`runStep`):
- * an end that does not hold climbs while a try is left.
+ * an end that does not hold climbs while a try is left. `more` adds what
+ * the node keeps of the try besides its outputs (a Value's answer).
  */
 export function climbSpec(
 	node: CascadeNode,
 	at: CascadePosition,
+	more?: () => Partial<CascadeTry>,
 ): NonNullable<StepSpec["climb"]> {
 	const next = (end: Pick<StepEnd, "outcome" | "outputs" | "error">) =>
-		nextTry(node, at, tryRecord(node, at, end));
+		nextTry(node, at, { ...tryRecord(node, at, end), ...more?.() });
 	return {
 		climbs: (end) => notHolding(end.outcome) && next(end) !== null,
 		command: (end) => climbCommand(node, end, next(end) ?? at),

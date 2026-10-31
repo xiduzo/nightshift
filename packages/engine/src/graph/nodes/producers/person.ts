@@ -60,6 +60,8 @@ export function personProducer(node: ValueNode, ctx: StepContext): Producer {
  * person tier of a cascade gives these.
  */
 export type AskHow = {
+	/** The question, else the node's prompt rendered. */
+	question?: (tctx: TemplateContext) => string;
 	prefill?: JsonValue;
 	deadline?: DeadlineSpec;
 	default?: JsonValue;
@@ -86,7 +88,8 @@ export function askGate(
 			: { ...node.deadline, choose: ASK_ANSWER });
 	const fallback = how.default ?? node.default;
 	return {
-		question: (tctx) => renderTemplate(node.prompt ?? "", tctx),
+		question:
+			how.question ?? ((tctx) => renderTemplate(node.prompt ?? "", tctx)),
 		choices: [ANSWER],
 		...(deadline ? { deadline } : {}),
 		outputs: { ...how.outputs, data: null },

@@ -1,5 +1,19 @@
-import type { ValueNode, ValueTier } from "@nightshift/flows";
-import { climbAt, tierAt } from "../cascade";
+import {
+	ASK_ANSWER,
+	type JsonValue,
+	type PersonTier,
+	personTierIndex,
+	renderTemplate,
+	type ValueNode,
+	type ValueTier,
+} from "@nightshift/flows";
+import {
+	climbAt,
+	climbLines,
+	climbOutputs,
+	climbValues,
+	tierAt,
+} from "../cascade";
 import {
 	type NodeAction,
 	type NodeKind,
@@ -8,9 +22,12 @@ import {
 	type Requirement,
 	type StepContext,
 } from "../context";
+import { dataProblem } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
+import type { CascadePosition, CascadeTry } from "../state";
+import { gateChooser } from "./choosers/person";
 import { modelProducer } from "./producers/model";
-import { askAnswerNode, personProducer } from "./producers/person";
+import { askAnswerNode, askGate, personProducer } from "./producers/person";
 import type { Producer } from "./producers/producer";
 import { ruleProducer } from "./producers/rule";
 
@@ -44,16 +61,24 @@ export function valueNode(node: ValueNode, ctx: StepContext): NodeAction {
  * A Value with a cascade (ADR 6): each try asks the model of its tier
  * (`producers/model.ts` with the climb). Data that does not match the
  * schema, or that the tier's `accept` rule refuses, goes to the next try.
- * No person tier yet: that is an Ask (ADR 10).
+ * The person tier is an Ask (ADR 10): the form starts with the best answer
+ * of the models (`bestAnswer`), and its answer ends the step.
  */
 function climbingValue(node: ValueNode, ctx: StepContext): NodeAction {
 	return (state, config) => {
 		const at = climbAt(state, node);
 		const tier = tierAt(node, at);
-		if (tier?.kind !== "node") {
+		if (tier === null) {
 			throw new Error(
-				`Value node "${node.id}" has no model tier ${at.tier + 1} in its cascade.`,
+				`Value node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
 			);
+		}
+		if (tier.kind === "person") {
+			return gateChooser(
+				node,
+				ctx,
+				personTierAsk(node, ctx, at, tier.tier),
+			)(state, config);
 		}
 		return modelProducer(tier.node as ValueNode, ctx, {
 			root: node,
@@ -61,6 +86,64 @@ function climbingValue(node: ValueNode, ctx: StepContext): NodeAction {
 			tier: tier.tier as ValueTier,
 		})(state, config);
 	};
+}
+
+/**
+ * The Ask of a Value's person tier: the prompt, then what each try did,
+ * and a form that starts with the best answer. Its deadline takes that
+ * answer (`accept`), or ends the step `fail`.
+ */
+function personTierAsk(
+	node: ValueNode,
+	ctx: StepContext,
+	at: CascadePosition,
+	tier: PersonTier,
+) {
+	const best = bestAnswer(node, at.trail);
+	const { deadline } = tier;
+	return askGate(node, ctx, {
+		question: (tctx) => {
+			const prompt = renderTemplate(node.prompt ?? "", {
+				...tctx,
+				cascade: climbValues(node, at),
+			});
+			return at.trail.length === 0
+				? prompt
+				: `${prompt}\n\nThe models did not make a value that holds:\n${climbLines(at.trail)}`;
+		},
+		...(best !== undefined ? { prefill: best } : {}),
+		...(deadline
+			? {
+					deadline: { ...deadline, choose: ASK_ANSWER },
+					...(deadline.choose === "accept" &&
+					best !== undefined &&
+					dataProblem(node.output, best) === null
+						? { default: best }
+						: {}),
+				}
+			: {}),
+		outputs: climbOutputs(node, at),
+		climb: true,
+	});
+}
+
+/**
+ * The best answer of the models: the latest that matches the output
+ * schema (the `accept` rule of its tier refused it), else the latest
+ * answer at all. The form takes only the fields that fit.
+ */
+export function bestAnswer(
+	node: ValueNode,
+	trail: readonly CascadeTry[],
+): JsonValue | undefined {
+	const answers = trail
+		.map((done) => done.data)
+		.filter((data): data is JsonValue => data !== undefined)
+		.reverse();
+	return (
+		answers.find((data) => dataProblem(node.output, data) === null) ??
+		answers[0]
+	);
 }
 
 function producerFor(node: ValueNode, ctx: StepContext): Producer {
@@ -99,7 +182,9 @@ export const VALUE: NodeKind<ValueNode> = {
 				: RESUME_RULES.fresh,
 	aux: (node) =>
 		node.by === "model"
-			? [{ kind: "wait" }]
+			? personTierIndex(node) !== null
+				? [{ kind: "wait" }, { kind: "ask", make: askAnswerNode }]
+				: [{ kind: "wait" }]
 			: node.by === "person"
 				? [{ kind: "ask", make: askAnswerNode }]
 				: [],

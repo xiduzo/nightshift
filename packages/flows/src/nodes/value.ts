@@ -21,6 +21,7 @@ import {
 	placed,
 } from "./base";
 import {
+	ASK_TIER_CHOICES,
 	checkCascade,
 	checkModelTier,
 	isPersonTier,
@@ -175,8 +176,8 @@ export const valueNodeSchema = z.object({
 	/**
 	 * `by: "model"` only: the tiers a model climbs (ADR 6). It replaces the
 	 * node's `profile`, `decider` and `model`. The step ends `fail` when
-	 * the last tier does not hold. A person tier (an Ask, ADR 10) is not
-	 * there yet: the checks refuse one.
+	 * the last tier does not hold. The last tier can be a person: an Ask
+	 * (ADR 10), filled in with the best answer of the models.
 	 */
 	cascade: z
 		.array(z.union([personTierSchema, valueTierSchema]))
@@ -206,7 +207,8 @@ export function checkValueNode(node: ValueNode, check: NodeCheck): void {
 /**
  * A Value's cascade belongs to a model and replaces its profile, decider
  * and model. Each tier's decider must make a value, and its `accept` rule
- * reads only `data`. No person tier yet (ADR 10): `checkCascade` refuses it.
+ * reads only `data`. A person tier's deadline takes `accept` (the best
+ * answer of the models) or `fail`.
  */
 function checkValueCascade(node: ValueNode, check: NodeCheck): void {
 	const tiers = node.cascade;
@@ -227,7 +229,11 @@ function checkValueCascade(node: ValueNode, check: NodeCheck): void {
 			`Value node "${node.id}" has a cascade and ${replaced.join(" and ")}. The tiers of the cascade name the models. Remove ${replaced.length === 1 ? "it" : "them"} from the node.`,
 		);
 	}
-	checkCascade(node, { title: "Value", personChoices: null }, check);
+	checkCascade(
+		node,
+		{ title: "Value", personChoices: ASK_TIER_CHOICES },
+		check,
+	);
 	tiers.forEach((tier, index) => {
 		if (isPersonTier(tier)) return;
 		const label = tierLabel(tier, index);

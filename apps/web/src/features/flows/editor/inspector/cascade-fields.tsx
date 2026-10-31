@@ -54,6 +54,12 @@ const RETRY_CHOICES = [
 	{ name: "stop", label: "Stop" },
 ] as const;
 
+/** What the deadline of a Value's person tier takes: the best answer, or a fail. */
+const ASK_CHOICES = [
+	{ name: "accept", label: "Take the best answer" },
+	{ name: "fail", label: "Fail the step" },
+] as const;
+
 const KITS = kitList();
 
 /** The node's first tier from what it runs on now: its profile, or its own model. */
@@ -143,8 +149,6 @@ export function CascadeSection<N extends CascadeNode>({
 		| PersonTier
 		| undefined;
 	const models = tiers.filter((tier) => !isPersonTier(tier));
-	// A Value cannot ask you yet: that comes with the Ask of a Value.
-	const canAsk = node.type !== "value";
 
 	if (node.cascade === undefined) {
 		return (
@@ -243,36 +247,36 @@ export function CascadeSection<N extends CascadeNode>({
 				Add tier
 			</Button>
 
-			{canAsk ? (
-				<ShadcnField orientation="horizontal" className="items-start">
-					<Switch
-						id={`${id}-person`}
-						checked={person !== undefined}
-						className="mt-0.5"
-						aria-describedby={`${id}-person-hint`}
-						onCheckedChange={(on) =>
-							change((all) =>
-								on
-									? [
-											...all.filter((tier) => !isPersonTier(tier)),
-											{ person: true },
-										]
-									: all.filter((tier) => !isPersonTier(tier)),
-							)
-						}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor={`${id}-person`}>
-							Ask me when no tier holds
-						</FieldLabel>
-						<FieldDescription id={`${id}-person-hint`} className="text-xs">
-							{node.type === "decision"
-								? "A Gate shows what each tier picked. You pick the option."
+			<ShadcnField orientation="horizontal" className="items-start">
+				<Switch
+					id={`${id}-person`}
+					checked={person !== undefined}
+					className="mt-0.5"
+					aria-describedby={`${id}-person-hint`}
+					onCheckedChange={(on) =>
+						change((all) =>
+							on
+								? [
+										...all.filter((tier) => !isPersonTier(tier)),
+										{ person: true },
+									]
+								: all.filter((tier) => !isPersonTier(tier)),
+						)
+					}
+				/>
+				<FieldContent>
+					<FieldLabel htmlFor={`${id}-person`}>
+						Ask me when no tier holds
+					</FieldLabel>
+					<FieldDescription id={`${id}-person-hint`} className="text-xs">
+						{node.type === "decision"
+							? "A Gate shows what each tier picked. You pick the option."
+							: node.type === "value"
+								? "A form shows what each try did, filled in with the best answer. You correct it and send it."
 								: "A Gate shows what each try did. You can try once more on the last tier, with a note, or stop."}
-						</FieldDescription>
-					</FieldContent>
-				</ShadcnField>
-			) : null}
+					</FieldDescription>
+				</FieldContent>
+			</ShadcnField>
 			{person ? (
 				<PersonDeadline
 					id={`${id}-deadline`}
@@ -638,7 +642,9 @@ function PersonDeadline<N extends CascadeNode>({
 					name: option.name,
 					label: option.name,
 				}))
-			: RETRY_CHOICES;
+			: node.type === "value"
+				? ASK_CHOICES
+				: RETRY_CHOICES;
 	const deadline = tier.deadline;
 	return (
 		<div className="grid grid-cols-2 gap-3">
