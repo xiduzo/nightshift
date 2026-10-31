@@ -372,6 +372,42 @@ describe("the address of a model profile", () => {
 		).toBe(false);
 	});
 
+	test("OpenJev and an OpenAI-compatible server need an address", () => {
+		expect(modelAddressProblem({ decider: "openjev" })).toBe(
+			'The decider "openjev" needs an address. Add the address of its server.',
+		);
+		expect(
+			modelAddressProblem({
+				decider: "compatible",
+				address: { baseUrl: "http://127.0.0.1:1234/v1" },
+			}),
+		).toBeNull();
+		const problem = resolveNodeProfile(decision({ decider: "openjev" }), {
+			decider: "typesafe",
+		});
+		expect("problem" in problem && problem.problem).toBe(
+			'The Decision node "pick" uses the decider "openjev", which needs an address, but the profile "triage" has none for it. Pick a profile on openjev with an address.',
+		);
+		const issues = validateFlow(
+			flowOf(decision({ profile: undefined, decider: "openjev" })),
+		).map((issue) => issue.message);
+		expect(issues).toContain(
+			'Decision node "pick" uses the decider "openjev", which needs an address. Pick a Model Profile on openjev that has one.',
+		);
+	});
+
+	test("an OpenAI-compatible server makes a value, OpenJev does not", () => {
+		const at = { baseUrl: "http://127.0.0.1:1234" };
+		expect(
+			"node" in
+				resolveNodeProfile(value(), { decider: "compatible", address: at }),
+		).toBe(true);
+		expect(
+			"problem" in
+				resolveNodeProfile(value(), { decider: "openjev", address: at }),
+		).toBe(true);
+	});
+
 	test("a flow does not set an address: the profile has it", () => {
 		const issues = validateFlow(
 			flowOf(

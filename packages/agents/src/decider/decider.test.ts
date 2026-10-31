@@ -65,6 +65,7 @@ describe("tanstackDecider", () => {
 			kind: "decided",
 			label: "ship",
 			notes: "TypeSafe Jev picked it with 87% probability.",
+			probability: 0.87,
 			// The stub's tokens, priced from the price list.
 			costUsd: expect.any(Number),
 			costSource: "estimated",
@@ -132,7 +133,10 @@ describe("tanstackDecider", () => {
 	test("every decider has a default model and says whether it needs a key", () => {
 		for (const spec of Object.values(DECIDER_ADAPTERS)) {
 			expect(spec.defaultModel).not.toBe("");
-			expect(spec.models).toContain(spec.defaultModel);
+			// A server at an address lists its own models: it knows none of them.
+			if (spec.models.length > 0) {
+				expect(spec.models).toContain(spec.defaultModel);
+			}
 		}
 		expect(DECIDER_ADAPTERS.ollaya.apiKey).toBeNull();
 		expect(DECIDER_ADAPTERS.ollama.apiKey).toBeNull();
@@ -179,7 +183,7 @@ describe("tanstackDecider: values", () => {
 		expect(DECIDER_ADAPTERS.ollaya.value).toBeUndefined();
 		expect(DECIDER_ADAPTERS.ollama.value).toBeDefined();
 		expect(cannotMakeValueMessage("typesafe")).toBe(
-			"TypeSafe Jev cannot make a value. Choose Jev on OpenRouter, OpenAI Decisions or Ollama on this computer.",
+			"TypeSafe Jev cannot make a value. Choose Jev on OpenRouter, OpenAI Decisions, Ollama on this computer or OpenAI-compatible server.",
 		);
 	});
 
@@ -557,5 +561,151 @@ describe("tanstackDecider: the address of a Model Profile", () => {
 			await withSecrets.value?.(valueInput({ decider: "ollama", address })),
 		).toMatchObject({ kind: "error", errorKind: "harness", message });
 		expect(sent).toHaveLength(0);
+	});
+});
+
+describe("tanstackDecider: OpenJev and an OpenAI-compatible server", () => {
+	function stub(respond: (url: string) => Response) {
+		const sent: { url: string; auth: string | null; body: unknown }[] = [];
+		globalThis.fetch = (async (
+			url: string | URL | Request,
+			init?: RequestInit,
+		) => {
+			const request = url instanceof Request ? url : null;
+			const href = request ? request.url : String(url);
+			const raw = init?.body ?? (request ? await request.clone().text() : null);
+			sent.push({
+				url: href,
+				auth: new Headers(init?.headers ?? request?.headers).get(
+					"authorization",
+				),
+				body: raw ? JSON.parse(String(raw)) : null,
+			});
+			return respond(href);
+		}) as typeof fetch;
+		return sent;
+	}
+	const decider = tanstackDecider({
+		secret: async (name) => (name === "OPENJEV_KEY" ? "jev-key" : undefined),
+	});
+	const openjev = { baseUrl: "http://openjev:8080", apiKey: "OPENJEV_KEY" };
+	const lmStudio = { baseUrl: "http://127.0.0.1:1234/v1" };
+	/** One streamed chat completion whose text is `content`: TanStack streams a held answer. */
+	const chatAnswer = (content: string) => {
+		const chunk = (delta: Record<string, unknown>, finish: string | null) =>
+			`data: ${JSON.stringify({
+				id: "c1",
+				object: "chat.completion.chunk",
+				created: 1_760_000_000,
+				model: "qwen3-4b",
+				choices: [{ index: 0, delta, finish_reason: finish }],
+			})}\n\n`;
+		return new Response(
+			`${chunk({ role: "assistant", content }, null)}${chunk({}, "stop")}data: [DONE]\n\n`,
+			{ status: 200, headers: { "content-type": "text/event-stream" } },
+		);
+	};
+
+	test("OpenJev asks the Jev wire API at its address, free, with the probability", async () => {
+		const sent = stub(() => answer("hold", 0.73));
+		const result = await decider.decide(
+			input({ decider: "openjev", address: openjev }),
+		);
+		expect(result).toEqual({
+			kind: "decided",
+			label: "hold",
+			notes: "OpenJev picked it with 73% probability.",
+			probability: 0.73,
+			costUsd: 0,
+			costSource: "estimated",
+		});
+		expect(sent[0]?.url).toBe("http://openjev:8080/v1/systemone");
+		expect(sent[0]?.auth).toBe("Bearer jev-key");
+		expect(sent[0]?.body).toMatchObject({ model: "openjev-latest" });
+	});
+
+	test("a decider without a vendor API needs an address, and sends nothing", async () => {
+		const sent = stub(() => answer("hold", 0.5));
+		expect(await decider.decide(input({ decider: "openjev" }))).toMatchObject({
+			kind: "error",
+			errorKind: "harness",
+			message:
+				"OpenJev needs an address. Pick a Model Profile with the address of its server.",
+		});
+		expect(sent).toHaveLength(0);
+	});
+
+	test("an OpenAI-compatible server picks on its chat model, free, without a probability", async () => {
+		const sent = stub(() => chatAnswer('{"choice":"ship"}'));
+		const result = await decider.decide(
+			input({ decider: "compatible", model: "qwen3-4b", address: lmStudio }),
+		);
+		expect(result).toEqual({
+			kind: "decided",
+			label: "ship",
+			notes: "OpenAI-compatible server picked it.",
+			costUsd: 0,
+			costSource: "estimated",
+		});
+		expect(sent[0]?.url).toBe("http://127.0.0.1:1234/v1/chat/completions");
+		expect(sent[0]?.body).toMatchObject({ model: "qwen3-4b" });
+	});
+
+	test("an OpenAI-compatible server makes a value", async () => {
+		stub(() => chatAnswer('{"tests":["a.test.ts"]}'));
+		const result = await decider.value?.(
+			valueInput({
+				decider: "compatible",
+				model: "qwen3-4b",
+				address: lmStudio,
+			}),
+		);
+		expect(result).toEqual({
+			kind: "made",
+			data: { tests: ["a.test.ts"] },
+			costUsd: 0,
+			costSource: "estimated",
+		});
+	});
+
+	test("lists the models of the address first", async () => {
+		const sent = stub(() =>
+			Response.json({ data: [{ id: "openjev-latest" }, { id: "clef-1.0" }] }),
+		);
+		const offered = await deciderModels(
+			"openjev",
+			{},
+			{
+				root: "http://openjev:8080",
+				headers: {},
+				apiKey: "jev-key",
+			},
+		);
+		expect(sent[0]).toMatchObject({
+			url: "http://openjev:8080/v1/models",
+			auth: "Bearer jev-key",
+		});
+		expect(offered).toMatchObject({ listed: 2, problem: null });
+		expect(offered.models.slice(0, 3)).toEqual([
+			"openjev-latest",
+			"clef-1.0",
+			"laya-1.0",
+		]);
+	});
+
+	test("an address that refuses the key, or does not answer, says so", async () => {
+		const at = { root: "http://openjev:8080", headers: {}, apiKey: undefined };
+		stub(() => new Response("no", { status: 401 }));
+		expect((await deciderModels("openjev", {}, at)).problem).toBe(
+			"http://openjev:8080 refuses the API key. Check the secret of the address.",
+		);
+		stub(() => {
+			throw new Error(
+				"Unable to connect. Is the computer able to access the url?",
+			);
+		});
+		expect((await deciderModels("compatible", {}, at)).problem).toBe(
+			"Nothing answers at http://openjev:8080. Start the server, or check the address.",
+		);
 	});
 });

@@ -279,6 +279,8 @@ export const deciderViewSchema = exact<DeciderView<SecretSource>>()(
 		value: z
 			.object({ defaultModel: z.string(), models: z.array(z.string()) })
 			.nullable(),
+		address: z.enum(["required", "optional"]).nullable(),
+		probability: z.boolean(),
 	}),
 );
 

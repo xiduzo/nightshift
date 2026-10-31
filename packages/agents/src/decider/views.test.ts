@@ -31,6 +31,19 @@ describe("deciderViews", () => {
 		expect(asked).toEqual(
 			views.flatMap((v) => (v.apiKey === null ? [] : [v.apiKey])),
 		);
+		const by = (name: string) => views.find((v) => v.name === name);
+		expect(by("openjev")).toMatchObject({
+			address: "required",
+			probability: true,
+			value: null,
+		});
+		expect(by("compatible")).toMatchObject({
+			address: "required",
+			probability: false,
+		});
+		expect(by("compatible")?.value).not.toBeNull();
+		expect(by("openai")?.address).toBe("optional");
+		expect(by("typesafe")?.address).toBeNull();
 		const ollama = views.find((v) => v.name === "ollama");
 		expect(ollama?.listed).toBe(0);
 		expect(ollama?.listProblem).not.toBeNull();

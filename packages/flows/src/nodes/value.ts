@@ -18,14 +18,16 @@ import {
 /**
  * The deciders that can also make a value (a Value node made by a model):
  * those with a TanStack AI text adapter, so `chat()` can hold their answer
- * to a JSON Schema: OpenRouter, OpenAI and Ollama. TypeSafe and Ollaya are
- * decision models only: they answer choice, score and yes/no questions,
- * never with data. The first is the default for a new Value node.
+ * to a JSON Schema: OpenRouter, OpenAI, Ollama and an OpenAI-compatible
+ * server. TypeSafe, Ollaya and OpenJev are decision models only: they
+ * answer choice, score and yes/no questions, never with data. The first is
+ * the default for a new Value node.
  */
 export const valueDeciderNameSchema = z.enum([
 	"openrouter",
 	"openai",
 	"ollama",
+	"compatible",
 ]);
 export type ValueDeciderName = z.infer<typeof valueDeciderNameSchema>;
 

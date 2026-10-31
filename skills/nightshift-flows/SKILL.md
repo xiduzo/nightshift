@@ -91,7 +91,7 @@ Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_
 
 ### decision
 
-Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama) and `model`, all optional.
+Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama, openjev, compatible) and `model`, all optional.
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
@@ -107,7 +107,7 @@ Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. O
 
 ### value
 
-Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and optionally a `profile` or a `decider` that can make a value (openrouter, openai, ollama). Use it to compute or reshape a value, often with `set`.
+Makes `data` that matches `output` (a JSON Schema for an object). `by: "rule"` with `expression` (JSONata over the run's values), or `by: "model"` with `prompt` and optionally a `profile` or a `decider` that can make a value (openrouter, openai, ollama, compatible). Use it to compute or reshape a value, often with `set`.
 
 Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 
