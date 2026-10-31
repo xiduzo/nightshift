@@ -19,4 +19,5 @@ export {
 	terminalTools,
 } from "./terminal";
 export { chooseProject, type TerminalProject } from "./terminal-project";
+export { terminalResources } from "./terminal-resources";
 export type { AuthoringPort, AuthoringRun, AuthoringRunStep } from "./tools";

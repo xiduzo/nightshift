@@ -17,7 +17,30 @@ export type ToolServerInfo = {
 	version: string;
 	/** What the agent reads first: how to use the tools. */
 	instructions?: string;
+	/** Resources the server lists and reads besides its tools (MCP 2025-11-25). */
+	resources?: ToolServerResources;
 };
+
+/** One resource the server lists. */
+export type ToolServerResource = {
+	uri: string;
+	name: string;
+	title?: string;
+	description?: string;
+	mimeType?: string;
+	/** Bytes. */
+	size?: number;
+};
+
+/** The resources of a tool server: a list, and the text of one by its URI. */
+export type ToolServerResources = {
+	list(): Promise<ToolServerResource[]>;
+	/** The resource's text. Null: no such resource. */
+	read(uri: string): Promise<{ text: string; mimeType: string } | null>;
+};
+
+/** The error code of a resource that is not there, as the MCP spec names it. */
+const RESOURCE_NOT_FOUND = -32002;
 
 const EMPTY_INPUT = { type: "object", properties: {} } as const;
 
@@ -26,18 +49,46 @@ async function toolServer(
 	tools: readonly BridgedTool[],
 	info: ToolServerInfo,
 ): Promise<Server> {
-	const [{ Server }, { CallToolRequestSchema, ListToolsRequestSchema }] =
-		await Promise.all([
-			import("@modelcontextprotocol/sdk/server/index.js"),
-			import("@modelcontextprotocol/sdk/types.js"),
-		]);
+	const [
+		{ Server },
+		{
+			CallToolRequestSchema,
+			ListResourcesRequestSchema,
+			ListToolsRequestSchema,
+			McpError,
+			ReadResourceRequestSchema,
+		},
+	] = await Promise.all([
+		import("@modelcontextprotocol/sdk/server/index.js"),
+		import("@modelcontextprotocol/sdk/types.js"),
+	]);
+	const { resources } = info;
 	const server = new Server(
 		{ name: info.name, version: info.version },
 		{
-			capabilities: { tools: {} },
+			capabilities: { tools: {}, ...(resources ? { resources: {} } : {}) },
 			...(info.instructions ? { instructions: info.instructions } : {}),
 		},
 	);
+	if (resources) {
+		server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+			resources: await resources.list(),
+		}));
+		server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+			const { uri } = request.params;
+			const read = await resources.read(uri).catch((error: unknown) => {
+				throw new McpError(
+					RESOURCE_NOT_FOUND,
+					error instanceof Error ? error.message : String(error),
+					{ uri },
+				);
+			});
+			if (!read) {
+				throw new McpError(RESOURCE_NOT_FOUND, "Resource not found", { uri });
+			}
+			return { contents: [{ uri, mimeType: read.mimeType, text: read.text }] };
+		});
+	}
 	const byName = new Map(tools.map((tool) => [tool.name, tool]));
 	server.setRequestHandler(ListToolsRequestSchema, () => ({
 		tools: tools.map((tool) => ({

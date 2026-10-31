@@ -18,6 +18,7 @@ export {
 	suggestField,
 	type TerminalPort,
 	type TerminalProject,
+	terminalResources,
 	terminalTools,
 } from "./assistant";
 export {

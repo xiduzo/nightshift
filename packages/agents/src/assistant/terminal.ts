@@ -49,6 +49,10 @@ import {
 /** What the terminal tools read and write: Night Shift on this computer. */
 export type TerminalPort = TerminalRunPort &
 	KnowledgePort & {
+		/** The files of the project's knowledge, as its Space lists them: its MCP resources. */
+		knowledgeFiles(
+			projectId: string,
+		): Promise<{ path: string; size: number }[]>;
 		projects(): Promise<TerminalProject[]>;
 		flows(projectId: string): Promise<ProjectFlowMap>;
 		/** The profiles a node of the project may name, each on its Device. */

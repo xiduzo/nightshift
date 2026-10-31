@@ -9,6 +9,7 @@ import {
 } from "@nightshift/flows";
 import { serveTools } from "./mcp";
 import { type TerminalPort, terminalTools } from "./terminal";
+import { terminalResources } from "./terminal-resources";
 import type { TerminalGate, TerminalRunSummary } from "./terminal-runs";
 
 const flow: Flow = flowSchema.parse({
@@ -69,6 +70,7 @@ function fakePort(
 		digest: async () => null,
 		searchKnowledge: async () => [],
 		readKnowledge: async () => null,
+		knowledgeFiles: async () => [],
 		runLink: (id, step) =>
 			`http://localhost:9/runs/${id}${step ? `?step=${step}` : ""}`,
 		flowLink: (p, name) => `http://localhost:9/projects/${p}/flows/${name}`,
@@ -648,5 +650,89 @@ describe("the knowledge tools", () => {
 			{ page: 2, line: 3 },
 			{ section: "Releases" },
 		]);
+	});
+});
+
+describe("the knowledge as MCP resources", () => {
+	async function connectResources(
+		port: TerminalPort,
+		options: { project?: string; folder?: string },
+	) {
+		const [clientEnd, serverEnd] = InMemoryTransport.createLinkedPair();
+		await serveTools(
+			terminalTools(port, options),
+			{
+				name: "nightshift",
+				version: "0",
+				resources: terminalResources(port, options),
+			},
+			serverEnd,
+		);
+		const client = new Client({ name: "test", version: "0" });
+		await client.connect(clientEnd);
+		return client;
+	}
+
+	test("lists the files of the folder's project, and reads one as read_knowledge does", async () => {
+		const reads: unknown[] = [];
+		const client = await connectResources(
+			fakePort({
+				knowledgeFiles: async (projectId) =>
+					projectId === "p2"
+						? [
+								{ path: "wiki/Home page.md", size: 12 },
+								{ path: "docs/handbook.pdf", size: 9000 },
+							]
+						: [{ path: "other.md", size: 1 }],
+				readKnowledge: async (projectId, path, maxBytes) => {
+					reads.push({ projectId, path, maxBytes });
+					return path === "wiki/Home page.md"
+						? {
+								path,
+								title: "Home",
+								text: "# Home\n",
+								size: 7,
+								truncated: false,
+							}
+						: null;
+				},
+			}),
+			{ folder: "/work/site" },
+		);
+		const { resources } = await client.listResources();
+		expect(resources).toEqual([
+			{
+				uri: "nightshift://knowledge/p2/wiki/Home%20page.md",
+				name: "wiki/Home page.md",
+				title: "wiki/Home page.md (Site)",
+				description: 'A file of the knowledge of "Site".',
+				mimeType: "text/markdown",
+				size: 12,
+			},
+			{
+				uri: "nightshift://knowledge/p2/docs/handbook.pdf",
+				name: "docs/handbook.pdf",
+				title: "docs/handbook.pdf (Site)",
+				description: 'A file of the knowledge of "Site".',
+				mimeType: "text/plain",
+				size: 9000,
+			},
+		]);
+		const read = await client.readResource({
+			uri: "nightshift://knowledge/p2/wiki/Home%20page.md",
+		});
+		expect(read.contents).toEqual([
+			{
+				uri: "nightshift://knowledge/p2/wiki/Home%20page.md",
+				mimeType: "text/markdown",
+				text: "# Home\n",
+			},
+		]);
+		expect(reads).toEqual([
+			{ projectId: "p2", path: "wiki/Home page.md", maxBytes: 1024 * 1024 },
+		]);
+		await expect(
+			client.readResource({ uri: "nightshift://knowledge/p2/gone.md" }),
+		).rejects.toThrow("Resource not found");
 	});
 });
