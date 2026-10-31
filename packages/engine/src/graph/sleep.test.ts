@@ -7,9 +7,9 @@ import {
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { WaitNode } from "@nightshift/flows";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveRunState, deriveSleep } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveRunState, deriveSleep, deriveSteps } from "../read/run-views";
 import {
 	agent,
 	command,
@@ -88,7 +88,7 @@ function daemon(h: Harness, time: { now(): number }) {
 	const drives: Promise<Driven>[] = [];
 	async function wake(how: Wake): Promise<void> {
 		const plan = planWake(
-			await h.events(),
+			foldRun(await h.events()),
 			await h.thread.state(),
 			how,
 			time.now(),
@@ -126,7 +126,7 @@ function daemon(h: Harness, time: { now(): number }) {
 const transcriptOf = async (h: Harness, stepId: string) =>
 	(
 		await readTranscriptFile(
-			deriveSteps(await h.events()).find((s) => s.id === stepId)
+			deriveSteps(foldRun(await h.events())).find((s) => s.id === stepId)
 				?.transcriptPath as string,
 		)
 	).map((e) => e.event);
@@ -147,7 +147,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		});
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 
 		// Persisted: the log, the transcript, the interrupt and the one pending shape.
 		expect(first.next).toEqual(["wait__worker"]);
@@ -193,7 +193,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				prompt: DEFAULT_RESUME_PROMPT,
 			},
 		});
-		expect(deriveRunState(await h.events()).status).toBe("sleeping");
+		expect(deriveRunState(foldRun(await h.events())).status).toBe("sleeping");
 
 		// A timer that fires before its time wakes nothing.
 		const d = daemon(h, time);
@@ -267,7 +267,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(first.parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[0]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 				nodeId: "worker",
 				status: "stopped",
 				reason:
@@ -298,7 +298,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(woken.parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[0]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 				nodeId: "worker",
 				status: "stopped",
 				reason: STOP_TIME_REASON,
@@ -317,7 +317,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(harness.calls).toHaveLength(1);
 		expect(held(woken.state)).toMatchObject({
 			kind: "parked",
-			stepId: deriveSteps(await h.events())[0]?.id as string,
+			stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 			harnessSessionId: "fake-session-1",
 		});
 	});
@@ -332,28 +332,37 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		await drive(h, { inputs: {} });
 		const events = await h.events();
 		const at = await h.thread.state();
-		const stepId = deriveSteps(events)[0]?.id as string;
-		expect(planWake(events, at, { early: false }, time.now())).toEqual({
-			kind: "too-soon",
-			until: resetAt + MINUTE,
-		});
+		const stepId = deriveSteps(foldRun(events))[0]?.id as string;
+		expect(planWake(foldRun(events), at, { early: false }, time.now())).toEqual(
+			{
+				kind: "too-soon",
+				until: resetAt + MINUTE,
+			},
+		);
 		expect(
-			planWake(events, at, { early: true, prompt: "Now." }, time.now()),
+			planWake(
+				foldRun(events),
+				at,
+				{ early: true, prompt: "Now." },
+				time.now(),
+			),
 		).toMatchObject({
 			kind: "wake",
 			step: { id: stepId },
 			resume: { kind: "wake", early: true, prompt: "Now." },
 		});
 		expect(
-			planWake(events, at, { early: true, signal: "go" }, time.now()),
+			planWake(foldRun(events), at, { early: true, signal: "go" }, time.now()),
 		).toMatchObject({ kind: "wake", resume: { kind: "signal", name: "go" } });
-		expect(planWake(events, { kind: "fresh" }, { early: true }, 0)).toEqual({
+		expect(
+			planWake(foldRun(events), { kind: "fresh" }, { early: true }, 0),
+		).toEqual({
 			kind: "not-sleeping",
 		});
 		// The log says the run stopped: the thread still sits at its wait.
 		expect(
 			planWake(
-				[
+				foldRun([
 					...events,
 					{
 						...(events.at(-1) as (typeof events)[number]),
@@ -361,7 +370,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 						type: "RunEnded",
 						payload: { status: "stopped", reason: null },
 					} as (typeof events)[number],
-				],
+				]),
 				at,
 				{ early: true },
 				time.now(),
@@ -376,7 +385,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		// The runner's closeOpenWork, then the engine's RunResumed.
 		await h.log.append({
 			type: "StepEnded",
@@ -426,7 +435,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		await drive(h, { inputs: {} });
 		time.advance(45);
 		const next = daemon(h, time);
-		next.sleeps.restore(h.runId, await h.events());
+		next.sleeps.restore(h.runId, foldRun(await h.events()));
 		await waitFor(() => next.resumed.length === 1);
 		expect(next.resumed).toEqual([{ kind: "wake", early: false }]);
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: false }]);
@@ -434,7 +443,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(woken.state.ended).toMatchObject({ status: "finished" });
 		// A run that stopped meanwhile gets no timer.
 		const other = daemon(h, time);
-		other.sleeps.restore(h.runId, await h.events());
+		other.sleeps.restore(h.runId, foldRun(await h.events()));
 		await Bun.sleep(10);
 		expect(other.resumed).toEqual([]);
 	});
@@ -456,7 +465,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		const h = await startRun(sandbox, timedFlow(15), { harness: silent });
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		expect(first.next).toEqual(["wait__pause"]);
 		expect(first.parked).toEqual([
 			{
@@ -492,9 +501,9 @@ describe("the sleep module: a Wait node's own wait", () => {
 			reason: "duration",
 		});
 		// The step is open, and the log alone says the run sleeps and until when.
-		expect(deriveSteps(await h.events())[0]?.endedAt).toBeNull();
-		expect(deriveRunState(await h.events()).status).toBe("sleeping");
-		expect(deriveSleep(await h.events())).toMatchObject({
+		expect(deriveSteps(foldRun(await h.events()))[0]?.endedAt).toBeNull();
+		expect(deriveRunState(foldRun(await h.events())).status).toBe("sleeping");
+		expect(deriveSleep(foldRun(await h.events()))).toMatchObject({
 			stepId,
 			reason: "duration",
 			until: time.now() + 15 * MINUTE,
@@ -552,7 +561,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		// The deadline is the only wake time: the sleep module cut it in.
 		expect(first.parked[0]).toMatchObject({
 			kind: "wait",
@@ -612,7 +621,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		expect(woken.parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[0]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 				nodeId: "pause",
 				status: "stopped",
 				reason: STOP_TIME_REASON,
@@ -635,7 +644,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		await drive(h, { inputs: {} });
 		time.advance(20);
 		const next = daemon(h, time);
-		next.sleeps.restore(h.runId, await h.events());
+		next.sleeps.restore(h.runId, foldRun(await h.events()));
 		await waitFor(() => next.resumed.length === 1);
 		const woken = await next.driven();
 		expect(woken.state.ended).toMatchObject({ status: "finished" });
@@ -650,7 +659,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		const h = await startRun(sandbox, timedFlow(15), { harness: silent });
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		await h.log.append({
 			type: "StepEnded",
 			runId: h.runId,
@@ -678,7 +687,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		);
 		expect(resumed.parked[0]).toMatchObject({ kind: "wait", nodeId: "pause" });
 		expect(
-			deriveSteps(await h.events()).map((s) => [s.visit, s.outcome]),
+			deriveSteps(foldRun(await h.events())).map((s) => [s.visit, s.outcome]),
 		).toEqual([
 			[1, "stopped"],
 			[2, null],

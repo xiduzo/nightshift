@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { foldRun } from "../log";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -185,7 +186,7 @@ function expectTable(
 		const point = resumePoint(
 			NODE,
 			situation.state,
-			situation.events,
+			foldRun(situation.events),
 			situation.scope ?? null,
 			rules,
 		);
@@ -381,7 +382,7 @@ describe("resumePoint", () => {
 					pending: parkedPending("s1", "h1"),
 					visits: { [NODE.id]: 1 },
 				}),
-				events,
+				foldRun(events),
 				null,
 				RESUME_RULES.agent,
 			);
@@ -558,7 +559,7 @@ describe("resumePoint", () => {
 			const point = resumePoint(
 				NODE,
 				stateOf(),
-				events,
+				foldRun(events),
 				null,
 				RESUME_RULES.gate,
 			);
@@ -578,7 +579,7 @@ describe("resumePoint", () => {
 			const point = resumePoint(
 				NODE,
 				stateOf(),
-				events,
+				foldRun(events),
 				null,
 				RESUME_RULES.gate,
 			);
@@ -594,7 +595,7 @@ describe("resumePoint", () => {
 			const point = resumePoint(
 				NODE,
 				stateOf(),
-				events,
+				foldRun(events),
 				null,
 				RESUME_RULES.gate,
 			);
@@ -610,7 +611,7 @@ describe("resumePoint", () => {
 			const point = resumePoint(
 				NODE,
 				stateOf(),
-				events,
+				foldRun(events),
 				null,
 				RESUME_RULES.gate,
 			);
@@ -626,7 +627,9 @@ describe("resumePoint", () => {
 				visits: { [NODE.id]: 1 },
 			});
 			expect(
-				summary(resumePoint(NODE, state, open, null, RESUME_RULES.callEach)),
+				summary(
+					resumePoint(NODE, state, foldRun(open), null, RESUME_RULES.callEach),
+				),
 			).toEqual({
 				kind: "continue",
 				stepId: "s1",
@@ -638,7 +641,15 @@ describe("resumePoint", () => {
 				ended("s1", "interrupted"),
 			);
 			expect(
-				summary(resumePoint(NODE, state, closed, null, RESUME_RULES.callEach)),
+				summary(
+					resumePoint(
+						NODE,
+						state,
+						foldRun(closed),
+						null,
+						RESUME_RULES.callEach,
+					),
+				),
 			).toEqual({
 				kind: "reopen",
 				stepId: "s1",
@@ -653,11 +664,11 @@ describe("resumePoint", () => {
 				loops: { [NODE.id]: { index: 0 } },
 				visits: { [NODE.id]: 1 },
 			});
-			expect(resumePoint(NODE, state, events, null, RESUME_RULES.call)).toEqual(
-				{
-					kind: "new",
-				},
-			);
+			expect(
+				resumePoint(NODE, state, foldRun(events), null, RESUME_RULES.call),
+			).toEqual({
+				kind: "new",
+			});
 		});
 	});
 
@@ -727,14 +738,14 @@ describe("resumePoint", () => {
 			visits: { [NODE.id]: 1 },
 		});
 		expect(
-			entryOf(point(NODE, state, events, null, RESUME_RULES.agent)),
+			entryOf(point(NODE, state, foldRun(events), null, RESUME_RULES.agent)),
 		).toEqual({
 			kind: "reopen",
 			stepId: "s1",
 			prompt: "Go on.",
 		});
 		expect(
-			entryOf(point(NODE, state, events, null, RESUME_RULES.call)),
+			entryOf(point(NODE, state, foldRun(events), null, RESUME_RULES.call)),
 		).toEqual({
 			kind: "new",
 		});
@@ -744,7 +755,7 @@ describe("resumePoint", () => {
 				point(
 					NODE,
 					stateOf({ pending: waitPending("s1", "h1") }),
-					open,
+					foldRun(open),
 					null,
 					RESUME_RULES.agent,
 				),
@@ -779,27 +790,34 @@ describe("run again from a node", () => {
 
 	test("the first visit of the node continues the session the rerun names, with its prompt", () => {
 		const events = logOf(...base, rerun("a", "s1", "Fix it."));
-		expect(rerunEntryOf({ id: "a" }, events, null)).toEqual({
+		expect(rerunEntryOf({ id: "a" }, foldRun(events), null)).toEqual({
 			harnessSessionId: "h-1",
 			prompt: "Fix it.",
 		});
 		// Without a prompt: Resume's follow-up.
 		expect(
-			rerunEntryOf({ id: "a" }, logOf(...base, rerun("a", "s1", null)), null),
+			rerunEntryOf(
+				{ id: "a" },
+				foldRun(logOf(...base, rerun("a", "s1", null))),
+				null,
+			),
 		).toEqual({ harnessSessionId: "h-1", prompt: DEFAULT_RESUME_PROMPT });
 	});
 
 	test("start fresh: no session, whatever the node says", () => {
 		const events = logOf(...base, rerun("a", null, null));
-		expect(rerunEntryOf({ id: "a" }, events, null)).toBeNull();
+		expect(rerunEntryOf({ id: "a" }, foldRun(events), null)).toBeNull();
 	});
 
 	test("any other visit runs as the node says", () => {
 		const events = logOf(...base, rerun("a", "s1", "Fix it."));
 		// Another node, a node inside a called flow.
-		expect(rerunEntryOf({ id: "b" }, events, null)).toBeUndefined();
+		expect(rerunEntryOf({ id: "b" }, foldRun(events), null)).toBeUndefined();
 		expect(
-			rerunEntryOf({ id: "a" }, events, { parentStepId: "s9", itemId: null }),
+			rerunEntryOf({ id: "a" }, foldRun(events), {
+				parentStepId: "s9",
+				itemId: null,
+			}),
 		).toBeUndefined();
 		// A later visit: the rerun walk opened a step already.
 		const later = logOf(
@@ -808,10 +826,14 @@ describe("run again from a node", () => {
 			started("s3", "a", 2),
 			ended("s3", "pass"),
 		);
-		expect(rerunEntryOf({ id: "a" }, later, null)).toBeUndefined();
+		expect(rerunEntryOf({ id: "a" }, foldRun(later), null)).toBeUndefined();
 		// A plain resume.
 		expect(
-			rerunEntryOf({ id: "a" }, logOf(...base, resumed("s1", "Go")), null),
+			rerunEntryOf(
+				{ id: "a" },
+				foldRun(logOf(...base, resumed("s1", "Go"))),
+				null,
+			),
 		).toBeUndefined();
 	});
 });

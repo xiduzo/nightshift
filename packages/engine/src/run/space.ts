@@ -195,7 +195,7 @@ export function createSpaces(deps: SpacesDeps) {
 				await projects.find(projectId, spaceId);
 				const runIds = await noActiveRun(projectId, "remove the project");
 				for (const runId of runIds) {
-					const status = deriveRunState(await log.events(runId)).status;
+					const status = deriveRunState(await log.state(runId)).status;
 					if (status === "waiting") {
 						throw new Refusal(
 							"conflict",

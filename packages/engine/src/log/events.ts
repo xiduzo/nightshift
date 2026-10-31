@@ -22,9 +22,9 @@ import { upgradePayload } from "./upgrade-payload";
 
 /**
  * Every fact the engine appends to the event log, and how to append and read
- * one. The pure functions that derive state from the log are in
- * `read/derive-run.ts` and `read/derive-steps.ts`. Status, reasons, step summaries,
- * edge counts and node outputs are never stored anywhere else.
+ * one. One fold of a run's log gives its state (`run-state.ts`). Status,
+ * reasons, step summaries, edge counts and node outputs are never stored
+ * anywhere else.
  *
  * Checkpoint rule: a fact goes into the log as soon as it happens, and a step
  * is closed (`StepEnded` with its outcome and outputs) before the walk picks

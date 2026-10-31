@@ -5,6 +5,7 @@ import { Command } from "@langchain/langgraph";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { FlowEdge, JoinNode } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
+import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
 import { deriveOpenGate, deriveRunState, deriveSteps } from "../read";
 import {
@@ -76,7 +77,9 @@ function fanOut(
 const ended = (h: Harness) =>
 	h
 		.events()
-		.then((events) => deriveSteps(events).map((s) => [s.nodeId, s.outcome]));
+		.then((events) =>
+			deriveSteps(foldRun(events)).map((s) => [s.nodeId, s.outcome]),
+		);
 
 describe("a fan-out into a Join that waits for all", () => {
 	test("an Agent and a Command run at once; the Join holds each branch's data and the run goes on", async () => {
@@ -102,7 +105,7 @@ describe("a fan-out into a Join that waits for all", () => {
 		expect(driven.state.ended).toMatchObject({ nodeId: "after" });
 		// Side by side: both steps started before either ended.
 		const events = await h.events();
-		const steps = deriveSteps(events);
+		const steps = deriveSteps(foldRun(events));
 		const seqOf = (type: string, nodeId: string) => {
 			const step = steps.find((s) => s.nodeId === nodeId);
 			return events.find((e) => e.type === type && e.stepId === step?.id)
@@ -232,7 +235,7 @@ describe("a Join that waits for the first", () => {
 		expect(driven.state.ended).toMatchObject({ nodeId: "after" });
 		expect(driven.state.nodes.joined?.data).toEqual({ fast: { who: "fast" } });
 		const events = await h.events();
-		const slow = deriveSteps(events).find((s) => s.nodeId === "slow");
+		const slow = deriveSteps(foldRun(events)).find((s) => s.nodeId === "slow");
 		expect(slow?.outcome).toBe("stopped");
 		expect(
 			payloads(events, "StepEnded").find(
@@ -244,7 +247,7 @@ describe("a Join that waits for the first", () => {
 			false,
 		);
 		expect(heldOf(driven.state.pending)).toEqual({});
-		expect(deriveRunState(events).status).toBe("running");
+		expect(deriveRunState(foldRun(events)).status).toBe("running");
 	});
 });
 
@@ -352,7 +355,7 @@ describe("an Agent that asks a person, on each of two branches", () => {
 		);
 		const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
 		const openGates = async () =>
-			deriveSteps(await h.events()).filter(
+			deriveSteps(foldRun(await h.events())).filter(
 				(s) => s.gate !== null && s.endedAt === null,
 			);
 		const answer = async (nodeId: string, note: string) => {
@@ -413,7 +416,7 @@ describe("a Gate on a branch", () => {
 		const h = await startRun(sandbox, fanOut([gate("left"), gate("right")]));
 		const runner = testRunner(h, { overdueSweepMs: 3_600_000 });
 		const openGates = async () =>
-			deriveSteps(await h.events()).filter(
+			deriveSteps(foldRun(await h.events())).filter(
 				(s) => s.gate !== null && s.endedAt === null,
 			);
 		try {
@@ -487,7 +490,7 @@ describe("a Gate on a branch", () => {
 				}),
 			});
 			const gate = await waitFor(
-				async () => deriveOpenGate(await h.events()) ?? false,
+				async () => deriveOpenGate(foldRun(await h.events())) ?? false,
 				{ label: "the Gate to open" },
 			);
 			if (runner.isActive(h.runId)) {
@@ -524,7 +527,7 @@ async function settle(
 	await waitFor(
 		async () =>
 			!runner.isActive(h.runId) &&
-			deriveRunState(await h.events()).status === status,
+			deriveRunState(foldRun(await h.events())).status === status,
 		{ label: `the run to be ${status}`, timeoutMs: 20_000 },
 	);
 }

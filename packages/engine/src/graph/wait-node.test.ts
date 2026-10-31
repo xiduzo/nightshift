@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import type { WaitNode } from "@nightshift/flows";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveSleep } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSleep, deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -112,7 +112,7 @@ describe("the Wait node", () => {
 			new Command({ resume: { kind: "wake", early: false } }),
 			past.graph(),
 		);
-		expect(deriveSteps(await past.events())[0]?.outcome).toBe("done");
+		expect(deriveSteps(foldRun(await past.events()))[0]?.outcome).toBe("done");
 	});
 
 	test("a time that does not parse fails the step with a plain message", async () => {
@@ -132,7 +132,7 @@ describe("the Wait node", () => {
 		expect(parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[0]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 				nodeId: "at",
 				status: "failed",
 				reason:
@@ -167,7 +167,7 @@ describe("the Wait node", () => {
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: { flag: "green" } });
-		const [stepRow] = deriveSteps(await h.events());
+		const [stepRow] = deriveSteps(foldRun(await h.events()));
 		const stepId = stepRow?.id as string;
 		expect(first.parked[0]).toEqual({
 			kind: "wait",
@@ -271,7 +271,7 @@ describe("the Wait node", () => {
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
-		const [stepRow] = deriveSteps(await h.events());
+		const [stepRow] = deriveSteps(foldRun(await h.events()));
 		const stepId = stepRow?.id as string;
 		expect(first.parked[0]).toEqual({
 			kind: "wait",
@@ -289,7 +289,7 @@ describe("the Wait node", () => {
 			signal: "deployed",
 		});
 		// The engine refuses a signal of another name from the log alone.
-		expect(deriveSleep(await h.events())).toMatchObject({
+		expect(deriveSleep(foldRun(await h.events()))).toMatchObject({
 			signal: "deployed",
 			until: null,
 		});
@@ -357,7 +357,7 @@ describe("the Wait node", () => {
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		expect(first.parked[0]).toMatchObject({
 			reason: "signal",
 			until: time.now() + 30 * MINUTE,
@@ -400,7 +400,7 @@ describe("the Wait node", () => {
 		const polled = await drive(poll, { inputs: {} });
 		expect(polled.parked[0]).toMatchObject({ until: time.now() + 10 * MINUTE });
 		time.advance(10);
-		const pollId = deriveSteps(await poll.events())[0]?.id as string;
+		const pollId = deriveSteps(foldRun(await poll.events()))[0]?.id as string;
 		await poll.log.append({
 			type: "WaitEnded",
 			runId: poll.runId,
@@ -441,7 +441,7 @@ describe("the Wait node", () => {
 			visit: 1,
 		});
 		const transcript = await readTranscriptFile(
-			deriveSteps(await poll.events())[0]?.transcriptPath as string,
+			deriveSteps(foldRun(await poll.events()))[0]?.transcriptPath as string,
 		);
 		expect(
 			transcript.filter((e) => e.event.type === "command-start"),

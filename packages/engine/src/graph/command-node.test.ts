@@ -5,8 +5,9 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import { drive, flowOf, held, payloads, startRun } from "../testing/graph";
 import { testKnowledge } from "../testing/knowledge";
 import {
@@ -63,7 +64,7 @@ describe("the Command node", () => {
 		expect(await h.types()).toEqual(["RunStarted", "StepStarted", "StepEnded"]);
 
 		const logged = await h.events();
-		const [derived] = deriveSteps(logged);
+		const [derived] = deriveSteps(foldRun(logged));
 		const stepId = derived?.id as string;
 		const logPath = join(sandbox.dataDir, "logs", h.runId, `${stepId}.log`);
 		expect(payloads(logged, "StepStarted")).toEqual([
@@ -185,7 +186,7 @@ describe("the Command node", () => {
 				scope: null,
 			},
 		]);
-		const [check] = deriveSteps(logged);
+		const [check] = deriveSteps(foldRun(logged));
 		const transcript = await readTranscriptFile(
 			check?.transcriptPath as string,
 		);
@@ -203,7 +204,7 @@ describe("the Command node", () => {
 			flowOf({ start: "check", nodes: [command("check", "false")], edges: [] }),
 		);
 		const { parked, next, state } = await drive(h, { inputs: {} });
-		const [check] = deriveSteps(await h.events());
+		const [check] = deriveSteps(foldRun(await h.events()));
 		expect(next).toEqual(["park__check"]);
 		expect(parked).toEqual([
 			{
@@ -236,7 +237,7 @@ describe("the Command node", () => {
 		);
 		setTimeout(() => controller.abort(), 200);
 		const { parked, state } = await drive(h, { inputs: {} });
-		const [slow] = deriveSteps(await h.events());
+		const [slow] = deriveSteps(foldRun(await h.events()));
 		expect(parked).toEqual([
 			{
 				kind: "parked",
@@ -293,7 +294,7 @@ describe("the Command node", () => {
 		);
 		expect(resumed.state.ended?.status).toBe("finished");
 		expect(
-			deriveSteps(await h.events()).map((s) => [s.visit, s.outcome]),
+			deriveSteps(foldRun(await h.events())).map((s) => [s.visit, s.outcome]),
 		).toEqual([
 			[1, "fail"],
 			[2, "pass"],
@@ -443,7 +444,7 @@ describe("the Command node", () => {
 			expect(ended?.outputs.log_tail).not.toContain("s3cr3t-pw");
 			expect(ended?.outputs.log_tail).toContain('"token": "•••"');
 
-			const [derived] = deriveSteps(logged);
+			const [derived] = deriveSteps(foldRun(logged));
 			const transcript = await readTranscriptFile(
 				derived?.transcriptPath as string,
 			);

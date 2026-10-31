@@ -157,11 +157,11 @@ async function ensureOpen(
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
 ): Promise<Ensured> {
-	const events = await ctx.log.events(ctx.run.id);
+	const runState = await ctx.log.state(ctx.run.id);
 	const point = resumePoint(
 		node,
 		state,
-		events,
+		runState,
 		scopeOf(config),
 		RESUME_RULES.gate,
 	);
@@ -186,7 +186,7 @@ async function ensureOpen(
 		state,
 		config,
 		{ kind: "new" },
-		events,
+		runState,
 	);
 	if (begun.kind === "parked") return begun;
 	const step = begun.step;

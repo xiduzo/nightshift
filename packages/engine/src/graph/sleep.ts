@@ -1,14 +1,14 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { FlowNode, JsonValue, WaitUntil } from "@nightshift/flows";
 
-import type { LoggedEvent, PolicyWaitReason, RunBus, RunLog } from "../log";
-import {
-	type DerivedStep,
-	deriveRunState,
-	deriveSleep,
-	deriveSteps,
-	firstDeadline,
-} from "../read";
+import type {
+	DerivedStep,
+	PolicyWaitReason,
+	RunBus,
+	RunLog,
+	RunState,
+} from "../log";
+import { deriveRunState, deriveSleep, firstDeadline } from "../read";
 import {
 	DEFAULT_RESUME_PROMPT,
 	type NodeAction,
@@ -55,7 +55,7 @@ import type { ThreadState } from "./thread";
  *    before its time is set again, and the resume value for the wait node.
  *    `recordWake` appends `WaitEnded` and the transcript `wake`.
  *    `createSleeps(deps)` holds the wake timers, and `restore(runId,
- *    events)` gives a new daemon its timers from `deriveSleep` (the log
+ *    run)` gives a new daemon its timers from `deriveSleep` (the log
  *    stays the restart source). The slot, the run cap and the drive into
  *    the wait node are the runner's: it wakes a run in a Turn (`take`).
  *
@@ -429,22 +429,21 @@ export type WakePlan =
  * is `{ kind: "signal" }` and the Wait node on it ends `done`.
  */
 export function planWake(
-	events: readonly LoggedEvent[],
+	run: RunState,
 	at: ThreadState,
 	how: Wake,
 	now: number,
 ): WakePlan {
-	if (deriveRunState(events).status !== "sleeping") {
+	if (deriveRunState(run).status !== "sleeping") {
 		return { kind: "not-sleeping" };
 	}
 	if (at.kind !== "interrupted") return { kind: "not-sleeping" };
-	const steps = deriveSteps(events);
-	const sleeping = sleepingBranch(events, steps, at, how);
+	const sleeping = sleepingBranch(run, at, how);
 	if (!sleeping) return { kind: "not-sleeping" };
 	if (!how.early && sleeping.until !== null && now < sleeping.until) {
 		return { kind: "too-soon", until: sleeping.until };
 	}
-	const step = steps.find((s) => s.id === sleeping.stepId);
+	const step = run.steps.get(sleeping.stepId);
 	if (!step) throw new Error(`Step not found: ${sleeping.stepId}`);
 	const resume: ResumeValue =
 		how.signal !== undefined
@@ -468,14 +467,12 @@ export function planWake(
  * ended does not count.
  */
 function sleepingBranch(
-	events: readonly LoggedEvent[],
-	steps: readonly DerivedStep[],
+	run: RunState,
 	at: Extract<ThreadState, { kind: "interrupted" }>,
 	how: Wake,
 ): Extract<Parked, { kind: "wait" }> | null {
 	const waits = at.interrupts.flatMap(({ value }) =>
-		value.kind === "wait" &&
-		steps.find((s) => s.id === value.stepId)?.endedAt === null
+		value.kind === "wait" && run.steps.get(value.stepId)?.endedAt === null
 			? [value]
 			: [],
 	);
@@ -484,12 +481,9 @@ function sleepingBranch(
 	}
 	if (how.signal !== undefined) {
 		const forSignal = waits.find((wait) =>
-			events.some(
-				(e) =>
-					e.type === "WaitStarted" &&
-					e.stepId === wait.stepId &&
-					e.payload.signal === how.signal,
-			),
+			run.steps
+				.get(wait.stepId)
+				?.sleeps.some((sleep) => sleep.signal === how.signal),
 		);
 		if (forSignal) return forSignal;
 	}
@@ -590,10 +584,10 @@ export function createSleeps(deps: SleepDeps) {
 	 * a deadline gets the deadline's timer: the runner answers the Gate when
 	 * it fires.
 	 */
-	function restore(runId: string, events: readonly LoggedEvent[]): void {
-		const sleeping = deriveSleep(events);
+	function restore(runId: string, run: RunState): void {
+		const sleeping = deriveSleep(run);
 		if (sleeping?.until != null) schedule(runId, sleeping.until);
-		const deadline = firstDeadline(events)?.deadline;
+		const deadline = firstDeadline(run)?.deadline;
 		if (deadline) schedule(runId, deadline.at);
 	}
 

@@ -11,9 +11,11 @@ import {
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
 import { defaultRunSettings } from "../device-config/settings";
+import type { DerivedStep } from "../log";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
 import { itemBranchName } from "../projects/worktrees";
-import { type DerivedStep, deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	agent,
 	command,
@@ -135,7 +137,7 @@ describe("the Call node with each", () => {
 		expect(state.visits).toEqual({ loop: 1 });
 
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const loop = loopStep(steps);
 		expect(loop.outcome).toBe("done");
 		expect(loop.scope).toBeNull();
@@ -327,7 +329,7 @@ describe("the Call node with each", () => {
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.outcome).toBe("done");
-		const loop = loopStep(deriveSteps(await h.events()));
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
 		expect(loop.items.map((i) => [i.branch, i.baseBranch])).toEqual([
 			[null, null],
 			[null, null],
@@ -367,7 +369,7 @@ describe("the Call node with each", () => {
 		expect(parked).toEqual([]);
 		expect(state.ended?.nodeId).toBe("after");
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const loop = loopStep(steps);
 		const reason =
 			'Node "check" ended with "fail" and no edge leaves it on that outcome.';
@@ -487,7 +489,7 @@ describe("the Call node with each", () => {
 			outcome: "halted",
 			reason: 'Ended at node "loop" with "halted".',
 		});
-		const loop = loopStep(deriveSteps(await h.events()));
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
 		expect(loop.outcome).toBe("halted");
 		expect(loop.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
@@ -525,7 +527,9 @@ describe("the Call node with each", () => {
 		);
 		await drive(h, { inputs: {} });
 		expect(harness.calls).toHaveLength(2);
-		expect(loopStep(deriveSteps(await h.events())).outputs).toMatchObject({
+		expect(
+			loopStep(deriveSteps(foldRun(await h.events()))).outputs,
+		).toMatchObject({
 			outcome: "done",
 			done_count: 2,
 			waiting_count: 1,
@@ -598,7 +602,7 @@ describe("the Call node with each", () => {
 			"Do Two (t2) for the plan",
 		]);
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const each = loopStep(steps, "each");
 		expect(
 			each.items.map((i) => [
@@ -676,7 +680,7 @@ describe("the Call node with each", () => {
 			"Build a",
 			"Build added",
 		]);
-		const loop = loopStep(deriveSteps(await h.events()));
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
 		expect(loop.items.map((i) => i.facts.id)).toEqual(["1", "2"]);
 		expect(loop.logPath).toBe(
 			join(sandbox.dataDir, "logs", h.runId, `${loop.id}.log`),
@@ -741,7 +745,7 @@ describe("the Call node with each", () => {
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.outcome).toBe("done");
-		const loop = loopStep(deriveSteps(await h.events()));
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
 		expect(loop.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
 			["2", "failed"],
@@ -779,7 +783,7 @@ describe("the Call node with each", () => {
 			{ harness, flows: { build } },
 		);
 		const first = await drive(h, { inputs: {} });
-		const steps = deriveSteps(await h.events());
+		const steps = deriveSteps(foldRun(await h.events()));
 		const loop = loopStep(steps);
 		const waiting = steps.find(
 			(s) => s.nodeId === "worker" && s.scope?.itemId === "2",
@@ -832,7 +836,7 @@ describe("the Call node with each", () => {
 			["Build c", null],
 		]);
 		const logged = await h.events();
-		const after = loopStep(deriveSteps(logged));
+		const after = loopStep(deriveSteps(foldRun(logged)));
 		expect(after.id).toBe(loop.id);
 		expect(after.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
@@ -854,11 +858,11 @@ describe("the Call node with each", () => {
 		]);
 		// The loop step was never reopened (it stayed open), nor started twice.
 		expect(
-			deriveSteps(logged).filter((s) => s.nodeType === "call"),
+			deriveSteps(foldRun(logged)).filter((s) => s.nodeType === "call"),
 		).toHaveLength(1);
 		expect(logged.filter((e) => e.type === "StepReopened")).toHaveLength(0);
 		expect(
-			deriveSteps(logged).find((s) => s.id === waiting?.id)?.sessions,
+			deriveSteps(foldRun(logged)).find((s) => s.id === waiting?.id)?.sessions,
 		).toHaveLength(2);
 	});
 
@@ -889,7 +893,7 @@ describe("the Call node with each", () => {
 			{ harness, flows: { build }, signal: controller.signal },
 		);
 		const first = await drive(h, { inputs: {} });
-		const stoppedSteps = deriveSteps(await h.events());
+		const stoppedSteps = deriveSteps(foldRun(await h.events()));
 		const loopStopped = loopStep(stoppedSteps);
 		const worker = stoppedSteps.find((s) => s.nodeId === "worker");
 		expect(first.parked).toEqual([
@@ -993,14 +997,16 @@ describe("the Call node with each", () => {
 				{ prompt: DEFAULT_RESUME_PROMPT, idleMs: 15 * MINUTE },
 			],
 		]);
-		const loop = loopStep(deriveSteps(logged));
+		const loop = loopStep(deriveSteps(foldRun(logged)));
 		expect(loop.id).toBe(loopStopped.id);
 		expect(loop.outcome).toBe("done");
 		expect(loop.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
 			["2", "done"],
 		]);
-		const workers = deriveSteps(logged).filter((s) => s.nodeId === "worker");
+		const workers = deriveSteps(foldRun(logged)).filter(
+			(s) => s.nodeId === "worker",
+		);
 		expect(workers.map((s) => s.sessions.length)).toEqual([2, 1]);
 		expect(loop.items[1]?.baseBranch).toBe(loop.items[0]?.branch ?? "");
 		expect(payloads(logged, "ItemStarted")).toHaveLength(2);
@@ -1027,7 +1033,7 @@ describe("the Call node with each", () => {
 		);
 		h.ctx.settings = () => ({ ...defaultRunSettings(), maxStepsPerRun: 3 });
 		const first = await drive(h, { inputs: {} });
-		const loop = loopStep(deriveSteps(await h.events()));
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
 		const reason =
 			'The run reached the limit of 3 steps before node "worker". Resume it to continue.';
 		expect(first.parked).toEqual([
@@ -1069,7 +1075,7 @@ describe("the Call node with each", () => {
 			"Build c",
 		]);
 		const logged = await h.events();
-		const after = loopStep(deriveSteps(logged));
+		const after = loopStep(deriveSteps(foldRun(logged)));
 		expect(after.id).toBe(loop.id);
 		expect(after.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
@@ -1111,7 +1117,7 @@ describe("the Call node with each", () => {
 			{ harness, flows: { build } },
 		);
 		const first = await drive(h, { inputs: {} });
-		const loop = loopStep(deriveSteps(await h.events()));
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
 		expect(first.parked).toEqual([
 			{
 				kind: "parked",
@@ -1142,7 +1148,7 @@ describe("the Call node with each", () => {
 		const second = await drive(h, new Command({ resume: { kind: "resume" } }));
 		expect(second.state.ended?.outcome).toBe("done");
 		const logged = await h.events();
-		const after = loopStep(deriveSteps(logged));
+		const after = loopStep(deriveSteps(foldRun(logged)));
 		expect(after.id).toBe(loop.id);
 		expect(after.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
@@ -1184,7 +1190,9 @@ describe("the Call node with each", () => {
 		const recorder = h.ctx.recorder;
 		let crashes = 1;
 		h.ctx.recorder = async (stepId) => {
-			const own = deriveSteps(await h.events()).find((s) => s.id === stepId);
+			const own = deriveSteps(foldRun(await h.events())).find(
+				(s) => s.id === stepId,
+			);
 			if (
 				own?.nodeId === "second" &&
 				own.scope?.itemId === "2" &&
@@ -1200,7 +1208,7 @@ describe("the Call node with each", () => {
 			"Second 1",
 			"First 2",
 		]);
-		const crashed = deriveSteps(await h.events());
+		const crashed = deriveSteps(foldRun(await h.events()));
 		const loop = loopStep(crashed);
 		const dead = crashed.find(
 			(s) => s.nodeId === "second" && s.scope?.itemId === "2",
@@ -1256,7 +1264,7 @@ describe("the Call node with each", () => {
 			"Second 3",
 		]);
 		const logged = await h.events();
-		const after = loopStep(deriveSteps(logged));
+		const after = loopStep(deriveSteps(foldRun(logged)));
 		expect(after.id).toBe(loop.id);
 		expect(after.items.map((i) => [i.facts.id, i.state])).toEqual([
 			["1", "done"],
@@ -1268,7 +1276,7 @@ describe("the Call node with each", () => {
 			logged.filter((e) => e.type === "StepReopened").map((e) => e.stepId),
 		).toEqual([loop.id]);
 		expect(
-			deriveSteps(logged)
+			deriveSteps(foldRun(logged))
 				.filter((s) => s.nodeId === "second" && s.scope?.itemId === "2")
 				.map((s) => [s.visit, s.outcome]),
 		).toEqual([

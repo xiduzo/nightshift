@@ -1,37 +1,5 @@
 /** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, the run views, cost, the Persons a run names, and the run bundle. */
 
-export {
-	awaitsWorktree,
-	countDaemonResumes,
-	countStepsSinceWalkBegan,
-	deriveBudgetSpend,
-	deriveInputs,
-	deriveOpenGate,
-	deriveRunState,
-	deriveSleep,
-	deriveStepClocks,
-	deriveStopAfterStep,
-	deriveStopAt,
-	deriveTraversals,
-	deriveWorktrees,
-	firstDeadline,
-	isOpenStatus,
-	parkedSteps,
-	type RunWorktree,
-	runWorktree,
-	type SleepFact,
-} from "./derive-run";
-export type { DerivedItem, DerivedSession, DerivedStep } from "./derive-steps";
-export {
-	countVisits,
-	deriveNodeOutputs,
-	deriveSessions,
-	deriveSteps,
-	deriveVariables,
-	itemStates,
-	lastHarnessSessionOfNode,
-	withEnclosing,
-} from "./derive-steps";
 export { type InboxGate, inboxOf, lockScreenRefusal } from "./inbox";
 export { type LandedFact, landedFacts } from "./landed-facts";
 export { gitAuthorOf, namesOf } from "./people";
@@ -47,6 +15,30 @@ export type { RunBundleSummary } from "./run-bundle";
 export { exportRun } from "./run-bundle";
 export type { RunTrace } from "./run-trace";
 export type { FeedStep } from "./run-transcript";
+export {
+	awaitsWorktree,
+	countVisits,
+	deriveBudgetSpend,
+	deriveInputs,
+	deriveNodeOutputs,
+	deriveOpenGate,
+	deriveRunState,
+	deriveSleep,
+	deriveStepClocks,
+	deriveSteps,
+	deriveTraversals,
+	deriveVariables,
+	deriveWorktrees,
+	firstDeadline,
+	isOpenStatus,
+	itemStates,
+	lastHarnessSessionOfNode,
+	parkedSteps,
+	type RunWorktree,
+	runWorktree,
+	type SleepFact,
+	withEnclosing,
+} from "./run-views";
 export type {
 	OpenGate,
 	PendingCommand,

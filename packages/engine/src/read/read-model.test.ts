@@ -11,8 +11,8 @@ import {
 } from "../log";
 import type { EventInput } from "../log/events";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import * as derivedSteps from "./derive-steps";
 import { createReadModel, type ReadModel } from "./read-model";
+import * as derivedSteps from "./run-views";
 import type { RunStreamItem } from "./views";
 
 /*

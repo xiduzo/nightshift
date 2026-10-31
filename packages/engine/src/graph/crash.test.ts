@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { CallEachNode, Flow } from "@nightshift/flows";
 import type { LoggedEvent, RunStatus } from "../log";
+import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
 import {
 	deriveOpenGate,
@@ -137,7 +138,7 @@ type Story = {
 const CUT = new Set(["stopped", "interrupted"]);
 
 function storyOf(events: readonly LoggedEvent[]): Story {
-	const steps = deriveSteps(events)
+	const steps = deriveSteps(foldRun(events))
 		.filter((s) => s.outcome !== null && !CUT.has(s.outcome))
 		.map(
 			(s) =>
@@ -247,7 +248,7 @@ afterAll(async () => {
 const harness = () => fakeHarness({ ...reportingScript("pass"), delayMs: 0 });
 
 const statusOf = async (h: Harness): Promise<RunStatus> =>
-	deriveRunState(await h.events()).status;
+	deriveRunState(foldRun(await h.events())).status;
 
 /** The run once no drive holds it: its status, or "dead" when its daemon died. */
 async function settled(
@@ -269,7 +270,7 @@ async function settled(
 /** A new daemon's startup recovery for the run, then its resume (`run/recovery.ts`). */
 async function recover(runner: Runner, h: Harness): Promise<void> {
 	const events = await h.events();
-	const open = openWork(events, "interrupted");
+	const open = openWork(foldRun(events), "interrupted");
 	if (open.endsRun || open.steps.length > 0 || open.sessions.length > 0) {
 		await closeOpenWork(
 			{
@@ -289,7 +290,7 @@ async function recover(runner: Runner, h: Harness): Promise<void> {
 	if (open.endsRun) {
 		await runner.take(h.runId, { kind: "resume", by: "daemon" });
 	} else {
-		runner.restore(h.runId, events);
+		runner.restore(h.runId, foldRun(events));
 	}
 }
 
@@ -339,7 +340,7 @@ async function walk(
 			}
 			if (status === "finished") break;
 			if (status === "waiting") {
-				const gate = deriveOpenGate(await h.events());
+				const gate = deriveOpenGate(foldRun(await h.events()));
 				if (!gate) throw new Error("No open Gate.");
 				faulty.state.answering = true;
 				try {
@@ -362,7 +363,7 @@ async function walk(
 	const events = await h.events();
 	const values = (await h.thread.graph.getState(h.config))
 		.values as RunStateValues;
-	const at = positionOf(values, events, null);
+	const at = positionOf(values, foldRun(events), null);
 	return {
 		story: storyOf(events),
 		writes: faulty.state.writes,

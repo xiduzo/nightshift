@@ -1,11 +1,12 @@
 import type { FlowNode } from "@nightshift/flows";
 import {
+	type DerivedStep,
 	type EnginePayloads,
-	type LoggedEvent,
+	type RunState,
 	type Scope,
 	scopeKey,
 } from "../log";
-import { countVisits, type DerivedStep, deriveSteps } from "../read";
+import { countVisits, deriveSteps } from "../read";
 import {
 	heldOf,
 	type Pending,
@@ -62,7 +63,7 @@ import {
  */
 
 type NodeRef = Pick<FlowNode, "id">;
-type EdgeTakenEvent = Extract<LoggedEvent, { type: "EdgeTaken" }>;
+type EdgeTaken = { seq: number; payload: EnginePayloads["EdgeTaken"] };
 
 /**
  * A step that ended before its work was done: a stop, an error (also a
@@ -147,29 +148,23 @@ export type Position = {
 
 /**
  * Where the run is in `scope` (null: the top level), from the checkpoint's
- * `pending`, `loops` and `visits` and from the log. The log is derived once,
- * on the first question that needs it.
+ * `pending`, `loops` and `visits` and from the run state of the log.
  */
 export function positionOf(
 	state: PositionState,
-	events: readonly LoggedEvent[],
+	run: RunState,
 	scope: Scope | null,
 ): Position {
 	const key = scopeKey(scope);
-	let derived: DerivedStep[] | undefined;
-	const steps = () => {
-		derived ??= deriveSteps(events);
-		return derived;
-	};
 	const latest = (node: NodeRef) =>
-		steps().findLast(
+		deriveSteps(run).findLast(
 			(s) => s.nodeId === node.id && scopeKey(s.scope) === key,
 		) ?? null;
 	const byId = (stepId: string | null) =>
-		stepId ? (steps().find((s) => s.id === stepId) ?? null) : null;
+		stepId ? (run.steps.get(stepId) ?? null) : null;
 	const looping = (node: NodeRef) => Boolean(state.loops?.[node.id]);
 	const uncommitted = (node: NodeRef) => {
-		const logged = countVisits(events, node.id, key);
+		const logged = countVisits(run, node.id, key);
 		if (logged <= (state.visits?.[node.id] ?? 0)) return null;
 		return latest(node);
 	};
@@ -190,7 +185,7 @@ export function positionOf(
 					? latest(node)
 					: uncommitted(node);
 			if (!step || step.endedAt === null || isCutShort(step)) return null;
-			return doneAfter(events, step, key);
+			return doneAfter(run, step, key);
 		},
 		cursorBehind(node) {
 			let last = 0;
@@ -202,46 +197,38 @@ export function positionOf(
 			const cursor = state.loops?.[node.id]?.index ?? 0;
 			return last > cursor ? last : null;
 		},
-		nextVisit: (node) => countVisits(events, node.id, key) + 1,
+		nextVisit: (node) => countVisits(run, node.id, key) + 1,
 	};
 }
 
 /**
- * The step's own end and the edge after it, unless the run finished after
- * that end. `key` is the step's scope.
+ * The step's own end (of its latest opening) and the edge after it, unless
+ * the run finished after that end. `key` is the step's scope.
  */
 function doneAfter(
-	events: readonly LoggedEvent[],
+	run: RunState,
 	step: DerivedStep,
 	key: string,
 ): DoneStep | null {
-	const ended = events.find(
-		(e) =>
-			e.type === "StepEnded" && e.stepId === step.id && e.seq > step.openedSeq,
-	);
-	if (ended?.type !== "StepEnded") return null;
-	const finished = events.some(
-		(e) =>
-			e.type === "RunEnded" &&
-			e.payload.status === "finished" &&
-			e.seq > ended.seq,
+	const ended = step.openings.at(-1)?.end;
+	if (!ended) return null;
+	const finished = run.ends.some(
+		(e) => e.payload.status === "finished" && e.seq > ended.seq,
 	);
 	if (finished) return null;
 	// The edges after this end, up to the node's next step in the scope.
-	const next = events.find(
-		(e) =>
-			e.type === "StepStarted" &&
-			e.seq > ended.seq &&
-			e.payload.nodeId === step.nodeId &&
-			scopeKey(e.payload.scope ?? null) === key,
-	);
-	const edges = events.filter(
-		(e): e is EdgeTakenEvent =>
-			e.type === "EdgeTaken" &&
-			e.seq > ended.seq &&
-			(next === undefined || e.seq < next.seq) &&
-			e.payload.from === step.nodeId &&
-			scopeKey(e.payload.scope ?? null) === key,
+	let next = Number.POSITIVE_INFINITY;
+	for (const other of run.steps.values()) {
+		if (
+			other.nodeId === step.nodeId &&
+			other.startSeq > ended.seq &&
+			scopeKey(other.scope) === key
+		) {
+			next = Math.min(next, other.startSeq);
+		}
+	}
+	const edges = (run.edges.get(key)?.taken ?? []).filter(
+		(e) => e.seq > ended.seq && e.seq < next && e.payload.from === step.nodeId,
 	);
 	return {
 		step,
@@ -255,12 +242,9 @@ function doneAfter(
  * Whether `step` ended on its own and the run did not finish after it: a
  * re-entry goes on from its end, and no harness session continues it.
  */
-export function isDone(
-	events: readonly LoggedEvent[],
-	step: DerivedStep,
-): boolean {
+export function isDone(run: RunState, step: DerivedStep): boolean {
 	if (step.endedAt === null || isCutShort(step)) return false;
-	return doneAfter(events, step, scopeKey(step.scope)) !== null;
+	return doneAfter(run, step, scopeKey(step.scope)) !== null;
 }
 
 /** The step the checkpoint holds for `nodeId`, or null when it holds another node's, or none. */
@@ -276,12 +260,9 @@ export function heldStep(
  * after the hold was written. Such a hold is stale: no wake and no answer
  * comes for it.
  */
-export function holdEnded(
-	events: readonly LoggedEvent[],
-	pending: Pending,
-): boolean {
+export function holdEnded(run: RunState, pending: Pending): boolean {
 	if (pending.kind === "parked" || pending.stepId === null) return false;
-	const step = deriveSteps(events).find((s) => s.id === pending.stepId);
+	const step = run.steps.get(pending.stepId);
 	return step !== undefined && step.endedAt !== null;
 }
 
@@ -289,15 +270,12 @@ export function holdEnded(
 export type Front = {
 	last: DerivedStep | null;
 	/** The latest `EdgeTaken` after `last` started: the walk moved on from it. */
-	movedOn: EdgeTakenEvent | null;
+	movedOn: EdgeTaken | null;
 };
 
 /** The front of the walk in one scope (null: the top level). */
-export function frontOf(
-	events: readonly LoggedEvent[],
-	scope: Scope | null,
-): Front {
-	return front(events, scopeKey(scope));
+export function frontOf(run: RunState, scope: Scope | null): Front {
+	return front(run, scopeKey(scope));
 }
 
 /**
@@ -305,19 +283,17 @@ export function frontOf(
  * edge taken anywhere after it. With one branch this is where the run is;
  * a walk with parallel branches has one front per branch.
  */
-export function latestFront(events: readonly LoggedEvent[]): Front {
-	return front(events, null);
+export function latestFront(run: RunState): Front {
+	return front(run, null);
 }
 
-function front(events: readonly LoggedEvent[], key: string | null): Front {
-	const inScope = (scope: Scope | null | undefined) =>
-		key === null || scopeKey(scope ?? null) === key;
-	const last = deriveSteps(events).findLast((s) => inScope(s.scope)) ?? null;
-	let lastEdge: EdgeTakenEvent | null = null;
-	for (const e of events) {
-		if (e.type !== "EdgeTaken" || !inScope(e.payload.scope)) continue;
-		if (!lastEdge || e.seq > lastEdge.seq) lastEdge = e;
-	}
+function front(run: RunState, key: string | null): Front {
+	const last =
+		deriveSteps(run).findLast(
+			(s) => key === null || scopeKey(s.scope) === key,
+		) ?? null;
+	const lastEdge =
+		key === null ? run.lastEdge : (run.edges.get(key)?.taken.at(-1) ?? null);
 	const movedOn =
 		lastEdge && (!last || lastEdge.seq > last.startSeq) ? lastEdge : null;
 	return { last, movedOn };
@@ -332,8 +308,8 @@ function front(events: readonly LoggedEvent[], key: string | null): Front {
  * continues its harness session with the resume prompt, a Call goes on
  * inside it. Null when the run moved on, or never started a step.
  */
-export function reenteredNode(events: readonly LoggedEvent[]): string | null {
-	const { last, movedOn } = frontOf(events, null);
+export function reenteredNode(run: RunState): string | null {
+	const { last, movedOn } = frontOf(run, null);
 	return last && !movedOn ? last.nodeId : null;
 }
 
@@ -345,13 +321,12 @@ export function reenteredNode(events: readonly LoggedEvent[]): string | null {
  */
 export function loggedVisits(
 	flow: { nodes: readonly NodeRef[] },
-	events: readonly LoggedEvent[],
+	run: RunState,
 	reopen: string | null,
 ): Record<string, number> {
 	const visits: Record<string, number> = {};
 	for (const node of flow.nodes) {
-		const count =
-			countVisits(events, node.id, "") - (node.id === reopen ? 1 : 0);
+		const count = countVisits(run, node.id, "") - (node.id === reopen ? 1 : 0);
 		if (count > 0) visits[node.id] = count;
 	}
 	return visits;

@@ -13,22 +13,17 @@ import {
 } from "../graph";
 import {
 	type EngineEventType,
+	foldRun,
 	groupByRun,
-	type LoggedEvent,
 	parseEventRow,
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	type RunState,
 	runsArriving,
 	spaceOfRun,
 } from "../log";
-import {
-	awaitsWorktree,
-	countDaemonResumes,
-	deriveRunState,
-	deriveStopAt,
-	runWorktree,
-} from "../read";
+import { awaitsWorktree, deriveRunState, runWorktree } from "../read";
 import type { StartHolds } from "./start-holds";
 
 /**
@@ -91,7 +86,7 @@ export type ResumeBlockDeps = {
  */
 export async function daemonResumeBlock(
 	runId: string,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	deps: ResumeBlockDeps,
 ): Promise<string | null> {
 	try {
@@ -106,11 +101,11 @@ export async function daemonResumeBlock(
 				? "its flow turns automatic resume off."
 				: "automatic resume is off in Settings.";
 		}
-		const resumes = countDaemonResumes(events);
+		const resumes = runState.daemonResumes;
 		if (resumes >= MAX_DAEMON_RESUMES) {
 			return `it continued on its own ${resumes} times in a row, and each time Night Shift stopped again.`;
 		}
-		const stopAt = deriveStopAt(events);
+		const { stopAt } = runState;
 		if (stopAt !== null && deps.now() >= stopAt) {
 			return "its stop time has passed.";
 		}
@@ -118,8 +113,8 @@ export async function daemonResumeBlock(
 		// says when it is gone.
 		if (deps.placedElsewhere?.(row)) return null;
 		// A run whose Device was offline at the start has no worktree yet: a step makes it.
-		if (awaitsWorktree(row, events)) return null;
-		const worktree = await stat(runWorktree(row, events).worktreePath).catch(
+		if (awaitsWorktree(row, runState)) return null;
+		const worktree = await stat(runWorktree(row, runState).worktreePath).catch(
 			() => null,
 		);
 		if (!worktree?.isDirectory()) {
@@ -210,7 +205,8 @@ export function createRecovery(deps: RecoveryDeps) {
 		for (const [runId, events] of byRun) {
 			if (arriving.has(runId)) continue;
 			// The lifecycle events are enough to see what is open.
-			const open = openWork(events, "interrupted");
+			const runState = foldRun(events);
+			const open = openWork(runState, "interrupted");
 			// A step that ran past its time budget or idle limit meanwhile
 			// ends as its timer would have ended it, and the run fails: it
 			// does not continue.
@@ -223,7 +219,7 @@ export function createRecovery(deps: RecoveryDeps) {
 				continue;
 			}
 			const why = open.endsRun
-				? await daemonResumeBlock(runId, events, deps)
+				? await daemonResumeBlock(runId, runState, deps)
 				: null;
 			if (open.endsRun || open.steps.length > 0 || open.sessions.length > 0) {
 				// The open work ends as a stop ends it (`closeOpenWork`), from
@@ -245,7 +241,7 @@ export function createRecovery(deps: RecoveryDeps) {
 			}
 			if (open.endsRun && !why) toResume.push(runId);
 			// A sleeping run gets its timer back from the log (`deriveSleep`).
-			if (!open.endsRun) runner.restore(runId, events);
+			if (!open.endsRun) runner.restore(runId, runState);
 		}
 	}
 
@@ -281,14 +277,14 @@ export function createRecovery(deps: RecoveryDeps) {
 				spaceId,
 				async () => {
 					if (disposed) return;
-					const events = await log.events(runId);
+					const runState = await log.state(runId);
 					if (
 						runner.isActive(runId) ||
-						deriveRunState(events).status !== "interrupted"
+						deriveRunState(runState).status !== "interrupted"
 					) {
 						return;
 					}
-					const why = await daemonResumeBlock(runId, events, deps);
+					const why = await daemonResumeBlock(runId, runState, deps);
 					if (why) {
 						console.warn(
 							`[engine] run ${runId} did not continue on its own: ${why}`,

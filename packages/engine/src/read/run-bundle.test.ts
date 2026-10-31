@@ -7,6 +7,7 @@ import { createDb } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
 import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
+import { foldRun } from "../log";
 import { parseEventRow } from "../log/events";
 import { readRunTranscript } from "../log/transcripts";
 import { createEngine } from "../run/engine";
@@ -18,9 +19,13 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { UNKNOWN_DEVICE, UNKNOWN_SPACE } from "./bundle-rows";
-import { deriveRunState } from "./derive-run";
-import { deriveNodeOutputs, deriveSteps, sumCost } from "./derive-steps";
 import { exportRun, openRunBundle } from "./run-bundle";
+import {
+	deriveNodeOutputs,
+	deriveRunState,
+	deriveSteps,
+	sumCost,
+} from "./run-views";
 
 const SECRET = "sk-test-0123456789";
 
@@ -206,13 +211,17 @@ describe("exportRun", () => {
 		expect(opened.run.spaceId).toBe(sandbox.spaceId);
 		expect(opened.clones[0]?.path).toBe(sandbox.repoPath);
 		expect(opened.events).toEqual(live);
-		expect(deriveRunState(opened.events)).toEqual(deriveRunState(live));
-		expect(deriveRunState(opened.events).status).toBe("finished");
-		expect(deriveSteps(opened.events)).toEqual(deriveSteps(live));
-		expect(deriveNodeOutputs(opened.events, "")).toEqual(
-			deriveNodeOutputs(live, ""),
+		expect(deriveRunState(foldRun(opened.events))).toEqual(
+			deriveRunState(foldRun(live)),
 		);
-		expect(sumCost(opened.events).usd).toBe(0.25);
+		expect(deriveRunState(foldRun(opened.events)).status).toBe("finished");
+		expect(deriveSteps(foldRun(opened.events))).toEqual(
+			deriveSteps(foldRun(live)),
+		);
+		expect(deriveNodeOutputs(foldRun(opened.events), "")).toEqual(
+			deriveNodeOutputs(foldRun(live), ""),
+		);
+		expect(sumCost(foldRun(opened.events)).usd).toBe(0.25);
 		expect(await opened.transcript()).toEqual(
 			await readRunTranscript(
 				(await liveSteps(runId)).map((s) => s.transcriptPath),
@@ -275,8 +284,8 @@ describe("exportRun", () => {
 		expect(opened.run.spaceId).toBe(UNKNOWN_SPACE);
 		expect(opened.steps.map((s) => s.deviceId)).toEqual([null, null]);
 		expect(opened.events).toEqual(live);
-		expect(deriveRunState(opened.events).status).toBe("finished");
-		expect(sumCost(opened.events).usd).toBe(0.25);
+		expect(deriveRunState(foldRun(opened.events)).status).toBe("finished");
+		expect(sumCost(foldRun(opened.events)).usd).toBe(0.25);
 		opened.close();
 	});
 
@@ -498,7 +507,7 @@ describe("exportRun", () => {
 		expect(text).toContain("TOKEN=•••");
 		expect(text).not.toContain(SECRET);
 		expect(opened.sessions[0]?.prompt).toContain("Fix it.");
-		expect(deriveRunState(opened.events).status).toBe("finished");
+		expect(deriveRunState(foldRun(opened.events)).status).toBe("finished");
 		opened.close();
 	});
 

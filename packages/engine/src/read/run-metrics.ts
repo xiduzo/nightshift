@@ -1,13 +1,18 @@
 import type { JsonValue } from "@nightshift/flows";
-import type { LoggedEvent, ScoreName } from "../log";
-import type { CostTally } from "./cost";
-import type { DerivedSession, DerivedStep, StepSleep } from "./derive-steps";
+import type {
+	CostTally,
+	DerivedSession,
+	DerivedStep,
+	RunState,
+	ScoreName,
+	StepSleep,
+} from "../log";
 
 /**
  * The run metrics: how long a run and each of its steps took, how long
  * agents worked and Gates waited, the tokens the agents used, how sure the
- * cost is, and the pull request a step opened. Pure over the derived steps
- * of the event log, like the cost (`cost.ts`) it sits beside. Nothing here
+ * cost is, and the pull request a step opened. Pure over the steps of the
+ * run state (`RunState`), like the cost arithmetic it builds on. Nothing here
  * is stored, and nothing leaves the computer.
  *
  * The log has no turns and no tool calls: those live in the transcripts.
@@ -64,19 +69,14 @@ export type RunScore = {
 };
 
 /** The run's scores, in log order. */
-export function deriveScores(events: readonly LoggedEvent[]): RunScore[] {
-	const scores: RunScore[] = [];
-	for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
-		if (e.type !== "Scored") continue;
-		scores.push({
-			score: e.payload.score,
-			value: e.payload.value,
-			label: e.payload.label,
-			stepId: e.stepId,
-			at: e.at,
-		});
-	}
-	return scores;
+export function deriveScores(run: RunState): RunScore[] {
+	return run.scores.map((e) => ({
+		score: e.payload.score,
+		value: e.payload.value,
+		label: e.payload.label,
+		stepId: e.stepId,
+		at: e.at,
+	}));
 }
 
 const NO_TOKENS: TokenCounts = {

@@ -6,8 +6,9 @@ import type {
 	DecisionInput,
 	DecisionResult,
 } from "@nightshift/agents/types";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -149,7 +150,7 @@ describe("the Decision node", () => {
 				scope: null,
 			},
 		]);
-		const [decide] = deriveSteps(logged);
+		const [decide] = deriveSteps(foldRun(logged));
 		expect(decide?.cost.usd).toBeCloseTo(0.02);
 		expect(decide?.sessions).toEqual([]);
 		const transcript = await readTranscriptFile(
@@ -201,7 +202,7 @@ describe("the Decision node", () => {
 			{ decider },
 		);
 		const { parked, next } = await drive(h, { inputs: {} });
-		const [decide] = deriveSteps(await h.events());
+		const [decide] = deriveSteps(foldRun(await h.events()));
 		expect(next).toEqual(["park__decide"]);
 		expect(parked).toEqual([
 			{
@@ -325,7 +326,7 @@ describe("the Decision node", () => {
 			{ decider },
 		);
 		const first = await drive(h, { inputs: {} });
-		const [decide] = deriveSteps(await h.events());
+		const [decide] = deriveSteps(foldRun(await h.events()));
 		const stepId = decide?.id as string;
 		expect(first.next).toEqual(["wait__decide"]);
 		expect(first.parked).toEqual([
@@ -379,7 +380,7 @@ describe("the Decision node", () => {
 			"WaitEnded",
 			"StepEnded",
 		]);
-		const steps = deriveSteps(await h.events());
+		const steps = deriveSteps(foldRun(await h.events()));
 		expect(steps).toHaveLength(1);
 		expect(steps[0]).toMatchObject({ id: stepId, visit: 1, outcome: "yes" });
 		expect(second.events[0]).toMatchObject({
@@ -423,7 +424,7 @@ describe("the Decision node", () => {
 			{ decider },
 		);
 		await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 		await h.log.append({
 			type: "WaitEnded",
 			runId: h.runId,
@@ -495,7 +496,7 @@ describe("the Decision node", () => {
 		]);
 		// The read model takes the end after the reopening: the label, not
 		// `interrupted`, and the decider's cost.
-		const steps = deriveSteps(await h.events());
+		const steps = deriveSteps(foldRun(await h.events()));
 		expect(steps).toHaveLength(1);
 		expect(steps[0]).toMatchObject({
 			id: stepId,
@@ -575,7 +576,7 @@ describe("the Decision node decided by a rule", () => {
 			outputs: { outcome: "retry", note: "", visit: 1 },
 			error: null,
 		});
-		const [, pick] = deriveSteps(logged);
+		const [, pick] = deriveSteps(foldRun(logged));
 		expect(pick?.cost.usd).toBe(0);
 		expect(pick?.sessions).toEqual([]);
 		const transcript = await readTranscriptFile(pick?.transcriptPath as string);
@@ -617,7 +618,7 @@ describe("the Decision node decided by a rule", () => {
 			outcome: "stop",
 			reason: 'Ended at node "pick" with "stop".',
 		});
-		const [pick] = deriveSteps(await h.events());
+		const [pick] = deriveSteps(foldRun(await h.events()));
 		expect(
 			(await readTranscriptFile(pick?.transcriptPath as string)).map(
 				(e) => e.event,
@@ -662,7 +663,7 @@ describe("the Decision node decided by a rule", () => {
 					"No option matched: no rule held, and no option is without a rule.",
 			},
 		]);
-		const [pick] = deriveSteps(await h.events());
+		const [pick] = deriveSteps(foldRun(await h.events()));
 		expect(
 			(await readTranscriptFile(pick?.transcriptPath as string)).map(
 				(e) => e.event,
@@ -714,7 +715,7 @@ describe("the Decision node decided by a rule", () => {
 		};
 		await expect(drive(h, { inputs: {} })).rejects.toThrow("the daemon died");
 		h.ctx.recorder = recorder;
-		const [first] = deriveSteps(await h.events());
+		const [first] = deriveSteps(foldRun(await h.events()));
 		expect(first).toMatchObject({ nodeId: "pick", visit: 1, endedAt: null });
 
 		// Recovery ended the step `interrupted`; the engine appended RunResumed
@@ -746,7 +747,7 @@ describe("the Decision node decided by a rule", () => {
 		expect(again.state.ended).toMatchObject({ nodeId: "pick", outcome: "go" });
 		expect(await h.types()).not.toContain("StepReopened");
 		expect(
-			deriveSteps(await h.events()).map((s) => [s.visit, s.outcome]),
+			deriveSteps(foldRun(await h.events())).map((s) => [s.visit, s.outcome]),
 		).toEqual([
 			[1, "interrupted"],
 			[2, "go"],

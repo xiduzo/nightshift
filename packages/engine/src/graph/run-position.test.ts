@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { foldRun } from "../log";
 import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
 	Scope,
 } from "../log/events";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	commitVisit,
 	frontOf,
@@ -115,7 +116,7 @@ describe("the rule: the log counts one more visit than the checkpoint for a step
 	])("%s", (_, committed, expected) => {
 		const at = positionOf(
 			stateOf({ visits: { a: committed } }),
-			twoVisits,
+			foldRun(twoVisits),
 			null,
 		);
 		expect(at.uncommitted(A)?.id ?? null).toBe(expected);
@@ -125,7 +126,7 @@ describe("the rule: the log counts one more visit than the checkpoint for a step
 		const { visits } = commitVisit(A, 2);
 		expect(visits).toEqual({ a: 2 });
 		expect(
-			positionOf(stateOf({ visits }), twoVisits, null).uncommitted(A),
+			positionOf(stateOf({ visits }), foldRun(twoVisits), null).uncommitted(A),
 		).toBeNull();
 	});
 
@@ -136,11 +137,15 @@ describe("the rule: the log counts one more visit than the checkpoint for a step
 			ended("s1"),
 			started("s2", "a", 2, body),
 		);
-		const top = positionOf(stateOf(), events, null);
+		const top = positionOf(stateOf(), foldRun(events), null);
 		expect(top.uncommitted(A)).toBeNull();
 		expect(top.latest(A)).toBeNull();
 		expect(top.nextVisit(A)).toBe(1);
-		const inner = positionOf(stateOf({ visits: { a: 1 } }), events, body);
+		const inner = positionOf(
+			stateOf({ visits: { a: 1 } }),
+			foldRun(events),
+			body,
+		);
 		expect(inner.uncommitted(A)?.id).toBe("s2");
 		expect(inner.latest(A)?.id).toBe("s2");
 		expect(inner.nextVisit(A)).toBe(3);
@@ -161,7 +166,7 @@ describe("the step a node holds", () => {
 	const events = logOf(started("s1", "a", 1), ended("s1"));
 
 	test("only its own, with the step as the log has it", () => {
-		const at = positionOf(stateOf({ pending: parked }), events, null);
+		const at = positionOf(stateOf({ pending: parked }), foldRun(events), null);
 		expect(at.held(A)?.pending).toBe(parked);
 		expect(at.held(A)?.step?.id).toBe("s1");
 		expect(at.held({ id: "b" })).toBeNull();
@@ -172,16 +177,20 @@ describe("the step a node holds", () => {
 
 	test("a park before the step started holds no step", () => {
 		const before = { ...parked, stepId: null };
-		const at = positionOf(stateOf({ pending: before }), events, null);
+		const at = positionOf(stateOf({ pending: before }), foldRun(events), null);
 		expect(at.held(A)).toEqual({ pending: before, step: null });
 	});
 
 	test("a loop is mid-way while its cursor is set", () => {
 		expect(
-			positionOf(stateOf({ loops: { a: { index: 1 } } }), [], null).looping(A),
+			positionOf(
+				stateOf({ loops: { a: { index: 1 } } }),
+				foldRun([]),
+				null,
+			).looping(A),
 		).toBe(true);
 		expect(
-			positionOf(stateOf({ loops: { a: null } }), [], null).looping(A),
+			positionOf(stateOf({ loops: { a: null } }), foldRun([]), null).looping(A),
 		).toBe(false);
 	});
 
@@ -206,11 +215,13 @@ describe("the step a node holds", () => {
 				payload: { itemId: "x", state: "done", reason: null, outputs: {} },
 			},
 		);
-		expect(positionOf(stateOf(), events, null).cursorBehind(A)).toBe(1);
+		expect(positionOf(stateOf(), foldRun(events), null).cursorBehind(A)).toBe(
+			1,
+		);
 		expect(
 			positionOf(
 				stateOf({ loops: { a: { index: 1 } } }),
-				events,
+				foldRun(events),
 				null,
 			).cursorBehind(A),
 		).toBeNull();
@@ -225,9 +236,12 @@ describe("the step a node holds", () => {
 			question: "Ship it?",
 			choices: [],
 		};
-		expect(holdEnded(logOf(started("s1", "a")), gate)).toBe(false);
+		expect(holdEnded(foldRun(logOf(started("s1", "a"))), gate)).toBe(false);
 		expect(
-			holdEnded(logOf(started("s1", "a"), ended("s1", "stopped")), gate),
+			holdEnded(
+				foldRun(logOf(started("s1", "a"), ended("s1", "stopped"))),
+				gate,
+			),
 		).toBe(true);
 	});
 });
@@ -236,7 +250,7 @@ describe("a step that is done: it ended on its own, and the commit after it neve
 	const doneAt = (
 		state: Partial<Pick<RunStateValues, "pending" | "loops" | "visits">>,
 		...events: Ev[]
-	) => positionOf(stateOf(state), logOf(...events), null).done(A);
+	) => positionOf(stateOf(state), foldRun(logOf(...events)), null).done(A);
 
 	test("an uncommitted step that ended on its own is done, with the edge the walk took after it", () => {
 		expect(doneAt({}, started("s1", "a"), ended("s1"))).toMatchObject({
@@ -321,27 +335,27 @@ describe("a step that is done: it ended on its own, and the commit after it neve
 
 	test("isDone asks the same of any step the log has", () => {
 		const events = logOf(started("s1", "a"), ended("s1"));
-		const [step] = deriveSteps(events);
+		const [step] = deriveSteps(foldRun(events));
 		if (!step) throw new Error("no step");
-		expect(isDone(events, step)).toBe(true);
+		expect(isDone(foldRun(events), step)).toBe(true);
 		const finished = logOf(
 			started("s1", "a"),
 			ended("s1"),
 			runEnded("finished"),
 		);
-		expect(isDone(finished, step)).toBe(false);
+		expect(isDone(foldRun(finished), step)).toBe(false);
 	});
 });
 
 describe("the front of the walk", () => {
 	test("the last step, and the edge the walk took after it", () => {
 		const atStep = logOf(started("s1", "a"), ended("s1"));
-		expect(frontOf(atStep, null)).toMatchObject({
+		expect(frontOf(foldRun(atStep), null)).toMatchObject({
 			last: { id: "s1" },
 			movedOn: null,
 		});
 		const movedOn = logOf(started("s1", "a"), ended("s1"), edgeTaken("a", "b"));
-		expect(frontOf(movedOn, null)).toMatchObject({
+		expect(frontOf(foldRun(movedOn), null)).toMatchObject({
 			last: { id: "s1" },
 			movedOn: { payload: { to: "b" } },
 		});
@@ -354,27 +368,31 @@ describe("the front of the walk", () => {
 			ended("s1"),
 			edgeTaken("a", "b", body),
 		);
-		expect(frontOf(events, null)).toMatchObject({
+		expect(frontOf(foldRun(events), null)).toMatchObject({
 			last: { id: "c1" },
 			movedOn: null,
 		});
-		expect(latestFront(events)).toMatchObject({
+		expect(latestFront(foldRun(events))).toMatchObject({
 			last: { id: "s1" },
 			movedOn: { payload: { to: "b" } },
 		});
 	});
 
 	test("a re-entry reopens the last top-level node the walk did not move on from", () => {
-		expect(reenteredNode(logOf())).toBeNull();
-		expect(reenteredNode(logOf(started("s1", "a"), ended("s1")))).toBe("a");
+		expect(reenteredNode(foldRun(logOf()))).toBeNull();
+		expect(reenteredNode(foldRun(logOf(started("s1", "a"), ended("s1"))))).toBe(
+			"a",
+		);
 		expect(
 			reenteredNode(
-				logOf(started("s1", "a"), ended("s1"), edgeTaken("a", "b")),
+				foldRun(logOf(started("s1", "a"), ended("s1"), edgeTaken("a", "b"))),
 			),
 		).toBeNull();
 		// A step in a called flow: its caller is the top-level node.
 		expect(
-			reenteredNode(logOf(started("c1", "c"), started("s1", "a", 1, body))),
+			reenteredNode(
+				foldRun(logOf(started("c1", "c"), started("s1", "a", 1, body))),
+			),
 		).toBe("c");
 	});
 });
@@ -390,10 +408,10 @@ describe("the re-entry seed", () => {
 	);
 
 	test("the log's counts commit every step; the reopened node's last one stays uncommitted", () => {
-		expect(loggedVisits(flow, events, null)).toEqual({ a: 2, b: 1 });
-		const visits = loggedVisits(flow, events, "a");
+		expect(loggedVisits(flow, foldRun(events), null)).toEqual({ a: 2, b: 1 });
+		const visits = loggedVisits(flow, foldRun(events), "a");
 		expect(visits).toEqual({ a: 1, b: 1 });
-		const at = positionOf(stateOf({ visits }), events, null);
+		const at = positionOf(stateOf({ visits }), foldRun(events), null);
 		expect(at.uncommitted(A)?.id).toBe("s3");
 		expect(at.uncommitted({ id: "b" })).toBeNull();
 	});
@@ -404,7 +422,7 @@ describe("the re-entry seed", () => {
 		expect(seed).toEqual({ visits: { a: 1 } });
 		const at = positionOf(
 			stateOf({ visits: { ...values.visits, ...seed.visits } }),
-			events,
+			foldRun(events),
 			null,
 		);
 		expect(at.uncommitted(A)?.id).toBe("s3");

@@ -3,8 +3,9 @@ import type { Command } from "@langchain/langgraph";
 import { step as stepTable } from "@nightshift/db/schema";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
+import { foldRun } from "../log";
 import type { EngineEventType } from "../log/events";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -428,7 +429,7 @@ describe("the step runner", () => {
 				expect(update.visits).toEqual({ n: 1 });
 			}
 			// One step at most, and the log is consistent with the state.
-			const steps = deriveSteps(events);
+			const steps = deriveSteps(foldRun(events));
 			expect(steps.length).toBeLessThanOrEqual(1);
 			if (row.goto === "wait__n") {
 				expect(steps[0]?.endedAt).toBeNull();
@@ -543,7 +544,7 @@ describe("the step runner", () => {
 			goto: "",
 			ran: true,
 		});
-		const [step] = deriveSteps(events);
+		const [step] = deriveSteps(foldRun(events));
 		expect(step?.visit).toBe(1);
 		expect(step?.endedAt).toBeNull();
 		// The second wait of the same step grows the streak.

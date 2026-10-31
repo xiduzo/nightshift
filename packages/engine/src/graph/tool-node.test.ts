@@ -4,8 +4,9 @@ import { fixturePath } from "@nightshift/agents/testing";
 import type { McpServerConfig } from "@nightshift/agents/types";
 import type { ToolNode } from "@nightshift/flows";
 import { coerceArguments } from "../device/tool-call";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -141,7 +142,7 @@ describe("the Tool node", () => {
 			visit: 1,
 		});
 
-		const [step] = deriveSteps(logged);
+		const [step] = deriveSteps(foldRun(logged));
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
 			{
@@ -263,7 +264,7 @@ describe("the Tool node", () => {
 			},
 			error: "No such team.",
 		});
-		const [step] = deriveSteps(await h.events());
+		const [step] = deriveSteps(foldRun(await h.events()));
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.at(-1)?.event).toEqual({
 			type: "tool-called",
@@ -288,7 +289,7 @@ describe("the Tool node", () => {
 			outputs: { outcome: "fail", data: null, text: "", visit: 1 },
 			error: message,
 		});
-		const [step] = deriveSteps(await h.events());
+		const [step] = deriveSteps(foldRun(await h.events()));
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
 			{

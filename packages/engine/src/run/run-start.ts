@@ -356,7 +356,7 @@ export function createRunStart(deps: RunStartDeps) {
 		const { memberName } = deps;
 		return toSummary(
 			row,
-			runFacts(await log.events(runId)),
+			runFacts(await log.state(runId)),
 			await namesOf(
 				db,
 				[row.startedBy],

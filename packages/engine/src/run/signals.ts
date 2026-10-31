@@ -3,7 +3,7 @@ import { event, run } from "@nightshift/db/schema";
 import type { JsonValue } from "@nightshift/flows";
 import { and, eq, sql } from "drizzle-orm";
 import type { Runner } from "../graph";
-import type { LoggedEvent, RunLog } from "../log";
+import type { RunLog, RunState } from "../log";
 import { deriveSleep, type SleepFact } from "../read";
 import { RunRefusal } from "../run-status";
 
@@ -74,7 +74,7 @@ export function createSignals(deps: SignalsDeps) {
 		async send(projectId: string, signal: ProjectSignal): Promise<number> {
 			let woke = 0;
 			for (const runId of await candidates(projectId, signal.name)) {
-				if (!waitsFor(deriveSleep(await log.events(runId)), signal)) continue;
+				if (!waitsFor(deriveSleep(await log.state(runId)), signal)) continue;
 				try {
 					await runner.take(
 						runId,
@@ -87,8 +87,8 @@ export function createSignals(deps: SignalsDeps) {
 						{
 							whenFull: "queue",
 							// It may have moved on since: a stop, a person's signal.
-							check: (events: readonly LoggedEvent[]) => {
-								if (!waitsFor(deriveSleep(events), signal)) {
+							check: (runState: RunState) => {
+								if (!waitsFor(deriveSleep(runState), signal)) {
 									throw new RunRefusal(
 										"wrong-signal",
 										"This run does not wait for that signal.",

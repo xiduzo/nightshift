@@ -6,6 +6,7 @@ import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { JoinNode } from "@nightshift/flows";
 import { localDevice } from "../device/local";
 import type { StepEvent, WorktreeChanges } from "../log";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read";
 import {
@@ -48,7 +49,9 @@ async function withSnapshots(h: Harness): Promise<Harness> {
 }
 
 async function transcriptOf(h: Harness, nodeId: string): Promise<StepEvent[]> {
-	const found = deriveSteps(await h.events()).find((s) => s.nodeId === nodeId);
+	const found = deriveSteps(foldRun(await h.events())).find(
+		(s) => s.nodeId === nodeId,
+	);
 	const entries = await readTranscriptFile(found?.transcriptPath as string);
 	return entries.map((entry) => entry.event);
 }
@@ -239,11 +242,14 @@ describe("activeBetween", () => {
 	});
 
 	test("a step asleep or at a Gate the whole time was not active", () => {
-		const asleep = step({ endedAt: null, sleeps: [{ from: 12, to: null }] });
+		const asleep = step({
+			endedAt: null,
+			sleeps: [{ from: 12, to: null, reason: "duration", signal: null }],
+		});
 		expect(activeBetween(asleep, 15, 30)).toBe(false);
 		expect(activeBetween(asleep, 11, 30)).toBe(true);
 		const atGate = step({
-			sleeps: [{ from: 10, to: 14 }],
+			sleeps: [{ from: 10, to: 14, reason: "duration", signal: null }],
 			gateWaits: [{ from: 14, to: 20 }],
 		});
 		expect(activeBetween(atGate, 0, 30)).toBe(false);

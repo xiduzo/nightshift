@@ -12,12 +12,12 @@ import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import {
 	getRunRow,
-	type LoggedEvent,
 	type ResumedBy,
 	type RunBus,
 	type RunEnding,
 	type RunLog,
 	type RunRow,
+	type RunState,
 	type RunStatus,
 	runsArriving,
 } from "../log";
@@ -217,14 +217,14 @@ export type TakeOptions = {
 	whenFull?: "refuse" | "queue";
 	/** What a queued Turn runs when a slot frees. Default: the same `take` again. */
 	retry?(): void;
-	/** Runs first in the Turn, on the run's log: throws to refuse the Turn. */
-	check?(events: readonly LoggedEvent[]): void;
+	/** Runs first in the Turn, on the run state: throws to refuse the Turn. */
+	check?(runState: RunState): void;
 };
 
-/** What `hold` gives its function: the run's log, and whether a drive or a Turn holds a slot of it. */
+/** What `hold` gives its function: the run state, and whether a drive or a Turn holds a slot of it. */
 export type Held = {
 	row: RunRow;
-	events: readonly LoggedEvent[];
+	runState: RunState;
 	active: boolean;
 };
 
@@ -733,9 +733,9 @@ export function createRunner(deps: RunnerDeps) {
 			const unsubscribe = bus.subscribe(runId, () => void look());
 			async function look(): Promise<void> {
 				if (settled) return;
-				const events = await log.events(runId);
+				const runState = await log.state(runId);
 				if (settled) return;
-				const step = deriveSteps(events).find((s) => s.id === stepId);
+				const step = deriveSteps(runState).find((s) => s.id === stepId);
 				const closed =
 					!step || step.endedAt !== null || step.openedSeq > askedSeq;
 				if (closed || !slots.has(runId)) {
@@ -760,7 +760,7 @@ export function createRunner(deps: RunnerDeps) {
 		const thread = threadOf(row);
 		const plan = planReentry({
 			flow: deps.flowOf(row),
-			events: await log.events(runId),
+			run: await log.state(runId),
 			thread: await thread.snapshot(),
 			request,
 			now: deps.now(),
@@ -818,7 +818,7 @@ export function createRunner(deps: RunnerDeps) {
 		sleeps.forget(row.id);
 		const { choice, note, byDeadline } = intent;
 		const asked =
-			deriveSteps(await log.events(row.id)).find((s) => s.id === intent.stepId)
+			deriveSteps(await log.state(row.id)).find((s) => s.id === intent.stepId)
 				?.gate?.openedSeq ?? 0;
 		const value: ResumeValue = {
 			kind: "gate",
@@ -847,11 +847,11 @@ export function createRunner(deps: RunnerDeps) {
 	 */
 	async function deadlineTurn(
 		row: RunRow,
-		events: readonly LoggedEvent[],
+		runState: RunState,
 		options: TakeOptions,
 	): Promise<Taken> {
 		// Parallel branches may wait at several Gates: the first deadline is due.
-		const gate = firstDeadline(events);
+		const gate = firstDeadline(runState);
 		if (!gate) return UNCHANGED;
 		if (deps.now() < gate.deadline.at) {
 			sleeps.schedule(row.id, gate.deadline.at);
@@ -877,14 +877,14 @@ export function createRunner(deps: RunnerDeps) {
 	 */
 	async function wakeTurn(
 		row: RunRow,
-		events: readonly LoggedEvent[],
+		runState: RunState,
 		intent: Intent,
 		how: Wake,
 		options: TakeOptions,
 	): Promise<Taken> {
 		const runId = row.id;
 		const at = await threadOf(row).state();
-		const plan = planWake(events, at, how, deps.now());
+		const plan = planWake(runState, at, how, deps.now());
 		if (plan.kind === "not-sleeping") return UNCHANGED;
 		if (plan.kind === "too-soon") {
 			sleeps.schedule(runId, plan.until);
@@ -948,10 +948,10 @@ export function createRunner(deps: RunnerDeps) {
 		else reserve(runId, intent, {});
 		// The old drive may never unwind to free its slot itself.
 		turn.freed = true;
-		const events = await log.events(runId);
-		const status = deriveRunState(events).status;
+		const runState = await log.state(runId);
+		const status = deriveRunState(runState).status;
 		if (!isGoing(status)) throw new RestartTooLate(status);
-		if (walk && deriveSteps(events).every((s) => s.endedAt !== null)) {
+		if (walk && deriveSteps(runState).every((s) => s.endedAt !== null)) {
 			drive(row, inputOf({ kind: "continue" }));
 			throw new RestartTooLate(status);
 		}
@@ -981,7 +981,7 @@ export function createRunner(deps: RunnerDeps) {
 			await takeFromDrive(runId, walk);
 			turn.freed = true;
 		}
-		const status = deriveRunState(await log.events(runId)).status;
+		const status = deriveRunState(await log.state(runId)).status;
 		if (!walk && !isGoing(status)) return UNCHANGED;
 		await log.append({ type: "StopRequested", runId, payload: {} });
 		// A drive may have ended the run before the stop took it.
@@ -999,14 +999,14 @@ export function createRunner(deps: RunnerDeps) {
 	 */
 	async function overdueTurn(
 		row: RunRow,
-		events: readonly LoggedEvent[],
+		runState: RunState,
 		graceMs: number,
 		turn: TurnState,
 	): Promise<Taken> {
 		const runId = row.id;
-		if (deriveRunState(events).status !== "running") return UNCHANGED;
+		if (deriveRunState(runState).status !== "running") return UNCHANGED;
 		const overdue = await findOverdue(
-			events,
+			runState,
 			{ now: deps.now(), graceMs, minuteMs: deps.minuteMs },
 			{ runId, dataDir: deps.dataDir },
 		);
@@ -1052,25 +1052,25 @@ export function createRunner(deps: RunnerDeps) {
 			);
 			return UNCHANGED;
 		}
-		const events = await log.events(runId);
-		options.check?.(events);
+		const runState = await log.state(runId);
+		options.check?.(runState);
 		switch (intent.kind) {
 			case "answer":
 				return answerTurn(row, intent, options);
 			case "wake":
 				// The timer of a Gate's deadline: the run waits, it does not sleep.
-				if (!intent.early && deriveRunState(events).status === "waiting") {
-					return deadlineTurn(row, events, options);
+				if (!intent.early && deriveRunState(runState).status === "waiting") {
+					return deadlineTurn(row, runState, options);
 				}
-				return wakeTurn(row, events, intent, intent, options);
+				return wakeTurn(row, runState, intent, intent, options);
 			case "resume": {
 				const { kind: _, ...request } = intent;
 				// A sleeping run wakes now, with the person's prompt.
-				if (deriveRunState(events).status === "sleeping") {
+				if (deriveRunState(runState).status === "sleeping") {
 					const prompt = request.prompt;
 					return wakeTurn(
 						row,
-						events,
+						runState,
 						intent,
 						{ early: true, ...(prompt !== undefined ? { prompt } : {}) },
 						options,
@@ -1092,7 +1092,7 @@ export function createRunner(deps: RunnerDeps) {
 			case "stop":
 				return stopTurn(row, turn);
 			case "overdue":
-				return overdueTurn(row, events, intent.graceMs, turn);
+				return overdueTurn(row, runState, intent.graceMs, turn);
 		}
 	}
 
@@ -1112,7 +1112,7 @@ export function createRunner(deps: RunnerDeps) {
 			walk &&
 			(intent.kind === "wake" ||
 				(intent.kind === "resume" &&
-					deriveRunState(await log.events(runId)).status === "sleeping"))
+					deriveRunState(await log.state(runId)).status === "sleeping"))
 		) {
 			await walk.done;
 		}
@@ -1141,7 +1141,7 @@ export function createRunner(deps: RunnerDeps) {
 			}
 			return fn({
 				row,
-				events: await log.events(runId),
+				runState: await log.state(runId),
 				active: slots.has(runId),
 			});
 		});
@@ -1183,8 +1183,8 @@ export function createRunner(deps: RunnerDeps) {
 		/** Whether a drive or a Turn holds a slot of the run. */
 		isActive: (runId: string): boolean => slots.has(runId),
 		/** A new daemon's wake timer from the log, or a moved-in run's (`graph/sleep.ts`). */
-		restore: (runId: string, events: readonly LoggedEvent[]): void =>
-			sleeps.restore(runId, events),
+		restore: (runId: string, runState: RunState): void =>
+			sleeps.restore(runId, runState),
 		/**
 		 * Drops what this runner keeps of a run that another Device walks
 		 * now: its compiled thread, its wake timer and its place in the cap

@@ -18,8 +18,8 @@ import type {
 	SessionOutcome,
 	StepOutcome,
 	TranscriptEntry,
+	VariableChange,
 } from "../log";
-import type { VariableChange } from "./derive-steps";
 import type { RunMetrics } from "./run-metrics";
 
 /**

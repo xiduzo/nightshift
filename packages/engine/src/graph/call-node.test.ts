@@ -4,8 +4,9 @@ import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
+import { foldRun } from "../log";
 
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	agent,
 	command,
@@ -110,7 +111,7 @@ describe("the Call node", () => {
 			"StepEnded",
 		]);
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const sub = steps.find((s) => s.nodeId === "sub");
 		expect(sub).toMatchObject({ nodeType: "call", visit: 1, scope: null });
 		expect(payloads(logged, "FlowCalled")).toEqual([
@@ -192,7 +193,7 @@ describe("the Call node", () => {
 		expect(parked).toEqual([]);
 		expect(state.ended?.nodeId).toBe("verdict");
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const tried = steps.find((s) => s.nodeId === "try");
 		expect(payloads(logged, "StepEnded")[1]).toEqual({
 			outcome: "fail",
@@ -245,7 +246,7 @@ describe("the Call node", () => {
 			flows,
 		});
 		const first = await drive(h2, { inputs: {} });
-		const [tryStep] = deriveSteps(await h2.events());
+		const [tryStep] = deriveSteps(foldRun(await h2.events()));
 		expect(first.next).toEqual(["park__try"]);
 		expect(first.parked).toEqual([
 			{
@@ -265,7 +266,7 @@ describe("the Call node", () => {
 		const second = await drive(h2, new Command({ resume: { kind: "resume" } }));
 		expect(second.parked[0]).toMatchObject({ status: "failed" });
 		expect(
-			deriveSteps(await h2.events())
+			deriveSteps(foldRun(await h2.events()))
 				.filter((s) => s.nodeId === "try")
 				.map((s) => [s.visit, s.outcome]),
 		).toEqual([
@@ -295,7 +296,7 @@ describe("the Call node", () => {
 		expect(parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[1]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[1]?.id as string,
 				nodeId: "call",
 				status: "failed",
 				reason: 'Node "call" failed: The flow "needs" needs a value for: must.',
@@ -343,7 +344,7 @@ describe("the Call node", () => {
 			{ harness, flows: { work }, signal: controller.signal },
 		);
 		const first = await drive(h, { inputs: {} });
-		const steps = deriveSteps(await h.events());
+		const steps = deriveSteps(foldRun(await h.events()));
 		const call = steps.find((s) => s.nodeId === "call");
 		const worker = steps.find((s) => s.nodeId === "worker");
 		expect(first.parked).toEqual([
@@ -425,7 +426,7 @@ describe("the Call node", () => {
 		]);
 		// One Subflow step, one FlowCalled, one body step with two sessions.
 		expect(payloads(logged, "FlowCalled")).toHaveLength(1);
-		const after = deriveSteps(logged);
+		const after = deriveSteps(foldRun(logged));
 		expect(after.filter((s) => s.nodeId === "call")).toHaveLength(1);
 		expect(after.find((s) => s.nodeId === "call")?.outputs).toEqual({
 			summary: "Finished",
@@ -452,7 +453,9 @@ describe("the Call node", () => {
 		const recorder = h.ctx.recorder;
 		let crashes = 1;
 		h.ctx.recorder = async (stepId) => {
-			const own = deriveSteps(await h.events()).find((s) => s.id === stepId);
+			const own = deriveSteps(foldRun(await h.events())).find(
+				(s) => s.id === stepId,
+			);
 			if (own?.nodeId === "second" && crashes-- > 0) {
 				throw new Error("the daemon died");
 			}
@@ -460,7 +463,7 @@ describe("the Call node", () => {
 		};
 		await expect(drive(h, { inputs: {} })).rejects.toThrow("the daemon died");
 		expect(harness.calls.map((c) => c.prompt)).toEqual(["First"]);
-		const crashed = deriveSteps(await h.events());
+		const crashed = deriveSteps(foldRun(await h.events()));
 		expect(crashed.map((s) => [s.nodeId, s.endedAt === null])).toEqual([
 			["call", true],
 			["first", false],
@@ -501,7 +504,7 @@ describe("the Call node", () => {
 		expect(harness.calls.map((c) => c.prompt)).toEqual(["First", "Second"]);
 		const logged = await h.events();
 		expect(payloads(logged, "FlowCalled")).toHaveLength(1);
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		expect(steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
 			["call", 1, "pass"],
 			["first", 1, "pass"],

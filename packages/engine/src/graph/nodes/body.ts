@@ -178,11 +178,12 @@ export async function bodyOutputs(
 	},
 	finished?: { nodes: NodeOutputs; vars: Record<string, JsonValue> },
 ): Promise<StepOutputs> {
-	const events = finished ? [] : await ctx.log.events(ctx.run.id);
+	const runState = finished ? null : await ctx.log.state(ctx.run.id);
 	const key = scopeKey(input.scope);
 	return flowOutputs(input.called, {
-		nodes: finished?.nodes ?? deriveNodeOutputs(events, key),
-		vars: finished?.vars ?? deriveVariables(events, key),
+		nodes:
+			finished?.nodes ?? (runState ? deriveNodeOutputs(runState, key) : {}),
+		vars: finished?.vars ?? (runState ? deriveVariables(runState, key) : {}),
 		inputs: input.inputs,
 		run: {
 			...input.run,

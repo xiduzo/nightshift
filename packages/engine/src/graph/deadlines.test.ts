@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { foldRun } from "../log";
 
 import type {
 	EngineEventType,
@@ -72,7 +73,7 @@ function log() {
 
 const check = (events: LoggedEvent[], now: number, graceMs = 0) =>
 	findOverdue(
-		events,
+		foldRun(events),
 		{ now, graceMs, minuteMs: MINUTE },
 		{ runId: "run-1", dataDir: dir },
 	);

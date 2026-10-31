@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
+import { foldRun } from "../log";
 import type { GateChoice } from "../log/events";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveOpenGate } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveOpenGate, deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -94,7 +94,7 @@ describe("the Gate node", () => {
 	test("opens the Gate, interrupts, and the answer ends the step with the choice and takes its edge", async () => {
 		const h = await startRun(sandbox, gateFlow());
 		const first = await drive(h, { inputs: { task: "the thing" } });
-		const [gateStep] = deriveSteps(await h.events());
+		const [gateStep] = deriveSteps(foldRun(await h.events()));
 		const stepId = gateStep?.id as string;
 		// The node opened the Gate and committed it; its ask node interrupts.
 		expect(first.next).toEqual(["ask__gate"]);
@@ -141,7 +141,7 @@ describe("the Gate node", () => {
 		]);
 		expect(logged.find((e) => e.type === "GateOpened")?.stepId).toBe(stepId);
 		expect(gateStep).toMatchObject({ outcome: null, endedAt: null });
-		expect(deriveOpenGate(logged)).toMatchObject({
+		expect(deriveOpenGate(foldRun(logged))).toMatchObject({
 			stepId,
 			nodeId: "gate",
 			visit: 1,
@@ -232,7 +232,7 @@ describe("the Gate node", () => {
 				scope: null,
 			},
 		]);
-		expect(deriveOpenGate(after)).toBeNull();
+		expect(deriveOpenGate(foldRun(after))).toBeNull();
 		expect(
 			(await readTranscriptFile(gateStep?.transcriptPath as string)).map(
 				(e) => e.event,
@@ -268,7 +268,7 @@ describe("the Gate node", () => {
 			}),
 		);
 		const first = await drive(h, {});
-		const [gateStep] = deriveSteps(await h.events());
+		const [gateStep] = deriveSteps(foldRun(await h.events()));
 		expect(payloads(await h.events(), "GateOpened")).toEqual([
 			{ question: "Ready?", choices },
 		]);
@@ -294,11 +294,13 @@ describe("the Gate node", () => {
 		expect(payloads(logged, "GateOpened")).toEqual([
 			{ question: "Ready?", choices: CHOICES, lockScreen: true },
 		]);
-		expect(deriveOpenGate(logged)?.lockScreen).toBe(true);
+		expect(deriveOpenGate(foldRun(logged))?.lockScreen).toBe(true);
 
 		const plain = await startRun(sandbox, gateFlow());
 		await drive(plain, { inputs: { task: "it" } });
-		expect(deriveOpenGate(await plain.events())?.lockScreen).toBe(false);
+		expect(deriveOpenGate(foldRun(await plain.events()))?.lockScreen).toBe(
+			false,
+		);
 	});
 
 	test("an answer without a note, and a choice without an edge, is a chosen end", async () => {
@@ -327,7 +329,7 @@ describe("the Gate node", () => {
 		const h = await startRun(sandbox, gateFlow());
 		const first = await drive(h, { inputs: { task: "it" } });
 		const before = await h.events();
-		const stepId = deriveSteps(before)[0]?.id as string;
+		const stepId = deriveSteps(foldRun(before))[0]?.id as string;
 
 		// invoke(null) on a new compile: the ask node interrupts again.
 		const again = await drive(h, null, h.graph());
@@ -338,7 +340,7 @@ describe("the Gate node", () => {
 		expect(
 			(
 				await readTranscriptFile(
-					deriveSteps(before)[0]?.transcriptPath as string,
+					deriveSteps(foldRun(before))[0]?.transcriptPath as string,
 				)
 			).map((e) => e.event.type),
 		).toEqual(["gate-open"]);
@@ -392,7 +394,7 @@ describe("the Gate node", () => {
 			"StepStarted",
 			"GateOpened",
 		]);
-		const stepId = deriveSteps(before)[0]?.id as string;
+		const stepId = deriveSteps(foldRun(before))[0]?.id as string;
 
 		// The re-run finds the open Gate in the log and asks it, logging nothing.
 		const again = await drive(h, null, h.graph());
@@ -463,8 +465,13 @@ describe("the Gate node", () => {
 			nodeType: "decision",
 			visit: 2,
 		});
-		expect(deriveOpenGate(logged)).toMatchObject({ stepId: second, visit: 2 });
-		expect(deriveSteps(logged).map((s) => [s.visit, s.outcome])).toEqual([
+		expect(deriveOpenGate(foldRun(logged))).toMatchObject({
+			stepId: second,
+			visit: 2,
+		});
+		expect(
+			deriveSteps(foldRun(logged)).map((s) => [s.visit, s.outcome]),
+		).toEqual([
 			[1, "stopped"],
 			[2, null],
 		]);
@@ -506,7 +513,9 @@ describe("the Gate node", () => {
 		]);
 		expect(await h.types()).not.toContain("StepReopened");
 		expect(logged.filter((e) => e.type === "GateOpened")).toHaveLength(3);
-		expect(deriveSteps(logged).map((s) => [s.visit, s.outcome])).toEqual([
+		expect(
+			deriveSteps(foldRun(logged)).map((s) => [s.visit, s.outcome]),
+		).toEqual([
 			[1, "stopped"],
 			[2, "stopped"],
 			[3, null],
@@ -528,7 +537,7 @@ describe("the Gate node", () => {
 		expect(answered.state.visits).toEqual({ gate: 3, ship: 1 });
 		logged = await h.events();
 		expect(
-			deriveSteps(logged).map((s) => [s.nodeId, s.visit, s.outcome]),
+			deriveSteps(foldRun(logged)).map((s) => [s.nodeId, s.visit, s.outcome]),
 		).toEqual([
 			["gate", 1, "stopped"],
 			["gate", 2, "stopped"],
@@ -544,7 +553,7 @@ describe("the Gate node", () => {
 			},
 		});
 		// One transcript per visit; the seq keeps counting across them.
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const transcripts = await Promise.all(
 			steps.slice(0, 3).map((s) => readTranscriptFile(s.transcriptPath)),
 		);
@@ -566,7 +575,7 @@ describe("the Gate node", () => {
 		expect(parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[0]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 				nodeId: "gate",
 				status: "failed",
 				reason:
@@ -597,7 +606,7 @@ describe("the Gate node", () => {
 		expect(parked).toEqual([
 			{
 				kind: "parked",
-				stepId: deriveSteps(await h.events())[0]?.id as string,
+				stepId: deriveSteps(foldRun(await h.events()))[0]?.id as string,
 				nodeId: "gate",
 				status: "failed",
 				reason: 'Node "gate" failed: The Gate could not open: disk full',

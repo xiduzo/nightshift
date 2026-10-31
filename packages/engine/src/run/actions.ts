@@ -5,19 +5,18 @@ import type { Actor, OwnDevice } from "../contract";
 import { type Runner, type RunWalks, rerunNodeRefusal } from "../graph";
 import {
 	applyWalkerMoves,
-	type LoggedEvent,
 	placedRun,
 	RUN_NOT_FOUND,
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	type RunState,
 } from "../log";
 import {
 	deriveOpenGate,
 	deriveRunState,
 	deriveSleep,
 	deriveSteps,
-	deriveStopAfterStep,
 } from "../read";
 import { RunRefusal, refuseUnless, whyNot } from "../run-status";
 import type { PlacementPort, RunsPort } from "./peers";
@@ -145,11 +144,11 @@ const signedOut = () =>
  * or the choice needs a note and has none (the answer to an Agent).
  */
 function refuseAnswer(
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	{ stepId, choice, note }: { stepId: string; choice: string; note?: string },
 ): void {
-	const why = whyNot("answer", deriveRunState(events).status, true);
-	const gate = deriveOpenGate(events);
+	const why = whyNot("answer", deriveRunState(runState).status, true);
+	const gate = deriveOpenGate(runState);
 	if (why !== null || !gate) {
 		throw new GateClosedError(why ?? "This run does not wait at a Gate.");
 	}
@@ -168,9 +167,9 @@ function refuseAnswer(
 }
 
 /** Throws unless the run sleeps in a Wait node that waits for the Signal `name`. */
-function refuseSignal(events: readonly LoggedEvent[], name: string): void {
-	refuseUnless("signal", deriveRunState(events).status, true);
-	if (deriveSleep(events)?.signal !== name) {
+function refuseSignal(runState: RunState, name: string): void {
+	refuseUnless("signal", deriveRunState(runState).status, true);
+	if (deriveSleep(runState)?.signal !== name) {
 		throw new RunRefusal(
 			"wrong-signal",
 			"This run does not wait for that signal.",
@@ -182,13 +181,10 @@ function refuseSignal(events: readonly LoggedEvent[], name: string): void {
  * Throws why a restart is refused, from the run's log: the run runs no
  * step, or `stepId` is not the step that runs.
  */
-function refuseRestart(
-	events: readonly LoggedEvent[],
-	stepId: string | undefined,
-): void {
-	const { status, result } = deriveRunState(events);
+function refuseRestart(runState: RunState, stepId: string | undefined): void {
+	const { status, result } = deriveRunState(runState);
 	refuseUnless("restart", status, true, result);
-	const open = deriveSteps(events).filter((s) => s.endedAt === null);
+	const open = deriveSteps(runState).filter((s) => s.endedAt === null);
 	if (open.length === 0) {
 		throw new RunRefusal(
 			"no-step",
@@ -225,8 +221,8 @@ export function createRunActions(deps: RunActionsDeps) {
 		actor: Actor | undefined,
 		request: RunActionRequest,
 	): Promise<void> {
-		const events = await log.events(row.id);
-		const { status, result } = deriveRunState(events);
+		const runState = await log.state(row.id);
+		const { status, result } = deriveRunState(runState);
 		switch (request.kind) {
 			case "stop":
 				// A run that has ended has nothing to stop.
@@ -236,7 +232,7 @@ export function createRunActions(deps: RunActionsDeps) {
 					payload: request.when ? { when: request.when } : {},
 				});
 			case "answer": {
-				refuseAnswer(events, request);
+				refuseAnswer(runState, request);
 				const pending =
 					(await deps.archive.pendingCommands([row.id])).get(row.id) ?? [];
 				if (pending.some((c) => c.kind === "gate.resolve")) {
@@ -251,7 +247,7 @@ export function createRunActions(deps: RunActionsDeps) {
 				});
 			}
 			case "signal":
-				refuseSignal(events, request.name);
+				refuseSignal(runState, request.name);
 				return relay.send(row, actor, {
 					kind: "signal.send",
 					payload: { name: request.name },
@@ -278,9 +274,10 @@ export function createRunActions(deps: RunActionsDeps) {
 			return;
 		}
 		const request = when === "after-step";
-		await runner.hold(row.id, async ({ events }) => {
-			if (whyNot("stop", deriveRunState(events).status, true) !== null) return;
-			if (deriveStopAfterStep(events) === request) return;
+		await runner.hold(row.id, async ({ runState }) => {
+			if (whyNot("stop", deriveRunState(runState).status, true) !== null)
+				return;
+			if (runState.stopAfterStep === request) return;
 			await log.append({
 				type: request ? "StopAfterStepRequested" : "StopAfterStepCancelled",
 				runId: row.id,
@@ -308,9 +305,9 @@ export function createRunActions(deps: RunActionsDeps) {
 				"This run already runs on this computer.",
 			);
 		}
-		await runner.hold(runId, async ({ events, active }) => {
+		await runner.hold(runId, async ({ runState, active }) => {
 			// A Turn that holds a slot is in the middle of a step too.
-			const { status, result } = deriveRunState(events);
+			const { status, result } = deriveRunState(runState);
 			refuseUnless("move", active ? "running" : status, true, result);
 			// The plan stays: only the Walker changes. A Device that is
 			// offline is the planner's refusal.
@@ -357,7 +354,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						choice: request.choice,
 						note: request.note ?? "",
 					},
-					{ check: (events) => refuseAnswer(events, request) },
+					{ check: (runState) => refuseAnswer(runState, request) },
 				);
 				return;
 			case "signal":
@@ -365,7 +362,7 @@ export function createRunActions(deps: RunActionsDeps) {
 				await runner.take(
 					runId,
 					{ kind: "wake", early: true, signal: request.name },
-					{ check: (events) => refuseSignal(events, request.name) },
+					{ check: (runState) => refuseSignal(runState, request.name) },
 				);
 				return;
 			case "move":
@@ -384,8 +381,8 @@ export function createRunActions(deps: RunActionsDeps) {
 								: {}),
 						},
 						{
-							check: (events) => {
-								const { status, result } = deriveRunState(events);
+							check: (runState) => {
+								const { status, result } = deriveRunState(runState);
 								refuseUnless("resume", status, true, result);
 							},
 						},
@@ -405,7 +402,7 @@ export function createRunActions(deps: RunActionsDeps) {
 								? { prompt: request.prompt }
 								: {}),
 						},
-						{ check: (events) => refuseRestart(events, request.stepId) },
+						{ check: (runState) => refuseRestart(runState, request.stepId) },
 					),
 				);
 				return;
@@ -419,8 +416,8 @@ export function createRunActions(deps: RunActionsDeps) {
 						runId,
 						{ kind: "rerun", by: "person", ...rerun },
 						{
-							check: (events) =>
-								refuseUnless("rerun", deriveRunState(events).status, true),
+							check: (runState) =>
+								refuseUnless("rerun", deriveRunState(runState).status, true),
 						},
 					),
 				);

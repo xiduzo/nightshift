@@ -13,9 +13,9 @@ import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveOpenGate } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveOpenGate, deriveSteps } from "../read/run-views";
 import {
 	agent as agentNode,
 	drive,
@@ -75,7 +75,7 @@ describe("the Agent node", () => {
 		expect(ended?.costSource).toBe("estimated");
 		expect(ended?.costUsd).toBeCloseTo(4.5, 6);
 		expect(payloads(logged, "RunWarned")).toEqual([]);
-		const cost = deriveSteps(logged)[0]?.cost;
+		const cost = deriveSteps(foldRun(logged))[0]?.cost;
 		expect(cost?.usd).toBeCloseTo(4.5, 6);
 		expect(cost).toMatchObject({ estimated: true, missing: 0 });
 	});
@@ -136,7 +136,9 @@ describe("the Agent node", () => {
 		expect(spent[0]?.costUsd).toBeCloseTo(3, 6);
 		// The end has the final cost, and it wins.
 		const [ended] = payloads(logged, "SessionEnded");
-		expect(deriveSteps(logged)[0]?.cost.usd).toBe(ended?.costUsd as number);
+		expect(deriveSteps(foldRun(logged))[0]?.cost.usd).toBe(
+			ended?.costUsd as number,
+		);
 		const [started] = payloads(logged, "StepStarted");
 		const transcript = await readTranscriptFile(
 			started?.transcriptPath as string,
@@ -208,7 +210,7 @@ describe("the Agent node", () => {
 		expect(ended?.outcome).toBe("failed");
 		expect(ended?.costSource).toBe("estimated");
 		expect(ended?.costUsd).toBeCloseTo(4.5, 6);
-		expect(deriveSteps(logged)[0]?.cost.usd).toBeCloseTo(4.5, 6);
+		expect(deriveSteps(foldRun(logged))[0]?.cost.usd).toBeCloseTo(4.5, 6);
 	});
 
 	test("no cost and no price: the cost is missing, and the run warns about it", async () => {
@@ -240,7 +242,7 @@ describe("the Agent node", () => {
 					'The cost of this step is not known. Claude Code reported no cost, and Night Shift has no price for "a-model-without-a-price". Spend totals leave it out.',
 			},
 		]);
-		expect(deriveSteps(logged)[0]?.cost).toEqual({
+		expect(deriveSteps(foldRun(logged))[0]?.cost).toEqual({
 			usd: 0,
 			estimated: false,
 			missing: 1,
@@ -323,7 +325,7 @@ describe("the Agent node", () => {
 		]);
 
 		// The state carries the same outputs, the visit and the chosen end.
-		const [derived] = deriveSteps(logged);
+		const [derived] = deriveSteps(foldRun(logged));
 		expect(state.nodes.worker).toEqual(
 			payloads(logged, "StepEnded")[0]?.outputs as Record<string, unknown>,
 		);
@@ -418,7 +420,7 @@ describe("the Agent node", () => {
 		expect(next).toEqual(["park__worker"]);
 
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		expect(steps.map((s) => [s.visit, s.outcome])).toEqual([
 			[1, "fail"],
 			[2, "fail"],
@@ -568,7 +570,7 @@ describe("the Agent node", () => {
 		const first = await drive(h, { inputs: {} });
 		const after = Date.now();
 		expect(first.next).toEqual(["wait__worker"]);
-		const [stepRow] = deriveSteps(await h.events());
+		const [stepRow] = deriveSteps(foldRun(await h.events()));
 		const stepId = stepRow?.id as string;
 		expect(first.parked).toEqual([
 			{
@@ -673,8 +675,8 @@ describe("the Agent node", () => {
 			resumeSessionId: "fake-session-1",
 			harness: "claude-code",
 		});
-		const [worker] = deriveSteps(logged);
-		expect(deriveSteps(logged)).toHaveLength(1);
+		const [worker] = deriveSteps(foldRun(logged));
+		expect(deriveSteps(foldRun(logged))).toHaveLength(1);
 		expect(worker?.outcome).toBe("pass");
 		expect(worker?.sessions.map((s) => s.ending?.outcome)).toEqual([
 			"failed",
@@ -754,7 +756,7 @@ describe("the Agent node", () => {
 		);
 		const first = await drive(h, { inputs: {} });
 		expect(first.next).toEqual(["wait__worker"]);
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
 
 		// The runner's wake appended WaitEnded; a person pressed Stop in the
 		// moment before the Agent node's entry. The step is in the log, so it
@@ -803,8 +805,8 @@ describe("the Agent node", () => {
 			outcome: "stopped",
 			error: null,
 		});
-		expect(deriveSteps(logged)).toHaveLength(1);
-		expect(deriveSteps(logged)[0]?.outcome).toBe("stopped");
+		expect(deriveSteps(foldRun(logged))).toHaveLength(1);
+		expect(deriveSteps(foldRun(logged))[0]?.outcome).toBe("stopped");
 
 		// The person resumes: the same step and harness session go on.
 		options.signal = new AbortController().signal;
@@ -819,7 +821,7 @@ describe("the Agent node", () => {
 			prompt: "go on",
 			resumeSessionId: "fake-session-1",
 		});
-		const after = deriveSteps(await h.events());
+		const after = deriveSteps(foldRun(await h.events()));
 		expect(after).toHaveLength(1);
 		expect(after[0]).toMatchObject({ id: stepId, visit: 1, outcome: "pass" });
 		expect(await h.types()).toContain("StepReopened");
@@ -835,7 +837,7 @@ describe("the Agent node", () => {
 			{ harness },
 		);
 		const first = await drive(h, { inputs: {} });
-		const [stepRow] = deriveSteps(await h.events());
+		const [stepRow] = deriveSteps(foldRun(await h.events()));
 		const stepId = stepRow?.id as string;
 		expect(first.next).toEqual(["park__worker"]);
 		expect(first.parked).toEqual([
@@ -905,7 +907,7 @@ describe("the Agent node", () => {
 			resumeSessionId: "fake-session-1",
 			harness: "claude-code",
 		});
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		expect(steps).toHaveLength(1);
 		expect(steps[0]?.outcome).toBe("pass");
 		expect(steps[0]?.sessions.map((s) => s.ending?.outcome)).toEqual([
@@ -937,7 +939,9 @@ describe("the Agent node", () => {
 		const second = await drive(h, new Command({ resume: { kind: "resume" } }));
 		expect(second.state.ended?.status).toBe("finished");
 		expect(harness.calls[0]?.resumeSessionId).toBeUndefined();
-		expect(deriveSteps(await h.events()).map((s) => s.visit)).toEqual([1, 2]);
+		expect(deriveSteps(foldRun(await h.events())).map((s) => s.visit)).toEqual([
+			1, 2,
+		]);
 		expect(await h.types()).not.toContain("StepReopened");
 	});
 
@@ -970,7 +974,9 @@ describe("the Agent node", () => {
 			["Work on worker: ", null],
 			["Work on worker: ", "fake-session-1"],
 		]);
-		expect(deriveSteps(await h.events()).map((s) => s.visit)).toEqual([1, 2]);
+		expect(deriveSteps(foldRun(await h.events())).map((s) => s.visit)).toEqual([
+			1, 2,
+		]);
 	});
 
 	test("a stop while the session runs ends the step stopped and parks the run", async () => {
@@ -1114,8 +1120,8 @@ describe("the Agent node", () => {
 			"StepEnded",
 		]);
 		expect(logged.find((e) => e.type === "StepReopened")?.stepId).toBe(stepId);
-		expect(deriveSteps(logged)).toHaveLength(1);
-		expect(deriveSteps(logged)[0]?.outcome).toBe("pass");
+		expect(deriveSteps(foldRun(logged))).toHaveLength(1);
+		expect(deriveSteps(foldRun(logged))[0]?.outcome).toBe("pass");
 	});
 });
 
@@ -1138,7 +1144,7 @@ describe("an Agent that asks a person", () => {
 		const harness = asking();
 		const h = await startRun(sandbox, askFlow(), { harness });
 		const first = await drive(h, { inputs: { task: "x" } });
-		const [own] = deriveSteps(await h.events());
+		const [own] = deriveSteps(foldRun(await h.events()));
 		const stepId = own?.id as string;
 		const question = "Which database should I use?\n\nWorking on it.";
 		expect(first.next).toEqual(["ask__worker"]);
@@ -1168,7 +1174,10 @@ describe("an Agent that asks a person", () => {
 		expect(payloads(asked, "GateOpened")).toEqual([
 			{ question, choices: [...ASK_CHOICES] },
 		]);
-		expect(deriveOpenGate(asked)).toMatchObject({ stepId, nodeId: "worker" });
+		expect(deriveOpenGate(foldRun(asked))).toMatchObject({
+			stepId,
+			nodeId: "worker",
+		});
 		expect(payloads(asked, "StepEnded")).toEqual([]);
 
 		const second = await drive(
@@ -1185,12 +1194,12 @@ describe("an Agent that asks a person", () => {
 			resumeSessionId: "fake-session-1",
 		});
 		const after = await h.events();
-		expect(deriveSteps(after)).toHaveLength(1);
+		expect(deriveSteps(foldRun(after))).toHaveLength(1);
 		expect(payloads(after, "StepReopened")).toEqual([
 			// Every Agent step has the run policy's idle limit.
 			{ prompt: "Use Postgres.", idleMs: 15 * MINUTE },
 		]);
-		expect(deriveOpenGate(after)).toBeNull();
+		expect(deriveOpenGate(foldRun(after))).toBeNull();
 		expect(payloads(after, "StepEnded")).toEqual([
 			{
 				outcome: "pass",
@@ -1267,7 +1276,7 @@ describe("an Agent that asks a person", () => {
 		const harness = asking();
 		const h = await startRun(sandbox, askFlow(), { harness });
 		await drive(h, { inputs: { task: "x" } });
-		const [own] = deriveSteps(await h.events());
+		const [own] = deriveSteps(foldRun(await h.events()));
 		const stepId = own?.id as string;
 		// What the runner and the engine append for a stop and a resume.
 		await h.log.append({ type: "StopRequested", runId: h.runId, payload: {} });

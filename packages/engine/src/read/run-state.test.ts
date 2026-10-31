@@ -1,165 +1,47 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNodeType } from "@nightshift/flows";
-import type {
-	EngineEventType,
-	EnginePayloads,
-	LoggedEvent,
-	RunStatus,
-	Scope,
-	SessionOutcome,
-	StepOutcome,
-} from "../log/events";
-import { NO_COST, sessionCost } from "./cost";
+import {
+	type EngineEventType,
+	foldRun,
+	type LoggedEvent,
+	NO_COST,
+	type RunStatus,
+	type Scope,
+	sessionCost,
+} from "../log";
+import { runEvents as log } from "../testing/run-events";
+import { deriveScores } from "./run-metrics";
+import { runTrace } from "./run-trace";
 import {
 	awaitsWorktree,
-	countDaemonResumes,
-	countStepsSinceWalkBegan,
+	countVisits,
 	deriveBudgetSpend,
 	deriveCalledTraversals,
-	deriveGateWaits,
+	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveRunState,
 	deriveSleep,
-	deriveStopAfterStep,
-	deriveStopAt,
+	deriveSteps,
 	deriveTraversals,
+	deriveVariables,
 	deriveWarnings,
-	deriveWorktree,
 	deriveWorktrees,
 	isOpenStatus,
-	parkedSteps,
-	runWorktree,
-} from "./derive-run";
-import {
-	countVisits,
-	deriveNodeOutputs,
-	deriveSessions,
-	deriveSteps,
 	lastHarnessSession,
 	lastHarnessSessionOfNode,
+	parkedSteps,
+	runWorktree,
 	sumCost,
-} from "./derive-steps";
+} from "./run-views";
 
-/** Builds a log for one run. Each helper appends one event with the next seq. */
-function log() {
-	const events: LoggedEvent[] = [];
-	const push = <T extends EngineEventType>(
-		type: T,
-		payload: EnginePayloads[T],
-		ids: { stepId?: string; sessionId?: string } = {},
-	) => {
-		events.push({
-			seq: events.length + 1,
-			runId: "run-1",
-			stepId: ids.stepId ?? null,
-			sessionId: ids.sessionId ?? null,
-			type,
-			payload,
-			at: 1000 + events.length,
-		} as LoggedEvent);
-		return builder;
-	};
-	const builder = {
-		events,
-		push,
-		runStarted: () =>
-			push("RunStarted", {
-				projectId: "p",
-				flowName: "f",
-				title: "f",
-				start: "worker",
-			}),
-		resumed: (nodeId: string, stepId: string | null = null) =>
-			push("RunResumed", { nodeId, stepId, prompt: null }),
-		stepStarted: (stepId: string, nodeId: string, visit = 1) =>
-			push(
-				"StepStarted",
-				{
-					nodeId,
-					nodeType:
-						nodeId === "check"
-							? "command"
-							: nodeId === "gate" || nodeId === "decide"
-								? "decision"
-								: "agent",
-					visit,
-					transcriptPath: `/t/${stepId}`,
-					logPath: null,
-				},
-				{ stepId },
-			),
-		stepReopened: (stepId: string) =>
-			push("StepReopened", { prompt: "go on" }, { stepId }),
-		stepEnded: (
-			stepId: string,
-			outcome: StepOutcome,
-			outputs: Record<string, string | number> = {},
-			costUsd?: number | null,
-		) =>
-			push(
-				"StepEnded",
-				{
-					outcome,
-					outputs: { outcome, ...outputs },
-					error: null,
-					...(costUsd === undefined ? {} : { costUsd }),
-				},
-				{ stepId },
-			),
-		gateOpened: (stepId: string, question = "Ship it?", lockScreen = false) =>
-			push(
-				"GateOpened",
-				{
-					question,
-					choices: [{ name: "approve" }, { name: "reject" }],
-					...(lockScreen ? { lockScreen: true as const } : {}),
-				},
-				{ stepId },
-			),
-		sessionStarted: (stepId: string, sessionId: string) =>
-			push(
-				"SessionStarted",
-				{ prompt: "p", resumeSessionId: null },
-				{ stepId, sessionId },
-			),
-		harness: (stepId: string, sessionId: string, harnessSessionId: string) =>
-			push(
-				"HarnessSessionAssigned",
-				{ harnessSessionId, model: null },
-				{ stepId, sessionId },
-			),
-		sessionEnded: (
-			stepId: string,
-			sessionId: string,
-			outcome: SessionOutcome,
-			costUsd: number | null = null,
-		) =>
-			push(
-				"SessionEnded",
-				{
-					outcome,
-					error: null,
-					errorKind: null,
-					usage: null,
-					costUsd,
-					resetAt: null,
-				},
-				{ stepId, sessionId },
-			),
-		edge: (edgeId: string, from: string, to: string) =>
-			push("EdgeTaken", { edgeId, from, to, outcome: "fail" }),
-		ended: (
-			status: EnginePayloads["RunEnded"]["status"],
-			reason: string | null = null,
-			result?: EnginePayloads["RunEnded"]["result"],
-		) => push("RunEnded", { status, reason, ...(result ? { result } : {}) }),
-	};
-	return builder;
-}
+/*
+ * The run state (`foldRun`, events in, state out) and the views of it.
+ * Every test builds a log, folds it, and reads the state or a view.
+ */
 
 describe("deriveRunState", () => {
 	test("a run without a start is interrupted", () => {
-		expect(deriveRunState([])).toEqual({
+		expect(deriveRunState(foldRun([]))).toEqual({
 			status: "interrupted",
 			reason: null,
 			result: null,
@@ -167,12 +49,12 @@ describe("deriveRunState", () => {
 	});
 
 	test("a started run without an end is running", () => {
-		expect(deriveRunState(log().runStarted().events).status).toBe("running");
+		expect(deriveRunState(log().runStarted().state()).status).toBe("running");
 	});
 
 	test("the end gives the status and the reason", () => {
 		const { events } = log().runStarted().ended("failed", "edge e1 at max");
-		expect(deriveRunState(events)).toEqual({
+		expect(deriveRunState(foldRun(events))).toEqual({
 			status: "failed",
 			reason: "edge e1 at max",
 			result: null,
@@ -183,13 +65,13 @@ describe("deriveRunState", () => {
 		const nothing = log()
 			.runStarted()
 			.ended("finished", "No open issues", "nothing-to-do");
-		expect(deriveRunState(nothing.events)).toEqual({
+		expect(deriveRunState(foldRun(nothing.events))).toEqual({
 			status: "finished",
 			reason: "No open issues",
 			result: "nothing-to-do",
 		});
 		const chosen = log().runStarted().ended("failed", null, "failed");
-		expect(deriveRunState(chosen.events)).toEqual({
+		expect(deriveRunState(foldRun(chosen.events))).toEqual({
 			status: "failed",
 			reason: null,
 			result: "failed",
@@ -198,9 +80,9 @@ describe("deriveRunState", () => {
 
 	test("a resume after an end makes the run running again", () => {
 		const b = log().runStarted().ended("stopped").resumed("worker");
-		expect(deriveRunState(b.events).status).toBe("running");
+		expect(deriveRunState(foldRun(b.events)).status).toBe("running");
 		b.ended("finished");
-		expect(deriveRunState(b.events)).toEqual({
+		expect(deriveRunState(foldRun(b.events))).toEqual({
 			status: "finished",
 			reason: null,
 			result: null,
@@ -220,7 +102,7 @@ describe("deriveSteps", () => {
 			.stepStarted("s2", "check")
 			.stepEnded("s2", "fail", { exit_code: 1, visit: 1 })
 			.stepStarted("s3", "worker", 2);
-		const steps = deriveSteps(events);
+		const steps = deriveSteps(foldRun(events));
 		expect(steps.map((s) => [s.id, s.nodeId, s.visit, s.outcome])).toEqual([
 			["s1", "worker", 1, "pass"],
 			["s2", "check", 1, "fail"],
@@ -242,9 +124,9 @@ describe("deriveSteps", () => {
 			.stepStarted("s1", "worker")
 			.stepEnded("s1", "stopped")
 			.stepReopened("s1");
-		expect(deriveSteps(b.events)[0]?.outcome).toBeNull();
+		expect(deriveSteps(foldRun(b.events))[0]?.outcome).toBeNull();
 		b.stepEnded("s1", "pass");
-		expect(deriveSteps(b.events)[0]?.outcome).toBe("pass");
+		expect(deriveSteps(foldRun(b.events))[0]?.outcome).toBe("pass");
 	});
 
 	test("the first end after an opening wins over a late duplicate", () => {
@@ -252,7 +134,7 @@ describe("deriveSteps", () => {
 			.stepStarted("s1", "worker")
 			.stepEnded("s1", "interrupted")
 			.stepEnded("s1", "pass");
-		expect(deriveSteps(events)[0]?.outcome).toBe("interrupted");
+		expect(deriveSteps(foldRun(events))[0]?.outcome).toBe("interrupted");
 	});
 });
 
@@ -261,7 +143,7 @@ test("deriveTraversals counts each edge", () => {
 		.edge("e1", "worker", "check")
 		.edge("e2", "check", "worker")
 		.edge("e1", "worker", "check");
-	expect(deriveTraversals(events)).toEqual({ e1: 2, e2: 1 });
+	expect(deriveTraversals(foldRun(events))).toEqual({ e1: 2, e2: 1 });
 });
 
 test("deriveNodeOutputs keeps the latest ended visit per node", () => {
@@ -273,23 +155,23 @@ test("deriveNodeOutputs keeps the latest ended visit per node", () => {
 		.stepStarted("s3", "check", 2)
 		.stepEnded("s3", "pass", { log_tail: "second" })
 		.stepStarted("s4", "worker", 2);
-	expect(deriveNodeOutputs(events)).toEqual({
+	expect(deriveNodeOutputs(foldRun(events))).toEqual({
 		check: { outcome: "pass", log_tail: "second" },
 		worker: { outcome: "pass", output: "w" },
 	});
 });
 
-test("countVisits and countStepsSinceWalkBegan", () => {
+test("visits per node, and the steps of the current walk", () => {
 	const b = log()
 		.runStarted()
 		.stepStarted("s1", "worker")
 		.stepStarted("s2", "check")
 		.stepStarted("s3", "worker", 2);
-	expect(countVisits(b.events, "worker")).toBe(2);
-	expect(countVisits(b.events, "check")).toBe(1);
-	expect(countStepsSinceWalkBegan(b.events)).toBe(3);
+	expect(countVisits(foldRun(b.events), "worker")).toBe(2);
+	expect(countVisits(foldRun(b.events), "check")).toBe(1);
+	expect(foldRun(b.events).stepsSinceWalk).toBe(3);
 	b.ended("stopped").resumed("worker").stepStarted("s4", "worker", 3);
-	expect(countStepsSinceWalkBegan(b.events)).toBe(1);
+	expect(foldRun(b.events).stepsSinceWalk).toBe(1);
 });
 
 test("harness session lookups", () => {
@@ -301,10 +183,10 @@ test("harness session lookups", () => {
 		.stepStarted("s2", "reviewer")
 		.sessionStarted("s2", "b")
 		.harness("s2", "b", "h-2");
-	expect(lastHarnessSessionOfNode(events, "worker")).toBe("h-1");
-	expect(lastHarnessSessionOfNode(events, "check")).toBeNull();
+	expect(lastHarnessSessionOfNode(foldRun(events), "worker")).toBe("h-1");
+	expect(lastHarnessSessionOfNode(foldRun(events), "check")).toBeNull();
 	// A session logged before Slice 8 names no harness: it ran on Claude Code.
-	expect(lastHarnessSession(events)).toEqual({
+	expect(lastHarnessSession(foldRun(events))).toEqual({
 		harness: "claude-code",
 		harnessSessionId: "h-2",
 	});
@@ -319,7 +201,7 @@ test("sumCost adds the cost of each ended session once", () => {
 		.sessionStarted("s2", "c")
 		.sessionEnded("s2", "c", "finished", 0.5)
 		.sessionEnded("s2", "c", "finished", 9);
-	expect(sumCost(events).usd).toBe(0.75);
+	expect(sumCost(foldRun(events)).usd).toBe(0.75);
 });
 
 test("isOpenStatus: a run at work, at a Gate or asleep is open; an ended one is not", () => {
@@ -352,9 +234,9 @@ test("sumCost and step costs include what a step spent itself", () => {
 		.stepEnded("s3", "error", {}, null)
 		// A late duplicate end of s2 does not count twice.
 		.stepEnded("s2", "continue", {}, 5);
-	const steps = deriveSteps(events);
+	const steps = deriveSteps(foldRun(events));
 	expect(steps.map((s) => s.cost.usd)).toEqual([0.25, 0.01, 0]);
-	expect(sumCost(events).usd).toBeCloseTo(0.26);
+	expect(sumCost(foldRun(events)).usd).toBeCloseTo(0.26);
 });
 
 test("a cost tally knows what it does not know", () => {
@@ -435,7 +317,7 @@ test("a cost tally knows what it does not know", () => {
 		{ stepId: "s1" },
 	);
 
-	const [worker, decide] = deriveSteps(events);
+	const [worker, decide] = deriveSteps(foldRun(events));
 	expect(worker?.cost).toEqual({
 		usd: 0.5,
 		estimated: true,
@@ -448,13 +330,13 @@ test("a cost tally knows what it does not know", () => {
 		missing: 0,
 		calls: 0,
 	});
-	expect(sumCost(events)).toEqual({
+	expect(sumCost(foldRun(events))).toEqual({
 		usd: 0.5,
 		estimated: true,
 		missing: 2,
 		calls: 3,
 	});
-	expect(deriveWarnings(events)).toEqual([
+	expect(deriveWarnings(foldRun(events))).toEqual([
 		{
 			stepId: "s1",
 			kind: "cost-unknown",
@@ -525,26 +407,15 @@ describe("sessionCost", () => {
 	});
 
 	test("the log keeps the last running total of each session", () => {
-		const events: LoggedEvent[] = [];
-		let seq = 0;
-		const push = <T extends EngineEventType>(
-			type: T,
-			payload: EnginePayloads[T],
-		) =>
-			events.push({
-				seq: ++seq,
-				runId: "r",
-				stepId: "s1",
-				sessionId: "a",
-				type,
-				payload,
-				at: seq,
-			} as LoggedEvent);
+		const b = log();
+		const push: typeof b.push = (type, payload) =>
+			b.push(type, payload, { stepId: "s1", sessionId: "a" });
+		const events = b.events;
 		push("SessionStarted", { prompt: "go", resumeSessionId: null });
 		push("SessionUsage", { ...spent, costUsd: 0.1 });
 		push("SessionUsage", spent);
-		expect(deriveSessions(events)[0]?.spent).toEqual(spent);
-		expect(sumCost(events).usd).toBe(0.2);
+		expect([...foldRun(events).sessions.values()][0]?.spent).toEqual(spent);
+		expect(sumCost(foldRun(events)).usd).toBe(0.2);
 	});
 });
 
@@ -554,12 +425,12 @@ describe("gates", () => {
 			.runStarted()
 			.stepStarted("s1", "gate")
 			.gateOpened("s1", "Ship PR 12?");
-		expect(deriveRunState(b.events)).toEqual({
+		expect(deriveRunState(foldRun(b.events))).toEqual({
 			status: "waiting",
 			reason: null,
 			result: null,
 		});
-		expect(deriveOpenGate(b.events)).toEqual({
+		expect(deriveOpenGate(foldRun(b.events))).toEqual({
 			stepId: "s1",
 			nodeId: "gate",
 			visit: 1,
@@ -569,12 +440,14 @@ describe("gates", () => {
 			openedAt: b.events.at(-1)?.at ?? 0,
 			deadline: null,
 		});
-		expect(deriveSteps(b.events)[0]?.gate?.question).toBe("Ship PR 12?");
+		expect(deriveSteps(foldRun(b.events))[0]?.gate?.question).toBe(
+			"Ship PR 12?",
+		);
 
 		b.stepEnded("s1", "approve", { note: "yes", visit: 1 });
-		expect(deriveOpenGate(b.events)).toBeNull();
-		expect(deriveRunState(b.events).status).toBe("running");
-		expect(deriveNodeOutputs(b.events).gate).toEqual({
+		expect(deriveOpenGate(foldRun(b.events))).toBeNull();
+		expect(deriveRunState(foldRun(b.events)).status).toBe("running");
+		expect(deriveNodeOutputs(foldRun(b.events)).gate).toEqual({
 			outcome: "approve",
 			note: "yes",
 			visit: 1,
@@ -586,8 +459,8 @@ describe("gates", () => {
 			.runStarted()
 			.stepStarted("s1", "gate")
 			.gateOpened("s1", "Ship it?", true);
-		expect(deriveOpenGate(b.events)?.lockScreen).toBe(true);
-		expect(deriveSteps(b.events)[0]?.gate?.lockScreen).toBe(true);
+		expect(deriveOpenGate(foldRun(b.events))?.lockScreen).toBe(true);
+		expect(deriveSteps(foldRun(b.events))[0]?.gate?.lockScreen).toBe(true);
 	});
 
 	test("the Gates a run asked stay in its history after the answer", () => {
@@ -600,21 +473,22 @@ describe("gates", () => {
 			.gateOpened("s2");
 		const at = (type: EngineEventType, index = 0) =>
 			b.events.filter((e) => e.type === type)[index]?.at ?? 0;
-		expect(deriveGateWaits(b.events)).toEqual([
-			{ openedAt: at("GateOpened"), closedAt: at("StepEnded") },
-			{ openedAt: at("GateOpened", 1), closedAt: null },
+		const waits = () => deriveSteps(b.state()).flatMap((s) => s.gateWaits);
+		expect(waits()).toEqual([
+			{ from: at("GateOpened"), to: at("StepEnded") },
+			{ from: at("GateOpened", 1), to: null },
 		]);
 
 		b.ended("stopped");
-		expect(deriveGateWaits(b.events)[1]?.closedAt).toBe(b.events.at(-1)?.at);
+		expect(waits()[1]?.to).toBe(b.events.at(-1)?.at);
 	});
 
 	test("a Gate step that never opened is not waiting", () => {
 		const { events } = log().runStarted().stepStarted("s1", "gate");
-		expect(deriveOpenGate(events)).toBeNull();
-		expect(deriveRunState(events).status).toBe("running");
+		expect(deriveOpenGate(foldRun(events))).toBeNull();
+		expect(deriveRunState(foldRun(events)).status).toBe("running");
 		// Recovery interrupts it like any other open step: it is not parked.
-		expect(parkedSteps(events)).toEqual([]);
+		expect(parkedSteps(foldRun(events))).toEqual([]);
 	});
 
 	test("an ended run has no open Gate", () => {
@@ -623,8 +497,8 @@ describe("gates", () => {
 			.stepStarted("s1", "gate")
 			.gateOpened("s1")
 			.ended("failed", "broken log");
-		expect(deriveOpenGate(events)).toBeNull();
-		expect(deriveRunState(events).status).toBe("failed");
+		expect(deriveOpenGate(foldRun(events))).toBeNull();
+		expect(deriveRunState(foldRun(events)).status).toBe("failed");
 	});
 
 	test("a waiting run is not lost work: recovery leaves it open", () => {
@@ -634,8 +508,8 @@ describe("gates", () => {
 			.stepEnded("s1", "pass")
 			.stepStarted("s2", "gate")
 			.gateOpened("s2");
-		expect(deriveRunState(events).status).toBe("waiting");
-		expect(parkedSteps(events).map((s) => s.id)).toEqual(["s2"]);
+		expect(deriveRunState(foldRun(events)).status).toBe("waiting");
+		expect(parkedSteps(foldRun(events)).map((s) => s.id)).toEqual(["s2"]);
 	});
 
 	test("a Gate closed by a stop is no longer open", () => {
@@ -645,8 +519,8 @@ describe("gates", () => {
 			.gateOpened("s1")
 			.stepEnded("s1", "stopped", { note: "", visit: 1 })
 			.ended("stopped");
-		expect(deriveOpenGate(events)).toBeNull();
-		expect(deriveRunState(events).status).toBe("stopped");
+		expect(deriveOpenGate(foldRun(events))).toBeNull();
+		expect(deriveRunState(foldRun(events)).status).toBe("stopped");
 	});
 });
 
@@ -667,9 +541,9 @@ describe("sleeps", () => {
 		waitStarted(b, "s1");
 		waitEnded(b, "s1");
 		waitStarted(b, "s1");
-		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: at(b, 3) },
-			{ from: at(b, 4), to: null },
+		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: at(b, 3), reason: "command", signal: null },
+			{ from: at(b, 4), to: null, reason: "command", signal: null },
 		]);
 	});
 
@@ -677,8 +551,8 @@ describe("sleeps", () => {
 		const b = log().runStarted().stepStarted("s1", "check");
 		waitStarted(b, "s1");
 		waitStarted(b, "s1");
-		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: null },
+		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: null, reason: "command", signal: null },
 		]);
 	});
 
@@ -686,8 +560,8 @@ describe("sleeps", () => {
 		const b = log().runStarted().stepStarted("s1", "check");
 		waitStarted(b, "s1");
 		b.ended("stopped");
-		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: at(b, 3) },
+		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: at(b, 3), reason: "command", signal: null },
 		]);
 	});
 
@@ -695,8 +569,8 @@ describe("sleeps", () => {
 		const b = log().runStarted().stepStarted("s1", "check");
 		waitStarted(b, "s1");
 		b.stepEnded("s1", "stopped");
-		expect(deriveSteps(b.events)[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: at(b, 3) },
+		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
+			{ from: at(b, 2), to: at(b, 3), reason: "command", signal: null },
 		]);
 	});
 });
@@ -720,7 +594,7 @@ describe("node types of runs from before flow version 4", () => {
 		started("s1", "sub", "subflow");
 		started("s2", "loop", "foreach");
 		started("s3", "worker", "agent");
-		expect(deriveSteps(b.events).map((s) => s.nodeType)).toEqual([
+		expect(deriveSteps(foldRun(b.events)).map((s) => s.nodeType)).toEqual([
 			"call",
 			"call",
 			"agent",
@@ -793,14 +667,18 @@ describe("Call scopes", () => {
 		b.stepEnded("top", "pass", { summary: "top" });
 		b.edge("e1", "worker", "check");
 		const key = "inner/a1";
-		expect(deriveNodeOutputs(b.events).worker?.summary).toBe("top");
-		expect(deriveNodeOutputs(b.events, key).worker?.summary).toBe("inside");
-		expect(countVisits(b.events, "worker")).toBe(1);
-		expect(countVisits(b.events, "worker", key)).toBe(1);
-		expect(deriveTraversals(b.events)).toEqual({ e1: 1 });
-		expect(deriveTraversals(b.events, key)).toEqual({ e1: 1 });
-		expect(lastHarnessSessionOfNode(b.events, "worker", key)).toBe("h-1");
-		expect(lastHarnessSessionOfNode(b.events, "worker")).toBeNull();
+		expect(deriveNodeOutputs(foldRun(b.events)).worker?.summary).toBe("top");
+		expect(deriveNodeOutputs(foldRun(b.events), key).worker?.summary).toBe(
+			"inside",
+		);
+		expect(countVisits(foldRun(b.events), "worker")).toBe(1);
+		expect(countVisits(foldRun(b.events), "worker", key)).toBe(1);
+		expect(deriveTraversals(foldRun(b.events))).toEqual({ e1: 1 });
+		expect(deriveTraversals(foldRun(b.events), key)).toEqual({ e1: 1 });
+		expect(lastHarnessSessionOfNode(foldRun(b.events), "worker", key)).toBe(
+			"h-1",
+		);
+		expect(lastHarnessSessionOfNode(foldRun(b.events), "worker")).toBeNull();
 	});
 
 	test("each called flow's edge counts come per scope, the top level apart", () => {
@@ -817,11 +695,11 @@ describe("Call scopes", () => {
 		taken("e2", "a2");
 		taken("e1", "a1");
 		b.edge("e9", "worker", "check");
-		expect(deriveCalledTraversals(b.events)).toEqual([
+		expect(deriveCalledTraversals(foldRun(b.events))).toEqual([
 			{ scope: { parentStepId: "inner", itemId: "a1" }, traversals: { e1: 2 } },
 			{ scope: { parentStepId: "inner", itemId: "a2" }, traversals: { e2: 1 } },
 		]);
-		expect(deriveTraversals(b.events)).toEqual({ e9: 1 });
+		expect(deriveTraversals(foldRun(b.events))).toEqual({ e9: 1 });
 	});
 
 	test("items derive their states, blocked ones included", () => {
@@ -838,9 +716,10 @@ describe("Call scopes", () => {
 				stepId: "inner",
 			},
 		);
-		const outer = () => deriveSteps(b.events).find((s) => s.id === "outer");
+		const outer = () =>
+			deriveSteps(foldRun(b.events)).find((s) => s.id === "outer");
 		expect(outer()?.items[0]).toMatchObject({ state: "running", open: true });
-		const inner = deriveSteps(b.events).find((s) => s.id === "inner");
+		const inner = deriveSteps(foldRun(b.events)).find((s) => s.id === "inner");
 		expect(inner?.scope).toEqual({ parentStepId: "outer", itemId: "A" });
 		expect(inner?.items.map((i) => [i.facts.id, i.state, i.reason])).toEqual([
 			["a1", "failed", "boom"],
@@ -865,17 +744,20 @@ describe("Call scopes", () => {
 			{ reason: "usage-limit", until: 5000, message: "limit", since: 1 },
 			{ stepId: "w" },
 		);
-		expect(deriveRunState(b.events).status).toBe("sleeping");
-		expect(deriveSleep(b.events)).toMatchObject({ stepId: "w", until: 5000 });
-		expect(parkedSteps(b.events).map((s) => s.id)).toEqual([
+		expect(deriveRunState(foldRun(b.events)).status).toBe("sleeping");
+		expect(deriveSleep(foldRun(b.events))).toMatchObject({
+			stepId: "w",
+			until: 5000,
+		});
+		expect(parkedSteps(foldRun(b.events)).map((s) => s.id)).toEqual([
 			"w",
 			"inner",
 			"outer",
 		]);
 
 		b.push("WaitEnded", { early: false }, { stepId: "w" });
-		expect(deriveRunState(b.events).status).toBe("running");
-		expect(parkedSteps(b.events)).toEqual([]);
+		expect(deriveRunState(foldRun(b.events)).status).toBe("running");
+		expect(parkedSteps(foldRun(b.events))).toEqual([]);
 	});
 
 	test("stop after the step and the stop time", () => {
@@ -887,14 +769,14 @@ describe("Call scopes", () => {
 			start: "worker",
 			stopAt: 99,
 		});
-		expect(deriveStopAt(b.events)).toBe(99);
-		expect(deriveStopAfterStep(b.events)).toBe(false);
+		expect(foldRun(b.events).stopAt).toBe(99);
+		expect(foldRun(b.events).stopAfterStep).toBe(false);
 		b.push("StopAfterStepRequested", {});
-		expect(deriveStopAfterStep(b.events)).toBe(true);
+		expect(foldRun(b.events).stopAfterStep).toBe(true);
 		b.push("StopAfterStepCancelled", {});
-		expect(deriveStopAfterStep(b.events)).toBe(false);
+		expect(foldRun(b.events).stopAfterStep).toBe(false);
 		b.push("StopAfterStepRequested", {});
-		expect(deriveStopAfterStep(b.events)).toBe(true);
+		expect(foldRun(b.events).stopAfterStep).toBe(true);
 		b.ended("stopped");
 		b.push("RunResumed", {
 			nodeId: "worker",
@@ -902,13 +784,13 @@ describe("Call scopes", () => {
 			prompt: null,
 			clearStopAt: true,
 		});
-		expect(deriveStopAfterStep(b.events)).toBe(false);
-		expect(deriveStopAt(b.events)).toBeNull();
+		expect(foldRun(b.events).stopAfterStep).toBe(false);
+		expect(foldRun(b.events).stopAt).toBeNull();
 	});
 });
 
 describe("automatic resume", () => {
-	test("countDaemonResumes counts the daemon's resumes since the start or a person's resume", () => {
+	test("the state counts the daemon's resumes since the start or a person's resume", () => {
 		const l = log().runStarted();
 		const daemon = () =>
 			l.push("RunResumed", {
@@ -917,20 +799,20 @@ describe("automatic resume", () => {
 				prompt: null,
 				by: "daemon",
 			});
-		expect(countDaemonResumes(l.events)).toBe(0);
+		expect(foldRun(l.events).daemonResumes).toBe(0);
 		daemon();
 		daemon();
-		expect(countDaemonResumes(l.events)).toBe(2);
+		expect(foldRun(l.events).daemonResumes).toBe(2);
 		// A person's resume (no `by` in older logs) starts over.
 		l.resumed("worker");
-		expect(countDaemonResumes(l.events)).toBe(0);
+		expect(foldRun(l.events).daemonResumes).toBe(0);
 		daemon();
-		expect(countDaemonResumes(l.events)).toBe(1);
+		expect(foldRun(l.events).daemonResumes).toBe(1);
 	});
 });
 
 describe("the run budget", () => {
-	test("deriveBudgetSpend counts sessions and deciders since the start or a person's resume, not the daemon's", () => {
+	test("the budget counts sessions and deciders since the start or a person's resume, not the daemon's", () => {
 		const l = log()
 			.runStarted()
 			.stepStarted("s1", "worker")
@@ -939,7 +821,7 @@ describe("the run budget", () => {
 			.stepEnded("s1", "pass")
 			.stepStarted("s2", "decide")
 			.stepEnded("s2", "pass", {}, 0.25);
-		expect(deriveBudgetSpend(l.events).usd).toBeCloseTo(1.75, 9);
+		expect(deriveBudgetSpend(foldRun(l.events)).usd).toBeCloseTo(1.75, 9);
 		// After a restart the daemon resumed the run: the spend stays.
 		l.push("RunResumed", {
 			nodeId: "worker",
@@ -947,10 +829,10 @@ describe("the run budget", () => {
 			prompt: null,
 			by: "daemon",
 		});
-		expect(deriveBudgetSpend(l.events).usd).toBeCloseTo(1.75, 9);
+		expect(deriveBudgetSpend(foldRun(l.events)).usd).toBeCloseTo(1.75, 9);
 		// A person resumed it: a budget of its own again.
 		l.resumed("worker");
-		expect(deriveBudgetSpend(l.events).usd).toBe(0);
+		expect(deriveBudgetSpend(foldRun(l.events)).usd).toBe(0);
 		l.stepStarted("s3", "worker", 2)
 			.sessionStarted("s3", "b")
 			.push(
@@ -959,7 +841,7 @@ describe("the run budget", () => {
 				{ stepId: "s3", sessionId: "b" },
 			);
 		// A running session counts with its spend so far.
-		expect(deriveBudgetSpend(l.events).usd).toBe(0.5);
+		expect(deriveBudgetSpend(foldRun(l.events)).usd).toBe(0.5);
 	});
 });
 
@@ -975,19 +857,19 @@ describe("the run's worktree", () => {
 
 	test("a run whose Device was offline at the start has none until the event names it", () => {
 		const events = log().runStarted().events;
-		expect(deriveWorktree(events)).toBeNull();
-		expect(awaitsWorktree(waiting, events)).toBe(true);
-		expect(runWorktree(waiting, events)).toEqual(waiting);
-		expect(deriveWorktrees(events, { ...run, ...waiting }).paths).toEqual(
-			new Map(),
-		);
+		expect(foldRun(events).worktree).toBeNull();
+		expect(awaitsWorktree(waiting, foldRun(events))).toBe(true);
+		expect(runWorktree(waiting, foldRun(events))).toEqual(waiting);
+		expect(
+			deriveWorktrees(foldRun(events), { ...run, ...waiting }).paths,
+		).toEqual(new Map());
 	});
 
 	test("the worktree a later step made comes from the event, on every Replica", () => {
 		const events = log().runStarted().push("WorktreeCreated", made).events;
-		expect(awaitsWorktree(waiting, events)).toBe(false);
-		expect(runWorktree(waiting, events)).toEqual(made);
-		expect(deriveWorktrees(events, { ...run, ...waiting })).toEqual({
+		expect(awaitsWorktree(waiting, foldRun(events))).toBe(false);
+		expect(runWorktree(waiting, foldRun(events))).toEqual(made);
+		expect(deriveWorktrees(foldRun(events), { ...run, ...waiting })).toEqual({
 			holder: "device-b",
 			paths: new Map([["device-b", made.worktreePath]]),
 		});
@@ -995,9 +877,9 @@ describe("the run's worktree", () => {
 
 	test("an old run without the event reads its worktree from its row", () => {
 		const events = log().runStarted().events;
-		expect(awaitsWorktree(made, events)).toBe(false);
-		expect(runWorktree(made, events)).toEqual(made);
-		expect(deriveWorktrees(events, { ...run, ...made }).paths).toEqual(
+		expect(awaitsWorktree(made, foldRun(events))).toBe(false);
+		expect(runWorktree(made, foldRun(events))).toEqual(made);
+		expect(deriveWorktrees(foldRun(events), { ...run, ...made }).paths).toEqual(
 			new Map([["device-b", made.worktreePath]]),
 		);
 	});
@@ -1014,12 +896,150 @@ describe("the run's worktree", () => {
 			},
 			{ stepId: "s1" },
 		).events;
-		expect(deriveWorktrees(events, { ...run, ...waiting })).toEqual({
+		expect(deriveWorktrees(foldRun(events), { ...run, ...waiting })).toEqual({
 			holder: "device-c",
 			paths: new Map([
 				["device-b", made.worktreePath],
 				["device-c", "/c/worktrees/abcd1234"],
 			]),
 		});
+	});
+});
+
+describe("one place decides when a step ends", () => {
+	test("a second StepStarted of a step is a new opening that keeps the first one's end", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "worker")
+			.stepEnded("s1", "fail", {}, 0.5)
+			.stepStarted("s1", "worker", 1)
+			.stepEnded("s1", "pass", {}, 0.25);
+		const run = b.state();
+		const [step] = deriveSteps(run);
+		expect(deriveSteps(run)).toHaveLength(1);
+		expect(step?.openings.map((o) => [o.kind, o.end?.payload.outcome])).toEqual(
+			[
+				["start", "fail"],
+				["start", "pass"],
+			],
+		);
+		// The latest opening is the current one.
+		expect(step?.outcome).toBe("pass");
+		expect(step?.startedAt).toBe(b.events[3]?.at);
+		// Each end counts once, in the step's cost, the budget and the trace.
+		expect(step?.cost.usd).toBe(0.75);
+		expect(deriveBudgetSpend(run).usd).toBe(0.75);
+		expect(runTrace(run)?.steps[0]?.ends.map((e) => [e.seq, e.first])).toEqual([
+			[3, true],
+			[5, false],
+		]);
+		// A new opening is not a new visit.
+		expect(countVisits(run, "worker")).toBe(1);
+	});
+
+	test("a late duplicate end counts nowhere: not in cost, budget, outputs or variables", () => {
+		const b = log().runStarted().stepStarted("s1", "decide");
+		b.push(
+			"StepEnded",
+			{
+				outcome: "pass",
+				outputs: { outcome: "pass" },
+				error: null,
+				costUsd: 0.1,
+				variables: { n: 1 },
+			},
+			{ stepId: "s1" },
+		);
+		b.push(
+			"StepEnded",
+			{
+				outcome: "fail",
+				outputs: { outcome: "fail" },
+				error: null,
+				costUsd: 5,
+				variables: { n: 2 },
+			},
+			{ stepId: "s1" },
+		);
+		const run = b.state();
+		expect(deriveSteps(run)[0]?.cost.usd).toBe(0.1);
+		expect(deriveBudgetSpend(run).usd).toBe(0.1);
+		expect(sumCost(run).usd).toBe(0.1);
+		expect(deriveNodeOutputs(run).decide).toEqual({ outcome: "pass" });
+		expect(deriveVariables(run)).toEqual({ n: 1 });
+		expect(run.variableChanges.map((c) => c.value)).toEqual([1]);
+		expect(runTrace(run)?.steps[0]?.ends).toHaveLength(1);
+	});
+
+	test("a reopened step that ends again counts each end, once per opening", () => {
+		const run = log()
+			.runStarted()
+			.stepStarted("s1", "decide")
+			.stepEnded("s1", "pass", {}, 0.1)
+			.stepReopened("s1")
+			.stepEnded("s1", "pass", {}, 0.2)
+			.state();
+		expect(deriveSteps(run)[0]?.cost.usd).toBeCloseTo(0.3);
+		expect(deriveBudgetSpend(run).usd).toBeCloseTo(0.3);
+		expect(runTrace(run)?.steps[0]?.ends.map((e) => e.costUsd)).toEqual([
+			0.1, 0.2,
+		]);
+	});
+
+	test("a GateOpened again while the Gate waits opens no second wait", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1")
+			.gateOpened("s1");
+		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
+			{ from: 1002, to: null },
+		]);
+		b.stepEnded("s1", "approve");
+		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
+			{ from: 1002, to: 1004 },
+		]);
+		expect(runTrace(b.state())?.steps[0]?.gateWaits).toHaveLength(1);
+	});
+
+	test("a sleep keeps what it waits for", () => {
+		const run = log()
+			.runStarted()
+			.stepStarted("s1", "wait")
+			.waitStarted("s1", { reason: "signal", until: null, signal: "deploy" })
+			.state();
+		expect(deriveSteps(run)[0]?.sleeps).toEqual([
+			{ from: 1002, to: null, reason: "signal", signal: "deploy" },
+		]);
+		expect(deriveSleep(run)).toMatchObject({ signal: "deploy", until: null });
+	});
+
+	test("the scores are kept in log order", () => {
+		const b = log().runStarted().stepStarted("s1", "gate");
+		b.push(
+			"Scored",
+			{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+			{ stepId: "s1" },
+		);
+		expect(deriveScores(b.state())).toEqual([
+			{
+				score: "gate_decision",
+				value: 1,
+				label: "approve",
+				stepId: "s1",
+				at: 1002,
+			},
+		]);
+	});
+
+	test("events out of seq order fold as in seq order", () => {
+		const { events } = log()
+			.runStarted()
+			.stepStarted("s1", "worker")
+			.stepEnded("s1", "pass");
+		const shuffled: LoggedEvent[] = [events[2], events[0], events[1]].flatMap(
+			(e) => (e ? [e] : []),
+		);
+		expect(foldRun(shuffled)).toEqual(foldRun(events));
 	});
 });

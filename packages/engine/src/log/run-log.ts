@@ -14,6 +14,7 @@ import {
 	landedEvent,
 	parseEventRow,
 } from "./events";
+import { foldRun, nextState, type RunState } from "./run-state";
 
 /**
  * The event log of each run, kept in memory by the daemon that writes it.
@@ -28,11 +29,14 @@ import {
  *   leaves the copy as it was.
  * - Open runs (running, waiting, sleeping) stay in memory. The logs of ended
  *   runs are dropped, least recently used first, beyond `maxIdleEvents`.
- * - `derive` keeps a value derived from a run's log (a run summary, an open
- *   Gate, its steps) until the run's next append, also after its log was
+ * - Each run's log is folded once into its run state (`run-state.ts`),
+ *   and each append or ingest of the run applies its event to that state:
+ *   the log is never walked again for it. `state` gives it.
+ * - `derive` keeps a view of the run state (a run summary, an open Gate,
+ *   its steps) until the run's next append, also after its log was
  *   dropped. Every reader of a run's derived state goes through it, so the
- *   run list, each watcher of a run and the copy stamps share one
- *   derivation per append instead of parsing the log again each.
+ *   run list, each watcher of a run and the copy stamps share one view per
+ *   append.
  * - `ingest` adds the events of runs another Device walks, as the exchange
  *   brings them (`exchange/`), in one transaction with the rows they name
  *   and what follows from them: the same bookkeeping as an append, once
@@ -62,8 +66,8 @@ export type ForeignEvent = {
 /** Called with the events that just landed in this Replica. */
 export type LandedListener = (events: readonly LandedEvent[]) => void;
 
-/** A pure function of one run's log, kept by identity. */
-export type Derive<T> = (events: readonly LoggedEvent[]) => T;
+/** A pure view of one run's state, kept by identity. */
+export type Derive<T> = (run: RunState) => T;
 
 export type RunLogOptions = {
 	/** How many events of ended runs to keep in memory. Default 20 000. */
@@ -116,6 +120,12 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 	>();
 	/** Derived values by run id, then by function. Cleared by an append. */
 	const memos = new Map<string, Map<Derive<unknown>, unknown>>();
+	/**
+	 * The run state of each run, as long as its views are kept (`memos`).
+	 * An append applies its event to it; an event that lands before the
+	 * latest (rare) drops it, and the next read folds the log again.
+	 */
+	const states = new Map<string, RunState>();
 	/** Counts the appends per run, so a read that raced one is not kept. */
 	const versions = new Map<string, number>();
 	const landedListeners = new Set<LandedListener>();
@@ -231,6 +241,16 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		return value;
 	}
 
+	/** The run state of a log, folded once per run and kept up to date by `keep`. */
+	function stateOf(runId: string, log: Log): RunState {
+		let state = states.get(runId);
+		if (!state) {
+			state = foldRun(log.events);
+			states.set(runId, state);
+		}
+		return state;
+	}
+
 	/** Keeps a committed event in its run's copy, and forgets what was derived from it. */
 	function keep(logged: LoggedEvent): void {
 		const runId = logged.runId;
@@ -238,6 +258,10 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		versions.set(runId, (versions.get(runId) ?? 0) + 1);
 		memos.delete(runId);
 		const log = logs.get(runId);
+		const state = states.get(runId);
+		const next = log && state ? nextState(state, logged) : null;
+		if (next) states.set(runId, next);
+		else states.delete(runId);
 		if (log) {
 			insertBySeq(log.events, logged);
 			if (isRunEvent(logged.type)) {
@@ -274,7 +298,8 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 					continue;
 				}
 				const log = logs.get(runId);
-				if (log) values.set(runId, remember(runId, fn, fn(log.events)));
+				if (log)
+					values.set(runId, remember(runId, fn, fn(stateOf(runId, log))));
 				else missing.push(runId);
 			}
 			if (missing.length === 0) return values;
@@ -297,9 +322,19 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 				const log =
 					logs.get(runId) ??
 					((versions.get(runId) ?? 0) === before ? loaded : await logOf(runId));
-				values.set(runId, remember(runId, fn, fn(log.events)));
+				values.set(runId, remember(runId, fn, fn(stateOf(runId, log))));
 			}
 			return values;
+		},
+
+		/**
+		 * One run's state (`run-state.ts`), as of its latest append: kept
+		 * in memory with its log, and never changed after it is given.
+		 */
+		async state(runId: string): Promise<RunState> {
+			const log = await logOf(runId);
+			// Another read may have kept a newer log meanwhile.
+			return stateOf(runId, logs.get(runId) ?? log);
 		},
 
 		/** The Device that appends: the Walker of the runs this log writes. */
@@ -391,6 +426,7 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 			for (const runId of runIds) {
 				logs.delete(runId);
 				memos.delete(runId);
+				states.delete(runId);
 				loading.delete(runId);
 				versions.set(runId, (versions.get(runId) ?? 0) + 1);
 			}

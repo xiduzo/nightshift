@@ -1,19 +1,18 @@
 import type { Database } from "@nightshift/db";
 import type { Flow, FlowNode } from "@nightshift/flows";
 import {
+	type DerivedSession,
+	type DerivedStep,
 	type EnginePayloads,
 	getRunRow,
-	type LoggedEvent,
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	type RunState,
 	type StepOutputs,
 } from "../log";
 import {
-	type DerivedSession,
-	type DerivedStep,
 	deriveRunState,
-	deriveSessions,
 	deriveSteps,
 	isOpenStatus,
 	parkedSteps,
@@ -68,17 +67,14 @@ export type OpenWork = {
 };
 
 /** What a `cut` of the run's work ends, from the log. */
-export function openWork(
-	events: readonly LoggedEvent[],
-	cut: CutShort["kind"],
-): OpenWork {
+export function openWork(runState: RunState, cut: CutShort["kind"]): OpenWork {
 	const parked = new Set(
-		cut === "interrupted" ? parkedSteps(events).map((s) => s.id) : [],
+		cut === "interrupted" ? parkedSteps(runState).map((s) => s.id) : [],
 	);
-	const status = deriveRunState(events).status;
+	const status = deriveRunState(runState).status;
 	return {
-		sessions: deriveSessions(events).filter((s) => s.ending === null),
-		steps: deriveSteps(events)
+		sessions: [...runState.sessions.values()].filter((s) => s.ending === null),
+		steps: deriveSteps(runState)
 			.filter((s) => s.endedAt === null && !parked.has(s.id))
 			.sort((a, b) => b.startSeq - a.startSeq),
 		endsRun:
@@ -167,11 +163,11 @@ const CUTS = {
  * kind an old log has and the engine no longer knows keeps its outputs.
  */
 export function closingEvents(
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	cut: CutShort,
 	flows: RunFlows | null,
 ): ClosingEvent[] {
-	const open = openWork(events, cut.kind);
+	const open = openWork(runState, cut.kind);
 	const rule = CUTS[cut.kind];
 	const reason =
 		cut.kind === "overdue"
@@ -191,12 +187,11 @@ export function closingEvents(
 		sessionId: session.id,
 		payload: { ...rule.session, usage: null, costUsd: null, resetAt: null },
 	}));
-	const steps = open.steps.length > 0 ? deriveSteps(events) : [];
 	for (const step of open.steps) {
 		// The kind says what a cut-short step ends with; the node is the
 		// logged kind's, or missing when the snapshot has no node for it.
 		const node = flows
-			? nodesOf(flows, withEnclosing(steps, step.id)).get(step.id)
+			? nodesOf(flows, withEnclosing(runState, step.id)).get(step.id)
 			: undefined;
 		closing.push({
 			type: "StepEnded",
@@ -248,12 +243,12 @@ export async function closeOpenWork(
 	runId: string,
 	cut: CutShort,
 ): Promise<void> {
-	const events = await deps.log.events(runId);
+	const runState = await deps.log.state(runId);
 	const flows =
-		openWork(events, cut.kind).steps.length > 0
+		openWork(runState, cut.kind).steps.length > 0
 			? await runFlowsOf(deps, runId)
 			: null;
-	const closing = closingEvents(events, cut, flows);
+	const closing = closingEvents(runState, cut, flows);
 	for (const event of closing) {
 		await deps.log.append({ ...event, runId });
 		if (event.type === "StepEnded") {

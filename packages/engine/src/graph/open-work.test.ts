@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNodeType } from "@nightshift/flows";
+import { foldRun } from "../log";
 
 import type {
 	EngineEventType,
@@ -184,7 +185,7 @@ describe("closingEvents: a stop", () => {
 			.started()
 			.step("s1", "a", "agent")
 			.session("s1", "x");
-		expect(closingEvents(events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), STOPPED, FLOWS)).toEqual([
 			sessionEnded("s1", "x"),
 			stepEnded("s1", { visit: 1 }),
 			runEnded("stopped"),
@@ -193,12 +194,12 @@ describe("closingEvents: a stop", () => {
 
 	test("a step parked at a Gate and a sleeping step end too", () => {
 		const gate = log().started().step("g", "d", "decision").gate("g");
-		expect(closingEvents(gate.events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(gate.events), STOPPED, FLOWS)).toEqual([
 			stepEnded("g", { note: "", visit: 1 }),
 			runEnded("stopped"),
 		]);
 		const nap = log().started().step("n", "nap", "wait").sleep("n");
-		expect(closingEvents(nap.events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(nap.events), STOPPED, FLOWS)).toEqual([
 			stepEnded("n", { visit: 1 }),
 			runEnded("stopped"),
 		]);
@@ -209,7 +210,7 @@ describe("closingEvents: a stop", () => {
 			.started()
 			.step("c", "once", "call")
 			.step("w", "w", "agent", { parentStepId: "c", itemId: null });
-		expect(closingEvents(events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), STOPPED, FLOWS)).toEqual([
 			stepEnded("w", { visit: 1 }),
 			stepEnded("c", { ended: "", visit: 1 }),
 			runEnded("stopped"),
@@ -226,7 +227,7 @@ describe("closingEvents: a stop", () => {
 			.itemEnded("c", "i2", "failed")
 			.item("c", "i3", 3)
 			.step("w", "w", "agent", { parentStepId: "c", itemId: "i3" });
-		const closing = closingEvents(events, STOPPED, FLOWS);
+		const closing = closingEvents(foldRun(events), STOPPED, FLOWS);
 		expect(
 			closing.map((e) => (e.type === "RunEnded" ? e.type : e.stepId)),
 		).toEqual(["w", "c", "RunEnded"]);
@@ -249,7 +250,7 @@ describe("closingEvents: a stop", () => {
 
 	test("a Decision ends with an empty note", () => {
 		const { events } = log().started().step("d1", "d", "decision");
-		expect(closingEvents(events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), STOPPED, FLOWS)).toEqual([
 			stepEnded("d1", { note: "", visit: 1 }),
 			runEnded("stopped"),
 		]);
@@ -260,11 +261,15 @@ describe("closingEvents: a stop", () => {
 			.started()
 			.step("s1", "a", "agent")
 			.ended("finished");
-		expect(closingEvents(events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), STOPPED, FLOWS)).toEqual([
 			stepEnded("s1", { visit: 1 }),
 		]);
 		expect(
-			closingEvents(log().started().ended("finished").events, STOPPED, FLOWS),
+			closingEvents(
+				foldRun(log().started().ended("finished").events),
+				STOPPED,
+				FLOWS,
+			),
 		).toEqual([]);
 	});
 });
@@ -284,7 +289,7 @@ describe("closingEvents: a missed deadline", () => {
 			error: "The step ran past its time budget.",
 		};
 		const reason = 'Node "w" failed: The step ran past its time budget.';
-		expect(closingEvents(events, cut, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), cut, FLOWS)).toEqual([
 			sessionEnded("w", "x", {
 				outcome: "failed",
 				error: "The step was stopped.",
@@ -303,7 +308,7 @@ describe("closingEvents: a daemon that died", () => {
 			.started()
 			.step("s1", "a", "agent")
 			.session("s1", "x");
-		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), INTERRUPTED, FLOWS)).toEqual([
 			sessionEnded("s1", "x", LOST_SESSION),
 			stepEnded("s1", { visit: 1 }, "interrupted", LOST),
 			runEnded("interrupted", INTERRUPTED.reason),
@@ -315,7 +320,7 @@ describe("closingEvents: a daemon that died", () => {
 			.started()
 			.step("c", "once", "call")
 			.step("w", "w", "agent", { parentStepId: "c", itemId: null });
-		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), INTERRUPTED, FLOWS)).toEqual([
 			stepEnded("w", { visit: 1 }, "interrupted", LOST),
 			stepEnded("c", { ended: "", visit: 1 }, "interrupted", LOST),
 			runEnded("interrupted", INTERRUPTED.reason),
@@ -324,13 +329,13 @@ describe("closingEvents: a daemon that died", () => {
 
 	test("an open Gate and a sleeping step stay open, and so does their run", () => {
 		const gate = log().started().step("g", "d", "decision").gate("g");
-		expect(closingEvents(gate.events, INTERRUPTED, FLOWS)).toEqual([]);
+		expect(closingEvents(foldRun(gate.events), INTERRUPTED, FLOWS)).toEqual([]);
 		const nap = log()
 			.started()
 			.step("c", "once", "call")
 			.step("n", "nap", "wait", { parentStepId: "c", itemId: null })
 			.sleep("n");
-		expect(closingEvents(nap.events, INTERRUPTED, FLOWS)).toEqual([]);
+		expect(closingEvents(foldRun(nap.events), INTERRUPTED, FLOWS)).toEqual([]);
 	});
 
 	test("a run that is not running gets only its stray steps ended", () => {
@@ -338,7 +343,7 @@ describe("closingEvents: a daemon that died", () => {
 			.started()
 			.step("s1", "a", "agent")
 			.ended("stopped");
-		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), INTERRUPTED, FLOWS)).toEqual([
 			stepEnded("s1", { visit: 1 }, "interrupted", LOST),
 		]);
 	});
@@ -347,11 +352,11 @@ describe("closingEvents: a daemon that died", () => {
 describe("closingEvents: an old log or a broken snapshot", () => {
 	test("a step of a kind that no longer exists keeps its outputs, for every cut", () => {
 		const { events } = log().started().step("g", "approve", "gate");
-		expect(closingEvents(events, STOPPED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), STOPPED, FLOWS)).toEqual([
 			stepEnded("g", { visit: 1 }),
 			runEnded("stopped"),
 		]);
-		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+		expect(closingEvents(foldRun(events), INTERRUPTED, FLOWS)).toEqual([
 			stepEnded("g", { visit: 1 }, "interrupted", LOST),
 			runEnded("interrupted", INTERRUPTED.reason),
 		]);
@@ -363,12 +368,12 @@ describe("closingEvents: an old log or a broken snapshot", () => {
 			.step("c", "loop", "call")
 			.item("c", "i1", 1)
 			.itemEnded("c", "i1", "done");
-		expect(closingEvents(events, STOPPED, null)[0]).toMatchObject({
+		expect(closingEvents(foldRun(events), STOPPED, null)[0]).toMatchObject({
 			stepId: "c",
 			payload: { outputs: { outcome: "stopped", done_count: 1 } },
 		});
 		const once = log().started().step("c", "once", "call");
-		expect(closingEvents(once.events, STOPPED, null)[0]).toEqual(
+		expect(closingEvents(foldRun(once.events), STOPPED, null)[0]).toEqual(
 			stepEnded("c", { ended: "", visit: 1 }),
 		);
 	});
@@ -377,11 +382,11 @@ describe("closingEvents: an old log or a broken snapshot", () => {
 describe("openWork: what a cut ends", () => {
 	test("a stop ends a parked step; an interrupt leaves it open, and the run with it", () => {
 		const { events } = log().started().step("g", "d", "decision").gate("g");
-		expect(openWork(events, "stopped")).toMatchObject({
+		expect(openWork(foldRun(events), "stopped")).toMatchObject({
 			steps: [{ id: "g" }],
 			endsRun: true,
 		});
-		expect(openWork(events, "interrupted")).toEqual({
+		expect(openWork(foldRun(events), "interrupted")).toEqual({
 			sessions: [],
 			steps: [],
 			endsRun: false,
@@ -393,21 +398,20 @@ describe("openWork: what a cut ends", () => {
 			.started()
 			.step("c", "once", "call")
 			.step("w", "w", "agent", { parentStepId: "c", itemId: null });
-		expect(openWork(events, "interrupted").steps.map((s) => s.id)).toEqual([
-			"w",
-			"c",
-		]);
+		expect(
+			openWork(foldRun(events), "interrupted").steps.map((s) => s.id),
+		).toEqual(["w", "c"]);
 	});
 
 	test("an interrupt ends a run only when it ran", () => {
 		const running = log().started().step("s1", "a", "agent").session("s1", "x");
-		expect(openWork(running.events, "interrupted")).toMatchObject({
+		expect(openWork(foldRun(running.events), "interrupted")).toMatchObject({
 			sessions: [{ id: "x" }],
 			steps: [{ id: "s1" }],
 			endsRun: true,
 		});
 		const ended = log().started().ended("finished");
-		expect(openWork(ended.events, "interrupted").endsRun).toBe(false);
-		expect(openWork(ended.events, "stopped").endsRun).toBe(false);
+		expect(openWork(foldRun(ended.events), "interrupted").endsRun).toBe(false);
+		expect(openWork(foldRun(ended.events), "stopped").endsRun).toBe(false);
 	});
 });

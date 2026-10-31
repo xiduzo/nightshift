@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
-import { deriveSteps } from "../read/derive-steps";
+import { foldRun } from "../log";
+import { deriveSteps } from "../read/run-views";
 import { command, drive, edge, flowOf, startRun } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { compileFlow } from "./compile";
@@ -58,7 +59,7 @@ describe("Sections", () => {
 				parked,
 				next,
 				types: events.map((e) => e.type),
-				steps: deriveSteps(events).map((s) => [s.nodeId, s.outcome]),
+				steps: deriveSteps(foldRun(events)).map((s) => [s.nodeId, s.outcome]),
 			};
 		};
 		const withSections = await runOf(sectioned);

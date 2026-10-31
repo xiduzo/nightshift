@@ -23,7 +23,7 @@ import {
 import type { SessionEvent } from "../../device";
 import {
 	type EnginePayloads,
-	type LoggedEvent,
+	type RunState,
 	type StepOutputs,
 	scopeKey,
 } from "../../log";
@@ -88,7 +88,7 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 				// to continue a session, or to start fresh.
 				const rerun =
 					entry.kind === "new"
-						? rerunEntryOf(node, step.events, scopeOf(config))
+						? rerunEntryOf(node, step.runState, scopeOf(config))
 						: undefined;
 				// The person's answer at the agent's Gate, when this entry goes on from it.
 				const asked = heldStep(state, node.id);
@@ -236,7 +236,7 @@ function resumeSessionOf(
 ): string | null {
 	if (entry.kind !== "new") return entry.harnessSessionId;
 	return node.session === "resume"
-		? lastSessionOf(node, state, step.events, config)
+		? lastSessionOf(node, state, step.runState, config)
 		: null;
 }
 
@@ -249,12 +249,12 @@ function resumeSessionOf(
 function lastSessionOf(
 	node: AgentNode,
 	state: RunStateValues,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	config: LangGraphRunnableConfig,
 ): string | null {
 	const own = state.nodes[node.id]?.session_id;
 	if (typeof own === "string" && own !== "") return own;
-	return lastHarnessSessionOfNode(events, node.id, scopeKey(scopeOf(config)));
+	return lastHarnessSessionOfNode(runState, node.id, scopeKey(scopeOf(config)));
 }
 
 const BUILT_IN_AGENT_OUTCOMES = ["pass", "fail", "needs-input"];
@@ -373,7 +373,7 @@ async function runSession(
 	// resumed it. Nothing left: the session does not start.
 	const budgetUsd = runBudget(ctx);
 	const spentBefore =
-		budgetUsd === null ? 0 : deriveBudgetSpend(step.events).usd;
+		budgetUsd === null ? 0 : deriveBudgetSpend(step.runState).usd;
 	if (budgetUsd !== null && spentBefore >= budgetUsd) {
 		step.halt("budget", budgetPassed(budgetUsd, spentBefore));
 		return {

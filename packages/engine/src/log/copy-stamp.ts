@@ -1,9 +1,9 @@
-import type { LoggedEvent } from "./events";
+import type { RunState } from "./run-state";
 
 /*
  * A copy of a step's file says which end of the step it holds: its
  * stamp. A step opens when it starts, and again at each reopen
- * (`StepReopened`). The stamp is the number of that opening and whether
+ * (`StepReopened`) or second start (`run-state.ts`). The stamp is the number of that opening and whether
  * it had ended when the copy was taken. The Run Log gives both, the same
  * on every Replica that has the run's events: a run that moves keeps its
  * stamps, and `seq` (the order on one Replica) plays no part.
@@ -23,26 +23,18 @@ export type CopyStamp = {
 };
 
 /**
- * The stamp a copy of each step's file taken now carries, by step id, from
- * a run's events in seq order (a Run Log's own order). A step the events
- * do not start has none. One pass: the run log keeps it per run until the
- * next append (`RunLog.derive`), so every reader of a stamp shares it.
+ * The stamp a copy of each step's file taken now carries, by step id: the
+ * number of its latest opening and whether that opening ended. A step the
+ * run did not start has none. The run log keeps it per run until the next
+ * append (`RunLog.derive`), so every reader of a stamp shares it.
  */
-export function copyStamps(
-	events: readonly LoggedEvent[],
-): ReadonlyMap<string, CopyStamp> {
+export function copyStamps(run: RunState): ReadonlyMap<string, CopyStamp> {
 	const stamps = new Map<string, CopyStamp>();
-	for (const e of events) {
-		if (e.stepId === null) continue;
-		const stamp = stamps.get(e.stepId);
-		// As the read model does: a second start begins the step again.
-		if (e.type === "StepStarted") {
-			stamps.set(e.stepId, { opening: 1, ended: false });
-		} else if (e.type === "StepReopened" && stamp) {
-			stamps.set(e.stepId, { opening: stamp.opening + 1, ended: false });
-		} else if (e.type === "StepEnded" && stamp) {
-			stamps.set(e.stepId, { opening: stamp.opening, ended: true });
-		}
+	for (const [stepId, step] of run.steps) {
+		stamps.set(stepId, {
+			opening: step.openings.length,
+			ended: step.openings.at(-1)?.end != null,
+		});
 	}
 	return stamps;
 }

@@ -1,8 +1,14 @@
-/** The event log of each run: the event payloads, append and parse, the run log in memory, the landed feed, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, the stamps of the copies of a step's files, the worktrees removed on this computer, the fields of each event that name a Person, and those that name a path on the Walker's disk. */
+/** The event log of each run: the event payloads, append and parse, the run state (one fold of a run's log) and its cost arithmetic, the run log in memory, the landed feed, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, the stamps of the copies of a step's files, the worktrees removed on this computer, the fields of each event that name a Person, and those that name a path on the Walker's disk. */
 
 export type { RunBus } from "./bus";
 export { createRunBus } from "./bus";
 export { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
+export {
+	addCost,
+	type CostTally,
+	NO_COST,
+	sessionCost,
+} from "./cost";
 export type {
 	EngineEventType,
 	EnginePayloads,
@@ -62,6 +68,16 @@ export {
 	spaceOfRun,
 	stepIdsOfRun,
 } from "./run-row";
+export {
+	type DerivedItem,
+	type DerivedSession,
+	type DerivedStep,
+	foldRun,
+	type RunState,
+	type StepSleep,
+	type VariableChange,
+	visitKey,
+} from "./run-state";
 export type {
 	StepEvent,
 	TranscriptEntry,

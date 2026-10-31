@@ -1,5 +1,5 @@
 import type { Device } from "../device";
-import type { LoggedEvent } from "../log";
+import type { RunState } from "../log";
 import {
 	awaitsWorktree,
 	gitAuthorOf,
@@ -29,12 +29,9 @@ const making = new Map<string, Promise<MadeWorktree>>();
  * The run as the log has it: a step reads the worktree another step made
  * after the run's row was read. Keeps the row when it has its worktree.
  */
-export function withLoggedWorktree(
-	ctx: StepContext,
-	events: readonly LoggedEvent[],
-): void {
+export function withLoggedWorktree(ctx: StepContext, runState: RunState): void {
 	if (ctx.run.branch !== "") return;
-	ctx.run = { ...ctx.run, ...runWorktree(ctx.run, events) };
+	ctx.run = { ...ctx.run, ...runWorktree(ctx.run, runState) };
 }
 
 /**
@@ -43,9 +40,9 @@ export function withLoggedWorktree(
  */
 export async function makeRunWorktree(
 	ctx: StepContext,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 ): Promise<MadeWorktree | null> {
-	if (!awaitsWorktree(ctx.run, events)) return null;
+	if (!awaitsWorktree(ctx.run, runState)) return null;
 	const runId = ctx.run.id;
 	let pending = making.get(runId);
 	if (!pending) {

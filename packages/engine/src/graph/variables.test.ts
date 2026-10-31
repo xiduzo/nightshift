@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { FlowEdge } from "@nightshift/flows";
+import { foldRun } from "../log";
 
-import {
-	deriveSteps,
-	deriveVariableChanges,
-	deriveVariables,
-} from "../read/derive-steps";
+import { deriveSteps, deriveVariables } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -99,17 +96,21 @@ describe("variables", () => {
 			{ last: "pass at 2" },
 			null,
 		]);
-		const report = deriveSteps(logged).find((s) => s.nodeId === "report");
+		const report = deriveSteps(foldRun(logged)).find(
+			(s) => s.nodeId === "report",
+		);
 		expect(report?.outputs.log_tail).toBe('["try 0","try 1"] pass at 2');
 		// The log alone gives the same values: a run re-entered without a
 		// checkpoint starts from them.
-		expect(deriveVariables(logged)).toEqual(state.vars);
-		expect(reentryUpdate(retry, logged).vars).toEqual(state.vars);
+		expect(deriveVariables(foldRun(logged))).toEqual(state.vars);
+		expect(reentryUpdate(retry, foldRun(logged)).vars).toEqual(state.vars);
 		// The run page's history: each value, with the step that wrote it.
-		const tries = deriveVariableChanges(logged).filter(
+		const tries = foldRun(logged).variableChanges.filter(
 			(c) => c.name === "tries",
 		);
-		const checks = deriveSteps(logged).filter((s) => s.nodeId === "check");
+		const checks = deriveSteps(foldRun(logged)).filter(
+			(s) => s.nodeId === "check",
+		);
 		expect(tries.map((c) => [c.value, c.stepId, c.scope])).toEqual([
 			[0, null, null],
 			[1, checks[0]?.id ?? null, null],
@@ -246,7 +247,7 @@ describe("variables", () => {
 		expect(state.vars).toEqual({ mine: 5 });
 
 		const logged = await h.events();
-		const steps = deriveSteps(logged);
+		const steps = deriveSteps(foldRun(logged));
 		const first = steps.find((s) => s.nodeId === "first");
 		const second = steps.find((s) => s.nodeId === "second");
 		if (!first || !second) throw new Error("both calls ran");
@@ -265,7 +266,9 @@ describe("variables", () => {
 				scope: { parentStepId: second.id, itemId: null },
 			},
 		]);
-		expect(deriveVariables(logged, `${first.id}/`)).toEqual({ count: 6 });
+		expect(deriveVariables(foldRun(logged), `${first.id}/`)).toEqual({
+			count: 6,
+		});
 	});
 
 	describe("kept between runs", () => {
@@ -324,8 +327,8 @@ describe("variables", () => {
 				{ values: { skipped: [12], count: 0 }, scope: null, kept: ["skipped"] },
 			]);
 			expect(
-				deriveVariableChanges(second.logged)
-					.filter((c) => c.stepId === null)
+				foldRun(second.logged)
+					.variableChanges.filter((c) => c.stepId === null)
 					.map((c) => [c.name, c.kept ?? false]),
 			).toEqual([
 				["skipped", true],

@@ -1,27 +1,28 @@
 import type { AgentHarnessName } from "@nightshift/agents/types";
 import type { FlowNodeType } from "@nightshift/flows";
-import type {
-	LoggedEvent,
-	RunEnding,
-	RunTrigger,
-	StepOutcome,
-	WaitReason,
+import {
+	type CostTally,
+	type DerivedStep,
+	type RunEnding,
+	type RunState,
+	type RunTrigger,
+	type StepOutcome,
+	sessionCost,
+	type WaitReason,
 } from "../log";
-import { sessionCost, stepEndCost } from "./cost";
-import { deriveTrigger } from "./derive-run";
-import { bySeq, deriveSteps, sumCost } from "./derive-steps";
 import {
 	type CostBasis,
 	costBasis,
 	sessionTokens,
 	type TokenCounts,
 } from "./run-metrics";
+import { deriveSteps, deriveTrigger, sumCost } from "./run-views";
 
 /**
  * A run as an export to monitoring reads it: its walks and steps with the
  * times each opened and ended, the sessions with their harness, model,
- * tokens and cost, the Gates' waits and the sleeps. Pure over the event
- * log, like the run metrics beside it, so a reader outside the engine
+ * tokens and cost, the Gates' waits and the sleeps. A view of the run
+ * state, like the run metrics beside it, so a reader outside the engine
  * never reads an event's type or payload. Nothing here is stored.
  *
  * A step or a run can end more than once (a step reopened for an answer,
@@ -49,6 +50,8 @@ export type TraceStepEnd = {
 	error: string | null;
 	/** What the step spent itself at this end (a decider), when it says. */
 	costUsd: number | null;
+	/** How sure `costUsd` is: `estimated` when it is priced from the tokens. */
+	costBasis: CostBasis;
 	/** The step's first end. A reopened step ends again. */
 	first: boolean;
 };
@@ -108,95 +111,28 @@ export type RunTrace = {
 	steps: TraceStep[];
 };
 
-/** The run of these events (one run's log) as monitoring reads it. Null for none. */
-export function runTrace(events: readonly LoggedEvent[]): RunTrace | null {
-	const runId = events.find((e) => e.runId !== null)?.runId;
-	if (!runId) return null;
-	const ordered = bySeq(events);
-	const derived = deriveSteps(ordered);
-	const cost = sumCost(ordered, derived);
-	const started = ordered.find((e) => e.type === "RunStarted");
-
-	const runEnds: TraceRunEnd[] = [];
-	let walkFrom: number | null = null;
-	const stepEnds = new Map<string, TraceStepEnd[]>();
-	const stepOpen = new Map<string, number>();
-	const sleeps = new Map<string, TraceSleep[]>();
-
-	const closeSleeps = (at: number) => {
-		for (const list of sleeps.values()) {
-			const last = list.at(-1);
-			if (last && last.to === null) last.to = at;
-		}
-	};
-
-	for (const e of ordered) {
-		if (e.type === "RunStarted" || e.type === "RunResumed") {
-			walkFrom = e.at;
-			closeSleeps(e.at);
-			continue;
-		}
-		if (e.type === "RunEnded") {
-			closeSleeps(e.at);
-			runEnds.push({
-				seq: e.seq,
-				openedAt: walkFrom ?? e.at,
-				at: e.at,
-				status: e.payload.status,
-				reason: e.payload.reason,
-				first: runEnds.length === 0,
-			});
-			continue;
-		}
-		const stepId = e.stepId;
-		if (!stepId) continue;
-		if (e.type === "StepStarted" || e.type === "StepReopened") {
-			stepOpen.set(stepId, e.at);
-		} else if (e.type === "StepEnded" && stepOpen.has(stepId)) {
-			const list = stepEnds.get(stepId) ?? [];
-			const own = stepEndCost(e.payload);
-			list.push({
-				seq: e.seq,
-				openedAt: stepOpen.get(stepId) ?? e.at,
-				at: e.at,
-				outcome: e.payload.outcome,
-				error: e.payload.error,
-				costUsd: own.calls > 0 && own.missing === 0 ? own.usd : null,
-				first: list.length === 0,
-			});
-			stepEnds.set(stepId, list);
-			// The first end after an opening counts, as the read model's.
-			stepOpen.delete(stepId);
-		}
-		const list = sleeps.get(stepId) ?? [];
-		const last = list.at(-1);
-		const asleep = last !== undefined && last.to === null;
-		if (e.type === "WaitStarted") {
-			// A wait logged again in the same sleep (a new daemon) goes on with it.
-			if (!asleep)
-				list.push({ from: e.at, to: null, reason: e.payload.reason });
-			sleeps.set(stepId, list);
-		} else if (
-			asleep &&
-			(e.type === "WaitEnded" ||
-				e.type === "StepEnded" ||
-				e.type === "StepReopened")
-		) {
-			last.to = e.at;
-		}
-	}
-
+/** The run as monitoring reads it, from its run state. Null for a log with no run. */
+export function runTrace(run: RunState): RunTrace | null {
+	if (!run.runId) return null;
+	const cost = sumCost(run);
+	const started = run.started;
 	return {
-		runId,
-		projectId:
-			started?.type === "RunStarted" ? started.payload.projectId : null,
-		flowName: started?.type === "RunStarted" ? started.payload.flowName : null,
-		trigger: deriveTrigger(ordered).kind,
+		runId: run.runId,
+		projectId: started?.payload.projectId ?? null,
+		flowName: started?.payload.flowName ?? null,
+		trigger: deriveTrigger(run).kind,
 		startedAt: started?.at ?? null,
-		ends: runEnds,
+		ends: run.ends.map((end, i) => ({
+			seq: end.seq,
+			openedAt: end.openedAt,
+			at: end.at,
+			status: end.payload.status,
+			reason: end.payload.reason,
+			first: i === 0,
+		})),
 		costUsd: cost.usd,
 		costBasis: costBasis(cost),
-		steps: derived.map((step) => ({
+		steps: deriveSteps(run).map((step) => ({
 			id: step.id,
 			nodeId: step.nodeId,
 			nodeType: step.nodeType,
@@ -204,7 +140,7 @@ export function runTrace(events: readonly LoggedEvent[]): RunTrace | null {
 			parentStepId: step.scope?.parentStepId ?? null,
 			deviceId: step.deviceId,
 			startedAt: step.startedAt,
-			ends: stepEnds.get(step.id) ?? [],
+			ends: stepEnds(step),
 			sessions: step.sessions.map((session) => {
 				const spent = sessionCost(session);
 				return {
@@ -213,13 +149,38 @@ export function runTrace(events: readonly LoggedEvent[]): RunTrace | null {
 					model: session.model,
 					startedAt: session.startedAt,
 					endedAt: session.endedAt,
-					costUsd: spent.calls > 0 && spent.missing === 0 ? spent.usd : null,
+					costUsd: knownUsd(spent),
 					costBasis: costBasis(spent),
 					tokens: sessionTokens(session),
 				};
 			}),
 			gateWaits: step.gateWaits.map(({ from, to }) => ({ from, to })),
-			sleeps: sleeps.get(step.id) ?? [],
+			sleeps: step.sleeps.map(({ from, to, reason }) => ({ from, to, reason })),
 		})),
 	};
+}
+
+/** The dollars of a tally when all of them are known, else null. */
+function knownUsd(cost: CostTally): number | null {
+	return cost.calls > 0 && cost.missing === 0 ? cost.usd : null;
+}
+
+/** Each opening of the step that ended, with its end. */
+function stepEnds(step: DerivedStep): TraceStepEnd[] {
+	const ends: TraceStepEnd[] = [];
+	for (const opening of step.openings) {
+		const { end } = opening;
+		if (!end) continue;
+		ends.push({
+			seq: end.seq,
+			openedAt: opening.at,
+			at: end.at,
+			outcome: end.payload.outcome,
+			error: end.payload.error,
+			costUsd: knownUsd(end.cost),
+			costBasis: costBasis(end.cost),
+			first: ends.length === 0,
+		});
+	}
+	return ends;
 }

@@ -123,8 +123,8 @@ async function stoppedStep(
 	node: AgentNode,
 	pending: PendingGate,
 ): Promise<{ end: StepEnd; update: RunStateUpdate; prompt: string | null }> {
-	const events = await ctx.log.events(ctx.run.id);
-	const step = deriveSteps(events).find((s) => s.id === pending.stepId);
+	const runState = await ctx.log.state(ctx.run.id);
+	const step = deriveSteps(runState).find((s) => s.id === pending.stepId);
 	const outputs = { ...askOutputs(pending), outcome: "stopped" };
 	return {
 		end: {
@@ -139,7 +139,7 @@ async function stoppedStep(
 			nodes: { [node.id]: outputs },
 			...commitVisit(node, pending.visit),
 		},
-		prompt: step ? resumePromptOf(events, step) : null,
+		prompt: step ? resumePromptOf(runState, step) : null,
 	};
 }
 

@@ -54,11 +54,11 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 	let graph: BodyGraph | null = null;
 	return async (state, config) => {
 		const runId = ctx.run.id;
-		const events = await ctx.log.events(runId);
+		const runState = await ctx.log.state(runId);
 		const point = resumePoint(
 			node,
 			state,
-			events,
+			runState,
 			scopeOf(config),
 			CALL.resumeRules(node),
 		);
@@ -71,7 +71,7 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			state,
 			config,
 			entryOf(point),
-			events,
+			runState,
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;

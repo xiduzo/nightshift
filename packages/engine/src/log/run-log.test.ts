@@ -3,10 +3,11 @@ import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
-import { deriveRunStatus } from "../read/derive-run";
+import { deriveRunState } from "../read/run-views";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { type EventInput, type LoggedEvent, parseEventRow } from "./events";
 import { createRunLog } from "./run-log";
+import { foldRun, type RunState } from "./run-state";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -32,6 +33,14 @@ beforeEach(async () => {
 afterEach(async () => {
 	await sandbox.cleanup();
 });
+
+/** How many of the events these tests append the run state holds: its start, its ends and its edges. */
+const eventsIn = (run: RunState) =>
+	(run.started ? 1 : 0) +
+	run.ends.length +
+	(run.edges.get("")?.taken.length ?? 0);
+
+const statusOf = (run: RunState) => deriveRunState(run).status;
 
 async function fromDb(runId: string): Promise<LoggedEvent[]> {
 	const rows = await sandbox.db
@@ -190,7 +199,7 @@ describe("run log", () => {
 		const log = createRunLog(heldReads(sandbox.db, held), {
 			walkerId: sandbox.deviceId,
 		});
-		const count = (events: readonly LoggedEvent[]) => events.length;
+		const count = (run: RunState) => eventsIn(run);
 		await log.append(started("r1"));
 		const counted = log.derive(["r1"], count);
 		await log.append(edge("r1", 1));
@@ -206,11 +215,11 @@ describe("run log", () => {
 		await sandbox.db.$client.execute(
 			"CREATE TRIGGER refuse BEFORE INSERT ON event WHEN NEW.type = 'EdgeTaken' BEGIN SELECT RAISE(ABORT, 'refused'); END",
 		);
-		const statuses = await log.derive(["r1"], deriveRunStatus);
+		const statuses = await log.derive(["r1"], statusOf);
 		await expect(log.append(edge("r1", 1))).rejects.toThrow();
 		expect(await log.events("r1")).toEqual(await fromDb("r1"));
 		expect(await log.events("r1")).toHaveLength(1);
-		expect(await log.derive(["r1"], deriveRunStatus)).toEqual(statuses);
+		expect(await log.derive(["r1"], statusOf)).toEqual(statuses);
 	});
 
 	test("an append and the rows it names land in one batch, or not at all", async () => {
@@ -280,9 +289,9 @@ describe("run log", () => {
 			maxIdleEvents: 0,
 		});
 		let calls = 0;
-		const count = (events: readonly LoggedEvent[]) => {
+		const count = (run: RunState) => {
 			calls++;
-			return events.length;
+			return eventsIn(run);
 		};
 		await log.append(started("a"));
 		await log.append(started("b"));
@@ -313,9 +322,9 @@ describe("run log", () => {
 		);
 		const log = createRunLog(db, { walkerId: sandbox.deviceId });
 		let calls = 0;
-		const count = (events: readonly LoggedEvent[]) => {
+		const count = (run: RunState) => {
 			calls++;
-			return events.length;
+			return eventsIn(run);
 		};
 		const before = counter.selects;
 		// A run page opens: the run list, the Gates and the run itself at once.
@@ -323,7 +332,7 @@ describe("run log", () => {
 			log.derive(["r1"], count),
 			log.derive(["r1"], count),
 			log.events("r1"),
-			log.derive(["r1"], deriveRunStatus),
+			log.derive(["r1"], statusOf),
 		]);
 		expect(counter.selects - before).toBe(1);
 		expect(calls).toBe(1);
@@ -335,9 +344,9 @@ describe("run log", () => {
 	test("every watcher of a run shares one derivation per append", async () => {
 		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		let calls = 0;
-		const count = (events: readonly LoggedEvent[]) => {
+		const count = (run: RunState) => {
 			calls++;
-			return events.length;
+			return eventsIn(run);
 		};
 		await log.append(started("r1"));
 		for (let n = 1; n <= 3; n++) {
@@ -350,6 +359,41 @@ describe("run log", () => {
 			);
 			expect(calls).toBe(n);
 		}
+	});
+});
+
+describe("the run state", () => {
+	test("each append applies its event to the state; a state given out never changes", async () => {
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		await log.append(started("r1"));
+		const before = await log.state("r1");
+		const kept = structuredClone(before);
+		await log.append(edge("r1", 1));
+		await log.append({
+			type: "StepStarted",
+			runId: "r1",
+			stepId: "s1",
+			payload: {
+				nodeId: "a",
+				nodeType: "agent",
+				visit: 1,
+				transcriptPath: "t",
+				logPath: null,
+			},
+		});
+		await log.append({
+			type: "StepEnded",
+			runId: "r1",
+			stepId: "s1",
+			payload: { outcome: "pass", outputs: {}, error: null },
+		});
+		await log.append(ended("r1"));
+		const after = await log.state("r1");
+		expect(before).toEqual(kept);
+		expect(after).not.toBe(before);
+		// The same state a fold of the whole log gives.
+		expect(after).toEqual(foldRun(await log.events("r1")));
+		expect(statusOf(after)).toBe("finished");
 	});
 });
 

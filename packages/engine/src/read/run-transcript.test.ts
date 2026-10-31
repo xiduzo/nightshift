@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	createRunBus,
 	type Derive,
+	foldRun,
 	type LoggedEvent,
 	type RunBus,
 	type TranscriptEntry,
@@ -143,7 +144,7 @@ function ports(extra: Partial<RunTranscriptPorts> = {}): RunTranscriptPorts {
 	return {
 		log: {
 			derive: async <T>(runIds: readonly string[], fn: Derive<T>) =>
-				new Map(runIds.map((id) => [id, fn([...events])])),
+				new Map(runIds.map((id) => [id, fn(foldRun([...events]))])),
 		},
 		bus,
 		stepEntries,

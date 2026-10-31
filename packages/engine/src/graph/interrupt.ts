@@ -70,7 +70,7 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 			if (
 				isGraphInterrupt(error) &&
 				stale &&
-				holdEnded(await stale.ctx.log.events(stale.ctx.run.id), own)
+				holdEnded(await stale.ctx.log.state(stale.ctx.run.id), own)
 			) {
 				return stale.letGo(own, state, config);
 			}

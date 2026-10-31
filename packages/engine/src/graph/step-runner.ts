@@ -12,9 +12,10 @@ import { eq } from "drizzle-orm";
 import type { Device } from "../device";
 import {
 	commandLogPath,
+	type DerivedStep,
 	type EnginePayloads,
 	type GateChoice,
-	type LoggedEvent,
+	type RunState,
 	type RunWarningKind,
 	type StepBudget,
 	type StepEvent,
@@ -23,15 +24,7 @@ import {
 	scopeKey,
 	transcriptPath,
 } from "../log";
-import {
-	countStepsSinceWalkBegan,
-	type DerivedStep,
-	deriveBudgetSpend,
-	deriveSteps,
-	deriveStopAfterStep,
-	deriveWorktrees,
-	gitAuthorOf,
-} from "../read";
+import { deriveBudgetSpend, deriveWorktrees, gitAuthorOf } from "../read";
 import { keptNames, saveKeptValues } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import { budgetPassed, runBudget } from "./budget";
@@ -169,8 +162,8 @@ export type StepHandle = {
 	worktree: string;
 	/** The step as the log had it, for a reopened or continued step; null for a new visit. */
 	existing: DerivedStep | null;
-	/** The log as read on entry, before this step's own events. */
-	events: readonly LoggedEvent[];
+	/** The run state as read on entry, before this step's own events. */
+	runState: RunState;
 	tctx: TemplateContext;
 	/** The step's own signal: a stop of the run, the node's time budget, or no activity for too long. */
 	signal: AbortSignal;
@@ -318,9 +311,9 @@ export async function runStep(
 	config: LangGraphRunnableConfig,
 	spec: StepSpec,
 ): Promise<Command> {
-	const events = await ctx.log.events(ctx.run.id);
-	withLoggedWorktree(ctx, events);
-	const entry = resumePoint(node, state, events, scopeOf(config), spec.rules);
+	const runState = await ctx.log.state(ctx.run.id);
+	withLoggedWorktree(ctx, runState);
+	const entry = resumePoint(node, state, runState, scopeOf(config), spec.rules);
 	const extra = spec.update;
 	if (entry.kind === "done") {
 		return routeDone(ctx, state, node, entry, config, extra);
@@ -331,7 +324,7 @@ export async function runStep(
 		state,
 		config,
 		entryOf(entry),
-		events,
+		runState,
 	);
 	if (begun.kind === "parked") return begun.command;
 	const step = begun.step;
@@ -573,8 +566,8 @@ const haltMessages = new WeakMap<AbortSignal, string>();
  * `runStep`'s scaffolding in the old engine. It asks `ctx.deviceFor` for
  * the step's Device first; `StepStarted` names it.
  *
- * `events` is the log as the caller read it on entry; without it the log
- * is read here.
+ * `runState` is the run state as the caller read it on entry; without it
+ * it is read here.
  */
 export async function beginStep(
 	ctx: StepContext,
@@ -582,14 +575,14 @@ export async function beginStep(
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
 	start: StepStart = { kind: "new" },
-	events?: readonly LoggedEvent[],
+	runState?: RunState,
 ): Promise<BeginStep> {
 	const runId = ctx.run.id;
 	const scope = scopeOf(config);
 	// Asked once per step: the body works on this Device, and a new step
 	// records it.
 	const device = ctx.deviceFor(node, ctx.run);
-	const logged = events ?? (await ctx.log.events(runId));
+	const logged = runState ?? (await ctx.log.state(runId));
 	// The kind says which timers a step has: a Gate waits as long as it
 	// must, a Wait node keeps its own deadline across its sleeps, and only an
 	// Agent step has an idle clock (its own, else the policy's). The log
@@ -629,7 +622,7 @@ export async function beginStep(
 		// enters the node body with the aborted signal, so it ends `stopped`
 		// with its session and a later resume can reopen it.
 		if (ctx.signal().aborted) return parked("stopped", null);
-		if (deriveStopAfterStep(logged)) {
+		if (logged.stopAfterStep) {
 			return parked("stopped", STOP_AFTER_STEP_REASON);
 		}
 		const stopAt = stopAtOf(state, config);
@@ -637,7 +630,7 @@ export async function beginStep(
 			return parked("stopped", STOP_TIME_REASON, true);
 		}
 		const limit = ctx.policy().maxSteps ?? ctx.settings().maxStepsPerRun;
-		if (countStepsSinceWalkBegan(logged) >= limit) {
+		if (logged.stepsSinceWalk >= limit) {
 			return parked(
 				"failed",
 				`The run reached the limit of ${limit} steps before node "${node.id}". Resume it to continue.`,
@@ -696,7 +689,7 @@ export async function beginStep(
 			},
 		);
 	} else {
-		existing = deriveSteps(logged).find((s) => s.id === start.stepId) ?? null;
+		existing = logged.steps.get(start.stepId) ?? null;
 		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
 		stepId = existing.id;
 		visit = existing.visit;
@@ -772,7 +765,7 @@ export async function beginStep(
 		// The run's worktree on this Device; a Hand-off sets it again.
 		worktree: worktreeOn(ctx, logged, device) ?? ctx.run.worktreePath,
 		existing,
-		events: logged,
+		runState: logged,
 		tctx: templateContext(ctx, state, config),
 		signal: stepController.signal,
 		opened: start.kind,
@@ -980,10 +973,10 @@ function isDevice(ctx: StepContext, id: string, device: Device): boolean {
 /** The run's worktree on `device`, from the log, or null when the run has none there. */
 function worktreeOn(
 	ctx: StepContext,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	device: Device,
 ): string | null {
-	for (const [id, path] of deriveWorktrees(events, ctx.run).paths) {
+	for (const [id, path] of deriveWorktrees(runState, ctx.run).paths) {
 		if (isDevice(ctx, id, device)) return path;
 	}
 	return null;
@@ -1023,8 +1016,8 @@ export async function readyDevice(
 		outputs: { visit: step.visit },
 		error,
 	});
-	let events = await ctx.log.events(ctx.run.id);
-	const made = await makeRunWorktree(ctx, events);
+	let runState = await ctx.log.state(ctx.run.id);
+	const made = await makeRunWorktree(ctx, runState);
 	if (made?.kind === "offline") return offline(made.at);
 	if (made?.kind === "refused") {
 		return fail(
@@ -1032,13 +1025,13 @@ export async function readyDevice(
 		);
 	}
 	if (made?.kind === "made") {
-		events = await ctx.log.events(ctx.run.id);
+		runState = await ctx.log.state(ctx.run.id);
 		step.tctx.run.worktree = made.worktree.worktreePath;
 		step.tctx.run.base_ref = made.worktree.baseRef;
 		if (step.tctx.run.branch === "")
 			step.tctx.run.branch = made.worktree.branch;
 	}
-	const { holder, paths } = deriveWorktrees(events, ctx.run);
+	const { holder, paths } = deriveWorktrees(runState, ctx.run);
 	if (isDevice(ctx, holder, device)) {
 		step.worktree = paths.get(holder) ?? step.worktree;
 		return null;

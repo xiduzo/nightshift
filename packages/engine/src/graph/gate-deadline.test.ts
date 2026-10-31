@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { DecisionNode, Flow } from "@nightshift/flows";
+import { foldRun } from "../log";
 
 import { getRunRow } from "../log/run-row";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveOpenGate, deriveRunState } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -78,11 +78,12 @@ async function setup(flow: Flow) {
 			stopAt: null,
 		}),
 	});
-	await waitFor(async () => deriveOpenGate(await h.events()));
+	await waitFor(async () => deriveOpenGate(foldRun(await h.events())));
 	return { h, runner, clock };
 }
 
-const statusOf = async (h: Harness) => deriveRunState(await h.events()).status;
+const statusOf = async (h: Harness) =>
+	deriveRunState(foldRun(await h.events())).status;
 
 describe("a Gate with a deadline", () => {
 	test("logs when it is due and what it chooses, from minutes after it opens", async () => {
@@ -95,7 +96,7 @@ describe("a Gate with a deadline", () => {
 				deadline: { at: T0 + 90 * MINUTE, choose: "keep" },
 			},
 		]);
-		expect(deriveOpenGate(events)?.deadline).toEqual({
+		expect(deriveOpenGate(foldRun(events))?.deadline).toEqual({
 			at: T0 + 90 * MINUTE,
 			choose: "keep",
 		});
@@ -103,7 +104,8 @@ describe("a Gate with a deadline", () => {
 
 	test("a time of day is the next one after the Gate opens", async () => {
 		const { h } = await setup(keepFlow({ at: "07:00", choose: "keep" }));
-		const due = deriveOpenGate(await h.events())?.deadline?.at as number;
+		const due = deriveOpenGate(foldRun(await h.events()))?.deadline
+			?.at as number;
 		expect(new Date(due).getHours()).toBe(7);
 		expect(due).toBeGreaterThan(T0);
 		expect(due - T0).toBeLessThan(24 * 60 * 60 * 1000);
@@ -113,7 +115,7 @@ describe("a Gate with a deadline", () => {
 		const { h, runner, clock } = await setup(
 			keepFlow({ minutes: 30, choose: "keep" }),
 		);
-		const stepId = deriveOpenGate(await h.events())?.stepId as string;
+		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
 
 		// A timer before the deadline changes nothing.
 		clock.now = T0 + 29 * MINUTE;
@@ -131,11 +133,12 @@ describe("a Gate with a deadline", () => {
 		const events = await h.events();
 		const note =
 			'Nobody answered by the deadline, so Night Shift chose "keep".';
-		const gateStep = deriveSteps(events).find((s) => s.id === stepId);
+		const gateStep = deriveSteps(foldRun(events)).find((s) => s.id === stepId);
 		expect(gateStep?.outcome).toBe("keep");
 		expect(gateStep?.outputs).toEqual({ outcome: "keep", note, visit: 1 });
 		expect(
-			deriveSteps(events).find((s) => s.nodeId === "kept")?.outputs.log_tail,
+			deriveSteps(foldRun(events)).find((s) => s.nodeId === "kept")?.outputs
+				.log_tail,
 		).toBe(note);
 		expect(
 			(await readTranscriptFile(gateStep?.transcriptPath as string)).map(
@@ -165,7 +168,7 @@ describe("a Gate with a deadline", () => {
 		const { h, runner, clock } = await setup(
 			keepFlow({ minutes: 30, choose: "keep" }),
 		);
-		const stepId = deriveOpenGate(await h.events())?.stepId as string;
+		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
 		await runner.take(h.runId, {
 			kind: "answer",
 			stepId,
@@ -177,7 +180,9 @@ describe("a Gate with a deadline", () => {
 		expect(await runner.take(h.runId, { kind: "wake", early: false })).toEqual({
 			kind: "unchanged",
 		});
-		const gateStep = deriveSteps(await h.events()).find((s) => s.id === stepId);
+		const gateStep = deriveSteps(foldRun(await h.events())).find(
+			(s) => s.id === stepId,
+		);
 		expect(gateStep?.outputs).toEqual({
 			outcome: "drop",
 			note: "Not needed",
@@ -193,9 +198,9 @@ describe("a Gate with a deadline", () => {
 		clock.now = T0 + 45 * MINUTE;
 		const next = testRunner(h, { now: () => clock.now });
 		runners.push(next);
-		next.restore(h.runId, await h.events());
+		next.restore(h.runId, foldRun(await h.events()));
 		await waitFor(async () => (await statusOf(h)) === "finished");
-		const gateStep = deriveSteps(await h.events()).find(
+		const gateStep = deriveSteps(foldRun(await h.events())).find(
 			(s) => s.nodeId === "keep",
 		);
 		expect(gateStep?.outcome).toBe("drop");
@@ -205,7 +210,7 @@ describe("a Gate with a deadline", () => {
 		const h = await startRun(sandbox, keepFlow({ at: "soon", choose: "keep" }));
 		const driven = await drive(h, { inputs: {} });
 		expect(driven.parked).toMatchObject([{ kind: "parked", status: "failed" }]);
-		const [gateStep] = deriveSteps(await h.events());
+		const [gateStep] = deriveSteps(foldRun(await h.events()));
 		expect(gateStep?.outcome).toBe("error");
 		expect(gateStep?.error).toBe(
 			'The Gate could not open: The deadline "soon" is not valid. Write a date and time like 2026-10-18T07:00, or a time like 07:00.',
@@ -238,12 +243,13 @@ describe("Gates with deadlines on parallel branches", () => {
 		await waitFor(
 			async () =>
 				!runner.isActive(h.runId) &&
-				deriveSteps(await h.events()).filter(
+				deriveSteps(foldRun(await h.events())).filter(
 					(s) => s.gate !== null && s.endedAt === null,
 				).length === 2,
 		);
 		const outcomeOf = async (nodeId: string) =>
-			deriveSteps(await h.events()).find((s) => s.nodeId === nodeId)?.outcome;
+			deriveSteps(foldRun(await h.events())).find((s) => s.nodeId === nodeId)
+				?.outcome;
 
 		// The first deadline is due: only its Gate takes its option.
 		clock.now = T0 + 30 * MINUTE;

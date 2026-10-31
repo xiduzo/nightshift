@@ -4,9 +4,9 @@ import type { Flow } from "@nightshift/flows";
 import { FAILURE_MESSAGE } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
+import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
-import { deriveOpenGate, deriveRunState } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
 import { WALKED_ELSEWHERE } from "../run-status";
 import {
 	agent,
@@ -96,7 +96,7 @@ const start = (runner: Runner, runId: string, before?: Promise<void>) =>
 	});
 
 const statusOf = async (h: Harness, runId = h.runId) =>
-	deriveRunState(await h.log.events(runId)).status;
+	deriveRunState(await h.log.state(runId)).status;
 
 /** A promise the test settles by hand. */
 function latch() {
@@ -231,7 +231,7 @@ describe("take: the run cap", () => {
 		const busy = await another(worker());
 		await start(runner, busy);
 		await waitFor(() => sessions[0]);
-		const stepId = deriveOpenGate(await h.events())?.stepId as string;
+		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
 		const answer = {
 			kind: "answer" as const,
 			stepId,
@@ -240,13 +240,15 @@ describe("take: the run cap", () => {
 		};
 
 		await expect(runner.take(h.runId, answer)).rejects.toThrow("run cap");
-		expect(deriveOpenGate(await h.events())?.stepId).toBe(stepId);
+		expect(deriveOpenGate(foldRun(await h.events()))?.stepId).toBe(stepId);
 
 		await runner.take(busy, { kind: "stop" });
 		expect(await runner.take(h.runId, answer)).toEqual({ kind: "driving" });
-		const gateStep = deriveSteps(await h.events()).find((s) => s.id === stepId);
+		const gateStep = deriveSteps(foldRun(await h.events())).find(
+			(s) => s.id === stepId,
+		);
 		expect(gateStep?.endedAt).not.toBeNull();
-		expect(deriveOpenGate(await h.events())).toBeNull();
+		expect(deriveOpenGate(foldRun(await h.events()))).toBeNull();
 	});
 
 	test("Turns queued on a full cap retry in order, each once, when a slot frees (I10)", async () => {
@@ -451,7 +453,7 @@ describe("a run keeps only the checkpoints a re-entry reads", () => {
 		resumed.finish();
 		await waitFor(async () => (await statusOf(h)) === "finished");
 		expect(
-			deriveSteps(await h.events()).map((s) => [s.nodeId, s.outcome]),
+			deriveSteps(foldRun(await h.events())).map((s) => [s.nodeId, s.outcome]),
 		).toEqual([
 			["worker", "pass"],
 			["check", "pass"],
@@ -504,7 +506,8 @@ describe("a run keeps only the checkpoints a re-entry reads", () => {
 
 		await runner.take(h.runId, { kind: "resume", by: "person" });
 		await waitFor(async () => (await statusOf(h)) === "waiting");
-		const gateStep = deriveOpenGate(await h.events())?.stepId as string;
+		const gateStep = deriveOpenGate(foldRun(await h.events()))
+			?.stepId as string;
 		await runner.take(h.runId, {
 			kind: "answer",
 			stepId: gateStep,
@@ -512,7 +515,7 @@ describe("a run keeps only the checkpoints a re-entry reads", () => {
 			note: "",
 		});
 		await waitFor(async () => (await statusOf(h)) === "finished");
-		const steps = deriveSteps(await h.events());
+		const steps = deriveSteps(foldRun(await h.events()));
 		expect(steps.filter((s) => s.nodeId === "first")).toHaveLength(1);
 		expect(steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
 			["call", 1, "pass"],

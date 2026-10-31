@@ -1,9 +1,9 @@
 import type { Flow } from "@nightshift/flows";
 import type {
 	EnginePayloads,
-	LoggedEvent,
 	ResumedBy,
 	RunResult,
+	RunState,
 	RunStatus,
 	Scope,
 } from "../log";
@@ -12,7 +12,6 @@ import {
 	deriveNodeOutputs,
 	deriveRunState,
 	deriveSteps,
-	deriveStopAt,
 	deriveTraversals,
 	deriveVariables,
 } from "../read";
@@ -66,16 +65,16 @@ import {
  */
 export function reentryUpdate(
 	flow: Flow,
-	events: readonly LoggedEvent[],
-	reentered: string | null = reenteredNode(events),
+	run: RunState,
+	reentered: string | null = reenteredNode(run),
 ): RunStateUpdate {
 	return {
-		inputs: deriveInputs(events),
-		stopAt: deriveStopAt(events),
-		visits: loggedVisits(flow, events, reentered),
-		nodes: deriveNodeOutputs(events, ""),
-		vars: deriveVariables(events, ""),
-		traversals: deriveTraversals(events, ""),
+		inputs: deriveInputs(run),
+		stopAt: run.stopAt,
+		visits: loggedVisits(flow, run, reentered),
+		nodes: deriveNodeOutputs(run, ""),
+		vars: deriveVariables(run, ""),
+		traversals: deriveTraversals(run, ""),
 		ended: null,
 		pending: null,
 	};
@@ -99,11 +98,9 @@ export type ResumeTarget = {
  * same session `resumePoint` takes up, `sessionOf`), and its scope. Null
  * when the run never started a step.
  */
-export function resumeTarget(
-	events: readonly LoggedEvent[],
-): ResumeTarget | null {
-	const steps = deriveSteps(events);
-	const { last, movedOn } = latestFront(events);
+export function resumeTarget(run: RunState): ResumeTarget | null {
+	const steps = deriveSteps(run);
+	const { last, movedOn } = latestFront(run);
 	let nodeId: string;
 	let stepId: string | null = null;
 	let scope: Scope | null;
@@ -117,7 +114,7 @@ export function resumeTarget(
 		if (
 			last.nodeType === "agent" &&
 			sessionOf(last) !== null &&
-			!isDone(events, last)
+			!isDone(run, last)
 		) {
 			stepId = last.id;
 		}
@@ -142,7 +139,7 @@ export function resumeTarget(
  */
 function branchTarget(
 	flow: Flow,
-	events: readonly LoggedEvent[],
+	run: RunState,
 	state: ThreadState,
 ): ResumeTarget | null {
 	if (state.kind !== "interrupted") return null;
@@ -151,7 +148,7 @@ function branchTarget(
 	)?.value;
 	if (parked?.kind !== "parked") return null;
 	const step = parked.stepId
-		? deriveSteps(events).find((s) => s.id === parked.stepId && !s.scope)
+		? deriveSteps(run).find((s) => s.id === parked.stepId && !s.scope)
 		: undefined;
 	const continued =
 		step?.nodeType === "agent" && sessionOf(step) !== null ? step : null;
@@ -231,13 +228,13 @@ export function rerunNodeRefusal(flow: Flow, nodeId: string): string | null {
  */
 export function planReentry(input: {
 	flow: Flow;
-	events: readonly LoggedEvent[];
+	run: RunState;
 	thread: ThreadSnapshot;
 	request: ReentryRequest;
 	now: number;
 }): ReentryPlan {
-	const { flow, events, thread, request } = input;
-	const stopAt = deriveStopAt(events);
+	const { flow, run, thread, request } = input;
+	const stopAt = run.stopAt;
 	const clearStopAt = stopAt !== null && input.now >= stopAt;
 	const cleared: RunStateUpdate | undefined = clearStopAt
 		? { stopAt: null }
@@ -246,13 +243,13 @@ export function planReentry(input: {
 		const refusal = rerunNodeRefusal(flow, request.nodeId);
 		if (refusal) throw new RunRefusal("unknown-node", refusal);
 	}
-	const { status, result } = deriveRunState(events);
+	const { status, result } = deriveRunState(run);
 	refuseLive(request.kind, status, result);
 	if (request.kind === "rerun") {
-		return planRerun(flow, events, thread, request, clearStopAt, cleared);
+		return planRerun(flow, run, thread, request, clearStopAt, cleared);
 	}
-	const target = branchTarget(flow, events, thread.state) ??
-		resumeTarget(events) ?? {
+	const target = branchTarget(flow, run, thread.state) ??
+		resumeTarget(run) ?? {
 			nodeId: flow.start,
 			stepId: null,
 			scope: null,
@@ -302,7 +299,7 @@ export function planReentry(input: {
 				entry: {
 					kind: "goto",
 					nodeId: target.topNodeId,
-					update: { ...reenteredSeed(flow, events, thread), ...cleared },
+					update: { ...reenteredSeed(flow, run, thread), ...cleared },
 				},
 				clearTasks: false,
 			};
@@ -312,20 +309,20 @@ export function planReentry(input: {
 /** The state a resume of a thread that ended or never ran jumps in with. */
 function reenteredSeed(
 	flow: Flow,
-	events: readonly LoggedEvent[],
+	run: RunState,
 	thread: ThreadSnapshot,
 ): RunStateUpdate {
-	if (!thread.hasCheckpoint) return reentryUpdate(flow, events);
+	if (!thread.hasCheckpoint) return reentryUpdate(flow, run);
 	return {
 		ended: null,
 		pending: null,
-		...takeBackVisit(thread.values, reenteredNode(events)),
+		...takeBackVisit(thread.values, reenteredNode(run)),
 	};
 }
 
 function planRerun(
 	flow: Flow,
-	events: readonly LoggedEvent[],
+	run: RunState,
 	thread: ThreadSnapshot,
 	request: Extract<ReentryRequest, { kind: "rerun" }>,
 	clearStopAt: boolean,
@@ -334,8 +331,8 @@ function planRerun(
 	const { nodeId } = request;
 	const last =
 		request.stepId === undefined
-			? positionOf(thread.values, events, null).latest({ id: nodeId })
-			: deriveSteps(events).find((s) => s.id === request.stepId);
+			? positionOf(thread.values, run, null).latest({ id: nodeId })
+			: deriveSteps(run).find((s) => s.id === request.stepId);
 	if (
 		request.stepId !== undefined &&
 		(last?.nodeId !== nodeId || last.scope !== null)
@@ -353,12 +350,12 @@ function planRerun(
 		? {
 				ended: null,
 				pending: null,
-				visits: loggedVisits(flow, events, null),
+				visits: loggedVisits(flow, run, null),
 				loops: Object.fromEntries(
 					Object.keys(thread.values.loops ?? {}).map((id) => [id, null]),
 				),
 			}
-		: reentryUpdate(flow, events, null);
+		: reentryUpdate(flow, run, null);
 	return {
 		resumed: {
 			nodeId,

@@ -5,8 +5,7 @@ import {
 	renderValue,
 	type TemplateContext,
 } from "@nightshift/flows";
-import type { ItemFacts, StepOutputs } from "../log";
-import type { DerivedItem } from "../read";
+import type { DerivedItem, ItemFacts, StepOutputs } from "../log";
 
 /**
  * The pure parts of a Call step with `each`: turning a source's JSON into

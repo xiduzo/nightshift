@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { type Flow, planSubflowFromSection } from "@nightshift/flows";
-import { deriveSteps } from "../read/derive-steps";
+import { foldRun } from "../log";
+import { deriveSteps } from "../read/run-views";
 import { command, drive, edge, flowOf, startRun } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 
@@ -65,7 +66,9 @@ const withSection: Flow = flowOf(
 async function runOf(flow: Flow, flows: Record<string, Flow> = {}) {
 	const h = await startRun(sandbox, flow, { flows });
 	const { parked, state } = await drive(h, { inputs: { who: "bob" } });
-	const steps = deriveSteps(await h.events()).filter((s) => s.scope === null);
+	const steps = deriveSteps(foldRun(await h.events())).filter(
+		(s) => s.scope === null,
+	);
 	const printed = (id: string) =>
 		steps.filter((s) => s.nodeId === id).at(-1)?.outputs.log_tail;
 	return {

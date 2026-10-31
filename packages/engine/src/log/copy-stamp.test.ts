@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
 import type { LoggedEvent } from "./events";
+import { foldRun } from "./run-state";
 
 /**
  * The stamp of a copy of a step's file: which opening of the step, and
@@ -10,7 +11,7 @@ import type { LoggedEvent } from "./events";
 
 /** The stamp of one step of a run's events. */
 const copyStampOf = (events: readonly LoggedEvent[], stepId: string) =>
-	copyStamps(events).get(stepId) ?? null;
+	copyStamps(foldRun(events)).get(stepId) ?? null;
 
 /** A step's lifecycle events, in `seq` order from 1. */
 function events(
@@ -55,6 +56,10 @@ describe("the stamp of a step", () => {
 				"step-1",
 			),
 		).toEqual(at(2, true));
+		// A second start of the step is a new opening, as a reopen is.
+		expect(
+			copyStampOf(events("StepStarted", "StepEnded", "StepStarted"), "step-1"),
+		).toEqual(at(2, false));
 	});
 
 	test("stamps every step of the run in one pass", () => {
@@ -62,7 +67,7 @@ describe("the stamp of a step", () => {
 		const second = events("StepStarted", "StepEnded", "StepReopened").map(
 			(e) => ({ ...e, seq: e.seq + first.length, stepId: "step-2" }),
 		);
-		expect(copyStamps([...first, ...second])).toEqual(
+		expect(copyStamps(foldRun([...first, ...second]))).toEqual(
 			new Map([
 				["step-1", at(1, true)],
 				["step-2", at(2, false)],

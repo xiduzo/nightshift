@@ -25,7 +25,7 @@ import type { RunsPort } from "./peers";
 export async function takeOver(
 	deps: {
 		db: Database;
-		log: Pick<RunLog, "events" | "append" | "walkerId">;
+		log: Pick<RunLog, "events" | "state" | "append" | "walkerId">;
 		runner: Pick<
 			Runner,
 			"hold" | "forget" | "restore" | "continueTranscriptAfter"
@@ -38,8 +38,9 @@ export async function takeOver(
 	// The one Turn a run that still arrives takes (`arrival`).
 	await deps.runner.hold(
 		runId,
-		async ({ row, events }) => {
+		async ({ row }) => {
 			const self = await deps.log.walkerId();
+			const events = await deps.log.events(runId);
 			const moved = events.findLast((e) => e.type === "WalkerMoved");
 			if (
 				moved?.type !== "WalkerMoved" ||
@@ -81,7 +82,7 @@ export async function takeOver(
 			});
 			deps.runner.continueTranscriptAfter(runId, lastSeq);
 			deps.runner.forget(runId);
-			deps.runner.restore(runId, await deps.log.events(runId));
+			deps.runner.restore(runId, await deps.log.state(runId));
 		},
 		{ arrival: true },
 	);

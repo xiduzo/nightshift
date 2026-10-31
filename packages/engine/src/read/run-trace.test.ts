@@ -1,36 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type {
-	EngineEventType,
-	EnginePayloads,
-	LoggedEvent,
-} from "../log/events";
+import { type EnginePayloads, foldRun } from "../log";
+import { runEvents as log } from "../testing/run-events";
 import { runTrace } from "./run-trace";
-
-/** A run's log, shape only. Each event gets the next seq at the time given. */
-function log() {
-	const events: LoggedEvent[] = [];
-	const builder = {
-		events,
-		at<T extends EngineEventType>(
-			time: number,
-			type: T,
-			payload: EnginePayloads[T],
-			ids: { stepId?: string; sessionId?: string } = {},
-		) {
-			events.push({
-				seq: events.length + 1,
-				runId: "run-1",
-				stepId: ids.stepId ?? null,
-				sessionId: ids.sessionId ?? null,
-				type,
-				payload,
-				at: time,
-			} as LoggedEvent);
-			return builder;
-		},
-	};
-	return builder;
-}
 
 const started: EnginePayloads["RunStarted"] = {
 	projectId: "p1",
@@ -65,27 +36,29 @@ const ended = (
 
 describe("runTrace", () => {
 	test("is null for a log with no run", () => {
-		expect(runTrace([])).toBeNull();
+		expect(runTrace(foldRun([]))).toBeNull();
 	});
 
 	test("gives each step its ends, sessions with harness, model, tokens and cost", () => {
 		const { events } = log()
-			.at(1000, "RunStarted", started)
-			.at(1010, "StepStarted", step("build", "agent"), { stepId: "s1" })
-			.at(
-				1020,
+			.at(1000)
+			.push("RunStarted", started)
+			.at(1010)
+			.push("StepStarted", step("build", "agent"), { stepId: "s1" })
+			.at(1020)
+			.push(
 				"SessionStarted",
 				{ prompt: "p", resumeSessionId: null, harness: "claude-code" },
 				{ stepId: "s1", sessionId: "x1" },
 			)
-			.at(
-				1021,
+			.at(1021)
+			.push(
 				"HarnessSessionAssigned",
 				{ harnessSessionId: "h1", model: "claude-sonnet" },
 				{ stepId: "s1", sessionId: "x1" },
 			)
-			.at(
-				1100,
+			.at(1100)
+			.push(
 				"SessionEnded",
 				{
 					outcome: "finished",
@@ -98,10 +71,12 @@ describe("runTrace", () => {
 				},
 				{ stepId: "s1", sessionId: "x1" },
 			)
-			.at(1110, "StepEnded", ended("pass"), { stepId: "s1" })
-			.at(1200, "RunEnded", { status: "finished", reason: null });
+			.at(1110)
+			.push("StepEnded", ended("pass"), { stepId: "s1" })
+			.at(1200)
+			.push("RunEnded", { status: "finished", reason: null });
 
-		const trace = runTrace(events);
+		const trace = runTrace(foldRun(events));
 		expect(trace).not.toBeNull();
 		if (!trace) return;
 		expect(trace).toMatchObject({
@@ -139,6 +114,7 @@ describe("runTrace", () => {
 						outcome: "pass",
 						error: null,
 						costUsd: null,
+						costBasis: "billed",
 						first: true,
 					},
 				],
@@ -162,22 +138,26 @@ describe("runTrace", () => {
 
 	test("lists each end of a reopened step and a resumed run, with where it opened", () => {
 		const { events } = log()
-			.at(1000, "RunStarted", started)
-			.at(1010, "StepStarted", step("ask", "decision"), { stepId: "g" })
-			.at(
-				1011,
-				"GateOpened",
-				{ question: "Ship?", choices: [] },
-				{ stepId: "g" },
-			)
-			.at(1100, "StepEnded", ended("stopped"), { stepId: "g" })
-			.at(1101, "RunEnded", { status: "stopped", reason: "Stopped" })
-			.at(2000, "RunResumed", { nodeId: "ask", stepId: null, prompt: null })
-			.at(2001, "StepReopened", { prompt: null }, { stepId: "g" })
-			.at(2500, "StepEnded", ended("yes"), { stepId: "g" })
-			.at(2600, "RunEnded", { status: "finished", reason: null });
+			.at(1000)
+			.push("RunStarted", started)
+			.at(1010)
+			.push("StepStarted", step("ask", "decision"), { stepId: "g" })
+			.at(1011)
+			.push("GateOpened", { question: "Ship?", choices: [] }, { stepId: "g" })
+			.at(1100)
+			.push("StepEnded", ended("stopped"), { stepId: "g" })
+			.at(1101)
+			.push("RunEnded", { status: "stopped", reason: "Stopped" })
+			.at(2000)
+			.push("RunResumed", { nodeId: "ask", stepId: null, prompt: null })
+			.at(2001)
+			.push("StepReopened", { prompt: null }, { stepId: "g" })
+			.at(2500)
+			.push("StepEnded", ended("yes"), { stepId: "g" })
+			.at(2600)
+			.push("RunEnded", { status: "finished", reason: null });
 
-		const trace = runTrace(events);
+		const trace = runTrace(foldRun(events));
 		expect(
 			trace?.ends.map(({ openedAt, at, first }) => ({ openedAt, at, first })),
 		).toEqual([
@@ -202,24 +182,28 @@ describe("runTrace", () => {
 
 	test("names what each sleep waited for, and the Call step a step ran in", () => {
 		const { events } = log()
-			.at(1000, "RunStarted", started)
-			.at(1010, "StepStarted", step("each", "call"), { stepId: "c" })
-			.at(
-				1020,
+			.at(1000)
+			.push("RunStarted", started)
+			.at(1010)
+			.push("StepStarted", step("each", "call"), { stepId: "c" })
+			.at(1020)
+			.push(
 				"StepStarted",
 				step("pause", "wait", { scope: { parentStepId: "c", itemId: null } }),
 				{ stepId: "w" },
 			)
-			.at(
-				1030,
+			.at(1030)
+			.push(
 				"WaitStarted",
 				{ reason: "duration", until: 1500, message: "m", since: 1030 },
 				{ stepId: "w" },
 			)
-			.at(1500, "WaitEnded", { early: false }, { stepId: "w" })
-			.at(1510, "StepEnded", ended("done"), { stepId: "w" });
+			.at(1500)
+			.push("WaitEnded", { early: false }, { stepId: "w" })
+			.at(1510)
+			.push("StepEnded", ended("done"), { stepId: "w" });
 
-		const trace = runTrace(events);
+		const trace = runTrace(foldRun(events));
 		const wait = trace?.steps.find((s) => s.id === "w");
 		expect(wait?.parentStepId).toBe("c");
 		expect(wait?.sleeps).toEqual([

@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type {
-	EngineEventType,
-	EnginePayloads,
-	LoggedEvent,
-} from "../log/events";
-import { NO_COST } from "./cost";
-import { deriveSteps, sumCost } from "./derive-steps";
+import { type EnginePayloads, foldRun, NO_COST } from "../log";
+import { runEvents as log } from "../testing/run-events";
 import { runFacts } from "./read-model";
 import {
 	costBasis,
@@ -13,101 +8,21 @@ import {
 	runMetrics,
 	stepMetrics,
 } from "./run-metrics";
+import { deriveSteps, sumCost } from "./run-views";
 
-/** A run's log, shape only. Each event gets the next seq at the time given. */
-function log() {
-	const events: LoggedEvent[] = [];
-	const at = <T extends EngineEventType>(
-		time: number,
-		type: T,
-		payload: EnginePayloads[T],
-		ids: { stepId?: string; sessionId?: string } = {},
-	) => {
-		events.push({
-			seq: events.length + 1,
-			runId: "run-1",
-			stepId: ids.stepId ?? null,
-			sessionId: ids.sessionId ?? null,
-			type,
-			payload,
-			at: time,
-		} as LoggedEvent);
-		return builder;
-	};
-	const builder = {
-		events,
-		at,
-		started: (time: number) =>
-			at(time, "RunStarted", {
-				projectId: "p",
-				flowName: "f",
-				title: "f",
-				start: "a",
-			}),
-		step: (time: number, stepId: string, nodeId: string, visit = 1) =>
-			at(
-				time,
-				"StepStarted",
-				{
-					nodeId,
-					nodeType: "agent",
-					visit,
-					transcriptPath: "t",
-					logPath: null,
-				},
-				{ stepId },
-			),
-		ended: (
-			time: number,
-			stepId: string,
-			outputs: EnginePayloads["StepEnded"]["outputs"] = {},
-		) =>
-			at(
-				time,
-				"StepEnded",
-				{ outcome: "pass", outputs, error: null },
-				{ stepId },
-			),
-		session: (time: number, stepId: string, sessionId: string) =>
-			at(
-				time,
-				"SessionStarted",
-				{ prompt: "p", resumeSessionId: null },
-				{ stepId, sessionId },
-			),
-		sessionEnded: (
-			time: number,
-			stepId: string,
-			sessionId: string,
-			cost: Partial<EnginePayloads["SessionEnded"]> = {},
-		) =>
-			at(
-				time,
-				"SessionEnded",
-				{
-					outcome: "finished",
-					error: null,
-					errorKind: null,
-					usage: {
-						inputTokens: 1000,
-						outputTokens: 200,
-						cacheReadTokens: 600,
-						cacheWriteTokens: 100,
-					},
-					costUsd: 0.5,
-					costSource: "reported",
-					resetAt: null,
-					...cost,
-				},
-				{ stepId, sessionId },
-			),
-		gate: (time: number, stepId: string) =>
-			at(time, "GateOpened", { question: "Ship?", choices: [] }, { stepId }),
-		runEnded: (time: number) =>
-			at(time, "RunEnded", { status: "finished", reason: null }),
-	};
-	return builder;
-}
+/** A finished session's usage and cost, unless `extra` says otherwise. */
+const spent = (
+	extra: Partial<EnginePayloads["SessionEnded"]> = {},
+): Partial<EnginePayloads["SessionEnded"]> => ({
+	usage: {
+		inputTokens: 1000,
+		outputTokens: 200,
+		cacheReadTokens: 600,
+		cacheWriteTokens: 100,
+	},
+	costSource: "reported",
+	...extra,
+});
 
 const PR = "https://github.com/acme/app/pull/7";
 
@@ -161,16 +76,31 @@ describe("pullRequestOf", () => {
 describe("stepMetrics", () => {
 	test("adds up the sessions' time and tokens, and the Gate's wait", () => {
 		const l = log()
-			.started(0)
-			.step(10, "s1", "a")
-			.session(20, "s1", "x1")
-			.sessionEnded(120, "s1", "x1")
-			.gate(130, "s1")
-			.at(530, "StepReopened", { prompt: "go on" }, { stepId: "s1" })
-			.session(540, "s1", "x2")
-			.sessionEnded(640, "s1", "x2", { costSource: "estimated" })
-			.ended(650, "s1", { data: { url: PR } });
-		const [step] = deriveSteps(l.events);
+			.at(0)
+			.runStarted()
+			.at(10)
+			.stepStarted("s1", "a")
+			.at(20)
+			.sessionStarted("s1", "x1")
+			.at(120)
+			.sessionEnded("s1", "x1", "finished", 0.5, spent())
+			.at(130)
+			.gateOpened("s1")
+			.at(530)
+			.push("StepReopened", { prompt: "go on" }, { stepId: "s1" })
+			.at(540)
+			.sessionStarted("s1", "x2")
+			.at(640)
+			.sessionEnded(
+				"s1",
+				"x2",
+				"finished",
+				0.5,
+				spent({ costSource: "estimated" }),
+			)
+			.at(650)
+			.stepEnded("s1", "pass", { data: { url: PR } });
+		const [step] = deriveSteps(l.state());
 		if (!step) throw new Error("no step");
 		expect(stepMetrics(step)).toEqual({
 			wallMs: 640,
@@ -184,11 +114,14 @@ describe("stepMetrics", () => {
 
 	test("counts a running session until its latest event, and no wall time yet", () => {
 		const l = log()
-			.started(0)
-			.step(10, "s1", "a")
-			.session(20, "s1", "x1")
-			.at(
-				80,
+			.at(0)
+			.runStarted()
+			.at(10)
+			.stepStarted("s1", "a")
+			.at(20)
+			.sessionStarted("s1", "x1")
+			.at(80)
+			.push(
 				"SessionUsage",
 				{
 					usage: { inputTokens: 50, outputTokens: 5 },
@@ -196,7 +129,7 @@ describe("stepMetrics", () => {
 				},
 				{ stepId: "s1", sessionId: "x1" },
 			);
-		const [step] = deriveSteps(l.events);
+		const [step] = deriveSteps(l.state());
 		if (!step) throw new Error("no step");
 		expect(stepMetrics(step)).toMatchObject({
 			wallMs: null,
@@ -208,19 +141,29 @@ describe("stepMetrics", () => {
 	});
 
 	test("does not count a Gate that still waits", () => {
-		const l = log().started(0).step(10, "s1", "a").gate(20, "s1");
-		const [step] = deriveSteps(l.events);
+		const l = log()
+			.at(0)
+			.runStarted()
+			.at(10)
+			.stepStarted("s1", "a")
+			.at(20)
+			.gateOpened("s1");
+		const [step] = deriveSteps(l.state());
 		if (!step) throw new Error("no step");
 		expect(stepMetrics(step).gateWaitMs).toBe(0);
 	});
 
 	test("ends a Gate's wait when the run stops", () => {
 		const l = log()
-			.started(0)
-			.step(10, "s1", "a")
-			.gate(20, "s1")
-			.at(70, "RunEnded", { status: "stopped", reason: null });
-		const [step] = deriveSteps(l.events);
+			.at(0)
+			.runStarted()
+			.at(10)
+			.stepStarted("s1", "a")
+			.at(20)
+			.gateOpened("s1")
+			.at(70)
+			.push("RunEnded", { status: "stopped", reason: null });
+		const [step] = deriveSteps(l.state());
 		if (!step) throw new Error("no step");
 		expect(stepMetrics(step).gateWaitMs).toBe(50);
 	});
@@ -229,23 +172,39 @@ describe("stepMetrics", () => {
 describe("runMetrics", () => {
 	const night = () =>
 		log()
-			.started(1000)
-			.step(1010, "s1", "a")
-			.session(1020, "s1", "x1")
-			.sessionEnded(1100, "s1", "x1")
-			.ended(1110, "s1", { data: { url: PR } })
-			.step(1120, "s2", "a", 2)
-			.session(1130, "s2", "x2")
-			.sessionEnded(1200, "s2", "x2", { costUsd: null, usage: null })
-			.ended(1210, "s2", {
+			.at(1000)
+			.runStarted()
+			.at(1010)
+			.stepStarted("s1", "a")
+			.at(1020)
+			.sessionStarted("s1", "x1")
+			.at(1100)
+			.sessionEnded("s1", "x1", "finished", 0.5, spent())
+			.at(1110)
+			.stepEnded("s1", "pass", { data: { url: PR } })
+			.at(1120)
+			.stepStarted("s2", "a", 2)
+			.at(1130)
+			.sessionStarted("s2", "x2")
+			.at(1200)
+			.sessionEnded(
+				"s2",
+				"x2",
+				"finished",
+				0.5,
+				spent({ costUsd: null, usage: null }),
+			)
+			.at(1210)
+			.stepEnded("s2", "pass", {
 				log_tail: "https://github.com/acme/app/pull/8",
 			})
-			.runEnded(1300);
+			.at(1300)
+			.ended("finished");
 
 	test("adds up every step, takes the last pull request, and the run's wall time", () => {
 		const { events } = night();
-		const steps = deriveSteps(events);
-		expect(runMetrics(steps, sumCost(events, steps), 1000, 1300)).toEqual({
+		const run = foldRun(events);
+		expect(runMetrics(deriveSteps(run), sumCost(run), 1000, 1300)).toEqual({
 			wallMs: 300,
 			agentMs: 150,
 			gateWaitMs: 0,
@@ -257,27 +216,32 @@ describe("runMetrics", () => {
 	});
 
 	test("has no wall time while the run is open", () => {
-		const { events } = log().started(1000).step(1010, "s1", "a");
-		expect(runMetrics(deriveSteps(events), NO_COST, 1000, null).wallMs).toBe(
-			null,
-		);
+		const { events } = log()
+			.at(1000)
+			.runStarted()
+			.at(1010)
+			.stepStarted("s1", "a");
+		expect(
+			runMetrics(deriveSteps(foldRun(events)), NO_COST, 1000, null).wallMs,
+		).toBe(null);
 	});
 
 	test("rides on the run's facts, as the run list reads them", () => {
-		const facts = runFacts(night().events);
+		const facts = runFacts(night().state());
 		expect(facts.metrics.wallMs).toBe(300);
 		expect(facts.metrics.prUrl).toBe("https://github.com/acme/app/pull/8");
 		expect(facts.costMissing).toBe(1);
 	});
 
 	test("lists the run's scores, oldest first", () => {
-		const { events } = night().at(
-			1400,
-			"Scored",
-			{ score: "gate_decision", value: 1, label: "approve", by: "person" },
-			{ stepId: "s2" },
-		);
-		expect(runFacts(events).metrics.scores).toEqual([
+		const { events } = night()
+			.at(1400)
+			.push(
+				"Scored",
+				{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+				{ stepId: "s2" },
+			);
+		expect(runFacts(foldRun(events)).metrics.scores).toEqual([
 			{
 				score: "gate_decision",
 				value: 1,

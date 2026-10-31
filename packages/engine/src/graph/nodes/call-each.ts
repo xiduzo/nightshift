@@ -13,21 +13,17 @@ import {
 import { runCommand } from "../../device";
 import {
 	commandLogPath,
+	type DerivedStep,
 	type EnginePayloads,
 	type InputValues,
 	type ItemFacts,
-	type LoggedEvent,
+	type RunState,
 	type Scope,
 	type StepOutcome,
 	type StepOutputs,
 } from "../../log";
 import { itemBranchName } from "../../projects";
-import {
-	type DerivedStep,
-	deriveSteps,
-	deriveStopAfterStep,
-	itemStates,
-} from "../../read";
+import { itemStates } from "../../read";
 import {
 	messageOf,
 	type NodeAction,
@@ -99,11 +95,11 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 	return async (state, config) => {
 		const runId = ctx.run.id;
 		const scope = scopeOf(config);
-		const events = await ctx.log.events(runId);
+		const runState = await ctx.log.state(runId);
 		const point = resumePoint(
 			node,
 			state,
-			events,
+			runState,
 			scope,
 			RESUME_RULES.callEach,
 		);
@@ -118,7 +114,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			state,
 			config,
 			entryOf(point),
-			events,
+			runState,
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
@@ -130,9 +126,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		let lastRead: ListItem[] = [];
 
 		const current = async (): Promise<DerivedStep> => {
-			const found = deriveSteps(await ctx.log.events(runId)).find(
-				(s) => s.id === stepId,
-			);
+			const found = (await ctx.log.state(runId)).steps.get(stepId);
 			if (!found) throw new Error(`Step not found: ${stepId}`);
 			return found;
 		};
@@ -264,13 +258,13 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			const behind =
 				step.opened === "new"
 					? null
-					: positionOf(state, events, scope).cursorBehind(node);
+					: positionOf(state, runState, scope).cursorBehind(node);
 			if (behind !== null) return next(behind);
 			if (ctx.signal().aborted) return parkStopped(null);
 			const stop = stopBeforeNext(
 				ctx,
 				stopAtOf(state, config),
-				await ctx.log.events(runId),
+				await ctx.log.state(runId),
 			);
 			if (stop === STOP_TIME_REASON && wrapsUp) return wrapUp();
 			if (stop) return parkStopped(stop);
@@ -478,9 +472,9 @@ type Element = {
 function stopBeforeNext(
 	ctx: StepContext,
 	stopAt: number | null,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 ): string | null {
-	if (deriveStopAfterStep(events)) return STOP_AFTER_STEP_REASON;
+	if (runState.stopAfterStep) return STOP_AFTER_STEP_REASON;
 	if (stopAt !== null && ctx.now() >= stopAt) return STOP_TIME_REASON;
 	return null;
 }

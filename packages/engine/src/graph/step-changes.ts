@@ -1,8 +1,8 @@
 import type { FlowNode } from "@nightshift/flows";
 
 import type { Device } from "../device";
-import { readTranscriptFile, transcriptToRead } from "../log";
-import { type DerivedStep, deriveSteps } from "../read";
+import { type DerivedStep, readTranscriptFile, transcriptToRead } from "../log";
+import { deriveSteps } from "../read";
 import { messageOf, type StepContext } from "./context";
 import type { OpenStep } from "./step-runner";
 
@@ -152,7 +152,7 @@ async function othersActive(
 	from: number,
 ): Promise<boolean> {
 	const to = Date.now();
-	const steps = deriveSteps(await ctx.log.events(ctx.run.id));
+	const steps = deriveSteps(await ctx.log.state(ctx.run.id));
 	return steps.some(
 		(other) =>
 			other.id !== step.stepId &&

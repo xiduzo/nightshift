@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
 import { fakeDecider } from "@nightshift/agents/testing";
 import type { ValueNode } from "@nightshift/flows";
+import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -118,7 +119,7 @@ describe("the Value node made by a rule", () => {
 		expect(payloads(logged, "EdgeTaken")).toEqual([
 			{ edgeId: "ok", from: "small", to: "done", outcome: "pass", scope: null },
 		]);
-		const [step] = deriveSteps(logged);
+		const [step] = deriveSteps(foldRun(logged));
 		expect(step?.cost.usd).toBe(0);
 		expect(step?.sessions).toEqual([]);
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
@@ -164,7 +165,7 @@ describe("the Value node made by a rule", () => {
 			},
 			error: null,
 		});
-		const [step] = deriveSteps(await h.events());
+		const [step] = deriveSteps(foldRun(await h.events()));
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript[1]?.event).toEqual({
 			type: "value",
@@ -243,7 +244,7 @@ describe("the Value node made by a model", () => {
 			costUsd: 0.02,
 			costSource: "reported",
 		});
-		const [step] = deriveSteps(logged);
+		const [step] = deriveSteps(foldRun(logged));
 		expect(step?.cost.usd).toBeCloseTo(0.02);
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
@@ -332,7 +333,7 @@ describe("the Value node made by a model", () => {
 		});
 		const h = await startRun(sandbox, around(byModel("small")), { decider });
 		const first = await drive(h, { inputs: { tasks } });
-		const [step] = deriveSteps(await h.events());
+		const [step] = deriveSteps(foldRun(await h.events()));
 		const stepId = step?.id as string;
 		expect(first.next).toEqual(["wait__small"]);
 		expect(first.parked).toEqual([
@@ -372,7 +373,7 @@ describe("the Value node made by a model", () => {
 		expect(second.parked).toEqual([]);
 		expect(second.state.ended?.nodeId).toBe("done");
 		expect(decider.valueCalls).toHaveLength(2);
-		const steps = deriveSteps(await h.events());
+		const steps = deriveSteps(foldRun(await h.events()));
 		expect(steps.map((s) => s.nodeId)).toEqual(["small", "done"]);
 		expect(steps[0]).toMatchObject({ id: stepId, visit: 1, outcome: "pass" });
 		const transcript = await readTranscriptFile(

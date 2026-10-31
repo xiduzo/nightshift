@@ -1,6 +1,5 @@
 import type { FlowNode } from "@nightshift/flows";
-import type { LoggedEvent, Scope } from "../log";
-import { type DerivedStep, deriveSteps } from "../read";
+import type { DerivedStep, RunState, Scope } from "../log";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { type DoneStep, isCutShort, positionOf } from "./run-position";
 import { pendingWaitOf } from "./sleep";
@@ -142,11 +141,11 @@ export const RESUME_RULES = {
 export function resumePoint(
 	node: Pick<FlowNode, "id">,
 	state: PositionState,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	scope: Scope | null,
 	rules: ResumeRules,
 ): ResumePoint {
-	const at = positionOf(state, events, scope);
+	const at = positionOf(state, runState, scope);
 	const done = at.done(node);
 	if (done) return { kind: "done", ...done };
 	const held = at.held(node);
@@ -159,7 +158,7 @@ export function resumePoint(
 		const prompt = sleeping.session?.prompt ?? DEFAULT_RESUME_PROMPT;
 		return takeUp(own, session, {
 			continued: prompt,
-			reopened: resumePromptOf(events, own) ?? prompt,
+			reopened: resumePromptOf(runState, own) ?? prompt,
 		});
 	}
 
@@ -171,7 +170,7 @@ export function resumePoint(
 			sessionOf(own),
 			gateAsked(own)
 				? held.pending.answer
-				: (resumePromptOf(events, own) ?? DEFAULT_RESUME_PROMPT),
+				: (resumePromptOf(runState, own) ?? DEFAULT_RESUME_PROMPT),
 		);
 	}
 
@@ -194,7 +193,7 @@ export function resumePoint(
 
 	if (rules.loop && at.looping(node)) {
 		const latest = at.latest(node);
-		if (latest) return takeUpFromLog(events, latest);
+		if (latest) return takeUpFromLog(runState, latest);
 	}
 
 	const crashed = at.uncommitted(node);
@@ -203,14 +202,14 @@ export function resumePoint(
 		case "new":
 			return { kind: "new" };
 		case "take-up":
-			return takeUpFromLog(events, crashed);
+			return takeUpFromLog(runState, crashed);
 		case "with-session": {
 			const session = sessionOf(crashed);
 			return session
 				? reopen(
 						crashed,
 						session,
-						resumePromptOf(events, crashed) ?? DEFAULT_RESUME_PROMPT,
+						resumePromptOf(runState, crashed) ?? DEFAULT_RESUME_PROMPT,
 					)
 				: { kind: "new" };
 		}
@@ -260,11 +259,8 @@ function takeUp(
 }
 
 /** `takeUp` for a step the log alone points at: its prompt is the latest resume's. */
-function takeUpFromLog(
-	events: readonly LoggedEvent[],
-	step: DerivedStep,
-): ResumePoint {
-	const prompt = resumePromptOf(events, step) ?? DEFAULT_RESUME_PROMPT;
+function takeUpFromLog(runState: RunState, step: DerivedStep): ResumePoint {
+	const prompt = resumePromptOf(runState, step) ?? DEFAULT_RESUME_PROMPT;
 	return takeUp(step, sessionOf(step), { continued: prompt, reopened: prompt });
 }
 
@@ -299,16 +295,13 @@ export function sessionOf(step: DerivedStep | undefined): string | null {
 
 /** The prompt the latest `RunResumed` for this step carries, if any. */
 export function resumePromptOf(
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	step: DerivedStep,
 ): string | null {
-	const resumed = events.findLast(
-		(e) =>
-			e.type === "RunResumed" &&
-			e.seq > step.startSeq &&
-			e.payload.stepId === step.id,
+	const resumed = runState.resumes.findLast(
+		(e) => e.seq > step.startSeq && e.payload.stepId === step.id,
 	);
-	return resumed?.type === "RunResumed" ? resumed.payload.prompt : null;
+	return resumed ? resumed.payload.prompt : null;
 }
 
 /**
@@ -318,33 +311,26 @@ export function resumePromptOf(
  * `stepId` null, starts a fresh session with the node's own prompt (also on
  * a node with `session: "resume"`). Only for the first step the rerun walk
  * opens, when it is this node's at the top level: later visits run as the
- * node says. `events` is the log before the visit's own `StepStarted`.
+ * node says. `runState` is the run state before the visit's own `StepStarted`.
  * Undefined for any other visit.
  */
 export function rerunEntryOf(
 	node: Pick<FlowNode, "id">,
-	events: readonly LoggedEvent[],
+	runState: RunState,
 	scope: Scope | null,
 ): { harnessSessionId: string; prompt: string } | null | undefined {
 	if (scope) return undefined;
-	let resumed: Extract<LoggedEvent, { type: "RunResumed" }> | undefined;
-	for (const e of events) {
-		if (e.type === "RunResumed" && (!resumed || e.seq > resumed.seq)) {
-			resumed = e;
-		}
-	}
+	const resumed = runState.resumes.at(-1);
 	if (resumed?.payload.action !== "rerun") return undefined;
 	if (resumed.payload.nodeId !== node.id) return undefined;
 	const after = resumed.seq;
 	// A step the rerun walk opened already: this visit is a later one.
-	const opened = events.some(
-		(e) =>
-			e.seq > after && (e.type === "StepStarted" || e.type === "StepReopened"),
-	);
-	if (opened) return undefined;
+	for (const step of runState.steps.values()) {
+		if (step.openings.some((opening) => opening.seq > after)) return undefined;
+	}
 	const { stepId: from, prompt } = resumed.payload;
 	if (from === null) return null;
-	const session = sessionOf(deriveSteps(events).find((s) => s.id === from));
+	const session = sessionOf(runState.steps.get(from));
 	return session
 		? { harnessSessionId: session, prompt: prompt ?? DEFAULT_RESUME_PROMPT }
 		: null;

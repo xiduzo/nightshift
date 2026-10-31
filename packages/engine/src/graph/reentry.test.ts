@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { foldRun } from "../log";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -145,8 +146,8 @@ describe("the daemon side agrees with the node side", () => {
 			ended("s2", "pass"),
 			runEnded("finished"),
 		);
-		expect(reenteredNode(events)).toBe("b");
-		expect(resumeTarget(events)).toEqual({
+		expect(reenteredNode(foldRun(events))).toBe("b");
+		expect(resumeTarget(foldRun(events))).toEqual({
 			nodeId: "b",
 			stepId: "s2",
 			scope: null,
@@ -155,13 +156,13 @@ describe("the daemon side agrees with the node side", () => {
 		const flow = {
 			nodes: [{ id: "a" }, { id: "b" }],
 		} as unknown as Parameters<typeof reentryUpdate>[0];
-		const seed = reentryUpdate(flow, events);
+		const seed = reentryUpdate(flow, foldRun(events));
 		expect(seed.visits).toEqual({ a: 1 });
 		// With that seed, node b finds its step uncommitted and the Agent rule reopens it.
 		const point = resumePoint(
 			{ id: "b" },
 			stateOf({ visits: seed.visits ?? {} }),
-			events,
+			foldRun(events),
 			null,
 			RESUME_RULES.agent,
 		);
@@ -181,7 +182,7 @@ describe("the daemon side agrees with the node side", () => {
 			ended("s1", "pass"),
 			runEnded("stopped"),
 		);
-		expect(resumeTarget(events)).toEqual({
+		expect(resumeTarget(foldRun(events))).toEqual({
 			nodeId: "a",
 			stepId: null,
 			scope: null,
@@ -190,7 +191,7 @@ describe("the daemon side agrees with the node side", () => {
 		const point = resumePoint(
 			{ id: "a" },
 			stateOf(),
-			events,
+			foldRun(events),
 			null,
 			RESUME_RULES.agent,
 		);
@@ -204,8 +205,8 @@ describe("the daemon side agrees with the node side", () => {
 			ended("s1", "pass"),
 			edgeTaken("a", "b"),
 		);
-		expect(reenteredNode(events)).toBeNull();
-		expect(resumeTarget(events)).toEqual({
+		expect(reenteredNode(foldRun(events))).toBeNull();
+		expect(resumeTarget(foldRun(events))).toEqual({
 			nodeId: "b",
 			stepId: null,
 			scope: null,
@@ -215,9 +216,15 @@ describe("the daemon side agrees with the node side", () => {
 
 	test("a step without a harness session is no resume target, as the Agent rule would not take it up", () => {
 		const events = logOf(started("s1", "a", 1), ended("s1", "interrupted"));
-		expect(resumeTarget(events)?.stepId).toBeNull();
+		expect(resumeTarget(foldRun(events))?.stepId).toBeNull();
 		expect(
-			resumePoint({ id: "a" }, stateOf(), events, null, RESUME_RULES.agent),
+			resumePoint(
+				{ id: "a" },
+				stateOf(),
+				foldRun(events),
+				null,
+				RESUME_RULES.agent,
+			),
 		).toEqual({ kind: "new" });
 	});
 
@@ -228,18 +235,18 @@ describe("the daemon side agrees with the node side", () => {
 			started("s2", "inner", 1, scope),
 			...session("s2", "h-in"),
 		);
-		expect(resumeTarget(events)).toEqual({
+		expect(resumeTarget(foldRun(events))).toEqual({
 			nodeId: "inner",
 			stepId: "s2",
 			scope,
 			topNodeId: "caller",
 		});
-		expect(reenteredNode(events)).toBe("caller");
+		expect(reenteredNode(foldRun(events))).toBe("caller");
 	});
 
 	test("no step yet: no target, no re-entered node", () => {
-		expect(resumeTarget(logOf())).toBeNull();
-		expect(reenteredNode(logOf())).toBeNull();
+		expect(resumeTarget(foldRun(logOf()))).toBeNull();
+		expect(reenteredNode(foldRun(logOf()))).toBeNull();
 	});
 });
 
@@ -311,7 +318,7 @@ const plan = (
 	thread: ThreadSnapshot,
 	request: ReentryRequest = BY_PERSON,
 	now = 0,
-) => planReentry({ flow: FLOW, events, thread, request, now });
+) => planReentry({ flow: FLOW, run: foldRun(events), thread, request, now });
 
 describe("planReentry: a resume", () => {
 	test("at a parked step: the interrupt gets the resume prompt, and RunResumed names the step's session", () => {
@@ -435,7 +442,7 @@ describe("planReentry: a resume", () => {
 		expect(plan(events, threadAt(FRESH)).entry).toEqual({
 			kind: "goto",
 			nodeId: "b",
-			update: reentryUpdate(FLOW, events),
+			update: reentryUpdate(FLOW, foldRun(events)),
 		});
 	});
 
@@ -556,7 +563,7 @@ describe("planReentry: a rerun", () => {
 		expect(fresh.entry).toEqual({
 			kind: "goto",
 			nodeId: "a",
-			update: reentryUpdate(FLOW, events, null),
+			update: reentryUpdate(FLOW, foldRun(events), null),
 		});
 	});
 
@@ -617,7 +624,7 @@ describe("planReentry keeps its promise: the node finds what RunResumed records"
 			const point = resumePoint(
 				{ id: planned.entry.nodeId },
 				stateOf({ visits: { a: 1, b: 1, ...planned.entry.update.visits } }),
-				after(events, planned.resumed),
+				foldRun(after(events, planned.resumed)),
 				null,
 				RESUME_RULES.agent,
 			);
@@ -638,7 +645,7 @@ describe("planReentry keeps its promise: the node finds what RunResumed records"
 		const point = resumePoint(
 			{ id: "b" },
 			stateOf({ visits: planned.entry.update.visits ?? {} }),
-			after(events, planned.resumed),
+			foldRun(after(events, planned.resumed)),
 			null,
 			RESUME_RULES.agent,
 		);
@@ -666,7 +673,7 @@ describe("planReentry keeps its promise: the node finds what RunResumed records"
 			expect(
 				rerunEntryOf(
 					{ id: request.nodeId },
-					after(events, planned.resumed),
+					foldRun(after(events, planned.resumed)),
 					null,
 				),
 			).toEqual(expected);

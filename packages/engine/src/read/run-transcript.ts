@@ -1,5 +1,11 @@
-import { type RunBus, type RunLog, type TranscriptEntry, waker } from "../log";
-import { type DerivedStep, deriveSteps } from "./derive-steps";
+import {
+	type DerivedStep,
+	type RunBus,
+	type RunLog,
+	type TranscriptEntry,
+	waker,
+} from "../log";
+import { deriveSteps } from "./run-views";
 
 /*
  * A run's transcript, as the run page reads it: the entries of all its

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { EndNode } from "@nightshift/flows";
+import { foldRun } from "../log";
 
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveRunState } from "../read/derive-run";
-import { deriveSteps } from "../read/derive-steps";
+import { deriveRunState, deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -83,7 +83,9 @@ describe("the End node", () => {
 			"command",
 			"end",
 		]);
-		const endStep = deriveSteps(events).find((s) => s.nodeId === "none");
+		const endStep = deriveSteps(foldRun(events)).find(
+			(s) => s.nodeId === "none",
+		);
 		expect(endStep?.outcome).toBe("nothing-to-do");
 		expect(
 			(await readTranscriptFile(endStep?.transcriptPath as string)).map(
@@ -123,7 +125,7 @@ describe("the End node", () => {
 				result: "failed",
 			},
 		});
-		expect(deriveRunState(await h.events())).toEqual({
+		expect(deriveRunState(foldRun(await h.events()))).toEqual({
 			status: "failed",
 			reason: null,
 			result: "failed",
@@ -181,7 +183,9 @@ describe("an End node in a called flow", () => {
 			ended: "failed",
 			end_message: "",
 		});
-		const sub = deriveSteps(await h.events()).find((s) => s.nodeId === "sub");
+		const sub = deriveSteps(foldRun(await h.events())).find(
+			(s) => s.nodeId === "sub",
+		);
 		expect(sub?.error).toBe('The flow ended as failed at node "broke".');
 		expect(driven.state.nodes.report).toMatchObject({
 			log_tail: "fail|failed|",

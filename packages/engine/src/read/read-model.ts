@@ -6,49 +6,45 @@ import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import {
+	addCost,
+	type CostTally,
 	type Derive,
-	type LoggedEvent,
+	type DerivedStep,
+	foldRun,
+	NO_COST,
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	type RunState,
 	type RunStatus,
 	type Scope,
 	type StepOutcome,
 	scopeKey,
+	sessionCost,
 	type TranscriptEntry,
 	type WaitReason,
 } from "../log";
-import { addCost, type CostTally, NO_COST, sessionCost } from "./cost";
-import {
-	deriveCalledTraversals,
-	deriveEndedAt,
-	deriveGateWaits,
-	deriveInputs,
-	deriveOpenGate,
-	deriveResumes,
-	deriveRunState,
-	deriveSleep,
-	deriveStartedAt,
-	deriveStopAfterStep,
-	deriveStopAt,
-	deriveTraversals,
-	deriveTrigger,
-	deriveWarnings,
-	deriveWorktree,
-	isOpenStatus,
-} from "./derive-run";
-import {
-	type DerivedStep,
-	deriveSteps,
-	deriveVariableChanges,
-	lastHarnessSession,
-	sumCost,
-} from "./derive-steps";
 import { inboxOrder } from "./inbox";
 import { type MemberName, namesOf, runPerson } from "./people";
 import { deriveScores, runMetrics, stepMetrics } from "./run-metrics";
 import { type RunTrace, runTrace } from "./run-trace";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
+import {
+	deriveCalledTraversals,
+	deriveEndedAt,
+	deriveInputs,
+	deriveOpenGate,
+	deriveResumes,
+	deriveRunState,
+	deriveSleep,
+	deriveSteps,
+	deriveTraversals,
+	deriveTrigger,
+	deriveWarnings,
+	isOpenStatus,
+	lastHarnessSession,
+	sumCost,
+} from "./run-views";
 import type {
 	ItemSummary,
 	OpenGate,
@@ -138,16 +134,16 @@ export function parseCalledFlows(row: RunRow): Record<string, Flow> {
 }
 
 /**
- * What a run summary reads from the log. The run log keeps it per run until
- * the next append. The steps are derived once, for every part that reads them.
+ * What a run summary reads from the run state. The run log keeps it per
+ * run until the next append.
  */
-export function runFacts(events: readonly LoggedEvent[]) {
-	const steps = deriveSteps(events);
-	const state = deriveRunState(events, steps);
+export function runFacts(run: RunState) {
+	const steps = deriveSteps(run);
+	const state = deriveRunState(run);
 	const open = isOpenStatus(state.status);
-	const sleep = state.status === "sleeping" ? deriveSleep(events, steps) : null;
-	const cost = sumCost(events, steps);
-	const endedAt = deriveEndedAt(events);
+	const sleep = state.status === "sleeping" ? deriveSleep(run) : null;
+	const cost = sumCost(run);
+	const endedAt = deriveEndedAt(run);
 	return {
 		status: state.status,
 		reason: state.reason,
@@ -156,26 +152,33 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		signal: sleep?.signal ?? null,
 		/** What the run sleeps for. Only `RunHere` carries it, not the summary. */
 		waitReason: sleep?.reason ?? null,
-		inputs: deriveInputs(events),
-		stopAt: deriveStopAt(events),
-		stopAfterStep: open && deriveStopAfterStep(events),
+		inputs: deriveInputs(run),
+		stopAt: run.stopAt,
+		stopAfterStep: open && run.stopAfterStep,
 		...costFields(cost),
-		warnings: runWarnings(events, steps),
+		warnings: runWarnings(run),
 		endedAt,
-		trigger: deriveTrigger(events),
+		trigger: deriveTrigger(run),
 		calls: deriveCalls(steps),
-		gates: deriveGateWaits(events),
+		gates: steps
+			.flatMap((step) =>
+				step.gateWaits.map(({ from, to }) => ({
+					openedAt: from,
+					closedAt: to,
+				})),
+			)
+			.sort((a, b) => a.openedAt - b.openedAt),
 		sleeps: steps
 			.flatMap((step) => step.sleeps.map(({ from, to }) => ({ from, to })))
 			.sort((a, b) => a.from - b.from),
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
-		worktree: deriveWorktree(events),
+		worktree: run.worktree,
 		metrics: runMetrics(
 			steps,
 			cost,
-			deriveStartedAt(events),
+			run.started?.at ?? null,
 			endedAt,
-			deriveScores(events),
+			deriveScores(run),
 		),
 	};
 }
@@ -183,8 +186,10 @@ export function runFacts(events: readonly LoggedEvent[]) {
 export type RunFacts = ReturnType<typeof runFacts>;
 
 /** The run's status, or null for a run the log has nothing on. */
-function knownStatus(events: readonly LoggedEvent[]): RunStatus | null {
-	return events.length === 0 ? null : deriveRunState(events).status;
+function knownStatus(run: RunState): RunStatus | null {
+	return run.lastSeq === Number.NEGATIVE_INFINITY
+		? null
+		: deriveRunState(run).status;
 }
 
 /** A run's status and whether it is on this computer (`ReadModel.runHere`). */
@@ -211,18 +216,12 @@ function costFields(cost: CostTally) {
 }
 
 /** The run's warnings, each with the node of its step. */
-function runWarnings(
-	events: readonly LoggedEvent[],
-	steps: readonly DerivedStep[],
-): RunWarning[] {
-	const warnings = deriveWarnings(events);
-	if (warnings.length === 0) return [];
-	const nodes = new Map(steps.map((s) => [s.id, s.nodeId]));
-	return warnings.map((w) => ({
+function runWarnings(run: RunState): RunWarning[] {
+	return deriveWarnings(run).map((w) => ({
 		kind: w.kind,
 		message: w.message,
 		stepId: w.stepId,
-		nodeId: w.stepId ? (nodes.get(w.stepId) ?? null) : null,
+		nodeId: w.stepId ? (run.steps.get(w.stepId)?.nodeId ?? null) : null,
 		at: w.at,
 	}));
 }
@@ -497,13 +496,13 @@ export function toStepDetail(
 
 /**
  * Everything the run page shows: the summary, the flows, the steps, the
- * edges, the resumes. `facts` and `steps` are `runFacts` and `deriveSteps`
- * of `events`, as the run log keeps them (`RunLog.derive`).
+ * edges, the resumes. `facts` are `runFacts` of `run`, as the run log
+ * keeps them (`RunLog.derive`).
  */
 export function toRunDetail(
 	row: RunRow,
-	events: readonly LoggedEvent[],
-	derived: { facts: RunFacts; steps: readonly DerivedStep[] },
+	run: RunState,
+	facts: RunFacts,
 	harnessOf: HarnessOf,
 	names: ReadonlyMap<string, string>,
 	walker: RunWalker,
@@ -513,35 +512,36 @@ export function toRunDetail(
 	const device = deviceOf?.(runDeviceId(row)) ?? walker;
 	// A run walked or placed elsewhere: its worktree is not on this computer.
 	const last =
-		walker.thisDevice && device.thisDevice ? lastHarnessSession(events) : null;
-	const summary = toSummary(row, derived.facts, names, walker, device);
+		walker.thisDevice && device.thisDevice ? lastHarnessSession(run) : null;
+	const summary = toSummary(row, facts, names, walker, device);
 	return {
 		...summary,
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
 		flowRevision: row.flowRevision,
-		steps: derived.steps.map((step) => toStepSummary(step, deviceOf)),
+		steps: deriveSteps(run).map((step) => toStepSummary(step, deviceOf)),
 		// Edges of the top-level flow; a called flow's edges count per scope.
-		traversals: deriveTraversals(events),
-		calledTraversals: deriveCalledTraversals(events),
+		traversals: deriveTraversals(run),
+		calledTraversals: deriveCalledTraversals(run),
 		takeOverCommand: takeOverCommand(summary.worktreePath, last, harnessOf),
-		resumes: deriveResumes(events),
+		resumes: deriveResumes(run),
 		commands,
-		variables: deriveVariableChanges(events),
-		handOffs: events.flatMap((e) =>
-			e.type === "HandedOff"
-				? [
-						{
-							at: e.at,
-							stepId: e.stepId,
-							from: deviceOf?.(e.payload.from) ?? unnamed(e.payload.from),
-							to: deviceOf?.(e.payload.to) ?? unnamed(e.payload.to),
-							commit: e.payload.commit,
-						},
-					]
-				: [],
-		),
+		variables: [...run.variableChanges],
+		handOffs: handOffsOf(run).map((e) => ({
+			at: e.at,
+			stepId: e.stepId,
+			from: deviceOf?.(e.payload.from) ?? unnamed(e.payload.from),
+			to: deviceOf?.(e.payload.to) ?? unnamed(e.payload.to),
+			commit: e.payload.commit,
+		})),
 	};
+}
+
+/** The run's `HandedOff`s, oldest first. */
+function handOffsOf(run: RunState) {
+	return run.moves.flatMap((move) =>
+		move.kind === "handed-off" ? [move] : [],
+	);
 }
 
 export type ReadModelDeps = {
@@ -659,7 +659,7 @@ export function createReadModel(deps: ReadModelDeps) {
 		return rows.map((row) =>
 			toSummary(
 				row,
-				facts.get(row.id) ?? runFacts([]),
+				facts.get(row.id) ?? runFacts(foldRun([])),
 				names,
 				deviceOf(row.walkerId),
 				deviceOf(runDeviceId(row)),
@@ -722,22 +722,19 @@ export function createReadModel(deps: ReadModelDeps) {
 
 	async function getRun(row: RunRow): Promise<RunDetail> {
 		const runId = row.id;
-		const events = await log.events(runId);
-		const steps = await one(runId, deriveSteps);
+		const state = await log.state(runId);
 		const facts = await one(runId, runFacts);
 		const deviceOf = await namer(row.spaceId, [
 			row.walkerId,
 			runDeviceId(row),
-			...steps.map((s) => s.deviceId),
-			...events.flatMap((e) =>
-				e.type === "HandedOff" ? [e.payload.from, e.payload.to] : [],
-			),
+			...deriveSteps(state).map((s) => s.deviceId),
+			...handOffsOf(state).flatMap((e) => [e.payload.from, e.payload.to]),
 		]);
 		const walker = deviceOf(row.walkerId);
 		return toRunDetail(
 			row,
-			events,
-			{ facts, steps },
+			state,
+			facts,
 			harnessOf,
 			await namesOf(db, [row.startedBy], memberIn(row.spaceId)),
 			walker,

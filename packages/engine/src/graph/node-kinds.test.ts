@@ -14,7 +14,7 @@ import type {
 	WaitNode,
 } from "@nightshift/flows";
 
-import type { DerivedItem, DerivedStep } from "../read/derive-steps";
+import type { DerivedItem, DerivedStep } from "../log";
 import { testDevice } from "../testing/test-support";
 import { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
 import { RESUME_RULES } from "./resume-point";

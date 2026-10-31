@@ -7,6 +7,7 @@ import {
 	type RunSettings,
 } from "../device-config/settings";
 import type { Runner } from "../graph";
+import { foldRun } from "../log";
 import { type BusItem, createRunBus } from "../log/bus";
 import type {
 	EngineEventType,
@@ -119,7 +120,7 @@ describe("daemonResumeBlock", () => {
 	test("lets a run continue when nothing stands in the way", async () => {
 		await insertRun(sandbox.repoPath);
 		expect(
-			await daemonResumeBlock(RUN_ID, logOf(started()), deps()),
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
 		).toBeNull();
 	});
 
@@ -128,7 +129,7 @@ describe("daemonResumeBlock", () => {
 		expect(
 			await daemonResumeBlock(
 				RUN_ID,
-				logOf(started()),
+				foldRun(logOf(started())),
 				deps({ schedulerOn: false }),
 			),
 		).toBe("schedules are paused.");
@@ -136,16 +137,16 @@ describe("daemonResumeBlock", () => {
 		expect(
 			await daemonResumeBlock(
 				RUN_ID,
-				logOf(started()),
+				foldRun(logOf(started())),
 				deps({ settings: () => paused }),
 			),
 		).toBe("schedules are paused.");
 	});
 
 	test("a missing run record", async () => {
-		expect(await daemonResumeBlock(RUN_ID, logOf(started()), deps())).toBe(
-			"the run's record is missing.",
-		);
+		expect(
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
+		).toBe("the run's record is missing.");
 	});
 
 	test("the flow's own policy wins over the Settings switch", async () => {
@@ -153,9 +154,9 @@ describe("daemonResumeBlock", () => {
 			...flow,
 			policy: { resumeInterruptedRuns: false },
 		});
-		expect(await daemonResumeBlock(RUN_ID, logOf(started()), deps())).toBe(
-			"its flow turns automatic resume off.",
-		);
+		expect(
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
+		).toBe("its flow turns automatic resume off.");
 	});
 
 	test("automatic resume off in Settings", async () => {
@@ -167,7 +168,7 @@ describe("daemonResumeBlock", () => {
 		expect(
 			await daemonResumeBlock(
 				RUN_ID,
-				logOf(started()),
+				foldRun(logOf(started())),
 				deps({ settings: () => off }),
 			),
 		).toBe("automatic resume is off in Settings.");
@@ -181,7 +182,7 @@ describe("daemonResumeBlock", () => {
 			daemonResumed,
 			daemonResumed,
 		);
-		expect(await daemonResumeBlock(RUN_ID, events, deps())).toBe(
+		expect(await daemonResumeBlock(RUN_ID, foldRun(events), deps())).toBe(
 			"it continued on its own 3 times in a row, and each time Night Shift stopped again.",
 		);
 		// A person's resume starts the count over.
@@ -192,30 +193,32 @@ describe("daemonResumeBlock", () => {
 			personResumed,
 			daemonResumed,
 		);
-		expect(await daemonResumeBlock(RUN_ID, withPerson, deps())).toBeNull();
+		expect(
+			await daemonResumeBlock(RUN_ID, foldRun(withPerson), deps()),
+		).toBeNull();
 	});
 
 	test("a stop time that has passed", async () => {
 		await insertRun(sandbox.repoPath);
-		expect(await daemonResumeBlock(RUN_ID, logOf(started(9_000)), deps())).toBe(
-			"its stop time has passed.",
-		);
 		expect(
-			await daemonResumeBlock(RUN_ID, logOf(started(11_000)), deps()),
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started(9_000))), deps()),
+		).toBe("its stop time has passed.");
+		expect(
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started(11_000))), deps()),
 		).toBeNull();
 	});
 
 	test("a worktree that is gone", async () => {
 		await insertRun(join(sandbox.root, "gone"));
-		expect(await daemonResumeBlock(RUN_ID, logOf(started()), deps())).toBe(
-			"the copy of the project it worked in is gone.",
-		);
+		expect(
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
+		).toBe("the copy of the project it worked in is gone.");
 	});
 
 	test("a run that waits for its worktree has none to lose", async () => {
 		await insertRun("", flow, {}, "");
 		expect(
-			await daemonResumeBlock(RUN_ID, logOf(started()), deps()),
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
 		).toBeNull();
 	});
 
@@ -230,7 +233,7 @@ describe("daemonResumeBlock", () => {
 			},
 		};
 		expect(
-			await daemonResumeBlock(RUN_ID, logOf(started(), made), deps()),
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(started(), made)), deps()),
 		).toBe("the copy of the project it worked in is gone.");
 	});
 
@@ -239,7 +242,7 @@ describe("daemonResumeBlock", () => {
 		expect(
 			await daemonResumeBlock(
 				RUN_ID,
-				logOf(started()),
+				foldRun(logOf(started())),
 				deps({
 					flowOf: () => {
 						throw new Error("bad snapshot");

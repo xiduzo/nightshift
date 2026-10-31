@@ -15,6 +15,7 @@ import { eq } from "drizzle-orm";
 import type { Capabilities, Device } from "../device";
 import type { RunSettings } from "../device-config";
 import {
+	type DerivedStep,
 	openTranscriptWriter,
 	type PolicyWaitReason,
 	type RunBus,
@@ -28,7 +29,6 @@ import {
 	transcriptPath,
 	transcriptToRead,
 } from "../log";
-import type { DerivedStep } from "../read";
 import type { RunResult } from "../run-status";
 import type { KeptFlow } from "../variables";
 import type { Races } from "./branches";
