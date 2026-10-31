@@ -35,7 +35,8 @@ describe("the peer protocol", () => {
 		}
 		// 24 before `sync.commands`, 25 before `sync.mergePersonal`, 26
 		// before `link.leave` and 27 before `archive.knowledgePut` and
-		// `archive.knowledgeGet`, which an older Host lacks.
-		expect(served).toBe(29);
+		// `archive.knowledgeGet`, and 29 before the `leases` group (ADR 7),
+		// which an older Host lacks.
+		expect(served).toBe(32);
 	});
 });

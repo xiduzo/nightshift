@@ -117,6 +117,11 @@ const engine: Context["engine"] = {
 	logMemberChange: async () => {},
 	logKnowledgeUse: async () => {},
 	onLandedFacts: () => () => {},
+	leases: {
+		take: async () => ({ kind: "held" }),
+		renew: async () => [],
+		release: async () => {},
+	},
 	moveProjects: async () => ({ projects: [], runIds: [], schedules: 0 }),
 	forgetSpace: async () => false,
 	flows: {

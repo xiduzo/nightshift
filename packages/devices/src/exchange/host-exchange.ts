@@ -320,6 +320,21 @@ export function createHostExchange(deps: {
 			await exchange.commands.done(input.id, key.deviceId, input.error);
 		},
 
+		async leaseTake(key, input) {
+			await mayLease(key, input.spaceId);
+			return engine.leases.take({ ...input, walkerId: key.deviceId });
+		},
+
+		async leaseRenew(key, input) {
+			await mayLease(key, input.spaceId);
+			return engine.leases.renew({ ...input, walkerId: key.deviceId });
+		},
+
+		async leaseRelease(key, input) {
+			await mayLease(key, input.spaceId);
+			await engine.leases.release({ ...input, walkerId: key.deviceId });
+		},
+
 		async addClone(key, input) {
 			await admit(key);
 			const role = await roleIn(db, key.personId, input.spaceId);
@@ -561,6 +576,18 @@ export function createHostExchange(deps: {
 		return (await engine.offers.list(spaceId)).some(
 			(o) => o.deviceId === deviceId,
 		);
+	}
+
+	/**
+	 * Refuses a lease call for a Space another Host keeps (its leases are
+	 * that Host's), and for a Person whose role there does not start runs.
+	 */
+	async function mayLease(key: DeviceKeyAccess, spaceId: string) {
+		await admit(key);
+		if ((await engine.hostSpaces.hostOf(spaceId)) !== null) {
+			forbidden("Another computer keeps the leases of this Space.");
+		}
+		await mayStart(key, spaceId);
 	}
 
 	/** Refuses a Person whose role in the Space does not start runs. */

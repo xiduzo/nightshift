@@ -101,6 +101,23 @@ const relay = procedure.meta({ key: "relay" });
 const deviceId = z.string().regex(/^[\w-]{1,64}$/);
 const deviceName = z.string().trim().min(1).max(64);
 
+/** The rendered name of a lease. */
+const leaseName = z.string().min(1).max(500);
+
+/** A Host's answer to a take: the run holds the lease, or another run does. */
+const leaseAnswerSchema = z.discriminatedUnion("kind", [
+	z.object({ kind: z.literal("held") }),
+	z.object({
+		kind: z.literal("busy"),
+		holder: z.object({
+			runId: z.string(),
+			runTitle: z.string(),
+			walkerId: z.string(),
+			since: z.number(),
+		}),
+	}),
+]);
+
 /** A run start, as a Device asks its Host for its Person: the Host walks it, its steps on `deviceId`. */
 const runStartInput = startRunInputSchema.and(
 	z.object({
@@ -371,6 +388,58 @@ export const hostContract = {
 			})
 			.input(personalMergeInputSchema)
 			.output(described(personalMergeSchema)),
+	},
+	/**
+	 * The leases of the Spaces this Host keeps (ADR 7), for the runs a
+	 * Device walks: the key's Device is their Walker, which renews them.
+	 * Needs a role that may start runs in the Space. An older Host has
+	 * none: a run of its Space cannot take a lease.
+	 */
+	leases: {
+		/** Takes a lease for a run the key's Device walks, unless another run holds it. */
+		take: sync
+			.route({
+				summary:
+					"Takes a lease of a Space here for a run the Device walks, unless another run holds it.",
+			})
+			.input(
+				z.object({
+					spaceId: z.string().min(1),
+					name: leaseName,
+					runId: z.string().min(1).max(128),
+					runTitle: z.string().max(500),
+					ttlMs: z.number().int().positive(),
+				}),
+			)
+			.output(described(leaseAnswerSchema)),
+		/** Renews the leases of a run the key's Device walks. Answers the names it no longer holds. */
+		renew: sync
+			.route({
+				summary:
+					"Renews the leases of a run the Device walks, and names those it no longer holds.",
+			})
+			.input(
+				z.object({
+					spaceId: z.string().min(1),
+					runId: z.string().min(1).max(128),
+					names: z.array(leaseName).max(100),
+				}),
+			)
+			.output(described(z.array(z.string()))),
+		/** Lets go of the leases of a run the key's Device walks: by name, or all. */
+		release: sync
+			.route({
+				summary:
+					"Lets go of the leases of a run the Device walks, by name or all of them.",
+			})
+			.input(
+				z.object({
+					spaceId: z.string().min(1),
+					runId: z.string().min(1).max(128),
+					names: z.array(leaseName).max(100).optional(),
+				}),
+			)
+			.output(described(z.void())),
 	},
 	/** The archive: the run state of runs walked elsewhere, per Space, and live transcripts. */
 	archive: {

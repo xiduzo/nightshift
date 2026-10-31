@@ -3,7 +3,12 @@ import type { KnowledgeUse } from "@nightshift/agents/tools";
 import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
-import type { Actor, MemberChange, StartRunInput } from "../contract";
+import type {
+	Actor,
+	LeaseHost,
+	MemberChange,
+	StartRunInput,
+} from "../contract";
 import {
 	defaultRunSettings,
 	lastKnownProfiles,
@@ -181,6 +186,11 @@ export interface Engine {
 	 * query (the landed feed). The notifier reads Gates, device waits and
 	 * run endings from it. Returns the unsubscribe.
 	 */
+	/**
+	 * The leases of the Spaces this Replica keeps (ADR 7). It serves the
+	 * runs its paired Devices walk (`leases.*` of the peer protocol).
+	 */
+	leases: LeaseHost;
 	onLandedFacts(
 		listener: (facts: readonly LandedFact[]) => void,
 		scope?: LandedScope,
@@ -809,6 +819,15 @@ export function createEngine(
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		logKnowledgeUse: (projectId, use) =>
 			logKnowledgeUse(runLog, projectId, use),
+		leases: {
+			take: (take) => leaseStore.take(take),
+			renew: (input) => leaseStore.renew(input),
+			// A lease a Device's run lets go of here wakes the runs here that wait.
+			release: async (input) => {
+				await leaseStore.release(input);
+				void wakeLeaseSleeps({ db, log: runLog, runner }).catch(() => {});
+			},
+		},
 		onLandedFacts: (listener, scope) =>
 			landed.subscribe((events) => listener(landedFacts(events)), scope),
 		moveProjects,
