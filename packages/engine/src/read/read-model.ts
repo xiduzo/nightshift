@@ -38,6 +38,7 @@ import {
 	deriveOpenGate,
 	deriveResumes,
 	deriveRunState,
+	deriveServices,
 	deriveSleep,
 	deriveSteps,
 	deriveTraversals,
@@ -532,6 +533,7 @@ export function toRunDetail(
 		commands,
 		variables: [...run.variableChanges],
 		leases: deriveLeases(run),
+		services: deriveServices(run),
 		handOffs: handOffsOf(run).map((e) => ({
 			at: e.at,
 			stepId: e.stepId,

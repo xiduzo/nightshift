@@ -91,6 +91,7 @@ export function runDetailOfSummary(run: RunSummary): RunDetail {
 		handOffs: [],
 		variables: [],
 		leases: [],
+		services: [],
 	};
 }
 

@@ -161,6 +161,15 @@ export interface SpaceEngine {
 	 */
 	getStep(runId: string, stepId: string): Promise<StepDetail>;
 	/**
+	 * The end of the log of a service of the run (ADR 9), by its node and
+	 * scope (`RunService.scopeKey`). Null when this computer does not walk
+	 * the run, or the service printed nothing yet.
+	 */
+	serviceLog(
+		runId: string,
+		service: { nodeId: string; scopeKey: string },
+	): Promise<string | null>;
+	/**
 	 * The files the run's agents kept for the person, oldest first. Only
 	 * the ones kept on this computer.
 	 */

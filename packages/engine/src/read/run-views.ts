@@ -19,7 +19,7 @@ import {
 	visitKey,
 	type WaitReason,
 } from "../log";
-import type { RunLease, RunResume, ScopeTraversals } from "./views";
+import type { RunLease, RunResume, RunService, ScopeTraversals } from "./views";
 
 /**
  * Views of a run's state (`RunState`, one fold of its event log): its
@@ -87,6 +87,30 @@ export function isOpenStatus(status: RunStatus): boolean {
 /** When the run ended: the time of its `RunEnded`, or null while it is open again or never ended. */
 export function deriveEndedAt(run: RunState): number | null {
 	return run.latest?.ended ? run.latest.at : null;
+}
+
+/**
+ * The services of the run (ADR 9): those that run now, oldest first. An
+ * ended run shows those that ran until its end, stopped.
+ */
+export function deriveServices(run: RunState): RunService[] {
+	const running = !run.latest?.ended;
+	const holds = running ? run.holds : run.endedHolding;
+	return holds.flatMap((hold) =>
+		hold.kind === "service"
+			? [
+					{
+						nodeId: hold.nodeId,
+						scopeKey: scopeKey(hold.scope),
+						state: running ? "running" : "stopped",
+						section: hold.section?.id ?? null,
+						since: hold.at,
+						deviceId: hold.deviceId,
+						command: hold.spec.start,
+					} satisfies RunService,
+				]
+			: [],
+	);
 }
 
 /**

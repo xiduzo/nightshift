@@ -332,6 +332,29 @@ export type RunDetail = RunSummary & {
 	variables: VariableChange[];
 	/** The leases the run holds now, and the one it waits for (ADR 7). */
 	leases: RunLease[];
+	/** The services of the run (ADR 9): those that run now, or ran until the run ended. */
+	services: RunService[];
+};
+
+/**
+ * A service of a run (ADR 9): one that runs now, until the run leaves
+ * `section` (null: until it ends), or one that ran until the run ended.
+ * Its log is `runs.serviceLog` by node and scope.
+ */
+export type RunService = {
+	/** The Service node that started it. */
+	nodeId: string;
+	/** The scope of the flow the node is in ("" at the top level). */
+	scopeKey: string;
+	state: "running" | "stopped";
+	/** The id of the Section it runs for. Null: the run. */
+	section: string | null;
+	/** When it started, last. */
+	since: number;
+	/** The Device it runs on. */
+	deviceId: string;
+	/** What started it. */
+	command: string;
 };
 
 /**

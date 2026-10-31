@@ -1,11 +1,4 @@
-import {
-	closeSync,
-	mkdirSync,
-	openSync,
-	readSync,
-	statSync,
-	writeSync,
-} from "node:fs";
+import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { dirname } from "node:path";
 import type { JsonValue } from "@nightshift/flows";
 
@@ -22,6 +15,7 @@ import {
 	type ServiceSpec,
 	scopeKey,
 } from "../log";
+import { readServiceLog } from "./log";
 
 /**
  * The services of the runs this computer walks (ADR 9): a process that a
@@ -54,8 +48,6 @@ const STOP_WAIT_MS = 5_000;
 const PROBE_MS = 10_000;
 /** Where the output goes that nobody reads. */
 const DEV_NULL = "/dev/null";
-/** How much of the end of a log `tail` reads. */
-const TAIL_READ_BYTES = 64 * 1024;
 
 /** A process this keeper started, by run, scope and node. */
 type Running = {
@@ -91,7 +83,7 @@ export function createServiceKeeper(deps: {
 		const started = launch(input);
 		running.set(key, started.process);
 		const pid = await started.pid;
-		const tail = () => tailOf(readTail(input.logPath));
+		const tail = () => tailOf(readServiceLog(input.logPath) ?? "");
 		const failed = async (reason: string): Promise<BroughtUp> => {
 			await stopRunning(key, started.process);
 			return { kind: "failed", reason, logTail: tail() };
@@ -361,7 +353,7 @@ export function createServiceKeeper(deps: {
 	return {
 		bringUp,
 		stop,
-		tail: (logPath) => tailOf(readTail(logPath)),
+		tail: (logPath) => tailOf(readServiceLog(logPath) ?? ""),
 	};
 }
 
@@ -403,25 +395,6 @@ async function processStart(
 	});
 	const started = out.trim();
 	return result.exitCode === 0 && started !== "" ? started : null;
-}
-
-/** The end of a file, or "" when there is none. */
-function readTail(path: string): string {
-	let fd: number;
-	try {
-		fd = openSync(path, "r");
-	} catch {
-		return "";
-	}
-	try {
-		const size = statSync(path).size;
-		const length = Math.min(size, TAIL_READ_BYTES);
-		const buffer = Buffer.alloc(length);
-		readSync(fd, buffer, 0, length, size - length);
-		return buffer.toString("utf8").replace(/^�+/, "");
-	} finally {
-		closeSync(fd);
-	}
 }
 
 function minutesText(minutes: number): string {

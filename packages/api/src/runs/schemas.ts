@@ -337,6 +337,17 @@ export const runDetailSchema = exact<RunDetail>()(
 				holder: z.object({ runId: z.string(), title: z.string() }).nullable(),
 			}),
 		),
+		services: z.array(
+			z.object({
+				nodeId: z.string(),
+				scopeKey: z.string(),
+				state: z.enum(["running", "stopped"]),
+				section: z.string().nullable(),
+				since: z.number(),
+				deviceId: z.string(),
+				command: z.string(),
+			}),
+		),
 		variables: z.array(
 			z.object({
 				scope: scopeSchema.nullable(),

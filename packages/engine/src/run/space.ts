@@ -10,6 +10,7 @@ import {
 	type RunLog,
 	type RunRow,
 	type RunTrigger,
+	scopeKey,
 } from "../log";
 import {
 	type Branches,
@@ -26,6 +27,7 @@ import {
 	type RunSummary,
 } from "../read";
 import type { ScheduleFiles } from "../schedules";
+import { readServiceLog } from "../services";
 import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
 import type { PlacementPort, WithPaths } from "./peers";
@@ -293,6 +295,20 @@ export function createSpaces(deps: SpacesDeps) {
 			async getStep(runId, stepId) {
 				await ready;
 				return reads.getStep(await getRunRow(runId, spaceId), stepId);
+			},
+
+			async serviceLog(runId, service) {
+				await ready;
+				const row = await getRunRow(runId, spaceId);
+				if (row.walkerId !== (await deps.log.walkerId())) return null;
+				const state = await deps.log.state(runId);
+				const hold = [...state.holds, ...state.endedHolding].find(
+					(held) =>
+						held.kind === "service" &&
+						held.nodeId === service.nodeId &&
+						scopeKey(held.scope) === service.scopeKey,
+				);
+				return hold?.kind === "service" ? readServiceLog(hold.logPath) : null;
 			},
 
 			async listArtifacts(runId) {
