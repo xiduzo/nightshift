@@ -10,6 +10,7 @@ import { useHostQueries } from "@/features/host";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { setInboxView, useInboxView } from "./inbox-filter";
 import {
 	type PlaceOption,
@@ -24,7 +25,7 @@ export function InboxFilterScreen() {
 	const inbox = useInbox();
 	const view = useInboxView();
 	const spaceQueries = useHostQueries(createSpaceQueries);
-	const spaces = useQuery(spaceQueries.list());
+	const spaces = useQuery({ ...spaceQueries.list(), ...useWhileFocused() });
 	const gates = inbox.data ?? [];
 	const manySpaces = spaces.data
 		? spaces.data.spaces.length > 1

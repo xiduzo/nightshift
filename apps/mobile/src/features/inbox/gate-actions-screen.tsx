@@ -8,6 +8,7 @@ import { useHostQueries } from "@/features/host";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 
 /**
  * The "More" sheet of a Gate: open its run, read the transcript, or share
@@ -16,7 +17,7 @@ import { Screen } from "@/shared/page";
 export function GateActionsScreen() {
 	const { runId } = useLocalSearchParams<{ runId: string; stepId: string }>();
 	const runQueries = useHostQueries(createRunQueries);
-	const run = useQuery(runQueries.get(runId));
+	const run = useQuery({ ...runQueries.get(runId), ...useWhileFocused() });
 	const command = run.data?.takeOverCommand ?? null;
 
 	return (

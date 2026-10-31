@@ -25,6 +25,7 @@ import { useHostQueries } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
 import { LargeTitleHeader } from "@/shared/header";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { type TranscriptLine, transcriptLines } from "./transcript-lines";
 import { useRunTranscript } from "./use-run-transcript";
 
@@ -36,7 +37,7 @@ import { useRunTranscript } from "./use-run-transcript";
 export function TranscriptScreen() {
 	const { runId } = useLocalSearchParams<{ runId: string }>();
 	const runQueries = useHostQueries(createRunQueries);
-	const run = useQuery(runQueries.get(runId));
+	const run = useQuery({ ...runQueries.get(runId), ...useWhileFocused() });
 	const { entries, connection } = useRunTranscript(runId);
 
 	const lines = useMemo(() => {

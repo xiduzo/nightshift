@@ -31,7 +31,7 @@ import { ErrorAlert } from "@/shared/feedback";
 import { AvatarButton, HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { useScreenRefresh } from "@/shared/refresh";
+import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { NightRunRow } from "./home-rows";
 import {
 	endedCount,
@@ -57,8 +57,11 @@ export function HomeScreen() {
 	const { person } = useSignedIn();
 	const dashboard = useHostQueries(createDashboardQueries);
 	const gateQueries = useHostQueries(createGateQueries);
-	const summary = useQuery(dashboard.summary({ everySpace: true }));
-	const gates = useQuery(gateQueries.open());
+	const summary = useQuery({
+		...dashboard.summary({ everySpace: true }),
+		...useWhileFocused(),
+	});
+	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
 	const refresh = useScreenRefresh([summary.refetch, gates.refetch]);
 
 	const now = Date.now();

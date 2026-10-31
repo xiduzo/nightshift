@@ -17,6 +17,7 @@ import { EmptyState } from "@/shared/empty";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { runStatusLook } from "@/shared/tone";
 import { resultsText, searchGates, searchRuns } from "./search";
 
@@ -30,9 +31,9 @@ export function SearchScreen() {
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
-	const gates = useQuery(gateQueries.open());
-	const runs = useQuery(runQueries.everyRun());
-	const projects = useQuery(projectQueries.list());
+	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
+	const runs = useQuery({ ...runQueries.everyRun(), ...useWhileFocused() });
+	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
 
 	const names = useMemo(
 		() =>

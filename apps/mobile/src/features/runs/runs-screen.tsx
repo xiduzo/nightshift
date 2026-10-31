@@ -16,7 +16,7 @@ import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { useScreenRefresh } from "@/shared/refresh";
+import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { RunRow } from "./run-row";
 import {
 	countedFilters,
@@ -85,16 +85,17 @@ export function RunsScreen() {
 	const { filter, projectId, setFilter, clearProject } = useRunsParams();
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
-	const projects = useQuery(projectQueries.list());
-	const runs = useInfiniteQuery(
-		runQueries.pages(
+	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
+	const runs = useInfiniteQuery({
+		...runQueries.pages(
 			{
 				...(projectId !== null ? { projectId } : {}),
 				...(filter !== "all" ? { statuses: filterStatuses(filter) } : {}),
 			},
 			RUNS_PAGE,
 		),
-	);
+		...useWhileFocused(),
+	});
 	const refresh = useScreenRefresh([runs.refetch, projects.refetch]);
 
 	const projectNames = useMemo(

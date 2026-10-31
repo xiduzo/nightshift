@@ -9,12 +9,13 @@ import { ErrorAlert } from "@/shared/feedback";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { type Computer, computersOf, onlineSummary } from "./computers";
 
 /** Your computers and whether each can run a flow now. A sheet from Home. */
 export function ComputersScreen() {
 	const devices = useHostQueries(createDeviceQueries);
-	const overview = useQuery(devices.overview());
+	const overview = useQuery({ ...devices.overview(), ...useWhileFocused() });
 	const computers = overview.data ? computersOf(overview.data) : undefined;
 	const now = overview.dataUpdatedAt || Date.now();
 

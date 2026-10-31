@@ -11,6 +11,7 @@ import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { LargeTitleHeader } from "@/shared/header";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { healthOf } from "./health";
 import { RunHealth } from "./run-health";
 
@@ -23,12 +24,14 @@ import { RunHealth } from "./run-health";
 export function FlowHealthScreen({ projectId }: { projectId?: string }) {
 	const dashboard = useHostQueries(createDashboardQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
-	const summary = useQuery(
-		dashboard.summary(projectId ? { projectId } : { everySpace: true }),
-	);
+	const summary = useQuery({
+		...dashboard.summary(projectId ? { projectId } : { everySpace: true }),
+		...useWhileFocused(),
+	});
 	const projects = useQuery({
 		...projectQueries.list(),
 		enabled: projectId !== undefined,
+		...useWhileFocused(),
 	});
 	const project = projectId
 		? projects.data?.find((p) => p.id === projectId)

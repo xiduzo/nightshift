@@ -39,6 +39,7 @@ import { GateRow } from "@/features/inbox";
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { FactGrid, FactTile } from "@/shared/tiles";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { RunActions } from "./run-actions";
@@ -70,9 +71,9 @@ function SignedInRun({ runId }: { runId: string }) {
 	const gateQueries = useHostQueries(createGateQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
 	const queryClient = useQueryClient();
-	const run = useQuery(runQueries.get(runId));
-	const gates = useQuery(gateQueries.open());
-	const projects = useQuery(projectQueries.list());
+	const run = useQuery({ ...runQueries.get(runId), ...useWhileFocused() });
+	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
+	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
 	const live = usePhoneLiveRun(runId);
 
 	// A pull reads this run and the open Gates again, not every run.
@@ -307,7 +308,10 @@ function MadeSection({
 	links: RunLink[];
 }) {
 	const runQueries = useHostQueries(createRunQueries);
-	const artifacts = useQuery(runQueries.artifacts(run.id, live));
+	const artifacts = useQuery({
+		...runQueries.artifacts(run.id, live),
+		...useWhileFocused(),
+	});
 	const files: Artifact[] = artifacts.data ?? [];
 	if (links.length === 0 && files.length === 0) return null;
 

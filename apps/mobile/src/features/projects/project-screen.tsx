@@ -32,7 +32,7 @@ import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { useScreenRefresh } from "@/shared/refresh";
+import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { projectLinks } from "./links";
 import { clonesText, newestFirst, remoteParts } from "./overview";
 import { ProjectRunRow } from "./rows";
@@ -49,18 +49,26 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const flowQueries = useHostQueries(createFlowQueries);
-	const projects = useQuery(projectQueries.list());
+	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
 	const ofProject = useCallback(
 		(open: OpenGate[]) => open.filter((gate) => gate.projectId === projectId),
 		[projectId],
 	);
-	const gates = useQuery({ ...gateQueries.open(), select: ofProject });
+	const gates = useQuery({
+		...gateQueries.open(),
+		select: ofProject,
+		...useWhileFocused(),
+	});
 	// Only the newest: the project list counts them all.
 	const runs = useQuery({
 		...runQueries.ofProject(projectId, SHOWN),
 		select: newestFirst,
+		...useWhileFocused(),
 	});
-	const flows = useQuery(flowQueries.list(projectId));
+	const flows = useQuery({
+		...flowQueries.list(projectId),
+		...useWhileFocused(),
+	});
 	const refresh = useScreenRefresh([
 		projects.refetch,
 		gates.refetch,

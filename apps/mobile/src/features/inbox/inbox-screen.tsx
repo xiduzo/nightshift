@@ -18,6 +18,7 @@ import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { DigestCard } from "./digest-card";
 import { GateRow } from "./gate-row";
 import { setInboxView, useInboxView } from "./inbox-filter";
@@ -102,7 +103,7 @@ export function InboxScreen() {
 /** You are in more than one Space: each group names its Space. */
 function useManySpaces(gates: readonly OpenGate[] | undefined): boolean {
 	const spaceQueries = useHostQueries(createSpaceQueries);
-	const spaces = useQuery(spaceQueries.list());
+	const spaces = useQuery({ ...spaceQueries.list(), ...useWhileFocused() });
 	if (spaces.data) return spaces.data.spaces.length > 1;
 	return gates ? spaceCount(gates) > 1 : false;
 }

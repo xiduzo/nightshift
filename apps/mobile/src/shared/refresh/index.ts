@@ -1,3 +1,4 @@
-/** Reading a screen again: when the person comes back to it, and on pull-down. */
+/** Reading a screen again: on pull-down, and when a stale query gets focus. */
 
 export { useScreenRefresh } from "./use-screen-refresh";
+export { useWhileFocused } from "./use-while-focused";

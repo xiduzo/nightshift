@@ -1,14 +1,14 @@
-import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
 
 /** A query's own `refetch`: what a screen reads again. */
 type Refetch = () => Promise<unknown>;
 
 /**
- * Reads a screen's queries again when the person comes back to it. The
- * first focus does nothing: the queries just loaded. Returns the same
- * reading for pull-down (`Screen`'s `onRefresh`), which settles when every
- * query has answered, also when one fails.
+ * The pull-down of a screen (`Screen`'s `onRefresh`): reads its queries
+ * again, and settles when every query has answered, also when one fails.
+ * Coming back to a screen reads nothing by itself: the live cache marks
+ * what changed, and a query that went stale reads again when its screen
+ * gets focus (`useWhileFocused`).
  */
 export function useScreenRefresh(
 	refetches: readonly Refetch[],
@@ -17,19 +17,9 @@ export function useScreenRefresh(
 	useEffect(() => {
 		latest.current = refetches;
 	});
-	const seen = useRef(false);
 
-	const readAgain = useCallback(
+	return useCallback(
 		() => Promise.allSettled(latest.current.map((refetch) => refetch())),
 		[],
 	);
-
-	useFocusEffect(
-		useCallback(() => {
-			if (seen.current) void readAgain();
-			seen.current = true;
-		}, [readAgain]),
-	);
-
-	return readAgain;
 }

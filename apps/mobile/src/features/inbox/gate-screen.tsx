@@ -79,6 +79,7 @@ import { ErrorAlert } from "@/shared/feedback";
 import { useNow } from "@/shared/format";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { useWhileFocused } from "@/shared/refresh";
 import { StatusBadge } from "@/shared/status";
 import { type Look, NEEDS_YOU } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
@@ -213,15 +214,15 @@ function OpenGateScreen({
 	const { headline, context, links } = gateParts(gate.question);
 	const { flow } = gateRun(gate);
 	const spaceQueries = useHostQueries(createSpaceQueries);
-	const spaces = useQuery(spaceQueries.list());
+	const spaces = useQuery({ ...spaceQueries.list(), ...useWhileFocused() });
 	const manySpaces = (spaces.data?.spaces.length ?? 1) > 1;
 	const projectQueries = useHostQueries(createProjectQueries);
-	const projects = useQuery(projectQueries.list());
+	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
 	/** A project screen shows the projects of the Space this phone works in only. */
 	const projectHere =
 		projects.data?.some((project) => project.id === gate.projectId) ?? false;
 	const runQueries = useHostQueries(createRunQueries);
-	const run = useQuery(runQueries.get(gate.runId));
+	const run = useQuery({ ...runQueries.get(gate.runId), ...useWhileFocused() });
 	const labels = run.data ? nodeLabels(run.data) : NO_LABELS;
 	const routes = choiceRoutes(run.data, gate, gate.choices, labels);
 	const answer = useGateAnswer(gate, { onSent, onGone });

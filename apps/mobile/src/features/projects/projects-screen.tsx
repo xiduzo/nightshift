@@ -16,7 +16,7 @@ import { useNow } from "@/shared/format";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { useScreenRefresh } from "@/shared/refresh";
+import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { projectOverviews, projectsSummary } from "./overview";
 import { ProjectRow } from "./rows";
 
@@ -28,13 +28,17 @@ export function ProjectsScreen() {
 	const projectQueries = useHostQueries(createProjectQueries);
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
-	const projects = useQuery(projectQueries.list());
-	const gates = useQuery(gateQueries.open());
+	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
+	const gates = useQuery({ ...gateQueries.open(), ...useWhileFocused() });
 	const list = projects.data;
 	// The Host says the last run of each project. An older Host does not:
 	// then every run tells it.
 	const counted = list?.every((project) => project.runs !== undefined) ?? true;
-	const runs = useQuery({ ...runQueries.everyRun(), enabled: !counted });
+	const runs = useQuery({
+		...runQueries.everyRun(),
+		enabled: !counted,
+		...useWhileFocused(),
+	});
 	const refresh = useScreenRefresh(
 		counted
 			? [projects.refetch, gates.refetch]
