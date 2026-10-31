@@ -14,8 +14,15 @@ import { type Computer, computersOf, onlineSummary } from "./computers";
 /** Your computers and whether each can run a flow now. A sheet from Home. */
 export function ComputersScreen() {
 	const devices = useHostQueries(createDeviceQueries);
-	const overview = useQuery({ ...devices.overview(), ...useWhileFocused() });
-	const computers = overview.data ? computersOf(overview.data) : undefined;
+	// Online changes by the minute: it follows the Host while the sheet is open.
+	const overview = useQuery({
+		...devices.overviewLive(),
+		...useWhileFocused(),
+	});
+	// A failed poll keeps the last list: then the Host does not answer.
+	const computers = overview.data
+		? computersOf(overview.data, !overview.isRefetchError)
+		: undefined;
 	const now = overview.dataUpdatedAt || Date.now();
 
 	return (

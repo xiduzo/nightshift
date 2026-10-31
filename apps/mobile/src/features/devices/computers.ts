@@ -13,11 +13,16 @@ export type Computer = {
 };
 
 /**
- * The person's computers: the Host first when they own it (it answers, so
- * it is online), then their paired computers, online ones first, by name.
- * A computer whose access was removed cannot run a flow, so it is left out.
+ * The person's computers: the Host first when they own it (online while it
+ * answers), then their paired computers, online ones first, by name. A
+ * computer whose access was removed cannot run a flow, so it is left out.
+ * `hostAnswers` is false when the last read of the Host failed: the list
+ * is the last one it gave.
  */
-export function computersOf(overview: DevicesOverview): Computer[] {
+export function computersOf(
+	overview: DevicesOverview,
+	hostAnswers = true,
+): Computer[] {
 	const host = overview.thisComputer;
 	const paired = overview.devices
 		.filter((device) => device.revokedAt === null)
@@ -39,7 +44,7 @@ export function computersOf(overview: DevicesOverview): Computer[] {
 					id: host.id,
 					name: host.name,
 					system: platformName(host.platform),
-					online: true,
+					online: hostAnswers,
 					lastSeenAt: null,
 					isHost: true,
 				},

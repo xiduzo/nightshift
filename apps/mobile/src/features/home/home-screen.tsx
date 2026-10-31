@@ -13,7 +13,6 @@ import {
 	CircleCheck,
 	FolderGit2,
 	History,
-	Laptop,
 	Moon,
 	MoonStar,
 	Plus,
@@ -23,6 +22,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { View } from "react-native";
 
+import { ComputersRow } from "@/features/devices";
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
 import { SearchResults } from "@/features/search";
@@ -180,12 +180,7 @@ export function HomeScreen() {
 								href="/flows"
 							/>
 							<ListRow icon={FolderGit2} title="Projects" href="/projects" />
-							<ListRow
-								icon={Laptop}
-								title="Computers"
-								caption="Where your flows run"
-								href="/computers"
-							/>
+							<ComputersRow />
 							<ListRow icon={Settings} title="Settings" href="/settings" />
 						</ListGroup>
 					</Section>

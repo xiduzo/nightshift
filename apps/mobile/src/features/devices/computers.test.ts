@@ -69,6 +69,11 @@ describe("computersOf", () => {
 		});
 		expect(list[1]?.isHost).toBe(false);
 	});
+
+	test("shows the Host offline when it stops answering", () => {
+		const list = computersOf({ thisComputer: HOST, devices: [] }, false);
+		expect(list[0]).toMatchObject({ isHost: true, online: false });
+	});
 });
 
 describe("onlineSummary", () => {
