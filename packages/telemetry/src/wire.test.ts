@@ -460,11 +460,49 @@ describe("the export to monitoring", () => {
 		});
 		expect(
 			h.telemetry.sessionEnv({
-				harness: "codex",
+				harness: "opencode",
 				runId: "run-1",
 				stepId: "s-agent",
 			}),
 		).toEqual({ env: {}, values: [] });
+		await h.done();
+	});
+
+	test("a Codex session gets its telemetry in its config, and the headers only in its environment", async () => {
+		const h = await setup({
+			telemetryEndpoint: "http://collector:4318/",
+			telemetryProtocol: "http/json",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+			telemetryHeaders: { "api-key": "${OTLP_KEY}" },
+		});
+		await h.secrets.setSecret("OTLP_KEY", "k 1");
+		await waitFor(h.on, { label: "the export on" });
+		const session = h.telemetry.sessionEnv({
+			harness: "codex",
+			runId: "run-1",
+			stepId: "s-agent",
+		});
+		expect(session).toEqual({
+			env: {
+				OTEL_EXPORTER_OTLP_HEADERS: "api-key=k%201",
+				OTEL_RESOURCE_ATTRIBUTES:
+					"nightshift.run.id=run-1,nightshift.step.id=s-agent,nightshift.device.id=mac",
+				TRACEPARENT: `00-${traceIdOf("run-1")}-${stepSpanIdOf("s-agent")}-01`,
+			},
+			values: ["k 1"],
+			config: {
+				"otel.environment": '"nightshift"',
+				"otel.log_user_prompt": "false",
+				"otel.exporter":
+					'{ otlp-http = { endpoint = "http://collector:4318/v1/logs", protocol = "json" } }',
+				"otel.trace_exporter":
+					'{ otlp-http = { endpoint = "http://collector:4318/v1/traces", protocol = "json" } }',
+				"otel.metrics_exporter":
+					'{ otlp-http = { endpoint = "http://collector:4318/v1/metrics", protocol = "json" } }',
+			},
+		});
+		// The secret's value never goes on Codex's command line.
+		expect(JSON.stringify(session.config)).not.toContain("k 1");
 		await h.done();
 	});
 

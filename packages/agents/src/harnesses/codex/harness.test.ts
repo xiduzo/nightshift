@@ -123,6 +123,24 @@ describe("codexSetup", () => {
 		).toEqual({ model_reasoning_effort: '"xhigh"' });
 		expect(codexEffort("low")).toBe("low");
 	});
+
+	test("a session's own config goes in, and the harness's own wins", () => {
+		const { config } = codexSetup(
+			input({
+				harnessConfig: { "otel.log_user_prompt": "false" },
+			}),
+			{ config: { "otel.log_user_prompt": "true" } },
+		);
+		expect(config["otel.log_user_prompt"]).toBe("false");
+		expect(config["shell_environment_policy.exclude"]).toBeUndefined();
+	});
+
+	test("with OTLP headers in its environment, its commands get no OTEL_*", () => {
+		const { config } = codexSetup(
+			input({ env: { OTEL_EXPORTER_OTLP_HEADERS: "api-key=k" } }),
+		);
+		expect(config["shell_environment_policy.exclude"]).toBe('["OTEL_*"]');
+	});
 });
 
 describe("codexHarness", () => {
@@ -155,6 +173,25 @@ describe("codexHarness", () => {
 		expect(line?.prompt).toContain("report_step");
 		// The worktree stays clean.
 		expect(await readdir(cwd)).toEqual([]);
+	});
+
+	test("the session's telemetry config reaches Codex's command line, its headers do not", async () => {
+		const { log, harness } = await fakeCodex({});
+		await collect(
+			harness.run(
+				input({
+					env: { OTEL_EXPORTER_OTLP_HEADERS: "api-key=k" },
+					harnessConfig: {
+						"otel.trace_exporter":
+							'{ otlp-http = { endpoint = "http://c:4318/v1/traces", protocol = "binary" } }',
+					},
+				}),
+			),
+		);
+		const [line] = await readLog(log);
+		expect(line?.config["otel.trace_exporter"]).toContain("/v1/traces");
+		expect(line?.config["shell_environment_policy.exclude"]).toBe('["OTEL_*"]');
+		expect(JSON.stringify(line?.argv)).not.toContain("api-key");
 	});
 
 	test("the knowledge tools reach Codex over the bridge, named after the prompt", async () => {

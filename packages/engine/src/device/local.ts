@@ -144,14 +144,19 @@ export type LocalDeviceDeps = {
 	 * the session starts: the export to monitoring gives Claude Code its
 	 * own telemetry under the step (`@nightshift/telemetry`). `values` are
 	 * the secret values in `env` (an API key in its headers): the session's
-	 * output has them as `•••`. Without it, or when it gives nothing:
-	 * nothing.
+	 * output has them as `•••`. `config`: the harness's own `--config`
+	 * overrides (Codex sets its telemetry there). Without it, or when it
+	 * gives nothing: nothing.
 	 */
 	sessionEnv?: (session: {
 		harness: AgentHarnessName;
 		runId: string;
 		stepId: string;
-	}) => { env: Record<string, string>; values: readonly string[] };
+	}) => {
+		env: Record<string, string>;
+		values: readonly string[];
+		config?: Record<string, string>;
+	};
 	/**
 	 * The values of the saved secrets and of the ones the connections
 	 * reference, read as a session starts: its output has each as `•••`,
@@ -343,6 +348,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					: {}),
 				...(tools?.toolsPath ? { toolsPath: tools.toolsPath } : {}),
 				...(Object.keys(env).length > 0 ? { env } : {}),
+				...(added?.config && Object.keys(added.config).length > 0
+					? { harnessConfig: added.config }
+					: {}),
 				// The folder, the line, the tools and the learnings.
 				...known?.input,
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),

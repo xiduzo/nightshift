@@ -100,6 +100,12 @@ export type AgentSessionInput = {
 	 */
 	scrubEnv?: string[];
 	/**
+	 * `--config key=value` overrides (TOML values) for this session only,
+	 * for a harness that takes them: Codex, whose telemetry is set there.
+	 * Another harness ignores them. The harness's own overrides win.
+	 */
+	harnessConfig?: Record<string, string>;
+	/**
 	 * Keeps a file for the person: an artifact of the run. With it, a
 	 * session that can use tools gets the `save_artifact` tool (see
 	 * `artifact-tool.ts`). `path` is what the agent gives: relative to

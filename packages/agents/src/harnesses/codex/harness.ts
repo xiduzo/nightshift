@@ -30,6 +30,7 @@ import {
 	type HarnessProfile,
 	type HarnessSpec,
 	harnessSession,
+	OTLP_HEADER_VARIABLES,
 	readOnlyInput,
 	type SdkSignals,
 	TODO_LIST,
@@ -275,6 +276,21 @@ export const CODEX_SPEC: HarnessSpec = {
 	resumeIsSilent: true,
 };
 
+/**
+ * Codex hands its environment on to the shell commands it runs, after its
+ * `shell_environment_policy`. Its default excludes take out names with
+ * KEY, SECRET or TOKEN, not `OTEL_EXPORTER_OTLP_HEADERS`. A session with
+ * OTLP headers in its environment (its own telemetry reads them) therefore
+ * excludes `OTEL_*` from its commands. That replaces an `exclude` list of
+ * the person's own config for this session.
+ */
+function otelKept(input: AgentSessionInput): Record<string, string> {
+	const env = input.env ?? {};
+	return OTLP_HEADER_VARIABLES.some((name) => name in env)
+		? { "shell_environment_policy.exclude": '["OTEL_*"]' }
+		: {};
+}
+
 /** The sandbox policy and `--config` overrides of one Codex session. */
 export function codexSetup(
 	input: AgentSessionInput,
@@ -292,6 +308,8 @@ export function codexSetup(
 		policy: codexPolicy(input.permissionMode),
 		config: {
 			...options.config,
+			...input.harnessConfig,
+			...otelKept(input),
 			...ownEffort,
 			...codexMcpConfig(input.mcpServers ?? {}),
 		},

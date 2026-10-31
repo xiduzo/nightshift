@@ -337,6 +337,7 @@ describe("session", () => {
 				return {
 					env: { TRACEPARENT: `00-${session.runId}-${session.stepId}-01` },
 					values: [],
+					config: { "otel.environment": '"night"' },
 				};
 			},
 		});
@@ -346,11 +347,13 @@ describe("session", () => {
 		await collect(d.session(sessionInput()));
 		const [forStep, plain] = harness.calls;
 		expect(forStep?.env).toEqual({ TRACEPARENT: "00-r1-s1-01" });
+		expect(forStep?.harnessConfig).toEqual({ "otel.environment": '"night"' });
 		expect(asked).toEqual([
 			{ harness: "claude-code", runId: "r1", stepId: "s1" },
 		]);
 		// A session of no step (the assistant's) gets nothing.
 		expect(plain?.env).toBeUndefined();
+		expect(plain?.harnessConfig).toBeUndefined();
 	});
 
 	test("every secret value the session could see comes back as •••: the export's headers, its MCP servers', the harness's own and the saved secrets", async () => {

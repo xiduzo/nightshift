@@ -174,6 +174,8 @@ export type SessionInput = Omit<
 	| "toolsPath"
 	| "env"
 	| "scrubEnv"
+	// The Device adds the export's own (`sessionEnv`) itself.
+	| "harnessConfig"
 	// The Device adds Night Shift's own (the knowledge tools) itself.
 	| "tools"
 	| "toolsInstruction"

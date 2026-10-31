@@ -2,12 +2,13 @@
 
 Night Shift can send the runs a computer walks to a monitoring tool you
 choose. Each run is one trace, and each step is a span in it. Metrics give
-the time, cost, tokens, retries and Gate waits of your runs. Claude Code steps
-also send their own usage, under the span of their step.
+the time, cost, tokens, retries and Gate waits of your runs. Claude Code
+steps also send their own usage, under the span of their step. Codex steps
+send their own usage too.
 
 The export is off by default. Nothing leaves your computer until you turn it
-on. Night Shift sends no prompts, no replies and no tool content. Claude
-Code's switches for those stay off.
+on. Night Shift sends no prompts, no replies and no tool content. The
+switches of Claude Code and Codex for those stay off.
 
 ## Turn it on
 
@@ -173,7 +174,27 @@ The commands that a step runs do not see your headers:
 One gap stays. On Linux, a command of the same user can read the
 environment of its parent process in `/proc`. On macOS it cannot.
 
-Other harnesses send nothing of their own. Night Shift's spans and metrics
-cover their steps. Codex can send OpenTelemetry logs through its own config
-(`-c otel.exporter=...`). Night Shift does not set it, because it puts your
-headers on the command line.
+### Codex
+
+While the export is on, a Codex step starts with:
+
+- Its own logs, metrics and traces to the same address, set with
+  `--config otel.exporter`, `otel.trace_exporter` and
+  `otel.metrics_exporter`. Each one has its full path, for example
+  `/v1/traces`.
+- `otel.log_user_prompt = false`, so your prompts stay out.
+- Your headers in `OTEL_EXPORTER_OTLP_HEADERS`, never on the command line.
+- `shell_environment_policy.exclude = ["OTEL_*"]`, so the commands Codex
+  runs do not see the headers. This replaces an `exclude` list in your own
+  Codex config for that step.
+- The run and step ids in `OTEL_RESOURCE_ATTRIBUTES`, and `TRACEPARENT`
+  set to the step's span.
+
+Codex reports tokens, not dollars. Night Shift prices the tokens:
+`nightshift.run.cost_usd` counts a Codex step with `basis="estimated"`.
+Nobody checked here that Codex reads `TRACEPARENT` and
+`OTEL_RESOURCE_ATTRIBUTES`. Without them, its spans have a trace of their
+own, with `service.name` `codex_exec`.
+
+Other harnesses (OpenCode, pi, ACP agents) send nothing of their own.
+Night Shift's spans and metrics cover their steps.

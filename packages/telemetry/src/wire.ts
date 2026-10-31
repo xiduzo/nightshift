@@ -12,13 +12,14 @@ import {
 	startExport,
 } from "./otlp";
 import { createRunProjection, type RunProjection } from "./runs";
-import { claudeCodeEnv } from "./sessions";
+import { claudeCodeEnv, codexSession } from "./sessions";
 
 /**
  * The export to monitoring of this computer, composed: off by default, on
  * with one setting. While it is on, the runs this computer walks go out as
- * OpenTelemetry spans and metrics (`runs/`), and the Claude Code sessions
- * of their steps send their own telemetry to the same place (`sessions/`).
+ * OpenTelemetry spans and metrics (`runs/`), and the Claude Code and Codex
+ * sessions of their steps send their own telemetry to the same place
+ * (`sessions/`).
  * Nothing is created while it is off: no provider, no exporter, no
  * connection. It reads its settings from the settings store and the
  * `${NAME}` references of its headers from the secrets, and starts,
@@ -27,13 +28,15 @@ import { claudeCodeEnv } from "./sessions";
 
 export type Telemetry = {
 	/**
-	 * What a run step's harness session adds to its environment, and the
+	 * What a run step's harness session adds to its environment, the
 	 * secret values in it (the headers' secrets), to take out of the
-	 * session's output. Nothing while the export is off.
+	 * session's output, and the harness's own `--config` overrides
+	 * (Codex's). Nothing while the export is off.
 	 */
 	sessionEnv(session: { harness: string; runId: string; stepId: string }): {
 		env: Record<string, string>;
 		values: string[];
+		config?: Record<string, string>;
 	};
 	/**
 	 * Sends the runs `engine` walks on this computer while the export is
@@ -135,16 +138,26 @@ export async function createTelemetry(deps: {
 
 	return {
 		sessionEnv(session) {
-			if (!current || session.harness !== "claude-code")
-				return { env: {}, values: [] };
-			return {
-				env: claudeCodeEnv(current.target, {
-					runId: session.runId,
-					stepId: session.stepId,
-					deviceId: deps.deviceId,
-				}),
-				values: current.values,
+			if (!current) return { env: {}, values: [] };
+			const ids = {
+				runId: session.runId,
+				stepId: session.stepId,
+				deviceId: deps.deviceId,
 			};
+			switch (session.harness) {
+				case "claude-code":
+					return {
+						env: claudeCodeEnv(current.target, ids),
+						values: current.values,
+					};
+				case "codex":
+					return {
+						...codexSession(current.target, ids),
+						values: current.values,
+					};
+				default:
+					return { env: {}, values: [] };
+			}
 		},
 		follow(next) {
 			unfollow();
