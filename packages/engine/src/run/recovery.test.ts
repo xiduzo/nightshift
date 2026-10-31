@@ -322,12 +322,15 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 
 	/** What recovery told the bus about the run. */
 	let told: BusItem[] = [];
+	/** What recovery told the run's holds (leases): each end and each run that does not continue. */
+	let holdsHeard: string[] = [];
 
 	/** Runs startup recovery on a new daemon (resume off) and returns the run's log after it. */
 	async function recover(flowOf: (row: { flow: string }) => Flow) {
 		const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		const bus = createRunBus();
 		told = [];
+		holdsHeard = [];
 		bus.subscribe(RUN_ID, (item) => told.push(item));
 		const runner = {
 			take: async () => ({ kind: "unchanged" }),
@@ -347,6 +350,14 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 			runner,
 			resumeGraceMs: 0,
 			holds: { start: (_spaceId, work) => work() },
+			runHolds: {
+				ended: async (runId, status) => {
+					holdsHeard.push(`${runId} ended ${status}`);
+				},
+				notContinuing: async (runId) => {
+					holdsHeard.push(`${runId} does not continue`);
+				},
+			},
 		});
 		await recovery.recoverInterruptedWork();
 		return runLog.events(RUN_ID);
@@ -387,6 +398,18 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 			{ kind: "step-changed", stepId: "w" },
 			{ kind: "step-changed", stepId: "c" },
 			{ kind: "status-changed" },
+		]);
+	});
+
+	test("given an interrupted run that does not continue on its own, then it lets go of what it holds", async () => {
+		await insertRun(sandbox.repoPath, outer, { inner });
+		await deadDaemonLog(async (b) => {
+			await b.step("c", "once", "call");
+		});
+		await recover((row) => JSON.parse(row.flow));
+		expect(holdsHeard).toEqual([
+			`${RUN_ID} ended interrupted`,
+			`${RUN_ID} does not continue`,
 		]);
 	});
 

@@ -5,11 +5,19 @@
  * `startRunInputSchema`), where a run can be placed (`Placement`,
  * `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the
  * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`, and
- * `HostUnreachableError` when one cannot be reached) and the Offer rule of a schedule (`OffersPort`). It imports no other vertical.
+ * `HostUnreachableError` when one cannot be reached), the leases a Host
+ * keeps (`LeaseHost`, ADR 7) and the Offer rule of a schedule (`OffersPort`). It imports no other vertical.
  */
 
 export type { Actor, MemberChange } from "./actor";
 export type { DeviceDirectory } from "./directory";
+export type {
+	LeaseAnswer,
+	LeaseHolder,
+	LeaseHost,
+	LeaseTake,
+	SpaceLease,
+} from "./leases";
 export type { OffersPort } from "./offers";
 export type {
 	DeviceProfile,

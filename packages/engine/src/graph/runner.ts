@@ -32,6 +32,7 @@ import {
 import { createRecorders } from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
+import { letGo, NO_HOLDS, type RunHolds } from "./holds";
 import { type CloseDeps, type CutShort, closeOpenWork } from "./open-work";
 import { planReentry, type ReentryRequest } from "./reentry";
 import { createSleeps, planWake, recordWake, type Wake } from "./sleep";
@@ -151,6 +152,8 @@ export type RunnerDeps = {
 	overdueSweepMs?: number;
 	/** Opens a run's thread. Default `openThread`; a test passes one that fails. */
 	openThread?: typeof openThread;
+	/** What runs hold for a scope (leases): let go on every end of a run. Default: nothing. */
+	holds?: RunHolds;
 };
 
 /** What a start's Turn prepares once its slot is held: the run row, its inputs and its stop time. */
@@ -298,12 +301,14 @@ export function createRunner(deps: RunnerDeps) {
 		calledFlowsOf: deps.calledFlowsOf,
 		policyFor: deps.policyFor,
 	};
+	const holds = deps.holds ?? NO_HOLDS;
 	const closeDeps: CloseDeps = {
 		db,
 		log,
 		bus,
 		flowOf: deps.flowOf,
 		calledFlowsOf: deps.calledFlowsOf,
+		holds,
 	};
 	/** Open threads by run id, kept while the run is likely to continue soon. */
 	const threads = new Map<string, Thread>();
@@ -535,6 +540,7 @@ export function createRunner(deps: RunnerDeps) {
 				runId,
 				payload: { status, reason, ...(result ? { result } : {}) },
 			});
+			await letGo(holds, runId, status);
 		} catch (error) {
 			// A stop took the run from the drive and wrote its end.
 			if (error instanceof FencedError) return;
@@ -784,6 +790,7 @@ export function createRunner(deps: RunnerDeps) {
 					reason: `The run could not start again. ${wordsFor(error)}`,
 				},
 			});
+			await letGo(holds, runId, "failed");
 			throw error;
 		}
 	}

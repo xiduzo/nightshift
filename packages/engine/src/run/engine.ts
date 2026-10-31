@@ -18,8 +18,14 @@ import {
 	createSpaceFlows,
 	type ProjectFlows,
 } from "../flows";
-import { createRunner, createRunWalks, resolvePolicy } from "../graph";
+import {
+	combineHolds,
+	createRunner,
+	createRunWalks,
+	resolvePolicy,
+} from "../graph";
 import { logKnowledgeUse } from "../knowledge";
+import { createLeaseKeeper, createLeaseStore, leaseHolds } from "../leases";
 import {
 	copyStamps,
 	createLandedFeed,
@@ -438,6 +444,20 @@ export function createEngine(
 		{ once: true },
 	);
 
+	/** The leases of the Spaces this Replica keeps, and of the runs it walks (ADR 7). */
+	const leaseStore = createLeaseStore({ db, now });
+	const leases = createLeaseKeeper({
+		db,
+		store: leaseStore,
+		hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
+		...(hosts?.leases ? { relay: hosts.leases } : {}),
+		walkerId: () => runLog.walkerId(),
+		minuteMs,
+	});
+	leases.start(signal);
+	/** What runs hold for a scope: the engine lets go of it when a run ends. */
+	const runHolds = combineHolds([leaseHolds(leases)]);
+
 	const runner = createRunner({
 		db,
 		log: runLog,
@@ -452,6 +472,7 @@ export function createEngine(
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
 		signal,
+		holds: runHolds,
 		...(internals.overdueSweepMs !== undefined
 			? { overdueSweepMs: internals.overdueSweepMs }
 			: {}),
@@ -474,6 +495,7 @@ export function createEngine(
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
 		signal,
 		holds: startHolds,
+		runHolds,
 	});
 
 	const ready = recovery
