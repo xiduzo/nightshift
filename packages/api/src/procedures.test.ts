@@ -115,6 +115,7 @@ const engine: Context["engine"] = {
 		}),
 	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
 	logMemberChange: async () => {},
+	logKnowledgeUse: async () => {},
 	onLandedFacts: () => () => {},
 	moveProjects: async () => ({ projects: [], runIds: [], schedules: 0 }),
 	forgetSpace: async () => false,

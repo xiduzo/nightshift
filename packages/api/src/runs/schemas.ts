@@ -114,6 +114,8 @@ const metricsSchema = z.object({
 	/** `billed`: every cost was reported. `estimated`: part is priced from tokens. `unknown`: part is not known. */
 	costBasis: z.enum(["billed", "estimated", "unknown"]),
 	prUrl: z.string().nullable(),
+	/** How often agents searched and read the project's knowledge. Older Hosts send none. */
+	knowledge: z.object({ searches: z.number(), reads: z.number() }).optional(),
 	/**
 	 * The feedback on a run: each Gate answered, and what became of its pull
 	 * request. Older Hosts send none. A score's name is an open list: a

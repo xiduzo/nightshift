@@ -241,5 +241,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | WaitEnded | The Wait is over: the timer, a person, or a Signal. |
 | RunEnded | The Run finished or failed, with the reason. After an End Node, also its result and its line. |
 | RunWarned | A Warning about the Run, with the Step it is about. |
+| KnowledgeSearched | An agent searched the project's Knowledge (`search_knowledge`): the query and the files it got back. On its Step, or with no Run through the nightshift MCP server. |
+| KnowledgeRead | An agent read one file of the project's Knowledge (`read_knowledge`). On its Step, or with no Run through the nightshift MCP server. |
 | ScheduleFired | A Schedule came due and started its Run, or failed to start it. |
 | ScheduleSkipped | A Schedule came due but did not start: too late, or its previous Run still runs. |

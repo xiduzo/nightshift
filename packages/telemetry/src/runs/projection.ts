@@ -175,6 +175,12 @@ export function createRunProjection(deps: {
 					? { [ATTR.toolName]: step.nodeId }
 					: {}),
 				...agent,
+				...(end.knowledge.searches > 0
+					? { [ATTR.knowledgeSearches]: end.knowledge.searches }
+					: {}),
+				...(end.knowledge.reads > 0
+					? { [ATTR.knowledgeReads]: end.knowledge.reads }
+					: {}),
 			},
 			error: end.error,
 		});

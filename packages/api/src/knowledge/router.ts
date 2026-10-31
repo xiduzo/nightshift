@@ -1,3 +1,4 @@
+import { useHit } from "@nightshift/agents/tools";
 import { type Permissions, ROLE_REFUSAL } from "@nightshift/auth";
 import { knowledgeSources } from "@nightshift/engine";
 import {
@@ -58,6 +59,22 @@ const MAY = {
 const timeZoneSchema = z.string().refine(isTimeZone, {
 	message: "Choose a time zone such as Europe/Amsterdam.",
 });
+
+/**
+ * An agent asks, through the nightshift MCP server: the search or the read
+ * is logged, for the Knowledge page. The page's own searches are not.
+ */
+const agentSchema = z.boolean().optional();
+
+/** Logs an agent's use; a failed write does not fail the answer. */
+function logUse(
+	context: Pick<Context, "engine">,
+	...args: Parameters<Context["engine"]["logKnowledgeUse"]>
+): Promise<void> {
+	return context.engine.logKnowledgeUse(...args).catch((error) => {
+		console.warn("A use of the knowledge was not logged:", error);
+	});
+}
 
 /** The most of one file `knowledge.read` returns. */
 const READ_MAX_BYTES = 1024 * 1024;
@@ -217,13 +234,24 @@ export const knowledge = {
 				projectId: z.string(),
 				query: z.string().max(1000),
 				limit: z.number().int().min(1).max(50).optional(),
+				agent: agentSchema,
 			}),
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			return context.knowledgeSearch.search(input.projectId, input.query, {
-				...(input.limit !== undefined ? { limit: input.limit } : {}),
-			});
+			const hits = await context.knowledgeSearch.search(
+				input.projectId,
+				input.query,
+				{ ...(input.limit !== undefined ? { limit: input.limit } : {}) },
+			);
+			if (input.agent) {
+				await logUse(context, input.projectId, {
+					kind: "search",
+					query: input.query.trim(),
+					hits: hits.map(useHit),
+				});
+			}
+			return hits;
 		}),
 	/**
 	 * Whether search by meaning works for the project on this computer:
@@ -255,14 +283,23 @@ export const knowledge = {
 				projectId: z.string(),
 				path: z.string().min(1).max(1000),
 				maxBytes: z.number().int().min(1).max(READ_MAX_BYTES).optional(),
+				agent: agentSchema,
 			}),
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			return context.knowledge.read(
+			const file = await context.knowledge.read(
 				input.projectId,
 				input.path,
 				input.maxBytes ?? READ_MAX_BYTES,
 			);
+			if (input.agent) {
+				await logUse(context, input.projectId, {
+					kind: "read",
+					path: file?.path ?? input.path.trim(),
+					found: file !== null,
+				});
+			}
+			return file;
 		}),
 };

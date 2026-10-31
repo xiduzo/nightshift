@@ -12,7 +12,10 @@ export {
 export {
 	KNOWLEDGE_TOOLS_INSTRUCTION,
 	type KnowledgePort,
+	type KnowledgeUse,
+	type KnowledgeUseHit,
 	knowledgeTools,
+	useHit,
 } from "./knowledge";
 export {
 	callMcpTool,

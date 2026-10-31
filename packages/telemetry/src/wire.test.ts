@@ -67,6 +67,11 @@ function nightRun() {
 		.at(T + 1_200)
 		.sessionStarted("s-agent", "x1", { harness: "claude-code" })
 		.harness("s-agent", "x1", "h1", "claude-sonnet")
+		.push(
+			"KnowledgeSearched",
+			{ projectId: "p1", query: "deploy", hits: [], via: "step" },
+			{ stepId: "s-agent", sessionId: "x1" },
+		)
 		.at(T + 3_000)
 		.sessionEnded("s-agent", "x1", "finished", 0.75, {
 			usage: { inputTokens: 900, outputTokens: 100, cacheReadTokens: 400 },
@@ -313,7 +318,9 @@ describe("the export to monitoring", () => {
 			"gen_ai.request.model": "claude-sonnet",
 			"gen_ai.operation.name": "invoke_agent",
 			"nightshift.step.outcome": "pass",
+			"nightshift.knowledge.searches": 1,
 		});
+		expect(agent.attributes["nightshift.knowledge.reads"]).toBeUndefined();
 
 		const gate = byName(spans, "gate ship");
 		expect(parentOf(gate)).toBe(stepSpanIdOf("s-gate"));

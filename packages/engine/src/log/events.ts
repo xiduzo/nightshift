@@ -1,4 +1,5 @@
 import type { CostSource } from "@nightshift/agents/pricing";
+import type { KnowledgeUseHit } from "@nightshift/agents/tools";
 import type {
 	AgentErrorKind,
 	AgentHarnessName,
@@ -484,6 +485,26 @@ export type EnginePayloads = {
 		by?: "person" | "deadline";
 	};
 	/**
+	 * An agent searched the project's knowledge (`search_knowledge`), and
+	 * the files it got back, best first, each at its best section. In an
+	 * Agent step: on the step and its session (`via: "step"`). Through the
+	 * nightshift MCP server (`via: "mcp"`): with no run. The Knowledge page
+	 * (`knowledge/use.ts`), the step's sources and the metrics read them.
+	 */
+	KnowledgeSearched: {
+		projectId: string;
+		query: string;
+		hits: KnowledgeUseHit[];
+		via: KnowledgeVia;
+	};
+	/** An agent read one file of the project's knowledge (`read_knowledge`). `found`: the file was there. */
+	KnowledgeRead: {
+		projectId: string;
+		path: string;
+		found: boolean;
+		via: KnowledgeVia;
+	};
+	/**
 	 * A schedule came due and the scheduler started its run (`runId`), or
 	 * tried to and could not (`error`). `at` is the cron time, not the
 	 * moment of the tick: no cron time of a schedule fires twice. Logged
@@ -545,6 +566,9 @@ export type StepBudget = {
 };
 
 export type EngineEventType = keyof EnginePayloads;
+
+/** Where an agent used the knowledge: the tools of an Agent step, or the nightshift MCP server. */
+export type KnowledgeVia = "step" | "mcp";
 
 /**
  * What a run warning is about. `cost-unknown`: a step ended without a cost.

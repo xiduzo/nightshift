@@ -154,6 +154,26 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 		woke: 0,
 		error: null,
 	},
+	KnowledgeSearched: {
+		projectId: "p1",
+		query: "deploy",
+		hits: [
+			{
+				path: "wiki/deploy.md",
+				section: "Deploy",
+				line: 1,
+				page: null,
+				found: ["words"],
+			},
+		],
+		via: "step",
+	},
+	KnowledgeRead: {
+		projectId: "p1",
+		path: "wiki/deploy.md",
+		found: true,
+		via: "mcp",
+	},
 };
 
 const count = (text: string, value: string) =>

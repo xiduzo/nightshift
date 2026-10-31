@@ -134,9 +134,40 @@ describe("runTrace", () => {
 						],
 						gateWaits: [],
 						sleeps: [],
+						knowledge: { searches: 0, reads: 0 },
 					},
 				],
 			},
+		]);
+	});
+
+	test("an end counts the knowledge its agents searched and read in its part", () => {
+		const use = { projectId: "p", via: "step" as const };
+		const trace = log()
+			.runStarted()
+			.stepStarted("s1", "build")
+			.push(
+				"KnowledgeSearched",
+				{ ...use, query: "deploy", hits: [] },
+				{ stepId: "s1" },
+			)
+			.push(
+				"KnowledgeRead",
+				{ ...use, path: "a.md", found: true },
+				{ stepId: "s1" },
+			)
+			.stepEnded("s1")
+			.stepReopened("s1")
+			.push(
+				"KnowledgeSearched",
+				{ ...use, query: "again", hits: [] },
+				{ stepId: "s1" },
+			)
+			.stepEnded("s1")
+			.trace();
+		expect(trace?.steps[0]?.ends.map((end) => end.knowledge)).toEqual([
+			{ searches: 1, reads: 1 },
+			{ searches: 1, reads: 0 },
 		]);
 	});
 

@@ -253,9 +253,13 @@ export function apiPort(
 				),
 			),
 		searchKnowledge: (projectId, query, limit) =>
-			g(() => client.knowledge.search({ projectId, query, limit })),
+			g(() =>
+				client.knowledge.search({ projectId, query, limit, agent: true }),
+			),
 		readKnowledge: (projectId, path, maxBytes) =>
-			g(() => client.knowledge.read({ projectId, path, maxBytes })),
+			g(() =>
+				client.knowledge.read({ projectId, path, maxBytes, agent: true }),
+			),
 		runLink: (runId, stepId) =>
 			`${options.ui}/runs/${encodeURIComponent(runId)}${stepId ? `?step=${encodeURIComponent(stepId)}` : ""}`,
 		flowLink: (projectId, name) =>

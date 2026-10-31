@@ -1,4 +1,5 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
+import type { KnowledgeUse } from "@nightshift/agents/tools";
 import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
@@ -18,6 +19,7 @@ import {
 	type ProjectFlows,
 } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
+import { logKnowledgeUse } from "../knowledge";
 import {
 	copyStamps,
 	createLandedFeed,
@@ -153,6 +155,12 @@ export interface Engine {
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
+	/**
+	 * Logs that an agent searched or read a project's knowledge through
+	 * the nightshift MCP server (`KnowledgeSearched`, `KnowledgeRead`), as
+	 * a fact of the project with no run. An Agent step logs its own.
+	 */
+	logKnowledgeUse(projectId: string, use: KnowledgeUse): Promise<void>;
 	/**
 	 * Calls `listener` with what each run event that lands in this Replica
 	 * from now on means (the landed facts): appended here, or brought by
@@ -753,6 +761,8 @@ export function createEngine(
 			return spaceOfRun(db, runId);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
+		logKnowledgeUse: (projectId, use) =>
+			logKnowledgeUse(runLog, projectId, use),
 		onLandedFacts: (listener, scope) =>
 			landed.subscribe((events) => listener(landedFacts(events)), scope),
 		moveProjects,

@@ -77,6 +77,8 @@ export const PATH_FIELDS = {
 	Scored: [],
 	ScheduleFired: [],
 	ScheduleSkipped: [],
+	KnowledgeSearched: [],
+	KnowledgeRead: [],
 	WebhookReceived: [],
 } as const satisfies {
 	[T in EngineEventType]: readonly PathField<T>[];

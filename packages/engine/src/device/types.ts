@@ -13,7 +13,7 @@ import type {
 	JsonValue,
 	ProfileSettings,
 } from "@nightshift/flows";
-import type { KnowledgeRequest } from "../knowledge";
+import type { KnowledgeRequest, KnowledgeUseEvent } from "../knowledge";
 import type { WorktreeChanges } from "../log";
 
 /**
@@ -225,6 +225,8 @@ export type OfferedSessionInput = Omit<
 
 export type SessionEvent =
 	| AgentEvent
+	/** The agent searched or read the project's knowledge: for the run's log. */
+	| KnowledgeUseEvent
 	/** `harness`: what runs the session, for an offered profile the Walker cannot resolve. */
 	| { type: "ready"; harness?: AgentHarnessName }
 	/** The session cannot start; the message says why, for the person. */

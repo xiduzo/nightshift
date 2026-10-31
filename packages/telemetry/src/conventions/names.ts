@@ -29,6 +29,10 @@ export const ATTR = {
 	resumed: "nightshift.run.resumed",
 	gateWaitMs: "nightshift.gate.wait_ms",
 	waitReason: "nightshift.wait.reason",
+	/** On a step's span: how often its agents searched the project's knowledge (`search_knowledge`). */
+	knowledgeSearches: "nightshift.knowledge.searches",
+	/** On a step's span: how often its agents read a file of the project's knowledge (`read_knowledge`). */
+	knowledgeReads: "nightshift.knowledge.reads",
 	/** On metric points: how sure a cost is (`billed`, `estimated`, `unknown`). */
 	basis: "basis",
 	/** On `nightshift.tokens`: `input`, `output`, `cache_read`, `cache_write`. */

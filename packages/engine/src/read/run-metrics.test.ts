@@ -253,3 +253,61 @@ describe("runMetrics", () => {
 		]);
 	});
 });
+
+describe("the knowledge agents used", () => {
+	const hit = {
+		path: "wiki/deploy.md",
+		section: "Deploy",
+		line: 3,
+		page: null,
+		found: ["words" as const],
+	};
+	test("each step keeps its searches and reads in order, and the metrics count them", () => {
+		const { events } = log()
+			.runStarted()
+			.stepStarted("s1", "worker")
+			.sessionStarted("s1", "a")
+			.push(
+				"KnowledgeSearched",
+				{ projectId: "p", query: "deploy", hits: [hit], via: "step" },
+				{ stepId: "s1", sessionId: "a" },
+			)
+			.push(
+				"KnowledgeRead",
+				{ projectId: "p", path: "wiki/deploy.md", found: true, via: "step" },
+				{ stepId: "s1", sessionId: "a" },
+			)
+			.sessionEnded("s1", "a", "finished", 0.1)
+			.stepEnded("s1")
+			.stepStarted("s2", "worker", 2)
+			.push(
+				"KnowledgeSearched",
+				{ projectId: "p", query: "nothing", hits: [], via: "step" },
+				{ stepId: "s2" },
+			)
+			.stepEnded("s2");
+		const run = foldRun(events);
+		const [s1, s2] = deriveSteps(run);
+		expect(s1?.knowledge.map((use) => [use.type, use.seq])).toEqual([
+			["KnowledgeSearched", 4],
+			["KnowledgeRead", 5],
+		]);
+		expect(s1?.knowledge[0]?.payload).toEqual({
+			projectId: "p",
+			query: "deploy",
+			hits: [hit],
+			via: "step",
+		});
+		expect(stepMetrics(s1 as never).knowledge).toEqual({
+			searches: 1,
+			reads: 1,
+		});
+		expect(stepMetrics(s2 as never).knowledge).toEqual({
+			searches: 1,
+			reads: 0,
+		});
+		expect(
+			runMetrics(deriveSteps(run), sumCost(run), 1000, 2000).knowledge,
+		).toEqual({ searches: 2, reads: 1 });
+	});
+});

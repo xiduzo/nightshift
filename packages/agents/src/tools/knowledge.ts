@@ -38,6 +38,24 @@ export type KnowledgeToolHit = {
 	found?: ("words" | "meaning")[];
 };
 
+/** A file a search returned, as the run's log keeps it: where, not what. */
+export type KnowledgeUseHit = {
+	path: string;
+	section: string | null;
+	line: number;
+	page: number | null;
+	found: ("words" | "meaning")[];
+};
+
+/**
+ * What an agent did with the knowledge, for the run's log: a search with
+ * the files it returned, or a read of one file (`found`: the file was
+ * there).
+ */
+export type KnowledgeUse =
+	| { kind: "search"; query: string; hits: KnowledgeUseHit[] }
+	| { kind: "read"; path: string; found: boolean };
+
 /** One file of the knowledge, its text cut at the size asked for. */
 export type KnowledgeToolFile = {
 	path: string;
@@ -113,11 +131,34 @@ function knowledgeOf(project: KnowledgeProject): string {
 		: "the project's knowledge";
 }
 
-/** The knowledge tools over `port`, in the project(s) of `scope`. */
+/** A search hit as the run's log keeps it. */
+export function useHit(hit: KnowledgeToolHit): KnowledgeUseHit {
+	return {
+		path: hit.path,
+		section: hit.section ?? null,
+		line: hit.line ?? 1,
+		page: hit.page ?? null,
+		found: hit.found ?? ["words"],
+	};
+}
+
+/**
+ * The knowledge tools over `port`, in the project(s) of `scope`. `onUse`
+ * hears each search and each read once it answered, with its project.
+ */
 export function knowledgeTools(
 	port: KnowledgePort,
 	scope: KnowledgeScope,
+	options: { onUse?: (projectId: string, use: KnowledgeUse) => void } = {},
 ): BridgedTool[] {
+	const used = (projectId: string, use: KnowledgeUse) => {
+		try {
+			options.onUse?.(projectId, use);
+		} catch (error) {
+			// The tool answers the agent all the same.
+			console.warn("A use of the knowledge was not kept:", error);
+		}
+	};
 	const chooses = "projectOf" in scope;
 	const projectOf = async (args: unknown) =>
 		"projectOf" in scope ? scope.projectOf(args) : scope.project;
@@ -154,11 +195,13 @@ export function knowledgeTools(
 					? Math.min(limit, SEARCH_MAX)
 					: SEARCH_DEFAULT;
 			const project = await projectOf(args);
-			const hits = await port.searchKnowledge(
-				project.id,
-				query.trim().slice(0, 1000),
-				count,
-			);
+			const words = query.trim().slice(0, 1000);
+			const hits = await port.searchKnowledge(project.id, words, count);
+			used(project.id, {
+				kind: "search",
+				query: words,
+				hits: hits.map(useHit),
+			});
 			if (hits.length === 0) {
 				return `No file in ${knowledgeOf(project)} matches ${JSON.stringify(query.trim())}. Try other words, or fewer.`;
 			}
@@ -205,6 +248,11 @@ export function knowledgeTools(
 				path.trim(),
 				READ_BYTES,
 			);
+			used(project.id, {
+				kind: "read",
+				path: file?.path ?? path.trim(),
+				found: file !== null,
+			});
 			if (!file) {
 				const where = knowledgeOf(project);
 				return `${where.charAt(0).toUpperCase()}${where.slice(1)} has no file "${path.trim()}". Call ${KNOWLEDGE_TOOLS.searchKnowledge} for the paths.`;

@@ -53,6 +53,12 @@ export type RunMetrics = {
 	/** The address of the GitHub pull request a step opened or named in its outputs. Null when none did. */
 	prUrl: string | null;
 	/**
+	 * How often agents searched (`search_knowledge`) and read
+	 * (`read_knowledge`) the project's knowledge. Absent when they did
+	 * neither. Older Hosts send none.
+	 */
+	knowledge?: KnowledgeCounts;
+	/**
 	 * The feedback on the run (`Scored`), oldest first: each Gate answered,
 	 * and what became of its pull request. Only a run's metrics have them.
 	 * Older Hosts send none.
@@ -63,6 +69,25 @@ export type RunMetrics = {
 /** The run's scores, in log order. */
 export function deriveScores(run: RunState): RunScore[] {
 	return run.scores.map(runScore);
+}
+
+/** How often agents used the project's knowledge. */
+export type KnowledgeCounts = { searches: number; reads: number };
+
+/** How often the step's agents searched and read the knowledge. */
+function knowledgeCounts(step: DerivedStep): KnowledgeCounts {
+	let searches = 0;
+	let reads = 0;
+	for (const use of step.knowledge) {
+		if (use.type === "KnowledgeSearched") searches++;
+		else reads++;
+	}
+	return { searches, reads };
+}
+
+/** `{ knowledge }`, or nothing when the agents did not use it. */
+function knowledgeField(knowledge: KnowledgeCounts) {
+	return knowledge.searches + knowledge.reads > 0 ? { knowledge } : {};
 }
 
 const NO_TOKENS: TokenCounts = {
@@ -166,6 +191,7 @@ export function stepMetrics(step: DerivedStep): RunMetrics {
 		tokens,
 		costBasis: costBasis(step.cost),
 		prUrl: step.endedAt === null ? null : pullRequestOf(step.outputs),
+		...knowledgeField(knowledgeCounts(step)),
 	};
 }
 
@@ -187,8 +213,11 @@ export function runMetrics(
 	let gateWaitMs = 0;
 	let prUrl: string | null = null;
 	let prAt = Number.NEGATIVE_INFINITY;
+	const knowledge: KnowledgeCounts = { searches: 0, reads: 0 };
 	for (const step of steps) {
 		const metrics = stepMetrics(step);
+		knowledge.searches += metrics.knowledge?.searches ?? 0;
+		knowledge.reads += metrics.knowledge?.reads ?? 0;
 		tokens = addTokens(tokens, metrics.tokens);
 		agentMs += metrics.agentMs;
 		gateWaitMs += metrics.gateWaitMs;
@@ -207,6 +236,7 @@ export function runMetrics(
 		tokens,
 		costBasis: costBasis(cost),
 		prUrl,
+		...knowledgeField(knowledge),
 		scores,
 	};
 }

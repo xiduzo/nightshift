@@ -10,6 +10,7 @@ import {
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { Device } from "../device";
+import { type KnowledgeUseEvent, knowledgeUseEvent } from "../knowledge";
 import {
 	commandLogPath,
 	type DerivedStep,
@@ -180,6 +181,12 @@ export type StepHandle = {
 	session(start: EnginePayloads["SessionStarted"]): Promise<SessionRecord>;
 	/** Logs a warning about this step (`RunWarned`): it did not fail, but a person should know. */
 	warn(kind: RunWarningKind, message: string): Promise<void>;
+	/**
+	 * Logs that an agent of the session searched or read the project's
+	 * knowledge (`KnowledgeSearched`, `KnowledgeRead`). A failed write is
+	 * left out: the step goes on.
+	 */
+	usedKnowledge(sessionId: string, used: KnowledgeUseEvent): Promise<void>;
 	/**
 	 * Trips a guard of the run policy: aborts the step's signal with the
 	 * guard as its reason, so the session stops. The body then returns
@@ -787,6 +794,18 @@ export async function beginStep(
 				payload: { kind, message },
 			});
 			changed();
+		},
+		async usedKnowledge(sessionId, { projectId, use }) {
+			await ctx.log
+				.append({
+					...knowledgeUseEvent(projectId, use, "step"),
+					runId,
+					stepId,
+					sessionId,
+				})
+				.then(changed, (error) => {
+					console.warn("A use of the knowledge was not logged:", error);
+				});
 		},
 		async session(started) {
 			const sessionId = randomUUID();

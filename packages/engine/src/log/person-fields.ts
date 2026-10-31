@@ -69,6 +69,8 @@ export const PERSON_FIELDS = {
 	Scored: [],
 	ScheduleFired: [],
 	ScheduleSkipped: [],
+	KnowledgeSearched: [],
+	KnowledgeRead: [],
 	WebhookReceived: [],
 } as const satisfies {
 	[T in EngineEventType]: readonly PersonField<T>[];

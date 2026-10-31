@@ -20,6 +20,7 @@ export { ollamaMeaning } from "./meaning";
 export {
 	createProjectKnowledge,
 	type KnowledgeRequest,
+	type KnowledgeUseEvent,
 	type ProjectKnowledge,
 } from "./project-knowledge";
 export {
@@ -28,3 +29,4 @@ export {
 	type KnowledgeMeaningStatus,
 	type KnowledgeSearch,
 } from "./search";
+export { knowledgeUseEvent, logKnowledgeUse } from "./use";

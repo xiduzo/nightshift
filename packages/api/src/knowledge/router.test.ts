@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Role } from "@nightshift/auth";
+import { event } from "@nightshift/db/schema";
 import { createEngine, type Engine } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -305,5 +306,49 @@ describe("knowledge.search and knowledge.read", () => {
 				{ context: ctx },
 			),
 		).rejects.toBeInstanceOf(ORPCError);
+	});
+
+	test("an agent's search and read through the MCP server are logged for the project, the page's are not", async () => {
+		await putFile("wiki/deploy.md", "# Deploy\n");
+		const ctx = context("viewer", "viewer");
+		await call(
+			appRouter.knowledge.search,
+			{ projectId, query: "deploy" },
+			{ context: ctx },
+		);
+		await call(
+			appRouter.knowledge.search,
+			{ projectId, query: "deploy", agent: true },
+			{ context: ctx },
+		);
+		await call(
+			appRouter.knowledge.read,
+			{ projectId, path: "nope.md", agent: true },
+			{ context: ctx },
+		);
+		const rows = (await sandbox.db.select().from(event))
+			.filter((row) => row.type.startsWith("Knowledge"))
+			.sort((a, b) => a.seq - b.seq);
+		expect(rows.map((row) => [row.type, row.runId])).toEqual([
+			["KnowledgeSearched", null],
+			["KnowledgeRead", null],
+		]);
+		expect(rows.map((row) => JSON.parse(row.payload))).toEqual([
+			{
+				projectId,
+				query: "deploy",
+				hits: [
+					{
+						path: "wiki/deploy.md",
+						section: "Rolling updates",
+						line: 12,
+						page: null,
+						found: ["words", "meaning"],
+					},
+				],
+				via: "mcp",
+			},
+			{ projectId, path: "nope.md", found: false, via: "mcp" },
+		]);
 	});
 });

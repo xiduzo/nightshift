@@ -124,7 +124,9 @@ A span goes out when its step or run ends. Every span has
 `nightshift.project.id`, `nightshift.flow.id`, `nightshift.run.id` (also as
 `gen_ai.conversation.id`), and, on a step, `nightshift.step.id`,
 `nightshift.node.kind`, `nightshift.device.id`, `nightshift.agent` and
-`gen_ai.request.model`. All names are in
+`gen_ai.request.model`. An Agent step that searched or read the project's
+knowledge also has `nightshift.knowledge.searches` and
+`nightshift.knowledge.reads`. All names are in
 `packages/telemetry/src/conventions/names.ts`. That file follows the GenAI
 conventions of OpenTelemetry, which are still in development.
 

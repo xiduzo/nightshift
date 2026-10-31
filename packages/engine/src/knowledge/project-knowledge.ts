@@ -1,6 +1,7 @@
 import {
 	KNOWLEDGE_TOOLS_INSTRUCTION,
 	type KnowledgePort,
+	type KnowledgeUse,
 	knowledgeTools,
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
@@ -68,6 +69,16 @@ export type CommandKnowledge = {
 	done(): Promise<void>;
 };
 
+/**
+ * The agent of a session searched or read the project's knowledge, with
+ * its tools: the step logs it (`KnowledgeSearched`, `KnowledgeRead`).
+ */
+export type KnowledgeUseEvent = {
+	type: "knowledge";
+	projectId: string;
+	use: KnowledgeUse;
+};
+
 /** What an Agent session gets. */
 export type SessionKnowledge = CommandKnowledge & {
 	/** The session's input besides `env`: the folder, the line, the tools, the learnings. */
@@ -75,8 +86,13 @@ export type SessionKnowledge = CommandKnowledge & {
 		AgentSessionInput,
 		"addDirs" | "instructions" | "tools" | "toolsInstruction" | "stepReport"
 	>;
-	/** The session's events as they are, its learnings kept as proposals of the run. */
-	events(events: AsyncIterable<AgentEvent>): AsyncIterable<AgentEvent>;
+	/**
+	 * The session's events as they are, its learnings kept as proposals of
+	 * the run, and each use of the knowledge tools before the next event.
+	 */
+	events(
+		events: AsyncIterable<AgentEvent>,
+	): AsyncIterable<AgentEvent | KnowledgeUseEvent>;
 };
 
 export type ProjectKnowledgeDeps = Pick<
@@ -93,6 +109,18 @@ export type ProjectKnowledgeDeps = Pick<
 /** The line an agent gets next to its prompt. */
 function knowledgeLine(path: string): string {
 	return `Project knowledge is in ${path}. Read ${INDEX_FILE} there first, then grep the folder for what you need. Do not change the folder.`;
+}
+
+/** The session's events, each with the uses of the knowledge that came before it in front. */
+async function* withUses(
+	events: AsyncIterable<AgentEvent>,
+	uses: KnowledgeUseEvent[],
+): AsyncGenerator<AgentEvent | KnowledgeUseEvent> {
+	for await (const event of events) {
+		yield* uses.splice(0);
+		yield event;
+	}
+	yield* uses.splice(0);
 }
 
 /** A project's knowledge on this Device. */
@@ -120,15 +148,18 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 		return { hold, path, env: { [KNOWLEDGE_ENV]: path } };
 	}
 
-	/** The knowledge tools of a session in the run's project only. */
-	function tools(projectId: string) {
+	/** The knowledge tools of a session in the run's project only. `onUse` hears each search and read. */
+	function tools(
+		projectId: string,
+		onUse: (projectId: string, use: KnowledgeUse) => void,
+	) {
 		const port: KnowledgePort = {
 			searchKnowledge: (id, query, limit) =>
 				deps.search.search(id, query, { limit }),
 			readKnowledge: (id, path, maxBytes) => sync.read(id, path, maxBytes),
 		};
 		return {
-			tools: knowledgeTools(port, { project: { id: projectId } }),
+			tools: knowledgeTools(port, { project: { id: projectId } }, { onUse }),
 			toolsInstruction: KNOWLEDGE_TOOLS_INSTRUCTION,
 		};
 	}
@@ -192,24 +223,32 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 				);
 			});
 			const { runId, stepId } = step;
+			// The tools answer while the harness waits: their uses go out before its next event.
+			const uses: KnowledgeUseEvent[] = [];
+			const onUse = (id: string, use: KnowledgeUse) => {
+				uses.push({ type: "knowledge", projectId: id, use });
+			};
 			return {
 				env,
 				input: {
 					addDirs: [path],
 					instructions: knowledgeLine(path),
-					...tools(projectId),
+					...tools(projectId, onUse),
 					// An agent of a run that reads the knowledge may propose to add to it.
 					...(runId !== undefined && step.stepReport
 						? { stepReport: withLearnings(step.stepReport) }
 						: {}),
 				},
 				events: (events) =>
-					runId === undefined
-						? events
-						: keepLearnings(events, path, {
-								runId,
-								...(stepId !== undefined ? { stepId } : {}),
-							}),
+					withUses(
+						runId === undefined
+							? events
+							: keepLearnings(events, path, {
+									runId,
+									...(stepId !== undefined ? { stepId } : {}),
+								}),
+						uses,
+					),
 				done: hold.done,
 			};
 		},

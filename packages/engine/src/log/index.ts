@@ -12,11 +12,13 @@ export {
 export type {
 	EngineEventType,
 	EnginePayloads,
+	EventInput,
 	EventWrites,
 	GateChoice,
 	GateDeadline,
 	InputValues,
 	ItemFacts,
+	KnowledgeVia,
 	LoggedEvent,
 	PolicyWaitReason,
 	ResumeAction,

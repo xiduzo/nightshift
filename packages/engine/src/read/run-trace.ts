@@ -66,6 +66,8 @@ export type TraceStepEnd = {
 	gateWaits: TraceGateWait[];
 	/** When the step slept in this part, and what for. */
 	sleeps: TraceSleep[];
+	/** How often its agents searched and read the project's knowledge in this part. */
+	knowledge: { searches: number; reads: number };
 };
 
 /** A harness session of an Agent step. */
@@ -164,6 +166,18 @@ function traceSession(session: DerivedSession): TraceSession {
 	};
 }
 
+/** How often the step's agents used the knowledge between two seqs. */
+function knowledgeIn(step: DerivedStep, from: number, to: number) {
+	let searches = 0;
+	let reads = 0;
+	for (const use of step.knowledge) {
+		if (use.seq < from || use.seq > to) continue;
+		if (use.type === "KnowledgeSearched") searches++;
+		else reads++;
+	}
+	return { searches, reads };
+}
+
 /** Each opening of the step that ended, with its end and what began in it. */
 function stepEnds(step: DerivedStep): TraceStepEnd[] {
 	const ends: TraceStepEnd[] = [];
@@ -189,6 +203,7 @@ function stepEnds(step: DerivedStep): TraceStepEnd[] {
 			sleeps: step.sleeps
 				.filter((w) => w.opening === index)
 				.map(({ from, to, reason }) => ({ from, to: to ?? end.at, reason })),
+			knowledge: knowledgeIn(step, opening.seq, end.seq),
 		});
 	});
 	return ends;

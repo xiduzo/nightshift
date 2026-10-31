@@ -503,6 +503,11 @@ async function runSession(
 	const onEvent = async (agentEvent: SessionEvent): Promise<void> => {
 		if (agentEvent.type === "ready" || agentEvent.type === "refused") return;
 		step.touch();
+		// A search or a read of the knowledge goes to the log, not the transcript.
+		if (agentEvent.type === "knowledge") {
+			await step.usedKnowledge(sessionId, agentEvent);
+			return;
+		}
 		// The spend so far is not part of the transcript.
 		if (agentEvent.type === "usage") {
 			spendSoFar(agentEvent.usage);

@@ -105,6 +105,69 @@ describe("the Agent node", () => {
 		expect(blind?.env?.NS_KNOWLEDGE).toBeUndefined();
 	});
 
+	test("the agent's searches and reads of the knowledge go to the log on its step, not to the transcript", async () => {
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
+		await mkdir(join(folder("project-1"), "wiki"), { recursive: true });
+		await writeFile(
+			join(folder("project-1"), "wiki", "deploy.md"),
+			"# Deploy\n\nWe deploy at night.\n",
+		);
+		const harness = fakeHarness({
+			steps: [
+				{ type: "tool", name: "search_knowledge", input: { query: "deploy" } },
+				{
+					type: "tool",
+					name: "read_knowledge",
+					input: { path: "wiki/deploy.md" },
+				},
+				{ type: "report", outcome: "pass", summary: "Done." },
+			],
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "reader", nodes: [agent("reader")], edges: [] }),
+			{ harness, knowledge },
+		);
+		await drive(h, { inputs: {} });
+		const logged = await h.events();
+		const uses = logged.filter((e) => e.type.startsWith("Knowledge"));
+		const [started] = logged.filter((e) => e.type === "SessionStarted");
+		const ids = [started?.stepId ?? null, started?.sessionId ?? null];
+		expect(uses.map((e) => [e.type, e.stepId, e.sessionId])).toEqual([
+			["KnowledgeSearched", ...ids],
+			["KnowledgeRead", ...ids],
+		]);
+		expect(payloads(logged, "KnowledgeSearched")).toEqual([
+			{
+				projectId: "project-1",
+				query: "deploy",
+				hits: [
+					{
+						path: "wiki/deploy.md",
+						section: "Deploy",
+						line: 1,
+						page: null,
+						found: ["words"],
+					},
+				],
+				via: "step",
+			},
+		]);
+		expect(payloads(logged, "KnowledgeRead")).toEqual([
+			{
+				projectId: "project-1",
+				path: "wiki/deploy.md",
+				found: true,
+				via: "step",
+			},
+		]);
+		const [step] = deriveSteps(foldRun(logged));
+		expect(step?.knowledge).toHaveLength(2);
+		const lines = await readTranscriptFile(step?.transcriptPath ?? "");
+		expect(JSON.stringify(lines)).not.toContain('"knowledge"');
+	});
+
 	test("the spend so far goes to the log, not to the transcript", async () => {
 		const usage = (outputTokens: number) => ({
 			type: "usage" as const,

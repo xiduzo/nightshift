@@ -150,6 +150,67 @@ describe("a step's knowledge", () => {
 			text: "# Home\n\nThe wiki.\n",
 		});
 	});
+
+	test("the agent's searches and reads go out before the session's next event, with what they found", async () => {
+		const a = await device(memoryHost());
+		await a.put("wiki/deploy.md", "# Deploy\n\nWe deploy at night.\n");
+		const session = await a.knowledge.forSession(
+			{ projectId: "p1" },
+			{ runId: "run-1" },
+		);
+		const tool = (name: string) =>
+			session.input.tools?.find((t) => t.name === name);
+		async function* harness(): AsyncGenerator<AgentEvent> {
+			await tool("search_knowledge")?.execute?.({ query: "deploy" });
+			await tool("read_knowledge")?.execute?.({ path: "wiki/deploy.md" });
+			await tool("read_knowledge")?.execute?.({ path: "wiki/gone.md" });
+			yield { type: "tool-result", toolCallId: "t1", content: "found" };
+			yield { type: "finished" };
+		}
+		const seen: string[] = [];
+		const uses: unknown[] = [];
+		for await (const event of session.events(harness())) {
+			seen.push(event.type);
+			if (event.type === "knowledge") uses.push(event);
+		}
+		await session.done();
+		expect(seen).toEqual([
+			"knowledge",
+			"knowledge",
+			"knowledge",
+			"tool-result",
+			"finished",
+		]);
+		expect(uses).toEqual([
+			{
+				type: "knowledge",
+				projectId: "p1",
+				use: {
+					kind: "search",
+					query: "deploy",
+					hits: [
+						{
+							path: "wiki/deploy.md",
+							section: "Deploy",
+							line: 1,
+							page: null,
+							found: ["words"],
+						},
+					],
+				},
+			},
+			{
+				type: "knowledge",
+				projectId: "p1",
+				use: { kind: "read", path: "wiki/deploy.md", found: true },
+			},
+			{
+				type: "knowledge",
+				projectId: "p1",
+				use: { kind: "read", path: "wiki/gone.md", found: false },
+			},
+		]);
+	});
 });
 
 describe("a Host of an older version", () => {

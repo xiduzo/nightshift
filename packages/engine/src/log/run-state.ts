@@ -187,6 +187,8 @@ export type DerivedStep = {
 	gateWaits: readonly GateWait[];
 	/** Call steps with `each` only: its items in the order they started or were blocked. */
 	items: readonly DerivedItem[];
+	/** What the step's agents searched and read in the project's knowledge, oldest first. */
+	knowledge: readonly KnowledgeUseFact[];
 	/** Call steps (once) only: the call, once its inputs were bound. */
 	call: EnginePayloads["FlowCalled"] | null;
 	/**
@@ -199,6 +201,11 @@ export type DerivedStep = {
 	 */
 	clock: { timeoutMs: number | null; idleMs: number | null; since: number };
 };
+
+/** A search or a read of the project's knowledge by an agent of a step, as the log tells it. */
+export type KnowledgeUseFact =
+	| ({ type: "KnowledgeSearched" } & Logged<"KnowledgeSearched">)
+	| ({ type: "KnowledgeRead" } & Logged<"KnowledgeRead">);
 
 /** One value a variable took in a run, from the log. */
 export type VariableChange = {
@@ -655,6 +662,18 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 	}
 	const current = step.openings.at(-1);
 	switch (e.type) {
+		case "KnowledgeSearched":
+			step = {
+				...step,
+				knowledge: [...step.knowledge, { type: e.type, ...logged(e) }],
+			};
+			break;
+		case "KnowledgeRead":
+			step = {
+				...step,
+				knowledge: [...step.knowledge, { type: e.type, ...logged(e) }],
+			};
+			break;
 		case "Scored": {
 			const by = answeredBy(e.payload);
 			const wait = step.gateWaits.at(-1);
@@ -915,6 +934,7 @@ function startStep(
 			sleeps: known?.sleeps ?? [],
 			gateWaits: known?.gateWaits ?? [],
 			items: [],
+			knowledge: known?.knowledge ?? [],
 			call: null,
 			clock: clockOf(e.payload, Math.max(known?.clock.since ?? e.at, e.at)),
 		}),
