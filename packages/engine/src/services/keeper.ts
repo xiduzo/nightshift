@@ -369,17 +369,18 @@ export function createServiceKeeper(deps: {
  * Ends the process group `NS_SERVICE_PID` on its Device: SIGTERM, then
  * SIGKILL. Only when the process with that id started at
  * `NS_SERVICE_STARTED` (`ps -o lstart=`): after a reboot the id may be
- * another process's. With no start time known it does nothing.
+ * another process's. With no start time known it does nothing. No `--`
+ * before the group: dash, the `sh` of Debian and Ubuntu, refuses it.
  */
 const KILL_GROUP = [
 	'p="$NS_SERVICE_PID"',
 	'[ -n "$NS_SERVICE_STARTED" ] || exit 0',
 	'now="$(ps -o lstart= -p "$p" 2>/dev/null | sed -e "s/^ *//" -e "s/ *$//")"',
 	'[ "$now" = "$NS_SERVICE_STARTED" ] || exit 0',
-	'kill -TERM -- "-$p" 2>/dev/null || exit 0',
+	'kill -TERM "-$p" 2>/dev/null || exit 0',
 	"i=0",
-	'while kill -0 -- "-$p" 2>/dev/null && [ "$i" -lt 20 ]; do sleep 0.25; i=$((i + 1)); done',
-	'kill -KILL -- "-$p" 2>/dev/null',
+	'while kill -0 "-$p" 2>/dev/null && [ "$i" -lt 20 ]; do sleep 0.25; i=$((i + 1)); done',
+	'kill -KILL "-$p" 2>/dev/null',
 	"exit 0",
 ].join("\n");
 
