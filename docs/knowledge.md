@@ -192,6 +192,10 @@ Kits do the common syncs. Call one from a Subflow node:
 
 `kit:knowledge/review-learnings` is not a sync. See Learnings below.
 
+When you add a project, the readiness check names curl or jq when this
+computer does not have them, with the command that installs them. Runs
+start without them: only the sources that need them fail.
+
 Each kit writes into its own folder in the knowledge (`folder`, for
 example `wiki`) and reports how many files it has. `files`, `folder` and
 `github-wiki` replace the old content of their folder.

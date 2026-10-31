@@ -126,6 +126,8 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 		enabled: repoPath !== "",
 	});
 	const ready = readiness.data?.ready === true;
+	// The tools of some knowledge sources: the project can be added without them.
+	const missesTools = readiness.data?.toolsInstall != null;
 
 	const folderName = folderPath.split("/").at(-1) || folderPath;
 	// The folder of a copy is in lower case: the repository keeps its own name.
@@ -275,7 +277,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						) : null}
 					</>
 				)}
-				{repoPath && readiness.data && !ready ? (
+				{repoPath && readiness.data && (!ready || missesTools) ? (
 					<ProjectReadiness
 						readiness={readiness.data}
 						checking={readiness.isFetching}

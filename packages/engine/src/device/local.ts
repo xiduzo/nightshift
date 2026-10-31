@@ -487,8 +487,12 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
 			const readiness = await checkProjectFolder(repoPath, { git });
+			// A missing name for git or program of a knowledge source does not stop a run.
 			const notReady = readiness.steps.find(
-				(step) => step.status === "failed" && step.id !== "identity",
+				(step) =>
+					step.status === "failed" &&
+					step.id !== "identity" &&
+					step.id !== "tools",
 			);
 			if (notReady) {
 				throw new Refusal(

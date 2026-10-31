@@ -24,6 +24,18 @@ describe("KNOWLEDGE_SOURCE_KINDS", () => {
 		}
 	});
 
+	test("every kind names the programs its kit's commands run, of those the readiness check knows", () => {
+		for (const kind of KNOWLEDGE_SOURCE_KINDS) {
+			const commands = (kitFlow(kind.kit)?.nodes ?? [])
+				.flatMap((node) => (node.type === "command" ? [node.command] : []))
+				.join("\n");
+			const runs = ["curl", "jq"].filter((program) =>
+				new RegExp(`(^|[\\s|(])${program}\\s`, "m").test(commands),
+			);
+			expect([...kind.programs].sort()).toEqual(runs);
+		}
+	});
+
 	test("a person fills in every input of the kit but its folder", () => {
 		const fields = knowledgeSourceFields("kit:knowledge/web").map(
 			(input) => input.name,

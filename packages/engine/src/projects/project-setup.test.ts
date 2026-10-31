@@ -13,13 +13,17 @@ import { mustGit } from "../testing/test-support";
 import { GIT_DOWNLOAD_URL, systemGit, systemGitInstaller } from "./git";
 import {
 	checkProjectFolder,
+	checkTools,
 	type ProjectReadiness,
 	STARTER_GITIGNORE,
 	setUpGit,
 } from "./project-setup";
 
+/** The steps a run needs: the tools step has tests of its own. */
 const statuses = (readiness: ProjectReadiness) =>
-	readiness.steps.map((step) => `${step.id}:${step.status}:${step.fix}`);
+	readiness.steps
+		.filter((step) => step.id !== "tools")
+		.map((step) => `${step.id}:${step.status}:${step.fix}`);
 
 // Keep the person's own git config out: no global identity unless a test sets one.
 const savedEnv = {
@@ -132,6 +136,7 @@ describe("checkProjectFolder", () => {
 			"git",
 			"folder",
 			"commit",
+			"tools",
 		]);
 	});
 });
@@ -251,5 +256,71 @@ describe("systemGitInstaller", () => {
 				run,
 			}).install(),
 		).toEqual({ kind: "manual", url: GIT_DOWNLOAD_URL });
+	});
+});
+
+describe("the programs of the knowledge sources", () => {
+	const which =
+		(...found: string[]) =>
+		(name: string) =>
+			found.includes(name) ? `/usr/bin/${name}` : null;
+
+	test("a missing one is named with the sources that need it and the command that installs it", () => {
+		expect(
+			checkTools({ which: which("curl", "brew"), platform: "darwin" }),
+		).toEqual({
+			step: {
+				id: "tools",
+				status: "failed",
+				problem:
+					"jq is not on this computer. Jira and Confluence sources need it.",
+				fix: "install-tools",
+			},
+			install: { kind: "command", command: "brew install jq" },
+		});
+		expect(
+			checkTools({ which: which("apk"), platform: "linux" }),
+		).toMatchObject({
+			step: {
+				problem:
+					"curl and jq are not on this computer. Web pages, Jira and Confluence sources need them.",
+			},
+			install: { kind: "command", command: "sudo apk add curl jq" },
+		});
+		// No package manager: the download page.
+		expect(
+			checkTools({ which: which("curl"), platform: "linux" }).install,
+		).toEqual({
+			kind: "manual",
+			url: "https://jqlang.org/download/",
+		});
+	});
+
+	test("none missing: the step is ok", () => {
+		expect(
+			checkTools({ which: which("curl", "jq"), platform: "linux" }),
+		).toEqual({
+			step: { id: "tools", status: "ok", problem: null, fix: null },
+			install: null,
+		});
+	});
+
+	test("never makes a folder not ready, and set-up still runs", async () => {
+		await withGlobalIdentity();
+		await mustGit(folder, ["init", "-q", "-b", "main"]);
+		await writeFile(join(folder, "a.txt"), "a\n");
+		await mustGit(folder, ["add", "a.txt"]);
+		await mustGit(folder, ["commit", "-q", "-m", "a"]);
+		const tools = { which: () => null, platform: "linux" as const };
+		const readiness = await checkProjectFolder(folder, { tools });
+		expect(readiness.ready).toBe(true);
+		expect(readiness.steps.at(-1)).toMatchObject({
+			id: "tools",
+			status: "failed",
+		});
+		expect(readiness.toolsInstall).toEqual({
+			kind: "manual",
+			url: "https://curl.se/download.html",
+		});
 	});
 });

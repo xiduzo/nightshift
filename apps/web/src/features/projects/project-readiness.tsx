@@ -47,6 +47,7 @@ const STEP_TITLE: Record<Step["id"], string> = {
 	folder: "Project folder",
 	commit: "First commit",
 	identity: "Your name and email for git",
+	tools: "Tools for knowledge sources",
 };
 
 const STEP_OK: Record<Step["id"], string> = {
@@ -54,6 +55,7 @@ const STEP_OK: Record<Step["id"], string> = {
 	folder: "The folder uses git.",
 	commit: "The project has a commit.",
 	identity: "Git knows your name and email.",
+	tools: "The tools are installed.",
 };
 
 /**
@@ -98,12 +100,21 @@ export function ProjectReadiness({
 
 	// One set-up button does all of its steps: show it on the first one.
 	const setUpStep = readiness.steps.find((step) => step.fix === "set-up-git");
-	const visible = readiness.steps.filter((step) => step.status !== "skipped");
+	// The tools step shows only when a tool is missing: runs start without it.
+	const visible = readiness.steps.filter(
+		(step) =>
+			step.status !== "skipped" &&
+			(step.id !== "tools" || step.status === "failed"),
+	);
 
 	return (
 		<div className="flex flex-col gap-3">
 			<div className="flex items-center justify-between gap-2">
-				<p className="font-medium text-sm">Before runs can start</p>
+				<p className="font-medium text-sm">
+					{readiness.ready
+						? "Before you add some knowledge sources"
+						: "Before runs can start"}
+				</p>
 				<Button
 					type="button"
 					variant="ghost"
@@ -174,6 +185,37 @@ export function ProjectReadiness({
 				))}
 			</ItemGroup>
 
+			{readiness.toolsInstall?.kind === "command" ? (
+				<Alert>
+					<AlertTitle>Install the tools from a terminal</AlertTitle>
+					<AlertDescription>
+						Run this command, then choose Check again. You can add the project
+						first.
+						<code className="mt-1 block rounded bg-muted px-2 py-1 font-mono text-foreground">
+							{readiness.toolsInstall.command}
+						</code>
+					</AlertDescription>
+				</Alert>
+			) : null}
+			{readiness.toolsInstall?.kind === "manual" ? (
+				<Alert>
+					<AlertTitle>Download the tools</AlertTitle>
+					<AlertDescription>
+						<span>
+							Install them from{" "}
+							<a
+								className="underline underline-offset-4"
+								href={readiness.toolsInstall.url}
+								target="_blank"
+								rel="noreferrer"
+							>
+								their website
+							</a>
+							, then choose Check again. You can add the project first.
+						</span>
+					</AlertDescription>
+				</Alert>
+			) : null}
 			{install?.kind === "command" ? (
 				<Alert>
 					<AlertTitle>Install git from a terminal</AlertTitle>

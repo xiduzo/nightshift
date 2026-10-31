@@ -39,6 +39,12 @@ export type KnowledgeSourceKind = {
 	lines: readonly string[];
 	/** It reads a folder of one computer: its runs belong on that Device. */
 	local: boolean;
+	/**
+	 * The programs its commands run besides a POSIX shell and git, which
+	 * the project readiness check names when they are missing. A CLI tool
+	 * the person picks (`acli`) has its own check.
+	 */
+	programs: readonly string[];
 };
 
 /** Every kind of source, in the order the page offers them. */
@@ -50,6 +56,7 @@ export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] = [
 		main: "path",
 		lines: ["patterns"],
 		local: true,
+		programs: [],
 	},
 	{
 		kit: "kit:knowledge/files",
@@ -58,6 +65,7 @@ export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] = [
 		main: "from",
 		lines: ["from"],
 		local: false,
+		programs: [],
 	},
 	{
 		kit: "kit:knowledge/web",
@@ -66,6 +74,7 @@ export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] = [
 		main: "urls",
 		lines: ["urls"],
 		local: false,
+		programs: ["curl"],
 	},
 	{
 		kit: "kit:knowledge/github-wiki",
@@ -74,6 +83,7 @@ export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] = [
 		main: "repo",
 		lines: [],
 		local: false,
+		programs: [],
 	},
 	{
 		kit: "kit:knowledge/jira",
@@ -82,6 +92,7 @@ export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] = [
 		main: "keys",
 		lines: ["keys"],
 		local: false,
+		programs: ["jq"],
 	},
 	{
 		kit: "kit:knowledge/confluence",
@@ -90,6 +101,7 @@ export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] = [
 		main: "pages",
 		lines: ["pages"],
 		local: false,
+		programs: ["curl", "jq"],
 	},
 ];
 

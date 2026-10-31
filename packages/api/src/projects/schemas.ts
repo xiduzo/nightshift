@@ -72,12 +72,26 @@ export const projectReadinessSchema = exact<ProjectReadiness>()(
 		needsIdentity: z.boolean(),
 		steps: z.array(
 			z.object({
-				id: z.enum(["git", "folder", "commit", "identity"]),
+				id: z.enum(["git", "folder", "commit", "identity", "tools"]),
 				status: z.enum(["ok", "failed", "skipped"]),
 				problem: z.string().nullable(),
-				fix: z.enum(["install-git", "use-top-folder", "set-up-git"]).nullable(),
+				fix: z
+					.enum([
+						"install-git",
+						"use-top-folder",
+						"set-up-git",
+						"install-tools",
+					])
+					.nullable(),
 			}),
 		),
+		/** How to install the programs of the knowledge sources that are missing. */
+		toolsInstall: z
+			.union([
+				z.object({ kind: z.literal("command"), command: z.string() }),
+				z.object({ kind: z.literal("manual"), url: z.string() }),
+			])
+			.nullable(),
 	}),
 );
 
