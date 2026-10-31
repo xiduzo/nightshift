@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+	mkdir,
+	readdir,
+	readFile,
+	rm,
+	stat,
+	writeFile,
+} from "node:fs/promises";
 import { dirname, join } from "node:path";
+import type { AgentEvent } from "@nightshift/agents/types";
 import { project } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
@@ -143,6 +151,75 @@ describe("a step's knowledge", () => {
 	});
 });
 
+/** An agent's events: one report with these learnings. */
+async function* reporting(learnings: string[]): AsyncGenerator<AgentEvent> {
+	yield { type: "report", outcome: "pass", summary: "Done.", learnings };
+}
+
+/** Brings two Devices' knowledge documents in step, as their Links to the Host do. */
+async function exchange(
+	a: Awaited<ReturnType<typeof device>>,
+	b: Awaited<ReturnType<typeof device>>,
+) {
+	const [docA, docB] = [
+		(await a.documents.open("p1")).doc,
+		(await b.documents.open("p1")).doc,
+	];
+	applyUpdate(docB, encodeStateAsUpdate(docA));
+	applyUpdate(docA, encodeStateAsUpdate(docB));
+}
+
+describe("the learnings of a run", () => {
+	test("from two Agent steps on two Devices at once are both kept", async () => {
+		const host = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.knowledge.listing("p1");
+		await exchange(a, b);
+
+		// One run, two branches: a step on each Device, at the same time.
+		const step = (stepId: string) => ({
+			runId: "run-1",
+			stepId,
+			stepReport: true as const,
+		});
+		const onA = await a.knowledge.forSession({ projectId: "p1" }, step("s1"));
+		const onB = await b.knowledge.forSession({ projectId: "p1" }, step("s2"));
+		for await (const _ of onA.events(reporting(["Use bun."]))) {
+		}
+		for await (const _ of onB.events(
+			reporting(["The API is in packages/api."]),
+		)) {
+		}
+		await Promise.all([onA.done(), onB.done()]);
+		await exchange(a, b);
+
+		for (const knowledge of [a, b]) {
+			const listing = await knowledge.knowledge.listing("p1");
+			expect(listing.proposed).toBe(2);
+		}
+		const [learned] = await Promise.all([
+			readProposals(a.dir),
+			readProposals(b.dir),
+		]);
+		expect(learned).toEqual(["- The API is in packages/api.", "- Use bun."]);
+		expect(await readProposals(b.dir)).toEqual(learned);
+	});
+});
+
+/** The notes of every proposal in a knowledge folder, sorted. */
+async function readProposals(dir: string): Promise<string[]> {
+	const folder = join(dir, "learnings", "proposed");
+	const names = await readdir(folder).catch(() => [] as string[]);
+	const notes: string[] = [];
+	for (const name of names) {
+		const text = await readFile(join(folder, name), "utf8");
+		notes.push(...text.split("\n").filter((line) => line.startsWith("- ")));
+	}
+	return notes.sort();
+}
+
 describe("a project that moves to another Space", () => {
 	test("to a new id there takes its knowledge along: the document, the folder, the content and the search index", async () => {
 		const host = memoryHost();
@@ -172,10 +249,9 @@ describe("a project that moves to another Space", () => {
 			"notes.md",
 			"wiki/Home.md",
 		]);
-		expect([...knowledgeEntries(await a.documents.open("p9")).keys()]).toEqual([
-			"notes.md",
-			"wiki/Home.md",
-		]);
+		expect(
+			[...knowledgeEntries(await a.documents.open("p9")).keys()].sort(),
+		).toEqual(["notes.md", "wiki/Home.md"]);
 		// The old document is gone: an empty one opens in its place.
 		expect(knowledgeEntries(await a.documents.open("p1")).size).toBe(0);
 		// The content went to the Team's Host.

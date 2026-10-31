@@ -194,8 +194,9 @@ Its report instructions say so in one sentence. The field is optional, so
 an agent with nothing to say reports as before.
 
 The computer that ran the step keeps them in
-`learnings/proposed/<run id>.md`. Its reconcile after the step puts them
-in the Space. They wait for you there. The index does not list them, and
+`learnings/proposed/<run id>.<step id>.md`. Each step has its own file, so
+two steps of one run on two computers keep both. Its reconcile after the
+step puts them in the Space. They wait for you there. The index does not list them, and
 no agent reads them.
 
 The `review-learnings` starter flow calls `kit:knowledge/review-learnings`.

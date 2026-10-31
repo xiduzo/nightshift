@@ -164,6 +164,8 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 			request: KnowledgeRequest,
 			step: {
 				runId?: string;
+				/** The step of the run: its proposals have a file of their own. */
+				stepId?: string;
 				stepReport?: AgentSessionInput["stepReport"];
 			} = {},
 		): Promise<SessionKnowledge> {
@@ -189,7 +191,7 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 					error,
 				);
 			});
-			const { runId } = step;
+			const { runId, stepId } = step;
 			return {
 				env,
 				input: {
@@ -202,7 +204,12 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 						: {}),
 				},
 				events: (events) =>
-					runId === undefined ? events : keepLearnings(events, path, runId),
+					runId === undefined
+						? events
+						: keepLearnings(events, path, {
+								runId,
+								...(stepId !== undefined ? { stepId } : {}),
+							}),
 				done: hold.done,
 			};
 		},

@@ -509,7 +509,7 @@ describe("the project's knowledge", () => {
 		expect(first?.stepReport).toEqual({ learnings: true });
 		expect(off?.stepReport).toBe(true);
 		const proposed = await Bun.file(
-			join(folder("p1"), "learnings/proposed/run-1.md"),
+			join(folder("p1"), "learnings/proposed/run-1.s1.md"),
 		).text();
 		expect(proposed).toStartWith("# Learnings of run run-1\n");
 		expect(

@@ -477,7 +477,10 @@ describe("reconcile", () => {
 		const b = await device(host);
 		await a.put("wiki/Home.md", "# Home\n");
 		await a.put("logo.png", new Uint8Array([137, 80, 78, 71, 0, 1, 2]));
-		await proposeLearnings(a.dir, "run-1", ["Use bun.", "Tests are slow."]);
+		await proposeLearnings(a.dir, { runId: "run-1" }, [
+			"Use bun.",
+			"Tests are slow.",
+		]);
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
 
@@ -549,7 +552,7 @@ describe("read", () => {
 		const { a, b, both } = await twoDevices();
 		await writeFile(join(a.sandbox.root, "outside.md"), "secret");
 		await a.put(".hidden.md", "hidden");
-		await proposeLearnings(a.dir, "run-1", ["Use bun."]);
+		await proposeLearnings(a.dir, { runId: "run-1" }, ["Use bun."]);
 		await mkdir(a.dir, { recursive: true });
 		await symlink(join(a.sandbox.root, "outside.md"), join(a.dir, "link.md"));
 		await both();

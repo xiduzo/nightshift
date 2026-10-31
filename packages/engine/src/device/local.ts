@@ -314,7 +314,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			known =
 				knowledge && deps.knowledge
 					? await deps.knowledge.forSession(knowledge, {
-							...(artifacts ? { runId: artifacts.runId } : {}),
+							...(artifacts
+								? { runId: artifacts.runId, stepId: artifacts.stepId }
+								: {}),
 							...(rest.stepReport ? { stepReport: rest.stepReport } : {}),
 						})
 					: null;
