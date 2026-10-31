@@ -60,6 +60,7 @@ export const PERSON_FIELDS = {
 	ItemBlocked: [],
 	ItemEnded: [],
 	WaitStarted: [],
+	LeaseTaken: [],
 	WaitEnded: [],
 	StopRequested: [],
 	StopAfterStepRequested: [],

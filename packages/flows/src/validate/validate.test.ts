@@ -8,6 +8,7 @@ import type {
 	CallNode,
 	CommandNode,
 	DecisionNode,
+	LeaseNode,
 	ValueNode,
 	WaitNode,
 } from "../nodes";
@@ -2888,5 +2889,69 @@ describe("validateFlow: variables", () => {
 				),
 			),
 		).toEqual([]);
+	});
+});
+
+describe("the Lease node", () => {
+	const lease = (extra: Partial<LeaseNode> = {}): LeaseNode => ({
+		id: "own",
+		type: "lease",
+		position: { x: 0, y: 0 },
+		name: "branch:{{branch}}",
+		...extra,
+	});
+	const stop = (id: string): FlowNode => ({
+		id,
+		type: "end",
+		position: { x: 0, y: 0 },
+		status: "nothing-to-do",
+	});
+
+	test("given a name with known references and a busy edge, then the flow has no issues", () => {
+		const issues = validateFlow({
+			...flow(
+				[lease(), command("work"), stop("skip")],
+				[edge("a", "own", "held", "work"), edge("b", "own", "busy", "skip")],
+				"own",
+			),
+			inputs: [{ name: "branch", type: "text", required: true }],
+		});
+		expect(issues).toEqual([]);
+	});
+
+	test("given a name that reads an unknown node, then it is an error on the node", () => {
+		const issues = validateFlow(
+			flow([lease({ name: "branch:{{ghost.head}}" })], [], "own"),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([["own", expect.stringContaining("{{ghost.head}}")]]);
+	});
+
+	test("given a timeout, then it warns that waitMinutes says how long it waits", () => {
+		const issues = validateFlow(
+			flow([lease({ name: "stack", timeoutMinutes: 5 })], [], "own"),
+		);
+		expect(warnings(issues).map((issue) => issue.message)).toContain(
+			'Lease node "own" does not use its timeout. Set how long it waits with waitMinutes.',
+		);
+	});
+
+	test("its outcomes are held and busy, and busy names the holder", () => {
+		expect(nodeOutcomes(lease())).toEqual(["held", "busy"]);
+		expect(outputFieldsByType.lease).toEqual([
+			"outcome",
+			"name",
+			"holder",
+			"holder_title",
+			"waited_minutes",
+			"visit",
+		]);
+	});
+
+	test("a negative wait does not parse", () => {
+		expect(() =>
+			flowSchema.parse(flow([lease({ waitMinutes: -1 })], [], "own")),
+		).toThrow();
 	});
 });

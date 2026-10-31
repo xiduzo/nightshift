@@ -173,6 +173,15 @@ export function transcriptLines(
 					text: event.message ? `Ended. ${event.message}` : "Ended.",
 				});
 				break;
+			case "lease":
+				push({
+					key: `lease:${seq}`,
+					kind: "night-shift",
+					text: event.held
+						? `Took the lease ${event.name}.`
+						: `${event.holderTitle ?? "Another run"} holds the lease ${event.name}.`,
+				});
+				break;
 			default:
 				break;
 		}

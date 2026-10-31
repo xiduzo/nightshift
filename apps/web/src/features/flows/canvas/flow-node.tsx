@@ -589,4 +589,5 @@ export const nodeTypes: NodeTypes = {
 	tool: FlowNodeCard,
 	end: FlowNodeCard,
 	join: FlowNodeCard,
+	lease: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

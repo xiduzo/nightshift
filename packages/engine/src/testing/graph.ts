@@ -16,7 +16,11 @@ import { eq } from "drizzle-orm";
 import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
-import { createRecorders, type StepContext } from "../graph/context";
+import {
+	createRecorders,
+	type LeaseTaker,
+	type StepContext,
+} from "../graph/context";
 import { resolvePolicy } from "../graph/policy";
 import { createRunner, type Runner, type RunnerDeps } from "../graph/runner";
 import {
@@ -174,6 +178,8 @@ export type StartOptions = {
 	flowName?: string;
 	/** The projects' knowledge folders on the Device; default none. */
 	knowledge?: TestDeviceDeps["knowledge"];
+	/** Takes the leases of Lease nodes; default: none can be taken. */
+	leases?: LeaseTaker;
 };
 
 let runs = 0;
@@ -246,6 +252,7 @@ export async function startRun(
 		calledFlowsOf: () => flows,
 		// The flow's own numbers, else the built-in settings: as the engine does.
 		policyFor: (f) => resolvePolicy(f.policy, defaultRunSettings().policy),
+		...(options.leases ? { leases: options.leases } : {}),
 	};
 	const thread = openThread(row, deps);
 	const { ctx, saver } = thread;

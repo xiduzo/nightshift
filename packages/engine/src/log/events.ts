@@ -106,7 +106,17 @@ export type WaitReason =
 	| PolicyWaitReason
 	| WaitUntil["kind"]
 	/** The step's Device is offline: it starts when the Device is back. */
-	| "device-offline";
+	| "device-offline"
+	/** A Lease node waits for a lease another run holds, or for the Host that keeps it. */
+	| "lease";
+
+/** The lease a Lease node waits for (`WaitStarted.lease`). */
+export type LeaseWait = {
+	name: string;
+	/** The run that holds it. Null while the Host that keeps it cannot be reached. */
+	holder: string | null;
+	holderTitle: string | null;
+};
 
 /** Who resumed a run: a person, or the daemon after a restart. */
 export type ResumedBy = "person" | "daemon";
@@ -461,6 +471,20 @@ export type EnginePayloads = {
 		deviceId?: string;
 		/** `device-offline`: the name of the Device it waits for, for a notification. */
 		deviceName?: string;
+		/** `lease`: the lease it waits for, and the run that holds it (null: the Host cannot be reached). */
+		lease?: LeaseWait;
+	};
+	/**
+	 * A Lease node's step took the lease `name` of the run's Space (ADR 7).
+	 * The run holds it until it ends. Logged on the step, in the scope of
+	 * the flow the node is in.
+	 */
+	LeaseTaken: {
+		name: string;
+		nodeId: string;
+		ttlMinutes: number;
+		/** The scope of the flow the node is in. Null at the top level. */
+		scope: Scope | null;
 	};
 	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
 	WaitEnded: { early: boolean; signal?: string };

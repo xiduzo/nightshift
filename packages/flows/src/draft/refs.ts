@@ -267,6 +267,8 @@ export function rewriteOwnTemplates(
 			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
 		case "join":
 			return node;
+		case "lease":
+			return { ...node, name: rewrite(node.name) };
 	}
 }
 

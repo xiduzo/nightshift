@@ -12,7 +12,7 @@ import type { RunBus, RunEnding, RunLog, RunRow } from "../log";
 import type { RunResult } from "../run-status";
 import { createRaces } from "./branches";
 import { compileFlow } from "./compile";
-import type { createRecorders, StepContext } from "./context";
+import type { createRecorders, LeaseTaker, StepContext } from "./context";
 import { createFence, type Fence, FencedSaver, fencedLog } from "./fence";
 import { kindOf } from "./node-kinds";
 import type {
@@ -71,6 +71,15 @@ export type ThreadDeps = {
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
 	/** The flow's own policy numbers, else the daemon's settings. */
 	policyFor(flow: Flow): ResolvedPolicy;
+	/** Takes the leases of Lease nodes (`StepContext.leases`). Default: none can be taken. */
+	leases?: LeaseTaker;
+};
+
+/** A thread without leases: a Lease step fails with this. */
+const NO_LEASES: LeaseTaker = {
+	take: async () => {
+		throw new Error("This computer keeps no leases.");
+	},
 };
 
 /** One interrupt the thread sits at, with the id a resume answers it by. */
@@ -184,6 +193,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		settings: deps.settings,
 		kindOf,
 		races: createRaces(),
+		leases: deps.leases ?? NO_LEASES,
 	};
 	const saver = new FencedSaver(deps.db, fence);
 	const graph = compileFlow(flow, ctx).compile({ checkpointer: saver });

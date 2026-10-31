@@ -103,8 +103,9 @@ describe("flowAuthoringGuide", () => {
 		// kits (one line each), the Agent's knowledge, $NS_KNOWLEDGE and
 		// the review of learnings. 3450: the folder kit (one line) and the
 		// number, boolean and choice inputs. 3600: the outcomes, rules and
-		// `any` of a Wait (ADR 8), and the watch-pr kit (one line).
-		expect(words).toBeLessThan(3600);
+		// `any` of a Wait (ADR 8), and the watch-pr kit (one line). 3700:
+		// the Lease node (ADR 7).
+		expect(words).toBeLessThan(3700);
 	});
 });
 

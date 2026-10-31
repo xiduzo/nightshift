@@ -3,6 +3,7 @@ import type { FlowNode, JsonValue, WaitUntil } from "@nightshift/flows";
 
 import type {
 	DerivedStep,
+	LeaseWait,
 	PolicyWaitReason,
 	RunBus,
 	RunLog,
@@ -77,9 +78,9 @@ export type WaitRequest = {
 	harnessSessionId: string | null;
 };
 
-/** A Wait node's own wait, as the node worked it out. */
+/** A Wait node's own wait, as the node worked it out, or a Lease node's wait for its lease. */
 export type OwnWait = {
-	reason: WaitUntil["kind"];
+	reason: WaitUntil["kind"] | "lease";
 	/** When the step wakes; null for a wait with no time (a signal with no timeout). */
 	until: number | null;
 	/** The node's time budget, from its first wait on; the wake is cut to it so the timeout fires as a wake. */
@@ -91,6 +92,8 @@ export type OwnWait = {
 	signalKey?: string;
 	/** A wait on a signal whose outcomes have rules: the rules, in order (`signalRules`). */
 	signalRules?: { outcome: string; when: string }[];
+	/** A Lease node's wait: the lease and its holder (`WaitStarted.lease`). */
+	lease?: LeaseWait;
 };
 
 /** The step's Device (or the one its work must move from) is offline. */
@@ -253,6 +256,10 @@ export async function sleep(
 		request.kind === "own" && request.signalKey !== undefined
 			? { signalKey: request.signalKey }
 			: {};
+	const lease =
+		request.kind === "own" && request.lease !== undefined
+			? { lease: request.lease }
+			: {};
 	const signalRules =
 		request.kind === "own" &&
 		request.signalRules !== undefined &&
@@ -280,6 +287,7 @@ export async function sleep(
 			...signalKey,
 			...signalRules,
 			...deviceId,
+			...lease,
 		},
 	});
 	step.record(null, {

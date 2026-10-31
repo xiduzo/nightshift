@@ -8,6 +8,7 @@ import type {
 	FlowNode,
 	FlowNodeType,
 	JoinNode,
+	LeaseNode,
 	Outcome,
 	ToolNode,
 	ValueNode,
@@ -65,6 +66,8 @@ const end = (status: EndNode["status"] = "done") =>
 	node<EndNode>({ type: "end", status });
 const join = (fields: Record<string, unknown> = {}) =>
 	node<JoinNode>({ type: "join", wait: "all", ...fields });
+const lease = (fields: Record<string, unknown> = {}) =>
+	node<LeaseNode>({ type: "lease", name: "stack", ...fields });
 
 const ALL_TYPES: FlowNodeType[] = [
 	"agent",
@@ -76,6 +79,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"call",
 	"end",
 	"join",
+	"lease",
 ];
 
 describe("NODE_KINDS", () => {
@@ -97,6 +101,7 @@ describe("NODE_KINDS", () => {
 			call(),
 			end(),
 			join(),
+			lease(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -122,6 +127,7 @@ describe("make and resumeRules", () => {
 			[callEach(), RESUME_RULES.callEach],
 			[end(), RESUME_RULES.fresh],
 			[join(), RESUME_RULES.fresh],
+			[lease(), RESUME_RULES.wait],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -136,7 +142,8 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 			.aux(n)
 			.map((a) => a.kind);
 
-	test("an Agent, a model Decision, a model Value and a Wait have a wait node", () => {
+	test("an Agent, a model Decision, a model Value, a Wait and a Lease have a wait node", () => {
+		expect(auxKinds(lease())).toEqual(["wait"]);
 		expect(auxKinds(agent())).toEqual(["wait"]);
 		expect(auxKinds(decision("model"))).toEqual(["wait"]);
 		expect(auxKinds(value("model"))).toEqual(["wait"]);
@@ -228,6 +235,12 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 		expect(chosen(w, "done")).toBe(true);
 		expect(reason(w, "done")).toBeNull();
 		expect(chosen(w, "timeout")).toBe(false);
+	});
+
+	test("a Lease that is held ends the flow plainly; busy is a failure", () => {
+		expect(chosen(lease(), "held")).toBe(true);
+		expect(reason(lease(), "held")).toBeNull();
+		expect(chosen(lease(), "busy")).toBe(false);
 	});
 
 	test("a Join that is done ends the flow plainly", () => {
@@ -333,7 +346,11 @@ describe("timeBudget: the step's timers", () => {
 		});
 	});
 
-	test("a Gate and a Wait node have no step timer; the other kinds have their own", () => {
+	test("a Gate, a Wait and a Lease node have no step timer; the other kinds have their own", () => {
+		expect(budget(lease({ timeoutMinutes: 10, waitMinutes: 5 }))).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: undefined,
+		});
 		expect(budget(decision("person", { timeoutMinutes: 10 }))).toEqual({
 			timeoutMinutes: undefined,
 			idleMinutes: undefined,
@@ -431,6 +448,7 @@ describe("cutShortOutputs: what a cut ends an open step with", () => {
 			"value",
 			"wait",
 			"end",
+			"lease",
 		] as const) {
 			for (const outcome of OUTCOMES) {
 				expect(

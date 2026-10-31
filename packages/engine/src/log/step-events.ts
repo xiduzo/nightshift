@@ -47,6 +47,18 @@ export type EndEvent = {
 	message: string | null;
 };
 
+/**
+ * What a Lease step writes to its transcript: it took the lease, or
+ * another run holds it (`holder`, its id, and `holderTitle`).
+ */
+export type LeaseEvent = {
+	type: "lease";
+	name: string;
+	held: boolean;
+	holder?: string;
+	holderTitle?: string;
+};
+
 /** What a Call step with `each` writes to its transcript. */
 export type ForEachEvent =
 	| { type: "items-read"; count: number; open: number }
@@ -80,7 +92,8 @@ export type WaitEvent =
 				| "command"
 				| "signal"
 				| "any"
-				| "device-offline";
+				| "device-offline"
+				| "lease";
 			until: number | null;
 			message: string;
 			signal?: string;
@@ -185,6 +198,7 @@ export type StepEvent =
 	| ValueEvent
 	| ToolEvent
 	| EndEvent
+	| LeaseEvent
 	| WorktreeEvent;
 
 /**
