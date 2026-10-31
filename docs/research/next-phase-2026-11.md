@@ -318,7 +318,9 @@ not fit (see "Not in this sprint").
   `search_knowledge` and `read_knowledge` through the engine's tool bridge,
   with no Connection to set up.
 - **PDF and Word** files are knowledge: the index extracts their text,
-  `read_knowledge` returns it, `INDEX.md` lists them.
+  `read_knowledge` returns it, `INDEX.md` lists them. LangChain's
+  `PDFLoader` and `DocxLoader` read them into `Document`s. `PDFLoader`
+  gets the PDF.js of `unpdf`, so the loader also works in the binary.
 - **A written spike** on vectors: `docs/research/knowledge-vectors.md`, with
   recall numbers for keyword, vector and hybrid search on this repo's docs.
 

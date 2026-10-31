@@ -203,10 +203,12 @@ has two tools (where its harness takes them), and so does `nightshift mcp`:
 - `read_knowledge` (`path`): one file, at most its first 100 KB. For a PDF
   or Word file, its text.
 
-`unpdf` reads the text of a PDF and `mammoth` the text of a Word file. Both
-are plain JavaScript, so they work in the `nightshift` binary too. A PDF of
-scanned pages has no text to find. `INDEX.md` lists a PDF or Word file
-with the first line of its text as the title, and its first sentence.
+LangChain's document loaders read the text: `PDFLoader` for a PDF and
+`DocxLoader` (on `mammoth`) for a Word file. Night Shift gives `PDFLoader`
+the PDF.js of `unpdf`, so both work in the `nightshift` binary too. A PDF
+of scanned pages has no text to find. `INDEX.md` lists a PDF or Word file
+with the title the PDF gives, else the first line of its text, and its
+first sentence.
 
 Every word must match. When no file has them all, the search returns files
 with some of them. A word in the title counts most, then one in the path,
