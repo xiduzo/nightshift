@@ -3,6 +3,7 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
@@ -35,10 +36,14 @@ import { knowledgeQueries } from "./queries";
 /** How long the words rest before the search runs, in ms. */
 const TYPING_PAUSE = 250;
 
+/** How often the page asks again while search by meaning gets ready, in ms. */
+const PREPARING_POLL = 5000;
+
 /**
  * A search field over the project's knowledge: the files that best match
- * the words, each with its title, path and the words found. A file opens
- * in a sheet beside the list.
+ * the words, or their meaning, each with its title, path, the heading of
+ * the part found and the words found. A file opens in a sheet beside the
+ * list. One quiet line says whether search finds by meaning.
  */
 export function KnowledgeSearch({ projectId }: { projectId: string }) {
 	const [text, setText] = useState("");
@@ -85,6 +90,7 @@ export function KnowledgeSearch({ projectId }: { projectId: string }) {
 					</InputGroupAddon>
 				) : null}
 			</InputGroup>
+			<MeaningLine projectId={projectId} />
 			{query === "" ? null : hits.error ? (
 				<Alert variant="destructive">
 					<CircleAlertIcon />
@@ -108,9 +114,16 @@ export function KnowledgeSearch({ projectId }: { projectId: string }) {
 					{hits.data.map((hit) => (
 						<Item key={hit.path} variant="outline">
 							<ItemContent>
-								<ItemTitle>{hit.title}</ItemTitle>
-								<p className="break-all font-mono text-muted-foreground text-xs">
-									{hit.path}
+								<ItemTitle>
+									{hit.title}
+									{hit.found.length === 1 && hit.found[0] === "meaning" ? (
+										<Badge variant="secondary">By meaning</Badge>
+									) : null}
+								</ItemTitle>
+								<p className="break-all text-muted-foreground text-xs">
+									<span className="font-mono">{hit.path}</span>
+									{hit.section ? ` · ${hit.section}` : ""}
+									{hit.page ? ` · page ${hit.page}` : ""}
 								</p>
 								<ItemDescription>
 									{hit.snippet.map((part, index) =>
@@ -146,5 +159,42 @@ export function KnowledgeSearch({ projectId }: { projectId: string }) {
 				onClose={() => setOpen(null)}
 			/>
 		</div>
+	);
+}
+
+/** What the page says about search by meaning on this computer. Nothing when it is off. */
+function MeaningLine({ projectId }: { projectId: string }) {
+	const meaning = useQuery({
+		...knowledgeQueries.meaning(projectId),
+		refetchInterval: (query) =>
+			query.state.data?.state === "preparing" ? PREPARING_POLL : false,
+	});
+	const status = meaning.data;
+	if (!status || status.state === "off") return null;
+	const pull = <code className="font-mono">ollama pull {status.model}</code>;
+	return (
+		<p className="text-muted-foreground text-sm">
+			{status.state === "on" ? (
+				"Search finds files by their words and by their meaning."
+			) : status.state === "preparing" ? (
+				<>
+					Search by meaning gets ready:{" "}
+					{status.total > 0
+						? Math.floor((status.done / status.total) * 100)
+						: 0}
+					% done.
+				</>
+			) : status.state === "no-model" ? (
+				<>
+					Search finds words only. To find files by their meaning too, run{" "}
+					{pull}.
+				</>
+			) : (
+				<>
+					Search finds words only. To find files by their meaning too, install
+					Ollama, then run {pull}.
+				</>
+			)}
+		</p>
 	);
 }

@@ -11,6 +11,9 @@ export const knowledgeQueries = {
 		orpc.knowledge.search.queryOptions({
 			input: { projectId, query, limit: 20 },
 		}),
+	/** Whether search finds by meaning on this computer. */
+	meaning: (projectId: string) =>
+		orpc.knowledge.meaning.queryOptions({ input: { projectId } }),
 	/** One file, by its path in the knowledge. */
 	read: (projectId: string, path: string) =>
 		orpc.knowledge.read.queryOptions({ input: { projectId, path } }),
