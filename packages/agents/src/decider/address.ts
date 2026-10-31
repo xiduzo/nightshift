@@ -80,8 +80,7 @@ export async function addressModels(at: AddressAccess): Promise<string[]> {
 			typeof model.name === "string" ? [model.name] : [],
 		);
 	}
-	throw new AddressError(
-		"other",
+	throw new Error(
 		`${at.root} did not list its models. Check that the address is the server's.`,
 	);
 }
