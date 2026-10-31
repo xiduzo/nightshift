@@ -217,7 +217,7 @@ function RunBody({
 
 			{notice ? <RunNotice notice={notice} /> : null}
 
-			{/* Room for Ask why, beside the reason the run ended. */}
+			<AskWhyCard runId={run.id} status={status} />
 
 			{allows.stop || allows.resume || allows.restart || allows.rerun ? (
 				<Card className="gap-4 py-4">
@@ -232,8 +232,6 @@ function RunBody({
 					<FollowOnLockScreen runId={run.id} ended={ended} />
 				</Card>
 			) : null}
-
-			<AskWhyCard runId={run.id} status={status} />
 
 			{talking.map((step) => {
 				const message = live.entries.messages.get(step.id);
