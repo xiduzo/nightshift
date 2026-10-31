@@ -2454,7 +2454,7 @@ describe("validateFlow: wait nodes", () => {
 		);
 	});
 
-	test("outcomes need a command, a name of their own and no rule", () => {
+	test("outcomes need a command or a signal, a name of their own, and no rule on a command", () => {
 		const issues = validateFlow(
 			flow(
 				[
@@ -2484,7 +2484,7 @@ describe("validateFlow: wait nodes", () => {
 		).toEqual([
 			[
 				"later",
-				'Wait node "later" lists outcomes, but only a command can pick one. Remove the outcomes, or wait for a command.',
+				'Wait node "later" lists outcomes, but only a command or a signal can pick one. Remove the outcomes, or wait for a command or a signal.',
 			],
 			[
 				"ci",
@@ -2496,6 +2496,44 @@ describe("validateFlow: wait nodes", () => {
 			],
 			["ci", 'Wait node "ci" has the outcome "green" more than once.'],
 		]);
+	});
+
+	test("a signal picks an outcome by rule: each rule must parse and read only event, and an outcome without one is a warning", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					wait(
+						"ci",
+						{ kind: "signal", name: "ci-done" },
+						{
+							outcomes: [
+								{ name: "green", when: 'event.body.conclusion = "success"' },
+								{ name: "red", when: "event.body.conclusion = " },
+								{ name: "late", when: "build.data.late" },
+								{ name: "closed" },
+							],
+						},
+					),
+				],
+				[],
+				"ci",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			[
+				"ci",
+				expect.stringContaining('The rule of "red" of "ci" is not valid:'),
+			],
+			[
+				"ci",
+				'The rule of "late" of "ci" reads "build", but it can only read the signal as event: event.body.action = "completed".',
+			],
+		]);
+		expect(warnings(issues).map((issue) => issue.message)).toContain(
+			'Wait node "ci" has no rule for "closed": a signal never ends the wait there. Give it a rule.',
+		);
 	});
 });
 

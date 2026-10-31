@@ -127,6 +127,7 @@ export {
 	checkWaitNode,
 	commandWaitOutcome,
 	isOwnWaitOutcome,
+	signalRules,
 	type WaitNode,
 	type WaitUntil,
 	waitNodeSchema,

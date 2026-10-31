@@ -438,6 +438,109 @@ describe("the Wait node", () => {
 		});
 	});
 
+	test("a signal with rules: the rules go into the log, a signal that matches none keeps it waiting, the first that holds ends it there", async () => {
+		const time = clock();
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "ci",
+				nodes: [
+					wait(
+						"ci",
+						{ kind: "signal", name: "ci-done" },
+						{
+							outcomes: [
+								{
+									name: "green",
+									when: 'event.body.conclusion = "success"',
+								},
+								{ name: "red", when: 'event.body.conclusion = "failure"' },
+							],
+						},
+					),
+					command("fix", "echo fix"),
+				],
+				edges: [{ id: "e1", from: "ci", outcome: "red", to: "fix" }],
+			}),
+		);
+		h.ctx.now = time.now;
+		await drive(h, { inputs: {} });
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
+		const rules = [
+			{ outcome: "green", when: 'event.body.conclusion = "success"' },
+			{ outcome: "red", when: 'event.body.conclusion = "failure"' },
+		];
+		expect(payloads(await h.events(), "WaitStarted")[0]).toMatchObject({
+			signal: "ci-done",
+			signalRules: rules,
+		});
+		expect(deriveSleep(foldRun(await h.events()))?.signalRules).toEqual(rules);
+
+		const signal = async (conclusion: string) => {
+			time.advance(2);
+			await h.log.append({
+				type: "WaitEnded",
+				runId: h.runId,
+				stepId,
+				payload: { early: true, signal: "ci-done" },
+			});
+			return drive(
+				h,
+				new Command({
+					resume: {
+						kind: "signal",
+						name: "ci-done",
+						data: { body: { conclusion }, headers: {} },
+					},
+				}),
+				h.graph(),
+			);
+		};
+		const neutral = await signal("neutral");
+		expect(neutral.parked[0]).toMatchObject({ kind: "wait", stepId });
+
+		const failed = await signal("failure");
+		expect(failed.parked).toEqual([]);
+		expect(failed.state.nodes.ci).toEqual({
+			outcome: "red",
+			waited_minutes: 4,
+			data: { body: { conclusion: "failure" }, headers: {} },
+			visit: 1,
+		});
+		expect(failed.state.ended?.nodeId).toBe("fix");
+	});
+
+	test("a signal with rules: a person's signal brings no event and ends it done", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "ci",
+				nodes: [
+					wait(
+						"ci",
+						{ kind: "signal", name: "ci-done" },
+						{ outcomes: [{ name: "green", when: "event.body.ok" }] },
+					),
+				],
+				edges: [],
+			}),
+		);
+		await drive(h, { inputs: {} });
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: true, signal: "ci-done" },
+		});
+		const signalled = await drive(
+			h,
+			new Command({ resume: { kind: "signal", name: "ci-done" } }),
+			h.graph(),
+		);
+		expect(signalled.state.nodes.ci).toMatchObject({ outcome: "done" });
+	});
+
 	test("timeoutMinutes bounds every kind: the wake time is cut to the deadline, and the wake ends the step timeout", async () => {
 		const time = clock();
 		const h = await startRun(

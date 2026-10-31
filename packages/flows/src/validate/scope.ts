@@ -43,6 +43,32 @@ export function checkRule(
 }
 
 /**
+ * A rule over a signal's data must be valid and read only `event`, the
+ * name the data has (`event.body.check_suite.conclusion = "success"`), as
+ * in the rules of a webhook schedule.
+ */
+export function checkEventRule(
+	expr: string,
+	subject: string,
+	at: At,
+	error: Report,
+): void {
+	const problem = ruleProblem(expr);
+	if (problem !== null) {
+		error(`${subject} is not valid: ${problem}`, at);
+		return;
+	}
+	for (const name of ruleNames(expr)) {
+		if (name !== "event") {
+			error(
+				`${subject} reads "${name}", but it can only read the signal as event: event.body.action = "completed".`,
+				at,
+			);
+		}
+	}
+}
+
+/**
  * The names a rule reads: `run`, `vars`, an input or a node at the top,
  * and a variable the flow has below `vars`.
  */

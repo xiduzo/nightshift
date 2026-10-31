@@ -231,6 +231,11 @@ export type NodeCheck = {
 	 * names. `subject` starts each message: `The expression of "pick"`.
 	 */
 	rule: (expr: string, subject: string) => void;
+	/**
+	 * Checks that a rule over a signal's data (`event.body.action`) is valid
+	 * and reads only `event`. `subject` starts each message.
+	 */
+	eventRule: (expr: string, subject: string) => void;
 	/** Whether an edge leaves the node on this outcome. */
 	routed: (outcome: string) => boolean;
 };

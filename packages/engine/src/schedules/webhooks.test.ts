@@ -85,6 +85,23 @@ const waitFlow: Flow = {
 	edges: [],
 };
 
+/** Waits for `ci-done` with the key `pr`, and ends green or red by the event. */
+const ruledFlow: Flow = {
+	...waitFlow,
+	nodes: [
+		{
+			id: "ci",
+			type: "wait",
+			position: { x: 0, y: 0 },
+			until: { kind: "signal", name: "ci-done", key: "{{pr}}" },
+			outcomes: [
+				{ name: "green", when: 'event.body.conclusion = "success"' },
+				{ name: "red", when: 'event.body.conclusion = "failure"' },
+			],
+		},
+	],
+};
+
 function hook(extra: Partial<Schedule> = {}): Schedule {
 	return {
 		id: "review",
@@ -103,7 +120,7 @@ async function setup(schedules: Schedule[]) {
 	await seedFlows(
 		space,
 		projectId,
-		{ echo: echoFlow, wait: waitFlow },
+		{ echo: echoFlow, wait: waitFlow, ruled: ruledFlow },
 		schedules,
 	);
 }
@@ -362,5 +379,47 @@ describe("a webhook schedule", () => {
 			runId: null,
 			woke: 1,
 		});
+	});
+
+	test("a signal that matches no rule of the Wait does not wake it, one that matches ends it on that outcome", async () => {
+		await setup([
+			{
+				id: "ci",
+				inputs: {},
+				enabled: true,
+				webhook: { secret: HOOK_SECRET },
+				signal: { name: "ci-done", key: "event.body.number" },
+			},
+		]);
+		const run = await space.startRun({
+			projectId,
+			flowName: "ruled",
+			inputs: { pr: "7" },
+		});
+		await waitFor(
+			async () =>
+				(await space.getRun(run.id)).status === "sleeping" ? true : null,
+			{ label: "a sleeping run" },
+		);
+
+		const neutral = body({ number: 7, conclusion: "neutral" });
+		expect(await send(neutral, signed(neutral), { scheduleId: "ci" })).toEqual({
+			kind: "accepted",
+		});
+		expect((await logged())[0]?.payload).toMatchObject({ woke: 0 });
+		expect((await space.getRun(run.id)).status).toBe("sleeping");
+
+		const failed = body({ number: 7, conclusion: "failure" });
+		expect(await send(failed, signed(failed), { scheduleId: "ci" })).toEqual({
+			kind: "accepted",
+		});
+		const ended = await waitFor(
+			async () => {
+				const current = await space.getRun(run.id);
+				return current.status === "finished" ? current : null;
+			},
+			{ label: "the woken run" },
+		);
+		expect(ended.steps[0]?.outcome).toBe("red");
 	});
 });

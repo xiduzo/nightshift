@@ -4,6 +4,8 @@ import {
 	type JsonValue,
 	renderCommand,
 	renderTemplate,
+	signalOutcome,
+	signalRules,
 	type WaitNode,
 	type WaitUntil,
 } from "@nightshift/flows";
@@ -46,7 +48,10 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  *   the event of the webhook that sent it as `data`; else the step keeps
  *   waiting. A `key` is rendered when the wait starts and logged with it
  *   (`WaitStarted.signalKey`): the webhook signals match on it
- *   (`run/signals.ts`).
+ *   (`run/signals.ts`). With rules on its outcomes (`signalRules`, logged
+ *   as `WaitStarted.signalRules`), a webhook's signal ends the wait on the
+ *   first outcome whose rule holds, and one that matches none keeps it
+ *   waiting. A person's signal brings no event: it ends `done`.
  *
  * The pending wait's streak carries what the node needs across its sleeps:
  * `since` is when the wait began (the deadline and `waited_minutes` count
@@ -163,7 +168,7 @@ async function startWait(
 			});
 		}
 		case "signal":
-			return sleep(node, signalWait(until, step, deadline));
+			return sleep(node, signalWait(node, until, step, deadline));
 	}
 }
 
@@ -183,7 +188,7 @@ async function continueWait(
 	const since = pending.streak.since;
 	const deadline = deadlineOf(node, since, ctx.minuteMs);
 	const outputs = await waitedOutputs(ctx, node, step, pending);
-	const end = (outcome: "done" | "timeout"): BodyResult => ({
+	const end = (outcome: string): BodyResult => ({
 		kind: "end",
 		outcome,
 		outputs,
@@ -193,9 +198,20 @@ async function continueWait(
 	// A stop between the wake and the node's entry ends the step there.
 	if (step.signal.aborted) return { kind: "aborted", outputs };
 	if (until.kind === "signal" && pending.signal === until.name) {
-		// A webhook's signal brings its event: the step's data.
-		if (pending.signalData !== undefined) outputs.data = pending.signalData;
-		return end("done");
+		const data = pending.signalData;
+		// A person's signal brings no event, so no rule reads it.
+		if (data === undefined) return end("done");
+		const rules = signalRules(node);
+		const picked =
+			rules.length === 0 ? "done" : await signalOutcome(rules, data);
+		if (picked !== null) {
+			// A webhook's signal brings its event: the step's data.
+			outputs.data = data;
+			return end(picked);
+		}
+		if (deadline === null || now < deadline) {
+			return sleep(node, signalWait(node, until, step, deadline));
+		}
 	}
 	if (deadline !== null && now >= deadline) return end("timeout");
 	switch (until.kind) {
@@ -213,15 +229,17 @@ async function continueWait(
 		}
 		case "signal":
 			// A timer or a person woke it before the signal came: keep waiting.
-			return sleep(node, signalWait(until, step, deadline));
+			return sleep(node, signalWait(node, until, step, deadline));
 	}
 }
 
 /**
- * A wait on a signal: no wake time, the deadline, and the key rendered
- * now, so a webhook's signal is matched against the run's own values.
+ * A wait on a signal: no wake time, the deadline, the key rendered now, so
+ * a webhook's signal is matched against the run's own values, and the
+ * rules of its outcomes, so one that matches none does not wake the run.
  */
 function signalWait(
+	node: WaitNode,
 	until: Extract<WaitUntil, { kind: "signal" }>,
 	step: StepHandle,
 	deadline: number | null,
@@ -230,6 +248,7 @@ function signalWait(
 		until.key === undefined
 			? undefined
 			: renderTemplate(until.key, step.tctx).trim();
+	const rules = signalRules(node);
 	return {
 		until: null,
 		deadline,
@@ -239,6 +258,7 @@ function signalWait(
 				: `Waits for the signal "${until.name}" with the key "${key}".`,
 		signal: until.name,
 		...(key === undefined ? {} : { signalKey: key }),
+		...(rules.length === 0 ? {} : { signalRules: rules }),
 	};
 }
 

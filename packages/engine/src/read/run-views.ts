@@ -99,6 +99,8 @@ export type SleepFact = {
 	signal: string | null;
 	/** The key a webhook signal must have to wake it, else null: any does. */
 	signalKey: string | null;
+	/** The rules one of which a webhook signal must match to wake it; empty: any does. */
+	signalRules: { outcome: string; when: string }[];
 };
 
 /**
@@ -118,6 +120,7 @@ export function deriveSleep(run: RunState): SleepFact | null {
 		message: wait.payload.message,
 		signal: wait.payload.signal ?? null,
 		signalKey: wait.payload.signalKey ?? null,
+		signalRules: wait.payload.signalRules ?? [],
 	};
 }
 

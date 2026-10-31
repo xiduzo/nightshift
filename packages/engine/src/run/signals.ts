@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event, run } from "@nightshift/db/schema";
-import type { JsonValue } from "@nightshift/flows";
+import { type JsonValue, signalOutcome } from "@nightshift/flows";
 import { and, eq, sql } from "drizzle-orm";
 import type { Runner } from "../graph";
 import type { RunLog, RunState } from "../log";
@@ -11,8 +11,9 @@ import { RunRefusal } from "../run-status";
  * Signals from webhooks: a webhook schedule sends a signal to every run of
  * its project that waits for it, not to one run by its id (that is
  * `actions.ts`). A run wakes when it sleeps in a Wait on the signal's
- * name, and the Wait's key (rendered when the wait began) is absent or
- * equals the signal's. The webhook's event is the Wait's data.
+ * name, the Wait's key (rendered when the wait began) is absent or equals
+ * the signal's, and one of the Wait's rules holds for the event, when it
+ * has rules (ADR 8). The webhook's event is the Wait's data.
  *
  * Only the runs this computer walks wake: a run another Device walks
  * waits for a signal sent there, or by its id.
@@ -33,12 +34,27 @@ export type ProjectSignal = {
 	data: JsonValue;
 };
 
-/** Whether the sleep waits for this signal: the name, and its key when it has one. */
+/** Whether the sleep waits for a signal of this name, and its key when it has one. */
 function waitsFor(sleep: SleepFact | null, signal: ProjectSignal): boolean {
 	return (
 		sleep?.signal === signal.name &&
 		(sleep.signalKey === null || sleep.signalKey === signal.key)
 	);
+}
+
+/**
+ * Whether the sleep takes this signal: it waits for it (`waitsFor`), and
+ * one of its rules holds for the event when it has rules. The Wait node
+ * reads the rules again when it wakes, so a check before the wake may
+ * leave them out.
+ */
+async function takes(
+	sleep: SleepFact | null,
+	signal: ProjectSignal,
+): Promise<boolean> {
+	if (!sleep || !waitsFor(sleep, signal)) return false;
+	if (sleep.signalRules.length === 0) return true;
+	return (await signalOutcome(sleep.signalRules, signal.data)) !== null;
 }
 
 export function createSignals(deps: SignalsDeps) {
@@ -74,7 +90,9 @@ export function createSignals(deps: SignalsDeps) {
 		async send(projectId: string, signal: ProjectSignal): Promise<number> {
 			let woke = 0;
 			for (const runId of await candidates(projectId, signal.name)) {
-				if (!waitsFor(deriveSleep(await log.state(runId)), signal)) continue;
+				if (!(await takes(deriveSleep(await log.state(runId)), signal))) {
+					continue;
+				}
 				try {
 					await runner.take(
 						runId,

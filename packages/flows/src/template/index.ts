@@ -20,6 +20,7 @@ export {
 	ruleNames,
 	ruleProblem,
 	ruleVariableNames,
+	signalOutcome,
 } from "./rule";
 export {
 	renderCommand,
