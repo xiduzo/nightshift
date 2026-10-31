@@ -100,16 +100,16 @@ when it starts.
 
 ### Add your tools
 
-The image holds Night Shift, git and ssh. It has no agent CLIs and no other
-tools. You choose them: build your own image on it, with the CLIs your flows
-use. The image is [Wolfi](https://github.com/wolfi-dev), so add packages with
-`apk add`. For example:
+The image holds Night Shift, git, ssh, and the jq and curl that the built-in
+kits use. It has no agent CLIs and no other tools. You choose them: build
+your own image on it, with the CLIs your flows use. The image is
+[Wolfi](https://github.com/wolfi-dev), so add packages with `apk add`. For example:
 
 ```dockerfile
 FROM xiduzo/nightshift:latest
 USER root
 # A tool from the Wolfi packages.
-RUN apk add --no-cache jq
+RUN apk add --no-cache gh
 # A CLI from npm needs Node. npm runs only the install scripts you allow.
 RUN apk add --no-cache nodejs-22 npm \
   && npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code@2

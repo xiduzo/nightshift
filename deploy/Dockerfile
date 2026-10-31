@@ -14,8 +14,9 @@
 #
 # CI publishes the second stage as xiduzo/nightshift on Docker Hub and as
 # ghcr.io/xiduzo/nightshift (.github/workflows/docker.yml). It holds Night
-# Shift, git and ssh only: no agent CLIs, no tools. Build your own image on
-# it with the CLIs your flows use (docs/deploy/README.md, "Add your tools").
+# Shift, git, ssh, jq and curl: no agent CLIs, no vendor tools. Build your own
+# image on it with the CLIs your flows use (docs/deploy/README.md, "Add your
+# tools").
 
 # The web build runs Vite on Node: Vite's prerender does not run under Bun alone.
 FROM node:22-bookworm-slim AS build
@@ -34,10 +35,12 @@ RUN bun install --frozen-lockfile --ignore-scripts \
 # since its own image. The images built on this one add tools with `apk add`.
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 # git for the projects and their worktrees, ssh for git remotes over SSH.
+# jq and curl for the built-in kits: the GitHub and knowledge kits read JSON
+# with jq, the web and Confluence kits fetch with curl.
 # The `bun` user (uid 1000) stays, for the images built on this one. No file
 # keeps a setuid or setgid bit: no program lets `bun` become root.
 RUN apk upgrade --no-cache \
-	&& apk add --no-cache git openssh-client \
+	&& apk add --no-cache git openssh-client jq curl \
 	&& addgroup -g 1000 bun \
 	&& adduser -u 1000 -G bun -D -s /bin/sh bun \
 	&& find / -xdev -perm /6000 -type f -exec chmod a-s {} + \

@@ -13,8 +13,9 @@
 # and to Docker Hub when the repository variable DOCKERHUB_USERNAME and the
 # secret DOCKERHUB_TOKEN are set (docker.io/<DOCKERHUB_USERNAME>/nightshift).
 #
-# The image holds Night Shift, git and ssh, and nothing else: it is a base to
-# build on. Each platform builds on its own runner, not under emulation.
+# The image holds Night Shift, git, ssh, jq and curl, and nothing else: it is
+# a base to build on. Each platform builds on its own runner, not under
+# emulation.
 name: Docker image
 
 on:
