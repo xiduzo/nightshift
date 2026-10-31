@@ -85,6 +85,23 @@ export function isLoopbackHost(hostname: string): boolean {
 export const telemetryProtocolSchema = z.enum(["http/protobuf", "http/json"]);
 export type TelemetryProtocol = z.infer<typeof telemetryProtocolSchema>;
 
+/** A header name, as HTTP allows it. */
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+/**
+ * The headers of the OTLP export, name → value. A value that must stay
+ * secret (an API key) is a `${NAME}` reference to a secret, as in an MCP
+ * connection: `Bearer ${GRAFANA_TOKEN}`. Plain values are fine for the rest.
+ */
+const telemetryHeadersSchema = z
+	.record(
+		z.string().regex(HEADER_NAME, "Use a header name such as Authorization."),
+		z.string().trim().min(1, "A header needs a value.").max(4000),
+	)
+	.refine((headers) => Object.keys(headers).length <= 32, {
+		message: "Use at most 32 headers.",
+	});
+
 /** An `http://` or `https://` address. */
 function isHttpAddress(value: string): boolean {
 	try {
@@ -345,8 +362,7 @@ const DEFS = {
 	 * "Send runs to your monitoring": the runs this computer walks go out
 	 * as OpenTelemetry traces and metrics to `telemetryEndpoint`, and its
 	 * Claude Code sessions send their own there too. Off by default:
-	 * nothing leaves the computer until a person turns it on. The headers
-	 * (an API key) are kept with the secrets, never in this document.
+	 * nothing leaves the computer until a person turns it on.
 	 */
 	telemetry: {
 		schema: z.boolean(),
@@ -373,6 +389,15 @@ const DEFS = {
 		schema: telemetryProtocolSchema,
 		default: "http/protobuf",
 	} satisfies Def<TelemetryProtocol>,
+	/**
+	 * Sent with every request of the export. A secret value stays a
+	 * `${NAME}` reference here: its value is in the secrets, never in this
+	 * document.
+	 */
+	telemetryHeaders: {
+		schema: telemetryHeadersSchema,
+		default: {},
+	} satisfies Def<Record<string, string>>,
 };
 
 type Defs = typeof DEFS;
@@ -453,6 +478,8 @@ export type SettingsStore = {
 	save(patch: SettingsPatch): Promise<SettingsView>;
 	/** The engine's part of the settings. */
 	run(): RunSettings;
+	/** Calls `listener` after each change of the saved values, here or synced. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
 };
 
 const SCHEDULER_LOCK =
@@ -559,6 +586,11 @@ export function createSettingsStore(options: {
 				}
 			});
 			return view();
+		},
+		onChange(listener) {
+			const observer = () => listener();
+			document.settings.observe(observer);
+			return () => document.settings.unobserve(observer);
 		},
 		run() {
 			const s = current();

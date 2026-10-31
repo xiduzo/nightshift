@@ -26,6 +26,7 @@ function switchStore(): SettingsStore {
 		run: () => {
 			throw new Error("not used");
 		},
+		onChange: () => () => {},
 	};
 }
 

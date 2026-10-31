@@ -130,7 +130,12 @@ export type ConnectionStore = {
 	 * daemon's environment: a custom agent's env. `missing` names the
 	 * references with no value; then nothing is expanded.
 	 */
-	expandEnv(values: Record<string, string>): Promise<SecretEnv>;
+	expandEnv(values: Record<string, string>): Promise<ExpandedEnv>;
+	/**
+	 * Calls `listener` after a secret is saved or removed, here or synced.
+	 * Returns the unsubscribe.
+	 */
+	onSecretsChange(listener: () => void): () => void;
 	/**
 	 * Secrets by name, each as an environment variable of that name: the
 	 * keychain, then the daemon's environment. A Command node's `secrets`.
@@ -142,6 +147,11 @@ export type ConnectionStore = {
 /** Environment values read from the secrets, or the names that have no value. */
 export type SecretEnv =
 	| { ok: true; env: Record<string, string> }
+	| { ok: false; missing: string[] };
+
+/** Values with `${NAME}` expanded, and the values read for them, or the names that have none. */
+export type ExpandedEnv =
+	| { ok: true; env: Record<string, string>; values: string[] }
 	| { ok: false; missing: string[] };
 
 /** The `${NAME}` references of a server's env values and headers. */
@@ -426,6 +436,7 @@ export function createConnectionStore(options: {
 			recordUse(names);
 			return {
 				ok: true,
+				values: [...names].flatMap((name) => (vars[name] ? [vars[name]] : [])),
 				env: Object.fromEntries(
 					Object.entries(values).map(([key, value]) => [
 						key,
@@ -446,6 +457,13 @@ export function createConnectionStore(options: {
 			if (missing.length > 0) return { ok: false, missing };
 			recordUse(names);
 			return { ok: true, env };
+		},
+		onSecretsChange(listener) {
+			const observer = (event: { keysChanged: Set<string> }) => {
+				if (event.keysChanged.has("secrets")) listener();
+			};
+			document.facts.observe(observer);
+			return () => document.facts.unobserve(observer);
 		},
 		async secretValues() {
 			const names = new Set(secretView().keys());
