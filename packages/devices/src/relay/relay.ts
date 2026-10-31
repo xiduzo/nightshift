@@ -1,14 +1,10 @@
 import { type FlowDocuments, HostUnreachableError } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import type { HostRelay } from "../contract";
+import type { HostRelay, InStep } from "../contract";
 import type { RunCommands } from "../exchange";
 import { type DeviceLinks, fromHost, type HostSpaces } from "../links";
 import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
-
-/** How long a run start waits for the project's flows to reach the Host. */
-const FLOW_SYNC_MS = 10_000;
-const FLOW_SYNC_POLL_MS = 100;
 
 /**
  * The engine's `Relay`: the actions on rows another Device owns, carried
@@ -38,37 +34,22 @@ export function createRelay(deps: {
 	flows: Pick<FlowDocuments, "open">;
 	/** How long a run start waits for the project's flows to reach the Host. Default 10 s. */
 	flowSyncMs?: number;
-	/** Default `Date.now`. */
-	now?(): number;
 }): HostRelay {
-	const now = deps.now ?? Date.now;
 	const { route, onHost } = createSpaceRoutes({
 		hostOf: (spaceId) => deps.engine().hostSpaces.hostOf(spaceId),
 		links: deps.links,
 	});
 
-	/**
-	 * Waits until the Host has the project's flows as this computer has
-	 * them: the Host starts the run from its own copy, so a flow saved here
-	 * a moment ago must reach it first. Refuses when they do not arrive in
-	 * time.
-	 */
-	async function flowsOnHost(hostId: string, projectId: string) {
-		const link = deps.links().get(hostId);
-		if (!link) throw new HostUnreachableError();
-		const { current, history } = await deps.flows.open(projectId);
-		const synced = () => link.synced(current.name) && link.synced(history.name);
-		if (synced()) return;
-		link.check();
-		const end = now() + (deps.flowSyncMs ?? FLOW_SYNC_MS);
-		while (now() < end) {
-			await Bun.sleep(FLOW_SYNC_POLL_MS);
-			if (synced()) return;
-		}
-		throw new Refusal(
-			"unavailable",
-			"The flows of this project are not on the computer that keeps this Space yet. Start the run again in a moment.",
-		);
+	async function inStep(
+		spaceId: string,
+		names: readonly string[],
+		options?: { timeoutMs?: number; signal?: AbortSignal },
+	): Promise<InStep> {
+		const to = await route(spaceId);
+		if (to.at === "here") return "in step";
+		const link = to.at === "host" ? deps.links().get(to.hostId) : undefined;
+		if (!link) return "unreachable";
+		return (await link.inStep(names, options)) ? "in step" : "timed out";
 	}
 
 	return {
@@ -147,15 +128,7 @@ export function createRelay(deps: {
 				: null;
 		},
 
-		async inStep(spaceId, documentName) {
-			const to = await route(spaceId);
-			if (to.at === "here") return true;
-			const link = to.at === "host" ? deps.links().get(to.hostId) : undefined;
-			if (!link) return null;
-			if (link.synced(documentName)) return true;
-			link.check();
-			return false;
-		},
+		inStep,
 
 		async reachable(spaceId) {
 			return (await route(spaceId)).at === "host";
@@ -166,8 +139,25 @@ export function createRelay(deps: {
 			const { startedBy: _person, ...start } = input;
 			const to = await route(input.spaceId);
 			if (to.at !== "host") throw new HostUnreachableError();
-			// A run of a saved flow starts from the Host's copy of it; a quick run carries its flow.
-			if ("flowName" in input) await flowsOnHost(to.hostId, input.projectId);
+			// A run of a saved flow starts from the Host's copy of it, so a flow
+			// saved here a moment ago must reach it first. A quick run carries its flow.
+			if ("flowName" in input) {
+				const { current, history } = await deps.flows.open(input.projectId);
+				const flows = await inStep(
+					input.spaceId,
+					[current.name, history.name],
+					{
+						...(deps.flowSyncMs ? { timeoutMs: deps.flowSyncMs } : {}),
+					},
+				);
+				if (flows === "unreachable") throw new HostUnreachableError();
+				if (flows === "timed out") {
+					throw new Refusal(
+						"unavailable",
+						"The flows of this project are not on the computer that keeps this Space yet. Start the run again in a moment.",
+					);
+				}
+			}
 			return to.ask((client) => client.sync.startRun(start));
 		},
 

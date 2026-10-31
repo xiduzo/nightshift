@@ -83,16 +83,6 @@ export type KnowledgeHost = {
 	 * that Host cannot be reached.
 	 */
 	get(spaceId: string, sha256: string): Promise<Uint8Array | null>;
-	/**
-	 * Resolves when this Replica's copy of a document of the Space and the
-	 * Host's are in step, or after a while: `before` a reconcile waits
-	 * less than after one. At once for a Space this Replica keeps.
-	 */
-	settled(
-		spaceId: string,
-		documentName: string,
-		when: "before" | "after",
-	): Promise<void>;
 };
 
 /** What one reconcile did. */
@@ -133,12 +123,25 @@ export type KnowledgeSyncDeps = {
 	 * made after this. Null or without it: content stays on this Device.
 	 */
 	host?: () => KnowledgeHost | null;
+	/**
+	 * Waits until this Replica's copies of documents of a Space and its
+	 * Host's are in step, for `timeoutMs` at most. At once for a Space this
+	 * Replica keeps, and while its Host cannot be reached. Without it: no wait.
+	 */
+	inStep?(
+		spaceId: string,
+		names: readonly string[],
+		options: { timeoutMs: number },
+	): Promise<unknown>;
 	/** How long a page read waits for its reconcile. Default 2 s. */
 	pageWaitMs?: number;
 };
 
 /** The state of the last reconcile, in the folder. Hidden: no walk lists it. */
 const STATE_FILE = ".reconciled.json";
+/** How long a reconcile waits for the document to be in step with the Host: before it, and after a change. */
+const IN_STEP_BEFORE_MS = 3_000;
+const IN_STEP_AFTER_MS = 10_000;
 /** How many files a reconcile reads, writes or fetches at once. */
 const AT_ONCE = 8;
 
@@ -212,7 +215,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		const root = folders.folder(projectId);
 		const document = await deps.documents.open(projectId);
 		const host = deps.host?.() ?? null;
-		await host?.settled(spaceId, document.name, "before").catch(() => {});
+		// The Host's changes first, a short while: the step must not wait long.
+		await deps
+			.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_BEFORE_MS })
+			.catch(() => {});
 		await mkdir(root, { recursive: true });
 
 		const state = await readState(root);
@@ -426,7 +432,11 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		if (unpushed.size > 0) pending.add(projectId);
 		else pending.delete(projectId);
 		if (sets.length > 0 || deletes.length > 0) {
-			await host?.settled(spaceId, document.name, "after").catch(() => {});
+			// This Device's changes reach the Host before the step ends: the
+			// next step on another Device reads them.
+			await deps
+				.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_AFTER_MS })
+				.catch(() => {});
 		}
 		return result;
 	}

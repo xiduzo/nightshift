@@ -109,15 +109,20 @@ const FLOWS = {
 		}) as never,
 };
 
+/** What a fake Link answers to `inStep`, and the asks it took. */
+type InStepFake = {
+	answer(names: readonly string[]): Promise<boolean>;
+	asked: { names: readonly string[]; timeoutMs: number | undefined }[];
+};
+
 /**
  * Links by Host: a client is an online Link, null an offline one, no key
- * no Link. `synced` says which documents the Host has as this computer
- * has them (default: all); `checks` counts the asks for the Host now.
+ * no Link. `inStep` says whether the documents are in step with the Host
+ * (default: at once).
  */
 function fakeLinks(
 	clients: Record<string, HostClient | null>,
-	synced: (name: string) => boolean = () => true,
-	checks: { count: number } = { count: 0 },
+	inStep: InStepFake = { answer: async () => true, asked: [] },
 ): Pick<DeviceLinks, "get"> {
 	return {
 		get(hostId) {
@@ -139,10 +144,11 @@ function fakeLinks(
 					if (!client) throw new Error("offline");
 					return client;
 				},
-				check: () => {
-					checks.count++;
+				check: () => {},
+				inStep: (names, options) => {
+					inStep.asked.push({ names, timeoutMs: options?.timeoutMs });
+					return inStep.answer(names);
 				},
-				synced,
 				close: async () => {},
 			};
 		},
@@ -155,11 +161,7 @@ const hostSpaces = {
 
 function relayWith(
 	host = fakeHost(),
-	options: {
-		synced?: (name: string) => boolean;
-		checks?: { count: number };
-		flowSyncMs?: number;
-	} = {},
+	options: { inStep?: InStepFake; flowSyncMs?: number } = {},
 ) {
 	const enqueued: unknown[] = [];
 	const relay = createRelay({
@@ -183,11 +185,7 @@ function relayWith(
 						: null,
 		}),
 		links: () =>
-			fakeLinks(
-				{ "host-1": host.client, "host-3": null },
-				options.synced,
-				options.checks,
-			),
+			fakeLinks({ "host-1": host.client, "host-3": null }, options.inStep),
 		flows: FLOWS,
 		...(options.flowSyncMs !== undefined
 			? { flowSyncMs: options.flowSyncMs }
@@ -440,46 +438,60 @@ describe("the relay, for a Space a Host keeps", () => {
 		expect(enqueued).toEqual([]);
 	});
 
-	test("a run starts on the Host once the project's flows reached it", async () => {
-		let arrived = false;
-		const checks = { count: 0 };
-		const { relay, host } = relayWith(fakeHost(), {
-			synced: (name) =>
-				arrived ||
-				!["flows:project-1", "flow-history:project-1"].includes(name),
-			checks,
-		});
+	test("a run starts on the Host once the project's flows are in step with it", async () => {
+		let arrive = (_: boolean) => {};
+		const inStep: InStepFake = {
+			answer: () => new Promise((resolve) => (arrive = resolve)),
+			asked: [],
+		};
+		const { relay, host } = relayWith(fakeHost(), { inStep });
 		const started = relay.startRun(start("space-team") as never);
-		await Bun.sleep(150);
-		// A flow saved here a moment ago is still on its way: the Host is asked now.
+		await Bun.sleep(20);
+		// A flow saved here a moment ago is still on its way.
 		expect(host.taken).toEqual([]);
-		expect(checks.count).toBe(1);
-		arrived = true;
+		expect(inStep.asked).toEqual([
+			{
+				names: ["flows:project-1", "flow-history:project-1"],
+				timeoutMs: undefined,
+			},
+		]);
+		arrive(true);
 		expect(await started).toEqual({ runId: "run-on-host" });
 		expect(host.taken.map((t) => t.procedure)).toEqual(["sync.startRun"]);
 	});
 
-	test("a run start refuses in plain words when the flows do not reach the Host in time", async () => {
-		const { relay, host } = relayWith(fakeHost(), {
-			synced: (name) => name !== "flows:project-1",
-			flowSyncMs: 200,
-		});
+	test("a run start refuses in plain words when the flows are not in step in time", async () => {
+		const inStep: InStepFake = { answer: async () => false, asked: [] };
+		const { relay, host } = relayWith(fakeHost(), { inStep, flowSyncMs: 200 });
 		await expect(relay.startRun(start("space-team") as never)).rejects.toThrow(
 			"The flows of this project are not on the computer that keeps this Space yet. Start the run again in a moment.",
 		);
+		expect(inStep.asked.map((a) => a.timeoutMs)).toEqual([200]);
 		expect(host.taken).toEqual([]);
 	});
 
 	test("a quick run carries its flow: it starts on the Host at once", async () => {
-		const { relay, host } = relayWith(fakeHost(), {
-			synced: () => false,
-			flowSyncMs: 60_000,
-		});
+		const inStep: InStepFake = { answer: async () => false, asked: [] };
+		const { relay, host } = relayWith(fakeHost(), { inStep });
 		const { flowName: _name, ...quick } = start("space-team");
 		expect(
 			await relay.startRun({ ...quick, flow: { nodes: [] } } as never),
 		).toEqual({ runId: "run-on-host" });
+		expect(inStep.asked).toEqual([]);
 		expect(host.taken.map((t) => t.procedure)).toEqual(["sync.startRun"]);
+	});
+
+	test("documents are in step here at once, through the Link of a Space's Host, and not at all without one", async () => {
+		const inStep: InStepFake = { answer: async () => false, asked: [] };
+		const { relay } = relayWith(fakeHost(), { inStep });
+		expect(await relay.inStep("space-own", ["knowledge:p"])).toBe("in step");
+		expect(await relay.inStep("space-gone", ["knowledge:p"])).toBe(
+			"unreachable",
+		);
+		expect(
+			await relay.inStep("space-team", ["knowledge:p"], { timeoutMs: 5 }),
+		).toBe("timed out");
+		expect(inStep.asked).toEqual([{ names: ["knowledge:p"], timeoutMs: 5 }]);
 	});
 
 	test("a live transcript is the Host's", async () => {

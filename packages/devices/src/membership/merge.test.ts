@@ -118,7 +118,8 @@ function online(options: { push?: boolean; synced?: () => boolean } = {}) {
 					idleMs: 100,
 				}).attach(link);
 	const synced = options.synced ?? (() => true);
-	const merged: Link = { ...link, synced: () => synced() };
+	// The flow documents are in step with the Host when the test says so.
+	const merged: Link = { ...link, inStep: async () => synced() };
 	const period = {
 		link: merged,
 		async stop() {

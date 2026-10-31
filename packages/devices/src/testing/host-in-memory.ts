@@ -1,7 +1,11 @@
 import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, user } from "@nightshift/db/schema";
-import { createFlowDocuments, createKnowledgeStore } from "@nightshift/engine";
+import {
+	createFlowDocuments,
+	createKnowledgeStore,
+	type FlowDocuments,
+} from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -12,6 +16,7 @@ import {
 	type Sandbox,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
+import * as Y from "yjs";
 import type { HostClient, HostHello, WorkRelay } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
 import { createHost } from "../host";
@@ -32,6 +37,8 @@ export type HostReplica = {
 	memory: MemoryHost;
 	/** A's Space documents: its engine's. */
 	documents: SpaceDocuments;
+	/** A's flow documents: its engine's. */
+	flows: FlowDocuments;
 	/** A's id, as a Device names its Host. */
 	hostId: string;
 	/** A's owner: the Person of every Device that joins. */
@@ -77,6 +84,7 @@ export async function hostInMemory(
 		db: a.db,
 		directory: deviceDirectory(a.db),
 	});
+	const flows = createFlowDocuments({ db: a.db });
 	const host: PeerEngine = createPeerEngine(
 		withPeers({
 			db: a.db,
@@ -85,12 +93,13 @@ export async function hostInMemory(
 			dataDir: a.dataDir,
 			scheduler: false,
 			spaceDocuments: documents,
+			flowDocuments: flows,
 			...(options.hostWork ? { work: options.hostWork } : {}),
 			relay: createRelay({
 				engine: () => host,
 				registry: () => host.devices,
 				links: () => linksTo(new Map()),
-				flows: createFlowDocuments({ db: a.db }),
+				flows,
 			}),
 		}),
 		{ runLog: createRunLog(a.db, { walkerId: a.deviceId }) },
@@ -133,6 +142,7 @@ export async function hostInMemory(
 		hostExchange,
 		memory,
 		documents,
+		flows,
 		hostId,
 		personId,
 		hello: asHost.hello,
@@ -182,10 +192,65 @@ const noPairing = new Proxy({} as Auth, {
 });
 
 /**
+ * A Replica's documents and its Host's, by name, as a Link in memory
+ * compares them. Null: that side does not have it.
+ */
+export type DocumentPairs = {
+	here(name: string): Promise<Y.Doc | null>;
+	host(name: string): Promise<Y.Doc | null>;
+};
+
+/**
+ * Whether the Host's copy has every change of this Replica's: what the
+ * Hocuspocus provider of a real Link waits for. Nothing syncs in memory:
+ * a test that wants them in step copies the updates itself.
+ */
+async function hostHasAll(documents: DocumentPairs, name: string) {
+	const here = await documents.here(name);
+	if (!here) return true;
+	const host = await documents.host(name);
+	const probe = new Y.Doc();
+	if (host) Y.applyUpdate(probe, Y.encodeStateAsUpdate(host));
+	const before = Y.snapshot(probe);
+	Y.applyUpdate(probe, Y.encodeStateAsUpdate(here));
+	const after = Y.snapshot(probe);
+	probe.destroy();
+	return Y.equalSnapshots(before, after);
+}
+
+/**
  * Links that are always online, one per Host: what a relay reads. They
  * run no streams: a test of the exchange starts its own `httpsLink`.
+ * `inStep` compares the documents of `documents` (a link without them
+ * cannot answer it): in step once the Host's copy has every change this
+ * Replica made. It does not model the other half, this Replica taking
+ * the Host's state.
  */
-export function linksTo(clients: Map<string, HostClient>): DeviceLinks {
+export function linksTo(
+	clients: Map<string, HostClient>,
+	documents?: DocumentPairs,
+): DeviceLinks {
+	async function inStep(
+		names: readonly string[],
+		options: { timeoutMs?: number; signal?: AbortSignal } = {},
+	): Promise<boolean> {
+		if (!documents) {
+			throw new Error("This link in memory compares no documents.");
+		}
+		const pairs = documents;
+		const all = async () => {
+			for (const name of names)
+				if (!(await hostHasAll(pairs, name))) return false;
+			return true;
+		};
+		const end = Date.now() + (options.timeoutMs ?? 10_000);
+		while (true) {
+			if (await all()) return true;
+			if (Date.now() >= end || options.signal?.aborted) return false;
+			await Bun.sleep(20);
+		}
+	}
+
 	const linkOf = (hostId: string, client: HostClient): Link => ({
 		hostId,
 		state: () => ({ status: "online", address: "memory", since: 0 }),
@@ -196,7 +261,7 @@ export function linksTo(clients: Map<string, HostClient>): DeviceLinks {
 		call: (use) => use(client),
 		ready: async () => client,
 		check: () => {},
-		synced: () => true,
+		inStep,
 		close: async () => {},
 	});
 	return {

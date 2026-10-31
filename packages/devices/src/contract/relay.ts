@@ -8,6 +8,9 @@ import type {
 import type { ArchiveRef, KnowledgeRef } from "./archive";
 import type { OfferCaps } from "./offers";
 
+/** Whether a Replica's documents and its Host's are in step (`HostRelay.inStep`). */
+export type InStep = "in step" | "timed out" | "unreachable";
+
 /**
  * What this Device asks of the Hosts it links to: the engine's `Relay` (the
  * actions on rows another Device owns), and what the peers ask beside it:
@@ -61,12 +64,17 @@ export type HostRelay = Relay & {
 	 */
 	knowledge(ref: KnowledgeRef): Promise<string | null>;
 	/**
-	 * Whether this Replica's copy of a document of the Space and its Host's
-	 * are in step (`Link.synced`), asking the Host now when they are not.
-	 * True for a Space this Replica keeps. Null while that Host cannot be
-	 * reached.
+	 * Waits until this Replica's copies of these documents of the Space
+	 * are in step with its Host's (`Link.inStep`). `in step` at once for a
+	 * Space this Replica keeps; `unreachable`, without a wait, while that
+	 * Host cannot be reached; `timed out` when they are not in step after
+	 * `timeoutMs` (default 10 s).
 	 */
-	inStep(spaceId: string, documentName: string): Promise<boolean | null>;
+	inStep(
+		spaceId: string,
+		names: readonly string[],
+		options?: { timeoutMs?: number; signal?: AbortSignal },
+	): Promise<InStep>;
 	/**
 	 * The actor's Devices, as the Host that keeps the Space knows them:
 	 * whether each is online and has a Clone of the project.

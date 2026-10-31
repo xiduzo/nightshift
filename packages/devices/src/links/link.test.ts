@@ -315,4 +315,25 @@ describe("httpsLink", () => {
 		await link.close();
 		await expect(closing).rejects.toThrow("The link to studio is closed.");
 	});
+
+	test("documents that do not sync are not in step: the link asks the Host now, and gives up after its time or when it closes", async () => {
+		const host = fakeHost({
+			"https://studio.local": () => Promise.resolve(hello([])),
+		});
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			heartbeatMs: 60_000,
+		});
+		await link.ready();
+		const asked = host.calls.length;
+		expect(await link.inStep([], { timeoutMs: 0 })).toBe(true);
+		expect(await link.inStep(["flows:p"], { timeoutMs: 150 })).toBe(false);
+		// The heartbeat a minute away came now.
+		await until(() => host.calls.length > asked);
+		const waiting = link.inStep(["flows:p"], { timeoutMs: 60_000 });
+		await link.close();
+		expect(await waiting).toBe(false);
+	});
 });

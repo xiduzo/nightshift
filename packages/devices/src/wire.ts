@@ -19,7 +19,7 @@ import {
 import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
 import type * as Y from "yjs";
 import { createKnowledgeArchive } from "./archive";
-import type { HostClient } from "./contract";
+import type { HostClient, HostRelay } from "./contract";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
@@ -80,6 +80,8 @@ export type DevicesRuntime = {
 	serve: { hostname: string; tls?: { cert: string; key: string } };
 	/** The Hosts of the Spaces, as the knowledge reconcile copies content to them and fetches it (ADR 4). */
 	knowledge: KnowledgeHost;
+	/** Waits until this Replica's documents of a Space are in step with its Host's. */
+	inStep: HostRelay["inStep"];
 };
 
 /**
@@ -466,6 +468,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		offers,
 		reach,
 		knowledge: createKnowledgeArchive({ relay }),
+		inStep: relay.inStep,
 		serve: {
 			hostname: listenHostname(reach, deps.env.NIGHTSHIFT_LISTEN),
 			...(certificate

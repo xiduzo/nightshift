@@ -211,7 +211,7 @@ describe("a disposed engine", () => {
 			archivePut: async () => {},
 			knowledgePut: async () => {},
 			knowledge: async () => null,
-			inStep: async () => true,
+			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},

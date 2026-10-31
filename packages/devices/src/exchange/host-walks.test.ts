@@ -147,6 +147,26 @@ async function keptOn(sandbox: Sandbox) {
 }
 
 describe("the Host walks a run a Device starts", () => {
+	test("B starts a flow it saved a moment ago: A starts it once its copy has that flow", async () => {
+		await seedFlows(paired.device.space(a.spaceId), projectId, {
+			fresh: countFlow,
+		});
+		let started = false;
+		const starting = paired.device
+			.space(a.spaceId, { personId: paired.personId })
+			.startRun({ projectId, flowName: "fresh" })
+			.finally(() => {
+				started = true;
+			});
+		await Bun.sleep(300);
+		// A's copy of the flows lacks B's save: the start waits for it.
+		expect(started).toBe(false);
+		await paired.flowsToHost(projectId);
+		const run = await starting;
+		expect(run.walker).toMatchObject({ id: a.deviceId });
+		await untilStatus(paired.host, run.id, "finished");
+	});
+
 	test("A walks it, its unplaced steps run on B, and B gets the run and its kept value", async () => {
 		const started = await paired.device
 			.space(a.spaceId, { personId: paired.personId })

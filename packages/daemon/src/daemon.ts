@@ -18,6 +18,7 @@ import {
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
+	type DevicesRuntime,
 	deviceDirectory,
 	type HostClient,
 	selfDevice,
@@ -35,7 +36,6 @@ import {
 	createKnowledgeSync,
 	createToolLaunchers,
 	documentSpace,
-	type KnowledgeHost,
 	localDevice,
 } from "@nightshift/engine";
 import {
@@ -387,7 +387,8 @@ export async function createDaemon(
 		(kept) => kept.close(),
 	);
 	/** The devices runtime, once it is made below: the Hosts of the Spaces. */
-	let devicesRuntime: { knowledge: KnowledgeHost } | null = null;
+	let devicesRuntime: Pick<DevicesRuntime, "knowledge" | "inStep"> | null =
+		null;
 	/**
 	 * Each folder is a working copy of its Project's knowledge in the
 	 * Space (ADR 4): reconciled before and after each step that gets it,
@@ -401,6 +402,8 @@ export async function createDaemon(
 		store: createKnowledgeStore(dataDir),
 		deviceId: device.id,
 		host: () => devicesRuntime?.knowledge ?? null,
+		inStep: async (spaceId, names, options) =>
+			devicesRuntime?.inStep(spaceId, names, options),
 	});
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({

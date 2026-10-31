@@ -45,7 +45,6 @@ function memoryHost() {
 			if (state.down) throw new TypeError("The network connection was lost.");
 			return kept.get(sha256)?.slice() ?? null;
 		},
-		async settled() {},
 	};
 	return { kept, state, host };
 }

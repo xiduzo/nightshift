@@ -37,7 +37,7 @@ export type {
 	SplitState,
 } from "./personal";
 export { READS, READS_HEADER, reads } from "./reads";
-export type { HostRelay } from "./relay";
+export type { HostRelay, InStep } from "./relay";
 export type { RunRows, SyncCursors } from "./rows";
 export type {
 	CommandBatch,

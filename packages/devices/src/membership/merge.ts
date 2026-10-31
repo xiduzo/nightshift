@@ -461,14 +461,11 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		const link = online(hostId);
 		if (!link) throw held("offline").refusal;
 		// The Host's copies of the documents they join come over the link.
-		link.check();
 		for (const [source, target] of pairs) {
 			const destination = await deps.flows.open(target.projectId);
-			const synced = await until(
-				async () =>
-					link.synced(destination.current.name) &&
-					link.synced(destination.history.name),
-				deps.syncWaitMs ?? 30_000,
+			const synced = await link.inStep(
+				[destination.current.name, destination.history.name],
+				{ timeoutMs: deps.syncWaitMs ?? 30_000 },
 			);
 			if (!synced) {
 				throw new Refusal(

@@ -27,6 +27,7 @@ export {
 	deviceNameIn,
 	memberName,
 	memberRole,
+	spaceDocumentName,
 } from "./space-document";
 export type { Branches } from "./worktrees";
 export { worktreeLocation } from "./worktrees";

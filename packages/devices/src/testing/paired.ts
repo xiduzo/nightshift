@@ -19,6 +19,7 @@ import {
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
+import * as Y from "yjs";
 import { createKnowledgeArchive } from "../archive";
 import type { HostRelay, WorkRelay } from "../contract";
 import type { HostExchange } from "../exchange";
@@ -58,6 +59,12 @@ export type PairedDevice = {
 		projectId: string,
 		options?: { clone?: boolean },
 	): Promise<void>;
+	/**
+	 * Brings the Device's changes of a project's flows to A, as its Link
+	 * does. Its relay waits for this before a run starts on A: nothing
+	 * syncs in memory by itself.
+	 */
+	flowsToHost(projectId: string): Promise<void>;
 };
 
 /** Replica A as a Host and Replica B as its paired Device, in one process. */
@@ -86,6 +93,8 @@ export type PairedReplicas = {
 	knowledge: KnowledgeHost;
 	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
 	projectOnDevice: PairedDevice["projectOnDevice"];
+	/** Brings B's changes of a project's flows to A (`PairedDevice.flowsToHost`). */
+	flowsToHost: PairedDevice["flowsToHost"];
 	/** Pairs one more Device of A's owner with A, as B is: a third Replica. */
 	pair(sandbox: Sandbox, name: string): Promise<PairedDevice>;
 };
@@ -137,7 +146,18 @@ export async function pairedReplicas(
 		const relay = createRelay({
 			engine: () => engine,
 			registry: () => engine.devices,
-			links: () => linksTo(new Map([[hostId, memory.client(key)]])),
+			links: () =>
+				linksTo(new Map([[hostId, memory.client(key)]]), {
+					// The documents a Link syncs: the Space and flow documents.
+					here: async (name) =>
+						documents.byName(name)?.doc ??
+						(await flows.find(name))?.doc ??
+						null,
+					host: async (name) =>
+						replica.documents.byName(name)?.doc ??
+						(await replica.flows.find(name))?.doc ??
+						null,
+				}),
 			flows,
 		});
 		const engine: PeerEngine = createPeerEngine(
@@ -178,6 +198,15 @@ export async function pairedReplicas(
 			});
 		}
 
+		async function flowsToHost(projectId: string) {
+			const here = await flows.open(projectId);
+			const there = await replica.flows.open(projectId);
+			for (const part of ["current", "history"] as const) {
+				Y.applyUpdate(there[part].doc, Y.encodeStateAsUpdate(here[part].doc));
+				await there[part].flush();
+			}
+		}
+
 		return {
 			engine,
 			log,
@@ -195,7 +224,10 @@ export async function pairedReplicas(
 					);
 				}
 				await engine.space(spaceId).addProject({ repoPath: sandbox.repoPath });
+				// The Clone's import marks the flows: the Link brings that to A.
+				await flowsToHost(projectId);
 			},
+			flowsToHost,
 		};
 	}
 
@@ -211,6 +243,7 @@ export async function pairedReplicas(
 		personId,
 		documents: paired.documents,
 		flows: paired.flows,
+		flowsToHost: paired.flowsToHost,
 		knowledge: paired.knowledge,
 		projectOnDevice: paired.projectOnDevice,
 		pair,

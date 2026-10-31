@@ -68,11 +68,19 @@ export type Link = {
 	/** Asks the Host now instead of at the next heartbeat. */
 	check(): void;
 	/**
-	 * Whether the document of this name syncs over the link, has taken
-	 * the Host's state of it once, and the Host has every change this
-	 * computer made to it.
+	 * Waits until the documents of these names are in step with the Host:
+	 * each syncs over the link, has taken the Host's state of it once, and
+	 * the Host has every change this computer made to it. Asks the Host now
+	 * when one is not. True when they are in step; false when `timeoutMs`
+	 * (default 10 s) passes first, `signal` aborts, or the link closes.
+	 *
+	 * The one wait for the order of the two channels: a call on the Host
+	 * that reads a document this computer changed comes after this.
 	 */
-	synced(name: string): boolean;
+	inStep(
+		names: readonly string[],
+		options?: { timeoutMs?: number; signal?: AbortSignal },
+	): Promise<boolean>;
 	/** Stops the link: no more calls, the document stops syncing, every stream stops. */
 	close(): Promise<void>;
 };
@@ -117,6 +125,10 @@ export type HttpsLinkOptions = {
 	clientFor?(address: string): HostClient;
 	now?: () => number;
 };
+
+/** How long `inStep` waits by default, and how often it looks. */
+const IN_STEP_MS = 10_000;
+const IN_STEP_POLL_MS = 100;
 
 /** The first address whose call answers, in order. Throws the last error when none does. */
 export async function firstAnswering<T>(
@@ -461,9 +473,23 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			});
 		},
 		check,
-		synced: (name) => {
-			const provider = providers.get(name);
-			return provider?.isSynced === true && !provider.hasUnsyncedChanges;
+		async inStep(names, options = {}) {
+			const synced = () =>
+				names.every((name) => {
+					const provider = providers.get(name);
+					return provider?.isSynced === true && !provider.hasUnsyncedChanges;
+				});
+			if (synced()) return true;
+			check();
+			const end = now() + (options.timeoutMs ?? IN_STEP_MS);
+			const signal = options.signal
+				? AbortSignal.any([options.signal, stop.signal])
+				: stop.signal;
+			while (now() < end && !signal.aborted) {
+				await pause(IN_STEP_POLL_MS, signal);
+				if (synced()) return true;
+			}
+			return false;
 		},
 		async close() {
 			stop.abort();

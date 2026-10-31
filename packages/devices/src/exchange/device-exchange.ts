@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Engine } from "@nightshift/engine";
+import { spaceDocumentName } from "@nightshift/engine/projects";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, RunCommand, RunRows } from "../contract";
 import { type HostSpaces, type Link, pause } from "../links";
@@ -46,7 +47,7 @@ import type { RunHistoryExchange } from "./run-history";
  */
 export type DeviceExchange = {
 	/** Pushes, pulls and applies over the link while it is online. Returns how to stop. */
-	attach(link: Pick<Link, "stream">): () => void;
+	attach(link: Pick<Link, "stream" | "inStep">): () => void;
 };
 
 /**
@@ -213,7 +214,11 @@ export function createDeviceExchange(deps: {
 	}
 
 	/** One pull stream: rows and follows (and an older Host's Commands) until it ends or `signal` aborts. */
-	async function pull(client: HostClient, signal: AbortSignal) {
+	async function pull(
+		link: Pick<Link, "inStep">,
+		client: HostClient,
+		signal: AbortSignal,
+	) {
 		/** The commands whose result the Host has from this stream. */
 		const reported = new Set<string>();
 		// The live transcripts the Host wants of this computer's runs. A
@@ -234,7 +239,7 @@ export function createDeviceExchange(deps: {
 				// A Host of an older version sends no follows.
 				pumps.set(batch.follows ?? []);
 				if (!isEmpty(batch.rows)) {
-					await ingestWhenReady(batch.rows, signal);
+					await ingestWhenReady(batch.rows, link, signal);
 					await exchange.advance(hostId, batch.cursors);
 				}
 				// A Host of an older version sends its Commands here, after
@@ -316,20 +321,28 @@ export function createDeviceExchange(deps: {
 		}
 	}
 
-	/** Ingests a batch, waiting a while for a project its Space document still brings. */
-	async function ingestWhenReady(batch: RunRows, signal: AbortSignal) {
-		const deadline = Date.now() + (deps.projectWaitMs ?? 30_000);
-		while (true) {
-			try {
-				await exchange.ingest(batch);
-				return;
-			} catch (error) {
-				if (!(error instanceof MissingProjectError) || Date.now() > deadline) {
-					throw error;
-				}
-				await pause(250, signal);
-				if (signal.aborted) throw error;
-			}
+	/**
+	 * Ingests a batch. A run whose project is not here yet waits for the
+	 * Space documents that bring it to be in step with the Host, a while
+	 * at most, and then is tried once more: else the stream starts again,
+	 * from the same cursor.
+	 */
+	async function ingestWhenReady(
+		batch: RunRows,
+		link: Pick<Link, "inStep">,
+		signal: AbortSignal,
+	) {
+		try {
+			await exchange.ingest(batch);
+		} catch (error) {
+			if (!(error instanceof MissingProjectError)) throw error;
+			const spaces = [...new Set(batch.runs.map((run) => run.spaceId))];
+			const inStep = await link.inStep(spaces.map(spaceDocumentName), {
+				timeoutMs: deps.projectWaitMs ?? 30_000,
+				signal,
+			});
+			if (!inStep) throw error;
+			await exchange.ingest(batch);
 		}
 	}
 
@@ -337,7 +350,9 @@ export function createDeviceExchange(deps: {
 		attach(link) {
 			const stops = [
 				link.stream("sync.push", push),
-				link.stream("sync.stream", pull),
+				link.stream("sync.stream", (client, signal) =>
+					pull(link, client, signal),
+				),
 				link.stream("sync.commands", commands),
 			];
 			return () => {

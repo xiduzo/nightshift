@@ -382,7 +382,7 @@ describe("a batch and what follows from it", () => {
 			archivePut: async () => {},
 			knowledgePut: async () => {},
 			knowledge: async () => null,
-			inStep: async () => true,
+			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},
@@ -726,7 +726,7 @@ describe("a run walked elsewhere", () => {
 			archivePut: async () => {},
 			knowledgePut: async () => {},
 			knowledge: async () => null,
-			inStep: async () => true,
+			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},
@@ -811,7 +811,7 @@ describe("a run walked elsewhere", () => {
 			archivePut: async () => {},
 			knowledgePut: async () => {},
 			knowledge: async () => null,
-			inStep: async () => true,
+			inStep: async () => "in step" as const,
 			startRun: async () => {
 				throw new Error("not in this test");
 			},
