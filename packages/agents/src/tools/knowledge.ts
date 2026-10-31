@@ -21,7 +21,7 @@ export const KNOWLEDGE_TOOLS = {
 } as const;
 
 /** What an Agent step is told when it gets the knowledge tools. */
-export const KNOWLEDGE_TOOLS_INSTRUCTION = `To find something in the project knowledge, call \`${KNOWLEDGE_TOOLS.searchKnowledge}\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`${KNOWLEDGE_TOOLS.readKnowledge}\`.`;
+export const KNOWLEDGE_TOOLS_INSTRUCTION = `To find something in the project knowledge, call \`${KNOWLEDGE_TOOLS.searchKnowledge}\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`${KNOWLEDGE_TOOLS.readKnowledge}\`: give the hit's section, page or line to read from there.`;
 
 /** A file a search found, at its best section. `match` parts of the excerpt are the words found. */
 export type KnowledgeToolHit = {
@@ -54,7 +54,20 @@ export type KnowledgeUseHit = {
  */
 export type KnowledgeUse =
 	| { kind: "search"; query: string; hits: KnowledgeUseHit[] }
-	| { kind: "read"; path: string; found: boolean };
+	| {
+			kind: "read";
+			path: string;
+			found: boolean;
+			/** The spot the read started from. Absent: the start of the file. */
+			from?: KnowledgeReadFrom;
+	  };
+
+/** Where a read starts: a search hit's section, line or page. */
+export type KnowledgeReadFrom = {
+	section?: string;
+	line?: number;
+	page?: number;
+};
 
 /** One file of the knowledge, its text cut at the size asked for. */
 export type KnowledgeToolFile = {
@@ -64,6 +77,8 @@ export type KnowledgeToolFile = {
 	/** Bytes of the whole text. */
 	size: number;
 	truncated: boolean;
+	/** Where the text starts, for a read from a spot. Absent: the start of the file. */
+	from?: { line: number; page: number | null };
 };
 
 /** What the knowledge tools read: Night Shift on this computer. */
@@ -74,11 +89,12 @@ export type KnowledgePort = {
 		query: string,
 		limit: number,
 	): Promise<KnowledgeToolHit[]>;
-	/** One file of the project's knowledge by its path. Null: no such file. */
+	/** One file of the project's knowledge by its path, from `from` when given. Null: no such file. */
 	readKnowledge(
 		projectId: string,
 		path: string,
 		maxBytes: number,
+		from?: KnowledgeReadFrom,
 	): Promise<KnowledgeToolFile | null>;
 };
 
@@ -101,6 +117,32 @@ const SEARCH_MAX = 50;
 const READ_BYTES = 100 * 1024;
 
 type JsonSchemaProperty = { type: string; description: string };
+
+/** The spot a `read_knowledge` call names, from its `section`, `line` and `page`. Undefined: none. */
+function spotOf(args: unknown): KnowledgeReadFrom | undefined {
+	const section = field(args, "section");
+	const line = field(args, "line");
+	const page = field(args, "page");
+	const whole = (value: unknown) =>
+		typeof value === "number" && Number.isInteger(value) && value > 0
+			? value
+			: undefined;
+	const from: KnowledgeReadFrom = {
+		...(typeof section === "string" && section.trim() !== ""
+			? { section: section.trim().slice(0, 500) }
+			: {}),
+		...(whole(line) !== undefined ? { line: whole(line) } : {}),
+		...(whole(page) !== undefined ? { page: whole(page) } : {}),
+	};
+	return Object.keys(from).length > 0 ? from : undefined;
+}
+
+/** Where a read started, for its first line. */
+function spotLine(from: { line: number; page: number | null }): string {
+	return from.page !== null
+		? `page ${from.page}, line ${from.line}`
+		: `line ${from.line}`;
+}
 
 const projectProperty: JsonSchemaProperty = {
 	type: "string",
@@ -168,7 +210,7 @@ export function knowledgeTools(
 		toolDefinition({
 			name: KNOWLEDGE_TOOLS.searchKnowledge,
 			description:
-				"Search the project's knowledge: the files besides the code that agents read, such as a wiki, web pages, work items, PDF and Word files. It finds by keyword, and also by meaning when this computer can, so a question in other words finds an answer too. Returns the best files first, each with its path, title, the section (its heading and line, and page for a PDF) and an excerpt with the words found in bold. Every word must match, else some of them. Keep a phrase together in quotes. End a word with * to match its start. Read a whole file with read_knowledge.",
+				"Search the project's knowledge: the files besides the code that agents read, such as a wiki, web pages, work items, PDF and Word files. It finds by keyword, and also by meaning when this computer can, so a question in other words finds an answer too. Returns the best files first, each with its path, title, the section (its heading and line, and page for a PDF) and an excerpt with the words found in bold. Every word must match, else some of them. Keep a phrase together in quotes. End a word with * to match its start. Read a file with read_knowledge: give it the hit's section, page or line to read from there.",
 			inputSchema: {
 				type: "object",
 				properties: withProject({
@@ -223,7 +265,7 @@ export function knowledgeTools(
 		}),
 		toolDefinition({
 			name: KNOWLEDGE_TOOLS.readKnowledge,
-			description: `Read one file of the project's knowledge by its path, as search_knowledge gives it. Returns its text, at most the first ${kilobytes(READ_BYTES)}. For a PDF or Word file, the text in it.`,
+			description: `Read one file of the project's knowledge by its path, as search_knowledge gives it. Returns its text, at most ${kilobytes(READ_BYTES)}: from the start, or from the section, page or line of a search hit when you give them. For a PDF or Word file, the text in it.`,
 			inputSchema: {
 				type: "object",
 				properties: withProject({
@@ -231,6 +273,20 @@ export function knowledgeTools(
 						type: "string",
 						description:
 							"The file's path in the knowledge, from search_knowledge. Example: wiki/Home.md",
+					},
+					section: {
+						type: "string",
+						description:
+							"Start at this section: its heading, as search_knowledge gives it. Example: Rolling updates",
+					},
+					page: {
+						type: "number",
+						description: "Start at this page of a PDF, from search_knowledge.",
+					},
+					line: {
+						type: "number",
+						description:
+							"Start at this line, from search_knowledge: of the file, or of the page you give.",
 					},
 				}),
 				required: ["path"],
@@ -243,23 +299,38 @@ export function knowledgeTools(
 				);
 			}
 			const project = await projectOf(args);
+			const from = spotOf(args);
 			const file = await port.readKnowledge(
 				project.id,
 				path.trim(),
 				READ_BYTES,
+				from,
 			);
 			used(project.id, {
 				kind: "read",
 				path: file?.path ?? path.trim(),
 				found: file !== null,
+				...(from ? { from } : {}),
 			});
 			if (!file) {
 				const where = knowledgeOf(project);
 				return `${where.charAt(0).toUpperCase()}${where.slice(1)} has no file "${path.trim()}". Call ${KNOWLEDGE_TOOLS.searchKnowledge} for the paths.`;
 			}
-			const head = file.truncated
-				? `${file.path}: ${file.title}. The file is ${kilobytes(file.size)}. This is its first ${kilobytes(READ_BYTES)}.`
-				: `${file.path}: ${file.title}`;
+			const where = file.from
+				? file.truncated
+					? ` This is ${kilobytes(READ_BYTES)} from ${spotLine(file.from)}.`
+					: ` This is the text from ${spotLine(file.from)} on.`
+				: file.truncated
+					? ` This is its first ${kilobytes(READ_BYTES)}.`
+					: "";
+			const missed =
+				from && !file.from
+					? ` It has no ${from.section ? `section "${from.section}"` : "such page or line"}: this is its start.`
+					: "";
+			const head =
+				file.truncated || file.from || missed
+					? `${file.path}: ${file.title}. The file is ${kilobytes(file.size)}.${where}${missed}`
+					: `${file.path}: ${file.title}`;
 			return `${head}\n\n${file.text}`;
 		}),
 	];

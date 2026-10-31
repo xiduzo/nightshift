@@ -30,7 +30,13 @@ export function knowledgeUseEvent(
 			}
 		: {
 				type: "KnowledgeRead",
-				payload: { projectId, path: use.path, found: use.found, via },
+				payload: {
+					projectId,
+					path: use.path,
+					found: use.found,
+					via,
+					...(use.from ? { from: use.from } : {}),
+				},
 			};
 }
 

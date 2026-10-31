@@ -290,6 +290,14 @@ export const knowledge = {
 				projectId: z.string(),
 				path: z.string().min(1).max(1000),
 				maxBytes: z.number().int().min(1).max(READ_MAX_BYTES).optional(),
+				/** Start at a search hit's section, page or line. */
+				from: z
+					.object({
+						section: z.string().trim().min(1).max(500).optional(),
+						line: z.number().int().min(1).optional(),
+						page: z.number().int().min(1).optional(),
+					})
+					.optional(),
 				agent: agentSchema,
 			}),
 		)
@@ -299,12 +307,14 @@ export const knowledge = {
 				input.projectId,
 				input.path,
 				input.maxBytes ?? READ_MAX_BYTES,
+				input.from,
 			);
 			if (input.agent) {
 				await logUse(context, input.projectId, {
 					kind: "read",
 					path: file?.path ?? input.path.trim(),
 					found: file !== null,
+					...(input.from ? { from: input.from } : {}),
 				});
 			}
 			return file;

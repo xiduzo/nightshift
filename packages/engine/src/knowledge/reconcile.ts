@@ -27,6 +27,7 @@ import {
 	isReadable,
 	type KnowledgeFile,
 	type KnowledgeFolders,
+	type KnowledgeReadFrom,
 	type KnowledgeText,
 	knowledgeText,
 	walkFolder,
@@ -634,9 +635,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			projectId: string,
 			path: string,
 			maxBytes: number,
+			from?: KnowledgeReadFrom,
 		): Promise<KnowledgeText | null> {
 			// This computer's folder first: it may not have the file yet.
-			const here = await folders.read(projectId, path, maxBytes);
+			const here = await folders.read(projectId, path, maxBytes, from);
 			if (here) return here;
 			const clean = path.trim().replace(/^\.\/+/, "");
 			const spaceId = await spaceOf(projectId);
@@ -665,7 +667,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					"Night Shift cannot get this file now. Try again when the computer that keeps this Space is online.",
 				);
 			}
-			return knowledgeText(clean, content, maxBytes);
+			return knowledgeText(clean, content, maxBytes, from);
 		},
 		/**
 		 * Removes a folder of the project's knowledge, for every Device of

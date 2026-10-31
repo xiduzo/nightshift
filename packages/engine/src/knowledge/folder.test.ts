@@ -14,6 +14,7 @@ import {
 	createKnowledgeFolders,
 	describeDocumentText,
 	describeText,
+	textFrom,
 } from "./folder";
 
 let dataDir: string;
@@ -194,5 +195,74 @@ describe("describeText", () => {
 		expect(describeText("- a list item. Then.", "f").sentence).toBe(
 			"a list item",
 		);
+	});
+});
+
+describe("a read from a spot", () => {
+	const doc = [
+		"# Guide",
+		"",
+		"Intro.",
+		"",
+		"## Rolling updates",
+		"",
+		"Stop the old one first.",
+		"",
+		"## Backups",
+		"",
+		"Every night.",
+	].join("\n");
+
+	test("starts at a section's heading, a line, or the first line with the section's words", async () => {
+		const folders = createKnowledgeFolders(dataDir);
+		const dir = await folders.ensure("p1");
+		await put(dir, "wiki/guide.md", doc);
+		const section = await folders.read("p1", "wiki/guide.md", 1024, {
+			section: "rolling updates",
+		});
+		expect(section).toMatchObject({
+			title: "Guide",
+			text: "## Rolling updates\n\nStop the old one first.\n\n## Backups\n\nEvery night.",
+			from: { line: 5, page: null },
+			size: Buffer.byteLength(doc),
+			truncated: false,
+		});
+		const line = await folders.read("p1", "wiki/guide.md", 12, { line: 9 });
+		expect(line).toMatchObject({
+			text: "## Backups\n\n",
+			from: { line: 9, page: null },
+			truncated: true,
+		});
+		expect(
+			(await folders.read("p1", "wiki/guide.md", 1024, { section: "night" }))
+				?.from,
+		).toEqual({ line: 11, page: null });
+		// A section it does not have: the start, without a spot.
+		const missing = await folders.read("p1", "wiki/guide.md", 7, {
+			section: "Releases",
+		});
+		expect(missing).toMatchObject({ text: "# Guide", truncated: true });
+		expect(missing?.from).toBeUndefined();
+	});
+
+	test("on pages, a line counts in its page, and a section is looked for from that page on", () => {
+		const pages = [
+			{ text: "Cover\nRollout", page: 1 },
+			{ text: "Intro\n# Rollout\nSteps", page: 2 },
+		];
+		expect(textFrom(pages, { page: 2, line: 2 })).toEqual({
+			text: "# Rollout\nSteps",
+			line: 2,
+			page: 2,
+		});
+		expect(textFrom(pages, { section: "Rollout" })).toMatchObject({
+			line: 2,
+			page: 2,
+		});
+		expect(textFrom(pages, { page: 1 })?.text).toBe(
+			"Cover\nRollout\n\nIntro\n# Rollout\nSteps",
+		);
+		expect(textFrom(pages, { page: 3 })).toBeNull();
+		expect(textFrom(pages, {})).toBeNull();
 	});
 });

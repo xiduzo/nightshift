@@ -176,7 +176,8 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 		const port: KnowledgePort = {
 			searchKnowledge: (id, query, limit) =>
 				deps.search.search(id, query, { limit }),
-			readKnowledge: (id, path, maxBytes) => sync.read(id, path, maxBytes),
+			readKnowledge: (id, path, maxBytes, from) =>
+				sync.read(id, path, maxBytes, from),
 		};
 		return {
 			tools: knowledgeTools(port, { project: { id: projectId } }, { onUse }),

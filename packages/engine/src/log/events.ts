@@ -1,5 +1,8 @@
 import type { CostSource } from "@nightshift/agents/pricing";
-import type { KnowledgeUseHit } from "@nightshift/agents/tools";
+import type {
+	KnowledgeReadFrom,
+	KnowledgeUseHit,
+} from "@nightshift/agents/tools";
 import type {
 	AgentErrorKind,
 	AgentHarnessName,
@@ -504,6 +507,8 @@ export type EnginePayloads = {
 		path: string;
 		found: boolean;
 		via: KnowledgeVia;
+		/** The section, page or line the read started from. Absent: the start of the file. */
+		from?: KnowledgeReadFrom;
 	};
 	/**
 	 * A schedule came due and the scheduler started its run (`runId`), or

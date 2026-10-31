@@ -135,6 +135,10 @@ export const knowledgeTextSchema = exact<KnowledgeText>()(
 		size: z.number(),
 		/** The text stops before the file ends. */
 		truncated: z.boolean(),
+		/** Where the text starts, for a read from a spot. Absent: the start of the file. */
+		from: z
+			.object({ line: z.number(), page: z.number().nullable() })
+			.optional(),
 	}),
 );
 

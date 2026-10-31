@@ -607,4 +607,46 @@ describe("the knowledge tools", () => {
 			'has no file "gone.md"',
 		);
 	});
+
+	test("read_knowledge reads from a hit's section, page or line, and says where it starts", async () => {
+		const asked: unknown[] = [];
+		const { call } = await connect(
+			fakePort({
+				readKnowledge: async (_projectId, path, _maxBytes, from) => {
+					asked.push(from);
+					return {
+						path,
+						title: "Guide",
+						text: "## Backups\n\nEvery night.",
+						size: 4096,
+						truncated: false,
+						...(from?.section === "Backups"
+							? { from: { line: 9, page: null } }
+							: from?.page
+								? { from: { line: 3, page: from.page } }
+								: {}),
+					};
+				},
+			}),
+			{ project: "App" },
+		);
+		expect(
+			(await call("read_knowledge", { path: "g.md", section: " Backups " }))
+				.text,
+		).toBe(
+			"g.md: Guide. The file is 4 KB. This is the text from line 9 on.\n\n## Backups\n\nEvery night.",
+		);
+		expect(
+			(await call("read_knowledge", { path: "g.pdf", page: 2, line: 3 })).text,
+		).toContain("This is the text from page 2, line 3 on.");
+		expect(
+			(await call("read_knowledge", { path: "g.md", section: "Releases" }))
+				.text,
+		).toContain('It has no section "Releases": this is its start.');
+		expect(asked).toEqual([
+			{ section: "Backups" },
+			{ page: 2, line: 3 },
+			{ section: "Releases" },
+		]);
+	});
 });
