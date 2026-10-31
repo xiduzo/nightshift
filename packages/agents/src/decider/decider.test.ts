@@ -693,6 +693,24 @@ describe("tanstackDecider: OpenJev and an OpenAI-compatible server", () => {
 		]);
 	});
 
+	test("lists the models of an OpenJev address in Jev's shape", async () => {
+		stub(() =>
+			Response.json({
+				models: [{ name: "openjev-latest" }, { name: "diffusiongemma-26b" }],
+			}),
+		);
+		const offered = await deciderModels(
+			"openjev",
+			{},
+			{ root: "http://127.0.0.1:18080", headers: {}, apiKey: undefined },
+		);
+		expect(offered).toMatchObject({ listed: 2, problem: null });
+		expect(offered.models.slice(0, 2)).toEqual([
+			"openjev-latest",
+			"diffusiongemma-26b",
+		]);
+	});
+
 	test("an address that refuses the key, or does not answer, says so", async () => {
 		const at = { root: "http://openjev:8080", headers: {}, apiKey: undefined };
 		stub(() => new Response("no", { status: 401 }));

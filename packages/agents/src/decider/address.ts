@@ -1,7 +1,8 @@
 /**
  * A server at a Model Profile's address (ADR 5): the models it lists, and
  * an OpenAI-compatible chat model on it. OpenJev, LM Studio, llama-server,
- * mlx-lm and vLLM all list their models at `GET /v1/models`.
+ * mlx-lm and vLLM all list their models at `GET /v1/models`: OpenAI's shape
+ * (`data[].id`), or Jev's shape (`models[].name`) for OpenJev.
  */
 
 import type { AnyTextAdapter } from "@tanstack/ai";
@@ -67,14 +68,21 @@ export async function addressModels(at: AddressAccess): Promise<string[]> {
 	}
 	const body = (await response.json().catch(() => null)) as {
 		data?: { id?: unknown }[];
+		models?: { name?: unknown }[];
 	} | null;
-	if (!Array.isArray(body?.data)) {
-		throw new Error(
-			`${at.root} did not list its models. Check that the address is the server's.`,
+	if (Array.isArray(body?.data)) {
+		return body.data.flatMap((model) =>
+			typeof model.id === "string" ? [model.id] : [],
 		);
 	}
-	return body.data.flatMap((model) =>
-		typeof model.id === "string" ? [model.id] : [],
+	if (Array.isArray(body?.models)) {
+		return body.models.flatMap((model) =>
+			typeof model.name === "string" ? [model.name] : [],
+		);
+	}
+	throw new AddressError(
+		"other",
+		`${at.root} did not list its models. Check that the address is the server's.`,
 	);
 }
 
