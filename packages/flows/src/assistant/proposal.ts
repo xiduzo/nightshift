@@ -7,7 +7,7 @@
 import { type CliToolRef, checkDraft, type DraftMessages } from "../draft";
 import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef } from "../nodes";
-import { profileOf } from "../profiles";
+import { nodeProfiles } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 
 export type ProposalCheckOptions = {
@@ -127,8 +127,7 @@ function schemaIssue(
 }
 
 function profilesOf(node: FlowNode): ProfileRef[] {
-	const profile = profileOf(node);
-	return isProfileRef(profile) ? [profile] : [];
+	return nodeProfiles(node).filter(isProfileRef);
 }
 
 function connectionsOf(node: FlowNode): string[] {

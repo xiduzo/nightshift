@@ -6,9 +6,10 @@ import {
 	flowSchema,
 	migrateFlow,
 	nodeOutcomes,
+	tierNode,
 } from "../flow";
 import { isKitName } from "../kits";
-import { reservedNames } from "../nodes";
+import { isPersonTier, reservedNames } from "../nodes";
 import { checkBranches } from "./branches";
 import { checkCall, type ErrorsOf } from "./calls";
 import { findCycles } from "./cycles";
@@ -219,10 +220,21 @@ function validateIn(
 		options.name === undefined ? ancestors : [...ancestors, options.name];
 	for (const node of nodes.values()) {
 		if (node.type !== "call") continue;
-		if (flows !== undefined) {
-			checkCall(node, flows, chain, error, warning, errorsOf);
-		} else if (isKitName(node.flow)) {
-			checkCall(node, {}, chain, error, warning, errorsOf);
+		// Each tier of a cascade that binds otherwise is a call of its own.
+		const calls = [
+			node,
+			...(node.cascade ?? []).flatMap((tier, index) => {
+				if (isPersonTier(tier)) return [];
+				if (tier.flow === undefined && tier.inputs === undefined) return [];
+				return [tierNode(node, index) ?? node];
+			}),
+		];
+		for (const call of calls) {
+			if (flows !== undefined) {
+				checkCall(call, flows, chain, error, warning, errorsOf);
+			} else if (isKitName(call.flow)) {
+				checkCall(call, {}, chain, error, warning, errorsOf);
+			}
 		}
 	}
 

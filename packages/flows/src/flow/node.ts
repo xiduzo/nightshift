@@ -3,11 +3,14 @@ import {
 	type CallEachNode,
 	callEachOutputFields,
 	callOutputFields,
+	cascadeOutputFields,
 	commandExits,
 	commandOutputFields,
+	confidenceField,
 	type DecidedBy,
 	decisionOutputFields,
 	endOutputFields,
+	isPersonTier,
 	joinOutputFields,
 	leaseOutcomes,
 	leaseOutputFields,
@@ -89,8 +92,14 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 		}
 		case "command":
 			return commandExits(node).map((exit) => exit.name);
-		case "decision":
-			return node.options.map((option) => option.name);
+		case "decision": {
+			const options = node.options.map((option) => option.name);
+			// A cascade with no person tier ends `fail` when no tier holds.
+			const fails =
+				node.cascade !== undefined &&
+				!node.cascade.some((tier) => isPersonTier(tier));
+			return fails ? [...options, "fail"] : options;
+		}
 		case "call":
 			return node.each
 				? (["done", "halted", "stopped"] satisfies BuiltInOutcome[])
@@ -168,10 +177,24 @@ export function nodeOutputFields(
 	called?: Flow | null,
 ): readonly string[] {
 	if (runsEach(node)) return callEachOutputFields;
-	const fields: readonly string[] = outputFieldsByType[node.type];
+	const fields: readonly string[] = [
+		...outputFieldsByType[node.type],
+		...cascadeFieldsOf(node),
+	];
 	if (node.type !== "call" || !called) return fields;
 	const outputs = called.outputs
 		.map((output) => output.name)
 		.filter((name) => !fields.includes(name));
 	return [...fields, ...outputs];
+}
+
+/**
+ * The fields a cascade adds to a node's step (ADR 6): the tier that held
+ * and the tries, and for a Decision the probability of its pick.
+ */
+function cascadeFieldsOf(node: FlowNode): readonly string[] {
+	if (!("cascade" in node) || node.cascade === undefined) return [];
+	return node.type === "decision"
+		? [...cascadeOutputFields, confidenceField]
+		: cascadeOutputFields;
 }

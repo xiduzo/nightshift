@@ -8,6 +8,14 @@ import {
 	placed,
 	reservedOutcomes,
 } from "./base";
+import {
+	checkCascade,
+	isPersonTier,
+	personTierSchema,
+	RETRY_CHOICES,
+	tierBase,
+	tierLabel,
+} from "./cascade";
 
 /**
  * The Call node: it runs another flow of the project, once or once per
@@ -69,6 +77,19 @@ export const callEachSchema = z.object({
 export type CallEach = z.infer<typeof callEachSchema>;
 
 /**
+ * A tier of a Call's cascade (ADR 6): a flow of the project or a kit, and
+ * its inputs. Unset: the node's flow. On the node's flow its inputs add to
+ * the node's; another flow takes only the tier's own. They may read
+ * `{{cascade.previous}}`. A try holds when the called flow ends `pass`.
+ */
+export const callTierSchema = z.object({
+	...tierBase,
+	flow: calledFlowNameSchema.optional(),
+	inputs: bindings.optional(),
+});
+export type CallTier = z.infer<typeof callTierSchema>;
+
+/**
  * Runs another flow of the project, or a kit (`kitFlow`): once, or once per element of a list
  * with `each`. `inputs` binds each input of the called flow to a template
  * (with `each`, the element goes to the input named by `each.as`).
@@ -100,8 +121,29 @@ export const callNodeSchema = z.object({
 	flow: calledFlowNameSchema,
 	inputs: bindings.default({}),
 	each: callEachSchema.optional(),
+	/**
+	 * Without `each` only: the flows the Call climbs (ADR 6). Each tier's
+	 * flow is tried up to its `tries`, then the next tier's. The last tier
+	 * can be a person: a Gate with "try-again" and "stop". To climb over a
+	 * group of nodes, make the group a flow.
+	 */
+	cascade: z
+		.array(z.union([personTierSchema, callTierSchema]))
+		.min(1)
+		.max(8)
+		.optional(),
 });
 export type CallNode = z.infer<typeof callNodeSchema>;
+
+/** Every flow a Call node may run: its own, then each tier's of its cascade. */
+export function calledFlowNames(node: CallNode): string[] {
+	const names = [node.flow];
+	for (const tier of node.cascade ?? []) {
+		if (isPersonTier(tier) || tier.flow === undefined) continue;
+		if (!names.includes(tier.flow)) names.push(tier.flow);
+	}
+	return names;
+}
 /** A Call node with `each`: it runs its flow once per element. */
 export type CallEachNode = CallNode & { each: CallEach };
 
@@ -150,6 +192,27 @@ export function checkCallNode(node: CallNode, check: NodeCheck): void {
 	for (const [name, value] of Object.entries(node.inputs)) {
 		check.template(value, `input "${name}"`);
 	}
+	checkCallCascade(node, check);
+}
+
+/** A Call's cascade runs its flows once each: not with `each`. Its tiers' inputs read known names. */
+function checkCallCascade(node: CallNode, check: NodeCheck): void {
+	const tiers = node.cascade;
+	if (tiers === undefined) return;
+	if (node.each !== undefined) {
+		check.error(
+			`Subflow node "${node.id}" has a cascade and runs its flow for each element. A cascade climbs one run of a flow. Remove the cascade, or the list.`,
+		);
+		return;
+	}
+	checkCascade(node, { title: "Subflow", personChoices: RETRY_CHOICES }, check);
+	tiers.forEach((tier, index) => {
+		if (isPersonTier(tier)) return;
+		const label = tierLabel(tier, index);
+		for (const [name, value] of Object.entries(tier.inputs ?? {})) {
+			check.template(value, `input "${name}" of the tier "${label}"`);
+		}
+	});
 }
 
 /** Halt labels are outcomes of the called flow: valid labels, not reserved. */

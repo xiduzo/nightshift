@@ -6,8 +6,8 @@ import {
 	flowSchema,
 	migrateFlow,
 } from "../flow";
-import { flowNameSchema, isProfileRef } from "../nodes";
-import { profileOf } from "../profiles";
+import { calledFlowNames, flowNameSchema, isProfileRef } from "../nodes";
+import { nodeProfiles } from "../profiles";
 import type { ScheduleFlowInfo } from "../schedules";
 import { parseFlow } from "./flow";
 import type {
@@ -108,7 +108,8 @@ export function callersOf(name: string, flows: ProjectFlowMap): string[] {
 			([caller, flow]) =>
 				caller !== name &&
 				(flow?.nodes ?? []).some(
-					(node) => node.type === "call" && node.flow === name,
+					(node) =>
+						node.type === "call" && calledFlowNames(node).includes(name),
 				),
 		)
 		.map(([caller]) => caller)
@@ -146,10 +147,12 @@ export function devicesOf(name: string, flows: ProjectFlowMap): FlowDevices {
 		if (seen.has(flowName)) return;
 		seen.add(flowName);
 		for (const node of flows[flowName]?.nodes ?? []) {
-			const profile = profileOf(node);
-			if (isProfileRef(profile)) ids.add(profile.device);
-			else if ("device" in node && node.device) names.add(node.device);
-			if (node.type === "call") walk(node.flow);
+			const profiles = nodeProfiles(node).filter(isProfileRef);
+			for (const profile of profiles) ids.add(profile.device);
+			if (profiles.length === 0 && "device" in node && node.device) {
+				names.add(node.device);
+			}
+			if (node.type === "call") calledFlowNames(node).forEach(walk);
 		}
 	};
 	walk(name);

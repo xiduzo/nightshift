@@ -1,5 +1,13 @@
 import { z } from "zod";
-import type { Flow, FlowNode } from "../flow";
+import {
+	cascadeOf,
+	type Flow,
+	type FlowNode,
+	hasCascade,
+	lastModelTier,
+	tierNode,
+	withTierNode,
+} from "../flow";
 import {
 	type AgentHarnessName,
 	type AgentNode,
@@ -8,13 +16,16 @@ import {
 	cliNameSchema,
 	type DecisionNode,
 	deciderAddress,
+	deciderMeasuresProbability,
 	deciderNameSchema,
 	effortSchema,
+	isPersonTier,
 	isProfileRef,
 	modelAddressSchema,
 	type NodeProfile,
 	nameSchema,
 	permissionModeSchema,
+	tierLabel,
 	type ValueNode,
 	valueDeciderNameSchema,
 } from "../nodes";
@@ -121,6 +132,50 @@ export function profileOf(node: FlowNode): NodeProfile | undefined {
 		return node.by === "model" ? node.profile : undefined;
 	}
 	return undefined;
+}
+
+/**
+ * Every profile a node names: its own, or each tier's of its cascade
+ * (ADR 6). Each tier's profile places that tier's tries.
+ */
+export function nodeProfiles(node: FlowNode): NodeProfile[] {
+	const own = profileOf(node);
+	if (own !== undefined) return [own];
+	return tierUsers(node).flatMap(({ node: tier }) => {
+		const profile = profileOf(tier);
+		return profile === undefined ? [] : [profile];
+	});
+}
+
+/**
+ * The nodes a cascade's tiers run as (`tierNode`), with their index: what
+ * run start resolves and places one by one. None for a node without one.
+ */
+export function tierUsers(node: FlowNode): { index: number; node: FlowNode }[] {
+	const tiers = cascadeOf(node) ?? [];
+	return tiers.flatMap((_tier, index) => {
+		const tier = tierNode(node, index);
+		return tier === null ? [] : [{ index, node: tier }];
+	});
+}
+
+/**
+ * Why a resolved cascade does not fit its node, or null: a Decision's
+ * decider without a probability (ADR 6.8) can only be its last model tier,
+ * and tests no minimum confidence. The checks of a flow see only a tier's
+ * own decider; a profile's shows when the run resolves it.
+ */
+export function cascadeProblem(node: FlowNode): string | null {
+	if (node.type !== "decision" || node.cascade === undefined) return null;
+	const last = lastModelTier(node);
+	for (const [index, tier] of node.cascade.entries()) {
+		if (isPersonTier(tier) || tier.decider === undefined) continue;
+		if (deciderMeasuresProbability(tier.decider)) continue;
+		if (index !== last || tier.minConfidence !== undefined) {
+			return `The tier "${tierLabel(tier, index)}" of Decision node "${node.id}" uses ${tier.decider}, which gives no probability. Only the last model tier can use it, without a minimum confidence. Pick another profile, or move the tier to the end.`;
+		}
+	}
+	return null;
 }
 
 /**
@@ -258,14 +313,14 @@ export function resolveFlowProfiles(
 	problems: string[] = [],
 ): Flow {
 	let changed = false;
-	const nodes = flow.nodes.map((node) => {
+	const resolveOne = (node: FlowNode, id: string): FlowNode => {
 		const named = profileOf(node);
 		if (named === undefined) return node;
 		const name = profileLabel(named);
 		const profile = profileFor(named);
 		if (!profile) {
 			const ids = missing.get(name) ?? [];
-			if (!ids.includes(node.id)) ids.push(node.id);
+			if (!ids.includes(id)) ids.push(id);
 			missing.set(name, ids);
 			return node;
 		}
@@ -276,6 +331,19 @@ export function resolveFlowProfiles(
 		}
 		changed = true;
 		return resolved.node;
+	};
+	const nodes = flow.nodes.map((node) => {
+		if (!hasCascade(node)) return resolveOne(node, node.id);
+		let climbing: FlowNode = node;
+		for (const tier of tierUsers(node)) {
+			const resolved = resolveOne(tier.node, node.id);
+			if (resolved !== tier.node) {
+				climbing = withTierNode(climbing, tier.index, resolved);
+			}
+		}
+		const problem = cascadeProblem(climbing);
+		if (problem !== null) problems.push(problem);
+		return climbing;
 	});
 	return changed ? { ...flow, nodes } : flow;
 }

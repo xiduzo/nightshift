@@ -117,6 +117,15 @@ export function deciderAddress(
 	return DECIDER_ADDRESS[name];
 }
 
+/**
+ * Whether a decider gives a probability with its pick. A chat model
+ * (Ollama, an OpenAI-compatible server) gives the pick only, so a cascade
+ * cannot test it against a `minConfidence` (ADR 6).
+ */
+export function deciderMeasuresProbability(name: DeciderName): boolean {
+	return name !== "ollama" && name !== "compatible";
+}
+
 /** A header name, as HTTP allows it. */
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 
@@ -351,6 +360,11 @@ export type NodeCheck = {
 	 * and reads only `event`. `subject` starts each message.
 	 */
 	eventRule: (expr: string, subject: string) => void;
+	/**
+	 * Checks that a rule over a value a model made (`data.tasks`) is valid
+	 * and reads only `data`: the `accept` rule of a cascade tier.
+	 */
+	dataRule: (expr: string, subject: string) => void;
 	/** Whether an edge leaves the node on this outcome. */
 	routed: (outcome: string) => boolean;
 	/**

@@ -1,4 +1,5 @@
 import type { Flow, FlowNode } from "../flow";
+import { CASCADE_TEMPLATE_FIELDS } from "../nodes";
 import {
 	ruleNames,
 	ruleProblem,
@@ -21,6 +22,8 @@ export type Scope = {
 	template: TemplateScope;
 	/** The variables a template or a rule read so far, for the unused-variable warning. */
 	readVars: Set<string>;
+	/** The node whose templates are checked has a cascade: it reads `{{cascade.*}}` (ADR 6). */
+	cascade?: boolean;
 };
 
 /**
@@ -62,6 +65,31 @@ export function checkEventRule(
 		if (name !== "event") {
 			error(
 				`${subject} reads "${name}", but it can only read the signal as event: event.body.action = "completed".`,
+				at,
+			);
+		}
+	}
+}
+
+/**
+ * A rule over the value a model made must be valid and read only `data`
+ * (`$count(data.tasks) > 0`): the `accept` rule of a cascade tier (ADR 6).
+ */
+export function checkDataRule(
+	expr: string,
+	subject: string,
+	at: At,
+	error: Report,
+): void {
+	const problem = ruleProblem(expr);
+	if (problem !== null) {
+		error(`${subject} is not valid: ${problem}`, at);
+		return;
+	}
+	for (const name of ruleNames(expr)) {
+		if (name !== "data") {
+			error(
+				`${subject} reads "${name}", but it can only read the value as data: $count(data.tasks) > 0.`,
 				at,
 			);
 		}
@@ -159,6 +187,11 @@ export function checkRef(
 		return;
 	}
 
+	if (ref.name === "cascade" && !readsName(readable, ref.name)) {
+		checkCascadeRef(ref, uses, at, scope, error);
+		return;
+	}
+
 	const input = readable.inputs.find(
 		(candidate) => candidate.name === ref.name,
 	);
@@ -195,6 +228,36 @@ export function checkRef(
 		);
 	} else if (deeper.length > 0 && !read.json) {
 		error(`${uses}, but ${ref.name}.${field} is text: it takes no path.`, at);
+	}
+}
+
+/**
+ * `{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous}}`: only a
+ * node with a cascade reads them, and only `previous` takes a path.
+ */
+function checkCascadeRef(
+	ref: TemplateRef,
+	uses: string,
+	at: At,
+	scope: Scope,
+	error: Report,
+): void {
+	const [field, ...deeper] = ref.path;
+	if (!scope.cascade) {
+		error(
+			`${uses}, but only a node with a cascade can read cascade. Add a cascade to the node, or remove the reference.`,
+			at,
+		);
+		return;
+	}
+	const fields: readonly string[] = CASCADE_TEMPLATE_FIELDS;
+	if (field === undefined || !fields.includes(field)) {
+		error(
+			`${uses}, but the cascade has no field ${field === undefined ? "there" : `"${field}"`}. Use one of: ${fields.join(", ")}.`,
+			at,
+		);
+	} else if (deeper.length > 0 && field !== "previous") {
+		error(`${uses}, but cascade.${field} takes no path.`, at);
 	}
 }
 

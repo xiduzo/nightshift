@@ -4,13 +4,22 @@ import {
 	checkNodeProfile,
 	type DeciderName,
 	deciderNameSchema,
-	labelSchema,
 	modelAddressSchema,
 	type NodeCheck,
 	nodeBase,
 	nodeProfileSchema,
 	placed,
 } from "./base";
+import {
+	checkCascade,
+	checkModelTier,
+	gateDeadlineSchema,
+	isPersonTier,
+	personTierSchema,
+	probabilityProblem,
+	tierBase,
+	tierLabel,
+} from "./cascade";
 import { checkOptions, option } from "./outcomes";
 
 /**
@@ -23,18 +32,21 @@ export const decidedBySchema = z.enum(["person", "rule", "model"]);
 export type DecidedBy = z.infer<typeof decidedBySchema>;
 
 /**
- * When a Gate stops waiting, in the same forms as a Wait node: `at`, a
- * template that renders a date and time (`2026-10-18T07:00`) or a time of
- * day (`07:00`: the next one after the Gate opens), or `minutes` after the
- * Gate opens. Exactly one of the two (the validator checks it). `choose`
- * names the option the Gate takes then.
+ * A tier of a Decision's cascade (ADR 6): a Model Profile, or its own
+ * decider and model, and the probability its pick needs to hold. Without
+ * `minConfidence` every pick holds. A run copies the profile's address
+ * onto the tier, as onto a node.
  */
-export const gateDeadlineSchema = z.object({
-	at: z.string().optional(),
-	minutes: z.number().int().positive().optional(),
-	choose: labelSchema,
+export const decisionTierSchema = z.object({
+	...tierBase,
+	profile: nodeProfileSchema.optional(),
+	decider: deciderNameSchema.optional(),
+	model: z.string().min(1).optional(),
+	address: modelAddressSchema.optional(),
+	/** The least probability, from 0 to 1, the pick needs. Unset: every pick holds. */
+	minConfidence: z.number().min(0).max(1).optional(),
 });
-export type GateDeadline = z.infer<typeof gateDeadlineSchema>;
+export type DecisionTier = z.infer<typeof decisionTierSchema>;
 
 /**
  * Picks one of its options, which is the step's outcome. `by` says who:
@@ -91,6 +103,18 @@ export const decisionNodeSchema = z.object({
 	 * waits as long as it must.
 	 */
 	deadline: gateDeadlineSchema.optional(),
+	/**
+	 * `by: "model"` only: the tiers a model climbs (ADR 6). The first tier
+	 * picks; a pick below its `minConfidence` goes to the next tier. The
+	 * last tier can be a person: a Gate that shows each tier's pick. It
+	 * replaces the node's `profile`, `decider` and `model`. Without a
+	 * person tier, the step ends `fail` when the last tier does not hold.
+	 */
+	cascade: z
+		.array(z.union([personTierSchema, decisionTierSchema]))
+		.min(1)
+		.max(8)
+		.optional(),
 });
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
 
@@ -101,8 +125,14 @@ export function decisionDecider(
 	return node.decider ?? "typesafe";
 }
 
-/** outcome: the option. note: what the person wrote, or why the model picked it. */
+/**
+ * outcome: the option. note: what the person wrote, or why the model
+ * picked it. With a cascade also `tier`, `tries` and `confidence`.
+ */
 export const decisionOutputFields = ["outcome", "note", "visit"] as const;
+
+/** The probability of the pick that held, a field of a Decision with a cascade. */
+export const confidenceField = "confidence";
 
 /** Who picks a Decision's option, for the warning on an option without an edge. */
 const pickerWords: Record<DecisionNode["by"], string> = {
@@ -125,6 +155,7 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 	);
 	checkDecidedBy(node, check);
 	checkDeadline(node, check);
+	checkDecisionCascade(node, check);
 	checkModelAddress(node, "Decision", check);
 	if (node.profile !== undefined && node.by !== "model") {
 		check.error(
@@ -134,6 +165,55 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 		checkNodeProfile(node, "Decision", check);
 	}
 	check.template(node.prompt, "prompt");
+}
+
+/**
+ * A Decision's cascade belongs to a model, replaces its profile, decider
+ * and model, and its tiers follow the model tier checks. A decider without
+ * a probability is the last model tier only. No option may be named
+ * `fail`: a cascade that does not hold ends there.
+ */
+function checkDecisionCascade(node: DecisionNode, check: NodeCheck): void {
+	const tiers = node.cascade;
+	if (tiers === undefined) return;
+	if (node.by !== "model") {
+		check.error(
+			`Decision node "${node.id}" has a cascade, but ${node.by === "person" ? "you decide" : "a rule decides"} it. Only a model climbs a cascade. Remove the cascade, or let a model decide.`,
+		);
+		return;
+	}
+	const replaced = [
+		node.profile !== undefined ? "a profile" : null,
+		node.decider !== undefined ? "a decider" : null,
+		node.model !== undefined ? "a model" : null,
+	].filter((name) => name !== null);
+	if (replaced.length > 0) {
+		check.error(
+			`Decision node "${node.id}" has a cascade and ${replaced.join(" and ")}. The tiers of the cascade name the models. Remove ${replaced.length === 1 ? "it" : "them"} from the node.`,
+		);
+	}
+	if (node.options.some((option) => option.name === "fail")) {
+		check.error(
+			`Decision node "${node.id}" has a cascade and an option named "fail". A cascade that does not hold ends on fail. Rename the option.`,
+		);
+	}
+	const options = node.options.map((option) => option.name);
+	checkCascade(node, { title: "Decision", personChoices: options }, check);
+	const lastModel = tiers.findLastIndex((tier) => !isPersonTier(tier));
+	tiers.forEach((tier, index) => {
+		if (isPersonTier(tier)) return;
+		const label = tierLabel(tier, index);
+		checkModelTier(node.id, tier, label, "Decision", check);
+		const problem = probabilityProblem({
+			nodeId: node.id,
+			label,
+			decider:
+				tier.decider ?? (tier.profile === undefined ? "typesafe" : undefined),
+			minConfidence: tier.minConfidence,
+			lastModelTier: index === lastModel,
+		});
+		if (problem !== null) check.error(problem);
+	});
 }
 
 /**

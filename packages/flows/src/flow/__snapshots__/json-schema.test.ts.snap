@@ -99,6 +99,165 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "string",
                 },
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "deadline": {
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "properties": {
+                          "clis": {
+                            "items": {
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "connections": {
+                            "items": {
+                              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "effort": {
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high",
+                              "xhigh",
+                              "max",
+                            ],
+                            "type": "string",
+                          },
+                          "harness": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "claude-code",
+                                  "opencode",
+                                  "codex",
+                                  "grok-build",
+                                  "copilot",
+                                  "gemini",
+                                  "cursor",
+                                  "pi",
+                                ],
+                                "type": "string",
+                              },
+                              {
+                                "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "model": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "permissionMode": {
+                            "enum": [
+                              "default",
+                              "acceptEdits",
+                              "auto",
+                              "bypassPermissions",
+                              "plan",
+                            ],
+                            "type": "string",
+                          },
+                          "profile": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "device": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "profile": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "device",
+                                  "profile",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "session": {
+                            "enum": [
+                              "fresh",
+                              "resume",
+                            ],
+                            "type": "string",
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "check": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "type": "string",
+                },
                 "clis": {
                   "items": {
                     "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
@@ -516,6 +675,142 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "string",
                 },
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "deadline": {
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "properties": {
+                          "address": {
+                            "properties": {
+                              "apiKey": {
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                                "type": "string",
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                              },
+                              "headers": {
+                                "additionalProperties": {
+                                  "maxLength": 4000,
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "propertyNames": {
+                                  "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                                  "type": "string",
+                                },
+                                "type": "object",
+                              },
+                            },
+                            "required": [
+                              "baseUrl",
+                            ],
+                            "type": "object",
+                          },
+                          "decider": {
+                            "enum": [
+                              "typesafe",
+                              "openrouter",
+                              "openai",
+                              "ollaya",
+                              "ollama",
+                              "openjev",
+                              "compatible",
+                            ],
+                            "type": "string",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "minConfidence": {
+                            "maximum": 1,
+                            "minimum": 0,
+                            "type": "number",
+                          },
+                          "model": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "profile": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "device": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "profile": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "device",
+                                  "profile",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
+                },
                 "deadline": {
                   "properties": {
                     "at": {
@@ -703,6 +998,89 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
             },
             {
               "properties": {
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "deadline": {
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "properties": {
+                          "flow": {
+                            "anyOf": [
+                              {
+                                "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+                                "type": "string",
+                              },
+                              {
+                                "pattern": "^kit:[a-z0-9][a-z0-9-]{0,29}\\/[a-z0-9][a-z0-9-]{0,59}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "inputs": {
+                            "additionalProperties": {
+                              "type": "string",
+                            },
+                            "propertyNames": {
+                              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                              "type": "string",
+                            },
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
+                },
                 "device": {
                   "maxLength": 64,
                   "minLength": 1,
@@ -908,6 +1286,140 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "model",
                   ],
                   "type": "string",
+                },
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "deadline": {
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "properties": {
+                          "accept": {
+                            "type": "string",
+                          },
+                          "address": {
+                            "properties": {
+                              "apiKey": {
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                                "type": "string",
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                              },
+                              "headers": {
+                                "additionalProperties": {
+                                  "maxLength": 4000,
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "propertyNames": {
+                                  "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                                  "type": "string",
+                                },
+                                "type": "object",
+                              },
+                            },
+                            "required": [
+                              "baseUrl",
+                            ],
+                            "type": "object",
+                          },
+                          "decider": {
+                            "enum": [
+                              "typesafe",
+                              "openrouter",
+                              "openai",
+                              "ollaya",
+                              "ollama",
+                              "openjev",
+                              "compatible",
+                            ],
+                            "type": "string",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "model": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "profile": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "device": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "profile": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "device",
+                                  "profile",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
                 },
                 "decider": {
                   "enum": [
@@ -1925,6 +2437,169 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "string",
                 },
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "deadline": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "clis": {
+                            "items": {
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "connections": {
+                            "items": {
+                              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "effort": {
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high",
+                              "xhigh",
+                              "max",
+                            ],
+                            "type": "string",
+                          },
+                          "harness": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "claude-code",
+                                  "opencode",
+                                  "codex",
+                                  "grok-build",
+                                  "copilot",
+                                  "gemini",
+                                  "cursor",
+                                  "pi",
+                                ],
+                                "type": "string",
+                              },
+                              {
+                                "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "model": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "permissionMode": {
+                            "enum": [
+                              "default",
+                              "acceptEdits",
+                              "auto",
+                              "bypassPermissions",
+                              "plan",
+                            ],
+                            "type": "string",
+                          },
+                          "profile": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "device": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "profile": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "device",
+                                  "profile",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "session": {
+                            "enum": [
+                              "fresh",
+                              "resume",
+                            ],
+                            "type": "string",
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "check": {
+                  "maxLength": 2000,
+                  "minLength": 1,
+                  "type": "string",
+                },
                 "clis": {
                   "items": {
                     "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
@@ -2354,6 +3029,147 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "string",
                 },
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "deadline": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "address": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "apiKey": {
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                                "type": "string",
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                              },
+                              "headers": {
+                                "additionalProperties": {
+                                  "maxLength": 4000,
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "propertyNames": {
+                                  "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                                  "type": "string",
+                                },
+                                "type": "object",
+                              },
+                            },
+                            "required": [
+                              "baseUrl",
+                            ],
+                            "type": "object",
+                          },
+                          "decider": {
+                            "enum": [
+                              "typesafe",
+                              "openrouter",
+                              "openai",
+                              "ollaya",
+                              "ollama",
+                              "openjev",
+                              "compatible",
+                            ],
+                            "type": "string",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "minConfidence": {
+                            "maximum": 1,
+                            "minimum": 0,
+                            "type": "number",
+                          },
+                          "model": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "profile": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "device": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "profile": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "device",
+                                  "profile",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
+                },
                 "deadline": {
                   "additionalProperties": false,
                   "properties": {
@@ -2547,6 +3363,92 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
             {
               "additionalProperties": false,
               "properties": {
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "deadline": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "flow": {
+                            "anyOf": [
+                              {
+                                "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+                                "type": "string",
+                              },
+                              {
+                                "pattern": "^kit:[a-z0-9][a-z0-9-]{0,29}\\/[a-z0-9][a-z0-9-]{0,59}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "inputs": {
+                            "additionalProperties": {
+                              "type": "string",
+                            },
+                            "propertyNames": {
+                              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                              "type": "string",
+                            },
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
+                },
                 "device": {
                   "maxLength": 64,
                   "minLength": 1,
@@ -2763,6 +3665,145 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "model",
                   ],
                   "type": "string",
+                },
+                "cascade": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "deadline": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "at": {
+                                "type": "string",
+                              },
+                              "choose": {
+                                "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                                "type": "string",
+                              },
+                              "minutes": {
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "choose",
+                            ],
+                            "type": "object",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "person": {
+                            "const": true,
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "person",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "accept": {
+                            "type": "string",
+                          },
+                          "address": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "apiKey": {
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                                "type": "string",
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                              },
+                              "headers": {
+                                "additionalProperties": {
+                                  "maxLength": 4000,
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "propertyNames": {
+                                  "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                                  "type": "string",
+                                },
+                                "type": "object",
+                              },
+                            },
+                            "required": [
+                              "baseUrl",
+                            ],
+                            "type": "object",
+                          },
+                          "decider": {
+                            "enum": [
+                              "typesafe",
+                              "openrouter",
+                              "openai",
+                              "ollaya",
+                              "ollama",
+                              "openjev",
+                              "compatible",
+                            ],
+                            "type": "string",
+                          },
+                          "label": {
+                            "maxLength": 40,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "model": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "profile": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "device": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "profile": {
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "device",
+                                  "profile",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "tries": {
+                            "maximum": 10,
+                            "minimum": 1,
+                            "type": "integer",
+                          },
+                        },
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "type": "array",
                 },
                 "decider": {
                   "enum": [
@@ -4662,14 +5703,16 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
-  "agentNodeSchema": "a9d50d21de9131d8106ed7197b4513b0319241e001cb7cb926b7e20ca88b8aa7",
+  "agentNodeSchema": "49363b42f0b9d2bfa6adc4ef2b7fb660c7b21b9a1b907e446392f21b3dda27aa",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
+  "agentTierSchema": "adbfb5ff1e0cd15b8f217bdc0015d321fa6a03f41c130deefa2d36eb4b4e7803",
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
-  "callNodeSchema": "2df95633dbf823f195ca6bf1c95cd5d69a7f7ca94928ce4408a05e6fa737198b",
+  "callNodeSchema": "cc57048a2024ee5bc09a3896327429864259bbdf3e7ec92ef11e118654966522",
+  "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "e917de8f0af3dfe81b65d8b48950ae0c6d071960d83fc0f650dba81afbafe0dd",
+  "chatRequestSchema": "18c801ddfe8ae3e0f116a28eb2e6afc5afdd97532a0f1c20f9a79a77df9539ba",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -4679,7 +5722,8 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "customHarnessSchema": "340fd5e4d3041404dcebc63ea2a312d8dba0e6b3c15d5b50b154df7a8f58ddb7",
   "decidedBySchema": "ba1eaed1ee91e185e0fe25e4b3ab48ebc800aac50bbe3b6f3762a1ddd7c5e6fe",
   "deciderNameSchema": "4338c2d9e635bf58f12c7dbe4716a305d0f6f491819629502015bd6a25a672c3",
-  "decisionNodeSchema": "2de1b57d2ab8e9003cf008b94acbbbf8a4ab6770793e1a15c2a56b5ce06b318a",
+  "decisionNodeSchema": "65aa6daa35851b678ee262a9016d67e27e148dbc091651026cff696e55fe5555",
+  "decisionTierSchema": "0640dc95d8a504367bbc6ccd14507b9721833cb53cd7d347ba4bb67e612d35b1",
   "deviceNameSchema": "c385fef4336b7131063a6ba2bc416a02725ab5eedb75af59ca29bafd252dc91b",
   "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
   "endNodeSchema": "9860d3288583367ade9b096862b726129131ef682df8a10ef4623a742ebc9953",
@@ -4688,9 +5732,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "7900dda6fcab188cbfb52e9b4e0f700ed450f2110baab29d30c722a01aa1e205",
+  "flowNodeSchema": "b158e37247b42230de8a96c2dcf0a5fd3fa23c73c824195cb818e3938e458354",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "99a2adb61737f218809c17a593243b6907bbc1327ffd523235bb542d71d7aea2",
+  "flowSchema": "93342ec4c354c62bef45c2b401ed3749d6ea9f8b4b96e9b973a54e9952694e32",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -4718,6 +5762,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "outcomeColorSchema": "a08d55161170d015984cde21947f73357d874c2c1469cf21d5df857936510817",
   "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
+  "personTierSchema": "8a46dbdb8b2ab3d01267ca29c3a6aa54ef27e714696f40ffe828658696d240c3",
   "policySchema": "fedfbecaffb7cf8c448cefd0ace896279f26e28d10f7d633245dd2876451a7b1",
   "profileRefSchema": "c7fda85c2da98330849db69ce0ddf66f6963b19edf33ce234237888cf5366222",
   "profileSchema": "c85890b1cbf0dbf0c6e8c78e3841b86358311f25b9a9f9635e18f42412a9e128",
@@ -4730,14 +5775,15 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "3759a6c27cfb361adbc7dae07f728cf2bb77621f33c26af8ec62db4eb2157edb",
+  "suggestionRequestSchema": "25681e427c88ad4905a1694e6a8e91ee51da24b67f34e6849bdad78e78152cd2",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",
   "valueBySchema": "bd03d7f4d6a9ce81bfdb8638ac71508d4761cd359a8b94bdc2fc070915a01cfd",
   "valueDeciderNameSchema": "1361d0968d68d449cc2f2a7659681f2bacff35a15c5fe94ac1f5f6777b100a48",
-  "valueNodeSchema": "cf855a4b3dd866128d7bea6904e3bdce2980857d80f82051d9bea2d84db81344",
+  "valueNodeSchema": "8ec55153b8306a676db8af0c1e98bc138df657b2fc772dca52675156cf87cb83",
+  "valueTierSchema": "283dcc80e09de2a2b3783c1b1330999bceecf200da194633e7c3d997ba2b07b3",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
   "waitNodeSchema": "38b0da541b71acb64e8ef7e2877924632c1ab931e0e3afe3e9886d51b78a5a4b",

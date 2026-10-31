@@ -12,6 +12,13 @@ export {
 	fanOutsOf,
 } from "./branches";
 export {
+	cascadeOf,
+	hasCascade,
+	lastModelTier,
+	tierNode,
+	withTierNode,
+} from "./cascade";
+export {
 	DEFAULT_POLICY,
 	FLOW_VERSION,
 	type Flow,

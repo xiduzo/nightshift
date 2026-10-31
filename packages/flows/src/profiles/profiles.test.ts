@@ -10,9 +10,11 @@ import { validateFlow } from "../validate";
 import {
 	type AgentProfileSettings,
 	agentProfileSettingsSchema,
+	cascadeProblem,
 	type ModelProfileSettings,
 	modelAddressProblem,
 	modelProfileSettingsSchema,
+	nodeProfiles,
 	profileLabel,
 	profileSettingsSchema,
 	resolveAgentNode,
@@ -421,5 +423,61 @@ describe("the address of a model profile", () => {
 		expect(issues).toContain(
 			'Value node "plan" sets an address. Put the address on a Model Profile, and pick that profile.',
 		);
+	});
+});
+
+describe("the profiles of a cascade (ADR 6)", () => {
+	const local: ModelProfileSettings = { decider: "ollama", model: "qwen3" };
+
+	test("each tier's profile is resolved onto its tier, and the node names them all", () => {
+		const climbing = node({
+			profile: undefined,
+			cascade: [
+				{ profile: { device: "mac", profile: "builder" }, tries: 2 },
+				{ person: true },
+			],
+		});
+		expect(nodeProfiles(climbing)).toEqual([
+			{ device: "mac", profile: "builder" },
+		]);
+		const resolved = resolveFlowProfiles(flowOf(climbing), () => builder);
+		expect((resolved.nodes[0] as AgentNode).cascade).toEqual([
+			{
+				profile: { device: "mac", profile: "builder" },
+				tries: 2,
+				harness: "opencode",
+				model: "openai/gpt-5.2",
+				effort: "high",
+				permissionMode: "auto",
+				clis: ["gh"],
+				connections: ["playwright"],
+			},
+			{ person: true },
+		]);
+	});
+
+	test("a profile's decider without a probability shows as a problem when it is not the last model tier", () => {
+		const climbing = decision({
+			profile: undefined,
+			cascade: [
+				{ profile: { device: "mac", profile: "local" }, minConfidence: 0.8 },
+				{ profile: { device: "mac", profile: "triage" } },
+			],
+		});
+		const problems: string[] = [];
+		const resolved = resolveFlowProfiles(
+			flowOf(climbing),
+			(profile) => (profileLabel(profile) === "local" ? local : triage),
+			new Map(),
+			problems,
+		);
+		expect((resolved.nodes[0] as DecisionNode).cascade?.[0]).toMatchObject({
+			decider: "ollama",
+			model: "qwen3",
+		});
+		expect(problems).toEqual([
+			'The tier "1" of Decision node "pick" uses ollama, which gives no probability. Only the last model tier can use it, without a minimum confidence. Pick another profile, or move the tier to the end.',
+		]);
+		expect(cascadeProblem(resolved.nodes[0] as DecisionNode)).not.toBeNull();
 	});
 });

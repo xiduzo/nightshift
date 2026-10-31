@@ -1,6 +1,6 @@
 import { type Flow, NODE_TYPE_LABEL, runsEach } from "../flow";
 import { isKitName, kitFlow } from "../kits";
-import type { CallNode } from "../nodes";
+import { type CallNode, calledFlowNames } from "../nodes";
 import type { ProjectFlowMap, Report, ValidateOptions } from "./issues";
 
 /** The checks of a Call node that need the flow it calls. */
@@ -138,11 +138,13 @@ function pathBack(
 	const queue = [start];
 	for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
 		const flow = Object.hasOwn(flows, name) ? flows[name] : null;
-		for (const node of flow?.nodes ?? []) {
-			if (node.type !== "call") continue;
-			if (parent.has(node.flow)) continue;
-			parent.set(node.flow, name);
-			if (node.flow === target) {
+		const called = (flow?.nodes ?? []).flatMap((node) =>
+			node.type === "call" ? calledFlowNames(node) : [],
+		);
+		for (const next of called) {
+			if (parent.has(next)) continue;
+			parent.set(next, name);
+			if (next === target) {
 				const path = [target];
 				for (let at = name; at !== start; ) {
 					path.push(at);
@@ -151,7 +153,7 @@ function pathBack(
 				path.push(start);
 				return path.reverse();
 			}
-			if (!skip.has(node.flow)) queue.push(node.flow);
+			if (!skip.has(next)) queue.push(next);
 		}
 	}
 	return null;

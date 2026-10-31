@@ -13,7 +13,13 @@ import {
 } from "../nodes";
 import { nodesWithin, sectionPath } from "../sections";
 import type { Report } from "./issues";
-import { checkEventRule, checkRule, checkTemplate, type Scope } from "./scope";
+import {
+	checkDataRule,
+	checkEventRule,
+	checkRule,
+	checkTemplate,
+	type Scope,
+} from "./scope";
 
 /**
  * The checks of one node's own content. Each node type keeps its checks in
@@ -27,13 +33,19 @@ export function checkNode(
 	warning: Report,
 ): void {
 	const at = { nodeId: node.id };
+	// A node with a cascade reads `{{cascade.*}}` in its own templates.
+	const own =
+		"cascade" in node && node.cascade !== undefined
+			? { ...scope, cascade: true }
+			: scope;
 	const check: NodeCheck = {
 		error: (message) => error(message, at),
 		warning: (message) => warning(message, at),
 		template: (text, where) =>
-			checkTemplate(text, `The ${where} of "${node.id}"`, at, scope, error),
+			checkTemplate(text, `The ${where} of "${node.id}"`, at, own, error),
 		rule: (expr, subject) => checkRule(expr, subject, at, scope, error),
 		eventRule: (expr, subject) => checkEventRule(expr, subject, at, error),
+		dataRule: (expr, subject) => checkDataRule(expr, subject, at, error),
 		routed: (outcome) =>
 			scope.flow.edges.some(
 				(edge) => edge.from === node.id && edge.outcome === outcome,
