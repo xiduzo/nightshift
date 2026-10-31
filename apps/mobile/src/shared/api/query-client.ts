@@ -7,6 +7,8 @@ import {
 import { addNetworkStateListener, getNetworkStateAsync } from "expo-network";
 import { AppState } from "react-native";
 
+import { setPhoneQueryDefaults } from "./query-defaults";
+
 /**
  * The app in front counts as focus: when the person comes back to it, the
  * screens read again what went stale meanwhile.
@@ -37,9 +39,15 @@ function followNetwork() {
 	});
 }
 
-/** The query client of the phone: the shared rules, the app's focus and the network. */
+/**
+ * The query client of the phone: the shared rules, how long each kind of
+ * read stays fresh and kept (`setPhoneQueryDefaults`), the app's focus and
+ * the network.
+ */
 export function createQueryClient(): QueryClient {
 	followAppState();
 	followNetwork();
-	return createSharedQueryClient();
+	const client = createSharedQueryClient();
+	setPhoneQueryDefaults(client);
+	return client;
 }

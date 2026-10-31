@@ -5,10 +5,7 @@ import Constants from "expo-constants";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Updates from "expo-updates";
 
-import { keptQuery } from "./kept-queries";
-
-/** How long a kept read may show at the next start. Older ones are dropped. */
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+import { firstPageOnly, KEPT_MAX_AGE_MS, keptQuery } from "./kept-queries";
 
 /**
  * A new build or update of the app drops what the phone kept: its screens
@@ -57,6 +54,10 @@ function keyOf(address: string, personId: string): string {
  * Keeps the reads of the screens between starts, for one Person at one
  * Host (`keptQuery`): it puts back what it kept, then writes each change.
  * Returns the stop, and the promise of the put back.
+ *
+ * What it puts back is from an earlier start: it shows at once, and reads
+ * again when a screen shows it. Gates and runs stay fresh until the live
+ * cache says so, and it does not know what changed while the app was closed.
  */
 export function keepQueries(
 	queryClient: QueryClient,
@@ -65,13 +66,24 @@ export function keepQueries(
 ): [stop: () => void, restored: Promise<void>] {
 	const key = keyOf(address, personId);
 	forgotten.delete(key);
-	return persistQueryClient({
+	const [stop, restoring] = persistQueryClient({
 		queryClient,
-		persister: createAsyncStoragePersister({ storage, key }),
-		maxAge: MAX_AGE_MS,
+		persister: createAsyncStoragePersister({
+			storage,
+			key,
+			serialize: (kept) => JSON.stringify(firstPageOnly(kept)),
+		}),
+		maxAge: KEPT_MAX_AGE_MS,
 		buster: BUSTER,
 		dehydrateOptions: { shouldDehydrateQuery: keptQuery },
 	});
+	const restored = restoring.then(() =>
+		queryClient.invalidateQueries({
+			predicate: keptQuery,
+			refetchType: "none",
+		}),
+	);
+	return [stop, restored];
 }
 
 /** Forgets what the phone kept for one Person at one Host: they signed out. */

@@ -1,7 +1,40 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 
-import { keptQuery } from "./kept-queries";
+import { firstPageOnly, keptQuery } from "./kept-queries";
+
+describe("what the phone writes of the kept reads", () => {
+	const kept = (
+		queries: { queryKey: unknown[]; state: { data?: unknown } }[],
+	) => ({
+		buster: "1",
+		timestamp: 0,
+		clientState: { mutations: [], queries },
+	});
+
+	test("keeps only the first page of a read in pages", () => {
+		const data = { pages: [["r1", "r2"], ["r3"]], pageParams: [null, "r2"] };
+		const pages = {
+			queryKey: [["runs", "list"], { type: "infinite", input: {} }],
+			state: { data },
+		};
+		const written = firstPageOnly(kept([pages]));
+		expect(written.clientState.queries[0]?.state.data).toEqual({
+			pages: [["r1", "r2"]],
+			pageParams: [null],
+		});
+		// What the cache holds stays the same.
+		expect(data.pages).toHaveLength(2);
+	});
+
+	test("keeps a plain read as it is", () => {
+		const plain = {
+			queryKey: [["gates", "list"], { type: "query" }],
+			state: { data: [{ runId: "r1" }] },
+		};
+		expect(firstPageOnly(kept([plain])).clientState.queries[0]).toBe(plain);
+	});
+});
 
 /** A query with `queryKey`, read or not yet. */
 const query = (queryKey: unknown[], status: "success" | "error" = "success") =>
