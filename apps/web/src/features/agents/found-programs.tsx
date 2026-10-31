@@ -11,8 +11,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import type { FoundProgram } from "@/shared/api";
+import type { CheckTarget, FoundProgram } from "@/shared/api";
 import type { Selection } from "./agents-selection";
+import { checkState, useCliCheck } from "./connections/cli-panel";
+import { CheckBadge } from "./connections/parts";
 import {
 	cliToolQueries,
 	harnessQueries,
@@ -63,28 +65,42 @@ export function useFoundPrograms(
 	return {
 		agents: programs.filter((program) => program.kind === "agent"),
 		tools: programs.filter((program) => program.kind !== "agent"),
-		row: (program) => (
-			<FoundItem
-				key={program.program}
-				program={program}
-				pending={
-					setUp.isPending && setUp.variables?.program === program.program
-				}
-				disabled={setUp.isPending}
-				onSetUp={() => setUp.mutate({ program: program.program })}
-			/>
-		),
+		row: (program) => {
+			const props = {
+				program,
+				pending:
+					setUp.isPending && setUp.variables?.program === program.program,
+				disabled: setUp.isPending,
+				onSetUp: () => setUp.mutate({ program: program.program }),
+			};
+			return program.kind === "agent" ? (
+				<FoundAgentItem
+					key={program.program}
+					harness={program.harness}
+					{...props}
+				/>
+			) : (
+				<FoundItem key={program.program} problem={null} {...props} />
+			);
+		},
 	};
 }
 
-/** A program that is here but not used yet: a dashed row with one action. */
+/**
+ * A program that is here but not used yet: a dashed row with one action.
+ * An agent CLI that its harness check refuses (an unsupported version, say)
+ * shows that problem instead of "On this computer".
+ */
 function FoundItem({
 	program,
+	problem,
 	pending,
 	disabled,
 	onSetUp,
 }: {
 	program: FoundProgram;
+	/** Why the program cannot run, from its check. */
+	problem: string | null;
 	pending: boolean;
 	disabled: boolean;
 	onSetUp: () => void;
@@ -94,12 +110,14 @@ function FoundItem({
 			<ItemContent>
 				<ItemTitle className="text-muted-foreground">{program.label}</ItemTitle>
 				<ItemDescription>
-					{program.kind === "agent"
-						? "On this computer, no profile uses it yet"
-						: "On this computer, not added yet"}
+					{problem ??
+						(program.kind === "agent"
+							? "On this computer, no profile uses it yet"
+							: "On this computer, not added yet")}
 				</ItemDescription>
 			</ItemContent>
 			<ItemActions>
+				{problem ? <CheckBadge state="problem" /> : null}
 				<Button
 					size="sm"
 					variant="outline"
@@ -116,4 +134,17 @@ function FoundItem({
 			</ItemActions>
 		</Item>
 	);
+}
+
+/** A found agent CLI: its harness check decides whether it shows a problem. */
+function FoundAgentItem({
+	harness,
+	...props
+}: Omit<Parameters<typeof FoundItem>[0], "problem"> & {
+	harness: CheckTarget;
+}) {
+	const check = useCliCheck(harness);
+	const problem =
+		checkState(check.data) === "problem" ? (check.data?.problem ?? null) : null;
+	return <FoundItem {...props} problem={problem} />;
 }
