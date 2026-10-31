@@ -307,7 +307,13 @@ export const runDetailSchema = exact<RunDetail>()(
 		commands: z.array(
 			z.object({
 				id: z.string(),
-				kind: z.enum(["gate.resolve", "signal.send", "run.stop", "run.move"]),
+				kind: z.enum([
+					"gate.resolve",
+					"signal.send",
+					"run.stop",
+					"run.move",
+					"lease.release",
+				]),
 				createdAt: z.number(),
 			}),
 		),
@@ -318,6 +324,16 @@ export const runDetailSchema = exact<RunDetail>()(
 				from: runWalkerSchema,
 				to: runWalkerSchema,
 				commit: z.string(),
+			}),
+		),
+		leases: z.array(
+			z.object({
+				name: z.string(),
+				state: z.enum(["held", "waiting"]),
+				nodeId: z.string(),
+				section: z.string().nullable(),
+				since: z.number(),
+				holder: z.object({ runId: z.string(), title: z.string() }).nullable(),
 			}),
 		),
 		variables: z.array(

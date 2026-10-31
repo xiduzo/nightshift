@@ -133,6 +133,24 @@ export const runs = {
 		.handler(({ context, input }) =>
 			context.space.act(input.runId, { kind: "move", to: input.deviceId }),
 		),
+	/**
+	 * Lets go of a lease the run holds (ADR 7): the next run that waits for
+	 * it takes it. The run goes on without it.
+	 */
+	releaseLease: runProcedure(
+		z.object({ runId: z.string(), name: z.string().min(1).max(500) }),
+		{ run: ["stop"] },
+	)
+		.route({
+			summary: "Lets go of a lease a run holds, so another run can take it.",
+		})
+		.output(output(z.void()))
+		.handler(({ context, input }) =>
+			context.space.act(input.runId, {
+				kind: "release-lease",
+				name: input.name,
+			}),
+		),
 	/** The Person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
 	moveTargets: runProcedure(z.object({ runId: z.string() }))
 		.route({

@@ -154,6 +154,11 @@ const runCommandInput = z.discriminatedUnion("kind", [
 		kind: z.literal("run.move"),
 		payload: z.object({ to: z.string().min(1).max(64) }),
 	}),
+	z.object({
+		runId: z.string().min(1),
+		kind: z.literal("lease.release"),
+		payload: z.object({ name: z.string().min(1).max(500) }),
+	}),
 ]);
 
 /** One of the Person's Devices, with whether it is online and has a Clone. */

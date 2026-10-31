@@ -26,6 +26,8 @@ export const COMMAND_PERMISSION = {
 	"signal.send": { signal: ["send"] },
 	"run.stop": { run: ["stop"] },
 	"run.move": { run: ["move"] },
+	// Letting go of a lease cuts into the run, as a stop does.
+	"lease.release": { run: ["stop"] },
 } as const satisfies Record<RunCommandKind, Record<string, string[]>>;
 
 /**
@@ -178,5 +180,7 @@ export async function applyRunCommand(
 			return space.act(runId, { kind: "stop", ...command.payload });
 		case "run.move":
 			return space.act(runId, { kind: "move", ...command.payload });
+		case "lease.release":
+			return space.act(runId, { kind: "release-lease", ...command.payload });
 	}
 }

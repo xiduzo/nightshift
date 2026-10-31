@@ -723,6 +723,7 @@ export function createEngine(
 		flowOf: parseRunFlow,
 		placement,
 		holds: startHolds,
+		leases,
 	});
 
 	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */

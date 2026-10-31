@@ -19,7 +19,7 @@ import {
 	visitKey,
 	type WaitReason,
 } from "../log";
-import type { RunResume, ScopeTraversals } from "./views";
+import type { RunLease, RunResume, ScopeTraversals } from "./views";
 
 /**
  * Views of a run's state (`RunState`, one fold of its event log): its
@@ -87,6 +87,45 @@ export function isOpenStatus(status: RunStatus): boolean {
 /** When the run ended: the time of its `RunEnded`, or null while it is open again or never ended. */
 export function deriveEndedAt(run: RunState): number | null {
 	return run.latest?.ended ? run.latest.at : null;
+}
+
+/**
+ * The leases of the run (ADR 7): those it holds now, oldest first, then
+ * the one its Lease step waits for. An ended run holds none.
+ */
+export function deriveLeases(run: RunState): RunLease[] {
+	const held: RunLease[] = run.holds.flatMap((hold) =>
+		hold.kind === "lease"
+			? [
+					{
+						name: hold.name,
+						state: "held",
+						nodeId: hold.nodeId,
+						section: hold.section?.id ?? null,
+						since: hold.at,
+						holder: null,
+					},
+				]
+			: [],
+	);
+	const sleep = deriveSleep(run);
+	const lease = run.wait?.payload.lease;
+	const step = sleep ? run.steps.get(sleep.stepId) : undefined;
+	if (sleep?.reason !== "lease" || !lease || !step) return held;
+	return [
+		...held,
+		{
+			name: lease.name,
+			state: "waiting",
+			nodeId: step.nodeId,
+			section: null,
+			since: run.wait?.payload.since ?? step.startedAt,
+			holder:
+				lease.holder === null
+					? null
+					: { runId: lease.holder, title: lease.holderTitle ?? "" },
+		},
+	];
 }
 
 export type SleepFact = {

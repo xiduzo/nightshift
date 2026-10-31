@@ -6,6 +6,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow, FlowEdge, FlowNode, LeaseNode } from "@nightshift/flows";
+import { applyRunCommand } from "../exchange/commands";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 
 /**
@@ -155,5 +156,23 @@ describe("leases across Devices", () => {
 		} finally {
 			await c.cleanup();
 		}
+	});
+
+	test("given B's run holds a lease, when B applies a person's release from A, then B logs it and A lets go", async () => {
+		const run = await paired.device
+			.space(a.spaceId)
+			.startRun({ projectId, flow: holding });
+		await statusOn(paired.device, run.id, "sleeping");
+		await applyRunCommand(paired.device.space(a.spaceId), {
+			kind: "lease.release",
+			runId: run.id,
+			payload: { name: "zac-docker-stack" },
+		});
+		await waitFor(async () => (await leasesOnA()).length === 0, {
+			label: "A to let go of the lease",
+		});
+		expect(
+			(await paired.device.space(a.spaceId).getRun(run.id)).leases,
+		).toEqual([]);
 	});
 });

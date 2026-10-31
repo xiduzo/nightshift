@@ -95,7 +95,9 @@ export type RunCommandInput =
 			payload: { when?: "now" | "after-step" | "cancel-after-step" };
 	  }
 	/** Another Device walks the run from here on. */
-	| { kind: "run.move"; payload: { to: string } };
+	| { kind: "run.move"; payload: { to: string } }
+	/** A person lets go of a lease the run holds (ADR 7). */
+	| { kind: "lease.release"; payload: { name: string } };
 
 /** What a command does. */
 export type RunCommandKind = RunCommandInput["kind"];

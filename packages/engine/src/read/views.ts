@@ -330,6 +330,25 @@ export type RunDetail = RunSummary & {
 	handOffs: HandOff[];
 	/** Every value each variable took, in every flow the run ran, oldest first. */
 	variables: VariableChange[];
+	/** The leases the run holds now, and the one it waits for (ADR 7). */
+	leases: RunLease[];
+};
+
+/**
+ * A lease of a run (ADR 7): one it holds, until it leaves `section` (null:
+ * until it ends), or one its Lease step waits for, held by `holder`.
+ */
+export type RunLease = {
+	name: string;
+	state: "held" | "waiting";
+	/** The Lease node that took it, or waits for it. */
+	nodeId: string;
+	/** The id of the Section it holds for. Null: the run. */
+	section: string | null;
+	/** When the run took it, or began to wait for it. */
+	since: number;
+	/** The run that holds a lease this run waits for. Null while its Host cannot be reached, and for a held lease. */
+	holder: { runId: string; title: string } | null;
 };
 
 /** How often the steps of one scope took each edge of their flow, by edge id. */

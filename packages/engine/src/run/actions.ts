@@ -71,6 +71,12 @@ export type RunActionRequest =
 	 */
 	| { kind: "move"; to: string }
 	/**
+	 * Lets go of the lease `name` that the run holds (ADR 7): the next run
+	 * that waits for it takes it. The run goes on, and does not take it
+	 * again. Fails when the run does not hold it.
+	 */
+	| { kind: "release-lease"; name: string }
+	/**
 	 * Continues a stopped, failed or interrupted run at its last step's
 	 * node (inside a Call with `each`, at the same item). A finished run
 	 * reopens its last step. A sleeping run wakes at once. An Agent node
@@ -102,6 +108,8 @@ export type RunActionRequest =
 	  };
 
 export type RunActionsDeps = {
+	/** Lets go of a run's leases (`LeaseKeeper.release`). */
+	leases: { release(runId: string, names: readonly string[]): Promise<void> };
 	db: Database;
 	log: RunLog;
 	bus: RunBus;
@@ -162,6 +170,18 @@ function refuseAnswer(
 		throw new RunRefusal(
 			"invalid-answer",
 			`Write a note to choose "${choice}". The agent continues with it.`,
+		);
+	}
+}
+
+/** Throws unless the run holds the lease `name` now: a run that ended holds none. */
+function refuseRelease(runState: RunState, name: string): void {
+	if (
+		!runState.holds.some((hold) => hold.kind === "lease" && hold.name === name)
+	) {
+		throw new RunRefusal(
+			"not-now",
+			`This run does not hold the lease "${name}" now.`,
 		);
 	}
 }
@@ -259,9 +279,33 @@ export function createRunActions(deps: RunActionsDeps) {
 					kind: "run.move",
 					payload: { to: request.to },
 				});
+			case "release-lease":
+				refuseRelease(runState, request.name);
+				return relay.send(row, actor, {
+					kind: "lease.release",
+					payload: { name: request.name },
+				});
 			default:
 				refuseUnless(request.kind, status, false, result);
 		}
+	}
+
+	/**
+	 * Lets go of a lease the run holds, in a Turn that drives nothing: the
+	 * log says so first (`LeaseReleased`, why `person`), so a resume does
+	 * not take it back, then its keeper frees it.
+	 */
+	async function releaseLease(row: RunRow, name: string): Promise<void> {
+		await runner.hold(row.id, async ({ runState }) => {
+			refuseRelease(runState, name);
+			await log.append({
+				type: "LeaseReleased",
+				runId: row.id,
+				payload: { name, why: "person" },
+			});
+			bus.publish(row.id, { kind: "status-changed" });
+		});
+		await deps.leases.release(row.id, [name]);
 	}
 
 	/** Stops the run now, or after its running step (`hold`: a Turn that drives nothing). */
@@ -368,6 +412,8 @@ export function createRunActions(deps: RunActionsDeps) {
 			case "move":
 				if (!actor) throw signedOut();
 				return move(row, actor, request.to);
+			case "release-lease":
+				return releaseLease(row, request.name);
 			case "resume":
 				// `RunResumed` before the thread moves; a sleeping run wakes.
 				await deps.holds.start(row.spaceId, () =>

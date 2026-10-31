@@ -423,3 +423,62 @@ describe("after a restart", () => {
 		expect(await holders()).toEqual({ "zac-docker-stack": run.id });
 	});
 });
+
+describe("people see and release leases", () => {
+	test("given a run that holds a lease and one that waits for it, then each run page shows it", async () => {
+		const engine = makeEngine();
+		const first = await holdingRun(engine);
+		const second = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: politeFlow({ waitMinutes: 1_000 }),
+		});
+		await statusOf(engine, second.id, "sleeping");
+		expect((await engine.getRun(first.id)).leases).toEqual([
+			{
+				name: "zac-docker-stack",
+				state: "held",
+				nodeId: "own",
+				section: null,
+				since: expect.any(Number),
+				holder: null,
+			},
+		]);
+		expect((await engine.getRun(second.id)).leases).toEqual([
+			{
+				name: "zac-docker-stack",
+				state: "waiting",
+				nodeId: "own",
+				section: null,
+				since: expect.any(Number),
+				holder: { runId: first.id, title: first.title },
+			},
+		]);
+	});
+
+	test("given a run that holds a lease, when a person releases it, then the waiting run takes it and the first run goes on without it", async () => {
+		const engine = makeEngine();
+		const first = await holdingRun(engine);
+		const second = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: politeFlow({ waitMinutes: 1_000 }),
+		});
+		await statusOf(engine, second.id, "sleeping");
+		await engine.act(first.id, {
+			kind: "release-lease",
+			name: "zac-docker-stack",
+		});
+		expect((await endOf(engine, second.id)).result).toBe("done");
+		const detail = await engine.getRun(first.id);
+		expect(detail.status).toBe("sleeping");
+		expect(detail.leases).toEqual([]);
+		const events = await (runLogs[0] as RunLog).events(first.id);
+		expect(
+			events.flatMap((e) => (e.type === "LeaseReleased" ? [e.payload] : [])),
+		).toEqual([{ name: "zac-docker-stack", why: "person" }]);
+		await expect(
+			engine.act(first.id, { kind: "release-lease", name: "zac-docker-stack" }),
+		).rejects.toThrow(
+			'This run does not hold the lease "zac-docker-stack" now.',
+		);
+	});
+});
