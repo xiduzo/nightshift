@@ -83,7 +83,7 @@ export function createLeaseStore(deps: {
 	return {
 		take,
 
-		async renew({ runId, names }) {
+		async renew({ runId, names, walkerId }) {
 			if (names.length === 0) return [];
 			const now = deps.now();
 			const renewed = await db
@@ -94,6 +94,9 @@ export function createLeaseStore(deps: {
 						eq(runLease.runId, runId),
 						inArray(runLease.name, [...names]),
 						gt(runLease.expiresAt, at(now)),
+						walkerId === undefined
+							? undefined
+							: eq(runLease.walkerId, walkerId),
 					),
 				)
 				.returning({ name: runLease.name });
@@ -101,17 +104,20 @@ export function createLeaseStore(deps: {
 			return names.filter((name) => !kept.has(name));
 		},
 
-		async release({ runId, names }) {
+		async release({ runId, names, walkerId }) {
 			if (names?.length === 0) return;
 			await db
 				.delete(runLease)
 				.where(
-					names === undefined
-						? eq(runLease.runId, runId)
-						: and(
-								eq(runLease.runId, runId),
-								inArray(runLease.name, [...names]),
-							),
+					and(
+						eq(runLease.runId, runId),
+						names === undefined
+							? undefined
+							: inArray(runLease.name, [...names]),
+						walkerId === undefined
+							? undefined
+							: eq(runLease.walkerId, walkerId),
+					),
 				);
 		},
 

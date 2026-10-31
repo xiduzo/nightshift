@@ -140,4 +140,28 @@ describe("the lease store", () => {
 		expect(answers.filter((answer) => answer.kind === "held")).toHaveLength(1);
 		expect(answers.filter((answer) => answer.kind === "busy")).toHaveLength(2);
 	});
+
+	test("given a Walker, then a renewal or a release reaches only the leases that Walker renews", async () => {
+		await take("run-a");
+		expect(
+			await store.renew({
+				spaceId: "space-1",
+				runId: "run-a",
+				names: ["branch:feature/x"],
+				walkerId: "device-2",
+			}),
+		).toEqual(["branch:feature/x"]);
+		await store.release({
+			spaceId: "space-1",
+			runId: "run-a",
+			walkerId: "device-2",
+		});
+		expect(await store.list("space-1")).toHaveLength(1);
+		await store.release({
+			spaceId: "space-1",
+			runId: "run-a",
+			walkerId: "device-1",
+		});
+		expect(await store.list("space-1")).toEqual([]);
+	});
 });

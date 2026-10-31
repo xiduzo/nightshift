@@ -65,11 +65,15 @@ export type LeaseHost = {
 		spaceId: string;
 		runId: string;
 		names: readonly string[];
+		/** Only the leases this Device walks the run for: a Host checks the Device's key. */
+		walkerId?: string;
 	}): Promise<string[]>;
 	/** Lets go of the run's leases of these names, or of all of them. */
 	release(input: {
 		spaceId: string;
 		runId: string;
 		names?: readonly string[];
+		/** Only the leases this Device walks the run for: a Host checks the Device's key. */
+		walkerId?: string;
 	}): Promise<void>;
 };

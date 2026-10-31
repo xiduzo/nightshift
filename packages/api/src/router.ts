@@ -72,5 +72,6 @@ export const appRouter = {
 	link: hostPeer.link,
 	sync: hostPeer.sync,
 	archive: hostPeer.archive,
+	leases: hostPeer.leases,
 };
 export type AppRouterClient = RouterClient<typeof appRouter>;

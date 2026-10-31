@@ -143,6 +143,17 @@ export const hostRouter = os.router({
 			context.exchange.mergePersonal(context.key, input),
 		),
 	},
+	leases: {
+		take: keyed.leases.take.handler(({ context, input }) =>
+			context.exchange.leaseTake(context.key, input),
+		),
+		renew: keyed.leases.renew.handler(({ context, input }) =>
+			context.exchange.leaseRenew(context.key, input),
+		),
+		release: keyed.leases.release.handler(({ context, input }) =>
+			context.exchange.leaseRelease(context.key, input),
+		),
+	},
 	archive: {
 		put: keyed.archive.put.handler(({ context, input }) =>
 			context.exchange.archivePut(

@@ -50,6 +50,30 @@ async function knowledgeCall<T>(
 	}
 }
 
+/** What a run reads when the Host that keeps its Space does not know leases. */
+export const OLDER_HOST_LEASES =
+	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to use a Lease node.";
+
+/**
+ * A lease call to the Host that keeps the Space (ADR 7). A Host of a
+ * version before leases does not know the procedure: the run reads that
+ * it must update the Host. A call the network cuts is a Host that cannot
+ * be reached, so the run waits for it, as it does without a Link.
+ */
+async function leaseCall<T>(
+	client: HostClient,
+	use: (client: HostClient) => Promise<T>,
+): Promise<T> {
+	try {
+		return await use(client);
+	} catch (error) {
+		if (isOlderHost(error)) throw new Refusal("unavailable", OLDER_HOST_LEASES);
+		const mine = fromHost(error);
+		if (mine instanceof Refusal) throw mine;
+		throw new HostUnreachableError();
+	}
+}
+
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
 	engine(): {
@@ -78,6 +102,13 @@ export function createRelay(deps: {
 		const link = to.at === "host" ? deps.links().get(to.hostId) : undefined;
 		if (!link) return "unreachable";
 		return (await link.inStep(names, options)) ? "in step" : "timed out";
+	}
+
+	/** The client of the Host that keeps the Space. Throws when that Host cannot be reached. */
+	async function hostClient(spaceId: string): Promise<HostClient> {
+		const to = await route(spaceId);
+		if (to.at !== "host") throw new HostUnreachableError();
+		return to.client;
 	}
 
 	return {
@@ -194,6 +225,29 @@ export function createRelay(deps: {
 				}
 			}
 			return to.ask((client) => client.sync.startRun(start));
+		},
+
+		leases: {
+			async take({ walkerId: _walker, ...take }) {
+				// The Host takes it for the key's Device, its Walker.
+				return leaseCall(await hostClient(take.spaceId), (client) =>
+					client.leases.take(take),
+				);
+			},
+			async renew({ spaceId, runId, names }) {
+				return leaseCall(await hostClient(spaceId), (client) =>
+					client.leases.renew({ spaceId, runId, names: [...names] }),
+				);
+			},
+			async release({ spaceId, runId, names }) {
+				await leaseCall(await hostClient(spaceId), (client) =>
+					client.leases.release({
+						spaceId,
+						runId,
+						...(names ? { names: [...names] } : {}),
+					}),
+				);
+			},
 		},
 
 		async devices(input) {

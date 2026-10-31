@@ -2,6 +2,8 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import type {
 	CopyStamp,
 	FeedStep,
+	LeaseAnswer,
+	LeaseTake,
 	OwnDevice,
 	RunCommandInput,
 	StartRunInput,
@@ -63,6 +65,24 @@ export type HostExchange = {
 	commandDone(
 		key: DeviceKeyAccess,
 		input: { id: string; error: string | null },
+	): Promise<void>;
+	/**
+	 * Takes a lease of a Space of this Host for a run the key's Device
+	 * walks (ADR 7). Needs `run.start` in the Space.
+	 */
+	leaseTake(
+		key: DeviceKeyAccess,
+		input: Omit<LeaseTake, "walkerId">,
+	): Promise<Exclude<LeaseAnswer, { kind: "unreachable" }>>;
+	/** Renews the leases of a run the key's Device walks. Answers the names it no longer holds. */
+	leaseRenew(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; runId: string; names: readonly string[] },
+	): Promise<string[]>;
+	/** Lets go of the leases of a run the key's Device walks: by name, or all. */
+	leaseRelease(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; runId: string; names?: readonly string[] },
 	): Promise<void>;
 	/** Records the Device's Clone of a Project in a Space of this Host. */
 	addClone(
