@@ -231,3 +231,54 @@ export function jsonOutput(value: unknown): unknown {
 		return undefined;
 	}
 }
+
+/** One try of a climb on the run page: its step, its tier, and its try within the tier. */
+export type ClimbTry = {
+	step: StepSummary;
+	tier: string;
+	/** The try's number within its tier, from 1. */
+	try: number;
+	/** The probability of a Decision's pick, from 0 to 1, when it has one. */
+	confidence: number | null;
+};
+
+/**
+ * The climb a step of a cascade belongs to (ADR 6): the visits of its node
+ * in its scope, back from it while the visit before did not hold (it ended
+ * `fail`, `error` or `try-again`), and on after it while it did not hold.
+ * Empty for a step that is no try of a cascade.
+ */
+export function climbOf(
+	steps: readonly StepSummary[],
+	step: StepSummary,
+): ClimbTry[] {
+	const tierOf = (each: StepSummary) =>
+		typeof each.outputs.tier === "string" ? each.outputs.tier : null;
+	if (tierOf(step) === null) return [];
+	const visits = stepsIn(steps, step.scope).filter(
+		(each) => each.nodeId === step.nodeId && tierOf(each) !== null,
+	);
+	const at = visits.findIndex((each) => each.id === step.id);
+	const climbs = (each: StepSummary | undefined) =>
+		each !== undefined &&
+		(each.outcome === "fail" ||
+			each.outcome === "error" ||
+			each.outcome === "try-again");
+	let first = at;
+	while (first > 0 && climbs(visits[first - 1])) first--;
+	let last = at;
+	while (last < visits.length - 1 && climbs(visits[last])) last++;
+	const counts = new Map<string, number>();
+	return visits.slice(first, last + 1).map((each) => {
+		const tier = tierOf(each) ?? "";
+		const count = (counts.get(tier) ?? 0) + 1;
+		counts.set(tier, count);
+		const confidence = each.outputs.confidence;
+		return {
+			step: each,
+			tier,
+			try: count,
+			confidence: typeof confidence === "number" ? confidence : null,
+		};
+	});
+}

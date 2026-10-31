@@ -11,6 +11,7 @@ import { VALUE_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
+import { CascadeSection } from "./cascade-fields";
 import { ModelSettings } from "./model-settings";
 
 const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
@@ -154,8 +155,11 @@ export function ValueFields({
 				/>
 			</InspectorSection>
 
-			{by === "model" ? (
+			{by === "model" && node.cascade === undefined ? (
 				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
+			) : null}
+			{by === "model" ? (
+				<CascadeSection projectId={projectId} node={node} onChange={onChange} />
 			) : null}
 		</>
 	);

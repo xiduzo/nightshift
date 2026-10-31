@@ -33,6 +33,7 @@ import {
 	type CalledFlowSupport,
 	InputBindings,
 } from "./called-flow-fields";
+import { CascadeSection } from "./cascade-fields";
 
 const SOURCE_ORDER: ListSource["kind"][] = ["json", "command"];
 
@@ -121,7 +122,16 @@ export function CallFields({
 					called={called}
 					onChange={onChange}
 				/>
-			) : null}
+			) : (
+				<CascadeSection
+					projectId=""
+					node={node}
+					flowNames={Object.keys(support.flows ?? {})
+						.filter((name) => name !== support.flowName)
+						.sort()}
+					onChange={onChange}
+				/>
+			)}
 		</>
 	);
 }
