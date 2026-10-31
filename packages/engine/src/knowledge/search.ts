@@ -72,8 +72,8 @@ export type KnowledgeRefresh = {
 
 /** The index file, hidden so no project id can name it. */
 export const SEARCH_FILE = ".search.sqlite";
-/** Bump to build every index again. 2: PDF and Word files. */
-const SCHEMA_VERSION = 2;
+/** Bump to build every index again. 2: PDF and Word files. 3: their text through LangChain loaders. */
+const SCHEMA_VERSION = 3;
 /** What the index reads of a file: past this, the end of a very large file is not found. */
 const MAX_BODY_BYTES = 1024 * 1024;
 /** Files read at once while indexing. */

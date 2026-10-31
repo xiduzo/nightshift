@@ -4,8 +4,11 @@
  */
 import { crc32 } from "node:zlib";
 
-/** A one-page PDF with these lines in Helvetica. */
-export function tinyPdf(lines: string[]): Uint8Array {
+/** A one-page PDF with these lines in Helvetica, and its own title if given. */
+export function tinyPdf(
+	lines: string[],
+	options: { title?: string } = {},
+): Uint8Array {
 	const esc = (s: string) => s.replace(/[\\()]/g, (c) => `\\${c}`);
 	const content = [
 		"BT /F1 12 Tf 72 720 Td 16 TL",
@@ -19,6 +22,9 @@ export function tinyPdf(lines: string[]): Uint8Array {
 		`<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
 		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
 	];
+	if (options.title !== undefined) {
+		objects.push(`<< /Title (${esc(options.title)}) >>`);
+	}
 	let out = "%PDF-1.4\n";
 	const offsets: number[] = [];
 	objects.forEach((body, i) => {
@@ -28,7 +34,9 @@ export function tinyPdf(lines: string[]): Uint8Array {
 	const xref = out.length;
 	out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
 	for (const at of offsets) out += `${String(at).padStart(10, "0")} 00000 n \n`;
-	out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+	const info =
+		options.title === undefined ? "" : ` /Info ${objects.length} 0 R`;
+	out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${info} >>\nstartxref\n${xref}\n%%EOF\n`;
 	return new TextEncoder().encode(out);
 }
 
