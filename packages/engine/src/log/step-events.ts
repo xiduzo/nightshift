@@ -79,6 +79,7 @@ export type WaitEvent =
 				| "time"
 				| "command"
 				| "signal"
+				| "any"
 				| "device-offline";
 			until: number | null;
 			message: string;

@@ -174,6 +174,17 @@ export function applySuggestion(
 						...current,
 						until: { ...current.until, command: suggestion.command },
 					};
+				if (current.type === "wait" && current.until.kind === "any")
+					return {
+						...current,
+						until: {
+							...current.until,
+							command: {
+								...current.until.command,
+								command: suggestion.command,
+							},
+						},
+					};
 				if (current.type === "call" && current.each?.source.kind === "command")
 					return {
 						...current,

@@ -541,6 +541,157 @@ describe("the Wait node", () => {
 		expect(signalled.state.nodes.ci).toMatchObject({ outcome: "done" });
 	});
 
+	test("any: the command runs at once, the run sleeps for the signal and the next try, a signal that matches no rule keeps the next try, and the command ends it", async () => {
+		const time = clock();
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				inputs: [{ name: "pr" }],
+				start: "ci",
+				nodes: [
+					wait(
+						"ci",
+						{
+							kind: "any",
+							signal: { name: "ci-done", key: "{{pr}}" },
+							command: {
+								command:
+									'if [ -f merged ]; then echo \'{"outcome": "merged"}\' > "$NS_OUTPUT"; else exit 1; fi',
+								everyMinutes: 10,
+							},
+						},
+						{
+							outcomes: [
+								{ name: "green", when: 'event.body.conclusion = "success"' },
+								{ name: "merged" },
+							],
+						},
+					),
+				],
+				edges: [],
+			}),
+			{ inputs: { pr: "7" } },
+		);
+		h.ctx.now = time.now;
+		const first = await drive(h, { inputs: { pr: "7" } });
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
+		const message =
+			'Waits for the signal "ci-done" with the key "7". The command did not pass yet. Tries again in 10 min.';
+		expect(first.parked[0]).toEqual({
+			kind: "wait",
+			stepId,
+			nodeId: "ci",
+			reason: "any",
+			until: time.now() + 10 * MINUTE,
+			message,
+		});
+		expect(payloads(await h.events(), "WaitStarted")[0]).toMatchObject({
+			reason: "any",
+			signal: "ci-done",
+			signalKey: "7",
+			signalRules: [
+				{ outcome: "green", when: 'event.body.conclusion = "success"' },
+			],
+		});
+
+		// A signal that matches no rule: the next try stays where it was.
+		time.advance(4);
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: true, signal: "ci-done" },
+		});
+		const neutral = await drive(
+			h,
+			new Command({
+				resume: {
+					kind: "signal",
+					name: "ci-done",
+					data: { body: { conclusion: "neutral" }, headers: {} },
+				},
+			}),
+			h.graph(),
+		);
+		expect(neutral.parked[0]).toMatchObject({
+			reason: "any",
+			until: time.now() + 6 * MINUTE,
+			message:
+				'Waits for the signal "ci-done" with the key "7". The command did not pass yet. Tries again in 6 min.',
+		});
+
+		// The timer: the command picks merged.
+		await Bun.write(join(sandbox.repoPath, "merged"), "");
+		time.advance(6);
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: false },
+		});
+		const polled = await drive(
+			h,
+			new Command({ resume: { kind: "wake", early: false } }),
+			h.graph(),
+		);
+		expect(polled.parked).toEqual([]);
+		expect(polled.state.nodes.ci).toEqual({
+			outcome: "merged",
+			waited_minutes: 10,
+			log_tail: "",
+			data: { outcome: "merged" },
+			visit: 1,
+		});
+	});
+
+	test("any: a signal whose rule holds ends it before the next try", async () => {
+		const time = clock();
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "ci",
+				nodes: [
+					wait(
+						"ci",
+						{
+							kind: "any",
+							signal: { name: "ci-done" },
+							command: { command: "exit 1", everyMinutes: 10 },
+						},
+						{ outcomes: [{ name: "green", when: "event.body.ok" }] },
+					),
+				],
+				edges: [],
+			}),
+		);
+		h.ctx.now = time.now;
+		await drive(h, { inputs: {} });
+		const stepId = deriveSteps(foldRun(await h.events()))[0]?.id as string;
+		time.advance(3);
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: true, signal: "ci-done" },
+		});
+		const signalled = await drive(
+			h,
+			new Command({
+				resume: {
+					kind: "signal",
+					name: "ci-done",
+					data: { body: { ok: true }, headers: {} },
+				},
+			}),
+			h.graph(),
+		);
+		expect(signalled.state.nodes.ci).toMatchObject({
+			outcome: "green",
+			waited_minutes: 3,
+			data: { body: { ok: true }, headers: {} },
+		});
+	});
+
 	test("timeoutMinutes bounds every kind: the wake time is cut to the deadline, and the wake ends the step timeout", async () => {
 		const time = clock();
 		const h = await startRun(

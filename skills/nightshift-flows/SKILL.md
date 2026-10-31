@@ -115,7 +115,7 @@ Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 
 ### wait
 
-Waits, then ends `done`. `until` is one of: `duration`, `time`, `command`, `signal` (`{ kind: "duration", minutes }`, `{ kind: "time", at: "07:00" }`, `{ kind: "command", command, everyMinutes }` until it exits 0, `{ kind: "signal", name, key? }`). `timeoutMinutes` ends it `timeout`. A signal comes from a person on the run page, or from a webhook schedule of the project: then `data` holds the webhook (`{{wait_ci.data.body.check_suite.conclusion}}`). With `key` (a template, for example `{{pr}}`), only a webhook whose signal key is that text wakes it.
+Waits, then ends `done`. `until` is one of: `duration`, `time`, `command`, `signal`, `any` (`{ kind: "duration", minutes }`, `{ kind: "time", at: "07:00" }`, `{ kind: "command", command, everyMinutes }` until it exits 0, `{ kind: "signal", name, key? }`, `{ kind: "any", signal: { name, key? }, command: { command, everyMinutes } }`: whichever ends it first). `timeoutMinutes` ends it `timeout`. A signal comes from a person on the run page, or from a webhook schedule of the project: then `data` holds the webhook (`{{wait_ci.data.body.check_suite.conclusion}}`). With `key` (a template, for example `{{pr}}`), only a webhook whose signal key is that text wakes it. `outcomes` (each `{ name, when? }`, each with an edge) are more ways out than `done`. The command picks one: it writes `{ "outcome": "red" }` to `$NS_OUTPUT` and exits 0; an unlisted outcome or another exit code polls again. A signal picks the first outcome whose `when` (JSONata over `event`) holds; a webhook that matches no rule does not wake it.
 
 Outcomes: `done`, `timeout`. Outputs: `outcome`, `waited_minutes`, `log_tail`, `data`, `visit`.
 

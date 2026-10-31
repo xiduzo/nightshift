@@ -220,6 +220,12 @@ export function emptyUntil(kind: WaitUntil["kind"]): WaitUntil {
 			return { kind: "command", command: "", everyMinutes: 5 };
 		case "signal":
 			return { kind: "signal", name: "" };
+		case "any":
+			return {
+				kind: "any",
+				signal: { name: "" },
+				command: { command: "", everyMinutes: 10 },
+			};
 	}
 }
 

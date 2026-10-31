@@ -11,6 +11,7 @@ import {
 	isProfileRef,
 	nameSchema,
 	type permissionModeSchema,
+	waitCommandOf,
 } from "@nightshift/flows";
 import { z } from "zod";
 import { offerCapsSchema } from "../contract";
@@ -252,7 +253,7 @@ function touchesDevice(node: FlowNode): boolean {
 		case "value":
 			return node.by === "model";
 		case "wait":
-			return node.until.kind === "command";
+			return waitCommandOf(node.until) !== null;
 		case "call":
 			return node.each?.source.kind === "command";
 		case "end":

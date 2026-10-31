@@ -46,6 +46,7 @@ const waitReasonSchema = z.enum([
 	"time",
 	"command",
 	"signal",
+	"any",
 	"device-offline",
 ]);
 

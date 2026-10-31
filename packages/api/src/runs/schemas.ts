@@ -479,6 +479,7 @@ const stepEventSchema = z.discriminatedUnion("type", [
 			"time",
 			"signal",
 			"command",
+			"any",
 			"usage-limit",
 			"network",
 			"device-offline",

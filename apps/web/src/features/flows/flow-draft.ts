@@ -27,6 +27,7 @@ export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
 	time: "A time",
 	command: "A command",
 	signal: "A signal",
+	any: "A signal or a command",
 };
 
 /** How each kind of list source reads in a picker. */
@@ -205,6 +206,11 @@ const FIELD_MESSAGES: Record<string, string> = {
 		"The interval must be a whole number of minutes above 0.",
 	"until.name":
 		"Signal name: use lowercase letters, digits and -, starting with a letter.",
+	"until.signal.name":
+		"Signal name: use lowercase letters, digits and -, starting with a letter.",
+	"until.command.command": "The command to wait for is empty.",
+	"until.command.everyMinutes":
+		"The interval must be a whole number of minutes above 0.",
 	connection: "Pick an MCP server.",
 	tool: "Pick a tool.",
 };
