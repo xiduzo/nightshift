@@ -1,14 +1,5 @@
 import type { LandedFact, RunTrace } from "@nightshift/engine";
-import {
-	type Attributes,
-	type Context,
-	type Counter,
-	type Histogram,
-	ROOT_CONTEXT,
-	SpanStatusCode,
-	TraceFlags,
-	trace,
-} from "@opentelemetry/api";
+import type { Attributes, Counter, Histogram } from "@opentelemetry/api";
 
 import {
 	ATTR,
@@ -20,7 +11,7 @@ import {
 	stepSpanIdOf,
 	traceIdOf,
 } from "../conventions";
-import { meterOf, type RunningExport, tracerOf } from "../otlp";
+import { meterOf, type RunningExport } from "../otlp";
 
 /**
  * The runs of this computer as spans and metric points: a projection of
@@ -29,6 +20,11 @@ import { meterOf, type RunningExport, tracerOf } from "../otlp";
  * writes the part that ended, with the ids any process can work out. A
  * landing is told once per process, so nothing is counted twice: a step
  * that ends again after a reopen writes only its new part.
+ *
+ * The trace tells which sessions, waits and sleeps belong to a part and
+ * what they cost: this module only names them. The cost of a part is what
+ * the run's spend (the Spend tab) counts for it, sessions cut short
+ * included, each with how sure it is.
  *
  * - `step-ended`: a span for the step's part from its (re)opening to its
  *   end: `invoke_agent {node}` for an Agent, `execute_tool {node}` for a
@@ -115,14 +111,6 @@ function runMetricAttributes(run: RunTrace): Attributes {
 	};
 }
 
-/** The sessions of a step that ended in this part of it. */
-function sessionsOf(step: Step, end: StepEnd) {
-	return step.sessions.filter(
-		(s) =>
-			s.endedAt !== null && s.endedAt >= end.openedAt && s.endedAt <= end.at,
-	);
-}
-
 /** The span name and GenAI operation of a step. */
 function stepName(step: Step): { name: string; operation: string | null } {
 	if (step.nodeType === "agent") {
@@ -140,16 +128,6 @@ function stepName(step: Step): { name: string; operation: string | null } {
 	return { name: `${step.nodeType} ${step.nodeId}`, operation: null };
 }
 
-/** A context whose span is a parent no process holds: worked out from the ids. */
-function parentContext(traceId: string, spanId: string): Context {
-	return trace.setSpanContext(ROOT_CONTEXT, {
-		traceId,
-		spanId,
-		traceFlags: TraceFlags.SAMPLED,
-		isRemote: true,
-	});
-}
-
 export type RunProjection = {
 	/** Writes what the facts of one landing ended. In order, one landing at a time. */
 	take(facts: readonly LandedFact[]): Promise<void>;
@@ -162,46 +140,13 @@ export function createRunProjection(deps: {
 	deviceId: string;
 }): RunProjection {
 	const { running, read, deviceId } = deps;
-	const tracer = tracerOf(running);
 	const m = instruments(running);
-
-	/** Starts and ends one span with these ids, over `[from, to]`. */
-	function span(input: {
-		name: string;
-		traceId: string;
-		spanId: string;
-		parentSpanId: string | null;
-		from: number;
-		to: number;
-		attributes: Attributes;
-		error?: string | null;
-	}): void {
-		running.ids.traceId = input.traceId;
-		running.ids.spanId = input.spanId;
-		try {
-			const context =
-				input.parentSpanId === null
-					? ROOT_CONTEXT
-					: parentContext(input.traceId, input.parentSpanId);
-			const started = tracer.startSpan(
-				input.name,
-				{ startTime: input.from, attributes: input.attributes },
-				context,
-			);
-			if (input.error) {
-				started.setStatus({ code: SpanStatusCode.ERROR, message: input.error });
-			}
-			started.end(Math.max(input.to, input.from));
-		} finally {
-			running.ids.traceId = null;
-			running.ids.spanId = null;
-		}
-	}
+	const span = running.writeSpan;
 
 	function stepEnded(run: RunTrace, step: Step, end: StepEnd): void {
 		const traceId = traceIdOf(run.runId);
-		const sessions = sessionsOf(step, end);
-		const last = sessions.at(-1) ?? step.sessions.at(-1);
+		const { sessions } = end;
+		const last = sessions.at(-1);
 		const device = step.deviceId ?? deviceId;
 		const { name, operation } = stepName(step);
 		const agent = last
@@ -239,40 +184,37 @@ export function createRunProjection(deps: {
 			error: end.error,
 		});
 
-		const inPart = (from: number) => from >= end.openedAt && from <= end.at;
 		const point = {
 			...runMetricAttributes(run),
 			[ATTR.nodeKind]: step.nodeType,
 			[ATTR.deviceId]: device,
 		};
-		for (const wait of step.gateWaits) {
-			if (!inPart(wait.from)) continue;
-			const to = wait.to ?? end.at;
+		for (const wait of end.gateWaits) {
+			const ms = Math.max(wait.to - wait.from, 0);
 			span({
 				name: `gate ${step.nodeId}`,
 				traceId,
 				spanId: innerSpanIdOf(step.id, "gate", wait.from),
 				parentSpanId: spanId,
 				from: wait.from,
-				to,
+				to: wait.to,
 				attributes: {
 					...runAttributes(run),
 					[ATTR.stepId]: step.id,
 					[ATTR.nodeKind]: step.nodeType,
-					[ATTR.gateWaitMs]: Math.max(to - wait.from, 0),
+					[ATTR.gateWaitMs]: ms,
 				},
 			});
-			m.gateWait.record(Math.max(to - wait.from, 0) / 1000, point);
+			m.gateWait.record(ms / 1000, point);
 		}
-		for (const sleep of step.sleeps) {
-			if (!inPart(sleep.from)) continue;
+		for (const sleep of end.sleeps) {
 			span({
 				name: `wait ${sleep.reason}`,
 				traceId,
 				spanId: innerSpanIdOf(step.id, "wait", sleep.from),
 				parentSpanId: spanId,
 				from: sleep.from,
-				to: sleep.to ?? end.at,
+				to: sleep.to,
 				attributes: {
 					...runAttributes(run),
 					[ATTR.stepId]: step.id,
@@ -289,7 +231,7 @@ export function createRunProjection(deps: {
 		});
 		if (end.first && step.visit > 1) m.retries.add(1, point);
 		if (end.costUsd !== null && end.costUsd > 0) {
-			m.cost.add(end.costUsd, { ...point, [ATTR.basis]: "billed" });
+			m.cost.add(end.costUsd, { ...point, [ATTR.basis]: end.costBasis });
 		}
 		for (const session of sessions) {
 			const who = {

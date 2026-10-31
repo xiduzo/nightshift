@@ -2,6 +2,7 @@ import type { AgentHarnessName } from "@nightshift/agents/types";
 import type { FlowNodeType } from "@nightshift/flows";
 import {
 	type CostTally,
+	type DerivedSession,
 	type DerivedStep,
 	type RunEnding,
 	type RunState,
@@ -16,12 +17,12 @@ import {
 	sessionTokens,
 	type TokenCounts,
 } from "./run-metrics";
-import { deriveSteps, deriveTrigger, sumCost } from "./run-views";
+import { deriveSteps, deriveTrigger } from "./run-views";
 
 /**
  * A run as an export to monitoring reads it: its walks and steps with the
- * times each opened and ended, the sessions with their harness, model,
- * tokens and cost, the Gates' waits and the sleeps. A view of the run
+ * times each opened and ended, and per part of a step the sessions with
+ * their harness, model, tokens and cost, the Gates' waits and the sleeps. A view of the run
  * state, like the run metrics beside it, so a reader outside the engine
  * never reads an event's type or payload. Nothing here is stored.
  *
@@ -41,7 +42,12 @@ export type TraceRunEnd = {
 	first: boolean;
 };
 
-/** One end of a step: from `openedAt` (its start or a reopen) to `at`. */
+/**
+ * One end of a step: the part from `openedAt` (its start or a reopen) to
+ * `at`, with what happened in it. A session, a sleep and a Gate's wait
+ * belong to the part they began in. What a step's ended parts cost adds
+ * up to what the run's cost (the Spend tab) counts for the step.
+ */
 export type TraceStepEnd = {
 	seq: number;
 	openedAt: number;
@@ -54,6 +60,12 @@ export type TraceStepEnd = {
 	costBasis: CostBasis;
 	/** The step's first end. A reopened step ends again. */
 	first: boolean;
+	/** The harness sessions that started in this part, also those that never ended. */
+	sessions: TraceSession[];
+	/** When a Gate of the step waited for a person in this part. */
+	gateWaits: TraceGateWait[];
+	/** When the step slept in this part, and what for. */
+	sleeps: TraceSleep[];
 };
 
 /** A harness session of an Agent step. */
@@ -63,23 +75,19 @@ export type TraceSession = {
 	/** The model the harness said it runs. Null when it did not say. */
 	model: string | null;
 	startedAt: number;
-	/** Null while it runs, or when it never ended. */
+	/** Null when it never ended. */
 	endedAt: number | null;
-	/** What it cost, or spent so far. Null: not known. */
+	/** What it cost, or spent until the part ended. Null: not known. */
 	costUsd: number | null;
 	costBasis: CostBasis;
 	tokens: TokenCounts;
 };
 
-/** A time a step slept, and what for. `to` is null while it sleeps. */
-export type TraceSleep = {
-	from: number;
-	to: number | null;
-	reason: WaitReason;
-};
+/** A time a step slept in an ended part, and what for. The part's end closes it at the latest. */
+export type TraceSleep = { from: number; to: number; reason: WaitReason };
 
-/** A time a Gate of the step waited for a person. `to` is null while it waits. */
-export type TraceGateWait = { from: number; to: number | null };
+/** A time a Gate of the step waited for a person in an ended part. */
+export type TraceGateWait = { from: number; to: number };
 
 export type TraceStep = {
 	id: string;
@@ -91,10 +99,8 @@ export type TraceStep = {
 	/** The Device it ran on. Null for steps from before Devices named it. */
 	deviceId: string | null;
 	startedAt: number;
+	/** Each part of the step that ended, oldest first. */
 	ends: TraceStepEnd[];
-	sessions: TraceSession[];
-	gateWaits: TraceGateWait[];
-	sleeps: TraceSleep[];
 };
 
 export type RunTrace = {
@@ -105,16 +111,12 @@ export type RunTrace = {
 	trigger: RunTrigger["kind"];
 	startedAt: number | null;
 	ends: TraceRunEnd[];
-	/** The run's cost so far, and how sure it is. */
-	costUsd: number;
-	costBasis: CostBasis;
 	steps: TraceStep[];
 };
 
 /** The run as monitoring reads it, from its run state. Null for a log with no run. */
 export function runTrace(run: RunState): RunTrace | null {
 	if (!run.runId) return null;
-	const cost = sumCost(run);
 	const started = run.started;
 	return {
 		runId: run.runId,
@@ -130,8 +132,6 @@ export function runTrace(run: RunState): RunTrace | null {
 			reason: end.payload.reason,
 			first: i === 0,
 		})),
-		costUsd: cost.usd,
-		costBasis: costBasis(cost),
 		steps: deriveSteps(run).map((step) => ({
 			id: step.id,
 			nodeId: step.nodeId,
@@ -141,21 +141,6 @@ export function runTrace(run: RunState): RunTrace | null {
 			deviceId: step.deviceId,
 			startedAt: step.startedAt,
 			ends: stepEnds(step),
-			sessions: step.sessions.map((session) => {
-				const spent = sessionCost(session);
-				return {
-					id: session.id,
-					harness: session.harness,
-					model: session.model,
-					startedAt: session.startedAt,
-					endedAt: session.endedAt,
-					costUsd: knownUsd(spent),
-					costBasis: costBasis(spent),
-					tokens: sessionTokens(session),
-				};
-			}),
-			gateWaits: step.gateWaits.map(({ from, to }) => ({ from, to })),
-			sleeps: step.sleeps.map(({ from, to, reason }) => ({ from, to, reason })),
 		})),
 	};
 }
@@ -165,12 +150,26 @@ function knownUsd(cost: CostTally): number | null {
 	return cost.calls > 0 && cost.missing === 0 ? cost.usd : null;
 }
 
-/** Each opening of the step that ended, with its end. */
+function traceSession(session: DerivedSession): TraceSession {
+	const spent = sessionCost(session);
+	return {
+		id: session.id,
+		harness: session.harness,
+		model: session.model,
+		startedAt: session.startedAt,
+		endedAt: session.endedAt,
+		costUsd: knownUsd(spent),
+		costBasis: costBasis(spent),
+		tokens: sessionTokens(session),
+	};
+}
+
+/** Each opening of the step that ended, with its end and what began in it. */
 function stepEnds(step: DerivedStep): TraceStepEnd[] {
 	const ends: TraceStepEnd[] = [];
-	for (const opening of step.openings) {
+	step.openings.forEach((opening, index) => {
 		const { end } = opening;
-		if (!end) continue;
+		if (!end) return;
 		ends.push({
 			seq: end.seq,
 			openedAt: opening.at,
@@ -180,7 +179,17 @@ function stepEnds(step: DerivedStep): TraceStepEnd[] {
 			costUsd: knownUsd(end.cost),
 			costBasis: costBasis(end.cost),
 			first: ends.length === 0,
+			sessions: step.sessions
+				.filter((s) => s.opening === index)
+				.map(traceSession),
+			// The fold closes a sleep and a wait at the end of their part at the latest.
+			gateWaits: step.gateWaits
+				.filter((w) => w.opening === index)
+				.map(({ from, to }) => ({ from, to: to ?? end.at })),
+			sleeps: step.sleeps
+				.filter((w) => w.opening === index)
+				.map(({ from, to, reason }) => ({ from, to: to ?? end.at, reason })),
 		});
-	}
+	});
 	return ends;
 }

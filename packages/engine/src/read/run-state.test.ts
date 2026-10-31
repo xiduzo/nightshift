@@ -475,8 +475,8 @@ describe("gates", () => {
 			b.events.filter((e) => e.type === type)[index]?.at ?? 0;
 		const waits = () => deriveSteps(b.state()).flatMap((s) => s.gateWaits);
 		expect(waits()).toEqual([
-			{ from: at("GateOpened"), to: at("StepEnded") },
-			{ from: at("GateOpened", 1), to: null },
+			{ from: at("GateOpened"), to: at("StepEnded"), opening: 0 },
+			{ from: at("GateOpened", 1), to: null, opening: 0 },
 		]);
 
 		b.ended("stopped");
@@ -542,8 +542,14 @@ describe("sleeps", () => {
 		waitEnded(b, "s1");
 		waitStarted(b, "s1");
 		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: at(b, 3), reason: "command", signal: null },
-			{ from: at(b, 4), to: null, reason: "command", signal: null },
+			{
+				from: at(b, 2),
+				to: at(b, 3),
+				reason: "command",
+				signal: null,
+				opening: 0,
+			},
+			{ from: at(b, 4), to: null, reason: "command", signal: null, opening: 0 },
 		]);
 	});
 
@@ -552,7 +558,7 @@ describe("sleeps", () => {
 		waitStarted(b, "s1");
 		waitStarted(b, "s1");
 		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: null, reason: "command", signal: null },
+			{ from: at(b, 2), to: null, reason: "command", signal: null, opening: 0 },
 		]);
 	});
 
@@ -561,7 +567,13 @@ describe("sleeps", () => {
 		waitStarted(b, "s1");
 		b.ended("stopped");
 		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: at(b, 3), reason: "command", signal: null },
+			{
+				from: at(b, 2),
+				to: at(b, 3),
+				reason: "command",
+				signal: null,
+				opening: 0,
+			},
 		]);
 	});
 
@@ -570,7 +582,13 @@ describe("sleeps", () => {
 		waitStarted(b, "s1");
 		b.stepEnded("s1", "stopped");
 		expect(deriveSteps(foldRun(b.events))[0]?.sleeps).toEqual([
-			{ from: at(b, 2), to: at(b, 3), reason: "command", signal: null },
+			{
+				from: at(b, 2),
+				to: at(b, 3),
+				reason: "command",
+				signal: null,
+				opening: 0,
+			},
 		]);
 	});
 });
@@ -993,13 +1011,13 @@ describe("one place decides when a step ends", () => {
 			.gateOpened("s1")
 			.gateOpened("s1");
 		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
-			{ from: 1002, to: null },
+			{ from: 1002, to: null, opening: 0 },
 		]);
 		b.stepEnded("s1", "approve");
 		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
-			{ from: 1002, to: 1004 },
+			{ from: 1002, to: 1004, opening: 0 },
 		]);
-		expect(runTrace(b.state())?.steps[0]?.gateWaits).toHaveLength(1);
+		expect(runTrace(b.state())?.steps[0]?.ends[0]?.gateWaits).toHaveLength(1);
 	});
 
 	test("a sleep keeps what it waits for", () => {
@@ -1009,7 +1027,7 @@ describe("one place decides when a step ends", () => {
 			.waitStarted("s1", { reason: "signal", until: null, signal: "deploy" })
 			.state();
 		expect(deriveSteps(run)[0]?.sleeps).toEqual([
-			{ from: 1002, to: null, reason: "signal", signal: "deploy" },
+			{ from: 1002, to: null, reason: "signal", signal: "deploy", opening: 0 },
 		]);
 		expect(deriveSleep(run)).toMatchObject({ signal: "deploy", until: null });
 	});

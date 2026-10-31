@@ -44,7 +44,9 @@ import {
  *   reopen. A Gate of the step waits from its `GateOpened` to the step's end
  *   or reopen. A `GateOpened` while the Gate still waits opens no second
  *   wait. Every run-level event (a start, a resume, an end) closes both.
- * - A session belongs to the step it started in.
+ * - A session belongs to the step it started in, and to the opening of the
+ *   step it started in: the part of the step whose end tells it. So do a
+ *   sleep and a Gate's wait.
  *
  * Nothing here is stored: the log is the only source. The run log keeps
  * one state per run and applies each appended event to it (`nextState`),
@@ -63,6 +65,8 @@ export type DerivedSession = {
 	model: string | null;
 	startedAt: number;
 	startSeq: number;
+	/** The index in its step's `openings` of the opening it started in. Null without a step. */
+	opening: number | null;
 	/** When it ended (its first `SessionEnded`). Null while it runs, or when it never ended. */
 	endedAt: number | null;
 	/** When the log last heard of it: its latest event. */
@@ -100,8 +104,11 @@ export type DerivedItem = {
 /** A time span of a step. `to` is null while it lasts. */
 export type StepSleep = { from: number; to: number | null };
 
+/** A time a Gate of the step waited for a person, in the opening (its index in `openings`) it began in. */
+export type GateWait = StepSleep & { opening: number };
+
 /** A time a step slept, and what for: a reason, and the signal of a Wait node on one (else null). */
-export type SleepSpan = StepSleep & {
+export type SleepSpan = GateWait & {
 	reason: WaitReason;
 	signal: string | null;
 };
@@ -167,7 +174,7 @@ export type DerivedStep = {
 	/** When the step slept (a Wait node, a usage limit, the network), oldest first. */
 	sleeps: readonly SleepSpan[];
 	/** When a Gate of the step waited for a person, oldest first. */
-	gateWaits: readonly StepSleep[];
+	gateWaits: readonly GateWait[];
 	/** Call steps with `each` only: its items in the order they started or were blocked. */
 	items: readonly DerivedItem[];
 	/** Call steps (once) only: the call, once its inputs were bound. */
@@ -578,6 +585,7 @@ function applySessionEvent(
 			model: null,
 			startedAt: e.at,
 			startSeq: e.seq,
+			opening: openingOf(run, e.stepId),
 			endedAt: null,
 			lastAt: e.at,
 			ending: null,
@@ -611,6 +619,12 @@ function applySessionEvent(
 	run.steps.set(step.id, settle({ ...step, sessions }));
 }
 
+/** The index of the step's latest opening, or null when the log has no such step. */
+function openingOf(run: Draft, stepId: string | null): number | null {
+	const step = stepId ? run.steps.get(stepId) : undefined;
+	return step ? step.openings.length - 1 : null;
+}
+
 function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 	if (e.type === "StepStarted") {
 		startStep(run, e, stepId);
@@ -642,6 +656,7 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 						{
 							from: e.at,
 							to: null,
+							opening: step.openings.length - 1,
 							reason: e.payload.reason,
 							signal: e.payload.signal ?? null,
 						},
@@ -681,7 +696,10 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 			if (!wait || wait.to !== null) {
 				step = {
 					...step,
-					gateWaits: [...step.gateWaits, { from: e.at, to: null }],
+					gateWaits: [
+						...step.gateWaits,
+						{ from: e.at, to: null, opening: step.openings.length - 1 },
+					],
 				};
 			}
 			step = {

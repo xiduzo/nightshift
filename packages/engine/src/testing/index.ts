@@ -23,6 +23,7 @@ export type { LandedChange } from "../read/landed-facts";
 export { openRunBundle } from "../read/run-bundle";
 
 export { testKnowledge } from "./knowledge";
+export { runEvents } from "./run-events";
 export { seedFlows } from "./seed-flows";
 export { syncSpaceDocument } from "./space-sync";
 export {

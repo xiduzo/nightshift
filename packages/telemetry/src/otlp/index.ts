@@ -7,5 +7,4 @@ export {
 	otlpSinks,
 	type RunningExport,
 	startExport,
-	tracerOf,
 } from "./providers";

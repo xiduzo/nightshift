@@ -1,4 +1,11 @@
 import type { TelemetryProtocol } from "@nightshift/engine/device-config";
+import {
+	type Attributes,
+	ROOT_CONTEXT,
+	SpanStatusCode,
+	TraceFlags,
+	trace,
+} from "@opentelemetry/api";
 import { OTLPMetricExporter as JsonMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPMetricExporter as ProtoMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
 import { OTLPTraceExporter as JsonTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -38,11 +45,11 @@ export type ExportTarget = {
 };
 
 /**
- * The ids of the next span: the projection sets them just before it
- * starts a span, so every span of a run has the ids any process can work
- * out (`conventions/ids.ts`). Unset: random, as the SDK's own.
+ * The ids of the next span: `writeSpan` sets them just before it starts a
+ * span, so every span of a run has the ids any process can work out
+ * (`conventions/ids.ts`). Unset: random, as the SDK's own.
  */
-export class NextIds implements IdGenerator {
+class NextIds implements IdGenerator {
 	traceId: string | null = null;
 	spanId: string | null = null;
 	readonly #random = new RandomIdGenerator();
@@ -54,11 +61,25 @@ export class NextIds implements IdGenerator {
 	}
 }
 
+/** A finished span with the ids any process can work out: its trace, its own, its parent's. */
+export type SpanInput = {
+	name: string;
+	traceId: string;
+	spanId: string;
+	/** Null: the trace's root. Else a parent no process holds, named by its id. */
+	parentSpanId: string | null;
+	from: number;
+	to: number;
+	attributes: Attributes;
+	/** Marks the span failed, with this message. */
+	error?: string | null;
+};
+
 /** One running export. */
 export type RunningExport = {
-	tracerProvider: TracerProvider;
 	meterProvider: MeterProvider;
-	ids: NextIds;
+	/** Writes one finished span with the ids it is given. */
+	writeSpan(span: SpanInput): void;
 	/** Sends what waits. */
 	flush(): Promise<void>;
 	/** Sends what waits and stops. Never throws. */
@@ -113,10 +134,39 @@ export function startExport(
 			}),
 		],
 	});
+	const tracer = tracerProvider.getTracer(SCOPE_NAME);
 	return {
-		tracerProvider,
 		meterProvider,
-		ids,
+		writeSpan(span) {
+			ids.traceId = span.traceId;
+			ids.spanId = span.spanId;
+			try {
+				const context =
+					span.parentSpanId === null
+						? ROOT_CONTEXT
+						: trace.setSpanContext(ROOT_CONTEXT, {
+								traceId: span.traceId,
+								spanId: span.parentSpanId,
+								traceFlags: TraceFlags.SAMPLED,
+								isRemote: true,
+							});
+				const started = tracer.startSpan(
+					span.name,
+					{ startTime: span.from, attributes: span.attributes },
+					context,
+				);
+				if (span.error) {
+					started.setStatus({
+						code: SpanStatusCode.ERROR,
+						message: span.error,
+					});
+				}
+				started.end(Math.max(span.to, span.from));
+			} finally {
+				ids.traceId = null;
+				ids.spanId = null;
+			}
+		},
 		async flush() {
 			await Promise.all([
 				tracerProvider.forceFlush(),
@@ -131,10 +181,6 @@ export function startExport(
 		},
 	};
 }
-
-/** The tracer of an export, under Night Shift's scope. */
-export const tracerOf = (running: RunningExport) =>
-	running.tracerProvider.getTracer(SCOPE_NAME);
 
 /** The meter of an export, under Night Shift's scope. */
 export const meterOf = (running: RunningExport) =>

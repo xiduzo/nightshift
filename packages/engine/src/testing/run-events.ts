@@ -9,6 +9,8 @@ import {
 	type SessionOutcome,
 	type StepOutcome,
 } from "../log";
+import { type LandedFact, landedFacts } from "../read/landed-facts";
+import { type RunTrace, runTrace } from "../read/run-trace";
 
 /**
  * Builds the event log of one run, shape only, for a test of what the log
@@ -40,6 +42,19 @@ export function runEvents(runId = "run-1") {
 		push,
 		/** The run state of the events so far. */
 		state: (): RunState => foldRun(events),
+		/** The run trace of the events so far, as monitoring reads it. */
+		trace: (): RunTrace | null => runTrace(foldRun(events)),
+		/** The landed facts of the events so far, walked by `walkerId` in `spaceId`. */
+		facts: (spaceId = "space-1", walkerId = "mac"): LandedFact[] =>
+			landedFacts(
+				events.map((e) => ({
+					...e,
+					spaceId,
+					walkerId,
+					walkerSeq: e.seq,
+					runId,
+				})),
+			),
 		/** The next event happens at `time`. */
 		at(time: number) {
 			next = time;

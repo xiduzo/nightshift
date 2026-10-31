@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { LandedFact, RunTrace } from "@nightshift/engine";
+import type { LandedFact } from "@nightshift/engine";
 import {
 	createConnectionStore,
 	createSandbox,
 	createSettingsStore,
+	runEvents,
 	waitFor,
 } from "@nightshift/engine/testing";
 import {
@@ -45,135 +46,91 @@ const DEVICE = "mac";
 const T = 1_700_000_000_000;
 
 /** A run of a flow: an Agent, a Gate that waited, a Call with a Wait inside, then it finished. */
-function nightRun(): RunTrace {
-	return {
-		runId: "run-1",
-		projectId: "p1",
-		flowName: "nightly",
-		trigger: "schedule",
-		startedAt: T + 1_000,
-		ends: [
+function nightRun() {
+	const on = (
+		nodeType: "agent" | "decision" | "call" | "wait",
+		extra: object = {},
+	) => ({
+		nodeType,
+		deviceId: DEVICE,
+		...extra,
+	});
+	return runEvents("run-1")
+		.at(T + 1_000)
+		.runStarted({
+			projectId: "p1",
+			flowName: "nightly",
+			trigger: { kind: "schedule", scheduleId: "nightly", at: T },
+		})
+		.at(T + 1_100)
+		.stepStarted("s-agent", "build", 1, on("agent"))
+		.at(T + 1_200)
+		.sessionStarted("s-agent", "x1", { harness: "claude-code" })
+		.harness("s-agent", "x1", "h1", "claude-sonnet")
+		.at(T + 3_000)
+		.sessionEnded("s-agent", "x1", "finished", 0.75, {
+			usage: { inputTokens: 900, outputTokens: 100, cacheReadTokens: 400 },
+			costSource: "reported",
+		})
+		.at(T + 3_100)
+		.stepEnded("s-agent", "pass")
+		.at(T + 3_150)
+		.stepStarted("s-gate", "ship", 1, on("decision"))
+		.at(T + 3_200)
+		.gateOpened("s-gate")
+		.at(T + 6_200)
+		.stepEnded("s-gate", "yes")
+		.at(T + 6_300)
+		.stepStarted("s-call", "each", 1, on("call"))
+		.at(T + 6_400)
+		.stepStarted(
+			"s-wait",
+			"pause",
+			2,
+			on("wait", { scope: { parentStepId: "s-call", itemId: null } }),
+		)
+		.at(T + 6_500)
+		.waitStarted("s-wait", { reason: "duration" })
+		.at(T + 8_300)
+		.waitEnded("s-wait")
+		.at(T + 8_400)
+		.stepEnded("s-wait", "done")
+		.at(T + 8_900)
+		.stepEnded("s-call", "done")
+		.at(T + 9_000)
+		.ended("finished");
+}
+
+/** A run Night Shift stopped during an Agent's session, after a decider priced its answer. */
+function cutShortRun() {
+	return runEvents("run-1")
+		.at(T + 1_000)
+		.runStarted({ projectId: "p1", flowName: "nightly" })
+		.stepStarted("s-decide", "decide", 1, { deviceId: DEVICE })
+		.push(
+			"StepEnded",
 			{
-				seq: 40,
-				openedAt: T + 1_000,
-				at: T + 9_000,
-				status: "finished",
-				reason: null,
-				first: true,
+				outcome: "yes",
+				outputs: {},
+				error: null,
+				costUsd: 0.05,
+				costSource: "estimated",
 			},
-		],
-		costUsd: 0.75,
-		costBasis: "billed",
-		steps: [
+			{ stepId: "s-decide" },
+		)
+		.stepStarted("s-agent", "build", 1, { deviceId: DEVICE })
+		.sessionStarted("s-agent", "x1", { harness: "codex" })
+		.push(
+			"SessionUsage",
 			{
-				id: "s-agent",
-				nodeId: "build",
-				nodeType: "agent",
-				visit: 1,
-				parentStepId: null,
-				deviceId: DEVICE,
-				startedAt: T + 1_100,
-				ends: [
-					{
-						seq: 10,
-						openedAt: T + 1_100,
-						at: T + 3_100,
-						outcome: "pass",
-						error: null,
-						costUsd: null,
-						costBasis: "billed",
-						first: true,
-					},
-				],
-				sessions: [
-					{
-						id: "x1",
-						harness: "claude-code",
-						model: "claude-sonnet",
-						startedAt: T + 1_200,
-						endedAt: T + 3_000,
-						costUsd: 0.75,
-						costBasis: "billed",
-						tokens: { input: 900, output: 100, cacheRead: 400, cacheWrite: 0 },
-					},
-				],
-				gateWaits: [],
-				sleeps: [],
+				usage: { inputTokens: 10, outputTokens: 5 },
+				costUsd: 0.4,
+				costSource: "estimated",
 			},
-			{
-				id: "s-gate",
-				nodeId: "ship",
-				nodeType: "decision",
-				visit: 1,
-				parentStepId: null,
-				deviceId: DEVICE,
-				startedAt: T + 3_200,
-				ends: [
-					{
-						seq: 20,
-						openedAt: T + 3_200,
-						at: T + 6_200,
-						outcome: "yes",
-						error: null,
-						costUsd: null,
-						costBasis: "billed",
-						first: true,
-					},
-				],
-				sessions: [],
-				gateWaits: [{ from: T + 3_200, to: T + 6_200 }],
-				sleeps: [],
-			},
-			{
-				id: "s-call",
-				nodeId: "each",
-				nodeType: "call",
-				visit: 1,
-				parentStepId: null,
-				deviceId: DEVICE,
-				startedAt: T + 6_300,
-				ends: [
-					{
-						seq: 35,
-						openedAt: T + 6_300,
-						at: T + 8_900,
-						outcome: "done",
-						error: null,
-						costUsd: null,
-						costBasis: "billed",
-						first: true,
-					},
-				],
-				sessions: [],
-				gateWaits: [],
-				sleeps: [],
-			},
-			{
-				id: "s-wait",
-				nodeId: "pause",
-				nodeType: "wait",
-				visit: 2,
-				parentStepId: "s-call",
-				deviceId: DEVICE,
-				startedAt: T + 6_400,
-				ends: [
-					{
-						seq: 30,
-						openedAt: T + 6_400,
-						at: T + 8_400,
-						outcome: "done",
-						error: null,
-						costUsd: null,
-						costBasis: "billed",
-						first: true,
-					},
-				],
-				sessions: [],
-				gateWaits: [],
-				sleeps: [{ from: T + 6_500, to: T + 8_300, reason: "duration" }],
-			},
-		],
-	};
+			{ stepId: "s-agent", sessionId: "x1" },
+		)
+		.stepEnded("s-agent", "interrupted")
+		.ended("interrupted");
 }
 
 const fact = (
@@ -220,7 +177,10 @@ type Monitoring = {
  * A telemetry over a fake engine and this computer's real settings and
  * secrets, with the secret values in memory.
  */
-async function setup(initial: Partial<Monitoring> = {}) {
+async function setup(
+	initial: Partial<Monitoring> = {},
+	run: ReturnType<typeof runEvents> = nightRun(),
+) {
 	let listener: ((facts: readonly LandedFact[]) => void) | null = null;
 	let scope: unknown = null;
 	const sandbox = await createSandbox();
@@ -249,7 +209,6 @@ async function setup(initial: Partial<Monitoring> = {}) {
 	const spans = new KeptSpans();
 	const metrics = new KeptMetrics(AggregationTemporality.CUMULATIVE);
 	const targets: unknown[] = [];
-	const run = nightRun();
 	const telemetry = await createTelemetry({
 		deviceId: DEVICE,
 		settings,
@@ -267,7 +226,7 @@ async function setup(initial: Partial<Monitoring> = {}) {
 				listener = null;
 			};
 		},
-		runTrace: async (runId) => (runId === run.runId ? run : null),
+		runTrace: async (runId) => (runId === "run-1" ? run.trace() : null),
 	});
 	const agentEnv = () =>
 		telemetry.sessionEnv({
@@ -285,6 +244,8 @@ async function setup(initial: Partial<Monitoring> = {}) {
 		agentEnv,
 		scope: () => scope,
 		land: (facts: LandedFact[]) => listener?.(facts),
+		/** Lands the run's events in one landing, as the engine tells them. */
+		landRun: () => listener?.(run.facts()),
 		spans: () => spans.getFinishedSpans(),
 		points: () => {
 			const byName = new Map<string, DataPoint<unknown>[]>();
@@ -303,14 +264,6 @@ async function setup(initial: Partial<Monitoring> = {}) {
 		},
 	};
 }
-
-const LANDINGS: LandedFact[][] = [
-	[fact({ kind: "step-ended", stepId: "s-agent", seq: 10 })],
-	[fact({ kind: "step-ended", stepId: "s-gate", seq: 20 })],
-	[fact({ kind: "step-ended", stepId: "s-wait", seq: 30 })],
-	[fact({ kind: "step-ended", stepId: "s-call", seq: 35 })],
-	[fact({ kind: "run-ended", seq: 40 })],
-];
 
 const byName = (spans: ReadableSpan[], name: string) => {
 	const found = spans.find((s) => s.name === name);
@@ -332,7 +285,7 @@ const sum = (
 describe("the export to monitoring", () => {
 	test("while the setting is off, nothing is made and nothing goes out", async () => {
 		const h = await setup({ telemetry: false });
-		for (const landing of LANDINGS) h.land(landing);
+		h.landRun();
 		expect(h.agentEnv()).toEqual({ env: {}, values: [] });
 		await h.done();
 		expect(h.targets).toEqual([]);
@@ -349,7 +302,7 @@ describe("the export to monitoring", () => {
 	test("a run's facts give one trace: the run, its steps, a Gate's wait and a sleep", async () => {
 		const h = await setup();
 		expect(h.scope()).toEqual({ only: DEVICE });
-		for (const landing of LANDINGS) h.land(landing);
+		h.landRun();
 		await h.done();
 
 		const spans = h.spans();
@@ -442,6 +395,16 @@ describe("the export to monitoring", () => {
 				expect(point.attributes["nightshift.step.id"]).toBeUndefined();
 			}
 		}
+	});
+
+	test("a run cut short exports what the Spend tab counts, with how sure each cost is", async () => {
+		const h = await setup({}, cutShortRun());
+		h.landRun();
+		await h.done();
+		const cost = h.points().get("nightshift.run.cost_usd");
+		expect(sum(cost, { basis: "billed" })).toBe(0);
+		expect(sum(cost, { basis: "estimated" })).toBeCloseTo(0.45);
+		expect(sum(cost, { "nightshift.agent": "codex" })).toBeCloseTo(0.4);
 	});
 
 	test("a score counts, and a merged pull request counts as an outcome", async () => {
@@ -538,7 +501,7 @@ describe("the export to monitoring", () => {
 		expect(h.on()).toBe(true);
 		await h.settings.save({ telemetry: false });
 		await waitFor(() => !h.on(), { label: "the export off" });
-		h.land(LANDINGS[0] ?? []);
+		h.landRun();
 		await h.settings.save({ telemetry: true, telemetryProtocol: "http/json" });
 		await waitFor(h.on, { label: "the export on" });
 		expect(h.targets).toHaveLength(2);

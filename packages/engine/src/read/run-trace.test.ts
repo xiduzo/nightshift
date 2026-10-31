@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type EnginePayloads, foldRun } from "../log";
 import { runEvents as log } from "../testing/run-events";
 import { runTrace } from "./run-trace";
+import { sumCost } from "./run-views";
 
 const started: EnginePayloads["RunStarted"] = {
 	projectId: "p1",
@@ -85,8 +86,6 @@ describe("runTrace", () => {
 			flowName: "nightly",
 			trigger: "manual",
 			startedAt: 1000,
-			costUsd: 0.25,
-			costBasis: "billed",
 			ends: [
 				{
 					seq: 7,
@@ -116,24 +115,78 @@ describe("runTrace", () => {
 						costUsd: null,
 						costBasis: "billed",
 						first: true,
+						sessions: [
+							{
+								id: "x1",
+								harness: "claude-code",
+								model: "claude-sonnet",
+								startedAt: 1020,
+								endedAt: 1100,
+								costUsd: 0.25,
+								costBasis: "billed",
+								tokens: {
+									input: 900,
+									output: 100,
+									cacheRead: 400,
+									cacheWrite: 0,
+								},
+							},
+						],
+						gateWaits: [],
+						sleeps: [],
 					},
 				],
-				sessions: [
-					{
-						id: "x1",
-						harness: "claude-code",
-						model: "claude-sonnet",
-						startedAt: 1020,
-						endedAt: 1100,
-						costUsd: 0.25,
-						costBasis: "billed",
-						tokens: { input: 900, output: 100, cacheRead: 400, cacheWrite: 0 },
-					},
-				],
-				gateWaits: [],
-				sleeps: [],
 			},
 		]);
+	});
+
+	test("an end's parts cost what the Spend tab counts: a session cut short, a decider's estimate", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "build")
+			.sessionStarted("s1", "x1")
+			.push(
+				"SessionUsage",
+				{
+					usage: { inputTokens: 10, outputTokens: 5 },
+					costUsd: 0.4,
+					costSource: "estimated",
+				},
+				{ stepId: "s1", sessionId: "x1" },
+			)
+			// Night Shift stopped: the step ends, the session never says it did.
+			.stepEnded("s1", "interrupted")
+			.stepStarted("d1", "decide")
+			.push(
+				"StepEnded",
+				{
+					outcome: "yes",
+					outputs: {},
+					error: null,
+					costUsd: 0.02,
+					costSource: "estimated",
+				},
+				{ stepId: "d1" },
+			)
+			.ended("interrupted");
+		const trace = runTrace(b.state());
+		const [build, decide] = trace?.steps ?? [];
+		expect(build?.ends[0]?.sessions).toMatchObject([
+			{ id: "x1", endedAt: null, costUsd: 0.4, costBasis: "estimated" },
+		]);
+		expect(decide?.ends[0]).toMatchObject({
+			costUsd: 0.02,
+			costBasis: "estimated",
+		});
+		const parts = (trace?.steps ?? []).flatMap((s) => s.ends);
+		const exported = parts.reduce(
+			(usd, end) =>
+				usd +
+				(end.costUsd ?? 0) +
+				end.sessions.reduce((n, x) => n + (x.costUsd ?? 0), 0),
+			0,
+		);
+		expect(exported).toBeCloseTo(sumCost(b.state()).usd);
 	});
 
 	test("lists each end of a reopened step and a resumed run, with where it opened", () => {
@@ -177,7 +230,11 @@ describe("runTrace", () => {
 			{ seq: 4, openedAt: 1010, at: 1100, first: true, outcome: "stopped" },
 			{ seq: 8, openedAt: 2001, at: 2500, first: false, outcome: "yes" },
 		]);
-		expect(gate?.gateWaits).toEqual([{ from: 1011, to: 1100 }]);
+		// The wait belongs to the part it began in.
+		expect(gate?.ends.map((end) => end.gateWaits)).toEqual([
+			[{ from: 1011, to: 1100 }],
+			[],
+		]);
 	});
 
 	test("names what each sleep waited for, and the Call step a step ran in", () => {
@@ -206,7 +263,7 @@ describe("runTrace", () => {
 		const trace = runTrace(foldRun(events));
 		const wait = trace?.steps.find((s) => s.id === "w");
 		expect(wait?.parentStepId).toBe("c");
-		expect(wait?.sleeps).toEqual([
+		expect(wait?.ends[0]?.sleeps).toEqual([
 			{ from: 1030, to: 1500, reason: "duration" },
 		]);
 		expect(trace?.ends).toEqual([]);

@@ -244,13 +244,17 @@ describe("activeBetween", () => {
 	test("a step asleep or at a Gate the whole time was not active", () => {
 		const asleep = step({
 			endedAt: null,
-			sleeps: [{ from: 12, to: null, reason: "duration", signal: null }],
+			sleeps: [
+				{ from: 12, to: null, reason: "duration", signal: null, opening: 0 },
+			],
 		});
 		expect(activeBetween(asleep, 15, 30)).toBe(false);
 		expect(activeBetween(asleep, 11, 30)).toBe(true);
 		const atGate = step({
-			sleeps: [{ from: 10, to: 14, reason: "duration", signal: null }],
-			gateWaits: [{ from: 14, to: 20 }],
+			sleeps: [
+				{ from: 10, to: 14, reason: "duration", signal: null, opening: 0 },
+			],
+			gateWaits: [{ from: 14, to: 20, opening: 0 }],
 		});
 		expect(activeBetween(atGate, 0, 30)).toBe(false);
 	});
