@@ -148,8 +148,8 @@ const SNIPPET_TOKENS = 16;
 const SNIPPET_CHARS = 180;
 /** Sections embedded in one call to the model. */
 const EMBED_BATCH = 32;
-/** How long a search waits for the query's vector before it finds by words only. */
-const QUERY_TIMEOUT_MS = 8_000;
+/** How long a search waits for the query's vector before it finds by words only. A Host's CPU takes 3 s for one, and up to 8 s more while a preparation runs. */
+const QUERY_TIMEOUT_MS = 15_000;
 /** After a failed preparation, how long until the next try. */
 const RETRY_MS = 60_000;
 
