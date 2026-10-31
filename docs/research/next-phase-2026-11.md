@@ -478,6 +478,10 @@ Moved from 4.4, unchanged. It goes last, when the proof of 5.6 is in.
 - A source value with `{{` made its flow impossible to edit. Done: it is
   refused, in the dialog and the engine (d196414b).
 - A search snippet shows a score of 0. Fixed 2026-10-31 (5.2): the score is the fused rank score, never 0.
+- A folder source synced only where its schedule pinned the run. Done: a
+  Subflow names the computer its steps run on (`device`, **Runs on**), and
+  a folder source names its own (e66dbeb7, 6bdad4cb, ac3d7dde, b2862645,
+  5a658151).
 - gh-aw lock file export and the ACP registry listing, an afternoon each.
 
 ### Not in this sprint
