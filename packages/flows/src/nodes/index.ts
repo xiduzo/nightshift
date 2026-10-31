@@ -28,6 +28,7 @@ export {
 	mcpServerSchema,
 	permissionModeSchema,
 } from "./agent";
+export type { AttachmentSource } from "./ask";
 export {
 	addressRoot,
 	type DeciderName,
@@ -149,6 +150,8 @@ export {
 	toolOutputFields,
 } from "./tool";
 export {
+	type AskChoicesSource,
+	type AskDeadline,
 	canMakeValue,
 	checkValueNode,
 	type ValueBy,

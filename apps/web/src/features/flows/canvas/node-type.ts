@@ -148,6 +148,7 @@ export const DECIDED_BY_ICON: Record<DecidedBy, LucideIcon> = {
 export const VALUE_BY_ICON: Record<ValueBy, LucideIcon> = {
 	rule: BracesIcon,
 	model: SparklesIcon,
+	person: HandIcon,
 };
 
 /**

@@ -538,10 +538,17 @@ describe("connections and requirements: what run start asks", () => {
 			NODE_KINDS.value.requirements.map((r) => r([value("model")], caps)),
 		).toEqual([
 			"The flow has a Value node made by a model, but no decider is configured.",
+			null,
 		]);
 		expect(
 			NODE_KINDS.value.requirements.map((r) => r([value("rule")], caps)),
-		).toEqual([null]);
+		).toEqual([null, null]);
+		expect(
+			NODE_KINDS.value.requirements.map((r) => r([value("person")], caps)),
+		).toEqual([
+			null,
+			"The flow has a Value node made by a person, which this Night Shift cannot run yet.",
+		]);
 	});
 
 	test("a Command, a Tool, a Wait, a Call and an End require nothing of their own", async () => {
