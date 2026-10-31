@@ -201,7 +201,7 @@ A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci
 
 ## Profiles
 
-An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model`) for a Decision or a Value by a model. A profile belongs to one computer. A node names both by id, as `list_profiles` gives them: `"profile": { "device": "<id>", "profile": "<id>" }`. The step runs there, so the node has no `device`. The node's own fields win.
+An Agent Profile (the Agent fields `harness`, `model`, `permissionMode`, …) is for Agents, a Model Profile (`decider`, optional `model` and `address`) for a Decision or a Value by a model. `openjev` and `compatible` need a Model Profile with an address: a node never sets one. A profile belongs to one computer. A node names both by id, as `list_profiles` gives them: `"profile": { "device": "<id>", "profile": "<id>" }`. The step runs there, so the node has no `device`. The node's own fields win.
 
 ## Sections
 

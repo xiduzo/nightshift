@@ -117,6 +117,12 @@ model downloads and while the first sections embed. Ollama takes about
 
 See [knowledge.md](../knowledge.md#by-meaning) for the details.
 
+### A decision model next to the Host
+
+A Model Profile can name the address of a model that you run yourself,
+for example OpenJev in a container on the Host network. Decisions on it
+cost nothing. See [local-models.md](local-models.md).
+
 ### Add your tools
 
 The image holds Night Shift, git, ssh, Ollama, and the jq and curl that the
