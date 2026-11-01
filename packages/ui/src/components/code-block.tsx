@@ -129,10 +129,70 @@ function CodeBlockCopyButton({
 	);
 }
 
+// Night Shift: fade an edge only while more code waits past it. The plain
+// scroll-fade utilities rely on a scroll timeline, and WebKit (the desktop
+// app) keeps both edges faded. Inline values override the timeline.
+type FadeEdges = { t: boolean; b: boolean; s: boolean; e: boolean };
+
+function useScrollEdgeFade(): [
+	(element: HTMLPreElement | null) => void,
+	React.CSSProperties,
+] {
+	const [element, setElement] = React.useState<HTMLPreElement | null>(null);
+	const [edges, setEdges] = React.useState<FadeEdges>({
+		t: false,
+		b: false,
+		s: false,
+		e: false,
+	});
+
+	React.useLayoutEffect(() => {
+		if (!element) return;
+		const update = () => {
+			const left = Math.abs(element.scrollLeft);
+			const next = {
+				t: element.scrollTop > 1,
+				b: element.scrollTop + element.clientHeight < element.scrollHeight - 1,
+				s: left > 1,
+				e: left + element.clientWidth < element.scrollWidth - 1,
+			};
+			setEdges((prev) =>
+				prev.t === next.t &&
+				prev.b === next.b &&
+				prev.s === next.s &&
+				prev.e === next.e
+					? prev
+					: next,
+			);
+		};
+		update();
+		element.addEventListener("scroll", update, { passive: true });
+		const observer = new ResizeObserver(update);
+		observer.observe(element);
+		if (element.firstElementChild) observer.observe(element.firstElementChild);
+		return () => {
+			element.removeEventListener("scroll", update);
+			observer.disconnect();
+		};
+	}, [element]);
+
+	return [
+		setElement,
+		{
+			animation: "none",
+			"--scroll-fade-t": edges.t ? "var(--_scroll-fade-size-t)" : "0px",
+			"--scroll-fade-b": edges.b ? "var(--_scroll-fade-size-b)" : "0px",
+			"--scroll-fade-s": edges.s ? "var(--_scroll-fade-size-s)" : "0px",
+			"--scroll-fade-e": edges.e ? "var(--_scroll-fade-size-e)" : "0px",
+		} as React.CSSProperties,
+	];
+}
+
 function CodeBlockContent({
 	className,
 	children,
 	style,
+	ref,
 	wrap = false,
 	lineNumbers = false,
 	startLine = 1,
@@ -142,14 +202,28 @@ function CodeBlockContent({
 	lineNumbers?: boolean;
 	startLine?: number;
 }) {
+	const [fadeRef, fadeStyle] = useScrollEdgeFade();
+	const mergedRef = React.useCallback(
+		(node: HTMLPreElement | null) => {
+			fadeRef(node);
+			if (typeof ref === "function") ref(node);
+			else if (ref) ref.current = node;
+		},
+		[fadeRef, ref],
+	);
 	return (
 		<pre
+			ref={mergedRef}
 			data-slot="code-block-content"
 			data-wrap={wrap || undefined}
 			data-numbered={lineNumbers || undefined}
 			dir="ltr"
 			tabIndex={0}
-			style={{ counterReset: `line ${startLine - 1}`, ...style }}
+			style={{
+				counterReset: `line ${startLine - 1}`,
+				...fadeStyle,
+				...style,
+			}}
 			className={cn(
 				"scroll-fade-x scrollbar-thin data-wrap:scroll-fade-y data-wrap:wrap-break-word min-h-0 min-w-0 overflow-auto px-4 py-4 text-start font-mono leading-relaxed outline-none group-has-data-[slot=code-block-header]/code-block:pt-2 group-has-data-[slot=code-block-footer]/code-block:pb-2 data-wrap:whitespace-pre-wrap group-data-[size=sm]/code-block:px-3 group-data-[size=sm]/code-block:py-3 group-data-[size=sm]/code-block:group-has-data-[slot=code-block-header]/code-block:pt-1.5",
 				className,
