@@ -7,6 +7,7 @@ import type {
 	UpdateOptions,
 } from "@langchain/core/indexing";
 import { VectorStore } from "@langchain/core/vectorstores";
+import { now as timeNow } from "@nightshift/time";
 
 /**
  * The two pieces that `index()` from `@langchain/core/indexing` needs to
@@ -86,7 +87,7 @@ export class BunSqliteRecordManager implements RecordManagerInterface {
 				.get(this.namespace);
 			this.last = row?.at ?? 0;
 		}
-		this.last = Math.max(Date.now() / 1000, this.last + 1e-6);
+		this.last = Math.max(timeNow() / 1000, this.last + 1e-6);
 		return this.last;
 	}
 

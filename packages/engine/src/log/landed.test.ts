@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
+import { now } from "@nightshift/time";
 import { eq, inArray } from "drizzle-orm";
-
 import {
 	createSandbox,
 	otherSpace,
@@ -89,7 +89,7 @@ const foreign = (walkerSeq: number): ForeignEvent => ({
 	sessionId: null,
 	type: "EdgeTaken",
 	payload: JSON.stringify({ edgeId: "x", from: "a", to: "b", outcome: "pass" }),
-	at: Date.now(),
+	at: now(),
 	walkerId: "walker-elsewhere",
 	walkerSeq,
 });

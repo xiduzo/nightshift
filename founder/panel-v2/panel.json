@@ -1,0 +1,88 @@
+{
+	"n": 20,
+	"seed": 960871,
+	"customer": {
+		"business": "Night Shift: open-source app that runs a team's coding-agent pipelines overnight on their own computers and logins",
+		"target": "Small development teams (2 to 15 people) at agencies or startups that already use coding agents such as Claude Code, Codex or OpenCode every week",
+		"where": "Online, mostly Europe and North America",
+		"age": [27, 48],
+		"segments": [
+			{
+				"name": "Tech lead at a small digital agency",
+				"share": 0.45,
+				"income": [70000, 130000]
+			},
+			{
+				"name": "Founder or CTO of an early-stage startup",
+				"share": 0.15,
+				"income": [90000, 180000]
+			},
+			{
+				"name": "Senior developer who picks the tools for a small team",
+				"share": 0.15,
+				"income": [65000, 120000]
+			},
+			{
+				"name": "Owner or managing director of a small agency who holds the budget",
+				"share": 0.25,
+				"income": [90000, 200000]
+			}
+		],
+		"behaviours": [
+			{
+				"name": "Vendor default is good enough",
+				"share": 0.2,
+				"how": "Already pays for Copilot, Codex or Claude cloud agents and uses whatever scheduling they include."
+			},
+			{
+				"name": "Burned by background agents",
+				"share": 0.15,
+				"how": "Tried agents that open PRs on their own and threw most of the PRs away."
+			},
+			{
+				"name": "Scripts it themselves",
+				"share": 0.15,
+				"how": "Has a cron job or GitHub Action that calls claude -p or codex exec and would rather extend it."
+			},
+			{
+				"name": "Tool tinkerer",
+				"share": 0.15,
+				"how": "Tries every new developer tool the week it shows up on Hacker News."
+			},
+			{
+				"name": "Open source and self-host first",
+				"share": 0.12,
+				"how": "Runs their own servers, avoids SaaS that holds code or keys."
+			},
+			{
+				"name": "Watches every subscription",
+				"share": 0.13,
+				"how": "Each new monthly fee needs a clear reason, and token spend is already a sore point."
+			},
+			{
+				"name": "Waits for proof from others",
+				"share": 0.1,
+				"how": "Needs case studies, GitHub stars or a team they know before trying anything new."
+			}
+		],
+		"objections": [
+			"A failed or looping run will burn our agent quota overnight and nobody notices",
+			"I tried background agents and the PRs were not worth reviewing",
+			"I can do this with a cron job and claude -p",
+			"Claude Code and GitHub already run agents on a schedule",
+			"Pre-alpha and built by one person on the side, will it still exist next year?",
+			"Leaving agents alone with our code at night is a security risk",
+			"Setting up a Host, pairing computers and drawing flows sounds like a lot of work",
+			"Our clients may not allow AI agents on their code"
+		],
+		"habits": [
+			"you run Claude Code or Codex in a terminal most days",
+			"your team reviews pull requests first thing in the morning",
+			"you juggle three or four client projects at once",
+			"your laptop is closed from 7pm to 8am",
+			"you have a spare Mac mini or a small VPS for side projects",
+			"the company pays for Claude Max or ChatGPT Pro seats"
+		]
+	},
+	"pitch": "Night Shift runs your coding-agent pipeline overnight on your own computers, with the agent logins your team already pays for (Claude Code, Codex, OpenCode). Start from a ready-made flow (issue to pull request, with tests and an approval step) or draw your own.\nIn the morning you get pull requests that passed your tests, a short list of decisions, and what each run cost, on your desktop or phone.\nEvery run has a dollar budget, a turn limit and a loop guard. When a run hits one, it stops and tells you.\nFree and open source (Apache-2.0) when you host it yourself, including the server for schedules and the phone app. Your code then stays on your computers and goes only to the agent vendor you already use. macOS and Linux.\nNight Shift Cloud: we host that server for your team. $99 a month per team, up to 10 people. First month: we set up your first flow with you on a video call.\nPre-alpha, built by one developer."
+}

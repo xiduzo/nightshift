@@ -1,0 +1,13 @@
+{
+	"id": "P021",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "Pre-alpha from one developer, and my last run with background agents gave me PRs nobody wanted to review. I'm not putting my team's nights or my clients' code on that until other agencies show it works.",
+	"objection": "Passing checks doesn't mean the PR is worth reviewing, and if the one developer stops, I'm stuck with a pipeline nobody supports.",
+	"would_change_my_mind": "Case studies from two or three agencies my size showing what share of overnight PRs actually got merged, plus real traction on GitHub.",
+	"price_too_cheap": 15,
+	"price_cheap": 49,
+	"price_expensive": 199,
+	"price_too_expensive": 400
+}

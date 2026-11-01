@@ -4,6 +4,7 @@
  */
 
 export {
+	asDate,
 	atWall,
 	dayStart,
 	formatDateTime,
@@ -13,6 +14,7 @@ export {
 	formatRelative,
 	formatTime,
 	formatWeekday,
+	formatWeekdayDate,
 	hourOf,
 	hoverTime,
 	iso,

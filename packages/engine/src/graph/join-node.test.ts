@@ -5,6 +5,7 @@ import { Command } from "@langchain/langgraph";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { FlowEdge, JoinNode } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
+import { now } from "@nightshift/time";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
 import { deriveOpenGate, deriveRunState, deriveSteps } from "../read";
@@ -97,9 +98,9 @@ describe("a fan-out into a Join that waits for all", () => {
 			]),
 			{ harness },
 		);
-		const began = Date.now();
+		const began = now();
 		const driven = await drive(h, { inputs: {} });
-		const took = Date.now() - began;
+		const took = now() - began;
 
 		expect(driven.outcome.kind).toBe("ended");
 		expect(driven.state.ended).toMatchObject({ nodeId: "after" });
@@ -229,9 +230,9 @@ describe("a Join that waits for the first", () => {
 				"first",
 			),
 		);
-		const began = Date.now();
+		const began = now();
 		const driven = await drive(h, { inputs: {} });
-		expect(Date.now() - began).toBeLessThan(10_000);
+		expect(now() - began).toBeLessThan(10_000);
 		expect(driven.state.ended).toMatchObject({ nodeId: "after" });
 		expect(driven.state.nodes.joined?.data).toEqual({ fast: { who: "fast" } });
 		const events = await h.events();

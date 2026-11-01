@@ -1,7 +1,7 @@
 import { cliHelp } from "@nightshift/agents/tools";
 import { cliNameSchema, type Login, loginSchema } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { z } from "zod";
-
 import { type DeviceDocument, mapView } from "./device-document";
 
 /**
@@ -154,7 +154,7 @@ export function createCliToolStore(options: {
 				description: parsed.description || null,
 				login: loginOrNull(parsed.login),
 				git: parsed.git ?? null,
-				updatedAt: Date.now(),
+				updatedAt: now(),
 			};
 			await document.change(() => {
 				document.cliTools.set(parsed.name, {

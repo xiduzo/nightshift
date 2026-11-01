@@ -3,6 +3,7 @@ import {
 	isLoopbackHost,
 } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { hostCertificate } from "../reach";
 import { pause } from "./backoff";
 import { hostClient } from "./host-client";
@@ -71,7 +72,7 @@ export async function* joinHost(
 		verificationUri: hostPage(code.verificationUri, address),
 		verificationUriComplete: hostPage(code.verificationUriComplete, address),
 		fingerprint: pinned?.fingerprint ?? null,
-		expiresAt: Date.now() + code.expiresIn * 1000,
+		expiresAt: now() + code.expiresIn * 1000,
 	};
 
 	const sleep = deps.sleep ?? pause;

@@ -7,6 +7,7 @@
  */
 
 import type { ListedNotification } from "@nightshift/client";
+import { now } from "@nightshift/client";
 
 /** The service worker's path. Its scope is the whole app. */
 const SERVICE_WORKER = "/sw.js";
@@ -118,7 +119,7 @@ export async function showNotification(options: {
 			tag: options.key,
 			body: options.body,
 			icon: "/favicon.svg",
-			data: { path: options.path, kind: options.kind, shownAt: Date.now() },
+			data: { path: options.path, kind: options.kind, shownAt: now() },
 		});
 		return;
 	}

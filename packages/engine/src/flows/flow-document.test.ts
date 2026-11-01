@@ -8,6 +8,7 @@ import {
 	singleAgentFlow,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { asDate } from "@nightshift/time";
 import * as Y from "yjs";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
@@ -405,7 +406,7 @@ describe("the flow document", () => {
 			id: "listed",
 			spaceId: laptop.sandbox.spaceId,
 			name: "Listed",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		const documents = await laptop.documents.openAll();
 		expect(

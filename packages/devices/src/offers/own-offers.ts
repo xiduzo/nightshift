@@ -12,6 +12,7 @@ import type {
 } from "@nightshift/engine/device-config";
 import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { createHostSpaces, personInSpace } from "../links";
 import { type DeviceRegistry, homePersonsOf } from "../registry";
 import type { EngineOffers } from "./engine-offers";
@@ -191,7 +192,7 @@ export function createOffers(deps: {
 				deviceName: self.name,
 				by: await personInSpace(db, input.spaceId, by),
 			});
-			await setDeviceOffer(document, { ...input, offeredAt: Date.now() });
+			await setDeviceOffer(document, { ...input, offeredAt: now() });
 		},
 
 		async renamed(profileId, by) {

@@ -1,3 +1,4 @@
+import { now as timeNow } from "@nightshift/time";
 import type { KnowledgeQuestion } from "./questions";
 import type {
 	KnowledgeMeaningStatus,
@@ -86,7 +87,7 @@ export async function evaluateKnowledge(
 	search: Pick<KnowledgeSearch, "search" | "meaning">,
 	projectId: string,
 	questions: readonly KnowledgeQuestion[],
-	now: () => number = Date.now,
+	now: () => number = timeNow,
 ): Promise<KnowledgeEvaluation> {
 	const meaning = await search.meaning(projectId);
 	// Partly prepared vectors would measure part of the knowledge.

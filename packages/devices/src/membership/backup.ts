@@ -1,6 +1,7 @@
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
+import { iso } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 
 /**
@@ -18,7 +19,7 @@ export async function backupDatabase(
 ): Promise<string> {
 	const folder = join(dataDir, "backups");
 	await mkdir(folder, { recursive: true });
-	const stamp = new Date(at).toISOString().replace(/[:.]/g, "-");
+	const stamp = iso(at).replace(/[:.]/g, "-");
 	const path = join(folder, `before-${before}-${stamp}.db`);
 	await db.run(sql.raw(`VACUUM INTO '${path.replaceAll("'", "''")}'`));
 	const copy = await stat(path).catch(() => null);

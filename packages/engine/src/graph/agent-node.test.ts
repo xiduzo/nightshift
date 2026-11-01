@@ -12,6 +12,7 @@ import {
 import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
@@ -618,7 +619,7 @@ describe("the Agent node", () => {
 	});
 
 	test("a usage limit parks the run at the wait node; a wake on a new compile over the same saver continues the same step and session", async () => {
-		const resetAt = Date.now() + 60 * MINUTE;
+		const resetAt = now() + 60 * MINUTE;
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
 			call === 0
 				? usageLimitScript(resetAt)
@@ -629,9 +630,9 @@ describe("the Agent node", () => {
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
 			{ harness },
 		);
-		const before = Date.now();
+		const before = now();
 		const first = await drive(h, { inputs: {} });
-		const after = Date.now();
+		const after = now();
 		expect(first.next).toEqual(["wait__worker"]);
 		const [stepRow] = deriveSteps(foldRun(await h.events()));
 		const stepId = stepRow?.id as string;

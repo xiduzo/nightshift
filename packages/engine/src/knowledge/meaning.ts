@@ -3,6 +3,7 @@ import {
 	type EmbeddingsInterface,
 } from "@langchain/core/embeddings";
 import { OllamaEmbeddings } from "@langchain/ollama";
+import { now as timeNow } from "@nightshift/time";
 
 /**
  * Search by meaning: an embedding model that turns a section of the
@@ -90,7 +91,7 @@ export class PacedEmbeddings extends Embeddings {
 	constructor(
 		readonly inner: EmbeddingsInterface,
 		private readonly paceMs = PACE_MS,
-		private readonly now: () => number = Date.now,
+		private readonly now: () => number = timeNow,
 	) {
 		super({});
 	}
@@ -176,7 +177,7 @@ export function ollamaMeaning(options: {
 		where,
 		downloaded: () => downloading?.() ?? null,
 		async ready() {
-			const now = Date.now();
+			const now = timeNow();
 			// A download moves on: its state is not kept.
 			if (
 				checked &&
@@ -186,7 +187,7 @@ export function ollamaMeaning(options: {
 				return checked.ready;
 			}
 			const ready = await check();
-			checked = { at: Date.now(), ready };
+			checked = { at: timeNow(), ready };
 			return ready;
 		},
 	};

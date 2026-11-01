@@ -13,6 +13,8 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { AgentProfileSettings, Flow, FlowNode } from "@nightshift/flows";
+import { asDate, now } from "@nightshift/time";
+import { atLocal } from "@nightshift/time/testing";
 import { eq } from "drizzle-orm";
 import type { WorkReply } from "../contract";
 import { createHostExchange } from "../exchange";
@@ -182,7 +184,7 @@ describe("another Person's run on the computer that walks it", () => {
 			organizationId: sandbox.spaceId,
 			userId: carol,
 			role: "member",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		engine = createPeerEngine(
 			withPeers({
@@ -215,7 +217,7 @@ describe("another Person's run on the computer that walks it", () => {
 				profileName: "coder",
 				permissionCap: "acceptEdits",
 				sessionCap: 1,
-				offeredAt: Date.now(),
+				offeredAt: now(),
 			},
 		];
 		await engine.offers.publish({
@@ -436,7 +438,7 @@ describe("a schedule that fires on another Person's Device", () => {
 	const carol = "person-carol";
 	/** Local time, October 2026. */
 	const at = (day: number, hours: number, minutes = 0, seconds = 0) =>
-		new Date(2026, 9, day, hours, minutes, seconds).getTime();
+		atLocal(2026, 9, day, hours, minutes, seconds);
 	let sandbox: Sandbox;
 	let documents: SpaceDocuments;
 	let signal: AbortController;
@@ -461,7 +463,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			organizationId: sandbox.spaceId,
 			userId: carol,
 			role: "member",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		engine = createPeerEngine(
 			withPeers({

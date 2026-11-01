@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SyncAccess } from "@nightshift/auth";
 import { HostUnreachableError } from "@nightshift/engine";
+import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import * as Y from "yjs";
 import type { HostHello } from "../contract";
@@ -50,9 +51,9 @@ function fakeHost(answers: Record<string, () => Promise<HostHello>>) {
 }
 
 async function until(check: () => boolean, timeoutMs = 2_000) {
-	const deadline = Date.now() + timeoutMs;
+	const deadline = now() + timeoutMs;
 	while (!check()) {
-		if (Date.now() > deadline) throw new Error("Timed out.");
+		if (now() > deadline) throw new Error("Timed out.");
 		await Bun.sleep(5);
 	}
 }
@@ -234,11 +235,11 @@ describe("httpsLink", () => {
 		console.error = () => {};
 		try {
 			link.stream("failing", async () => {
-				failing.push(Date.now());
+				failing.push(now());
 				throw new TypeError("Unable to connect.");
 			});
 			link.stream("returning", async () => {
-				returning.push(Date.now());
+				returning.push(now());
 				await Bun.sleep(25);
 			});
 			await until(() => failing.length >= 2 && returning.length >= 3);

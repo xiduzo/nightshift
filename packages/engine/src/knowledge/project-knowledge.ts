@@ -8,6 +8,7 @@ import {
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
 import { createKnowledgeFolders, INDEX_FILE, isReadable } from "./folder";
@@ -348,7 +349,7 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 						...mark,
 						// Only a file an agent reads can answer.
 						answers: mark.answers.filter(isReadable),
-						at: Date.now(),
+						at: now(),
 					},
 				);
 				const file = join(

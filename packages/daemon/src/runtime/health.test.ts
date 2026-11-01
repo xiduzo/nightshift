@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { daemonLease } from "@nightshift/db/schema";
-
+import { asDate, now as timeNow } from "@nightshift/time";
 import { type Heartbeat, readHeartbeatFile } from "../heartbeat";
 import {
 	checkHealth,
@@ -54,8 +54,8 @@ describe("the health of the lease", () => {
 
 	test("no lease, a lease given up, and another daemon's lease are not healthy", () => {
 		expect(leaseHealth(null).status).toBe("none");
-		expect(leaseHealth(heartbeat(Date.now(), null)).status).toBe("stopped");
-		expect(leaseHealth(heartbeat(Date.now(), "b"), { owner: "a" })).toEqual({
+		expect(leaseHealth(heartbeat(timeNow(), null)).status).toBe("stopped");
+		expect(leaseHealth(heartbeat(timeNow(), "b"), { owner: "a" })).toEqual({
 			healthy: false,
 			status: "other",
 			heartbeatAgeMs: expect.any(Number),
@@ -93,7 +93,7 @@ describe("nightshift health", () => {
 		expect(await checkHealth({ url, restart: false, log: quiet })).toBe(0);
 		await db
 			.update(daemonLease)
-			.set({ heartbeatAt: new Date(Date.now() - 60_000) });
+			.set({ heartbeatAt: asDate(timeNow() - 60_000) });
 		expect(await checkHealth({ url, restart: false, log: quiet })).toBe(1);
 	});
 
@@ -106,7 +106,7 @@ describe("nightshift health", () => {
 			"process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)",
 		]);
 		await Bun.sleep(200);
-		const at = new Date(Date.now() + 1_000);
+		const at = asDate(timeNow() + 1_000);
 		await db.insert(daemonLease).values({
 			id: 1,
 			owner: "stuck",
@@ -114,7 +114,7 @@ describe("nightshift health", () => {
 			pid: stuck.pid,
 			epoch: 1,
 			acquiredAt: at,
-			heartbeatAt: new Date(Date.now() - 60_000),
+			heartbeatAt: asDate(timeNow() - 60_000),
 		});
 		const logs: string[] = [];
 		const code = await checkHealth({
@@ -143,8 +143,8 @@ describe("nightshift health", () => {
 				owner: "gone",
 				host: hostname(),
 				pid: other.pid,
-				acquiredAt: Date.now() - 3_600_000,
-				heartbeatAt: Date.now() - 3_600_000,
+				acquiredAt: timeNow() - 3_600_000,
+				heartbeatAt: timeNow() - 3_600_000,
 			},
 			{ log: () => {} },
 		);

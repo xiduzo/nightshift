@@ -1,0 +1,13 @@
+{
+	"id": "P019",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I'd self-host the free version this weekend and poke at it, but I'm not putting $99 a month and my team's nightly pipeline on a pre-alpha one-person project.",
+	"objection": "Pre-alpha and one developer on the side. If he gets bored or busy, my overnight PR pipeline dies with it.",
+	"would_change_my_mind": "A few months of steady releases and a couple of other agencies publicly running it nightly, plus a way to export flows if it dies.",
+	"price_too_cheap": 15,
+	"price_cheap": 39,
+	"price_expensive": 99,
+	"price_too_expensive": 199
+}

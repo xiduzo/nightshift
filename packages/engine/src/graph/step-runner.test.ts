@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
 import { step as stepTable } from "@nightshift/db/schema";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { foldRun } from "../log";
 import type { EngineEventType } from "../log/events";
@@ -135,7 +136,7 @@ async function runRow(row: Row) {
 			});
 			break;
 		case "past-stop-time":
-			state = { ...state, stopAt: Date.now() - 1 };
+			state = { ...state, stopAt: now() - 1 };
 			break;
 		case "step-cap":
 			ctx = { ...h.ctx, policy: () => ({ ...h.ctx.policy(), maxSteps: 0 }) };

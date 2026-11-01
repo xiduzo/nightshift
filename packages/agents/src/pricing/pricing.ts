@@ -9,8 +9,8 @@
  * so a restart without a network still prices with the last list.
  */
 import { readFile, rename, stat, utimes, writeFile } from "node:fs/promises";
+import { asDate, now as timeNow } from "@nightshift/time";
 import { calcPrice, updatePrices } from "@pydantic/genai-prices";
-
 import type { AgentUsage, CostSource } from "../port";
 
 export type { CostSource };
@@ -144,7 +144,7 @@ export async function startPriceUpdates(options: {
 			});
 			if (response.status === 304) {
 				// Unchanged: the file counts as fresh, so a restart does not ask again.
-				const now = new Date();
+				const now = asDate();
 				await utimes(options.file, now, now).catch(() => undefined);
 				return;
 			}
@@ -166,7 +166,7 @@ export async function startPriceUpdates(options: {
 	};
 
 	const age = await stat(options.file)
-		.then((file) => Date.now() - file.mtimeMs)
+		.then((file) => timeNow() - file.mtimeMs)
 		.catch(() => Number.POSITIVE_INFINITY);
 	if (age >= intervalMs) await refresh();
 	const timer = setInterval(() => void refresh(), intervalMs);

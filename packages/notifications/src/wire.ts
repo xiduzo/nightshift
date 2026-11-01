@@ -6,7 +6,7 @@ import {
 	spacesOf,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-
+import { now as timeNow } from "@nightshift/time";
 import {
 	createVapidKeyStore,
 	createWebPushChannel,
@@ -154,7 +154,7 @@ export function createNotifications(
 	options: NotificationsOptions,
 ): Notifications {
 	const { db } = options;
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const settings = createSettingsStore(db, {
 		...(options.timeZone ? { timeZone: options.timeZone } : {}),
 	});

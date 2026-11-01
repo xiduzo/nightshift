@@ -1,6 +1,7 @@
 import type { KnowledgeUse, KnowledgeUseHit } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
+import { asDate, now as timeNow } from "@nightshift/time";
 import { and, desc, gte, inArray, sql } from "drizzle-orm";
 import {
 	type EventInput,
@@ -84,7 +85,7 @@ function projectEvents(
 				sql`json_extract(${event.payload}, '$.projectId') = ${projectId}`,
 				options.since === undefined
 					? undefined
-					: gte(event.at, new Date(options.since)),
+					: gte(event.at, asDate(options.since)),
 			),
 		)
 		.orderBy(desc(event.seq))
@@ -244,7 +245,7 @@ export const UNUSED_DAYS = 30;
 export async function knowledgeFileUse(
 	db: Database,
 	projectId: string,
-	now: number = Date.now(),
+	now: number = timeNow(),
 ): Promise<KnowledgeUseReport> {
 	const since = now - USE_WINDOW_DAYS * DAY;
 	const rows = await projectEvents(

@@ -1,3 +1,4 @@
+import { now as timeNow } from "@nightshift/time";
 import {
 	type DerivedStep,
 	type RunBus,
@@ -128,7 +129,7 @@ export async function* followRunTranscript(
 			return;
 		}
 		if (clockFrom === Number.POSITIVE_INFINITY) return;
-		const now = Date.now();
+		const now = timeNow();
 		let due = Number.POSITIVE_INFINITY;
 		let upTo = Number.NEGATIVE_INFINITY;
 		for (const [seq, { came }] of held) {
@@ -150,7 +151,7 @@ export async function* followRunTranscript(
 
 	function take(entry: TranscriptEntry) {
 		if (entry.seq <= last || held.has(entry.seq)) return;
-		held.set(entry.seq, { entry, came: Date.now() });
+		held.set(entry.seq, { entry, came: timeNow() });
 		flush();
 		wakeUp.notify();
 	}
@@ -158,7 +159,7 @@ export async function* followRunTranscript(
 	function replayed() {
 		if (replaying === null || replaying > 0) return;
 		replaying = 0;
-		clockFrom = Date.now();
+		clockFrom = timeNow();
 	}
 
 	function follow(step: DerivedStep, ended: boolean, initial: boolean) {

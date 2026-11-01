@@ -9,6 +9,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema";
+import { now } from "@nightshift/time";
 import { and, asc, eq, sql } from "drizzle-orm";
 import {
 	integer,
@@ -16,7 +17,6 @@ import {
 	sqliteTable,
 	text,
 } from "drizzle-orm/sqlite-core";
-
 import {
 	type LoggedEvent,
 	parseEventRow,
@@ -202,7 +202,7 @@ export async function exportRun(options: {
 
 		const meta: Record<string, unknown> = {
 			format_version: RUN_BUNDLE_FORMAT_VERSION,
-			exported_at: Date.now(),
+			exported_at: now(),
 			run_id: runId,
 			schema: await lastMigration(db),
 			missing_transcripts: missing,

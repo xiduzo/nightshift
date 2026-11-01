@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { spaceMerge, spaceSplit } from "@nightshift/db/schema";
+import { asDate, instant } from "@nightshift/time";
 import { desc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { MergeState, SplitState } from "../contract";
@@ -62,8 +63,8 @@ function mergeOf(row: typeof spaceMerge.$inferSelect): MergeRow {
 		personMap: parse(row.personMap, {}),
 		joined: parse(row.joined, []),
 		backup: row.backup,
-		createdAt: row.createdAt.getTime(),
-		updatedAt: row.updatedAt.getTime(),
+		createdAt: instant(row.createdAt),
+		updatedAt: instant(row.updatedAt),
 	};
 }
 
@@ -126,7 +127,7 @@ export function membershipRecord(db: Database) {
 			async latest(): Promise<MergeRow | null> {
 				const rows = await db.select().from(spaceMerge);
 				const latest = rows.sort(
-					(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+					(a, b) => instant(b.updatedAt) - instant(a.updatedAt),
 				)[0];
 				return latest ? mergeOf(latest) : null;
 			},
@@ -170,7 +171,7 @@ export function membershipRecord(db: Database) {
 						toSpace: input.toSpace,
 						projectMap: JSON.stringify(input.projectMap),
 						personMap: JSON.stringify(input.personMap),
-						updatedAt: new Date(),
+						updatedAt: asDate(),
 					})
 					.where(eq(spaceMerge.fromSpace, fromSpace));
 			},
@@ -179,7 +180,7 @@ export function membershipRecord(db: Database) {
 			moved(fromSpace: string): BatchItem<"sqlite"> {
 				return db
 					.update(spaceMerge)
-					.set({ state: "moved", updatedAt: new Date() })
+					.set({ state: "moved", updatedAt: asDate() })
 					.where(eq(spaceMerge.fromSpace, fromSpace));
 			},
 
@@ -195,7 +196,7 @@ export function membershipRecord(db: Database) {
 			async pushed(fromSpace: string): Promise<void> {
 				await db
 					.update(spaceMerge)
-					.set({ state: "pushed", updatedAt: new Date() })
+					.set({ state: "pushed", updatedAt: asDate() })
 					.where(eq(spaceMerge.fromSpace, fromSpace));
 			},
 		},
@@ -240,7 +241,7 @@ export function membershipRecord(db: Database) {
 						projects: JSON.stringify(input.projects),
 						runs: input.runs,
 						unpinned: input.unpinned,
-						updatedAt: new Date(),
+						updatedAt: asDate(),
 					})
 					.where(eq(spaceSplit.toSpace, toSpace));
 			},
@@ -249,7 +250,7 @@ export function membershipRecord(db: Database) {
 			async done(toSpace: string): Promise<void> {
 				await db
 					.update(spaceSplit)
-					.set({ state: "done", updatedAt: new Date() })
+					.set({ state: "done", updatedAt: asDate() })
 					.where(eq(spaceSplit.toSpace, toSpace));
 			},
 		},

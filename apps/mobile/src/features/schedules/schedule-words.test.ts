@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { ScheduleSummary } from "@nightshift/client";
-
+import { atLocal } from "@nightshift/client/testing";
 import { problemCopy, shownPaused } from "./schedule-words";
 
 const HOUR = 60 * 60 * 1000;
 // Noon on a weekday, on this clock: the next hours stay on the same day.
-const NOW = new Date(2026, 9, 28, 12, 0).getTime();
+const NOW = atLocal(2026, 9, 28, 12, 0);
 
 const schedule = (
 	id: string,

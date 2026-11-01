@@ -1,0 +1,13 @@
+{
+	"id": "P029",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "values",
+	"reason": "If it's Apache-2.0 and runs on my own boxes, I'd self-host it and never pay for Cloud. I'd maybe try the free version, but Claude Code and GitHub Actions already cover most of the scheduled-agent stuff.",
+	"objection": "Pre-alpha from one developer, and Cloud means your server firing schedules against my team's machines and agent logins. I won't hand that to a solo project.",
+	"would_change_my_mind": "A self-hostable server with the phone app working against it, plus a few months of real teams running it without breakage.",
+	"price_too_cheap": 5,
+	"price_cheap": 20,
+	"price_expensive": 60,
+	"price_too_expensive": 120
+}

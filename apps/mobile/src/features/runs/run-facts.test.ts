@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import type { StepSummary } from "@nightshift/client";
-
+import { atLocal } from "@nightshift/client/testing";
 import {
 	changesSummary,
 	computerName,
@@ -18,7 +18,7 @@ import {
 } from "./run-facts";
 
 const MIN = 60_000;
-const NOW = new Date(2026, 9, 23, 10, 0).getTime();
+const NOW = atLocal(2026, 9, 23, 10, 0);
 
 type FactRun = Parameters<typeof runFacts>[0];
 

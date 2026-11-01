@@ -1,5 +1,5 @@
 import type { FlowNode } from "@nightshift/flows";
-
+import { now } from "@nightshift/time";
 import type { Device } from "../device";
 import { type DerivedStep, readTranscriptFile, transcriptToRead } from "../log";
 import { deriveSteps } from "../read";
@@ -66,7 +66,7 @@ export async function watchChanges(
 				cwd,
 				signal: AbortSignal.timeout(SNAPSHOT_MS),
 			});
-			start = { tree, at: Date.now() };
+			start = { tree, at: now() };
 			step.record(null, { type: "worktree-snapshot", tree });
 		} catch (error) {
 			console.warn(
@@ -151,7 +151,7 @@ async function othersActive(
 	step: Pick<OpenStep, "stepId" | "device">,
 	from: number,
 ): Promise<boolean> {
-	const to = Date.now();
+	const to = now();
 	const steps = deriveSteps(await ctx.log.state(ctx.run.id));
 	return steps.some(
 		(other) =>

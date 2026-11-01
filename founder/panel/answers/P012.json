@@ -1,0 +1,13 @@
+{
+	"id": "P012",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "We already pay for Claude and Codex, and their cloud agents plus a cron job with claude -p cover what we need overnight. I'm not adding another tool or $99 a month for a pre-alpha project from one developer.",
+	"objection": "It's pre-alpha and built by one person. If it breaks or gets abandoned, I'm the one explaining to three clients why their PRs didn't show up.",
+	"would_change_my_mind": "Seeing it run reliably for a few months at another agency, with retries and approval gates that clearly beat what the vendor schedulers already give me.",
+	"price_too_cheap": 10,
+	"price_cheap": 29,
+	"price_expensive": 79,
+	"price_too_expensive": 150
+}

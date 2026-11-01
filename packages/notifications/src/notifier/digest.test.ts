@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
-
+import { utc } from "@nightshift/time/testing";
 import { createInAppChannel, type InAppItem } from "../channels";
 import { createDeliveryLog, type DeliveryLog } from "../deliveries";
 import type { DigestSource } from "../digest";
@@ -25,7 +25,7 @@ const SPACE = "space-1";
 const OTHER_SPACE = "space-2";
 /** A time on 21 October 2026, UTC. */
 const at = (hour: number, minute = 0, day = 21) =>
-	Date.UTC(2026, 9, day, hour, minute);
+	utc(2026, 9, day, hour, minute);
 
 let db: Database;
 let cleanup: () => void;

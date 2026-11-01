@@ -299,7 +299,8 @@
 											"!@nightshift/engine/run-status",
 											"!@nightshift/flows",
 											"!@nightshift/notifications/contract",
-											"!@nightshift/time"
+											"!@nightshift/time",
+											"!@nightshift/time/testing"
 										],
 										"message": "@nightshift/client imports only @nightshift/api/client (types), @nightshift/engine/run-status, the @nightshift/flows root, @nightshift/notifications/contract and @nightshift/time (see docs/steering/STRUCTURE.md, section 1)."
 									},
@@ -546,7 +547,11 @@
 			}
 		},
 		{
-			"includes": ["apps/mobile/**"],
+			"includes": [
+				"apps/mobile/**",
+				"!apps/mobile/**/*.test.ts",
+				"!apps/mobile/**/*.test.tsx"
+			],
 			"linter": {
 				"rules": {
 					"style": {

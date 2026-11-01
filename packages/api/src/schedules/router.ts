@@ -5,8 +5,8 @@ import {
 	nextCronTimes,
 	scheduleSchema,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { z } from "zod";
-
 import { output } from "../output";
 import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
 import { runSummarySchema } from "../runs";
@@ -145,12 +145,7 @@ export const schedules = {
 				description: error ? null : describeCron(input.cron),
 				times: error
 					? []
-					: nextCronTimes(
-							input.cron,
-							Date.now(),
-							input.count ?? 3,
-							input.timeZone,
-						),
+					: nextCronTimes(input.cron, now(), input.count ?? 3, input.timeZone),
 			};
 		}),
 };

@@ -11,6 +11,7 @@ import {
 import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import * as Y from "yjs";
 import { type ArchiveHost, createSpaceArchive, sha256Of } from "../archive";
 import { createSandbox, type Sandbox } from "../testing";
@@ -115,7 +116,7 @@ async function syncDocuments(...devices: TestDevice[]) {
 	}
 }
 
-const NOW = Date.now();
+const NOW = now();
 
 describe("removeFolder", () => {
 	test("removes a folder's entries for every Device, and its files here and there", async () => {

@@ -7,8 +7,8 @@ import {
 	secretNameSchema,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import { z } from "zod";
-
 import { type DeviceDocument, mapView } from "./device-document";
 import { type KeyStoreKind, keychainValues, valueStore } from "./keychain";
 import { expandMcpServers, type McpExpansion } from "./mcp";
@@ -189,7 +189,7 @@ export function createConnectionStore(options: {
 	/** The clock for the set and use times. */
 	now?: () => number;
 }): ConnectionStore {
-	const { document, env, secrets, now = Date.now } = options;
+	const { document, env, secrets, now = timeNow } = options;
 	const connectionView = mapView(document, document.connections, () => {
 		const out = new Map<string, Omit<Connection, "variables">>();
 		for (const [name, value] of document.connections.entries()) {
@@ -331,7 +331,7 @@ export function createConnectionStore(options: {
 				name: parsed.name,
 				description: parsed.description || null,
 				server: parsed.server,
-				updatedAt: Date.now(),
+				updatedAt: timeNow(),
 			};
 			await document.change(() => {
 				document.connections.set(parsed.name, {

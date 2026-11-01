@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { project } from "@nightshift/db/schema";
+import { now as timeNow } from "@nightshift/time";
 import { createRunLog, type KnowledgeUseFact } from "../log";
 import { createSandbox, type Sandbox } from "../testing";
 import {
@@ -138,7 +139,7 @@ describe("knowledgeFileUse", () => {
 			path: "x.md",
 			found: false,
 		});
-		const now = Date.now() + 1000;
+		const now = timeNow() + 1000;
 		const report = await knowledgeFileUse(db, "p1", now);
 		expect(report.unusedDays).toBe(30);
 		// Only the MCP server used it: no run did.

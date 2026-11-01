@@ -1,4 +1,5 @@
 import { HostUnreachableError } from "@nightshift/engine";
+import { now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, HostHello } from "../contract";
 import { type Backoff, backoff, pause } from "./backoff";
@@ -179,7 +180,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		maxMs: 60_000,
 	};
 	const answerTimeoutMs = options.answerTimeoutMs ?? 5_000;
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const { link, key } = options;
 	const clientFor =
 		options.clientFor ??

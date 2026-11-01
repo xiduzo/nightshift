@@ -6,6 +6,7 @@
  * heartbeat read of `@nightshift/daemon`, an entry that loads nothing else.
  */
 import { readHeartbeatFile } from "@nightshift/daemon/heartbeat";
+import { now } from "@nightshift/time";
 
 export type WatchdogStart = {
 	/** The database file. */
@@ -26,7 +27,7 @@ declare const self: Worker;
 function heartbeatAge(start: WatchdogStart): number | null {
 	try {
 		const row = readHeartbeatFile(start.database);
-		return row?.owner === start.owner ? Date.now() - row.heartbeatAt : null;
+		return row?.owner === start.owner ? now() - row.heartbeatAt : null;
 	} catch (error) {
 		console.error("The watchdog could not read the database:", error);
 		return null;

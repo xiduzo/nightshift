@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { FAILURE_MESSAGE } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
 import { foldRun } from "../log";
@@ -302,7 +303,7 @@ describe("take: the run cap", () => {
 
 describe("take: a drive's time and a thread that cannot move", () => {
 	test("overdue: within its budget the step goes on; past budget plus grace it ends as its timer would", async () => {
-		let now = Date.now();
+		let now = timeNow();
 		const { h, runner, sessions } = await setup(
 			// An idle limit past the time budget: the budget is what runs out.
 			flowOf([
@@ -328,7 +329,7 @@ describe("take: a drive's time and a thread that cannot move", () => {
 	});
 
 	test("the sweep: a run whose Turn is slow holds back only its own check, not another run's", async () => {
-		let now = Date.now();
+		let now = timeNow();
 		const { h, runner, sessions } = await setup(worker(), 2, {
 			now: () => now,
 			overdueSweepMs: 10,

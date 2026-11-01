@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-
+import { now as timeNow } from "@nightshift/time";
 import type { Auth } from "../auth";
 import { cookiesOf } from "./sandbox";
 
@@ -23,7 +23,7 @@ export function secretOf(totpURI: string): string {
 }
 
 /** The code the authenticator app shows now (RFC 6238: SHA-1, 6 digits, 30 seconds). */
-export function codeNow(secret: string, now = Date.now()): string {
+export function codeNow(secret: string, now = timeNow()): string {
 	const counter = Buffer.alloc(8);
 	counter.writeBigUInt64BE(BigInt(Math.floor(now / 30_000)));
 	const hmac = createHmac("sha1", secret).update(counter).digest();

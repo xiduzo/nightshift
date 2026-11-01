@@ -23,6 +23,7 @@ import {
 	singleAgentFlow,
 	type WaitNode,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import {
 	defaultRunSettings,
@@ -1189,9 +1190,9 @@ describe("stop and resume", () => {
 			(await engine.getRun(run.id)).steps.some((s) => s.nodeId === "check"),
 		);
 		await Bun.sleep(50);
-		const started = Date.now();
+		const started = now();
 		await engine.act(run.id, { kind: "stop" });
-		expect(Date.now() - started).toBeLessThan(2_000);
+		expect(now() - started).toBeLessThan(2_000);
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("stopped");
 		expect(detail.steps[0]?.outcome).toBe("stopped");
@@ -2122,12 +2123,9 @@ describe("automatic resume after a restart", () => {
 
 	test("past its stop time, a run does not continue on its own", async () => {
 		const { run } = await dieMidStep(undefined, {
-			stopAt: Date.now() + 60_000,
+			stopAt: now() + 60_000,
 		});
-		const { engine, sessions } = restart(
-			{},
-			{ now: () => Date.now() + 2 * 60_000 },
-		);
+		const { engine, sessions } = restart({}, { now: () => now() + 2 * 60_000 });
 		await expectNotResumed(
 			engine,
 			run.id,
@@ -2290,10 +2288,7 @@ describe("automatic resume after a restart", () => {
 			budgeted({ timeoutMinutes: 60, idleMinutes: 600 }),
 		);
 		// The new daemon starts two hours later: the budget ran out meanwhile.
-		const { engine, sessions } = restart(
-			{},
-			{ now: () => Date.now() + 2 * HOUR },
-		);
+		const { engine, sessions } = restart({}, { now: () => now() + 2 * HOUR });
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("failed");
 		expect(detail.reason).toBe(
@@ -2311,7 +2306,7 @@ describe("automatic resume after a restart", () => {
 
 	test("a step idle past its limit ends as its idle timer would", async () => {
 		const { run } = await dieMidStep(budgeted({ idleMinutes: 30 }));
-		const { engine, sessions } = restart({}, { now: () => Date.now() + HOUR });
+		const { engine, sessions } = restart({}, { now: () => now() + HOUR });
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("failed");
 		expect(detail.steps[0]).toMatchObject({
@@ -2359,10 +2354,7 @@ describe("automatic resume after a restart", () => {
 			.set({ payload: JSON.stringify(payload) })
 			.where(eq(event.seq, started.seq));
 
-		const { engine, sessions } = restart(
-			{},
-			{ now: () => Date.now() + 2 * HOUR },
-		);
+		const { engine, sessions } = restart({}, { now: () => now() + 2 * HOUR });
 		const resumed = await waitFor(() => sessions[0]);
 		expect(resumed.input.resumeSessionId).toBe("harness-0");
 		expect((await engine.getRun(run.id)).steps[0]?.outcome).toBeNull();

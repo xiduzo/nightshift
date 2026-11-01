@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { now } from "@nightshift/time";
 import {
 	createRunBus,
 	type Derive,
@@ -176,9 +177,9 @@ function read(extra: Partial<RunTranscriptPorts> = {}, afterSeq = 0) {
 }
 
 async function until(check: () => boolean, ms = 2_000) {
-	const deadline = Date.now() + ms;
+	const deadline = now() + ms;
 	while (!check()) {
-		if (Date.now() > deadline) throw new Error("timed out");
+		if (now() > deadline) throw new Error("timed out");
 		await Bun.sleep(2);
 	}
 }

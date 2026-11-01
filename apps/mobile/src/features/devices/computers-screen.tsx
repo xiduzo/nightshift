@@ -1,4 +1,8 @@
-import { agoLabel, createDeviceQueries } from "@nightshift/client";
+import {
+	agoLabel,
+	createDeviceQueries,
+	now as timeNow,
+} from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Laptop, Server } from "lucide-react-native";
@@ -29,7 +33,7 @@ export function ComputersScreen() {
 	const computers = overview.data
 		? computersOf(overview.data, !overview.isRefetchError)
 		: undefined;
-	const now = overview.dataUpdatedAt || Date.now();
+	const now = overview.dataUpdatedAt || timeNow();
 
 	return (
 		<Screen

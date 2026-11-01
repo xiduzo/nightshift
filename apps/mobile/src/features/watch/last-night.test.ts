@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import type { DashboardSummary } from "@nightshift/client";
-
+import { atLocal, utc } from "@nightshift/client/testing";
 import {
 	type LeadItem,
 	leadText,
@@ -17,7 +17,7 @@ type LastNight = NonNullable<DashboardSummary["lastNight"]>;
 type Nights = DashboardSummary["nights"][number];
 
 const HOUR = 3_600_000;
-const NIGHT = Date.UTC(2026, 9, 22, 12);
+const NIGHT = utc(2026, 9, 22, 12);
 
 /** Writes a time as hours after the night's noon: "+6". */
 const time = (at: number) => `+${(at - NIGHT) / HOUR}`;
@@ -250,7 +250,7 @@ describe("leadText", () => {
 
 describe("todayLine", () => {
 	test("gives the day and the time", () => {
-		const at = new Date(2026, 9, 31, 7, 12).getTime();
+		const at = atLocal(2026, 9, 31, 7, 12);
 		const line = todayLine(at, () => "07:12");
 		expect(line).toContain("31");
 		expect(line.endsWith(" · 07:12")).toBe(true);

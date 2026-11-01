@@ -1,0 +1,13 @@
+{
+	"id": "P008",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "We already pay for Codex and Claude cloud agents, and their built-in scheduling covers what we need. Adding a pre-alpha tool from one developer to our morning PR routine is not worth the switching cost.",
+	"objection": "Our clients may not allow AI agents on their code, and a one-person pre-alpha project is another thing I would have to vouch for in a security review.",
+	"would_change_my_mind": "A clear case where the vendor scheduling fails us, like budget overruns or runs looping overnight, plus a few named teams running it in production for months.",
+	"price_too_cheap": 10,
+	"price_cheap": 30,
+	"price_expensive": 80,
+	"price_too_expensive": 150
+}

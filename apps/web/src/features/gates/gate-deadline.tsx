@@ -1,4 +1,4 @@
-import { deadlineWhen } from "@nightshift/client";
+import { deadlineWhen, now } from "@nightshift/client";
 import { cn } from "@nightshift/ui/lib/utils";
 import { AlarmClockIcon } from "lucide-react";
 import { outcomeLabel } from "@/features/flows";
@@ -18,7 +18,7 @@ export function GateDeadline({
 	className?: string;
 }) {
 	if (!deadline) return null;
-	const { time, day } = deadlineWhen(deadline.at, Date.now());
+	const { time, day } = deadlineWhen(deadline.at, now());
 	return (
 		<p
 			className={cn(

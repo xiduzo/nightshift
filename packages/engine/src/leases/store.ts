@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { runLease } from "@nightshift/db/schema";
+import { asDate, instant } from "@nightshift/time";
 import { and, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import type {
 	LeaseAnswer,
@@ -33,7 +34,7 @@ export function createLeaseStore(deps: {
 	now(): number;
 }): LeaseStore {
 	const { db } = deps;
-	const at = (ms: number) => new Date(ms);
+	const at = (ms: number) => asDate(ms);
 
 	async function take(
 		input: LeaseTake,
@@ -136,7 +137,7 @@ export function createLeaseStore(deps: {
 				...holderOf(row),
 				spaceId: row.spaceId,
 				name: row.name,
-				expiresAt: row.expiresAt.getTime(),
+				expiresAt: instant(row.expiresAt),
 			}));
 		},
 	};
@@ -147,6 +148,6 @@ function holderOf(row: typeof runLease.$inferSelect): LeaseHolder {
 		runId: row.runId,
 		runTitle: row.runTitle,
 		walkerId: row.walkerId,
-		since: row.takenAt.getTime(),
+		since: instant(row.takenAt),
 	};
 }

@@ -9,6 +9,7 @@ import type {
 	Flow,
 	WaitNode,
 } from "@nightshift/flows";
+import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { WalkFile, WalkRef } from "../archive";
 import type { OwnDevice } from "../contract";
@@ -561,7 +562,7 @@ describe("a run that moves to another Device", () => {
 			id: "pause",
 			type: "wait",
 			position: { x: 0, y: 0 },
-			until: { kind: "time", at: new Date(Date.now() + 4_000).toISOString() },
+			until: { kind: "time", at: iso(now() + 4_000) },
 		};
 		const space = spaceOf(a, a);
 		const { id: projectId } = await space.addProject({

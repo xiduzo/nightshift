@@ -1,8 +1,8 @@
 import { apiKey, defaultKeyHasher } from "@better-auth/api-key";
 import type { Database } from "@nightshift/db";
 import { apikey } from "@nightshift/db/schema";
+import { asDate, instantOrNull, now } from "@nightshift/time";
 import { eq, inArray } from "drizzle-orm";
-
 import type { Auth } from "../auth";
 
 /**
@@ -131,7 +131,7 @@ export function createDeviceKeys(options: {
 	/** The key of that hash, from memory while it is fresh, else from its row. */
 	async function lookup(hash: string): Promise<Verified | null> {
 		const kept = verified.get(hash);
-		if (kept && Date.now() - kept.checkedAt < VERIFIED_MS) return kept;
+		if (kept && now() - kept.checkedAt < VERIFIED_MS) return kept;
 		verified.delete(hash);
 		const [row] = await db
 			.select({
@@ -153,8 +153,8 @@ export function createDeviceKeys(options: {
 				personId: row.referenceId,
 				permissions: permissionsOf(row.permissions),
 			},
-			expiresAt: row.expiresAt?.getTime() ?? null,
-			checkedAt: Date.now(),
+			expiresAt: instantOrNull(row.expiresAt),
+			checkedAt: now(),
 		};
 		verified.set(hash, found);
 		return found;
@@ -183,7 +183,7 @@ export function createDeviceKeys(options: {
 			const found = await lookup(hash);
 			if (!found) return null;
 			const { keyId } = found.access;
-			if (found.expiresAt !== null && found.expiresAt <= Date.now()) {
+			if (found.expiresAt !== null && found.expiresAt <= now()) {
 				// Past the idle time: refused, and gone, as the plugin does.
 				verified.delete(hash);
 				await db.delete(apikey).where(eq(apikey.id, keyId));
@@ -191,11 +191,11 @@ export function createDeviceKeys(options: {
 			}
 			if (need && !allows(found.access.permissions, need)) return null;
 			// Idle expiry: a use moves the expiry on, at most once a day.
-			const next = Date.now() + idleMs();
+			const next = now() + idleMs();
 			if (found.expiresAt === null || next - found.expiresAt > DAY_MS) {
 				await db
 					.update(apikey)
-					.set({ expiresAt: new Date(next) })
+					.set({ expiresAt: asDate(next) })
 					.where(eq(apikey.id, keyId));
 				found.expiresAt = next;
 			}

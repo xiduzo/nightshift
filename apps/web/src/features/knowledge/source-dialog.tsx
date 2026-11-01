@@ -1,4 +1,4 @@
-import { type InputTexts, missingInputs } from "@nightshift/client";
+import { type InputTexts, localZone, missingInputs } from "@nightshift/client";
 import {
 	cronToTimeAndDays,
 	KNOWLEDGE_SOURCE_KINDS,
@@ -246,7 +246,7 @@ function SourceForm({
 			...(schedule !== undefined
 				? {
 						keepUpToDate: schedule,
-						timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+						timeZone: localZone(),
 					}
 				: {}),
 		});

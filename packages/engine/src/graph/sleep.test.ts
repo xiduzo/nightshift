@@ -7,6 +7,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { WaitNode } from "@nightshift/flows";
+import { now as timeNow } from "@nightshift/time";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveRunState, deriveSleep, deriveSteps } from "../read/run-views";
@@ -54,7 +55,7 @@ afterEach(async () => {
 });
 
 /** A clock the test moves. */
-function clock(start = Date.now()) {
+function clock(start = timeNow()) {
 	let now = start;
 	return {
 		now: () => now,

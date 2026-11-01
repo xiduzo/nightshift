@@ -1,0 +1,13 @@
+{
+	"id": "P022",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "We already binned most of the PRs background agents opened for us, and running them unattended overnight on our machines with client code is exactly the risk I don't want. A pre-alpha tool from one developer doesn't change that.",
+	"objection": "Agents alone with client code all night, built by a single developer in pre-alpha. If something leaks or breaks, it's my agency's reputation on the line.",
+	"would_change_my_mind": "A security review or sandboxing story I can show clients, plus proof from a similar agency that the morning PRs actually get merged instead of thrown away.",
+	"price_too_cheap": 15,
+	"price_cheap": 49,
+	"price_expensive": 199,
+	"price_too_expensive": 400
+}

@@ -1,3 +1,4 @@
+import { now as timeNow } from "@nightshift/time";
 import {
 	type WorkReply,
 	type WorkRequest,
@@ -69,13 +70,13 @@ export function createWorkServer(deps: {
 	served?: ServedCalls;
 	/** Read each time a call's replies fail: the Device setting. Default `REPLY_DEADLINE_MS`. */
 	replyDeadlineMs?: () => number;
-	/** The clock. Default `Date.now`. */
+	/** The clock. Default `now`. */
 	now?: () => number;
 	/** Waits between two tries to send the replies. Default a timer. */
 	pause?: (ms: number) => Promise<void>;
 }): WorkServer {
 	const replyDeadlineMs = deps.replyDeadlineMs ?? (() => REPLY_DEADLINE_MS);
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const wait = deps.pause ?? pause;
 	/** The calls, and the link they reply over. A call outlives a link that restarts, and this server. */
 	const served = deps.served ?? servedCalls();

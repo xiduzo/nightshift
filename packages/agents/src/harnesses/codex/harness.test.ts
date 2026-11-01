@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { now } from "@nightshift/time";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
 import { fakeBin } from "../../testing/fixtures/bin";
 import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
@@ -337,14 +338,14 @@ describe("codexHarness", () => {
 		const { harness } = await fakeCodex({ FAKE_CODEX_SLEEP_MS: "30000" });
 		const controller = new AbortController();
 		const events: AgentEvent[] = [];
-		const started = Date.now();
+		const started = now();
 		for await (const event of harness.run(
 			input({ signal: controller.signal }),
 		)) {
 			events.push(event);
 			if (event.type === "session") controller.abort();
 		}
-		expect(Date.now() - started).toBeLessThan(5_000);
+		expect(now() - started).toBeLessThan(5_000);
 		expect(events.at(-1)).toMatchObject({ type: "error", kind: "aborted" });
 	}, 10_000);
 

@@ -18,6 +18,7 @@
  * server that stops responding is restarted (the watchdog, below).
  */
 import { join } from "node:path";
+import { now } from "@nightshift/time";
 
 const root = join(import.meta.dir, "..");
 // `bun run night` does not run through turbo: no turbo env to declare.
@@ -94,7 +95,7 @@ const CHECK_EVERY_MS = 15_000;
 const START_GRACE_MS = 60_000;
 const KILL_AFTER_MS = 5_000;
 const healthUrl = `${env.NIGHTSHIFT_TLS_CERT ? "https" : "http"}://127.0.0.1:${port}/health`;
-let startedAt = Date.now();
+let startedAt = now();
 let failures = 0;
 let restarting = false;
 let stopping = false;
@@ -129,14 +130,14 @@ async function restartServer() {
 	if (!stopping) {
 		server = spawnServer();
 		watch("server", server);
-		startedAt = Date.now();
+		startedAt = now();
 		log(`server pid ${server.pid} on :${port}`);
 	}
 	restarting = false;
 }
 
 const watchdog = setInterval(async () => {
-	if (stopping || restarting || Date.now() - startedAt < START_GRACE_MS) {
+	if (stopping || restarting || now() - startedAt < START_GRACE_MS) {
 		return;
 	}
 	failures = (await healthy()) ? 0 : failures + 1;

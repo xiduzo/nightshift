@@ -26,6 +26,24 @@ describe("a clock call", () => {
 		]);
 	});
 
+	test("allows a number grouped by toLocaleString", () => {
+		const source = [
+			"const lines = 1200;",
+			"const text = lines.toLocaleString();",
+			"const grouped = lines.toLocaleString('en-US');",
+			"const when = new Date(lines).toLocaleString('en-GB', { dateStyle: 'medium' });",
+		].join("\n");
+		expect(timeProblems(source, "a.ts")).toEqual([
+			"a.ts:4 calls `.toLocaleString()`. Use @nightshift/time.",
+			"a.ts:4 calls `new Date`. Use @nightshift/time.",
+		]);
+	});
+
+	test("allows an awaited record-manager getTime", () => {
+		const source = "const t = await records.getTime();\n";
+		expect(timeProblems(source, "a.ts")).toEqual([]);
+	});
+
 	test("allows a Date type and instanceof Date", () => {
 		const source =
 			"function f(value: Date) { return value instanceof Date; }\n";

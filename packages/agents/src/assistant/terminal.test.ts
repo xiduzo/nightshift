@@ -7,6 +7,8 @@ import {
 	flowSchema,
 	type ProjectFlowMap,
 } from "@nightshift/flows";
+import { iso } from "@nightshift/time";
+import { utc } from "@nightshift/time/testing";
 import { serveTools } from "./mcp";
 import { type TerminalPort, terminalTools } from "./terminal";
 import { terminalResources } from "./terminal-resources";
@@ -212,7 +214,7 @@ describe("nightshift mcp tools", () => {
 });
 
 const HOUR = 60 * 60_000;
-const NOW = Date.UTC(2026, 9, 30, 8);
+const NOW = utc(2026, 9, 30, 8);
 
 function summary(
 	id: string,
@@ -289,8 +291,8 @@ describe("the run tools of nightshift mcp", () => {
 				title: "existing · new",
 				status: "finished",
 				reason: null,
-				createdAt: new Date(NOW - HOUR).toISOString(),
-				endedAt: new Date(NOW - HOUR / 2).toISOString(),
+				createdAt: iso(NOW - HOUR),
+				endedAt: iso(NOW - HOUR / 2),
 				cost: "about $0.40",
 				prUrl: "https://github.com/acme/app/pull/7",
 			},
@@ -393,8 +395,8 @@ describe("the run tools of nightshift mcp", () => {
 				{ option: "merge", description: "Merge it" },
 				{ option: "change", needsNote: true },
 			],
-			waitingSince: new Date(NOW - 2 * HOUR).toISOString(),
-			deadline: `Night Shift chooses "merge" at ${new Date(NOW + HOUR).toISOString()} when nobody answers.`,
+			waitingSince: iso(NOW - 2 * HOUR),
+			deadline: `Night Shift chooses "merge" at ${iso(NOW + HOUR)} when nobody answers.`,
 			open: "http://localhost:9/runs/run-1?step=step-1",
 		});
 		const site = JSON.parse((await call("needs_me", { project: "Site" })).text);
@@ -497,7 +499,7 @@ describe("the run tools of nightshift mcp", () => {
 		);
 		expect((await call("get_digest")).text).toBe(
 			[
-				`Since ${new Date(NOW - 10 * HOUR).toISOString()}: 1 run finished, 1 failed. About $1.40 spent. 1 Gate waits for you.`,
+				`Since ${iso(NOW - 10 * HOUR)}: 1 run finished, 1 failed. About $1.40 spent. 1 Gate waits for you.`,
 				"",
 				"Runs:",
 				"- existing · login (run run-1): Finished · $1.00 · Pull request: https://github.com/acme/app/pull/7",
@@ -509,7 +511,7 @@ describe("the run tools of nightshift mcp", () => {
 		);
 		await call("get_digest", { since: "12h" });
 		expect((await call("get_digest", { since: "0h" })).text).toBe(
-			`No run ended since ${new Date(NOW).toISOString()}, and no Gate waits.`,
+			`No run ended since ${iso(NOW)}, and no Gate waits.`,
 		);
 		expect(asked).toEqual([undefined, NOW - 12 * HOUR, NOW]);
 		expect((await call("get_digest", { since: "yesterday" })).isError).toBe(

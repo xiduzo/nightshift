@@ -4,6 +4,7 @@ import type { Database } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { asDate, instant } from "@nightshift/time";
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { stepSources } from "../knowledge";
 import {
@@ -262,7 +263,7 @@ export function toSummary(
 		baseRef: where.baseRef,
 		...rest,
 		subflows: subflowRuns(row, calls, facts.status),
-		createdAt: row.createdAt.getTime(),
+		createdAt: instant(row.createdAt),
 	};
 }
 
@@ -632,9 +633,9 @@ export function createReadModel(deps: ReadModelDeps) {
 					projectId ? eq(run.projectId, projectId) : undefined,
 					cursor
 						? or(
-								lt(run.createdAt, new Date(cursor.createdAt)),
+								lt(run.createdAt, asDate(cursor.createdAt)),
 								and(
-									eq(run.createdAt, new Date(cursor.createdAt)),
+									eq(run.createdAt, asDate(cursor.createdAt)),
 									lt(run.id, cursor.id),
 								),
 							)
@@ -708,7 +709,7 @@ export function createReadModel(deps: ReadModelDeps) {
 					last: {
 						id: row.id,
 						title: row.title,
-						createdAt: row.createdAt.getTime(),
+						createdAt: instant(row.createdAt),
 					},
 					nextWakeAt: null,
 				};

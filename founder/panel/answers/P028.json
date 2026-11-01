@@ -1,0 +1,13 @@
+{
+	"id": "P028",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "I already have a GitHub Action that runs claude -p overnight and opens PRs. Drawing flows and pairing a Host feels like more setup than adding twenty lines of YAML to what I have.",
+	"objection": "It is pre-alpha from one developer, and I would be swapping a script I fully control for a tool that might stall or vanish.",
+	"would_change_my_mind": "If my script started falling over on retries and approval steps, and I could import it into Night Shift in an afternoon without running a Host.",
+	"price_too_cheap": 10,
+	"price_cheap": 29,
+	"price_expensive": 79,
+	"price_too_expensive": 150
+}

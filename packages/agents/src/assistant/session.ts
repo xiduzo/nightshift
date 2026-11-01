@@ -10,6 +10,7 @@
  * `end` (with the report and the session id to resume) or `error` last.
  */
 import type { AgentProfileSettings, AssistantUsage } from "@nightshift/flows";
+import { formatDateTime } from "@nightshift/time";
 import type {
 	AgentErrorKind,
 	AgentHarness,
@@ -79,7 +80,7 @@ export function sessionErrorMessage(
 			return "Stopped.";
 		case "usage-limit":
 			return resetAt
-				? `This agent reached its usage limit until ${new Date(resetAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}. Try again then, or choose another agent.`
+				? `This agent reached its usage limit until ${formatDateTime(resetAt)}. Try again then, or choose another agent.`
 				: "This agent reached its usage limit. Try again later, or choose another agent.";
 		case "network":
 			return "Night Shift could not reach the model. Check the internet connection, then try again.";

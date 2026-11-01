@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { project } from "@nightshift/db/schema";
+import { asDate, now } from "@nightshift/time";
 import { createSpaceArchive, type SpaceArchive, sha256Of } from "../archive";
 import { createSandbox, type Sandbox } from "../testing";
 import { CONTENT_GRACE_MS, collectContent } from "./collect";
@@ -32,7 +33,7 @@ beforeEach(async () => {
 			id: "p2",
 			spaceId: sandbox.spaceId,
 			name: "p2",
-			removedAt: new Date(),
+			removedAt: asDate(),
 		},
 	]);
 });
@@ -46,7 +47,7 @@ async function kept(spaceId: string, text: string, ageMs: number) {
 	const sha256 = sha256Of(content);
 	const ref = { kind: "content" as const, spaceId, sha256 };
 	await archive.here.write({ ref, content });
-	const at = new Date(Date.now() - ageMs);
+	const at = asDate(now() - ageMs);
 	await utimes(
 		join(sandbox.dataDir, "archive", spaceId, "knowledge", sha256),
 		at,
@@ -112,7 +113,7 @@ describe("the collection of knowledge content", () => {
 		await archive.here.write({ ref: old.ref, content: old.content });
 		expect(
 			await archive.here.drop(old.ref, {
-				keptBefore: Date.now() - CONTENT_GRACE_MS,
+				keptBefore: now() - CONTENT_GRACE_MS,
 			}),
 		).toBe(false);
 		expect(await archive.here.read(old.ref)).toEqual(old.content);

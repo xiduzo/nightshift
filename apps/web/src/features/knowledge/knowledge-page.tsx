@@ -1,4 +1,4 @@
-import { hasEnded } from "@nightshift/client";
+import { hasEnded, now } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -342,7 +342,7 @@ function fileUse(report: KnowledgeUse | undefined) {
 		/** Files no run used since then are marked. Null: mark none. */
 		unusedBefore:
 			report?.runsUsedIt === true
-				? Date.now() - report.unusedDays * 24 * 60 * 60 * 1000
+				? now() - report.unusedDays * 24 * 60 * 60 * 1000
 				: null,
 		unusedDays: report?.unusedDays ?? 30,
 	};

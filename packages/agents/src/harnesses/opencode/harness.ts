@@ -38,6 +38,8 @@
  * - An abort reaches the server as a session abort; the server process is
  *   killed only if it is still alive 10 s later (see `withSpawnRewrite`).
  */
+
+import { parseInstant, now as timeNow } from "@nightshift/time";
 import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
 import type {
 	AgentHarness,
@@ -263,7 +265,7 @@ function retryAfter(headers: unknown, now: number): number | undefined {
 	if (!value) return undefined;
 	const seconds = Number(value);
 	if (Number.isFinite(seconds)) return now + seconds * 1000;
-	const date = Date.parse(value);
+	const date = parseInstant(value);
 	return Number.isNaN(date) ? undefined : date;
 }
 
@@ -275,7 +277,7 @@ function retryAfter(headers: unknown, now: number): number | undefined {
 export function opencodeErrorSignals(
 	signals: SdkSignals,
 	error: unknown,
-	now = Date.now(),
+	now = timeNow(),
 ): SdkSignals {
 	if (!isRecord(error)) return signals;
 	const data = isRecord(error.data) ? error.data : {};

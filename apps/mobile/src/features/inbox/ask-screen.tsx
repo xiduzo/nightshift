@@ -4,6 +4,7 @@ import {
 	askStartValues,
 	deadlineText,
 	gateParts,
+	now,
 	type OpenGate,
 	phoneCanAnswer,
 } from "@nightshift/client";
@@ -221,7 +222,7 @@ export function AskScreen({
 					)}
 					{gate.deadline && answerable ? (
 						<Text className="text-muted-foreground text-xs">
-							{deadlineText(gate.deadline, Date.now(), form)}
+							{deadlineText(gate.deadline, now(), form)}
 						</Text>
 					) : null}
 					{elsewhere && native && answerable ? (

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import type { RunCommand, RunRows } from "../contract";
 import { inMemoryHostClient } from "./in-memory-host";
@@ -60,7 +61,7 @@ function rowsOf(walkerId: string, projectId = "project-none"): RunRows {
 				deviceId: null,
 				placements: null,
 				deviceNames: null,
-				createdAt: Date.now(),
+				createdAt: now(),
 			},
 		],
 		steps: [],
@@ -73,7 +74,7 @@ function rowsOf(walkerId: string, projectId = "project-none"): RunRows {
 				sessionId: null,
 				type: "RunStarted",
 				payload: "{}",
-				at: Date.now(),
+				at: now(),
 				walkerId,
 				walkerSeq: 1,
 			},

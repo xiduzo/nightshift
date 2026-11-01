@@ -10,8 +10,8 @@ import {
 	flowNameSchema,
 	parseFlow,
 } from "@nightshift/flows";
+import { iso } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
-
 import { daemonClient, defaultDaemonUrl } from "./join";
 
 /**
@@ -392,7 +392,7 @@ export async function runFlows(
 				io.out(
 					`${[
 						revision.id,
-						new Date(revision.at).toISOString(),
+						iso(revision.at),
 						revision.kind,
 						revision.person?.name ?? revision.person?.id ?? "-",
 						revision.device.name ?? revision.device.id,

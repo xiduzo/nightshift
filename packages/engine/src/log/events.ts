@@ -19,9 +19,9 @@ import type {
 	OutcomeColor,
 	WaitUntil,
 } from "@nightshift/flows";
+import { instant } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-
 import type { RunResult, RunStatus } from "../run-status";
 import { upgradePayload } from "./upgrade-payload";
 
@@ -842,7 +842,7 @@ export function parseEventRow(row: typeof event.$inferSelect): LoggedEvent {
 		sessionId: row.sessionId,
 		type,
 		payload: upgradePayload(type, JSON.parse(row.payload)),
-		at: row.at.getTime(),
+		at: instant(row.at),
 	} as LoggedEvent;
 }
 

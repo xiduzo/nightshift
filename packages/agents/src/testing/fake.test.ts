@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { now } from "@nightshift/time";
 import type {
 	AgentEvent,
 	AgentSessionInput,
@@ -95,7 +96,7 @@ describe("fakeHarness", () => {
 	test("an abort ends the session with an aborted error", async () => {
 		const controller = new AbortController();
 		const harness = fakeHarness({ steps: [{ type: "wait", ms: 10_000 }] });
-		const started = Date.now();
+		const started = now();
 		const events: AgentEvent[] = [];
 		for await (const event of harness.run(
 			input({ signal: controller.signal }),
@@ -103,7 +104,7 @@ describe("fakeHarness", () => {
 			events.push(event);
 			if (event.type === "session") controller.abort();
 		}
-		expect(Date.now() - started).toBeLessThan(1_000);
+		expect(now() - started).toBeLessThan(1_000);
 		expectContract(events);
 		expect(events.at(-1)).toEqual({
 			type: "error",

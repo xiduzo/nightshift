@@ -13,6 +13,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { now } from "@nightshift/time";
 
 const START_TIMEOUT_MS = 60_000;
 
@@ -77,8 +78,8 @@ function fail(message: string): never {
 }
 
 async function waitForAnswer(): Promise<string> {
-	const deadline = Date.now() + START_TIMEOUT_MS;
-	while (Date.now() < deadline) {
+	const deadline = now() + START_TIMEOUT_MS;
+	while (now() < deadline) {
 		const match = /Night Shift answers at (\S+)/.exec(output);
 		if (match?.[1]) return match[1];
 		if (serve.exitCode !== null) {

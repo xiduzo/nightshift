@@ -1,5 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
-
+import { now as timeNow } from "@nightshift/time";
 import { type Git, systemGit } from "./git";
 import { parseGitHubRepo } from "./github";
 import type { GitHubClones } from "./github-clone";
@@ -71,7 +71,7 @@ export function createProjectCopies(deps: {
 	now?: () => number;
 }): ProjectCopies {
 	const git = deps.git ?? systemGit();
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const copying = new Map<string, Promise<ProjectCopy | null>>();
 	const failed = new Map<
 		string,

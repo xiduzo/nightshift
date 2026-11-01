@@ -1,0 +1,13 @@
+{
+	"id": "P005",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "I already have cloud agents with scheduling in what we pay for, and for anything custom a cron job plus claude -p covers it. A pre-alpha tool from one developer is not something I'd put my team's repos on.",
+	"objection": "It's a nicer wrapper around something I can script in an afternoon, and if the solo developer stops, we're stuck maintaining it.",
+	"would_change_my_mind": "Seeing it reliably beat my cron setup for a few weeks, with the approval step and cost caps actually saving us from bad overnight runs.",
+	"price_too_cheap": 5,
+	"price_cheap": 20,
+	"price_expensive": 60,
+	"price_too_expensive": 120
+}

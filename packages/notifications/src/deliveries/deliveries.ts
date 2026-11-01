@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
+import { asDate, instant, instantOrNull } from "@nightshift/time";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 /**
@@ -96,17 +97,17 @@ export function createDeliveryLog(db: Database) {
 			title: row.title,
 			body: row.body,
 			status: row.status as DeliveryStatus,
-			dueAt: row.dueAt?.getTime() ?? null,
+			dueAt: instantOrNull(row.dueAt),
 			sentTo: ids(row.sentTo),
 			heldFor: ids(row.heldFor),
-			createdAt: row.createdAt.getTime(),
-			sentAt: row.sentAt?.getTime() ?? null,
-			withdrawnAt: row.withdrawnAt?.getTime() ?? null,
+			createdAt: instant(row.createdAt),
+			sentAt: instantOrNull(row.sentAt),
+			withdrawnAt: instantOrNull(row.withdrawnAt),
 		};
 	}
 
 	const date = (ms: number | null | undefined) =>
-		ms === undefined ? undefined : ms === null ? null : new Date(ms);
+		ms === undefined ? undefined : ms === null ? null : asDate(ms);
 
 	function columns(change: DeliveryChange) {
 		const set: Partial<typeof notificationDelivery.$inferInsert> = {};
@@ -138,7 +139,7 @@ export function createDeliveryLog(db: Database) {
 				body: claim.body ?? null,
 				...columns(change),
 				status: change.status,
-				createdAt: new Date(now),
+				createdAt: asDate(now),
 			};
 			const [added] = await db
 				.insert(notificationDelivery)

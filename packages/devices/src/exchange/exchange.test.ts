@@ -23,6 +23,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { and, eq, max, sql } from "drizzle-orm";
 import type { HostRelay as Relay, RunCommand } from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
@@ -354,7 +355,7 @@ describe("a batch and what follows from it", () => {
 				sessionId: null,
 				type,
 				payload: JSON.stringify(payload),
-				at: Date.now(),
+				at: now(),
 				walkerId,
 				walkerSeq: (counted?.latest ?? 0) + 1,
 			},
@@ -569,7 +570,7 @@ describe("a batch and what follows from it", () => {
 				runId,
 				walkerId: b.deviceId,
 				personId: "person-ada",
-				createdAt: Date.now(),
+				createdAt: now(),
 				kind: "gate.resolve",
 				payload: { stepId: gate?.id as string, choice: "approve" },
 			};
@@ -577,11 +578,11 @@ describe("a batch and what follows from it", () => {
 			// The rows that move the run to B are not here yet, however long
 			// they take: not "done, with an error", it comes again. At once,
 			// so the Commands of other runs never wait behind it.
-			const asked = Date.now();
+			const asked = now();
 			await expect(engineB.exchange.apply(command, engineB)).rejects.toThrow(
 				"The run is still on its way to this device.",
 			);
-			expect(Date.now() - asked).toBeLessThan(5_000);
+			expect(now() - asked).toBeLessThan(5_000);
 
 			// The rows that move the run to B are here; its walk state is not.
 			await copyRows(engineA, engineB);
@@ -626,7 +627,7 @@ describe("a batch and what follows from it", () => {
 			runId,
 			walkerId,
 			personId: "person-a",
-			createdAt: Date.now(),
+			createdAt: now(),
 			kind: "signal.send",
 			payload: { name: "go" },
 		});

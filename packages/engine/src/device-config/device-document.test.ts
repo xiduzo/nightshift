@@ -9,6 +9,7 @@ import {
 	setting,
 	ydoc,
 } from "@nightshift/db/schema";
+import { asDate } from "@nightshift/time";
 import * as Y from "yjs";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createCliToolStore } from "./cli-tools";
@@ -87,7 +88,7 @@ async function seedOlderRows() {
 	});
 	await sandbox.db
 		.insert(secret)
-		.values({ name: "TRACKER_TOKEN", updatedAt: new Date(SECRET_SET_AT) });
+		.values({ name: "TRACKER_TOKEN", updatedAt: asDate(SECRET_SET_AT) });
 }
 
 describe("the Device document", () => {

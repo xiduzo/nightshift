@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { apikey } from "@nightshift/db/schema";
+import { asDate, instantOrNull, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-
 import { createDeviceKeys, type DeviceKeys } from "../device-keys/device-keys";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import {
@@ -217,27 +217,29 @@ describe("Device keys", () => {
 			deviceName: "MacBook",
 		});
 		const expiry = async () =>
-			(
-				await sandbox.db
-					.select({ at: apikey.expiresAt })
-					.from(apikey)
-					.where(eq(apikey.id, keyId))
-			)[0]?.at?.getTime() ?? 0;
+			instantOrNull(
+				(
+					await sandbox.db
+						.select({ at: apikey.expiresAt })
+						.from(apikey)
+						.where(eq(apikey.id, keyId))
+				)[0]?.at,
+			) ?? 0;
 
 		// Used two days ago, for the last time: the expiry moves on with this use.
-		const twoDaysAgo = Date.now() + 28 * 86_400_000;
+		const twoDaysAgo = now() + 28 * 86_400_000;
 		await sandbox.db
 			.update(apikey)
-			.set({ expiresAt: new Date(twoDaysAgo) })
+			.set({ expiresAt: asDate(twoDaysAgo) })
 			.where(eq(apikey.id, keyId));
 		expect(await keys.verify(key)).not.toBeNull();
-		expect(await expiry()).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+		expect(await expiry()).toBeGreaterThan(now() + 29 * 86_400_000);
 
 		// Past the idle time: refused, and gone. (A Host keeps a valid key in
 		// memory for a minute: a Host that starts now reads the row.)
 		await sandbox.db
 			.update(apikey)
-			.set({ expiresAt: new Date(Date.now() - 1_000) })
+			.set({ expiresAt: asDate(now() - 1_000) })
 			.where(eq(apikey.id, keyId));
 		keys = createDeviceKeys({ auth: sandbox.auth, db: sandbox.db });
 		expect(await keys.verify(key)).toBeNull();

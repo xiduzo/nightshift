@@ -6,6 +6,7 @@ import {
 	valueStore,
 } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
+import { asDate, instant, instantOrNull } from "@nightshift/time";
 import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 
 export type { KeyStoreKind } from "@nightshift/engine/device-config";
@@ -69,8 +70,8 @@ export function createHostLinks(db: Database): HostLinks {
 			role: row.role,
 			personId: row.personId,
 			keyStore: row.keyStore,
-			createdAt: row.createdAt.getTime(),
-			revokedAt: row.revokedAt?.getTime() ?? null,
+			createdAt: instant(row.createdAt),
+			revokedAt: instantOrNull(row.revokedAt),
 		};
 	}
 
@@ -151,7 +152,7 @@ export function createHostLinks(db: Database): HostLinks {
 		async revoked(hostId) {
 			await db
 				.update(hostLink)
-				.set({ revokedAt: new Date() })
+				.set({ revokedAt: asDate() })
 				.where(and(eq(hostLink.hostId, hostId), isNull(hostLink.revokedAt)));
 		},
 	};

@@ -1,0 +1,13 @@
+{
+	"id": "P020",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I already tried background agents and the PRs were not worth reviewing, so drawing a pipeline around the same agents does not convince me. Pre-alpha from one developer, with no case studies or teams I know using it, means I wait.",
+	"objection": "The checks and retries do not fix the core problem that agent PRs are mediocre. I would just wake up to more stuff to review, and a solo pre-alpha project could disappear next month.",
+	"would_change_my_mind": "A case study from a small agency like mine showing what share of overnight PRs actually got merged, or a founder I know vouching for it.",
+	"price_too_cheap": 10,
+	"price_cheap": 39,
+	"price_expensive": 99,
+	"price_too_expensive": 200
+}

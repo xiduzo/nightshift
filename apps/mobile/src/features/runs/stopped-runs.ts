@@ -1,7 +1,7 @@
 import type { RunSummary } from "@nightshift/client";
+import { now as timeNow } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-
 import { useSignedIn } from "@/features/host";
 import { useLeftRuns } from "./left-runs";
 
@@ -59,7 +59,7 @@ export function useStoppedRuns(subscribed = true): {
 	const left = useLeftRuns();
 	const page = list.data;
 	const runs = useMemo(
-		() => (page ? stoppedRuns(page, left, Date.now()) : undefined),
+		() => (page ? stoppedRuns(page, left, timeNow()) : undefined),
 		[page, left],
 	);
 	return { runs, error: list.error, refetch: list.refetch };

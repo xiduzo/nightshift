@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { readdir, readFile, rm, stat, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
+import { asDate } from "@nightshift/time";
 import { HostUnreachableError } from "../contract";
 import { type CopyStamp, stampHolds } from "../log";
 import { writeWhole } from "./write-whole";
@@ -233,7 +234,7 @@ export function createSpaceArchive(dataDir: string) {
 			}
 			return oneAtATime(path, async () => {
 				if (await stat(path).catch(() => null)) {
-					const now = new Date();
+					const now = asDate();
 					await utimes(path, now, now).catch(() => {});
 					return;
 				}

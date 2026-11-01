@@ -7,6 +7,7 @@ import {
 	askOptions,
 	askStartValues,
 	deadlineText,
+	now,
 } from "@nightshift/client";
 import type { AskField, AskForm as Form } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
@@ -117,7 +118,7 @@ export function AskForm({
 						className="mt-px size-3.5 shrink-0"
 						aria-hidden="true"
 					/>
-					{deadlineText(deadline, Date.now(), form)}
+					{deadlineText(deadline, now(), form)}
 				</p>
 			) : null}
 			{tried && "problem" in answer ? (

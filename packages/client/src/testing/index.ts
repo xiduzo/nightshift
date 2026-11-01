@@ -1,7 +1,9 @@
 /**
  * Test helpers of `@nightshift/client`: the push contract's Gate key
- * (`gateKey`) and the rule that finds a closed Gate's notification
- * (`staleGates`), for a test that checks code which cannot import them,
- * such as the web app's service worker. Only tests import this entry.
+ * (`gateKey`), the rule that finds a closed Gate's notification
+ * (`staleGates`), and the clock fixtures `atLocal` and `utc`. Only tests
+ * import this entry.
  */
+
+export { atLocal, utc } from "@nightshift/time/testing";
 export { gateKey, staleGates } from "../notifications";

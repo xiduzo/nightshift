@@ -41,6 +41,7 @@ import {
 	parsedFlows,
 	singleAgentFlow,
 } from "@nightshift/flows";
+import { asDate } from "@nightshift/time";
 import type { Server } from "bun";
 import * as Y from "yjs";
 import { isThisComputer } from "../http";
@@ -288,7 +289,7 @@ async function platform(projectId?: string) {
 			id: projectId,
 			spaceId: space.id,
 			name: "Shop",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		for (const [token, person] of [
 			["nsd_bob", bob],
@@ -516,7 +517,7 @@ describe("a flow document a Device keeps a copy of", () => {
 			id: PROJECT,
 			spaceId: sandbox.spaceId,
 			name: "Shop",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		const documents = createFlowDocuments({ db: sandbox.db });
 		const opened = await documents.open(PROJECT);

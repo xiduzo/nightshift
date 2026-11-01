@@ -13,6 +13,7 @@ import {
 	validateSchedules,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import {
 	dismissNotice,
 	type FlowDocuments,
@@ -141,7 +142,7 @@ export type ProjectFlowsDeps = {
 	project(projectId: string): Promise<{ spaceId: string }>;
 	/** This Device: where a save happens. */
 	deviceId: string | (() => Promise<string>);
-	/** The clock of a revision. Default `Date.now`. */
+	/** The clock of a revision. Default `now`. */
 	now?: () => number;
 	/**
 	 * What brings a flow of format 6, and a revision of it, to the current
@@ -152,7 +153,7 @@ export type ProjectFlowsDeps = {
 };
 
 export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const { migrations } = deps;
 	const documentOf = async (projectId: string) => {
 		await deps.project(projectId);

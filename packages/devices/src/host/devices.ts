@@ -4,6 +4,7 @@ import type {
 	DeviceCopy,
 	SettingsStore,
 } from "@nightshift/engine/device-config";
+import { now as timeNow } from "@nightshift/time";
 import type { HostClient, PhoneView } from "../contract";
 import {
 	type DeviceKeyStore,
@@ -44,11 +45,11 @@ export function createDevices(deps: {
 		HomeMembership,
 		"pending" | "preview" | "merge" | "joined" | "leave"
 	>;
-	/** The clock, in milliseconds. Default: `Date.now`. */
+	/** The clock, in milliseconds. Default: `now`. */
 	now?: () => number;
 }): Devices {
 	const { host } = deps;
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	/**
 	 * The phones on each Host, as it last said: the Devices page asks every
 	 * few seconds, and a phone signs in rarely. Signing one out here asks

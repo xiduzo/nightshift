@@ -286,15 +286,19 @@ export {
 	spaceChanged,
 } from "./spaces";
 export {
+	asDate,
 	atWall,
 	formatDateTime,
+	formatDay,
 	formatDayTime,
 	formatLongDay,
 	formatRelative,
 	formatTime,
+	formatWeekdayDate,
 	hourOf,
 	hoverTime,
 	iso,
+	localZone,
 	now,
 	wall,
 } from "./time";

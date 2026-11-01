@@ -12,6 +12,7 @@ import {
 	type PeerProjects,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import { and, eq, isNull } from "drizzle-orm";
 import type {
 	PersonalMerge as HostAnswer,
@@ -140,7 +141,7 @@ export type MergeDeps = {
 /** The steps of a merge, for the membership: it runs one at a time. */
 export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	const { db, engine, self } = deps;
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const rows = deps.record.merges;
 	const pollMs = deps.pollMs ?? 250;
 

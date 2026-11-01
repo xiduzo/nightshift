@@ -20,6 +20,7 @@
 	},
 	"dependencies": {
 		"@libsql/client": "0.18.0",
+		"@nightshift/time": "workspace:*",
 		"drizzle-orm": "catalog:",
 		"libsql": "catalog:"
 	},

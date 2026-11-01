@@ -3,6 +3,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { now } from "@nightshift/time";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -23,8 +24,8 @@ function leaseDatabase(owner: string, heartbeatAgeMs: number): string {
 	db.run("INSERT INTO daemon_lease VALUES (1, ?, 'mac', ?, 1, ?, ?)", [
 		owner,
 		process.pid,
-		Date.now(),
-		Date.now() - heartbeatAgeMs,
+		now(),
+		now() - heartbeatAgeMs,
 	]);
 	db.close();
 	return path;

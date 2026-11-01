@@ -8,6 +8,7 @@ import type { Database } from "@nightshift/db";
 import type { Engine, FlowDocuments, PeerProjects } from "@nightshift/engine";
 import type { SpaceDocuments } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import type { SplitResult, SplitState } from "../contract";
 import type { HostSpaces } from "../links";
 import { backupDatabase } from "./backup";
@@ -93,7 +94,7 @@ type Left = {
 /** The steps of a split, for the membership: it runs one at a time. */
 export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	const { db, engine, self } = deps;
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const rows = deps.record.splits;
 	const merges = deps.record.merges;
 

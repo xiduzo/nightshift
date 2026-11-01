@@ -9,9 +9,9 @@ import {
 	user,
 	ydoc,
 } from "@nightshift/db/schema";
+import { asDate, now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
-
 import { createEngine } from "../run/engine";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
@@ -172,7 +172,7 @@ describe("projection", () => {
 				id: "p9",
 				spaceId: sandbox.spaceId,
 				name: "renamed",
-				removedAt: new Date(5),
+				removedAt: asDate(5),
 			},
 		]);
 	});
@@ -289,7 +289,7 @@ describe("the engine writes the document", () => {
 			document.clones.set(`${added.id}/studio`, {
 				projectId: added.id,
 				deviceId: "studio",
-				addedAt: Date.now() + 1,
+				addedAt: now() + 1,
 			});
 			document.devices.set("studio", { name: "studio", updatedAt: 1 });
 		});
@@ -318,14 +318,14 @@ describe("members", () => {
 				organizationId: space,
 				userId: "u-ada",
 				role: "owner",
-				createdAt: new Date(),
+				createdAt: asDate(),
 			},
 			{
 				id: "m2",
 				organizationId: space,
 				userId: "u-bob",
 				role: "viewer",
-				createdAt: new Date(),
+				createdAt: asDate(),
 			},
 		]);
 		const document = await documents.open(space);
@@ -358,7 +358,7 @@ describe("members", () => {
 			organizationId: space,
 			userId: "u-ada",
 			role: "owner",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		const document = await documents.open(space);
 		expect(memberName(document, "u-ada")).toBe("Ada");

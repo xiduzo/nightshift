@@ -21,6 +21,7 @@
 		"@nightshift/flows": "workspace:*",
 		"@nightshift/notifications": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
+		"@nightshift/time": "workspace:*",
 		"@orpc/server": "catalog:",
 		"zod": "catalog:"
 	},

@@ -7,6 +7,8 @@
  * in that harness's folder (`harnesses/<harness>/record.ts`). They build on
  * `baseCheck`.
  */
+
+import { now } from "@nightshift/time";
 import { firstLine, probe, resolveBin } from "./probe";
 
 export type CliCheck = {
@@ -38,7 +40,7 @@ export async function baseCheck(
 		account: null,
 		facts: [],
 		problem: null,
-		checkedAt: Date.now(),
+		checkedAt: now(),
 	};
 	if (!path) {
 		return {
@@ -80,7 +82,7 @@ export async function checkCustomAgent(
 		account: null,
 		facts: [],
 		problem: null,
-		checkedAt: Date.now(),
+		checkedAt: now(),
 	};
 	if (!path) {
 		return {

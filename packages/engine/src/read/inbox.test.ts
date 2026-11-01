@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { member, user } from "@nightshift/db/schema";
-
+import { asDate } from "@nightshift/time";
 import {
 	createSandbox,
 	otherSpace,
@@ -78,14 +78,14 @@ describe("inboxOf", () => {
 				organizationId: platform,
 				userId: "u-ada",
 				role: "member",
-				createdAt: new Date(),
+				createdAt: asDate(),
 			},
 			{
 				id: "m2",
 				organizationId: docs,
 				userId: "u-ada",
 				role: "viewer",
-				createdAt: new Date(),
+				createdAt: asDate(),
 			},
 		]);
 		const gatesIn = new Map([

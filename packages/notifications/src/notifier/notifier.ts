@@ -1,5 +1,5 @@
 import type { LandedFact } from "@nightshift/engine";
-
+import { now as timeNow } from "@nightshift/time";
 import {
 	deviceWaitWords,
 	type GateFacts,
@@ -147,7 +147,7 @@ const DIGEST_CHECK_MS = 60_000;
 const LOCAL_KINDS: ReadonlySet<PushTarget["kind"]> = new Set(["desktop"]);
 
 export function createNotifier(deps: NotifierDeps): Notifier {
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const onError =
 		deps.onError ??
 		((message: string, error: unknown) =>

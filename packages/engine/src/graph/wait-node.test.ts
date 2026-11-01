@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import type { WaitNode } from "@nightshift/flows";
+import { parseInstant, now as timeNow } from "@nightshift/time";
+import { atLocal } from "@nightshift/time/testing";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSleep, deriveSteps } from "../read/run-views";
@@ -46,7 +48,7 @@ afterEach(async () => {
 });
 
 /** A clock the test moves. */
-function clock(start = Date.now()) {
+function clock(start = timeNow()) {
 	let now = start;
 	return {
 		now: () => now,
@@ -58,7 +60,7 @@ function clock(start = Date.now()) {
 
 describe("the Wait node", () => {
 	test("a time: a clock time means the next one, a date and time is taken as is, and a past time wakes at once", async () => {
-		const start = new Date(2026, 9, 17, 22, 0, 0, 0).getTime();
+		const start = atLocal(2026, 9, 17, 22, 0, 0, 0);
 		const time = clock(start);
 		const h = await startRun(
 			sandbox,
@@ -72,7 +74,7 @@ describe("the Wait node", () => {
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: { when: "07:00" } });
-		const seven = new Date(2026, 9, 18, 7, 0, 0, 0).getTime();
+		const seven = atLocal(2026, 9, 18, 7, 0, 0, 0);
 		expect(first.parked[0]).toMatchObject({
 			kind: "wait",
 			reason: "time",
@@ -80,14 +82,12 @@ describe("the Wait node", () => {
 		});
 
 		expect(parseTime("2026-10-18T07:00", start)).toBe(
-			new Date(2026, 9, 18, 7, 0).getTime(),
+			atLocal(2026, 9, 18, 7, 0),
 		);
 		expect(parseTime("2026-10-18T07:00:00Z", start)).toBe(
-			Date.parse("2026-10-18T07:00:00Z"),
+			parseInstant("2026-10-18T07:00:00Z"),
 		);
-		expect(parseTime("22:00", start)).toBe(
-			new Date(2026, 9, 18, 22, 0).getTime(),
-		);
+		expect(parseTime("22:00", start)).toBe(atLocal(2026, 9, 18, 22, 0));
 		expect(parseTime("soon", start)).toBeNull();
 		expect(parseTime("", start)).toBeNull();
 		expect(parseTime("25:00", start)).toBeNull();
@@ -105,7 +105,7 @@ describe("the Wait node", () => {
 		const parked = await drive(past, { inputs: {} });
 		expect(parked.parked[0]).toMatchObject({
 			kind: "wait",
-			until: new Date(2026, 9, 17, 20, 0).getTime(),
+			until: atLocal(2026, 9, 17, 20, 0),
 		});
 		await drive(
 			past,

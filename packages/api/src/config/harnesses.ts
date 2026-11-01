@@ -22,8 +22,8 @@ import {
 	isCustomHarness,
 	modelAddressSchema,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { z } from "zod";
-
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import {
@@ -119,7 +119,7 @@ export const harnesses = {
 						models: [ACP_DEFAULT_MODEL],
 						listed: 0,
 						problem: null,
-						checkedAt: Date.now(),
+						checkedAt: now(),
 					}
 				: context.checks.models(
 						input.harness,

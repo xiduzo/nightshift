@@ -47,7 +47,6 @@ const CALENDAR = new Set([
 	"setUTCSeconds",
 	"setUTCMilliseconds",
 	"toISOString",
-	"toLocaleString",
 	"toLocaleDateString",
 	"toLocaleTimeString",
 	"toDateString",
@@ -113,7 +112,8 @@ export function timeProblems(source: string, file: string): string[] {
 		} else if (
 			ts.isCallExpression(node) &&
 			ts.isPropertyAccessExpression(node.expression) &&
-			CALENDAR.has(node.expression.name.text)
+			(CALENDAR.has(node.expression.name.text) || isClockLocaleString(node)) &&
+			!isRecordManagerClock(node)
 		) {
 			report(node, `.${node.expression.name.text}()`);
 		}
@@ -121,6 +121,56 @@ export function timeProblems(source: string, file: string): string[] {
 	};
 	visit(sf);
 	return found;
+}
+
+const LOCALE_CLOCK = new Set([
+	"dateStyle",
+	"timeStyle",
+	"weekday",
+	"era",
+	"hour",
+	"minute",
+	"second",
+	"day",
+	"month",
+	"year",
+	"timeZone",
+	"hourCycle",
+	"dayPeriod",
+]);
+
+/**
+ * `toLocaleString` on a number groups digits. It is a clock only when the
+ * receiver is built here (`new Date()`, a call) or the options name a date.
+ */
+function isClockLocaleString(node: ts.CallExpression): boolean {
+	if (!ts.isPropertyAccessExpression(node.expression)) return false;
+	if (node.expression.name.text !== "toLocaleString") return false;
+	const receiver = node.expression.expression;
+	if (ts.isNewExpression(receiver) || ts.isCallExpression(receiver))
+		return true;
+	return node.arguments.some(
+		(arg) =>
+			ts.isObjectLiteralExpression(arg) &&
+			arg.properties.some(
+				(prop) =>
+					ts.isPropertyAssignment(prop) &&
+					ts.isIdentifier(prop.name) &&
+					LOCALE_CLOCK.has(prop.name.text),
+			),
+	);
+}
+
+/**
+ * `@langchain` `RecordManager.getTime` returns a promise. `Date#getTime`
+ * does not, so an awaited call is that method, not the clock.
+ */
+function isRecordManagerClock(node: ts.CallExpression): boolean {
+	return (
+		ts.isPropertyAccessExpression(node.expression) &&
+		node.expression.name.text === "getTime" &&
+		ts.isAwaitExpression(node.parent)
+	);
 }
 
 function bannedModule(specifier: string): boolean {
@@ -142,6 +192,10 @@ export function sourceFiles(root: string): string[] {
 			if (SKIP_DIR.has(entry.name)) continue;
 			const path = join(dir, entry.name);
 			if (entry.isDirectory()) {
+				const rel = relative(root, path).split("\\").join("/");
+				if (rel === "apps/desktop/.hutch" || rel === "apps/desktop/build") {
+					continue;
+				}
 				walk(path);
 				continue;
 			}

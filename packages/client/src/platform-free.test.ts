@@ -17,6 +17,7 @@ const ALLOWED: Record<string, "types" | "values"> = {
 	"@nightshift/flows": "values",
 	"@nightshift/notifications/contract": "values",
 	"@nightshift/time": "values",
+	"@nightshift/time/testing": "values",
 	"@orpc/client": "values",
 	"@orpc/client/fetch": "values",
 	"@orpc/client/plugins": "values",

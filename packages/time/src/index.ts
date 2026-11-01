@@ -6,6 +6,7 @@
  */
 
 export {
+	asDate,
 	atWall,
 	DAY_MS,
 	dayKey,
@@ -13,14 +14,18 @@ export {
 	HOUR_MS,
 	hourOf,
 	type Instant,
+	instant,
+	instantOrNull,
 	iso,
 	isTimeZone,
 	lastHours,
 	lastNights,
 	localZone,
 	minuteOfDay,
+	nextClockTime,
 	nightOf,
 	now,
+	parseInstant,
 	type Wall,
 	type WallTime,
 	wall,
@@ -34,5 +39,6 @@ export {
 	formatRelative,
 	formatTime,
 	formatWeekday,
+	formatWeekdayDate,
 	hoverTime,
 } from "./format";

@@ -5,7 +5,7 @@ import type {
 	PlannedSchedule,
 	ScheduleSummary,
 } from "@nightshift/client";
-
+import { atLocal } from "@nightshift/client/testing";
 import {
 	offlineNotices,
 	scheduleKey,
@@ -16,8 +16,8 @@ import {
 
 const HOUR = 60 * 60 * 1000;
 // Saturday morning on this clock.
-const NOW = new Date(2026, 9, 31, 7, 12).getTime();
-const TONIGHT_3 = new Date(2026, 10, 1, 3, 0).getTime();
+const NOW = atLocal(2026, 9, 31, 7, 12);
+const TONIGHT_3 = atLocal(2026, 10, 1, 3, 0);
 
 const schedule = (
 	id: string,
@@ -138,7 +138,7 @@ describe("startWhen", () => {
 	});
 
 	test("gives the day for a start by day", () => {
-		const afternoon = new Date(2026, 10, 1, 14, 0).getTime();
+		const afternoon = atLocal(2026, 10, 1, 14, 0);
 		expect(startWhen(afternoon, NOW)).toMatch(/^tomorrow at /);
 	});
 });

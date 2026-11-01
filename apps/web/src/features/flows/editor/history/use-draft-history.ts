@@ -1,3 +1,4 @@
+import { now } from "@nightshift/client";
 import type { Flow } from "@nightshift/flows";
 import { type SetStateAction, useCallback, useState } from "react";
 import { record, redo, startHistory, undo } from "./draft-history";
@@ -26,7 +27,7 @@ export function useDraftHistory(initial: Flow) {
 		const merge =
 			gesture === undefined
 				? undefined
-				: { key: gesture, at: Date.now(), within: GESTURE_PAUSE_MS };
+				: { key: gesture, at: now(), within: GESTURE_PAUSE_MS };
 		setHistory((current) =>
 			record(
 				current,

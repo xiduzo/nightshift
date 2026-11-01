@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project, ydoc } from "@nightshift/db/schema";
+import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { createSandbox, type Sandbox } from "../testing";
 import {
@@ -21,7 +22,7 @@ beforeEach(async () => {
 		id: "shop",
 		spaceId: sandbox.spaceId,
 		name: "Shop",
-		createdAt: new Date(),
+		createdAt: asDate(),
 	});
 });
 

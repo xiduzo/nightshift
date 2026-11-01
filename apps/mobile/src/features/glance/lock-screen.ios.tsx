@@ -16,15 +16,14 @@ import {
 	padding,
 	tint,
 } from "@expo/ui/swift-ui/modifiers";
+import { asDate, now } from "@nightshift/client";
 import {
 	createLiveActivity,
 	type LiveActivity,
 	type LiveActivityEnvironment,
 	type LiveActivityFactory,
 } from "expo-widgets";
-
 import type { ComponentProps } from "react";
-
 import { type RunActivityProps, runActivityProps } from "./glance-props";
 import type { LockScreenPort } from "./lock-screen-port";
 
@@ -213,7 +212,7 @@ function activityOf(key: string): LiveActivity<RunActivityProps> | null {
 	);
 }
 
-const staleDate = () => new Date(Date.now() + STALE_MS);
+const staleDate = () => asDate(now() + STALE_MS);
 
 /**
  * iOS: a Live Activity per followed run, started and updated from the app
@@ -242,7 +241,7 @@ export const lockScreen: LockScreenPort = {
 	},
 	end: async (key, progress) => {
 		await activityOf(key)?.end(
-			{ after: new Date(Date.now() + ENDED_STAYS_MS) },
+			{ after: asDate(now() + ENDED_STAYS_MS) },
 			runActivityProps(progress),
 		);
 	},

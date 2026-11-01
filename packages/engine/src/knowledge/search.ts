@@ -4,6 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { index } from "@langchain/core/indexing";
+import { now } from "@nightshift/time";
 import { sha256OfFile } from "../archive";
 import { isDocument, loadDocument } from "./documents";
 import {
@@ -552,7 +553,7 @@ export function createKnowledgeSearch(
 		if (synced.has(projectId) || queued.has(projectId)) return;
 		if (turnedOff.has(projectId)) return;
 		const failed = failedAt.get(projectId);
-		if (failed !== undefined && Date.now() - failed < RETRY_MS) return;
+		if (failed !== undefined && now() - failed < RETRY_MS) return;
 		queued.add(projectId);
 		preparing = preparing.then(async () => {
 			let again = false;
@@ -560,7 +561,7 @@ export function createKnowledgeSearch(
 				again = await embed(projectId, meaning);
 				failedAt.delete(projectId);
 			} catch (error) {
-				failedAt.set(projectId, Date.now());
+				failedAt.set(projectId, now());
 				if (!closed) {
 					console.warn(
 						"Knowledge search could not prepare its search by meaning:",

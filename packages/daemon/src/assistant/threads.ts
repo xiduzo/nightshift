@@ -7,6 +7,7 @@
  */
 import type { ChatExchange } from "@nightshift/agents";
 import type { AgentProfileSettings } from "@nightshift/flows";
+import { now as timeNow } from "@nightshift/time";
 
 /** The agent a thread's session runs on. */
 export type ThreadAgent = Pick<
@@ -73,7 +74,7 @@ export function createThreadStore(
 ): ThreadStore {
 	const cap = options.cap ?? 100;
 	const idleMs = options.idleMs ?? 6 * 60 * 60 * 1000;
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const threads = new Map<string, ChatThread>();
 
 	const expire = () => {

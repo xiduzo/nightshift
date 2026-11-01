@@ -6,6 +6,7 @@
  * `TerminalRunPort`.
  */
 import type { ProjectFlowMap } from "@nightshift/flows";
+import { iso, parseInstant, now as timeNow } from "@nightshift/time";
 import { toolDefinition } from "@tanstack/ai";
 import type { BridgedTool } from "../port";
 import type { TerminalProject } from "./terminal-project";
@@ -163,7 +164,7 @@ export function sinceOf(value: unknown, now: number): number | undefined {
 			const unit = (span[2] as string).toLowerCase() as keyof typeof SPAN_MS;
 			return now - Number(span[1]) * SPAN_MS[unit];
 		}
-		const at = Date.parse(value);
+		const at = parseInstant(value);
 		if (!Number.isNaN(at)) return at;
 	}
 	throw new Error(
@@ -191,8 +192,8 @@ export function costText(cost: TerminalCost): string | null {
 	}
 }
 
-const iso = (at: number | null) =>
-	at === null ? null : new Date(at).toISOString();
+const isoOrNull = (at: number | null): string | null =>
+	at === null ? null : iso(at);
 
 /** A Gate's id for the agent: its run and its step. */
 export function gateIdOf(gate: { runId: string; stepId: string }): string {
@@ -227,7 +228,7 @@ function statusesOf(value: unknown): TerminalRunStatus[] | undefined {
 export function terminalRunTools(
 	port: TerminalRunPort,
 	projectOf: (args: unknown) => Promise<TerminalProject>,
-	now: () => number = Date.now,
+	now: () => number = timeNow,
 ): BridgedTool[] {
 	return [
 		toolDefinition({
@@ -282,8 +283,8 @@ export function terminalRunTools(
 			return JSON.stringify(
 				runs.map(({ cost, ...run }) => ({
 					...run,
-					createdAt: iso(run.createdAt),
-					endedAt: iso(run.endedAt),
+					createdAt: isoOrNull(run.createdAt),
+					endedAt: isoOrNull(run.endedAt),
 					cost: costText(cost),
 				})),
 				null,
@@ -408,10 +409,10 @@ export function terminalRunTools(
 						...(choice.description ? { description: choice.description } : {}),
 						...(choice.needsNote ? { needsNote: true } : {}),
 					})),
-					waitingSince: iso(gate.openedAt),
+					waitingSince: isoOrNull(gate.openedAt),
 					...(gate.deadline
 						? {
-								deadline: `Night Shift chooses "${gate.deadline.choose}" at ${iso(gate.deadline.at)} when nobody answers.`,
+								deadline: `Night Shift chooses "${gate.deadline.choose}" at ${isoOrNull(gate.deadline.at)} when nobody answers.`,
 							}
 						: {}),
 					...(gate.canAnswer ? {} : { youCanAnswer: false }),
@@ -505,9 +506,9 @@ export function terminalRunTools(
 			const since = sinceOf(field(args, "since"), now());
 			const digest = await port.digest(since);
 			const when =
-				since === undefined ? "your last digest" : (iso(since) as string);
+				since === undefined ? "your last digest" : (isoOrNull(since) as string);
 			if (!digest) return `No run ended since ${when}, and no Gate waits.`;
-			const lines = [`Since ${iso(digest.from)}: ${digest.body}`];
+			const lines = [`Since ${isoOrNull(digest.from)}: ${digest.body}`];
 			if (digest.runs.length > 0) {
 				lines.push("", "Runs:");
 				for (const run of digest.runs) {

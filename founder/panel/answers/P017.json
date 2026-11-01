@@ -1,0 +1,13 @@
+{
+	"id": "P017",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "quality",
+	"reason": "I'd maybe self-host the open source version to poke at it, but I won't pay $99 for Cloud. My problem with background agents was never scheduling. It was that the PRs were junk, and a nicer pipeline doesn't prove it fixes that.",
+	"objection": "Overnight PRs that pass checks can still be bad PRs. Pre-alpha from one developer, and a hosted server sitting near my team's agent logins, is two trust problems on top of a quality problem.",
+	"would_change_my_mind": "Real merged-PR rates from teams like mine, showing most overnight PRs got merged with light review.",
+	"price_too_cheap": 10,
+	"price_cheap": 25,
+	"price_expensive": 60,
+	"price_too_expensive": 120
+}

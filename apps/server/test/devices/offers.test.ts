@@ -14,9 +14,9 @@ import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
 import type { AppRouterClient } from "@nightshift/api";
 import { seedFlows } from "@nightshift/engine/testing";
+import { now } from "@nightshift/time";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-
 import {
 	type Daemon,
 	pair,
@@ -387,8 +387,8 @@ describe("a colleague's run on another Person's Device", () => {
 			colleague.runs.start({ projectId, flowName: "offered", deviceId: bId }),
 		]);
 		let most = 0;
-		const deadline = Date.now() + 60_000;
-		while (Date.now() < deadline) {
+		const deadline = now() + 60_000;
+		while (now() < deadline) {
 			const live = lines(PIDS).slice(before).map(Number).filter(alive).length;
 			most = Math.max(most, live);
 			const statuses = await Promise.all(runs.map((r) => runOf(r.id)));

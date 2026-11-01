@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { invitation, member, organization, user } from "@nightshift/db/schema";
+import { asDate, instant, now as timeNow } from "@nightshift/time";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
-
 import type { Role } from "./roles";
 
 /**
@@ -75,7 +75,7 @@ export async function isHostAdmin(
 export async function signUpRefusal(
 	db: Database,
 	body: { email?: unknown; invitationId?: unknown },
-	now = Date.now(),
+	now = timeNow(),
 ): Promise<string | null> {
 	const [anyone] = await db.select({ id: user.id }).from(user).limit(1);
 	if (!anyone) return null;
@@ -91,7 +91,7 @@ export async function signUpRefusal(
 			and(
 				eq(invitation.id, id),
 				eq(invitation.status, "pending"),
-				gt(invitation.expiresAt, new Date(now)),
+				gt(invitation.expiresAt, asDate(now)),
 				eq(sql`lower(${invitation.email})`, email),
 			),
 		)
@@ -118,7 +118,7 @@ export type InvitationView = {
 export async function invitationView(
 	db: Database,
 	id: string,
-	now = Date.now(),
+	now = timeNow(),
 ): Promise<InvitationView | null> {
 	const [row] = await db
 		.select({
@@ -142,7 +142,7 @@ export async function invitationView(
 		.where(eq(sql`lower(${user.email})`, row.email.toLowerCase()))
 		.limit(1);
 	const status =
-		row.status === "pending" && row.expiresAt.getTime() <= now
+		row.status === "pending" && instant(row.expiresAt) <= now
 			? "expired"
 			: (row.status as InvitationView["status"]);
 	return {
@@ -180,7 +180,7 @@ export type PendingInvitation = {
 export async function membersOf(
 	db: Database,
 	spaceId: string,
-	now = Date.now(),
+	now = timeNow(),
 ): Promise<{ members: SpaceMember[]; invitations: PendingInvitation[] }> {
 	const members = await db
 		.select({
@@ -209,7 +209,7 @@ export async function membersOf(
 			and(
 				eq(invitation.organizationId, spaceId),
 				eq(invitation.status, "pending"),
-				gt(invitation.expiresAt, new Date(now)),
+				gt(invitation.expiresAt, asDate(now)),
 			),
 		)
 		.orderBy(invitation.createdAt);
@@ -217,12 +217,12 @@ export async function membersOf(
 		members: members.map((m) => ({
 			...m,
 			role: m.role as Role,
-			joinedAt: m.joinedAt.getTime(),
+			joinedAt: instant(m.joinedAt),
 		})),
 		invitations: invitations.map((i) => ({
 			...i,
 			role: (i.role ?? "member") as Role,
-			expiresAt: i.expiresAt.getTime(),
+			expiresAt: instant(i.expiresAt),
 		})),
 	};
 }
@@ -273,7 +273,7 @@ export async function addMembership(
 		organizationId: input.spaceId,
 		userId: input.personId,
 		role: input.role,
-		createdAt: new Date(),
+		createdAt: asDate(),
 	});
 }
 

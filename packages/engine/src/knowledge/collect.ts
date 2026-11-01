@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { project } from "@nightshift/db/schema";
+import { now as timeNow } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { SpaceArchive } from "../archive";
 import { type KnowledgeDocuments, knowledgeFiles } from "./knowledge-document";
@@ -43,7 +44,7 @@ export type CollectDeps = {
 export async function collectContent(
 	deps: CollectDeps,
 ): Promise<CollectResult> {
-	const now = deps.now?.() ?? Date.now();
+	const now = deps.now?.() ?? timeNow();
 	const keptBefore = now - (deps.graceMs ?? CONTENT_GRACE_MS);
 	const result: CollectResult = { removed: 0, waiting: 0 };
 	const bySpace = new Map<string, { sha256: string; keptAt: number }[]>();

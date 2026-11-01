@@ -55,7 +55,7 @@ import {
 } from "@nightshift/engine/projects";
 import { deliveryMoves } from "@nightshift/notifications";
 import { createTelemetry } from "@nightshift/telemetry";
-
+import { instant } from "@nightshift/time";
 import { createAssistant } from "./assistant";
 import {
 	harnessLookup,
@@ -684,7 +684,7 @@ export async function createDaemon(
 			host: lease.host,
 			pid: lease.pid,
 			epoch: lease.epoch,
-			since: lease.since.getTime(),
+			since: instant(lease.since),
 		},
 		databaseUrl: url,
 		leaseOwner: lease.owner,

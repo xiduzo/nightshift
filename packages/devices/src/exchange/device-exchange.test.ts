@@ -20,6 +20,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
@@ -971,7 +972,7 @@ describe("the Device's exchange with its Host", () => {
 
 	test("a Space B's owner is not a Member of never reaches B", async () => {
 		// Another Person's Space on A, with a run of A's own.
-		const now = Date.now();
+		const now = timeNow();
 		await a.db.insert(user).values({
 			id: "stranger",
 			name: "Stranger",
@@ -981,7 +982,7 @@ describe("the Device's exchange with its Host", () => {
 			id: "space-private",
 			name: "Private",
 			slug: "space-private",
-			createdAt: new Date(now),
+			createdAt: asDate(now),
 			personal: false,
 		});
 		await a.db.insert(member).values({
@@ -989,7 +990,7 @@ describe("the Device's exchange with its Host", () => {
 			organizationId: "space-private",
 			userId: "stranger",
 			role: "owner",
-			createdAt: new Date(now),
+			createdAt: asDate(now),
 		});
 		await a.db.insert(project).values({
 			id: "project-private",

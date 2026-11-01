@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFile, copyFile, mkdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
+import { now } from "@nightshift/time";
 
 /**
  * Artifacts: files a run keeps for the person, such as the screenshots of a
@@ -99,7 +100,7 @@ export function createArtifactStore(dataDir: string) {
 				title: input.title ?? name,
 				mediaType: Bun.file(source).type.split(";")[0] ?? "",
 				size: info.size,
-				savedAt: Date.now(),
+				savedAt: now(),
 			};
 			await mkdir(runDir(input.runId), { recursive: true });
 			await copyFile(source, filePath(input.runId, artifact));

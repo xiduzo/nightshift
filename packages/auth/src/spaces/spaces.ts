@@ -8,6 +8,7 @@ import {
 	session,
 	user,
 } from "@nightshift/db/schema";
+import { asDate } from "@nightshift/time";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { claimHostAdmin } from "./members";
@@ -66,7 +67,7 @@ export async function ensurePersonalSpace(
 	const found = await personalSpaceId(db, userId);
 	if (found) return found;
 	const id = randomUUID();
-	const createdAt = new Date();
+	const createdAt = asDate();
 	await db.batch([
 		db.insert(organization).values({
 			id,
@@ -233,7 +234,7 @@ export async function mirrorHostSpace(
 			id: space.id,
 			name: space.name,
 			slug: `host-${space.id}`,
-			createdAt: new Date(),
+			createdAt: asDate(),
 		})
 		.onConflictDoUpdate({
 			target: organization.id,
@@ -281,7 +282,7 @@ export async function adoptPersonalSpaceBatch(
 					organizationId: to,
 					userId: personId,
 					role: "owner",
-					createdAt: new Date(),
+					createdAt: asDate(),
 				}),
 		db
 			.update(organization)
@@ -329,7 +330,7 @@ export async function splitPersonalSpaceBatch(
 		.select({ id: organization.id })
 		.from(organization)
 		.where(eq(organization.slug, slug));
-	const createdAt = new Date();
+	const createdAt = asDate();
 	return [
 		db.insert(organization).values({
 			id: to,

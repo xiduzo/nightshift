@@ -1,6 +1,6 @@
 import type { PushData } from "@nightshift/client";
+import { now } from "@nightshift/client";
 import { useSyncExternalStore } from "react";
-
 import type { InFrontPlace } from "./push-data";
 
 /** A Gate that opened while the app was in front (from the stream or a push), shown as a banner in the app. */
@@ -26,7 +26,7 @@ export function setInFrontPlace(next: InFrontPlace): void {
 
 /** Shows a banner in the app. A newer push replaces the one shown. */
 export function showBanner(next: Omit<Banner, "at">): void {
-	banner = { ...next, at: Date.now() };
+	banner = { ...next, at: now() };
 	emit();
 }
 

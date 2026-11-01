@@ -6,6 +6,7 @@ import {
 	usageLimitScript,
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
+import { now } from "@nightshift/time";
 import {
 	agent,
 	command,
@@ -45,7 +46,7 @@ const callOnce = (id: string, flow: string) =>
 
 describe("the stop time in the state", () => {
 	test("the start input sets it, the next step parks on it, and a resume's update clears it", async () => {
-		let clock = Date.now();
+		let clock = now();
 		const stopAt = clock + 60_000;
 		// The agent's session takes the run past its stop time.
 		const harness = fakeHarness(() => {
@@ -91,7 +92,7 @@ describe("the stop time in the state", () => {
 	});
 
 	test("a stop time cleared at the root reaches a body that resumes from its own checkpoint", async () => {
-		let clock = Date.now();
+		let clock = now();
 		const stopAt = clock + 60_000;
 		const harness = fakeHarness(() => {
 			clock = stopAt + 1;
@@ -132,7 +133,7 @@ describe("the stop time in the state", () => {
 	});
 
 	test("a Command update reaches a thread pending at a node before the node re-runs", async () => {
-		let clock = Date.now();
+		let clock = now();
 		const stopAt = clock + 60_000;
 		const harness = fakeHarness(reportingScript("pass"));
 		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {

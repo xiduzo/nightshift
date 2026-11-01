@@ -18,6 +18,7 @@ import {
 	customHarnessName,
 	harnessNameSchema,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import {
 	baseCheck,
 	type CliCheck,
@@ -25,7 +26,6 @@ import {
 	probe,
 	resolveBin,
 } from "../doctor";
-
 import type { AgentHarnessName, HarnessName } from "../port";
 import { ACP_DEFAULT_MODEL } from "./acp/facts";
 import { ACP_ADAPTERS } from "./acp/record";
@@ -82,7 +82,7 @@ export async function harnessModels(
 			models: [...known, ...extra],
 			listed: extra.length,
 			problem,
-			checkedAt: Date.now(),
+			checkedAt: now(),
 		};
 	};
 	if (!adapter.listing) return result([], null);

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 import type { LandedFact } from "@nightshift/engine";
 import type { LandedChange } from "@nightshift/engine/testing";
-
+import { utc } from "@nightshift/time/testing";
 import {
 	createInAppChannel,
 	type InAppChannel,
@@ -27,7 +27,7 @@ import { type OpenGateRef, oneSenderPerSpace } from "./sources";
 const SPACE = "space-1";
 const OTHER_SPACE = "space-2";
 /** 12:00 UTC on a weekday. */
-const NOON = Date.UTC(2026, 9, 21, 12, 0);
+const NOON = utc(2026, 9, 21, 12, 0);
 const MINUTE = 60_000;
 
 let db: Database;
@@ -371,12 +371,12 @@ describe("this computer's desktop", () => {
 		await openGate("run-1", "step-1");
 		expect(sentTo(desktop)).toEqual([`${own.id}:run-1:step-1`]);
 
-		clock = Date.UTC(2026, 9, 21, 23, 0);
+		clock = utc(2026, 9, 21, 23, 0);
 		await openGate("run-3", "step-3");
 		await openGate("run-4", "step-4");
 		expect(desktop.sent()).toHaveLength(1);
 
-		clock = Date.UTC(2026, 9, 22, 7, 0);
+		clock = utc(2026, 9, 22, 7, 0);
 		await notifier.tick();
 		expect(desktop.sent().map((m) => m.title)).toEqual([
 			"A Gate waits for you",
@@ -389,13 +389,13 @@ describe("this computer's desktop", () => {
 		await settings.save("ada", {
 			quietHours: { start: "22:00", end: "07:00" },
 		});
-		clock = Date.UTC(2026, 9, 21, 23, 0);
+		clock = utc(2026, 9, 21, 23, 0);
 		await notifier.start();
 		await register("ada", "web");
 
 		await openGate("run-1", "step-1");
 		await openGate("run-2", "step-2");
-		clock = Date.UTC(2026, 9, 22, 7, 0);
+		clock = utc(2026, 9, 22, 7, 0);
 		await notifier.tick();
 
 		expect(web.calls).toEqual([]);
@@ -407,7 +407,7 @@ describe("quiet hours", () => {
 		await settings.save("ada", {
 			quietHours: { start: "22:00", end: "07:00" },
 		});
-		clock = Date.UTC(2026, 9, 21, 23, 0);
+		clock = utc(2026, 9, 21, 23, 0);
 	});
 
 	test("hold pushes, not the in-app stream; when they end, the one Gate that waits goes out", async () => {
@@ -424,11 +424,11 @@ describe("quiet hours", () => {
 			["run-finished", false],
 		]);
 
-		clock = Date.UTC(2026, 9, 22, 6, 59);
+		clock = utc(2026, 9, 22, 6, 59);
 		await notifier.tick();
 		expect(web.calls).toEqual([]);
 
-		clock = Date.UTC(2026, 9, 22, 7, 0);
+		clock = utc(2026, 9, 22, 7, 0);
 		await notifier.tick();
 		expect(sentTo(web)).toEqual([`${ada.id}:run-1:step-1`]);
 
@@ -446,7 +446,7 @@ describe("quiet hours", () => {
 		await openGate("run-3", "step-3");
 		await answerGate("run-2", "step-2");
 
-		clock = Date.UTC(2026, 9, 22, 7, 30);
+		clock = utc(2026, 9, 22, 7, 30);
 		await notifier.tick();
 
 		expect(web.sent()).toHaveLength(1);
@@ -469,7 +469,7 @@ describe("quiet hours", () => {
 		await openGate("run-1", "step-1");
 		await openGate("run-2", "step-2", OTHER_SPACE);
 
-		clock = Date.UTC(2026, 9, 22, 7, 30);
+		clock = utc(2026, 9, 22, 7, 30);
 		await notifier.tick();
 
 		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
@@ -981,7 +981,7 @@ describe("lock-screen Gates", () => {
 
 describe("a step that waits for a device", () => {
 	/** 06:00 UTC the next morning: the run's stop time. */
-	const STOP = Date.UTC(2026, 9, 22, 6, 0);
+	const STOP = utc(2026, 9, 22, 6, 0);
 
 	beforeEach(() => {
 		events.setRun("run-1", {
@@ -1142,11 +1142,11 @@ describe("a step that waits for a device", () => {
 		await settings.save("ada", {
 			quietHours: { start: "22:00", end: "07:00" },
 		});
-		clock = Date.UTC(2026, 9, 21, 23, 0);
+		clock = utc(2026, 9, 21, 23, 0);
 		events.setRun("run-1", {
 			title: "Nightly triage",
 			personId: "ada",
-			stopAt: Date.UTC(2026, 9, 22, 9, 30),
+			stopAt: utc(2026, 9, 22, 9, 30),
 			sleeping: true,
 		});
 		await notifier.start();
@@ -1155,7 +1155,7 @@ describe("a step that waits for a device", () => {
 		await sleepFor();
 		expect(web.calls).toEqual([]);
 
-		clock = Date.UTC(2026, 9, 22, 7, 0);
+		clock = utc(2026, 9, 22, 7, 0);
 		await notifier.tick();
 
 		expect(sentTo(web)).toEqual([`${ada.id}:run-1:wait:step-1`]);

@@ -1,3 +1,4 @@
+import { asDate } from "@nightshift/time";
 import { defineRelationsPart, sql } from "drizzle-orm";
 import {
 	index,
@@ -20,7 +21,7 @@ export const user = sqliteTable("user", {
 		.notNull(),
 	updatedAt: integer("updated_at", { mode: "timestamp_ms" })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-		.$onUpdate(() => /* @__PURE__ */ new Date())
+		.$onUpdate(() => /* @__PURE__ */ asDate())
 		.notNull(),
 	/**
 	 * The Person's role on this Host (admin plugin): `admin` for the Host
@@ -46,7 +47,7 @@ export const session = sqliteTable(
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
 		updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-			.$onUpdate(() => /* @__PURE__ */ new Date())
+			.$onUpdate(() => /* @__PURE__ */ asDate())
 			.notNull(),
 		ipAddress: text("ip_address"),
 		userAgent: text("user_agent"),
@@ -85,7 +86,7 @@ export const account = sqliteTable(
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
 		updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-			.$onUpdate(() => /* @__PURE__ */ new Date())
+			.$onUpdate(() => /* @__PURE__ */ asDate())
 			.notNull(),
 	},
 	(table) => [index("account_userId_idx").on(table.userId)],
@@ -103,7 +104,7 @@ export const verification = sqliteTable(
 			.notNull(),
 		updatedAt: integer("updated_at", { mode: "timestamp_ms" })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-			.$onUpdate(() => /* @__PURE__ */ new Date())
+			.$onUpdate(() => /* @__PURE__ */ asDate())
 			.notNull(),
 	},
 	(table) => [index("verification_identifier_idx").on(table.identifier)],

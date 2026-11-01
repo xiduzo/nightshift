@@ -6,6 +6,8 @@
  * to the log, and only its errors.
  */
 
+import { now } from "@nightshift/time";
+
 /** A started `ollama serve`, as the starter needs it. Tests pass a fake. */
 export type OllamaChild = {
 	/** Its exit code, once it ends. */
@@ -119,8 +121,8 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 		void started.exited.then(() => {
 			ended = true;
 		});
-		const until = Date.now() + upWaitMs;
-		while (wanted && !ended && Date.now() < until) {
+		const until = now() + upWaitMs;
+		while (wanted && !ended && now() < until) {
 			if (await answers()) return true;
 			await new Promise((resolve) => setTimeout(resolve, 250));
 		}
@@ -155,7 +157,7 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 				},
 			});
 			child = started;
-			const since = Date.now();
+			const since = now();
 			void forward(started.stdout);
 			void forward(started.stderr);
 			if (await awaitUp(started)) {
@@ -166,7 +168,7 @@ export function createOllamaStarter(options: OllamaStarterOptions) {
 			up = false;
 			child = null;
 			if (!wanted) return;
-			if (Date.now() - since >= stableMs) wait = firstWaitMs;
+			if (now() - since >= stableMs) wait = firstWaitMs;
 			log(
 				`${PREFIX} Ollama stopped (exit ${code ?? "signal"}). Night Shift starts it again in ${Math.round(wait / 1000)} s.`,
 			);

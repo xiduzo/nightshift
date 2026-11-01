@@ -5,7 +5,7 @@
  */
 import { access, constants, readdir, stat } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-
+import { now } from "@nightshift/time";
 import { type CliCheck, firstLine, probe } from "../doctor";
 
 /** A CLI tool's check: the CLI check, plus the help the agents read. */
@@ -42,7 +42,7 @@ async function programCheck(
 		problem: path
 			? null
 			: `Night Shift cannot find ${name} on this computer. Install it, then check again.`,
-		checkedAt: Date.now(),
+		checkedAt: now(),
 	};
 	if (!path) return check;
 	try {

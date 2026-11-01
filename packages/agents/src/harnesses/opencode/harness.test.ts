@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { now } from "@nightshift/time";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
 import type { SdkSignals } from "../../session/translate";
 import { fakeBin } from "../../testing/fixtures/bin";
@@ -38,8 +39,8 @@ async function serversStop(log: string): Promise<string[]> {
 		(line) => line.argv.find((arg) => arg.startsWith("--port=")) ?? [],
 	);
 	const left = () => ports.flatMap(servers);
-	const deadline = Date.now() + 5_000;
-	while (left().length > 0 && Date.now() < deadline) await Bun.sleep(50);
+	const deadline = now() + 5_000;
+	while (left().length > 0 && now() < deadline) await Bun.sleep(50);
 	return left();
 }
 
@@ -299,7 +300,7 @@ describe("createOpencodeObserver", () => {
 			},
 		);
 		expect(signals.usageLimit?.message).toBe("Too Many Requests");
-		expect(signals.usageLimit?.resetAt).toBeGreaterThan(Date.now());
+		expect(signals.usageLimit?.resetAt).toBeGreaterThan(now());
 	});
 });
 
@@ -483,7 +484,7 @@ describe("opencodeHarness", () => {
 		});
 		const controller = new AbortController();
 		const events: AgentEvent[] = [];
-		const started = Date.now();
+		const started = now();
 		for await (const event of harness.run(
 			input({ signal: controller.signal, prompt: "Slow", stepReport: true }),
 		)) {
@@ -494,13 +495,13 @@ describe("opencodeHarness", () => {
 				controller.abort();
 			}
 		}
-		expect(Date.now() - started).toBeLessThan(3_000);
+		expect(now() - started).toBeLessThan(3_000);
 		expect(events.at(-1)).toMatchObject({ type: "error", kind: "aborted" });
 		// The abort reached the server as a session abort; the adapter's
 		// teardown then stops it.
 		expect(await serversStop(log)).toEqual([]);
 		const [line] = await readLog(log);
-		const deadline = Date.now() + 5_000;
+		const deadline = now() + 5_000;
 		// The adapter's teardown ran to the end: its tool bridge is closed. The
 		// shared bridge answers a closed session with 404 (an unshared one
 		// refuses the connection).
@@ -510,7 +511,7 @@ describe("opencodeHarness", () => {
 				(response) => response.status !== 404,
 				() => false,
 			);
-		while ((await open()) && Date.now() < deadline) await Bun.sleep(100);
+		while ((await open()) && now() < deadline) await Bun.sleep(100);
 		expect(await open()).toBe(false);
 	}, 15_000);
 

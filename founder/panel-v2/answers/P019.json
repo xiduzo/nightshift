@@ -1,0 +1,13 @@
+{
+	"id": "P019",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I'd self-host the free version this week and kick the tires, but I'm not putting $99 a month and my team's workflow on a pre-alpha one-person project. Self-hosting costs me nothing, so the Cloud tier has to earn it.",
+	"objection": "Pre-alpha and built by one person on the side. If he gets bored or burns out, my overnight pipeline dies with it.",
+	"would_change_my_mind": "A few months of steady releases and a second maintainer, or a handful of agencies like mine running it nightly in public.",
+	"price_too_cheap": 10,
+	"price_cheap": 39,
+	"price_expensive": 149,
+	"price_too_expensive": 300
+}

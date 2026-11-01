@@ -1,6 +1,7 @@
-import type {
-	NotificationSettings,
-	NotificationSettingsPatch,
+import {
+	localZone,
+	type NotificationSettings,
+	type NotificationSettingsPatch,
 } from "@nightshift/client";
 
 /** What Settings offers to choose, without React Native: the hours, the digest times and the phone's time zone. */
@@ -66,9 +67,5 @@ export function digestPatch(value: string): NotificationSettingsPatch {
 
 /** The phone's time zone, for quiet hours and the digest. */
 export function phoneTimeZone(): string {
-	try {
-		return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-	} catch {
-		return "UTC";
-	}
+	return localZone();
 }

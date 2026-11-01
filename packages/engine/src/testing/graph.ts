@@ -12,6 +12,7 @@ import {
 	flowSchema,
 } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";
@@ -170,7 +171,7 @@ export type StartOptions = {
 	flows?: Record<string, Flow>;
 	/** The run's abort signal; read at each use, so a test can swap it. */
 	signal?: AbortSignal;
-	/** The clock. Default `Date.now`. */
+	/** The clock. Default `now`. */
 	now?: () => number;
 	/** What `RunStarted` records as the run's inputs. */
 	inputs?: InputValues;
@@ -246,7 +247,7 @@ export async function startRun(
 		bus,
 		recorders: createRecorders({ db, bus, dataDir: sandbox.dataDir }),
 		dataDir: sandbox.dataDir,
-		now: options.now ?? Date.now,
+		now: options.now ?? now,
 		minuteMs: MINUTE,
 		settings: defaultRunSettings,
 		deviceFor: device,

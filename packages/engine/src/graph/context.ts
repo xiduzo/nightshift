@@ -12,6 +12,7 @@ import type {
 	TemplateContext,
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { LeaseAnswer } from "../contract";
 import type { Capabilities, Device } from "../device";
@@ -435,7 +436,7 @@ export function createRecorders(input: {
 						seq,
 						stepId,
 						sessionId,
-						at: Date.now(),
+						at: now(),
 						event: stepEvent,
 					};
 					// On disk first, then on the bus: watchRun depends on this order.

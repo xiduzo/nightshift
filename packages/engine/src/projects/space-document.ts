@@ -1,6 +1,7 @@
 import { spaceIds, spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { clone, project } from "@nightshift/db/schema";
+import { asDate, instant, instantOrNull, now } from "@nightshift/time";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
@@ -161,7 +162,7 @@ export function recordClone(
 		document.clones.set(key, {
 			projectId: clone.projectId,
 			deviceId: clone.deviceId,
-			addedAt: Date.now(),
+			addedAt: now(),
 		} satisfies SpaceClone);
 	}
 	const named = spaceDeviceSchema.safeParse(
@@ -170,7 +171,7 @@ export function recordClone(
 	if (!named.success || named.data.name !== clone.deviceName) {
 		document.devices.set(clone.deviceId, {
 			name: clone.deviceName,
-			updatedAt: Date.now(),
+			updatedAt: now(),
 		});
 	}
 }
@@ -311,7 +312,7 @@ async function importRows(
 	});
 	await document.change(() => {
 		meta.set("spaceId", document.spaceId);
-		meta.set("importedAt", Date.now());
+		meta.set("importedAt", now());
 		for (const row of projects) {
 			if (document.projects.has(row.id)) continue;
 			document.projects.set(row.id, projectEntry(row));
@@ -322,12 +323,12 @@ async function importRows(
 			document.clones.set(key, {
 				projectId: row.projectId,
 				deviceId: row.deviceId,
-				addedAt: row.createdAt.getTime(),
+				addedAt: instant(row.createdAt),
 			} satisfies SpaceClone);
 			if (!document.devices.has(row.deviceId)) {
 				document.devices.set(row.deviceId, {
 					name: row.deviceName,
-					updatedAt: Date.now(),
+					updatedAt: now(),
 				});
 			}
 		}
@@ -339,9 +340,9 @@ export function projectEntry(row: typeof project.$inferSelect): SpaceProject {
 	return {
 		name: row.name,
 		remote: row.remote,
-		createdAt: row.createdAt.getTime(),
-		removedAt: row.removedAt?.getTime() ?? null,
-		updatedAt: Date.now(),
+		createdAt: instant(row.createdAt),
+		removedAt: instantOrNull(row.removedAt),
+		updatedAt: now(),
 	};
 }
 
@@ -367,8 +368,7 @@ export async function projectSpace(
 	);
 	for (const [id, entry] of entries) {
 		const row = rows.get(id);
-		const removedAt =
-			entry.removedAt === null ? null : new Date(entry.removedAt);
+		const removedAt = entry.removedAt === null ? null : asDate(entry.removedAt);
 		try {
 			if (!row) {
 				await db.insert(project).values({
@@ -376,7 +376,7 @@ export async function projectSpace(
 					spaceId: document.spaceId,
 					name: entry.name,
 					remote: entry.remote,
-					createdAt: new Date(entry.createdAt),
+					createdAt: asDate(entry.createdAt),
 					removedAt,
 				});
 				continue;
@@ -385,7 +385,7 @@ export async function projectSpace(
 			if (
 				row.name === entry.name &&
 				row.remote === entry.remote &&
-				(row.removedAt?.getTime() ?? null) === entry.removedAt
+				instantOrNull(row.removedAt) === entry.removedAt
 			) {
 				continue;
 			}

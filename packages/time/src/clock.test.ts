@@ -7,6 +7,7 @@ import {
 	isTimeZone,
 	lastHours,
 	lastNights,
+	nextClockTime,
 	nightOf,
 	parseInstant,
 	utc,
@@ -92,6 +93,20 @@ describe("hours start on the reader's clock", () => {
 });
 
 describe("utc and atLocal", () => {
+	test("the next clock time is later today, or the next day once it has passed", () => {
+		// 07:12 in Amsterdam on 31 Oct 2026 (CET, UTC+1).
+		const at = parseInstant("2026-10-31T06:12:00Z");
+		expect(iso(nextClockTime(at, 22, 0, "Europe/Amsterdam"))).toBe(
+			"2026-10-31T21:00:00.000Z",
+		);
+		expect(iso(nextClockTime(at, 7, 0, "Europe/Amsterdam"))).toBe(
+			"2026-11-01T06:00:00.000Z",
+		);
+		expect(iso(nextClockTime(at, 7, 12, "Europe/Amsterdam"))).toBe(
+			"2026-11-01T06:12:00.000Z",
+		);
+	});
+
 	test("utc matches an ISO instant, and atLocal in UTC matches it", () => {
 		expect(iso(utc(2026, 9, 31, 7, 12))).toBe("2026-10-31T07:12:00.000Z");
 		expect(atLocal(2026, 9, 31, 7, 12, 0, 0, "UTC")).toBe(

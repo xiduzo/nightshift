@@ -1,0 +1,13 @@
+{
+	"id": "P004",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I have a spare Mac mini, so I'd try the free self-hosted version before paying $99 a month. And a pre-alpha built by one developer running agents unattended on our paid quotas overnight is exactly the setup I fear will loop and burn tokens.",
+	"objection": "A failed or looping run eats our agent quota overnight and nobody notices until the bill or the rate limit hits. I see nothing here about spend caps or kill switches.",
+	"would_change_my_mind": "Hard per-run and per-night token or retry caps that stop a run and ping my phone, shown working on our own repo during the setup call.",
+	"price_too_cheap": 10,
+	"price_cheap": 29,
+	"price_expensive": 79,
+	"price_too_expensive": 149
+}

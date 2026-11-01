@@ -22,6 +22,7 @@ import {
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { runCommand, type SessionEvent } from "../../device";
 import {
 	commandLogPath,
@@ -629,7 +630,7 @@ async function runSession(
 	const logSpent = () => {
 		spentTimer = undefined;
 		if (sessionOver || !used) return;
-		spentAt = Date.now();
+		spentAt = now();
 		void session
 			.spent({ usage: used, ...settleCost(used, sessionModel) })
 			.catch(() => {});
@@ -638,7 +639,7 @@ async function runSession(
 	const spendSoFar = (usage: AgentUsage) => {
 		used = usage;
 		if (spentTimer) return;
-		const wait = spentAt + SPENT_EVERY_MS - Date.now();
+		const wait = spentAt + SPENT_EVERY_MS - now();
 		if (wait <= 0) logSpent();
 		else spentTimer = setTimeout(logSpent, wait);
 	};

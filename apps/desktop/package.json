@@ -19,6 +19,7 @@
 	},
 	"dependencies": {
 		"@nightshift/daemon": "workspace:*",
+		"@nightshift/time": "workspace:*",
 		"fix-path": "^5.0.0"
 	}
 }

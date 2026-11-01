@@ -1,6 +1,12 @@
 import type { Database } from "@nightshift/db";
 import { notificationSettings } from "@nightshift/db/schema";
-import { dayKey, isTimeZone, localZone, minuteOfDay } from "@nightshift/time";
+import {
+	asDate,
+	dayKey,
+	isTimeZone,
+	localZone,
+	minuteOfDay,
+} from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -270,7 +276,7 @@ export function createSettingsStore(
 			holdMinutes: settings.holdMinutes,
 			digestWhen: settings.digest.when,
 			digestTime: settings.digest.time,
-			updatedAt: new Date(),
+			updatedAt: asDate(),
 		};
 	}
 

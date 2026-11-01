@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { formatTime, formatWeekday } from "@nightshift/time";
-
+import { atLocal } from "@nightshift/time/testing";
 import { deadlineSoon, deadlineText, deadlineWhen } from "./deadline";
 
 /** A moment on this machine's clock, in October 2026 (the 29th is a Thursday). */
 function at(day: number, hour: number): number {
-	return new Date(2026, 9, day, hour, 0).getTime();
+	return atLocal(2026, 9, day, hour, 0);
 }
 
 const NOW = at(29, 22);
@@ -69,8 +69,8 @@ describe("deadlineSoon", () => {
 describe("the deadline of an Ask", () => {
 	const form = { schema: { type: "object" } };
 	test("takes the default, or the step fails without one", () => {
-		const at = new Date(2026, 9, 31, 7, 0).getTime();
-		const now = new Date(2026, 9, 31, 6, 50).getTime();
+		const at = atLocal(2026, 9, 31, 7, 0);
+		const now = atLocal(2026, 9, 31, 6, 50);
 		const deadline = { at, choose: "answer" };
 		expect(deadlineText(deadline, now, { ...form, default: {} })).toStartWith(
 			"If nobody answers, Night Shift takes the default at ",

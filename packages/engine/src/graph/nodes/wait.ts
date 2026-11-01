@@ -11,6 +11,7 @@ import {
 	waitCommandOf,
 	waitSignalOf,
 } from "@nightshift/flows";
+import { iso, nextClockTime, parseInstant } from "@nightshift/time";
 
 import { runCommand, tailOf } from "../../device";
 import { commandLogPath, type StepOutputs } from "../../log";
@@ -156,7 +157,7 @@ async function startWait(
 			return sleep(node, {
 				until: at,
 				deadline,
-				message: `Waits until ${new Date(at).toISOString()}.`,
+				message: `Waits until ${iso(at)}.`,
 			});
 		}
 		default:
@@ -423,18 +424,13 @@ const CLOCK_TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 /**
  * A rendered `time` wait: a date and time (`2026-10-18T07:00`, with an
- * optional zone, as `Date.parse` reads it) or a time of day (`07:00`, the
- * next such time on this computer's clock). Null when it is neither.
+ * optional zone) or a time of day (`07:00`, the next such time on this
+ * computer's clock). Null when it is neither.
  */
 export function parseTime(text: string, now: number): number | null {
 	const clock = CLOCK_TIME.exec(text);
-	if (clock) {
-		const next = new Date(now);
-		next.setHours(Number(clock[1]), Number(clock[2]), 0, 0);
-		if (next.getTime() <= now) next.setDate(next.getDate() + 1);
-		return next.getTime();
-	}
+	if (clock) return nextClockTime(now, Number(clock[1]), Number(clock[2]));
 	if (!/\d{4}-\d{2}-\d{2}/.test(text)) return null;
-	const parsed = Date.parse(text);
+	const parsed = parseInstant(text);
 	return Number.isNaN(parsed) ? null : parsed;
 }

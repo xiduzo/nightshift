@@ -1,4 +1,5 @@
 import type { project } from "@nightshift/db/schema";
+import { now as timeNow } from "@nightshift/time";
 import {
 	cloneKey,
 	projectClones,
@@ -43,7 +44,7 @@ export async function moveSpaceEntries(
 	for (const spaceId of new Set(pairs.map(([, t]) => t.spaceId))) {
 		const destination = await documents.open(spaceId);
 		if (destination.hostedElsewhere) continue;
-		const now = Date.now();
+		const now = timeNow();
 		await destination.change(() => {
 			for (const [id, target] of pairs) {
 				if (target.spaceId !== spaceId) continue;

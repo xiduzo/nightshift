@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { liveSessionIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { pushTarget } from "@nightshift/db/schema";
+import {
+	asDate,
+	instant,
+	instantOrNull,
+	now as timeNow,
+} from "@nightshift/time";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { Expo } from "expo-server-sdk";
 import { z } from "zod";
@@ -115,7 +121,7 @@ export const registerScreenSchema = z
 
 export type TargetStore = ReturnType<typeof createTargetStore>;
 
-export function createTargetStore(db: Database, now: () => number = Date.now) {
+export function createTargetStore(db: Database, now: () => number = timeNow) {
 	function toTarget(row: typeof pushTarget.$inferSelect): PushTarget {
 		return {
 			id: row.id,
@@ -126,8 +132,8 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 			endpoint: row.endpoint,
 			keys: row.keys ? (JSON.parse(row.keys) as Record<string, string>) : null,
 			sessionId: row.sessionId,
-			createdAt: row.createdAt.getTime(),
-			lastSeenAt: row.lastSeenAt?.getTime() ?? null,
+			createdAt: instant(row.createdAt),
+			lastSeenAt: instantOrNull(row.lastSeenAt),
 		};
 	}
 
@@ -193,7 +199,7 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 			sessionId: string | null = null,
 		): Promise<PushTarget> {
 			const parsed = registerTargetSchema.parse(input);
-			const at = new Date(now());
+			const at = asDate(now());
 			if (parsed.kind === "expo") {
 				await db
 					.delete(pushTarget)

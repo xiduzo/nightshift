@@ -1,0 +1,13 @@
+{
+	"id": "P024",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "need",
+	"reason": "I already run claude -p from cron for the boring stuff, and the free self-hosted version covers anything more. $99 a month for someone else to host a scheduler is a hard sell when my token bill already hurts.",
+	"objection": "It's pre-alpha from one developer, and I'd be pointing it at three client repos overnight. If it breaks or the dev disappears, I've built my workflow on sand, and I'd still be paying for the tokens it burns on retries.",
+	"would_change_my_mind": "Seeing it run a real week on a repo like mine and land PRs I'd actually merge, with clear token spend per run, so it saves me more than it costs.",
+	"price_too_cheap": 5,
+	"price_cheap": 19,
+	"price_expensive": 49,
+	"price_too_expensive": 99
+}

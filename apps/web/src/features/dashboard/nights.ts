@@ -4,21 +4,16 @@
  * (`dashboard.summary`). These name a night by the noon it starts.
  */
 
+import { formatDay, formatWeekdayDate } from "@nightshift/client";
+
 /** "Wed 15 Oct": the evening a night starts. */
 export function formatNight(nightStart: number): string {
-	return new Date(nightStart).toLocaleDateString(undefined, {
-		weekday: "short",
-		day: "numeric",
-		month: "short",
-	});
+	return formatWeekdayDate(nightStart);
 }
 
 /** "15 Oct": short, for a chart axis. */
 export function formatNightShort(nightStart: number): string {
-	return new Date(nightStart).toLocaleDateString(undefined, {
-		day: "numeric",
-		month: "short",
-	});
+	return formatDay(nightStart);
 }
 
 /** The rows of a chart per night: a label and a title per night, and its counts. */

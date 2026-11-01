@@ -1,0 +1,222 @@
+[
+	{
+		"id": "P001",
+		"name": "Tess",
+		"age": 29,
+		"segment": "Tech lead at a small digital agency",
+		"income": 84000,
+		"behaviour": "Vendor default is good enough",
+		"behaviour_how": "Already pays for Copilot, Codex or Claude cloud agents and uses whatever scheduling they include.",
+		"objection": "Claude Code and GitHub already run agents on a schedule",
+		"habit": "the company pays for Claude Max or ChatGPT Pro seats"
+	},
+	{
+		"id": "P002",
+		"name": "Marco",
+		"age": 41,
+		"segment": "Tech lead at a small digital agency",
+		"income": 111000,
+		"behaviour": "Burned by background agents",
+		"behaviour_how": "Tried agents that open PRs on their own and threw most of the PRs away.",
+		"objection": "Setting up a Host, pairing computers and drawing flows sounds like a lot of work",
+		"habit": "the company pays for Claude Max or ChatGPT Pro seats"
+	},
+	{
+		"id": "P003",
+		"name": "Omar",
+		"age": 34,
+		"segment": "Senior developer who picks the tools for a small team",
+		"income": 119000,
+		"behaviour": "Scripts it themselves",
+		"behaviour_how": "Has a cron job or GitHub Action that calls claude -p or codex exec and would rather extend it.",
+		"objection": "A failed or looping run will burn our agent quota overnight and nobody notices",
+		"habit": "the company pays for Claude Max or ChatGPT Pro seats"
+	},
+	{
+		"id": "P004",
+		"name": "Victor",
+		"age": 38,
+		"segment": "Owner or managing director of a small agency who holds the budget",
+		"income": 170000,
+		"behaviour": "Watches every subscription",
+		"behaviour_how": "Each new monthly fee needs a clear reason, and token spend is already a sore point.",
+		"objection": "A failed or looping run will burn our agent quota overnight and nobody notices",
+		"habit": "you have a spare Mac mini or a small VPS for side projects"
+	},
+	{
+		"id": "P005",
+		"name": "Kenji",
+		"age": 30,
+		"segment": "Tech lead at a small digital agency",
+		"income": 98000,
+		"behaviour": "Vendor default is good enough",
+		"behaviour_how": "Already pays for Copilot, Codex or Claude cloud agents and uses whatever scheduling they include.",
+		"objection": "I can do this with a cron job and claude -p",
+		"habit": "you run Claude Code or Codex in a terminal most days"
+	},
+	{
+		"id": "P006",
+		"name": "Ines",
+		"age": 29,
+		"segment": "Owner or managing director of a small agency who holds the budget",
+		"income": 104000,
+		"behaviour": "Vendor default is good enough",
+		"behaviour_how": "Already pays for Copilot, Codex or Claude cloud agents and uses whatever scheduling they include.",
+		"objection": "A failed or looping run will burn our agent quota overnight and nobody notices",
+		"habit": "you juggle three or four client projects at once"
+	},
+	{
+		"id": "P007",
+		"name": "Anya",
+		"age": 35,
+		"segment": "Tech lead at a small digital agency",
+		"income": 113000,
+		"behaviour": "Burned by background agents",
+		"behaviour_how": "Tried agents that open PRs on their own and threw most of the PRs away.",
+		"objection": "Our clients may not allow AI agents on their code",
+		"habit": "the company pays for Claude Max or ChatGPT Pro seats"
+	},
+	{
+		"id": "P008",
+		"name": "Emil",
+		"age": 28,
+		"segment": "Founder or CTO of an early-stage startup",
+		"income": 102000,
+		"behaviour": "Vendor default is good enough",
+		"behaviour_how": "Already pays for Copilot, Codex or Claude cloud agents and uses whatever scheduling they include.",
+		"objection": "Our clients may not allow AI agents on their code",
+		"habit": "your team reviews pull requests first thing in the morning"
+	},
+	{
+		"id": "P009",
+		"name": "Sam",
+		"age": 43,
+		"segment": "Tech lead at a small digital agency",
+		"income": 107000,
+		"behaviour": "Scripts it themselves",
+		"behaviour_how": "Has a cron job or GitHub Action that calls claude -p or codex exec and would rather extend it.",
+		"objection": "Claude Code and GitHub already run agents on a schedule",
+		"habit": "you run Claude Code or Codex in a terminal most days"
+	},
+	{
+		"id": "P010",
+		"name": "Daniel",
+		"age": 36,
+		"segment": "Owner or managing director of a small agency who holds the budget",
+		"income": 190000,
+		"behaviour": "Watches every subscription",
+		"behaviour_how": "Each new monthly fee needs a clear reason, and token spend is already a sore point.",
+		"objection": "A failed or looping run will burn our agent quota overnight and nobody notices",
+		"habit": "you run Claude Code or Codex in a terminal most days"
+	},
+	{
+		"id": "P011",
+		"name": "Nia",
+		"age": 43,
+		"segment": "Tech lead at a small digital agency",
+		"income": 106000,
+		"behaviour": "Tool tinkerer",
+		"behaviour_how": "Tries every new developer tool the week it shows up on Hacker News.",
+		"objection": "Leaving agents alone with our code at night is a security risk",
+		"habit": "you run Claude Code or Codex in a terminal most days"
+	},
+	{
+		"id": "P012",
+		"name": "Isla",
+		"age": 38,
+		"segment": "Tech lead at a small digital agency",
+		"income": 112000,
+		"behaviour": "Vendor default is good enough",
+		"behaviour_how": "Already pays for Copilot, Codex or Claude cloud agents and uses whatever scheduling they include.",
+		"objection": "I can do this with a cron job and claude -p",
+		"habit": "you juggle three or four client projects at once"
+	},
+	{
+		"id": "P013",
+		"name": "Priya",
+		"age": 40,
+		"segment": "Tech lead at a small digital agency",
+		"income": 78000,
+		"behaviour": "Tool tinkerer",
+		"behaviour_how": "Tries every new developer tool the week it shows up on Hacker News.",
+		"objection": "Our clients may not allow AI agents on their code",
+		"habit": "you run Claude Code or Codex in a terminal most days"
+	},
+	{
+		"id": "P014",
+		"name": "Leah",
+		"age": 46,
+		"segment": "Owner or managing director of a small agency who holds the budget",
+		"income": 152000,
+		"behaviour": "Watches every subscription",
+		"behaviour_how": "Each new monthly fee needs a clear reason, and token spend is already a sore point.",
+		"objection": "A failed or looping run will burn our agent quota overnight and nobody notices",
+		"habit": "your laptop is closed from 7pm to 8am"
+	},
+	{
+		"id": "P015",
+		"name": "Jasper",
+		"age": 46,
+		"segment": "Tech lead at a small digital agency",
+		"income": 72000,
+		"behaviour": "Waits for proof from others",
+		"behaviour_how": "Needs case studies, GitHub stars or a team they know before trying anything new.",
+		"objection": "I can do this with a cron job and claude -p",
+		"habit": "the company pays for Claude Max or ChatGPT Pro seats"
+	},
+	{
+		"id": "P016",
+		"name": "Leila",
+		"age": 48,
+		"segment": "Senior developer who picks the tools for a small team",
+		"income": 77000,
+		"behaviour": "Waits for proof from others",
+		"behaviour_how": "Needs case studies, GitHub stars or a team they know before trying anything new.",
+		"objection": "Leaving agents alone with our code at night is a security risk",
+		"habit": "you juggle three or four client projects at once"
+	},
+	{
+		"id": "P017",
+		"name": "Kofi",
+		"age": 36,
+		"segment": "Senior developer who picks the tools for a small team",
+		"income": 90000,
+		"behaviour": "Open source and self-host first",
+		"behaviour_how": "Runs their own servers, avoids SaaS that holds code or keys.",
+		"objection": "I tried background agents and the PRs were not worth reviewing",
+		"habit": "the company pays for Claude Max or ChatGPT Pro seats"
+	},
+	{
+		"id": "P018",
+		"name": "Fatima",
+		"age": 34,
+		"segment": "Senior developer who picks the tools for a small team",
+		"income": 118000,
+		"behaviour": "Open source and self-host first",
+		"behaviour_how": "Runs their own servers, avoids SaaS that holds code or keys.",
+		"objection": "A failed or looping run will burn our agent quota overnight and nobody notices",
+		"habit": "you have a spare Mac mini or a small VPS for side projects"
+	},
+	{
+		"id": "P019",
+		"name": "Idris",
+		"age": 29,
+		"segment": "Owner or managing director of a small agency who holds the budget",
+		"income": 186000,
+		"behaviour": "Tool tinkerer",
+		"behaviour_how": "Tries every new developer tool the week it shows up on Hacker News.",
+		"objection": "Pre-alpha and built by one person on the side, will it still exist next year?",
+		"habit": "you run Claude Code or Codex in a terminal most days"
+	},
+	{
+		"id": "P020",
+		"name": "Elle",
+		"age": 27,
+		"segment": "Founder or CTO of an early-stage startup",
+		"income": 94000,
+		"behaviour": "Waits for proof from others",
+		"behaviour_how": "Needs case studies, GitHub stars or a team they know before trying anything new.",
+		"objection": "I tried background agents and the PRs were not worth reviewing",
+		"habit": "you juggle three or four client projects at once"
+	}
+]

@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { clone, project } from "@nightshift/db/schema";
 import { singleAgentFlow } from "@nightshift/flows";
+import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { systemGit } from "../projects";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -26,7 +27,7 @@ beforeEach(async () => {
 		id: "project",
 		spaceId: sandbox.spaceId,
 		name: "Project",
-		createdAt: new Date(),
+		createdAt: asDate(),
 	});
 	await sandbox.db.insert(clone).values({
 		id: "clone",
@@ -60,7 +61,7 @@ const imports = () =>
 		documents,
 		git: systemGit(),
 		device: async () => ({ id: sandbox.deviceId, name: "laptop" }),
-		now: Date.now,
+		now: now,
 	});
 
 test("imports every Clone of this Device, once, also when two starts ask at the same time", async () => {
@@ -79,7 +80,7 @@ test("imports every Clone of this Device, once, also when two starts ask at the 
 test("leaves the folder of a removed project alone", async () => {
 	await sandbox.db
 		.update(project)
-		.set({ removedAt: new Date() })
+		.set({ removedAt: asDate() })
 		.where(eq(project.id, "project"));
 
 	await imports().all();

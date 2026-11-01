@@ -1,0 +1,13 @@
+{
+	"id": "P001",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "We already get scheduled agent runs from Claude Code and GitHub as part of what we pay for. I would not add another tool and another bill for the same thing.",
+	"objection": "Pre-alpha and built by one developer. I am not running client repos through that, and the vendor defaults already do most of this.",
+	"would_change_my_mind": "A clear demo where it reliably ships tested PRs overnight that our vendor scheduling cannot, plus some proof it will still exist in a year.",
+	"price_too_cheap": 10,
+	"price_cheap": 25,
+	"price_expensive": 60,
+	"price_too_expensive": 100
+}

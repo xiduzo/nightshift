@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { Flow, Schedule, WebhookEvent } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { createEngine, type Engine } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
 import { seedFlows } from "../testing/seed-flows";
@@ -123,7 +124,7 @@ beforeEach(async () => {
 			dataDir: sandbox.dataDir,
 			secret: async (name) => (name === "HOOK_SECRET" ? SECRET : undefined),
 		}),
-		{ signal: controller.signal, now: () => Date.now() + ahead },
+		{ signal: controller.signal, now: () => now() + ahead },
 	);
 	space = engine.space(sandbox.spaceId);
 	projectId = (await space.addProject({ repoPath: sandbox.repoPath })).id;

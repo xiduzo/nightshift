@@ -9,6 +9,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema";
+import { asDate } from "@nightshift/time";
 import { asc, eq, inArray } from "drizzle-orm";
 import { createRunBus } from "../log/bus";
 import { createRunHistory } from "../log/history";
@@ -120,7 +121,7 @@ async function keep(
 		value: JSON.stringify(value),
 		runId: "r",
 		stepId: "s",
-		updatedAt: new Date(updatedAt),
+		updatedAt: asDate(updatedAt),
 	});
 }
 

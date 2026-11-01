@@ -51,6 +51,11 @@ export function instant(value: Date): Instant {
 	return value.getTime();
 }
 
+/** `instant` when `value` is a `Date`, otherwise null. */
+export function instantOrNull(value: Date | null | undefined): Instant | null {
+	return value == null ? null : value.getTime();
+}
+
 /** UTC ISO-8601 with a `Z`, for storage, the wire, and `<time dateTime>`. */
 export function iso(at: Instant): string {
 	return new UTCDate(at).toISOString();
@@ -251,6 +256,31 @@ export function minuteOfDay(at: Instant, timeZone: string): number {
 /** The hour of `at` in `timeZone`, 0–23. */
 export function hourOf(at: Instant, timeZone: string = localZone()): number {
 	return getHours(at, zone(timeZone));
+}
+
+/**
+ * The next time the clock in `timeZone` shows `hour`:`minute`, strictly
+ * after `at`. A time that has already passed today is tomorrow.
+ */
+export function nextClockTime(
+	at: Instant,
+	hour: number,
+	minute: number,
+	timeZone: string = localZone(),
+): Instant {
+	const shown = wall(at, timeZone);
+	const fields = {
+		year: shown.year,
+		month: shown.month,
+		day: shown.day,
+		hour,
+		minute,
+		second: 0,
+		millisecond: 0,
+	};
+	const today = atWall(fields, timeZone);
+	if (today > at) return today;
+	return atWall({ ...fields, day: shown.day + 1 }, timeZone);
 }
 
 /** The calendar day of `at` in `timeZone`, `YYYY-MM-DD`. */

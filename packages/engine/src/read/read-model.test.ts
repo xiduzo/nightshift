@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { project, run } from "@nightshift/db/schema";
+import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-
 import {
 	createRunBus,
 	createRunLog,
@@ -233,7 +233,7 @@ describe("the read model", () => {
 		// r1 is the oldest; r2 and r3 start at the same time, so the id orders them.
 		await sandbox.db
 			.update(run)
-			.set({ createdAt: new Date(1_000) })
+			.set({ createdAt: asDate(1_000) })
 			.where(eq(run.id, "r1"));
 		for (const id of ["r2", "r3", "r4"]) {
 			await sandbox.db.insert(run).values({
@@ -246,7 +246,7 @@ describe("the read model", () => {
 				branch: "b",
 				baseRef: "main",
 				walkerId: sandbox.deviceId,
-				createdAt: new Date(id === "r4" ? 3_000 : 2_000),
+				createdAt: asDate(id === "r4" ? 3_000 : 2_000),
 			});
 		}
 		const ids = (runs: { id: string }[]) => runs.map((r) => r.id);
@@ -288,7 +288,7 @@ describe("the read model", () => {
 			branch: "b",
 			baseRef: "main",
 			walkerId: sandbox.deviceId,
-			createdAt: new Date(Date.now() + 60_000),
+			createdAt: asDate(now() + 60_000),
 		});
 		await log.append({
 			type: "RunStarted",

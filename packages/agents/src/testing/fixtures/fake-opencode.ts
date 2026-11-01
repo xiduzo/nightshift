@@ -24,6 +24,7 @@
  * `OPENCODE_CONFIG_CONTENT`; `tools`: the bridge's `tools/list`).
  */
 import { appendFileSync } from "node:fs";
+import { now } from "@nightshift/time";
 
 type Call = { name: string; arguments: unknown };
 
@@ -155,8 +156,8 @@ async function prompt(sessionID: string, text: string) {
 	}
 
 	const sleepMs = Number(process.env.FAKE_OPENCODE_SLEEP_MS ?? 0);
-	const until = Date.now() + sleepMs;
-	while (Date.now() < until && !aborted.has(sessionID)) await Bun.sleep(20);
+	const until = now() + sleepMs;
+	while (now() < until && !aborted.has(sessionID)) await Bun.sleep(20);
 
 	const finalText = process.env.FAKE_OPENCODE_TEXT ?? "Done.";
 	const textID = nextId("prt");

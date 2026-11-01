@@ -6,6 +6,7 @@ import {
 	session,
 	user,
 } from "@nightshift/db/schema";
+import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { requestAccess } from "../access";
 import { type Permissions, roleAllows } from "../index";
@@ -274,7 +275,7 @@ describe("adopting the personal Space of the Home Host", () => {
 				organizationId: hosted,
 				userId: ada.userId,
 				role: "owner",
-				createdAt: new Date(),
+				createdAt: asDate(),
 			});
 		}
 		return { ada, own, hosted };

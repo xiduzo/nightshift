@@ -9,6 +9,7 @@ import {
 	scheduleSchema,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import {
 	KNOWLEDGE_FILES_WARNING,
 	type KnowledgeFile,
@@ -186,7 +187,7 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 		 * not have refuses.
 		 */
 		async list(projectId: string): Promise<KnowledgeOverview> {
-			const now = Date.now();
+			const now = timeNow();
 			const flows = await space.flows.map(projectId);
 			const [{ files, proposed, shared, olderHost }, schedules, runs] =
 				await Promise.all([
@@ -372,7 +373,7 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
  */
 export async function knowledgeSourceProblems(
 	space: Pick<SpaceEngine, "listProjects" | "flows" | "listRuns">,
-	now: number = Date.now(),
+	now: number = timeNow(),
 ): Promise<SourceProblem[]> {
 	const problems: SourceProblem[] = [];
 	for (const project of await space.listProjects()) {

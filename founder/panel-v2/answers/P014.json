@@ -1,0 +1,13 @@
+{
+	"id": "P014",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "The budget caps and loop guard speak right to my fear, so I'm interested. But pre-alpha from one developer, running unattended on our agent quota overnight, is a risk I won't pay $99 a month to take. I'd let a dev try the free self-hosted version first.",
+	"objection": "If the one developer's guardrails have a bug, a run burns our tokens all night and I find out at 8am. Pre-alpha software with nobody behind it doesn't get trusted with our spend.",
+	"would_change_my_mind": "A month of our own self-hosted runs that stayed inside budget and shipped PRs we actually merged, plus proof the project has more than one person behind it.",
+	"price_too_cheap": 15,
+	"price_cheap": 39,
+	"price_expensive": 129,
+	"price_too_expensive": 249
+}

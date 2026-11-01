@@ -8,8 +8,8 @@ import {
 import type { RunSummary, SpaceEngine, SpaceFlows } from "@nightshift/engine";
 import type { Project } from "@nightshift/engine/projects";
 import type { FlowListItem } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { call, ORPCError } from "@orpc/server";
-
 import type { Context } from "../context";
 import { appRouter } from "../router";
 import { stub, testContext } from "../testing/context";
@@ -50,8 +50,8 @@ function aRun(fields: Partial<RunSummary>): RunSummary {
 		inputs: {},
 		stopAt: null,
 		stopAfterStep: false,
-		createdAt: Date.now() - HOUR,
-		endedAt: Date.now() - HOUR / 2,
+		createdAt: now() - HOUR,
+		endedAt: now() - HOUR / 2,
 		costUsd: 1,
 		costEstimated: false,
 		costMissing: 0,
@@ -259,8 +259,8 @@ describe("dashboard.flow", () => {
 								costEstimated: false,
 								costMissing: 0,
 								costCalls: 1,
-								startedAt: Date.now() - HOUR,
-								endedAt: Date.now(),
+								startedAt: now() - HOUR,
+								endedAt: now(),
 							},
 						],
 					}),

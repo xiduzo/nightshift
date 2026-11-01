@@ -7,6 +7,7 @@ import {
 	profileSchema,
 	profileSettingsSchema,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import type * as Y from "yjs";
 import { z } from "zod";
 import type { DeviceProfile } from "../contract";
@@ -136,7 +137,7 @@ export function createProfileStore(options: {
 		},
 		async save(input, id = newProfileId()) {
 			const { name, description, ...settings } = profileSchema.parse(input);
-			const updatedAt = Date.now();
+			const updatedAt = now();
 			await document.change(() => {
 				document.profiles.set(id, {
 					name,

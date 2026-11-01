@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createDb } from "@nightshift/db";
 import { daemonLease } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import { instant, iso, parseInstant } from "@nightshift/time";
 import { acquireLease, LeaseHeldError } from "./lease";
 
 let sandbox: Sandbox;
 let clock: number;
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	clock = Date.parse("2026-10-16T22:00:00Z");
+	clock = parseInstant("2026-10-16T22:00:00Z");
 });
 afterEach(async () => {
 	await sandbox.cleanup();
@@ -46,7 +47,7 @@ describe("acquire", () => {
 		expect(lease.epoch).toBe(1);
 		expect(lease.host).toBe("mac");
 		expect(lease.pid).toBe(100);
-		expect(lease.since.getTime()).toBe(clock);
+		expect(instant(lease.since)).toBe(clock);
 		expect(await row()).toMatchObject({
 			owner: lease.owner,
 			epoch: 1,
@@ -70,7 +71,7 @@ describe("acquire", () => {
 		const refused = await daemon({ host: "mac", pid: 200 }).catch((e) => e);
 		expect(refused).toBeInstanceOf(LeaseHeldError);
 		expect(refused.message).toContain("pid 100 on mac");
-		expect(refused.message).toContain(holder.since.toISOString());
+		expect(refused.message).toContain(iso(instant(holder.since)));
 		expect(refused.message).toContain("its own NIGHTSHIFT_DATA_DIR");
 		expect((await row())?.owner).toBe(holder.owner);
 	});
@@ -147,7 +148,8 @@ describe("heartbeat", () => {
 		expect(await lease.heartbeat()).toBe(true);
 		expect(lost).toEqual([]);
 		expect(lease.signal.aborted).toBe(false);
-		expect((await row())?.heartbeatAt.getTime()).toBe(clock);
+		const beat = (await row())?.heartbeatAt;
+		expect(beat && instant(beat)).toBe(clock);
 	});
 
 	test("a heartbeat after a takeover reports the loss once", async () => {

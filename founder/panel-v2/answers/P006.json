@@ -1,0 +1,13 @@
+{
+	"id": "P006",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "The budget caps and loop guard speak right to my fear, but I'm not running client work overnight on a pre-alpha tool built by one person. What Claude and Codex already schedule is good enough for us right now.",
+	"objection": "If that one developer stops or a bug gets past the guard, my client repos and our agent quota are the ones that pay for it.",
+	"would_change_my_mind": "A few agencies like mine running it on real client work for a couple of months, with proof the budget stop actually held.",
+	"price_too_cheap": 15,
+	"price_cheap": 49,
+	"price_expensive": 149,
+	"price_too_expensive": 300
+}

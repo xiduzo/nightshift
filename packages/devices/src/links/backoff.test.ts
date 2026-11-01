@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { now } from "@nightshift/time";
 import { backoff, pause } from "./backoff";
 
 describe("backoff", () => {
@@ -28,9 +29,9 @@ describe("backoff", () => {
 
 describe("pause", () => {
 	test("waits, or ends at once when the signal aborts", async () => {
-		const started = Date.now();
+		const started = now();
 		await pause(20);
-		expect(Date.now() - started).toBeGreaterThanOrEqual(15);
+		expect(now() - started).toBeGreaterThanOrEqual(15);
 
 		const stop = new AbortController();
 		const waiting = pause(60_000, stop.signal);

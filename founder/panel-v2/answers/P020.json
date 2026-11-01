@@ -1,0 +1,13 @@
+{
+	"id": "P020",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I already tried background agents and the PRs were not worth reviewing. A pre-alpha tool from one developer, with no case studies, does not give me a reason to try again.",
+	"objection": "Running it overnight does not make the PRs better. I would wake up to more mediocre PRs to review across my client projects, and the project could die if the one developer stops.",
+	"would_change_my_mind": "Case studies from teams like mine that show the overnight PRs got merged without big rework, plus real GitHub traction.",
+	"price_too_cheap": 10,
+	"price_cheap": 40,
+	"price_expensive": 150,
+	"price_too_expensive": 300
+}

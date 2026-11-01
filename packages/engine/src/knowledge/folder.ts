@@ -10,6 +10,7 @@ import {
 import { extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
 import { Refusal } from "@nightshift/refusal";
+import { iso } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import {
 	type DocumentMetadata,
@@ -310,7 +311,7 @@ async function indexText(
 				join(dir, ...file.path.split("/")),
 				file,
 			);
-			const day = new Date(file.changedAt).toISOString().slice(0, 10);
+			const day = iso(file.changedAt).slice(0, 10);
 			return `- \`${file.path}\`: ${title}${sentence ? `. ${sentence}` : ""} (changed ${day})`;
 		}),
 	);

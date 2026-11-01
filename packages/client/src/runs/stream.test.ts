@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
-
 import {
 	followRun,
 	type RunStreamConnection,
@@ -257,10 +257,10 @@ describe("the stream of one run", () => {
 			onStatus: () => {},
 		});
 		await Bun.sleep(5);
-		const started = Date.now();
+		const started = now();
 		controller.abort();
 		await done;
-		expect(Date.now() - started).toBeLessThan(500);
+		expect(now() - started).toBeLessThan(500);
 	});
 });
 

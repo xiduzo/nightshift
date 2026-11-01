@@ -1,5 +1,6 @@
 import type { AppRouterClient } from "@nightshift/api";
 import { DEFAULT_PORT } from "@nightshift/daemon";
+import { formatTime } from "@nightshift/time";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { previewLines, resultLines } from "./merge-words";
@@ -99,7 +100,7 @@ export async function joinCommand(argv: string[], program: string) {
 								]
 							: []),
 						"",
-						`The code works until ${new Date(step.expiresAt).toLocaleTimeString()}. Waiting for the Host…`,
+						`The code works until ${formatTime(step.expiresAt)}. Waiting for the Host…`,
 					].join("\n"),
 				);
 			} else if (step.kind === "merge-preview") {

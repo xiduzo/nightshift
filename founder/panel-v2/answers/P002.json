@@ -1,0 +1,13 @@
+{
+	"id": "P002",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I already threw away most of the PRs background agents opened for us, and a pre-alpha tool from one developer doesn't change what the agent writes. Maybe I'd poke at the free self-hosted version on a slow Friday, but I'm not paying $99 a month for it.",
+	"objection": "The morning PRs will still be junk I have to review and bin. Tests passing doesn't mean the code is something I'd merge, and setting up a Host and flows is more work on top.",
+	"would_change_my_mind": "Seeing that a team like mine actually merges most of the overnight PRs without rewriting them, for example a real merge rate over a few weeks.",
+	"price_too_cheap": 10,
+	"price_cheap": 29,
+	"price_expensive": 79,
+	"price_too_expensive": 150
+}

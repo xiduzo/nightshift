@@ -9,6 +9,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema";
+import { instant, instantOrNull } from "@nightshift/time";
 import {
 	and,
 	count,
@@ -420,8 +421,8 @@ function moving(row: {
 }): MovingProject {
 	return {
 		...row,
-		createdAt: row.createdAt.getTime(),
-		removedAt: row.removedAt?.getTime() ?? null,
+		createdAt: instant(row.createdAt),
+		removedAt: instantOrNull(row.removedAt),
 	};
 }
 

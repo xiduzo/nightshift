@@ -1,0 +1,184 @@
+{
+	"business": "Night Shift: open-source app that runs a team's coding-agent pipelines overnight on their own computers and logins",
+	"seed": 960871,
+	"dealt": 100,
+	"answered": 30,
+	"skipped": [
+		["P031", "missing"],
+		["P032", "missing"],
+		["P033", "missing"],
+		["P034", "missing"],
+		["P035", "missing"],
+		["P036", "missing"],
+		["P037", "missing"],
+		["P038", "missing"],
+		["P039", "missing"],
+		["P040", "missing"],
+		["P041", "missing"],
+		["P042", "missing"],
+		["P043", "missing"],
+		["P044", "missing"],
+		["P045", "missing"],
+		["P046", "missing"],
+		["P047", "missing"],
+		["P048", "missing"],
+		["P049", "missing"],
+		["P050", "missing"],
+		["P051", "missing"],
+		["P052", "missing"],
+		["P053", "missing"],
+		["P054", "missing"],
+		["P055", "missing"],
+		["P056", "missing"],
+		["P057", "missing"],
+		["P058", "missing"],
+		["P059", "missing"],
+		["P060", "missing"],
+		["P061", "missing"],
+		["P062", "missing"],
+		["P063", "missing"],
+		["P064", "missing"],
+		["P065", "missing"],
+		["P066", "missing"],
+		["P067", "missing"],
+		["P068", "missing"],
+		["P069", "missing"],
+		["P070", "missing"],
+		["P071", "missing"],
+		["P072", "missing"],
+		["P073", "missing"],
+		["P074", "missing"],
+		["P075", "missing"],
+		["P076", "missing"],
+		["P077", "missing"],
+		["P078", "missing"],
+		["P079", "missing"],
+		["P080", "missing"],
+		["P081", "missing"],
+		["P082", "missing"],
+		["P083", "missing"],
+		["P084", "missing"],
+		["P085", "missing"],
+		["P086", "missing"],
+		["P087", "missing"],
+		["P088", "missing"],
+		["P089", "missing"],
+		["P090", "missing"],
+		["P091", "missing"],
+		["P092", "missing"],
+		["P093", "missing"],
+		["P094", "missing"],
+		["P095", "missing"],
+		["P096", "missing"],
+		["P097", "missing"],
+		["P098", "missing"],
+		["P099", "missing"],
+		["P100", "missing"]
+	],
+	"buys": 0,
+	"passes": 30,
+	"buy_rate": 0.0,
+	"by_segment": [
+		["Tech lead at a small digital agency", 10, 0.0],
+		["Senior developer who picks the tools for a small team", 6, 0.0],
+		[
+			"Owner or managing director of a small agency who holds the budget",
+			9,
+			0.0
+		],
+		["Founder or CTO of an early-stage startup", 5, 0.0]
+	],
+	"by_behaviour": [
+		["Vendor default is good enough", 5, 0.0],
+		["Burned by background agents", 4, 0.0],
+		["Scripts it themselves", 3, 0.0],
+		["Watches every subscription", 4, 0.0],
+		["Tool tinkerer", 5, 0.0],
+		["Waits for proof from others", 4, 0.0],
+		["Open source and self-host first", 5, 0.0]
+	],
+	"by_income": [
+		["under $102,000", 10, 0.0],
+		["$102,000 to $113,000", 8, 0.0],
+		["$113,000 and up", 12, 0.0]
+	],
+	"why_not": [
+		[
+			"trust",
+			18,
+			[
+				"I already threw away most of the PRs that background agents opened for us, and running them overnight just means I triage the junk in the morning. A pre-alpha tool from one developer won't change that, and I don't have time to draw flows and pair machines.",
+				"I have a spare Mac mini, so I'd try the free self-hosted version before paying $99 a month. And a pre-alpha built by one developer running agents unattended on our paid quotas overnight is exactly the setup I fear will loop and burn tokens."
+			],
+			["P002", "P004"]
+		],
+		[
+			"habit",
+			9,
+			[
+				"We already get scheduled agents and PRs out of Claude Code and GitHub with the seats the company pays for. Drawing pipelines in a separate tool is one more thing I have to maintain.",
+				"I already have a cron job calling claude -p that opens PRs, and it works well enough. A pre-alpha tool from one developer is not something I move my team's pipeline onto, and the free self-hosted version covers me anyway if I get curious."
+			],
+			["P001", "P003"]
+		],
+		[
+			"quality",
+			1,
+			[
+				"I'd maybe self-host the open source version to poke at it, but I won't pay $99 for Cloud. My problem with background agents was never scheduling. It was that the PRs were junk, and a nicer pipeline doesn't prove it fixes that."
+			],
+			["P017"]
+		],
+		[
+			"need",
+			1,
+			[
+				"I already run claude -p from cron for the boring stuff, and the free self-hosted version covers anything more. $99 a month for someone else to host a scheduler is a hard sell when my token bill already hurts."
+			],
+			["P024"]
+		],
+		[
+			"values",
+			1,
+			[
+				"If it's Apache-2.0 and runs on my own boxes, I'd self-host it and never pay for Cloud. I'd maybe try the free version, but Claude Code and GitHub Actions already cover most of the scheduled-agent stuff."
+			],
+			["P029"]
+		]
+	],
+	"why_yes": [],
+	"flip": [
+		"Seeing it reliably produce mergeable PRs overnight on a real agency repo, with approval gates our vendor tools can't do.",
+		"Proof from a team like mine that most of the overnight PRs got merged without rework, and setup that takes under an hour.",
+		"Proof of hard per-run quota and retry caps that kill a looping agent and ping me, plus a few months of other teams running it without incidents.",
+		"Hard per-run and per-night token or retry caps that stop a run and ping my phone, shown working on our own repo during the setup call.",
+		"If my cron setup broke for a week of nights and I saw a demo where approval gates and retries saved real review time compared with plain cloud agents.",
+		"Hard spend and retry caps per run that stop a looping agent, plus proof from other agencies that it ran for months without surprises.",
+		"Seeing it produce mergeable PRs on one of our internal repos for two weeks with the free self-hosted version, plus a clear story for client data and compliance.",
+		"A client contract that explicitly allows agents only on our own hardware, plus proof that the morning PRs actually pass review more often than what our vendor agents produce.",
+		"Seeing it handle retries, approval gates and the phone decision list much better than my script on a real repo, so I'd use the free self-hosted version first.",
+		"Hard per-run token and retry limits that stop a run and alert me, plus a few weeks of the free version producing PRs we actually merge.",
+		"A clear security model (sandboxing, scoped credentials, audit log) plus a few weeks of my own self-hosted runs producing PRs we actually merge.",
+		"Seeing it run reliably for a few months at another agency, with retries and approval gates that clearly beat what the vendor schedulers already give me.",
+		"A client contract or policy template that clearly allows this, plus proof it runs stably on real projects for a few months, so I can actually use it on billable work.",
+		"Hard per-run and per-night token or cost limits that stop runs automatically, plus a morning report of exactly what each run spent.",
+		"A few agencies like ours publicly showing months of overnight PRs that actually merged, plus a real contributor base on GitHub.",
+		"Case studies from agencies like ours running it on real client work for a few months, plus a clear security write-up on what the agents can touch.",
+		"Real merged-PR rates from teams like mine, showing most overnight PRs got merged with light review.",
+		"Hard per-run budget and retry limits that stop a run before it eats our quota, plus a few months of the self-hosted version working on real nights without surprises.",
+		"A few months of steady releases and a couple of other agencies publicly running it nightly, plus a way to export flows if it dies.",
+		"A case study from a small agency like mine showing what share of overnight PRs actually got merged, or a founder I know vouching for it.",
+		"Case studies from two or three agencies my size showing what share of overnight PRs actually got merged, plus real traction on GitHub.",
+		"A security review or sandboxing story I can show clients, plus proof from a similar agency that the morning PRs actually get merged instead of thrown away.",
+		"A real trial on one of our own repos where most of the morning PRs actually get merged, plus a clear answer I can give clients about where their code goes.",
+		"Seeing it run a real week on a repo like mine and land PRs I'd actually merge, with clear token spend per run, so it saves me more than it costs.",
+		"A clear sandboxing and permissions model I can show clients, plus a few months of other agencies running it safely.",
+		"A few months of steady releases and other teams running it, plus a self-hosted Host that does schedules and phone push without the paid cloud. Then I might pay for support.",
+		"A few months of other agencies running it on real client repos, with a second maintainer and a simple self-host setup I can do in an afternoon.",
+		"If my script started falling over on retries and approval steps, and I could import it into Night Shift in an afternoon without running a Host.",
+		"A self-hostable server with the phone app working against it, plus a few months of real teams running it without breakage.",
+		"If the self-hosted version actually saved my team hours of review every week for a month and the phone approvals were genuinely good, I'd pay for Cloud so I stop babysitting the server."
+	],
+	"purchases_first_month_per_buyer": null,
+	"price_answers": 30
+}

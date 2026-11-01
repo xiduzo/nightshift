@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { AgentNode, Policy } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import {
 	agent as agentNode,
 	drive,
@@ -76,9 +77,9 @@ describe("the run budget", () => {
 			withPolicy([agent("worker")], { budgetUsd: 1 }),
 			{ harness },
 		);
-		const started = Date.now();
+		const started = now();
 		const { parked } = await drive(h, { inputs: {} });
-		expect(Date.now() - started).toBeLessThan(10_000);
+		expect(now() - started).toBeLessThan(10_000);
 		const reason =
 			"The run spent $3.00 of its $1.00 budget, so it stopped. Resume it to spend up to $1.00 more.";
 		expect(parked[0]).toMatchObject({

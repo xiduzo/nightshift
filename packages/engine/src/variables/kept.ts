@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { keptVariable } from "@nightshift/db/schema";
 import type { Flow, JsonValue } from "@nightshift/flows";
+import { asDate, instant } from "@nightshift/time";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
@@ -70,7 +71,7 @@ export async function listKeptValues(
 		name: row.name,
 		value: parse(row.value),
 		runId: row.runId,
-		updatedAt: row.updatedAt.getTime(),
+		updatedAt: instant(row.updatedAt),
 	}));
 }
 
@@ -147,7 +148,7 @@ export function saveKeptWrites(
 	return writes.flatMap((write) =>
 		Object.entries(write.values).map(([name, value]) => {
 			const json = JSON.stringify(value);
-			const updatedAt = new Date(write.at);
+			const updatedAt = asDate(write.at);
 			return db
 				.insert(keptVariable)
 				.values({

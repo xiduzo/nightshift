@@ -18,6 +18,7 @@ import {
 	type Sandbox,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
+import { now as timeNow } from "@nightshift/time";
 import type { HostRelay, WorkRelay } from "../contract";
 import type { HostExchange } from "../exchange";
 import type { SyncedDocument } from "../links";
@@ -205,9 +206,9 @@ export async function pairedReplicas(
 				}
 				channel.sync(listed);
 				const names = listed.map((document) => document.name);
-				const end = Date.now() + 10_000;
+				const end = timeNow() + 10_000;
 				while (!channel.inStep(names)) {
-					if (Date.now() >= end) {
+					if (timeNow() >= end) {
 						throw new Error(`${name}'s documents are not in step with A.`);
 					}
 					await Bun.sleep(5);

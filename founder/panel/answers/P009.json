@@ -1,0 +1,13 @@
+{
+	"id": "P009",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "I already have a GitHub Action that runs claude -p every night and opens PRs. Drawing the pipeline in a GUI doesn't buy me much over a YAML file I control.",
+	"objection": "It's pre-alpha from one developer, and I'd be swapping a script I understand for a whole new system my team has to learn and trust with our repos.",
+	"would_change_my_mind": "Seeing it handle retries, approval gates and the phone decision list much better than my script on a real repo, so I'd use the free self-hosted version first.",
+	"price_too_cheap": 5,
+	"price_cheap": 20,
+	"price_expensive": 60,
+	"price_too_expensive": 120
+}

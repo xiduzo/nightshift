@@ -14,6 +14,7 @@ import {
 	type Sandbox,
 } from "@nightshift/engine/testing";
 import type { AgentProfile } from "@nightshift/flows";
+import { asDate } from "@nightshift/time";
 import { selfOwnerId } from "../registry";
 import { createEngineOffers } from "./engine-offers";
 import {
@@ -355,14 +356,14 @@ describe("the Host admin offers to a person's Personal", () => {
 			name: "Personal",
 			slug: spaceId,
 			personal: true,
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		await sandbox.db.insert(member).values({
 			id: `m-${id}`,
 			organizationId: spaceId,
 			userId: id,
 			role: "owner",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		if (device) {
 			await sandbox.db.insert(deviceTable).values({
@@ -371,7 +372,7 @@ describe("the Host admin offers to a person's Personal", () => {
 				platform: "darwin",
 				ownerId: id,
 				homeHost: device.home ? "https://host.invalid" : null,
-				revokedAt: device.revoked ? new Date() : null,
+				revokedAt: device.revoked ? asDate() : null,
 			});
 		}
 		return spaceId;

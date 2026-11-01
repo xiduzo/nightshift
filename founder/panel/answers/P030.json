@@ -1,0 +1,13 @@
+{
+	"id": "P030",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "I'll install the open-source version the day I see it and play with it on a spare Mac mini, but $99 a month for someone else to fire my cron jobs is a hard sell when I already have a box that can do that.",
+	"objection": "It's pre-alpha from one developer, and most of what it does I can already hack together with cron, claude -p and a GitHub Action. I'm not paying a monthly fee for something that might be abandoned in six months.",
+	"would_change_my_mind": "If the self-hosted version actually saved my team hours of review every week for a month and the phone approvals were genuinely good, I'd pay for Cloud so I stop babysitting the server.",
+	"price_too_cheap": 5,
+	"price_cheap": 20,
+	"price_expensive": 60,
+	"price_too_expensive": 120
+}

@@ -1,0 +1,13 @@
+{
+	"id": "P009",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "I already have a GitHub Action that runs claude -p on labeled issues and opens PRs. The budget and loop guard sound nice, but I'd add those to my script in an afternoon rather than adopt a pre-alpha tool from one developer.",
+	"objection": "It's pre-alpha and built by one person. If it breaks overnight or the developer walks away, I'm stuck, and my homemade script already does about 80% of this.",
+	"would_change_my_mind": "If a peer at another agency showed me it reliably producing mergeable PRs every week, I might self-host the free version and try it. I still wouldn't pay $99 for hosting.",
+	"price_too_cheap": 5,
+	"price_cheap": 20,
+	"price_expensive": 60,
+	"price_too_expensive": 120
+}

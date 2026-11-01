@@ -18,8 +18,8 @@ import type {
 } from "@nightshift/flows";
 import { flowSchema } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
+import { now } from "@nightshift/time";
 import { call } from "@orpc/server";
-
 import {
 	type AssistantDeps,
 	BUSY,
@@ -580,12 +580,12 @@ describe("chatRun", () => {
 		}) as unknown as ChatSpace;
 
 	test("the failed step and the end of its transcript, bounded; it stops once the replay is done", async () => {
-		const started = Date.now();
+		const started = now();
 		const found = await chatRun(space(), "p1", "r1", {
 			signal: new AbortController().signal,
 			idleMs: 50,
 		});
-		expect(Date.now() - started).toBeLessThan(2_000);
+		expect(now() - started).toBeLessThan(2_000);
 		expect(found?.failedStepId).toBe("s2");
 		expect(found?.steps[0]?.note).toBe("Planned.");
 		expect(found?.transcript.at(-1)).toBe("Exit code: 1");

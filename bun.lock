@@ -5,6 +5,7 @@
     "": {
       "name": "nightshift",
       "dependencies": {
+        "@nightshift/time": "workspace:*",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -22,6 +23,7 @@
       "name": "desktop",
       "dependencies": {
         "@nightshift/daemon": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "fix-path": "^5.0.0",
       },
       "devDependencies": {
@@ -102,6 +104,7 @@
         "@nightshift/daemon": "workspace:*",
         "@nightshift/db": "workspace:*",
         "@nightshift/flows": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "@orpc/client": "catalog:",
         "better-auth": "catalog:",
         "libsql": "catalog:",
@@ -171,6 +174,7 @@
         "@modelcontextprotocol/sdk": "1.32.1",
         "@nightshift/flows": "workspace:*",
         "@nightshift/refusal": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "@pydantic/genai-prices": "0.1.13",
         "@tanstack/ai": "0.69.0",
         "@tanstack/ai-acp": "0.3.25",
@@ -206,6 +210,7 @@
         "@nightshift/flows": "workspace:*",
         "@nightshift/notifications": "workspace:*",
         "@nightshift/refusal": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "@orpc/server": "catalog:",
         "zod": "catalog:",
       },
@@ -225,6 +230,7 @@
         "@better-auth/expo": "catalog:",
         "@nightshift/db": "workspace:*",
         "@nightshift/refusal": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "better-auth": "catalog:",
         "drizzle-orm": "catalog:",
         "zod": "catalog:",
@@ -281,6 +287,7 @@
         "@nightshift/notifications": "workspace:*",
         "@nightshift/refusal": "workspace:*",
         "@nightshift/telemetry": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "@orpc/openapi": "catalog:",
         "@orpc/server": "catalog:",
         "@orpc/zod": "catalog:",
@@ -299,6 +306,7 @@
       "name": "@nightshift/db",
       "dependencies": {
         "@libsql/client": "0.18.0",
+        "@nightshift/time": "workspace:*",
         "drizzle-orm": "catalog:",
         "libsql": "catalog:",
       },
@@ -319,6 +327,7 @@
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/refusal": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/contract": "catalog:",
         "@orpc/server": "catalog:",

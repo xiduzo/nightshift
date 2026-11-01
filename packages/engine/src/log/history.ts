@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { Database } from "@nightshift/db";
 import { agentSession, event, project, run, step } from "@nightshift/db/schema";
 import type { JsonValue } from "@nightshift/flows";
+import { asDate, instant } from "@nightshift/time";
 import {
 	and,
 	asc,
@@ -273,11 +274,11 @@ export function createRunHistory(deps: {
 				: [],
 		]);
 		return {
-			runs: runs.map((r) => ({ ...r, createdAt: r.createdAt.getTime() })),
-			steps: steps.map((s) => ({ ...s, createdAt: s.createdAt.getTime() })),
+			runs: runs.map((r) => ({ ...r, createdAt: instant(r.createdAt) })),
+			steps: steps.map((s) => ({ ...s, createdAt: instant(s.createdAt) })),
 			sessions: sessions.map((s) => ({
 				...s,
-				createdAt: s.createdAt.getTime(),
+				createdAt: instant(s.createdAt),
 			})),
 			events: events.map((e) => ({
 				spaceId: e.spaceId,
@@ -286,7 +287,7 @@ export function createRunHistory(deps: {
 				sessionId: e.sessionId,
 				type: e.type,
 				payload: e.payload,
-				at: e.at.getTime(),
+				at: instant(e.at),
 				walkerId: e.walkerId,
 				walkerSeq: e.walkerSeq,
 			})),
@@ -328,7 +329,7 @@ export function createRunHistory(deps: {
 				db
 					.insert(run)
 					.values(
-						rows.runs.map((r) => ({ ...r, createdAt: new Date(r.createdAt) })),
+						rows.runs.map((r) => ({ ...r, createdAt: asDate(r.createdAt) })),
 					)
 					.onConflictDoNothing(),
 			);
@@ -338,7 +339,7 @@ export function createRunHistory(deps: {
 				db
 					.insert(step)
 					.values(
-						rows.steps.map((s) => ({ ...s, createdAt: new Date(s.createdAt) })),
+						rows.steps.map((s) => ({ ...s, createdAt: asDate(s.createdAt) })),
 					)
 					.onConflictDoNothing(),
 			);
@@ -350,7 +351,7 @@ export function createRunHistory(deps: {
 					.values(
 						rows.sessions.map((s) => ({
 							...s,
-							createdAt: new Date(s.createdAt),
+							createdAt: asDate(s.createdAt),
 						})),
 					)
 					.onConflictDoNothing(),

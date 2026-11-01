@@ -7,6 +7,7 @@ import type {
 	RunCommandKind,
 	SpaceEngine,
 } from "@nightshift/engine";
+import { asDate, instant } from "@nightshift/time";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { RunCommand } from "../contract";
 
@@ -80,7 +81,7 @@ export function createRunCommands(deps: { db: Database }) {
 			runId: row.runId,
 			walkerId: row.walkerId,
 			personId: row.personId,
-			createdAt: row.createdAt.getTime(),
+			createdAt: instant(row.createdAt),
 			kind: row.kind,
 			payload: JSON.parse(row.payload),
 		} as RunCommand;
@@ -149,7 +150,7 @@ export function createRunCommands(deps: { db: Database }) {
 		): Promise<void> {
 			await db
 				.update(runCommand)
-				.set({ doneAt: new Date(), error })
+				.set({ doneAt: asDate(), error })
 				.where(and(eq(runCommand.id, id), eq(runCommand.walkerId, walkerId)));
 			for (const listener of [...listeners]) listener();
 		},

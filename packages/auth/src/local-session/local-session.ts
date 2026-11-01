@@ -1,9 +1,9 @@
 import type { Database } from "@nightshift/db";
 import { session as sessionTable } from "@nightshift/db/schema";
+import { asDate, instant, now } from "@nightshift/time";
 import { parseCookies, setRequestCookie } from "better-auth/cookies";
 import { makeSignature } from "better-auth/crypto";
 import { and, desc, eq, gt } from "drizzle-orm";
-
 import type { Auth, Session } from "../auth";
 
 /**
@@ -45,14 +45,14 @@ export function createLocalSession(
 
 	/** An unexpired session of the Person, else a new one. */
 	async function currentToken(): Promise<string> {
-		if (current && current.expiresAt > Date.now()) return current.token;
+		if (current && current.expiresAt > now()) return current.token;
 		const [latest] = await db
 			.select({ token: sessionTable.token, expiresAt: sessionTable.expiresAt })
 			.from(sessionTable)
 			.where(
 				and(
 					eq(sessionTable.userId, personId),
-					gt(sessionTable.expiresAt, new Date()),
+					gt(sessionTable.expiresAt, asDate()),
 				),
 			)
 			.orderBy(desc(sessionTable.expiresAt))
@@ -60,7 +60,7 @@ export function createLocalSession(
 		const found =
 			latest ??
 			(await (await auth.$context).internalAdapter.createSession(personId));
-		current = { token: found.token, expiresAt: found.expiresAt.getTime() };
+		current = { token: found.token, expiresAt: instant(found.expiresAt) };
 		return current.token;
 	}
 
@@ -91,7 +91,7 @@ export function createLocalSession(
 		if (session) {
 			current = {
 				token: session.session.token,
-				expiresAt: session.session.expiresAt.getTime(),
+				expiresAt: instant(session.session.expiresAt),
 			};
 			return { session, headers: local };
 		}

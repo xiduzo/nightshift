@@ -9,6 +9,7 @@ import {
 	profileSchema,
 	type Schedule,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import * as Y from "yjs";
 import type { ProfileStore } from "../device-config";
 import { createProfileStore } from "../device-config/profiles";
@@ -170,7 +171,7 @@ async function replica(name: string): Promise<Replica> {
 						profiles,
 					}).forDevice(sandbox.deviceId),
 				flush: () => documents.flush(),
-				at: Date.now(),
+				at: now(),
 			}),
 		restart: async () => {
 			await documents.flush();
@@ -334,7 +335,7 @@ describe("the import on upgrade", () => {
 				throw new Error("git is gone");
 			},
 			flush: () => laptop.documents.flush(),
-			at: Date.now(),
+			at: now(),
 		});
 
 		expect(result).toMatchObject({ status: "imported", deleted: false });
@@ -359,7 +360,7 @@ describe("the import on upgrade", () => {
 			flush: async () => {
 				throw new Error("The disk is full.");
 			},
-			at: Date.now(),
+			at: now(),
 		});
 
 		await expect(failed).rejects.toThrow("The disk is full.");
@@ -528,7 +529,7 @@ describe("the import on upgrade", () => {
 			kind: "save",
 			personId: "person",
 			deviceId: laptop.sandbox.deviceId,
-			at: Date.now(),
+			at: now(),
 		});
 		await sync(laptop, desktop);
 

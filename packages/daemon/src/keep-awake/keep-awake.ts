@@ -1,5 +1,5 @@
 import type { Engine, RunHere } from "@nightshift/engine";
-
+import { now as timeNow } from "@nightshift/time";
 import type { SleepHold, SleepLock } from "./sleep-lock";
 
 /**
@@ -124,7 +124,7 @@ export type KeepAwake = {
 };
 
 export function createKeepAwake(options: KeepAwakeOptions): KeepAwake {
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const retryMs = options.retryMs ?? 60_000;
 	const onError =
 		options.onError ??

@@ -10,6 +10,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { defaultRunSettings } from "../device-config/settings";
 import type { DerivedStep } from "../log";
 import { foldRun } from "../log";
@@ -761,7 +762,7 @@ describe("the Call node with each", () => {
 	});
 
 	test("a wait inside element 2 parks the run; a wake on a new compile over the same saver continues the element, then element 3 runs", async () => {
-		const resetAt = Date.now() + 60_000;
+		const resetAt = now() + 60_000;
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
 			call === 1 ? usageLimitScript(resetAt) : reportingScript("pass"),
 		);

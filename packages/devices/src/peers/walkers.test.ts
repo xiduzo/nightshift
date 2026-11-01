@@ -12,6 +12,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { withPeers } from "../testing";
 import { deviceDirectory } from "./directory";
@@ -126,7 +127,7 @@ async function walkersOn(engine: PeerEngine): Promise<(RunWalker | null)[]> {
 async function namedInDocument(name: string) {
 	const document = await documentsB.open(a.spaceId);
 	await document.change(() =>
-		document.devices.set(a.deviceId, { name, updatedAt: Date.now() }),
+		document.devices.set(a.deviceId, { name, updatedAt: now() }),
 	);
 }
 

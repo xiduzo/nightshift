@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
+import { utc } from "@nightshift/time/testing";
 import { type DigestSource, digestFrom, readDigest } from "./digest";
 
 /** What the digest says of runs and Gates: the push's sum and one line per run. */
@@ -7,7 +7,7 @@ import { type DigestSource, digestFrom, readDigest } from "./digest";
 type EndedRun = Awaited<ReturnType<DigestSource["endedRuns"]>>[number];
 
 const HOUR = 60 * 60_000;
-const TO = Date.UTC(2026, 9, 21, 7);
+const TO = utc(2026, 9, 21, 7);
 const FROM = TO - 24 * HOUR;
 
 function ended(id: string, over: Partial<EndedRun> = {}): EndedRun {

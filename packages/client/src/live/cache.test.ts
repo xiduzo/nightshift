@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { now } from "@nightshift/time";
 import { QueryClient } from "@tanstack/react-query";
-
 import { createApiClient, createQueryUtils } from "../api";
 import { createDashboardQueries } from "../dashboard";
 import { createGateQueries, type OpenGate } from "../gates";
@@ -509,7 +509,7 @@ describe("the live cache follows the Host", () => {
 
 	test("each read of the open Gates takes away the notifications of Gates that no longer wait", async () => {
 		const { live, queryClient } = setUp();
-		const readAt = Date.now() + 120_000;
+		const readAt = now() + 120_000;
 		const { dismissed } = follow(
 			live,
 			fakeScreen([

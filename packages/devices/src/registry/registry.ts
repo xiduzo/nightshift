@@ -4,6 +4,12 @@ import { device } from "@nightshift/db/schema";
 import type { PeerContext } from "@nightshift/engine";
 import { deviceDocumentName } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
+import {
+	asDate,
+	instant,
+	instantOrNull,
+	now as timeNow,
+} from "@nightshift/time";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 /**
@@ -133,7 +139,7 @@ export function createDeviceRegistry(deps: {
 	now?: () => number;
 }): DeviceRegistry {
 	const { db, logFact } = deps;
-	const now = deps.now ?? Date.now;
+	const now = deps.now ?? timeNow;
 	const online: DevicePresence = deps.presence ?? new Map();
 
 	const ready = closeStalePresence().catch((error) => {
@@ -147,10 +153,10 @@ export function createDeviceRegistry(deps: {
 			platform: row.platform,
 			ownerId: row.ownerId ?? "",
 			homeHost: row.homeHost,
-			lastSeenAt: row.lastSeenAt?.getTime() ?? null,
+			lastSeenAt: instantOrNull(row.lastSeenAt),
 			online: online.has(row.id),
-			pairedAt: row.createdAt.getTime(),
-			revokedAt: row.revokedAt?.getTime() ?? null,
+			pairedAt: instant(row.createdAt),
+			revokedAt: instantOrNull(row.revokedAt),
 		};
 	}
 
@@ -261,7 +267,7 @@ export function createDeviceRegistry(deps: {
 			online.set(id, at);
 			const [updated] = await db
 				.update(device)
-				.set({ lastSeenAt: new Date(at) })
+				.set({ lastSeenAt: asDate(at) })
 				.where(and(eq(device.id, id), eq(device.self, false)))
 				.returning({ id: device.id, ownerId: device.ownerId });
 			if (!updated) {
@@ -302,7 +308,7 @@ export function createDeviceRegistry(deps: {
 					before: [
 						db
 							.update(device)
-							.set({ revokedAt: new Date(now()) })
+							.set({ revokedAt: asDate(now()) })
 							.where(eq(device.id, id)),
 					],
 				},

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 import { session, user } from "@nightshift/db/schema";
-
+import { asDate } from "@nightshift/time";
 import { testDatabase } from "../testing/database";
 import { createTargetStore, registerScreenSchema, targetView } from "./targets";
 
@@ -75,8 +75,8 @@ describe("a phone", () => {
 				id: sessionId,
 				token: `token-${sessionId}`,
 				userId: id,
-				expiresAt: new Date(endsAt),
-				updatedAt: new Date(0),
+				expiresAt: asDate(endsAt),
+				updatedAt: asDate(0),
 			});
 		}
 	}

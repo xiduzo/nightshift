@@ -4,8 +4,8 @@ import {
 	spacesDashboard,
 	summarizeFlow,
 } from "@nightshift/engine";
+import { now } from "@nightshift/time";
 import { z } from "zod";
-
 import { output } from "../output";
 import { protectedProcedure } from "../procedures";
 import {
@@ -40,7 +40,7 @@ export const dashboard = {
 				.default({ timeZone: "UTC" }),
 		)
 		.handler(async ({ context, input }) => {
-			const read = { now: Date.now(), timeZone: input.timeZone };
+			const read = { now: now(), timeZone: input.timeZone };
 			if (input.projectId !== undefined) {
 				return projectDashboard(context.space, input.projectId, read);
 			}
@@ -70,7 +70,7 @@ export const dashboard = {
 			summarizeFlow(
 				input.flowName,
 				await context.space.listRuns({ projectId: input.projectId }),
-				{ now: Date.now(), timeZone: input.timeZone },
+				{ now: now(), timeZone: input.timeZone },
 			),
 		),
 };

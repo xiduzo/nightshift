@@ -9,6 +9,7 @@ import type {
 	LeaseNode,
 	WaitNode,
 } from "@nightshift/flows";
+import { instant, now } from "@nightshift/time";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -167,7 +168,7 @@ async function holders(): Promise<Record<string, string>> {
 	const rows = await sandbox.db.select().from(runLease);
 	return Object.fromEntries(
 		rows
-			.filter((row) => row.expiresAt.getTime() > Date.now())
+			.filter((row) => instant(row.expiresAt) > now())
 			.map((row) => [row.name, row.runId]),
 	);
 }

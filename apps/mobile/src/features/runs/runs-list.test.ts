@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import type { RunStatus, RunSummary } from "@nightshift/client";
-
+import { atLocal } from "@nightshift/client/testing";
 import {
 	byNight,
 	countedFilters,
@@ -17,7 +17,7 @@ import {
 
 const MIN = 60_000;
 /** Saturday 31 Oct 2026, 07:12 local time. */
-const NOW = new Date(2026, 9, 31, 7, 12).getTime();
+const NOW = atLocal(2026, 9, 31, 7, 12);
 
 type Row = Pick<
 	RunSummary,
@@ -151,7 +151,7 @@ describe("shownRuns", () => {
 
 describe("nightLabel", () => {
 	const at = (day: number, hour: number, minute = 0) =>
-		new Date(2026, 9, day, hour, minute).getTime();
+		atLocal(2026, 9, day, hour, minute);
 
 	test("a night runs from noon to noon", () => {
 		expect(nightLabel(at(31, 6, 40), NOW)).toBe("Last night");
@@ -171,7 +171,7 @@ describe("nightLabel", () => {
 		expect(nightLabel(at(29, 1, 0), NOW)).toBe("Wednesday night");
 		expect(nightLabel(at(26, 2, 0), NOW)).toBe("Sunday night");
 		expect(nightLabel(at(24, 22, 0), NOW)).toBe("Night of 24 October");
-		expect(nightLabel(new Date(2025, 11, 30, 23).getTime(), NOW)).toBe(
+		expect(nightLabel(atLocal(2025, 11, 30, 23), NOW)).toBe(
 			"Night of 30 December 2025",
 		);
 	});
@@ -198,7 +198,7 @@ describe("byNight", () => {
 
 describe("runMeta and runPlace", () => {
 	const at = (hour: number, minute: number) =>
-		new Date(2026, 9, 31, hour, minute).getTime();
+		atLocal(2026, 9, 31, hour, minute);
 
 	test("a run on its way: since it started", () => {
 		expect(runMeta(run({ status: "running", createdAt: at(6, 40) }))).toBe(

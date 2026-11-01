@@ -1,3 +1,4 @@
+import { now } from "@nightshift/time";
 import type { McpServerConfig } from "../port";
 import { type McpToolInfo, toolInfo, withMcpClient } from "./mcp";
 
@@ -18,7 +19,7 @@ export async function testMcpServer(
 	config: McpServerConfig,
 	options: { redact?: string[]; timeoutMs?: number } = {},
 ): Promise<McpTestResult> {
-	const started = Date.now();
+	const started = now();
 	const redact = (text: string) =>
 		(options.redact ?? [])
 			.filter((v) => v.length >= 4)
@@ -36,7 +37,7 @@ export async function testMcpServer(
 						: null,
 					tools: tools.map(toolInfo),
 					error: null,
-					ms: Date.now() - started,
+					ms: now() - started,
 				};
 			},
 			{ timeoutMs: options.timeoutMs },
@@ -47,7 +48,7 @@ export async function testMcpServer(
 			server: null,
 			tools: [],
 			error: redact(error instanceof Error ? error.message : String(error)),
-			ms: Date.now() - started,
+			ms: now() - started,
 		};
 	}
 }

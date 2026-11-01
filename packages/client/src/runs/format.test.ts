@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
+import { utc } from "@nightshift/time/testing";
 import {
 	agoLabel,
 	compactCount,
@@ -36,7 +36,7 @@ describe("the cost of a run, when it is known", () => {
 });
 
 describe("how long ago, short", () => {
-	const now = Date.UTC(2026, 9, 21, 12, 0, 0);
+	const now = utc(2026, 9, 21, 12, 0, 0);
 	const minute = 60_000;
 
 	test("says how long ago, in short words", () => {

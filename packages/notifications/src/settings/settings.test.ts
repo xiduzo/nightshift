@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
-
+import { utc } from "@nightshift/time/testing";
 import { testDatabase } from "../testing/database";
 import {
 	createSettingsStore,
@@ -16,7 +16,7 @@ beforeEach(async () => {
 });
 afterEach(() => cleanup());
 
-const at = (hour: number, minute = 0) => Date.UTC(2026, 9, 21, hour, minute);
+const at = (hour: number, minute = 0) => utc(2026, 9, 21, hour, minute);
 
 describe("quiet hours", () => {
 	const night = {

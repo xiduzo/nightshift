@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
 import type { SpaceEngine, SpaceFlows } from "@nightshift/engine";
+import { now } from "@nightshift/time";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { Subprocess } from "bun";
@@ -81,8 +82,8 @@ export async function startDaemon(
 		stdout: "ignore",
 		stderr: "pipe",
 	});
-	const deadline = Date.now() + 30_000;
-	while (Date.now() < deadline) {
+	const deadline = now() + 30_000;
+	while (now() < deadline) {
 		if (child.exitCode !== null) {
 			throw new Error(
 				`${name} stopped: ${await new Response(child.stderr).text()}`,
@@ -111,10 +112,10 @@ export async function waitFor<T>(
 	until: (value: T) => boolean,
 	timeoutMs = 20_000,
 ): Promise<T> {
-	const deadline = Date.now() + timeoutMs;
+	const deadline = now() + timeoutMs;
 	let value = await read();
 	while (!until(value)) {
-		if (Date.now() > deadline) {
+		if (now() > deadline) {
 			throw new Error(`Timed out; last value: ${JSON.stringify(value)}`);
 		}
 		await Bun.sleep(100);

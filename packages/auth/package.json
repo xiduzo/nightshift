@@ -17,6 +17,7 @@
 		"@better-auth/expo": "catalog:",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
+		"@nightshift/time": "workspace:*",
 		"better-auth": "catalog:",
 		"drizzle-orm": "catalog:",
 		"zod": "catalog:"

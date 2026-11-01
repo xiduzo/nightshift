@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { DecisionNode, Flow } from "@nightshift/flows";
+import { hourOf, parseInstant } from "@nightshift/time";
 import { foldRun } from "../log";
-
 import { getRunRow } from "../log/run-row";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
@@ -39,7 +39,7 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const T0 = Date.parse("2026-10-26T22:00:00");
+const T0 = parseInstant("2026-10-26T22:00:00");
 
 const gate = (deadline: DecisionNode["deadline"]): DecisionNode => ({
 	id: "keep",
@@ -106,7 +106,7 @@ describe("a Gate with a deadline", () => {
 		const { h } = await setup(keepFlow({ at: "07:00", choose: "keep" }));
 		const due = deriveOpenGate(foldRun(await h.events()))?.deadline
 			?.at as number;
-		expect(new Date(due).getHours()).toBe(7);
+		expect(hourOf(due)).toBe(7);
 		expect(due).toBeGreaterThan(T0);
 		expect(due - T0).toBeLessThan(24 * 60 * 60 * 1000);
 	});

@@ -7,9 +7,9 @@ import {
 	secret,
 	setting,
 } from "@nightshift/db/schema";
+import { instant, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type * as Y from "yjs";
-
 import {
 	createSyncedDocuments,
 	documentName,
@@ -109,7 +109,7 @@ export async function openDeviceDocument(options: {
 		const legacy = await readLegacyRows(db);
 		await document.change(() => {
 			meta.set("deviceId", deviceId);
-			meta.set("importedAt", Date.now());
+			meta.set("importedAt", now());
 			for (const [key, value] of legacy.settings)
 				document.settings.set(key, value);
 			for (const [key, value] of legacy.connections)
@@ -145,14 +145,14 @@ async function readLegacyRows(db: Database) {
 			{
 				description: row.description,
 				server,
-				updatedAt: row.updatedAt.getTime(),
+				updatedAt: instant(row.updatedAt),
 			},
 		]);
 	}
 	const cliTools: [string, unknown][] = (await db.select().from(cliTool)).map(
 		(row) => [
 			row.name,
-			{ description: row.description, updatedAt: row.updatedAt.getTime() },
+			{ description: row.description, updatedAt: instant(row.updatedAt) },
 		],
 	);
 	const profiles: [string, unknown][] = [];
@@ -164,7 +164,7 @@ async function readLegacyRows(db: Database) {
 			{
 				description: row.description,
 				settings: parsed,
-				updatedAt: row.updatedAt.getTime(),
+				updatedAt: instant(row.updatedAt),
 			},
 		]);
 	}
@@ -173,7 +173,7 @@ async function readLegacyRows(db: Database) {
 			.select({ name: secret.name, updatedAt: secret.updatedAt })
 			.from(secret)
 			.orderBy(secret.name)
-	).map((row) => ({ name: row.name, setAt: row.updatedAt.getTime() }));
+	).map((row) => ({ name: row.name, setAt: instant(row.updatedAt) }));
 	return { settings, connections, cliTools, profiles, secrets };
 }
 
@@ -190,7 +190,7 @@ export function setDeviceFacts(
 	if (changed.length === 0) return Promise.resolve();
 	return document.change(() => {
 		for (const [key, value] of changed) document.facts.set(key, value);
-		document.facts.set("checkedAt", facts.checkedAt ?? Date.now());
+		document.facts.set("checkedAt", facts.checkedAt ?? now());
 	});
 }
 
@@ -222,7 +222,7 @@ export async function refreshDeviceFacts(options: {
 		harnesses: options.harnesses(),
 		programs: await options.programs(),
 		clones,
-		checkedAt: Date.now(),
+		checkedAt: now(),
 	});
 }
 

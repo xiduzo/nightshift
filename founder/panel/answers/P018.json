@@ -1,0 +1,13 @@
+{
+	"id": "P018",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I'd self-host the free version on my Mac mini and try it, but I won't pay $99 a month for a hosted server from a pre-alpha one-person project. I don't hand our schedules or agent logins to someone else's server anyway.",
+	"objection": "A looping or failing run could burn our whole agent quota overnight. Nothing here says there are spend caps, retry limits or a kill switch. And one developer in pre-alpha might vanish next year.",
+	"would_change_my_mind": "Hard per-run budget and retry limits that stop a run before it eats our quota, plus a few months of the self-hosted version working on real nights without surprises.",
+	"price_too_cheap": 10,
+	"price_cheap": 25,
+	"price_expensive": 60,
+	"price_too_expensive": 100
+}

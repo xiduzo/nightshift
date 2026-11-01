@@ -2,6 +2,7 @@ import { hostname } from "node:os";
 
 import { createDb, type Database } from "@nightshift/db";
 import { daemonLease } from "@nightshift/db/schema";
+import { instant, now as timeNow } from "@nightshift/time";
 import { type Heartbeat, readHeartbeatFile } from "../heartbeat";
 import { pidAlive } from "./lease";
 
@@ -10,7 +11,7 @@ import { pidAlive } from "./lease";
  * timer). A heartbeat older than three periods means the daemon hangs or
  * its timers stopped, even when HTTP still answers. `GET /health`,
  * `nightshift health` and the watchdogs all read this. Reading it needs
- * `Date.now()` and the database, never a timer, so it answers truthfully
+ * `now()` and the database, never a timer, so it answers truthfully
  * when the daemon's timers are dead.
  */
 
@@ -36,7 +37,7 @@ export function leaseHealth(
 ): Health {
 	if (!heartbeat)
 		return { healthy: false, status: "none", heartbeatAgeMs: null };
-	const heartbeatAgeMs = (options.now ?? Date.now()) - heartbeat.heartbeatAt;
+	const heartbeatAgeMs = (options.now ?? timeNow()) - heartbeat.heartbeatAt;
 	const status =
 		heartbeat.owner === null
 			? "stopped"
@@ -57,8 +58,8 @@ export async function readHeartbeat(db: Database): Promise<Heartbeat | null> {
 		owner: row.owner,
 		host: row.host,
 		pid: row.pid,
-		acquiredAt: row.acquiredAt.getTime(),
-		heartbeatAt: row.heartbeatAt.getTime(),
+		acquiredAt: instant(row.acquiredAt),
+		heartbeatAt: instant(row.heartbeatAt),
 	};
 }
 
@@ -71,7 +72,7 @@ export function elapsedSeconds(etime: string): number | null {
 }
 
 /** When the process with this pid started, from `ps`. Null when unknown. */
-export function processStartedAt(pid: number, now = Date.now()): number | null {
+export function processStartedAt(pid: number, now = timeNow()): number | null {
 	try {
 		const ps = Bun.spawnSync(["ps", "-o", "etime=", "-p", String(pid)]);
 		if (ps.exitCode !== 0) return null;

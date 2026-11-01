@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { personalSpaceId } from "@nightshift/auth";
 import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
-
+import { now } from "@nightshift/time";
+import { utc } from "@nightshift/time/testing";
 import { createInAppChannel } from "./channels";
 import {
 	type FakeRunEvents,
@@ -204,9 +205,9 @@ test("nobody removes or signs out another Person's phone", async () => {
 async function waitFor(
 	condition: () => boolean | Promise<boolean>,
 ): Promise<void> {
-	const until = Date.now() + 2_000;
+	const until = now() + 2_000;
 	while (!(await condition())) {
-		if (Date.now() > until) throw new Error("It did not happen in time.");
+		if (now() > until) throw new Error("It did not happen in time.");
 		await Bun.sleep(5);
 	}
 }
@@ -214,7 +215,7 @@ async function waitFor(
 test("the inbox reads the last digest again: its runs, and the Gates that wait now", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
-	const nine = Date.UTC(2026, 9, 21, 9);
+	const nine = utc(2026, 9, 21, 9);
 	let clock = nine;
 	const run = (id: string, endedAt: number) => ({
 		id,

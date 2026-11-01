@@ -1,3 +1,4 @@
+import { now as timeNow } from "@nightshift/time";
 import {
 	Expo,
 	type ExpoClientOptions,
@@ -5,7 +6,6 @@ import {
 	type ExpoPushReceiptId,
 	type ExpoPushTicket,
 } from "expo-server-sdk";
-
 import {
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
@@ -168,7 +168,7 @@ export function expoWithdrawMessage(
 export function createExpoChannel(
 	options: ExpoChannelOptions = {},
 ): ExpoChannel {
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const delay = options.receiptDelayMs ?? DEFAULT_RECEIPT_DELAY_MS;
 	const maxAge = options.receiptMaxAgeMs ?? DEFAULT_RECEIPT_MAX_AGE_MS;
 	const onError =

@@ -9,6 +9,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { asDate, now } from "@nightshift/time";
 import { eq, max } from "drizzle-orm";
 import type { HostRelay } from "../contract";
 import { withPeers } from "../testing";
@@ -103,7 +104,7 @@ async function otherSpace(sandbox: Sandbox, name: string): Promise<string> {
 	const id = `space-${name.toLowerCase()}`;
 	await sandbox.db
 		.insert(organization)
-		.values({ id, name, slug: id, createdAt: new Date() });
+		.values({ id, name, slug: id, createdAt: asDate() });
 	return id;
 }
 
@@ -280,7 +281,7 @@ describe("a disposed engine", () => {
 				sessionId: null,
 				type: "WalkerMoved",
 				payload: JSON.stringify({ from: a.deviceId, to: b.deviceId, by: null }),
-				at: Date.now(),
+				at: now(),
 				walkerId: a.deviceId,
 				walkerSeq: (counted?.latest ?? 0) + 1,
 			},

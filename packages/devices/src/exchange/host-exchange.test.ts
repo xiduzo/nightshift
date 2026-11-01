@@ -19,6 +19,7 @@ import {
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
+import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import type { SyncBatch } from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
@@ -68,7 +69,7 @@ beforeEach(async () => {
 		organizationId: sandbox.spaceId,
 		userId: "colleague",
 		role: "member",
-		createdAt: new Date(),
+		createdAt: asDate(),
 	});
 	projectId = (
 		await engine
@@ -161,7 +162,7 @@ describe("a Walker's paths", () => {
 	});
 
 	test("of another Person's Device never land in the Host's Replica", async () => {
-		const now = Date.now();
+		const now = timeNow();
 		const rows = {
 			runs: [
 				{
@@ -249,7 +250,7 @@ describe("a Walker's paths", () => {
 describe("live transcripts", () => {
 	/** A run the colleague's Device walks here, with one running step. */
 	async function colleagueRun() {
-		const now = Date.now();
+		const now = timeNow();
 		await host().push(keyOf("device-colleague", "colleague"), {
 			runs: [
 				{
@@ -315,7 +316,7 @@ describe("live transcripts", () => {
 			seq,
 			stepId: "step-live",
 			sessionId: null,
-			at: Date.now(),
+			at: timeNow(),
 			event: { type: "command-output", stream: "stdout", text: `line ${seq}` },
 		}) as never;
 
@@ -388,7 +389,7 @@ describe("live transcripts", () => {
 							? { outcome: "pass", outputs: { visit: 1 }, error: null }
 							: { prompt: null },
 					),
-					at: Date.now(),
+					at: timeNow(),
 					walkerId: "device-colleague",
 					walkerSeq,
 				},
@@ -505,7 +506,7 @@ describe("a push the Host refuses", () => {
 				deviceId: null,
 				placements: null,
 				deviceNames: null,
-				createdAt: Date.now(),
+				createdAt: timeNow(),
 			},
 		],
 		steps: [],
@@ -518,7 +519,7 @@ describe("a push the Host refuses", () => {
 				sessionId: null,
 				type: "RunStarted",
 				payload: "{}",
-				at: Date.now(),
+				at: timeNow(),
 				walkerId,
 				walkerSeq: 1,
 			},
@@ -558,7 +559,7 @@ describe("a Device's stream of rows", () => {
 			id: "space-other",
 			name: "Other",
 			slug: "space-other",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		await sandbox.db
 			.insert(projectTable)
@@ -593,7 +594,7 @@ describe("a Device's stream of rows", () => {
 			sessionId: null,
 			type: "EdgeTaken",
 			payload: "{}",
-			at: Date.now(),
+			at: timeNow(),
 			walkerId: "device-colleague",
 			walkerSeq,
 		});

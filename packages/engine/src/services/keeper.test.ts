@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { now } from "@nightshift/time";
 import type { Device } from "../device";
 import { spawnCommand } from "../device/command";
 import type { ServiceHold, ServiceSpec } from "../log";
@@ -56,7 +57,7 @@ setInterval(() => {}, 1000);
 const READY_COMMAND = `"${BUN}" -e 'const p = require("node:fs").readFileSync("port", "utf8"); const r = await fetch("http://127.0.0.1:" + p); if (!r.ok) process.exit(1); require("node:fs").writeFileSync(process.env.NS_OUTPUT, JSON.stringify({ url: "http://127.0.0.1:" + p }));'`;
 
 function keeper(): ServiceKeeper {
-	const made = createServiceKeeper({ now: Date.now, secondMs: SECOND_MS });
+	const made = createServiceKeeper({ now: now, secondMs: SECOND_MS });
 	keepers.push(made);
 	return made;
 }

@@ -24,6 +24,7 @@ import {
 	stepName,
 	stepState,
 	stoppedNotice,
+	now as timeNow,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
@@ -214,7 +215,7 @@ function RunBody({
 	};
 	const primary = primaryAction(actions);
 	const more = moreActions(actions, primary);
-	const now = Date.now();
+	const now = timeNow();
 	const verdict = runVerdict({
 		status,
 		gateQuestion: gate

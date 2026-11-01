@@ -1,5 +1,6 @@
 import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import type {
 	LeaveResult,
@@ -158,8 +159,8 @@ export function createHomeMembership(deps: HomeMembershipDeps) {
 			hostId: string,
 			signal?: AbortSignal,
 		): AsyncGenerator<JoinProgress> {
-			const end = Date.now() + (deps.listedWaitMs ?? LISTED_WAIT_MS);
-			while (Date.now() < end && !signal?.aborted) {
+			const end = timeNow() + (deps.listedWaitMs ?? LISTED_WAIT_MS);
+			while (timeNow() < end && !signal?.aborted) {
 				const link = deps.links.get(hostId);
 				const listed = await deps.engine.hostSpaces.listed(hostId);
 				if (

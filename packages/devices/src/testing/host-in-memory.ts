@@ -22,6 +22,7 @@ import {
 	type Sandbox,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
+import { now } from "@nightshift/time";
 import type { HostClient, HostHello, WorkRelay } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
 import { createHost, servedDocuments } from "../host";
@@ -261,10 +262,10 @@ export function linksTo(
 			if (!channel) {
 				throw new Error("This link in memory syncs no documents.");
 			}
-			const end = Date.now() + (options.timeoutMs ?? 10_000);
+			const end = now() + (options.timeoutMs ?? 10_000);
 			while (true) {
 				if (channel.inStep(names)) return true;
-				if (Date.now() >= end || options.signal?.aborted) return false;
+				if (now() >= end || options.signal?.aborted) return false;
 				await Bun.sleep(20);
 			}
 		},

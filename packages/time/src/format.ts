@@ -64,6 +64,18 @@ export function formatDay(at: Instant, timeZone: string = localZone()): string {
 	return zoned(at, { day: "numeric", month: "short" }, timeZone);
 }
 
+/** "Wed 15 Oct": the weekday, the day and the month on the viewer's clock. */
+export function formatWeekdayDate(
+	at: Instant,
+	timeZone: string = localZone(),
+): string {
+	return zoned(
+		at,
+		{ weekday: "short", day: "numeric", month: "short" },
+		timeZone,
+	);
+}
+
 /** "Friday": the weekday on the viewer's clock. */
 export function formatWeekday(
 	at: Instant,

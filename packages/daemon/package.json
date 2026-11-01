@@ -22,6 +22,7 @@
 		"@nightshift/notifications": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
 		"@nightshift/telemetry": "workspace:*",
+		"@nightshift/time": "workspace:*",
 		"@orpc/openapi": "catalog:",
 		"@orpc/server": "catalog:",
 		"@orpc/zod": "catalog:",

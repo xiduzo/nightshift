@@ -4,6 +4,7 @@ import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { clone, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
+import { instant, now as timeNow } from "@nightshift/time";
 import { and, asc, eq, getColumns, isNull } from "drizzle-orm";
 import type { DeviceDirectory, Relay } from "../contract";
 import type { RunLog } from "../log";
@@ -159,7 +160,7 @@ export function toProject(
 		name: row.name,
 		repoPath: row.repoPath,
 		remote: row.remote,
-		createdAt: row.createdAt.getTime(),
+		createdAt: instant(row.createdAt),
 		clones,
 	};
 }
@@ -188,7 +189,7 @@ export function createProjects(deps: ProjectsDeps) {
 			document.projects.set(row.id, {
 				...entry,
 				...change,
-				updatedAt: Date.now(),
+				updatedAt: timeNow(),
 			} satisfies SpaceProject);
 		});
 	}
@@ -411,7 +412,7 @@ export function createProjects(deps: ProjectsDeps) {
 					"This Space is kept by another computer. Add the project there first, then add this folder.",
 				);
 			}
-			const now = Date.now();
+			const now = timeNow();
 			await document.change(() => {
 				document.projects.set(id, {
 					name,
@@ -436,7 +437,7 @@ export function createProjects(deps: ProjectsDeps) {
 
 		/** Marks a project removed. Its runs, events and Clones stay. */
 		async remove(projectId: string): Promise<void> {
-			await define(await rowOf(projectId), { removedAt: Date.now() });
+			await define(await rowOf(projectId), { removedAt: timeNow() });
 			await log.append({
 				type: "ProjectRemoved",
 				payload: { projectId },
@@ -547,7 +548,7 @@ export function createProjects(deps: ProjectsDeps) {
 			const document = await documents.open(spaceId);
 			if (document.hostedElsewhere) return;
 			await document.change(() => {
-				const now = Date.now();
+				const now = timeNow();
 				for (const { id, ...entry } of taken.define ?? []) {
 					if (document.projects.has(id)) continue;
 					document.projects.set(id, {

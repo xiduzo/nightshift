@@ -1,6 +1,7 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { KnowledgeUse } from "@nightshift/agents/tools";
 import { isCustomHarness, type Schedule } from "@nightshift/flows";
+import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
 import type {
@@ -274,7 +275,7 @@ export type EngineInternals = {
 	minuteMs?: number;
 	/** How long one second of a service's probe (`everySeconds`, `timeoutMinutes`) lasts. Default 1 000 ms. */
 	secondMs?: number;
-	/** The clock for waits and the stop time. Default `Date.now`. */
+	/** The clock for waits and the stop time. Default `now`. */
 	now?: () => number;
 	/** Aborting it clears the engine's wake timers and stops its scheduler: a test's way to let a daemon die. */
 	signal?: AbortSignal;
@@ -297,7 +298,7 @@ export function createEngine(
 	internals: EngineInternals = {},
 ): Engine {
 	const minuteMs = internals.minuteMs ?? 60_000;
-	const now = internals.now ?? Date.now;
+	const now = internals.now ?? timeNow;
 	const { db, dataDir, device, directory } = options;
 	const maxConcurrentRuns =
 		options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS;

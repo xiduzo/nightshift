@@ -72,6 +72,7 @@
 		"data:migrate": "bun run --cwd apps/server data:migrate"
 	},
 	"dependencies": {
+		"@nightshift/time": "workspace:*",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
+import { parseInstant } from "@nightshift/time";
 import type { RunSummary } from "../read";
 import { summarizeFlow } from "./flow-health";
 import { projectDashboard, spacesDashboard } from "./spaces";
@@ -11,8 +11,8 @@ import { type DashboardScope, summarizeDashboard } from "./summary";
  */
 
 const HOUR = 60 * 60 * 1000;
-const NOW = Date.parse("2026-10-21T15:00:00Z");
-const TONIGHT = Date.parse("2026-10-21T12:00:00Z");
+const NOW = parseInstant("2026-10-21T15:00:00Z");
+const TONIGHT = parseInstant("2026-10-21T12:00:00Z");
 const NIGHT = 24 * HOUR;
 
 let next = 0;

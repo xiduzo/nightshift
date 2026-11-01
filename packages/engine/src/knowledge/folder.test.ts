@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { asDate, iso, now } from "@nightshift/time";
 import { tinyDocx, tinyPdf } from "../testing/documents";
 import {
 	createKnowledgeFolders,
@@ -65,7 +66,7 @@ describe("the knowledge folder", () => {
 		);
 		await put(dir, "notes.txt", "Plain words here.\n");
 		await put(dir, "diagram.png", "png");
-		const day = new Date().toISOString().slice(0, 10);
+		const day = iso(now()).slice(0, 10);
 		await folders.index("p1");
 		const index = join(dir, "INDEX.md");
 		const first = await readFile(index, "utf8");
@@ -79,7 +80,7 @@ describe("the knowledge folder", () => {
 
 		// Not stale: the index stays as it is.
 		await writeFile(index, `${first}<!-- kept -->\n`);
-		const past = new Date(Date.now() - 60_000);
+		const past = asDate(now() - 60_000);
 		await utimes(join(dir, "wiki/Home.md"), past, past);
 		await utimes(join(dir, "wiki"), past, past);
 		await utimes(join(dir, "notes.txt"), past, past);
@@ -96,7 +97,7 @@ describe("the knowledge folder", () => {
 
 		// A file that changed: written again.
 		await writeFile(index, `${second}<!-- kept -->\n`);
-		const old = new Date(Date.now() - 30_000);
+		const old = asDate(now() - 30_000);
 		await utimes(index, old, old);
 		await put(dir, "notes.txt", "New words.\n");
 		await folders.index("p1");

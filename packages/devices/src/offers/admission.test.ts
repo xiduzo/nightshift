@@ -8,6 +8,7 @@ import {
 	worktreeLocation,
 } from "@nightshift/engine/projects";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces } from "../links";
 import { deviceDirectory } from "../peers";
@@ -669,9 +670,9 @@ describe("Offer admission, its owner's run", () => {
 });
 
 async function until(ok: () => boolean, timeoutMs = 5_000) {
-	const deadline = Date.now() + timeoutMs;
+	const deadline = now() + timeoutMs;
 	while (!ok()) {
-		if (Date.now() > deadline) throw new Error("Timed out.");
+		if (now() > deadline) throw new Error("Timed out.");
 		await Bun.sleep(5);
 	}
 }

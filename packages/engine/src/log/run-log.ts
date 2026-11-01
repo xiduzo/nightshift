@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
+import { asDate } from "@nightshift/time";
 import { asc, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { stampedAppend } from "./command-stamp";
@@ -384,7 +385,7 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 						sessionId: e.sessionId,
 						type: e.type,
 						payload: e.payload,
-						at: new Date(e.at),
+						at: asDate(e.at),
 						walkerId: e.walkerId,
 						walkerSeq: e.walkerSeq,
 					})

@@ -16,6 +16,7 @@ import {
 import type { Database } from "@nightshift/db";
 import type { SettingsStore } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
+import { now as timeNow } from "@nightshift/time";
 import {
 	type HostHello,
 	NOT_A_HOST,
@@ -110,7 +111,7 @@ export function createHost(deps: {
 		return [...host, ...others.map((d) => ({ id: d.id, name: d.name }))];
 	}
 	function prune() {
-		const now = Date.now();
+		const now = timeNow();
 		for (const [code, p] of pending)
 			if (p.expiresAt < now) pending.delete(code);
 	}
@@ -154,7 +155,7 @@ export function createHost(deps: {
 			pending.set(code.deviceCode, {
 				...input,
 				userCode: code.userCode,
-				expiresAt: Date.now() + code.expiresIn * 1000,
+				expiresAt: timeNow() + code.expiresIn * 1000,
 			});
 			const page = new URL(deps.devicesPage);
 			const complete = new URL(page);

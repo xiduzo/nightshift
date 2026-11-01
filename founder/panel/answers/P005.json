@@ -1,0 +1,13 @@
+{
+	"id": "P005",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "habit",
+	"reason": "I already have a cron job running claude -p, and the cloud agents we pay for do the scheduling for us. A pre-alpha tool from one developer at $99 a month does not beat that for my team.",
+	"objection": "It is a solo-dev pre-alpha, and our vendors keep adding scheduling and background agents. Why would I add another moving part that could disappear?",
+	"would_change_my_mind": "If my cron setup broke for a week of nights and I saw a demo where approval gates and retries saved real review time compared with plain cloud agents.",
+	"price_too_cheap": 5,
+	"price_cheap": 19,
+	"price_expensive": 49,
+	"price_too_expensive": 99
+}

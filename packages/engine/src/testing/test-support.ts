@@ -10,6 +10,7 @@ import type {
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";
+import { asDate, now } from "@nightshift/time";
 import { asc, eq, sql } from "drizzle-orm";
 import type { DeviceDirectory } from "../contract/directory";
 import { type LocalDeviceDeps, localDevice } from "../device/local";
@@ -154,7 +155,7 @@ export async function otherSpace(
 	const id = `space-${name.toLowerCase()}`;
 	await db
 		.insert(organization)
-		.values({ id, name, slug: id, createdAt: new Date() });
+		.values({ id, name, slug: id, createdAt: asDate() });
 	return id;
 }
 
@@ -317,8 +318,8 @@ export async function waitFor<T>(
 		| Promise<T | undefined | null | false>,
 	{ timeoutMs = 5_000, label = "condition" } = {},
 ): Promise<T> {
-	const deadline = Date.now() + timeoutMs;
-	while (Date.now() < deadline) {
+	const deadline = now() + timeoutMs;
+	while (now() < deadline) {
 		const value = await check();
 		if (value) return value;
 		await Bun.sleep(5);
@@ -333,7 +334,7 @@ export async function waitFor<T>(
  * however late a busy machine fires the timer, and the work between two
  * waits takes no time on it.
  */
-export function sleepClock(start = Date.now()) {
+export function sleepClock(start = now()) {
 	let at = start;
 	return {
 		now: () => at,
@@ -367,7 +368,7 @@ export async function expectRunLogsInSync(
 	db: Database,
 	runLogs: readonly RunLog[],
 ): Promise<void> {
-	const deadline = Date.now() + 2_000;
+	const deadline = now() + 2_000;
 	while (true) {
 		const drift: string[] = [];
 		const takenOver = new Set<string>();
@@ -387,7 +388,7 @@ export async function expectRunLogsInSync(
 			for (const runId of cached.keys()) takenOver.add(runId);
 		}
 		if (drift.length === 0) return;
-		if (Date.now() > deadline) {
+		if (now() > deadline) {
 			throw new Error(
 				`The run log differs from the database for run ${drift.join(", ")}`,
 			);

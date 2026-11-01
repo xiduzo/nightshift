@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { organization, project } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import {
 	type SpaceArchive,
@@ -193,12 +194,11 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 	 * no reconcile waits for its documents or calls it until that time.
 	 */
 	const olderHosts = new Map<string, number>();
-	const isOlder = (spaceId: string) =>
-		(olderHosts.get(spaceId) ?? 0) > Date.now();
+	const isOlder = (spaceId: string) => (olderHosts.get(spaceId) ?? 0) > now();
 	/** What a failed knowledge call to the Host says about it. */
 	function heard(spaceId: string, error: unknown): void {
 		if (error instanceof OlderHostError) {
-			olderHosts.set(spaceId, Date.now() + OLDER_HOST_WAIT_MS);
+			olderHosts.set(spaceId, now() + OLDER_HOST_WAIT_MS);
 		}
 	}
 

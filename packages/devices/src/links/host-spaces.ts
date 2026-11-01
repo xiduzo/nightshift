@@ -10,6 +10,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
+import { asDate, instantOrNull } from "@nightshift/time";
 import { and, asc, desc, eq, inArray, notInArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { ListedSpace } from "../contract";
@@ -100,7 +101,7 @@ export function createHostSpaces(db: Database) {
 							name,
 							role: space.role,
 							personal: space.personal,
-							updatedAt: new Date(),
+							updatedAt: asDate(),
 						},
 					});
 				await mirrorHostSpace(db, { id: space.id, name });
@@ -152,7 +153,7 @@ export function createHostSpaces(db: Database) {
 		named(spaceId: string, name: string): BatchItem<"sqlite"> {
 			return db
 				.update(hostSpace)
-				.set({ name, updatedAt: new Date() })
+				.set({ name, updatedAt: asDate() })
 				.where(eq(hostSpace.spaceId, spaceId));
 		},
 
@@ -250,7 +251,7 @@ async function keeperOf(
 		hostId,
 		link:
 			name !== null && personId !== null && role !== null
-				? { name, personId, role, revokedAt: revokedAt?.getTime() ?? null }
+				? { name, personId, role, revokedAt: instantOrNull(revokedAt) }
 				: null,
 	};
 }

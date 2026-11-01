@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
 import { seedFlows } from "@nightshift/engine/testing";
-
+import { now as timeNow } from "@nightshift/time";
 import {
 	type Daemon,
 	pair,
@@ -282,7 +282,7 @@ describe("a run placed on another Device", () => {
 
 	test("a run placed on a Device of another Person is refused", async () => {
 		const db = new Database(join(a.dataDir, "nightshift.db"));
-		const now = Date.now();
+		const now = timeNow();
 		db.run(
 			"insert into user (id, name, email, email_verified, created_at, updated_at) values ('colleague', 'Colleague', 'colleague@example.invalid', 0, ?, ?)",
 			[now, now],

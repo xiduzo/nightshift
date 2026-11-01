@@ -20,6 +20,7 @@ import type {
 	FlowEdge,
 } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
+import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
@@ -947,7 +948,7 @@ describe("run policy", () => {
 
 	test("a usage limit with a reset time sleeps, then continues the same harness session", async () => {
 		const harness = fakeHarness((_input, call) =>
-			call === 0 ? usageLimitScript(Date.now() + 2 * MINUTE) : {},
+			call === 0 ? usageLimitScript(now() + 2 * MINUTE) : {},
 		);
 		const engine = makeEngine(harness, {}, { minuteMs: MINUTE });
 		const started = await engine.startRun({
@@ -1092,11 +1093,7 @@ describe("run policy", () => {
 
 		// A new daemon, ten minutes later.
 		const second = fakeHarness();
-		const engine2 = makeEngine(
-			second,
-			{},
-			{ now: () => Date.now() + 10 * 60_000 },
-		);
+		const engine2 = makeEngine(second, {}, { now: () => now() + 10 * 60_000 });
 		const detail = await waitForEnd(engine2, started.id);
 		expect(detail.status).toBe("finished");
 		expect(second.calls[0]?.resumeSessionId).toBe("fake-session-1");
@@ -1276,7 +1273,7 @@ describe("stop modes", () => {
 	});
 
 	test("the stop time ends the run before the next step, never during one", async () => {
-		let clock = Date.now();
+		let clock = now();
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness, {}, { now: () => clock });
 		const stopAt = clock + 60_000;
@@ -1316,7 +1313,7 @@ describe("stop modes", () => {
 	});
 
 	test("a usage limit that resets after the stop time stops the run at once; resume continues the same session", async () => {
-		const clock = Date.now();
+		const clock = now();
 		const stopAt = clock + 60 * 60_000;
 		const harness = fakeHarness((_input, call) =>
 			call === 0 ? usageLimitScript(stopAt) : {},
@@ -1353,7 +1350,7 @@ describe("stop modes", () => {
 	});
 
 	test("a usage limit that resets before the stop time still waits", async () => {
-		const clock = Date.now();
+		const clock = now();
 		const harness = fakeHarness((_input, call) =>
 			call === 0 ? usageLimitScript(clock + 60_000) : {},
 		);
@@ -1375,7 +1372,7 @@ describe("stop modes", () => {
 			[agent("worker", "Build {{item.id}}"), command("commit", commitItem)],
 			[edge("b1", "worker", "pass", "commit")],
 		);
-		let clock = Date.now();
+		let clock = now();
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness, {}, { now: () => clock });
 		const stopAt = clock + 60_000;
@@ -1421,7 +1418,7 @@ describe("stop modes", () => {
 
 	test("without a stopped edge, the stop time inside a Call still stops the run there", async () => {
 		await saveBody("build", [agent("worker", "Build {{item.id}}")]);
-		let clock = Date.now();
+		let clock = now();
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness, {}, { now: () => clock });
 		const stopAt = clock + 60_000;

@@ -1,0 +1,13 @@
+{
+	"id": "P014",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "Letting agents run unwatched all night on our paid logins is exactly how a looping run eats our quota before anyone wakes up. A pre-alpha from one developer does not earn that level of trust, and our laptops are shut overnight anyway.",
+	"objection": "Nothing in the offer tells me how it stops a runaway or failed run from burning tokens, or caps spend per night. One developer behind it means nobody answers when it breaks at 3am.",
+	"would_change_my_mind": "Hard per-run and per-night token or cost limits that stop runs automatically, plus a morning report of exactly what each run spent.",
+	"price_too_cheap": 15,
+	"price_cheap": 39,
+	"price_expensive": 99,
+	"price_too_expensive": 180
+}

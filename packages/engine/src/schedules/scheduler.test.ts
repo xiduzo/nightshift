@@ -3,6 +3,7 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { atLocal, utc } from "@nightshift/time/testing";
 import { asc, eq, inArray } from "drizzle-orm";
 import {
 	defaultRunSettings,
@@ -46,7 +47,7 @@ afterEach(async () => {
 
 /** Local time on the daemon's clock, October 2026 (the 16th is a Friday). */
 function at(day: number, hours: number, minutes = 0, seconds = 0): number {
-	return new Date(2026, 9, day, hours, minutes, seconds).getTime();
+	return atLocal(2026, 9, day, hours, minutes, seconds);
 }
 
 /** A daemon. Abort its controller to let it die. */
@@ -252,21 +253,21 @@ describe("the scheduler", () => {
 
 	test("a schedule with a time zone fires and stops on that clock, not this computer's", async () => {
 		// 22:00 in Tokyo on the 16th is 13:00 UTC; 07:00 there the next day is 22:00 UTC.
-		clock = Date.UTC(2026, 9, 16, 12, 59);
+		clock = utc(2026, 9, 16, 12, 59);
 		const { engine } = startDaemon();
 		const project = await setup(engine, [
 			nightly({ stopAt: "07:00", timeZone: "Asia/Tokyo" }),
 		]);
 		await settle();
 		expect((await engine.listSchedules(project.id)).schedules[0]?.nextAt).toBe(
-			Date.UTC(2026, 9, 16, 13),
+			utc(2026, 9, 16, 13),
 		);
 
-		clock = Date.UTC(2026, 9, 16, 13, 0, 20);
+		clock = utc(2026, 9, 16, 13, 0, 20);
 		const [fired] = await waitForFacts(1);
-		expect(fired?.payload).toMatchObject({ at: Date.UTC(2026, 9, 16, 13) });
+		expect(fired?.payload).toMatchObject({ at: utc(2026, 9, 16, 13) });
 		const run = (await engine.listRuns())[0] as RunSummary;
-		expect(run.stopAt).toBe(Date.UTC(2026, 9, 16, 22));
+		expect(run.stopAt).toBe(utc(2026, 9, 16, 22));
 	});
 
 	test("a scheduled run has a starter: the schedule's Person, else this computer's owner", async () => {

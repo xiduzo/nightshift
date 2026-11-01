@@ -9,6 +9,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { WorkRelay } from "../contract";
 import { httpsLink } from "../links/link";
@@ -234,7 +235,7 @@ describe("the Host walks a run a Device starts", () => {
 			value: "7",
 			runId: "a-run-of-b",
 			stepId: "a-step-of-b",
-			updatedAt: new Date(Date.now() + 60_000),
+			updatedAt: asDate(now() + 60_000),
 		});
 		const started = await paired.device
 			.space(a.spaceId, { personId: paired.personId })

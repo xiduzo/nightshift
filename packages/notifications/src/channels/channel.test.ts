@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-
+import { utc } from "@nightshift/time/testing";
 import { deviceWaitWords } from "./channel";
 
 /** 22:00 in Amsterdam (20:00 UTC). */
-const NIGHT = Date.UTC(2026, 9, 27, 21, 0);
+const NIGHT = utc(2026, 9, 27, 21, 0);
 
 describe("the words of a device wait", () => {
 	test("name the flow, the device, and the stop time in the person's time zone", () => {
@@ -11,7 +11,7 @@ describe("the words of a device wait", () => {
 			deviceWaitWords({
 				flow: "Nightly triage",
 				device: "studio-mac",
-				stopAt: Date.UTC(2026, 9, 28, 5, 0),
+				stopAt: utc(2026, 9, 28, 5, 0),
 				timeZone: "Europe/Amsterdam",
 				now: NIGHT,
 			}),
@@ -26,7 +26,7 @@ describe("the words of a device wait", () => {
 			deviceWaitWords({
 				flow: "Triage",
 				device: "studio-mac",
-				stopAt: Date.UTC(2026, 9, 30, 5, 0),
+				stopAt: utc(2026, 9, 30, 5, 0),
 				timeZone: "Europe/Amsterdam",
 				now: NIGHT,
 			}).body,

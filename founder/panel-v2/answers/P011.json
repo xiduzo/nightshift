@@ -1,0 +1,13 @@
+{
+	"id": "P011",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "I'd clone the open-source version and try it on a side repo the week it hits HN, sure. But paying $99 a month for a hosted server from a pre-alpha one-person project, to let agents loose on client code overnight? No.",
+	"objection": "Agents running unattended on our client repos all night is a security risk. Budgets and loop guards stop runaway cost. They don't stop an agent leaking secrets or pushing something bad while nobody is watching.",
+	"would_change_my_mind": "A clear sandboxing story (no network or secrets access by default, reviewed permissions per flow) plus a few months of other agencies running it in production without incidents.",
+	"price_too_cheap": 10,
+	"price_cheap": 29,
+	"price_expensive": 79,
+	"price_too_expensive": 150
+}

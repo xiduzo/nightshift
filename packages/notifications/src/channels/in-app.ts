@@ -1,3 +1,4 @@
+import { now as timeNow } from "@nightshift/time";
 import { parseDeviceWaitKey, parseGateKey } from "../contract";
 import type { NoticeKind } from "../deliveries";
 import type {
@@ -131,7 +132,7 @@ export type InAppChannel = NotificationChannel<InAppTarget> & {
 export function createInAppChannel(
 	options: { now?: () => number; recentMs?: number } = {},
 ): InAppChannel {
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const recentMs = options.recentMs ?? DEFAULT_RECENT_MS;
 	const listeners = new Map<string, Set<(item: InAppItem) => void>>();
 	/** When each Person's last page closed its stream. */

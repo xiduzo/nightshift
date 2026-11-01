@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Flow, ValueNode } from "@nightshift/flows";
+import { parseInstant } from "@nightshift/time";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
 import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
@@ -33,7 +34,7 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const T0 = Date.parse("2026-10-26T22:00:00");
+const T0 = parseInstant("2026-10-26T22:00:00");
 
 const ask = (extra: Partial<ValueNode>): ValueNode => ({
 	id: "pick",

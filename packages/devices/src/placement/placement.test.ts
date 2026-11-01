@@ -40,6 +40,8 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow, ProfileRef } from "@nightshift/flows";
+import { asDate } from "@nightshift/time";
+import { atLocal } from "@nightshift/time/testing";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
 import {
@@ -427,7 +429,7 @@ describe("a run placed on another Device", () => {
 			id: "personal-someone-else",
 			name: "Personal",
 			slug: "personal-someone-else",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		await engine.devices.join({
 			id: "device-c",
@@ -1479,7 +1481,7 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 	const TICK_MS = 5;
 	/** Local time, October 2026. */
 	const at = (day: number, hours: number, minutes = 0, seconds = 0) =>
-		new Date(2026, 9, day, hours, minutes, seconds).getTime();
+		atLocal(2026, 9, day, hours, minutes, seconds);
 	let clock: number;
 
 	beforeEach(() => {
@@ -1595,14 +1597,14 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 			name: "Personal",
 			slug: ADA_SPACE,
 			personal: true,
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		await a.db.insert(member).values({
 			id: "m-ada",
 			organizationId: ADA_SPACE,
 			userId: ADA,
 			role: "owner",
-			createdAt: new Date(),
+			createdAt: asDate(),
 		});
 		await engine.devices.join({
 			id: "ada-laptop",

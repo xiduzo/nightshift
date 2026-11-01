@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { shellQuoteAlways } from "@nightshift/agents/types";
 import type { Login } from "@nightshift/flows";
-
+import { now as timeNow } from "@nightshift/time";
 import {
 	type CliTool,
 	type CliToolStore,
@@ -133,7 +133,7 @@ export function createToolLaunchers(options: {
 		dataDir,
 		which = (program: string) => Bun.which(program),
 		env = process.env,
-		now = Date.now,
+		now = timeNow,
 	} = options;
 	const folderOf = (name: string) => join(dataDir, "tools", name);
 	/** One sign-in at a time per tool: steps that start together wait for it. */

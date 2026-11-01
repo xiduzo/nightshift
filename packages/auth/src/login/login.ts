@@ -1,8 +1,8 @@
 import type { Database } from "@nightshift/db";
 import { account, session } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
+import { asDate, now as timeNow } from "@nightshift/time";
 import { and, eq, gt, inArray } from "drizzle-orm";
-
 import type { Auth } from "../auth";
 
 /**
@@ -115,7 +115,7 @@ export async function endSession(
 export async function liveSessionIds(
 	db: Database,
 	sessionIds: readonly string[],
-	now: number = Date.now(),
+	now: number = timeNow(),
 ): Promise<Set<string>> {
 	if (sessionIds.length === 0) return new Set();
 	const rows = await db
@@ -124,7 +124,7 @@ export async function liveSessionIds(
 		.where(
 			and(
 				inArray(session.id, [...sessionIds]),
-				gt(session.expiresAt, new Date(now)),
+				gt(session.expiresAt, asDate(now)),
 			),
 		);
 	return new Set(rows.map((row) => row.id));

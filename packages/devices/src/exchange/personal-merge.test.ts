@@ -7,6 +7,7 @@ import {
 	mustGit,
 	type Sandbox,
 } from "@nightshift/engine/testing";
+import { asDate } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import type { PersonalMergeInput } from "../contract";
@@ -65,14 +66,14 @@ async function sharedSpace(role: string) {
 		id: "shared",
 		name: "Platform",
 		slug: "platform",
-		createdAt: new Date(),
+		createdAt: asDate(),
 	});
 	await a.db.insert(member).values({
 		id: "m-shared",
 		organizationId: "shared",
 		userId: paired.personId,
 		role,
-		createdAt: new Date(),
+		createdAt: asDate(),
 	});
 }
 

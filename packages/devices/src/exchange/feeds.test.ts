@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { TranscriptEntry } from "@nightshift/engine";
 import { createRunBus, type RunBus } from "@nightshift/engine/testing";
+import { now } from "@nightshift/time";
 import {
 	createTranscriptFeeds,
 	type FollowPumps,
@@ -108,7 +109,7 @@ function write(stepId = STEP.stepId): TranscriptEntry {
 		seq,
 		stepId,
 		sessionId: null,
-		at: Date.now(),
+		at: now(),
 		event: { type: "command-output", stream: "stdout", text: `line ${seq}\n` },
 	} as TranscriptEntry;
 	files.set(stepId, [...(files.get(stepId) ?? []), entry]);
@@ -146,9 +147,9 @@ function follow(feeds: TranscriptFeeds, afterSeq = 0, step = STEP) {
 }
 
 async function until(check: () => boolean, ms = 2_000) {
-	const deadline = Date.now() + ms;
+	const deadline = now() + ms;
 	while (!check()) {
-		if (Date.now() > deadline) throw new Error("timed out");
+		if (now() > deadline) throw new Error("timed out");
 		await Bun.sleep(2);
 	}
 }

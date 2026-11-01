@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { Database } from "@nightshift/db";
 import { daemonLease } from "@nightshift/db/schema";
+import { asDate, instant, iso, now as timeNow } from "@nightshift/time";
 import { and, eq } from "drizzle-orm";
 
 /**
@@ -41,7 +42,7 @@ export class LeaseHeldError extends Error {
 	constructor(readonly holder: LeaseHolder & { heartbeatAt: Date }) {
 		super(
 			[
-				`Another daemon holds this database: pid ${holder.pid} on ${holder.host}, since ${holder.since.toISOString()} (last heartbeat ${holder.heartbeatAt.toISOString()}).`,
+				`Another daemon holds this database: pid ${holder.pid} on ${holder.host}, since ${iso(instant(holder.since))} (last heartbeat ${iso(instant(holder.heartbeatAt))}).`,
 				"Two daemons must never share a database. Stop that daemon, or give this one its own NIGHTSHIFT_DATA_DIR (see docs/PLAN.md, section 6).",
 			].join("\n"),
 		);
@@ -71,7 +72,7 @@ export async function acquireLease(options: {
 	onLost?: (reason: string) => void;
 }): Promise<Lease> {
 	const { db } = options;
-	const now = options.now ?? Date.now;
+	const now = options.now ?? timeNow;
 	const staleAfterMs = options.staleAfterMs ?? LEASE_STALE_AFTER_MS;
 	const isAlive = options.isAlive ?? pidAlive;
 	const host = options.host ?? hostname();
@@ -81,7 +82,7 @@ export async function acquireLease(options: {
 	type Row = typeof daemonLease.$inferSelect;
 	const free = (row: Row): boolean =>
 		row.owner === null ||
-		now() - row.heartbeatAt.getTime() > staleAfterMs ||
+		now() - instant(row.heartbeatAt) > staleAfterMs ||
 		(row.host === host && !isAlive(row.pid));
 
 	// A lost race means another daemon just took the lease: read it again,
@@ -101,7 +102,7 @@ export async function acquireLease(options: {
 				heartbeatAt: row.heartbeatAt,
 			});
 		}
-		const at = new Date(now());
+		const at = asDate(now());
 		const taken = {
 			owner,
 			host,
@@ -155,7 +156,7 @@ export async function acquireLease(options: {
 			// keeps the lease as long as no other daemon took it.
 			const updated = await db
 				.update(daemonLease)
-				.set({ heartbeatAt: new Date(now()) })
+				.set({ heartbeatAt: asDate(now()) })
 				.where(ours)
 				.returning({ epoch: daemonLease.epoch });
 			if (updated.length > 0) return true;

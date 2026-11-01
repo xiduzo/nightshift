@@ -1,0 +1,13 @@
+{
+	"id": "P016",
+	"buys": false,
+	"purchases_first_month": 0,
+	"reason_code": "trust",
+	"reason": "Pre-alpha, one developer, and it wants to run agents unattended on our client code overnight. I juggle client projects, so I am not going to be the first team to try that.",
+	"objection": "Agents working alone on client repos at night, built by a single person with no track record. If something leaks or breaks, it is my name with the client.",
+	"would_change_my_mind": "A few agencies I know using it for months, plus a clear security write-up on what the agents can touch, and a real GitHub following.",
+	"price_too_cheap": 10,
+	"price_cheap": 39,
+	"price_expensive": 99,
+	"price_too_expensive": 200
+}
