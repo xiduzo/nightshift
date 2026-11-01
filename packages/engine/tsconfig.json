@@ -13,6 +13,7 @@
 		{ "path": "../agents" },
 		{ "path": "../auth" },
 		{ "path": "../flows" },
-		{ "path": "../refusal" }
+		{ "path": "../refusal" },
+		{ "path": "../time" }
 	]
 }

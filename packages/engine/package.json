@@ -26,6 +26,7 @@
 		"@nightshift/db": "workspace:*",
 		"@nightshift/flows": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
+		"@nightshift/time": "workspace:*",
 		"ajv": "^8.20.0",
 		"drizzle-orm": "catalog:",
 		"mammoth": "1.13.0",

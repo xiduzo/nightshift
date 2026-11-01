@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { notificationSettings } from "@nightshift/db/schema";
+import { dayKey, isTimeZone, localZone, minuteOfDay } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -15,16 +16,6 @@ import { z } from "zod";
 const timeOfDaySchema = z
 	.string()
 	.regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: "Use a time like 22:00." });
-
-/** Whether this runtime knows the IANA time zone. */
-function isTimeZone(value: string): boolean {
-	try {
-		new Intl.DateTimeFormat("en-US", { timeZone: value });
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 const timeZoneSchema = z.string().trim().min(1).max(64).refine(isTimeZone, {
 	message: "Use a time zone like Europe/Amsterdam.",
@@ -135,11 +126,7 @@ export function eventsOfSwitches(
 
 /** This computer's time zone, else UTC. */
 export function localTimeZone(): string {
-	try {
-		return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-	} catch {
-		return "UTC";
-	}
+	return localZone();
 }
 
 /** The settings of a Person who never saved any. */
@@ -175,19 +162,6 @@ export function applyPatch(
 		holdMinutes: patch.holdMinutes ?? current.holdMinutes,
 		digest: { ...current.digest, ...patch.digest },
 	});
-}
-
-/** The minutes since midnight of `at` in the time zone. */
-function minuteOfDay(at: number, timeZone: string): number {
-	const parts = new Intl.DateTimeFormat("en-GB", {
-		timeZone,
-		hour: "2-digit",
-		minute: "2-digit",
-		hourCycle: "h23",
-	}).formatToParts(new Date(at));
-	const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-	const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-	return hour * 60 + minute;
 }
 
 const minutesOf = (time: string) => {
@@ -229,19 +203,6 @@ export function digestTime(
 	return time;
 }
 
-/** The day of `at` in the time zone, `YYYY-MM-DD`. */
-function dayOf(at: number, timeZone: string): string {
-	const parts = new Intl.DateTimeFormat("en-GB", {
-		timeZone,
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-	}).formatToParts(new Date(at));
-	const part = (type: Intl.DateTimeFormatPartTypes) =>
-		parts.find((p) => p.type === type)?.value ?? "";
-	return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
 /**
  * The day whose digest is due at `at`, `YYYY-MM-DD` in the Person's time
  * zone: its time came today, and it is not quiet hours. A digest that did
@@ -255,7 +216,7 @@ export function digestDay(
 	const time = digestTime(settings);
 	if (time === null || inQuietHours(settings, at)) return null;
 	if (minuteOfDay(at, settings.timeZone) < minutesOf(time)) return null;
-	return dayOf(at, settings.timeZone);
+	return dayKey(at, settings.timeZone);
 }
 
 export type SettingsStore = ReturnType<typeof createSettingsStore>;

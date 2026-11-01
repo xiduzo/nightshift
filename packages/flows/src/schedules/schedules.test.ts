@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { atLocal, utc } from "@nightshift/time/testing";
 import {
 	cronError,
 	cronToTimeAndDays,
@@ -20,7 +21,7 @@ const HOOK_SECRET = "${HOOK_SECRET}";
 
 /** Local time, the daemon's clock. */
 const at = (day: number, hours: number, minutes = 0) =>
-	new Date(2026, 9, day, hours, minutes).getTime();
+	atLocal(2026, 9, day, hours, minutes);
 
 const schedule = (extra: Partial<Schedule> = {}): Schedule => ({
 	id: "night",
@@ -106,16 +107,16 @@ describe("cron helpers", () => {
 		// Amsterdam is UTC+2 until 25 October 2026, then UTC+1.
 		const amsterdam = "Europe/Amsterdam";
 		expect(
-			nextCronTimes("0 22 * * *", Date.UTC(2026, 9, 24, 12), 2, amsterdam),
-		).toEqual([Date.UTC(2026, 9, 24, 20), Date.UTC(2026, 9, 25, 21)]);
+			nextCronTimes("0 22 * * *", utc(2026, 9, 24, 12), 2, amsterdam),
+		).toEqual([utc(2026, 9, 24, 20), utc(2026, 9, 25, 21)]);
+		expect(nextCronTimes("0 22 * * *", utc(2026, 9, 30, 12), 1, "UTC")).toEqual(
+			[utc(2026, 9, 30, 22)],
+		);
 		expect(
-			nextCronTimes("0 22 * * *", Date.UTC(2026, 9, 30, 12), 1, "UTC"),
-		).toEqual([Date.UTC(2026, 9, 30, 22)]);
-		expect(
-			latestCronTime("0 22 * * *", Date.UTC(2026, 9, 30, 21, 30), amsterdam),
-		).toBe(Date.UTC(2026, 9, 30, 21));
-		expect(nextTimeOfDay("07:00", Date.UTC(2026, 9, 30, 21), amsterdam)).toBe(
-			Date.UTC(2026, 9, 31, 6),
+			latestCronTime("0 22 * * *", utc(2026, 9, 30, 21, 30), amsterdam),
+		).toBe(utc(2026, 9, 30, 21));
+		expect(nextTimeOfDay("07:00", utc(2026, 9, 30, 21), amsterdam)).toBe(
+			utc(2026, 9, 31, 6),
 		);
 		expect(nextCronTimes("0 22 * * *", 0, 1, "Mars/Olympus")).toEqual([]);
 	});

@@ -1,9 +1,13 @@
+import { isTimeZone } from "@nightshift/time";
+import { latestCronTime, nextCronTimes } from "@nightshift/time/cron";
 import { Cron } from "croner";
 import { z } from "zod";
 
 import type { FlowInputDef } from "../flow";
 import { deviceNameSchema, flowNameSchema, labelSchema } from "../nodes";
 import { ruleProblem, templateRefs } from "../template";
+
+export { isTimeZone, latestCronTime, nextCronTimes };
 
 /**
  * A project's schedules, which Night Shift keeps next to its flows. Each
@@ -56,16 +60,6 @@ export const scheduleIdSchema = z
 export const timeOfDaySchema = z
 	.string()
 	.regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM, for example 07:00.");
-
-/** Whether `timeZone` is an IANA time zone this runtime knows. */
-export function isTimeZone(timeZone: string): boolean {
-	try {
-		new Intl.DateTimeFormat("en-US", { timeZone });
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 /** A webhook's secret: one secret by name, as `${NAME}`. */
 export const webhookSecretSchema = z
@@ -209,49 +203,6 @@ export function cronError(cron: string): string | null {
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		return message.replace(/^CronPattern: /, "");
-	}
-}
-
-/**
- * The next `count` times of the cron line strictly after `after` (epoch ms),
- * on the clock of `timeZone` (default: this computer's). Empty when it does
- * not parse.
- */
-export function nextCronTimes(
-	cron: string,
-	after: number,
-	count = 1,
-	timeZone?: string,
-): number[] {
-	try {
-		return cronOf(cron, timeZone)
-			.nextRuns(count, new Date(after))
-			.map((date) => date.getTime());
-	} catch {
-		return [];
-	}
-}
-
-/**
- * The latest time of the cron line at or before `at`, on the clock of
- * `timeZone` (default: this computer's). Null when there is none or it does
- * not parse.
- */
-export function latestCronTime(
-	cron: string,
-	at: number,
-	timeZone?: string,
-): number | null {
-	try {
-		// Croner strips milliseconds and excludes the reference itself: one
-		// second later makes `at` count when it is a time of the line.
-		const [previous] = cronOf(cron, timeZone).previousRuns(
-			1,
-			new Date(at + 1000),
-		);
-		return previous && previous.getTime() <= at ? previous.getTime() : null;
-	} catch {
-		return null;
 	}
 }
 

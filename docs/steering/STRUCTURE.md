@@ -16,7 +16,7 @@ Code that changes together lives together. A boundary that is not enforced is no
 
 | Layer | Packages | May import (`@nightshift/*`) |
 | --- | --- | --- |
-| 0. Foundation | `config`, `refusal`, `db`, `flows`, `ui`, `ui-native` | Nothing. `ui` and `ui-native` import only themselves. Every workspace may import `config` and `refusal`. `config` holds no code, and `refusal` is the one refusal type, which imports nothing. |
+| 0. Foundation | `config`, `refusal`, `time`, `db`, `flows`, `ui`, `ui-native` | Nothing. `ui` and `ui-native` import only themselves. Every workspace may import `config`, `refusal` and `time`. `config` holds no code. `refusal` is the one refusal type, and `time` is the one clock. Both import nothing of Night Shift. |
 | 1. Capabilities | `auth`, `agents` | `auth`: `db`. `agents`: `flows`. |
 | 2. Core | `engine` | `db`, `flows`, `agents`, `auth` |
 | 3. Core domains | `devices`, `notifications`, `telemetry` | Layer 2 and lower |
@@ -48,6 +48,7 @@ One package is one bounded context. One domain has one home.
 | --- | --- | --- |
 | `config` | The shared TypeScript configuration (`tsconfig.base.json`). | Code. |
 | `refusal` | The refusal type (`Refusal`): an error written for people, with what happened, how to fix it, and its kind (`invalid`, `signed-out`, `forbidden`, `not-found`, `conflict`, `unavailable`). Every package throws it when it refuses a person's request. Any other error is a failure, and a person sees its plain words (`FAILURE_MESSAGE`, `wordsFor`). It imports nothing. | How a surface answers it. The API gives each kind its status (`readable` in `api`). The peer protocol of `devices` keeps the codes older Devices know. |
+| `time` | The clock. An instant is UTC milliseconds, and that is the only time Night Shift stores. Calendar math is date-fns in an explicit IANA zone (`in: tz(zone)`). Screens format with the viewer's zone (`formatTime` and the rest) and show the same instant in UTC on hover (`hoverTime`). Cron times are the `./cron` entry. `./testing` builds instants for tests (`utc`, `atLocal`). It imports no Night Shift package. | Cron lines as a schedule rule (those stay in `flows`). A screen's own sentence around a time. |
 | `db` | The libsql client, the drizzle schema, migrations, the data directory. | The queries of a domain. Those live with the domain. |
 | `flows` | The flow format: one file per node type (`nodes/`: its schema, its checks, its output fields), the flow schema and migration (`flow/`), and the checks of a whole flow (`validate/`). `validate/` holds the template scope too: what a template may read, for the checks and the editor's suggestions. Templates, rules and variables (`template/`). List sources (`lists/`, `recipes/`). The pure edits of a draft (`draft/`: new nodes, graph and outcome edits, renames, the name clash of the one namespace, the draft check). The built-in run policy (`DEFAULT_POLICY`), which the engine's settings fall back to. No I/O: flows are Night Shift data ([ADR 2](../adr/0002-flows-are-night-shift-data.md)), and the engine keeps them. Schedules and agent profiles, because a flow references them. The harness catalog (`harnesses/`): what a person sees of each built-in harness, browser-safe, for the web app and `agents`. | Running a flow. UI copy: the editor passes its own words to `checkDraft`. |
 | `ui` | shadcn/ui components and tokens. See `AGENTS.md`. | Anything domain-specific. |
@@ -118,6 +119,7 @@ The entries today:
 | `flows` | `.`, `./testing` (`commandNode`: a Command node with the id and position a test chooses, `FlowInput`: a flow before the schema fills in its defaults) |
 | `telemetry` | `.` (`createTelemetry`, `Telemetry`) |
 | `refusal` | `.` (`Refusal`, `RefusalKind`, `FAILURE_MESSAGE`, `wordsFor`, from `src/refusal.ts`. It imports nothing.) |
+| `time` | `.` (instants, the viewer's clock, the UTC hover), `./cron` (the next and previous time of a cron line, so croner stays off the phone), `./testing` (`utc`, `atLocal`) |
 | `notifications` | `.` (`createNotifications`, `createInAppChannel`, `createExpoChannel`, `engineRunEvents`, `oneSenderPerSpace`, `createDesktopChannel`, `systemDesktopNotifier`, the settings and push target schemas, the channel port `NotificationChannel`, the Expo port `ExpoClient`, the desktop ports `DesktopNotifier` and `DesktopWindow`), `./contract` (the notification contract: keys, push data, where a tap goes. It imports nothing, for `client`), `./testing` (`fakeRunEvents`, `fakeWebPushSender`, `fakeVapidKeys`) |
 | `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css` |
 | `ui-native` | `./components/ui/*`, `./hooks/*` (no hook yet: the CLI's `hooks` alias in `components.json` puts one there), `./lib/*` (`lib/theme`: the theme colors in hex, the run status colors too, for JavaScript and for the widgets), `./global.css` (the theme tokens, for Uniwind) |

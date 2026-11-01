@@ -8,5 +8,5 @@
 		"outDir": "dist"
 	},
 	"include": ["src/**/*.ts", "src/**/*.json"],
-	"references": [{ "path": "../refusal" }]
+	"references": [{ "path": "../refusal" }, { "path": "../time" }]
 }

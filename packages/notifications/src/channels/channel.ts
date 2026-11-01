@@ -1,3 +1,5 @@
+import { formatClock } from "@nightshift/time";
+
 import type { GateOption } from "../contract";
 import type { NoticeKind } from "../deliveries";
 import type { PushKind, PushTarget } from "../targets";
@@ -111,30 +113,6 @@ export function gatesWaitingTitle(count: number): string {
 /** What one notification says: its sentence, and a second line. */
 export type NoticeWords = { title: string; body?: string };
 
-const DAY_MS = 24 * 60 * 60_000;
-
-/**
- * When the run stops, in the Person's time zone: the time of day within a
- * day ("06:00"), else the day too ("Tue 28 Oct at 06:00").
- */
-function stopTimeOf(stopAt: number, now: number, timeZone: string): string {
-	// Built from parts: ICU versions put different separators between them.
-	const parts = new Intl.DateTimeFormat("en-GB", {
-		timeZone,
-		weekday: "short",
-		day: "numeric",
-		month: "short",
-		hour: "2-digit",
-		minute: "2-digit",
-		hourCycle: "h23",
-	}).formatToParts(new Date(stopAt));
-	const part = (type: Intl.DateTimeFormatPartTypes) =>
-		parts.find((p) => p.type === type)?.value ?? "";
-	const time = `${part("hour")}:${part("minute")}`;
-	if (stopAt - now < DAY_MS) return time;
-	return `${part("weekday")} ${part("day")} ${part("month")} at ${time}`;
-}
-
 /**
  * The words of a device wait: "<flow> waits for <device>", and what
  * happens next. A Device of an older version does not say its name: "a
@@ -152,7 +130,7 @@ export function deviceWaitWords(wait: {
 	if (wait.stopAt === null || wait.stopAt <= wait.now) {
 		return { title, body: next };
 	}
-	const at = stopTimeOf(wait.stopAt, wait.now, wait.timeZone);
+	const at = formatClock(wait.stopAt, wait.now, wait.timeZone);
 	return {
 		title,
 		body: `${next} If it is not back by ${at}, the run stops.`,
