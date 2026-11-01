@@ -1,7 +1,11 @@
 import {
+	compactCount,
 	formatCost,
 	formatKnownCost,
 	type KnownCost,
+	tokensLabel,
+	type UsageTokens,
+	usageLabel,
 } from "@nightshift/client";
 
 // One way to write a cost on every screen: the phone uses the same two.
@@ -54,6 +58,64 @@ export function formatStepCost(
 	step: KnownCost & { endedAt: number | null; costCalls: number },
 ): string {
 	return noCostYet(step) ? "—" : formatKnownCost(step);
+}
+
+/**
+ * A step's tokens and cost together: "12.3K tokens · $0.0412". "—" while
+ * it runs and has reported neither yet.
+ */
+export function formatStepUsage(
+	step: KnownCost & {
+		endedAt: number | null;
+		costCalls: number;
+		metrics?: { tokens: UsageTokens } | null;
+	},
+): string {
+	const tokens = step.metrics?.tokens;
+	if (noCostYet(step)) return usageLabel(tokens, null) ?? "—";
+	return usageLabel(tokens, formatKnownCost(step)) ?? "—";
+}
+
+/** A dollar amount with its tokens, when any were used. */
+export function costWithTokens(
+	cost: string,
+	tokens: UsageTokens | number | null | undefined,
+): string {
+	return usageLabel(tokens, cost) ?? cost;
+}
+
+/** "A finished run typically costs $0.42 and uses 12K tokens." */
+export function typicalCostSentence(
+	medianUsd: number,
+	tokenUse: { median: number } | null,
+): string {
+	const money = formatCost(medianUsd);
+	const used = tokenUse
+		? tokensLabel({ input: tokenUse.median, output: 0 })
+		: null;
+	return used
+		? `A finished run typically costs ${money} and uses ${used}.`
+		: `A finished run typically costs ${money}.`;
+}
+
+/** "Half of them cost $0.10 to $0.40. Half use 8K to 20K tokens." */
+export function costHalfSentence(
+	cost: { q1: number; q3: number },
+	tokenUse: { q1: number; q3: number } | null,
+): string {
+	const money = `Half of them cost ${formatCost(cost.q1)} to ${formatCost(cost.q3)}.`;
+	if (!tokenUse) return money;
+	return `${money} Half use ${compactCount(tokenUse.q1)} to ${compactCount(tokenUse.q3)} tokens.`;
+}
+
+/** "The cheapest cost $0.10, the most $0.40. They used 1K to 80K tokens." */
+export function costEndsSentence(
+	cost: { min: number; max: number },
+	tokenUse: { min: number; max: number } | null,
+): string {
+	const money = `The cheapest cost ${formatCost(cost.min)}, the most ${formatCost(cost.max)}.`;
+	if (!tokenUse) return money;
+	return `${money} They used ${compactCount(tokenUse.min)} to ${compactCount(tokenUse.max)} tokens.`;
 }
 
 /** The costs of several runs or steps together. */

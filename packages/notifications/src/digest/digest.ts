@@ -197,7 +197,12 @@ function runLine(run: EndedRun): DigestRun {
 			}),
 		),
 	];
-	const parts = [costText(run.costUsd, basisOf(run)), reason, ...warnings]
+	const parts = [
+		tokensText(run.metrics?.tokens),
+		costText(run.costUsd, basisOf(run)),
+		reason,
+		...warnings,
+	]
 		.filter((part): part is string => part !== null && part !== "")
 		.map(capital);
 	const detail = parts.join(" · ");
@@ -236,18 +241,49 @@ function runsSentence(runs: readonly EndedRun[]): string | null {
 	].join(", ")}.`;
 }
 
-/** "$4.20 spent.", "About $4.20 spent.", "At least $4.20 spent.", "Cost unknown." */
+/** "$4.20 spent.", "About $4.20 spent on 12.3K tokens.", "Cost unknown." */
 function costSentence(runs: readonly EndedRun[]): string | null {
 	const bases = runs.map(basisOf);
 	if (bases.every((basis) => basis === null)) return null;
 	const total = runs.reduce((sum, run) => sum + run.costUsd, 0);
+	const used = runs.reduce(
+		(sum, run) =>
+			sum +
+			(run.metrics ? run.metrics.tokens.input + run.metrics.tokens.output : 0),
+		0,
+	);
+	const tokens = used > 0 ? `${compact(used)} tokens` : null;
 	const text = bases.includes("unknown")
 		? costText(total, "unknown")
 		: bases.includes("estimated")
 			? costText(total, "estimated")
 			: costText(total, "billed");
-	if (!text) return null;
-	return `${capital(text)}${text === "cost unknown" ? "." : " spent."}`;
+	if (!text) return tokens ? `${capital(tokens)} used.` : null;
+	if (text === "cost unknown") {
+		return tokens ? `Cost unknown. ${capital(tokens)} used.` : "Cost unknown.";
+	}
+	return `${capital(text)} spent${tokens ? ` on ${tokens}` : ""}.`;
+}
+
+/**
+ * A short count, the same words as the screens: "950", "12.3K", "1.2M".
+ */
+function compact(count: number): string {
+	const round = (value: number) =>
+		value < 100
+			? String(Math.round(value * 10) / 10)
+			: String(Math.round(value));
+	if (count < 1000) return String(Math.round(count));
+	if (count < 999_500) return `${round(count / 1000)}K`;
+	return `${round(count / 1_000_000)}M`;
+}
+
+/** "12.3K tokens". Null when none were used. */
+function tokensText(
+	tokens: { input: number; output: number } | null | undefined,
+): string | null {
+	const used = tokens ? tokens.input + tokens.output : 0;
+	return used > 0 ? `${compact(used)} tokens` : null;
 }
 
 /** "Night Shift: last night" for a morning digest, else "Night Shift: your digest". */

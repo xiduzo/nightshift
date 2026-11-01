@@ -53,10 +53,13 @@ describe("runFacts", () => {
 			"Length",
 		]);
 		const fact = byLabel(facts);
-		expect(fact.get("Cost")?.value).toBe("$0.42");
+		expect(fact.get("Cost")).toMatchObject({
+			value: "$0.42",
+			sub: "12.3K tokens",
+		});
 		expect(fact.get("Tokens")).toMatchObject({
 			value: "12.3K",
-			sub: "12K in, 345 out",
+			sub: "12K in, 345 out · $0.42",
 		});
 		expect(fact.get("Length")).toMatchObject({
 			value: "30 min",

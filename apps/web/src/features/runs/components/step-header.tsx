@@ -12,7 +12,7 @@ import { CodeView, formatJson, JsonBlock } from "@/shared/code";
 import {
 	formatDateTime,
 	formatDuration,
-	formatStepCost,
+	formatStepUsage,
 	formatTime,
 	noCostYet,
 } from "@/shared/format";
@@ -66,7 +66,7 @@ export function StepLine({
 				</time>
 				{" · "}
 				<StepDuration step={step} />
-				{hasCost(step) ? ` · ${formatStepCost(step)}` : ""}
+				{hasCost(step) ? ` · ${formatStepUsage(step)}` : ""}
 			</span>
 		</div>
 	);
@@ -99,13 +99,8 @@ export function StepFacts({ step }: { step: StepSummary }) {
 			value: formatDuration(metrics.agentMs),
 		});
 	}
-	const cost = hasCost(step) ? (
-		noCostYet(step) ? (
-			"—"
-		) : (
-			<CostText cost={step} />
-		)
-	) : undefined;
+	const cost =
+		hasCost(step) && !noCostYet(step) ? <CostText cost={step} /> : undefined;
 	if (metrics && metrics.tokens.input + metrics.tokens.output > 0) {
 		const { input, output, cacheRead, cacheWrite } = metrics.tokens;
 		facts.push({
@@ -123,8 +118,12 @@ export function StepFacts({ step }: { step: StepSummary }) {
 				/>
 			),
 		});
+	} else if (hasCost(step)) {
+		facts.push({
+			label: "Cost",
+			value: noCostYet(step) ? "—" : <CostText cost={step} />,
+		});
 	}
-	if (cost !== undefined) facts.push({ label: "Cost", value: cost });
 	if (step.visit > 1) facts.push({ label: "Visit", value: step.visit });
 	if (exit !== undefined && exit !== "") {
 		facts.push({ label: "Exit code", value: String(exit) });

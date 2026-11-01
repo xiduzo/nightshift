@@ -12,6 +12,7 @@ const totals = (over: Partial<Totals> = {}): Totals => ({
 	ended: 0,
 	finished: 0,
 	costUsd: 0,
+	tokens: 0,
 	gates: 0,
 	perNight: [],
 	...over,

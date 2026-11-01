@@ -51,6 +51,8 @@ export type DashboardRun = {
 	costUsd: number;
 	costEstimated: boolean;
 	costMissing: number;
+	/** Tokens its agents used. Null when it used none, or reported none. */
+	tokens: { input: number; output: number } | null;
 	/** Its flow (on a project's dashboard), or its project (over all of them). */
 	group: string;
 };
@@ -73,6 +75,8 @@ export type CardHour = {
 	gates: number;
 	/** What the runs that started in this hour spent. */
 	costUsd: number;
+	/** Tokens the runs that started in this hour used. */
+	tokens: number;
 	/** Of the runs that started in this hour: how they stand. */
 	finished: number;
 	failed: number;
@@ -85,6 +89,8 @@ export type DayCounts = {
 	finished: number;
 	failed: number;
 	cost: KnownCost;
+	/** Tokens the runs used. */
+	tokens: number;
 };
 
 /** The numbers on top of the dashboard. */
@@ -145,11 +151,17 @@ export type SpendGroup = {
 	total: number;
 	/** What its runs that ended without finishing spent: part of `total`. */
 	unfinished: number;
+	/** Tokens its runs used. */
+	tokens: number;
+	/** Tokens of the runs in `unfinished`. */
+	unfinishedTokens: number;
 };
 
 export type SpendRange = {
 	/** Spend in the range. */
 	total: number;
+	/** Tokens the runs in the range used. */
+	tokens: number;
 	/** Runs started in the range. */
 	runs: number;
 	nightsWithRuns: number;
@@ -159,6 +171,8 @@ export type SpendRange = {
 	groups: SpendGroup[];
 	/** Spend per night per group key, oldest first. */
 	perNight: NightCounts[];
+	/** Tokens per night per group key, the same nights and keys as `perNight`. */
+	tokensPerNight: NightCounts[];
 	/** The runs that cost the most, the dearest first. */
 	priciest: DashboardRun[];
 };
@@ -260,6 +274,8 @@ export type NightTotals = {
 	finished: number;
 	/** What the runs spent, the steps with a known cost. */
 	costUsd: number;
+	/** Tokens the runs used. */
+	tokens: number;
 	/** Gates the runs asked. */
 	gates: number;
 };
@@ -292,6 +308,8 @@ export type NightOutput = {
 	night: number;
 	runs: number;
 	cost: KnownCost;
+	/** Tokens its runs used. */
+	tokens: number;
 	/**
 	 * Its newest runs, whole, so they show like any run list. `group` is its
 	 * flow or its project, as on a DashboardRun.
@@ -331,8 +349,13 @@ export type FlowHealthRow = {
 	rate: number | null;
 	/** What a finished run that asked an agent or model cost. Null when none did. */
 	cost: Spread | null;
+	/**
+	 * What a finished run in `cost` used, the same runs. Null when one of
+	 * them did not report its tokens, so the two spreads would not match.
+	 */
+	tokenUse: Spread | null;
 	/** The runs that ended without finishing, and what they spent together. */
-	unfinished: { count: number; costUsd: number };
+	unfinished: { count: number; costUsd: number; tokens: number };
 	/** Finished runs with a step whose cost is not known: not in `cost`. */
 	unknownCost: number;
 	/** Finished runs that asked no agent or model: not in `cost`. */
@@ -383,6 +406,8 @@ export type FlowRun = {
 	costMissing: number;
 	/** Agent sessions and model calls that ended. With none, it could not cost. */
 	costCalls: number;
+	/** Tokens it used. Null when it did not report any, as a subflow run does not. */
+	tokens: number | null;
 	/** How many warnings a run of its own has. A subflow run shows its warnings in the run that called it. */
 	warnings: number;
 };
@@ -418,12 +443,21 @@ export type FlowRange = {
 	unfinished: number;
 	/** What a finished run that asked an agent or model cost. */
 	cost: Spread | null;
+	/**
+	 * What a finished run in `cost` used, the same runs. Null when one of
+	 * them did not report its tokens.
+	 */
+	tokenUse: Spread | null;
 	/** How long a finished run took. */
 	length: Spread | null;
 	spent: KnownCost;
+	/** Tokens of the runs in `spent`. A run that reported none counts as 0. */
+	spentTokens: number;
 	spentUnfinished: KnownCost;
+	/** Tokens of the runs in `spentUnfinished`. */
+	unfinishedTokens: number;
 	/** The ended run that cost the most. */
-	dearest: { costUsd: number; startedAt: number } | null;
+	dearest: { costUsd: number; startedAt: number; tokens: number | null } | null;
 	warnings: number;
 	statuses: StatusCount[];
 	/** Runs per night per status, oldest first. */
@@ -435,6 +469,8 @@ export type FlowRange = {
 		/** The night it started in. */
 		night: number;
 		costUsd: number;
+		/** Tokens it used. Null when it did not report any. */
+		tokens: number | null;
 		status: RunStatus;
 	}[];
 	/** The most common first. */

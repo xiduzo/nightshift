@@ -18,9 +18,13 @@ import { RunStatusIcon } from "@/features/runs";
 import type { FlowHealthRow, Project, Spread } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
+	costEndsSentence,
+	costHalfSentence,
+	costWithTokens,
 	formatCost,
 	formatDateTime,
 	formatRelative,
+	typicalCostSentence,
 	useNow,
 } from "@/shared/format";
 import { FlowHealthDialog } from "./flow-health-dialog";
@@ -131,6 +135,7 @@ function flowHealthColumns(
 			cell: ({ row: { original } }) => (
 				<CostCell
 					cost={original.cost}
+					tokenUse={original.tokenUse}
 					unfinished={original.unfinished}
 					unknownCost={original.unknownCost}
 					freeRuns={original.freeRuns}
@@ -227,11 +232,13 @@ const PLOT_HEIGHT = 14;
  */
 function CostCell({
 	cost,
+	tokenUse,
 	unfinished,
 	unknownCost,
 	freeRuns,
 }: {
 	cost: Spread | null;
+	tokenUse: Spread | null;
 	unfinished: FlowHealthRow["unfinished"];
 	unknownCost: number;
 	freeRuns: number;
@@ -258,7 +265,8 @@ function CostCell({
 				{unfinished.count === 1
 					? "1 run that did not finish"
 					: `${unfinished.count} runs that did not finish`}{" "}
-				spent {formatCost(unfinished.costUsd)}.
+				spent{" "}
+				{costWithTokens(formatCost(unfinished.costUsd), unfinished.tokens)}.
 			</span>
 		) : null;
 	if (cost === null) {
@@ -331,20 +339,15 @@ function CostCell({
 					/>
 				</svg>
 				<span className="text-muted-foreground text-xs">
-					{formatCost(cost.median)}
+					{costWithTokens(formatCost(cost.median), tokenUse?.median)}
 				</span>
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
-				<span>A finished run typically costs {formatCost(cost.median)}.</span>
+				<span>{typicalCostSentence(cost.median, tokenUse)}</span>
 				{cost.count > 1 ? (
 					<>
-						<span>
-							Half of them cost {formatCost(cost.q1)} to {formatCost(cost.q3)}.
-						</span>
-						<span>
-							The cheapest cost {formatCost(cost.min)}, the most{" "}
-							{formatCost(cost.max)}.
-						</span>
+						<span>{costHalfSentence(cost, tokenUse)}</span>
+						<span>{costEndsSentence(cost, tokenUse)}</span>
 					</>
 				) : null}
 				{freeLine}

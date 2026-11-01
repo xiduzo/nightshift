@@ -1,4 +1,4 @@
-import { changeOf } from "@nightshift/client";
+import { changeOf, tokensLabel } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
@@ -52,6 +52,12 @@ export function MetricStrip({
 								{metrics ? (
 									<span className="font-semibold text-xl tabular-nums">
 										{metric.format(metrics.values[metric.key])}
+										{metric.key === "spend" &&
+										tokensLabel(metrics.spendTokens) ? (
+											<span className="mt-0.5 block font-normal text-muted-foreground text-xs">
+												{tokensLabel(metrics.spendTokens)}
+											</span>
+										) : null}
 									</span>
 								) : (
 									<Skeleton className="my-1 h-5 w-14" />

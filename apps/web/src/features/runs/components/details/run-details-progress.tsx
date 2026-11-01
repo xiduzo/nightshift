@@ -1,5 +1,9 @@
 /** How far a run is, and what it cost, in its details. */
-import { metricsByNode, type NodeMetrics } from "@nightshift/client";
+import {
+	metricsByNode,
+	type NodeMetrics,
+	tokensLabel,
+} from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Table,
@@ -93,23 +97,24 @@ export function CostSection({
 }) {
 	const nodes = useMemo(() => metricsByNode(steps), [steps]);
 	const tokens = run.metrics?.tokens;
+	const used = tokensLabel(tokens);
 	const waited = nodes.some((node) => node.gateWaitMs > 0);
 	return (
 		<InspectorSection title="Cost and time">
 			<dl className="grid grid-cols-2 gap-3">
 				<Fact label="Total">
+					{used ? (
+						<>
+							<span
+								title={`${formatTokens(tokens?.input ?? 0)} in, ${formatTokens(tokens?.output ?? 0)} out`}
+							>
+								{used}
+							</span>
+							<span aria-hidden="true"> · </span>
+						</>
+					) : null}
 					<CostText cost={run} className="font-medium tabular-nums" />
 				</Fact>
-				{tokens && tokens.input + tokens.output > 0 ? (
-					<Fact label="Tokens">
-						<span
-							className="tabular-nums"
-							title={`${formatTokens(tokens.input)} in, ${formatTokens(tokens.output)} out`}
-						>
-							{formatTokens(tokens.input + tokens.output)}
-						</span>
-					</Fact>
-				) : null}
 				{run.metrics && run.metrics.agentMs > 0 ? (
 					<Fact label="Agents worked">
 						<span className="tabular-nums">

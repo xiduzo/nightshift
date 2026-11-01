@@ -2,7 +2,13 @@ import type { RunSummary } from "../read";
 import { DAY_MS, HOUR_MS, lastHours, nightOf } from "./clock";
 import { FLOW_HEALTH_NIGHTS, flowHealthRows } from "./flow-health";
 import { askedGates, nightsRange, type PlacedRun } from "./nights";
-import { isOpen, sumKnownCost, toDashboardRun, topRows } from "./stats";
+import {
+	isOpen,
+	sumKnownCost,
+	toDashboardRun,
+	topRows,
+	usedTokens,
+} from "./stats";
 import {
 	type ActivityRange,
 	type AtWorkGroup,
@@ -117,6 +123,7 @@ function dayCountsOf(runs: readonly RunSummary[]): DayCounts {
 		finished: runs.filter((run) => run.status === "finished").length,
 		failed: runs.filter((run) => run.status === "failed").length,
 		cost: sumKnownCost(runs),
+		tokens: runs.reduce((sum, run) => sum + usedTokens(run), 0),
 	};
 }
 
@@ -172,6 +179,7 @@ function cardsOf(
 			active: active[index] ?? 0,
 			gates: gates[index] ?? 0,
 			costUsd: started.reduce((sum, run) => sum + run.costUsd, 0),
+			tokens: started.reduce((sum, run) => sum + usedTokens(run), 0),
 			finished,
 			failed,
 			other: started.length - finished - failed,
@@ -280,6 +288,7 @@ function lastNightOf(runs: readonly PlacedRun[]): NightOutput | null {
 		night: newest.night,
 		runs: ofNight.length,
 		cost: sumKnownCost(ofNight.map(({ run }) => run)),
+		tokens: ofNight.reduce((sum, { run }) => sum + usedTokens(run), 0),
 		latest: ofNight
 			.slice(0, OVERVIEW_ROWS)
 			.map(({ run, group }) => ({ ...run, group })),

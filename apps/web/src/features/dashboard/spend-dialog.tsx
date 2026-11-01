@@ -24,10 +24,11 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, CircleHelpIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { CostText, RunStatusBadge } from "@/features/runs";
+import { CostWithTokens, RunStatusBadge } from "@/features/runs";
 import type { DashboardSummary, NightRange, Project } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
+	costWithTokens,
 	formatCost,
 	formatKnownCost,
 	formatRelative,
@@ -105,7 +106,15 @@ function SpendDetails({
 	// Runs with a step whose cost is not known: the totals leave that step out.
 	const { unknown, priciest } = history;
 	const latest = lastDay.latestAt;
-	const rows = nightChartRows(history.perNight);
+	const rows = history.perNight.map((night, index) => {
+		const tokens = history.tokensPerNight[index]?.counts ?? {};
+		return {
+			...(nightChartRows([night])[0] ?? {}),
+			...Object.fromEntries(
+				Object.entries(tokens).map(([key, value]) => [`${key}Tokens`, value]),
+			),
+		};
+	});
 	const config = Object.fromEntries(
 		history.groups.map((group, index) => [
 			group.key,
@@ -157,7 +166,10 @@ function SpendDetails({
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 						<Stat
 							label="Last 24 h"
-							value={formatKnownCost(lastDay.cost)}
+							value={costWithTokens(
+								formatKnownCost(lastDay.cost),
+								lastDay.tokens,
+							)}
 							hint={
 								lastDay.runs === 0
 									? "No runs in the last day"
@@ -166,14 +178,17 @@ function SpendDetails({
 						/>
 						<Stat
 							label="Spent"
-							value={formatCost(history.total)}
+							value={costWithTokens(formatCost(history.total), history.tokens)}
 							hint={`Last ${range} nights`}
 						/>
 						<Stat
 							label="Per run"
 							value={
 								history.runs > 0
-									? formatCost(history.total / history.runs)
+									? costWithTokens(
+											formatCost(history.total / history.runs),
+											history.tokens / history.runs,
+										)
 									: "—"
 							}
 							hint="Average"
@@ -182,7 +197,10 @@ function SpendDetails({
 							label="Per night"
 							value={
 								history.nightsWithRuns > 0
-									? formatCost(history.total / history.nightsWithRuns)
+									? costWithTokens(
+											formatCost(history.total / history.nightsWithRuns),
+											history.tokens / history.nightsWithRuns,
+										)
 									: "—"
 							}
 							hint="Nights with runs"
@@ -223,14 +241,23 @@ function SpendDetails({
 												labelFormatter={(_, payload) =>
 													String(payload[0]?.payload?.title ?? "")
 												}
-												formatter={(value, name) => (
+												formatter={(value, name, item) => (
 													<div className="flex w-full items-center gap-2">
 														<Swatch color={`var(--color-${name})`} />
 														<span className="text-muted-foreground">
 															{config[name as string]?.label ?? name}
 														</span>
 														<span className="ml-auto font-medium font-mono tabular-nums">
-															{formatCost(Number(value))}
+															{costWithTokens(
+																formatCost(Number(value)),
+																Number(
+																	(
+																		item.payload as
+																			| Record<string, number | string>
+																			| undefined
+																	)?.[`${String(name)}Tokens`] ?? 0,
+																),
+															)}
 														</span>
 													</div>
 												)}
@@ -311,9 +338,10 @@ function SpendDetails({
 										</ItemContent>
 										<ItemActions>
 											<RunStatusBadge status={run.status} />
-											<CostText
+											<CostWithTokens
 												cost={run}
-												className="w-20 text-right font-medium tabular-nums"
+												tokens={run.tokens}
+												className="text-right font-medium tabular-nums"
 											/>
 										</ItemActions>
 									</Item>
@@ -352,6 +380,7 @@ type SpendRow = {
 	color: string | undefined;
 	runs: number;
 	total: number;
+	tokens: number;
 };
 
 const spendColumn = dataTableColumns<SpendRow>();
@@ -382,7 +411,11 @@ function spendColumns(groupLabel: string, total: number) {
 			id: "perRun",
 			header: "Per run",
 			enableSorting: true,
-			cell: ({ getValue }) => formatCost(getValue()),
+			cell: ({ row: { original } }) =>
+				costWithTokens(
+					formatCost(original.total / original.runs),
+					original.tokens / original.runs,
+				),
 			meta: {
 				headClassName: "text-right",
 				cellClassName: "text-right tabular-nums",
@@ -402,7 +435,8 @@ function spendColumns(groupLabel: string, total: number) {
 		spendColumn.accessor("total", {
 			header: "Total",
 			enableSorting: true,
-			cell: ({ row }) => formatCost(row.original.total),
+			cell: ({ row }) =>
+				costWithTokens(formatCost(row.original.total), row.original.tokens),
 			meta: {
 				headClassName: "text-right",
 				cellClassName: "text-right font-medium tabular-nums",

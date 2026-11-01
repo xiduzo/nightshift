@@ -39,6 +39,8 @@ export type MetricValues = ConsoleValues;
 export type MetricRow = {
 	label: string;
 	title: string;
+	spendTokens?: number;
+	before_spendTokens?: number;
 } & MetricValues &
 	Partial<Record<`before_${Metric}`, number | null>>;
 
@@ -52,6 +54,8 @@ export function metricsOf(range: NightsRange): {
 	values: MetricValues;
 	before: MetricValues;
 	compared: boolean;
+	spendTokens: number;
+	spendTokensBefore: number;
 } {
 	const rows = range.totals.perNight.map((night, index): MetricRow => {
 		const before = range.before.perNight[index];
@@ -59,15 +63,24 @@ export function metricsOf(range: NightsRange): {
 			label: formatNightShort(night.night),
 			title: formatNight(night.night),
 			...consoleValues(night),
+			spendTokens: night.tokens,
 			...(before
-				? Object.fromEntries(
-						METRICS.map((metric) => [
-							`before_${metric.key}`,
-							metric.of(before),
-						]),
-					)
+				? {
+						...Object.fromEntries(
+							METRICS.map((metric) => [
+								`before_${metric.key}`,
+								metric.of(before),
+							]),
+						),
+						before_spendTokens: before.tokens,
+					}
 				: {}),
 		};
 	});
-	return { rows, ...consoleNumbers(range) };
+	return {
+		rows,
+		...consoleNumbers(range),
+		spendTokens: range.totals.tokens,
+		spendTokensBefore: range.before.tokens,
+	};
 }

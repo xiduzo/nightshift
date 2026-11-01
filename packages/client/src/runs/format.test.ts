@@ -10,6 +10,7 @@ import {
 	stepOutcomeLabel,
 	tokensLabel,
 	tokensSplit,
+	usageLabel,
 } from "./format";
 
 describe("the cost of a run, when it is known", () => {
@@ -124,5 +125,16 @@ describe("tokens, short", () => {
 		expect(tokensLabel({ input: 0, output: 0 })).toBeNull();
 		expect(tokensLabel(undefined)).toBeNull();
 		expect(tokensSplit(null)).toBeNull();
+	});
+
+	test("a cost keeps its tokens, and either part stands alone", () => {
+		expect(usageLabel({ input: 12_000, output: 345 }, "$0.0412")).toBe(
+			"12.3K tokens · $0.0412",
+		);
+		expect(usageLabel(101_673, "$0.1236")).toBe("102K tokens · $0.1236");
+		expect(usageLabel({ input: 12_000, output: 0 }, null)).toBe("12K tokens");
+		expect(usageLabel(0, "$1.20+")).toBe("$1.20+");
+		expect(usageLabel(null, "—")).toBeNull();
+		expect(usageLabel(null, null)).toBeNull();
 	});
 });

@@ -50,6 +50,30 @@ export function countStatuses(
 	});
 }
 
+/** Tokens a run reported. Null when it sent no metrics. */
+export function reportedTokens(run: {
+	metrics?: { tokens: { input: number; output: number } } | undefined;
+}): number | null {
+	if (!run.metrics) return null;
+	return run.metrics.tokens.input + run.metrics.tokens.output;
+}
+
+/** Tokens a run's agents used. 0 when it did not report any. */
+export function usedTokens(run: {
+	metrics?: { tokens: { input: number; output: number } } | undefined;
+}): number {
+	return reportedTokens(run) ?? 0;
+}
+
+/** The tokens a dashboard row shows. Null when none were used. */
+export function tokenCounts(run: {
+	metrics?: { tokens: { input: number; output: number } } | undefined;
+}): { input: number; output: number } | null {
+	const tokens = run.metrics?.tokens;
+	if (!tokens || tokens.input + tokens.output <= 0) return null;
+	return { input: tokens.input, output: tokens.output };
+}
+
 /** The costs of several runs or steps together. */
 export function sumKnownCost(
 	costs: readonly {
@@ -108,6 +132,7 @@ export function toDashboardRun(run: RunSummary, group: string): DashboardRun {
 		costUsd: run.costUsd,
 		costEstimated: run.costEstimated,
 		costMissing: run.costMissing,
+		tokens: tokenCounts(run),
 		group,
 	};
 }

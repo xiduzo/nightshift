@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CostText, RunStatusIcon } from "@/features/runs";
+import { CostWithTokens, RunStatusIcon } from "@/features/runs";
 import type { NightsRange } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
@@ -96,9 +96,11 @@ function failureColumns(now: number) {
 		column.accessor("costUsd", {
 			header: "Spent",
 			enableSorting: true,
-			cell: ({ row: { original } }) => <CostText cost={original} />,
+			cell: ({ row: { original } }) => (
+				<CostWithTokens cost={original} tokens={original.tokens} />
+			),
 			meta: {
-				headClassName: "w-24 pr-6 text-right",
+				headClassName: "pr-6 text-right",
 				cellClassName: "pr-6 text-right tabular-nums",
 			},
 		}),

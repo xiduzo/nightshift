@@ -63,6 +63,7 @@ const dashboardRunSchema = z.object({
 	costUsd: z.number(),
 	costEstimated: z.boolean(),
 	costMissing: z.number(),
+	tokens: z.object({ input: z.number(), output: z.number() }).nullable(),
 	group: z.string(),
 });
 
@@ -83,7 +84,12 @@ const flowHealthRowSchema = z.object({
 	ended: z.number(),
 	rate: z.number().nullable(),
 	cost: spreadSchema.nullable(),
-	unfinished: z.object({ count: z.number(), costUsd: z.number() }),
+	tokenUse: spreadSchema.nullable(),
+	unfinished: z.object({
+		count: z.number(),
+		costUsd: z.number(),
+		tokens: z.number(),
+	}),
 	unknownCost: z.number(),
 	freeRuns: z.number(),
 });
@@ -94,6 +100,7 @@ const nightTotalsSchema = z.object({
 	ended: z.number(),
 	finished: z.number(),
 	costUsd: z.number(),
+	tokens: z.number(),
 	gates: z.number(),
 });
 
@@ -105,6 +112,7 @@ const nightsRangeSchema = z.object({
 	nights: nightRangeSchema,
 	spend: z.object({
 		total: z.number(),
+		tokens: z.number(),
 		runs: z.number(),
 		nightsWithRuns: z.number(),
 		unknown: z.number(),
@@ -115,9 +123,12 @@ const nightsRangeSchema = z.object({
 				runs: z.number(),
 				total: z.number(),
 				unfinished: z.number(),
+				tokens: z.number(),
+				unfinishedTokens: z.number(),
 			}),
 		),
 		perNight: z.array(nightCountsSchema),
+		tokensPerNight: z.array(nightCountsSchema),
 		priciest: z.array(dashboardRunSchema),
 	}),
 	runs: z.object({
@@ -198,6 +209,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				finished: z.number(),
 				failed: z.number(),
 				cost: knownCostSchema,
+				tokens: z.number(),
 				latestAt: z.number().nullable(),
 			}),
 			dayBefore: z.object({
@@ -205,6 +217,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				finished: z.number(),
 				failed: z.number(),
 				cost: knownCostSchema,
+				tokens: z.number(),
 			}),
 			yesterday: z.object({ running: z.number(), gates: z.number() }),
 			allTime: knownCostSchema,
@@ -214,6 +227,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 					active: z.number(),
 					gates: z.number(),
 					costUsd: z.number(),
+					tokens: z.number(),
 					finished: z.number(),
 					failed: z.number(),
 					other: z.number(),
@@ -252,6 +266,7 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				night: z.number(),
 				runs: z.number(),
 				cost: knownCostSchema,
+				tokens: z.number(),
 				latest: z.array(runSummarySchema.extend({ group: z.string() })),
 			})
 			.nullable(),
@@ -278,6 +293,7 @@ const flowRunSchema = z.object({
 	costEstimated: z.boolean(),
 	costMissing: z.number(),
 	costCalls: z.number(),
+	tokens: z.number().nullable(),
 	warnings: z.number(),
 });
 
@@ -294,11 +310,18 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 				finished: z.number(),
 				unfinished: z.number(),
 				cost: spreadSchema.nullable(),
+				tokenUse: spreadSchema.nullable(),
 				length: spreadSchema.nullable(),
 				spent: knownCostSchema,
+				spentTokens: z.number(),
 				spentUnfinished: knownCostSchema,
+				unfinishedTokens: z.number(),
 				dearest: z
-					.object({ costUsd: z.number(), startedAt: z.number() })
+					.object({
+						costUsd: z.number(),
+						startedAt: z.number(),
+						tokens: z.number().nullable(),
+					})
 					.nullable(),
 				warnings: z.number(),
 				statuses: z.array(statusCountSchema),
@@ -309,6 +332,7 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 						startedAt: z.number(),
 						night: z.number(),
 						costUsd: z.number(),
+						tokens: z.number().nullable(),
 						status: runStatusSchema,
 					}),
 				),

@@ -4,6 +4,7 @@ import { lastNights, nightOf } from "./clock";
 import {
 	countStatuses,
 	hasEnded,
+	reportedTokens,
 	spreadOf,
 	sumKnownCost,
 	topRows,
@@ -52,6 +53,7 @@ function runsOf(
 						costEstimated: run.costEstimated,
 						costMissing: run.costMissing,
 						costCalls: run.costCalls,
+						tokens: reportedTokens(run),
 						calledBy: null,
 						reason: run.reason,
 						warnings: run.warnings,
@@ -70,6 +72,7 @@ function runsOf(
 				costEstimated: subflow.costEstimated,
 				costMissing: subflow.costMissing,
 				costCalls: subflow.costCalls,
+				tokens: null,
 				calledBy: run.title,
 				reason: null,
 				warnings: [],
@@ -87,14 +90,19 @@ function runsOf(
  */
 function finishedCostOf(finished: readonly PlacedFlowRun[]): {
 	cost: Spread | null;
+	/** The same runs as `cost`. Null when one of them did not report tokens. */
+	tokenUse: Spread | null;
 	unknown: number;
 	free: number;
 } {
 	const costly = finished.filter((run) => run.costCalls > 0);
+	const known = costly.filter((run) => run.costMissing === 0);
+	const reported = known.flatMap((run) =>
+		run.tokens === null ? [] : [run.tokens],
+	);
 	return {
-		cost: spreadOf(
-			costly.filter((run) => run.costMissing === 0).map((run) => run.costUsd),
-		),
+		cost: spreadOf(known.map((run) => run.costUsd)),
+		tokenUse: reported.length === known.length ? spreadOf(reported) : null,
 		unknown: costly.filter((run) => run.costMissing > 0).length,
 		free: finished.length - costly.length,
 	};
@@ -136,7 +144,7 @@ export function flowHealthRows(
 		// A run that failed early spent next to nothing, which would drag down
 		// what a run costs. Its spend shows on its own instead.
 		const unfinished = ended.filter((run) => run.status !== "finished");
-		const { cost, unknown, free } = finishedCostOf(finished);
+		const { cost, tokenUse, unknown, free } = finishedCostOf(finished);
 		return {
 			name,
 			last: lastRuns[0] ?? null,
@@ -146,11 +154,13 @@ export function flowHealthRows(
 			ended: ended.length,
 			rate: finishedShare(finished.length, ended.length),
 			cost,
+			tokenUse,
 			unknownCost: unknown,
 			freeRuns: free,
 			unfinished: {
 				count: unfinished.length,
 				costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
+				tokens: unfinished.reduce((total, run) => total + (run.tokens ?? 0), 0),
 			},
 		};
 	});
@@ -236,6 +246,7 @@ function flowRange(
 		(top, run) => (top === undefined || run.costUsd > top.costUsd ? run : top),
 		undefined,
 	);
+	const { cost, tokenUse } = finishedCostOf(finished);
 	const perNight: NightCounts[] = nights.map((night) => {
 		const counts: Record<string, number> = {};
 		for (const { status } of statuses) counts[status] = 0;
@@ -252,16 +263,26 @@ function flowRange(
 		ended: ended.length,
 		finished: finished.length,
 		unfinished: unfinished.length,
-		cost: finishedCostOf(finished).cost,
+		cost,
+		tokenUse,
 		length: spreadOf(
 			finished.flatMap((run) =>
 				run.endedAt === null ? [] : [run.endedAt - run.startedAt],
 			),
 		),
 		spent: sumKnownCost(inRange),
+		spentTokens: inRange.reduce((total, run) => total + (run.tokens ?? 0), 0),
 		spentUnfinished: sumKnownCost(unfinished),
+		unfinishedTokens: unfinished.reduce(
+			(total, run) => total + (run.tokens ?? 0),
+			0,
+		),
 		dearest: dearest
-			? { costUsd: dearest.costUsd, startedAt: dearest.startedAt }
+			? {
+					costUsd: dearest.costUsd,
+					startedAt: dearest.startedAt,
+					tokens: dearest.tokens,
+				}
 			: null,
 		warnings: inRange.reduce((total, run) => total + run.warnings.length, 0),
 		statuses,
@@ -271,6 +292,7 @@ function flowRange(
 			startedAt: run.startedAt,
 			night: run.night,
 			costUsd: run.costUsd,
+			tokens: run.tokens,
 			status: run.status,
 		})),
 		whyUnfinished: topRows(whyUnfinished(unfinished)),

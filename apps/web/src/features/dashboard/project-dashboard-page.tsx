@@ -76,6 +76,7 @@ export function ProjectDashboardPage({
 						values={metrics?.values}
 						before={metrics?.before}
 						compared={metrics?.compared ?? false}
+						spendTokens={metrics?.spendTokens}
 						on={on}
 						onChange={setOn}
 						onDetails={(metric) => setDetails({ metric, open: true })}

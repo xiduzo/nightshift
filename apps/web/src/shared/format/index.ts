@@ -3,7 +3,10 @@
 export { dayWord, formatCountdown, useNow } from "@nightshift/client";
 export type { KnownCost } from "./format";
 export {
+	costEndsSentence,
+	costHalfSentence,
 	costNote,
+	costWithTokens,
 	formatCost,
 	formatDateTime,
 	formatDayTime,
@@ -11,11 +14,12 @@ export {
 	formatKnownCost,
 	formatRelative,
 	formatSize,
-	formatStepCost,
+	formatStepUsage,
 	formatTime,
 	formatTokens,
 	nextOccurrence,
 	noCostYet,
 	sumKnownCost,
 	truncate,
+	typicalCostSentence,
 } from "./format";

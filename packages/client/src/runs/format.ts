@@ -151,16 +151,47 @@ export function compactCount(count: number): string {
 }
 
 /** The tokens a run's or a step's agents used, as its metrics carry them. */
-type Tokens = { input: number; output: number };
+export type UsageTokens = { input: number; output: number };
+
+/** A token total, or the split. A number is the total. Null when none are known. */
+function asTokens(
+	tokens: UsageTokens | number | null | undefined,
+): UsageTokens | null {
+	if (typeof tokens === "number") {
+		return tokens > 0 ? { input: tokens, output: 0 } : null;
+	}
+	return tokens ?? null;
+}
 
 /** "12.3K tokens": the tokens in and out. Null when none are known. */
-export function tokensLabel(tokens: Tokens | null | undefined): string | null {
-	const used = tokens ? tokens.input + tokens.output : 0;
+export function tokensLabel(
+	tokens: UsageTokens | number | null | undefined,
+): string | null {
+	const counts = asTokens(tokens);
+	const used = counts ? counts.input + counts.output : 0;
 	return used > 0 ? `${compactCount(used)} tokens` : null;
 }
 
+/**
+ * Tokens and cost together, as every screen shows them: "12.3K tokens ·
+ * $0.0412". The tokens come first. Either part drops when it is not known.
+ * "—" is not a cost. Null when neither is known. A number is a token total.
+ */
+export function usageLabel(
+	tokens: UsageTokens | number | null | undefined,
+	cost: string | null | undefined,
+): string | null {
+	const money = cost && cost !== "—" ? cost : null;
+	const parts = [tokensLabel(tokens), money].filter(
+		(part): part is string => part !== null,
+	);
+	return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 /** "12K in, 300 out": what the tokens of `tokensLabel` are made of. Null when none are known. */
-export function tokensSplit(tokens: Tokens | null | undefined): string | null {
+export function tokensSplit(
+	tokens: UsageTokens | null | undefined,
+): string | null {
 	if (!tokens || tokens.input + tokens.output === 0) return null;
 	return `${compactCount(tokens.input)} in, ${compactCount(tokens.output)} out`;
 }

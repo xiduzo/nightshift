@@ -1,3 +1,4 @@
+import { tokensLabel, usageLabel } from "@nightshift/client";
 import type { OutcomeColor } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -37,8 +38,9 @@ import {
 import type { RunStatus, StepSummary } from "@/shared/api";
 import {
 	formatKnownCost,
-	formatStepCost,
+	formatStepUsage,
 	formatTime,
+	noCostYet,
 	sumKnownCost,
 } from "@/shared/format";
 import {
@@ -64,12 +66,26 @@ function spanOf(list: StepSummary[]): ReactNode {
 	return <WorkTime steps={list} start={start} />;
 }
 
-/** What the steps that can cost cost together; undefined when none did. */
-function costOf(list: StepSummary[]): string | undefined {
+/** The tokens of these steps, when any were used. */
+function tokensOf(list: readonly StepSummary[]) {
+	let input = 0;
+	let output = 0;
+	for (const step of list) {
+		const tokens = step.metrics?.tokens;
+		if (!tokens) continue;
+		input += tokens.input;
+		output += tokens.output;
+	}
+	return input + output > 0 ? { input, output } : null;
+}
+
+/** What these steps used and cost. Undefined when none of them can cost and none used tokens. */
+function usageOf(list: StepSummary[]): string | undefined {
 	const costing = list.filter(hasCost);
-	return costing.length === 0
-		? undefined
-		: formatKnownCost(sumKnownCost(costing));
+	const tokens = tokensOf(list);
+	if (costing.length === 0) return tokensLabel(tokens) ?? undefined;
+	if (costing.every(noCostYet)) return usageLabel(tokens, null) ?? "—";
+	return usageLabel(tokens, formatKnownCost(sumKnownCost(costing))) ?? "—";
 }
 
 /** Every step a Call step called, nested ones included. */
@@ -197,7 +213,7 @@ export function StepTimeline({
 						label={label}
 						badge={badge}
 						duration={spanOf(nested)}
-						cost={costOf(nested)}
+						cost={usageOf(nested)}
 						depth={depth}
 						stepCount={children.length}
 						open={open}
@@ -221,9 +237,9 @@ export function StepTimeline({
 					step={step}
 					cost={
 						callsFlow(step)
-							? costOf(calledSteps(steps, step))
+							? usageOf(calledSteps(steps, step))
 							: hasCost(step)
-								? formatStepCost(step)
+								? formatStepUsage(step)
 								: undefined
 					}
 					number={numbers.get(step.id) ?? 0}
@@ -318,7 +334,7 @@ function RowStats({
 			>
 				{duration}
 			</span>
-			<span className="hidden w-16 shrink-0 whitespace-nowrap text-right text-muted-foreground tabular-nums sm:inline">
+			<span className="hidden w-44 shrink-0 whitespace-nowrap text-right text-muted-foreground tabular-nums sm:inline">
 				{cost}
 			</span>
 		</>

@@ -4,6 +4,7 @@ import {
 	consoleValues,
 	type DashboardSummary,
 	type NightRange,
+	usageLabel,
 } from "@nightshift/client";
 
 /**
@@ -32,7 +33,13 @@ export function nightsFacts(
 		(metric) => ({
 			key: metric.key,
 			label: metric.label,
-			value: metric.format(values[metric.key]),
+			value:
+				metric.key === "spend"
+					? (usageLabel(
+							range.totals.tokens,
+							metric.format(values[metric.key]),
+						) ?? metric.format(values[metric.key]))
+					: metric.format(values[metric.key]),
 		}),
 	);
 }

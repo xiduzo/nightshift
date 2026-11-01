@@ -9,6 +9,7 @@ import {
 	type StepChangedFiles,
 	type StepSummary,
 	type StoppedNotice,
+	tokensLabel,
 	tokensSplit,
 	waitedText,
 } from "@nightshift/client";
@@ -37,20 +38,25 @@ export function computerName(device: Computer): string {
 function costFact(
 	run: Pick<
 		RunDetail,
-		"costUsd" | "costMissing" | "costCalls" | "costEstimated"
+		"costUsd" | "costMissing" | "costCalls" | "costEstimated" | "metrics"
 	>,
 ): RunFact {
 	const known = costLabel(run);
+	const tokens = tokensLabel(run.metrics?.tokens);
 	if (known === null) return { label: "Cost", value: UNKNOWN };
+	const note =
+		run.costMissing > 0
+			? "A step did not report its cost"
+			: run.costEstimated
+				? "Part of it is estimated"
+				: undefined;
+	const sub = [tokens, note].filter(
+		(part) => part !== null && part !== undefined,
+	);
 	return {
 		label: "Cost",
 		value: known,
-		sub:
-			run.costMissing > 0
-				? "A step did not report its cost"
-				: run.costEstimated
-					? "Part of it is estimated"
-					: undefined,
+		sub: sub.length > 0 ? sub.join(" · ") : undefined,
 	};
 }
 
@@ -73,15 +79,17 @@ export function runFacts(
 ): RunFact[] {
 	const tokens = run.metrics?.tokens;
 	const split = tokensSplit(tokens);
+	const known = costLabel(run);
 	const ended = hasEnded(status);
 	const end = ended ? run.endedAt : now;
+	const tokenSub = [split, known].filter((part) => part !== null);
 	return [
 		costFact(run),
 		tokens && split !== null
 			? {
 					label: "Tokens",
 					value: compactCount(tokens.input + tokens.output),
-					sub: split,
+					sub: tokenSub.join(" · "),
 				}
 			: { label: "Tokens", value: UNKNOWN },
 		end === null

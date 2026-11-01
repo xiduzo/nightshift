@@ -4,6 +4,7 @@ import {
 	hasEnded,
 	type RunStatus,
 	type RunSummary,
+	tokensLabel,
 } from "@nightshift/client";
 
 import { matches, queryWords } from "@/shared/match";
@@ -265,6 +266,7 @@ export function runMeta(
 		| "costUsd"
 		| "costMissing"
 		| "costCalls"
+		| "metrics"
 	>,
 ): string {
 	if (run.status === "waiting") {
@@ -278,7 +280,11 @@ export function runMeta(
 		return `since ${clock(open ?? run.createdAt)}`;
 	}
 	if (!hasEnded(run.status)) return `since ${clock(run.createdAt)}`;
-	return [run.endedAt !== null ? clock(run.endedAt) : null, costLabel(run)]
+	return [
+		run.endedAt !== null ? clock(run.endedAt) : null,
+		tokensLabel(run.metrics?.tokens),
+		costLabel(run),
+	]
 		.filter((part): part is string => part !== null)
 		.join(" · ");
 }

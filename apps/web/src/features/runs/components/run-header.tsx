@@ -1,4 +1,9 @@
-import { runActions, runningStep, useRunActed } from "@nightshift/client";
+import {
+	runActions,
+	runningStep,
+	tokensLabel,
+	useRunActed,
+} from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -70,6 +75,7 @@ export function RunTitle({
 }) {
 	const stoppable = runActions(status, run.walker.thisDevice, run.result).stop;
 	const time = useWorkTime(steps, run.createdAt);
+	const tokens = tokensLabel(run.metrics?.tokens);
 
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3 lg:px-5 lg:pt-4">
@@ -138,7 +144,13 @@ export function RunTitle({
 					</>
 				)}
 				<span aria-hidden="true"> · </span>
-				<span className="sr-only">, cost </span>
+				{tokens ? (
+					<>
+						{tokens}
+						<span aria-hidden="true"> · </span>
+					</>
+				) : null}
+				<span className="sr-only">cost </span>
 				<CostText cost={run} />
 			</p>
 		</div>

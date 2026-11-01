@@ -442,10 +442,11 @@ function AnswerUsage({ usage }: { usage: NonNullable<AgentMessage["usage"]> }) {
 	if (!tokens && cost === undefined) return null;
 	return (
 		<MessageFooter className="items-center gap-2 px-0 font-normal">
-			{tokens ? <UsageContext size="xs" usage={usage} cost={cost} /> : null}
-			{cost !== undefined ? (
+			{tokens ? (
+				<UsageContext size="xs" usage={usage} cost={cost} />
+			) : (
 				<span title="What this answer cost">{cost}</span>
-			) : null}
+			)}
 		</MessageFooter>
 	);
 }

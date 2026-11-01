@@ -14,7 +14,12 @@ import {
 	YAxis,
 } from "recharts";
 import type { FlowRange, RunStatus } from "@/shared/api";
-import { formatCost, formatDateTime } from "@/shared/format";
+import {
+	costWithTokens,
+	formatCost,
+	formatDateTime,
+	typicalCostSentence,
+} from "@/shared/format";
 import { ChartSection, DetailsEmpty, Swatch } from "./details";
 import { formatNightShort, nightChartRows } from "./nights";
 import { RUN_STATUS_CHART } from "./run-statuses";
@@ -99,15 +104,18 @@ export function RunsPerNight({
 export function CostPerRun({
 	runs,
 	median,
+	tokenMedian,
 }: {
 	runs: FlowRange["endedRuns"];
 	median: number | undefined;
+	tokenMedian?: number;
 }) {
 	const rows = runs.map((run, index) => ({
 		key: `${run.runId}-${index}`,
 		label: formatNightShort(run.night),
 		title: formatDateTime(run.startedAt),
 		costUsd: run.costUsd,
+		tokens: run.tokens,
 		status: run.status,
 	}));
 	const config = Object.fromEntries(
@@ -121,8 +129,8 @@ export function CostPerRun({
 			title="Cost per run"
 			hint={
 				median === undefined
-					? "Each ended run, oldest first"
-					: `Each ended run, oldest first. The dashed line is the typical cost of a finished run, ${formatCost(median)}.`
+					? "Each ended run, oldest first."
+					: `Each ended run, oldest first. ${typicalCostSentence(median, tokenMedian === undefined ? null : { median: tokenMedian })} The dashed line marks that cost.`
 			}
 		>
 			{runs.length === 0 ? (
@@ -154,6 +162,7 @@ export function CostPerRun({
 									}
 									formatter={(value, _, item) => {
 										const status = item.payload?.status as RunStatus;
+										const tokens = item.payload?.tokens as number | null;
 										return (
 											<div className="flex w-full items-center gap-2">
 												<Swatch color={`var(--color-${status})`} />
@@ -161,7 +170,7 @@ export function CostPerRun({
 													{RUN_STATUS_CHART[status]?.label ?? status}
 												</span>
 												<span className="ml-auto font-medium font-mono tabular-nums">
-													{formatCost(Number(value))}
+													{costWithTokens(formatCost(Number(value)), tokens)}
 												</span>
 											</div>
 										);

@@ -62,7 +62,10 @@ export function UsageContext({
 					<Button variant="outline" size={size} className="tabular-nums" />
 				}
 			>
-				{formatTokens(total)}
+				<span className="inline-flex items-center gap-1.5">
+					{formatTokens(total)}
+					{cost !== undefined ? cost : null}
+				</span>
 				<span className="sr-only"> tokens</span>
 			</HoverCardTrigger>
 			<HoverCardContent className="flex w-64 flex-col gap-3">

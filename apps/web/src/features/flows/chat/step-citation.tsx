@@ -8,7 +8,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { stepGist, WorkTime } from "@/features/runs/flows-port";
 import type { RunStatus, StepSummary } from "@/shared/api";
-import { formatStepCost } from "@/shared/format";
+import { formatStepUsage } from "@/shared/format";
 import { hasCost } from "../canvas/node-type";
 import { OutcomeBadge, stepState } from "../canvas/outcome-badge";
 
@@ -64,7 +64,7 @@ export function StepCitation({
 				<p className="text-muted-foreground text-xs tabular-nums">
 					{step.visit > 1 ? `Visit ${step.visit} · ` : null}
 					<WorkTime steps={[step]} start={step.startedAt} />
-					{hasCost(step) ? ` · ${formatStepCost(step)}` : null}
+					{hasCost(step) ? ` · ${formatStepUsage(step)}` : null}
 				</p>
 				{gist ? <p className="line-clamp-3 text-xs">{gist}</p> : null}
 			</HoverCardContent>

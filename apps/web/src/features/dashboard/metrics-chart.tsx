@@ -4,6 +4,7 @@ import {
 	ChartTooltipContent,
 } from "@nightshift/ui/components/chart";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { costWithTokens } from "@/shared/format";
 import { METRICS, METRICS_CHART, type Metric, type MetricRow } from "./metrics";
 
 /**
@@ -68,14 +69,27 @@ export function MetricsChart({
 									const metric = METRICS.find((each) => each.key === name);
 									if (!metric) return null;
 									const row = item.payload as MetricRow;
+									const money = metric.format(value as number | null);
+									const beforeMoney = metric.format(
+										row[`before_${metric.key}`] ?? null,
+									);
 									return (
 										<TooltipLine
 											label={metric.label}
 											color={metric.color}
-											value={metric.format(value as number | null)}
+											value={
+												metric.key === "spend"
+													? costWithTokens(money, row.spendTokens)
+													: money
+											}
 											before={
 												compared
-													? metric.format(row[`before_${metric.key}`] ?? null)
+													? metric.key === "spend"
+														? costWithTokens(
+																beforeMoney,
+																row.before_spendTokens,
+															)
+														: beforeMoney
 													: undefined
 											}
 										/>

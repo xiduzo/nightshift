@@ -40,6 +40,7 @@ function run(id: string, over: Partial<NightRun> = {}): NightRun {
 		costUsd: 0,
 		costEstimated: false,
 		costMissing: 0,
+		tokens: null,
 		group: "website",
 		...over,
 	};
@@ -51,6 +52,7 @@ function lastNight(latest: NightRun[], runs = latest.length): LastNight {
 		night: NIGHT,
 		runs,
 		cost: cost(1.5),
+		tokens: 0,
 		latest: latest as LastNight["latest"],
 	};
 }

@@ -6,6 +6,7 @@ import { RunStatusBadge } from "@/features/runs";
 import type { FlowRange, FlowRun } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
+	costWithTokens,
 	formatCost,
 	formatDateTime,
 	formatDuration,
@@ -287,7 +288,8 @@ function latestColumns(now: number, onNavigate: () => void) {
 		),
 		latestColumn.accessor("costUsd", {
 			header: "Cost",
-			cell: ({ getValue }) => formatCost(getValue()),
+			cell: ({ row: { original } }) =>
+				costWithTokens(formatCost(original.costUsd), original.tokens),
 			meta: {
 				headClassName: "text-right",
 				cellClassName: "text-right tabular-nums text-xs",

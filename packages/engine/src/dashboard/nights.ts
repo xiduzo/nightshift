@@ -6,6 +6,7 @@ import {
 	spreadOf,
 	toDashboardRun,
 	topRows,
+	usedTokens,
 } from "./stats";
 import {
 	type AskedGate,
@@ -97,14 +98,29 @@ function perNight<T extends { night: number }>(
 function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 	const byLabel = new Map<
 		string,
-		{ runs: number; total: number; unfinished: number }
+		{
+			runs: number;
+			total: number;
+			unfinished: number;
+			tokens: number;
+			unfinishedTokens: number;
+		}
 	>();
 	for (const { run, group } of inRange) {
-		const totals = byLabel.get(group) ?? { runs: 0, total: 0, unfinished: 0 };
+		const totals = byLabel.get(group) ?? {
+			runs: 0,
+			total: 0,
+			unfinished: 0,
+			tokens: 0,
+			unfinishedTokens: 0,
+		};
+		const used = usedTokens(run);
 		totals.runs += 1;
 		totals.total += run.costUsd;
+		totals.tokens += used;
 		if (hasEnded(run) && run.status !== "finished") {
 			totals.unfinished += run.costUsd;
+			totals.unfinishedTokens += used;
 		}
 		byLabel.set(group, totals);
 	}
@@ -123,6 +139,11 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 			runs: rest.reduce((sum, [, totals]) => sum + totals.runs, 0),
 			total: rest.reduce((sum, [, totals]) => sum + totals.total, 0),
 			unfinished: rest.reduce((sum, [, totals]) => sum + totals.unfinished, 0),
+			tokens: rest.reduce((sum, [, totals]) => sum + totals.tokens, 0),
+			unfinishedTokens: rest.reduce(
+				(sum, [, totals]) => sum + totals.unfinishedTokens,
+				0,
+			),
 		});
 	}
 	const keyOf = new Map(
@@ -130,6 +151,7 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 	);
 	return {
 		total: inRange.reduce((sum, { run }) => sum + run.costUsd, 0),
+		tokens: inRange.reduce((sum, { run }) => sum + usedTokens(run), 0),
 		runs: inRange.length,
 		nightsWithRuns: new Set(inRange.map(({ night }) => night)).size,
 		unknown: inRange.filter(({ run }) => run.costMissing > 0).length,
@@ -141,6 +163,15 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 			({ run, group }) => ({
 				key: keyOf.get(group) ?? "other",
 				value: run.costUsd,
+			}),
+		),
+		tokensPerNight: perNight(
+			nights,
+			inRange,
+			groups.map((group) => group.key),
+			({ run, group }) => ({
+				key: keyOf.get(group) ?? "other",
+				value: usedTokens(run),
 			}),
 		),
 		priciest: inRange
@@ -273,6 +304,7 @@ function totalsOf(
 			ended: finished.length + failed.length,
 			finished: finished.length,
 			costUsd: ofNight.reduce((sum, { run }) => sum + run.costUsd, 0),
+			tokens: ofNight.reduce((sum, { run }) => sum + usedTokens(run), 0),
 			gates: gates.filter((gate) => gate.night === night).length,
 		};
 	});
@@ -283,6 +315,7 @@ function totalsOf(
 		ended: sum("ended"),
 		finished: sum("finished"),
 		costUsd: sum("costUsd"),
+		tokens: sum("tokens"),
 		gates: sum("gates"),
 		perNight,
 	};

@@ -247,6 +247,8 @@ export {
 	tokensSplit,
 	toolCallsSummary,
 	toolKind,
+	type UsageTokens,
+	usageLabel,
 	useNow,
 	useRunPrefetch,
 	type Wait,

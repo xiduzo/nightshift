@@ -5,13 +5,13 @@ import {
 } from "@nightshift/ui/components/tooltip";
 import type { NightsRange } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatCost } from "@/shared/format";
+import { costWithTokens, formatCost } from "@/shared/format";
 import { CellLines } from "./table-cells";
 
 type SpendGroup = NightsRange["spend"]["groups"][number];
 
 /** A spend group with what it spent each night, oldest first. */
-type SpendRow = SpendGroup & { nights: number[] };
+type SpendRow = SpendGroup & { nights: number[]; tokenNights: number[] };
 
 /**
  * What each flow spent, the most first: its share of the spend, what it
@@ -30,6 +30,9 @@ export function SpendTable({ spend }: { spend: NightsRange["spend"] }) {
 		(group): SpendRow => ({
 			...group,
 			nights: spend.perNight.map((night) => night.counts[group.key] ?? 0),
+			tokenNights: spend.tokensPerNight.map(
+				(night) => night.counts[group.key] ?? 0,
+			),
 		}),
 	);
 	return (
@@ -63,7 +66,12 @@ function spendColumns(total: number) {
 		column.display({
 			id: "nights",
 			header: "Per night",
-			cell: ({ row: { original } }) => <NightBars nights={original.nights} />,
+			cell: ({ row: { original } }) => (
+				<NightBars
+					nights={original.nights}
+					tokenNights={original.tokenNights}
+				/>
+			),
 		}),
 		column.accessor((group) => group.total / group.runs, {
 			id: "perRun",
@@ -75,7 +83,10 @@ function spendColumns(total: number) {
 					sub={original.runs === 1 ? "1 run" : `${original.runs} runs`}
 				>
 					<span className="tabular-nums">
-						{formatCost(original.total / original.runs)}
+						{costWithTokens(
+							formatCost(original.total / original.runs),
+							original.tokens / original.runs,
+						)}
 					</span>
 				</CellLines>
 			),
@@ -89,12 +100,12 @@ function spendColumns(total: number) {
 					align="end"
 					sub={
 						original.unfinished > 0
-							? `${formatCost(original.unfinished)} on runs that did not finish`
+							? `${costWithTokens(formatCost(original.unfinished), original.unfinishedTokens)} on runs that did not finish`
 							: undefined
 					}
 				>
 					<span className="font-medium tabular-nums">
-						{formatCost(original.total)}
+						{costWithTokens(formatCost(original.total), original.tokens)}
 					</span>
 				</CellLines>
 			),
@@ -115,8 +126,15 @@ const BARS_HEIGHT = 20;
  * from zero to its own dearest night: one shared scale would squash the
  * cheap flows flat. Their share of the spend says how they compare.
  */
-function NightBars({ nights }: { nights: number[] }) {
+function NightBars({
+	nights,
+	tokenNights,
+}: {
+	nights: number[];
+	tokenNights: number[];
+}) {
 	const max = Math.max(...nights, 0);
+	const peak = nights.indexOf(max);
 	const spentOn = nights.filter((usd) => usd > 0).length;
 	const width = nights.length * (BAR_WIDTH + BAR_GAP);
 	return (
@@ -150,7 +168,10 @@ function NightBars({ nights }: { nights: number[] }) {
 					Spent on {spentOn} of {nights.length} nights.
 				</span>
 				{max > 0 ? (
-					<span>The most in one night: {formatCost(max)}.</span>
+					<span>
+						The most in one night:{" "}
+						{costWithTokens(formatCost(max), tokenNights[peak] ?? 0)}.
+					</span>
 				) : null}
 			</TooltipContent>
 		</Tooltip>

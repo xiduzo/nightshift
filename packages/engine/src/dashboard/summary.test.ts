@@ -104,6 +104,7 @@ describe("the stat cards", () => {
 			finished: 1,
 			failed: 1,
 			cost: { costUsd: 2.25, costEstimated: false, costMissing: 1 },
+			tokens: 0,
 			latestAt: NOW - HOUR,
 		});
 		expect(summary.cards.allTime.costUsd).toBe(6.25);
@@ -141,6 +142,7 @@ describe("the stat cards", () => {
 			finished: 2,
 			failed: 1,
 			cost: { costUsd: 2.5, costEstimated: false, costMissing: 0 },
+			tokens: 0,
 		});
 		expect(summary.cards.yesterday).toEqual({ running: 1, gates: 1 });
 	});
@@ -300,11 +302,51 @@ describe("spend over a night range", () => {
 		);
 		const spend = nightsOf(summarize(runs), 7).spend;
 		expect(spend.groups).toEqual([
-			{ key: "g0", label: "a", runs: 2, total: 7, unfinished: 0 },
-			{ key: "g1", label: "b", runs: 1, total: 5, unfinished: 0 },
-			{ key: "g2", label: "c", runs: 1, total: 4, unfinished: 0 },
-			{ key: "g3", label: "d", runs: 1, total: 3, unfinished: 0 },
-			{ key: "other", label: "2 more", runs: 2, total: 3, unfinished: 0 },
+			{
+				key: "g0",
+				label: "a",
+				runs: 2,
+				total: 7,
+				unfinished: 0,
+				tokens: 0,
+				unfinishedTokens: 0,
+			},
+			{
+				key: "g1",
+				label: "b",
+				runs: 1,
+				total: 5,
+				unfinished: 0,
+				tokens: 0,
+				unfinishedTokens: 0,
+			},
+			{
+				key: "g2",
+				label: "c",
+				runs: 1,
+				total: 4,
+				unfinished: 0,
+				tokens: 0,
+				unfinishedTokens: 0,
+			},
+			{
+				key: "g3",
+				label: "d",
+				runs: 1,
+				total: 3,
+				unfinished: 0,
+				tokens: 0,
+				unfinishedTokens: 0,
+			},
+			{
+				key: "other",
+				label: "2 more",
+				runs: 2,
+				total: 3,
+				unfinished: 0,
+				tokens: 0,
+				unfinishedTokens: 0,
+			},
 		]);
 		expect(spend.total).toBe(22);
 		expect(spend.runs).toBe(7);
@@ -316,6 +358,30 @@ describe("spend over a night range", () => {
 		});
 		expect(spend.perNight.at(-2)?.counts.g0).toBe(1);
 		expect(spend.priciest.map((run) => run.costUsd)).toEqual([6, 5, 4, 3, 2]);
+	});
+
+	test("adds the tokens a run reported to the spend and the night totals", () => {
+		const range = nightsOf(
+			summarize([
+				aRun({
+					costUsd: 1.2,
+					metrics: {
+						wallMs: 1,
+						agentMs: 1,
+						gateWaitMs: 0,
+						tokens: { input: 12_000, output: 345, cacheRead: 0, cacheWrite: 0 },
+						costBasis: "billed",
+						prUrl: null,
+					},
+				}),
+				aRun({ costUsd: 0.3 }),
+			]),
+			7,
+		);
+		expect(range.spend.tokens).toBe(12_345);
+		expect(range.spend.groups[0]?.tokens).toBe(12_345);
+		expect(range.totals.tokens).toBe(12_345);
+		expect(range.totals.perNight.at(-1)?.tokens).toBe(12_345);
 	});
 
 	test("counts the runs whose cost is not known, and leaves out older nights", () => {
@@ -523,6 +589,7 @@ describe("the totals of a night range", () => {
 			ended: 2,
 			finished: 1,
 			costUsd: 3,
+			tokens: 0,
 			gates: 1,
 		});
 		expect(totals.perNight).toHaveLength(7);
@@ -532,6 +599,7 @@ describe("the totals of a night range", () => {
 			ended: 1,
 			finished: 1,
 			costUsd: 2,
+			tokens: 0,
 			gates: 1,
 		});
 		expect(before).toMatchObject({
@@ -539,6 +607,7 @@ describe("the totals of a night range", () => {
 			ended: 2,
 			finished: 1,
 			costUsd: 4,
+			tokens: 0,
 			gates: 0,
 		});
 		expect(before.perNight[0]?.night).toBe(TONIGHT - 13 * NIGHT);

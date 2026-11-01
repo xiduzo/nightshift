@@ -3,6 +3,7 @@ import {
 	formatKnownCost,
 	type OpenGate,
 	type RunSummary,
+	usageLabel,
 	useRunPrefetch,
 	waitedText,
 } from "@nightshift/client";
@@ -36,7 +37,12 @@ export function NightRunRow({ run, now }: { run: NightRun; now: number }) {
 			caption={[
 				{ text: look.label, tone: look.tone },
 				run.group,
-				...(atWork ? [] : [formatKnownCost(run)]),
+				...(atWork
+					? []
+					: [
+							usageLabel(run.tokens, formatKnownCost(run)) ??
+								formatKnownCost(run),
+						]),
 			]}
 			detail={run.reason ?? undefined}
 			value={value}

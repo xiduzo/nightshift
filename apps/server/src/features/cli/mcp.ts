@@ -284,14 +284,23 @@ function costOf(run: {
 	costEstimated: boolean;
 	costMissing: number;
 	costCalls: number;
-	metrics?: { costBasis: "billed" | "estimated" | "unknown" };
+	metrics?: {
+		costBasis: "billed" | "estimated" | "unknown";
+		tokens: { input: number; output: number };
+	};
 }) {
+	const tokens = run.metrics?.tokens;
+	const used = tokens ? tokens.input + tokens.output : 0;
 	return {
 		usd: run.costUsd,
 		estimated: run.costEstimated,
 		missing: run.costMissing,
 		calls: run.costCalls,
 		basis: run.metrics?.costBasis ?? null,
+		tokens:
+			used > 0 && tokens
+				? { input: tokens.input, output: tokens.output }
+				: null,
 	};
 }
 

@@ -29,6 +29,7 @@ import type { Project, RunSummary } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	costNote,
+	costWithTokens,
 	formatDateTime,
 	formatDuration,
 	formatKnownCost,
@@ -288,7 +289,7 @@ function RunFacts({ run }: { run: RunSummary }) {
 								: "text-sm tabular-nums"
 						}
 					>
-						{formatKnownCost(run)}
+						{costWithTokens(formatKnownCost(run), tokens)}
 					</span>
 				</Fact>
 			) : null}

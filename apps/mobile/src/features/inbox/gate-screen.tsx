@@ -12,6 +12,7 @@ import {
 	gateRun,
 	nodeLabels,
 	type OpenGate,
+	usageLabel,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -341,7 +342,7 @@ function OpenGateScreen({
 							? stepsHint(
 									run.data.steps.filter((step) => step.scope === null).length,
 									null,
-									costLabel(run.data),
+									usageLabel(run.data.metrics?.tokens, costLabel(run.data)),
 								)
 							: undefined
 					}

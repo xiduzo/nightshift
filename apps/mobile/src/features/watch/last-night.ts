@@ -1,10 +1,21 @@
-import { type DashboardSummary, formatKnownCost } from "@nightshift/client";
+import {
+	type DashboardSummary,
+	formatKnownCost,
+	tokensLabel,
+} from "@nightshift/client";
 
 /** A run in a dashboard list: its title, status, start, branch and project. */
 export type NightRun = DashboardSummary["open"]["rows"][number];
 
 function plural(count: number, one: string, many: string): string {
 	return `${count} ${count === 1 ? one : many}`;
+}
+
+/** "12.3K tokens of 9 runs", or "Of 9 runs" when the night used none. */
+function nightCaption(tokens: number, runs: number): string {
+	const used = tokensLabel(tokens);
+	const count = plural(runs, "run", "runs");
+	return used ? `${used} of ${count}` : `Of ${count}`;
 }
 
 /** The numbers of "Last night". Null where the summary does not tell. */
@@ -42,7 +53,7 @@ export function nightNumbers(summary: DashboardSummary): NightNumbers | null {
 		failed: count("failed", "interrupted"),
 		stopped: count("stopped"),
 		cost: formatKnownCost(night.cost),
-		costCaption: `Of ${plural(night.runs, "run", "runs")}`,
+		costCaption: nightCaption(night.tokens, night.runs),
 	};
 }
 
@@ -108,6 +119,17 @@ const LIVE = new Set(["running", "waiting", "sleeping"]);
 /** The statuses of a run at work now: running, or waiting at a Gate. */
 const AT_WORK = new Set(["running", "waiting"]);
 
+/** Tokens a run reported, from a dashboard row or from a whole run. */
+function runTokens(run: {
+	tokens?: { input: number; output: number } | null;
+	metrics?: { tokens: { input: number; output: number } } | null;
+}): { input: number; output: number } | null {
+	if (run.tokens && run.tokens.input + run.tokens.output > 0) return run.tokens;
+	const tokens = run.metrics?.tokens;
+	if (!tokens || tokens.input + tokens.output <= 0) return null;
+	return { input: tokens.input, output: tokens.output };
+}
+
 /**
  * The runs at work now, running or waiting, the newest first. The summary
  * lists the oldest open runs and the newest runs of the last night: a run
@@ -121,12 +143,14 @@ export function runningNow(summary: DashboardSummary): NightRun[] {
 			seen.add(run.id);
 			return true;
 		})
-		.sort((a, b) => b.createdAt - a.createdAt);
+		.sort((a, b) => b.createdAt - a.createdAt)
+		.map((run) => ({ ...run, tokens: runTokens(run) }));
 }
 
 /** The runs of the last night that ended, newest first, at most `limit`. */
 export function nightOutput(summary: DashboardSummary, limit = 4): NightRun[] {
 	return (summary.lastNight?.latest ?? [])
 		.filter((run) => !LIVE.has(run.status))
-		.slice(0, limit);
+		.slice(0, limit)
+		.map((run) => ({ ...run, tokens: runTokens(run) }));
 }

@@ -1,4 +1,4 @@
-import { changeOf } from "@nightshift/client";
+import { changeOf, tokensLabel } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Toggle } from "@nightshift/ui/components/toggle";
@@ -19,6 +19,7 @@ export function MetricTiles({
 	on,
 	onChange,
 	onDetails,
+	spendTokens,
 }: {
 	/** Undefined while they load. */
 	values: MetricValues | undefined;
@@ -28,6 +29,8 @@ export function MetricTiles({
 	on: Metric[];
 	onChange: (on: Metric[]) => void;
 	onDetails: (metric: Metric) => void;
+	/** Tokens behind the Spend number. */
+	spendTokens?: number;
 }) {
 	return (
 		<div className="grid grid-cols-2 overflow-hidden rounded-xl border lg:grid-cols-4">
@@ -65,8 +68,15 @@ export function MetricTiles({
 								{metric.label}
 							</span>
 							{values ? (
-								<span className="font-semibold text-4xl tabular-nums tracking-tight">
-									{metric.format(value)}
+								<span className="flex flex-col">
+									<span className="font-semibold text-4xl tabular-nums tracking-tight">
+										{metric.format(value)}
+									</span>
+									{metric.key === "spend" && tokensLabel(spendTokens) ? (
+										<span className="font-normal text-sm tabular-nums">
+											{tokensLabel(spendTokens)}
+										</span>
+									) : null}
 								</span>
 							) : (
 								<Skeleton className="h-10 w-20" />

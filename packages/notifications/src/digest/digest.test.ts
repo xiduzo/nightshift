@@ -142,7 +142,7 @@ describe("the digest", () => {
 			expect.objectContaining({
 				runId: "pr",
 				title: "Triage · pr",
-				detail: "$1.00",
+				detail: "2 tokens · $1.00",
 				prUrl: "https://github.com/acme/site/pull/7",
 			}),
 		]);

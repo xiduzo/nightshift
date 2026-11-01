@@ -7,6 +7,8 @@ import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
 import type { NightRange, Project } from "@/shared/api";
 import {
+	costHalfSentence,
+	costWithTokens,
 	formatCost,
 	formatDateTime,
 	formatDuration,
@@ -135,10 +137,17 @@ function FlowHealthDetails({
 								/>
 								<Stat
 									label="Per finished run"
-									value={inRange.cost ? formatCost(inRange.cost.median) : "—"}
+									value={
+										inRange.cost
+											? costWithTokens(
+													formatCost(inRange.cost.median),
+													inRange.tokenUse?.median,
+												)
+											: "—"
+									}
 									hint={
 										inRange.cost && inRange.cost.count > 1
-											? `Half cost ${formatCost(inRange.cost.q1)} to ${formatCost(inRange.cost.q3)}`
+											? costHalfSentence(inRange.cost, inRange.tokenUse)
 											: undefined
 									}
 								/>
@@ -164,11 +173,17 @@ function FlowHealthDetails({
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Stat
 									label="Total spent"
-									value={formatKnownCost(inRange.spent)}
+									value={costWithTokens(
+										formatKnownCost(inRange.spent),
+										inRange.spentTokens,
+									)}
 								/>
 								<Stat
 									label="Not finished"
-									value={formatKnownCost(inRange.spentUnfinished)}
+									value={costWithTokens(
+										formatKnownCost(inRange.spentUnfinished),
+										inRange.unfinishedTokens,
+									)}
 									hint={
 										unfinished === 1
 											? "Spent by 1 run"
@@ -178,7 +193,12 @@ function FlowHealthDetails({
 								<Stat
 									label="Most expensive run"
 									value={
-										inRange.dearest ? formatCost(inRange.dearest.costUsd) : "—"
+										inRange.dearest
+											? costWithTokens(
+													formatCost(inRange.dearest.costUsd),
+													inRange.dearest.tokens,
+												)
+											: "—"
 									}
 									hint={
 										inRange.dearest
@@ -190,6 +210,7 @@ function FlowHealthDetails({
 							<CostPerRun
 								runs={inRange.endedRuns}
 								median={inRange.cost?.median}
+								tokenMedian={inRange.tokenUse?.median}
 							/>
 						</DetailsTabContent>
 

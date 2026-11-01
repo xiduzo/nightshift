@@ -43,6 +43,8 @@ export {
 	stepOutcomeLabel,
 	tokensLabel,
 	tokensSplit,
+	type UsageTokens,
+	usageLabel,
 } from "./format";
 export { metricsByNode, type NodeMetrics } from "./node-metrics";
 export {
