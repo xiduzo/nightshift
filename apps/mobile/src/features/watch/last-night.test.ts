@@ -53,7 +53,7 @@ function lastNight(latest: NightRun[], runs = latest.length): LastNight {
 		runs,
 		cost: cost(1.5),
 		tokens: 0,
-		latest: latest as LastNight["latest"],
+		latest: latest as unknown as LastNight["latest"],
 	};
 }
 

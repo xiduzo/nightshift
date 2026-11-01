@@ -106,7 +106,8 @@ describe("questionSections", () => {
 			{
 				label: "Plan",
 				kind: "text",
-				value: "First we change the form.\nThen we change the server.",
+				// One fact per line keeps its line: a Markdown hard break.
+				value: "First we change the form.  \nThen we change the server.",
 			},
 			{ label: "Diff", kind: "code", language: "diff", value: "- a\n+ b" },
 		]);
