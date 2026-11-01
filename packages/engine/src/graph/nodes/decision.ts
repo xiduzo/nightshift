@@ -3,7 +3,7 @@ import {
 	type DecisionTier,
 	type PersonTier,
 	personTierIndex,
-	renderTemplate,
+	renderReadable,
 } from "@nightshift/flows";
 import {
 	climbAt,
@@ -68,7 +68,7 @@ function climbingDecision(node: DecisionNode, ctx: StepContext): NodeAction {
 			return gateChooser(node, ctx, {
 				question: (tctx) =>
 					climbQuestion(
-						renderTemplate(node.prompt, {
+						renderReadable(node.prompt, {
 							...tctx,
 							cascade: climbValues(node, at),
 						}),

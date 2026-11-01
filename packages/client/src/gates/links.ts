@@ -64,6 +64,19 @@ export function describeLink(url: string, label: string | null): GateLink {
 	};
 }
 
+/** A line that only names what comes below it: `Draft pull requests:`. */
+const LABEL_ABOVE = /^\s*[^\n:]{1,48}:\s*$/;
+
+/**
+ * Takes out the `Label:` line right above a link line, blank lines
+ * between allowed: with its links listed apart, it names nothing.
+ */
+function dropLabelAbove(kept: string[]): void {
+	let index = kept.length - 1;
+	while (index >= 0 && kept[index]?.trim() === "") index--;
+	if (index >= 0 && LABEL_ABOVE.test(kept[index] ?? "")) kept.splice(index, 1);
+}
+
 /**
  * The links in a question, in order, once each, and the question without the
  * lines that held only a link. A link inside a sentence stays in the text and
@@ -87,6 +100,7 @@ export function extractGateLinks(question: string): {
 		if (only?.[2]) {
 			const url = trimUrl(only[2]);
 			if (!links.has(url)) links.set(url, describeLink(url, only[1] ?? null));
+			dropLabelAbove(kept);
 			continue;
 		}
 		for (const match of line.matchAll(URL_PATTERN)) {

@@ -75,6 +75,59 @@ describe("parseGateQuestion", () => {
 		]);
 	});
 
+	test("long JSON inside a sentence becomes its own block", () => {
+		const findings = [
+			{ reviewer: "code", findings: [{ file: "a.kt", problem: 'Say "no".' }] },
+		];
+		const question = `Approve?\n\nRisks to check: Findings still open: ${JSON.stringify(findings)} Builder: built. Tests pass.`;
+		expect(parseGateQuestion(question).context).toEqual([
+			{ label: null, kind: "text", value: "Risks to check:" },
+			{
+				label: "Findings still open",
+				kind: "code",
+				language: "json",
+				value: JSON.stringify(findings, null, 2),
+			},
+			{ label: null, kind: "text", value: "Builder: built. Tests pass." },
+		]);
+	});
+
+	test("short JSON and brackets in prose stay in the sentence", () => {
+		const text = 'Set {"a":1} and see [the docs](https://x.y) for [1, 2].';
+		expect(parseGateQuestion(`Go on?\n\n${text}`).context).toEqual([
+			{ label: null, kind: "text", value: text },
+		]);
+	});
+
+	test("a Label: last line of a paragraph names the block below it", () => {
+		expect(
+			parseGateQuestion(
+				"Go on?\n\nBuilder: built.\nOpen findings:\n\n```json\n[1]\n```",
+			).context,
+		).toEqual([
+			{ label: null, kind: "text", value: "Builder: built." },
+			{
+				label: "Open findings",
+				kind: "code",
+				language: "json",
+				value: "[\n  1\n]",
+			},
+		]);
+	});
+
+	test("one fact per line keeps its line, lists keep their Markdown", () => {
+		expect(
+			parseGateQuestion("Go on?\n\nBuilder: built.\nTests: pass.\n- one\n- two")
+				.context,
+		).toEqual([
+			{
+				label: null,
+				kind: "text",
+				value: "Builder: built.  \nTests: pass.\n- one\n- two",
+			},
+		]);
+	});
+
 	test("a question that starts with code is all headline", () => {
 		const text = "```\nx\n```\nOK?";
 		expect(parseGateQuestion(text)).toEqual({ headline: text, context: [] });
@@ -89,5 +142,15 @@ describe("gateParts", () => {
 		expect(parts.headline).toBe("Review the pull request?");
 		expect(parts.context).toEqual([]);
 		expect(parts.links.map((link) => link.short)).toEqual(["#3"]);
+	});
+
+	test("a label above a list of links goes with the links", () => {
+		const parts = gateParts(
+			"Review them?\n\nDraft pull requests:\n\n- https://github.com/a/b/pull/3\n- https://github.com/a/b/pull/4\n\nBuilder: built.",
+		);
+		expect(parts.context).toEqual([
+			{ label: null, kind: "text", value: "Builder: built." },
+		]);
+		expect(parts.links.map((link) => link.short)).toEqual(["#3", "#4"]);
 	});
 });

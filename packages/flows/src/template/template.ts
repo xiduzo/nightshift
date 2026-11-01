@@ -86,6 +86,78 @@ export function renderTemplate(text: string, context: TemplateContext): string {
 	);
 }
 
+/** Plain values, each as it is when it goes in a Markdown list. */
+function isScalar(value: JsonValue): value is string | number | boolean {
+	return (
+		typeof value === "string" ||
+		typeof value === "number" ||
+		typeof value === "boolean"
+	);
+}
+
+/**
+ * An object or array as lines of its own: a list of plain values as a
+ * Markdown list, anything else as a fenced JSON block. "" when empty.
+ * null for any other value.
+ */
+function asBlock(value: JsonValue | undefined): string | null {
+	if (typeof value !== "object" || value === null) return null;
+	const entries = Array.isArray(value) ? value : Object.keys(value);
+	if (entries.length === 0) return "";
+	if (Array.isArray(value) && value.every(isScalar)) {
+		return value
+			.map((item) => `- ${String(item).replace(/\n/g, "\n  ")}`)
+			.join("\n");
+	}
+	return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+}
+
+/** One line of `renderReadable`, or null when all its references are empty. */
+function readableLine(line: string, context: TemplateContext): string | null {
+	let out = "";
+	let last = 0;
+	let refs = 0;
+	let filled = 0;
+	let afterBlock = false;
+	for (const match of line.matchAll(TEMPLATE_REF)) {
+		const [raw, name = "", keys = ""] = match;
+		const literal = line.slice(last, match.index);
+		out += afterBlock ? literal.trimStart() : literal;
+		last = match.index + raw.length;
+		refs++;
+		const value = lookupRef(context, toRef(raw, name, keys));
+		const block = asBlock(value);
+		afterBlock = block !== null && block !== "";
+		if (afterBlock) {
+			out = `${out.trimEnd()}\n\n${block}\n\n`;
+			filled++;
+		} else if (block === null) {
+			const text = asText(value);
+			if (text.trim() !== "") filled++;
+			out += text;
+		}
+	}
+	const tail = line.slice(last);
+	out += afterBlock ? tail.trimStart() : tail;
+	return refs === 0 || filled > 0 ? out : null;
+}
+
+/**
+ * Renders text a person reads, such as the question of a Gate. As
+ * `renderTemplate`, but an object or array never sits inside a sentence:
+ * it gets lines of its own (see `asBlock`). A line whose references all
+ * render empty is left out, so a step that did not run leaves no
+ * "Approver: ." behind.
+ */
+export function renderReadable(text: string, context: TemplateContext): string {
+	const lines: string[] = [];
+	for (const line of text.split("\n")) {
+		const rendered = readableLine(line, context);
+		if (rendered !== null) lines.push(rendered);
+	}
+	return lines.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 /** Whether the template is exactly one reference, whitespace around it allowed. */
 export function isOnlyRef(text: string): boolean {
 	return ONLY_REF.test(text);

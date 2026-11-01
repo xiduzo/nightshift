@@ -10,6 +10,7 @@ import {
 	choiceItemSchema,
 	type GateDeadline as DeadlineSpec,
 	type JsonValue,
+	renderReadable,
 	renderTemplate,
 	renderValue,
 	type TemplateContext,
@@ -89,7 +90,7 @@ export function askGate(
 	const fallback = how.default ?? node.default;
 	return {
 		question:
-			how.question ?? ((tctx) => renderTemplate(node.prompt ?? "", tctx)),
+			how.question ?? ((tctx) => renderReadable(node.prompt ?? "", tctx)),
 		choices: [ANSWER],
 		...(deadline ? { deadline } : {}),
 		outputs: { ...how.outputs, data: null },

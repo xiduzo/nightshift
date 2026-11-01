@@ -25,6 +25,7 @@ export {
 } from "./rule";
 export {
 	renderCommand,
+	renderReadable,
 	renderTemplate,
 	renderValue,
 	TEMPLATE_REF,

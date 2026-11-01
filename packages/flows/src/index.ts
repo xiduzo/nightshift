@@ -385,6 +385,7 @@ export {
 	type RuleOutcome,
 	type RunField,
 	renderCommand,
+	renderReadable,
 	renderTemplate,
 	renderValue,
 	type SchemaCheck,

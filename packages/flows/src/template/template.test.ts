@@ -3,6 +3,7 @@ import type { TemplateContext } from "./context";
 import {
 	lookupRef,
 	renderCommand,
+	renderReadable,
 	renderTemplate,
 	renderValue,
 	templateEnvName,
@@ -315,5 +316,38 @@ describe("renderCommand", () => {
 			cwd: "/tmp",
 		});
 		expect(proc.stdout.toString().trim()).toBe('done $(touch pwned) "quoted"');
+	});
+});
+
+describe("renderReadable", () => {
+	test("a list of plain values becomes a Markdown list on its own lines", () => {
+		expect(
+			renderReadable("Tags: {{planner.data.tasks.0.tags}}\nDone.", context),
+		).toBe("Tags:\n\n- auth\n- ui\n\nDone.");
+	});
+
+	test("an object becomes a fenced JSON block on its own lines", () => {
+		const tasks = (context.nodes.planner as { data: { tasks: unknown } }).data
+			.tasks;
+		expect(
+			renderReadable("Tasks: {{planner.data.tasks}} Go on?", context),
+		).toBe(
+			`Tasks:\n\n\`\`\`json\n${JSON.stringify(tasks, null, 2)}\n\`\`\`\n\nGo on?`,
+		);
+	});
+
+	test("a line whose references are all empty is left out", () => {
+		expect(
+			renderReadable(
+				"Check {{check.outcome}}\nApprover: {{approver.outcome}}. {{approver.data.reason}}\nWorker: {{worker.data}}\nPlain line",
+				context,
+			),
+		).toBe("Check fail\nPlain line");
+	});
+
+	test("text and scalars render as renderTemplate does", () => {
+		const text =
+			"Epic {{epic}}, {{planner.data.count}} tasks, done {{planner.data.tasks.1.done}}";
+		expect(renderReadable(text, context)).toBe(renderTemplate(text, context));
 	});
 });
