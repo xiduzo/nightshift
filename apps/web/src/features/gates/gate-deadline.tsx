@@ -3,7 +3,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { AlarmClockIcon } from "lucide-react";
 import { outcomeLabel } from "@/features/flows";
 import type { OpenGate } from "@/shared/api";
-import { formatDateTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 
 /**
  * What happens to a Gate with a deadline when nobody answers: "Night Shift
@@ -33,13 +33,12 @@ export function GateDeadline({
 					{outcomeLabel(deadline.choose)}
 				</span>{" "}
 				at{" "}
-				<time
-					dateTime={new Date(deadline.at).toISOString()}
-					title={formatDateTime(deadline.at)}
+				<LocalTime
+					at={deadline.at}
 					className="font-medium text-foreground tabular-nums"
 				>
 					{time}
-				</time>
+				</LocalTime>
 				{day}.
 			</span>
 		</p>

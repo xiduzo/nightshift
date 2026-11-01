@@ -1,4 +1,5 @@
 import {
+	hoverTime,
 	type RunSummary,
 	runActions,
 	useRunPrefetch,
@@ -62,7 +63,7 @@ export const StoppedRunRow = memo(function StoppedRunRow({
 				detail={run.reason ?? undefined}
 				href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
 				onPressIn={() => prefetch(run.id)}
-				accessibilityHint="Opens the run"
+				accessibilityHint={`${hoverTime(run.endedAt ?? run.createdAt)}. Opens the run`}
 			/>
 			<View className="flex-row flex-wrap items-center gap-2 px-4 pb-4">
 				{retry ? (

@@ -49,7 +49,7 @@ import { toast } from "sonner";
 import { WalkerBadge, walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { orpc, SERVER_URL } from "@/shared/api";
-import { dayWord, formatDateTime, formatTime } from "@/shared/format";
+import { dayWord, formatTime, hoverTime } from "@/shared/format";
 import { runMutations } from "../queries";
 import { CostText } from "./cost-text";
 import { useWorkTime } from "./elapsed";
@@ -107,7 +107,7 @@ export function RunTitle({
 				{stoppable && run.stopAt ? (
 					<Badge
 						variant="outline"
-						title={`No new step starts after ${formatDateTime(run.stopAt)}.`}
+						title={`No new step starts after ${hoverTime(run.stopAt)}.`}
 					>
 						<AlarmClockIcon aria-hidden="true" />
 						Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}

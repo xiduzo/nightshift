@@ -14,6 +14,7 @@ import {
 import { GitBranchIcon, ListChecksIcon } from "lucide-react";
 import { ItemStateBadge } from "@/features/flows";
 import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type {
 	ItemEndItem,
 	ItemStartItem,
@@ -29,7 +30,7 @@ export function ItemsRead({ item }: { item: ItemsReadItem }) {
 			</MarkerIcon>
 			<MarkerContent>
 				Read {item.count} {item.count === 1 ? "item" : "items"} · {item.open}{" "}
-				open · {formatTime(item.at)}
+				open · <LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 			</MarkerContent>
 		</Marker>
 	);
@@ -103,7 +104,7 @@ export function ItemEnd({
 				) : null}
 			</ItemContent>
 			<ItemActions className="self-start text-muted-foreground text-xs tabular-nums">
-				{formatTime(item.at)}
+				<LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 			</ItemActions>
 		</Item>
 	);

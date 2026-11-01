@@ -21,6 +21,7 @@ import type { OtherDevice } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 
 /** Where a person changes what another device has. */
 function openOn(device: Pick<OtherDevice, "name">): string {
@@ -42,9 +43,17 @@ export function OtherDeviceDetail({ device }: { device: OtherDevice }) {
 						: device.online
 							? "Online. "
 							: "Offline. "}
-					{device.checkedAt === null
-						? openOn(device)
-						: `Updated ${formatRelative(device.checkedAt, now)}. ${openOn(device)}`}
+					{device.checkedAt === null ? (
+						openOn(device)
+					) : (
+						<>
+							Updated{" "}
+							<LocalTime at={device.checkedAt}>
+								{formatRelative(device.checkedAt, now)}
+							</LocalTime>
+							. {openOn(device)}
+						</>
+					)}
 				</>
 			}
 		>
@@ -125,7 +134,10 @@ function SecretNames({ device, now }: { device: OtherDevice; now: number }) {
 						<ItemTitle className="font-mono">{secret.name}</ItemTitle>
 						{secret.setAt === null ? null : (
 							<ItemDescription>
-								Set {formatRelative(secret.setAt, now)}
+								Set{" "}
+								<LocalTime at={secret.setAt}>
+									{formatRelative(secret.setAt, now)}
+								</LocalTime>
 							</ItemDescription>
 						)}
 					</ItemContent>

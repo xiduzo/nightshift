@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { CostWithTokens, RunStatusIcon } from "@/features/runs";
 import type { NightsRange } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { CellLines, MoreRows } from "./table-cells";
 
 type FailedRun = NightsRange["runs"]["failed"]["rows"][number];
@@ -51,12 +52,9 @@ function failureColumns(now: number) {
 						<>
 							<span className="font-mono">{original.group}</span>
 							{", "}
-							<time
-								dateTime={new Date(original.createdAt).toISOString()}
-								title={formatDateTime(original.createdAt)}
-							>
+							<LocalTime at={original.createdAt}>
 								{formatRelative(original.createdAt, now)}
-							</time>
+							</LocalTime>
 						</>
 					}
 				>
@@ -128,9 +126,16 @@ function SinceThen({ after, now }: { after: FailedRun["after"]; now: number }) {
 	return (
 		<CellLines
 			sub={
-				after.runs === 1
-					? `1 run since, ${formatRelative(last.createdAt, now)}`
-					: `${after.finished} of ${after.runs} runs since finished`
+				after.runs === 1 ? (
+					<>
+						1 run since,{" "}
+						<LocalTime at={last.createdAt}>
+							{formatRelative(last.createdAt, now)}
+						</LocalTime>
+					</>
+				) : (
+					`${after.finished} of ${after.runs} runs since finished`
+				)
 			}
 		>
 			<span className="inline-flex items-center gap-1.5">

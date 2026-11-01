@@ -56,7 +56,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CopyProjectHere, projectQueries } from "@/features/projects";
-import { formatDateTime } from "@/shared/format";
+import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
 import { type PaletteItem, paletteMeta } from "../canvas/node-type";
@@ -884,7 +884,7 @@ function Editor({
 						/>
 						{shownRevision ? (
 							<ProposalBar
-								title={`What the revision of ${formatDateTime(shownRevision.at)} changed`}
+								title={`What the revision of ${hoverTime(shownRevision.at)} changed`}
 								onHide={() => setShownRevision(null)}
 								className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
 							>

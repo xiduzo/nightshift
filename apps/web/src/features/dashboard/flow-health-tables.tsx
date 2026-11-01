@@ -8,10 +8,11 @@ import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	costWithTokens,
 	formatCost,
-	formatDateTime,
 	formatDuration,
 	formatRelative,
+	hoverTime,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { ChartSection, MoreRows } from "./details";
 import { RUN_STATUS_CHART } from "./run-statuses";
 
@@ -83,13 +84,12 @@ function warningColumns(now: number, onNavigate: () => void) {
 			enableSorting: true,
 			cell: ({ row: { original } }) => (
 				<span className="flex items-center gap-2">
-					<time
-						dateTime={new Date(original.last.at).toISOString()}
-						title={formatDateTime(original.last.at)}
+					<LocalTime
+						at={original.last.at}
 						className="text-muted-foreground text-xs"
 					>
 						{formatRelative(original.last.at, now)}
-					</time>
+					</LocalTime>
 					<Button
 						variant="link"
 						size="xs"
@@ -177,13 +177,12 @@ function reasonColumns(now: number) {
 			header: "Last",
 			enableSorting: true,
 			cell: ({ row: { original } }) => (
-				<time
-					dateTime={new Date(original.lastAt).toISOString()}
-					title={formatDateTime(original.lastAt)}
+				<LocalTime
+					at={original.lastAt}
 					className="text-muted-foreground text-xs"
 				>
 					{formatRelative(original.lastAt, now)}
-				</time>
+				</LocalTime>
 			),
 			meta: { headClassName: "w-28" },
 		}),
@@ -239,7 +238,7 @@ function latestColumns(now: number, onNavigate: () => void) {
 						size="xs"
 						className="h-auto px-0 font-normal text-muted-foreground"
 						nativeButton={false}
-						aria-label={`Open run, started ${formatDateTime(original.startedAt)}`}
+						aria-label={`Open run, started ${hoverTime(original.startedAt)}`}
 						render={
 							<Link
 								to="/runs/$runId"
@@ -251,12 +250,9 @@ function latestColumns(now: number, onNavigate: () => void) {
 							/>
 						}
 					>
-						<time
-							dateTime={new Date(original.startedAt).toISOString()}
-							title={formatDateTime(original.startedAt)}
-						>
+						<LocalTime at={original.startedAt}>
 							{formatRelative(original.startedAt, now)}
-						</time>
+						</LocalTime>
 					</Button>
 				</span>
 			),

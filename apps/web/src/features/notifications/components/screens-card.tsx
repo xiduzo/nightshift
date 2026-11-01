@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import type { NotificationScreen } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { currentSubscription, ownScreenId, setOwnScreenId } from "../browser";
 import { notificationMutations, notificationQueries } from "../queries";
 
@@ -150,9 +151,21 @@ export function ScreensCard() {
 												</ItemTitle>
 												<ItemDescription>
 													{KINDS[screen.kind]}
-													{screen.lastSeenAt
-														? `, last used ${formatRelative(screen.lastSeenAt)}`
-														: `, added ${formatRelative(screen.createdAt)}`}
+													{screen.lastSeenAt ? (
+														<>
+															, last used{" "}
+															<LocalTime at={screen.lastSeenAt}>
+																{formatRelative(screen.lastSeenAt)}
+															</LocalTime>
+														</>
+													) : (
+														<>
+															, added{" "}
+															<LocalTime at={screen.createdAt}>
+																{formatRelative(screen.createdAt)}
+															</LocalTime>
+														</>
+													)}
 												</ItemDescription>
 											</ItemContent>
 											<ItemActions>

@@ -55,6 +55,7 @@ import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { StatusText } from "@/shared/status";
 import { FactTile } from "@/shared/tiles";
+import { TimeText } from "@/shared/time";
 import { runStatusLook } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { AskWhyCard } from "./ask-why-card";
@@ -270,9 +271,12 @@ function RunBody({
 				</Text>
 				<View className="flex-row flex-wrap items-center gap-1.5">
 					<StatusText look={runStatusLook(status, shown.result)} />
-					<Text className="text-muted-foreground text-sm">
+					<TimeText
+						at={run.endedAt ?? run.createdAt}
+						className="text-muted-foreground text-sm"
+					>
 						{`· ${runTimeLine(run, status, formatTime)}`}
-					</Text>
+					</TimeText>
 					{live.connection === "reconnecting" && !ended ? (
 						<Text className="text-muted-foreground text-sm">
 							· Reconnecting…

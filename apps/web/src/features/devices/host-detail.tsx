@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { LeaveHostButton } from "./leave-host";
 import type { SpaceHost } from "./space-view";
 import { HostStatus, OnlineDot } from "./status-badges";
@@ -62,13 +63,21 @@ function LinkedHostDetail({
 			subtitle={
 				<span className="flex flex-wrap items-center gap-2">
 					<HostStatus status={host.status} />
-					{host.status === "online"
-						? "Connected now."
-						: host.status === "connecting"
-							? "Connecting."
-							: host.status === "revoked"
-								? "It removed the access of this computer."
-								: `Not connected since ${formatRelative(host.since, now)}.`}
+					{host.status === "online" ? (
+						"Connected now."
+					) : host.status === "connecting" ? (
+						"Connecting."
+					) : host.status === "revoked" ? (
+						"It removed the access of this computer."
+					) : (
+						<>
+							Not connected since{" "}
+							<LocalTime at={host.since}>
+								{formatRelative(host.since, now)}
+							</LocalTime>
+							.
+						</>
+					)}
 				</span>
 			}
 		>

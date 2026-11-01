@@ -26,6 +26,11 @@ pre-commit:
         - "**/package.json"
         - "**/tsconfig.json"
       run: bun scripts/check-verticals.ts
+    - name: time
+      glob:
+        - "*.{ts,tsx}"
+        - "scripts/time-debt.txt"
+      run: bun scripts/check-time.ts
     - name: check tests
       glob:
         - "scripts/check-*.ts"

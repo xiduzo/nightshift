@@ -15,6 +15,7 @@ import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { authClient } from "@/shared/api";
 import { formatDayTime } from "@/shared/format";
 import { PanelHeader } from "@/shared/panel";
+import { LocalTime } from "@/shared/time";
 import { useWorkTime } from "../elapsed";
 import { RunStatusBadge } from "../run-status-badge";
 import { InputsSection, VariablesSection } from "./run-details-data";
@@ -263,7 +264,7 @@ function HistorySection({ run }: { run: RunDetail }) {
 				{run.resumes.map((resume) => (
 					<li key={`${resume.at}-${resume.nodeId}`} className="flex gap-2">
 						<span className="shrink-0 text-muted-foreground tabular-nums">
-							{formatDayTime(resume.at)}
+							<LocalTime at={resume.at}>{formatDayTime(resume.at)}</LocalTime>
 						</span>
 						<span className="min-w-0">
 							{resume.by === "daemon"

@@ -32,7 +32,8 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useId } from "react";
 import type { ScheduleSummary } from "@/shared/api";
-import { formatDateTime, formatDayTime } from "@/shared/format";
+import { formatDayTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { WebhookAddress, webhookAddress } from "./webhook-fields";
 
 /** One webhook a schedule received. */
@@ -57,15 +58,22 @@ function outcomeOf(delivery: WebhookDelivery): string | null {
 }
 
 /** The latest webhook, as one line of the schedule list. */
-export function LastDelivery({ delivery }: { delivery: WebhookDelivery }) {
+export function LastDelivery({
+	delivery,
+	zone,
+	device,
+}: {
+	delivery: WebhookDelivery;
+	/** The schedule's clock, when it is not this computer's. */
+	zone?: string;
+	/** The computer the schedule runs on. */
+	device?: string | null;
+}) {
 	return (
 		<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 whitespace-normal text-muted-foreground text-xs">
-			<time
-				dateTime={new Date(delivery.at).toISOString()}
-				title={formatDateTime(delivery.at)}
-			>
+			<LocalTime at={delivery.at} zone={zone} device={device}>
 				{formatDayTime(delivery.at)}
-			</time>
+			</LocalTime>
 			<Badge
 				variant={delivery.result === "refused" ? "destructive" : "secondary"}
 			>
@@ -146,7 +154,11 @@ export function WebhookDialog({
 										>
 											<ItemContent className="min-w-0">
 												<ItemTitle>
-													<LastDelivery delivery={delivery} />
+													<LastDelivery
+														delivery={delivery}
+														zone={schedule.timeZone}
+														device={schedule.device}
+													/>
 												</ItemTitle>
 												{outcomeOf(delivery) ? (
 													<ItemDescription className="line-clamp-none">

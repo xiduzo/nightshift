@@ -1,6 +1,7 @@
 import {
 	flowLabel,
 	formatKnownCost,
+	hoverTime,
 	type OpenGate,
 	type RunSummary,
 	usageLabel,
@@ -49,7 +50,7 @@ export function NightRunRow({ run, now }: { run: NightRun; now: number }) {
 			valueLabel={atWork ? `at work for ${value}` : `started ${value}`}
 			href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
 			onPressIn={() => prefetch(run.id)}
-			accessibilityHint="Opens the run"
+			accessibilityHint={`${hoverTime(run.createdAt)}. Opens the run`}
 		/>
 	);
 }
@@ -79,7 +80,7 @@ function StoppedRunRow({
 			detail={run.reason ?? undefined}
 			href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
 			onPressIn={() => prefetch(run.id)}
-			accessibilityHint="Opens the run"
+			accessibilityHint={`${hoverTime(run.endedAt ?? run.createdAt)}. Opens the run`}
 		/>
 	);
 }

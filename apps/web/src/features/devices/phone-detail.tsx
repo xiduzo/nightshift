@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import type { Phone } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { deviceMutations, deviceQueries } from "./queries";
 
 /**
@@ -38,14 +39,20 @@ export function PhoneDetail({
 			icon={<SmartphoneIcon />}
 			kicker={`Your phone on ${hostName}`}
 			title={phone.name}
-			subtitle={[
-				phone.platform ? `${platformName(phone.platform)}.` : null,
-				phone.lastSeenAt
-					? `Last seen ${formatRelative(phone.lastSeenAt, now)}.`
-					: null,
-			]
-				.filter(Boolean)
-				.join(" ")}
+			subtitle={
+				<>
+					{phone.platform ? `${platformName(phone.platform)}. ` : null}
+					{phone.lastSeenAt ? (
+						<>
+							Last seen{" "}
+							<LocalTime at={phone.lastSeenAt}>
+								{formatRelative(phone.lastSeenAt, now)}
+							</LocalTime>
+							.
+						</>
+					) : null}
+				</>
+			}
 			actions={[
 				{
 					label: "Sign out",

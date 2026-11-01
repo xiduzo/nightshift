@@ -10,7 +10,8 @@ import {
 	MarkerIcon,
 } from "@nightshift/ui/components/marker";
 import { MoonIcon, SunriseIcon } from "lucide-react";
-import { formatDateTime, formatRelative, formatTime } from "@/shared/format";
+import { formatRelative, formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type { WaitItem, WakeItem } from "../transcript-items";
 
 const WAIT_TITLE: Record<WaitItem["reason"], string> = {
@@ -41,13 +42,9 @@ export function WaitCard({ item }: { item: WaitItem }) {
 	const at =
 		until === null ? null : (
 			<>
-				<time
-					dateTime={new Date(until).toISOString()}
-					title={formatDateTime(until)}
-					className="text-foreground tabular-nums"
-				>
+				<LocalTime at={until} className="text-foreground tabular-nums">
 					{formatTime(until)}
-				</time>{" "}
+				</LocalTime>{" "}
 				({formatRelative(until)})
 			</>
 		);

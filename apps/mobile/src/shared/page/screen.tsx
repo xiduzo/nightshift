@@ -18,6 +18,8 @@ type ScreenProps = {
 	 * you · 2 Spaces". The native header has no room for it.
 	 */
 	summary?: string;
+	/** The standardized time of that line, for the screen reader. */
+	summaryHint?: string;
 	/**
 	 * What stays at the bottom while the body scrolls: an ActionBar. It
 	 * sits above the home indicator, and above the keyboard while one is
@@ -66,9 +68,19 @@ export function useRefreshControl(
 }
 
 /** The muted line under the native title. */
-export function Summary({ text }: { text: string | undefined }) {
+export function Summary({
+	text,
+	hint,
+}: {
+	text: string | undefined;
+	hint?: string;
+}) {
 	if (!text) return null;
-	return <Text className="text-muted-foreground text-sm">{text}</Text>;
+	return (
+		<Text className="text-muted-foreground text-sm" accessibilityHint={hint}>
+			{text}
+		</Text>
+	);
 }
 
 /**
@@ -78,7 +90,13 @@ export function Summary({ text }: { text: string | undefined }) {
  * body starts below the header and ends above the tab bar, which iOS
  * draws translucent over it.
  */
-export function Screen({ children, onRefresh, summary, footer }: ScreenProps) {
+export function Screen({
+	children,
+	onRefresh,
+	summary,
+	summaryHint,
+	footer,
+}: ScreenProps) {
 	const [footerHeight, setFooterHeight] = useState(0);
 	const { colors } = useThemeColors();
 	const insets = useSafeAreaInsets();
@@ -94,7 +112,7 @@ export function Screen({ children, onRefresh, summary, footer }: ScreenProps) {
 				automaticallyAdjustKeyboardInsets
 				refreshControl={refreshControl}
 			>
-				<Summary text={summary} />
+				<Summary text={summary} hint={summaryHint} />
 				{children}
 			</ScrollView>
 		);
@@ -114,7 +132,7 @@ export function Screen({ children, onRefresh, summary, footer }: ScreenProps) {
 				bottomOffset={footerHeight + gap}
 				refreshControl={refreshControl}
 			>
-				<Summary text={summary} />
+				<Summary text={summary} hint={summaryHint} />
 				{children}
 			</KeyboardAwareScrollView>
 			<KeyboardStickyView

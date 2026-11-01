@@ -27,8 +27,8 @@ import {
 import { useId } from "react";
 import { projectQueries } from "@/features/projects";
 import type { OpenGate } from "@/shared/api";
-import { formatDateTime } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
+import { LocalTime } from "@/shared/time";
 import { AskAttachments } from "../ask-attachments";
 import { AskForm } from "../ask-form";
 import { GateChoiceForm } from "../gate-choice-form";
@@ -93,13 +93,9 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 						>
 							<HourglassIcon aria-hidden="true" />
 							waiting{" "}
-							<time
-								dateTime={new Date(gate.openedAt).toISOString()}
-								title={`Opened ${formatDateTime(gate.openedAt)}`}
-								className="tabular-nums"
-							>
+							<LocalTime at={gate.openedAt} className="tabular-nums">
 								{waitedText(now - gate.openedAt)}
-							</time>
+							</LocalTime>
 						</Badge>
 						<span>
 							{gate.flowName ? (

@@ -16,6 +16,7 @@ const ALLOWED: Record<string, "types" | "values"> = {
 	"@nightshift/engine/run-status": "values",
 	"@nightshift/flows": "values",
 	"@nightshift/notifications/contract": "values",
+	"@nightshift/time": "values",
 	"@orpc/client": "values",
 	"@orpc/client/fetch": "values",
 	"@orpc/client/plugins": "values",
@@ -176,6 +177,28 @@ describe("the run rule it reads", () => {
 				{ "@nightshift/refusal": "values" },
 				false,
 			),
+		);
+		expect(found).toEqual([]);
+	});
+});
+
+describe("the clock it reads", () => {
+	test("imports date-fns only, and uses no API of one platform", () => {
+		const dir = join(import.meta.dir, "../../time/src");
+		const files = sourceFiles(dir).filter(
+			(file) =>
+				!file.includes("/cron") &&
+				!file.endsWith("/cron.ts") &&
+				!file.includes("/testing/"),
+		);
+		expect(files.length).toBeGreaterThan(1);
+		const found = files.flatMap((file) =>
+			violations(relative(dir, file), readFileSync(file, "utf8"), {
+				"date-fns": "values",
+				"date-fns/locale/en-GB": "values",
+				"@date-fns/tz": "values",
+				"@date-fns/utc": "values",
+			}),
 		);
 		expect(found).toEqual([]);
 	});

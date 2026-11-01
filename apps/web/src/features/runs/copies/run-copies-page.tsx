@@ -21,6 +21,7 @@ import type { RunCopy } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { RunStatusBadge } from "../components/run-status-badge";
 import { RunCopyMenu } from "./run-copy-menu";
 
@@ -156,32 +157,21 @@ function RunCell({ copy }: { copy: RunCopy }) {
 				) : (
 					<>
 						{copy.endedAt ? "Ended " : "Started "}
-						<time
-							dateTime={new Date(ended).toISOString()}
-							title={formatDateTime(ended)}
-						>
-							{formatRelative(ended)}
-						</time>
+						<LocalTime at={ended}>{formatRelative(ended)}</LocalTime>
 						{copy.removed && !hasLeftovers(copy) ? (
 							<>
 								. Removed{" "}
 								{copy.removed.by === "cleanup" ? "by the cleanup " : ""}
-								<time
-									dateTime={new Date(copy.removed.at).toISOString()}
-									title={formatDateTime(copy.removed.at)}
-								>
+								<LocalTime at={copy.removed.at}>
 									{formatRelative(copy.removed.at)}
-								</time>
+								</LocalTime>
 							</>
 						) : copy.cleanupAt ? (
 							<>
 								. Cleaned up from{" "}
-								<time
-									dateTime={new Date(copy.cleanupAt).toISOString()}
-									title={formatDateTime(copy.cleanupAt)}
-								>
+								<LocalTime at={copy.cleanupAt}>
 									{formatDateTime(copy.cleanupAt)}
-								</time>
+								</LocalTime>
 							</>
 						) : hasLeftovers(copy) && !copy.safe ? (
 							". Kept until you remove it."

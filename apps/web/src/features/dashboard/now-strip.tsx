@@ -3,6 +3,7 @@ import { HourglassIcon, LoaderCircleIcon } from "lucide-react";
 import { useOpenGates } from "@/features/gates";
 import type { DashboardSummary } from "@/shared/api";
 import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 
 /**
  * What runs and what waits for you right now, in one slim line. Only when
@@ -42,7 +43,8 @@ export function NowStrip({
 			) : null}
 			{nextWake ? (
 				<span className="text-muted-foreground">
-					Next wake-up at {formatTime(nextWake)}
+					Next wake-up at{" "}
+					<LocalTime at={nextWake}>{formatTime(nextWake)}</LocalTime>
 				</span>
 			) : null}
 		</div>

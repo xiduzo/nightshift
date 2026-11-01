@@ -42,6 +42,8 @@ import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { client, type MergePreview, type MergeResult } from "@/shared/api";
+import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 
 import { MergePreviewList } from "./merge-preview";
 import { formatUserCode } from "./platform";
@@ -417,11 +419,7 @@ function CodeStep({ step }: { step: Extract<Step, { kind: "code" }> }) {
 			<p className="flex items-center gap-2 text-muted-foreground text-sm">
 				<Spinner />
 				Keep this window open. The code works until{" "}
-				{new Date(step.expiresAt).toLocaleTimeString([], {
-					hour: "2-digit",
-					minute: "2-digit",
-				})}
-				.
+				<LocalTime at={step.expiresAt}>{formatTime(step.expiresAt)}</LocalTime>.
 			</p>
 			<DialogFooter>
 				<DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>

@@ -1,48 +1,33 @@
 import {
 	compactCount,
+	formatDateTime as dateTimeOf,
+	formatDayTime as dayTimeOf,
 	formatCost,
 	formatKnownCost,
 	type KnownCost,
+	now,
+	formatRelative as relativeOf,
+	formatTime as timeOf,
 	tokensLabel,
 	type UsageTokens,
 	usageLabel,
 } from "@nightshift/client";
+import { nextTimeOfDay } from "@nightshift/flows";
 
 // One way to write a cost on every screen: the phone uses the same two.
 export { formatCost, formatKnownCost, type KnownCost };
 
-const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-	["year", 365 * 24 * 60 * 60 * 1000],
-	["month", 30 * 24 * 60 * 60 * 1000],
-	["day", 24 * 60 * 60 * 1000],
-	["hour", 60 * 60 * 1000],
-	["minute", 60 * 1000],
-];
-
 /** "3 minutes ago", "yesterday", "just now". */
-export function formatRelative(epochMs: number, now = Date.now()): string {
-	const diff = epochMs - now;
-	for (const [unit, ms] of UNITS) {
-		if (Math.abs(diff) >= ms) {
-			return relativeTime.format(Math.round(diff / ms), unit);
-		}
-	}
-	return "just now";
+export function formatRelative(epochMs: number, at = now()): string {
+	return relativeOf(epochMs, at);
 }
 
 export function formatDateTime(epochMs: number): string {
-	return new Date(epochMs).toLocaleString(undefined, {
-		dateStyle: "medium",
-		timeStyle: "short",
-	});
+	return dateTimeOf(epochMs);
 }
 
 export function formatTime(epochMs: number): string {
-	return new Date(epochMs).toLocaleTimeString(undefined, {
-		timeStyle: "short",
-	});
+	return timeOf(epochMs);
 }
 
 /** A step that runs and has not reported any spend yet: its cost is not known. */
@@ -167,29 +152,21 @@ export function formatDuration(ms: number): string {
 
 /** "Thu 16 Oct, 07:00": a moment within the next days, with its weekday. */
 export function formatDayTime(epochMs: number): string {
-	return new Date(epochMs).toLocaleString(undefined, {
-		weekday: "short",
-		day: "numeric",
-		month: "short",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
+	return dayTimeOf(epochMs);
 }
 
 /**
  * The next time the clock shows `hhmm` ("07:00"): later today, else tomorrow.
  * Null when the text is not a time.
  */
-export function nextOccurrence(hhmm: string, now = Date.now()): number | null {
+export function nextOccurrence(hhmm: string, at = now()): number | null {
 	const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
 	if (!match) return null;
 	const hours = Number(match[1]);
 	const minutes = Number(match[2]);
 	if (hours > 23 || minutes > 59) return null;
-	const date = new Date(now);
-	date.setHours(hours, minutes, 0, 0);
-	if (date.getTime() <= now) date.setDate(date.getDate() + 1);
-	return date.getTime();
+	const text = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+	return nextTimeOfDay(text, at);
 }
 
 /** A file size in bytes, as a person reads it: `512 B`, `12 KB`, `3.4 MB`. */

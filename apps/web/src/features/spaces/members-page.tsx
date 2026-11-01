@@ -65,6 +65,7 @@ import type {
 } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { CreateSpaceDialog } from "./create-space-dialog";
 import { copyInvitationLink, InviteDialog } from "./invite-dialog";
 import { spaceMutations, spaceQueries } from "./queries";
@@ -413,7 +414,10 @@ function InvitationItem({
 				</ItemTitle>
 				<ItemDescription className="truncate">
 					Invited by {invitation.inviterName}. The link works until{" "}
-					{formatDateTime(invitation.expiresAt)}.
+					<LocalTime at={invitation.expiresAt}>
+						{formatDateTime(invitation.expiresAt)}
+					</LocalTime>
+					.
 				</ItemDescription>
 			</ItemContent>
 			{canCancel ? (

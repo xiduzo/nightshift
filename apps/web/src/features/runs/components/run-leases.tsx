@@ -27,7 +27,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { orpc, type RunDetail } from "@/shared/api";
-import { formatDateTime, formatRelative } from "@/shared/format";
+import { formatRelative } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { runMutations } from "../queries";
 
 type RunLease = RunDetail["leases"][number];
@@ -108,12 +109,7 @@ function LeaseRow({
 }) {
 	const held = lease.state === "held";
 	const since = (
-		<time
-			dateTime={new Date(lease.since).toISOString()}
-			title={formatDateTime(lease.since)}
-		>
-			{formatRelative(lease.since)}
-		</time>
+		<LocalTime at={lease.since}>{formatRelative(lease.since)}</LocalTime>
 	);
 	return (
 		<Item variant="outline" size="sm">

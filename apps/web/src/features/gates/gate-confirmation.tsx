@@ -16,9 +16,10 @@ import { HandIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { outcomeLabel, outcomeStyle } from "@/features/flows";
 import type { GateChoice, OpenGate } from "@/shared/api";
-import { formatDateTime, formatRelative } from "@/shared/format";
+import { formatRelative } from "@/shared/format";
 import { LargerTextarea } from "@/shared/larger-window";
 import { InlineMarkdown } from "@/shared/markdown";
+import { LocalTime } from "@/shared/time";
 import { GateDeadline } from "./gate-deadline";
 import { ContextList } from "./gate-question";
 import { useResolveGate } from "./use-resolve-gate";
@@ -130,12 +131,7 @@ export function GateConfirmation({
 				</ItemTitle>
 				<ItemDescription className="text-xs">
 					Waiting for you · opened{" "}
-					<time
-						dateTime={new Date(openedAt).toISOString()}
-						title={formatDateTime(openedAt)}
-					>
-						{formatRelative(openedAt)}
-					</time>
+					<LocalTime at={openedAt}>{formatRelative(openedAt)}</LocalTime>
 				</ItemDescription>
 			</ItemContent>
 			{beside ? <ItemActions>{buttons}</ItemActions> : null}

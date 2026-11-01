@@ -16,7 +16,7 @@ import {
 import { cn } from "@nightshift/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { formatDateTime } from "@/shared/format";
+import { hoverTime } from "@/shared/format";
 
 /** A section break in the transcript: a session, an element, a decision. */
 export function Divider({
@@ -32,7 +32,7 @@ export function Divider({
 		<Marker variant="separator" className="text-xs">
 			<MarkerContent>
 				<h3 className="inline font-medium text-foreground">{title}</h3>
-				<span title={formatDateTime(at)}>
+				<span title={hoverTime(at)}>
 					{" "}
 					· {details.filter(Boolean).join(" · ")}
 				</span>

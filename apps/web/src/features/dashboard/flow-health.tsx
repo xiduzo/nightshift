@@ -22,11 +22,11 @@ import {
 	costHalfSentence,
 	costWithTokens,
 	formatCost,
-	formatDateTime,
 	formatRelative,
 	typicalCostSentence,
 	useNow,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { FlowHealthDialog } from "./flow-health-dialog";
 import { projectFlowsQuery } from "./queries";
 
@@ -187,13 +187,12 @@ function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
 					</Link>
 				))}
 			</div>
-			<time
-				dateTime={new Date(row.last.startedAt).toISOString()}
-				title={formatDateTime(row.last.startedAt)}
+			<LocalTime
+				at={row.last.startedAt}
 				className="text-muted-foreground text-xs"
 			>
 				Last run {formatRelative(row.last.startedAt, now)}
-			</time>
+			</LocalTime>
 		</div>
 	);
 }

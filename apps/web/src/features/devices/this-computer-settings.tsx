@@ -50,6 +50,7 @@ import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { LargerTextarea } from "@/shared/larger-window";
 import { PageSection } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { deviceIcon } from "./device-icon";
 import { JoinHostDialog } from "./join-host-dialog";
 import { LeaveHostButton } from "./leave-host";
@@ -173,7 +174,11 @@ function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 							<ItemTitle>Status</ItemTitle>
 							{lease ? (
 								<ItemDescription className="line-clamp-none">
-									On {lease.host} since {formatDateTime(lease.since)}.
+									On {lease.host} since{" "}
+									<LocalTime at={lease.since}>
+										{formatDateTime(lease.since)}
+									</LocalTime>
+									.
 								</ItemDescription>
 							) : (
 								<Skeleton className="h-4 w-64" />

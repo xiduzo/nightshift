@@ -48,7 +48,8 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { HarnessRow } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { useCliCheck } from "./connections/cli-panel";
 import {
 	type KeyValueRow,
@@ -405,12 +406,12 @@ export function CustomAgentDetail({
 							Edit
 						</Button>
 						{data ? (
-							<span
+							<LocalTime
+								at={data.checkedAt}
 								className="ml-auto text-muted-foreground text-xs"
-								title={formatDateTime(data.checkedAt)}
 							>
 								Checked {formatTime(data.checkedAt)}
-							</span>
+							</LocalTime>
 						) : null}
 					</div>
 				</div>

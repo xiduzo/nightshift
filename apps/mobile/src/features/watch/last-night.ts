@@ -1,6 +1,7 @@
 import {
 	type DashboardSummary,
 	formatKnownCost,
+	formatLongDay,
 	tokensLabel,
 } from "@nightshift/client";
 
@@ -105,12 +106,7 @@ export function todayLine(
 	now: number,
 	time: (epochMs: number) => string,
 ): string {
-	const day = new Date(now).toLocaleDateString(undefined, {
-		weekday: "long",
-		day: "numeric",
-		month: "long",
-	});
-	return `${day} · ${time(now)}`;
+	return `${formatLongDay(now)} · ${time(now)}`;
 }
 
 /** The statuses of a run that has not ended. */

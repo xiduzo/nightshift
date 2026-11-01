@@ -20,7 +20,8 @@ import { ServerIcon, ServerOffIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { RunDetail } from "@/shared/api";
-import { formatDateTime, formatRelative } from "@/shared/format";
+import { formatRelative } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { runQueries } from "../queries";
 
 type RunService = RunDetail["services"][number];
@@ -58,12 +59,7 @@ function ServiceRow({
 		enabled: open,
 	});
 	const since = (
-		<time
-			dateTime={new Date(service.since).toISOString()}
-			title={formatDateTime(service.since)}
-		>
-			{formatRelative(service.since)}
-		</time>
+		<LocalTime at={service.since}>{formatRelative(service.since)}</LocalTime>
 	);
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>

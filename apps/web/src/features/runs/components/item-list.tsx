@@ -30,7 +30,7 @@ import {
 import { ItemStateBadge } from "@/features/flows";
 import type { ItemState, ItemSummary, StepSummary } from "@/shared/api";
 import { JsonDetails } from "@/shared/code";
-import { formatTime } from "@/shared/format";
+import { hoverTime } from "@/shared/format";
 import { useOpenedStep } from "../hooks/use-opened-step";
 import { type ItemScope, itemsOf, scopeKey } from "../lib/run-steps";
 import { Elapsed } from "./elapsed";
@@ -191,7 +191,7 @@ function ItemRow({
 			<ItemActions className="gap-1">
 				<span
 					className="text-muted-foreground text-xs tabular-nums"
-					title={`Started ${formatTime(item.startedAt)}`}
+					title={`Started ${hoverTime(item.startedAt)}`}
 				>
 					<Elapsed start={item.startedAt} end={item.endedAt ?? null} />
 				</span>

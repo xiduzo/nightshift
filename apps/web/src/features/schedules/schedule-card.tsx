@@ -42,12 +42,8 @@ import type {
 	ScheduleResult,
 	ScheduleSummary,
 } from "@/shared/api";
-import {
-	dayWord,
-	formatDateTime,
-	formatDayTime,
-	formatTime,
-} from "@/shared/format";
+import { dayWord, formatDayTime, formatTime, hoverTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { LastDelivery } from "./webhook-deliveries";
 
 /**
@@ -87,6 +83,7 @@ export function ScheduleCard({
 	onWebhook: () => void;
 }) {
 	const name = scheduleName(schedule);
+	const runsOn = schedule.device?.trim() || needs[0]?.name || null;
 	const errors = schedule.issues.filter((issue) => issue.severity === "error");
 	const StartIcon = schedule.webhook ? WebhookIcon : CalendarClockIcon;
 	return (
@@ -154,10 +151,15 @@ export function ScheduleCard({
 						schedule={schedule}
 						now={now}
 						schedulerOff={schedulerOff}
+						device={runsOn}
 					/>
 				</div>
-				<LastRuns lastRuns={lastRuns} />
-				<LastStart schedule={schedule} />
+				<LastRuns
+					lastRuns={lastRuns}
+					zone={schedule.timeZone}
+					device={runsOn}
+				/>
+				<LastStart schedule={schedule} device={runsOn} />
 				{needs.length > 0 ? (
 					<Part label="Runs on">
 						<RunsOn machines={needs} />
@@ -217,10 +219,12 @@ function NextStart({
 	schedule,
 	now,
 	schedulerOff,
+	device,
 }: {
 	schedule: ScheduleSummary;
 	now: number;
 	schedulerOff: boolean;
+	device: string | null;
 }) {
 	const { nextAt } = schedule;
 	const main = !schedule.enabled
@@ -245,13 +249,14 @@ function NextStart({
 				<span className="font-medium text-sm">{main}</span>
 			) : (
 				<>
-					<time
-						dateTime={new Date(nextAt).toISOString()}
-						title={formatDateTime(nextAt)}
+					<LocalTime
+						at={nextAt}
+						zone={schedule.timeZone}
+						device={device}
 						className="font-medium text-sm"
 					>
 						{dayWord(nextAt, now)} {formatTime(nextAt)}
-					</time>
+					</LocalTime>
 					<span className="text-muted-foreground text-xs tabular-nums">
 						in {waitedText(nextAt - now)}
 					</span>
@@ -262,7 +267,15 @@ function NextStart({
 }
 
 /** The status of its last runs, newest first, and how many that ended finished. */
-function LastRuns({ lastRuns }: { lastRuns: ScheduleLastRuns }) {
+function LastRuns({
+	lastRuns,
+	zone,
+	device,
+}: {
+	lastRuns: ScheduleLastRuns;
+	zone?: string;
+	device?: string | null;
+}) {
 	const { runs, ended, finished } = lastRuns;
 	if (runs.length === 0) {
 		return (
@@ -285,7 +298,9 @@ function LastRuns({ lastRuns }: { lastRuns: ScheduleLastRuns }) {
 							<RunStatusIcon
 								status={run.status}
 								result={run.result}
-								context={{ after: formatDayTime(run.createdAt) }}
+								context={{
+									after: hoverTime(run.createdAt, { zone, device }),
+								}}
 								className="[&>svg]:size-3.5"
 							/>
 						</Link>
@@ -310,32 +325,47 @@ function LastRuns({ lastRuns }: { lastRuns: ScheduleLastRuns }) {
  * What the last start did when it did not start a run: a cron time that
  * failed or was skipped, or the latest webhook.
  */
-function LastStart({ schedule }: { schedule: ScheduleSummary }) {
+function LastStart({
+	schedule,
+	device,
+}: {
+	schedule: ScheduleSummary;
+	device: string | null;
+}) {
 	if (schedule.webhook) {
 		const [latest] = schedule.deliveries;
 		return latest ? (
 			<Part label="Last webhook">
-				<LastDelivery delivery={latest} />
+				<LastDelivery
+					delivery={latest}
+					zone={schedule.timeZone}
+					device={device}
+				/>
 			</Part>
 		) : null;
 	}
 	return schedule.last && schedule.last.kind !== "fired" ? (
-		<LastResult result={schedule.last} />
+		<LastResult
+			result={schedule.last}
+			zone={schedule.timeZone}
+			device={device}
+		/>
 	) : null;
 }
 
 function LastResult({
 	result,
+	zone,
+	device,
 }: {
 	result: Exclude<ScheduleResult, { kind: "fired" }>;
+	zone?: string;
+	device?: string | null;
 }) {
 	const when = (
-		<time
-			dateTime={new Date(result.at).toISOString()}
-			title={formatDateTime(result.at)}
-		>
+		<LocalTime at={result.at} zone={zone} device={device}>
 			{formatDayTime(result.at)}
-		</time>
+		</LocalTime>
 	);
 	if (result.kind === "failed") {
 		return (
@@ -346,7 +376,11 @@ function LastResult({
 	}
 	return (
 		<p className="text-muted-foreground text-xs">
-			Skipped {formatTime(result.at)}: {result.reason}
+			Skipped{" "}
+			<LocalTime at={result.at} zone={zone} device={device}>
+				{formatTime(result.at)}
+			</LocalTime>
+			: {result.reason}
 			{result.runId ? (
 				<>
 					{" "}

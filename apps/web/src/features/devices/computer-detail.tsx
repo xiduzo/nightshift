@@ -38,6 +38,7 @@ import { RunStatusBadge } from "@/features/runs/components/run-status-badge";
 import type { OfferView, RunSummary } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { deviceMutations, deviceQueries, offerQueries } from "./queries";
 import type { SpaceComputer } from "./space-view";
 import { ComputerStatus, computerLine } from "./status-badges";
@@ -141,7 +142,10 @@ export function ComputerDetail({
 										{run.startedBy?.name
 											? `${run.startedBy.name} started it`
 											: "Started"}{" "}
-										{formatRelative(run.createdAt, now)}.
+										<LocalTime at={run.createdAt}>
+											{formatRelative(run.createdAt, now)}
+										</LocalTime>
+										.
 									</ItemDescription>
 								</ItemContent>
 								<ItemActions>
@@ -207,9 +211,17 @@ export function ComputerDetail({
 			{computer.paired ? (
 				<DetailSection title="Paired">
 					<p className="text-sm">
-						{revoked
-							? "You removed its access. To use it here again, pair it again."
-							: `Paired on ${formatDateTime(computer.paired.pairedAt)}.`}{" "}
+						{revoked ? (
+							"You removed its access. To use it here again, pair it again."
+						) : (
+							<>
+								Paired on{" "}
+								<LocalTime at={computer.paired.pairedAt}>
+									{formatDateTime(computer.paired.pairedAt)}
+								</LocalTime>
+								.
+							</>
+						)}{" "}
 						{computer.paired.homeHost !== null && !revoked
 							? "This computer keeps its settings."
 							: null}
@@ -312,7 +324,10 @@ function ThisComputerOffers({ spaceId }: { spaceId: string }) {
 														</ItemTitle>
 														<ItemDescription className="text-xs">
 															{run.startedBy ?? "Someone"} started it{" "}
-															{formatRelative(run.createdAt, now)}.
+															<LocalTime at={run.createdAt}>
+																{formatRelative(run.createdAt, now)}
+															</LocalTime>
+															.
 														</ItemDescription>
 													</ItemContent>
 													<ItemActions>

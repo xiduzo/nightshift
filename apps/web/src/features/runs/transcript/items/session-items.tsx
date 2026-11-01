@@ -27,6 +27,7 @@ import {
 	formatTokens,
 } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
+import { LocalTime } from "@/shared/time";
 import type {
 	ErrorItem,
 	FinishedItem,
@@ -61,12 +62,7 @@ export function SessionBoundary({
 					<h3 className="font-medium text-foreground">
 						{number === undefined ? "Session" : `Session ${number}`}
 					</h3>
-					<time
-						dateTime={new Date(at).toISOString()}
-						title={formatDateTime(at)}
-					>
-						{details.join(" · ")}
-					</time>
+					<LocalTime at={at}>{details.join(" · ")}</LocalTime>
 				</MarkerContent>
 			</Marker>
 			<PromptBubble
@@ -173,9 +169,9 @@ export function SessionError({ item }: { item: ErrorItem }) {
 				{usageLimit && item.resetAt ? (
 					<p>
 						Resets{" "}
-						<time dateTime={new Date(item.resetAt).toISOString()}>
+						<LocalTime at={item.resetAt}>
 							{formatDateTime(item.resetAt)}
-						</time>{" "}
+						</LocalTime>{" "}
 						({formatRelative(item.resetAt)}). Resume the run after that.
 					</p>
 				) : null}

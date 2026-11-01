@@ -49,7 +49,7 @@ import {
 	useSpaceMachines,
 } from "@/features/devices";
 import { RunStatusIcon } from "@/features/runs/flows-port";
-import { formatDateTime } from "@/shared/format";
+import { hoverTime } from "@/shared/format";
 import { NODE_TYPE } from "./canvas/node-type";
 
 /**
@@ -160,7 +160,10 @@ function startHint(start: FlowStart): string {
 	const { nextAt } = start.schedule;
 	return nextAt === null
 		? "No next start."
-		: `Starts next on ${formatDateTime(nextAt)}.`;
+		: `Starts next on ${hoverTime(nextAt, {
+				zone: start.schedule.timeZone,
+				device: start.schedule.device,
+			})}.`;
 }
 
 /** Every way the flow starts besides you, one chip each. */

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { Phone } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type { SpaceHost } from "./space-view";
 import { HostStatus, ONLINE } from "./status-badges";
 
@@ -124,8 +125,11 @@ export function HostCard({
 						<CircleAlertIcon />
 						<AlertTitle>This computer cannot reach {linked.name}</AlertTitle>
 						<AlertDescription>
-							Not connected since {formatRelative(linked.since, now)}. Night
-							Shift tries again, and syncs when it answers.
+							Not connected since{" "}
+							<LocalTime at={linked.since}>
+								{formatRelative(linked.since, now)}
+							</LocalTime>
+							. Night Shift tries again, and syncs when it answers.
 						</AlertDescription>
 						<AlertAction>
 							<Button
@@ -161,9 +165,13 @@ export function HostCard({
 								<SmartphoneIcon data-icon="inline-start" />
 								{phone.name}
 								<span className="text-muted-foreground">
-									{phone.lastSeenAt
-										? formatRelative(phone.lastSeenAt, now)
-										: platformName(phone.platform)}
+									{phone.lastSeenAt ? (
+										<LocalTime at={phone.lastSeenAt}>
+											{formatRelative(phone.lastSeenAt, now)}
+										</LocalTime>
+									) : (
+										platformName(phone.platform)
+									)}
 								</span>
 							</Button>
 						))}

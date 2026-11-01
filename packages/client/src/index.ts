@@ -285,3 +285,16 @@ export {
 	type SpaceRole,
 	spaceChanged,
 } from "./spaces";
+export {
+	atWall,
+	formatDateTime,
+	formatDayTime,
+	formatLongDay,
+	formatRelative,
+	formatTime,
+	hourOf,
+	hoverTime,
+	iso,
+	now,
+	wall,
+} from "./time";

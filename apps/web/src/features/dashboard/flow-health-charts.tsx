@@ -17,7 +17,7 @@ import type { FlowRange, RunStatus } from "@/shared/api";
 import {
 	costWithTokens,
 	formatCost,
-	formatDateTime,
+	hoverTime,
 	typicalCostSentence,
 } from "@/shared/format";
 import { ChartSection, DetailsEmpty, Swatch } from "./details";
@@ -113,7 +113,7 @@ export function CostPerRun({
 	const rows = runs.map((run, index) => ({
 		key: `${run.runId}-${index}`,
 		label: formatNightShort(run.night),
-		title: formatDateTime(run.startedAt),
+		title: hoverTime(run.startedAt),
 		costUsd: run.costUsd,
 		tokens: run.tokens,
 		status: run.status,

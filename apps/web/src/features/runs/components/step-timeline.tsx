@@ -39,7 +39,7 @@ import type { RunStatus, StepSummary } from "@/shared/api";
 import {
 	formatKnownCost,
 	formatStepUsage,
-	formatTime,
+	hoverTime,
 	noCostYet,
 	sumKnownCost,
 } from "@/shared/format";
@@ -440,7 +440,7 @@ function StepRow({
 						/>
 					}
 					duration={<StepDuration step={step} />}
-					durationTitle={`Started ${formatTime(step.startedAt)}`}
+					durationTitle={`Started ${hoverTime(step.startedAt)}`}
 					cost={cost}
 				/>
 			</Item>

@@ -1,7 +1,9 @@
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
+import type { ReactNode } from "react";
 import type { LinkedHost } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type { SpaceComputer } from "./space-view";
 
 export const ONLINE =
@@ -24,13 +26,21 @@ export function ComputerStatus({ computer }: { computer: SpaceComputer }) {
 }
 
 /** How a computer is now, in one sentence. */
-export function computerLine(computer: SpaceComputer, now: number): string {
+export function computerLine(computer: SpaceComputer, now: number): ReactNode {
 	if (computer.paired?.revokedAt != null)
 		return "It can no longer sync with this computer.";
 	if (computer.thisDevice) return "Night Shift runs here now.";
 	if (computer.online) return "Connected now.";
 	if (computer.lastSeenAt)
-		return `Last seen ${formatRelative(computer.lastSeenAt, now)}.`;
+		return (
+			<>
+				Last seen{" "}
+				<LocalTime at={computer.lastSeenAt}>
+					{formatRelative(computer.lastSeenAt, now)}
+				</LocalTime>
+				.
+			</>
+		);
 	if (computer.online === false) return "Not connected yet.";
 	return "Night Shift cannot tell if it is online.";
 }

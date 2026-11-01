@@ -6,6 +6,7 @@ import {
 } from "@nightshift/ui/components/marker";
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type { CommandItem, ExitItem, LogItem } from "../transcript-items";
 import { Terminal, type TerminalState } from "./terminal";
 import { TerminalOutput } from "./terminal-output";
@@ -74,7 +75,7 @@ export function CommandExit({ item }: { item: ExitItem }) {
 					: passed
 						? "The command succeeded"
 						: `The command failed with code ${item.exitCode}`}{" "}
-				· {formatTime(item.at)}
+				· <LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 			</MarkerContent>
 		</Marker>
 	);

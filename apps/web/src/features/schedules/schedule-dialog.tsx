@@ -61,6 +61,7 @@ import {
 } from "@/features/flows";
 import { CopyProjectHere, projectQueries } from "@/features/projects";
 import { formatDayTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { scheduleQueries } from "./queries";
 import {
 	WebhookFields,
@@ -610,9 +611,7 @@ function ScheduleForm({
 									{preview.data.times.map((time, index) => (
 										<span key={time}>
 											{index > 0 ? ", " : null}
-											<time dateTime={new Date(time).toISOString()}>
-												{formatDayTime(time)}
-											</time>
+											<LocalTime at={time}>{formatDayTime(time)}</LocalTime>
 										</span>
 									))}
 								</>

@@ -8,7 +8,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { spaceQueries } from "@/features/spaces";
-import { formatRelative, useNow } from "@/shared/format";
+import { formatRelative, hoverTime, useNow } from "@/shared/format";
 import { type Machine, type SpaceMachines, spaceMachines } from "./machines";
 import { deviceQueries } from "./queries";
 import { spaceView } from "./space-view";
@@ -43,7 +43,7 @@ function statusLine(machine: Machine, now: number): string {
 	if (machine.online === null)
 		return "Night Shift cannot tell if it is online.";
 	if (machine.lastSeenAt) {
-		return `Offline. Last seen ${formatRelative(machine.lastSeenAt, now)}.`;
+		return `Offline. Last seen ${formatRelative(machine.lastSeenAt, now)}. ${hoverTime(machine.lastSeenAt)}.`;
 	}
 	return "Offline.";
 }

@@ -35,8 +35,9 @@ import { StartRunDialog } from "@/features/flows";
 import { ProjectPage } from "@/features/projects";
 import type { KnowledgeFile, KnowledgeUse } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatDateTime, formatRelative, formatSize } from "@/shared/format";
+import { formatRelative, formatSize, hoverTime } from "@/shared/format";
 import { PageHeading, PageSection } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
@@ -394,7 +395,7 @@ function fileColumns(
 						{used ? (
 							<span
 								className="whitespace-nowrap text-muted-foreground text-sm tabular-nums"
-								title={`Last used ${formatDateTime(used.lastAt)}`}
+								title={`Last used ${hoverTime(used.lastAt)}`}
 							>
 								Found {used.found}, read {used.read}
 							</span>
@@ -418,13 +419,12 @@ function fileColumns(
 		column.accessor("changedAt", {
 			header: "Changed",
 			cell: ({ row }) => (
-				<time
-					dateTime={new Date(row.original.changedAt).toISOString()}
-					title={formatDateTime(row.original.changedAt)}
+				<LocalTime
+					at={row.original.changedAt}
 					className="whitespace-nowrap text-muted-foreground text-sm"
 				>
 					{formatRelative(row.original.changedAt)}
-				</time>
+				</LocalTime>
 			),
 			meta: { cellClassName: "py-3" },
 		}),

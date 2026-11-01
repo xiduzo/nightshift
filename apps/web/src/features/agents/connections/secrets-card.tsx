@@ -57,8 +57,9 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { SecretView } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { connectionMutations, connectionQueries } from "../queries";
 import { OUTSIDE_HINT } from "./parts";
 
@@ -119,16 +120,9 @@ function usersOf(secret: SecretView): string[] {
 	];
 }
 
-/** A moment as "3 minutes ago", with the date and time on hover. */
+/** A moment as "3 minutes ago", with the UTC time on hover. */
 function Ago({ at, now }: { at: number; now: number }) {
-	return (
-		<Tooltip>
-			<TooltipTrigger render={<time dateTime={new Date(at).toISOString()} />}>
-				{formatRelative(at, now)}
-			</TooltipTrigger>
-			<TooltipContent>{formatDateTime(at)}</TooltipContent>
-		</Tooltip>
-	);
+	return <LocalTime at={at}>{formatRelative(at, now)}</LocalTime>;
 }
 
 /** When a value was last saved: "—" when it is not saved here, or saved before the date was kept. */

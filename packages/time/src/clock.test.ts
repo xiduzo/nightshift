@@ -10,6 +10,7 @@ import {
 	nightOf,
 	parseInstant,
 	utc,
+	wall,
 } from "./clock";
 
 describe("a night runs from noon to noon on the reader's clock", () => {
@@ -71,6 +72,16 @@ describe("hours start on the reader's clock", () => {
 			"2026-05-01T10:30:00.000Z",
 		]);
 		expect((hours[1] ?? 0) - (hours[0] ?? 0)).toBe(HOUR_MS);
+	});
+
+	test("the seconds follow the zone, including an old offset of seconds", () => {
+		// Paris in 1891 is 9 minutes and 21 seconds ahead of UTC.
+		const at = parseInstant("1891-06-01T00:00:40Z");
+		expect(wall(at, "Europe/Paris")).toMatchObject({
+			hour: 0,
+			minute: 10,
+			second: 1,
+		});
 	});
 
 	test("a time zone this runtime does not know is refused", () => {

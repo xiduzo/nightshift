@@ -6,8 +6,9 @@ import { HourglassIcon, MoonIcon, ZapIcon } from "lucide-react";
 import { useState } from "react";
 import { useOpenGates } from "@/features/gates";
 import { ProjectPage } from "@/features/projects";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatTime } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { useProjectRuns } from "../hooks/use-project-runs";
 import { QuickRunDialog } from "./new-run-form";
 import { RunList } from "./run-list";
@@ -49,12 +50,9 @@ export function ProjectRunsPage({ projectId }: { projectId: string }) {
 											{nextWake ? (
 												<>
 													, wakes{" "}
-													<time
-														dateTime={new Date(nextWake).toISOString()}
-														title={formatDateTime(nextWake)}
-													>
+													<LocalTime at={nextWake}>
 														{formatTime(nextWake)}
-													</time>
+													</LocalTime>
 												</>
 											) : null}
 										</Badge>

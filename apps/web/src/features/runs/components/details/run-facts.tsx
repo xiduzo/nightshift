@@ -11,6 +11,7 @@ import { CopyIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { formatDateTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 
 export function Time({
 	at,
@@ -20,12 +21,9 @@ export function Time({
 	format?: (epochMs: number) => string;
 }) {
 	return (
-		<time
-			dateTime={new Date(at).toISOString()}
-			className="truncate tabular-nums"
-		>
+		<LocalTime at={at} className="truncate tabular-nums">
 			{format(at)}
-		</time>
+		</LocalTime>
 	);
 }
 

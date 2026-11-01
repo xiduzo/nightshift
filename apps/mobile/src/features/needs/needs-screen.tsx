@@ -1,4 +1,8 @@
-import { createProjectQueries, type RunSummary } from "@nightshift/client";
+import {
+	createProjectQueries,
+	hoverTime,
+	type RunSummary,
+} from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -145,6 +149,10 @@ export function NeedsScreen() {
 		[projectNames, sends, onRetry, onLeave, onKeep, onDelete],
 	);
 
+	const firstGate = needs.items.find((item) => item.kind === "gate");
+	const firstDeadline =
+		firstGate?.kind === "gate" ? firstGate.gate.deadline?.at : undefined;
+
 	const empty =
 		!needs.loading &&
 		needs.items.length === 0 &&
@@ -165,6 +173,9 @@ export function NeedsScreen() {
 				needs.items.length > 0
 					? needsSummary(needs.items, formatTime)
 					: undefined
+			}
+			summaryHint={
+				firstDeadline === undefined ? undefined : hoverTime(firstDeadline)
 			}
 			header={
 				<>

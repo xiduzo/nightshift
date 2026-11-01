@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { notificationQueries } from "@/features/notifications";
 import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 
 /**
  * The last morning digest on top of the inbox, as the phone shows it: its
@@ -28,7 +29,7 @@ export function DigestGroup({ now }: { now: number }) {
 				<div className="px-2">
 					<h2 className="font-medium text-sm">Your last digest</h2>
 					<p className="text-muted-foreground text-xs">
-						Sent at {formatTime(data.to)}
+						Sent at <LocalTime at={data.to}>{formatTime(data.to)}</LocalTime>
 					</p>
 				</div>
 				<p className="px-2 text-muted-foreground text-xs">{data.body}</p>

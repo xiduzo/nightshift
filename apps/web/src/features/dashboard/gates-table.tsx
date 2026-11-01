@@ -4,7 +4,8 @@ import { Progress } from "@nightshift/ui/components/progress";
 import { Link } from "@tanstack/react-router";
 import type { NightsRange } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { CellLines, MoreRows } from "./table-cells";
 
 type GatesGroup = NightsRange["gates"]["groups"]["rows"][number];
@@ -47,12 +48,9 @@ function gateColumns(now: number) {
 			cell: ({ row: { original } }) => (
 				<CellLines
 					sub={
-						<time
-							dateTime={new Date(original.lastAskedAt).toISOString()}
-							title={formatDateTime(original.lastAskedAt)}
-						>
+						<LocalTime at={original.lastAskedAt}>
 							Last asked {formatRelative(original.lastAskedAt, now)}
-						</time>
+						</LocalTime>
 					}
 				>
 					<span className="font-mono">{original.label}</span>

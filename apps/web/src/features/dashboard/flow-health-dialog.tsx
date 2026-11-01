@@ -15,6 +15,7 @@ import {
 	formatKnownCost,
 	useNow,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import {
 	DetailsDialog,
 	DetailsEmpty,
@@ -201,9 +202,11 @@ function FlowHealthDetails({
 											: "—"
 									}
 									hint={
-										inRange.dearest
-											? formatDateTime(inRange.dearest.startedAt)
-											: undefined
+										inRange.dearest ? (
+											<LocalTime at={inRange.dearest.startedAt}>
+												{formatDateTime(inRange.dearest.startedAt)}
+											</LocalTime>
+										) : undefined
 									}
 								/>
 							</div>

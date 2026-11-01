@@ -22,7 +22,8 @@ import type {
 	NightsRange,
 	Project,
 } from "@/shared/api";
-import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { formatRelative, hoverTime, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { dashboardQueries } from "./queries";
 
 /** How many last runs a project shows. */
@@ -129,19 +130,15 @@ function LastRuns({
 							status={run.status}
 							context={{
 								before: run.flow,
-								after: formatRelative(run.startedAt, now),
+								after: hoverTime(run.startedAt),
 							}}
 						/>
 					</span>
 				))}
 			</div>
-			<time
-				dateTime={new Date(last.startedAt).toISOString()}
-				title={formatDateTime(last.startedAt)}
-				className="text-muted-foreground text-xs"
-			>
+			<LocalTime at={last.startedAt} className="text-muted-foreground text-xs">
 				Last run {formatRelative(last.startedAt, now)}
-			</time>
+			</LocalTime>
 		</div>
 	);
 }

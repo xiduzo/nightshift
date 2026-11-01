@@ -72,6 +72,18 @@ export function formatWeekday(
 	return zoned(at, { weekday: "long" }, timeZone);
 }
 
+/** "Saturday, October 31": the day on the viewer's clock, with its weekday. */
+export function formatLongDay(
+	at: Instant,
+	timeZone: string = localZone(),
+): string {
+	return zoned(
+		at,
+		{ weekday: "long", day: "numeric", month: "long" },
+		timeZone,
+	);
+}
+
 /**
  * "3 minutes ago", "yesterday", "just now". A minute or less is "just now".
  * Longer spans use the same units the screens already show.

@@ -152,7 +152,11 @@ export function ListRow({
 
 	if (!opens) {
 		return (
-			<View accessible accessibilityLabel={label}>
+			<View
+				accessible
+				accessibilityLabel={label}
+				accessibilityHint={accessibilityHint}
+			>
 				{body}
 			</View>
 		);

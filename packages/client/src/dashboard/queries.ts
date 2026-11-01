@@ -1,4 +1,5 @@
 import type { ApiQueryUtils } from "../api";
+import { localZone } from "../time";
 import type { DashboardInput } from "./types";
 
 /**
@@ -15,7 +16,7 @@ const POLL_MS = 5 * 60_000;
  * schedule someone saves runs on it.
  */
 export function readerTimeZone(): string {
-	return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+	return localZone();
 }
 
 /** The query options of the dashboard, and how often it polls. */

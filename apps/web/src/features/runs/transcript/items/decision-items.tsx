@@ -22,7 +22,8 @@ import { AlarmClockIcon, BracesIcon, HandIcon, SplitIcon } from "lucide-react";
 import { outcomeLabel, outcomeStyle, stepStateStyle } from "@/features/flows";
 import { GateQuestion as GateQuestionText } from "@/features/gates";
 import { JsonBlock } from "@/shared/code";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type {
 	DecisionAskItem,
 	DecisionItem,
@@ -187,12 +188,7 @@ export function GateQuestion({ item }: { item: GateOpenItem }) {
 						</TraceIcon>
 						<TraceTitle>Asked: {plainText(headline)}</TraceTitle>
 						<TraceDescription>
-							<time
-								dateTime={new Date(item.at).toISOString()}
-								title={formatDateTime(item.at)}
-							>
-								{formatTime(item.at)}
-							</time>
+							<LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 						</TraceDescription>
 					</TraceLine>
 				</TraceCollapsibleTrigger>
@@ -234,13 +230,7 @@ export function GateResolved({ item }: { item: GateResolvedItem }) {
 					<span className={cn("font-medium font-mono", text)}>
 						{outcomeLabel(item.choice)}
 					</span>{" "}
-					·{" "}
-					<time
-						dateTime={new Date(item.at).toISOString()}
-						title={formatDateTime(item.at)}
-					>
-						{formatTime(item.at)}
-					</time>
+					· <LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 				</MarkerContent>
 			</Marker>
 			{item.note.trim() ? (

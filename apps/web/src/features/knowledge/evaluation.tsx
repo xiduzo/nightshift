@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { type KnowledgeEvaluation, orpc } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
 
 /** The ways to search, as the page names them. */
@@ -140,7 +141,9 @@ export function SearchEvaluation({
 					</Table>
 					<Ranks evaluation={result} />
 					<p className="text-muted-foreground text-xs">
-						Tested {formatRelative(result.at)} on this computer.
+						Tested{" "}
+						<LocalTime at={result.at}>{formatRelative(result.at)}</LocalTime> on
+						this computer.
 					</p>
 				</CardContent>
 			) : null}

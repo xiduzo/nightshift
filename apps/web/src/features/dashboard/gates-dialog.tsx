@@ -29,8 +29,9 @@ import type {
 	Project,
 } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { formatRelative, useNow } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
+import { LocalTime } from "@/shared/time";
 import {
 	ChartSection,
 	DetailsDialog,
@@ -280,12 +281,9 @@ function GatesDetails({
 											<ItemDescription className="truncate">
 												{project ? null : `${gate.group}, `}
 												asked{" "}
-												<time
-													dateTime={new Date(gate.openedAt).toISOString()}
-													title={formatDateTime(gate.openedAt)}
-												>
+												<LocalTime at={gate.openedAt}>
 													{formatRelative(gate.openedAt, now)}
-												</time>
+												</LocalTime>
 											</ItemDescription>
 										</ItemContent>
 										<ItemActions>

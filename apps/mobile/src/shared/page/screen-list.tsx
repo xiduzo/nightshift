@@ -16,6 +16,8 @@ type ScreenListProps<T> = Omit<
 	onRefresh?: () => Promise<unknown>;
 	/** The muted line under the native title, as on `Screen`. */
 	summary?: string;
+	/** The standardized time of that line, for the screen reader. */
+	summaryHint?: string;
 	/**
 	 * What comes above the rows: the native header parts (search, toolbar),
 	 * chips, a card. A loading, error or empty state goes here too, with no
@@ -35,6 +37,7 @@ type ScreenListProps<T> = Omit<
 export function ScreenList<T>({
 	onRefresh,
 	summary,
+	summaryHint,
 	header,
 	...list
 }: ScreenListProps<T>) {
@@ -50,7 +53,7 @@ export function ScreenList<T>({
 			refreshControl={refreshControl}
 			ListHeaderComponent={
 				<View className="gap-4 pb-4">
-					<Summary text={summary} />
+					<Summary text={summary} hint={summaryHint} />
 					{header}
 				</View>
 			}

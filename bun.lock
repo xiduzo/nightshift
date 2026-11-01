@@ -241,6 +241,7 @@
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/notifications": "workspace:*",
+        "@nightshift/time": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/tanstack-query": "^1.15.0",
         "mdast-util-from-markdown": "^2.1.0",

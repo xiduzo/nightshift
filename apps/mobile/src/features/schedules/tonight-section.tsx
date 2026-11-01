@@ -1,4 +1,4 @@
-import { scheduleName, scheduleNudges } from "@nightshift/client";
+import { hoverTime, scheduleName, scheduleNudges } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
@@ -122,6 +122,14 @@ const TonightRow = memo(function TonightRow({
 	const allowed = scheduleNudges(schedule, now);
 	const name = scheduleName(schedule);
 	const where = whereLine(entry);
+	const at = entry.started?.at ?? (entry.paused ? null : schedule.nextAt);
+	const hint =
+		at === null
+			? undefined
+			: hoverTime(at, {
+					zone: schedule.timeZone,
+					device: schedule.device ?? entry.computer,
+				});
 
 	let actions: ReactNode = null;
 	if (nudges.hidden) actions = null;
@@ -190,6 +198,7 @@ const TonightRow = memo(function TonightRow({
 				title={name}
 				status={statusOf(entry)}
 				caption={[entry.projectName, ...(where ? [where] : [])]}
+				accessibilityHint={hint}
 			/>
 			{actions ? (
 				<View className="flex-row flex-wrap gap-2 px-4 pb-3">{actions}</View>
@@ -223,7 +232,14 @@ export function OfflineNotices({ tonight }: { tonight: Tonight }) {
 					title={notice.title}
 					caption={notice.caption}
 					href="/computers"
-					accessibilityHint="Opens your computers"
+					accessibilityHint={
+						notice.entry.schedule.nextAt === null
+							? "Opens your computers"
+							: `${hoverTime(notice.entry.schedule.nextAt, {
+									zone: notice.entry.schedule.timeZone,
+									device: notice.entry.computer,
+								})}. Opens your computers`
+					}
 				/>
 			))}
 		</ListGroup>

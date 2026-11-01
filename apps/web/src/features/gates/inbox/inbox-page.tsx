@@ -57,6 +57,7 @@ import { orpc } from "@/shared/api";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
 import { SiteHeader } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { useOpenGates } from "../use-open-gates";
 import { DigestGroup } from "./digest-group";
 import { GateDetail } from "./gate-detail";
@@ -347,7 +348,10 @@ function SleepingGroup({
 									<>
 										{" · "}
 										<span className="text-status-sleeping">
-											wakes {formatTime(run.wakeAt)}{" "}
+											wakes{" "}
+											<LocalTime at={run.wakeAt}>
+												{formatTime(run.wakeAt)}
+											</LocalTime>{" "}
 											<WakeCountdown at={run.wakeAt} />
 										</span>
 									</>

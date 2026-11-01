@@ -1,3 +1,4 @@
+import { dayStart, formatTime, formatWeekday } from "../time";
 import { waitedText } from "./inbox";
 import type { OpenGate } from "./types";
 
@@ -11,12 +12,7 @@ const SOON_MS = 60 * 60_000;
 
 /** The start of the day of a moment, on this device's clock. */
 function dayOf(epochMs: number): number {
-	const date = new Date(epochMs);
-	return new Date(
-		date.getFullYear(),
-		date.getMonth(),
-		date.getDate(),
-	).getTime();
+	return dayStart(epochMs);
 }
 
 /**
@@ -30,15 +26,8 @@ export function deadlineWhen(
 ): { time: string; day: string } {
 	const days = Math.round((dayOf(at) - dayOf(now)) / DAY);
 	const day =
-		days <= 0
-			? ""
-			: days === 1
-				? " tomorrow"
-				: ` on ${new Date(at).toLocaleDateString(undefined, { weekday: "long" })}`;
-	const time = new Date(at).toLocaleTimeString(undefined, {
-		hour: "numeric",
-		minute: "2-digit",
-	});
+		days <= 0 ? "" : days === 1 ? " tomorrow" : ` on ${formatWeekday(at)}`;
+	const time = formatTime(at);
 	return { time, day };
 }
 

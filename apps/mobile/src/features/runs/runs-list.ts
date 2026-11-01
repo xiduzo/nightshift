@@ -1,10 +1,12 @@
 import {
+	atWall,
 	costLabel,
 	flowLabel,
 	hasEnded,
 	type RunStatus,
 	type RunSummary,
 	tokensLabel,
+	wall,
 } from "@nightshift/client";
 
 import { matches, queryWords } from "@/shared/match";
@@ -191,15 +193,15 @@ const MONTHS = [
 ] as const;
 
 function clock(at: number): string {
-	const date = new Date(at);
-	return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+	const shown = wall(at);
+	return `${String(shown.hour).padStart(2, "0")}:${String(shown.minute).padStart(2, "0")}`;
 }
 
-/** The evening a moment belongs to, as the local midnight that starts that day. */
-function eveningOf(at: number): Date {
-	const date = new Date(at);
-	const day = date.getHours() < NOON ? date.getDate() - 1 : date.getDate();
-	return new Date(date.getFullYear(), date.getMonth(), day);
+/** The evening a moment belongs to: midnight that starts that day, on this phone. */
+function eveningOf(at: number): number {
+	const shown = wall(at);
+	const day = shown.hour < NOON ? shown.day - 1 : shown.day;
+	return atWall({ year: shown.year, month: shown.month, day });
 }
 
 /**
@@ -209,28 +211,26 @@ function eveningOf(at: number): Date {
  * 24 October".
  */
 export function nightLabel(startedAt: number, now: number): string {
-	const today = new Date(now);
-	const noonToday = new Date(
-		today.getFullYear(),
-		today.getMonth(),
-		today.getDate(),
-		NOON,
-	).getTime();
+	const today = wall(now);
+	const noonToday = atWall({
+		year: today.year,
+		month: today.month,
+		day: today.day,
+		hour: NOON,
+	});
 	if (startedAt >= noonToday) return "Today";
 	const evening = eveningOf(startedAt);
-	const startOfToday = new Date(
-		today.getFullYear(),
-		today.getMonth(),
-		today.getDate(),
-	).getTime();
-	const days = Math.round((startOfToday - evening.getTime()) / DAY);
+	const startOfToday = atWall({
+		year: today.year,
+		month: today.month,
+		day: today.day,
+	});
+	const days = Math.round((startOfToday - evening) / DAY);
+	const shown = wall(evening);
 	if (days <= 1) return "Last night";
-	if (days < 7) return `${WEEKDAYS[evening.getDay()]} night`;
-	const year =
-		evening.getFullYear() === today.getFullYear()
-			? ""
-			: ` ${evening.getFullYear()}`;
-	return `Night of ${evening.getDate()} ${MONTHS[evening.getMonth()]}${year}`;
+	if (days < 7) return `${WEEKDAYS[shown.weekday]} night`;
+	const year = shown.year === today.year ? "" : ` ${shown.year}`;
+	return `Night of ${shown.day} ${MONTHS[shown.month - 1]}${year}`;
 }
 
 /** The runs of one night, under its heading. */

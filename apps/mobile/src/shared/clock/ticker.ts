@@ -1,3 +1,5 @@
+import { now as clockNow } from "@nightshift/client";
+
 /**
  * One clock per period, shared by every text that shows a time: "12 min",
  * "0:41". It runs one timer while someone listens, and none when nobody
@@ -18,7 +20,7 @@ type Clock = {
 };
 
 const SYSTEM_CLOCK: Clock = {
-	now: Date.now,
+	now: clockNow,
 	every(run, ms) {
 		const timer = setInterval(run, ms);
 		return () => clearInterval(timer);

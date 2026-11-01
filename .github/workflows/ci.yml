@@ -55,6 +55,9 @@ jobs:
       - name: Verticals
         run: bun scripts/check-verticals.ts
 
+      - name: Clock
+        run: bun scripts/check-time.ts
+
       - name: Tests of the checks
         run: bun test ./scripts/
 

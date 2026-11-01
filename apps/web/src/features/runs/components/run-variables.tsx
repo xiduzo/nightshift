@@ -35,7 +35,8 @@ import { useMemo, useState } from "react";
 
 import type { RunDetail, StepSummary } from "@/shared/api";
 import { JsonBlock } from "@/shared/code";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import {
 	previewValue,
 	scopeLabel,
@@ -310,12 +311,9 @@ function VariableHistory({
 										/>
 									</ItemTitle>
 									<ItemDescription>
-										<time
-											dateTime={new Date(change.at).toISOString()}
-											title={formatDateTime(change.at)}
-										>
+										<LocalTime at={change.at}>
 											{formatTime(change.at)}
-										</time>
+										</LocalTime>
 									</ItemDescription>
 								</div>
 								{change.value === null ? (

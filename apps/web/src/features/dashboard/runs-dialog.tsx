@@ -28,6 +28,7 @@ import type {
 } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import {
 	ChartSection,
 	DetailsDialog,
@@ -284,7 +285,9 @@ function RunsDetails({
 												</ItemTitle>
 												<ItemDescription className="truncate">
 													{project ? null : `${run.group}, `}
-													{formatRelative(run.createdAt, now)}
+													<LocalTime at={run.createdAt}>
+														{formatRelative(run.createdAt, now)}
+													</LocalTime>
 													{run.reason ? `: ${run.reason}` : null}
 												</ItemDescription>
 											</ItemContent>

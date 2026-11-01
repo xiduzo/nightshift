@@ -1,5 +1,6 @@
 import {
 	dayWord,
+	hourOf,
 	type KnownComputer,
 	offlineNeeds,
 	type PlannedSchedule,
@@ -81,7 +82,7 @@ export function tonightHint(entries: readonly TonightEntry[]): string {
  * 06:00 within the next day, else "tomorrow at 14:00".
  */
 export function startWhen(at: number, now: number): string {
-	const hour = new Date(at).getHours();
+	const hour = hourOf(at);
 	const night = hour >= 18 || hour < 6;
 	if (night && at - now < 24 * 60 * 60 * 1000) {
 		return `at ${formatTime(at)} tonight`;

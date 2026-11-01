@@ -2,6 +2,7 @@ import {
 	createDashboardQueries,
 	createProjectQueries,
 	type DashboardSummary,
+	hoverTime,
 } from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
@@ -75,16 +76,26 @@ export function WatchScreen() {
 	);
 	const data = summary.data;
 	const numbers = data ? nightNumbers(data) : undefined;
+	const leadGate = needs.items.find((item) => item.kind === "gate");
+	const leadAt =
+		leadGate?.kind === "gate" ? leadGate.gate.deadline?.at : undefined;
 
 	return (
-		<Screen onRefresh={refresh} summary={todayLine(now, formatTime)}>
+		<Screen
+			onRefresh={refresh}
+			summary={todayLine(now, formatTime)}
+			summaryHint={hoverTime(now)}
+		>
 			<TabRootHeader name={person.name} />
 
 			{needs.loading ? (
 				<Skeleton className="h-16 w-full rounded-xl" />
 			) : (
 				<View className="gap-1">
-					<Text className="font-semibold text-xl tracking-tight">
+					<Text
+						className="font-semibold text-xl tracking-tight"
+						accessibilityHint={leadAt ? hoverTime(leadAt) : undefined}
+					>
 						{leadText(needs.items, formatTime)}
 					</Text>
 					{numbers && data?.lastNight ? (

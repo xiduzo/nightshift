@@ -36,12 +36,8 @@ import { toast } from "sonner";
 import { walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
-import {
-	formatCountdown,
-	formatDateTime,
-	formatTime,
-	useNow,
-} from "@/shared/format";
+import { formatCountdown, formatTime, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { runMutations } from "../queries";
 import type { CurrentWait } from "../transcript/transcript";
 import { ResumeComposer } from "./resume-composer";
@@ -247,13 +243,12 @@ function noticeOf({
 			const signal = run.signal ?? wait?.signal ?? null;
 			const reason = wait ? SLEEP_REASON[wait.reason] : "The run sleeps.";
 			const at = until ? (
-				<time
-					dateTime={new Date(until).toISOString()}
-					title={formatDateTime(until)}
+				<LocalTime
+					at={until}
 					className="font-medium text-foreground tabular-nums"
 				>
 					{formatTime(until)}
-				</time>
+				</LocalTime>
 			) : null;
 			if (signal !== null) {
 				return {

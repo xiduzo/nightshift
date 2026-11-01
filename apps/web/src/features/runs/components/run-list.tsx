@@ -30,13 +30,14 @@ import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	costNote,
 	costWithTokens,
-	formatDateTime,
 	formatDuration,
 	formatKnownCost,
 	formatRelative,
 	formatTime,
 	formatTokens,
+	hoverTime,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { RunStatusIcon } from "./run-status-badge";
 
 /**
@@ -216,12 +217,7 @@ function RunTitle({
 				{run.status === "sleeping" && run.wakeAt ? (
 					<span className="shrink-0 text-status-sleeping text-xs">
 						wakes{" "}
-						<time
-							dateTime={new Date(run.wakeAt).toISOString()}
-							title={formatDateTime(run.wakeAt)}
-						>
-							{formatTime(run.wakeAt)}
-						</time>
+						<LocalTime at={run.wakeAt}>{formatTime(run.wakeAt)}</LocalTime>
 					</span>
 				) : null}
 			</div>
@@ -261,8 +257,8 @@ function RunFacts({ run }: { run: RunSummary }) {
 				<Fact
 					label={
 						trigger.kind === "webhook"
-							? `Started by a webhook of the schedule ${trigger.scheduleId}, at ${formatDateTime(trigger.at)}`
-							: `Started by the schedule ${trigger.scheduleId}, for ${formatDateTime(trigger.at)}`
+							? `Started by a webhook of the schedule ${trigger.scheduleId}, at ${hoverTime(trigger.at)}`
+							: `Started by the schedule ${trigger.scheduleId}, for ${hoverTime(trigger.at)}`
 					}
 					copy={{ what: "schedule ID", value: trigger.scheduleId }}
 				>
@@ -348,9 +344,7 @@ function Fact({
 
 function Started({ at, clock }: { at: number; clock: boolean }) {
 	return (
-		<time dateTime={new Date(at).toISOString()} title={formatDateTime(at)}>
-			{clock ? formatTime(at) : formatRelative(at)}
-		</time>
+		<LocalTime at={at}>{clock ? formatTime(at) : formatRelative(at)}</LocalTime>
 	);
 }
 

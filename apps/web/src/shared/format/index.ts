@@ -1,6 +1,11 @@
 /** How times, durations, costs and counts read, and useNow, formatCountdown and dayWord (from `@nightshift/client`). */
 
-export { dayWord, formatCountdown, useNow } from "@nightshift/client";
+export {
+	dayWord,
+	formatCountdown,
+	hoverTime,
+	useNow,
+} from "@nightshift/client";
 export type { KnownCost } from "./format";
 export {
 	costEndsSentence,

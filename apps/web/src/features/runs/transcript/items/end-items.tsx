@@ -1,7 +1,8 @@
 /** The item of an End step: how it ends the run, and its message. */
 import { FlagIcon } from "lucide-react";
 import { END_STATUS_LABEL } from "@/features/flows";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import type { EndItem } from "../transcript-items";
 import { ResultCard } from "./parts";
 
@@ -22,13 +23,7 @@ export function EndCard({ item }: { item: EndItem }) {
 			tone={TONE[item.status]}
 			extra={
 				<span className="text-muted-foreground">
-					·{" "}
-					<time
-						dateTime={new Date(item.at).toISOString()}
-						title={formatDateTime(item.at)}
-					>
-						{formatTime(item.at)}
-					</time>
+					· <LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 				</span>
 			}
 		>

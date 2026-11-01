@@ -10,12 +10,12 @@ import { hasCost, NODE_TYPE, OutcomeBadge, stepState } from "@/features/flows";
 import type { RunStatus, StepSummary } from "@/shared/api";
 import { CodeView, formatJson, JsonBlock } from "@/shared/code";
 import {
-	formatDateTime,
 	formatDuration,
 	formatStepUsage,
 	formatTime,
 	noCostYet,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { UsageContext } from "@/shared/usage";
 import { jsonOutput } from "../lib/run-steps";
 import { CostText } from "./cost-text";
@@ -58,12 +58,7 @@ export function StepLine({
 				className="shrink-0"
 			/>
 			<span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-				<time
-					dateTime={new Date(step.startedAt).toISOString()}
-					title={formatDateTime(step.startedAt)}
-				>
-					{formatTime(step.startedAt)}
-				</time>
+				<LocalTime at={step.startedAt}>{formatTime(step.startedAt)}</LocalTime>
 				{" · "}
 				<StepDuration step={step} />
 				{hasCost(step) ? ` · ${formatStepUsage(step)}` : ""}
@@ -80,12 +75,7 @@ export function StepFacts({ step }: { step: StepSummary }) {
 		{
 			label: "Started",
 			value: (
-				<time
-					dateTime={new Date(step.startedAt).toISOString()}
-					title={formatDateTime(step.startedAt)}
-				>
-					{formatTime(step.startedAt)}
-				</time>
+				<LocalTime at={step.startedAt}>{formatTime(step.startedAt)}</LocalTime>
 			),
 		},
 		{ label: "Took", value: time.active },

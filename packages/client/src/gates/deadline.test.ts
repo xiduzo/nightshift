@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { formatTime, formatWeekday } from "@nightshift/time";
+
 import { deadlineSoon, deadlineText, deadlineWhen } from "./deadline";
 
 /** A moment on this machine's clock, in October 2026 (the 29th is a Thursday). */
@@ -10,10 +12,7 @@ function at(day: number, hour: number): number {
 const NOW = at(29, 22);
 
 function clock(epochMs: number): string {
-	return new Date(epochMs).toLocaleTimeString(undefined, {
-		hour: "numeric",
-		minute: "2-digit",
-	});
+	return formatTime(epochMs);
 }
 
 describe("deadlineWhen", () => {
@@ -29,9 +28,7 @@ describe("deadlineWhen", () => {
 	});
 
 	test("a later day goes by its weekday", () => {
-		const weekday = new Date(at(31, 7)).toLocaleDateString(undefined, {
-			weekday: "long",
-		});
+		const weekday = formatWeekday(at(31, 7));
 		expect(deadlineWhen(at(31, 7), NOW).day).toBe(` on ${weekday}`);
 	});
 

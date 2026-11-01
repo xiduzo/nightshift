@@ -6,15 +6,33 @@
  */
 
 export {
+	atWall,
 	DAY_MS,
 	dayKey,
+	dayStart,
 	HOUR_MS,
+	hourOf,
 	type Instant,
+	iso,
 	isTimeZone,
 	lastHours,
 	lastNights,
 	localZone,
 	minuteOfDay,
 	nightOf,
+	now,
+	type Wall,
+	type WallTime,
+	wall,
 } from "./clock";
-export { formatClock } from "./format";
+export {
+	formatClock,
+	formatDateTime,
+	formatDay,
+	formatDayTime,
+	formatLongDay,
+	formatRelative,
+	formatTime,
+	formatWeekday,
+	hoverTime,
+} from "./format";

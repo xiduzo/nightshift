@@ -41,6 +41,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { FlowRevisionItem } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { summaryLabels } from "../../chat/proposal-canvas";
 import { flowMutations, flowQueries } from "../../queries";
 import {
@@ -183,7 +184,9 @@ function RevisionRow({
 			>
 				<ItemContent className="min-w-0 gap-1">
 					<ItemTitle className="flex flex-wrap items-center gap-1.5">
-						<span className="tabular-nums">{formatDateTime(item.at)}</span>
+						<LocalTime at={item.at} className="tabular-nums">
+							{formatDateTime(item.at)}
+						</LocalTime>
 						<Badge variant="outline">{REVISION_KIND_LABEL[item.kind]}</Badge>
 						{item.current ? <Badge variant="secondary">Current</Badge> : null}
 					</ItemTitle>

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { WalkerBadge, walkerName } from "@/features/devices";
 import type { OpenGate } from "@/shared/api";
-import { formatDateTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { GateAnswer } from "./gate-answer";
 import { GateQuestion } from "./gate-question";
 
@@ -63,13 +63,9 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 					>
 						<HourglassIcon aria-hidden="true" />
 						waiting{" "}
-						<time
-							dateTime={new Date(gate.openedAt).toISOString()}
-							title={`Opened ${formatDateTime(gate.openedAt)}`}
-							className="tabular-nums"
-						>
+						<LocalTime at={gate.openedAt} className="tabular-nums">
 							{waitedText(now - gate.openedAt)}
-						</time>
+						</LocalTime>
 					</Badge>
 				</div>
 			</CardHeader>

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { formatDateTime } from "@/shared/format";
+import { formatDateTime, hoverTime } from "@/shared/format";
 import { flowQueries } from "../../queries";
 import { revisionAuthor } from "./revision-words";
 
@@ -34,7 +34,7 @@ export function RunRevision({
 			to="/projects/$projectId/flows/$name"
 			params={{ projectId, name: flowName }}
 			search={{ revision: revisionId }}
-			title={revisionAuthor(item)}
+			title={`${revisionAuthor(item)}. ${hoverTime(item.at)}`}
 			className="truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
 		>
 			Saved {formatDateTime(item.at)}

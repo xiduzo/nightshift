@@ -1,5 +1,7 @@
 import { describeCron, type Schedule } from "@nightshift/flows";
 
+import { dayStart, formatWeekday, now } from "../time";
+
 /** What a schedule starts, for its name: its flow, else its signal. */
 export function scheduleName(
 	schedule: Pick<Schedule, "id" | "flow" | "signal">,
@@ -17,19 +19,13 @@ export function scheduleWhen(
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** "yesterday", "today", "tomorrow", or the weekday, for a moment in the days around `now`, on this clock. */
-export function dayWord(epochMs: number, now = Date.now()): string {
-	const day = (ms: number) => {
-		const date = new Date(ms);
-		return new Date(
-			date.getFullYear(),
-			date.getMonth(),
-			date.getDate(),
-		).getTime();
-	};
-	const days = Math.round((day(epochMs) - day(now)) / (24 * 60 * 60 * 1000));
+export function dayWord(epochMs: number, at = now()): string {
+	const days = Math.round((dayStart(epochMs) - dayStart(at)) / DAY_MS);
 	if (days === -1) return "yesterday";
 	if (days === 0) return "today";
 	if (days === 1) return "tomorrow";
-	return new Date(epochMs).toLocaleDateString(undefined, { weekday: "long" });
+	return formatWeekday(epochMs);
 }

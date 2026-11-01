@@ -52,6 +52,7 @@ import {
 	nextOccurrence,
 	useNow,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { BaseRefCombobox } from "./base-ref-combobox";
 import { FlowInputFields } from "./flow-input-fields";
 import { placementDescription } from "./placement-words";
@@ -391,12 +392,12 @@ function StartRunForm({
 							) : (
 								<>
 									Stops{" "}
-									<time
-										dateTime={new Date(stopAt).toISOString()}
+									<LocalTime
+										at={stopAt}
 										className="font-medium text-foreground"
 									>
 										{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
-									</time>{" "}
+									</LocalTime>{" "}
 									(in {waitedText(stopAt - now)}). No new step starts after
 									that.
 								</>

@@ -1,5 +1,6 @@
 import type { BuiltInOutcome } from "@nightshift/flows";
 
+import { formatDay, now } from "../time";
 import type { RunResult, RunSummary, StepOutcome } from "./types";
 
 const MINUTE = 60_000;
@@ -12,18 +13,15 @@ const DAY = 24 * HOUR;
  * `Intl.RelativeTimeFormat` on every platform. A time in the future reads
  * as "just now".
  */
-export function agoLabel(at: number, now = Date.now()): string {
-	const ago = now - at;
+export function agoLabel(at: number, atNow = now()): string {
+	const ago = atNow - at;
 	if (ago < MINUTE) return "just now";
 	if (ago < HOUR) return `${Math.floor(ago / MINUTE)} min ago`;
 	if (ago < DAY) return `${Math.floor(ago / HOUR)} h ago`;
 	const days = Math.floor(ago / DAY);
 	if (days === 1) return "yesterday";
 	if (days < 7) return `${days} days ago`;
-	return new Date(at).toLocaleDateString(undefined, {
-		day: "numeric",
-		month: "short",
-	});
+	return formatDay(at);
 }
 
 /** A countdown: "4:05", "1:02:09". Zero when the moment has passed. */

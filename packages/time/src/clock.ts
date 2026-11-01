@@ -4,8 +4,9 @@
  *
  * Calendar math goes through date-fns in an explicit IANA zone
  * (`in: tz(zone)`), so a Host and a Device agree, including across a
- * clock change. This file is the only place that calls date-fns, `Date`
- * or `Intl` for a clock. `scripts/check-time.ts` fails a call anywhere else.
+ * clock change. This package is the only place that calls date-fns,
+ * `Date` or `Intl` for a clock. `scripts/check-time.ts` fails a call
+ * anywhere else.
  */
 
 import { TZDate, tz } from "@date-fns/tz";
@@ -19,7 +20,6 @@ import {
 	getHours,
 	getMinutes,
 	getMonth,
-	getSeconds,
 	getYear,
 	set,
 	startOfDay,
@@ -133,7 +133,8 @@ export function wall(at: Instant, timeZone: string = localZone()): Wall {
 		day: getDate(at, inZone),
 		hour: getHours(at, inZone),
 		minute: getMinutes(at, inZone),
-		second: getSeconds(at, inZone),
+		// date-fns getSeconds ignores the zone. TZDate reads it in the zone.
+		second: new TZDate(at, timeZone).getSeconds(),
 		weekday: getDay(at, inZone),
 	};
 }

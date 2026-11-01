@@ -36,7 +36,8 @@ import {
 	settingsQueries,
 } from "@/features/settings/queries";
 import type { CheckTarget, CliCheck, SettingsView } from "@/shared/api";
-import { formatDateTime, formatTime } from "@/shared/format";
+import { formatTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { HARNESSES, type HarnessInfo } from "../harnesses";
 import { connectionQueries } from "../queries";
 import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
@@ -199,12 +200,12 @@ export function CliPanel({
 					Change path
 				</Button>
 				{data ? (
-					<span
+					<LocalTime
+						at={data.checkedAt}
 						className="ml-auto text-muted-foreground text-xs"
-						title={formatDateTime(data.checkedAt)}
 					>
 						Checked {formatTime(data.checkedAt)}
-					</span>
+					</LocalTime>
 				) : null}
 			</div>
 			{settings ? (

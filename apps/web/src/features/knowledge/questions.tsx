@@ -34,8 +34,9 @@ import { CircleAlertIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { orpc } from "@/shared/api";
-import { formatDateTime, formatRelative } from "@/shared/format";
+import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
+import { LocalTime } from "@/shared/time";
 import { SearchEvaluation } from "./evaluation";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
 
@@ -121,15 +122,14 @@ export function AskedQuestions({
 										<TableCell className="max-w-0 whitespace-normal py-3 pl-6 align-top">
 											<div className="flex flex-col gap-1">
 												<span className="break-words">{question.query}</span>
-												<time
-													dateTime={new Date(question.lastAt).toISOString()}
-													title={formatDateTime(question.lastAt)}
+												<LocalTime
+													at={question.lastAt}
 													className="text-muted-foreground text-xs"
 												>
 													{question.times === 1
 														? `Asked ${formatRelative(question.lastAt)}`
 														: `Asked ${question.times} times, last ${formatRelative(question.lastAt)}`}
-												</time>
+												</LocalTime>
 											</div>
 										</TableCell>
 										<TableCell className="max-w-0 whitespace-normal py-3 align-top">

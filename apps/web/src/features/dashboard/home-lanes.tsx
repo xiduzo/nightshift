@@ -45,6 +45,7 @@ import type {
 	RunSummary,
 } from "@/shared/api";
 import { formatRelative, formatTime, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { MoreRows } from "./details";
 
 /**
@@ -110,9 +111,21 @@ export function HomeLanes({
 									{project ? `${project} · ${run.title}` : run.title}
 								</ItemTitle>
 								<ItemDescription>
-									{run.status === "sleeping" && run.wakeAt
-										? `Continues at ${formatTime(run.wakeAt)}`
-										: `Started ${formatRelative(run.createdAt, now)}`}
+									{run.status === "sleeping" && run.wakeAt ? (
+										<>
+											Continues at{" "}
+											<LocalTime at={run.wakeAt}>
+												{formatTime(run.wakeAt)}
+											</LocalTime>
+										</>
+									) : (
+										<>
+											Started{" "}
+											<LocalTime at={run.createdAt}>
+												{formatRelative(run.createdAt, now)}
+											</LocalTime>
+										</>
+									)}
 								</ItemDescription>
 							</ItemContent>
 							<ItemActions>
@@ -156,7 +169,10 @@ export function HomeLanes({
 							<ItemTitle className="line-clamp-2">{gate.question}</ItemTitle>
 							<ItemDescription>
 								{gate.projectName} · {gate.flowName ?? gate.runTitle} · waits
-								since {formatRelative(gate.openedAt, now)}
+								since{" "}
+								<LocalTime at={gate.openedAt}>
+									{formatRelative(gate.openedAt, now)}
+								</LocalTime>
 							</ItemDescription>
 						</ItemContent>
 						<ItemActions>
@@ -209,7 +225,9 @@ export function HomeLanes({
 							</ItemDescription>
 						</ItemContent>
 						<ItemActions className="self-start text-muted-foreground text-xs">
-							{formatRelative(run.createdAt, now)}
+							<LocalTime at={run.createdAt}>
+								{formatRelative(run.createdAt, now)}
+							</LocalTime>
 						</ItemActions>
 					</Item>
 				))}

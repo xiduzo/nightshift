@@ -43,6 +43,7 @@ import {
 } from "@/shared/api";
 import { formatDateTime, formatSize, formatTime } from "@/shared/format";
 import { Markdown } from "@/shared/markdown";
+import { LocalTime } from "@/shared/time";
 import { SetBy } from "./run-variables";
 
 /** Where the daemon serves one artifact's file. */
@@ -185,12 +186,9 @@ function ArtifactTile({
 					{artifact.title}
 				</AttachmentTitle>
 				<AttachmentDescription>
-					<time
-						dateTime={new Date(artifact.savedAt).toISOString()}
-						title={formatDateTime(artifact.savedAt)}
-					>
+					<LocalTime at={artifact.savedAt}>
 						{formatTime(artifact.savedAt)}
-					</time>{" "}
+					</LocalTime>{" "}
 					· {formatSize(artifact.size)}
 				</AttachmentDescription>
 			</AttachmentContent>
@@ -239,7 +237,12 @@ function ArtifactView({
 						steps={steps}
 						onShowStep={onShowStep}
 					/>
-					<span>at {formatDateTime(artifact.savedAt)}</span>
+					<span>
+						at{" "}
+						<LocalTime at={artifact.savedAt}>
+							{formatDateTime(artifact.savedAt)}
+						</LocalTime>
+					</span>
 				</DialogDescription>
 			</DialogHeader>
 			{kind === "image" ? (

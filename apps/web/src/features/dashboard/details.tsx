@@ -80,7 +80,7 @@ export function Stat({
 }: {
 	label: string;
 	value: string;
-	hint?: string;
+	hint?: ReactNode;
 }) {
 	return (
 		<Card size="sm" className="gap-1">

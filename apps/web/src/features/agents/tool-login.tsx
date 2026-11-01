@@ -23,7 +23,8 @@ import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { DetailSection } from "@/shared/detail";
-import { formatDateTime, formatRelative, useNow } from "@/shared/format";
+import { formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { KeyValueRows } from "./connections/key-value-rows";
 import { FactList } from "./connections/parts";
 import { cliToolMutations, cliToolQueries, connectionQueries } from "./queries";
@@ -261,12 +262,9 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 										label: "Signed in",
 										value:
 											tool.signedInAt !== null ? (
-												<time
-													dateTime={new Date(tool.signedInAt).toISOString()}
-													title={formatDateTime(tool.signedInAt)}
-												>
+												<LocalTime at={tool.signedInAt}>
 													{formatRelative(tool.signedInAt, now)}
-												</time>
+												</LocalTime>
 											) : (
 												<span className="text-muted-foreground">
 													Not yet. It signs in before its first step.

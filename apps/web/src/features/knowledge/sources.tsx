@@ -50,7 +50,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { flowQueries, StartRunDialog } from "@/features/flows";
 import { type Knowledge, orpc } from "@/shared/api";
-import { formatRelative } from "@/shared/format";
+import { formatRelative, hoverTime } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { knowledgeMutations } from "./queries";
 import type { EditedSource } from "./source-dialog";
@@ -226,6 +226,7 @@ function SourceItem({
 							<Link
 								to="/runs/$runId"
 								params={{ runId: sync.lastRun.id }}
+								title={hoverTime(sync.lastRun.at)}
 								className="hover:underline"
 							>
 								{last}

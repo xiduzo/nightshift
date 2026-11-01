@@ -34,6 +34,7 @@ import {
 	formatRelative,
 	useNow,
 } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import {
 	ChartSection,
 	DetailsDialog,
@@ -171,9 +172,21 @@ function SpendDetails({
 								lastDay.tokens,
 							)}
 							hint={
-								lastDay.runs === 0
-									? "No runs in the last day"
-									: `${lastDay.runs} ${lastDay.runs === 1 ? "run" : "runs"}, the last ${latest ? formatRelative(latest, now) : ""}`
+								lastDay.runs === 0 ? (
+									"No runs in the last day"
+								) : (
+									<>
+										{lastDay.runs} {lastDay.runs === 1 ? "run" : "runs"}
+										{latest ? (
+											<>
+												, the last{" "}
+												<LocalTime at={latest}>
+													{formatRelative(latest, now)}
+												</LocalTime>
+											</>
+										) : null}
+									</>
+								)
 							}
 						/>
 						<Stat
@@ -333,7 +346,9 @@ function SpendDetails({
 											</ItemTitle>
 											<ItemDescription>
 												{project ? null : `${run.group}, `}
-												{formatRelative(run.createdAt, now)}
+												<LocalTime at={run.createdAt}>
+													{formatRelative(run.createdAt, now)}
+												</LocalTime>
 											</ItemDescription>
 										</ItemContent>
 										<ItemActions>
