@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "../flow";
-import { checkDraft, type DraftMessages, isSavable } from "./check";
+import type { AgentNode } from "../nodes";
+import {
+	checkDraft,
+	type DraftMessages,
+	isSavable,
+	type KnownProfile,
+} from "./check";
 import { agentNode, commandNode } from "./nodes";
 
 const messages: DraftMessages = {
@@ -10,6 +16,7 @@ const messages: DraftMessages = {
 	missingDevice: (name, node) => `${node.type} on ${name}`,
 	programWithoutLogin: (program, tools) =>
 		`${program} without ${tools.join(",")}`,
+	refusesCommands: (node, mode) => `${node.id} refuses commands in ${mode}`,
 };
 
 const flow: Flow = {
@@ -56,6 +63,69 @@ describe("checkDraft", () => {
 			severity: "error",
 			message: "profile night",
 			nodeId: "worker",
+		});
+	});
+
+	describe("an Agent node in a mode that refuses commands", () => {
+		const worker = (fields: Partial<AgentNode>): Flow => ({
+			...flow,
+			nodes: [
+				{
+					...agentNode("worker", { x: 0, y: 0 }),
+					prompt: "Work.",
+					profile: { device: "mac", profile: "night" },
+					permissionMode: undefined,
+					...fields,
+				},
+			],
+		});
+		const warnings = (draft: Flow, profiles?: KnownProfile[]) =>
+			checkDraft(draft, messages, profiles ? { profiles } : {}).issues.filter(
+				(issue) => issue.severity === "warning",
+			);
+
+		test("its profile's mode counts once the profiles load", () => {
+			const draft = worker({});
+			expect(warnings(draft)).toEqual([]);
+			expect(
+				warnings(draft, [
+					{ device: "mac", profile: "night", permissionMode: "acceptEdits" },
+				]),
+			).toEqual([
+				{
+					severity: "warning",
+					message: "worker refuses commands in acceptEdits",
+					nodeId: "worker",
+				},
+			]);
+		});
+
+		test("its own mode wins over the profile's", () => {
+			const profiles: KnownProfile[] = [
+				{ device: "mac", profile: "night", permissionMode: "acceptEdits" },
+			];
+			expect(warnings(worker({ permissionMode: "auto" }), profiles)).toEqual(
+				[],
+			);
+			expect(
+				warnings(worker({ permissionMode: "default" }), [
+					{ device: "mac", profile: "night", permissionMode: "auto" },
+				]).map((issue) => issue.message),
+			).toEqual(["worker refuses commands in default"]);
+		});
+
+		test("plan mode and the wider modes do not warn", () => {
+			for (const permissionMode of [
+				"plan",
+				"auto",
+				"bypassPermissions",
+			] as const) {
+				expect(
+					warnings(worker({}), [
+						{ device: "mac", profile: "night", permissionMode },
+					]),
+				).toEqual([]);
+			}
 		});
 	});
 

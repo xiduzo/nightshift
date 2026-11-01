@@ -91,10 +91,14 @@ export function readProfiles(
 
 /** A profile as a Person picks it for a node. */
 export function profileChoice(profile: ProfileView): DeviceProfile {
+	if (!isAgentProfile(profile)) {
+		return { id: profile.id, name: profile.name, kind: "model" };
+	}
 	return {
 		id: profile.id,
 		name: profile.name,
-		kind: isAgentProfile(profile) ? "agent" : "model",
+		kind: "agent",
+		permissionMode: profile.permissionMode,
 	};
 }
 

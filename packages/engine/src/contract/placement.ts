@@ -1,3 +1,5 @@
+import type { AgentProfileSettings } from "@nightshift/flows";
+
 /**
  * A Device a run of a project can be placed on, online, with a Clone of
  * the project: one of the Person's own, or another Person's that offers
@@ -40,12 +42,15 @@ export type NodeToPlace = { profile?: string };
 /**
  * A profile of a Device, as a Person picks it for a node: its id, its
  * name, and its kind (an Agent Profile for Agent nodes, a Model Profile
- * for Decisions and Values decided by a model).
+ * for Decisions and Values decided by a model). An Agent Profile also
+ * tells its permission mode, so the editor can warn about a mode that
+ * refuses commands. An offered profile and an older Host leave it out.
  */
 export type DeviceProfile = {
 	id: string;
 	name: string;
 	kind: "agent" | "model";
+	permissionMode?: AgentProfileSettings["permissionMode"];
 };
 
 /** One of a Person's Devices, as placement sees it. */

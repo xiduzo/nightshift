@@ -95,6 +95,8 @@ const messages: DraftMessages = {
 		`There is no device named "${name}". Use a device name from list_profiles, or leave device out.`,
 	programWithoutLogin: (program, tools) =>
 		`The command calls ${program}, which runs without a login. Call ${tools.join(" or ")} instead: ${tools.length === 1 ? "that CLI tool runs" : "those CLI tools run"} ${program} signed in. list_tools names them.`,
+	refusesCommands: (node, mode) =>
+		`The Agent node "${node.id}" runs in ${mode}, which refuses shell commands such as git commit, except its CLI tools. Set permissionMode to "auto" if it must run commands.`,
 };
 
 /** A schema issue, on its node or edge when it has one: `Node "build": prompt: …`. */

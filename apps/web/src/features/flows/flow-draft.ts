@@ -11,6 +11,7 @@ import {
 	type FlowCheck,
 	type FlowNode,
 	isOptionNode,
+	type KnownProfile,
 	type ListSource,
 	nodeOptions,
 	type ProfileRef,
@@ -70,6 +71,18 @@ export function programWithoutLoginMessage(
 ): string {
 	const each = tools.length === 1 ? "it runs" : "each runs";
 	return `${program} runs without a login in a command. Use ${tools.join(" or ")} instead: ${each} ${program} signed in.`;
+}
+
+/**
+ * What the editor says about an Agent node whose permission mode refuses
+ * commands: with nobody there to approve them, `git commit` fails.
+ */
+export function refusesCommandsMessage(
+	_node: Pick<FlowNode, "id">,
+	mode: "acceptEdits" | "default",
+): string {
+	const name = mode === "acceptEdits" ? "Accept edits" : "Ask for each tool";
+	return `${name} runs no commands at night, such as git commit, except its CLI tools. Pick Auto for this node or its profile.`;
 }
 
 /** One `{{…}}` a template can use. */
@@ -248,6 +261,7 @@ const MESSAGES: DraftMessages = {
 	missingProfile: missingProfileMessage,
 	missingDevice: missingDeviceMessage,
 	programWithoutLogin: programWithoutLoginMessage,
+	refusesCommands: refusesCommandsMessage,
 };
 
 /** A `{{` the cursor is in: where it starts, and the name typed after it so far. */
@@ -318,7 +332,7 @@ export function checkFlow(
 	name?: string,
 	connections?: readonly string[],
 	profiles?: {
-		known: readonly ProfileRef[];
+		known: readonly KnownProfile[];
 		untoldDevices: readonly string[];
 		/** The names of the devices a run may use: a node that names another does not start. */
 		deviceNames: readonly string[];

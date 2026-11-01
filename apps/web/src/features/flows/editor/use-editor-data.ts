@@ -1,4 +1,4 @@
-import { type ProfileRef, policyFromSettings } from "@nightshift/flows";
+import { type KnownProfile, policyFromSettings } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { connectionQueries } from "@/features/agents";
@@ -38,10 +38,13 @@ export function useEditorData(projectId: string, name: string) {
 	const profileRefs = useMemo(
 		() =>
 			devices.data && {
-				known: devices.data.flatMap((device): ProfileRef[] =>
+				known: devices.data.flatMap((device): KnownProfile[] =>
 					(device.profiles ?? []).map((profile) => ({
 						device: device.deviceId,
 						profile: profile.id,
+						...(profile.permissionMode
+							? { permissionMode: profile.permissionMode }
+							: {}),
 					})),
 				),
 				untoldDevices: devices.data

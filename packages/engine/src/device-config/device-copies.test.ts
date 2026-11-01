@@ -63,7 +63,14 @@ describe("device copies", () => {
 			deviceId: "laptop",
 			name: "Laptop",
 			platform: "darwin",
-			profiles: [{ id: expect.any(String), name: "builder", kind: "agent" }],
+			profiles: [
+				{
+					id: expect.any(String),
+					name: "builder",
+					kind: "agent",
+					permissionMode: "acceptEdits",
+				},
+			],
 			secrets: [
 				{ name: "GH_TOKEN", setAt: 5 },
 				{ name: "OLD_NAME", setAt: null },

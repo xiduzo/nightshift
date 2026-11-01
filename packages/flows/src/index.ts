@@ -66,6 +66,7 @@ export {
 	type FlowClip,
 	isOptionNode,
 	isSavable,
+	type KnownProfile,
 	moveNode,
 	type NameClash,
 	type NameOwner,

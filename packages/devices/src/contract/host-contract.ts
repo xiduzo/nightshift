@@ -4,7 +4,11 @@ import {
 	startRunInputSchema,
 	type TranscriptEntry,
 } from "@nightshift/engine";
-import { labelSchema, nameSchema } from "@nightshift/flows";
+import {
+	labelSchema,
+	nameSchema,
+	permissionModeSchema,
+} from "@nightshift/flows";
 import type { RefusalKind } from "@nightshift/refusal";
 import { type ContractRouterClient, oc } from "@orpc/contract";
 import { z } from "zod";
@@ -179,6 +183,7 @@ const ownDeviceSchema = exact<OwnDevice>()(
 					id: z.string(),
 					name: z.string(),
 					kind: z.enum(["agent", "model"]),
+					permissionMode: permissionModeSchema.optional(),
 				}),
 			)
 			.optional(),

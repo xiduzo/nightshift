@@ -14,6 +14,7 @@ import {
 
 import { z } from "zod";
 
+import { deviceProfileSchema } from "../config";
 import { exact } from "../output";
 import { runStatusSchema } from "../runs";
 
@@ -115,13 +116,7 @@ export const otherDeviceViewSchema = exact<OtherDeviceView>()(
 		/** Null when this computer cannot tell. */
 		online: z.boolean().nullable(),
 		platform: z.string().nullable(),
-		profiles: z.array(
-			z.object({
-				id: z.string(),
-				name: z.string(),
-				kind: z.enum(["agent", "model"]),
-			}),
-		),
+		profiles: z.array(deviceProfileSchema),
 		secrets: z.array(
 			z.object({ name: z.string(), setAt: z.number().nullable() }),
 		),

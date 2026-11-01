@@ -11,6 +11,7 @@ export {
 	type DraftSchemaIssue,
 	type FlowCheck,
 	isSavable,
+	type KnownProfile,
 } from "./check";
 export {
 	type CliToolRef,

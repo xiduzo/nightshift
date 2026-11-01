@@ -36,6 +36,7 @@ import {
 	loginSchema,
 	mcpServerSchema,
 	modelProfileSchema,
+	permissionModeSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -312,6 +313,7 @@ export const deviceProfileSchema = exact<DeviceProfile>()(
 		id: z.string(),
 		name: z.string(),
 		kind: z.enum(["agent", "model"]),
+		permissionMode: permissionModeSchema.optional(),
 	}),
 );
 

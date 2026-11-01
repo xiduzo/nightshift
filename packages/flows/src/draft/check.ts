@@ -1,7 +1,12 @@
 /** Checks a draft: the schema, the connections, profiles, Devices and CLI programs it names, and `validateFlow`. */
 import { type Flow, type FlowNode, flowSchema } from "../flow";
-import { isProfileRef, type ProfileRef, sameProfileRef } from "../nodes";
-import { nodeProfiles } from "../profiles";
+import {
+	type AgentNode,
+	isProfileRef,
+	type ProfileRef,
+	sameProfileRef,
+} from "../nodes";
+import { nodeProfiles, profileOf, runsAs } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 import { validateFlow } from "../validate";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
@@ -31,6 +36,20 @@ export type DraftMessages = {
 	missingDevice: (name: string, node: FlowNode) => string;
 	/** A program a command calls by its own name, such as `acli`, that only `tools` sign in to. */
 	programWithoutLogin: (program: string, tools: readonly string[]) => string;
+	/**
+	 * An Agent node that runs in a mode that refuses shell commands
+	 * (`acceptEdits`, `default`): with nobody there to approve, it can only
+	 * edit files and run its CLI tools. `git commit` fails.
+	 */
+	refusesCommands: (node: AgentNode, mode: CommandlessMode) => string;
+};
+
+/** The permission modes that refuse every shell command but the node's CLI tools in a run nobody watches. */
+export type CommandlessMode = "acceptEdits" | "default";
+
+/** A profile a node may name, with its permission mode when it is an Agent Profile and its Device tells it. */
+export type KnownProfile = ProfileRef & {
+	permissionMode?: AgentNode["permissionMode"];
 };
 
 export type DraftCheckOptions = {
@@ -44,7 +63,7 @@ export type DraftCheckOptions = {
 	 * The profiles a node may name: each Device's that this computer knows
 	 * of. Leave it out while they load.
 	 */
-	profiles?: readonly ProfileRef[];
+	profiles?: readonly KnownProfile[];
 	/** The Devices whose profiles this computer cannot tell: a profile on one is not checked. */
 	untoldDevices?: readonly string[];
 	/**
@@ -127,6 +146,17 @@ export function checkDraft(
 		}
 	}
 
+	for (const node of flow.nodes) {
+		if (node.type !== "agent") continue;
+		const mode = commandlessMode(node, profiles);
+		if (mode === null) continue;
+		issues.push({
+			severity: "warning",
+			message: messages.refusesCommands(node, mode),
+			nodeId: node.id,
+		});
+	}
+
 	if (devices) {
 		for (const node of flow.nodes) {
 			const name = "device" in node ? node.device : undefined;
@@ -159,6 +189,31 @@ export function checkDraft(
 		validatorError = error instanceof Error ? error.message : String(error);
 	}
 	return { issues, validatorError };
+}
+
+/**
+ * The mode that refuses commands that the Agent node, or one of its
+ * cascade's tiers, runs in: its own permission mode, else its profile's.
+ * Null when it runs in another mode, or when the profile's mode is not
+ * known.
+ */
+function commandlessMode(
+	node: AgentNode,
+	profiles: readonly KnownProfile[] | undefined,
+): CommandlessMode | null {
+	for (const run of runsAs(node)) {
+		if (run.type !== "agent") continue;
+		const profile = profileOf(run);
+		const mode =
+			run.permissionMode ??
+			node.permissionMode ??
+			(profile !== undefined && isProfileRef(profile)
+				? profiles?.find((known) => sameProfileRef(known, profile))
+						?.permissionMode
+				: undefined);
+		if (mode === "acceptEdits" || mode === "default") return mode;
+	}
+	return null;
 }
 
 /** Whether the draft passes the schema, so `flows.save` accepts it. */

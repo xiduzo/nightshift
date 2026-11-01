@@ -1146,7 +1146,11 @@ describe("the Space's profiles", () => {
 			(await devices()).map((d) => [d.name, d.offers, d.profiles]),
 		).toEqual([
 			[expect.any(String), undefined, A_PROFILES],
-			["studio-b", undefined, [{ id: "p-1", name: "builder", kind: "agent" }]],
+			[
+				"studio-b",
+				undefined,
+				[{ id: "p-1", name: "builder", kind: "agent", permissionMode: "auto" }],
+			],
 			["laptop-c", ["coder"], [{ id: "p-2", name: "coder", kind: "agent" }]],
 		]);
 	});
