@@ -16,7 +16,12 @@ import {
 	replaceIdentity,
 	waitingEvents,
 } from "./outbox";
-import { chunkEvents, otlpUsageTransport, type UsageTransport } from "./send";
+import {
+	chunkEvents,
+	otlpUsageTransport,
+	type UsageTransport,
+	usageEndpoint,
+} from "./send";
 
 /** How often a batch may leave, apart from a stop. */
 const USAGE_INTERVAL_MS = 15 * 60 * 1000;
@@ -91,7 +96,7 @@ export function createUsage(deps: {
 	policy?: () => Promise<boolean>;
 	/** The daily event's counts. Null until the daemon can read them. */
 	snapshot?: () => Promise<UsageSnapshot | null>;
-	/** Where batches go. Default: OTLP JSON at NIGHTSHIFT_USAGE_ENDPOINT, or nowhere. */
+	/** Where batches go. Default: OTLP JSON at usageEndpoint(), or nowhere. */
 	transport?: UsageTransport;
 	now?: () => number;
 	intervalMs?: number;
@@ -114,7 +119,7 @@ export function createUsage(deps: {
 
 	function transport(): UsageTransport | null {
 		if (deps.transport) return deps.transport;
-		const endpoint = process.env.NIGHTSHIFT_USAGE_ENDPOINT?.trim() ?? "";
+		const endpoint = usageEndpoint();
 		if (endpoint === "") return null;
 		return otlpUsageTransport(endpoint);
 	}

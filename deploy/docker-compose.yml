@@ -13,8 +13,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
       args:
-        # An absent value stays empty. Night Shift sends usage only when
-        # the value has a URL.
+        # Empty sends usage to the team ingest. A URL sends there instead.
         NIGHTSHIFT_USAGE_ENDPOINT: ${NIGHTSHIFT_USAGE_ENDPOINT:-}
     restart: unless-stopped
     # The image's health check marks a Night Shift that stops responding as

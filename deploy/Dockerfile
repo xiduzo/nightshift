@@ -63,9 +63,9 @@ USER bun
 WORKDIR /home/bun
 # NIGHTSHIFT_EMBEDDING_MODEL: the model search by meaning downloads and uses.
 # Override it with -e, or pick another on the Settings page (that wins).
-# Anonymous usage. Pass the ingest URL as a build arg. Put no domain here.
-# An absent arg leaves the value empty. Night Shift sends usage only when
-# the value has a URL.
+# Anonymous usage. An empty value sends to the team ingest, the default in
+# @nightshift/telemetry. A build arg with a URL sends there instead.
+# NIGHTSHIFT_USAGE=off at run time sends nothing.
 ARG NIGHTSHIFT_USAGE_ENDPOINT
 ENV NIGHTSHIFT_DATA_DIR=/data \
 	PORT=3000 \

@@ -66,17 +66,16 @@ Cloudflare Access is free for up to 50 users.
 
 14. Add a WAF rate limit on the ingest host of 60 requests a minute per IP.
 15. Enable daily backups for the Postgres service in Dokploy.
-16. Set `NIGHTSHIFT_USAGE_ENDPOINT` on the Night Shift image build to
+Released builds of Night Shift send to `https://ingest.xiduzo.com/nightshift`.
+That default is in `usageEndpoint()` of `@nightshift/telemetry` (see
+[ADR 12](../adr/0012-released-builds-send-usage-to-the-team-ingest.md)).
+A run from source sends nothing.
+
+16. To send to another ingest, set `NIGHTSHIFT_USAGE_ENDPOINT` to
     `https://ingest.<your domain>/nightshift`. Night Shift adds `/v1/logs`.
-17. Pass that URL as the build arg `NIGHTSHIFT_USAGE_ENDPOINT` of
-    [`deploy/Dockerfile`](../../deploy/Dockerfile).
-
-An absent build arg leaves the value empty. Night Shift sends usage only
-when the value has a URL. The image workflow reads the repository
-variable `NIGHTSHIFT_USAGE_ENDPOINT` when the workflow input is empty.
-
-18. When the published image should carry the URL, set the repository
-    variable `NIGHTSHIFT_USAGE_ENDPOINT` to that URL.
+17. For an image, pass that URL as the build arg `NIGHTSHIFT_USAGE_ENDPOINT`
+    of [`deploy/Dockerfile`](../../deploy/Dockerfile), or set the
+    repository variable `NIGHTSHIFT_USAGE_ENDPOINT`.
 
 A Host sends usage unless `NIGHTSHIFT_USAGE` is `off`. The Host compose
 file shows that line as a comment.

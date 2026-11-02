@@ -19,7 +19,24 @@ export type UsageTransport = {
 	send(events: WaitingEvent[], installId: string): Promise<void>;
 };
 
-/** The logs URL. A base without `/v1/logs` gets that path. No domain is invented. */
+/** The ingest of the Night Shift team. Released builds send here. */
+export const DEFAULT_USAGE_ENDPOINT = "https://ingest.xiduzo.com/nightshift";
+
+/**
+ * Where usage goes. A non-empty NIGHTSHIFT_USAGE_ENDPOINT wins. Otherwise a
+ * released build (NIGHTSHIFT_VERSION is set) sends to the team ingest, and a
+ * run from source (no version) sends nothing. NIGHTSHIFT_USAGE=off and the
+ * other locks still stop every send.
+ */
+export function usageEndpoint(
+	env: Record<string, string | undefined> = process.env,
+): string {
+	const chosen = env.NIGHTSHIFT_USAGE_ENDPOINT?.trim() ?? "";
+	if (chosen !== "") return chosen;
+	return env.NIGHTSHIFT_VERSION?.trim() ? DEFAULT_USAGE_ENDPOINT : "";
+}
+
+/** The logs URL. A base without `/v1/logs` gets that path. */
 export function usageLogsUrl(endpoint: string): string {
 	const base = endpoint.trim().replace(/\/+$/, "");
 	return base.endsWith("/v1/logs") ? base : `${base}/v1/logs`;

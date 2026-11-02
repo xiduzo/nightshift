@@ -2,7 +2,7 @@
 
 Night Shift defines a closed list of usage events. Each event has a fixed set of fields. A value outside a field's list is `_OTHER`.
 
-The events are defined. Night Shift does not send them yet. The run export in [Monitoring](deploy/monitoring.md) is separate. That export goes to an address you choose.
+A released build of Night Shift sends these events to the Night Shift team. A run from source sends nothing. Turn usage off in Settings, or set `NIGHTSHIFT_USAGE=off` or `DO_NOT_TRACK=1`. The run export in [Monitoring](deploy/monitoring.md) is separate. That export goes to an address you choose.
 
 ## Events
 
