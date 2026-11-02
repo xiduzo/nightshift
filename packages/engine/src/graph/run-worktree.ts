@@ -62,6 +62,7 @@ async function make(ctx: StepContext): Promise<MadeWorktree> {
 		? await gitAuthorOf(ctx.db, row.startedBy)
 		: null;
 	let worktree: RunWorktree;
+	let warning: string | undefined;
 	try {
 		const made = await at.worktree({
 			id: row.id,
@@ -75,6 +76,7 @@ async function make(ctx: StepContext): Promise<MadeWorktree> {
 			branch: made.branch,
 			baseRef: made.baseRef,
 		};
+		warning = made.warning;
 	} catch (error) {
 		return { kind: "refused", at, error };
 	}
@@ -83,5 +85,12 @@ async function make(ctx: StepContext): Promise<MadeWorktree> {
 		runId: row.id,
 		payload: worktree,
 	});
+	if (warning) {
+		await ctx.log.append({
+			type: "RunWarned",
+			runId: row.id,
+			payload: { kind: "base-ref", message: warning },
+		});
+	}
 	return { kind: "made", worktree };
 }

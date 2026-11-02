@@ -37,7 +37,8 @@ export const runStatusSchema = z.enum([
 
 /**
  * What a run warning is about: a cost that is not known, or a guard of the
- * run policy (the budget, a turn limit, no activity, a loop).
+ * run policy (the budget, a turn limit, no activity, a loop), or a run that
+ * does not start from the newest commit of its base branch.
  */
 const runWarningKindSchema = z.enum([
 	"cost-unknown",
@@ -45,6 +46,7 @@ const runWarningKindSchema = z.enum([
 	"turns",
 	"stalled",
 	"looping",
+	"base-ref",
 ]);
 
 /** How the End node that ended a run says it came out. */

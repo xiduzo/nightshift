@@ -368,4 +368,11 @@ export type Worktree = {
 	worktreePath: string;
 	branch: string;
 	baseRef: string;
+	/**
+	 * Why the run does not start from the newest commit of its base branch:
+	 * the fetch failed, or the branch here went apart from the remote's. The
+	 * run logs it as a warning (`RunWarned`, `base-ref`). Absent from an
+	 * older Device, and when the run starts from the newest commit.
+	 */
+	warning?: string;
 };

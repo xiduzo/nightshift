@@ -711,7 +711,9 @@ export type KnowledgeVia = "step" | "mcp";
  * The guards of the run policy: `budget` (the run passed its budget),
  * `turns` (a session reached its turn limit), `stalled` (an Agent step
  * showed no activity for its idle limit), `looping` (an agent made the
- * same tool call with the same input three times in a row). A reader
+ * same tool call with the same input three times in a row). `base-ref`:
+ * the run does not start from the newest commit of its base branch (the
+ * fetch failed, or the branch went apart from the remote's). A reader
  * treats the kinds as an open list: a later build may add one.
  */
 export type RunWarningKind =
@@ -719,7 +721,8 @@ export type RunWarningKind =
 	| "budget"
 	| "turns"
 	| "stalled"
-	| "looping";
+	| "looping"
+	| "base-ref";
 
 /**
  * What a `Scored` event of this build scores (`scores.ts` says what each

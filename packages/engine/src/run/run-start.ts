@@ -327,7 +327,7 @@ export function createRunStart(deps: RunStartDeps) {
 						// The worktree lives on the run's Device. An offline one makes it
 						// when it is back: until then the row keeps the base the person
 						// asked for, and no branch.
-						const worktree = planned.run.offline
+						const made = planned.run.offline
 							? null
 							: await device.worktree({
 									id: runId,
@@ -337,6 +337,12 @@ export function createRunStart(deps: RunStartDeps) {
 										: {}),
 									...(author ? { author } : {}),
 								});
+						// A base branch the Device could not bring up to date is a warning, not part of the worktree.
+						const worktree = made && {
+							worktreePath: made.worktreePath,
+							branch: made.branch,
+							baseRef: made.baseRef,
+						};
 						// Too late: the person was told it did not start, so it does not.
 						if (deadline.aborted)
 							throw new Refusal("unavailable", START_TOO_LONG);
@@ -388,6 +394,13 @@ export function createRunStart(deps: RunStartDeps) {
 								type: "WorktreeCreated",
 								runId,
 								payload: worktree,
+							});
+						}
+						if (made?.warning) {
+							await log.append({
+								type: "RunWarned",
+								runId,
+								payload: { kind: "base-ref", message: made.warning },
 							});
 						}
 						started = { row, walkerId, device };

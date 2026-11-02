@@ -511,6 +511,38 @@ describe("runs", () => {
 		expect(transcript.at(-1)?.event.type).toBe("finished");
 	});
 
+	test("a base branch whose remote cannot be reached starts from the local commit, with a warning", async () => {
+		const head = await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"]);
+		const gone = join(sandbox.root, "gone.git");
+		await mustGit(sandbox.repoPath, ["remote", "add", "origin", gone]);
+		await mustGit(sandbox.repoPath, [
+			"update-ref",
+			"refs/remotes/origin/main",
+			head,
+		]);
+		await mustGit(sandbox.repoPath, ["branch", "-u", "origin/main", "main"]);
+		const engine = makeEngine(fakeHarness());
+		const summary = await engine.startRun({
+			projectId: await projectId(engine),
+			baseRef: "main",
+			flow: singleAgentFlow({
+				prompt: "Fix it.",
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+			}),
+		});
+		expect(summary.baseRef).toBe(head);
+		expect(await waitForEnd(engine, summary.id)).toBe("finished");
+		const detail = await engine.getRun(summary.id);
+		expect(detail.warnings).toMatchObject([
+			{
+				stepId: null,
+				kind: "base-ref",
+				message: expect.stringContaining("could not get the newest main"),
+			},
+		]);
+	});
+
 	test("this computer walks the run: the run and its events name the Walker, each step the Device it ran on", async () => {
 		const engine = makeEngine(fakeHarness());
 		const { id: runId } = await engine.startRun({

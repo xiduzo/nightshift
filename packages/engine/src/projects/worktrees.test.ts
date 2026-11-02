@@ -10,6 +10,8 @@ import {
 	type Sandbox,
 } from "../testing/test-support";
 import {
+	baseDiverged,
+	baseNotFetched,
 	branchExists,
 	checkoutBranch,
 	createAndCheckoutBranch,
@@ -101,6 +103,176 @@ describe("createWorktree", () => {
 				baseRef: "does-not-exist",
 			}),
 		).rejects.toThrow('The branch or commit "does-not-exist"');
+	});
+});
+
+describe("createWorktree from a branch a remote has", () => {
+	let remotePath: string;
+	let otherPath: string;
+
+	/** A commit on the remote's main, made from another clone. */
+	async function pushFromElsewhere(name: string): Promise<string> {
+		await commitFile(otherPath, name);
+		await mustGit(otherPath, ["push", "-q", "origin", "main"]);
+		return mustGit(otherPath, ["rev-parse", "HEAD"]);
+	}
+
+	const head = (ref = "HEAD") => mustGit(sandbox.repoPath, ["rev-parse", ref]);
+
+	beforeEach(async () => {
+		remotePath = join(sandbox.root, "remote.git");
+		otherPath = join(sandbox.root, "other");
+		await mustGit(sandbox.root, ["init", "-q", "--bare", remotePath]);
+		await mustGit(sandbox.repoPath, ["remote", "add", "origin", remotePath]);
+		await mustGit(sandbox.repoPath, ["push", "-q", "-u", "origin", "main"]);
+		await mustGit(sandbox.root, [
+			"clone",
+			"-q",
+			"-b",
+			"main",
+			remotePath,
+			otherPath,
+		]);
+	});
+
+	/** The person's refs and checkout, which a run start never moves. */
+	async function personsRefs() {
+		return {
+			main: await head("refs/heads/main"),
+			originMain: await head("refs/remotes/origin/main"),
+			checkedOut: await currentBranch(sandbox.repoPath),
+			changes: await uncommittedChanges(sandbox.repoPath),
+		};
+	}
+
+	async function expectNoFetchRefLeft() {
+		const refs = await mustGit(sandbox.repoPath, [
+			"for-each-ref",
+			"refs/nightshift",
+		]);
+		expect(refs).toBe("");
+	}
+
+	test("starts at the remote's commit when the remote is ahead", async () => {
+		const before = await personsRefs();
+		const newest = await pushFromElsewhere("merged.txt");
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "ahead001",
+			baseRef: "main",
+		});
+		expect(worktree.baseRef).toBe(newest);
+		expect(worktree.warning).toBeUndefined();
+		expect(existsSync(join(worktree.worktreePath, "merged.txt"))).toBe(true);
+		expect(await personsRefs()).toEqual(before);
+		await expectNoFetchRefLeft();
+	});
+
+	test("fetches from origin for a branch without an upstream", async () => {
+		await mustGit(sandbox.repoPath, ["branch", "--unset-upstream", "main"]);
+		const newest = await pushFromElsewhere("merged.txt");
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "noup0001",
+			baseRef: "main",
+		});
+		expect(worktree.baseRef).toBe(newest);
+		expect(worktree.warning).toBeUndefined();
+	});
+
+	test("a remote-tracking base ref starts at the remote's commit too", async () => {
+		const newest = await pushFromElsewhere("merged.txt");
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "track001",
+			baseRef: "origin/main",
+		});
+		expect(worktree.baseRef).toBe(newest);
+		expect(worktree.warning).toBeUndefined();
+	});
+
+	test("starts at the local commit when the local branch is ahead", async () => {
+		await commitFile(sandbox.repoPath, "unpushed.txt");
+		const local = await head();
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "local001",
+			baseRef: "main",
+		});
+		expect(worktree.baseRef).toBe(local);
+		expect(worktree.warning).toBeUndefined();
+	});
+
+	test("starts at the local commit with a warning when the two went apart", async () => {
+		await pushFromElsewhere("merged.txt");
+		await commitFile(sandbox.repoPath, "unpushed.txt");
+		const before = await personsRefs();
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "apart001",
+			baseRef: "main",
+		});
+		expect(worktree.baseRef).toBe(before.main);
+		expect(worktree.warning).toBe(baseDiverged("main"));
+		expect(await personsRefs()).toEqual(before);
+		await expectNoFetchRefLeft();
+	});
+
+	test("starts at the local commit with a warning when the remote cannot be reached", async () => {
+		await mustGit(sandbox.repoPath, [
+			"remote",
+			"set-url",
+			"origin",
+			join(sandbox.root, "gone.git"),
+		]);
+		const local = await head();
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "gone0001",
+			baseRef: "main",
+		});
+		expect(worktree.baseRef).toBe(local);
+		expect(worktree.warning).toBe(baseNotFetched("main"));
+	});
+
+	test("a commit or a tag as base ref fetches nothing", async () => {
+		const local = await head();
+		await mustGit(sandbox.repoPath, ["tag", "v1"]);
+		await mustGit(sandbox.repoPath, [
+			"remote",
+			"set-url",
+			"origin",
+			join(sandbox.root, "gone.git"),
+		]);
+		for (const [shortId, baseRef] of [
+			["sha00001", local],
+			["tag00001", "v1"],
+		] as const) {
+			const worktree = await createWorktree({
+				repoPath: sandbox.repoPath,
+				shortId,
+				baseRef,
+			});
+			expect(worktree.baseRef).toBe(local);
+			expect(worktree.warning).toBeUndefined();
+		}
+	});
+
+	test("a branch only this clone has fetches nothing", async () => {
+		await mustGit(sandbox.repoPath, ["branch", "only-here"]);
+		await mustGit(sandbox.repoPath, [
+			"remote",
+			"set-url",
+			"origin",
+			join(sandbox.root, "gone.git"),
+		]);
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "here0001",
+			baseRef: "only-here",
+		});
+		expect(worktree.baseRef).toBe(await head());
+		expect(worktree.warning).toBeUndefined();
 	});
 });
 

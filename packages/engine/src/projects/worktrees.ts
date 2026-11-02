@@ -31,6 +31,19 @@ export type Branches = {
 	remote: string[];
 };
 
+/** How long fetching a run's base branch may take before the run starts without it. */
+export const BASE_FETCH_TIMEOUT_MS = 30_000;
+
+/** The run's warning when the fetch of its base branch failed. */
+export function baseNotFetched(branch: string): string {
+	return `Night Shift could not get the newest ${branch}. This run starts from the ${branch} on the run's computer.`;
+}
+
+/** The run's warning when its base branch and the remote's went apart. */
+export function baseDiverged(branch: string): string {
+	return `The newest ${branch} and the ${branch} on the run's computer have different commits. This run starts from the one on the run's computer.`;
+}
+
 /** A git-safe slug: lowercase letters, digits and single dashes. */
 export function slugify(text: string, maxChars = 48): string {
 	const slug = text
@@ -131,21 +144,171 @@ export function createWorktrees(git: Git) {
 		return result.stdout;
 	}
 
+	/** Whether the full ref `ref` exists (`refs/heads/main`, `refs/remotes/origin/main`). */
+	async function refExists(cwd: string, ref: string): Promise<boolean> {
+		const result = await git.run(cwd, [
+			"rev-parse",
+			"--verify",
+			"--quiet",
+			ref,
+		]);
+		return result.exitCode === 0;
+	}
+
+	/** A git config value of the clone, or null when it has none. */
+	async function configValue(cwd: string, key: string): Promise<string | null> {
+		const result = await git.run(cwd, ["config", "--get", key]);
+		return result.exitCode === 0 && result.stdout ? result.stdout : null;
+	}
+
+	/**
+	 * Where the newest commit of a base ref is, when the ref is a branch that
+	 * a remote has too: `remote` and its `branch`. A local branch fetches
+	 * from its upstream, else from `origin` when `origin/<name>` is known. A
+	 * remote-tracking branch (`origin/main`) fetches itself. Null for
+	 * anything else: a commit, a tag, `HEAD~1`, a branch only this clone has.
+	 */
+	async function remoteOfBase(
+		repoPath: string,
+		ref: string,
+	): Promise<{ remote: string; branch: string; label: string } | null> {
+		const name = ref.replace(/^refs\/heads\//, "");
+		if (await refExists(repoPath, `refs/heads/${name}`)) {
+			const remote = await configValue(repoPath, `branch.${name}.remote`);
+			const merge = await configValue(repoPath, `branch.${name}.merge`);
+			if (remote && remote !== "." && merge?.startsWith("refs/heads/")) {
+				return { remote, branch: merge.slice(11), label: name };
+			}
+			if (await refExists(repoPath, `refs/remotes/origin/${name}`)) {
+				return { remote: "origin", branch: name, label: name };
+			}
+			return null;
+		}
+		const tracking = ref.replace(/^refs\/remotes\//, "");
+		if (!(await refExists(repoPath, `refs/remotes/${tracking}`))) return null;
+		const remotes = await git.run(repoPath, ["remote"]);
+		if (remotes.exitCode !== 0) return null;
+		for (const remote of remotes.stdout.split("\n").filter(Boolean)) {
+			if (tracking.startsWith(`${remote}/`)) {
+				const branch = tracking.slice(remote.length + 1);
+				return { remote, branch, label: tracking };
+			}
+		}
+		return null;
+	}
+
+	/** Whether `ancestor` is `commit` or comes before it. */
+	async function isAncestor(
+		cwd: string,
+		ancestor: string,
+		commit: string,
+	): Promise<boolean> {
+		const result = await git.run(cwd, [
+			"merge-base",
+			"--is-ancestor",
+			ancestor,
+			commit,
+		]);
+		return result.exitCode === 0;
+	}
+
+	/**
+	 * The commit a run starts from, for `ref`. A branch that a remote has
+	 * too is fetched first (`BASE_FETCH_TIMEOUT_MS`, never a prompt), so a
+	 * merge on the remote reaches the next run: it starts at the newest
+	 * commit, unless the clone's branch has commits the remote lacks. Then
+	 * the clone's branch wins (a person's work that is not pushed), with a
+	 * warning when the two went apart. A fetch that fails starts from the
+	 * clone's branch, with a warning; it never stops the run. The fetch
+	 * writes only a ref of its own, removed after: the person's branches,
+	 * their remote-tracking branches and their checkout stay as they are.
+	 */
+	async function startCommit(
+		repoPath: string,
+		ref: string,
+		shortId: string,
+	): Promise<{ commit: string; warning: string | null }> {
+		const local = await resolveCommit(repoPath, ref);
+		const source = await remoteOfBase(repoPath, ref);
+		if (!source) return { commit: local, warning: null };
+		const fetched = `refs/nightshift/base/${shortId}`;
+		try {
+			const result = await git.run(
+				repoPath,
+				[
+					"fetch",
+					"--quiet",
+					"--no-tags",
+					"--no-write-fetch-head",
+					// No update of `origin/<branch>` on the side: two starts at once
+					// would race for its lock, and the person's refs stay theirs.
+					"--refmap=",
+					source.remote,
+					`+refs/heads/${source.branch}:${fetched}`,
+				],
+				{
+					timeoutMs: BASE_FETCH_TIMEOUT_MS,
+					env: { GIT_TERMINAL_PROMPT: "0" },
+				},
+			);
+			const newest =
+				result.exitCode === 0 && !result.timedOut
+					? await git.run(repoPath, [
+							"rev-parse",
+							"--verify",
+							"--quiet",
+							`${fetched}^{commit}`,
+						])
+					: null;
+			const remote = newest?.exitCode === 0 ? newest.stdout : "";
+			if (!remote) {
+				console.warn(
+					`[projects] fetching ${source.branch} from ${source.remote} for a run failed${result.timedOut ? " (timed out)" : ""}: ${result.stderr}`,
+				);
+				return { commit: local, warning: baseNotFetched(source.label) };
+			}
+			if (remote === local || (await isAncestor(repoPath, local, remote))) {
+				return { commit: remote, warning: null };
+			}
+			if (await isAncestor(repoPath, remote, local)) {
+				return { commit: local, warning: null };
+			}
+			return { commit: local, warning: baseDiverged(source.label) };
+		} catch (error) {
+			// Git could not start: the worktree below says so.
+			console.warn(`[projects] fetching a run's base failed: ${error}`);
+			return { commit: local, warning: baseNotFetched(source.label) };
+		} finally {
+			await git.run(repoPath, ["update-ref", "-d", fetched]).catch(() => {});
+		}
+	}
+
 	/**
 	 * Adds a worktree on a new branch `nightshift/<shortId>` from `baseRef`
 	 * (default: the clone's current HEAD). Returns the resolved base commit.
-	 * With `author`, the worktree gets that git identity in its own config.
+	 * A branch base ref starts at its newest commit (`startCommit`), and
+	 * `warning` says when it could not. With `author`, the worktree gets that
+	 * git identity in its own config.
 	 */
 	async function createWorktree(input: {
 		repoPath: string;
 		shortId: string;
 		baseRef?: string;
 		author?: { name: string; email: string };
-	}): Promise<{ worktreePath: string; branch: string; baseRef: string }> {
-		const baseRef = await resolveCommit(
-			input.repoPath,
-			input.baseRef ?? "HEAD",
-		);
+	}): Promise<{
+		worktreePath: string;
+		branch: string;
+		baseRef: string;
+		warning?: string;
+	}> {
+		const start =
+			input.baseRef === undefined
+				? {
+						commit: await resolveCommit(input.repoPath, "HEAD"),
+						warning: null,
+					}
+				: await startCommit(input.repoPath, input.baseRef, input.shortId);
+		const baseRef = start.commit;
 		const { worktreePath, branch } = worktreeLocation(
 			input.repoPath,
 			input.shortId,
@@ -160,7 +323,12 @@ export function createWorktrees(git: Git) {
 			baseRef,
 		]);
 		if (input.author) await setWorktreeAuthor(worktreePath, input.author);
-		return { worktreePath, branch, baseRef };
+		return {
+			worktreePath,
+			branch,
+			baseRef,
+			...(start.warning ? { warning: start.warning } : {}),
+		};
 	}
 
 	/**

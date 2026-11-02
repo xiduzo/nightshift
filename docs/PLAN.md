@@ -278,7 +278,7 @@ The lease is free in three cases:
 
 Every acquisition adds one to the epoch. A daemon whose machine slept keeps the lease when it wakes, unless another daemon took it in the meantime. In that case its next heartbeat fails. It logs `SELF-FENCE:` and exits with code 3, and writes nothing more. Nothing restarts it. Stop the other daemon first, then start this one again. The Settings page shows the lease under This daemon.
 
-**Schedules.** The schedules of a project live in the Space that keeps it, next to its flows, not in a Clone ([ADR 2](adr/0002-flows-are-night-shift-data.md)). The UI lists, adds, pauses and removes them. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and a base ref.
+**Schedules.** The schedules of a project live in the Space that keeps it, next to its flows, not in a Clone ([ADR 2](adr/0002-flows-are-night-shift-data.md)). The UI lists, adds, pauses and removes them. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and a base ref. Each run starts from the newest commit of the base ref: a branch is fetched from its remote first, so a merge to `main` on GitHub reaches the next run (glossary: Worktree).
 
 - A schedule that names no Device fires on the Host of its Space, once ([ADR 1](adr/0001-one-personal-space-per-home-host.md)).
 - A cron time that is more than 15 minutes late is skipped.
