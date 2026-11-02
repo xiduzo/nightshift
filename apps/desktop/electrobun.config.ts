@@ -116,6 +116,10 @@ export default {
 			defaultRenderer: "cef",
 		},
 	},
+	scripts: {
+		// Seals an unsigned macOS app, or macOS calls the download "damaged".
+		postWrap: "scripts/sign-ad-hoc.ts",
+	},
 	release: {
 		baseUrl: UPDATE_FEEDS[feed],
 		// A patch diffs against the last release on the feed. Only the release

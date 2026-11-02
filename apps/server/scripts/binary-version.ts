@@ -8,7 +8,7 @@
 export const DESKTOP_VERSION_FALLBACK = "0.1.0";
 
 export function binaryVersion(
-	env: { NIGHTSHIFT_VERSION?: string } = process.env,
+	env: Record<string, string | undefined> = process.env,
 ): string {
 	return env.NIGHTSHIFT_VERSION || DESKTOP_VERSION_FALLBACK;
 }

@@ -92,6 +92,9 @@ Without signing, macOS blocks the first open of a downloaded app:
 
 Later updates install without this step.
 
+An unsigned build gets an ad-hoc signature (`apps/desktop/scripts/sign-ad-hoc.ts`).
+Without it, macOS calls the download "damaged" and shows no **Open Anyway**.
+
 To sign and notarize, add these repository secrets. The macOS builds of the
 Release and Nightly workflows then use them. Pull request builds are never
 signed.
