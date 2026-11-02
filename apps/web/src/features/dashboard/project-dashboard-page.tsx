@@ -18,7 +18,6 @@ import { MetricDetails } from "./metric-details";
 import { MetricTiles } from "./metric-tiles";
 import { type Metric, metricsOf } from "./metrics";
 import { MetricsChart } from "./metrics-chart";
-import { NowStrip } from "./now-strip";
 import { ProjectTables } from "./project-tables";
 import { dashboardQueries } from "./queries";
 import { RangeBar } from "./range-bar";
@@ -71,7 +70,6 @@ export function ProjectDashboardPage({
 					<CopyProjectHere project={project} />
 
 					<RangeBar value={range} onValueChange={onRangeChange} />
-					<NowStrip projectId={project.id} summary={summary.data} />
 					<MetricTiles
 						values={metrics?.values}
 						before={metrics?.before}
