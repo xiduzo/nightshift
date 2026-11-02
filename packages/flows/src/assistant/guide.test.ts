@@ -109,8 +109,10 @@ describe("flowAuthoringGuide", () => {
 		// 4100: the Service node (ADR 9). 4350: the Ask (ADR 10), a Value
 		// made by a person. 4450: a schedule's late window (`lateMinutes`)
 		// and `{{run.due_at}}`, so a monthly run does not skip its day.
-		// 4470: an Agent's knowledge as a list of folders.
-		expect(words).toBeLessThan(4470);
+		// 4470: an Agent's knowledge as a list of folders. 4500: the
+		// `scores` a Command writes (one sentence), so a flow can say what
+		// it achieved.
+		expect(words).toBeLessThan(4500);
 	});
 });
 
