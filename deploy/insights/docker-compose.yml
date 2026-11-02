@@ -1,13 +1,16 @@
 # Insights: Postgres, the Collector, and the app.
 #
-#   docker compose -f deploy/insights/docker-compose.yml up -d --build
+#   docker compose -f deploy/insights/docker-compose.yml \
+#     -f deploy/insights/docker-compose.local.yml up -d --build
 #
 # The command reads INSIGHTS_DB_PASSWORD and INSIGHTS_AUTH_SECRET from the
 # environment. Use letters and digits in the password. The app uses it in
 # the database URL.
 #
-# The Collector publishes port 4318. The app publishes port 8787.
-# Ingest on port 8788 stays on this network. Postgres publishes nothing.
+# This file publishes no port. On Dokploy, Traefik reaches the Collector
+# (4318) and the app (8787) through their domains. On one computer,
+# docker-compose.local.yml publishes those two ports. Ingest on port 8788
+# stays on this network. Postgres publishes nothing.
 
 services:
   postgres:
@@ -33,8 +36,6 @@ services:
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./collector.yaml:/etc/otelcol-contrib/config.yaml:ro
-    ports:
-      - "4318:4318"
     depends_on:
       - insights
 
@@ -51,8 +52,6 @@ services:
       # 0.0.0.0 so the Collector on this network can reach ingest.
       # Port 8788 is not published.
       INSIGHTS_INGEST_HOST: 0.0.0.0
-    ports:
-      - "8787:8787"
     depends_on:
       postgres:
         condition: service_healthy

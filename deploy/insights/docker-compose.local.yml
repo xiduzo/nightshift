@@ -1,0 +1,12 @@
+# Publishes the Collector and the admin UI on one computer.
+#
+#   docker compose -f deploy/insights/docker-compose.yml \
+#     -f deploy/insights/docker-compose.local.yml up -d --build
+
+services:
+  collector:
+    ports:
+      - "4318:4318"
+  insights:
+    ports:
+      - "8787:8787"

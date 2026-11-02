@@ -11,6 +11,11 @@ The files are in [`deploy/insights/`](../../deploy/insights/):
 - [`Dockerfile`](../../deploy/insights/Dockerfile) builds the app.
 - [`collector.yaml`](../../deploy/insights/collector.yaml) is the Collector config.
 - [`docker-compose.yml`](../../deploy/insights/docker-compose.yml) runs Postgres, the Collector, and the app.
+- [`docker-compose.local.yml`](../../deploy/insights/docker-compose.local.yml) publishes the ports on one computer.
+
+The team instance runs on Dokploy in the project `nightshift-insights`.
+Ingest is `https://ingest.xiduzo.com/nightshift`. The admin UI is
+`https://insights.xiduzo.com`.
 
 ## On one computer
 
@@ -19,11 +24,12 @@ the environment. Use letters and digits in `INSIGHTS_DB_PASSWORD`. The
 app uses that password in the database URL.
 
 ```bash
-docker compose -f deploy/insights/docker-compose.yml up -d --build
+docker compose -f deploy/insights/docker-compose.yml \
+  -f deploy/insights/docker-compose.local.yml up -d --build
 ```
 
-The Collector listens on port 4318. The admin UI listens on port 8787.
-Postgres has no host port. The app accepts ingest on port 8788 only
+The local file publishes the Collector on port 4318 and the admin UI on
+port 8787. The main file publishes no port. Postgres has no host port. The app accepts ingest on port 8788 only
 inside the compose network.
 
 ## On Dokploy
@@ -36,7 +42,8 @@ These steps are for you to do on the server.
 3. Set `INSIGHTS_DB_PASSWORD` and `INSIGHTS_AUTH_SECRET` in the project
    environment.
 4. Add the domain `ingest.example.com` (an example) on the Collector,
-   container port 4318.
+   container port 4318, path `/nightshift`, with strip path on. Other
+   sources can use other paths on the same name later.
 5. Add the domain `insights.example.com` (an example) on the app,
    container port 8787.
 6. In Cloudflare, add a proxied DNS record for the ingest name.
@@ -59,7 +66,7 @@ Cloudflare Access is free for up to 50 users.
 14. Add a WAF rate limit on the ingest host of 60 requests a minute per IP.
 15. Enable daily backups for the Postgres service in Dokploy.
 16. Set `NIGHTSHIFT_USAGE_ENDPOINT` on the Night Shift image build to
-    `https://ingest.<your domain>/v1/logs`.
+    `https://ingest.<your domain>/nightshift`. Night Shift adds `/v1/logs`.
 17. Pass that URL as the build arg `NIGHTSHIFT_USAGE_ENDPOINT` of
     [`deploy/Dockerfile`](../../deploy/Dockerfile).
 
