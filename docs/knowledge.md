@@ -97,7 +97,8 @@ index lists only the accepted ones.
 ## What an agent gets
 
 An Agent step gets the folder when the folder has files. To change that,
-set `knowledge` on the Agent node: `true` gives it always, `false` never.
+set `knowledge` on the Agent node: `true` gives it always, `false` never,
+and a list of folders gives only those ([Only some folders](#only-some-folders)).
 In the editor, this is the Knowledge section on the Setup tab.
 
 The agent gets one line next to its prompt, not the files:
@@ -125,6 +126,50 @@ run's project only, and one more line after its prompt:
 
 Some versions of Claude Code also load a `CLAUDE.md` in an `--add-dir`
 folder. Only the line works with every version.
+
+### Only some folders
+
+An agent that sees a result steers toward it. To give a step only part of
+the knowledge, set `knowledge` to a list of folders (or files) of it:
+
+```json
+"knowledge": ["books", "learnings/accepted", "research/papers"]
+```
+
+In the editor, choose "Only some folders" in the Knowledge section and
+pick the folders.
+
+The step then gets a view, not the folder:
+
+1. Before the step, the reconcile runs as usual. Then the computer copies
+   the files of the listed folders into a new folder of the step, outside
+   the knowledge folder and outside the worktree. It does not link them,
+   so a write to the copy never reaches the knowledge.
+2. Night Shift writes an `INDEX.md` in the copy that lists only its files.
+3. `$NS_KNOWLEDGE`, the line and the folder to read (`--add-dir`) point at
+   the copy. The agent does not get the path of the knowledge folder.
+4. `search_knowledge` returns only files in the listed folders, found by
+   words and by meaning. `read_knowledge` reads no other file.
+5. When the step ends, the computer removes the copy. No reconcile sees it.
+
+The rules:
+
+- A path is relative to the knowledge folder, with `/` between its parts.
+  `books` gives `books/` and everything in it, not `bookshelf/`.
+- An absolute path, `..`, a hidden part and an empty list are not valid.
+  To give no knowledge, use `false`.
+- A folder that does not exist yet is valid and gives nothing. The editor
+  marks it.
+- `learnings/accepted` is a folder like the others: list it to give the
+  learnings you kept. The step still gets the learnings field, and its
+  proposals still go to `learnings/proposed/` of the knowledge.
+- The view is a wall for what the agent reads through Night Shift. A
+  harness that reads any file on the computer can still find the knowledge
+  folder if it looks for it. Keep data that no agent may see out of the
+  knowledge.
+- The list goes to the computer that runs the step in a field of its own.
+  A computer with an older Night Shift gives such a step no knowledge,
+  never the whole folder.
 
 ## Filling it
 
