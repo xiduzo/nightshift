@@ -26,14 +26,19 @@ import {
 	Stat,
 } from "./details";
 import { CostPerRun, RunsPerNight } from "./flow-health-charts";
-import { LatestRuns, Warnings, WhyUnfinished } from "./flow-health-tables";
+import {
+	LatestRuns,
+	Scores,
+	Warnings,
+	WhyUnfinished,
+} from "./flow-health-tables";
 import { dashboardQueries } from "./queries";
 
 type Tab = "overview" | "cost" | "problems" | "runs";
 
 /**
  * One flow in detail, behind its Flow health row, in tabs so each view stays
- * small: an overview with runs per night, what each run cost against the
+ * small: an overview with runs per night and the runs' scores, what each run cost against the
  * median, why runs did not finish, and the latest runs. One range drives
  * every tab. Runs as a subflow count, as in the row.
  */
@@ -168,6 +173,13 @@ function FlowHealthDetails({
 								perNight={inRange.perNight}
 								statuses={inRange.statuses}
 							/>
+							{inRange.scores && inRange.scores.length > 0 ? (
+								<Scores
+									scores={inRange.scores}
+									now={now}
+									onNavigate={onNavigate}
+								/>
+							) : null}
 						</DetailsTabContent>
 
 						<DetailsTabContent value="cost">

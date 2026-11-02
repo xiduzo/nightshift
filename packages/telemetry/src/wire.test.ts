@@ -540,6 +540,66 @@ describe("the export to monitoring", () => {
 		).toBe(1);
 	});
 
+	test("a score a Command step wrote counts unchanged, under the flow's own name", async () => {
+		const run = runEvents("run-1")
+			.at(T + 1_000)
+			.runStarted({ projectId: "p1", flowName: "replicate" })
+			.at(T + 1_100)
+			.stepStarted("s-check", "replicate", 1, {
+				nodeType: "command",
+				deviceId: DEVICE,
+			})
+			.at(T + 2_000)
+			.stepEnded("s-check", "pass")
+			.push(
+				"Scored",
+				{ score: "replicated", value: 1, label: null },
+				{ stepId: "s-check" },
+			)
+			.push(
+				"Scored",
+				{ score: "held_post_publication", value: 0.25, label: null },
+				{ stepId: "s-check" },
+			)
+			.at(T + 2_100)
+			.ended("finished");
+		const h = await setup({}, run);
+		h.landRun();
+		await h.done();
+		const points = h.points().get(METRIC.score.name) ?? [];
+		expect(
+			points
+				.map((p) => ({ attributes: p.attributes, value: p.value }))
+				.sort((a, b) =>
+					String(a.attributes[ATTR.score]).localeCompare(
+						String(b.attributes[ATTR.score]),
+					),
+				),
+		).toEqual([
+			{
+				attributes: {
+					[ATTR.projectId]: "p1",
+					[ATTR.flowId]: "replicate",
+					[ATTR.deviceId]: DEVICE,
+					[ATTR.score]: "held_post_publication",
+				},
+				value: 0.25,
+			},
+			{
+				attributes: {
+					[ATTR.projectId]: "p1",
+					[ATTR.flowId]: "replicate",
+					[ATTR.deviceId]: DEVICE,
+					[ATTR.score]: "replicated",
+				},
+				value: 1,
+			},
+		]);
+		// Not a pull request: no outcome.
+		expect(sum(h.points().get(METRIC.prOutcome.name))).toBe(0);
+		assertConforms(exported(h.spans(), h.resources()));
+	});
+
 	test("a pull request's scores count, and as what became of it", async () => {
 		const run = nightRun()
 			.push("Scored", {

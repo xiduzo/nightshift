@@ -141,7 +141,7 @@ function instruments(running: RunningExport): Instruments {
 		),
 		score: counter(
 			METRIC.score,
-			"Feedback on runs: Gate answers, pull request outcomes.",
+			"Feedback on runs: Gate answers, pull request outcomes, and the scores a flow writes.",
 		),
 	};
 }

@@ -15,6 +15,7 @@ import {
 	commandLogPath,
 	type DerivedStep,
 	type EnginePayloads,
+	type FlowScore,
 	type GateChoice,
 	type Hold,
 	type RunState,
@@ -258,6 +259,11 @@ export type BodyEnd = {
 	costSource?: CostSource | null;
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
+	/**
+	 * Scores the step wrote (a Command's data): one `Scored` each on the
+	 * step, after its `StepEnded`, as a Gate's answer is scored.
+	 */
+	scores?: readonly FlowScore[];
 };
 
 /**
@@ -423,12 +429,22 @@ export async function runStep(
 		outputs: StepOutputs,
 		error: string | null,
 		costs: ReturnType<typeof extraOf> & { guard?: StepGuard },
+		scores: readonly FlowScore[] = [],
 	): Promise<Command> => {
 		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
 		const end = await step.end(outcome, outputs, error, {
 			...costs,
 			...(climbing ? { skipWrites: true } : {}),
 		});
+		// After the end, as a Gate's answer: every reader sees the step ended first.
+		for (const { score, value } of scores) {
+			await ctx.log.append({
+				type: "Scored",
+				runId: ctx.run.id,
+				stepId: step.stepId,
+				payload: { score, value, label: null },
+			});
+		}
 		if (climbing && spec.climb) return spec.climb.command(end);
 		return route(ctx, state, node, end, config, extra);
 	};
@@ -439,6 +455,7 @@ export async function runStep(
 				{ ...result.outputs, outcome: result.outcome },
 				result.error,
 				extraOf(result),
+				result.scores,
 			);
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);

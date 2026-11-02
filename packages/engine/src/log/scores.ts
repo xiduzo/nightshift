@@ -1,4 +1,6 @@
-import type { EnginePayloads } from "./events";
+import type { JsonValue } from "@nightshift/flows";
+
+import type { EnginePayloads, ScoreName } from "./events";
 
 /**
  * What a score means: the one place that reads a `Scored` event's name,
@@ -15,6 +17,12 @@ import type { EnginePayloads } from "./events";
  *   reverted it.
  * - `pr_useful`: a person said whether that pull request was useful.
  *   `value` is 1 for yes and 0 for no. On the run.
+ * - Any other name: a Command step wrote it in its data, as
+ *   `{"scores": {"replicated": 1}}` (`flowScores`). On that step, after its
+ *   `StepEnded`, with no label. The flow chooses the name and what the
+ *   value means. A name is letters, digits, `_` and `-`, at most 64
+ *   characters, and not one of the names above. The value is a number of
+ *   0 or more: the export adds scores up as a counter.
  *
  * `value` is 1 for a fact that happened. The names are an open list: a
  * score of a newer Walker passes through with its name, and means nothing
@@ -72,4 +80,69 @@ const PULL_REQUEST_OUTCOMES: Readonly<Record<string, PullRequestOutcome>> = {
 /** What became of the run's pull request, when the score tells it. Else null. */
 export function pullRequestOutcome(score: string): PullRequestOutcome | null {
 	return PULL_REQUEST_OUTCOMES[score] ?? null;
+}
+
+/** The names Night Shift writes itself. A flow may not write them. */
+const OWN_SCORES: ReadonlySet<string> = new Set<ScoreName>([
+	"gate_decision",
+	"pr_merged",
+	"pr_closed",
+	"reverted_within_7d",
+	"pr_useful",
+]);
+
+/** The name of a score a flow writes: letters, digits, `_` and `-`. */
+const FLOW_SCORE_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** A score a Command step wrote, to log as `Scored` on its step. */
+export type FlowScore = { score: string; value: number };
+
+/**
+ * The scores in a Command step's data: its `scores` object, name to
+ * number. An entry Night Shift cannot keep is left out, with a sentence
+ * for the step's warning: a name Night Shift writes itself, a name that is
+ * not letters, digits, `_` and `-` (at most 64), or a value that is not a
+ * number of 0 or more. `scores` that is not an object is one refusal.
+ */
+export function flowScores(data: JsonValue | undefined): {
+	scores: FlowScore[];
+	refused: string[];
+} {
+	if (data === null || typeof data !== "object" || Array.isArray(data)) {
+		return { scores: [], refused: [] };
+	}
+	const raw = data.scores;
+	if (raw === undefined) return { scores: [], refused: [] };
+	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+		return {
+			scores: [],
+			refused: [
+				'The step wrote "scores" that is not an object. Write names with numbers, such as {"scores": {"replicated": 1}}.',
+			],
+		};
+	}
+	const scores: FlowScore[] = [];
+	const refused: string[] = [];
+	for (const [score, value] of Object.entries(raw)) {
+		if (OWN_SCORES.has(score)) {
+			refused.push(
+				`The step wrote the score "${score}". Night Shift keeps that name for itself. Choose another name.`,
+			);
+		} else if (!FLOW_SCORE_NAME.test(score)) {
+			refused.push(
+				`The step wrote the score "${score.slice(0, 80)}". Use letters, digits, _ and -, at most 64 characters.`,
+			);
+		} else if (
+			typeof value !== "number" ||
+			!Number.isFinite(value) ||
+			value < 0
+		) {
+			refused.push(
+				`The step wrote the score "${score}" without a number of 0 or more. Write a number, such as 1.`,
+			);
+		} else {
+			scores.push({ score, value });
+		}
+	}
+	return { scores, refused };
 }

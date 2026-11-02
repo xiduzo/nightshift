@@ -1,3 +1,4 @@
+import type { RunScore } from "../log";
 import type { RunSummary } from "../read";
 import { finishedShare } from "../run-status";
 import { lastNights, nightOf } from "./clock";
@@ -14,6 +15,7 @@ import {
 	type FlowHealthRow,
 	type FlowRange,
 	type FlowRun,
+	type FlowScoreRow,
 	type FlowWarning,
 	LAST_FLOW_RUNS,
 	type LastFlowRun,
@@ -29,9 +31,11 @@ import {
 /** The nights a Flow health row covers. */
 export const FLOW_HEALTH_NIGHTS: NightRange = 30;
 
-/** A run of a flow with its warnings and the night it started in. */
+/** A run of a flow with its warnings, its scores and the night it started in. */
 type PlacedFlowRun = Omit<FlowRun, "warnings"> & {
 	warnings: RunSummary["warnings"];
+	/** Its scores. A subflow run has none: they are in the run that called it. */
+	scores: RunScore[];
 	night: number;
 };
 
@@ -57,6 +61,7 @@ function runsOf(
 						calledBy: null,
 						reason: run.reason,
 						warnings: run.warnings,
+						scores: run.metrics?.scores ?? [],
 						night: nightOf(run.createdAt, timeZone),
 					},
 				]
@@ -76,6 +81,7 @@ function runsOf(
 				calledBy: run.title,
 				reason: null,
 				warnings: [],
+				scores: [],
 				night: nightOf(subflow.startedAt, timeZone),
 			})),
 	]);
@@ -108,8 +114,44 @@ function finishedCostOf(finished: readonly PlacedFlowRun[]): {
 	};
 }
 
-function toFlowRun({ night: _night, ...run }: PlacedFlowRun): FlowRun {
+function toFlowRun({
+	night: _night,
+	scores: _scores,
+	...run
+}: PlacedFlowRun): FlowRun {
 	return { ...run, warnings: run.warnings.length };
+}
+
+/**
+ * The scores of the runs, one row per name, the most scored first. A
+ * Gate's answer is left out: the Gates have their own numbers.
+ */
+function scoresOf(runs: readonly PlacedFlowRun[]): FlowScoreRow[] {
+	const byName = new Map<string, FlowScoreRow & { runIds: Set<string> }>();
+	for (const run of runs) {
+		for (const { score, value, at } of run.scores) {
+			if (score === "gate_decision") continue;
+			const row = byName.get(score) ?? {
+				name: score,
+				runs: 0,
+				count: 0,
+				sum: 0,
+				mean: 0,
+				latest: { value, at, runId: run.runId },
+				runIds: new Set<string>(),
+			};
+			row.runIds.add(run.runId);
+			row.runs = row.runIds.size;
+			row.count += 1;
+			row.sum += value;
+			row.mean = row.sum / row.count;
+			if (at >= row.latest.at) row.latest = { value, at, runId: run.runId };
+			byName.set(score, row);
+		}
+	}
+	return [...byName.values()]
+		.sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name))
+		.map(({ runIds: _runIds, ...row }) => row);
 }
 
 /**
@@ -162,6 +204,7 @@ export function flowHealthRows(
 				costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
 				tokens: unfinished.reduce((total, run) => total + (run.tokens ?? 0), 0),
 			},
+			scores: scoresOf(recent),
 		};
 	});
 	return topRows(
@@ -297,6 +340,7 @@ function flowRange(
 		})),
 		whyUnfinished: topRows(whyUnfinished(unfinished)),
 		warningRows: topRows(warningsOf(inRange)),
+		scores: scoresOf(inRange),
 		latest: inRange.slice(-OVERVIEW_ROWS).reverse().map(toFlowRun),
 	};
 }

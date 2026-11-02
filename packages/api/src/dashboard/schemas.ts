@@ -75,6 +75,16 @@ const lastFlowRunSchema = z.object({
 	startedAt: z.number(),
 });
 
+/** One score name of a flow's runs. A flow chooses its own names. */
+const flowScoreRowSchema = z.object({
+	name: z.string(),
+	runs: z.number(),
+	count: z.number(),
+	sum: z.number(),
+	mean: z.number(),
+	latest: z.object({ value: z.number(), at: z.number(), runId: z.string() }),
+});
+
 const flowHealthRowSchema = z.object({
 	name: z.string(),
 	last: lastFlowRunSchema.nullable(),
@@ -92,6 +102,7 @@ const flowHealthRowSchema = z.object({
 	}),
 	unknownCost: z.number(),
 	freeRuns: z.number(),
+	scores: z.array(flowScoreRowSchema).optional(),
 });
 
 const nightTotalsSchema = z.object({
@@ -354,6 +365,7 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 						last: z.object({ runId: z.string(), at: z.number() }),
 					}),
 				),
+				scores: z.array(flowScoreRowSchema).optional(),
 				latest: z.array(flowRunSchema),
 			}),
 		),

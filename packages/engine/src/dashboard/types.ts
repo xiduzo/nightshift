@@ -360,6 +360,27 @@ export type FlowHealthRow = {
 	unknownCost: number;
 	/** Finished runs that asked no agent or model: not in `cost`. */
 	freeRuns: number;
+	/** Its runs' scores in the last nights, the most scored first. Empty when none scored. Older Hosts send none. */
+	scores?: FlowScoreRow[];
+};
+
+/**
+ * One score name of a flow's runs over some nights: what its Command
+ * steps wrote, and what became of its pull requests. A Gate's answer is
+ * left out: the Gates have their own numbers. Only the flow's own runs
+ * count, not its runs as a subflow.
+ */
+export type FlowScoreRow = {
+	name: string;
+	/** Runs that scored it at least once. */
+	runs: number;
+	/** How many values were written. */
+	count: number;
+	sum: number;
+	/** `sum` over `count`. */
+	mean: number;
+	/** The value written last, when, and in which run. */
+	latest: { value: number; at: number; runId: string };
 };
 
 /** The dashboard of a Space, or of one project in it. */
@@ -477,6 +498,8 @@ export type FlowRange = {
 	whyUnfinished: TopRows<UnfinishedReason>;
 	/** The most common first. */
 	warningRows: TopRows<FlowWarning>;
+	/** The most scored first. Empty when no run scored. Older Hosts send none. */
+	scores?: FlowScoreRow[];
 	/** The newest first. */
 	latest: FlowRun[];
 };

@@ -699,6 +699,60 @@ describe("the Command node", () => {
 			expect(state.nodes.printed?.data).toEqual({ from: "stdout" });
 		});
 
+		test("its `scores` score the run on the step, after StepEnded; one it cannot keep warns", async () => {
+			const data = JSON.stringify({
+				scores: {
+					replicated: 1,
+					held_post_publication: 0.25,
+					pr_merged: 1,
+					"not a name": 1,
+					negative: -1,
+					text: "high",
+				},
+			});
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "replicate",
+					nodes: [command("replicate", `echo '${data}' > "$NS_OUTPUT"`)],
+					edges: [],
+				}),
+			);
+			const { parked } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			const logged = await h.events();
+			const [derived] = deriveSteps(foldRun(logged));
+			// Scores it cannot keep never fail the step.
+			expect(derived?.outcome).toBe("pass");
+			expect(await h.types()).toEqual([
+				"RunStarted",
+				"StepStarted",
+				"RunWarned",
+				"RunWarned",
+				"RunWarned",
+				"RunWarned",
+				"StepEnded",
+				"Scored",
+				"Scored",
+			]);
+			const stepId = derived?.id as string;
+			const scored = logged.filter((e) => e.type === "Scored");
+			expect(scored.map((e) => [e.stepId, e.payload])).toEqual([
+				[stepId, { score: "replicated", value: 1, label: null }],
+				[stepId, { score: "held_post_publication", value: 0.25, label: null }],
+			]);
+			const warnings = payloads(logged, "RunWarned");
+			expect(warnings.map((w) => w.kind)).toEqual([
+				"score",
+				"score",
+				"score",
+				"score",
+			]);
+			expect(warnings.map((w) => w.message).join("\n")).toContain(
+				'"pr_merged". Night Shift keeps that name for itself.',
+			);
+		});
+
 		test("each step gets a new, empty file of its own, and it goes when the step ends", async () => {
 			const h = await startRun(
 				sandbox,

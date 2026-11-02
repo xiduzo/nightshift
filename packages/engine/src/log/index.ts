@@ -96,6 +96,8 @@ export {
 } from "./run-state";
 export {
 	type AnsweredBy,
+	type FlowScore,
+	flowScores,
 	pullRequestOutcome,
 	type RunScore,
 	runScore,

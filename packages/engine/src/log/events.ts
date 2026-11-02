@@ -606,12 +606,14 @@ export type EnginePayloads = {
 	PullRequestOpened: { url: string };
 	/**
 	 * Feedback on what a run did: a Gate was answered, on the Gate's step,
-	 * what became of the run's pull request, or whether a person found that
-	 * pull request useful. What each name, value and `by` means is in
+	 * what became of the run's pull request, whether a person found that
+	 * pull request useful, or a name a Command step wrote in its data
+	 * (`scores`), on that step. What each name, value and `by` means is in
 	 * `scores.ts`. The metrics and the export count them.
 	 */
 	Scored: {
-		score: ScoreName;
+		/** One of Night Shift's own names (`ScoreName`), or a name a flow chose. */
+		score: string;
 		value: number;
 		label: string | null;
 		by?: "person" | "deadline";
@@ -713,7 +715,8 @@ export type KnowledgeVia = "step" | "mcp";
  * showed no activity for its idle limit), `looping` (an agent made the
  * same tool call with the same input three times in a row). `base-ref`:
  * the run does not start from the newest commit of its base branch (the
- * fetch failed, or the branch went apart from the remote's). A reader
+ * fetch failed, or the branch went apart from the remote's). `score`: a
+ * Command step wrote a score Night Shift left out (`scores.ts`). A reader
  * treats the kinds as an open list: a later build may add one.
  */
 export type RunWarningKind =
@@ -722,12 +725,13 @@ export type RunWarningKind =
 	| "turns"
 	| "stalled"
 	| "looping"
-	| "base-ref";
+	| "base-ref"
+	| "score";
 
 /**
- * What a `Scored` event of this build scores (`scores.ts` says what each
- * means). A reader treats the names as an open list: a later build may add
- * one.
+ * The names Night Shift scores itself (`scores.ts` says what each means).
+ * A flow may not write them. A reader treats the names of a `Scored` event
+ * as an open list: a flow names its own, and a later build may add one.
  */
 export type ScoreName =
 	| "gate_decision"

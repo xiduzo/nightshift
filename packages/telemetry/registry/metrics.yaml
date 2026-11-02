@@ -114,7 +114,7 @@ metrics:
     requirement_level: recommended
     instrument: counter
     unit: "{score}"
-    brief: Feedback on runs. Gate answers and pull request outcomes.
+    brief: Feedback on runs. Gate answers, pull request outcomes, and the scores a flow writes.
     stability: development
     attributes:
       - ref: nightshift.score.name
