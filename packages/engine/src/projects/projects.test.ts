@@ -11,7 +11,11 @@ import {
 	otherSpace,
 	type Sandbox,
 } from "../testing/test-support";
-import { createProjects, PROJECT_NOT_FOUND } from "./projects";
+import {
+	createProjects,
+	HOSTED_NEEDS_REMOTE,
+	PROJECT_NOT_FOUND,
+} from "./projects";
 import { normaliseRemote } from "./remote";
 import { createSpaceDocuments, type SpaceDocuments } from "./space-document";
 
@@ -238,6 +242,114 @@ describe("what the peers ask of the Projects", () => {
 			},
 		});
 	}
+
+	test("add in a Space a Host keeps: the Host adds the Project, and this folder is its Clone", async () => {
+		const team = await otherSpace(sandbox.db, "Team");
+		const replica = keptElsewhere(team);
+		const asked: unknown[] = [];
+		const directory = {
+			...aloneDirectory(sandbox.db),
+			hostedElsewhere: async (id: string) => id === team,
+		};
+		const projects = createProjects({
+			db: sandbox.db,
+			log: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
+			deviceId: async () => sandbox.deviceId,
+			documents: replica,
+			directory,
+			relay: {
+				async addProject(input) {
+					asked.push({ addProject: input });
+					return { projectId: "from-host" };
+				},
+				async addClone(input) {
+					asked.push({ addClone: input.projectId });
+				},
+			},
+		});
+		try {
+			const path = await repo("app", "https://github.com/acme/app.git");
+			const added = await projects.add({ repoPath: path }, team);
+			expect(added).toMatchObject({
+				id: "from-host",
+				spaceId: team,
+				name: "app",
+				remote: "github.com/acme/app",
+				repoPath: path,
+			});
+			expect(asked).toEqual([
+				{
+					addProject: {
+						spaceId: team,
+						name: "app",
+						remote: "github.com/acme/app",
+					},
+				},
+				{ addClone: "from-host" },
+			]);
+			expect((await projects.list(team)).map((p) => p.id)).toEqual([
+				"from-host",
+			]);
+			// This Replica never writes the Host's document.
+			expect((await replica.open(team)).projects.size).toBe(0);
+
+			// A folder without a remote: the Host has nothing to copy.
+			await expect(
+				projects.add({ repoPath: await repo("local") }, team),
+			).rejects.toThrow(HOSTED_NEEDS_REMOTE);
+			expect(asked).toHaveLength(2);
+		} finally {
+			await replica.flush();
+		}
+	});
+
+	test("addFromRemote: a new Project without a Clone here, the same one again, a removed one back", async () => {
+		const projects = projectsOf();
+		const first = await projects.addFromRemote(sandbox.spaceId, {
+			name: "app",
+			remote: "github.com/acme/app",
+		});
+		const document = await documents.open(sandbox.spaceId);
+		expect(document.projects.get(first.projectId)).toMatchObject({
+			name: "app",
+			remote: "github.com/acme/app",
+			removedAt: null,
+		});
+		expect(await clones()).toEqual([]);
+		const [added] = await sandbox.db
+			.select({ payload: event.payload })
+			.from(event)
+			.where(eq(event.type, "ProjectAdded"));
+		expect(JSON.parse(String(added?.payload))).toEqual({
+			projectId: first.projectId,
+			name: "app",
+			remote: "github.com/acme/app",
+		});
+
+		expect(
+			await projects.addFromRemote(sandbox.spaceId, {
+				name: "other name",
+				remote: "github.com/acme/app",
+			}),
+		).toEqual(first);
+
+		await projects.remove(first.projectId);
+		await projects.addFromRemote(sandbox.spaceId, {
+			name: "app",
+			remote: "github.com/acme/app",
+		});
+		expect(
+			(await projects.listInSpace(sandbox.spaceId)).map((p) => p.id),
+		).toEqual([first.projectId]);
+
+		const team = await otherSpace(sandbox.db, "Team");
+		await expect(
+			projects.addFromRemote(team, {
+				name: "app",
+				remote: "github.com/acme/app",
+			}),
+		).rejects.toThrow("another Space");
+	});
 
 	test("recordClone records another Device's Clone, and refuses a Project the document lacks and a Space a Host keeps", async () => {
 		const projects = projectsOf();

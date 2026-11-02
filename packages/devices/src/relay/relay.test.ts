@@ -13,7 +13,7 @@ import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
 import { NOT_PAIRED } from "../links/from-host";
 import { pairedReplicas } from "../testing";
-import { createRelay } from "./relay";
+import { createRelay, OLDER_HOST_PROJECTS } from "./relay";
 import { createSpaceRoutes } from "./route";
 import { createWorkRelay } from "./work-relay";
 
@@ -73,6 +73,7 @@ function fakeHost(
 	const client = {
 		sync: {
 			command: take("sync.command", undefined),
+			addProject: take("sync.addProject", { projectId: "project-on-host" }),
 			addClone: take("sync.addClone", undefined),
 			offer: take("sync.offer", undefined),
 			withdrawOffer: take("sync.withdrawOffer", undefined),
@@ -231,6 +232,12 @@ const start = (spaceId: string) => ({
 function actions(relay: ReturnType<typeof createRelay>, spaceId: string) {
 	return {
 		command: () => relay.command(command(spaceId)),
+		addProject: () =>
+			relay.addProject({
+				spaceId,
+				name: "app",
+				remote: "github.com/acme/app",
+			}),
 		addClone: () =>
 			relay.addClone({
 				spaceId,
@@ -451,6 +458,7 @@ describe("the relay, for a Space a Host keeps", () => {
 		const { relay, host, enqueued } = relayWith();
 		const act = actions(relay, "space-team");
 		await act.command();
+		expect(await act.addProject()).toEqual({ projectId: "project-on-host" });
 		await act.addClone();
 		await act.offer();
 		await act.withdrawOffer();
@@ -464,6 +472,14 @@ describe("the relay, for a Space a Host keeps", () => {
 		expect(host.taken).toEqual([
 			// The Host acts in the name of the key's Person: the command goes as it is.
 			{ procedure: "sync.command", input: command("space-team") },
+			{
+				procedure: "sync.addProject",
+				input: {
+					spaceId: "space-team",
+					name: "app",
+					remote: "github.com/acme/app",
+				},
+			},
 			{
 				procedure: "sync.addClone",
 				input: {
@@ -507,6 +523,23 @@ describe("the relay, for a Space a Host keeps", () => {
 			},
 		]);
 		expect(enqueued).toEqual([]);
+	});
+
+	test("a Host of an older version, which cannot add a project, says to update it", async () => {
+		const host = fakeHost();
+		Object.assign(host.client.sync, {
+			addProject: async () => {
+				throw new ORPCError("NOT_FOUND", { message: "Not found" });
+			},
+		});
+		const { relay } = relayWith(host);
+		await expect(
+			relay.addProject({
+				spaceId: "space-team",
+				name: "app",
+				remote: "github.com/acme/app",
+			}),
+		).rejects.toThrow(OLDER_HOST_PROJECTS);
 	});
 
 	test("a Host of an older version, which does not know the knowledge procedures, says so: not a failed sync", async () => {

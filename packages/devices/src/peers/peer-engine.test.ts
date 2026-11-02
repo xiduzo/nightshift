@@ -206,6 +206,7 @@ describe("a disposed engine", () => {
 	function relayOf(files: () => Map<string, string>): HostRelay {
 		return {
 			command: async () => {},
+			addProject: async () => ({ projectId: "p" }),
 			addClone: async () => {},
 			reachable: async () => false,
 			archiveGet: async (ref) =>

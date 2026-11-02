@@ -21,6 +21,7 @@ import {
 } from "@nightshift/engine/testing";
 import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
+import { eq } from "drizzle-orm";
 import type { SyncBatch } from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import type { DeviceRegistry } from "../registry";
@@ -549,6 +550,48 @@ describe("a push the Host refuses", () => {
 		expect(await host().push(mine, rowsOf("device-mine"))).toEqual({
 			events: 1,
 		});
+	});
+});
+
+describe("a Project a Device asks for", () => {
+	test("a Member adds it to the Space document; the same remote comes back; a viewer and a stranger are refused", async () => {
+		const colleague = keyOf("device-colleague", "colleague");
+		const added = await host().addProject(colleague, {
+			spaceId: sandbox.spaceId,
+			name: "app",
+			remote: "github.com/acme/app",
+		});
+		const document = await documents.open(sandbox.spaceId);
+		expect(document.projects.get(added.projectId)).toMatchObject({
+			name: "app",
+			remote: "github.com/acme/app",
+		});
+		expect(
+			await host().addProject(colleague, {
+				spaceId: sandbox.spaceId,
+				name: "app again",
+				remote: "github.com/acme/app",
+			}),
+		).toEqual(added);
+
+		await sandbox.db
+			.update(member)
+			.set({ role: "viewer" })
+			.where(eq(member.userId, "colleague"));
+		const refused = (key: DeviceKeyAccess) =>
+			host()
+				.addProject(key, {
+					spaceId: sandbox.spaceId,
+					name: "tools",
+					remote: "github.com/acme/tools",
+				})
+				.then(
+					() => null,
+					(error: unknown) => error,
+				);
+		expect(await refused(colleague)).toBeInstanceOf(ORPCError);
+		expect(await refused(keyOf("device-stranger", "stranger"))).toBeTruthy();
+		expect(document.projects.size).toBe(2);
 	});
 });
 

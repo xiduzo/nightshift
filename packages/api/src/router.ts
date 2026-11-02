@@ -36,11 +36,20 @@ import { usage } from "./usage";
 // its paths.
 
 /**
- * The API: one router from the procedures of each domain. Its keys and
- * nesting are the wire format (`/rpc/runs/list`): the web app, OpenAPI and
- * the paired Devices all go through it.
+ * The rest of the peer protocol, as a paired Device calls it. A const of
+ * its own: in one object with the rest, the router's type grows past what
+ * the compiler writes out (TS7056).
  */
-export const appRouter = {
+const peerRoutes = {
+	pairing: hostPeer.pairing,
+	link: hostPeer.link,
+	sync: hostPeer.sync,
+	archive: hostPeer.archive,
+	leases: hostPeer.leases,
+};
+
+/** What the screens call, and the Devices procedures of a paired Device. */
+const screenRoutes = {
 	healthCheck: publicProcedure
 		.route({ summary: "Answers OK while Night Shift runs." })
 		.output(output(z.string()))
@@ -70,10 +79,15 @@ export const appRouter = {
 	// A Person's Devices, and the work relay a paired Device calls.
 	devices: { ...devices, ...hostPeer.devices },
 	account,
-	pairing: hostPeer.pairing,
-	link: hostPeer.link,
-	sync: hostPeer.sync,
-	archive: hostPeer.archive,
-	leases: hostPeer.leases,
+};
+
+/**
+ * The API: one router from the procedures of each domain. Its keys and
+ * nesting are the wire format (`/rpc/runs/list`): the web app, OpenAPI and
+ * the paired Devices all go through it.
+ */
+export const appRouter: typeof screenRoutes & typeof peerRoutes = {
+	...screenRoutes,
+	...peerRoutes,
 };
 export type AppRouterClient = RouterClient<typeof appRouter>;

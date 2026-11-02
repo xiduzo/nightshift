@@ -62,6 +62,10 @@ export const NOT_ON_THIS_COMPUTER =
 export const HOSTED_ELSEWHERE =
 	"Your Host keeps the projects of this Space. Change them on your Host.";
 
+/** A folder without a remote, in a Space a Host keeps: the Host has nothing to copy. */
+export const HOSTED_NEEDS_REMOTE =
+	"Your Host keeps the projects of this Space and copies them from GitHub. Put this folder on GitHub first, then add it again.";
+
 /** A project that is not in the Space, or that a person removed. */
 export const PROJECT_NOT_FOUND = "Night Shift cannot find this project.";
 
@@ -111,8 +115,8 @@ export type ProjectsDeps = {
 	documents: SpaceDocuments;
 	/** The names of Devices, and the Spaces a Host keeps. */
 	directory: Pick<DeviceDirectory, "names" | "hostedElsewhere">;
-	/** The Hosts: a Clone in a Space a Host keeps is recorded through it. */
-	relay?: Pick<Relay, "addClone">;
+	/** The Hosts: a Project or a Clone in a Space a Host keeps is added through it. */
+	relay?: Pick<Relay, "addClone" | "addProject">;
 	/** The git port, for a clone's top folder and remote. Default: the git programs on this computer. */
 	git?: Git;
 };
@@ -215,6 +219,28 @@ export function createProjects(deps: ProjectsDeps) {
 		await document.change(() => recordClone(document, clone));
 	}
 
+	/**
+	 * Asks the Host that keeps the Space to add the Project, and keeps its
+	 * row here at once: the Space document brings the same entry a moment
+	 * later, and its projection finds the row in step.
+	 */
+	async function addOnHost(
+		spaceId: string,
+		input: { name: string; remote: string },
+	): Promise<typeof project.$inferSelect> {
+		if (!deps.relay) throw new Refusal("conflict", HOSTED_ELSEWHERE);
+		const { projectId } = await deps.relay.addProject({ spaceId, ...input });
+		await db
+			.insert(project)
+			.values({ id: projectId, spaceId, ...input })
+			.onConflictDoUpdate({
+				target: project.id,
+				set: { removedAt: null },
+				where: eq(project.spaceId, spaceId),
+			});
+		return rowOf(projectId);
+	}
+
 	/** Projects with a Clone on this computer, with its path, removed ones too. */
 	async function withClone(where?: ReturnType<typeof and>) {
 		const deviceId = await deps.deviceId();
@@ -229,7 +255,9 @@ export function createProjects(deps: ProjectsDeps) {
 			.orderBy(asc(project.createdAt));
 	}
 
-	async function restore(row: ProjectRow): Promise<ProjectRow> {
+	async function restore<T extends typeof project.$inferSelect>(
+		row: T,
+	): Promise<T> {
 		if (row.removedAt === null) return row;
 		await define(row, { removedAt: null });
 		await log.append({
@@ -352,15 +380,29 @@ export function createProjects(deps: ProjectsDeps) {
 
 			const url = await originUrl(path);
 			const remote = url === null ? null : normaliseRemote(url);
-			const [known] = remote
+			const [found] = remote
 				? await db.select().from(project).where(eq(project.remote, remote))
 				: [];
+			if (found) ownSpace(found, spaceId);
+			// A Space a Host keeps: the Host adds a new Project, or restores a
+			// removed one, and this folder becomes its Clone.
+			const onHost =
+				remote !== null &&
+				(!found || found.removedAt !== null) &&
+				(await directory.hostedElsewhere(spaceId));
+			const known = onHost
+				? await addOnHost(spaceId, {
+						name: input.name ?? path.split("/").at(-1) ?? path,
+						remote,
+					})
+				: found;
 			if (known) {
 				ownSpace(known, spaceId);
 				const [elsewhere] = await withClone(eq(project.id, known.id));
+				// A removed project's Clone may move: its Host restored it just now.
 				if (
 					elsewhere &&
-					known.removedAt === null &&
+					(found?.removedAt ?? null) === null &&
 					existsSync(elsewhere.repoPath)
 				) {
 					throw new Refusal(
@@ -407,10 +449,7 @@ export function createProjects(deps: ProjectsDeps) {
 			const name = input.name ?? path.split("/").at(-1) ?? path;
 			const document = await documents.open(spaceId);
 			if (document.hostedElsewhere) {
-				throw new Refusal(
-					"conflict",
-					"Your Host keeps the projects of this Space. Add this repository on your Host. It then shows here, and you can copy it to this computer from its page.",
-				);
+				throw new Refusal("conflict", HOSTED_NEEDS_REMOTE);
 			}
 			const now = timeNow();
 			await document.change(() => {
@@ -433,6 +472,50 @@ export function createProjects(deps: ProjectsDeps) {
 				payload: { projectId: id, name, repoPath: path, remote },
 			});
 			return { ...row, repoPath: path };
+		},
+
+		/**
+		 * The Project of a remote in the Space, for a Device that asks its
+		 * Host (`relay.addProject`): the one with this remote, restored when
+		 * a person removed it, else a new one without a Clone here. The
+		 * Host copies it from GitHub on its own.
+		 */
+		async addFromRemote(
+			spaceId: string,
+			input: { name: string; remote: string },
+		): Promise<{ projectId: string }> {
+			// Normalised by the Device, as its own `add` does (`github.com/acme/app`).
+			const { remote } = input;
+			const [found] = await db
+				.select()
+				.from(project)
+				.where(eq(project.remote, remote));
+			if (found) {
+				await restore(ownSpace(found, spaceId));
+				return { projectId: found.id };
+			}
+			const document = await documents.open(spaceId);
+			if (document.hostedElsewhere) {
+				throw new Refusal("conflict", HOSTED_ELSEWHERE);
+			}
+			const id = randomUUID();
+			const now = timeNow();
+			await document.change(() => {
+				document.projects.set(id, {
+					name: input.name,
+					remote,
+					createdAt: now,
+					removedAt: null,
+					updatedAt: now,
+				} satisfies SpaceProject);
+			});
+			const [row] = await db.select().from(project).where(eq(project.id, id));
+			if (!row) throw new Error("Could not add the project.");
+			await log.append({
+				type: "ProjectAdded",
+				payload: { projectId: id, name: input.name, remote },
+			});
+			return { projectId: id };
 		},
 
 		/** Marks a project removed. Its runs, events and Clones stay. */

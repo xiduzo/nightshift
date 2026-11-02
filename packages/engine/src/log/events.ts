@@ -149,7 +149,8 @@ export type EnginePayloads = {
 	ProjectAdded: {
 		projectId: string;
 		name: string;
-		repoPath: string;
+		/** Absent: a Device asked its Host to add it, with a Clone only there. */
+		repoPath?: string;
 		/** The normalised `origin`, null without one. Absent before Clones. */
 		remote?: string | null;
 	};

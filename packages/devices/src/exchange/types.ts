@@ -84,6 +84,14 @@ export type HostExchange = {
 		key: DeviceKeyAccess,
 		input: { spaceId: string; runId: string; names?: readonly string[] },
 	): Promise<void>;
+	/**
+	 * Adds a Project to a Space of this Host for the key's Person, by its
+	 * remote (`PeerProjects.addFromRemote`). Needs `project.add` there.
+	 */
+	addProject(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; name: string; remote: string },
+	): Promise<{ projectId: string }>;
 	/** Records the Device's Clone of a Project in a Space of this Host. */
 	addClone(
 		key: DeviceKeyAccess,

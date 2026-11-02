@@ -384,6 +384,29 @@ export const hostContract = {
 			})
 			.input(offerRefSchema)
 			.output(described(z.void())),
+		/**
+		 * A Person on the Device adds a Project to a Space here, by its
+		 * remote: this Host defines it and copies it from GitHub. The
+		 * Project of that remote comes back when the Space has one.
+		 */
+		addProject: sync
+			.route({
+				summary:
+					"Adds a project to a Space here for a paired Device, by its GitHub repository.",
+			})
+			.input(
+				z.object({
+					spaceId: z.string().min(1),
+					name: z.string().trim().min(1).max(200),
+					/** Normalised: `github.com/acme/app`. */
+					remote: z
+						.string()
+						.min(3)
+						.max(300)
+						.regex(/^[^\s/:@]+\/\S+$/),
+				}),
+			)
+			.output(described(z.object({ projectId: z.string() }))),
 		/** The Device has a Clone of a Project of a Space here. */
 		addClone: sync
 			.route({

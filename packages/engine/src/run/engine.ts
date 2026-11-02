@@ -382,6 +382,7 @@ export function createEngine(
 			clones: (spaceId, projectId) => projects.clones(spaceId, projectId),
 			clonePath: (projectId, spaceId) => projects.clonePath(projectId, spaceId),
 			recordClone: (spaceId, record) => projects.recordClone(spaceId, record),
+			addFromRemote: (spaceId, input) => projects.addFromRemote(spaceId, input),
 			take: (spaceId, taken) => projects.take(spaceId, taken),
 		},
 		flows: (projectId) => projectFlows.flows(projectId),

@@ -136,6 +136,9 @@ export const hostRouter = os.router({
 		withdrawOffer: keyed.sync.withdrawOffer.handler(({ context, input }) =>
 			context.exchange.withdrawOffer(context.key, input),
 		),
+		addProject: keyed.sync.addProject.handler(({ context, input }) =>
+			context.exchange.addProject(context.key, input),
+		),
 		addClone: keyed.sync.addClone.handler(({ context, input }) =>
 			context.exchange.addClone(context.key, input),
 		),

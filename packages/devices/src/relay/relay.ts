@@ -51,6 +51,10 @@ async function knowledgeCall<T>(
 	}
 }
 
+/** What a person reads when the Host that keeps the Space cannot add a project for this computer. */
+export const OLDER_HOST_PROJECTS =
+	"Your Host runs an older version of Night Shift. Update Night Shift there, or add this repository on your Host.";
+
 /** What a run reads when the Host that keeps its Space does not know leases. */
 export const OLDER_HOST_LEASES =
 	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to use a Lease node.";
@@ -129,6 +133,20 @@ export function createRelay(deps: {
 				);
 			}
 			await deps.engine().exchange.commands.enqueue(command);
+		},
+
+		async addProject({ spaceId, name, remote }) {
+			// The Host adds it in the name of the key's Person.
+			return onHost(spaceId, async (client) => {
+				try {
+					return await client.sync.addProject({ spaceId, name, remote });
+				} catch (error) {
+					if (isOlderHost(error)) {
+						throw new Refusal("unavailable", OLDER_HOST_PROJECTS);
+					}
+					throw error;
+				}
+			});
 		},
 
 		async addClone({ spaceId, projectId, deviceName }) {

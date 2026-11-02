@@ -55,6 +55,17 @@ export type Relay = {
 			personId: string;
 		},
 	): Promise<void>;
+	/**
+	 * Adds a Project to a Space a Host keeps, through that Host: the Host
+	 * defines it in the Space document and copies it from GitHub. Returns
+	 * the Project's id. A Project the Space has with this remote comes
+	 * back, a removed one restored.
+	 */
+	addProject(input: {
+		spaceId: string;
+		name: string;
+		remote: string;
+	}): Promise<{ projectId: string }>;
 	/** Records this Device's Clone in a Space a Host keeps, through that Host. */
 	addClone(input: {
 		spaceId: string;

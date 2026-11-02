@@ -75,7 +75,10 @@ export function createHostExchange(deps: {
 		exchange: RunHistoryExchange;
 		offers: EngineOffers;
 		admission: Pick<OfferAdmission, "serve">;
-		projects: Pick<PeerProjects, "recordClone" | "matching" | "take">;
+		projects: Pick<
+			PeerProjects,
+			"recordClone" | "addFromRemote" | "matching" | "take"
+		>;
 		hostSpaces: Pick<HostSpaces, "hostOf">;
 		/** Its Space archive: the knowledge content its Devices copy here, by hash (ADR 4). */
 		archive: Pick<SpaceArchive, "here">;
@@ -333,6 +336,18 @@ export function createHostExchange(deps: {
 		async leaseRelease(key, input) {
 			await mayLease(key, input.spaceId);
 			await engine.leases.release({ ...input, walkerId: key.deviceId });
+		},
+
+		async addProject(key, input) {
+			await admit(key);
+			const role = await roleIn(db, key.personId, input.spaceId);
+			if (!role || !roleAllows(role, { project: ["add"] })) {
+				forbidden(ROLE_REFUSAL.message);
+			}
+			return engine.projects.addFromRemote(input.spaceId, {
+				name: input.name,
+				remote: input.remote,
+			});
 		},
 
 		async addClone(key, input) {
