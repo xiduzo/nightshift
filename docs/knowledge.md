@@ -227,6 +227,29 @@ The Knowledge page shows how many wait, with a button that runs the review.
 The review runs on any computer of the Space. Its reconcile first fetches
 the proposals, and then puts what it kept or deleted back in the Space.
 
+### Proposals from a Command
+
+A Command can propose learnings too. It writes a file to
+`$NS_KNOWLEDGE/learnings/proposed/`. The rules:
+
+- The review Gate shows every `*.md` file directly in that folder, with
+  its full text. It does not look in subfolders.
+- Write one note per `- ` line. The Knowledge page counts the notes by
+  these lines.
+- Night Shift names its own files `<run id>.<step id>.md`. A Command gets
+  no run id or step id, so it gives the file a name of its own, for
+  example `<flow>.<date>.md`.
+- Use only letters, digits, `-` and `_` in each part of the name, and at
+  most two parts before `.md`. The Knowledge page lists only names of that
+  form. Keep and Delete skip a name with a space.
+
+For example:
+
+```sh
+echo "- The nightly sweep needs 40 minutes." \
+  >> "$NS_KNOWLEDGE/learnings/proposed/{{run.flow}}.$(date +%Y-%m-%d).md"
+```
+
 ## Search
 
 Each computer keeps a search index of its knowledge: the text files

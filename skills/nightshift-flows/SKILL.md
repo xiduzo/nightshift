@@ -64,7 +64,7 @@ A flow is a directed graph of nodes and edges. Night Shift keeps it in the proje
 - `inputs`: `{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }`. The start dialog shows a field per type: a number field, a switch, a list to pick from. `choice` needs `options` (a list of text) and gives the picked text. A default is text: `"45"`, `"true"`, one of the options, or JSON text. Use `boolean` for yes/no, `number` for counts and minutes, `choice` for a fixed list. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
 - `variables`: `{ name, type, initial?, schema?, description?, keep? }`, `type` one of `text`, `number`, `boolean`, `json`.
-- `policy`: optional. `maxSteps` caps the steps of a run. `budgetUsd` stops the run when its cost passes it. `maxTurns` and `idleMinutes` (default 15) limit each Agent step. A node may set its own.
+- `policy`: optional. `maxSteps` caps the steps of a run. `budgetUsd` stops the run when its known cost, at API prices, passes it. `maxTurns` and `idleMinutes` (default 15) limit each Agent step. A node may set its own. The stop time ends no running step. Only its own `timeoutMinutes` ends a long Command.
 - `sections`: frames in the editor only, see below.
 
 Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting with a letter, at most 40 characters. Node ids and inputs share one namespace. Do not use `run`, `vars`. Outcomes and option names: lowercase letters, digits and `-`. Do not use `error`, `stopped`, `interrupted`, `waiting`: those are the engine's.
@@ -99,7 +99,7 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message. With `device` (a computer's name), its steps run on that computer wherever the run runs.
+Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. A parameter sweep is one Command that loops, not one element per set. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message. With `device` (a computer's name), its steps run on that computer wherever the run runs.
 
 Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `end_message`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 
