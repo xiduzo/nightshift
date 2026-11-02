@@ -6157,6 +6157,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "agentTierSchema": "adbfb5ff1e0cd15b8f217bdc0015d321fa6a03f41c130deefa2d36eb4b4e7803",
+  "answerFilesSchema": "0697fb0ee84db8a2cdb49169b0c3f32656567fd5eb92aa77c1c6de33ab216a61",
   "askChoicesSourceSchema": "0d49c2c5e314decab5a9a29246bd6ef412774634cc3bcdffbe74a1a63f2b8b03",
   "askDeadlineSchema": "109be9354db247052dfbcf6e51a26e165aca847ab933142e1ed553d6266f1d0f",
   "askFormSchema": "097414de3e04104422c07cb05b39ec3ee8347aae90cfb84348b9964bf3690aa1",

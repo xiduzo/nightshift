@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, copyFile, mkdir, readFile, stat } from "node:fs/promises";
+import {
+	appendFile,
+	copyFile,
+	mkdir,
+	readFile,
+	stat,
+	writeFile,
+} from "node:fs/promises";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
+import type { AnswerFile } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 
 /**
@@ -30,6 +38,8 @@ export type Artifact = {
 	size: number;
 	/** Epoch ms. */
 	savedAt: number;
+	/** `answer`: a person added it to the answer of the Gate `stepId`. Absent: an agent kept it. */
+	from?: "answer";
 };
 
 /** The largest file an agent may keep. */
@@ -106,6 +116,92 @@ export function createArtifactStore(dataDir: string) {
 			await copyFile(source, filePath(input.runId, artifact));
 			await appendFile(indexPath(input.runId), `${JSON.stringify(artifact)}\n`);
 			return artifact;
+		},
+
+		/**
+		 * Keeps the files a person added to the answer of the Gate `stepId`,
+		 * in the order given, as artifacts `from: "answer"`.
+		 */
+		async saveAnswer(input: {
+			runId: string;
+			stepId: string;
+			files: readonly AnswerFile[];
+		}): Promise<Artifact[]> {
+			if (input.files.length === 0) return [];
+			await mkdir(runDir(input.runId), { recursive: true });
+			const kept: Artifact[] = [];
+			for (const file of input.files) {
+				const bytes = Buffer.from(file.content, "base64");
+				const name = basename(file.name);
+				const artifact: Artifact = {
+					id: randomUUID(),
+					stepId: input.stepId,
+					name,
+					title: name,
+					mediaType:
+						file.mediaType.split(";")[0] ||
+						(Bun.file(name).type.split(";")[0] ?? ""),
+					size: bytes.byteLength,
+					savedAt: now(),
+					from: "answer",
+				};
+				await writeFile(filePath(input.runId, artifact), bytes);
+				kept.push(artifact);
+			}
+			await appendFile(
+				indexPath(input.runId),
+				kept.map((artifact) => `${JSON.stringify(artifact)}\n`).join(""),
+			);
+			return kept;
+		},
+
+		/**
+		 * The files people added to the answers of the run's Gates, oldest
+		 * first, with their bytes: what each agent session of the run gets.
+		 * A name used twice gets the step's short id in front.
+		 */
+		async answerFiles(runId: string): Promise<AnswerFile[]> {
+			const answers = (await list(runId)).filter(
+				(artifact) => artifact.from === "answer",
+			);
+			const seen = new Set<string>();
+			const files: AnswerFile[] = [];
+			for (const artifact of answers) {
+				const content = await readFile(filePath(runId, artifact)).catch(
+					() => null,
+				);
+				if (content === null) continue;
+				const name = seen.has(artifact.name)
+					? `${artifact.stepId.slice(0, 8)}-${artifact.name}`
+					: artifact.name;
+				seen.add(name);
+				files.push({
+					name,
+					mediaType: artifact.mediaType,
+					content: content.toString("base64"),
+				});
+			}
+			return files;
+		},
+
+		/**
+		 * Writes the files of the run's answers where an agent session on this
+		 * computer reads them: `<dataDir>/artifacts/<runId>/answers/`. A file
+		 * already there is written again. Returns the folder and each path.
+		 */
+		async answerFolder(
+			runId: string,
+			files: readonly AnswerFile[],
+		): Promise<{ dir: string; paths: string[] }> {
+			const dir = join(runDir(runId), "answers");
+			await mkdir(dir, { recursive: true });
+			const paths: string[] = [];
+			for (const file of files) {
+				const path = join(dir, basename(file.name));
+				await writeFile(path, Buffer.from(file.content, "base64"));
+				paths.push(path);
+			}
+			return { dir, paths };
 		},
 
 		/** One artifact and where its copy is, or null when the run has none of that id. */

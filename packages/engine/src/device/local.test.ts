@@ -299,6 +299,7 @@ describe("session", () => {
 						savedAt: 1,
 					};
 				},
+				answerFolder: async () => ({ dir: "/data", paths: [] }),
 			},
 		});
 		await collect(
@@ -325,6 +326,57 @@ describe("session", () => {
 			},
 		]);
 		expect(plain?.saveArtifact).toBeUndefined();
+	});
+
+	test("a session for a step gets the files of the run's answers: in a folder it may read, and a line that says where", async () => {
+		const harness = fakeHarness();
+		const written: unknown[] = [];
+		const d = device({
+			harnesses: { "claude-code": harness },
+			artifacts: {
+				save: async () => {
+					throw new Error("not used");
+				},
+				answerFolder: async (runId, files) => {
+					written.push({ runId, names: files.map((file) => file.name) });
+					return {
+						dir: `/data/artifacts/${runId}/answers`,
+						paths: files.map(
+							(file) => `/data/artifacts/${runId}/answers/${file.name}`,
+						),
+					};
+				},
+			},
+		});
+		const files = [
+			{ name: "spec.md", mediaType: "text/markdown", content: "IyBTcGVj" },
+			{ name: "shot.png", mediaType: "image/png", content: "iVBORw==" },
+		];
+		await collect(
+			d.session(
+				sessionInput({
+					prompt: "Use the spec.",
+					artifacts: { runId: "r1", stepId: "s2" },
+					files,
+				}),
+			),
+		);
+		// Without the step, the Device has nowhere to keep them.
+		await collect(d.session(sessionInput({ files })));
+		const [forStep, plain] = harness.calls;
+		expect(written).toEqual([{ runId: "r1", names: ["spec.md", "shot.png"] }]);
+		expect(forStep?.prompt).toBe(
+			[
+				"Use the spec.",
+				"",
+				"The person added files to their answers in this run. Read the ones your task needs:",
+				"- /data/artifacts/r1/answers/spec.md",
+				"- /data/artifacts/r1/answers/shot.png",
+			].join("\n"),
+		);
+		expect(forStep?.addDirs).toEqual(["/data/artifacts/r1/answers"]);
+		expect(forStep && "files" in forStep).toBe(false);
+		expect(plain?.addDirs).toBeUndefined();
 	});
 
 	test("a session for a step gets what the export to monitoring adds to its environment", async () => {

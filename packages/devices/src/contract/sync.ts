@@ -1,4 +1,9 @@
-import type { FeedStep, RunCommandInput } from "@nightshift/engine";
+import type {
+	FeedStep,
+	GateResolvePayload,
+	RunCommandInput,
+} from "@nightshift/engine";
+import { answerFilesSchema } from "@nightshift/flows";
 import { z } from "zod";
 import { exact } from "./described";
 import {
@@ -66,18 +71,22 @@ const commandFields = {
 	createdAt: z.number(),
 };
 
+/** An answer to a Gate, on its way to the Walker. Typed by its name, so the declared types stay small. */
+const gateResolvePayload: z.ZodType<GateResolvePayload> = z.object({
+	stepId: z.string(),
+	choice: z.string(),
+	note: z.string().optional(),
+	data: z.json().optional(),
+	files: answerFilesSchema.optional(),
+	via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
+});
+
 /** A person's action on a run another Device walks, on its way to that Walker. */
 const runCommandSchema = exact<RunCommand>()(
 	z.discriminatedUnion("kind", [
 		z.object({
 			kind: z.literal("gate.resolve"),
-			payload: z.object({
-				stepId: z.string(),
-				choice: z.string(),
-				note: z.string().optional(),
-				data: z.json().optional(),
-				via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
-			}),
+			payload: gateResolvePayload,
 			...commandFields,
 		}),
 		z.object({

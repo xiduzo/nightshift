@@ -625,7 +625,7 @@ export const ownDeviceSchema = exact<OwnDevice>()(
 	}),
 );
 
-/** A file a run's agent kept for the person. */
+/** A file a run's agent kept for the person, or one a person added to an answer. */
 export const artifactSchema = exact<Artifact>()(
 	z.object({
 		id: z.string(),
@@ -635,5 +635,7 @@ export const artifactSchema = exact<Artifact>()(
 		mediaType: z.string(),
 		size: z.number(),
 		savedAt: z.number(),
+		/** `answer`: a person added it to the answer of the Gate `stepId`. */
+		from: z.literal("answer").optional(),
 	}),
 );

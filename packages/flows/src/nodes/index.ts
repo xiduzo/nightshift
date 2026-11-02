@@ -29,6 +29,13 @@ export {
 	permissionModeSchema,
 } from "./agent";
 export {
+	type AnswerFile,
+	answerFilesProblem,
+	answerFilesSchema,
+	MAX_ANSWER_FILES,
+	MAX_ANSWER_FILES_BYTES,
+} from "./answer-files";
+export {
 	ASK_ANSWER,
 	type AskAttachment,
 	type AskChoice,

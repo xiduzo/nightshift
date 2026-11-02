@@ -1,10 +1,12 @@
 import type { DeviceKeyPermission } from "@nightshift/auth";
 import {
+	type GateResolvePayload,
 	type OwnDevice,
 	startRunInputSchema,
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import {
+	answerFilesSchema,
 	labelSchema,
 	nameSchema,
 	permissionModeSchema,
@@ -130,19 +132,23 @@ const runStartInput = startRunInputSchema.and(
 	}),
 );
 
+/** An answer to a Gate, as a Device sends it. Typed by its name, so the declared types stay small. */
+const gateResolveInput: z.ZodType<GateResolvePayload> = z.object({
+	stepId: z.string().min(1),
+	choice: z.string().min(1),
+	note: z.string().optional(),
+	/** The answer to an Ask (ADR 10): the data of its form. */
+	data: z.json().optional(),
+	files: answerFilesSchema.optional(),
+	via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
+});
+
 /** A person's action on a run another Device walks, as a Device sends it. */
 const runCommandInput = z.discriminatedUnion("kind", [
 	z.object({
 		runId: z.string().min(1),
 		kind: z.literal("gate.resolve"),
-		payload: z.object({
-			stepId: z.string().min(1),
-			choice: z.string().min(1),
-			note: z.string().optional(),
-			/** The answer to an Ask (ADR 10): the data of its form. */
-			data: z.json().optional(),
-			via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
-		}),
+		payload: gateResolveInput,
 	}),
 	z.object({
 		runId: z.string().min(1),

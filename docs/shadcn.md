@@ -139,7 +139,7 @@ yet. Read the source with `shadcn view <name>`.
 | ✓ `message` | One chat message: `Message`, `MessageAvatar`, `MessageHeader`, `MessageContent`, `MessageFooter`, `MessageGroup`. |
 | ✓ `bubble` | A chat bubble around message text, with `BubbleGroup` and `BubbleReactions`. |
 | ✓ `message-scroller` | A chat scroll area that sticks to the bottom while new content streams, with a "jump to latest" button. |
-| ✓ `attachment` | A file or link attached to a message: media, title, description, actions. |
+| ✓ `attachment` | A file or link attached to a message: media, title, description, actions. The files of an Ask, a run's artifacts, and the files you add to the answer of a Gate, each with a Remove action (`features/gates/answer-files.tsx`). |
 | ✓ `marker` | An inline marker in a conversation: a system note, a divider, a status line. |
 | ✓ `trace` | A collapsible line of agent activity (a tool call, a thinking step) with icon, title and description. The base of the Chain of Thought, Terminal, Tool, Reasoning and Subagent patterns in a run's transcript. |
 | ✓ `code-block` | Code with a header, title, copy button and Shiki highlighting (`useHighlightedCode` in `apps/web/src/shared/code`). Use for commands, logs, JSON. |

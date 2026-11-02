@@ -34,6 +34,7 @@ import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
 import { AlarmClockIcon } from "lucide-react";
 import { useId, useState } from "react";
+import { AnswerFilesField, useAnswerFiles } from "./answer-files";
 import { AskAttachments } from "./ask-attachments";
 import { useResolveGate } from "./use-resolve-gate";
 
@@ -43,8 +44,8 @@ import { useResolveGate } from "./use-resolve-gate";
  * several, a boolean a switch, a number a number field, and any other
  * field takes JSON. The run's choices show their labels, descriptions and
  * files. The form starts with the best answer of the models, if there is
- * one. Nothing goes out before the send, and Night Shift checks the
- * answer again.
+ * one. Files may go with the answer. Nothing goes out before the send,
+ * and Night Shift checks the answer again.
  */
 export function AskForm({
 	runId,
@@ -74,18 +75,24 @@ export function AskForm({
 		...(runTitle ? { runTitle } : {}),
 		...(walkerName ? { walkerName } : {}),
 	});
+	const files = useAnswerFiles();
+	const [reading, setReading] = useState(false);
+	const busy = resolve.isPending || reading;
 	const answer = askAnswerOf(form, values);
 	const set = (name: string, value: AskValue) =>
 		setValues((current) => ({ ...current, [name]: value }));
 
-	const send = () => {
+	const send = async () => {
 		setTried(true);
-		if (resolve.isPending || "problem" in answer) return;
+		if (busy || "problem" in answer || files.problem) return;
+		setReading(true);
+		const attached = await files.read().finally(() => setReading(false));
 		resolve.mutate({
 			runId,
 			stepId,
 			choice: "answer",
 			data: answer.data,
+			...(attached ? { files: attached } : {}),
 		});
 	};
 
@@ -94,7 +101,7 @@ export function AskForm({
 			className={cn("flex flex-col gap-5", className)}
 			onSubmit={(event) => {
 				event.preventDefault();
-				send();
+				void send();
 			}}
 		>
 			<FieldGroup className="gap-5">
@@ -106,11 +113,12 @@ export function AskForm({
 						form={form}
 						field={field}
 						value={values[field.name]}
-						disabled={resolve.isPending}
+						disabled={busy}
 						filesHere={filesHere}
 						onChange={(value) => set(field.name, value)}
 					/>
 				))}
+				<AnswerFilesField files={files} disabled={busy} />
 			</FieldGroup>
 			{deadline ? (
 				<p className="flex items-start gap-1.5 text-muted-foreground text-xs leading-snug">
@@ -124,8 +132,8 @@ export function AskForm({
 			{tried && "problem" in answer ? (
 				<FieldError>{answer.problem}</FieldError>
 			) : null}
-			<Button type="submit" disabled={resolve.isPending}>
-				{resolve.isPending ? <Spinner data-icon="inline-start" /> : null}
+			<Button type="submit" disabled={busy || files.problem !== null}>
+				{busy ? <Spinner data-icon="inline-start" /> : null}
 				Send answer
 			</Button>
 		</form>

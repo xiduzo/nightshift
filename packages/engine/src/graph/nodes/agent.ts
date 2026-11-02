@@ -23,6 +23,7 @@ import {
 	resolvedAgent,
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
+import { createArtifactStore } from "../../artifacts";
 import { runCommand, type SessionEvent } from "../../device";
 import {
 	commandLogPath,
@@ -532,12 +533,15 @@ async function runSession(
 		};
 	}
 	const maxTurns = turnLimit(ctx, node);
+	// The files people added to the run's answers go to the Device that runs it.
+	const files = await createArtifactStore(ctx.dataDir).answerFiles(ctx.run.id);
 	const common = {
 		cwd: step.worktree,
 		prompt,
 		resumeSessionId: resumeSessionId ?? undefined,
 		stepReport: stepReportOf(node),
 		artifacts: { runId: ctx.run.id, stepId: step.stepId },
+		...(files.length > 0 ? { files } : {}),
 		// The project's knowledge folder on the Device that runs the step.
 		...(node.knowledge !== false
 			? {

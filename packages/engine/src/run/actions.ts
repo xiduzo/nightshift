@@ -1,6 +1,13 @@
 import type { Database } from "@nightshift/db";
-import { type Flow, type JsonValue, optionProblem } from "@nightshift/flows";
+import {
+	type AnswerFile,
+	answerFilesProblem,
+	type Flow,
+	type JsonValue,
+	optionProblem,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { ArtifactStore } from "../artifacts";
 import type { Actor, OwnDevice } from "../contract";
 import {
 	askAnswerProblem,
@@ -63,6 +70,8 @@ export type RunActionRequest =
 	 * on that outcome. Fails when the step is not an open Gate or the
 	 * choice is not one of its choices. An Ask (ADR 10) takes `data`, the
 	 * data of its form: it fails when the data does not match the form.
+	 * `files` go with the answer: the Walker keeps them with the run's
+	 * artifacts, and each agent session of the run after it gets them.
 	 */
 	| {
 			kind: "answer";
@@ -70,6 +79,7 @@ export type RunActionRequest =
 			choice: string;
 			note?: string;
 			data?: JsonValue;
+			files?: AnswerFile[];
 			/** Where the answer came from. Absent stores `_OTHER`. */
 			via?: GateVia;
 	  }
@@ -134,6 +144,8 @@ export type RunActionsDeps = {
 	db: Database;
 	log: RunLog;
 	bus: RunBus;
+	/** Where the Walker keeps the files of an answer. */
+	artifacts: Pick<ArtifactStore, "saveAnswer">;
 	runner: Pick<Runner, "take" | "hold" | "forget">;
 	relay: RunRelay;
 	archive: Pick<RunsPort, "keepWalk" | "pendingCommands">;
@@ -182,7 +194,14 @@ function refuseAnswer(
 		choice,
 		note,
 		data,
-	}: { stepId: string; choice: string; note?: string; data?: JsonValue },
+		files,
+	}: {
+		stepId: string;
+		choice: string;
+		note?: string;
+		data?: JsonValue;
+		files?: readonly AnswerFile[];
+	},
 ): void {
 	const why = whyNot("answer", deriveRunState(runState).status, true);
 	const gate = deriveOpenGate(runState);
@@ -205,6 +224,8 @@ function refuseAnswer(
 		const wrong = askAnswerProblem(gate.form, data);
 		if (wrong !== null) throw new RunRefusal("invalid-answer", wrong);
 	}
+	const tooMany = answerFilesProblem(files ?? []);
+	if (tooMany !== null) throw new RunRefusal("invalid-answer", tooMany);
 }
 
 /** Throws unless the run holds the lease `name` now: a run that ended holds none. */
@@ -293,7 +314,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						"An answer to this Gate is already on its way to the device that runs it.",
 					);
 				}
-				const { stepId, choice, note, data, via } = request;
+				const { stepId, choice, note, data, files, via } = request;
 				return relay.send(row, actor, {
 					kind: "gate.resolve",
 					payload: {
@@ -301,6 +322,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						choice,
 						...(note ? { note } : {}),
 						...(data !== undefined ? { data } : {}),
+						...(files && files.length > 0 ? { files } : {}),
 						...(via ? { via } : {}),
 					},
 				});
@@ -449,6 +471,16 @@ export function createRunActions(deps: RunActionsDeps) {
 				});
 				return;
 			case "answer":
+				// The files first, so the session the answer starts has them.
+				// An answer the Turn refuses leaves them as artifacts of the run.
+				if (request.files && request.files.length > 0) {
+					refuseAnswer(await log.state(runId), request);
+					await deps.artifacts.saveAnswer({
+						runId,
+						stepId: request.stepId,
+						files: request.files,
+					});
+				}
 				// The thread continues at once with the answer. The Turn ends
 				// once the Gate's step ended. A full run cap leaves it open.
 				await runner.take(

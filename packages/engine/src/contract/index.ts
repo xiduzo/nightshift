@@ -26,6 +26,7 @@ export type {
 	Placement,
 } from "./placement";
 export {
+	type GateResolvePayload,
 	HOST_UNREACHABLE,
 	HostUnreachableError,
 	OLDER_HOST,

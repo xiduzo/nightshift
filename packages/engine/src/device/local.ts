@@ -133,8 +133,11 @@ export type LocalDeviceDeps = {
 	snapshots?: boolean;
 	/** A profile defined on this computer, by its id, or null. */
 	profileFor?: (id: string) => ProfileSettings | null;
-	/** Where a session keeps its artifacts. Without it, sessions keep none. */
-	artifacts?: Pick<ArtifactStore, "save">;
+	/**
+	 * Where a session keeps its artifacts, and reads the files of the run's
+	 * answers. Without it, sessions keep none and get none.
+	 */
+	artifacts?: Pick<ArtifactStore, "save" | "answerFolder">;
 	/**
 	 * The projects' knowledge on this computer, in step with their Spaces
 	 * (ADR 4). A step that asks for it gets it here, and gives it back when
@@ -167,6 +170,14 @@ export type LocalDeviceDeps = {
 	 */
 	secretValues?: () => Promise<readonly string[]>;
 };
+
+/** What an agent learns about the files a person added to the run's answers. */
+function answerFilesInstruction(paths: readonly string[]): string {
+	return [
+		"The person added files to their answers in this run. Read the ones your task needs:",
+		...paths.map((path) => `- ${path}`),
+	].join("\n");
+}
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
 function noDecider(
@@ -290,6 +301,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			clis,
 			artifacts,
 			knowledge,
+			files,
 			...rest
 		} = input;
 		const harness = harnessFor(name);
@@ -343,6 +355,16 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			const added = artifacts
 				? deps.sessionEnv?.({ harness: name, ...artifacts })
 				: undefined;
+			// The files of the run's answers, in a folder the agent may read.
+			const answers =
+				artifacts && deps.artifacts && files && files.length > 0
+					? await deps.artifacts.answerFolder(artifacts.runId, files)
+					: null;
+			const prompt = [
+				input.prompt,
+				...(answers ? [answerFilesInstruction(answers.paths)] : []),
+				...(guide ? [guide] : []),
+			].join("\n\n");
 			const env = {
 				...added?.env,
 				...known?.env,
@@ -351,7 +373,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "ready", harness: name };
 			const run = harness.run({
 				...rest,
-				prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,
+				prompt,
 				...(clis && clis.length > 0 ? { clis } : {}),
 				...(Object.keys(mcp.servers).length > 0
 					? { mcpServers: mcp.servers }
@@ -368,6 +390,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					: {}),
 				// The folder, the line, the tools and the learnings.
 				...known?.input,
+				...(answers
+					? { addDirs: [...(known?.input.addDirs ?? []), answers.dir] }
+					: {}),
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
 			});
 			const events = known ? known.events(run) : run;

@@ -775,9 +775,11 @@ export function createEngine(
 		listRuns: reads.listRuns,
 	});
 
+	const artifacts = createArtifactStore(dataDir);
 	const actions = createRunActions({
 		db,
 		log: runLog,
+		artifacts,
 		bus,
 		runner,
 		relay,
@@ -872,7 +874,7 @@ export function createEngine(
 			schedulesWithOffers: peers.offers.schedulesWithOffers,
 		}),
 		reads,
-		artifacts: createArtifactStore(dataDir),
+		artifacts,
 		actions,
 		startRun: startRunWith,
 		moveProjects,

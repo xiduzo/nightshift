@@ -3,7 +3,7 @@ import type {
 	InboxGate,
 	OpenGate,
 } from "@nightshift/engine";
-import { askFormSchema } from "@nightshift/flows";
+import { answerFilesSchema, askFormSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { exact } from "../output";
@@ -87,6 +87,11 @@ export const gateAnswerSchema = z.object({
 	note: z.string().optional(),
 	/** The answer to an Ask: the data of its form. It must match the form. */
 	data: z.json().optional(),
+	/**
+	 * Files the person adds to the answer, in base64: at most 10, and 10 MB
+	 * together. The run keeps them, and its next agent sessions read them.
+	 */
+	files: answerFilesSchema.optional(),
 	/**
 	 * Where the answer comes from. `lock-screen` is the older name of
 	 * `lock_screen`: a button on a notification, without an unlock. Only a

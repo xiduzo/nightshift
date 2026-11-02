@@ -25,6 +25,7 @@ export type {
 	Actor,
 	DeviceDirectory,
 	DeviceProfile,
+	GateResolvePayload,
 	LeaseAnswer,
 	LeaseHost,
 	LeaseTake,

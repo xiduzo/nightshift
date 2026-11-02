@@ -174,6 +174,16 @@ const sessionFields = {
 	resumeSessionId: z.string().optional(),
 	stepReport: stepReportSchema.optional(),
 	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
+	/** The files people added to the run's answers, in base64. */
+	files: z
+		.array(
+			z.object({
+				name: z.string(),
+				mediaType: z.string(),
+				content: z.base64(),
+			}),
+		)
+		.optional(),
 	/** The project whose knowledge folder the session gets on the Device. */
 	knowledge: z
 		.object({ projectId: z.string(), always: z.boolean().optional() })

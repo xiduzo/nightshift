@@ -9,6 +9,7 @@ import type {
 	ValueResult,
 } from "@nightshift/agents/types";
 import type {
+	AnswerFile,
 	FlowSources,
 	JsonValue,
 	ModelAddress,
@@ -223,6 +224,12 @@ export type SessionInput = Omit<
 	 * `save_artifact`. The Device that runs the session keeps them.
 	 */
 	artifacts?: { runId: string; stepId: string };
+	/**
+	 * The files people added to the answers of the run's Gates. The Device
+	 * writes them where the session may read them, and tells the agent
+	 * where. Needs `artifacts`.
+	 */
+	files?: AnswerFile[];
 	/**
 	 * The project whose knowledge folder the session gets on the Device
 	 * that runs it: in `NS_KNOWLEDGE`, and to read with a line that says
