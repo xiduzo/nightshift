@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { PushTarget } from "../targets";
 import { type FakeExpoClient, fakeExpoClient } from "../testing/expo";
 import type { NotificationMessage } from "./channel";
-import { createExpoChannel, type ExpoChannel } from "./expo";
+import {
+	collapseIdOf,
+	createExpoChannel,
+	type ExpoChannel,
+	expoMessage,
+} from "./expo";
 
 /**
  * The Expo Push channel against a fake Expo service: what each kind of
@@ -88,6 +93,18 @@ beforeEach(() => {
 afterEach(() => channel.stop());
 
 describe("messages", () => {
+	test("a key longer than Apple's 64 bytes gets a short collapse id of its own, and keeps its key everywhere else", () => {
+		const key = `missed:${"p".repeat(36)}:${"s".repeat(36)}:1762120800000`;
+		const push = expoMessage(TOKEN, { ...gate(), key });
+		expect(push.collapseId).not.toBe(key);
+		expect(
+			Buffer.byteLength(push.collapseId ?? "", "utf8"),
+		).toBeLessThanOrEqual(64);
+		expect(push.collapseId).toBe(collapseIdOf(key));
+		expect(push).toMatchObject({ threadId: key, tag: key, data: { key } });
+		expect(collapseIdOf("run-1:step-1")).toBe("run-1:step-1");
+	});
+
 	test("a Gate carries ids and the short sentence, at high priority", async () => {
 		expect(await channel.send(phone(), gate())).toBe("sent");
 		expect(expo.sent).toEqual([

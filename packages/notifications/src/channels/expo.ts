@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { now as timeNow } from "@nightshift/time";
 import {
 	Expo,
@@ -86,6 +87,22 @@ const DEFAULT_RECEIPT_DELAY_MS = 15 * 60_000;
 const DEFAULT_RECEIPT_MAX_AGE_MS = 24 * 60 * 60_000;
 
 /** The push Expo sends for one message: ids, the short sentence, how to show it. */
+/** Apple refuses a push whose collapse id is longer than this, in bytes. */
+const COLLAPSE_ID_MAX_BYTES = 64;
+
+/**
+ * The collapse id of a key: the key itself when Apple takes it, else a
+ * stable hash of it. A Gate's key (`<runId>:<stepId>`) or a missed
+ * schedule's can be longer than 64 bytes, and Apple then refuses the
+ * whole push (`InvalidCollapseId`). The phone finds a notification by the
+ * key in its data, never by the collapse id, so a hash changes nothing
+ * else.
+ */
+export function collapseIdOf(key: string): string {
+	if (Buffer.byteLength(key, "utf8") <= COLLAPSE_ID_MAX_BYTES) return key;
+	return createHash("sha256").update(key).digest("base64url");
+}
+
 export function expoMessage(
 	token: string,
 	message: NotificationMessage,
@@ -103,7 +120,7 @@ export function expoMessage(
 		...(message.body ? { body: message.body } : {}),
 		sound: "default",
 		threadId: message.key,
-		collapseId: message.key,
+		collapseId: collapseIdOf(message.key),
 		tag: message.key,
 	};
 	if (
