@@ -79,6 +79,16 @@ export type InAppItem =
 			spaceId: string;
 			projectId: string;
 			at: number;
+	  }
+	/**
+	 * The projects of a Space changed without a person on this computer:
+	 * its Host added, renamed or removed one. Quiet, as `run-changed`: a
+	 * screen reads its projects again.
+	 */
+	| {
+			kind: "projects-changed";
+			spaceId: string;
+			at: number;
 	  };
 
 /** A page counts as open this long after its stream ended: a page that reloads. */
@@ -120,6 +130,8 @@ export type InAppChannel = NotificationChannel<InAppTarget> & {
 		target: InAppTarget,
 		project: { spaceId: string; projectId: string },
 	): void;
+	/** Tells the Person's open screens that the projects of a Space changed. No push. */
+	projectsChanged(target: InAppTarget, space: { spaceId: string }): void;
 	/**
 	 * Whether the Person has a screen open, or closed a page a moment ago.
 	 * A phone app that left the front does not count.
@@ -213,6 +225,14 @@ export function createInAppChannel(
 			publish(target.personId, {
 				kind: "learnings-changed",
 				...project,
+				at: now(),
+			});
+		},
+
+		projectsChanged(target, space) {
+			publish(target.personId, {
+				kind: "projects-changed",
+				...space,
 				at: now(),
 			});
 		},

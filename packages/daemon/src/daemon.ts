@@ -237,10 +237,13 @@ export async function createDaemon(
 	 * Members. The engine defines Projects in them, the relay serves them to
 	 * Members, and the auth hooks keep their Members in step.
 	 */
+	/** Tells the open screens; set once the notifications below exist. */
+	let projectsChanged: (spaceId: string) => void = () => {};
 	const spaces = createSpaceDocuments({
 		db,
 		directory: deviceDirectory(db),
 		documents,
+		onProjected: (spaceId) => projectsChanged(spaceId),
 	});
 	/** The flow documents: each Project's flows and schedules, and their revisions. */
 	const flows = createFlowDocuments({ db, documents });
@@ -611,6 +614,11 @@ export async function createDaemon(
 			slots,
 		},
 	);
+	projectsChanged = (spaceId) => {
+		notifications.projectsChanged(spaceId).catch((error: unknown) => {
+			console.error("Could not tell the open screens of new projects:", error);
+		});
+	};
 	usageSnapshot = () =>
 		usageFacts({
 			db,

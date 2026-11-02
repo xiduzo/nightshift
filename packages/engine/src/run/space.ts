@@ -167,7 +167,7 @@ export function createSpaces(deps: SpacesDeps) {
 				if (document.hostedElsewhere) {
 					throw new Refusal(
 						"conflict",
-						"This Space is kept by another computer. Change usage there.",
+						"Your Host keeps the settings of this Space. Change usage on your Host.",
 					);
 				}
 				await setSpaceUsage(document, enabled);

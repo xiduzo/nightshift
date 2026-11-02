@@ -55,7 +55,8 @@ import type { Notice, ShownNotifications } from "./shown";
  * the learnings that wait (a step that ends may propose some). `runs`: the
  * same for every run. `schedules`: the lists of schedules, after a pause
  * tonight began or ended. `learnings`: the learnings that wait, and the
- * Knowledge page that counts them.
+ * Knowledge page that counts them. `projects`: every read of projects,
+ * the dashboard and the schedules, after a Host changed the Space's projects.
  * The Devices a run can run on or move to do not change with a run.
  */
 type Read =
@@ -63,7 +64,8 @@ type Read =
 	| { kind: "runs" }
 	| { kind: "run"; runId: string }
 	| { kind: "schedules" }
-	| { kind: "learnings" };
+	| { kind: "learnings" }
+	| { kind: "projects" };
 
 const GATES: Read = { kind: "gates" };
 const ofRun = (runId: string): Read => ({ kind: "run", runId });
@@ -97,6 +99,8 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 			return [{ kind: "schedules" }];
 		case "learnings-changed":
 			return [{ kind: "learnings" }];
+		case "projects-changed":
+			return [{ kind: "projects" }];
 		default:
 			return EVERYTHING;
 	}
@@ -211,6 +215,8 @@ export function createLiveCache({
 		learnings: false,
 		/** The schedules only: a pause tonight began or ended. */
 		schedules: false,
+		/** The projects of a Space: its Host added, renamed or removed one. */
+		projects: false,
 	};
 	let waiting = false;
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
@@ -235,6 +241,10 @@ export function createLiveCache({
 				pending.learnings = true;
 				continue;
 			}
+			if (one.kind === "projects") {
+				pending.projects = true;
+				continue;
+			}
 			pending.lists = true;
 			if (one.kind === "runs") {
 				pending.everyRun = true;
@@ -249,7 +259,8 @@ export function createLiveCache({
 		schedule(() => {
 			waiting = false;
 			const { gates: readGates, everyRun, lists, learnings } = pending;
-			const readSchedules = pending.schedules && !lists;
+			const readProjects = pending.projects;
+			const readSchedules = (pending.schedules || readProjects) && !lists;
 			const details = [...pending.details];
 			const steps = [...pending.steps];
 			const files = [...pending.files];
@@ -258,6 +269,7 @@ export function createLiveCache({
 			pending.lists = false;
 			pending.schedules = false;
 			pending.learnings = false;
+			pending.projects = false;
 			pending.details.clear();
 			pending.steps.clear();
 			pending.files.clear();
@@ -277,6 +289,11 @@ export function createLiveCache({
 				invalidate(schedules.lists());
 				// Each project carries the counts of its runs (the sidebar, the phone's Projects).
 				invalidate(projects.lists());
+			}
+			if (readProjects) {
+				// Every read of projects: the lists, one project's page, its sources.
+				invalidate(projects.all());
+				if (!lists) invalidate(dashboard.all());
 			}
 			if (readSchedules) invalidate(schedules.lists());
 			if (lists || learnings) invalidate(knowledge.learningsKey());

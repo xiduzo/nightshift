@@ -128,6 +128,30 @@ test("a project's schedules that changed reach only that Person's open streams",
 	]);
 });
 
+test("the projects of a Space that changed reach only that Person's open streams", async () => {
+	const inApp = createInAppChannel({ now: () => 7 });
+	const stop = new AbortController();
+	const got: InAppItem[] = [];
+	const done = (async () => {
+		for await (const item of inApp.watch("ada", stop.signal)) got.push(item);
+	})();
+	inApp.projectsChanged(
+		{ kind: "in-app", personId: "ada" },
+		{ spaceId: "space-1" },
+	);
+	inApp.projectsChanged(
+		{ kind: "in-app", personId: "bob" },
+		{ spaceId: "space-2" },
+	);
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	stop.abort();
+	await done;
+
+	expect(got).toEqual([
+		{ kind: "projects-changed", spaceId: "space-1", at: 7 },
+	]);
+});
+
 test("a stream from this computer makes the Person active here; one from elsewhere does not", async () => {
 	let clock = 1_000;
 	const inApp = createInAppChannel({ now: () => clock, recentMs: 60_000 });

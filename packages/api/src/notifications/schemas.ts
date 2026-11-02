@@ -106,6 +106,15 @@ export const notificationItemSchema = exact<InAppItem>()(
 			projectId: z.string(),
 			at: z.number(),
 		}),
+		/**
+		 * The projects of a Space changed: its Host added, renamed or
+		 * removed one. Quiet: an older screen reads everything again.
+		 */
+		z.object({
+			kind: z.literal("projects-changed"),
+			spaceId: z.string(),
+			at: z.number(),
+		}),
 	]),
 );
 

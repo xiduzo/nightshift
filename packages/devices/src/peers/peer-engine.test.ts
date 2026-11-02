@@ -123,7 +123,7 @@ describe("a Device's engine among its peers", () => {
 
 		await expect(
 			engine.space(a.spaceId).moveProject(app.id, "space-studio"),
-		).rejects.toThrow("This Space is kept by another computer.");
+		).rejects.toThrow("Your Host keeps the projects of this Space.");
 		expect(
 			(await engine.space(a.spaceId).listProjects()).map((p) => p.id),
 		).toEqual([app.id]);

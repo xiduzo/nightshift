@@ -373,6 +373,17 @@ describe("the live cache follows the Host", () => {
 		expect(stale()).toEqual(sorted(["learnings", "knowledge"]));
 	});
 
+	test("a Host that changes the projects reads the projects, the dashboard and the schedules", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({ kind: "projects-changed", spaceId: "s1", at: 4 });
+		expect(stale()).toEqual(NOTHING);
+		timers.due(300);
+		expect(stale()).toEqual(
+			sorted(["projects", "branches", "dashboard", "flowHealth", "schedules"]),
+		);
+	});
+
 	test("an item of a kind this screen does not know reads everything again", async () => {
 		const { live, stale, timers } = setUp();
 		const { host } = follow(live);

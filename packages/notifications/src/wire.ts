@@ -160,6 +160,11 @@ export type Notifications = {
 	 * a project changed: a person kept or deleted some. Quiet: no push.
 	 */
 	learningsChanged(spaceId: string, projectId: string): Promise<void>;
+	/**
+	 * Tells the open screens of the Space's Members that its projects
+	 * changed: its Host added, renamed or removed one. Quiet: no push.
+	 */
+	projectsChanged(spaceId: string): Promise<void>;
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
 	stop(): void;
@@ -334,6 +339,14 @@ export function createNotifications(
 				options.inApp.learningsChanged(
 					{ kind: "in-app", personId },
 					{ spaceId, projectId },
+				);
+			}
+		},
+		async projectsChanged(spaceId) {
+			for (const personId of await audience(spaceId)) {
+				options.inApp.projectsChanged(
+					{ kind: "in-app", personId },
+					{ spaceId },
 				);
 			}
 		},

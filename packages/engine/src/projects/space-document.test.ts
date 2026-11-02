@@ -37,11 +37,15 @@ import {
 let sandbox: Sandbox;
 let documents: SpaceDocuments;
 let signal: AbortController;
+/** The Spaces whose rows a write changed, in order: what the open screens hear. */
+let projected: string[];
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	projected = [];
 	documents = createSpaceDocuments({
 		db: sandbox.db,
 		directory: aloneDirectory(sandbox.db),
+		onProjected: (spaceId) => projected.push(spaceId),
 	});
 	signal = new AbortController();
 });
@@ -175,6 +179,38 @@ describe("projection", () => {
 				removedAt: asDate(5),
 			},
 		]);
+	});
+
+	test("a write that changes the rows tells the screens; one that does not stays quiet", async () => {
+		const document = await documents.open(sandbox.spaceId);
+		const entry = {
+			name: "from the Host",
+			remote: "github.com/acme/nine",
+			createdAt: 1,
+			removedAt: null,
+			updatedAt: 1,
+		};
+		asClient(document.doc, () => document.projects.set("p9", entry));
+		await waitFor(async () => projected.length === 1);
+		expect(projected).toEqual([sandbox.spaceId]);
+
+		// The same entry again, and a Clone of another Device: no row changes.
+		asClient(document.doc, () => {
+			document.projects.set("p9", { ...entry, updatedAt: 2 });
+			document.clones.set("p9/other", {
+				projectId: "p9",
+				deviceId: "other",
+				addedAt: 3,
+			});
+		});
+		await document.change(() => {});
+		await Bun.sleep(20);
+		expect(projected).toEqual([sandbox.spaceId]);
+
+		asClient(document.doc, () =>
+			document.projects.set("p9", { ...entry, name: "renamed", updatedAt: 4 }),
+		);
+		await waitFor(async () => projected.length === 2);
 	});
 
 	test("an entry for a project of another Space does not take its row", async () => {

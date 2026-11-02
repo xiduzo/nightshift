@@ -225,8 +225,14 @@ export function createSpaceDocuments(options: {
 	directory: Pick<DeviceDirectory, "names" | "hostedElsewhere">;
 	/** This Replica's synced documents. Default: its own over `db`. */
 	documents?: SyncedDocuments;
+	/**
+	 * A write to the Space document changed its `project` rows: a project
+	 * came, was renamed, removed or restored. The daemon tells the open
+	 * screens, so a project a Host adds shows without a restart.
+	 */
+	onProjected?: (spaceId: string) => void;
 }): SpaceDocuments {
-	const { db, directory } = options;
+	const { db, directory, onProjected } = options;
 	const documents = options.documents ?? createSyncedDocuments({ db });
 
 	/** The Space document view of a persisted one. */
@@ -259,7 +265,8 @@ export function createSpaceDocuments(options: {
 		},
 		// Every write, ours or a client's, is projected into the rows.
 		async stored(persisted) {
-			await projectSpace(db, await viewOf(persisted));
+			const document = await viewOf(persisted);
+			if (await projectSpace(db, document)) onProjected?.(document.spaceId);
 		},
 	});
 
@@ -370,14 +377,16 @@ export function projectEntry(row: typeof project.$inferSelect): SpaceProject {
  * Brings the `project` rows in line with the document: a new entry makes
  * a row, a changed one updates it (name, remote, removed). A row of
  * another Space is left alone, and so is an entry the rows refuse (a
- * remote another Project has): the next change tries again.
+ * remote another Project has): the next change tries again. True when
+ * a row was written.
  */
 export async function projectSpace(
 	db: Database,
 	document: SpaceDocument,
-): Promise<void> {
+): Promise<boolean> {
 	const entries = spaceProjects(document);
-	if (entries.size === 0) return;
+	if (entries.size === 0) return false;
+	let changed = false;
 	const rows = new Map(
 		(
 			await db
@@ -399,6 +408,7 @@ export async function projectSpace(
 					createdAt: asDate(entry.createdAt),
 					removedAt,
 				});
+				changed = true;
 				continue;
 			}
 			if (row.spaceId !== document.spaceId) continue;
@@ -413,6 +423,7 @@ export async function projectSpace(
 				.update(project)
 				.set({ name: entry.name, remote: entry.remote, removedAt })
 				.where(eq(project.id, id));
+			changed = true;
 		} catch (error) {
 			console.error(
 				`The project ${id} of ${document.name} was not written:`,
@@ -420,6 +431,7 @@ export async function projectSpace(
 			);
 		}
 	}
+	return changed;
 }
 
 /** Writes the Space's Members (id, name, role) when they differ from the mirror. */

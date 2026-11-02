@@ -60,7 +60,7 @@ export const NOT_ON_THIS_COMPUTER =
 
 /** A change this Replica cannot make to a Space a Host keeps. */
 export const HOSTED_ELSEWHERE =
-	"This Space is kept by another computer. Change its projects there.";
+	"Your Host keeps the projects of this Space. Change them on your Host.";
 
 /** A project that is not in the Space, or that a person removed. */
 export const PROJECT_NOT_FOUND = "Night Shift cannot find this project.";
@@ -409,7 +409,7 @@ export function createProjects(deps: ProjectsDeps) {
 			if (document.hostedElsewhere) {
 				throw new Refusal(
 					"conflict",
-					"This Space is kept by another computer. Add the project there first, then add this folder.",
+					"Your Host keeps the projects of this Space. Add this repository on your Host. It then shows here, and you can copy it to this computer from its page.",
 				);
 			}
 			const now = timeNow();
