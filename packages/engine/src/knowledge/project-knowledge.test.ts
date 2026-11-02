@@ -252,6 +252,160 @@ describe("a Host of an older version", () => {
 	});
 });
 
+/** Every file under `dir`, by its path from there, sorted. */
+async function filesUnder(dir: string): Promise<string[]> {
+	const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+	return entries
+		.filter((entry) => entry.isFile())
+		.map((entry) => join(entry.parentPath, entry.name).slice(dir.length + 1))
+		.sort();
+}
+
+describe("a node that lists folders of the knowledge", () => {
+	/** A Device whose knowledge has the folders of the lab, and some that look like them. */
+	async function lab() {
+		const a = await device(memoryHost());
+		await a.put(
+			"books/graham.md",
+			"# Graham\n\nBuy with a margin of safety.\n",
+		);
+		await a.put("research/papers/2013-gem.md", "# GEM\n\nDual momentum.\n");
+		await a.put("results/gem.md", "# GEM card\n\nPost-publication: held.\n");
+		await a.put("bookshelf/gem.md", "# Shelf\n\nGEM held, says the shelf.\n");
+		await a.put("learnings/accepted/costs.md", "- Costs are always on.\n");
+		await a.put("learnings/proposed/run-0.s1.md", "- A proposal.\n");
+		await a.knowledge.listing("p1");
+		return a;
+	}
+
+	test("gets a copy of those folders only, with its own index, in NS_KNOWLEDGE and to read", async () => {
+		const a = await lab();
+		const session = await a.knowledge.forSession(
+			{ projectId: "p1", folders: ["books", "research/papers"] },
+			{ runId: "run-1", stepId: "s1", stepReport: true },
+		);
+		const view = session.env.NS_KNOWLEDGE as string;
+		expect(view).toBeString();
+		// Outside the knowledge folders, where no reconcile looks.
+		expect(view.startsWith(join(a.sandbox.dataDir, "knowledge"))).toBe(false);
+		expect(session.input.addDirs).toEqual([view]);
+		expect(session.input.instructions).toContain(view);
+		expect(session.input.instructions).not.toContain(a.dir);
+		expect(JSON.stringify(session.input)).not.toContain(a.dir);
+		// The learnings stay on: proposals go to the real folder.
+		expect(session.input.stepReport).toEqual({ learnings: true });
+		expect(await filesUnder(view)).toEqual([
+			"INDEX.md",
+			"books/graham.md",
+			"research/papers/2013-gem.md",
+		]);
+		const index = await readFile(join(view, "INDEX.md"), "utf8");
+		expect(index).toContain("`books/graham.md`: Graham");
+		expect(index).toContain("`research/papers/2013-gem.md`: GEM");
+		for (const hidden of ["results/", "bookshelf/", "learnings/"]) {
+			expect(index).not.toContain(hidden);
+		}
+		await session.done();
+	});
+
+	test("searches and reads nothing outside them", async () => {
+		const a = await lab();
+		const session = await a.knowledge.forSession(
+			{ projectId: "p1", folders: ["books", "research/papers"] },
+			{ runId: "run-1", stepId: "s1" },
+		);
+		const tool = (name: string) =>
+			session.input.tools?.find((t) => t.name === name);
+		const search = async (query: string) =>
+			String(await tool("search_knowledge")?.execute?.({ query }));
+		const read = async (path: string) =>
+			String(await tool("read_knowledge")?.execute?.({ path }));
+
+		const gem = await search("GEM");
+		expect(gem).toContain("research/papers/2013-gem.md");
+		expect(gem).not.toContain("results/gem.md");
+		expect(gem).not.toContain("bookshelf/gem.md");
+		expect(await search("held")).toContain("No file");
+		expect(await search("costs")).toContain("No file");
+
+		expect(await read("books/graham.md")).toContain("margin of safety");
+		expect(await read("./books/graham.md")).toContain("margin of safety");
+		for (const path of [
+			"results/gem.md",
+			"bookshelf/gem.md",
+			"books/../results/gem.md",
+			"/results/gem.md",
+			"learnings/accepted/costs.md",
+		]) {
+			expect(await read(path)).toContain("has no file");
+		}
+		await session.done();
+	});
+
+	test("gets the kept learnings only when it lists them, and its proposals still go to the knowledge", async () => {
+		const a = await lab();
+		const session = await a.knowledge.forSession(
+			{ projectId: "p1", folders: ["learnings/accepted"] },
+			{ runId: "run-1", stepId: "s1", stepReport: true },
+		);
+		const view = session.env.NS_KNOWLEDGE as string;
+		expect(await filesUnder(view)).toEqual([
+			"INDEX.md",
+			"learnings/accepted/costs.md",
+		]);
+		for await (const _ of session.events(reporting(["Use total returns."]))) {
+		}
+		await session.done();
+		expect(
+			await readFile(join(a.dir, "learnings/proposed/run-1.s1.md"), "utf8"),
+		).toContain("Use total returns.");
+		expect(await a.paths()).toContain("learnings/proposed/run-1.s1.md");
+	});
+
+	test("is gone when the step ends: what the agent wrote there never reaches the knowledge", async () => {
+		const a = await lab();
+		const before = await a.paths();
+		const session = await a.knowledge.forSession(
+			{ projectId: "p1", folders: ["books", "nothing/here"] },
+			{ runId: "run-1", stepId: "s1" },
+		);
+		const view = session.env.NS_KNOWLEDGE as string;
+		// The agent writes in its copy.
+		await writeFile(join(view, "books/graham.md"), "# Changed\n");
+		await writeFile(join(view, "books/new.md"), "# New\n");
+		await session.done();
+		expect(await stat(view).catch(() => null)).toBeNull();
+		expect(await readFile(join(a.dir, "books/graham.md"), "utf8")).toContain(
+			"margin of safety",
+		);
+		expect(await a.paths()).toEqual(before);
+		expect(await filesUnder(a.dir)).not.toContain("books/new.md");
+	});
+
+	test("an empty view is still a view: never the whole folder", async () => {
+		const a = await lab();
+		const session = await a.knowledge.forSession(
+			{ projectId: "p1", folders: ["nothing/here"] },
+			{ runId: "run-1" },
+		);
+		const view = session.env.NS_KNOWLEDGE as string;
+		expect(view).not.toBe(a.dir);
+		expect(await filesUnder(view)).toEqual(["INDEX.md"]);
+		expect(await readFile(join(view, "INDEX.md"), "utf8")).toContain(
+			"No files yet.",
+		);
+		await session.done();
+	});
+
+	test("without a list, the agent gets the whole folder as before", async () => {
+		const a = await lab();
+		const session = await a.knowledge.forSession({ projectId: "p1" });
+		expect(session.env).toEqual({ NS_KNOWLEDGE: a.dir });
+		expect(session.input.addDirs).toEqual([a.dir]);
+		await session.done();
+	});
+});
+
 /** An agent's events: one report with these learnings. */
 async function* reporting(learnings: string[]): AsyncGenerator<AgentEvent> {
 	yield { type: "report", outcome: "pass", summary: "Done.", learnings };

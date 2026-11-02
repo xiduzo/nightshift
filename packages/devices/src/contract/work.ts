@@ -188,6 +188,13 @@ const sessionFields = {
 	knowledge: z
 		.object({ projectId: z.string(), always: z.boolean().optional() })
 		.optional(),
+	/**
+	 * Only these folders of the project's knowledge, in a copy. A field of
+	 * its own: a Device without it gives no knowledge, never the whole folder.
+	 */
+	knowledgeOnly: z
+		.object({ projectId: z.string(), folders: z.array(z.string()) })
+		.optional(),
 	/** The step's turn limit, and what is left of the run's budget. */
 	maxTurns: z.number().int().positive().optional(),
 	maxBudgetUsd: z.number().positive().optional(),

@@ -25,6 +25,7 @@ import {
 	createVectorTables,
 	VECTOR_TABLES,
 } from "./vectors";
+import { inFolders } from "./view";
 
 /**
  * Search over a project's knowledge folder, on this Device: by words, and
@@ -234,6 +235,22 @@ function within<T>(promise: Promise<T>, ms: number): Promise<T> {
 			},
 		);
 	});
+}
+
+/**
+ * The SQL that keeps a file's path (`f.path`) in `folders`, as
+ * `inFolders` does: the folder itself, or a path that starts with it and
+ * a `/`, in the same case. No folders: no file.
+ */
+function folderClause(folders: readonly string[]): {
+	sql: string;
+	params: string[];
+} {
+	if (folders.length === 0) return { sql: "0", params: [] };
+	return {
+		sql: folders.map(() => "f.path = ? OR instr(f.path, ?) = 1").join(" OR "),
+		params: folders.flatMap((folder) => [folder, `${folder}/`]),
+	};
 }
 
 /**
@@ -804,13 +821,19 @@ export function createKnowledgeSearch(
 		return next;
 	}
 
-	/** The files whose sections have the words, best section first, at most `limit`. */
+	/**
+	 * The files whose sections have the words, best section first, at most
+	 * `limit`. With `folders`: in those folders only (`inFolders`).
+	 */
 	function byWords(
 		sqlite: Database,
 		projectId: string,
 		match: string,
 		limit: number,
+		folders?: readonly string[],
 	): WordsHit[] {
+		// In the query, so other files take no place among the candidates.
+		const within = folders ? folderClause(folders) : null;
 		// Columns: path, title, heading, body. A word in the title counts most, then the path, then a heading.
 		const rows = sqlite
 			.query<
@@ -822,15 +845,15 @@ export function createKnowledgeSearch(
 					page: number | null;
 					snippet: string;
 				},
-				[string, string, number]
+				(string | number)[]
 			>(
 				`SELECT f.path AS path, f.title AS title, s.heading AS heading, s.line AS line, s.page AS page,
 					snippet(texts, -1, '${OPEN}', '${CLOSE}', '…', ${SNIPPET_TOKENS}) AS snippet
 				FROM texts t JOIN sections s ON s.id = t.rowid JOIN files f ON f.id = s.file_id
-				WHERE texts MATCH ? AND f.project_id = ?
+				WHERE texts MATCH ? AND f.project_id = ?${within ? ` AND (${within.sql})` : ""}
 				ORDER BY bm25(texts, 3.0, 5.0, 2.0, 1.0) LIMIT ?`,
 			)
-			.all(match, projectId, SECTION_CANDIDATES);
+			.all(match, projectId, ...(within?.params ?? []), SECTION_CANDIDATES);
 		const out: WordsHit[] = [];
 		const seen = new Set<string>();
 		for (const row of rows) {
@@ -859,6 +882,7 @@ export function createKnowledgeSearch(
 		projectId: string,
 		text: string,
 		limit: number,
+		folders?: readonly string[],
 	): Promise<MeaningHit[]> {
 		const meaning = current();
 		if (!meaning || (await readyNow(meaning)) !== "ready") return [];
@@ -884,6 +908,10 @@ export function createKnowledgeSearch(
 		const found = await store.similaritySearchVectorWithScore(
 			vector,
 			SECTION_CANDIDATES,
+			// Before the candidates are counted, so other files take no place.
+			folders
+				? (doc) => inFolders(String(doc.metadata.path ?? ""), folders)
+				: undefined,
 		);
 		const files = new Map(
 			sqlite
@@ -938,12 +966,18 @@ export function createKnowledgeSearch(
 		 * first, after a refresh, each at its best section. By words: every
 		 * word must match, and when no section has them all, sections with
 		 * some of them. By meaning too, when this computer can: both lists
-		 * are fused by reciprocal rank. No input makes it throw.
+		 * are fused by reciprocal rank. With `folders`: files in those folders
+		 * only (`inFolders`), as a step with a view of the knowledge searches.
+		 * No input makes it throw.
 		 */
 		async search(
 			projectId: string,
 			text: string,
-			options: { limit?: number; mode?: KnowledgeSearchMode } = {},
+			options: {
+				limit?: number;
+				mode?: KnowledgeSearchMode;
+				folders?: readonly string[];
+			} = {},
 		): Promise<KnowledgeHit[]> {
 			const limit = Math.min(
 				Math.max(1, Math.floor(options.limit ?? LIMIT_DEFAULT)),
@@ -958,17 +992,18 @@ export function createKnowledgeSearch(
 				await refresh(projectId);
 				const sqlite = await database();
 				let words: WordsHit[] = [];
+				const { folders } = options;
 				if (mode !== "meaning") {
-					words = byWords(sqlite, projectId, all, depth);
+					words = byWords(sqlite, projectId, all, depth, folders);
 					if (words.length === 0) {
 						const any = matchQuery(text, "any");
 						if (any !== null && any !== all) {
-							words = byWords(sqlite, projectId, any, depth);
+							words = byWords(sqlite, projectId, any, depth, folders);
 						}
 					}
 				}
 				const meant = on
-					? await byMeaning(sqlite, projectId, text.trim(), depth)
+					? await byMeaning(sqlite, projectId, text.trim(), depth, folders)
 					: [];
 				const byPath = {
 					words: new Map(words.map((hit) => [hit.path, hit])),
@@ -979,33 +1014,37 @@ export function createKnowledgeSearch(
 				const close = (path: string) =>
 					byPath.words.has(path) ||
 					(byPath.meaning.get(path)?.similarity ?? 0) >= floor;
-				return fuseRanks([
-					words.map((hit) => hit.path),
-					meant.map((hit) => hit.path),
-				])
-					.filter(({ key }) => close(key))
-					.slice(0, limit)
-					.flatMap(({ key, score }) => {
-						const word = byPath.words.get(key);
-						const meanHit = byPath.meaning.get(key);
-						const best = word ?? meanHit;
-						if (!best) return [];
-						const found: KnowledgeFound[] = [];
-						if (word) found.push("words");
-						if (meanHit) found.push("meaning");
-						return [
-							{
-								path: best.path,
-								title: best.title,
-								section: best.heading,
-								line: best.line,
-								page: best.page,
-								snippet: best.snippet,
-								score,
-								found,
-							},
-						];
-					});
+				return (
+					fuseRanks([
+						words.map((hit) => hit.path),
+						meant.map((hit) => hit.path),
+					])
+						.filter(({ key }) => close(key))
+						// Once more, whatever the lists did.
+						.filter(({ key }) => !folders || inFolders(key, folders))
+						.slice(0, limit)
+						.flatMap(({ key, score }) => {
+							const word = byPath.words.get(key);
+							const meanHit = byPath.meaning.get(key);
+							const best = word ?? meanHit;
+							if (!best) return [];
+							const found: KnowledgeFound[] = [];
+							if (word) found.push("words");
+							if (meanHit) found.push("meaning");
+							return [
+								{
+									path: best.path,
+									title: best.title,
+									section: best.heading,
+									line: best.line,
+									page: best.page,
+									snippet: best.snippet,
+									score,
+									found,
+								},
+							];
+						})
+				);
 			});
 		},
 		/**

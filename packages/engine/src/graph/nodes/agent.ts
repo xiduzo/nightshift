@@ -15,6 +15,7 @@ import {
 	type AgentNode,
 	type FlowNode,
 	type JsonValue,
+	knowledgeFolderPath,
 	type Outcome,
 	personTierIndex,
 	profileLabel,
@@ -24,7 +25,7 @@ import {
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { createArtifactStore } from "../../artifacts";
-import { runCommand, type SessionEvent } from "../../device";
+import { runCommand, type SessionEvent, type SessionInput } from "../../device";
 import {
 	commandLogPath,
 	type EnginePayloads,
@@ -450,6 +451,31 @@ function stepReportOf(node: AgentNode): AgentSessionInput["stepReport"] {
 	return spec;
 }
 
+/**
+ * What the Device that runs the session gets of the project's knowledge:
+ * the whole folder (`knowledge`), only some folders of it
+ * (`knowledgeOnly`), or nothing. A list travels in a field of its own, so
+ * a Device that does not know it gives no knowledge, never the whole folder.
+ */
+function knowledgeOf(
+	node: AgentNode,
+	projectId: string,
+): Pick<SessionInput, "knowledge" | "knowledgeOnly"> {
+	if (node.knowledge === false) return {};
+	if (Array.isArray(node.knowledge)) {
+		const folders = node.knowledge.flatMap(
+			(folder) => knowledgeFolderPath(folder) ?? [],
+		);
+		return { knowledgeOnly: { projectId, folders } };
+	}
+	return {
+		knowledge: {
+			projectId,
+			...(node.knowledge === true ? { always: true } : {}),
+		},
+	};
+}
+
 /** The built-in outcomes, as an agent that asks a person reads them. */
 const BUILT_IN_OUTCOMES = [
 	{ name: "pass", description: "The task is done." },
@@ -543,14 +569,7 @@ async function runSession(
 		artifacts: { runId: ctx.run.id, stepId: step.stepId },
 		...(files.length > 0 ? { files } : {}),
 		// The project's knowledge folder on the Device that runs the step.
-		...(node.knowledge !== false
-			? {
-					knowledge: {
-						projectId: ctx.run.projectId,
-						...(node.knowledge === true ? { always: true } : {}),
-					},
-				}
-			: {}),
+		...knowledgeOf(node, ctx.run.projectId),
 		signal,
 		...(maxTurns !== null ? { maxTurns } : {}),
 		...(budgetUsd !== null ? { maxBudgetUsd: budgetUsd - spentBefore } : {}),

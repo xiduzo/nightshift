@@ -301,9 +301,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			clis,
 			artifacts,
 			knowledge,
+			knowledgeOnly,
 			files,
 			...rest
 		} = input;
+		// Some folders of the knowledge (a view), or the whole folder.
+		const knowledgeAsked = knowledgeOnly
+			? { projectId: knowledgeOnly.projectId, folders: knowledgeOnly.folders }
+			: knowledge;
 		const harness = harnessFor(name);
 		if (!harness) {
 			yield {
@@ -344,8 +349,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
 			// The knowledge as the Space has it now, before the agent reads it.
 			known =
-				knowledge && deps.knowledge
-					? await deps.knowledge.forSession(knowledge, {
+				knowledgeAsked && deps.knowledge
+					? await deps.knowledge.forSession(knowledgeAsked, {
 							...(artifacts
 								? { runId: artifacts.runId, stepId: artifacts.stepId }
 								: {}),

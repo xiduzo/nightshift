@@ -6,6 +6,12 @@ import { orpc } from "@/shared/api";
 
 export const flowQueries = createFlowQueries(orpc);
 
+/** The files of a project's knowledge: the folders an Agent node may read come from them. */
+export const knowledgeFolderQueries = {
+	files: (projectId: string) =>
+		orpc.knowledge.get.queryOptions({ input: { projectId } }),
+};
+
 export const flowMutations = {
 	save: orpc.flows.save.mutationOptions,
 	remove: orpc.flows.remove.mutationOptions,

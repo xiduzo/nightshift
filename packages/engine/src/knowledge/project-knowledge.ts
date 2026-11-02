@@ -7,6 +7,7 @@ import {
 	knowledgeTools,
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
+import { knowledgeFolderPath } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
@@ -34,6 +35,7 @@ import {
 } from "./questions";
 import { createKnowledgeSync, type KnowledgeSyncDeps } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
+import { createKnowledgeView, inFolders, type KnowledgeView } from "./view";
 
 /**
  * A project's knowledge on this Device, as one module: its folder, the
@@ -68,6 +70,11 @@ export type KnowledgeRequest = {
 	 * even when it is empty. Else only when it has files.
 	 */
 	always?: boolean;
+	/**
+	 * The node lists folders of the knowledge (`knowledge: [...]`): the
+	 * agent gets a view of those only (`view.ts`), even when it is empty.
+	 */
+	folders?: readonly string[];
 };
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
@@ -146,6 +153,14 @@ async function* withUses(
 	yield* uses.splice(0);
 }
 
+/** The step an Agent session runs for. */
+type SessionStep = {
+	runId?: string;
+	/** The step of the run: its proposals have a file of their own. */
+	stepId?: string;
+	stepReport?: AgentSessionInput["stepReport"];
+};
+
 /** A project's knowledge on this Device. */
 export type ProjectKnowledge = ReturnType<typeof createProjectKnowledge>;
 
@@ -177,20 +192,86 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 		return { hold, path, env: { [KNOWLEDGE_ENV]: path } };
 	}
 
-	/** The knowledge tools of a session in the run's project only. `onUse` hears each search and read. */
+	/**
+	 * The knowledge tools of a session in the run's project only, and in
+	 * `folders` only when given. `onUse` hears each search and read.
+	 */
 	function tools(
 		projectId: string,
 		onUse: (projectId: string, use: KnowledgeUse) => void,
+		folders?: readonly string[],
 	) {
 		const port: KnowledgePort = {
 			searchKnowledge: (id, query, limit) =>
-				deps.search.search(id, query, { limit }),
-			readKnowledge: (id, path, maxBytes, from) =>
-				sync.read(id, path, maxBytes, from),
+				deps.search.search(id, query, {
+					limit,
+					...(folders ? { folders } : {}),
+				}),
+			readKnowledge: async (id, path, maxBytes, from) => {
+				if (!folders) return sync.read(id, path, maxBytes, from);
+				// A file outside the folders is not there for this agent.
+				const clean = knowledgeFolderPath(path);
+				if (clean === null || !inFolders(clean, folders)) return null;
+				return sync.read(id, clean, maxBytes, from);
+			},
 		};
 		return {
 			tools: knowledgeTools(port, { project: { id: projectId } }, { onUse }),
 			toolsInstruction: KNOWLEDGE_TOOLS_INSTRUCTION,
+		};
+	}
+
+	/** The index catches up with the folder from now on, not at the first search. */
+	function refreshSearch(projectId: string): void {
+		deps.search.refresh(projectId).catch((error) => {
+			console.warn(
+				"The knowledge search index was not brought up to date:",
+				error,
+			);
+		});
+	}
+
+	/**
+	 * What a session gets of the knowledge: `shown` in `NS_KNOWLEDGE`, to
+	 * read and in the line; the tools, in `only` when given; and for a step
+	 * of a run, the learnings, kept in the folder `path`.
+	 */
+	function given(
+		projectId: string,
+		path: string,
+		shown: string,
+		step: SessionStep,
+		done: () => Promise<void>,
+		only?: readonly string[],
+	): SessionKnowledge {
+		const { runId, stepId } = step;
+		// The tools answer while the harness waits: their uses go out before its next event.
+		const uses: KnowledgeUseEvent[] = [];
+		const onUse = (id: string, use: KnowledgeUse) => {
+			uses.push({ type: "knowledge", projectId: id, use });
+		};
+		return {
+			env: { [KNOWLEDGE_ENV]: shown },
+			input: {
+				addDirs: [shown],
+				instructions: knowledgeLine(shown),
+				...tools(projectId, onUse, only),
+				// An agent of a run that reads the knowledge may propose to add to it.
+				...(runId !== undefined && step.stepReport
+					? { stepReport: withLearnings(step.stepReport) }
+					: {}),
+			},
+			events: (events) =>
+				withUses(
+					runId === undefined
+						? events
+						: keepLearnings(events, path, {
+								runId,
+								...(stepId !== undefined ? { stepId } : {}),
+							}),
+					uses,
+				),
+			done,
 		};
 	}
 
@@ -220,18 +301,48 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 		 * index, the line, the tools and, for a step of a run (`runId`), the
 		 * learnings. The index catches up with the folder from now on, not at
 		 * the first search.
+		 *
+		 * With `folders`: a view of those folders instead (`view.ts`), even
+		 * when it is empty. `NS_KNOWLEDGE`, the line and the folder to read
+		 * are the view's, the tools find nothing else, and the session never
+		 * gets the folder's path. Its learnings still go to the folder's
+		 * `learnings/proposed/`. The view goes when the step ends. A view that
+		 * cannot be made gives no knowledge, never the whole folder.
 		 */
 		async forSession(
 			request: KnowledgeRequest,
-			step: {
-				runId?: string;
-				/** The step of the run: its proposals have a file of their own. */
-				stepId?: string;
-				stepReport?: AgentSessionInput["stepReport"];
-			} = {},
+			step: SessionStep = {},
 		): Promise<SessionKnowledge> {
 			const { projectId } = request;
 			const { hold, path, env } = await begin(projectId);
+			if (request.folders) {
+				const only = request.folders;
+				let view: KnowledgeView;
+				try {
+					view = await createKnowledgeView(
+						path,
+						await folders.files(projectId),
+						only,
+					);
+				} catch (error) {
+					console.warn("The knowledge was left out:", error);
+					return {
+						env: {},
+						input: {},
+						events: (events) => events,
+						done: hold.done,
+					};
+				}
+				refreshSearch(projectId);
+				const done = async () => {
+					try {
+						await view.remove();
+					} finally {
+						await hold.done();
+					}
+				};
+				return given(projectId, path, view.path, step, done, only);
+			}
 			const plain: SessionKnowledge = {
 				env,
 				input: {},
@@ -246,41 +357,8 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 				console.warn("The knowledge folder was left out:", error);
 				return plain;
 			}
-			deps.search.refresh(projectId).catch((error) => {
-				console.warn(
-					"The knowledge search index was not brought up to date:",
-					error,
-				);
-			});
-			const { runId, stepId } = step;
-			// The tools answer while the harness waits: their uses go out before its next event.
-			const uses: KnowledgeUseEvent[] = [];
-			const onUse = (id: string, use: KnowledgeUse) => {
-				uses.push({ type: "knowledge", projectId: id, use });
-			};
-			return {
-				env,
-				input: {
-					addDirs: [path],
-					instructions: knowledgeLine(path),
-					...tools(projectId, onUse),
-					// An agent of a run that reads the knowledge may propose to add to it.
-					...(runId !== undefined && step.stepReport
-						? { stepReport: withLearnings(step.stepReport) }
-						: {}),
-				},
-				events: (events) =>
-					withUses(
-						runId === undefined
-							? events
-							: keepLearnings(events, path, {
-									runId,
-									...(stepId !== undefined ? { stepId } : {}),
-								}),
-						uses,
-					),
-				done: hold.done,
-			};
+			refreshSearch(projectId);
+			return given(projectId, path, path, step, hold.done);
 		},
 		/**
 		 * Removes the content of the Spaces this Replica keeps that no

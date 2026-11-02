@@ -295,8 +295,16 @@ export const agentNodeSchema = z.object({
 	 * Unset: the agent gets it when the folder has files. `true`: always.
 	 * `false`: never. The agent reads it itself; nothing goes into the prompt
 	 * but one line that says where it is.
+	 *
+	 * A list of folders (or files) of the knowledge, for example
+	 * `["books", "learnings/accepted"]`: the agent gets a copy of those only,
+	 * with its own index, and its search and reads find nothing else. It
+	 * never learns where the whole folder is. `learnings/accepted` is one
+	 * folder like the others: list it to give the kept learnings. A folder
+	 * that is not there yet gives nothing. An empty list is not valid: use
+	 * `false`.
 	 */
-	knowledge: z.boolean().optional(),
+	knowledge: z.union([z.boolean(), z.array(z.string())]).optional(),
 	/**
 	 * A JSON Schema for the `data` of the step report. The agent must report
 	 * data that matches it, else the step ends as `error`. Later nodes read
@@ -390,6 +398,47 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 		check.error(
 			`The output schema of agent node "${node.id}" must describe an object: give it "type": "object" or "properties".`,
 		);
+	}
+	if (Array.isArray(node.knowledge)) checkKnowledgeFolders(node, check);
+}
+
+/** The longest knowledge folder path, as the knowledge takes it. */
+const MAX_KNOWLEDGE_PATH = 1024;
+
+/**
+ * A folder (or file) of the knowledge as a person typed it, made plain:
+ * spaces around, `./` in front and `/` at the end go. Null when it is not
+ * one: empty, absolute, with `..`, `.`, an empty or a hidden part, or a
+ * backslash. Night Shift reads no hidden file of the knowledge.
+ */
+export function knowledgeFolderPath(input: string): string | null {
+	const path = input
+		.trim()
+		.replace(/^(\.\/)+/, "")
+		.replace(/\/+$/, "");
+	if (path === "" || path.length > MAX_KNOWLEDGE_PATH) return null;
+	if (/[\\\0]/.test(path)) return null;
+	const parts = path.split("/");
+	return parts.every((part) => part !== "" && !part.startsWith("."))
+		? path
+		: null;
+}
+
+/** An Agent node's list of knowledge folders: not empty, each one a folder of the knowledge. */
+function checkKnowledgeFolders(node: AgentNode, check: NodeCheck): void {
+	const folders = Array.isArray(node.knowledge) ? node.knowledge : [];
+	if (folders.length === 0) {
+		check.error(
+			`Agent node "${node.id}" lists no knowledge folders. Use false to give the agent no knowledge.`,
+		);
+		return;
+	}
+	for (const folder of folders) {
+		if (knowledgeFolderPath(folder) === null) {
+			check.error(
+				`Agent node "${node.id}" lists "${folder}" as a knowledge folder. Give a folder inside the knowledge, for example books or research/papers.`,
+			);
+		}
 	}
 }
 

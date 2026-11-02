@@ -351,7 +351,17 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "integer",
                 },
                 "knowledge": {
-                  "type": "boolean",
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                    },
+                    {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  ],
                 },
                 "label": {
                   "type": "string",
@@ -2914,7 +2924,17 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "type": "integer",
                 },
                 "knowledge": {
-                  "type": "boolean",
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                    },
+                    {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                  ],
                 },
                 "label": {
                   "type": "string",
@@ -6163,7 +6183,7 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
-  "agentNodeSchema": "49363b42f0b9d2bfa6adc4ef2b7fb660c7b21b9a1b907e446392f21b3dda27aa",
+  "agentNodeSchema": "30ca125edb12b80bffa6cf373ac384c7c3d229ebe355b4cb93b2842b2cacf35f",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "agentTierSchema": "adbfb5ff1e0cd15b8f217bdc0015d321fa6a03f41c130deefa2d36eb4b4e7803",
@@ -6177,7 +6197,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callNodeSchema": "cc57048a2024ee5bc09a3896327429864259bbdf3e7ec92ef11e118654966522",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "4c18a69ac9466dae87299f313a9779ba3e756e8d07d2779c7ffaced9ed71a664",
+  "chatRequestSchema": "252afbaf4ce61a192d13d8d7466f9dbc48693db77bb39b93a74e85b3938f8d81",
   "choiceItemSchema": "55d6a793593f2331affa67faa389d61df03d4029c01b7a7443f9a98834f63da7",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
@@ -6198,9 +6218,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "b3c64614b3b8ab8efdccabae6120c6af660d016ffc54600100bc58d022fec6e3",
+  "flowNodeSchema": "c968d8d3ee335001a6f3b4f252fdefdff723f60dc8a633b4aed0c26041cfc34e",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "12c7f5124bf15788afc8d4706e49f636e06d8cbbbbddfd35c39fbc00a74348f6",
+  "flowSchema": "64f611665ce40165906a8356faff113a0d1642c8c97587a6504ce8454d828ed2",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -6244,7 +6264,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "serviceNodeSchema": "3c31613b202951fdda89a7ea10c565a72c597db774e77cb52305bf735407d90e",
   "serviceReadySchema": "6844b7f89e0f30cfd776eb620d2ff7ad2f06ac7f4e908b6752b84ca055ebe2da",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "63ac311549a16d08023deaa3acd81cbbb60397ec4f49012fdbfeeb7b91810e9a",
+  "suggestionRequestSchema": "c8b6080beec88e07ea7c68002c7e1da54a2fa3d0a28017a25a2aa21f0f098e21",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",

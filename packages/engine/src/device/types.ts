@@ -236,7 +236,15 @@ export type SessionInput = Omit<
 	 * where, when it has files or `always` (`knowledge/project-knowledge.ts`).
 	 * Absent: the node turned it off (`knowledge: false`).
 	 */
-	knowledge?: KnowledgeRequest;
+	knowledge?: Omit<KnowledgeRequest, "folders">;
+	/**
+	 * The node lists folders of the knowledge (`knowledge: [...]`): the
+	 * session gets a copy of those only, in `NS_KNOWLEDGE` and to read, and
+	 * its search and reads find nothing else. A field of its own, not part of
+	 * `knowledge`: a Device that does not know it gives no knowledge, never
+	 * the whole folder.
+	 */
+	knowledgeOnly?: { projectId: string; folders: string[] };
 };
 
 /**

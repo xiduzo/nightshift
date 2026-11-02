@@ -106,6 +106,35 @@ describe("the Agent node", () => {
 		expect(blind?.env?.NS_KNOWLEDGE).toBeUndefined();
 	});
 
+	test("a node that lists folders gets a copy of those only, gone when the step ends", async () => {
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
+		const root = folder("project-1");
+		await mkdir(join(root, "books"), { recursive: true });
+		await mkdir(join(root, "results"), { recursive: true });
+		await writeFile(join(root, "books", "a.md"), "# A\n");
+		await writeFile(join(root, "results", "r.md"), "# R\n");
+		const harness = fakeHarness(reportingScript("pass"));
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "reader",
+				nodes: [agent("reader", { knowledge: ["./books/"] })],
+				edges: [],
+			}),
+			{ harness, knowledge },
+		);
+		await drive(h, { inputs: {} });
+		const [reader] = harness.calls;
+		const view = reader?.env?.NS_KNOWLEDGE;
+		expect(view).toBeString();
+		expect(view).not.toBe(root);
+		expect(reader?.addDirs).toEqual([view as string]);
+		expect(reader?.instructions).toContain(view as string);
+		expect(reader?.instructions).not.toContain(root);
+		expect(existsSync(view as string)).toBe(false);
+	});
+
 	test("the agent's searches and reads of the knowledge go to the log on its step, not to the transcript", async () => {
 		const { knowledge, folder, close } = testKnowledge(sandbox);
 		closes.push(close);

@@ -491,6 +491,31 @@ describe("the project's knowledge", () => {
 		expect(off && "knowledge" in off).toBe(false);
 	});
 
+	test("a session with only some folders gets a view of those, never the folder", async () => {
+		const harness = fakeHarness();
+		const { knowledge, folder: folderOf, close } = testKnowledge(sandbox);
+		closes.push(close);
+		const d = device({ harnesses: { "claude-code": harness }, knowledge });
+		const folder = folderOf("p1");
+		await Bun.write(join(folder, "books/a.md"), "# A\n");
+		await Bun.write(join(folder, "results/r.md"), "# R\n");
+		await collect(
+			d.session(
+				sessionInput({
+					knowledgeOnly: { projectId: "p1", folders: ["books"] },
+				}),
+			),
+		);
+		const [only] = harness.calls;
+		const view = only?.env?.NS_KNOWLEDGE as string;
+		expect(view).not.toBe(folder);
+		expect(only?.addDirs).toEqual([view]);
+		expect(JSON.stringify(only)).not.toContain(folder);
+		expect(only && "knowledgeOnly" in only).toBe(false);
+		// The view went with the session.
+		expect(existsSync(view)).toBe(false);
+	});
+
 	test("an agent that reads the knowledge searches it with this computer's index", async () => {
 		const harness = fakeHarness({
 			steps: [

@@ -108,6 +108,42 @@ describe("search by meaning", () => {
 		expect([...scores].sort((a, b) => b - a)).toEqual(scores);
 	});
 
+	test("with folders, finds by words and by meaning in those folders only", async () => {
+		await put("results/cars.md", FILES["cars.md"]);
+		await put("Results/cars.md", FILES["cars.md"]);
+		await put("resultsx/cars.md", FILES["cars.md"]);
+		await put("books/garage.md", FILES["cars.md"]);
+		await put("books/deploy.md", "# Deploy\n\nHow we ship the app.\n");
+		await put("results/deploy.md", "# Deploy\n\nHow we ship the app.\n");
+		await put("ops.md", FILES["ops.md"]);
+		await prepared();
+		// Unfiltered, each one is found.
+		expect(paths(await search.search("p1", "vehicle storage"))).toContain(
+			"results/cars.md",
+		);
+		const folders = ["books", "ops.md"];
+		const meant = await search.search("p1", "vehicle storage", { folders });
+		// The fake model has no floor: every file in the folders comes, the closest first.
+		expect(paths(meant)).toEqual([
+			"books/garage.md",
+			"ops.md",
+			"books/deploy.md",
+		]);
+		const both = await search.search("p1", "deploy", { folders });
+		expect(paths(both)[0]).toBe("books/deploy.md");
+		expect(paths(both).sort()).toEqual([
+			"books/deploy.md",
+			"books/garage.md",
+			"ops.md",
+		]);
+		const words = await search.search("p1", "garage", {
+			folders,
+			mode: "words",
+		});
+		expect(paths(words)).toEqual(["books/garage.md"]);
+		expect(await search.search("p1", "deploy", { folders: [] })).toEqual([]);
+	});
+
 	test("embeds only what changed, and forgets a file that went", async () => {
 		for (const [path, text] of Object.entries(FILES)) await put(path, text);
 		await prepared();

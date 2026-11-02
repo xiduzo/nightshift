@@ -10,6 +10,7 @@ import { useId } from "react";
 import { cliToolQueries } from "@/features/agents";
 import type { DaemonConnection } from "../connections-field";
 import { Field, InspectorSection, Note } from "../fields";
+import { KnowledgeFoldersField } from "../knowledge-folders-field";
 import { OutputSchemaField } from "../output-schema-field";
 import { NodeProgramsField, ToolsField } from "../tools-field";
 import { useProfile } from "./agent-fields";
@@ -21,27 +22,37 @@ function withClis(node: AgentNode, clis: string[]): AgentNode {
 }
 
 /** The node's knowledge choice, as the select shows it. */
-type KnowledgeChoice = "auto" | "always" | "never";
+type KnowledgeChoice = "auto" | "always" | "only" | "never";
 
 const KNOWLEDGE_HINTS: Record<KnowledgeChoice, string> = {
 	auto: "The agent reads the project's knowledge when there is some.",
 	always:
 		"Night Shift tells the agent where the project knowledge is, also when there is none yet.",
+	only: "The agent gets these folders only. It cannot see or search the rest of the knowledge.",
 	never: "The agent works only from the project and its task.",
 };
 
 function knowledgeChoice(node: AgentNode): KnowledgeChoice {
-	return node.knowledge === true
-		? "always"
-		: node.knowledge === false
-			? "never"
-			: "auto";
+	return Array.isArray(node.knowledge)
+		? "only"
+		: node.knowledge === true
+			? "always"
+			: node.knowledge === false
+				? "never"
+				: "auto";
 }
 
-/** The node with this choice: no `knowledge` field for the default. */
+/**
+ * The node with this choice: no `knowledge` field for the default. Only
+ * some folders keeps the folders the node lists, else none yet.
+ */
 function withKnowledge(node: AgentNode, choice: KnowledgeChoice): AgentNode {
-	const { knowledge: _, ...rest } = node;
-	return choice === "auto" ? rest : { ...rest, knowledge: choice === "always" };
+	const { knowledge, ...rest } = node;
+	if (choice === "auto") return rest;
+	if (choice === "only") {
+		return { ...rest, knowledge: Array.isArray(knowledge) ? knowledge : [] };
+	}
+	return { ...rest, knowledge: choice === "always" };
 }
 
 /** An Agent node's output data, tools and knowledge. */
@@ -158,6 +169,13 @@ export function AgentAdvanced({
 				title="Knowledge"
 				tab="setup"
 				defaultOpen={node.knowledge !== undefined}
+				aside={
+					Array.isArray(node.knowledge) ? (
+						<Badge variant="secondary" className="tabular-nums">
+							{node.knowledge.length}
+						</Badge>
+					) : null
+				}
 			>
 				<Field
 					id={`${id}-knowledge`}
@@ -177,9 +195,22 @@ export function AgentAdvanced({
 							When there is some
 						</NativeSelectOption>
 						<NativeSelectOption value="always">Always</NativeSelectOption>
+						<NativeSelectOption value="only">
+							Only some folders
+						</NativeSelectOption>
 						<NativeSelectOption value="never">Never</NativeSelectOption>
 					</NativeSelect>
 				</Field>
+				{Array.isArray(node.knowledge) ? (
+					<KnowledgeFoldersField
+						id={`${id}-knowledge-folders`}
+						projectId={projectId}
+						folders={node.knowledge}
+						onChange={(folders) =>
+							onChange((current) => ({ ...current, knowledge: folders }))
+						}
+					/>
+				) : null}
 			</InspectorSection>
 		</>
 	);

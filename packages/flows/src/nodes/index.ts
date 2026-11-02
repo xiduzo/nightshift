@@ -22,6 +22,7 @@ export {
 	type HarnessName,
 	harnessNameSchema,
 	isCustomHarness,
+	knowledgeFolderPath,
 	type Login,
 	loginSchema,
 	type McpServer,

@@ -223,23 +223,28 @@ export function createKnowledgeFolders(dataDir: string) {
 		 * the files it lists. A folder that is not there is made.
 		 */
 		async index(projectId: string): Promise<KnowledgeFile[]> {
-			const path = await ensure(projectId);
-			const { files, newest } = await walkFolder(path, readable);
-			const indexPath = join(path, INDEX_FILE);
-			const written = await stat(indexPath).catch(() => null);
-			const text =
-				written === null
-					? ""
-					: await readFile(indexPath, "utf8").catch(() => "");
-			const stale =
-				written === null ||
-				newest > written.mtimeMs ||
-				!text.includes(INDEX_INTRO) ||
-				!samePaths(indexedPaths(text), files);
-			if (stale) await writeWhole(indexPath, await indexText(path, files));
-			return files;
+			return indexFolder(await ensure(projectId));
 		},
 	};
+}
+
+/**
+ * Writes `INDEX.md` at the top of the folder `dir` again when it is stale,
+ * over the files a person or an agent reads there. Returns them.
+ */
+export async function indexFolder(dir: string): Promise<KnowledgeFile[]> {
+	const { files, newest } = await walkFolder(dir, readable);
+	const indexPath = join(dir, INDEX_FILE);
+	const written = await stat(indexPath).catch(() => null);
+	const text =
+		written === null ? "" : await readFile(indexPath, "utf8").catch(() => "");
+	const stale =
+		written === null ||
+		newest > written.mtimeMs ||
+		!text.includes(INDEX_INTRO) ||
+		!samePaths(indexedPaths(text), files);
+	if (stale) await writeWhole(indexPath, await indexText(dir, files));
+	return files;
 }
 
 /** What a person or an agent reads, at most 20 000 files. */

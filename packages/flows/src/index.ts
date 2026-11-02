@@ -273,6 +273,7 @@ export {
 	type JoinNode,
 	type JoinWait,
 	type JsonValue,
+	knowledgeFolderPath,
 	type LeaseNode,
 	type ListSource,
 	type Login,
