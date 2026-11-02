@@ -1,0 +1,1 @@
+export { MorningsPage } from "./page";

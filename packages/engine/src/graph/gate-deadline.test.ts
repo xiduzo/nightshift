@@ -161,6 +161,7 @@ describe("a Gate with a deadline", () => {
 			value: 1,
 			label: "keep",
 			by: "deadline",
+			via: "_OTHER",
 		});
 	});
 
@@ -174,6 +175,7 @@ describe("a Gate with a deadline", () => {
 			stepId,
 			choice: "drop",
 			note: "Not needed",
+			via: "phone",
 		});
 		await waitFor(async () => (await statusOf(h)) === "finished");
 		clock.now = T0 + 31 * MINUTE;
@@ -187,6 +189,15 @@ describe("a Gate with a deadline", () => {
 			outcome: "drop",
 			note: "Not needed",
 			visit: 1,
+		});
+		expect(
+			(await h.events()).find((e) => e.type === "Scored")?.payload,
+		).toEqual({
+			score: "gate_decision",
+			value: 1,
+			label: "drop",
+			by: "person",
+			via: "phone",
 		});
 	});
 

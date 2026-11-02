@@ -19,6 +19,7 @@ export type EndedRun = Pick<
 	| "status"
 	| "result"
 	| "reason"
+	| "endReason"
 	| "costUsd"
 	| "costEstimated"
 	| "costMissing"
@@ -167,7 +168,8 @@ function statusText(run: EndedRun): string {
  * list: a kind not here says nothing. `cost-unknown` shows in the cost.
  */
 const WARNING_WORDS: Record<string, string> = {
-	budget: "reached its budget or turn limit",
+	budget: "reached its budget",
+	turns: "reached its turn limit",
 	stalled: "an agent went quiet",
 	looping: "an agent repeated itself",
 };

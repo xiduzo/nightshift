@@ -189,6 +189,53 @@ describe("the scheduler switch", () => {
 	});
 });
 
+describe("anonymous usage", () => {
+	test("on by default, and the notice is unseen until the switch is saved", async () => {
+		const s = await store();
+		expect(s.current().usage).toBe(true);
+		expect(s.current().usageSeen).toBe(false);
+		expect(s.view().fields.usage).toMatchObject({
+			source: "default",
+			default: true,
+			env: "NIGHTSHIFT_USAGE",
+		});
+		await s.save({ usage: false });
+		expect(s.current().usage).toBe(false);
+		expect(s.current().usageSeen).toBe(true);
+	});
+
+	test("NIGHTSHIFT_USAGE beats the default, and a saved value beats it", async () => {
+		const s = await store({ NIGHTSHIFT_USAGE: "off" });
+		expect(s.current().usage).toBe(false);
+		expect(s.view().fields.usage.locked).toContain(
+			"anonymous usage turned off",
+		);
+		const open = await store({ NIGHTSHIFT_USAGE: "on" });
+		expect(open.current().usage).toBe(true);
+		expect(open.view().fields.usage.locked).toBeUndefined();
+		await open.save({ usage: false });
+		expect(open.current().usage).toBe(false);
+		expect(open.current().usageSeen).toBe(true);
+	});
+
+	test.each([
+		["DO_NOT_TRACK", "1"],
+		["DO_NOT_TRACK", " 1 "],
+		["OTEL_SDK_DISABLED", "true"],
+		["OTEL_SDK_DISABLED", "TRUE"],
+		["NIGHTSHIFT_USAGE", "OFF"],
+	])("%s=%s locks usage off over a saved true", async (name, raw) => {
+		const s = await store({ [name]: raw });
+		await s.save({ usage: true });
+		expect(s.current().usage).toBe(false);
+		expect(s.view().fields.usage.source).toBe("env");
+		expect(s.view().fields.usage.locked).toContain(
+			"anonymous usage turned off",
+		);
+		expect(s.current().usageSeen).toBe(true);
+	});
+});
+
 describe("automatic resume", () => {
 	test("on by default; NIGHTSHIFT_RESUME_INTERRUPTED_RUNS turns it off, and a saved value wins", async () => {
 		expect((await store()).run().resumeInterruptedRuns).toBe(true);

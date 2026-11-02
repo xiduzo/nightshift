@@ -273,6 +273,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				status: "stopped",
 				reason:
 					"Usage limit: You've hit your limit. It resets after the stop time, so the run stopped. Resume the run to continue.",
+				endReason: "agent.usage_limit",
 				atStopTime: true,
 			},
 		]);
@@ -303,6 +304,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				nodeId: "worker",
 				status: "stopped",
 				reason: STOP_TIME_REASON,
+				endReason: "stop_time",
 				atStopTime: true,
 			},
 		]);
@@ -626,6 +628,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 				nodeId: "pause",
 				status: "stopped",
 				reason: STOP_TIME_REASON,
+				endReason: "stop_time",
 				atStopTime: true,
 			},
 		]);

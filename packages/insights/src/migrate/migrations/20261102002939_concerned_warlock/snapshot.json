@@ -1,0 +1,456 @@
+{
+	"version": "8",
+	"dialect": "postgres",
+	"id": "840290c4-915e-43db-928d-77c6a51b5280",
+	"prevIds": ["00000000-0000-0000-0000-000000000000"],
+	"ddl": [
+		{
+			"isRlsEnabled": false,
+			"name": "usage_event",
+			"entityType": "tables",
+			"schema": "public"
+		},
+		{
+			"type": "bigserial",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "id",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "text",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "event_name",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "text",
+			"typeSchema": null,
+			"notNull": false,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "install_id",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "timestamp with time zone",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "event_time",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "text",
+			"typeSchema": null,
+			"notNull": false,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "service_version",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "text",
+			"typeSchema": null,
+			"notNull": false,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "os_type",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "text",
+			"typeSchema": null,
+			"notNull": false,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "host_arch",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "text",
+			"typeSchema": null,
+			"notNull": false,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "country",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"type": "jsonb",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "attributes",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"nameExplicit": true,
+			"columns": [
+				{
+					"value": "install_id",
+					"isExpression": false,
+					"asc": true,
+					"nullsFirst": false,
+					"opclass": null
+				},
+				{
+					"value": "event_time",
+					"isExpression": false,
+					"asc": true,
+					"nullsFirst": false,
+					"opclass": null
+				}
+			],
+			"isUnique": false,
+			"where": null,
+			"with": "",
+			"method": "btree",
+			"concurrently": false,
+			"name": "usage_event_install_time",
+			"entityType": "indexes",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"nameExplicit": true,
+			"columns": [
+				{
+					"value": "event_name",
+					"isExpression": false,
+					"asc": true,
+					"nullsFirst": false,
+					"opclass": null
+				},
+				{
+					"value": "event_time",
+					"isExpression": false,
+					"asc": true,
+					"nullsFirst": false,
+					"opclass": null
+				}
+			],
+			"isUnique": false,
+			"where": null,
+			"with": "",
+			"method": "btree",
+			"concurrently": false,
+			"name": "usage_event_name_time",
+			"entityType": "indexes",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"columns": ["id"],
+			"nameExplicit": false,
+			"name": "usage_event_pkey",
+			"schema": "public",
+			"table": "usage_event",
+			"entityType": "pks"
+		},
+		{
+			"value": "\"country\" IS NULL OR \"country\" ~ '^[A-Z0-9]{2}$'",
+			"name": "usage_event_country",
+			"entityType": "checks",
+			"schema": "public",
+			"table": "usage_event"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tinstall_id,\n\t\tevent_name,\n\t\tevent_time,\n\t\tservice_version,\n\t\tos_type,\n\t\thost_arch,\n\t\tcountry,\n\t\tattributes->>'nightshift.run.end_reason' AS end_reason,\n\t\tattributes->>'nightshift.run.status' AS run_status,\n\t\t(attributes->>'nightshift.run.cost_usd')::double precision AS cost_usd,\n\t\tattributes->>'nightshift.pull_request.outcome' AS pr_outcome,\n\t\t(attributes->>'nightshift.pull_request.hours')::double precision AS pr_hours,\n\t\tattributes->>'nightshift.gate.by' AS gate_by,\n\t\tattributes->>'nightshift.gate.via' AS gate_via,\n\t\t(attributes->>'nightshift.gate.wait')::double precision AS gate_wait,\n\t\t(attributes->>'nightshift.install.agents')::double precision AS agents,\n\t\tattributes->>'nightshift.install.entry' AS install_entry,\n\t\t(attributes->>'nightshift.install.host')::boolean AS install_host,\n\t\tattributes->>'nightshift.flow.from' AS flow_from,\n\t\tattributes->>'nightshift.flow.starter' AS flow_starter\n\tFROM \"usage_event\"\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_fact",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT agents::int AS agents, count(*)::int AS installs\n\tFROM (\n\t\tSELECT install_id, max(agents) AS agents\n\t\tFROM \"usage_fact\"\n\t\tWHERE event_name = 'nightshift.install.active' AND agents IS NOT NULL AND install_id IS NOT NULL\n\t\tGROUP BY install_id\n\t) per_install\n\tGROUP BY 1\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_agent_count",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tWITH installs AS (\n\t\tSELECT count(DISTINCT install_id)::int AS total\n\t\tFROM \"usage_fact\"\n\t\tWHERE install_id IS NOT NULL\n\t),\n\tmulti AS (\n\t\tSELECT count(*)::int AS n\n\t\tFROM (\n\t\t\tSELECT install_id\n\t\t\tFROM \"usage_fact\"\n\t\t\tWHERE event_name = 'nightshift.install.active' AND agents IS NOT NULL AND install_id IS NOT NULL\n\t\t\tGROUP BY install_id\n\t\t\tHAVING max(agents) >= 2\n\t\t) per_install\n\t)\n\tSELECT\n\t\tinstalls.total AS installs,\n\t\tmulti.n AS with_two_or_more,\n\t\tCASE\n\t\t\tWHEN installs.total = 0 THEN NULL\n\t\t\tELSE multi.n::double precision / installs.total\n\t\tEND AS share\n\tFROM installs\n\tCROSS JOIN multi\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_agent_share",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\t\tSELECT arch, count(*)::int AS installs\n\t\tFROM (\n\t\t\tSELECT DISTINCT ON (install_id) install_id, host_arch AS arch\n\t\t\tFROM \"usage_fact\"\n\t\t\tWHERE install_id IS NOT NULL AND host_arch IS NOT NULL AND (TRUE)\n\t\t\tORDER BY install_id, event_time DESC\n\t\t) picked\n\t\tGROUP BY 1\n\t",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_arch",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tWITH first_run AS (\n\t\tSELECT\n\t\t\tinstall_id,\n\t\t\tdate_trunc('week', min(event_time) AT TIME ZONE 'UTC') AS cohort\n\t\tFROM \"usage_fact\"\n\t\tWHERE event_name = 'nightshift.run.ended' AND install_id IS NOT NULL\n\t\tGROUP BY install_id\n\t),\n\truns AS (\n\t\tSELECT DISTINCT\n\t\t\tinstall_id,\n\t\t\tdate_trunc('week', event_time AT TIME ZONE 'UTC') AS week\n\t\tFROM \"usage_fact\"\n\t\tWHERE event_name = 'nightshift.run.ended' AND install_id IS NOT NULL\n\t)\n\tSELECT\n\t\tto_char(first_run.cohort, 'YYYY-MM-DD') AS week,\n\t\tcount(*)::int AS size,\n\t\tcount(*) FILTER (\n\t\t\tWHERE EXISTS (\n\t\t\t\tSELECT 1\n\t\t\t\tFROM runs\n\t\t\t\tWHERE runs.install_id = first_run.install_id\n\t\t\t\t\tAND runs.week = first_run.cohort + interval '4 weeks'\n\t\t\t)\n\t\t)::int AS retained_week_4,\n\t\tbool_or(\n\t\t\tfirst_run.cohort + interval '4 weeks'\n\t\t\t\t<= date_trunc('week', (now() AT TIME ZONE 'UTC'))\n\t\t) AS mature\n\tFROM first_run\n\tGROUP BY first_run.cohort\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_cohort",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\t\tSELECT entry, count(*)::int AS installs\n\t\tFROM (\n\t\t\tSELECT DISTINCT ON (install_id) install_id, install_entry AS entry\n\t\t\tFROM \"usage_fact\"\n\t\t\tWHERE install_id IS NOT NULL AND install_entry IS NOT NULL AND (event_name = 'nightshift.install.started')\n\t\t\tORDER BY install_id, event_time ASC\n\t\t) picked\n\t\tGROUP BY 1\n\t",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_entry",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tWITH daily AS (\n\t\tSELECT\n\t\t\tinstall_id,\n\t\t\t(event_time AT TIME ZONE 'UTC')::date AS day,\n\t\t\tcount(*)::double precision AS n\n\t\tFROM \"usage_event\"\n\t\tWHERE install_id IS NOT NULL\n\t\tGROUP BY 1, 2\n\t),\n\tmed AS (\n\t\tSELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY n) AS median_daily\n\t\tFROM daily\n\t)\n\tSELECT d.install_id\n\tFROM daily d\n\tCROSS JOIN med\n\tWHERE med.median_daily > 0 AND d.n > med.median_daily * 10\n\tGROUP BY d.install_id\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_flagged_install",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tinstall_id,\n\t\tstep_install,\n\t\tstep_agent,\n\t\tstep_project,\n\t\tstep_checked,\n\t\tstep_flow,\n\t\tstep_schedule,\n\t\tstep_run,\n\t\tstep_finished,\n\t\tstep_pull_request,\n\t\tstep_merged,\n\t\tCASE WHEN step_install IS NULL THEN 0 WHEN step_agent IS NULL THEN 1 WHEN step_project IS NULL THEN 2 WHEN step_checked IS NULL THEN 3 WHEN step_flow IS NULL THEN 4 WHEN step_schedule IS NULL THEN 5 WHEN step_run IS NULL THEN 6 WHEN step_finished IS NULL THEN 7 WHEN step_pull_request IS NULL THEN 8 WHEN step_merged IS NULL THEN 9 ELSE 10 END AS consecutive\n\tFROM (\n\t\tSELECT\n\t\t\tinstall_id,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.install.started') AS step_install,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.agent.checked') AS step_agent,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.project.added') AS step_project,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.project.checked') AS step_checked,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.flow.created') AS step_flow,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.schedule.changed') AS step_schedule,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.run.ended') AS step_run,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.run.ended' AND run_status = 'finished') AS step_finished,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.pull_request.opened') AS step_pull_request,\n\t\t\tmin(event_time) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'merged') AS step_merged\n\t\tFROM \"usage_fact\"\n\t\tWHERE install_id IS NOT NULL\n\t\tGROUP BY install_id\n\t) steps\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_funnel_install",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\t\tSELECT\n\t\t\t'install' AS step,\n\t\t\t1::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 1)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 1 AND 1 < 10)::int AS stopped,\n\t\t\tNULL::double precision AS median_seconds_from_install,\n\t\t\tNULL::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'agent' AS step,\n\t\t\t2::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 2)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 2 AND 2 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_agent - step_install))) FILTER (WHERE consecutive >= 2 AND step_install IS NOT NULL AND step_agent IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_agent - step_install))) FILTER (WHERE consecutive >= 2 AND step_install IS NOT NULL AND step_agent IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'project' AS step,\n\t\t\t3::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 3)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 3 AND 3 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_project - step_install))) FILTER (WHERE consecutive >= 3 AND step_install IS NOT NULL AND step_project IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_project - step_agent))) FILTER (WHERE consecutive >= 3 AND step_agent IS NOT NULL AND step_project IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'checked' AS step,\n\t\t\t4::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 4)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 4 AND 4 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_checked - step_install))) FILTER (WHERE consecutive >= 4 AND step_install IS NOT NULL AND step_checked IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_checked - step_project))) FILTER (WHERE consecutive >= 4 AND step_project IS NOT NULL AND step_checked IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'flow' AS step,\n\t\t\t5::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 5)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 5 AND 5 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_flow - step_install))) FILTER (WHERE consecutive >= 5 AND step_install IS NOT NULL AND step_flow IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_flow - step_checked))) FILTER (WHERE consecutive >= 5 AND step_checked IS NOT NULL AND step_flow IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'schedule' AS step,\n\t\t\t6::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 6)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 6 AND 6 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_schedule - step_install))) FILTER (WHERE consecutive >= 6 AND step_install IS NOT NULL AND step_schedule IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_schedule - step_flow))) FILTER (WHERE consecutive >= 6 AND step_flow IS NOT NULL AND step_schedule IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'run' AS step,\n\t\t\t7::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 7)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 7 AND 7 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_run - step_install))) FILTER (WHERE consecutive >= 7 AND step_install IS NOT NULL AND step_run IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_run - step_schedule))) FILTER (WHERE consecutive >= 7 AND step_schedule IS NOT NULL AND step_run IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'finished' AS step,\n\t\t\t8::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 8)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 8 AND 8 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_finished - step_install))) FILTER (WHERE consecutive >= 8 AND step_install IS NOT NULL AND step_finished IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_finished - step_run))) FILTER (WHERE consecutive >= 8 AND step_run IS NOT NULL AND step_finished IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'pull_request' AS step,\n\t\t\t9::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 9)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 9 AND 9 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_pull_request - step_install))) FILTER (WHERE consecutive >= 9 AND step_install IS NOT NULL AND step_pull_request IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_pull_request - step_finished))) FILTER (WHERE consecutive >= 9 AND step_finished IS NOT NULL AND step_pull_request IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t UNION ALL \n\t\tSELECT\n\t\t\t'merged' AS step,\n\t\t\t10::int AS step_order,\n\t\t\tcount(*) FILTER (WHERE consecutive >= 10)::int AS installs,\n\t\t\tcount(*) FILTER (WHERE consecutive = 10 AND 10 < 10)::int AS stopped,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_merged - step_install))) FILTER (WHERE consecutive >= 10 AND step_install IS NOT NULL AND step_merged IS NOT NULL))::double precision AS median_seconds_from_install,\n\t\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (step_merged - step_pull_request))) FILTER (WHERE consecutive >= 10 AND step_pull_request IS NOT NULL AND step_merged IS NOT NULL))::double precision AS median_seconds_from_previous\n\t\tFROM \"usage_funnel_install\"\n\t",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_funnel_step",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tcount(*) FILTER (WHERE gate_by = 'person')::int AS by_person,\n\t\tcount(*) FILTER (WHERE gate_by = 'deadline')::int AS by_deadline,\n\t\t(percentile_cont(0.5) WITHIN GROUP (ORDER BY gate_wait))::double precision AS median_wait_seconds,\n\t\tcount(*) FILTER (WHERE gate_via = 'phone')::int AS phone,\n\t\tcount(*) FILTER (WHERE gate_via = 'web')::int AS web,\n\t\tcount(*) FILTER (WHERE gate_via = 'lock_screen')::int AS lock_screen,\n\t\tcount(*) FILTER (\n\t\t\tWHERE gate_via IS NOT NULL\n\t\t\t\tAND gate_via <> 'phone'\n\t\t\t\tAND gate_via <> 'web'\n\t\t\t\tAND gate_via <> 'lock_screen'\n\t\t)::int AS other\n\tFROM \"usage_fact\"\n\tWHERE event_name = 'nightshift.gate.answered'\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_gates",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT g.guard, coalesce(seen.runs, 0)::int AS runs\n\tFROM (VALUES ('guard.budget'), ('guard.turns'), ('guard.looping'), ('guard.idle'), ('guard.max_steps')) AS g(guard)\n\tLEFT JOIN (\n\t\tSELECT end_reason AS guard, count(*)::int AS runs\n\t\tFROM \"usage_fact\"\n\t\tWHERE event_name = 'nightshift.run.ended' AND end_reason LIKE 'guard.%'\n\t\tGROUP BY 1\n\t) seen ON seen.guard = g.guard\n\tUNION ALL\n\tSELECT end_reason AS guard, count(*)::int AS runs\n\tFROM \"usage_fact\"\n\tWHERE event_name = 'nightshift.run.ended'\n\t\tAND end_reason LIKE 'guard.%'\n\t\tAND end_reason NOT IN ('guard.budget', 'guard.turns', 'guard.looping', 'guard.idle', 'guard.max_steps')\n\tGROUP BY 1\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_guard",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT host, count(*)::int AS installs\n\tFROM (\n\t\tSELECT DISTINCT ON (install_id) install_id, install_host AS host\n\t\tFROM \"usage_fact\"\n\t\tWHERE install_id IS NOT NULL\n\t\t\tAND event_name = 'nightshift.install.started'\n\t\t\tAND install_host IS NOT NULL\n\t\tORDER BY install_id, event_time ASC\n\t) picked\n\tGROUP BY 1\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_host",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT avg(nights::double precision / installs_with_runs) AS nights_per_week\n\tFROM (\n\tSELECT\n\t\tto_char(date_trunc('week', event_time AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS week,\n\t\tcount(DISTINCT install_id)::int AS active_installs,\n\t\tcount(DISTINCT install_id) FILTER (WHERE event_name = 'nightshift.run.ended')::int AS installs_with_runs,\n\t\tcount(DISTINCT (install_id, (event_time AT TIME ZONE 'UTC')::date)) FILTER (\n\t\t\tWHERE event_name = 'nightshift.run.ended'\n\t\t)::int AS nights\n\tFROM \"usage_fact\"\n\tWHERE install_id IS NOT NULL\n\tGROUP BY 1\n) weeks\n\tWHERE installs_with_runs > 0\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_nights_per_week",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\t\tSELECT os, count(*)::int AS installs\n\t\tFROM (\n\t\t\tSELECT DISTINCT ON (install_id) install_id, os_type AS os\n\t\t\tFROM \"usage_fact\"\n\t\t\tWHERE install_id IS NOT NULL AND os_type IS NOT NULL AND (TRUE)\n\t\t\tORDER BY install_id, event_time DESC\n\t\t) picked\n\t\tGROUP BY 1\n\t",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_os",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.opened')::int AS opened,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'merged')::int AS merged,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'closed')::int AS closed,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'reverted')::int AS reverted,\n\t\tcount(*) FILTER (\n\t\t\tWHERE event_name = 'nightshift.pull_request.outcome'\n\t\t\t\tAND pr_outcome = 'reverted'\n\t\t\t\tAND pr_hours <= 168\n\t\t)::int AS reverted_within_7_days,\n\t\tcoalesce(sum(cost_usd) FILTER (WHERE event_name = 'nightshift.run.ended'), 0)::double precision AS cost_usd\n\tFROM \"usage_fact\"\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_pull_request_totals",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tinstall_id,\n\t\tto_char(date_trunc('week', event_time AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS week,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.opened')::int AS opened,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'merged')::int AS merged,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'closed')::int AS closed,\n\t\tcount(*) FILTER (WHERE event_name = 'nightshift.pull_request.outcome' AND pr_outcome = 'reverted')::int AS reverted\n\tFROM \"usage_fact\"\n\tWHERE install_id IS NOT NULL AND (event_name = 'nightshift.pull_request.opened' OR event_name = 'nightshift.pull_request.outcome')\n\tGROUP BY 1, 2\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_pull_request_week",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT end_reason, count(*)::int AS runs\n\tFROM \"usage_fact\"\n\tWHERE event_name = 'nightshift.run.ended'\n\tGROUP BY 1\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_run_ending",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tto_char((event_time AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS night,\n\t\tcount(*)::int AS runs\n\tFROM \"usage_fact\"\n\tWHERE event_name = 'nightshift.run.ended'\n\tGROUP BY 1\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_run_night",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT flow_starter AS starter, flow_from AS from_source, count(*)::int AS installs\n\tFROM (\n\t\tSELECT DISTINCT ON (install_id) install_id, flow_starter, flow_from\n\t\tFROM \"usage_fact\"\n\t\tWHERE install_id IS NOT NULL AND event_name = 'nightshift.flow.created'\n\t\tORDER BY install_id, event_time ASC\n\t) picked\n\tGROUP BY 1, 2\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_starter",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tcount(DISTINCT install_id)::int AS active_installs,\n\t\tcount(DISTINCT (install_id, (event_time AT TIME ZONE 'UTC')::date)) FILTER (\n\t\t\tWHERE event_name = 'nightshift.run.ended'\n\t\t)::int AS nights_with_runs\n\tFROM \"usage_fact\"\n\tWHERE install_id IS NOT NULL\n\t\tAND date_trunc('week', event_time AT TIME ZONE 'UTC')\n\t\t\t= date_trunc('week', (now() AT TIME ZONE 'UTC'))\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_this_week",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\t(percentile_cont(0.5) WITHIN GROUP (\n\t\t\tORDER BY extract(epoch FROM (step_finished - step_install))\n\t\t) FILTER (\n\t\t\tWHERE step_install IS NOT NULL\n\t\t\t\tAND step_finished IS NOT NULL\n\t\t\t\tAND step_finished >= step_install\n\t\t))::double precision AS median_seconds_to_finished,\n\t\t(percentile_cont(0.5) WITHIN GROUP (\n\t\t\tORDER BY extract(epoch FROM (step_merged - step_install))\n\t\t) FILTER (\n\t\t\tWHERE step_install IS NOT NULL\n\t\t\t\tAND step_merged IS NOT NULL\n\t\t\t\tAND step_merged >= step_install\n\t\t))::double precision AS median_seconds_to_merged\n\tFROM \"usage_funnel_install\"\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_time_to_first",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\t\tSELECT version, count(*)::int AS installs\n\t\tFROM (\n\t\t\tSELECT DISTINCT ON (install_id) install_id, service_version AS version\n\t\t\tFROM \"usage_fact\"\n\t\t\tWHERE install_id IS NOT NULL AND service_version IS NOT NULL AND (TRUE)\n\t\t\tORDER BY install_id, event_time DESC\n\t\t) picked\n\t\tGROUP BY 1\n\t",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_version",
+			"entityType": "views",
+			"schema": "public"
+		},
+		{
+			"definition": "\n\tSELECT\n\t\tto_char(date_trunc('week', event_time AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS week,\n\t\tcount(DISTINCT install_id)::int AS active_installs,\n\t\tcount(DISTINCT install_id) FILTER (WHERE event_name = 'nightshift.run.ended')::int AS installs_with_runs,\n\t\tcount(DISTINCT (install_id, (event_time AT TIME ZONE 'UTC')::date)) FILTER (\n\t\t\tWHERE event_name = 'nightshift.run.ended'\n\t\t)::int AS nights\n\tFROM \"usage_fact\"\n\tWHERE install_id IS NOT NULL\n\tGROUP BY 1\n",
+			"with": null,
+			"withNoData": null,
+			"using": null,
+			"tablespace": null,
+			"materialized": false,
+			"name": "usage_week",
+			"entityType": "views",
+			"schema": "public"
+		}
+	],
+	"renames": []
+}

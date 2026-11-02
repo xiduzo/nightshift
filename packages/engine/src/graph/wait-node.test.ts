@@ -137,6 +137,7 @@ describe("the Wait node", () => {
 				status: "failed",
 				reason:
 					'Node "at" failed: The time "after lunch" is not valid. Write a date and time like 2026-10-18T07:00, or a time like 07:00.',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(state.nodes.at).toEqual({

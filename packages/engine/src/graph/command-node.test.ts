@@ -214,6 +214,7 @@ describe("the Command node", () => {
 				status: "failed",
 				reason:
 					'Node "check" ended with "fail" and no edge leaves it on that outcome.',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(state.nodes.check).toEqual({
@@ -245,6 +246,7 @@ describe("the Command node", () => {
 				nodeId: "slow",
 				status: "stopped",
 				reason: null,
+				endReason: "stopped_by_person",
 			},
 		]);
 		// Killed: no exit code, only the tail.

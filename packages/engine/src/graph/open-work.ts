@@ -5,6 +5,7 @@ import {
 	type DerivedStep,
 	type EnginePayloads,
 	getRunRow,
+	provedEndReason,
 	type RunBus,
 	type RunLog,
 	type RunRow,
@@ -219,7 +220,16 @@ export function closingEvents(
 	if (open.endsRun) {
 		closing.push({
 			type: "RunEnded",
-			payload: { status: rule.run, reason },
+			payload: {
+				status: rule.run,
+				reason,
+				endReason: provedEndReason({
+					status: rule.run,
+					reason,
+					guard:
+						cut.kind === "overdue" && cut.reason === "idle" ? "idle" : null,
+				}),
+			},
 		});
 	}
 	return closing;

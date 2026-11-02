@@ -70,6 +70,7 @@ export const PERSON_FIELDS = {
 	StopAfterStepCancelled: [],
 	RunEnded: [],
 	RunWarned: [],
+	PullRequestOpened: [],
 	Scored: [],
 	ScheduleFired: [],
 	ScheduleSkipped: [],

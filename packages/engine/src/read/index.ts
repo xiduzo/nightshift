@@ -13,6 +13,7 @@ export {
 } from "./read-model";
 export type { RunBundleSummary } from "./run-bundle";
 export { exportRun } from "./run-bundle";
+export { pullRequestOf } from "./run-metrics";
 export type { RunTrace } from "./run-trace";
 export type { FeedStep } from "./run-transcript";
 export {

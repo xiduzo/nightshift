@@ -1,0 +1,178 @@
+file_format: definition/2
+spans:
+  - type: nightshift.step
+    kind: internal
+    name:
+      note: The span name is nightshift.step plus the node id.
+      templates:
+        - pattern: "nightshift.step {nightshift.node.id}"
+          attributes: [nightshift.node.id]
+    brief: A Command step, a Tool step, or any other step the flow runs.
+    note: >
+      The span name is `nightshift.step {nightshift.node.id}`.
+      This is not gen_ai.execute_tool. execute_tool is a tool an agent calls.
+    stability: development
+    attributes:
+      - ref: nightshift.node.kind
+        requirement_level: required
+      - ref: nightshift.node.id
+        requirement_level: required
+      - ref: nightshift.step.id
+        requirement_level: recommended
+      - ref: nightshift.step.visit
+        requirement_level: recommended
+      - ref: nightshift.step.outcome
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.run.id
+        requirement_level: recommended
+      - ref: gen_ai.conversation.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+      - ref: nightshift.knowledge.searches
+        requirement_level: recommended
+      - ref: nightshift.knowledge.reads
+        requirement_level: recommended
+      - ref: error.type
+        requirement_level:
+          conditionally_required: If the step failed.
+
+  - type: nightshift.gate
+    kind: internal
+    name:
+      note: The span name is gate plus the node id.
+      templates:
+        - pattern: "gate {nightshift.node.id}"
+          attributes: [nightshift.node.id]
+    brief: A Gate waiting for a person.
+    note: The span name is `gate {nightshift.node.id}`.
+    stability: development
+    attributes:
+      - ref: nightshift.node.id
+        requirement_level: required
+      - ref: nightshift.gate.wait_ms
+        requirement_level: recommended
+      - ref: nightshift.step.id
+        requirement_level: recommended
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.run.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+
+  - type: nightshift.wait
+    kind: internal
+    name:
+      note: The span name is wait plus the reason.
+      templates:
+        - pattern: "wait {nightshift.wait.reason}"
+          attributes: [nightshift.wait.reason]
+    brief: A step sleeping.
+    note: The span name is `wait {nightshift.wait.reason}`.
+    stability: development
+    attributes:
+      - ref: nightshift.wait.reason
+        requirement_level: recommended
+      - ref: nightshift.step.id
+        requirement_level: recommended
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.run.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+
+span_refinements:
+  - id: nightshift.invoke_workflow
+    ref: gen_ai.invoke_workflow.internal
+    brief: A Night Shift run.
+    note: >
+      The span name is `invoke_workflow {gen_ai.workflow.name}`.
+      The person's export may set gen_ai.workflow.name to the flow name.
+    stability: development
+    attributes:
+      - ref: gen_ai.workflow.name
+        requirement_level: required
+      - ref: gen_ai.operation.name
+        requirement_level: required
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.run.id
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+      - ref: nightshift.run.trigger
+        requirement_level: recommended
+      - ref: nightshift.run.status
+        requirement_level: recommended
+      - ref: nightshift.run.reason
+        requirement_level: recommended
+      - ref: nightshift.run.resumed
+        requirement_level: recommended
+      - ref: error.type
+        requirement_level:
+          conditionally_required: If the run failed.
+
+  - id: nightshift.invoke_agent
+    ref: gen_ai.invoke_agent.internal
+    brief: An Agent step of a Night Shift flow.
+    note: >
+      The span name is `invoke_agent {gen_ai.agent.name}`.
+      gen_ai.provider.name is required.
+      gen_ai.agent.name is the node id of the Agent step.
+    stability: development
+    attributes:
+      - ref: gen_ai.provider.name
+        requirement_level: required
+      - ref: gen_ai.agent.name
+        requirement_level: required
+      - ref: gen_ai.operation.name
+        requirement_level: required
+      - ref: gen_ai.request.model
+        requirement_level: recommended
+      - ref: gen_ai.usage.input_tokens
+        requirement_level: recommended
+      - ref: gen_ai.usage.output_tokens
+        requirement_level: recommended
+      - ref: gen_ai.usage.cache_read.input_tokens
+        requirement_level: recommended
+      - ref: gen_ai.usage.cache_write.input_tokens
+        requirement_level: recommended
+      - ref: nightshift.agent
+        requirement_level: recommended
+      - ref: nightshift.node.id
+        requirement_level: recommended
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.step.id
+        requirement_level: recommended
+      - ref: nightshift.step.visit
+        requirement_level: recommended
+      - ref: nightshift.step.outcome
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.run.id
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+      - ref: nightshift.knowledge.searches
+        requirement_level: recommended
+      - ref: nightshift.knowledge.reads
+        requirement_level: recommended
+      - ref: error.type
+        requirement_level:
+          conditionally_required: If the step failed.

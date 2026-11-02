@@ -13,6 +13,8 @@ import {
 	type GateDeadline,
 	type InputValues,
 	NO_COST,
+	provedEndReason,
+	type RunEndReason,
 	type RunResult,
 	type RunRow,
 	type RunState,
@@ -68,17 +70,31 @@ export function deriveRunState(run: RunState): {
 	status: RunStatus;
 	reason: string | null;
 	result: RunResult | null;
+	endReason: RunEndReason | null;
 } {
 	const { latest } = run;
-	if (!latest) return { status: "interrupted", reason: null, result: null };
+	const open = (status: RunStatus) => ({
+		status,
+		reason: null,
+		result: null,
+		endReason: null,
+	});
+	if (!latest) return open("interrupted");
 	if (latest.ended) {
+		const ended = latest.ended;
 		return {
-			status: latest.ended.status,
-			reason: latest.ended.reason,
-			result: latest.ended.result ?? null,
+			status: ended.status,
+			reason: ended.reason,
+			result: ended.result ?? null,
+			endReason:
+				ended.endReason ??
+				provedEndReason({
+					status: ended.status,
+					reason: ended.reason,
+					result: ended.result ?? null,
+				}),
 		};
 	}
-	const open = (status: RunStatus) => ({ status, reason: null, result: null });
 	if (deriveOpenGate(run)) return open("waiting");
 	if (deriveSleep(run)) return open("sleeping");
 	return open("running");

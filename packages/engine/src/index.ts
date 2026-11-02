@@ -134,6 +134,7 @@ export {
 	MissingProjectError,
 	parseTranscript,
 	pullRequestOutcome,
+	RUN_END_REASONS,
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,
 } from "./log";
@@ -190,4 +191,5 @@ export type {
 	SchedulePause,
 	WebhookAnswer,
 } from "./schedules";
+export type { UsageMoment, UsageNotes } from "./usage";
 export type { KeptValue } from "./variables";

@@ -1,5 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
+import type { UsageNotes } from "../usage";
 import { type Git, systemGit } from "./git";
 import { parseGitHubRepo } from "./github";
 import type { GitHubClones } from "./github-clone";
@@ -69,6 +70,8 @@ export function createProjectCopies(deps: {
 	git?: Git;
 	intervalMs?: number;
 	now?: () => number;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 }): ProjectCopies {
 	const git = deps.git ?? systemGit();
 	const now = deps.now ?? timeNow;
@@ -131,6 +134,12 @@ export function createProjectCopies(deps: {
 			);
 		}
 		await space.addProject({ repoPath: end.path });
+		deps.usage?.note({
+			kind: "project-added",
+			source: "github",
+			hasRemote: true,
+			starters: 0,
+		});
 		failed.delete(project.id);
 		return null;
 	}

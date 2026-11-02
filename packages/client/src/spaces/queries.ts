@@ -12,5 +12,7 @@ export function createSpaceQueries(orpc: ApiQueryUtils) {
 		/** One invitation, as its link shows it. */
 		invitation: (invitationId: string) =>
 			orpc.invitations.get.queryOptions({ input: { invitationId } }),
+		/** Turns anonymous usage on or off for every computer in this Space. */
+		setUsage: () => orpc.spaces.setUsage.mutationOptions(),
 	};
 }

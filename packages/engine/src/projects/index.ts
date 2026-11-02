@@ -2,6 +2,7 @@
 
 export type { Git } from "./git";
 export { systemGit } from "./git";
+export type { PullRequestReader, PullRequestView } from "./github";
 export { moveSpaceEntries, type ProjectTarget } from "./moved-entries";
 export { checkProjectFolder } from "./project-setup";
 export type { ListedProject, Project, Projects } from "./projects";
@@ -18,7 +19,12 @@ export {
 	type RunCopyState,
 } from "./run-branches";
 export type { SpaceDocuments } from "./space-document";
-export { createSpaceDocuments, memberName } from "./space-document";
+export {
+	createSpaceDocuments,
+	memberName,
+	setSpaceUsage,
+	spaceUsageOn,
+} from "./space-document";
 export { forgetSpaceRows, spaceMoveBatch, spaceRunIds } from "./space-rows";
 export { createWorktreeSnapshots } from "./worktree-changes";
 export type { Branches } from "./worktrees";

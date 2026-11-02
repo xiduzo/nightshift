@@ -151,6 +151,7 @@ export const cliCheckSchema = exact<CliCheck>()(
 		path: z.string().nullable(),
 		version: z.string().nullable(),
 		account: z.string().nullable(),
+		signIn: z.enum(["signed_in", "signed_out", "unknown"]),
 		facts: z.array(z.object({ label: z.string(), value: z.string() })),
 		/** Why it cannot run Night Shift's sessions. Null when it can. */
 		problem: z.string().nullable(),

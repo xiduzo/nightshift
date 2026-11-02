@@ -1,12 +1,13 @@
-import type {
-	Artifact,
-	OwnDevice,
-	Placement,
-	RunDetail,
-	RunStreamItem,
-	RunSummary,
-	StepDetail,
-	TranscriptEntry,
+import {
+	type Artifact,
+	type OwnDevice,
+	type Placement,
+	RUN_END_REASONS,
+	type RunDetail,
+	type RunStreamItem,
+	type RunSummary,
+	type StepDetail,
+	type TranscriptEntry,
 } from "@nightshift/engine";
 import {
 	askFormSchema,
@@ -36,11 +37,12 @@ export const runStatusSchema = z.enum([
 
 /**
  * What a run warning is about: a cost that is not known, or a guard of the
- * run policy (the budget or a turn limit, no activity, a loop).
+ * run policy (the budget, a turn limit, no activity, a loop).
  */
 const runWarningKindSchema = z.enum([
 	"cost-unknown",
 	"budget",
+	"turns",
 	"stalled",
 	"looping",
 ]);
@@ -156,6 +158,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		baseRef: z.string(),
 		status: runStatusSchema,
 		reason: z.string().nullable(),
+		endReason: z.enum(RUN_END_REASONS).nullable().optional(),
 		result: runResultSchema.nullable(),
 		wakeAt: z.number().nullable(),
 		signal: z.string().nullable(),
@@ -320,6 +323,7 @@ export const runDetailSchema = exact<RunDetail>()(
 					"run.stop",
 					"run.move",
 					"lease.release",
+					"run.useful",
 				]),
 				createdAt: z.number(),
 			}),

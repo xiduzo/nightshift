@@ -1,0 +1,109 @@
+# Collector in front of Night Shift Insights.
+#
+# Night Shift sends OTLP HTTP logs. This pipeline limits the body.
+# It drops every attribute the usage export does not send.
+# It batches the rest. It posts JSON to the app on port 8788.
+# scripts/check-collector-allowlist.ts checks allowed_keys.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        # 256 KB. The limit applies to the bytes received and, for gzip,
+        # to the decompressed body.
+        max_request_body_size: 262144
+        # Client headers stay here. The HTTP server logs errors only.
+        # It has no switch that logs each request.
+        include_metadata: false
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  redaction:
+    allow_all_keys: false
+    # Silent: a summary would add attributes the app refuses.
+    summary: silent
+    # Generated from @nightshift/semconv and the usage export.
+    # Do not edit this list by hand.
+    allowed_keys:
+      - error.type
+      - event.name
+      - gen_ai.provider.name
+      - gen_ai.usage.cache_read.input_tokens
+      - gen_ai.usage.cache_write.input_tokens
+      - gen_ai.usage.input_tokens
+      - gen_ai.usage.output_tokens
+      - host.arch
+      - nightshift.agent.harness
+      - nightshift.agent.installed
+      - nightshift.agent.signed_in
+      - nightshift.cost.basis
+      - nightshift.flow.from
+      - nightshift.flow.id
+      - nightshift.flow.starter
+      - nightshift.gate.by
+      - nightshift.gate.has_deadline
+      - nightshift.gate.is_form
+      - nightshift.gate.via
+      - nightshift.gate.wait
+      - nightshift.host.paired
+      - nightshift.install.agents
+      - nightshift.install.entry
+      - nightshift.install.host
+      - nightshift.install.members
+      - nightshift.install.spaces
+      - nightshift.model.family
+      - nightshift.node.kind
+      - nightshift.phone.signed_in
+      - nightshift.project.check.commit
+      - nightshift.project.check.folder
+      - nightshift.project.check.git
+      - nightshift.project.check.identity
+      - nightshift.project.check.tools
+      - nightshift.project.has_remote
+      - nightshift.project.source
+      - nightshift.project.starters
+      - nightshift.pull_request.hours
+      - nightshift.pull_request.outcome
+      - nightshift.pull_request.useful
+      - nightshift.run.cost_usd
+      - nightshift.run.duration
+      - nightshift.run.end_reason
+      - nightshift.run.id
+      - nightshift.run.node_kinds
+      - nightshift.run.status
+      - nightshift.run.trigger
+      - nightshift.schedule.enabled
+      - nightshift.schedule.score_pull_requests
+      - nightshift.schedule.skip_reason
+      - nightshift.schedule.webhook
+      - nightshift.step.guard
+      - nightshift.step.result
+      - nightshift.step.visit
+      - os.type
+      - service.instance.id
+      - service.name
+      - service.version
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+exporters:
+  # OTLP/HTTP JSON. The collector name is otlp_http.
+  # otlphttp is the old name of this exporter.
+  # The exporter appends /v1/logs. The app reads JSON and does not
+  # decompress a body, so compression stays off.
+  otlp_http:
+    endpoint: http://insights:8788
+    encoding: json
+    compression: none
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, batch]
+      exporters: [otlp_http]

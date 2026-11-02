@@ -24,6 +24,6 @@ export {
 	stopOlderDocuments,
 } from "./hot";
 export { DEFAULT_PORT, DESKTOP_PORT, daemonPort } from "./port";
-export { guardProcess } from "./process-guard";
+export { guardProcess, onProcessCrashed } from "./process-guard";
 export { boundedStop, stopOnSignals } from "./signals";
 export { notifySystemd } from "./systemd";

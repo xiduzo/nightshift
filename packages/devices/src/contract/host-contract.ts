@@ -141,6 +141,7 @@ const runCommandInput = z.discriminatedUnion("kind", [
 			note: z.string().optional(),
 			/** The answer to an Ask (ADR 10): the data of its form. */
 			data: z.json().optional(),
+			via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
 		}),
 	}),
 	z.object({
@@ -164,6 +165,11 @@ const runCommandInput = z.discriminatedUnion("kind", [
 		runId: z.string().min(1),
 		kind: z.literal("lease.release"),
 		payload: z.object({ name: z.string().min(1).max(500) }),
+	}),
+	z.object({
+		runId: z.string().min(1),
+		kind: z.literal("run.useful"),
+		payload: z.object({ useful: z.boolean() }),
 	}),
 ]);
 

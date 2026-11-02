@@ -59,9 +59,12 @@ export const gateAnswerSchema = z.object({
 	/** The answer to an Ask: the data of its form. It must match the form. */
 	data: z.json().optional(),
 	/**
-	 * `lock-screen`: the answer comes from a button on a notification,
-	 * without an unlock. Only a Gate its author marked for the lock screen
-	 * takes it.
+	 * Where the answer comes from. `lock-screen` is the older name of
+	 * `lock_screen`: a button on a notification, without an unlock. Only a
+	 * Gate its author marked for the lock screen takes that one. Omit it
+	 * and Night Shift records the answer without a place.
 	 */
-	via: z.enum(["lock-screen"]).optional(),
+	via: z
+		.enum(["web", "phone", "lock_screen", "lock-screen", "_OTHER"])
+		.optional(),
 });

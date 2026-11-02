@@ -12,7 +12,9 @@ import {
 import type { Device } from "../device";
 import {
 	leavingHolds,
+	provedEndReason,
 	type Scope,
+	type StepGuard,
 	type StepOutcome,
 	type StepOutputs,
 } from "../log";
@@ -56,6 +58,8 @@ export type StepEnd = {
 	outcome: StepOutcome;
 	outputs: StepOutputs;
 	error: string | null;
+	/** The guard that stopped the step, when one did. */
+	guard?: StepGuard;
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
 	/** The variables the step's writes changed (`StepEnded.variables`). */
@@ -87,6 +91,12 @@ export function parkCommand(input: {
 		prompt: null,
 		status: input.status,
 		reason: input.reason,
+		endReason: provedEndReason({
+			status: input.status,
+			reason: input.reason,
+			atStopTime: input.atStopTime,
+			guard: step?.guard,
+		}),
 		...(input.atStopTime ? { atStopTime: true } : {}),
 	};
 	return new Command({
@@ -461,6 +471,9 @@ export function parkNode(node: FlowNode): NodeAction {
 			nodeId: node.id,
 			status: pending.status,
 			reason: pending.reason,
+			...(pending.endReason !== undefined
+				? { endReason: pending.endReason }
+				: {}),
 			...(pending.atStopTime ? { atStopTime: true } : {}),
 		}),
 		answer: (pending, answer) => {

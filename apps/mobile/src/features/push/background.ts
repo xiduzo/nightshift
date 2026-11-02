@@ -18,6 +18,7 @@ import { updateGlance } from "@/features/glance";
 import { savedHost } from "@/features/host";
 import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
+import { lockScreenAnswer } from "./lock-answer";
 import { answerOfAction, showInFront, taskDataOf } from "./push-data";
 import { dismissKey, dismissOne } from "./shown";
 
@@ -50,10 +51,10 @@ async function answerFromButton(
 	try {
 		const host = await savedHost();
 		if (!host) throw new Error("This phone has no Host.");
-		const result = await answerGate(host.client, {
-			...answer,
-			via: "lock-screen",
-		});
+		const result = await answerGate(
+			host.client,
+			lockScreenAnswer(answer) as unknown as Parameters<typeof answerGate>[1],
+		);
 		if (result.kind === "refused" && result.refusal === "needs-app") {
 			await tellAnswerInApp(data);
 		} else if (result.kind === "refused" && result.refusal !== "closed") {

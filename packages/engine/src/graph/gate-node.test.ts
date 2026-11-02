@@ -214,7 +214,13 @@ describe("the Gate node", () => {
 		const after = await h.events();
 		// The answer is scored on the Gate's step: what it took, and who chose.
 		expect(payloads(after, "Scored")).toEqual([
-			{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+			{
+				score: "gate_decision",
+				value: 1,
+				label: "approve",
+				by: "person",
+				via: "_OTHER",
+			},
 		]);
 		expect(after.find((e) => e.type === "Scored")?.stepId).toBe(stepId);
 		expect(payloads(after, "StepEnded")[0]).toEqual({
@@ -580,6 +586,7 @@ describe("the Gate node", () => {
 				status: "failed",
 				reason:
 					'Node "gate" failed: "maybe" is not an option of this node. Choose one of: approve, reject.',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(payloads(await h.events(), "StepEnded")).toEqual([
@@ -610,6 +617,7 @@ describe("the Gate node", () => {
 				nodeId: "gate",
 				status: "failed",
 				reason: 'Node "gate" failed: The Gate could not open: disk full',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(await h.types()).toEqual(["RunStarted", "StepStarted", "StepEnded"]);
@@ -637,6 +645,7 @@ describe("the Gate node", () => {
 				nodeId: "gate",
 				status: "stopped",
 				reason: "Stopped after the running step, as asked.",
+				endReason: "stopped_by_person",
 			},
 		]);
 		expect(await h.types()).toEqual(["RunStarted", "StopAfterStepRequested"]);

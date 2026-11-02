@@ -43,6 +43,18 @@ export const spaces = {
 		.output(output(z.object({ id: z.string() })))
 		.input(z.object({ name: z.string().trim().min(1).max(60) }))
 		.handler(({ context, input }) => context.access.createSpace(input.name)),
+	/** Anonymous usage for every computer in this Space. Missing means on. */
+	setUsage: permitted({ space: ["settings"] })
+		.route({
+			summary:
+				"Turns anonymous usage on or off for every computer in this Space.",
+		})
+		.input(z.object({ enabled: z.boolean() }))
+		.output(output(z.object({ enabled: z.boolean() })))
+		.handler(async ({ context, input }) => {
+			await context.space.setUsage(input.enabled);
+			return { enabled: input.enabled };
+		}),
 };
 
 const role = roleSchema;

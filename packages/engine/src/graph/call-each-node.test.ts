@@ -904,6 +904,7 @@ describe("the Call node with each", () => {
 				nodeId: "worker",
 				status: "stopped",
 				reason: null,
+				endReason: "stopped_by_person",
 			},
 		]);
 		expect(first.next).toEqual(["loop"]);
@@ -1044,6 +1045,7 @@ describe("the Call node with each", () => {
 				nodeId: "worker",
 				status: "failed",
 				reason,
+				endReason: "guard.max_steps",
 			},
 		]);
 		expect(first.next).toEqual(["loop"]);
@@ -1126,6 +1128,7 @@ describe("the Call node with each", () => {
 				nodeId: "loop",
 				status: "stopped",
 				reason: "Stopped after the running step, as asked.",
+				endReason: "stopped_by_person",
 			},
 		]);
 		expect(first.next).toEqual(["park__loop"]);

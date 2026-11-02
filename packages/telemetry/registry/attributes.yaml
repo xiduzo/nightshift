@@ -1,0 +1,405 @@
+file_format: definition/2
+attributes:
+  - key: nightshift.project.id
+    type: string
+    brief: The project a run belongs to.
+    stability: development
+  - key: nightshift.flow.id
+    type: string
+    brief: The flow a run started from. A usage event sends a hash, not the name.
+    stability: development
+  - key: nightshift.run.id
+    type: string
+    brief: The run. A usage event sends a hash, not a name.
+    stability: development
+  - key: nightshift.step.id
+    type: string
+    brief: The step.
+    stability: development
+  - key: nightshift.node.id
+    type: string
+    brief: The node in the flow.
+    stability: development
+  - key: nightshift.node.kind
+    type:
+      members:
+        - { id: agent, value: agent, brief: An Agent step., stability: development }
+        - { id: command, value: command, brief: A Command step., stability: development }
+        - { id: decision, value: decision, brief: A Decision step., stability: development }
+        - { id: call, value: call, brief: A Call step., stability: development }
+        - { id: value, value: value, brief: A Value step., stability: development }
+        - { id: wait, value: wait, brief: A Wait step., stability: development }
+        - { id: tool, value: tool, brief: A Tool step the flow runs., stability: development }
+        - { id: end, value: end, brief: An End step., stability: development }
+        - { id: join, value: join, brief: A Join step., stability: development }
+        - { id: lease, value: lease, brief: A Lease step., stability: development }
+        - { id: service, value: service, brief: A Service step., stability: development }
+        - { id: other, value: _OTHER, brief: A node kind outside this list., stability: development }
+    brief: The kind of node.
+    stability: development
+  - key: nightshift.step.visit
+    type: int
+    brief: Which visit of the node this is. The first visit is 1.
+    stability: development
+  - key: nightshift.step.outcome
+    type: string
+    brief: How the step ended. A flow may name its own outcome.
+    stability: development
+  - key: nightshift.step.result
+    type:
+      members:
+        - { id: pass, value: pass, brief: The step passed., stability: development }
+        - { id: error, value: error, brief: The step errored., stability: development }
+        - { id: stopped, value: stopped, brief: A person stopped the run., stability: development }
+        - { id: interrupted, value: interrupted, brief: The step was interrupted., stability: development }
+        - { id: other, value: _OTHER, brief: An outcome outside this list., stability: development }
+    brief: How a step ended, as a closed list for a usage event.
+    stability: development
+  - key: nightshift.agent
+    type: string
+    brief: The harness that ran an Agent step.
+    stability: development
+  - key: nightshift.agent.harness
+    type:
+      members:
+        - { id: claude_code, value: claude-code, brief: Claude Code., stability: development }
+        - { id: opencode, value: opencode, brief: OpenCode., stability: development }
+        - { id: codex, value: codex, brief: Codex., stability: development }
+        - { id: grok_build, value: grok-build, brief: Grok Build., stability: development }
+        - { id: copilot, value: copilot, brief: GitHub Copilot., stability: development }
+        - { id: gemini, value: gemini, brief: Gemini CLI., stability: development }
+        - { id: cursor, value: cursor, brief: Cursor., stability: development }
+        - { id: pi, value: pi, brief: pi., stability: development }
+        - { id: other, value: _OTHER, brief: A harness outside this list., stability: development }
+    brief: The harness a check or a usage event names.
+    stability: development
+  - key: nightshift.agent.installed
+    type: boolean
+    brief: Whether the harness is installed on this computer.
+    stability: development
+  - key: nightshift.agent.signed_in
+    type:
+      members:
+        - { id: signed_in, value: signed_in, brief: The harness has a login., stability: development }
+        - { id: signed_out, value: signed_out, brief: The harness has no login., stability: development }
+        - { id: unknown, value: unknown, brief: Night Shift cannot tell., stability: development }
+    brief: Whether the person is signed in to the harness.
+    stability: development
+  - key: nightshift.device.id
+    type: string
+    brief: This computer, as Hosts and pairing know it.
+    stability: development
+  - key: nightshift.run.trigger
+    type:
+      members:
+        - { id: manual, value: manual, brief: A person started the run., stability: development }
+        - { id: schedule, value: schedule, brief: A schedule started the run., stability: development }
+        - { id: webhook, value: webhook, brief: A webhook started the run., stability: development }
+        - { id: other, value: _OTHER, brief: A trigger outside this list., stability: development }
+    brief: What started the run.
+    stability: development
+  - key: nightshift.run.status
+    type:
+      members:
+        - { id: finished, value: finished, brief: The run finished., stability: development }
+        - { id: failed, value: failed, brief: The run failed., stability: development }
+        - { id: stopped, value: stopped, brief: A person stopped the run., stability: development }
+        - { id: interrupted, value: interrupted, brief: The run was interrupted., stability: development }
+        - { id: other, value: _OTHER, brief: A status outside this list., stability: development }
+    brief: How the run ended.
+    stability: development
+  - key: nightshift.run.reason
+    type: string
+    brief: The words Night Shift keeps for why a run ended. The person's export only.
+    stability: development
+  - key: nightshift.run.end_reason
+    type:
+      members:
+        - { id: finished, value: finished, brief: The run finished., stability: development }
+        - { id: guard_budget, value: guard.budget, brief: The cost cap stopped the run., stability: development }
+        - { id: guard_turns, value: guard.turns, brief: The turn cap stopped the run., stability: development }
+        - { id: guard_looping, value: guard.looping, brief: The looping guard stopped the run., stability: development }
+        - { id: guard_idle, value: guard.idle, brief: The idle guard stopped the run., stability: development }
+        - { id: guard_max_steps, value: guard.max_steps, brief: The step cap stopped the run., stability: development }
+        - { id: stop_time, value: stop_time, brief: The stop time ended the run., stability: development }
+        - { id: agent_usage_limit, value: agent.usage_limit, brief: The agent hit a usage limit., stability: development }
+        - { id: agent_network, value: agent.network, brief: The network stopped the agent., stability: development }
+        - { id: agent_signed_out, value: agent.signed_out, brief: The agent was signed out., stability: development }
+        - { id: stopped_by_person, value: stopped_by_person, brief: A person stopped the run., stability: development }
+        - { id: other, value: _OTHER, brief: A reason outside this list., stability: development }
+    brief: Why a run ended, as a closed list.
+    stability: development
+  - key: nightshift.run.resumed
+    type: boolean
+    brief: Whether this end is a later end of a resumed run.
+    stability: development
+  - key: nightshift.run.duration
+    type: double
+    brief: How long the run took, in seconds.
+    stability: development
+  - key: nightshift.run.cost_usd
+    type: double
+    brief: What the run cost, in US dollars.
+    note: The metric of the same name is the counter. This attribute is the amount on a usage event.
+    stability: development
+  - key: nightshift.run.node_kinds
+    type: string[]
+    brief: The node kinds the run used.
+    stability: development
+  - key: nightshift.cost.basis
+    type:
+      members:
+        - { id: billed, value: billed, brief: The provider reported the cost., stability: development }
+        - { id: estimated, value: estimated, brief: Night Shift priced the tokens., stability: development }
+        - { id: unknown, value: unknown, brief: The cost is not known., stability: development }
+    brief: How sure a cost is.
+    stability: development
+  - key: nightshift.gate.wait_ms
+    type: int
+    brief: How long a Gate waited for a person, in milliseconds.
+    stability: development
+  - key: nightshift.gate.wait
+    type: double
+    brief: How long a Gate waited for a person, in seconds.
+    stability: development
+  - key: nightshift.gate.by
+    type:
+      members:
+        - { id: person, value: person, brief: A person answered., stability: development }
+        - { id: deadline, value: deadline, brief: The deadline answered., stability: development }
+    brief: Who answered a Gate.
+    stability: development
+  - key: nightshift.gate.via
+    type:
+      members:
+        - { id: web, value: web, brief: The web app., stability: development }
+        - { id: phone, value: phone, brief: The phone., stability: development }
+        - { id: lock_screen, value: lock_screen, brief: The lock screen., stability: development }
+        - { id: other, value: _OTHER, brief: A place outside this list., stability: development }
+    brief: Where a person answered a Gate.
+    stability: development
+  - key: nightshift.gate.has_deadline
+    type: boolean
+    brief: Whether the Gate had a deadline.
+    stability: development
+  - key: nightshift.gate.is_form
+    type: boolean
+    brief: Whether the Gate asked for a form.
+    stability: development
+  - key: nightshift.wait.reason
+    type: string
+    brief: Why a step slept.
+    stability: development
+  - key: nightshift.knowledge.searches
+    type: int
+    brief: How often the step searched the project's knowledge.
+    stability: development
+  - key: nightshift.knowledge.reads
+    type: int
+    brief: How often the step read a file of the project's knowledge.
+    stability: development
+  - key: nightshift.score.name
+    type: string
+    brief: Which score this point is.
+    stability: development
+  - key: nightshift.score.label
+    type: string
+    brief: The label of a score.
+    stability: development
+  - key: nightshift.score.by
+    type:
+      members:
+        - { id: person, value: person, brief: A person chose., stability: development }
+        - { id: deadline, value: deadline, brief: The deadline chose., stability: development }
+    brief: Who chose a Gate answer that became a score.
+    stability: development
+  - key: nightshift.pull_request.outcome
+    type:
+      members:
+        - { id: merged, value: merged, brief: The pull request was merged., stability: development }
+        - { id: closed, value: closed, brief: The pull request was closed., stability: development }
+        - { id: reverted, value: reverted, brief: The pull request was reverted., stability: development }
+        - { id: other, value: _OTHER, brief: An outcome outside this list., stability: development }
+    brief: What became of a pull request.
+    stability: development
+  - key: nightshift.pull_request.hours
+    type: double
+    brief: Hours from open to the pull request outcome.
+    stability: development
+  - key: nightshift.pull_request.useful
+    type: boolean
+    brief: Whether you found the pull request useful.
+    stability: development
+  - key: nightshift.install.entry
+    type:
+      members:
+        - { id: desktop, value: desktop, brief: The desktop app., stability: development }
+        - { id: server, value: server, brief: The server., stability: development }
+        - { id: other, value: _OTHER, brief: An entry outside this list., stability: development }
+    brief: How this computer runs Night Shift.
+    stability: development
+  - key: nightshift.install.host
+    type: boolean
+    brief: Whether this computer is a Host.
+    stability: development
+  - key: nightshift.project.source
+    type:
+      members:
+        - { id: folder, value: folder, brief: A folder on this computer., stability: development }
+        - { id: github, value: github, brief: A GitHub repository., stability: development }
+        - { id: other, value: _OTHER, brief: A source outside this list., stability: development }
+    brief: Where a project was added from.
+    stability: development
+  - key: nightshift.project.has_remote
+    type: boolean
+    brief: Whether the project has a git remote.
+    stability: development
+  - key: nightshift.project.starters
+    type: int
+    brief: How many starter flows were added with the project.
+    stability: development
+  - key: nightshift.project.check
+    type:
+      members:
+        - { id: ok, value: ok, brief: The check passed., stability: development }
+        - { id: failed, value: failed, brief: The check failed., stability: development }
+        - { id: skipped, value: skipped, brief: The check was skipped., stability: development }
+    brief: The result of one project check. Each check has its own attribute.
+    stability: development
+  - key: nightshift.project.check.git
+    type:
+      members:
+        - { id: ok, value: ok, brief: Git is present., stability: development }
+        - { id: failed, value: failed, brief: Git is missing., stability: development }
+        - { id: skipped, value: skipped, brief: The check was skipped., stability: development }
+    brief: The git check of a new project.
+    stability: development
+  - key: nightshift.project.check.folder
+    type:
+      members:
+        - { id: ok, value: ok, brief: The folder is a git checkout., stability: development }
+        - { id: failed, value: failed, brief: The folder check failed., stability: development }
+        - { id: skipped, value: skipped, brief: The check was skipped., stability: development }
+    brief: The folder check of a new project.
+    stability: development
+  - key: nightshift.project.check.commit
+    type:
+      members:
+        - { id: ok, value: ok, brief: The project has a commit., stability: development }
+        - { id: failed, value: failed, brief: The project has no commit., stability: development }
+        - { id: skipped, value: skipped, brief: The check was skipped., stability: development }
+    brief: The commit check of a new project.
+    stability: development
+  - key: nightshift.project.check.identity
+    type:
+      members:
+        - { id: ok, value: ok, brief: Git has a name and an email., stability: development }
+        - { id: failed, value: failed, brief: Git has no name or email., stability: development }
+        - { id: skipped, value: skipped, brief: The check was skipped., stability: development }
+    brief: The git identity check of a new project.
+    stability: development
+  - key: nightshift.project.check.tools
+    type:
+      members:
+        - { id: ok, value: ok, brief: The tools are present., stability: development }
+        - { id: failed, value: failed, brief: A tool is missing., stability: development }
+        - { id: skipped, value: skipped, brief: The check was skipped., stability: development }
+    brief: The tools check of a new project.
+    stability: development
+  - key: nightshift.flow.from
+    type:
+      members:
+        - { id: starter, value: starter, brief: From a starter., stability: development }
+        - { id: blank, value: blank, brief: A blank flow., stability: development }
+        - { id: import, value: import, brief: Imported., stability: development }
+        - { id: copy, value: copy, brief: Copied from another project., stability: development }
+        - { id: other, value: _OTHER, brief: A source outside this list., stability: development }
+    brief: How a flow was created.
+    stability: development
+  - key: nightshift.flow.starter
+    type:
+      members:
+        - { id: implement_and_check, value: implement-and-check, brief: The implement-and-check starter., stability: development }
+        - { id: build_task, value: build-task, brief: The build-task starter., stability: development }
+        - { id: plan_and_build, value: plan-and-build, brief: The plan-and-build starter., stability: development }
+        - { id: review_pr, value: review-pr, brief: The review-pr starter., stability: development }
+        - { id: edit_file, value: edit-file, brief: The edit-file starter., stability: development }
+        - { id: review_learnings, value: review-learnings, brief: The review-learnings starter., stability: development }
+        - { id: per_file, value: per-file, brief: The per-file starter., stability: development }
+        - { id: other, value: _OTHER, brief: A starter outside this list., stability: development }
+    brief: Which starter a flow was created from.
+    stability: development
+  - key: nightshift.schedule.enabled
+    type: boolean
+    brief: Whether the schedule is on.
+    stability: development
+  - key: nightshift.schedule.webhook
+    type: boolean
+    brief: Whether the schedule has a webhook.
+    stability: development
+  - key: nightshift.schedule.score_pull_requests
+    type: boolean
+    brief: Whether the schedule scores pull requests.
+    stability: development
+  - key: nightshift.schedule.skip_reason
+    type:
+      members:
+        - { id: missed, value: missed, brief: The computer was off or asleep past the grace time., stability: development }
+        - { id: paused, value: paused, brief: The schedule was paused for the night., stability: development }
+        - { id: still_open, value: still_open, brief: An earlier run of the schedule is still open., stability: development }
+        - { id: other, value: _OTHER, brief: A reason outside this list., stability: development }
+    brief: Why a schedule did not start a run.
+    stability: development
+  - key: nightshift.step.guard
+    type:
+      members:
+        - { id: budget, value: budget, brief: The cost cap., stability: development }
+        - { id: turns, value: turns, brief: The turn cap., stability: development }
+        - { id: looping, value: looping, brief: The looping guard., stability: development }
+        - { id: idle, value: idle, brief: The idle guard., stability: development }
+        - { id: max_steps, value: max_steps, brief: The step cap., stability: development }
+        - { id: other, value: _OTHER, brief: A guard outside this list., stability: development }
+    brief: The guard that stopped a step, when one did.
+    stability: development
+  - key: nightshift.model.family
+    type:
+      members:
+        - { id: claude_sonnet, value: claude-sonnet, brief: A Claude Sonnet model., stability: development }
+        - { id: claude_opus, value: claude-opus, brief: A Claude Opus model., stability: development }
+        - { id: claude_haiku, value: claude-haiku, brief: A Claude Haiku model., stability: development }
+        - { id: gpt_5, value: gpt-5, brief: A GPT-5 model., stability: development }
+        - { id: gemini, value: gemini, brief: A Gemini model., stability: development }
+        - { id: grok, value: grok, brief: A Grok model., stability: development }
+        - { id: other, value: _OTHER, brief: "A local, private, or unknown model.", stability: development }
+    brief: The model family. A local or private model is _OTHER.
+    stability: development
+  - key: nightshift.phone.signed_in
+    type: boolean
+    brief: Whether a phone is signed in.
+    stability: development
+  - key: nightshift.host.paired
+    type: boolean
+    brief: Whether this computer is paired with a Host.
+    stability: development
+  - key: nightshift.install.agents
+    type: int
+    brief: How many harnesses this computer has installed.
+    stability: development
+  - key: nightshift.install.spaces
+    type:
+      members:
+        - { id: zero, value: "0", brief: No Spaces., stability: development }
+        - { id: one, value: "1", brief: One Space., stability: development }
+        - { id: two_to_four, value: "2-4", brief: Two to four Spaces., stability: development }
+        - { id: five_plus, value: "5+", brief: Five or more Spaces., stability: development }
+    brief: How many Spaces this computer is in, as a bucket.
+    stability: development
+  - key: nightshift.install.members
+    type:
+      members:
+        - { id: zero, value: "0", brief: No other members., stability: development }
+        - { id: one, value: "1", brief: One other member., stability: development }
+        - { id: two_to_four, value: "2-4", brief: Two to four other members., stability: development }
+        - { id: five_plus, value: "5+", brief: Five or more other members., stability: development }
+    brief: How many members the Spaces have, as a bucket.
+    stability: development

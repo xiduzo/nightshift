@@ -13,10 +13,11 @@ async function codexCheck(bin: string): Promise<CliCheck> {
 		if (out.code !== 0) {
 			return {
 				...check,
+				signIn: "signed_out",
 				problem: line ?? "Not logged in. Run `codex login`.",
 			};
 		}
-		return { ...check, account: line };
+		return { ...check, signIn: "signed_in", account: line };
 	} catch {
 		return check;
 	}

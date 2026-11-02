@@ -271,6 +271,8 @@ export type RunState = {
 	stepsSinceWalk: number;
 	warnings: readonly Logged<"RunWarned">[];
 	scores: readonly Logged<"Scored">[];
+	/** The latest pull request a step of the run opened. Null until one does. */
+	pullRequest: { url: string; at: number } | null;
 	/** The latest `WorktreeCreated`. */
 	worktree: EnginePayloads["WorktreeCreated"] | null;
 	/** Where the run's work went: each `WorktreeCreated` and `HandedOff`, oldest first. */
@@ -342,6 +344,7 @@ function emptyState(): Draft {
 		stepsSinceWalk: 0,
 		warnings: [],
 		scores: [],
+		pullRequest: null,
 		worktree: null,
 		moves: [],
 		edges: new Map(),
@@ -538,6 +541,9 @@ function apply(run: Draft, e: LoggedEvent): void {
 			break;
 		case "Scored":
 			run.scores.push(logged(e));
+			break;
+		case "PullRequestOpened":
+			run.pullRequest = { url: e.payload.url, at: e.at };
 			break;
 		case "StopAfterStepRequested":
 			run.stopAfterStep = true;

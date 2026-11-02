@@ -76,6 +76,7 @@ describe("the End node", () => {
 			status: "finished",
 			reason: "No open issues for bugs",
 			result: "nothing-to-do",
+			endReason: "finished",
 		});
 
 		const events = await h.events();
@@ -114,6 +115,7 @@ describe("the End node", () => {
 			status: "failed",
 			reason: null,
 			result: "failed",
+			endReason: "_OTHER",
 		});
 		// As the runner logs it, the run reads as failed with its result.
 		await h.log.append({
@@ -129,6 +131,7 @@ describe("the End node", () => {
 			status: "failed",
 			reason: null,
 			result: "failed",
+			endReason: "_OTHER",
 		});
 	});
 });

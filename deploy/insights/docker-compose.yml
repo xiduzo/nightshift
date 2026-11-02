@@ -1,0 +1,61 @@
+# Insights: Postgres, the Collector, and the app.
+#
+#   docker compose -f deploy/insights/docker-compose.yml up -d --build
+#
+# The command reads INSIGHTS_DB_PASSWORD and INSIGHTS_AUTH_SECRET from the
+# environment. Use letters and digits in the password. The app uses it in
+# the database URL.
+#
+# The Collector publishes port 4318. The app publishes port 8787.
+# Ingest on port 8788 stays on this network. Postgres publishes nothing.
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    # Enable daily backups for this Postgres service in Dokploy.
+    environment:
+      POSTGRES_USER: insights
+      POSTGRES_PASSWORD: ${INSIGHTS_DB_PASSWORD:?Set INSIGHTS_DB_PASSWORD}
+      POSTGRES_DB: insights
+    volumes:
+      - insights:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insights -d insights"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No ports. Only the app reaches Postgres, on the compose network.
+
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    restart: unless-stopped
+    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4318:4318"
+    depends_on:
+      - insights
+
+  insights:
+    build:
+      context: ../..
+      dockerfile: deploy/insights/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://insights:${INSIGHTS_DB_PASSWORD:?Set INSIGHTS_DB_PASSWORD}@postgres:5432/insights
+      BETTER_AUTH_SECRET: ${INSIGHTS_AUTH_SECRET:?Set INSIGHTS_AUTH_SECRET}
+      INSIGHTS_PORT: "8787"
+      INSIGHTS_INGEST_PORT: "8788"
+      # 0.0.0.0 so the Collector on this network can reach ingest.
+      # Port 8788 is not published.
+      INSIGHTS_INGEST_HOST: 0.0.0.0
+    ports:
+      - "8787:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  insights:

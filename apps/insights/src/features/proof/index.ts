@@ -1,0 +1,1 @@
+export { ProofPage } from "./page";

@@ -22,12 +22,18 @@ import {
 	type Scope,
 	type StepBudget,
 	type StepEvent,
+	type StepGuard,
 	type StepOutcome,
 	type StepOutputs,
 	scopeKey,
 	transcriptPath,
 } from "../log";
-import { deriveBudgetSpend, deriveWorktrees, gitAuthorOf } from "../read";
+import {
+	deriveBudgetSpend,
+	deriveWorktrees,
+	gitAuthorOf,
+	pullRequestOf,
+} from "../read";
 import { keptNames, saveKeptValues } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import { budgetPassed, runBudget } from "./budget";
@@ -123,7 +129,7 @@ export type GuardReason = "budget" | "turns" | "looping";
 /** The run warning each guard lands, and the stall guard's (`idle`). */
 const GUARD_WARNINGS = {
 	budget: "budget",
-	turns: "budget",
+	turns: "turns",
 	looping: "looping",
 	idle: "stalled",
 } as const satisfies Record<GuardReason | "idle", RunWarningKind>;
@@ -222,6 +228,8 @@ export type OpenStep = StepHandle & {
 			harnessSessionId?: string | null;
 			/** The node's variable writes do not apply: a try of a cascade that climbs on. */
 			skipWrites?: boolean;
+			/** The guard that stopped the step. */
+			guard?: StepGuard;
 		},
 	): Promise<StepEnd>;
 	/** Closes the recorder and the timers but leaves the step open in the log (a wait). */
@@ -414,7 +422,7 @@ export async function runStep(
 		outcome: StepOutcome,
 		outputs: StepOutputs,
 		error: string | null,
-		costs: ReturnType<typeof extraOf>,
+		costs: ReturnType<typeof extraOf> & { guard?: StepGuard },
 	): Promise<Command> => {
 		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
 		const end = await step.end(outcome, outputs, error, {
@@ -452,16 +460,14 @@ export async function runStep(
 					"stopped",
 					{ ...result.outputs, outcome: "stopped" },
 					aborted.error,
-					extraOf(result),
+					{ ...extraOf(result), guard: "budget" },
 				);
 				return parkFailed(node, end, aborted.error ?? "", extra);
 			}
-			return endAndGo(
-				aborted.outcome,
-				aborted.outputs,
-				aborted.error,
-				extraOf(result),
-			);
+			return endAndGo(aborted.outcome, aborted.outputs, aborted.error, {
+				...extraOf(result),
+				...(guard && guard !== "budget" ? { guard } : {}),
+			});
 		}
 		case "ask":
 			return askPerson(ctx, node, state, config, step, result);
@@ -945,6 +951,15 @@ export async function beginStep(
 							stepId,
 						})
 					: [];
+			const opened = pullRequestOf(outputs);
+			if (opened) {
+				await ctx.log.append({
+					type: "PullRequestOpened",
+					runId,
+					payload: { url: opened },
+				});
+				ctx.usage?.note({ kind: "pull-request-opened", runId });
+			}
 			await ctx.log.append(
 				{
 					type: "StepEnded",
@@ -964,6 +979,7 @@ export async function beginStep(
 						...(extra?.costSource !== undefined
 							? { costSource: extra.costSource }
 							: {}),
+						...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
 					},
 				},
 				saveKept.length > 0 ? { before: saveKept } : undefined,
@@ -982,6 +998,7 @@ export async function beginStep(
 				outcome,
 				outputs,
 				error,
+				...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
 				...(extra?.harnessSessionId !== undefined
 					? { harnessSessionId: extra.harnessSessionId }
 					: {}),

@@ -19,7 +19,7 @@ Night Shift is for its author first. It runs on the author's machine with the au
 ## Core Principles
 
 1. **The engine decides, the model advises** — Order, retries, loop limits and gates are code. A Decision node picks one of its options. The engine checks a model's pick against them. A Decision by rule is deterministic: an expression over the run's values, with no model. A model never adds a node or changes the graph.
-2. **Local first, your credentials** — Every session, worktree and token stays on the user's own computers. A secret never leaves the Device it is on. A step that sends data off the machine says so in its node.
+2. **Local first, your credentials** — Every session, worktree and token stays on the person's own computers. A secret never leaves the Device it is on. Night Shift sends anonymous usage by default. A person can set it to off. A step that sends other data off the machine says so in its node.
 3. **The flow is the method** — Night Shift has no built-in opinion on how to write a spec. A WTF night is one flow. Another method is another flow.
 4. **Durable facts, derived status** — The database stores what happened. Night Shift computes status from facts. Every change appends to an event log. No late hook can overwrite a state.
 5. **People at gates only** — An unattended run never blocks on a person. A step that needs input ends with a report, and the gate waits in an inbox.

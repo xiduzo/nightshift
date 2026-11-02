@@ -38,6 +38,8 @@ export type TraceRunEnd = {
 	at: number;
 	status: RunEnding;
 	reason: string | null;
+	/** The stored code. Absent on a trace a caller built by hand. */
+	endReason?: string | null;
 	/** The run's first end. A resumed run ends again. */
 	first: boolean;
 };
@@ -54,6 +56,8 @@ export type TraceStepEnd = {
 	at: number;
 	outcome: StepOutcome;
 	error: string | null;
+	/** The guard that stopped the step, when one did. */
+	guard?: string | null;
 	/** What the step spent itself at this end (a decider), when it says. */
 	costUsd: number | null;
 	/** How sure `costUsd` is: `estimated` when it is priced from the tokens. */
@@ -132,6 +136,7 @@ export function runTrace(run: RunState): RunTrace | null {
 			at: end.at,
 			status: end.payload.status,
 			reason: end.payload.reason,
+			endReason: end.payload.endReason ?? null,
 			first: i === 0,
 		})),
 		steps: deriveSteps(run).map((step) => ({
@@ -190,6 +195,7 @@ function stepEnds(step: DerivedStep): TraceStepEnd[] {
 			at: end.at,
 			outcome: end.payload.outcome,
 			error: end.payload.error,
+			...(end.payload.guard ? { guard: end.payload.guard } : {}),
 			costUsd: knownUsd(end.cost),
 			costBasis: costBasis(end.cost),
 			first: ends.length === 0,

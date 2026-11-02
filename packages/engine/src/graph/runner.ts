@@ -11,10 +11,13 @@ import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import {
+	type GateVia,
 	getRunRow,
+	provedEndReason,
 	type ResumedBy,
 	type RunBus,
 	type RunEnding,
+	type RunEndReason,
 	type RunLog,
 	type RunRow,
 	type RunState,
@@ -29,6 +32,7 @@ import {
 	STILL_RUNNING,
 	WALKED_ELSEWHERE,
 } from "../run-status";
+import type { UsageNotes } from "../usage";
 import {
 	createRecorders,
 	type LeaseTaker,
@@ -162,6 +166,8 @@ export type RunnerDeps = {
 	leases?: LeaseTaker;
 	/** Starts and stops the services of Service nodes. Default: none. */
 	services?: ServiceRunner;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 };
 
 /** What a start's Turn prepares once its slot is held: the run row, its inputs and its stop time. */
@@ -188,6 +194,8 @@ export type Intent =
 			byDeadline?: true;
 			/** The answer to an Ask (ADR 10): the data of its form. */
 			data?: JsonValue;
+			/** Where the answer came from. Absent: the score stores `_OTHER`. */
+			via?: GateVia;
 	  }
 	/** Ends the sleep of a sleeping run (`planWake`): its timer, a person early, or a signal. */
 	| ({ kind: "wake" } & Wake)
@@ -312,6 +320,7 @@ export function createRunner(deps: RunnerDeps) {
 		policyFor: deps.policyFor,
 		...(deps.leases ? { leases: deps.leases } : {}),
 		...(deps.services ? { services: deps.services } : {}),
+		...(deps.usage ? { usage: deps.usage } : {}),
 	};
 	const holds = deps.holds ?? NO_HOLDS;
 	const closeDeps: CloseDeps = {
@@ -545,12 +554,20 @@ export function createRunner(deps: RunnerDeps) {
 		status: RunEnding,
 		reason: string | null,
 		result?: RunResult,
+		endReason?: RunEndReason,
 	): Promise<void> {
+		const code =
+			endReason ?? provedEndReason({ status, reason, result: result ?? null });
 		try {
 			await writer.append({
 				type: "RunEnded",
 				runId,
-				payload: { status, reason, ...(result ? { result } : {}) },
+				payload: {
+					status,
+					reason,
+					endReason: code,
+					...(result ? { result } : {}),
+				},
 			});
 			await letGo(holds, runId, status);
 		} catch (error) {
@@ -623,6 +640,7 @@ export function createRunner(deps: RunnerDeps) {
 				ending.status,
 				ending.reason,
 				ending.result,
+				ending.endReason,
 			);
 		} catch (error) {
 			// A stop took the run from this drive: it writes nothing more.
@@ -799,12 +817,14 @@ export function createRunner(deps: RunnerDeps) {
 			if (!(error instanceof Refusal)) {
 				console.error(`[engine] run ${runId} could not start again`, error);
 			}
+			const reason = `The run could not start again. ${wordsFor(error)}`;
 			await log.append({
 				type: "RunEnded",
 				runId,
 				payload: {
 					status: "failed",
-					reason: `The run could not start again. ${wordsFor(error)}`,
+					reason,
+					endReason: provedEndReason({ status: "failed", reason }),
 				},
 			});
 			await letGo(holds, runId, "failed");
@@ -840,7 +860,7 @@ export function createRunner(deps: RunnerDeps) {
 		if (!reserve(row.id, intent, options)) return QUEUED;
 		// The Gate's deadline, if it has one, no longer applies.
 		sleeps.forget(row.id);
-		const { choice, note, byDeadline, data } = intent;
+		const { choice, note, byDeadline, data, via } = intent;
 		const asked =
 			deriveSteps(await log.state(row.id)).find((s) => s.id === intent.stepId)
 				?.gate?.openedSeq ?? 0;
@@ -850,6 +870,7 @@ export function createRunner(deps: RunnerDeps) {
 			note,
 			...(byDeadline ? { byDeadline } : {}),
 			...(data !== undefined ? { data } : {}),
+			...(via ? { via } : {}),
 		};
 		// Parallel branches may hold several Gates: the answer goes to its own.
 		const each = resumeEach(await threadOf(row).state(), (parked) =>

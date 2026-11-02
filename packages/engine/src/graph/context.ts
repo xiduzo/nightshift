@@ -35,6 +35,7 @@ import {
 	transcriptToRead,
 } from "../log";
 import type { RunResult } from "../run-status";
+import type { UsageNotes } from "../usage";
 import type { KeptFlow } from "../variables";
 import type { Races } from "./branches";
 import type { ResumeRules } from "./resume-point";
@@ -133,6 +134,8 @@ export type StepContext = {
 	minuteMs: number;
 	dataDir: string;
 	settings(): RunSettings;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 	/**
 	 * The descriptor of a node's kind (`node-kinds.ts`). The registry comes
 	 * in by the context, so the engine around the nodes never imports the

@@ -9,6 +9,8 @@ export {
 	NO_COST,
 	sessionCost,
 } from "./cost";
+export type { RunEndReason, StepGuard } from "./end-reason";
+export { provedEndReason, RUN_END_REASONS } from "./end-reason";
 export type {
 	EngineEventType,
 	EnginePayloads,
@@ -16,6 +18,7 @@ export type {
 	EventWrites,
 	GateChoice,
 	GateDeadline,
+	GateVia,
 	HoldSection,
 	InputValues,
 	ItemFacts,

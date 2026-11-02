@@ -1,0 +1,30 @@
+{
+	"name": "@nightshift/insights",
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build": "tsc -b",
+		"check-types": "tsc -b",
+		"test": "bun test",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:push": "drizzle-kit push",
+		"db:studio": "drizzle-kit studio"
+	},
+	"dependencies": {
+		"@nightshift/semconv": "workspace:*",
+		"@nightshift/time": "workspace:*",
+		"drizzle-orm": "catalog:",
+		"postgres": "3.4.7"
+	},
+	"devDependencies": {
+		"@electric-sql/pglite": "0.3.14",
+		"@nightshift/config": "workspace:*",
+		"@types/bun": "catalog:",
+		"drizzle-kit": "1.0.0-rc.4",
+		"typescript": "catalog:"
+	}
+}

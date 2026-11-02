@@ -136,6 +136,45 @@ describe("systemGitHubCli", () => {
 		expect(calls[0]?.argv).toContain("--slurp");
 	});
 
+	test("reads a merged pull request from gh pr view", async () => {
+		const gh = cli(true, (argv) => {
+			if (argv[2] === "view") {
+				return ok(
+					JSON.stringify({
+						state: "MERGED",
+						mergedAt: "2026-06-01T00:00:00Z",
+						closedAt: "2026-06-01T00:00:00Z",
+						mergeCommit: { oid: "abc123" },
+					}),
+				);
+			}
+			return ok("[]");
+		});
+		expect(
+			await gh.viewPullRequest("https://github.com/acme/app/pull/12"),
+		).toEqual({
+			state: "merged",
+			mergeSha: "abc123",
+			mergedAt: "2026-06-01T00:00:00Z",
+			closedAt: "2026-06-01T00:00:00Z",
+			reverted: null,
+		});
+		expect(calls[0]?.argv.slice(0, 4)).toEqual([
+			"gh",
+			"pr",
+			"view",
+			"https://github.com/acme/app/pull/12",
+		]);
+	});
+
+	test("is null when gh is missing", async () => {
+		const gh = cli(false, () => ok());
+		expect(
+			await gh.viewPullRequest("https://github.com/acme/app/pull/12"),
+		).toBeNull();
+		expect(calls).toEqual([]);
+	});
+
 	test("clones with an argv, never a shell line", async () => {
 		const gh = cli(true, () => ok());
 		await gh.clone({ owner: "acme", repo: "app" }, "/data/acme/app", "/data");

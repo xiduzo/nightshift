@@ -154,6 +154,8 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			orpc.runs.devices.queryOptions({
 				input: { projectId, ...(forNode ? { forNode } : {}) },
 			}),
+		/** Records whether you found the pull request of this run useful. */
+		useful: () => orpc.runs.useful.mutationOptions(),
 		/** The person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
 		moveTargets: (runId: string) =>
 			orpc.runs.moveTargets.queryOptions({ input: { runId } }),

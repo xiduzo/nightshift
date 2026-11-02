@@ -10,6 +10,7 @@ import {
 } from "../graph";
 import {
 	applyWalkerMoves,
+	type GateVia,
 	placedRun,
 	RUN_NOT_FOUND,
 	type RunBus,
@@ -24,6 +25,7 @@ import {
 	deriveSteps,
 } from "../read";
 import { RunRefusal, refuseUnless, whyNot } from "../run-status";
+import type { UsageNotes } from "../usage";
 import type { PlacementPort, RunsPort } from "./peers";
 import type { RunRelay } from "./relay";
 import type { StartHolds } from "./start-holds";
@@ -68,7 +70,14 @@ export type RunActionRequest =
 			choice: string;
 			note?: string;
 			data?: JsonValue;
+			/** Where the answer came from. Absent stores `_OTHER`. */
+			via?: GateVia;
 	  }
+	/**
+	 * Records whether you found the pull request of this run useful.
+	 * One tap. A later tap replaces it.
+	 */
+	| { kind: "useful"; useful: boolean }
 	/**
 	 * A signal to a run whose Wait node waits for it: the step ends `done`
 	 * and the walk goes on. Fails when the run does not wait for a signal
@@ -142,6 +151,8 @@ export type RunActionsDeps = {
 	placement: Pick<PlacementPort, "moveTo" | "devicesFor">;
 	/** A resume, a restart and a run again make the run active: refused while its Space's Projects move. */
 	holds: Pick<StartHolds, "start">;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 };
 
 /**
@@ -282,7 +293,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						"An answer to this Gate is already on its way to the device that runs it.",
 					);
 				}
-				const { stepId, choice, note, data } = request;
+				const { stepId, choice, note, data, via } = request;
 				return relay.send(row, actor, {
 					kind: "gate.resolve",
 					payload: {
@@ -290,9 +301,15 @@ export function createRunActions(deps: RunActionsDeps) {
 						choice,
 						...(note ? { note } : {}),
 						...(data !== undefined ? { data } : {}),
+						...(via ? { via } : {}),
 					},
 				});
 			}
+			case "useful":
+				return relay.send(row, actor, {
+					kind: "run.useful",
+					payload: { useful: request.useful },
+				});
 			case "signal":
 				refuseSignal(runState, request.name);
 				return relay.send(row, actor, {
@@ -414,6 +431,23 @@ export function createRunActions(deps: RunActionsDeps) {
 		switch (request.kind) {
 			case "stop":
 				return stop(row, request.when);
+			case "useful":
+				await deps.log.append({
+					type: "Scored",
+					runId,
+					stepId: null,
+					payload: {
+						score: "pr_useful",
+						value: request.useful ? 1 : 0,
+						label: null,
+					},
+				});
+				deps.usage?.note({
+					kind: "pull-request-useful",
+					runId,
+					useful: request.useful,
+				});
+				return;
 			case "answer":
 				// The thread continues at once with the answer. The Turn ends
 				// once the Gate's step ended. A full run cap leaves it open.
@@ -425,6 +459,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						choice: request.choice,
 						note: request.note ?? "",
 						...(request.data !== undefined ? { data: request.data } : {}),
+						...(request.via ? { via: request.via } : {}),
 					},
 					{ check: (runState) => refuseAnswer(runState, request) },
 				);

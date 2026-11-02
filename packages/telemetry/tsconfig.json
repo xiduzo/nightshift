@@ -8,5 +8,5 @@
 		"outDir": "dist"
 	},
 	"include": ["src/**/*.ts"],
-	"references": [{ "path": "../engine" }]
+	"references": [{ "path": "../engine" }, { "path": "../semconv" }]
 }

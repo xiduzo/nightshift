@@ -8,10 +8,13 @@ import type { EnginePayloads } from "./events";
  * - `gate_decision`: a Gate was answered, on the Gate's step. `label` is
  *   the option it took, `by` who chose it: a person, or its deadline.
  * - `pr_merged`, `pr_closed`, `reverted_within_7d`: what became of the
- *   pull request the run opened, from a GitHub webhook of a schedule with
- *   `scorePullRequests` (`schedules/pull-request-scores.ts`). On the run,
- *   not on a step. `pr_merged`'s label is the merge commit's sha, a
- *   revert's the commit or the pull request that reverted it.
+ *   pull request the run opened. A GitHub webhook of a schedule with
+ *   `scorePullRequests` writes them, and so does the morning check of
+ *   `gh pr view`. On the run, not on a step. `pr_merged`'s label is the
+ *   merge commit's sha, a revert's the commit or the pull request that
+ *   reverted it.
+ * - `pr_useful`: a person said whether that pull request was useful.
+ *   `value` is 1 for yes and 0 for no. On the run.
  *
  * `value` is 1 for a fact that happened. The names are an open list: a
  * score of a newer Walker passes through with its name, and means nothing

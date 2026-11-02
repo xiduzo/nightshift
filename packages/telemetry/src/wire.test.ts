@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { arch, type as osTypeName } from "node:os";
 import type { LandedFact } from "@nightshift/engine";
 import {
 	createConnectionStore,
@@ -7,12 +8,14 @@ import {
 	runEvents,
 	waitFor,
 } from "@nightshift/engine/testing";
-import { trace } from "@opentelemetry/api";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import {
 	AggregationTemporality,
 	type DataPoint,
+	DataPointType,
 	type Histogram,
 	InMemoryMetricExporter,
+	type ResourceMetrics,
 } from "@opentelemetry/sdk-metrics";
 import {
 	InMemorySpanExporter,
@@ -21,7 +24,20 @@ import {
 import { os } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 
-import { runSpanIdOf, stepSpanIdOf, traceIdOf } from "./conventions";
+import {
+	ATTR,
+	ERROR_TYPE,
+	METRIC,
+	OPERATION,
+	PROVIDER,
+	runSpanIdOf,
+	SERVICE_NAME,
+	SPAN,
+	stepSpanIdOf,
+	TOKEN_MODALITY,
+	traceIdOf,
+} from "./conventions";
+import { assertConforms } from "./runs";
 import { createTelemetry } from "./wire";
 
 /*
@@ -153,9 +169,22 @@ type Monitoring = {
  * A telemetry over a fake engine and this computer's real settings and
  * secrets, with the secret values in memory.
  */
+let restoreEnv = () => {};
+afterEach(() => restoreEnv());
+
+const OTEL_KEYS = [
+	"OTEL_SDK_DISABLED",
+	"OTEL_EXPORTER_OTLP_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_HEADERS",
+	"OTEL_EXPORTER_OTLP_PROTOCOL",
+	"OTEL_RESOURCE_ATTRIBUTES",
+	"NIGHTSHIFT_VERSION",
+];
+
 async function setup(
 	initial: Partial<Monitoring> = {},
 	run: ReturnType<typeof runEvents> = nightRun(),
+	env: Record<string, string> = {},
 ) {
 	let listener: ((facts: readonly LandedFact[]) => void) | null = null;
 	let scope: unknown = null;
@@ -182,11 +211,27 @@ async function setup(
 		telemetryProtocol: "http/protobuf",
 		...initial,
 	});
+	const savedEnv = new Map<string, string | undefined>();
+	for (const key of OTEL_KEYS) {
+		savedEnv.set(key, process.env[key]);
+		delete process.env[key];
+	}
+	for (const [key, value] of Object.entries(env)) process.env[key] = value;
+	let restored = false;
+	restoreEnv = () => {
+		if (restored) return;
+		restored = true;
+		for (const [key, value] of savedEnv) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	};
 	const spans = new KeptSpans();
 	const metrics = new KeptMetrics(AggregationTemporality.CUMULATIVE);
 	const targets: unknown[] = [];
 	const telemetry = await createTelemetry({
 		deviceId: DEVICE,
+		db: sandbox.db,
 		settings,
 		secrets,
 		sinks: (target) => {
@@ -234,10 +279,75 @@ async function setup(
 			}
 			return byName;
 		},
+		resources: () => metrics.getMetrics(),
 		async done() {
 			await telemetry.stop();
 			await sandbox.cleanup();
+			restoreEnv();
 		},
+	};
+}
+
+function expectedOs(): string {
+	if (osTypeName() === "Darwin") return "darwin";
+	if (osTypeName() === "Linux") return "linux";
+	if (osTypeName() === "Windows_NT") return "windows";
+	return osTypeName().toLowerCase();
+}
+
+function expectedArch(): string {
+	if (arch() === "x64") return "amd64";
+	if (arch() === "ia32") return "x86";
+	if (arch() === "arm") return "arm32";
+	return arch();
+}
+
+function instrumentOf(metric: {
+	dataPointType: DataPointType;
+	isMonotonic?: boolean;
+}): string {
+	if (metric.dataPointType === DataPointType.HISTOGRAM) return "histogram";
+	if (metric.dataPointType === DataPointType.SUM && metric.isMonotonic) {
+		return "counter";
+	}
+	return String(metric.dataPointType);
+}
+
+/** The in-memory export, in the shape the registry check reads. */
+function exported(
+	spans: ReadableSpan[],
+	resources: ResourceMetrics[],
+): {
+	spans: {
+		name: string;
+		failed: boolean;
+		attributes: Record<string, unknown>;
+	}[];
+	metrics: {
+		name: string;
+		unit: string;
+		instrument: string;
+		points: { attributes: Record<string, unknown> }[];
+	}[];
+} {
+	return {
+		spans: spans.map((span) => ({
+			name: span.name,
+			failed: span.status.code === SpanStatusCode.ERROR,
+			attributes: { ...span.attributes },
+		})),
+		metrics: resources.flatMap((resource) =>
+			resource.scopeMetrics.flatMap((scoped) =>
+				scoped.metrics.map((metric) => ({
+					name: metric.descriptor.name,
+					unit: metric.descriptor.unit ?? "",
+					instrument: instrumentOf(metric),
+					points: metric.dataPoints.map((point) => ({
+						attributes: { ...point.attributes },
+					})),
+				})),
+			),
+		),
 	};
 }
 
@@ -282,15 +392,17 @@ describe("the export to monitoring", () => {
 		await h.done();
 
 		const spans = h.spans();
-		expect(spans.map((s) => s.name).sort()).toEqual([
-			"call each",
-			"decision ship",
-			"gate ship",
-			"invoke_agent build",
-			"invoke_workflow nightly",
-			"wait duration",
-			"wait pause",
-		]);
+		expect(spans.map((s) => s.name).sort()).toEqual(
+			[
+				`${SPAN.gate} ship`,
+				`${OPERATION.agent} build`,
+				`${OPERATION.workflow} nightly`,
+				`${SPAN.step} each`,
+				`${SPAN.step} pause`,
+				`${SPAN.step} ship`,
+				`${SPAN.wait} duration`,
+			].sort(),
+		);
 		const traceId = traceIdOf("run-1");
 		expect(new Set(spans.map((s) => s.spanContext().traceId))).toEqual(
 			new Set([traceId]),
@@ -300,14 +412,24 @@ describe("the export to monitoring", () => {
 		expect(run.spanContext().spanId).toBe(runSpanIdOf("run-1"));
 		expect(parentOf(run)).toBeNull();
 		expect(run.attributes).toMatchObject({
-			"nightshift.run.id": "run-1",
-			"gen_ai.conversation.id": "run-1",
-			"nightshift.project.id": "p1",
-			"nightshift.flow.id": "nightly",
-			"gen_ai.operation.name": "invoke_workflow",
-			"nightshift.device.id": DEVICE,
-			"nightshift.run.status": "finished",
-			"nightshift.run.trigger": "schedule",
+			[ATTR.runId]: "run-1",
+			[ATTR.conversationId]: "run-1",
+			[ATTR.projectId]: "p1",
+			[ATTR.flowId]: "nightly",
+			[ATTR.operation]: "invoke_workflow",
+			[ATTR.workflowName]: "nightly",
+			[ATTR.deviceId]: DEVICE,
+			[ATTR.status]: "finished",
+			[ATTR.trigger]: "schedule",
+		});
+		expect(run.resource.attributes).toMatchObject({
+			[ATTR.serviceName]: SERVICE_NAME,
+			[ATTR.serviceInstance]: DEVICE,
+			[ATTR.deviceId]: DEVICE,
+			[ATTR.serviceVersion]: "dev",
+			[ATTR.osType]: expectedOs(),
+			[ATTR.hostArch]: expectedArch(),
+			[ATTR.deploymentEnvironment]: "local",
 		});
 		expect(run.startTime).toEqual([1_700_000_001, 0]);
 		expect(run.endTime).toEqual([1_700_000_009, 0]);
@@ -316,73 +438,88 @@ describe("the export to monitoring", () => {
 		expect(agent.spanContext().spanId).toBe(stepSpanIdOf("s-agent"));
 		expect(parentOf(agent)).toBe(runSpanIdOf("run-1"));
 		expect(agent.attributes).toMatchObject({
-			"nightshift.step.id": "s-agent",
-			"nightshift.node.kind": "agent",
-			"nightshift.agent": "claude-code",
-			"gen_ai.request.model": "claude-sonnet",
-			"gen_ai.operation.name": "invoke_agent",
-			"nightshift.step.outcome": "pass",
-			"nightshift.knowledge.searches": 1,
+			[ATTR.stepId]: "s-agent",
+			[ATTR.nodeKind]: "agent",
+			[ATTR.agent]: "claude-code",
+			[ATTR.agentName]: "build",
+			[ATTR.provider]: PROVIDER.claudeCode,
+			[ATTR.model]: "claude-sonnet",
+			[ATTR.operation]: "invoke_agent",
+			[ATTR.outcome]: "pass",
+			[ATTR.knowledgeSearches]: 1,
+			[ATTR.usageInput]: 900,
+			[ATTR.usageOutput]: 100,
+			[ATTR.usageCacheRead]: 400,
 		});
-		expect(agent.attributes["nightshift.knowledge.reads"]).toBeUndefined();
+		expect(agent.attributes[ATTR.knowledgeReads]).toBeUndefined();
+		expect(agent.attributes[ATTR.usageCacheWrite]).toBeUndefined();
 
 		const gate = byName(spans, "gate ship");
 		expect(parentOf(gate)).toBe(stepSpanIdOf("s-gate"));
-		expect(gate.attributes["nightshift.gate.wait_ms"]).toBe(3_000);
+		expect(gate.attributes[ATTR.gateWaitMs]).toBe(3_000);
+		expect(gate.attributes[ATTR.nodeId]).toBe("ship");
 
 		// A step inside a Call hangs under the Call's span, its sleep under it.
-		const wait = byName(spans, "wait pause");
+		const wait = byName(spans, `${SPAN.step} pause`);
 		expect(parentOf(wait)).toBe(stepSpanIdOf("s-call"));
 		expect(parentOf(byName(spans, "wait duration"))).toBe(
 			stepSpanIdOf("s-wait"),
 		);
-		expect(
-			byName(spans, "wait duration").attributes["nightshift.wait.reason"],
-		).toBe("duration");
+		expect(byName(spans, "wait duration").attributes[ATTR.waitReason]).toBe(
+			"duration",
+		);
 
 		const points = h.points();
 		expect(
 			points
-				.get("nightshift.run.outcome")
-				?.map((p) => [p.attributes["nightshift.run.status"], p.value]),
+				.get(METRIC.runOutcome.name)
+				?.map((p) => [p.attributes[ATTR.status], p.value]),
 		).toEqual([["finished", 1]]);
-		const runDuration = points.get("nightshift.run.duration")?.[0]
+		const runDuration = points.get(METRIC.workflowDuration.name)?.[0]
 			?.value as Histogram;
 		expect(runDuration.count).toBe(1);
 		expect(runDuration.sum).toBe(8);
-		expect(sum(points.get("nightshift.tokens"), { type: "input" })).toBe(900);
-		expect(sum(points.get("nightshift.tokens"), { type: "output" })).toBe(100);
-		expect(sum(points.get("nightshift.tokens"), { type: "cache_read" })).toBe(
-			400,
-		);
+		expect(sum(points.get(METRIC.inputTokens.name))).toBe(900);
+		expect(sum(points.get(METRIC.outputTokens.name))).toBe(100);
+		expect(sum(points.get(METRIC.cacheReadTokens.name))).toBe(400);
+		expect(points.get(METRIC.cacheWriteTokens.name)).toBeUndefined();
 		expect(
-			sum(points.get("nightshift.run.cost_usd"), { basis: "billed" }),
+			sum(points.get(METRIC.inputTokens.name), {
+				[ATTR.tokenModality]: TOKEN_MODALITY.unknown,
+				[ATTR.provider]: PROVIDER.claudeCode,
+			}),
+		).toBe(900);
+		expect(
+			sum(points.get(METRIC.cost.name), { [ATTR.costBasis]: "billed" }),
 		).toBe(0.75);
 		expect(
-			sum(points.get("nightshift.retries"), { "nightshift.node.kind": "wait" }),
+			sum(points.get(METRIC.retries.name), { [ATTR.nodeKind]: "wait" }),
 		).toBe(1);
-		const gateWait = points.get("nightshift.gate.wait")?.[0]
-			?.value as Histogram;
+		const gateWait = points.get(METRIC.gateWait.name)?.[0]?.value as Histogram;
 		expect(gateWait.sum).toBe(3);
-		const steps = points.get("nightshift.step.duration") ?? [];
-		expect(steps.reduce((n, p) => n + (p.value as Histogram).count, 0)).toBe(4);
+		const steps = points.get(METRIC.stepDuration.name) ?? [];
+		expect(steps.reduce((n, p) => n + (p.value as Histogram).count, 0)).toBe(3);
+		const agentDuration = points.get(METRIC.agentDuration.name)?.[0]
+			?.value as Histogram;
+		expect(agentDuration.count).toBe(1);
 		// No ids of one run or step on a metric point.
 		for (const list of points.values()) {
 			for (const point of list) {
-				expect(point.attributes["nightshift.run.id"]).toBeUndefined();
-				expect(point.attributes["nightshift.step.id"]).toBeUndefined();
+				expect(point.attributes[ATTR.runId]).toBeUndefined();
+				expect(point.attributes[ATTR.stepId]).toBeUndefined();
 			}
 		}
+		assertConforms(exported(h.spans(), h.resources()));
 	});
 
 	test("a run cut short exports what the Spend tab counts, with how sure each cost is", async () => {
 		const h = await setup({}, cutShortRun());
 		h.landRun();
 		await h.done();
-		const cost = h.points().get("nightshift.run.cost_usd");
-		expect(sum(cost, { basis: "billed" })).toBe(0);
-		expect(sum(cost, { basis: "estimated" })).toBeCloseTo(0.45);
-		expect(sum(cost, { "nightshift.agent": "codex" })).toBeCloseTo(0.4);
+		const cost = h.points().get(METRIC.cost.name);
+		expect(sum(cost, { [ATTR.costBasis]: "billed" })).toBe(0);
+		expect(sum(cost, { [ATTR.costBasis]: "estimated" })).toBeCloseTo(0.45);
+		expect(sum(cost, { [ATTR.agent]: "codex" })).toBeCloseTo(0.4);
 	});
 
 	test("a Gate's answer counts as a score, with who chose", async () => {
@@ -395,10 +532,10 @@ describe("the export to monitoring", () => {
 		h.landRun();
 		await h.done();
 		expect(
-			sum(h.points().get("nightshift.score"), {
-				"nightshift.score.name": "gate_decision",
-				"nightshift.score.label": "yes",
-				"nightshift.score.by": "person",
+			sum(h.points().get(METRIC.score.name), {
+				[ATTR.score]: "gate_decision",
+				[ATTR.scoreLabel]: "yes",
+				[ATTR.scoreBy]: "person",
 			}),
 		).toBe(1);
 	});
@@ -418,13 +555,13 @@ describe("the export to monitoring", () => {
 		const h = await setup({}, run);
 		h.landRun();
 		await h.done();
-		const outcomes = h.points().get("nightshift.pr.outcome");
-		expect(sum(outcomes, { outcome: "merged" })).toBe(1);
-		expect(sum(outcomes, { outcome: "reverted" })).toBe(1);
-		expect(sum(outcomes, { outcome: "closed" })).toBe(0);
+		const outcomes = h.points().get(METRIC.prOutcome.name);
+		expect(sum(outcomes, { [ATTR.prOutcome]: "merged" })).toBe(1);
+		expect(sum(outcomes, { [ATTR.prOutcome]: "reverted" })).toBe(1);
+		expect(sum(outcomes, { [ATTR.prOutcome]: "closed" })).toBe(0);
 		expect(
-			sum(h.points().get("nightshift.score"), {
-				"nightshift.score.name": "pr_merged",
+			sum(h.points().get(METRIC.score.name), {
+				[ATTR.score]: "pr_merged",
 			}),
 		).toBe(1);
 	});
@@ -506,8 +643,11 @@ describe("the export to monitoring", () => {
 			OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
 			OTEL_EXPORTER_OTLP_HEADERS:
 				"Authorization=Bearer%20abc%20123,X-Scope-OrgID=night",
-			OTEL_RESOURCE_ATTRIBUTES:
-				"nightshift.run.id=run-1,nightshift.step.id=s-agent,nightshift.device.id=mac",
+			OTEL_RESOURCE_ATTRIBUTES: [
+				`${ATTR.runId}=run-1`,
+				`${ATTR.stepId}=s-agent`,
+				`${ATTR.deviceId}=${DEVICE}`,
+			].join(","),
 			TRACEPARENT: `00-${traceIdOf("run-1")}-${stepSpanIdOf("s-agent")}-01`,
 			OTEL_LOG_USER_PROMPTS: "0",
 			OTEL_LOG_TOOL_DETAILS: "0",
@@ -539,8 +679,11 @@ describe("the export to monitoring", () => {
 		expect(session).toEqual({
 			env: {
 				OTEL_EXPORTER_OTLP_HEADERS: "api-key=k%201",
-				OTEL_RESOURCE_ATTRIBUTES:
-					"nightshift.run.id=run-1,nightshift.step.id=s-agent,nightshift.device.id=mac",
+				OTEL_RESOURCE_ATTRIBUTES: [
+					`${ATTR.runId}=run-1`,
+					`${ATTR.stepId}=s-agent`,
+					`${ATTR.deviceId}=${DEVICE}`,
+				].join(","),
 				TRACEPARENT: `00-${traceIdOf("run-1")}-${stepSpanIdOf("s-agent")}-01`,
 			},
 			values: ["k 1"],
@@ -599,5 +742,96 @@ describe("the export to monitoring", () => {
 		await h.done();
 		// The landing while it was off made nothing.
 		expect(h.spans()).toEqual([]);
+	});
+
+	test("a failed run sets error.type, and a Command step is not a tool call", async () => {
+		const run = runEvents("run-1")
+			.at(T + 1_000)
+			.runStarted({ projectId: "p1", flowName: "nightly" })
+			.stepStarted("s-cmd", "check", 1, { deviceId: DEVICE })
+			.stepEnded("s-cmd", "pass")
+			.stepStarted("s-agent", "build", 1, { deviceId: DEVICE })
+			.push(
+				"StepEnded",
+				{ outcome: "error", outputs: {}, error: ERROR_TYPE.guardBudget },
+				{ stepId: "s-agent" },
+			)
+			.ended("failed", "the build failed");
+		const h = await setup({}, run);
+		h.landRun();
+		await h.done();
+		const spans = h.spans();
+		const command = byName(spans, `${SPAN.step} check`);
+		expect(command.attributes[ATTR.nodeKind]).toBe("command");
+		expect(command.attributes[ATTR.toolName]).toBeUndefined();
+		const agent = byName(spans, "invoke_agent build");
+		expect(agent.status.code).toBe(SpanStatusCode.ERROR);
+		expect(agent.attributes[ATTR.errorType]).toBe(ERROR_TYPE.guardBudget);
+		expect(agent.status.message).toBe(ERROR_TYPE.guardBudget);
+		const workflow = byName(spans, "invoke_workflow nightly");
+		expect(workflow.status.code).toBe(SpanStatusCode.ERROR);
+		expect(workflow.attributes[ATTR.errorType]).toBe(ERROR_TYPE.other);
+		expect(workflow.status.message).toBe("the build failed");
+		expect(h.points().get(METRIC.toolDuration.name)).toBeUndefined();
+		assertConforms(exported(spans, h.resources()));
+	});
+
+	test("an empty address uses the OTEL endpoint, and a saved address wins", async () => {
+		const h = await setup({ telemetryEndpoint: "" }, nightRun(), {
+			OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
+			OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+			OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer%20x",
+		});
+		expect(h.targets).toEqual([
+			{
+				endpoint: "http://collector:4318",
+				protocol: "http/json",
+				headers: { Authorization: "Bearer x" },
+			},
+		]);
+		await h.settings.save({ telemetryEndpoint: "http://saved:4318" });
+		await waitFor(() => h.targets.length === 2, { label: "the saved address" });
+		expect(h.targets[1]).toMatchObject({ endpoint: "http://saved:4318" });
+		await h.done();
+	});
+
+	test("the switch stays off when only an OTEL endpoint is set", async () => {
+		const h = await setup(
+			{ telemetry: false, telemetryEndpoint: "" },
+			nightRun(),
+			{
+				OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
+			},
+		);
+		expect(h.on()).toBe(false);
+		expect(h.targets).toEqual([]);
+		await h.done();
+	});
+
+	test("OTEL_SDK_DISABLED turns the export off, and grpc is not spoken", async () => {
+		const disabled = await setup({}, nightRun(), { OTEL_SDK_DISABLED: "true" });
+		expect(disabled.on()).toBe(false);
+		await disabled.done();
+		const grpc = await setup({ telemetryEndpoint: "" }, nightRun(), {
+			OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4317",
+			OTEL_EXPORTER_OTLP_PROTOCOL: "grpc",
+		});
+		expect(grpc.on()).toBe(false);
+		await grpc.done();
+	});
+
+	test("deployment.environment.name comes from OTEL_RESOURCE_ATTRIBUTES", async () => {
+		const h = await setup({}, nightRun(), {
+			OTEL_RESOURCE_ATTRIBUTES: `${ATTR.deploymentEnvironment}=production`,
+			NIGHTSHIFT_VERSION: "1.2.3",
+		});
+		h.landRun();
+		await h.done();
+		const run = byName(h.spans(), "invoke_workflow nightly");
+		expect(run.resource.attributes[ATTR.deploymentEnvironment]).toBe(
+			"production",
+		);
+		expect(run.resource.attributes[ATTR.serviceVersion]).toBe("1.2.3");
+		expect(run.resource.attributes[ATTR.serviceName]).toBe(SERVICE_NAME);
 	});
 });

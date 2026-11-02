@@ -14,7 +14,11 @@
  *   starts it again. In dev and in the desktop app it keeps running.
  */
 
-type Guard = { exitOnUncaughtException: boolean };
+type Guard = {
+	exitOnUncaughtException: boolean;
+	/** Replaced on each start. The usage export notes a crash from here. */
+	onCrash: (() => void) | null;
+};
 
 // Kept across `bun --hot` reloads: the handlers are registered once.
 const installed = globalThis as { nightshiftGuard?: Guard };
@@ -28,7 +32,7 @@ export function guardProcess(
 ): void {
 	let guard = installed.nightshiftGuard;
 	if (!guard) {
-		const created: Guard = { exitOnUncaughtException: false };
+		const created: Guard = { exitOnUncaughtException: false, onCrash: null };
 		process.on("unhandledRejection", (reason) => {
 			console.error(
 				"UNHANDLED REJECTION: a promise failed and nothing handled it. Night Shift keeps running.",
@@ -36,6 +40,7 @@ export function guardProcess(
 			);
 		});
 		process.on("uncaughtException", (error) => {
+			created.onCrash?.();
 			if (created.exitOnUncaughtException) {
 				console.error("UNCAUGHT EXCEPTION: exiting with code 1.", error);
 				process.exit(1);
@@ -51,4 +56,14 @@ export function guardProcess(
 	if (options.exitOnUncaughtException !== undefined) {
 		guard.exitOnUncaughtException = options.exitOnUncaughtException;
 	}
+}
+
+/**
+ * Replaces the listener an uncaught exception calls. A later start replaces
+ * it again. The listener gets no error text.
+ */
+export function onProcessCrashed(listener: (() => void) | null): void {
+	const guard = installed.nightshiftGuard;
+	if (!guard) return;
+	guard.onCrash = listener;
 }

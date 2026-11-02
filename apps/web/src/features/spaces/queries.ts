@@ -17,4 +17,5 @@ export const spaceMutations = {
 	removeMember: orpc.members.remove.mutationOptions,
 	cancelInvitation: orpc.members.cancelInvitation.mutationOptions,
 	acceptInvitation: orpc.invitations.accept.mutationOptions,
+	setUsage: spaceQueries.setUsage,
 };

@@ -33,6 +33,11 @@ on:
         description: Where the build goes, stable or nightly.
         type: string
         required: true
+      usage_endpoint:
+        description: Anonymous usage ingest URL. Empty leaves the value empty.
+        type: string
+        required: false
+        default: ""
   pull_request:
     paths:
       - deploy/Dockerfile
@@ -98,6 +103,9 @@ jobs:
           no-cache-filters: runtime
           load: true
           tags: nightshift:test
+          build-args: |
+            NIGHTSHIFT_VERSION=${{ inputs.version }}
+            NIGHTSHIFT_USAGE_ENDPOINT=${{ inputs.usage_endpoint || vars.NIGHTSHIFT_USAGE_ENDPOINT }}
           cache-from: type=gha,scope=${{ steps.names.outputs.pair }}
           cache-to: type=gha,scope=${{ steps.names.outputs.pair }},mode=max
 
@@ -155,6 +163,9 @@ jobs:
           target: runtime
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NIGHTSHIFT_VERSION=${{ inputs.version }}
+            NIGHTSHIFT_USAGE_ENDPOINT=${{ inputs.usage_endpoint || vars.NIGHTSHIFT_USAGE_ENDPOINT }}
           outputs: type=image,"name=${{ steps.names.outputs.images }}",push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ steps.names.outputs.pair }}
 

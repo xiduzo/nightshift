@@ -256,6 +256,7 @@ describe("the Call node", () => {
 				status: "failed",
 				reason:
 					'Node "try" ended with "fail" and no edge leaves it on that outcome.',
+				endReason: "_OTHER",
 			},
 		]);
 		await h2.log.append({
@@ -300,6 +301,7 @@ describe("the Call node", () => {
 				nodeId: "call",
 				status: "failed",
 				reason: 'Node "call" failed: The flow "needs" needs a value for: must.',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(payloads(await h.events(), "StepEnded")[1]).toEqual({
@@ -354,6 +356,7 @@ describe("the Call node", () => {
 				nodeId: "worker",
 				status: "stopped",
 				reason: null,
+				endReason: "stopped_by_person",
 			},
 		]);
 		// The Subflow task never committed: the root stays at the node.

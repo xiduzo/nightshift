@@ -1,3 +1,4 @@
+import { arch, type } from "node:os";
 import type { TelemetryProtocol } from "@nightshift/engine/device-config";
 import {
 	type Attributes,
@@ -109,6 +110,72 @@ export function otlpSinks(target: ExportTarget): ExportSinks {
 			};
 }
 
+/** `key=value` pairs, as `OTEL_RESOURCE_ATTRIBUTES` writes them. Values are encoded. */
+function resourcePairs(raw: string | undefined): Record<string, string> {
+	const pairs: Record<string, string> = {};
+	if (!raw) return pairs;
+	for (const part of raw.split(",")) {
+		const eq = part.indexOf("=");
+		if (eq <= 0) continue;
+		const key = part.slice(0, eq).trim();
+		if (!key) continue;
+		try {
+			pairs[key] = decodeURIComponent(part.slice(eq + 1).trim());
+		} catch {
+			pairs[key] = part.slice(eq + 1).trim();
+		}
+	}
+	return pairs;
+}
+
+/** `os.type` as the registry spells it. */
+export function osType(): string {
+	switch (type()) {
+		case "Darwin":
+			return "darwin";
+		case "Linux":
+			return "linux";
+		case "Windows_NT":
+			return "windows";
+		default:
+			return type().toLowerCase();
+	}
+}
+
+/** `host.arch` as the registry spells it. */
+export function hostArch(): string {
+	switch (arch()) {
+		case "x64":
+			return "amd64";
+		case "ia32":
+			return "x86";
+		case "arm":
+			return "arm32";
+		default:
+			return arch();
+	}
+}
+
+/**
+ * The resource of the monitoring export. `service.name` stays Night Shift.
+ * The version is `NIGHTSHIFT_VERSION`, or `dev` when it is unset.
+ * `deployment.environment.name` comes from `OTEL_RESOURCE_ATTRIBUTES`, or `local`.
+ */
+export function resourceAttributes(deviceId: string): Attributes {
+	const fromEnv = resourcePairs(process.env.OTEL_RESOURCE_ATTRIBUTES);
+	const version = process.env.NIGHTSHIFT_VERSION?.trim() || "dev";
+	const environment = fromEnv[ATTR.deploymentEnvironment] || "local";
+	return {
+		[ATTR.serviceName]: SERVICE_NAME,
+		[ATTR.serviceInstance]: deviceId,
+		[ATTR.serviceVersion]: version,
+		[ATTR.osType]: osType(),
+		[ATTR.hostArch]: hostArch(),
+		[ATTR.deploymentEnvironment]: environment,
+		[ATTR.deviceId]: deviceId,
+	};
+}
+
 /**
  * Starts the providers over `sinks`. `metricIntervalMs`: how often the
  * metrics go out (default 60 s, the SDK's).
@@ -117,11 +184,7 @@ export function startExport(
 	sinks: ExportSinks,
 	options: { deviceId: string; metricIntervalMs?: number },
 ): RunningExport {
-	const resource = resourceFromAttributes({
-		[ATTR.serviceName]: SERVICE_NAME,
-		[ATTR.serviceInstance]: options.deviceId,
-		[ATTR.deviceId]: options.deviceId,
-	});
+	const resource = resourceFromAttributes(resourceAttributes(options.deviceId));
 	const ids = new NextIds();
 	const tracerProvider = new TracerProvider({
 		resource,

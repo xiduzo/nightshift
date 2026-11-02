@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import { useSignedIn } from "@/features/host";
 import type { CheckFailure } from "./answer-check";
+import { phoneGateAnswer } from "./gate-via";
 import { checkBeforeAnswer } from "./person-check";
 
 /** What went wrong with the last answer. */
@@ -105,24 +106,28 @@ export function useGateAnswer(
 		if (busy || choice === null) return;
 		if (!(await checked())) return;
 		const trimmed = note.trim();
-		resolve.mutate({
-			runId: gate.runId,
-			stepId: gate.stepId,
-			choice,
-			note: trimmed === "" ? undefined : trimmed,
-		});
+		resolve.mutate(
+			phoneGateAnswer({
+				runId: gate.runId,
+				stepId: gate.stepId,
+				choice,
+				note: trimmed === "" ? undefined : trimmed,
+			}) as unknown as Parameters<typeof resolve.mutate>[0],
+		);
 	}
 
 	/** Checks that it is you, then sends the data of an Ask's form (ADR 10). */
 	async function sendForm(data: JsonValue) {
 		if (busy) return;
 		if (!(await checked())) return;
-		resolve.mutate({
-			runId: gate.runId,
-			stepId: gate.stepId,
-			choice: "answer",
-			data,
-		});
+		resolve.mutate(
+			phoneGateAnswer({
+				runId: gate.runId,
+				stepId: gate.stepId,
+				choice: "answer",
+				data,
+			}) as unknown as Parameters<typeof resolve.mutate>[0],
+		);
 	}
 
 	return {

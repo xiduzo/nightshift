@@ -41,6 +41,7 @@ describe("checkHarness: claude-code", () => {
 			path: bin,
 			version: "2.1.3 (Claude Code)",
 			account: "night@example.com",
+			signIn: "signed_in",
 			facts: [
 				{ label: "Plan", value: "max" },
 				{ label: "Organization", value: "Night Shift" },
@@ -63,6 +64,7 @@ describe("checkHarness: claude-code", () => {
 		const check = await checkHarness("claude-code", bin);
 		expect(check.version).toBe("2.1.3 (Claude Code)");
 		expect(check.account).toBeNull();
+		expect(check.signIn).toBe("signed_out");
 		expect(check.problem).toBe("Not logged in. Run `claude` once to log in.");
 	});
 
@@ -74,6 +76,7 @@ describe("checkHarness: claude-code", () => {
 		expect(check).toMatchObject({
 			version: "1.0.0 (Claude Code)",
 			account: null,
+			signIn: "unknown",
 			facts: [],
 			problem: null,
 		});

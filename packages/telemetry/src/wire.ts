@@ -1,7 +1,9 @@
-import type { Engine, LandedFact } from "@nightshift/engine";
+import type { Database } from "@nightshift/db";
+import type { Engine, LandedFact, UsageMoment } from "@nightshift/engine";
 import type {
 	ConnectionStore,
 	SettingsStore,
+	TelemetryProtocol,
 } from "@nightshift/engine/device-config";
 
 import {
@@ -12,8 +14,14 @@ import {
 	startExport,
 } from "./otlp";
 import { traceRequests } from "./requests";
-import { createRunProjection, type RunProjection } from "./runs";
+import {
+	assertConforms,
+	createRunProjection,
+	type RunProjection,
+} from "./runs";
 import { claudeCodeEnv, codexSession } from "./sessions";
+import type { UsageSnapshot } from "./usage";
+import { createUsage, parseUsageEvent, sampleUsageEvent } from "./usage";
 
 /**
  * The export to monitoring of this computer, composed: off by default, on
@@ -25,6 +33,8 @@ import { claudeCodeEnv, codexSession } from "./sessions";
  * connection. It reads its settings from the settings store and the
  * `${NAME}` references of its headers from the secrets, and starts,
  * changes or stops the export itself when either changes, with no restart.
+ * The anonymous usage export is separate. It never uses this endpoint,
+ * and a session's own telemetry never uses the usage endpoint.
  */
 
 export type Telemetry = {
@@ -43,10 +53,48 @@ export type Telemetry = {
 	 * Sends the runs `engine` walks on this computer while the export is
 	 * on. Until it is called, only the sessions' own telemetry goes out.
 	 */
-	follow(engine: Pick<Engine, "onLandedFacts" | "runTrace">): void;
+	follow(
+		engine: Pick<Engine, "onLandedFacts" | "runTrace"> & {
+			usageAllowed?: () => Promise<boolean>;
+		},
+	): void;
 	/** Sends what waits, and stops. */
 	stop(): Promise<void>;
+	/** Notes a moment for the anonymous usage export. */
+	note(moment: UsageMoment): void;
+	/** The anonymous events still here, and the last batch that left. */
+	outbox(): Promise<{ waiting: unknown[]; lastSent: unknown[] }>;
+	/** The usage events and the fields each one can send. */
+	catalog(): { events: { name: string; attributes: string[] }[] };
+	/** A new install id and a new key. Old ids stop matching. */
+	resetId(): Promise<{ ok: true }>;
 };
+
+/** `http/protobuf` and `http/json` only. Unset is protobuf. gRPC stays off. */
+function otelProtocol(raw: string | undefined): TelemetryProtocol | null {
+	const value = (raw ?? "").trim();
+	if (value === "" || value === "http/protobuf") return "http/protobuf";
+	if (value === "http/json") return "http/json";
+	return null;
+}
+
+/** `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,…`, values encoded. */
+function otelHeaders(raw: string | undefined): Record<string, string> {
+	const headers: Record<string, string> = {};
+	if (!raw) return headers;
+	for (const part of raw.split(",")) {
+		const eq = part.indexOf("=");
+		if (eq <= 0) continue;
+		const name = part.slice(0, eq).trim();
+		if (!name) continue;
+		try {
+			headers[name] = decodeURIComponent(part.slice(eq + 1).trim());
+		} catch {
+			headers[name] = part.slice(eq + 1).trim();
+		}
+	}
+	return headers;
+}
 
 /** The export as the settings and the secrets have it now. */
 type Wanted =
@@ -67,6 +115,10 @@ export async function createTelemetry(deps: {
 	sinks?: (target: ExportTarget) => ExportSinks;
 	/** How often metrics go out. Default 60 s. */
 	metricIntervalMs?: number;
+	/** The local database: the usage outbox lives here. */
+	db: Database;
+	/** Counts for the daily usage event. Null until the daemon can read them. */
+	usageSnapshot?: () => Promise<UsageSnapshot | null>;
 }): Promise<Telemetry> {
 	const sinks = deps.sinks ?? otlpSinks;
 	let engine: Pick<Engine, "onLandedFacts" | "runTrace"> | null = null;
@@ -91,20 +143,37 @@ export async function createTelemetry(deps: {
 
 	/** Where the export goes now, with the secrets of its headers read. */
 	async function wanted(): Promise<Wanted> {
+		if (process.env.OTEL_SDK_DISABLED === "true") return { on: false };
 		const s = deps.settings.current();
-		const endpoint = s.telemetryEndpoint.trim();
-		if (!s.telemetry || endpoint === "") return { on: false };
-		const headers = await deps.secrets.expandEnv(s.telemetryHeaders);
-		if (!headers.ok) {
-			console.warn(
-				`[telemetry] the export to monitoring stays off: its headers need the secrets ${headers.missing.join(", ")}.`,
-			);
-			return { on: false };
+		// The Night Shift switch wins. An OTEL endpoint does not turn it on.
+		if (!s.telemetry) return { on: false };
+		const saved = s.telemetryEndpoint.trim();
+		if (saved !== "") {
+			const headers = await deps.secrets.expandEnv(s.telemetryHeaders);
+			if (!headers.ok) {
+				console.warn(
+					`[telemetry] the export to monitoring stays off: its headers need the secrets ${headers.missing.join(", ")}.`,
+				);
+				return { on: false };
+			}
+			return {
+				on: true,
+				target: {
+					endpoint: saved,
+					protocol: s.telemetryProtocol,
+					headers: headers.env,
+				},
+				values: headers.values,
+			};
 		}
+		const endpoint = (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "").trim();
+		const protocol = otelProtocol(process.env.OTEL_EXPORTER_OTLP_PROTOCOL);
+		if (endpoint === "" || !protocol) return { on: false };
+		const headers = otelHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS);
 		return {
 			on: true,
-			target: { endpoint, protocol: s.telemetryProtocol, headers: headers.env },
-			values: headers.values,
+			target: { endpoint, protocol, headers },
+			values: Object.values(headers),
 		};
 	}
 
@@ -134,6 +203,16 @@ export async function createTelemetry(deps: {
 			untraceRequests: traceRequests(running.tracerProvider),
 		};
 	}
+
+	// A valid usage event, and an empty export. A broken schema fails here.
+	parseUsageEvent(sampleUsageEvent());
+	assertConforms({ spans: [], metrics: [] });
+
+	const usage = createUsage({
+		db: deps.db,
+		settings: deps.settings,
+		snapshot: deps.usageSnapshot,
+	});
 
 	const reapply = () => void enqueue(apply);
 	const offSettings = deps.settings.onChange(reapply);
@@ -166,9 +245,11 @@ export async function createTelemetry(deps: {
 		follow(next) {
 			unfollow();
 			engine = next;
+			usage.follow(next);
 			// The runs this computer walks: each run's events are written here once.
 			unfollow = next.onLandedFacts(
 				(facts: readonly LandedFact[]) => {
+					void usage.take(facts, (runId) => next.runTrace(runId));
 					if (!current) return;
 					void enqueue(async () => {
 						await current?.projection.take(facts);
@@ -181,11 +262,16 @@ export async function createTelemetry(deps: {
 			offSettings();
 			offSecrets();
 			unfollow();
+			await usage.stop();
 			await queue;
 			const before = current;
 			current = null;
 			before?.untraceRequests();
 			await before?.running.shutdown();
 		},
+		note: (moment) => usage.note(moment),
+		outbox: () => usage.outbox(),
+		catalog: () => usage.catalog(),
+		resetId: () => usage.resetId(),
 	};
 }

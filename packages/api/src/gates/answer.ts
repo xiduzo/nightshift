@@ -48,15 +48,21 @@ export async function answerGate(
 	input: z.output<typeof gateAnswerSchema>,
 	errors: AnswerRefusals,
 ): Promise<void> {
-	const { via, ...answer } = input;
-	if (via === "lock-screen") {
+	const { via: raw, ...answer } = input;
+	const via =
+		raw === "lock-screen" || raw === "lock_screen"
+			? "lock_screen"
+			: raw === "web" || raw === "phone"
+				? raw
+				: "_OTHER";
+	if (via === "lock_screen") {
 		const refusal = lockScreenRefusal(await space.listGates(), answer);
 		if (refusal === "gate-closed") throw errors.GATE_CLOSED();
 		if (refusal === "needs-app") throw errors.NEEDS_APP();
 	}
 	try {
 		const { runId, ...choice } = answer;
-		await space.act(runId, { kind: "answer", ...choice });
+		await space.act(runId, { kind: "answer", ...choice, via });
 	} catch (error) {
 		if (error instanceof GateClosedError) {
 			throw errors.GATE_CLOSED({ cause: error });

@@ -18,9 +18,11 @@ import { type DeviceDocument, mapView } from "./device-document";
 /**
  * The daemon's settings. Each one is changed in the UI and saved in this
  * Device's document; a setting with no saved value falls back to the
- * daemon's environment, then to its default. One exception: `NIGHTSHIFT_SCHEDULER=off`
- * locks the scheduler off, so a dev daemon on a copy of the database never
- * starts the night's schedules.
+ * daemon's environment, then to its default. Two exceptions lock a switch
+ * off over a saved value: `NIGHTSHIFT_SCHEDULER=off`, so a dev daemon on a
+ * copy of the database never starts the night's schedules, and anonymous
+ * usage when `DO_NOT_TRACK=1`, `NIGHTSHIFT_USAGE=off` or
+ * `OTEL_SDK_DISABLED=true`.
  */
 
 type Def<T> = {
@@ -399,6 +401,22 @@ const DEFS = {
 		env: "NIGHTSHIFT_TELEMETRY",
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
+	/**
+	 * Anonymous usage leaves this computer. On by default. Nothing is sent
+	 * until the person has seen the notice (`usageSeen`), unless the
+	 * environment sets this itself.
+	 */
+	usage: {
+		schema: z.boolean(),
+		default: true,
+		env: "NIGHTSHIFT_USAGE",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	/** The person has seen the usage notice, or saved this switch. */
+	usageSeen: {
+		schema: z.boolean(),
+		default: false,
+	} satisfies Def<boolean>,
 	/** The OTLP endpoint, without `/v1/traces`: `http://localhost:4318`. Empty: none. */
 	telemetryEndpoint: {
 		schema: z
@@ -570,6 +588,9 @@ export type SettingsStore = {
 const SCHEDULER_LOCK =
 	"Night Shift was started with schedules turned off. You cannot turn them on here. To turn them on, start Night Shift again with schedules on.";
 
+const USAGE_LOCK =
+	"Night Shift was started with anonymous usage turned off. You cannot turn it on here. Start Night Shift again with usage on.";
+
 export function createSettingsStore(options: {
 	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
@@ -601,6 +622,19 @@ export function createSettingsStore(options: {
 		return env.NIGHTSHIFT_SCHEDULER?.trim().toLowerCase() === "off";
 	}
 
+	function envIs(name: string, expected: string): boolean {
+		return env[name]?.trim().toLowerCase() === expected;
+	}
+
+	/** An environment lock forces anonymous usage off for this start. */
+	function usageLocked(): boolean {
+		return (
+			envIs("DO_NOT_TRACK", "1") ||
+			envIs("OTEL_SDK_DISABLED", "true") ||
+			onOff(env.NIGHTSHIFT_USAGE ?? "") === false
+		);
+	}
+
 	function field(key: SettingKey): { value: unknown } & SettingField {
 		const def: Def<unknown> = DEFS[key];
 		const envValue = fromEnv(key);
@@ -615,6 +649,14 @@ export function createSettingsStore(options: {
 				source: "env",
 				...base,
 				locked: SCHEDULER_LOCK,
+			};
+		}
+		if (key === "usage" && usageLocked()) {
+			return {
+				value: false,
+				source: "env",
+				...base,
+				locked: USAGE_LOCK,
 			};
 		}
 		if (saved().has(key))
@@ -653,11 +695,11 @@ export function createSettingsStore(options: {
 				if (value === null) return fromEnv(key) ?? DEFS[key].default;
 				return value;
 			};
-			const usage = {
+			const waits = {
 				first: after("usageLimitFirstWaitMinutes") as number,
 				max: after("usageLimitMaxWaitMinutes") as number,
 			};
-			if (usage.first > usage.max) {
+			if (waits.first > waits.max) {
 				throw new Refusal(
 					"invalid",
 					"The first usage-limit wait cannot be longer than the longest one.",
@@ -668,6 +710,10 @@ export function createSettingsStore(options: {
 					const value = parsed[key];
 					if (value === null) document.settings.delete(key);
 					else if (value !== undefined) document.settings.set(key, value);
+				}
+				// Saving the switch, on or off, means the person has seen it.
+				if (typeof parsed.usage === "boolean") {
+					document.settings.set("usageSeen", true);
 				}
 			});
 			return view();

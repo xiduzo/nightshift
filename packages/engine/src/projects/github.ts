@@ -40,7 +40,26 @@ export type GitHubCli = {
 		cwd: string,
 		options?: GitRunOptions,
 	): Promise<GitResult>;
+	/**
+	 * What became of a pull request, from `gh pr view`. Null when `gh` is
+	 * missing, not signed in, or the address is not a pull request: the
+	 * morning check tries again later.
+	 */
+	viewPullRequest(url: string): Promise<PullRequestView | null>;
 };
+
+/** What `gh pr view` says about a pull request. */
+export type PullRequestView = {
+	state: "open" | "merged" | "closed";
+	mergeSha: string | null;
+	mergedAt: string | null;
+	closedAt: string | null;
+	/** A revert found within the commits `gh` lists. Null when none shows. */
+	reverted: { label: string } | null;
+};
+
+/** The morning check asks this. A test passes its own. */
+export type PullRequestReader = Pick<GitHubCli, "viewPullRequest">;
 
 /** A GitHub user or organization name: letters, digits and single dashes, at most 39. */
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
@@ -144,7 +163,145 @@ export function systemGitHubCli(
 				options,
 			);
 		},
+		viewPullRequest(url) {
+			return readPullRequest(gh, deps.which, url);
+		},
 	};
+}
+
+const PULL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/i;
+const REVERTS_PULL = /Reverts\s+([\w.-]+)\/([\w.-]+)#(\d+)\b/i;
+const REVERTS_COMMIT = /This reverts commit ([0-9a-f]{7,40})\b/i;
+
+type GhRun = (
+	args: string[],
+	cwd: string,
+	options?: GitRunOptions,
+) => Promise<GitResult>;
+
+/** `gh pr view`, then a revert search when the pull request merged. */
+async function readPullRequest(
+	gh: GhRun,
+	which: (name: string) => string | null,
+	url: string,
+): Promise<PullRequestView | null> {
+	if (which("gh") === null) return null;
+	const parsed = PULL.exec(url.trim());
+	if (!parsed) return null;
+	try {
+		const result = await gh(
+			[
+				"pr",
+				"view",
+				url,
+				"--json",
+				"state,mergedAt,closedAt,mergeCommit,url,number",
+			],
+			process.cwd(),
+			{ timeoutMs: ASK_TIMEOUT_MS },
+		);
+		if (result.exitCode !== 0) return null;
+		const body = JSON.parse(result.stdout) as {
+			state?: string;
+			mergedAt?: string | null;
+			closedAt?: string | null;
+			mergeCommit?: { oid?: string } | null;
+		};
+		const state = body.state?.toUpperCase();
+		const mapped =
+			state === "OPEN"
+				? "open"
+				: state === "MERGED"
+					? "merged"
+					: state === "CLOSED"
+						? "closed"
+						: null;
+		if (!mapped) return null;
+		const mergeSha = body.mergeCommit?.oid ?? null;
+		const reverted =
+			mapped === "merged"
+				? await revertOf(
+						gh,
+						parsed[1] ?? "",
+						parsed[2] ?? "",
+						parsed[3] ?? "",
+						mergeSha,
+					)
+				: null;
+		return {
+			state: mapped,
+			mergeSha,
+			mergedAt: body.mergedAt ?? null,
+			closedAt: body.closedAt ?? null,
+			reverted,
+		};
+	} catch {
+		return null;
+	}
+}
+
+/** A merged revert of this pull request, from `gh pr list` or recent commits. */
+async function revertOf(
+	gh: GhRun,
+	owner: string,
+	repo: string,
+	number: string,
+	mergeSha: string | null,
+): Promise<{ label: string } | null> {
+	const list = await gh(
+		[
+			"pr",
+			"list",
+			"--repo",
+			`${owner}/${repo}`,
+			"--state",
+			"merged",
+			"--search",
+			`Reverts ${owner}/${repo}#${number}`,
+			"--json",
+			"number,body",
+			"--limit",
+			"10",
+		],
+		process.cwd(),
+		{ timeoutMs: ASK_TIMEOUT_MS },
+	).catch(() => null);
+	if (list && list.exitCode === 0) {
+		const rows = JSON.parse(list.stdout) as {
+			number?: number;
+			body?: string;
+		}[];
+		for (const row of Array.isArray(rows) ? rows : []) {
+			const match = REVERTS_PULL.exec(row.body ?? "");
+			if (
+				match &&
+				match[1]?.toLowerCase() === owner.toLowerCase() &&
+				match[2]?.toLowerCase() === repo.toLowerCase() &&
+				match[3] === number
+			) {
+				return { label: `${owner}/${repo}#${row.number ?? number}` };
+			}
+		}
+	}
+	if (!mergeSha) return null;
+	const commits = await gh(
+		["api", `repos/${owner}/${repo}/commits?per_page=20`],
+		process.cwd(),
+		{ timeoutMs: ASK_TIMEOUT_MS },
+	).catch(() => null);
+	const listed =
+		commits !== null && commits.exitCode === 0 ? commits.stdout : null;
+	if (listed === null) return null;
+	const items = JSON.parse(listed) as {
+		commit?: { message?: string };
+	}[];
+	const needle = mergeSha.toLowerCase();
+	for (const item of Array.isArray(items) ? items : []) {
+		const found = REVERTS_COMMIT.exec(item.commit?.message ?? "");
+		const sha = found?.[1]?.toLowerCase();
+		if (sha && needle.startsWith(sha)) return { label: found?.[1] ?? sha };
+	}
+	return null;
 }
 
 /**

@@ -1,13 +1,16 @@
 import { withLangGraph } from "@langchain/langgraph/zod";
 import { type JsonValue, outcomeColorSchema } from "@nightshift/flows";
 import { z } from "zod";
-import type {
-	GateChoice,
-	GateDeadline,
-	StepOutcome,
-	StepOutputs,
-	TranscriptEntry,
-	WaitReason,
+import {
+	type GateChoice,
+	type GateDeadline,
+	type GateVia,
+	RUN_END_REASONS,
+	type RunEndReason,
+	type StepOutcome,
+	type StepOutputs,
+	type TranscriptEntry,
+	type WaitReason,
 } from "../log";
 
 /**
@@ -113,6 +116,8 @@ const pendingParkedSchema = z.object({
 	status: z.enum(["failed", "stopped"]),
 	/** The run's end reason, as `RunEnded` records it. */
 	reason: z.string().nullable(),
+	/** Why the run ended, as a code. Absent in a checkpoint from before the code was stored. */
+	endReason: z.enum(RUN_END_REASONS).optional(),
 	/** True when the stop time stopped the run, not a person: a Call node's `stopped` edge may then go on. */
 	atStopTime: z.boolean().optional(),
 });
@@ -444,6 +449,8 @@ export type Parked =
 			nodeId: string;
 			status: "failed" | "stopped";
 			reason: string | null;
+			/** The code stored with the park. Absent when the checkpoint predates it. */
+			endReason?: RunEndReason;
 			atStopTime?: boolean;
 	  };
 
@@ -472,6 +479,8 @@ export type ResumeValue =
 			note?: string;
 			byDeadline?: true;
 			data?: JsonValue;
+			/** Where the answer came from. Absent: the score stores `_OTHER`. */
+			via?: GateVia;
 	  }
 	/** A signal ended the wait. `data`: the webhook event that sent it, if one did. */
 	| { kind: "signal"; name: string; data?: JsonValue };

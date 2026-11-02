@@ -1,0 +1,1 @@
+export { migrateInsights } from "./migrate";

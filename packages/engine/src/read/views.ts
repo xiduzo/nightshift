@@ -13,6 +13,7 @@ import type {
 	GateDeadline,
 	ResumeAction,
 	ResumedBy,
+	RunEndReason,
 	RunResult,
 	RunStatus,
 	RunTrigger,
@@ -183,6 +184,11 @@ export type RunSummary = {
 	 * or the message of the End node that ended it.
 	 */
 	reason: string | null;
+	/**
+	 * Why the run ended, as a code. Null while it has not ended. Absent
+	 * on a summary a caller built by hand.
+	 */
+	endReason?: RunEndReason | null;
 	/**
 	 * How the End node that ended the run says it came out: `done`,
 	 * `nothing-to-do` or `failed`. Null when no End node ended it.

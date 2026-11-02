@@ -5,9 +5,10 @@
  *      workspaces its layer allows. Bun links only declared dependencies,
  *      so the dependencies in each package.json are the real import graph
  *      between workspaces. `@nightshift/config` (shared tsconfig)
- *      `@nightshift/refusal` (the refusal type, which imports nothing)
- *      and `@nightshift/time` (the clock, which imports no Night Shift
- *      package) are allowed everywhere.
+ *      `@nightshift/refusal` (the refusal type, which imports nothing),
+ *      `@nightshift/time` (the clock, which imports no Night Shift
+ *      package) and `@nightshift/semconv` (the semantic-convention
+ *      names, which import no Night Shift package) are allowed everywhere.
  * (L2) Every declared workspace dependency is used: a file of the
  *      workspace imports it (a .ts, .tsx, .js, .mjs, .cjs or .css file), or
  *      its tsconfig extends it.
@@ -39,6 +40,7 @@ import { join, relative, sep } from "node:path";
 const EVERYWHERE = new Set([
 	"@nightshift/config",
 	"@nightshift/refusal",
+	"@nightshift/semconv",
 	"@nightshift/time",
 ]);
 
@@ -56,11 +58,18 @@ export const LAYERS: Record<string, Rule> = {
 	// 0. Foundation
 	"@nightshift/config": { layer: 0, mayImport: [] },
 	"@nightshift/refusal": { layer: 0, mayImport: [] },
+	"@nightshift/semconv": { layer: 0, mayImport: [] },
 	"@nightshift/time": { layer: 0, mayImport: [] },
 	"@nightshift/db": { layer: 0, mayImport: [] },
 	"@nightshift/flows": { layer: 0, mayImport: [] },
 	"@nightshift/ui": { layer: 0, mayImport: [] },
 	"@nightshift/ui-native": { layer: 0, mayImport: [] },
+	// 1. Insights. Postgres for the admin app. It does not import db:
+	// that package is libsql on the computer. It imports semconv and time.
+	"@nightshift/insights": {
+		layer: 1,
+		mayImport: ["@nightshift/semconv", "@nightshift/time"],
+	},
 	// 1. Capabilities
 	"@nightshift/auth": { layer: 1, mayImport: ["@nightshift/db"] },
 	"@nightshift/agents": { layer: 1, mayImport: ["@nightshift/flows"] },
@@ -97,6 +106,7 @@ export const LAYERS: Record<string, Rule> = {
 	},
 	// 6. Apps. The web app and the phone app read the API's types through
 	// `@nightshift/client`, never from `@nightshift/api` itself.
+	// Insights wires `@nightshift/insights` and `@nightshift/ui` only.
 	server: { layer: 6, mayImport: "lower" },
 	desktop: { layer: 6, mayImport: ["@nightshift/daemon"] },
 	web: {
@@ -111,9 +121,13 @@ export const LAYERS: Record<string, Rule> = {
 			"@nightshift/ui-native",
 		],
 	},
+	insights: {
+		layer: 6,
+		mayImport: ["@nightshift/insights", "@nightshift/ui"],
+	},
 };
 
-export const APPS = new Set(["server", "desktop", "web", "mobile"]);
+export const APPS = new Set(["server", "desktop", "web", "mobile", "insights"]);
 
 /** The packages in the shadcn layout: their entries point deep (L4). */
 const SHADCN = new Set(["@nightshift/ui", "@nightshift/ui-native"]);

@@ -106,7 +106,9 @@ function restorePatch(
 ): SettingsPatch {
 	const patch: Record<string, unknown> = {};
 	for (const key of keys) {
-		patch[key] = view.fields[key].source === "saved" ? view.values[key] : null;
+		// A key the view does not know yet (the usage export, until it lands)
+		// resets to the default instead of throwing.
+		patch[key] = view.fields[key]?.source === "saved" ? view.values[key] : null;
 	}
 	return patch as SettingsPatch;
 }

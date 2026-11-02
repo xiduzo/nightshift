@@ -12,6 +12,7 @@ import { Link } from "@tanstack/react-router";
 import { notificationQueries } from "@/features/notifications";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { UsefulChoice } from "./useful-choice";
 
 /**
  * The last morning digest on top of the inbox, as the phone shows it: its
@@ -73,6 +74,7 @@ function DigestRun({ run }: { run: Digest["runs"][number] }) {
 				<ItemDescription className="line-clamp-2 text-xs">
 					{facts.join(" · ")}
 				</ItemDescription>
+				<UsefulChoice run={run} />
 			</ItemContent>
 		</Item>
 	);

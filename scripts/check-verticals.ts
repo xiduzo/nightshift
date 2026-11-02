@@ -190,6 +190,7 @@ export const KNOWN_CYCLES: Record<string, string[]> = {};
 export const ENTRY_DIRS: Record<string, string[]> = {
 	// TanStack Router's file routes.
 	"apps/web": ["routes"],
+	"apps/insights": ["routes"],
 	// Expo Router's files.
 	"apps/mobile": ["app"],
 	// Electrobun's main process entry.

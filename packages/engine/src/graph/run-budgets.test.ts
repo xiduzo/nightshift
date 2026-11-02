@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { AgentNode, Policy } from "@nightshift/flows";
 import { now } from "@nightshift/time";
+import { getRunRow } from "../log";
 import {
 	agent as agentNode,
 	drive,
@@ -10,8 +11,9 @@ import {
 	MINUTE,
 	payloads,
 	startRun,
+	testRunner,
 } from "../testing/graph";
-import { createSandbox, type Sandbox } from "../testing/test-support";
+import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
 
 /**
  * The guards of the run policy on the compiled graph, with the fake
@@ -192,7 +194,7 @@ describe("the turn limit", () => {
 		expect(harness.calls.map((c) => c.maxTurns)).toEqual([7, 9]);
 	});
 
-	test("Claude Code stopping at its turn limit ends the step fail, with a budget warning", async () => {
+	test("Claude Code stopping at its turn limit ends the step fail, with a turns warning", async () => {
 		const harness = fakeHarness({
 			steps: [{ type: "text", text: "Still working." }],
 			outcome: { type: "finished", limit: "turns" },
@@ -217,8 +219,8 @@ describe("the turn limit", () => {
 		// A guard's fail takes the fail edge, like the agent's own.
 		expect(payloads(logged, "EdgeTaken")[0]?.to).toBe("fixer");
 		expect(
-			payloads(logged, "RunWarned").filter((w) => w.kind === "budget"),
-		).toEqual([{ kind: "budget", message }]);
+			payloads(logged, "RunWarned").filter((w) => w.kind === "turns"),
+		).toEqual([{ kind: "turns", message }]);
 	});
 
 	test("for another harness the engine counts the turns and stops the session past the limit", async () => {
@@ -255,9 +257,44 @@ describe("the turn limit", () => {
 			outcome: "fail",
 			error: message,
 		});
-		expect(payloads(logged, "RunWarned")).toEqual([
-			{ kind: "budget", message },
-		]);
+		expect(payloads(logged, "RunWarned")).toEqual([{ kind: "turns", message }]);
+		expect(parked[0]).toMatchObject({ endReason: "guard.turns" });
+	});
+
+	test("a turn limit with no way on stores guard.turns, and the reason stays a sentence", async () => {
+		const harness = fakeHarness({
+			steps: [{ type: "text", text: "Still working." }],
+			outcome: { type: "finished", limit: "turns" },
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "worker",
+				nodes: [agent("worker", { maxTurns: 4 })],
+				edges: [],
+			}),
+			{ harness },
+		);
+		const runner = testRunner(h);
+		try {
+			await runner.take(h.runId, {
+				kind: "start",
+				prepare: async () => ({
+					row: await getRunRow(sandbox.db, h.runId),
+					inputs: {},
+					stopAt: null,
+				}),
+			});
+			await waitFor(async () =>
+				(await h.events()).some((event) => event.type === "RunEnded"),
+			);
+			const ended = payloads(await h.events(), "RunEnded")[0];
+			expect(ended?.endReason).toBe("guard.turns");
+			expect(ended?.reason?.includes(" ")).toBe(true);
+			expect(ended?.reason).not.toBe("guard.turns");
+		} finally {
+			await runner.release();
+		}
 	});
 });
 

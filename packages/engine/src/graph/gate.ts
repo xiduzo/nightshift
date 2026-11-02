@@ -1,5 +1,5 @@
 import type { AskForm } from "@nightshift/flows";
-import type { GateChoice, GateDeadline, StepEvent } from "../log";
+import type { GateChoice, GateDeadline, GateVia, StepEvent } from "../log";
 import type { StepContext } from "./context";
 
 /**
@@ -54,10 +54,11 @@ export async function openGate(
  * nodes that ask a person score it the same way.
  */
 export async function scoreGate(
-	ctx: Pick<StepContext, "log" | "run">,
+	ctx: Pick<StepContext, "log" | "run" | "usage">,
 	stepId: string,
-	answer: { choice: string; byDeadline?: boolean },
+	answer: { choice: string; byDeadline?: boolean; via?: GateVia },
 ): Promise<void> {
+	const via = answer.via ?? "_OTHER";
 	await ctx.log.append({
 		type: "Scored",
 		runId: ctx.run.id,
@@ -67,6 +68,23 @@ export async function scoreGate(
 			value: 1,
 			label: answer.choice,
 			by: answer.byDeadline ? "deadline" : "person",
+			via,
 		},
+	});
+	if (!ctx.usage) return;
+	const state = await ctx.log.state(ctx.run.id);
+	const step = state.steps.get(stepId);
+	const waits = step?.gateWaits ?? [];
+	let waitMs = 0;
+	for (const wait of waits) {
+		if (wait.to !== null && wait.to >= wait.from) waitMs += wait.to - wait.from;
+	}
+	ctx.usage.note({
+		kind: "gate-answered",
+		by: answer.byDeadline ? "deadline" : "person",
+		via,
+		waitMs,
+		hasDeadline: step?.gate?.deadline != null,
+		isForm: step?.gate?.form != null,
 	});
 }

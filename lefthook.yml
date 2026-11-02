@@ -18,6 +18,21 @@ pre-commit:
         - "biome.json"
         - "*.{ts,tsx,js,mjs,cjs,css}"
       run: bun scripts/check-layers.ts
+    # A gen_ai.* or nightshift.* string outside the generated package.
+    - name: semconv
+      glob:
+        - "*.{ts,tsx}"
+        - "packages/semconv/**"
+        - "packages/telemetry/registry/**"
+      run: bun scripts/check-semconv.ts
+    # The Collector allowlist matches the usage export.
+    - name: collector allowlist
+      glob:
+        - "deploy/insights/collector.yaml"
+        - "packages/telemetry/src/usage/send.ts"
+        - "packages/semconv/**"
+        - "scripts/check-collector-allowlist.ts"
+      run: bun scripts/check-collector-allowlist.ts
     # The vertical check reads the source, the entries and the path aliases.
     - name: verticals
       glob:

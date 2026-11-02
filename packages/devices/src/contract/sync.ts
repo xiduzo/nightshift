@@ -76,6 +76,7 @@ const runCommandSchema = exact<RunCommand>()(
 				choice: z.string(),
 				note: z.string().optional(),
 				data: z.json().optional(),
+				via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
 			}),
 			...commandFields,
 		}),
@@ -99,6 +100,11 @@ const runCommandSchema = exact<RunCommand>()(
 		z.object({
 			kind: z.literal("lease.release"),
 			payload: z.object({ name: z.string() }),
+			...commandFields,
+		}),
+		z.object({
+			kind: z.literal("run.useful"),
+			payload: z.object({ useful: z.boolean() }),
 			...commandFields,
 		}),
 	]),

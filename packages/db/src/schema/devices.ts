@@ -160,6 +160,7 @@ export const runCommand = sqliteTable(
 				"run.stop",
 				"run.move",
 				"lease.release",
+				"run.useful",
 			],
 		}).notNull(),
 		/** JSON: the action's input (the Gate's step, choice and note; the signal; when to stop; the lease). */

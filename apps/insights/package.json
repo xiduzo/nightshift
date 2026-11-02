@@ -1,0 +1,45 @@
+{
+	"name": "insights",
+	"private": true,
+	"type": "module",
+	"sideEffects": [
+		"*.css"
+	],
+	"scripts": {
+		"dev": "bun --hot src/main.ts",
+		"start": "NODE_ENV=production bun src/main.ts",
+		"build": "vite build",
+		"check-types": "vite build && tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@better-auth/drizzle-adapter": "catalog:",
+		"@nightshift/insights": "workspace:*",
+		"@nightshift/ui": "workspace:*",
+		"@orpc/client": "catalog:",
+		"@orpc/server": "catalog:",
+		"@orpc/tanstack-query": "catalog:",
+		"@tanstack/react-query": "catalog:",
+		"@tanstack/react-router": "^1.170.32",
+		"@tailwindcss/vite": "^4.3.3",
+		"better-auth": "catalog:",
+		"drizzle-orm": "catalog:",
+		"hono": "^4.13.7",
+		"lucide-react": "catalog:",
+		"next-themes": "catalog:",
+		"postgres": "3.4.7",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tailwindcss": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@tanstack/router-plugin": "^1.168.48",
+		"@types/bun": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"@vitejs/plugin-react": "^6.1.1",
+		"typescript": "catalog:",
+		"vite": "^8.2.2"
+	}
+}

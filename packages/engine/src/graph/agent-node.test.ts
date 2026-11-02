@@ -514,6 +514,7 @@ describe("the Agent node", () => {
 				status: "failed",
 				reason:
 					'Node "worker" ended with "fail", but edge "retry" (worker → worker on fail, max 2) reached its max.',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(held(state)).toMatchObject({
@@ -845,6 +846,7 @@ describe("the Agent node", () => {
 				nodeId: "worker",
 				status: "stopped",
 				reason: null,
+				endReason: "stopped_by_person",
 			},
 		]);
 		expect(held(second.state)).toMatchObject({
@@ -911,6 +913,7 @@ describe("the Agent node", () => {
 				nodeId: "worker",
 				status: "failed",
 				reason: 'Node "worker" failed: boom',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(payloads(await h.events(), "SessionEnded")[0]).toMatchObject({
@@ -1065,6 +1068,7 @@ describe("the Agent node", () => {
 				nodeId: "worker",
 				status: "stopped",
 				reason: null,
+				endReason: "stopped_by_person",
 			},
 		]);
 		const logged = await h.events();

@@ -52,6 +52,23 @@ jobs:
       - name: Layer map
         run: bun scripts/check-layers.ts
 
+      - name: Semantic convention strings
+        run: bun scripts/check-semconv.ts
+
+      - name: Collector allowlist
+        run: bun scripts/check-collector-allowlist.ts
+
+      - name: Weaver registry
+        run: |
+          version=$(tr -d '[:space:]' < packages/telemetry/registry/weaver-version.txt)
+          asset="weaver-x86_64-unknown-linux-gnu.tar.xz"
+          curl -fsSL -o /tmp/weaver.tar.xz \
+            "https://github.com/open-telemetry/weaver/releases/download/${version}/${asset}"
+          mkdir -p /tmp/weaver
+          tar -xJf /tmp/weaver.tar.xz -C /tmp/weaver
+          bin=$(find /tmp/weaver -type f -name weaver -print -quit)
+          "$bin" registry check --v2 --registry packages/telemetry/registry
+
       - name: Verticals
         run: bun scripts/check-verticals.ts
 

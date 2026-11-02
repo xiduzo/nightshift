@@ -12,6 +12,10 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+      args:
+        # An absent value stays empty. Night Shift sends usage only when
+        # the value has a URL.
+        NIGHTSHIFT_USAGE_ENDPOINT: ${NIGHTSHIFT_USAGE_ENDPOINT:-}
     restart: unless-stopped
     # The image's health check marks a Night Shift that stops responding as
     # unhealthy (`docker compose ps`). Compose does not restart it for that:
@@ -26,6 +30,8 @@ services:
       # People who sign in from another computer must use two-factor sign-in.
       # Give the Host admin a password first (docs/deploy/README.md).
       # NIGHTSHIFT_REQUIRE_TWO_FACTOR: "on"
+      # Hosts send anonymous usage. For a Host that must not send usage:
+      # NIGHTSHIFT_USAGE: "off"
       # Pushes to the phone app, when its Expo project requires a token.
       # EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN}
     volumes:

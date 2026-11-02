@@ -63,6 +63,7 @@ import {
 	createWorktrees,
 	forgetSpaceRows,
 	memberName,
+	spaceUsageOn,
 	systemGit,
 } from "../projects";
 import {
@@ -78,10 +79,12 @@ import {
 } from "../read";
 import {
 	createPullRequestScores,
+	createPullRequestWatch,
 	createScheduleFiles,
 	createScheduler,
 	createWebhooks,
 	DEFAULT_SCHEDULE_TICK_MS,
+	msUntilMorning,
 	type WebhookAnswer,
 	type WebhookRequest,
 } from "../schedules";
@@ -229,6 +232,11 @@ export interface Engine {
 		"flows" | "schedules" | "planMerge" | "merge"
 	>;
 	/**
+	 * Whether this computer may send anonymous usage. False when any Space
+	 * it belongs to has usage turned off. Missing means on.
+	 */
+	usageAllowed(): Promise<boolean>;
+	/**
 	 * A run's status, when it wakes, and whether this computer walks it or
 	 * runs its steps, in any Space of this Replica. Null for a run it does
 	 * not have. Cheap: one row and the facts the run log keeps, for a
@@ -248,6 +256,12 @@ export interface Engine {
 	 * offline look again now, instead of at their next try.
 	 */
 	deviceBack(deviceId: string): Promise<void>;
+	/**
+	 * Asks GitHub about each pull request a run on this computer opened,
+	 * until it is merged or closed. Does nothing when this computer has no
+	 * `gh`. The morning check calls this; a test can call it too.
+	 */
+	scoreOpenPullRequests(): Promise<void>;
 	/**
 	 * A webhook for a schedule (`POST /hooks/<project>/<schedule>`): the
 	 * answer for its sender, and `done`, the run's start and the signal
@@ -517,6 +531,7 @@ export function createEngine(
 		holds: runHolds,
 		leases,
 		services,
+		usage: options.usage,
 		...(internals.overdueSweepMs !== undefined
 			? { overdueSweepMs: internals.overdueSweepMs }
 			: {}),
@@ -645,15 +660,38 @@ export function createEngine(
 		enabled: () => runSettings().scheduler,
 		firesHere,
 		runStatus: reads.runStatus,
+		usage: options.usage,
 	});
+	const pullRequestWatch = createPullRequestWatch({
+		db,
+		log: runLog,
+		now,
+		usage: options.usage,
+		github: options.github ?? { viewPullRequest: async () => null },
+	});
+	let morningTimer: ReturnType<typeof setTimeout> | undefined;
+	const armMorning = () => {
+		morningTimer = setTimeout(() => {
+			void pullRequestWatch.score().catch(() => {});
+			if (!disposed) armMorning();
+		}, msUntilMorning(now()));
+		morningTimer.unref?.();
+	};
 	if (options.scheduler !== false) {
 		const schedulerSignal = options.scheduler?.signal;
-		signal.addEventListener("abort", () => scheduler.stop(), {
-			once: true,
-		});
+		signal.addEventListener(
+			"abort",
+			() => {
+				scheduler.stop();
+				clearTimeout(morningTimer);
+			},
+			{ once: true },
+		);
 		ready.then(
 			() => {
-				if (!disposed) scheduler.start(schedulerSignal);
+				if (disposed) return;
+				scheduler.start(schedulerSignal);
+				if (options.github) armMorning();
 			},
 			() => {},
 		);
@@ -707,7 +745,12 @@ export function createEngine(
 	const signals = createSignals({ db, log: runLog, runner });
 
 	/** A webhook schedule's pull request scores: the project's runs this computer walks. */
-	const pullRequestScores = createPullRequestScores({ db, log: runLog, now });
+	const pullRequestScores = createPullRequestScores({
+		db,
+		log: runLog,
+		now,
+		usage: options.usage,
+	});
 
 	const webhooks = createWebhooks({
 		db,
@@ -746,6 +789,7 @@ export function createEngine(
 		placement,
 		holds: startHolds,
 		leases,
+		...(options.usage ? { usage: options.usage } : {}),
 	});
 
 	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */
@@ -807,6 +851,7 @@ export function createEngine(
 		flows: createSpaceFlows({
 			ready,
 			flows: projectFlows,
+			usage: options.usage,
 			project: (projectId, spaceId) => projects.find(projectId, spaceId),
 			personNames: (ids) => namesOf(db, ids),
 			deviceNames: (ids) => directory.names(ids),
@@ -820,6 +865,7 @@ export function createEngine(
 		scheduleFiles: createScheduleFiles({
 			now,
 			flows: projectFlows,
+			usage: options.usage,
 			scheduler,
 			webhooks,
 			runStatus: reads.runStatus,
@@ -861,6 +907,11 @@ export function createEngine(
 			return true;
 		},
 		flows: projectFlows,
+		async usageAllowed() {
+			await ready;
+			const spaces = await documents.openAll();
+			return spaces.every(spaceUsageOn);
+		},
 		async runHere(runId) {
 			await ready;
 			return reads.runHere(runId);
@@ -872,6 +923,10 @@ export function createEngine(
 		async deviceBack(_deviceId) {
 			await ready;
 			await wakeOfflineSleeps({ db, log: runLog, runner });
+		},
+		async scoreOpenPullRequests() {
+			await ready;
+			await pullRequestWatch.score();
 		},
 		async webhook(request) {
 			await ready;

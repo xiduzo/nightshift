@@ -72,6 +72,7 @@ describe("the stop time in the state", () => {
 				nodeId: "check",
 				status: "stopped",
 				reason: STOP_TIME_REASON,
+				endReason: "stop_time",
 				atStopTime: true,
 			},
 		]);

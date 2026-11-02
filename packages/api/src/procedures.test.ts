@@ -117,6 +117,7 @@ const engine: Context["engine"] = {
 	logMemberChange: async () => {},
 	logKnowledgeUse: async () => {},
 	onLandedFacts: () => () => {},
+	usageAllowed: async () => true,
 	leases: {
 		take: async () => ({ kind: "held" }),
 		renew: async () => [],
@@ -133,6 +134,7 @@ const engine: Context["engine"] = {
 	runHere: async () => null,
 	runTrace: async () => null,
 	deviceBack: async () => {},
+	scoreOpenPullRequests: async () => {},
 	webhook: async () => ({
 		answer: { kind: "not-found" },
 		done: Promise.resolve(),
@@ -1195,7 +1197,7 @@ describe("the Needs-you inbox", () => {
 		// Bound to its run and step.
 		expect(args.at(-1)).toEqual([
 			"ada-run",
-			{ kind: "answer", stepId: "step-1", choice: "yes" },
+			{ kind: "answer", stepId: "step-1", choice: "yes", via: "_OTHER" },
 		]);
 		// The session still works in Platform.
 		expect((await contextFor(ada.headers)).access.spaceId).toBe(spaceId);
@@ -1253,7 +1255,12 @@ describe("the Needs-you inbox", () => {
 		});
 		expect(args.at(-1)).toEqual([
 			"marked-run",
-			{ kind: "answer", stepId: "step-marked-run", choice: "yes" },
+			{
+				kind: "answer",
+				stepId: "step-marked-run",
+				choice: "yes",
+				via: "lock_screen",
+			},
 		]);
 
 		expect(
@@ -1290,7 +1297,12 @@ describe("the Needs-you inbox", () => {
 		await call(appRouter.gates.resolve, inApp, { context });
 		expect(args.at(-1)).toEqual([
 			"plain-run",
-			{ kind: "answer", stepId: "step-plain-run", choice: "yes" },
+			{
+				kind: "answer",
+				stepId: "step-plain-run",
+				choice: "yes",
+				via: "_OTHER",
+			},
 		]);
 	});
 

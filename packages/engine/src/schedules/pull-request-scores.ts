@@ -4,6 +4,7 @@ import type { JsonValue, WebhookEvent } from "@nightshift/flows";
 import { and, eq, sql } from "drizzle-orm";
 import type { RunLog, RunState, ScoreName } from "../log";
 import { runFacts } from "../read";
+import type { UsageNotes } from "../usage";
 
 /**
  * Pull request scores from GitHub's webhooks: what became of the pull
@@ -116,9 +117,38 @@ export type PullRequestScoresDeps = {
 	/** Appends `Scored`, and reads the runs. */
 	log: Pick<RunLog, "append" | "state" | "walkerId">;
 	now(): number;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 };
 
 export type PullRequestScores = ReturnType<typeof createPullRequestScores>;
+
+/**
+ * Writes one pull request score and notes the hours from when the run
+ * opened it (or from when the run started) to `outcomeAt`.
+ */
+export async function recordPullRequestScore(
+	deps: Pick<PullRequestScoresDeps, "log" | "now" | "usage">,
+	runId: string,
+	score: ScoreName,
+	label: string | null,
+	outcomeAt?: number,
+): Promise<void> {
+	await deps.log.append({
+		type: "Scored",
+		runId,
+		stepId: null,
+		payload: { score, value: 1, label },
+	});
+	const state = await deps.log.state(runId);
+	const opened = state.pullRequest?.at ?? state.started?.at;
+	if (opened === undefined) return;
+	deps.usage?.note({
+		kind: "pull-request-outcome",
+		outcome: score,
+		elapsedMs: Math.max(0, (outcomeAt ?? deps.now()) - opened),
+	});
+}
 
 /** The `pr_merged` score of a run, when it has one. */
 const mergedOf = (state: RunState) =>
@@ -198,12 +228,7 @@ export function createPullRequestScores(deps: PullRequestScoresDeps) {
 		score: ScoreName,
 		label: string | null,
 	): Promise<void> {
-		await log.append({
-			type: "Scored",
-			runId,
-			stepId: null,
-			payload: { score, value: 1, label },
-		});
+		await recordPullRequestScore(deps, runId, score, label);
 	}
 
 	/** A revert of the run's merged pull request, when it is within the window. */

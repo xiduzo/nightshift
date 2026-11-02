@@ -26,6 +26,8 @@ keep the first that answers. Put the LAN name first, then the tailnet name,
 then the public name. A computer then syncs on the LAN at home, stays private
 in the tailnet, and uses the public name in a café.
 
+The Night Shift team runs [Insights](insights.md).
+
 ## Run a Host without a screen
 
 `nightshift` is Night Shift in one file: the daemon, its web UI and its

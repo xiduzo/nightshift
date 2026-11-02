@@ -38,6 +38,7 @@ async function programCheck(
 		path,
 		version: null,
 		account: null,
+		signIn: "unknown",
 		facts: [],
 		problem: path
 			? null

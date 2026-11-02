@@ -1,0 +1,42 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"description": "Updates only the Weaver registry pins. The rest of the monorepo is ignored.",
+	"enabledManagers": ["custom.regex"],
+	"ignorePaths": ["**"],
+	"includePaths": ["packages/telemetry/registry/**"],
+	"customManagers": [
+		{
+			"customType": "regex",
+			"managerFilePatterns": [
+				"/^packages\\/telemetry\\/registry\\/manifest\\.yaml$/"
+			],
+			"matchStrings": [
+				"semantic-conventions-genai\\.git@(?<currentDigest>[0-9a-f]{40})\\[model\\]"
+			],
+			"depNameTemplate": "open-telemetry/semantic-conventions-genai",
+			"packageNameTemplate": "https://github.com/open-telemetry/semantic-conventions-genai",
+			"datasourceTemplate": "git-refs"
+		},
+		{
+			"customType": "regex",
+			"managerFilePatterns": [
+				"/^packages\\/telemetry\\/registry\\/manifest\\.yaml$/"
+			],
+			"matchStrings": [
+				"semantic-conventions\\.git@(?<currentValue>v\\d+\\.\\d+\\.\\d+)\\[model\\]"
+			],
+			"depNameTemplate": "open-telemetry/semantic-conventions",
+			"datasourceTemplate": "github-tags"
+		},
+		{
+			"customType": "regex",
+			"managerFilePatterns": [
+				"/^packages\\/telemetry\\/registry\\/weaver-version\\.txt$/"
+			],
+			"matchStrings": ["(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+			"depNameTemplate": "open-telemetry/weaver",
+			"datasourceTemplate": "github-releases",
+			"extractVersionTemplate": "^v(?<version>.*)$"
+		}
+	]
+}

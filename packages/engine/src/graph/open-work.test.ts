@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNodeType } from "@nightshift/flows";
-import { foldRun } from "../log";
+import { foldRun, provedEndReason } from "../log";
 
 import type {
 	EngineEventType,
@@ -177,7 +177,14 @@ const stepEnded = (
 const runEnded = (
 	status: "stopped" | "failed" | "interrupted",
 	reason: string | null = null,
-): ClosingEvent => ({ type: "RunEnded", payload: { status, reason } });
+): ClosingEvent => ({
+	type: "RunEnded",
+	payload: {
+		status,
+		reason,
+		endReason: provedEndReason({ status, reason }),
+	},
+});
 
 describe("closingEvents: a stop", () => {
 	test("an Agent step with an open session: the session, then the step, then the run", () => {

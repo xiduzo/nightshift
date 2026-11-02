@@ -69,6 +69,7 @@ function ports(
 	const gh: GitHubCli = {
 		access: async () => access,
 		repos: async () => [{ name: "acme/app", description: null, private: true }],
+		viewPullRequest: async () => null,
 		async clone(repo, into, cwd) {
 			seen.ghClones.push(`${repo.owner}/${repo.repo}`);
 			if (fail) return fail;

@@ -3,7 +3,9 @@
 export {
 	type ExportSinks,
 	type ExportTarget,
+	hostArch,
 	meterOf,
+	osType,
 	otlpSinks,
 	type RunningExport,
 	startExport,

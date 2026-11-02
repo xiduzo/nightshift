@@ -28,6 +28,8 @@ import {
  * - `offers`: the profiles Devices offer into the Space (slice 6). Empty.
  * - `members`: user id → `{ name, role }`, a mirror of the auth tables.
  *   Only this Replica writes it, from `member` and `user`.
+ * - `policy`: `usage` boolean. Missing means this computer may send
+ *   anonymous usage. Only a Space admin writes it.
  *
  * The document is the source of the Space's Projects. The Replica's
  * `project` rows are its projection: after every change, ours or synced,
@@ -49,6 +51,8 @@ export type SpaceDocument = PersistedDocument & {
 	readonly devices: Y.Map<unknown>;
 	readonly offers: Y.Map<unknown>;
 	readonly members: Y.Map<unknown>;
+	/** `usage`: whether computers in this Space send anonymous usage. */
+	readonly policy: Y.Map<unknown>;
 };
 
 export const spaceProjectSchema = z.object({
@@ -106,6 +110,21 @@ export function deviceNameIn(
 ): string | null {
 	const named = spaceDeviceSchema.safeParse(document.devices.get(deviceId));
 	return named.success ? named.data.name : null;
+}
+
+/** Whether computers in this Space may send anonymous usage. Missing means yes. */
+export function spaceUsageOn(document: SpaceDocument): boolean {
+	return document.policy.get("usage") !== false;
+}
+
+/** Turns anonymous usage on or off for the Space. The caller checks the role. */
+export async function setSpaceUsage(
+	document: SpaceDocument,
+	enabled: boolean,
+): Promise<void> {
+	await document.change(() => {
+		document.policy.set("usage", enabled);
+	});
 }
 
 /** The name of a Space's document. */
@@ -223,6 +242,7 @@ export function createSpaceDocuments(options: {
 			devices: doc.getMap("devices"),
 			offers: doc.getMap("offers"),
 			members: doc.getMap("members"),
+			policy: doc.getMap("policy"),
 		};
 	}
 

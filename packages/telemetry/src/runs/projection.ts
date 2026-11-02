@@ -7,12 +7,16 @@ import type { Attributes, Counter, Histogram } from "@opentelemetry/api";
 
 import {
 	ATTR,
+	ERROR_TYPE,
 	innerSpanIdOf,
 	laterSpanIdOf,
 	METRIC,
 	OPERATION,
+	PROVIDER,
 	runSpanIdOf,
+	SPAN,
 	stepSpanIdOf,
+	TOKEN_MODALITY,
 	traceIdOf,
 } from "../conventions";
 import { meterOf, type RunningExport } from "../otlp";
@@ -30,17 +34,13 @@ import { meterOf, type RunningExport } from "../otlp";
  * the run's spend (the Spend tab) counts for it, sessions cut short
  * included, each with how sure it is.
  *
- * - `step-ended`: a span for the step's part from its (re)opening to its
- *   end: `invoke_agent {node}` for an Agent, `execute_tool {node}` for a
- *   Command or a Tool, `{kind} {node}` for any other, with a span inside
- *   per Gate wait (`gate {node}`, `nightshift.gate.wait_ms`) and per sleep
- *   (`wait {reason}`). The step's time, its sessions' tokens and cost, a
- *   retry (a visit after the first) and each Gate wait as metric points.
+ * - `step-ended`: `invoke_agent {node}` for an Agent. A Command step, a
+ *   Tool step and every other step the flow runs is `nightshift.step {node}`.
+ *   That is not `execute_tool`. `execute_tool` is a tool an agent calls.
+ *   A Gate wait is `gate {node}`. A sleep is `wait {reason}`.
  * - `run-ended`: the run's span (`invoke_workflow {flow}`), the trace's
- *   root; a resumed run's later end is a span under it. Its time and how
- *   it ended.
- * - `scored`: a score, with its name, label and who answered a Gate, and
- *   for a pull request what became of it (`nightshift.pr.outcome`).
+ *   root; a resumed run's later end is a span under it.
+ * - `scored`: a score, and for a pull request what became of it.
  */
 
 /** The run as the engine derives it, or null when it has none. */
@@ -49,11 +49,43 @@ export type ReadTrace = (runId: string) => Promise<RunTrace | null>;
 type Step = RunTrace["steps"][number];
 type StepEnd = Step["ends"][number];
 
+const ERROR_CLASSES = new Set<string>(Object.values(ERROR_TYPE));
+
+/** A closed class when the message is one, else the registry's other value. */
+function errorTypeOf(message: string | null | undefined): string {
+	if (message && ERROR_CLASSES.has(message)) return message;
+	return ERROR_TYPE.other;
+}
+
+/** The provider name for a harness. Anything else is the custom value. */
+function providerOf(harness: string | undefined): string {
+	switch (harness) {
+		case "claude-code":
+			return PROVIDER.claudeCode;
+		case "codex":
+			return PROVIDER.codex;
+		case "grok-build":
+			return PROVIDER.grokBuild;
+		case "gemini":
+			return PROVIDER.gemini;
+		default:
+			return PROVIDER.other;
+	}
+}
+
+function workflowName(run: RunTrace): string {
+	return run.flowName ?? "quick run";
+}
+
 type Instruments = {
-	runDuration: Histogram;
+	workflowDuration: Histogram;
+	agentDuration: Histogram;
 	stepDuration: Histogram;
 	cost: Counter;
-	tokens: Counter;
+	inputTokens: Counter;
+	outputTokens: Counter;
+	cacheReadTokens: Counter;
+	cacheWriteTokens: Counter;
 	retries: Counter;
 	gateWait: Histogram;
 	runOutcome: Counter;
@@ -68,13 +100,29 @@ function instruments(running: RunningExport): Instruments {
 	const counter = (m: { name: string; unit: string }, description: string) =>
 		meter.createCounter(m.name, { unit: m.unit, description });
 	return {
-		runDuration: histogram(
-			METRIC.runDuration,
+		workflowDuration: histogram(
+			METRIC.workflowDuration,
 			"How long a run took, start to end.",
 		),
-		stepDuration: histogram(METRIC.stepDuration, "How long a step took."),
+		agentDuration: histogram(
+			METRIC.agentDuration,
+			"How long an Agent step took.",
+		),
+		stepDuration: histogram(
+			METRIC.stepDuration,
+			"How long a step other than an Agent took.",
+		),
 		cost: counter(METRIC.cost, "What runs cost, in USD."),
-		tokens: counter(METRIC.tokens, "Tokens the agent sessions used."),
+		inputTokens: counter(METRIC.inputTokens, "Input tokens a session used."),
+		outputTokens: counter(METRIC.outputTokens, "Output tokens a session used."),
+		cacheReadTokens: counter(
+			METRIC.cacheReadTokens,
+			"Cache-read input tokens a session used.",
+		),
+		cacheWriteTokens: counter(
+			METRIC.cacheWriteTokens,
+			"Cache-write input tokens a session used.",
+		),
 		retries: counter(
 			METRIC.retries,
 			"Steps that ran again: a visit after the first.",
@@ -116,21 +164,12 @@ function runMetricAttributes(run: RunTrace): Attributes {
 	};
 }
 
-/** The span name and GenAI operation of a step. */
-function stepName(step: Step): { name: string; operation: string | null } {
+/** The span name of a step. An Agent is invoke_agent. Every other step is nightshift.step. */
+function stepName(step: Step): { name: string; agent: boolean } {
 	if (step.nodeType === "agent") {
-		return {
-			name: `${OPERATION.agent} ${step.nodeId}`,
-			operation: OPERATION.agent,
-		};
+		return { name: `${OPERATION.agent} ${step.nodeId}`, agent: true };
 	}
-	if (step.nodeType === "command" || step.nodeType === "tool") {
-		return {
-			name: `${OPERATION.tool} ${step.nodeId}`,
-			operation: OPERATION.tool,
-		};
-	}
-	return { name: `${step.nodeType} ${step.nodeId}`, operation: null };
+	return { name: `${SPAN.step} ${step.nodeId}`, agent: false };
 }
 
 export type RunProjection = {
@@ -153,8 +192,18 @@ export function createRunProjection(deps: {
 		const { sessions } = end;
 		const last = sessions.at(-1);
 		const device = step.deviceId ?? deviceId;
-		const { name, operation } = stepName(step);
-		const agent = last
+		const { name, agent } = stepName(step);
+		const provider = providerOf(last?.harness);
+		const usage = sessions.reduce(
+			(total, session) => ({
+				input: total.input + session.tokens.input,
+				output: total.output + session.tokens.output,
+				cacheRead: total.cacheRead + session.tokens.cacheRead,
+				cacheWrite: total.cacheWrite + session.tokens.cacheWrite,
+			}),
+			{ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		);
+		const who = last
 			? {
 					[ATTR.agent]: last.harness,
 					...(last.model ? { [ATTR.model]: last.model } : {}),
@@ -163,6 +212,9 @@ export function createRunProjection(deps: {
 		const spanId = end.first
 			? stepSpanIdOf(step.id)
 			: laterSpanIdOf(step.id, end.seq);
+		const failed = end.error
+			? { [ATTR.errorType]: errorTypeOf(end.error) }
+			: {};
 		span({
 			name,
 			traceId,
@@ -180,17 +232,29 @@ export function createRunProjection(deps: {
 				[ATTR.visit]: step.visit,
 				[ATTR.outcome]: end.outcome,
 				[ATTR.deviceId]: device,
-				...(operation ? { [ATTR.operation]: operation } : {}),
-				...(operation === OPERATION.tool
-					? { [ATTR.toolName]: step.nodeId }
+				...(agent
+					? {
+							[ATTR.operation]: OPERATION.agent,
+							[ATTR.provider]: provider,
+							[ATTR.agentName]: step.nodeId,
+							...(usage.input > 0 ? { [ATTR.usageInput]: usage.input } : {}),
+							...(usage.output > 0 ? { [ATTR.usageOutput]: usage.output } : {}),
+							...(usage.cacheRead > 0
+								? { [ATTR.usageCacheRead]: usage.cacheRead }
+								: {}),
+							...(usage.cacheWrite > 0
+								? { [ATTR.usageCacheWrite]: usage.cacheWrite }
+								: {}),
+						}
 					: {}),
-				...agent,
+				...who,
 				...(end.knowledge.searches > 0
 					? { [ATTR.knowledgeSearches]: end.knowledge.searches }
 					: {}),
 				...(end.knowledge.reads > 0
 					? { [ATTR.knowledgeReads]: end.knowledge.reads }
 					: {}),
+				...failed,
 			},
 			error: end.error,
 		});
@@ -203,7 +267,7 @@ export function createRunProjection(deps: {
 		for (const wait of end.gateWaits) {
 			const ms = Math.max(wait.to - wait.from, 0);
 			span({
-				name: `gate ${step.nodeId}`,
+				name: `${SPAN.gate} ${step.nodeId}`,
 				traceId,
 				spanId: innerSpanIdOf(step.id, "gate", wait.from),
 				parentSpanId: spanId,
@@ -212,6 +276,7 @@ export function createRunProjection(deps: {
 				attributes: {
 					...runAttributes(run),
 					[ATTR.stepId]: step.id,
+					[ATTR.nodeId]: step.nodeId,
 					[ATTR.nodeKind]: step.nodeType,
 					[ATTR.gateWaitMs]: ms,
 				},
@@ -220,7 +285,7 @@ export function createRunProjection(deps: {
 		}
 		for (const sleep of end.sleeps) {
 			span({
-				name: `wait ${sleep.reason}`,
+				name: `${SPAN.wait} ${sleep.reason}`,
 				traceId,
 				spanId: innerSpanIdOf(step.id, "wait", sleep.from),
 				parentSpanId: spanId,
@@ -235,44 +300,60 @@ export function createRunProjection(deps: {
 			});
 		}
 
-		m.stepDuration.record(Math.max(end.at - end.openedAt, 0) / 1000, {
-			...point,
-			[ATTR.outcome]: end.outcome,
-			...agent,
-		});
+		const seconds = Math.max(end.at - end.openedAt, 0) / 1000;
+		if (agent) {
+			m.agentDuration.record(seconds, {
+				...point,
+				[ATTR.operation]: OPERATION.agent,
+				[ATTR.provider]: provider,
+				[ATTR.agentName]: step.nodeId,
+				[ATTR.workflowName]: workflowName(run),
+				...who,
+				...failed,
+			});
+		} else {
+			m.stepDuration.record(seconds, {
+				...point,
+				[ATTR.outcome]: end.outcome,
+				...who,
+				...failed,
+			});
+		}
 		if (end.first && step.visit > 1) m.retries.add(1, point);
 		if (end.costUsd !== null && end.costUsd > 0) {
-			m.cost.add(end.costUsd, { ...point, [ATTR.basis]: end.costBasis });
+			m.cost.add(end.costUsd, { ...point, [ATTR.costBasis]: end.costBasis });
 		}
 		for (const session of sessions) {
-			const who = {
+			const sessionProvider = providerOf(session.harness);
+			const labels = {
 				...point,
 				[ATTR.agent]: session.harness,
 				...(session.model ? { [ATTR.model]: session.model } : {}),
+				[ATTR.operation]: OPERATION.agent,
+				[ATTR.provider]: sessionProvider,
+				[ATTR.tokenModality]: TOKEN_MODALITY.unknown,
 			};
 			if (session.costUsd !== null && session.costUsd > 0) {
 				m.cost.add(session.costUsd, {
-					...who,
-					[ATTR.basis]: session.costBasis,
+					...point,
+					[ATTR.agent]: session.harness,
+					...(session.model ? { [ATTR.model]: session.model } : {}),
+					[ATTR.costBasis]: session.costBasis,
 				});
 			}
 			const { input, output, cacheRead, cacheWrite } = session.tokens;
-			const counts: [string, number][] = [
-				["input", input],
-				["output", output],
-				["cache_read", cacheRead],
-				["cache_write", cacheWrite],
-			];
-			for (const [type, count] of counts) {
-				if (count > 0) m.tokens.add(count, { ...who, [ATTR.tokenType]: type });
-			}
+			if (input > 0) m.inputTokens.add(input, labels);
+			if (output > 0) m.outputTokens.add(output, labels);
+			if (cacheRead > 0) m.cacheReadTokens.add(cacheRead, labels);
+			if (cacheWrite > 0) m.cacheWriteTokens.add(cacheWrite, labels);
 		}
 	}
 
 	function runEnded(run: RunTrace, end: RunTrace["ends"][number]): void {
 		const from = end.first ? (run.startedAt ?? end.openedAt) : end.openedAt;
+		const failed = end.status === "failed";
 		span({
-			name: `${OPERATION.workflow} ${run.flowName ?? "quick run"}`,
+			name: `${OPERATION.workflow} ${workflowName(run)}`,
 			traceId: traceIdOf(run.runId),
 			spanId: end.first
 				? runSpanIdOf(run.runId)
@@ -283,18 +364,23 @@ export function createRunProjection(deps: {
 			attributes: {
 				...runAttributes(run),
 				[ATTR.operation]: OPERATION.workflow,
+				[ATTR.workflowName]: workflowName(run),
 				[ATTR.deviceId]: deviceId,
 				[ATTR.trigger]: run.trigger,
 				[ATTR.status]: end.status,
 				...(end.reason ? { [ATTR.reason]: end.reason } : {}),
 				...(end.first ? {} : { [ATTR.resumed]: true }),
+				...(failed ? { [ATTR.errorType]: errorTypeOf(end.endReason) } : {}),
 			},
-			error: end.status === "failed" ? (end.reason ?? "failed") : null,
+			error: failed ? (end.reason ?? "failed") : null,
 		});
 		const point = { ...runMetricAttributes(run), [ATTR.deviceId]: deviceId };
-		m.runDuration.record(Math.max(end.at - from, 0) / 1000, {
+		m.workflowDuration.record(Math.max(end.at - from, 0) / 1000, {
 			...point,
+			[ATTR.workflowName]: workflowName(run),
+			[ATTR.operation]: OPERATION.workflow,
 			[ATTR.status]: end.status,
+			...(failed ? { [ATTR.errorType]: errorTypeOf(end.endReason) } : {}),
 		});
 		m.runOutcome.add(1, { ...point, [ATTR.status]: end.status });
 	}

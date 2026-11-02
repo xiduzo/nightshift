@@ -36,6 +36,7 @@ const SERVICES: Record<keyof Services, true> = {
 	assistant: true,
 	checks: true,
 	projectSetup: true,
+	usage: true,
 	daemon: true,
 };
 
@@ -98,6 +99,12 @@ export function testContext(fields: TestContextFields = {}): Context {
 		engine: {
 			space: () => stub<SpaceEngine>("Space view"),
 			...fields.engine,
+		},
+		// Adding a project notes anonymous usage. Tests that do not care
+		// about that note get a no-op.
+		usage: {
+			note() {},
+			...fields.usage,
 		},
 	};
 	const services = {} as Record<keyof Services, object>;

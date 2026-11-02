@@ -21,6 +21,7 @@ import {
 	suffixedName,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { UsageNotes } from "../usage";
 import type { FlowNotice, FlowRevision, RevisionKind } from "./flow-document";
 import type { ProjectFlows } from "./project-flows";
 
@@ -37,6 +38,8 @@ export type SpaceFlowsDeps = {
 	/** The engine is ready. */
 	ready: Promise<unknown>;
 	flows: ProjectFlows;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 	/** The project, in the Space. Throws (`not-found`) for one of another Space. */
 	project(projectId: string, spaceId: string): Promise<unknown>;
 	/** The names of these Persons, by id. One without a name is missing. */
@@ -257,7 +260,10 @@ export function createSpaceFlows(
 
 			async save(projectId, name, flow) {
 				await inSpace(projectId);
-				return flows.save(projectId, name, flow, { personId });
+				const existed = namesOf(await flows.flows(projectId)).has(name);
+				const issues = await flows.save(projectId, name, flow, { personId });
+				if (!existed) deps.usage?.note({ kind: "flow-created", from: "blank" });
+				return issues;
 			},
 
 			async remove(projectId, name) {
@@ -340,6 +346,7 @@ export function createSpaceFlows(
 					kind: "import",
 					personId,
 				});
+				deps.usage?.note({ kind: "flow-created", from: "import" });
 				return { name: free, issues };
 			},
 
@@ -359,6 +366,11 @@ export function createSpaceFlows(
 						migratedFlow(starter.source, migration),
 						{ kind: "import", personId },
 					);
+					deps.usage?.note({
+						kind: "flow-created",
+						from: "starter",
+						starter: starter.name,
+					});
 					result.imported.push(starter.name);
 				}
 				return result;
@@ -379,6 +391,7 @@ export function createSpaceFlows(
 					kind: "copy",
 					personId,
 				});
+				deps.usage?.note({ kind: "flow-created", from: "copy" });
 				return { name: to.name, issues };
 			},
 		};

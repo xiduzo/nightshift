@@ -13,6 +13,7 @@
 // - `daemon.ts`: `@nightshift/daemon` `runtime/` (the lease).
 // - `notifications.ts`: `@nightshift/notifications` `settings/`, `targets/`,
 //   `deliveries/` and `channels/` (the Web Push keys).
+// - `telemetry.ts`: `@nightshift/telemetry` `usage/`.
 //
 // drizzle-kit reads this file: every table must be exported from here.
 
@@ -29,3 +30,4 @@ export * from "./engine";
 export * from "./notifications";
 export * from "./projects";
 export * from "./runs";
+export * from "./telemetry";

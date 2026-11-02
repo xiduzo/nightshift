@@ -198,8 +198,8 @@ export function stepMetrics(step: DerivedStep): RunMetrics {
 /**
  * A run's metrics: every step added up, also the steps of called flows.
  * `cost`: the run's cost (`sumCost`); `startedAt` and `endedAt`: the
- * run's start and end. The pull request is that of the step that ended
- * last with one.
+ * run's start and end. The pull request is the one stored on the run,
+ * else that of the step that ended last with one.
  */
 export function runMetrics(
 	steps: readonly DerivedStep[],
@@ -207,6 +207,7 @@ export function runMetrics(
 	startedAt: number | null,
 	endedAt: number | null,
 	scores: RunScore[] = [],
+	storedUrl: string | null = null,
 ): RunMetrics {
 	let tokens = NO_TOKENS;
 	let agentMs = 0;
@@ -235,7 +236,7 @@ export function runMetrics(
 		gateWaitMs,
 		tokens,
 		costBasis: costBasis(cost),
-		prUrl,
+		prUrl: storedUrl ?? prUrl,
 		...knowledgeField(knowledge),
 		scores,
 	};

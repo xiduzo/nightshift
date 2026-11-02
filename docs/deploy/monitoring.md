@@ -36,6 +36,12 @@ On a server, you can also set the switch and the address in the environment:
 `NIGHTSHIFT_TELEMETRY=on` and `NIGHTSHIFT_OTLP_ENDPOINT=http://collector:4318`.
 A value saved in Settings wins over the environment.
 
+If the switch is on and the address is empty, Night Shift uses
+`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` and
+`OTEL_EXPORTER_OTLP_PROTOCOL`. It speaks `http/protobuf` and `http/json`.
+`OTEL_SDK_DISABLED=true` turns the export off. An OTEL address does not
+turn the switch on.
+
 ## On a laptop: Grafana in one container
 
 `grafana/otel-lgtm` runs an OpenTelemetry collector, Tempo (traces),
@@ -114,10 +120,9 @@ your traces stay on LangSmith's servers.
 
 | Span | When |
 | --- | --- |
-| `invoke_workflow {flow}` | The run, from its start to its end: the root of the trace. A resumed run's later end is a span under it. |
-| `invoke_agent {node}` | An Agent step. Claude Code's own spans hang under it. |
-| `execute_tool {node}` | A Command or a Tool step. |
-| `{kind} {node}` | Any other step (`decision`, `wait`, `call`, `value`, ...). A step in a called flow hangs under its Call step. |
+| `invoke_workflow {flow}` | The run, from its start to its end: the root of the trace. A resumed run's later end is a span under it. The flow name is `gen_ai.workflow.name`. |
+| `invoke_agent {agent}` | An Agent step. The agent name is the node id (`gen_ai.agent.name`). `gen_ai.provider.name` is set. Claude Code's own spans hang under it. |
+| `nightshift.step {node}` | A Command step, a Tool step, or any other step the flow runs. `nightshift.node.kind` says which. This is not `execute_tool`. `execute_tool` is a tool an agent calls. A step in a called flow hangs under its Call step. |
 | `gate {node}` | A Gate's wait for a person, with `nightshift.gate.wait_ms`. |
 | `wait {reason}` | A sleep: a Wait node, a usage limit, the network, an offline Device. |
 | `orpc.{procedure}` | An API request this computer answers, from the web app, the phone or a peer, with `call_procedure`, `handler` and the input checks under it. A request to a Host is `send_request`. Each request is a trace of its own. |
@@ -128,29 +133,35 @@ A span goes out when its step or run ends. Every span of a run has
 `nightshift.node.kind`, `nightshift.device.id`, `nightshift.agent` and
 `gen_ai.request.model`. An Agent step that searched or read the project's
 knowledge also has `nightshift.knowledge.searches` and
-`nightshift.knowledge.reads`. All names are in
-`packages/telemetry/src/conventions/names.ts`. That file follows the GenAI
-conventions of OpenTelemetry, which are still in development.
+`nightshift.knowledge.reads`. A failed span has `error.type`. The resource
+has `service.name` `nightshift`, `service.version`, `os.type`, `host.arch`
+and `deployment.environment.name`. The names come from `@nightshift/semconv`.
+The GenAI conventions are still in development.
 
 ### Metrics
 
 | Metric | Kind | Attributes |
 | --- | --- | --- |
-| `nightshift.run.duration` (s) | histogram | `nightshift.run.status` |
-| `nightshift.step.duration` (s) | histogram | `nightshift.node.kind`, `nightshift.step.outcome`, `nightshift.agent` |
-| `nightshift.run.cost_usd` | counter | `basis` (`billed`, `estimated`), `nightshift.agent`, `gen_ai.request.model`: the same cost as the Spend tab, also for a run that was cut short |
-| `nightshift.tokens` | counter | `type` (`input`, `output`, `cache_read`, `cache_write`) |
+| `gen_ai.invoke_workflow.duration` (s) | histogram | `gen_ai.workflow.name`, `nightshift.run.status` |
+| `gen_ai.invoke_agent.duration` (s) | histogram | `gen_ai.provider.name`, `gen_ai.agent.name` |
+| `nightshift.step.duration` (s) | histogram | `nightshift.node.kind`, `nightshift.step.outcome`. An Agent step uses `gen_ai.invoke_agent.duration` instead. |
+| `nightshift.run.cost_usd` | counter | `nightshift.cost.basis` (`billed`, `estimated`), `nightshift.agent`, `gen_ai.request.model`: the same cost as the Spend tab, also for a run that was cut short |
+| `gen_ai.client.inference.usage.input_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
+| `gen_ai.client.inference.usage.output_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
+| `gen_ai.client.inference.usage.cache_read.input_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
+| `gen_ai.client.inference.usage.cache_write.input_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
 | `nightshift.retries` | counter | `nightshift.node.kind`: a step that ran again |
 | `nightshift.gate.wait` (s) | histogram | how long Gates waited for a person |
 | `nightshift.run.outcome` | counter | `nightshift.run.status` (`finished`, `failed`, `stopped`, ...) |
 | `nightshift.score` | counter | `nightshift.score.name`, `nightshift.score.label`, `nightshift.score.by` (`person`, `deadline`): a Gate answered, a pull request outcome |
-| `nightshift.pr.outcome` | counter | `outcome` (`merged`, `closed`, `reverted`): what became of a run's pull request, from a schedule that [scores pull requests](triggers.md#score-runs-by-their-pull-requests) |
+| `nightshift.pr.outcome` | counter | `nightshift.pull_request.outcome` (`merged`, `closed`, `reverted`): what became of a run's pull request, from a schedule that [scores pull requests](triggers.md#score-runs-by-their-pull-requests) |
 
 Each point also has `nightshift.project.id`, `nightshift.flow.id` and
 `nightshift.device.id`. No point has the id of one run or step, so there are
 few series. Prometheus names them with `_` and a unit:
-`nightshift_run_duration_seconds`, `nightshift_run_cost_usd_total`,
-`nightshift_tokens_total`.
+`gen_ai_invoke_workflow_duration_seconds`, `nightshift_run_cost_usd_total`,
+`gen_ai_client_inference_usage_input_tokens_total`. A unit in braces, such as
+`{token}` or `{USD}`, adds no suffix.
 
 ### Claude Code
 
@@ -192,7 +203,7 @@ While the export is on, a Codex step starts with:
   set to the step's span.
 
 Codex reports tokens, not dollars. Night Shift prices the tokens:
-`nightshift.run.cost_usd` counts a Codex step with `basis="estimated"`.
+`nightshift.run.cost_usd` counts a Codex step with `nightshift.cost.basis="estimated"`.
 Nobody checked here that Codex reads `TRACEPARENT` and
 `OTEL_RESOURCE_ATTRIBUTES`. Without them, its spans have a trace of their
 own, with `service.name` `codex_exec`.

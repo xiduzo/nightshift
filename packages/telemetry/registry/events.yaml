@@ -1,0 +1,198 @@
+file_format: definition/2
+events:
+  - name: nightshift.install.started
+    brief: Night Shift started on this computer.
+    stability: development
+    attributes:
+      - ref: nightshift.install.entry
+        requirement_level: required
+      - ref: nightshift.install.host
+        requirement_level: required
+
+  - name: nightshift.agent.checked
+    brief: Night Shift checked one harness.
+    stability: development
+    attributes:
+      - ref: gen_ai.provider.name
+        requirement_level: required
+      - ref: nightshift.agent.harness
+        requirement_level: required
+      - ref: nightshift.agent.installed
+        requirement_level: required
+      - ref: nightshift.agent.signed_in
+        requirement_level: required
+
+  - name: nightshift.project.added
+    brief: A person added a project.
+    stability: development
+    attributes:
+      - ref: nightshift.project.source
+        requirement_level: required
+      - ref: nightshift.project.has_remote
+        requirement_level: required
+      - ref: nightshift.project.starters
+        requirement_level: required
+
+  - name: nightshift.project.checked
+    brief: Night Shift checked a project folder.
+    stability: development
+    attributes:
+      - ref: nightshift.project.check.git
+        requirement_level: required
+      - ref: nightshift.project.check.folder
+        requirement_level: required
+      - ref: nightshift.project.check.commit
+        requirement_level: required
+      - ref: nightshift.project.check.identity
+        requirement_level: required
+      - ref: nightshift.project.check.tools
+        requirement_level: required
+
+  - name: nightshift.flow.created
+    brief: A person created a flow.
+    stability: development
+    attributes:
+      - ref: nightshift.flow.from
+        requirement_level: required
+      - ref: nightshift.flow.starter
+        requirement_level:
+          conditionally_required: When the flow comes from a starter.
+
+  - name: nightshift.schedule.changed
+    brief: A person changed a schedule.
+    stability: development
+    attributes:
+      - ref: nightshift.schedule.enabled
+        requirement_level: required
+      - ref: nightshift.schedule.webhook
+        requirement_level: required
+      - ref: nightshift.schedule.score_pull_requests
+        requirement_level: required
+
+  - name: nightshift.run.ended
+    brief: A run ended.
+    stability: development
+    attributes:
+      - ref: nightshift.run.trigger
+        requirement_level: required
+      - ref: nightshift.run.status
+        requirement_level: required
+      - ref: nightshift.run.end_reason
+        requirement_level: required
+      - ref: nightshift.run.duration
+        requirement_level: required
+      - ref: nightshift.run.cost_usd
+        requirement_level: required
+      - ref: nightshift.flow.id
+        requirement_level: required
+      - ref: nightshift.run.node_kinds
+        requirement_level: required
+
+  - name: nightshift.step.ended
+    brief: A step ended.
+    stability: development
+    attributes:
+      - ref: nightshift.node.kind
+        requirement_level: required
+      - ref: nightshift.step.result
+        requirement_level: required
+      - ref: gen_ai.provider.name
+        requirement_level: recommended
+      - ref: nightshift.model.family
+        requirement_level: recommended
+      - ref: gen_ai.usage.input_tokens
+        requirement_level: recommended
+      - ref: gen_ai.usage.output_tokens
+        requirement_level: recommended
+      - ref: gen_ai.usage.cache_read.input_tokens
+        requirement_level: recommended
+      - ref: gen_ai.usage.cache_write.input_tokens
+        requirement_level: recommended
+      - ref: nightshift.cost.basis
+        requirement_level: recommended
+      - ref: nightshift.step.guard
+        requirement_level: recommended
+      - ref: error.type
+        requirement_level: recommended
+      - ref: nightshift.step.visit
+        requirement_level: required
+
+  - name: nightshift.schedule.fired
+    brief: A schedule started a run.
+    stability: development
+    attributes: []
+
+  - name: nightshift.schedule.skipped
+    brief: A schedule did not start a run.
+    stability: development
+    attributes:
+      - ref: nightshift.schedule.skip_reason
+        requirement_level: required
+
+  - name: nightshift.gate.answered
+    brief: A Gate was answered.
+    stability: development
+    attributes:
+      - ref: nightshift.gate.by
+        requirement_level: required
+      - ref: nightshift.gate.via
+        requirement_level: required
+      - ref: nightshift.gate.wait
+        requirement_level: required
+      - ref: nightshift.gate.has_deadline
+        requirement_level: required
+      - ref: nightshift.gate.is_form
+        requirement_level: required
+
+  - name: nightshift.pull_request.opened
+    brief: A run opened a pull request.
+    stability: development
+    attributes:
+      - ref: nightshift.run.id
+        requirement_level: required
+
+  - name: nightshift.pull_request.outcome
+    brief: A pull request was merged, closed, or reverted.
+    stability: development
+    attributes:
+      - ref: nightshift.pull_request.outcome
+        requirement_level: required
+      - ref: nightshift.pull_request.hours
+        requirement_level: required
+
+  - name: nightshift.pull_request.useful
+    brief: You said whether a pull request was useful.
+    stability: development
+    attributes:
+      - ref: nightshift.run.id
+        requirement_level: required
+      - ref: nightshift.pull_request.useful
+        requirement_level: required
+
+  - name: nightshift.install.active
+    brief: This computer was in use today.
+    stability: development
+    attributes:
+      - ref: os.type
+        requirement_level: required
+      - ref: host.arch
+        requirement_level: required
+      - ref: service.version
+        requirement_level: required
+      - ref: nightshift.install.agents
+        requirement_level: required
+      - ref: nightshift.phone.signed_in
+        requirement_level: required
+      - ref: nightshift.host.paired
+        requirement_level: required
+      - ref: nightshift.install.spaces
+        requirement_level: required
+      - ref: nightshift.install.members
+        requirement_level: required
+
+  - name: nightshift.process.crashed
+    brief: The Night Shift process crashed.
+    stability: development
+    attributes:
+      - ref: error.type
+        requirement_level: required

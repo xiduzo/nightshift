@@ -1,0 +1,1 @@
+export { MixPage } from "./page";

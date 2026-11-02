@@ -1,0 +1,151 @@
+file_format: definition/2
+metrics:
+  - name: nightshift.step.duration
+    requirement_level: recommended
+    instrument: histogram
+    unit: "s"
+    brief: How long a Command, Tool, Gate, or other step took.
+    note: >
+      An Agent step uses gen_ai.invoke_agent.duration.
+      A tool an agent calls uses gen_ai.execute_tool.duration.
+    stability: development
+    attributes:
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.step.outcome
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+      - ref: error.type
+        requirement_level:
+          conditionally_required: If the step failed.
+
+  - name: nightshift.run.cost_usd
+    requirement_level: recommended
+    instrument: counter
+    unit: "{USD}"
+    brief: What runs cost, in US dollars.
+    stability: development
+    attributes:
+      - ref: nightshift.cost.basis
+        requirement_level: recommended
+      - ref: nightshift.agent
+        requirement_level: recommended
+      - ref: gen_ai.request.model
+        requirement_level: recommended
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.retries
+    requirement_level: recommended
+    instrument: counter
+    unit: "{step}"
+    brief: Steps that ran again. A visit after the first.
+    stability: development
+    attributes:
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.gate.wait
+    requirement_level: recommended
+    instrument: histogram
+    unit: "s"
+    brief: How long a Gate waited for a person.
+    stability: development
+    attributes:
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.run.outcome
+    requirement_level: recommended
+    instrument: counter
+    unit: "{run}"
+    brief: Runs that ended, by how they ended.
+    stability: development
+    attributes:
+      - ref: nightshift.run.status
+        requirement_level: required
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.pr.outcome
+    requirement_level: recommended
+    instrument: counter
+    unit: "{pull_request}"
+    brief: What became of the pull requests runs opened.
+    stability: development
+    attributes:
+      - ref: nightshift.pull_request.outcome
+        requirement_level: required
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.score
+    requirement_level: recommended
+    instrument: counter
+    unit: "{score}"
+    brief: Feedback on runs. Gate answers and pull request outcomes.
+    stability: development
+    attributes:
+      - ref: nightshift.score.name
+        requirement_level: required
+      - ref: nightshift.score.label
+        requirement_level: recommended
+      - ref: nightshift.score.by
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+imports:
+  attribute_groups:
+    - registry.os
+    - registry.host
+    - registry.service
+    - registry.deployment
+    - registry.error
+  spans:
+    - gen_ai.invoke_workflow.internal
+    - gen_ai.invoke_agent.internal
+    - gen_ai.execute_tool.internal
+  metrics:
+    - gen_ai.invoke_workflow.duration
+    - gen_ai.invoke_agent.duration
+    - gen_ai.execute_tool.duration
+    - gen_ai.client.inference.usage.input_tokens
+    - gen_ai.client.inference.usage.output_tokens
+    - gen_ai.client.inference.usage.cache_read.input_tokens
+    - gen_ai.client.inference.usage.cache_write.input_tokens

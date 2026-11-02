@@ -8,8 +8,10 @@ import {
 	hasLogin,
 	hostPolicyFromEnv,
 	localPerson,
+	membersOf,
 	spaceIds,
 } from "@nightshift/auth";
+import type { Database } from "@nightshift/db";
 import {
 	databaseUrl,
 	ensureDataDir,
@@ -40,6 +42,7 @@ import {
 	localDevice,
 } from "@nightshift/engine";
 import {
+	HARNESS_BIN,
 	openConfigStores,
 	openDeviceDocument,
 	secretStore,
@@ -93,6 +96,7 @@ import {
 	holdLease,
 	hot,
 	hotSlots,
+	onProcessCrashed,
 	processDatabase,
 	secretFiles,
 	secretsDir,
@@ -377,10 +381,25 @@ export async function createDaemon(
 	}).catch((error) =>
 		console.warn("[telemetry] the export's headers were not moved:", error),
 	);
+	let usageSnapshot:
+		| (() => Promise<{
+				agents: number;
+				phone: boolean;
+				paired: boolean;
+				spaces: number;
+				members: number;
+		  } | null>)
+		| null = null;
 	const telemetry = await slots.replace(
 		"nightshiftTelemetry",
 		() =>
-			createTelemetry({ deviceId: device.id, settings, secrets: connections }),
+			createTelemetry({
+				deviceId: device.id,
+				db,
+				settings,
+				secrets: connections,
+				usageSnapshot: () => usageSnapshot?.() ?? Promise.resolve(null),
+			}),
 		(before) => before.stop(),
 	);
 
@@ -532,6 +551,7 @@ export async function createDaemon(
 		// Otherwise the Settings switch is read on every tick.
 		scheduler:
 			env.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
+		usage: telemetry,
 		// The secret a webhook schedule names: the keychain, then the environment.
 		secret: (name) => connections.secret(name),
 		// The relay below is made once per process, before any access is removed.
@@ -549,8 +569,6 @@ export async function createDaemon(
 		...(outside.documents ? { documentChannel: outside.documents } : {}),
 	});
 	const { engine } = devices;
-	// The runs this engine walks go to the monitoring while the export is on.
-	telemetry.follow(engine);
 	knowledge.connect({
 		inStep: devices.inStep,
 		// The Spaces with no Host: this Replica keeps their knowledge content.
@@ -593,6 +611,25 @@ export async function createDaemon(
 			slots,
 		},
 	);
+	usageSnapshot = () =>
+		usageFacts({
+			db,
+			settings,
+			listScreens: (personId) => notifications.targets.list(personId),
+			devices: devices.devices,
+			ownerId: person.userId,
+		});
+	// Runs this computer walks go to monitoring while that export is on.
+	// Anonymous usage follows the same engine, including the Space policy.
+	telemetry.follow(engine);
+	telemetry.note({
+		kind: "install-started",
+		entry: options.desktop ? "desktop" : "server",
+		host: settings.current().host,
+	});
+	onProcessCrashed(() => {
+		telemetry.note({ kind: "process-crashed" });
+	});
 
 	/**
 	 * "Keep this computer awake" (this computer's
@@ -635,6 +672,7 @@ export async function createDaemon(
 					const current = settings.current();
 					return current.host && current.copyProjects;
 				},
+				usage: telemetry,
 			}),
 		(before) => before.stop(),
 	);
@@ -724,7 +762,20 @@ export async function createDaemon(
 				return folder;
 			},
 		}),
-		checks: programChecks(),
+		checks: {
+			...programChecks(),
+			harness: async (harness, bin) => {
+				const check = await programChecks().harness(harness, bin);
+				telemetry.note({
+					kind: "agent-checked",
+					harness,
+					installed: check.path !== null,
+					signIn: check.signIn,
+				});
+				return check;
+			},
+		},
+		usage: telemetry,
 		knowledge,
 		knowledgeSearch,
 		ollama,
@@ -756,5 +807,57 @@ export async function createDaemon(
 		info,
 		ownerHasLogin: () => hasLogin(db, person.userId),
 		stop,
+	};
+}
+
+/** Counts for the daily usage event. No names, paths or free text leave here. */
+async function usageFacts(input: {
+	db: Database;
+	settings: {
+		current(): {
+			customAgents: { command: string }[];
+			[key: string]: unknown;
+		};
+	};
+	listScreens(personId: string): Promise<{ kind: string }[]>;
+	devices: {
+		overview(query: { personId: string; owner: boolean }): Promise<{
+			thisComputer: { hosts: unknown[] } | null;
+		}>;
+	};
+	ownerId: string;
+}): Promise<{
+	agents: number;
+	phone: boolean;
+	paired: boolean;
+	spaces: number;
+	members: number;
+}> {
+	const current = input.settings.current();
+	let agents = 0;
+	for (const name of Object.keys(HARNESS_BIN) as (keyof typeof HARNESS_BIN)[]) {
+		const bin = current[HARNESS_BIN[name]];
+		if (typeof bin === "string" && Bun.which(bin)) agents += 1;
+	}
+	for (const agent of current.customAgents) {
+		if (Bun.which(agent.command)) agents += 1;
+	}
+	const screens = await input.listScreens(input.ownerId);
+	const overview = await input.devices.overview({
+		personId: input.ownerId,
+		owner: true,
+	});
+	const spaces = await spaceIds(input.db);
+	const people = new Set<string>();
+	for (const spaceId of spaces) {
+		const listed = await membersOf(input.db, spaceId);
+		for (const member of listed.members) people.add(member.personId);
+	}
+	return {
+		agents,
+		phone: screens.some((screen) => screen.kind === "expo"),
+		paired: (overview.thisComputer?.hosts.length ?? 0) > 0,
+		spaces: spaces.length,
+		members: people.size,
 	};
 }

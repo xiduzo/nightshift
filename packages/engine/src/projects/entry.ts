@@ -10,6 +10,7 @@
 export type { GitInstall } from "./git";
 export { systemGitInstaller } from "./git";
 export type { GitHubAccess, GitHubRepo } from "./github";
+export { systemGitHubCli } from "./github";
 export type { GitHubClone, GitHubClones } from "./github-clone";
 export { createGitHubClones } from "./github-clone";
 export {

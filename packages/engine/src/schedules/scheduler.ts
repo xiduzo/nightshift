@@ -20,6 +20,7 @@ import {
 	type RunTrigger,
 } from "../log";
 import type { RunSummary } from "../read";
+import type { UsageNotes } from "../usage";
 import type { WebhookDelivery } from "./webhooks";
 
 /**
@@ -117,6 +118,8 @@ export type SchedulerDeps = {
 	runStatus(runId: string): Promise<RunStatus | null>;
 	/** Read on every tick: false skips the tick, like a pause of every schedule. Default on. */
 	enabled?: () => boolean;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 	/**
 	 * Whether this Device fires the schedule: the Space's Host, else the one
 	 * Device of a Space without a Host, so a schedule every Clone reads
@@ -296,6 +299,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			type: "ScheduleSkipped",
 			payload: { projectId, scheduleId, at, reason, runId },
 		});
+		deps.usage?.note({ kind: "schedule-skipped", reason });
 		record(projectId, scheduleId, { kind: "skipped", at, reason, runId });
 	}
 
@@ -382,6 +386,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			type: "ScheduleFired",
 			payload: { projectId, scheduleId: schedule.id, at: due, runId, error },
 		});
+		if (runId) deps.usage?.note({ kind: "schedule-fired" });
 		record(
 			projectId,
 			schedule.id,

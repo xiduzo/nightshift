@@ -23,6 +23,7 @@ import { instant } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { RunResult, RunStatus } from "../run-status";
+import type { RunEndReason, StepGuard } from "./end-reason";
 import { upgradePayload } from "./upgrade-payload";
 
 /**
@@ -343,6 +344,11 @@ export type EnginePayloads = {
 		 */
 		costSource?: CostSource | null;
 		/**
+		 * The guard that stopped the step, when one did. Absent when the
+		 * step ended on its own.
+		 */
+		guard?: StepGuard;
+		/**
 		 * The variables the step's writes (`set`) changed, by name. Absent
 		 * when it wrote none. In `StepEnded`, so a step never ends without
 		 * its writes, or the reverse.
@@ -575,7 +581,17 @@ export type EnginePayloads = {
 	 * chose (the reason is then the End's message). Absent for every other
 	 * end, and in older logs.
 	 */
-	RunEnded: { status: RunEnding; reason: string | null; result?: RunResult };
+	RunEnded: {
+		status: RunEnding;
+		/** The sentence a person reads. Null when the run finished with nothing to say. */
+		reason: string | null;
+		/**
+		 * Why it ended, as a code. Absent in logs written before the code
+		 * was stored: a reader proves one from the sentence, or `_OTHER`.
+		 */
+		endReason?: RunEndReason;
+		result?: RunResult;
+	};
 	/**
 	 * Something went wrong that did not fail the step, and that a person
 	 * should know: for example, what a step cost is not known. Logged with
@@ -583,17 +599,23 @@ export type EnginePayloads = {
 	 */
 	RunWarned: { kind: RunWarningKind; message: string };
 	/**
+	 * A run opened a pull request. On the run, not on a step. The latest
+	 * one is the pull request the morning check asks about.
+	 */
+	PullRequestOpened: { url: string };
+	/**
 	 * Feedback on what a run did: a Gate was answered, on the Gate's step,
-	 * or a GitHub webhook told what became of the run's pull request, on
-	 * the run. What each name, value and `by` means is in `scores.ts`.
-	 * The metrics and the export count them, so a later read tells which
-	 * flow version merges.
+	 * what became of the run's pull request, or whether a person found that
+	 * pull request useful. What each name, value and `by` means is in
+	 * `scores.ts`. The metrics and the export count them.
 	 */
 	Scored: {
 		score: ScoreName;
 		value: number;
 		label: string | null;
 		by?: "person" | "deadline";
+		/** Where a Gate answer came from. Absent on every other score. */
+		via?: GateVia;
 	};
 	/**
 	 * An agent searched the project's knowledge (`search_knowledge`), and
@@ -685,13 +707,18 @@ export type KnowledgeVia = "step" | "mcp";
 
 /**
  * What a run warning is about. `cost-unknown`: a step ended without a cost.
- * The guards of the run policy: `budget` (the run passed its budget, or a
- * session its turn limit), `stalled` (an Agent step showed no activity for
- * its idle limit), `looping` (an agent made the same tool call with the
- * same input three times in a row). A reader treats the kinds as an open
- * list: a later build may add one.
+ * The guards of the run policy: `budget` (the run passed its budget),
+ * `turns` (a session reached its turn limit), `stalled` (an Agent step
+ * showed no activity for its idle limit), `looping` (an agent made the
+ * same tool call with the same input three times in a row). A reader
+ * treats the kinds as an open list: a later build may add one.
  */
-export type RunWarningKind = "cost-unknown" | "budget" | "stalled" | "looping";
+export type RunWarningKind =
+	| "cost-unknown"
+	| "budget"
+	| "turns"
+	| "stalled"
+	| "looping";
 
 /**
  * What a `Scored` event of this build scores (`scores.ts` says what each
@@ -702,7 +729,11 @@ export type ScoreName =
 	| "gate_decision"
 	| "pr_merged"
 	| "pr_closed"
-	| "reverted_within_7d";
+	| "reverted_within_7d"
+	| "pr_useful";
+
+/** Where a Gate answer came from. `_OTHER` when the caller did not say. */
+export type GateVia = "web" | "phone" | "lock_screen" | "_OTHER";
 
 /**
  * One event as this Replica's log has it. Any payload may also carry

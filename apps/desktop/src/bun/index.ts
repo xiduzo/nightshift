@@ -132,6 +132,10 @@ setMenus();
 const windowState = trackWindow();
 
 try {
+	// This process runs the daemon. Set the version this app was built with.
+	// An empty version stays unset, and a reader treats that as dev.
+	const builtVersion = (await Updater.getLocalInfo()).version;
+	if (builtVersion) process.env.NIGHTSHIFT_VERSION = builtVersion;
 	daemon = await startDaemon({
 		notifier: electrobunNotifier((options) => Utils.showNotification(options)),
 		window: windowState,

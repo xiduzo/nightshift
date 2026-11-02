@@ -33,6 +33,8 @@ export interface SpaceEngine {
 	 * still needs, and runs refuse to start until then.
 	 */
 	addProject(input: { repoPath: string; name?: string }): Promise<Project>;
+	/** Turns anonymous usage on or off for every computer in this Space. */
+	setUsage(enabled: boolean): Promise<void>;
 	/** Keeps the project's runs and events. Fails while one of its runs is running. */
 	removeProject(projectId: string): Promise<void>;
 	/** Gives the project a new name, for every Member of the Space. */

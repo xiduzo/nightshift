@@ -1,3 +1,4 @@
+import { isAbsolute, join, relative } from "node:path";
 import type { ProjectRuns } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
@@ -69,14 +70,24 @@ export const projects = {
 				repoPath: input.repoPath,
 				name: input.name,
 			});
+			let starters = 0;
 			if (input.starters) {
 				// The project is added: a failed import leaves it, without the starters.
-				await context.space.flows.importStarters(project.id).catch((error) => {
+				try {
+					const imported = await context.space.flows.importStarters(project.id);
+					starters = imported.imported.length;
+				} catch (error) {
 					console.warn(
 						`Could not import the starters into ${project.name}: ${error instanceof Error ? error.message : String(error)}`,
 					);
-				});
+				}
 			}
+			context.usage.note({
+				kind: "project-added",
+				source: addedFrom(context.daemon.dataDir, input.repoPath),
+				hasRemote: project.remote !== null,
+				starters,
+			});
 			return project;
 		}),
 	/** The local and remote branches of the clone, for "Start from". Read-only, no fetch. */
@@ -137,7 +148,11 @@ export const projects = {
 		})
 		.output(output(projectReadinessSchema))
 		.input(z.object({ path: z.string().min(1) }))
-		.handler(({ context, input }) => context.projectSetup.check(input.path)),
+		.handler(async ({ context, input }) => {
+			const readiness = await context.projectSetup.check(input.path);
+			noteChecked(context, readiness.steps);
+			return readiness;
+		}),
 	/**
 	 * The `set-up-git` fix: a repository, a starter `.gitignore` and a first
 	 * commit. A name and email go into the repository's own git config.
@@ -152,7 +167,11 @@ export const projects = {
 				email: z.email().optional(),
 			}),
 		)
-		.handler(({ context, input }) => context.projectSetup.setUpGit(input)),
+		.handler(async ({ context, input }) => {
+			const readiness = await context.projectSetup.setUpGit(input);
+			noteChecked(context, readiness.steps);
+			return readiness;
+		}),
 	/** The `install-git` fix: starts the system's installer, or says what to run. */
 	installGit: ownerProcedure
 		.route({
@@ -294,3 +313,28 @@ export const projects = {
 			await context.space.moveProject(input.projectId, input.spaceId);
 		}),
 };
+
+/** A clone under Night Shift's projects folder came from GitHub. Any other folder is a folder. */
+function addedFrom(dataDir: string, repoPath: string): "folder" | "github" {
+	const fromRoot = relative(join(dataDir, "projects"), repoPath);
+	const inside =
+		fromRoot !== "" && !fromRoot.startsWith("..") && !isAbsolute(fromRoot);
+	return inside ? "github" : "folder";
+}
+
+function noteChecked(
+	context: {
+		usage: {
+			note(moment: {
+				kind: "project-checked";
+				steps: { id: string; status: "ok" | "failed" | "skipped" }[];
+			}): void;
+		};
+	},
+	steps: readonly { id: string; status: "ok" | "failed" | "skipped" }[],
+): void {
+	context.usage.note({
+		kind: "project-checked",
+		steps: steps.map((step) => ({ id: step.id, status: step.status })),
+	});
+}

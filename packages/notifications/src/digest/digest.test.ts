@@ -137,7 +137,7 @@ describe("the digest", () => {
 				runId: "broke",
 				statusText: "Failed",
 				detail:
-					"At least $0.30 · The step ran out of time. · Reached its budget or turn limit",
+					"At least $0.30 · The step ran out of time. · Reached its budget",
 			}),
 			expect.objectContaining({
 				runId: "pr",

@@ -211,6 +211,7 @@ describe("the Decision node", () => {
 				nodeId: "decide",
 				status: "failed",
 				reason: 'Node "decide" failed: The decider failed: boom',
+				endReason: "_OTHER",
 			},
 		]);
 		expect(payloads(await h.events(), "StepEnded")).toEqual([

@@ -151,6 +151,7 @@ export function runFacts(run: RunState) {
 	return {
 		status: state.status,
 		reason: state.reason,
+		endReason: state.endReason,
 		result: state.result,
 		wakeAt: sleep?.until ?? null,
 		signal: sleep?.signal ?? null,
@@ -184,6 +185,7 @@ export function runFacts(run: RunState) {
 			run.started?.at ?? null,
 			endedAt,
 			deriveScores(run),
+			run.pullRequest?.url ?? null,
 		),
 	};
 }

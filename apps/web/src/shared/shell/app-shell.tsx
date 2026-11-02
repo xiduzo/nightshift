@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { isOutsideApp, useAccessGuard } from "@/features/access";
 import { NotificationStream } from "@/features/notifications";
+import { UsageNotice } from "@/features/settings";
 import { SpaceTabs } from "@/features/spaces";
 
 import { AppSidebar } from "./app-sidebar";
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					<NotificationStream />
 					<SpaceTabs />
 					<TabBadge />
+					<UsageNotice />
 				</>
 			)}
 		</ThemeProvider>

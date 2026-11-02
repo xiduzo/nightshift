@@ -15,6 +15,7 @@ import type {
 	OllamaService,
 	ProjectKnowledge,
 	ToolLaunchers,
+	UsageMoment,
 } from "@nightshift/engine";
 import type {
 	CliToolStore,
@@ -143,6 +144,13 @@ export type Services = {
 		gitHub: GitHubClones;
 		/** Copies of the Space's projects to this computer, from GitHub: a Host's, and the ones a person asks for. */
 		copies: ProjectCopies;
+	};
+	/** Anonymous usage on this computer: what waits, the catalog, and a new id. */
+	usage: {
+		note(moment: UsageMoment): void;
+		outbox(): Promise<{ waiting: unknown[]; lastSent: unknown[] }>;
+		catalog(): { events: { name: string; attributes: string[] }[] };
+		resetId(): Promise<{ ok: true }>;
 	};
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {

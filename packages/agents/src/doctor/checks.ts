@@ -11,6 +11,9 @@
 import { now } from "@nightshift/time";
 import { firstLine, probe, resolveBin } from "./probe";
 
+/** Whether the CLI is signed in. `unknown` when the check cannot tell. */
+export type AgentSignIn = "signed_in" | "signed_out" | "unknown";
+
 export type CliCheck = {
 	/** The executable as configured: a name on the PATH, or a path. */
 	bin: string;
@@ -19,6 +22,8 @@ export type CliCheck = {
 	version: string | null;
 	/** Whose login the CLI uses, when it says. */
 	account: string | null;
+	/** Whether that login is signed in. `unknown` when the check cannot tell. */
+	signIn: AgentSignIn;
 	/** More facts, label → value, for example a plan or token scopes. */
 	facts: { label: string; value: string }[];
 	/** Why it cannot run Night Shift's sessions. Null when it can. */
@@ -38,6 +43,7 @@ export async function baseCheck(
 		resolved: path,
 		version: null,
 		account: null,
+		signIn: "unknown" as const,
 		facts: [],
 		problem: null,
 		checkedAt: now(),
@@ -80,6 +86,7 @@ export async function checkCustomAgent(
 		path,
 		version: null,
 		account: null,
+		signIn: "unknown",
 		facts: [],
 		problem: null,
 		checkedAt: now(),

@@ -46,6 +46,7 @@ describe("deriveRunState", () => {
 			status: "interrupted",
 			reason: null,
 			result: null,
+			endReason: null,
 		});
 	});
 
@@ -59,6 +60,7 @@ describe("deriveRunState", () => {
 			status: "failed",
 			reason: "edge e1 at max",
 			result: null,
+			endReason: "_OTHER",
 		});
 	});
 
@@ -70,12 +72,14 @@ describe("deriveRunState", () => {
 			status: "finished",
 			reason: "No open issues",
 			result: "nothing-to-do",
+			endReason: "finished",
 		});
 		const chosen = log().runStarted().ended("failed", null, "failed");
 		expect(deriveRunState(foldRun(chosen.events))).toEqual({
 			status: "failed",
 			reason: null,
 			result: "failed",
+			endReason: "_OTHER",
 		});
 	});
 
@@ -87,6 +91,7 @@ describe("deriveRunState", () => {
 			status: "finished",
 			reason: null,
 			result: null,
+			endReason: "finished",
 		});
 	});
 });
@@ -430,6 +435,7 @@ describe("gates", () => {
 			status: "waiting",
 			reason: null,
 			result: null,
+			endReason: null,
 		});
 		expect(deriveOpenGate(foldRun(b.events))).toEqual({
 			stepId: "s1",

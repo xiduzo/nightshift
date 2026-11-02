@@ -19,6 +19,7 @@ async function claudeCheck(bin: string): Promise<CliCheck> {
 		if (!status.loggedIn) {
 			return {
 				...check,
+				signIn: "signed_out",
 				problem: "Not logged in. Run `claude` once to log in.",
 			};
 		}
@@ -30,7 +31,12 @@ async function claudeCheck(bin: string): Promise<CliCheck> {
 			status.orgName && { label: "Organization", value: status.orgName },
 			status.authMethod && { label: "Login", value: status.authMethod },
 		].filter((f): f is { label: string; value: string } => Boolean(f));
-		return { ...check, account: status.email ?? null, facts };
+		return {
+			...check,
+			signIn: "signed_in",
+			account: status.email ?? null,
+			facts,
+		};
 	} catch {
 		// An older Claude Code without `auth status --json`: the version is enough.
 		return check;

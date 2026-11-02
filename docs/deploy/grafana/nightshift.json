@@ -218,7 +218,7 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "sum(increase(nightshift_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"expr": "sum(increase(gen_ai_client_inference_usage_input_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range])) + sum(increase(gen_ai_client_inference_usage_output_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range])) + sum(increase(gen_ai_client_inference_usage_cache_read_input_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range])) + sum(increase(gen_ai_client_inference_usage_cache_write_input_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
 					"legendFormat": "tokens"
 				}
 			],
@@ -310,7 +310,7 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "histogram_quantile(0.5, sum by (le) (rate(nightshift_run_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"expr": "histogram_quantile(0.5, sum by (le) (rate(gen_ai_invoke_workflow_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
 					"legendFormat": "p50"
 				},
 				{
@@ -319,7 +319,7 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "histogram_quantile(0.95, sum by (le) (rate(nightshift_run_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
+					"expr": "histogram_quantile(0.95, sum by (le) (rate(gen_ai_invoke_workflow_duration_seconds_bucket{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__rate_interval])))",
 					"legendFormat": "p95"
 				}
 			],
@@ -412,8 +412,8 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "sum by (gen_ai_request_model, basis) (increase(nightshift_run_cost_usd_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
-					"legendFormat": "{{gen_ai_request_model}} ({{basis}})"
+					"expr": "sum by (gen_ai_request_model, nightshift_cost_basis) (increase(nightshift_run_cost_usd_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "{{gen_ai_request_model}} ({{nightshift_cost_basis}})"
 				}
 			],
 			"fieldConfig": {
@@ -462,8 +462,35 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "sum by (type) (increase(nightshift_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
-					"legendFormat": "{{type}}"
+					"expr": "sum(increase(gen_ai_client_inference_usage_input_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "input"
+				},
+				{
+					"refId": "B",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(gen_ai_client_inference_usage_output_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "output"
+				},
+				{
+					"refId": "C",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(gen_ai_client_inference_usage_cache_read_input_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "cache read"
+				},
+				{
+					"refId": "D",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(gen_ai_client_inference_usage_cache_write_input_tokens_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "cache write"
 				}
 			],
 			"fieldConfig": {
@@ -710,8 +737,8 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "sum by (outcome) (increase(nightshift_pr_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
-					"legendFormat": "{{outcome}}",
+					"expr": "sum by (nightshift_pull_request_outcome) (increase(nightshift_pr_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "{{nightshift_pull_request_outcome}}",
 					"instant": true,
 					"format": "table"
 				}

@@ -4,6 +4,7 @@ import type { Actor, OffersPort } from "../contract";
 import type { ProjectFlows } from "../flows";
 import type { RunStatus } from "../log";
 import type { RunSummary } from "../read";
+import type { UsageNotes } from "../usage";
 import {
 	pausedAt,
 	pauseTonightEnds,
@@ -32,6 +33,8 @@ export type ScheduleFilesDeps = {
 	runStatus(runId: string): Promise<RunStatus | null>;
 	/** The schedules as a Person saves them, with the Offers of another Person's Device (`Peers.offers`). */
 	schedulesWithOffers: OffersPort["schedulesWithOffers"];
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 };
 
 export type ScheduleFiles = ReturnType<typeof createScheduleFiles>;
@@ -208,15 +211,22 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 				id: projectId,
 				flows: () => deps.flows.flows(projectId),
 			};
-			return deps.flows.saveSchedules(
-				projectId,
-				await deps.schedulesWithOffers(
-					project,
-					spaceId,
-					actor,
-					timeZone ? withTimeZone(schedules, timeZone) : schedules,
-				),
+			const written = await deps.schedulesWithOffers(
+				project,
+				spaceId,
+				actor,
+				timeZone ? withTimeZone(schedules, timeZone) : schedules,
 			);
+			const issues = await deps.flows.saveSchedules(projectId, written);
+			for (const schedule of written) {
+				deps.usage?.note({
+					kind: "schedule-changed",
+					enabled: schedule.enabled,
+					webhook: schedule.webhook !== undefined,
+					scorePullRequests: schedule.scorePullRequests === true,
+				});
+			}
+			return issues;
 		},
 	};
 }

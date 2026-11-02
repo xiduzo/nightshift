@@ -18,6 +18,7 @@ import {
 	PROJECT_NOT_FOUND,
 	type Projects,
 	type SpaceDocuments,
+	setSpaceUsage,
 	toProject,
 } from "../projects";
 import {
@@ -158,6 +159,18 @@ export function createSpaces(deps: SpacesDeps) {
 				const [added] = await withClones(spaceId, [row]);
 				if (!added) throw new Error("Could not add the project.");
 				return added;
+			},
+
+			async setUsage(enabled) {
+				await ready;
+				const document = await deps.documents.open(spaceId);
+				if (document.hostedElsewhere) {
+					throw new Refusal(
+						"conflict",
+						"This Space is kept by another computer. Change usage there.",
+					);
+				}
+				await setSpaceUsage(document, enabled);
 			},
 
 			// A rename, a move and a removal are the Space's: they need no Clone here.

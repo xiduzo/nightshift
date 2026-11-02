@@ -6,6 +6,8 @@
  * (`scripts/check-verticals.ts`), because the settings page imports them.
  */
 
+import { createUsageQueries } from "@nightshift/client";
+
 import { orpc } from "@/shared/api";
 
 export const settingsQueries = {
@@ -18,6 +20,20 @@ export const settingsQueries = {
 export const settingsMutations = {
 	/** Saves a patch. A `null` value forgets the saved value. Answers with the new view. */
 	save: orpc.settings.save.mutationOptions,
+};
+
+const usage = createUsageQueries(orpc);
+
+export const usageQueries = {
+	/** Events waiting to send, and the last batch that was sent. */
+	outbox: usage.outbox,
+	/** The events that can be sent, and the fields of each. */
+	catalog: usage.catalog,
+};
+
+export const usageMutations = {
+	/** Gives this computer a new anonymous id. */
+	resetId: usage.resetId,
 };
 
 /** The Ollama search by meaning uses: where it is, its models, a download. */

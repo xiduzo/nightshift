@@ -8,8 +8,16 @@ import type {
 } from "@nightshift/flows";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
-import type { RunBus, RunEnding, RunLog, RunRow } from "../log";
+import {
+	provedEndReason,
+	type RunBus,
+	type RunEnding,
+	type RunEndReason,
+	type RunLog,
+	type RunRow,
+} from "../log";
 import type { RunResult } from "../run-status";
+import type { UsageNotes } from "../usage";
 import { createRaces } from "./branches";
 import { compileFlow } from "./compile";
 import type {
@@ -80,6 +88,8 @@ export type ThreadDeps = {
 	leases?: LeaseTaker;
 	/** Starts and stops the services of Service nodes (`StepContext.services`). Default: none. */
 	services?: ServiceRunner;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
 };
 
 /** A thread without services: a Service step fails with this. */
@@ -212,6 +222,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		races: createRaces(),
 		leases: deps.leases ?? NO_LEASES,
 		services: deps.services ?? NO_SERVICES,
+		...(deps.usage ? { usage: deps.usage } : {}),
 	};
 	const saver = new FencedSaver(deps.db, fence);
 	const graph = compileFlow(flow, ctx).compile({ checkpointer: saver });
@@ -346,21 +357,37 @@ export function endingOf(outcome: DriveOutcome): {
 	status: RunEnding;
 	reason: string | null;
 	result?: RunResult;
+	endReason: RunEndReason;
 } | null {
 	switch (outcome.kind) {
 		case "ended": {
 			// An End node's result: `failed` is a failure the flow chose.
 			const { reason, result } = outcome.ended;
-			if (result === undefined) return { status: "finished", reason };
+			const status = result === "failed" ? "failed" : "finished";
 			return {
-				status: result === "failed" ? "failed" : "finished",
+				status,
 				reason,
-				result,
+				...(result !== undefined ? { result } : {}),
+				endReason: provedEndReason({
+					status,
+					reason,
+					result: result ?? null,
+				}),
 			};
 		}
 		case "parked":
 			return outcome.parked.kind === "parked"
-				? { status: outcome.parked.status, reason: outcome.parked.reason }
+				? {
+						status: outcome.parked.status,
+						reason: outcome.parked.reason,
+						endReason:
+							outcome.parked.endReason ??
+							provedEndReason({
+								status: outcome.parked.status,
+								reason: outcome.parked.reason,
+								atStopTime: outcome.parked.atStopTime,
+							}),
+					}
 				: null;
 		case "fenced":
 			return null;

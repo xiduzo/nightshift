@@ -31,8 +31,11 @@ RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
 WORKDIR /src
 COPY . .
 RUN bun install --frozen-lockfile --ignore-scripts \
-	&& bun run postinstall \
-	&& bun run --cwd apps/server build:binary \
+	&& bun run postinstall
+# The version baked into the binary. The desktop build uses the same
+# variable. Unset uses 0.1.0.
+ARG NIGHTSHIFT_VERSION
+RUN bun run --cwd apps/server build:binary \
 	&& cp "apps/server/dist/bin/nightshift-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')" /nightshift
 
 # Wolfi, not Debian: Wolfi rebuilds its packages as soon as upstream fixes a
@@ -60,10 +63,15 @@ USER bun
 WORKDIR /home/bun
 # NIGHTSHIFT_EMBEDDING_MODEL: the model search by meaning downloads and uses.
 # Override it with -e, or pick another on the Settings page (that wins).
+# Anonymous usage. Pass the ingest URL as a build arg. Put no domain here.
+# An absent arg leaves the value empty. Night Shift sends usage only when
+# the value has a URL.
+ARG NIGHTSHIFT_USAGE_ENDPOINT
 ENV NIGHTSHIFT_DATA_DIR=/data \
 	PORT=3000 \
 	NIGHTSHIFT_HOST=on \
-	NIGHTSHIFT_EMBEDDING_MODEL=qwen3-embedding:0.6b
+	NIGHTSHIFT_EMBEDDING_MODEL=qwen3-embedding:0.6b \
+	NIGHTSHIFT_USAGE_ENDPOINT=${NIGHTSHIFT_USAGE_ENDPOINT}
 VOLUME /data
 EXPOSE 3000
 # Healthy while Night Shift's heartbeat in the database is fresh. It reads

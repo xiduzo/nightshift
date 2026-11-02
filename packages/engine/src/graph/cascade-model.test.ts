@@ -147,6 +147,7 @@ describe("a Decision climbs its cascade", () => {
 				status: "failed",
 				reason:
 					'Node "triage" ended with "fail" and no edge leaves it on that outcome.',
+				endReason: "_OTHER",
 			},
 		]);
 	});
@@ -260,6 +261,7 @@ describe("a Decision climbs its cascade", () => {
 				status: "failed",
 				reason:
 					'The run reached the limit of 1 steps before node "triage". Resume it to continue.',
+				endReason: "guard.max_steps",
 			},
 		]);
 		expect(calls).toHaveLength(1);

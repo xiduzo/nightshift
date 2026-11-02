@@ -73,7 +73,11 @@ describe("driveGraph", () => {
 				reason: null,
 			},
 		});
-		expect(endingOf(outcome)).toEqual({ status: "finished", reason: null });
+		expect(endingOf(outcome)).toEqual({
+			status: "finished",
+			reason: null,
+			endReason: "finished",
+		});
 	});
 
 	test("a step that fails in a Call body parks the run once: only the root's interrupt counts", async () => {
@@ -186,7 +190,7 @@ describe("endingOf", () => {
 					reason: "done",
 				},
 			},
-			{ status: "finished", reason: "done" },
+			{ status: "finished", reason: "done", endReason: "finished" },
 		],
 		[
 			"a stopped step",
@@ -195,7 +199,7 @@ describe("endingOf", () => {
 				parked: { kind: "parked", ...at, status: "stopped", reason: null },
 				interrupts: [],
 			},
-			{ status: "stopped", reason: null },
+			{ status: "stopped", reason: null, endReason: "stopped_by_person" },
 		],
 		[
 			"a failed step",
@@ -204,7 +208,7 @@ describe("endingOf", () => {
 				parked: { kind: "parked", ...at, status: "failed", reason: "boom" },
 				interrupts: [],
 			},
-			{ status: "failed", reason: "boom" },
+			{ status: "failed", reason: "boom", endReason: "_OTHER" },
 		],
 		[
 			"a wait",

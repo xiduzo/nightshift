@@ -94,6 +94,8 @@ export type RunCommandInput =
 				note?: string;
 				/** The answer to an Ask (ADR 10): the data of its form. */
 				data?: JsonValue;
+				/** Where the answer came from. */
+				via?: "web" | "phone" | "lock_screen" | "_OTHER";
 			};
 	  }
 	| { kind: "signal.send"; payload: { name: string } }
@@ -104,7 +106,9 @@ export type RunCommandInput =
 	/** Another Device walks the run from here on. */
 	| { kind: "run.move"; payload: { to: string } }
 	/** A person lets go of a lease the run holds (ADR 7). */
-	| { kind: "lease.release"; payload: { name: string } };
+	| { kind: "lease.release"; payload: { name: string } }
+	/** Whether the person found the run's pull request useful. */
+	| { kind: "run.useful"; payload: { useful: boolean } };
 
 /** What a command does. */
 export type RunCommandKind = RunCommandInput["kind"];

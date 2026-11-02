@@ -23,6 +23,7 @@ import { projects } from "./projects";
 import { runs } from "./runs";
 import { schedules } from "./schedules";
 import { invitations, members, spaces } from "./spaces";
+import { usage } from "./usage";
 
 // Every procedure but the health check needs a session in a Space. One
 // person on one computer has one without signing in (the local session).
@@ -57,6 +58,7 @@ export const appRouter = {
 	notifications,
 	dashboard,
 	settings,
+	usage,
 	connections,
 	cliTools,
 	programs,

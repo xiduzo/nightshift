@@ -4,7 +4,8 @@ import type { DeviceDirectory } from "../contract";
 import type { Device } from "../device";
 import type { ProfileStore, RunSettings } from "../device-config";
 import type { FlowDocuments } from "../flows";
-import type { Git, SpaceDocuments } from "../projects";
+import type { Git, PullRequestReader, SpaceDocuments } from "../projects";
+import type { UsageNotes } from "../usage";
 import type { PeersFactory } from "./peers";
 import type { MoveRows, ProjectsMoved } from "./projects-move";
 
@@ -37,6 +38,8 @@ export type EngineOptions = {
 	peers: PeersFactory;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
+	/** Moments for the anonymous usage export. Absent records none. */
+	usage?: UsageNotes;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */
 	maxConcurrentRuns?: number;
 	/** Safety net against runaway flows: the most steps one run may take, unless the flow's policy sets `maxSteps`. Default 500. */
@@ -48,6 +51,11 @@ export type EngineOptions = {
 	 * replaces the engine.
 	 */
 	scheduler?: false | { signal?: AbortSignal };
+	/**
+	 * `gh pr view` for the morning check of pull requests a run opened.
+	 * Absent: the check does nothing. The daemon passes `systemGitHubCli()`.
+	 */
+	github?: PullRequestReader;
 	/**
 	 * The daemon's settings, read each time one applies: the run cap, the
 	 * step cap, the policy defaults and the scheduler switch. Overrides

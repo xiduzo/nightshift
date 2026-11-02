@@ -2,6 +2,7 @@ import { type Auth, roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type {
 	Device,
+	EngineOptions,
 	FlowDocuments,
 	MoveRows,
 	SpaceArchive,
@@ -16,7 +17,11 @@ import {
 	profileChoice,
 	type SettingsStore,
 } from "@nightshift/engine/device-config";
-import { memberRole, type SpaceDocuments } from "@nightshift/engine/projects";
+import {
+	memberRole,
+	type SpaceDocuments,
+	systemGitHubCli,
+} from "@nightshift/engine/projects";
 import type { HostClient, HostHello, HostRelay } from "./contract";
 import {
 	type AppliedCommands,
@@ -149,6 +154,8 @@ export type DevicesDeps = {
 		NIGHTSHIFT_TLS_KEY?: string;
 	};
 	settings: SettingsStore;
+	/** Moments for the anonymous usage export. The engine notes them. */
+	usage?: EngineOptions["usage"];
 	profiles: ProfileStore;
 	document: DeviceDocument;
 	/** The documents this Replica syncs, by name: the views below are over them. */
@@ -284,6 +291,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			// The import on upgrade gives a Clone's project profiles to this Device.
 			profiles: deps.profiles,
 			scheduler: deps.scheduler,
+			github: systemGitHubCli(),
+			...(deps.usage ? { usage: deps.usage } : {}),
 			...(deps.secret ? { secret: deps.secret } : {}),
 			...(deps.moveRows ? { moveRows: deps.moveRows } : {}),
 			...(deps.projectsMoved ? { projectsMoved: deps.projectsMoved } : {}),

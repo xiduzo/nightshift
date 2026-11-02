@@ -126,6 +126,19 @@ export const runs = {
 				startedBy: context.session.user.id,
 			}),
 		),
+	useful: runProcedure(z.object({ runId: z.string(), useful: z.boolean() }), {
+		run: ["stop"],
+	})
+		.route({
+			summary: "Records whether you found the pull request of this run useful.",
+		})
+		.output(output(z.void()))
+		.handler(({ context, input }) =>
+			context.space.act(input.runId, {
+				kind: "useful",
+				useful: input.useful,
+			}),
+		),
 	stop: runProcedure(
 		z.object({
 			runId: z.string(),
