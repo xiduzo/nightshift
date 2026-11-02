@@ -10,6 +10,7 @@ import type {
 import type { FlowUse, SpaceFlows } from "../flows";
 import type { Branches, Project } from "../projects";
 import type {
+	AnsweredGate,
 	OpenGate,
 	ProjectRuns,
 	RunDetail,
@@ -114,6 +115,9 @@ export interface SpaceEngine {
 
 	/** Open Gates over the Space's runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
 	listGates(): Promise<OpenGate[]>;
+
+	/** Gates that closed after `since` (epoch ms), newest first: the answered part of the inbox. */
+	listAnsweredGates(since: number): Promise<AnsweredGate[]>;
 
 	/**
 	 * The schedules of the project, from its flow document, with the next

@@ -75,6 +75,7 @@ export {
 	missingInputs,
 } from "./flows";
 export {
+	type AnsweredGate,
 	type AskOption,
 	type AskValue,
 	type AskValues,
@@ -131,6 +132,7 @@ export {
 	createNotificationQueries,
 	DIGEST_CHOICES,
 	type Digest,
+	type DigestEntry,
 	digestAtTime,
 	digestShown,
 	type NotificationScreen,

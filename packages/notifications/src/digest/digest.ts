@@ -95,10 +95,28 @@ export type Digest = {
 	sources: DigestKnowledgeSource[];
 };
 
+/** One digest in the inbox list: what its push said, and whether the Person opened it. */
+export type DigestEntry = {
+	/** `digest:<YYYY-MM-DD>`: opens it again (`digest.of`). */
+	key: string;
+	/** When it went out, epoch ms. */
+	at: number;
+	title: string;
+	body: string;
+	read: boolean;
+};
+
 /** What a digest reads: the runs of a Space that ended, its open Gates and its knowledge sources. */
 export type DigestSource = {
-	/** The runs of the Space that ended after `since`, newest first. */
-	endedRuns(spaceId: string, since: number): Promise<EndedRun[]>;
+	/**
+	 * The runs of the Space that ended after `since`, newest first. With
+	 * `until`: only runs that started by then, for a digest of the past.
+	 */
+	endedRuns(
+		spaceId: string,
+		since: number,
+		until?: number,
+	): Promise<EndedRun[]>;
 	/** The Gates of the Space that wait for an answer. */
 	waitingGates(spaceId: string): Promise<WaitingGate[]>;
 	/** The knowledge sources of the Space whose last sync needs a person. Without it: none. */
@@ -383,12 +401,21 @@ export async function readDigest(
 	source: DigestSource,
 	spaceIds: readonly string[],
 	window: { from: number; to: number; time: string | null },
+	/** A digest of the past: its runs only, read up to `to`. No Gates or sources of now. */
+	past = false,
 ): Promise<Digest | null> {
 	const runs: EndedRun[] = [];
 	const gates: WaitingGate[] = [];
 	const sources: KnowledgeSourceProblem[] = [];
 	for (const spaceId of spaceIds) {
-		runs.push(...(await source.endedRuns(spaceId, window.from)));
+		runs.push(
+			...(await source.endedRuns(
+				spaceId,
+				window.from,
+				past ? window.to : undefined,
+			)),
+		);
+		if (past) continue;
 		gates.push(...(await source.waitingGates(spaceId)));
 		const problems = (await source.sourceProblems?.(spaceId)) ?? [];
 		sources.push(...problems.map((problem) => ({ ...problem, spaceId })));

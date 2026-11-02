@@ -1,4 +1,4 @@
-import type { LandedFact } from "@nightshift/engine";
+import { INBOX_KEEP_MS, type LandedFact } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import {
 	deviceWaitWords,
@@ -137,6 +137,8 @@ const LOST_AFTER_MS = 60_000;
 
 /** How often the notifier looks for digests that are due. */
 const DIGEST_CHECK_MS = 60_000;
+/** How often the notifier removes the entries the inbox no longer keeps. */
+const PRUNE_EVERY_MS = 60 * 60_000;
 
 /**
  * The screens of this computer itself: the desktop notification. The
@@ -164,6 +166,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	/** The digests this notifier sent or skipped, as `personId digest:<day>`. */
 	const digestsDone = new Set<string>();
 	let digestCheckedAt = Number.NEGATIVE_INFINITY;
+	let prunedAt = Number.NEGATIVE_INFINITY;
 
 	function enqueue(what: string, job: () => Promise<void>): Promise<void> {
 		queue = queue.then(job).catch((error) => onError(what, error));
@@ -783,5 +786,13 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		await sendDue(at);
 		await endQuietHours(at);
 		await sendDigests(at);
+		await prune(at);
+	}
+
+	/** Removes the entries older than the inbox keeps (90 days), once an hour. */
+	async function prune(at: number): Promise<void> {
+		if (at - prunedAt < PRUNE_EVERY_MS) return;
+		prunedAt = at;
+		await deps.deliveries.prune(at - INBOX_KEEP_MS);
 	}
 }

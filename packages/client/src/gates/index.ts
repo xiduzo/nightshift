@@ -30,4 +30,4 @@ export { plainText } from "./plain-text";
 export { createGateMutations, createGateQueries } from "./queries";
 export { type ContextItem, gateParts, parseGateQuestion } from "./question";
 export { type ChoiceRoute, choiceRoutes } from "./routes";
-export type { GateChoice, OpenGate } from "./types";
+export type { AnsweredGate, GateChoice, OpenGate } from "./types";

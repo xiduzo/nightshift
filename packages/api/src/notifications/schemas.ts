@@ -1,5 +1,6 @@
 import {
 	type Digest,
+	type DigestEntry,
 	type DigestGate,
 	type DigestKnowledgeSource,
 	type DigestRun,
@@ -158,6 +159,21 @@ export const digestSchema = exact<Digest>()(
 		sources: z.array(digestKnowledgeSourceSchema),
 	}),
 );
+
+/** One digest in the inbox list: what its push said, and whether you opened it. */
+export const digestEntrySchema = exact<DigestEntry>()(
+	z.object({
+		/** Opens it again (`digest.of`). */
+		key: z.string(),
+		at: z.number(),
+		title: z.string(),
+		body: z.string(),
+		read: z.boolean(),
+	}),
+);
+
+/** One digest of the list, by its key. */
+export const digestKeySchema = z.object({ key: z.string().min(1) });
 
 /** Who follows the stream. Optional, so an older screen sends nothing. */
 export const watchInputSchema = z

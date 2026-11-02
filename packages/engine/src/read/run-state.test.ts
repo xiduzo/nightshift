@@ -487,9 +487,18 @@ describe("gates", () => {
 				from: at("GateOpened"),
 				to: at("StepEnded"),
 				opening: 0,
+				question: "Ship it?",
 				answeredBy: null,
+				answer: null,
 			},
-			{ from: at("GateOpened", 1), to: null, opening: 0, answeredBy: null },
+			{
+				from: at("GateOpened", 1),
+				to: null,
+				opening: 0,
+				question: "Ship it?",
+				answeredBy: null,
+				answer: null,
+			},
 		]);
 
 		b.ended("stopped");
@@ -1042,6 +1051,16 @@ describe("one place decides when a step ends", () => {
 		expect(
 			deriveSteps(b.state()).map((s) => s.gateWaits[0]?.answeredBy),
 		).toEqual(["deadline", "person", null]);
+		expect(
+			deriveSteps(b.state()).map((s) => [
+				s.gateWaits[0]?.question,
+				s.gateWaits[0]?.answer,
+			]),
+		).toEqual([
+			["Ship it?", "approve"],
+			["Ship it?", "approve"],
+			["Ship it?", null],
+		]);
 		expect(runFacts(b.state()).gates.map((g) => g.answeredBy)).toEqual([
 			"deadline",
 			"person",
@@ -1056,11 +1075,25 @@ describe("one place decides when a step ends", () => {
 			.gateOpened("s1")
 			.gateOpened("s1");
 		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
-			{ from: 1002, to: null, opening: 0, answeredBy: null },
+			{
+				from: 1002,
+				to: null,
+				opening: 0,
+				question: "Ship it?",
+				answeredBy: null,
+				answer: null,
+			},
 		]);
 		b.stepEnded("s1", "approve");
 		expect(deriveSteps(b.state())[0]?.gateWaits).toEqual([
-			{ from: 1002, to: 1004, opening: 0, answeredBy: null },
+			{
+				from: 1002,
+				to: 1004,
+				opening: 0,
+				question: "Ship it?",
+				answeredBy: null,
+				answer: null,
+			},
 		]);
 		expect(runTrace(b.state())?.steps[0]?.ends[0]?.gateWaits).toHaveLength(1);
 	});

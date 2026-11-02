@@ -28,6 +28,7 @@ export { describeNotice } from "./rules";
 export { followNotifications, type NotificationWatchClient } from "./stream";
 export type {
 	Digest,
+	DigestEntry,
 	NotificationItem,
 	NotificationScreen,
 	NotificationSettings,

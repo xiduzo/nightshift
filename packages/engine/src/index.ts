@@ -147,6 +147,7 @@ export {
 } from "./ollama";
 export type {
 	FeedStep,
+	InboxAnsweredGate,
 	InboxGate,
 	LandedFact,
 	OpenGate,
@@ -160,7 +161,9 @@ export type {
 	StepDetail,
 } from "./read";
 export {
+	answeredOf,
 	exportRun,
+	INBOX_KEEP_MS,
 	inboxOf,
 	lockScreenRefusal,
 	type RunBundleSummary,

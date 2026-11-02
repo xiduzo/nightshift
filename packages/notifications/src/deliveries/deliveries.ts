@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
 import { asDate, instant, instantOrNull } from "@nightshift/time";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, not, or } from "drizzle-orm";
 
 /**
  * The delivery log: what the notifier did with each event for each
@@ -63,6 +63,8 @@ export type Delivery = {
 	createdAt: number;
 	sentAt: number | null;
 	withdrawnAt: number | null;
+	/** When the Person opened it in the inbox: a digest. Null: unread. */
+	readAt: number | null;
 };
 
 /** A new entry of the log. Without `title` and `body`: the sentence of its kind. */
@@ -103,6 +105,7 @@ export function createDeliveryLog(db: Database) {
 			createdAt: instant(row.createdAt),
 			sentAt: instantOrNull(row.sentAt),
 			withdrawnAt: instantOrNull(row.withdrawnAt),
+			readAt: instantOrNull(row.readAt),
 		};
 	}
 
@@ -245,6 +248,78 @@ export function createDeliveryLog(db: Database) {
 				.orderBy(desc(notificationDelivery.createdAt))
 				.limit(limit);
 			return rows.map(toDelivery);
+		},
+
+		/** The Person's entries of one kind made at `since` or later, newest first. */
+		async ofPersonSince(
+			personId: string,
+			kind: NoticeKind,
+			since: number,
+		): Promise<Delivery[]> {
+			const rows = await db
+				.select()
+				.from(notificationDelivery)
+				.where(
+					and(
+						eq(notificationDelivery.personId, personId),
+						eq(notificationDelivery.kind, kind),
+						gte(notificationDelivery.createdAt, asDate(since)),
+					),
+				)
+				.orderBy(desc(notificationDelivery.createdAt));
+			return rows.map(toDelivery);
+		},
+
+		/** Marks the Person's entry read. False: they have no such entry. */
+		async markRead(personId: string, key: string, at: number) {
+			const rows = await db
+				.update(notificationDelivery)
+				.set({ readAt: asDate(at) })
+				.where(
+					and(
+						eq(notificationDelivery.personId, personId),
+						eq(notificationDelivery.key, key),
+						isNull(notificationDelivery.readAt),
+					),
+				)
+				.returning({ key: notificationDelivery.key });
+			if (rows.length > 0) return true;
+			const [known] = await db
+				.select({ key: notificationDelivery.key })
+				.from(notificationDelivery)
+				.where(
+					and(
+						eq(notificationDelivery.personId, personId),
+						eq(notificationDelivery.key, key),
+					),
+				);
+			return known !== undefined;
+		},
+
+		/**
+		 * Removes the entries made before `before`: the inbox keeps no
+		 * more. A Gate or a device wait that can still reach a screen
+		 * stays, so it is not pushed again and can still be withdrawn.
+		 */
+		async prune(before: number): Promise<number> {
+			const rows = await db
+				.delete(notificationDelivery)
+				.where(
+					and(
+						lt(notificationDelivery.createdAt, asDate(before)),
+						or(
+							not(
+								inArray(notificationDelivery.kind, [
+									"gate-opened",
+									"device-wait",
+								]),
+							),
+							not(inArray(notificationDelivery.status, LIVE)),
+						),
+					),
+				)
+				.returning({ key: notificationDelivery.key });
+			return rows.length;
 		},
 
 		/**

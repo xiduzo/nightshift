@@ -2,7 +2,7 @@ import { roleAllows, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 
 import type { Actor } from "../contract";
-import type { OpenGate } from "./views";
+import type { AnsweredGate, OpenGate } from "./views";
 
 /**
  * The Needs-you inbox: the open Gates of every Space a Person is in, in one
@@ -13,6 +13,15 @@ import type { OpenGate } from "./views";
 
 /** An open Gate in a Person's inbox: with its Space's name and whether their role there allows an answer. */
 export type InboxGate = OpenGate & { spaceName: string; canAnswer: boolean };
+
+/**
+ * How long the inbox keeps what it showed: answered Gates and digests.
+ * The same 90 days as runs (`cleanUpAfterDays`).
+ */
+export const INBOX_KEEP_MS = 90 * 24 * 60 * 60_000;
+
+/** An answered Gate in a Person's inbox, with its Space's name. */
+export type InboxAnsweredGate = AnsweredGate & { spaceName: string };
 
 type Ordered = Pick<OpenGate, "openedAt" | "runId" | "stepId">;
 
@@ -33,7 +42,13 @@ export function inboxOrder<G extends Ordered>(gates: readonly G[]): G[] {
 export type InboxSources = {
 	db: Database;
 	engine: {
-		space(spaceId: string, actor: Actor): { listGates(): Promise<OpenGate[]> };
+		space(
+			spaceId: string,
+			actor: Actor,
+		): {
+			listGates(): Promise<OpenGate[]>;
+			listAnsweredGates(since: number): Promise<AnsweredGate[]>;
+		};
 	};
 };
 
@@ -60,6 +75,35 @@ export async function inboxOf(
 		}),
 	);
 	return inboxOrder(lists.flat());
+}
+
+/**
+ * The Gates that closed in the last 90 days (`INBOX_KEEP_MS`) in every
+ * Space the Person is a member of, newest first, each with its Space's name.
+ */
+export async function answeredOf(
+	{ db, engine }: InboxSources,
+	personId: string,
+	now: number,
+): Promise<InboxAnsweredGate[]> {
+	const since = now - INBOX_KEEP_MS;
+	const spaces = await spacesOf(db, personId);
+	const lists = await Promise.all(
+		spaces.map(async (space) => {
+			const answered = await engine
+				.space(space.id, { personId })
+				.listAnsweredGates(since);
+			return answered.map((gate) => ({ ...gate, spaceName: space.name }));
+		}),
+	);
+	return lists
+		.flat()
+		.sort(
+			(a, b) =>
+				b.closedAt - a.closedAt ||
+				a.runId.localeCompare(b.runId) ||
+				a.stepId.localeCompare(b.stepId),
+		);
 }
 
 /**

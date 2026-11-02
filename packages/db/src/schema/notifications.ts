@@ -131,11 +131,14 @@ export const notificationDelivery = sqliteTable(
 		createdAt: createdAt(),
 		sentAt: integer("sent_at", { mode: "timestamp_ms" }),
 		withdrawnAt: integer("withdrawn_at", { mode: "timestamp_ms" }),
+		/** When the Person opened it in the inbox: a digest. Null: unread. */
+		readAt: integer("read_at", { mode: "timestamp_ms" }),
 	},
 	(table) => [
 		primaryKey({ columns: [table.personId, table.key] }),
 		index("notification_delivery_key_idx").on(table.key),
 		index("notification_delivery_status_idx").on(table.status),
+		index("notification_delivery_createdAt_idx").on(table.createdAt),
 	],
 );
 

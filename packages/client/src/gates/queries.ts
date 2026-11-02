@@ -22,6 +22,15 @@ export function createGateQueries(orpc: ApiQueryUtils) {
 			refetchOnWindowFocus: "always" as const,
 			meta: { quietErrors: true },
 		}),
+		/**
+		 * The Gates of every Space the person is in that closed in the last
+		 * 90 days, newest first: what each asked and the option it took. The
+		 * live cache reads it again with the open ones.
+		 */
+		answered: () => ({
+			...orpc.gates.answered.queryOptions(),
+			meta: { quietErrors: true },
+		}),
 	};
 }
 

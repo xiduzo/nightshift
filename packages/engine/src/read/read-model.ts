@@ -5,7 +5,7 @@ import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { asDate, instant } from "@nightshift/time";
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, or } from "drizzle-orm";
 import { stepSources } from "../knowledge";
 import {
 	addCost,
@@ -50,6 +50,7 @@ import {
 	sumCost,
 } from "./run-views";
 import type {
+	AnsweredGate,
 	ItemSummary,
 	OpenGate,
 	PendingCommand,
@@ -858,6 +859,61 @@ export function createReadModel(deps: ReadModelDeps) {
 	}
 
 	/**
+	 * The Gates of the Space's runs that closed after `since`, newest first:
+	 * one per wait, with the question it asked and the option it took.
+	 * Only runs that started after `since` count: the inbox keeps no more.
+	 */
+	async function listAnsweredGates(
+		spaceId: string,
+		since: number,
+	): Promise<AnsweredGate[]> {
+		const rows = await db
+			.select({ run, projectName: project.name })
+			.from(run)
+			.innerJoin(project, eq(run.projectId, project.id))
+			.where(
+				and(
+					eq(run.spaceId, spaceId),
+					isNull(project.removedAt),
+					gte(run.createdAt, asDate(since)),
+				),
+			);
+		const steps = await log.derive(
+			rows.map((r) => r.run.id),
+			deriveSteps,
+		);
+		const gates: AnsweredGate[] = [];
+		for (const { run: row, projectName } of rows) {
+			for (const step of steps.get(row.id) ?? []) {
+				for (const wait of step.gateWaits) {
+					if (wait.to === null || wait.to < since) continue;
+					gates.push({
+						spaceId: row.spaceId,
+						runId: row.id,
+						runTitle: row.title,
+						flowName: row.flowName,
+						projectId: row.projectId,
+						projectName,
+						stepId: step.id,
+						nodeId: step.nodeId,
+						question: wait.question,
+						openedAt: wait.from,
+						closedAt: wait.to,
+						answeredBy: wait.answeredBy,
+						answer: wait.answer,
+					});
+				}
+			}
+		}
+		return gates.sort(
+			(a, b) =>
+				b.closedAt - a.closedAt ||
+				a.runId.localeCompare(b.runId) ||
+				a.stepId.localeCompare(b.stepId),
+		);
+	}
+
+	/**
 	 * The run's status, its steps and its transcript so far, then every
 	 * change as it happens, until `signal` aborts. Transcript entries up to
 	 * `afterSeq` are skipped. The transcript goes out in `seq` order
@@ -988,6 +1044,7 @@ export function createReadModel(deps: ReadModelDeps) {
 		runHere,
 		trace,
 		listGates,
+		listAnsweredGates,
 		watch,
 	};
 }

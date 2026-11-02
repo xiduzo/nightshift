@@ -282,4 +282,34 @@ test("the inbox reads the last digest again: its runs, and the Gates that wait n
 	);
 	expect(sinceMorning?.runs.map((r) => r.runId)).toEqual(["run-2", "run-1"]);
 	expect(await digests.digest.since(ada.userId, clock)).toBeNull();
+
+	// The inbox lists it unread, opens it with its runs, and marks it read.
+	expect(await digests.digest.list(ada.userId)).toEqual([
+		{
+			key: "digest:2026-10-21",
+			at: nine,
+			title: "Night Shift: last night",
+			body: "1 run finished. $1.00 spent.",
+			read: false,
+		},
+	]);
+	const opened = await digests.digest.of(ada.userId, "digest:2026-10-21");
+	expect(opened).toMatchObject({
+		to: nine,
+		body: "1 run finished. $1.00 spent.",
+	});
+	expect(opened?.runs.map((r) => r.runId)).toEqual(["run-1"]);
+	expect(await digests.digest.of(ada.userId, "digest:2026-10-20")).toBeNull();
+	expect(await digests.digest.markRead(ada.userId, "digest:2026-10-21")).toBe(
+		true,
+	);
+	expect(await digests.digest.markRead(ada.userId, "digest:2026-10-20")).toBe(
+		false,
+	);
+	expect((await digests.digest.list(ada.userId))[0]?.read).toBe(true);
+
+	// After 90 days the inbox no longer keeps it.
+	clock = nine + 91 * 24 * 60 * 60_000;
+	expect(await digests.digest.list(ada.userId)).toEqual([]);
+	expect(await digests.digest.of(ada.userId, "digest:2026-10-21")).toBeNull();
 });

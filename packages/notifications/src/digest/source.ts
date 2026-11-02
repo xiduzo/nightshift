@@ -13,8 +13,14 @@ export function engineDigestSource(
 	engine: Pick<Engine, "space">,
 ): DigestSource {
 	return {
-		async endedRuns(spaceId, since) {
-			const runs = await engine.space(spaceId).listRuns({ limit: RUNS_READ });
+		async endedRuns(spaceId, since, until) {
+			// An older digest reads the runs that started before it.
+			const runs = await engine.space(spaceId).listRuns({
+				limit: RUNS_READ,
+				...(until === undefined
+					? {}
+					: { cursor: { createdAt: until + 1, id: "" } }),
+			});
 			return runs.flatMap((run) =>
 				run.endedAt !== null && run.endedAt > since
 					? [{ ...run, spaceId, endedAt: run.endedAt }]

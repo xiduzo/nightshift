@@ -13,4 +13,5 @@ export const notificationMutations = {
 	saveSettings: orpc.notifications.settings.save.mutationOptions,
 	registerScreen: orpc.notifications.targets.register.mutationOptions,
 	removeScreen: orpc.notifications.targets.remove.mutationOptions,
+	markDigestRead: orpc.notifications.digests.markRead.mutationOptions,
 };

@@ -1,4 +1,8 @@
-import type { InboxGate, OpenGate } from "@nightshift/engine";
+import type {
+	InboxAnsweredGate,
+	InboxGate,
+	OpenGate,
+} from "@nightshift/engine";
 import { askFormSchema } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -48,6 +52,31 @@ export const inboxGateSchema = exact<InboxGate>()(
 		/** Your role in the Gate's Space allows `gate.resolve`. */
 		canAnswer: z.boolean(),
 	}),
+);
+
+/** A Gate of the inbox that is no longer open: what it asked, and the option it took. */
+export const answeredGateSchema = exact<InboxAnsweredGate>()(
+	openGateSchema
+		.pick({
+			spaceId: true,
+			runId: true,
+			runTitle: true,
+			flowName: true,
+			projectId: true,
+			projectName: true,
+			stepId: true,
+			nodeId: true,
+			question: true,
+			openedAt: true,
+		})
+		.extend({
+			spaceName: z.string(),
+			closedAt: z.number(),
+			/** Who chose its option. Null: the run ended while it waited. */
+			answeredBy: z.enum(["person", "deadline"]).nullable(),
+			/** The option it took. Null: nobody chose one. */
+			answer: z.string().nullable(),
+		}),
 );
 
 /** The answer to one open Gate, bound to its run and step. */

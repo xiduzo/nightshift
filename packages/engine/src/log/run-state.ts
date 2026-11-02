@@ -113,11 +113,18 @@ export type StepSleep = { from: number; to: number | null };
 type PartSpan = StepSleep & { opening: number };
 
 /**
- * A time a Gate of the step waited for a person, and who chose its option
- * (the Gate's answer score). Null: nobody did yet, or the run stopped
- * while it waited.
+ * A time a Gate of the step waited for a person, what it asked, and who
+ * chose its option and which (the Gate's answer score). `answeredBy` and
+ * `answer` are null while nobody did, or when the run stopped while it
+ * waited.
  */
-export type GateWait = PartSpan & { answeredBy: AnsweredBy | null };
+export type GateWait = PartSpan & {
+	/** The rendered question of the `GateOpened` that began the wait. */
+	question: string;
+	answeredBy: AnsweredBy | null;
+	/** The option it took (the score's label). */
+	answer: string | null;
+};
 
 /** A time a step slept, and what for: a reason, and the signal of a Wait node on one (else null). */
 export type SleepSpan = PartSpan & {
@@ -746,7 +753,7 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 					...step,
 					gateWaits: [
 						...step.gateWaits.slice(0, -1),
-						{ ...wait, answeredBy: by },
+						{ ...wait, answeredBy: by, answer: e.payload.label },
 					],
 				};
 			}
@@ -809,7 +816,9 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 							from: e.at,
 							to: null,
 							opening: step.openings.length - 1,
+							question: e.payload.question,
 							answeredBy: null,
+							answer: null,
 						},
 					],
 				};

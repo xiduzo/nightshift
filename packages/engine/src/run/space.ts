@@ -363,6 +363,11 @@ export function createSpaces(deps: SpacesDeps) {
 				return reads.listGates(spaceId);
 			},
 
+			async listAnsweredGates(since) {
+				await ready;
+				return reads.listAnsweredGates(spaceId, since);
+			},
+
 			async listSchedules(projectId) {
 				await ready;
 				await projects.find(projectId, spaceId);

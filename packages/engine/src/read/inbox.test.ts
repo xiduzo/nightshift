@@ -100,6 +100,7 @@ describe("inboxOf", () => {
 					asked.push(`${spaceId}:${actor.personId}`);
 					return gatesIn.get(spaceId) ?? [];
 				},
+				listAnsweredGates: async () => [],
 			}),
 		};
 

@@ -8,6 +8,8 @@ import { z } from "zod";
 import { output, stream } from "../output";
 import { protectedProcedure, readable } from "../procedures";
 import {
+	digestEntrySchema,
+	digestKeySchema,
 	digestSchema,
 	notificationItemSchema,
 	pushTargetSchema,
@@ -143,6 +145,53 @@ export const notifications = {
 					input?.since,
 				),
 			),
+	},
+	digests: {
+		list: protectedProcedure
+			.route({
+				summary:
+					"Lists your digests of the last 90 days, newest first: what each said, and whether you opened it.",
+			})
+			.output(output(z.array(digestEntrySchema)))
+			.handler(({ context }) =>
+				context.notifications.digest.list(context.session.user.id),
+			),
+		get: protectedProcedure
+			.route({
+				summary:
+					"Reads one of your digests again: what it said, and the runs that ended before it.",
+			})
+			.input(digestKeySchema)
+			.output(output(digestSchema))
+			.handler(async ({ context, input }) => {
+				const digest = await context.notifications.digest.of(
+					context.session.user.id,
+					input.key,
+				);
+				if (!digest) {
+					throw new ORPCError("NOT_FOUND", {
+						message:
+							"This digest is no longer in your inbox. The inbox keeps 90 days.",
+					});
+				}
+				return digest;
+			}),
+		markRead: protectedProcedure
+			.route({ summary: "Marks one of your digests read." })
+			.input(digestKeySchema)
+			.output(output(z.void()))
+			.handler(async ({ context, input }) => {
+				const known = await context.notifications.digest.markRead(
+					context.session.user.id,
+					input.key,
+				);
+				if (!known) {
+					throw new ORPCError("NOT_FOUND", {
+						message:
+							"This digest is no longer in your inbox. The inbox keeps 90 days.",
+					});
+				}
+			}),
 	},
 	webPush: {
 		key: protectedProcedure

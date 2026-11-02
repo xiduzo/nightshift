@@ -1,6 +1,13 @@
 /** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, the run views, cost, the Persons a run names, and the run bundle. */
 
-export { type InboxGate, inboxOf, lockScreenRefusal } from "./inbox";
+export {
+	answeredOf,
+	INBOX_KEEP_MS,
+	type InboxAnsweredGate,
+	type InboxGate,
+	inboxOf,
+	lockScreenRefusal,
+} from "./inbox";
 export { type LandedFact, landedFacts } from "./landed-facts";
 export { gitAuthorOf, namesOf } from "./people";
 export type { ReadModel, RunHere } from "./read-model";
@@ -41,6 +48,7 @@ export {
 	withEnclosing,
 } from "./run-views";
 export type {
+	AnsweredGate,
 	OpenGate,
 	PendingCommand,
 	ProjectRuns,

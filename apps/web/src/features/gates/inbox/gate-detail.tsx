@@ -15,7 +15,6 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Separator } from "@nightshift/ui/components/separator";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
@@ -25,7 +24,6 @@ import {
 	LockIcon,
 } from "lucide-react";
 import { useId } from "react";
-import { projectQueries } from "@/features/projects";
 import type { OpenGate } from "@/shared/api";
 import { InlineMarkdown } from "@/shared/markdown";
 import { LocalTime } from "@/shared/time";
@@ -34,6 +32,7 @@ import { AskForm } from "../ask-form";
 import { GateChoiceForm } from "../gate-choice-form";
 import { GateLinkItem } from "../gate-link-item";
 import { ContextList } from "../gate-question";
+import { GateWhere } from "./gate-where";
 
 /**
  * One open Gate in the inbox pane. What happened on the left; the links to
@@ -44,9 +43,6 @@ import { ContextList } from "../gate-question";
 export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 	const answerId = useId();
 	const { headline, context, links } = gateParts(gate.question);
-	const projects = useQuery(projectQueries.list());
-	// A project page shows the projects of the Space you work in only.
-	const projectHere = projects.data?.some((p) => p.id === gate.projectId);
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-8 pb-16 md:px-8">
@@ -55,34 +51,7 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 					<HandIcon aria-hidden="true" />
 				</div>
 				<div className="flex min-w-0 flex-1 flex-col gap-1.5">
-					<nav
-						aria-label="Where"
-						className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs"
-					>
-						<Badge variant="outline" className="shrink-0">
-							{gate.spaceName}
-						</Badge>
-						<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
-						{projectHere ? (
-							<Link
-								to="/projects/$projectId"
-								params={{ projectId: gate.projectId }}
-								className="shrink-0 underline-offset-3 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-							>
-								{gate.projectName}
-							</Link>
-						) : (
-							<span className="shrink-0">{gate.projectName}</span>
-						)}
-						<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
-						<Link
-							to="/runs/$runId"
-							params={{ runId: gate.runId }}
-							className="min-w-0 truncate underline-offset-3 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-						>
-							{gate.runTitle}
-						</Link>
-					</nav>
+					<GateWhere gate={gate} />
 					<h1 className="whitespace-pre-wrap text-balance break-words font-semibold text-xl leading-snug tracking-tight">
 						<InlineMarkdown text={headline} />
 					</h1>

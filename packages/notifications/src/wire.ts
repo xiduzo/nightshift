@@ -6,6 +6,7 @@ import {
 	spacesOf,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import { INBOX_KEEP_MS } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import {
 	createVapidKeyStore,
@@ -20,6 +21,7 @@ import {
 import { createDeliveryLog } from "./deliveries";
 import {
 	type Digest,
+	type DigestEntry,
 	type DigestSource,
 	digestFrom,
 	readDigest,
@@ -134,6 +136,19 @@ export type Notifications = {
 		 * Gate waits.
 		 */
 		since(personId: string, from?: number): Promise<Digest | null>;
+		/**
+		 * The digests that said something in the last 90 days, newest
+		 * first: what each push said, and whether the Person opened it.
+		 */
+		list(personId: string): Promise<DigestEntry[]>;
+		/**
+		 * One digest of the list, read again: what its push said, and the
+		 * runs that ended between the digest before it and it. Null: no
+		 * such digest in the last 90 days.
+		 */
+		of(personId: string, key: string): Promise<Digest | null>;
+		/** Marks one of the Person's digests read. False: no such digest. */
+		markRead(personId: string, key: string): Promise<boolean>;
 	};
 	/**
 	 * Tells the open screens of every Member of the Space that a project's
@@ -249,6 +264,62 @@ export function createNotifications(
 					time: digestTime(await settings.get(personId)),
 				});
 			},
+			async list(personId) {
+				const rows = await deliveries.ofPersonSince(
+					personId,
+					"digest",
+					now() - INBOX_KEEP_MS,
+				);
+				return rows.flatMap((row) =>
+					row.title === null
+						? []
+						: [
+								{
+									key: row.key,
+									at: row.createdAt,
+									title: row.title,
+									body: row.body ?? "",
+									read: row.readAt !== null,
+								},
+							],
+				);
+			},
+			async of(personId, key) {
+				const source = options.digests;
+				if (!source) return null;
+				// One more than the window: the digest before the oldest one sets where it starts.
+				const rows = await deliveries.ofPersonSince(
+					personId,
+					"digest",
+					now() - INBOX_KEEP_MS - 8 * 24 * 60 * 60_000,
+				);
+				const index = rows.findIndex((row) => row.key === key);
+				const row = rows[index];
+				if (!row || row.title === null) return null;
+				if (row.createdAt < now() - INBOX_KEEP_MS) return null;
+				const spaces = (await spacesOf(db, personId)).map((space) => space.id);
+				const digest = await readDigest(
+					source,
+					spaces,
+					{
+						from: digestFrom(rows[index + 1]?.createdAt ?? null, row.createdAt),
+						to: row.createdAt,
+						time: digestTime(await settings.get(personId)),
+					},
+					true,
+				);
+				// What the push said then, also when no run of it is left to show.
+				return {
+					from: digest?.from ?? row.createdAt,
+					to: row.createdAt,
+					runs: digest?.runs ?? [],
+					gates: [],
+					sources: [],
+					title: row.title,
+					body: row.body ?? "",
+				};
+			},
+			markRead: (personId, key) => deliveries.markRead(personId, key, now()),
 		},
 		async schedulesChanged(spaceId, projectId) {
 			for (const personId of await audience(spaceId)) {

@@ -71,7 +71,7 @@ CLI when you need them.
 | ✓ [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb) | Where a page sits: Projects › rpgdotexe › night. |
 | [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu) | Top-of-site links with dropdown panels (marketing sites). |
 | ✓ [Sidebar](https://ui.shadcn.com/docs/components/sidebar) | The app shell: `SidebarProvider`, `Sidebar`, `SidebarHeader`/`Content`/`Footer`, `SidebarGroup`, `SidebarMenu`, `SidebarMenuButton`, `SidebarMenuBadge`, `SidebarInset`, `SidebarTrigger`. Collapses to icons, turns into a Sheet on mobile. |
-| ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (a schedule's Time and days / Cron line, a run's Steps / Flow / Variables / Artifacts, the node inspector's Work / Results / Setup). `variant="line"` for underline tabs. |
+| ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (a schedule's Time and days / Cron line, a run's Steps / Flow / Variables / Artifacts, the node inspector's Work / Results / Setup, the inbox's Waiting for you / Daily digest). `variant="line"` for underline tabs. |
 | ✓ [Separator](https://ui.shadcn.com/docs/components/separator) | A thin rule between sections or toolbar items. |
 | ✓ [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) | A scroll region with styled scrollbars (transcripts, long lists in a fixed height). |
 | ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them. On a run: the run's tabs above, and the step console below, a `collapsible` panel whose collapsed size is its one-line bar. |

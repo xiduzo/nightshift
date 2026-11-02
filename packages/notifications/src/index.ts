@@ -27,6 +27,7 @@ export {
 } from "./desktop";
 export {
 	type Digest,
+	type DigestEntry,
 	type DigestGate,
 	type DigestKnowledgeSource,
 	type DigestRun,

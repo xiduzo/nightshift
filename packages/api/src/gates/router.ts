@@ -1,11 +1,16 @@
-import { inboxOf } from "@nightshift/engine";
+import { answeredOf, inboxOf } from "@nightshift/engine";
+import { now } from "@nightshift/time";
 import { z } from "zod";
 
 import { output } from "../output";
 import { protectedProcedure } from "../procedures";
 import { runProcedure } from "../runs";
 import { answerGate, answerRefusals } from "./answer";
-import { gateAnswerSchema, inboxGateSchema } from "./schemas";
+import {
+	answeredGateSchema,
+	gateAnswerSchema,
+	inboxGateSchema,
+} from "./schemas";
 
 /**
  * The Needs-you inbox. It spans every Space the Person is in, not only the
@@ -19,6 +24,15 @@ export const gates = {
 		})
 		.output(output(z.array(inboxGateSchema)))
 		.handler(({ context }) => inboxOf(context, context.session.user.id)),
+	answered: protectedProcedure
+		.route({
+			summary:
+				"Lists the Gates of every Space the Person is in that closed in the last 90 days, newest first: the answered part of the inbox.",
+		})
+		.output(output(z.array(answeredGateSchema)))
+		.handler(({ context }) =>
+			answeredOf(context, context.session.user.id, now()),
+		),
 	resolve: runProcedure(gateAnswerSchema, { gate: ["resolve"] })
 		.errors(answerRefusals)
 		.route({

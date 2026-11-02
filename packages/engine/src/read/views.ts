@@ -434,6 +434,30 @@ export type OpenGate = {
 	answerPending: boolean;
 };
 
+/**
+ * A Gate that is no longer open: a person or its deadline answered it, or
+ * its run ended while it waited. The inbox keeps it below the open ones.
+ */
+export type AnsweredGate = Pick<
+	OpenGate,
+	| "spaceId"
+	| "runId"
+	| "runTitle"
+	| "flowName"
+	| "projectId"
+	| "projectName"
+	| "stepId"
+	| "nodeId"
+	| "question"
+	| "openedAt"
+> & {
+	closedAt: number;
+	/** Who chose its option. Null: the run ended while it waited. */
+	answeredBy: "person" | "deadline" | null;
+	/** The option it took. Null: nobody chose one. */
+	answer: string | null;
+};
+
 export type RunStreamItem =
 	| { kind: "transcript"; entry: TranscriptEntry }
 	| { kind: "status"; status: RunStatus }

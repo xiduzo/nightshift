@@ -4,6 +4,6 @@ export { AskForm } from "./ask-form";
 export { GateAnswer } from "./gate-answer";
 export { GateConfirmation } from "./gate-confirmation";
 export { GateQuestion } from "./gate-question";
-export { InboxPage } from "./inbox/inbox-page";
+export { InboxPage, type InboxTab } from "./inbox/inbox-page";
 export { preloadInboxPage } from "./preload";
 export { useOpenGates } from "./use-open-gates";
