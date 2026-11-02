@@ -136,16 +136,15 @@ export function InboxPage({
 	return (
 		<>
 			<SiteHeader crumbs={[{ label: "Inbox" }]} />
-			<Tabs
-				value={tab}
-				onValueChange={(next) => onSelect({ tab: next as InboxTab })}
-				className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-row gap-0"
-			>
-				<nav
-					aria-label="Inbox"
-					className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r p-4"
+			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
+				{/* The tabs stay on top; only the list below them scrolls. */}
+				<Tabs
+					value={tab}
+					onValueChange={(next) => onSelect({ tab: next as InboxTab })}
+					render={<nav aria-label="Inbox" />}
+					className="min-h-0 w-80 shrink-0 gap-0 border-r"
 				>
-					<TabsList className="w-full">
+					<TabsList className="m-4 mb-2 w-auto shrink-0">
 						<TabsTrigger value="waiting">
 							Waiting for you
 							{open.length > 0 ? (
@@ -164,7 +163,10 @@ export function InboxPage({
 							) : null}
 						</TabsTrigger>
 					</TabsList>
-					<TabsContent value="waiting" className="flex flex-col gap-5">
+					<TabsContent
+						value="waiting"
+						className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-2 pb-4"
+					>
 						{gates.isLoading ? (
 							<ListSkeleton />
 						) : open.length === 0 ? (
@@ -228,7 +230,10 @@ export function InboxPage({
 							</>
 						) : null}
 					</TabsContent>
-					<TabsContent value="digest" className="flex flex-col gap-3">
+					<TabsContent
+						value="digest"
+						className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-4"
+					>
 						{digests.isLoading ? (
 							<ListSkeleton />
 						) : entries.length === 0 ? (
@@ -244,7 +249,7 @@ export function InboxPage({
 							/>
 						)}
 					</TabsContent>
-				</nav>
+				</Tabs>
 				<div className="min-w-0 flex-1 overflow-y-auto">
 					{tab === "digest" ? (
 						selectedDigest ? (
@@ -329,7 +334,7 @@ export function InboxPage({
 						</Empty>
 					)}
 				</div>
-			</Tabs>
+			</div>
 		</>
 	);
 }
