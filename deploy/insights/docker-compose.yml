@@ -52,6 +52,13 @@ services:
       # 0.0.0.0 so the Collector on this network can reach ingest.
       # Port 8788 is not published.
       INSIGHTS_INGEST_HOST: 0.0.0.0
+      # The first admin. The app creates it only while no account exists.
+      INSIGHTS_ADMIN_EMAIL: ${INSIGHTS_ADMIN_EMAIL:-}
+      INSIGHTS_ADMIN_PASSWORD: ${INSIGHTS_ADMIN_PASSWORD:-}
+      # Optional sign-in with GitHub, for the logins in INSIGHTS_GITHUB_LOGINS.
+      INSIGHTS_GITHUB_CLIENT_ID: ${INSIGHTS_GITHUB_CLIENT_ID:-}
+      INSIGHTS_GITHUB_CLIENT_SECRET: ${INSIGHTS_GITHUB_CLIENT_SECRET:-}
+      INSIGHTS_GITHUB_LOGINS: ${INSIGHTS_GITHUB_LOGINS:-}
     depends_on:
       postgres:
         condition: service_healthy

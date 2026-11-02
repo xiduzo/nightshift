@@ -40,7 +40,8 @@ These steps are for you to do on the server.
 2. Add Postgres, the Collector, and the app from
    [`deploy/insights/docker-compose.yml`](../../deploy/insights/docker-compose.yml).
 3. Set `INSIGHTS_DB_PASSWORD` and `INSIGHTS_AUTH_SECRET` in the project
-   environment.
+   environment. Set `INSIGHTS_ADMIN_EMAIL` and `INSIGHTS_ADMIN_PASSWORD` for
+   the first admin. The app creates that admin only while no account exists.
 4. Add the domain `ingest.example.com` (an example) on the Collector,
    container port 4318, path `/nightshift`, with strip path on. Other
    sources can use other paths on the same name later.
