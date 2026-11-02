@@ -178,7 +178,7 @@ Status: built. Agent outcomes run in real nights. The starters validate, but non
 
 Proves: a night starts without a person.
 
-Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes. Schedules start real nights since 2026-10-20. The Host of a Space fires its schedules.
+Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes, or within the late window of a schedule (`lateMinutes`). Schedules start real nights since 2026-10-20. The Host of a Space fires its schedules.
 
 ### Slice 8 — More harnesses and tools
 
@@ -281,7 +281,8 @@ Every acquisition adds one to the epoch. A daemon whose machine slept keeps the 
 **Schedules.** The schedules of a project live in the Space that keeps it, next to its flows, not in a Clone ([ADR 2](adr/0002-flows-are-night-shift-data.md)). The UI lists, adds, pauses and removes them. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and a base ref. Each run starts from the newest commit of the base ref: a branch is fetched from its remote first, so a merge to `main` on GitHub reaches the next run (glossary: Worktree).
 
 - A schedule that names no Device fires on the Host of its Space, once ([ADR 1](adr/0001-one-personal-space-per-home-host.md)).
-- A cron time that is more than 15 minutes late is skipped.
+- A cron time may start up to 15 minutes late. A schedule may allow more with `lateMinutes` (up to 10080, 7 days). Then a time that was missed while the daemon was off still starts when it is back within that window. Only the latest missed time starts, once. Its run keeps the time it was due (`{{run.due_at}}`, `$NS_DUE_AT`).
+- A missed time later than the window is skipped. The log gets an entry, and the Members of the Space get "A schedule did not start".
 - A schedule does not start while its previous run still runs, waits or sleeps.
 - A Space without a Host fires its schedules on its one Device. Keep the night's projects out of the dev database.
 

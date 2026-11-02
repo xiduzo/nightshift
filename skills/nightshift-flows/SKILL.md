@@ -200,7 +200,7 @@ Prompts, commands, arguments, input bindings, outputs and variable values are te
 - `{{task}}`: an input, by its name (a `json` input takes a path).
 - `{{check.log_tail}}`: an output field of a node, by its id. A node that has not run yet gives "". `data` and `results` take a path: `{{plan.data.tasks.0.title}}`.
 - `{{vars.failures}}`: a variable.
-- `{{run.branch}}`: a field of the run: `branch`, `base_branch`, `index`, `worktree`, `base_ref`, `flow`.
+- `{{run.branch}}`: a field of the run: `branch`, `base_branch`, `index`, `worktree`, `base_ref`, `flow`, `due_at`.
 
 A template that is only one reference keeps its JSON value (an array stays an array). The validator checks every reference: read only inputs, variables, run fields and output fields that exist.
 
@@ -215,6 +215,8 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 ## Schedules and webhooks
 
 A schedule starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, or with `any` and a command as a backup, not with a command alone: the kits `kit:github/wait-for-checks` and `kit:github/watch-pr` do it.
+
+A cron time missed while Night Shift was off still starts up to `lateMinutes` late (default 15, at most 10080): only the latest, once. Later, it is skipped with a notification. `{{run.due_at}}` and `$NS_DUE_AT` hold when the run was due (ISO 8601 UTC): use them, not the clock, for the day a run works on.
 
 ## Kits
 

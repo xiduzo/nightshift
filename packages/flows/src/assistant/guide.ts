@@ -470,6 +470,8 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in \
 
 A schedule starts a flow at set times (\`cron\`) or when a webhook arrives (\`webhook: { secret: "\${NAME}", when? }\`, \`when\` a JSONata rule over \`event\`). A webhook schedule's \`inputs\` are templates over the event: \`{{event.body.pull_request.number}}\`, \`{{event.headers.x-github-event}}\`. It can also send a signal to the project's runs (\`signal: { name, key? }\`, \`key\` JSONata over \`event\`): a Wait on that name wakes, with the event as its \`data\`. Wait for CI with a signal and a \`timeoutMinutes\`, or with \`any\` and a command as a backup, not with a command alone: the kits \`kit:github/wait-for-checks\` and \`kit:github/watch-pr\` do it.
 
+A cron time missed while Night Shift was off still starts up to \`lateMinutes\` late (default 15, at most 10080): only the latest, once. Later, it is skipped with a notification. \`{{run.due_at}}\` and \`$NS_DUE_AT\` hold when the run was due (ISO 8601 UTC): use them, not the clock, for the day a run works on.
+
 ## Kits
 
 A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\` or \`acli\`. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`.

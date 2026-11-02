@@ -107,8 +107,9 @@ describe("flowAuthoringGuide", () => {
 		// the Lease node (ADR 7). 3950: cascades (ADR 6), which replace the
 		// loops of nodes that climbed from a cheap try to a strong one.
 		// 4100: the Service node (ADR 9). 4350: the Ask (ADR 10), a Value
-		// made by a person.
-		expect(words).toBeLessThan(4350);
+		// made by a person. 4450: a schedule's late window (`lateMinutes`)
+		// and `{{run.due_at}}`, so a monthly run does not skip its day.
+		expect(words).toBeLessThan(4450);
 	});
 });
 
