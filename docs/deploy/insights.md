@@ -13,7 +13,7 @@ The files are in [`deploy/insights/`](../../deploy/insights/):
 - [`docker-compose.yml`](../../deploy/insights/docker-compose.yml) runs Postgres, the Collector, and the app.
 - [`docker-compose.local.yml`](../../deploy/insights/docker-compose.local.yml) publishes the ports on one computer.
 
-The team instance runs on Dokploy in the project `nightshift-insights`.
+The team instance runs on Dokploy as the compose `insights` in the project `nightshift`.
 Ingest is `https://ingest.xiduzo.com/nightshift`. The admin UI is
 `https://insights.xiduzo.com`.
 
