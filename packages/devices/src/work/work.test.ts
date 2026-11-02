@@ -331,14 +331,16 @@ describe("the work hub", () => {
 		taking.abort();
 	});
 
-	test("a call the Device no longer serves when it comes back ends", async () => {
+	test("a call the Device answered but no longer serves when it comes back ends", async () => {
 		const hub = createWorkHub();
 		const first = new AbortController();
 		const before = hub.take("b", first.signal)[Symbol.asyncIterator]();
 		const delivered = before.next();
 		const replies = hub.call("b", request())[Symbol.asyncIterator]();
 		const answered = replies.next();
-		await delivered;
+		const call = (await delivered).value;
+		// It acked the call: the call began there.
+		hub.reply("b", { id: call.id, replies: [], done: false });
 		first.abort();
 		await before.next();
 		// It restarted: it serves nothing now.
@@ -352,6 +354,86 @@ describe("the work hub", () => {
 		});
 		again.abort();
 		await next;
+	});
+
+	test("a call a dead stream took that the Device never answered goes to its new stream", async () => {
+		const hub = createWorkHub();
+		// The stream of before: its connection died, nobody reads it, and it never closed.
+		const dead = new AbortController();
+		const before = hub.take("b", dead.signal)[Symbol.asyncIterator]();
+		const lost = before.next();
+		const replies = hub.call("b", request())[Symbol.asyncIterator]();
+		const answered = replies.next();
+		const call = (await lost).value;
+		// The Device restarted and opens a new stream: the newest wins.
+		const taking = new AbortController();
+		const after = hub.take("b", taking.signal, [])[Symbol.asyncIterator]();
+		expect((await after.next()).value).toEqual(call);
+		expect((await before.next()).done).toBe(true);
+		hub.reply("b", {
+			id: call.id,
+			replies: [{ kind: "result", value: "done" }],
+			done: true,
+		});
+		expect((await answered).value).toEqual({ kind: "result", value: "done" });
+		taking.abort();
+		await after.next();
+	});
+
+	test("a Device that acks its calls and leaves one without an ack gets it again on its next stream", async () => {
+		const hub = createWorkHub({ ackMs: 20 });
+		const first = new AbortController();
+		const before = hub.take("b", first.signal)[Symbol.asyncIterator]();
+		const taken = before.next();
+		// An earlier call tells the hub this Device acks.
+		const earlier = hub.call("b", request())[Symbol.asyncIterator]();
+		const earlierAnswer = earlier.next();
+		const one = (await taken).value;
+		hub.reply("b", { id: one.id, replies: [], done: false });
+		hub.reply("b", {
+			id: one.id,
+			replies: [{ kind: "result", value: 1 }],
+			done: true,
+		});
+		expect((await earlierAnswer).value).toEqual({ kind: "result", value: 1 });
+
+		// The next call goes into a stream that died: no ack comes.
+		const replies = hub.call("b", request())[Symbol.asyncIterator]();
+		const answered = replies.next();
+		const call = (await before.next()).value;
+		// The hub ends that stream.
+		expect((await before.next()).done).toBe(true);
+		const again = new AbortController();
+		const after = hub.take("b", again.signal, [])[Symbol.asyncIterator]();
+		expect((await after.next()).value).toEqual(call);
+		hub.reply("b", {
+			id: call.id,
+			replies: [{ kind: "result", value: 2 }],
+			done: true,
+		});
+		expect((await answered).value).toEqual({ kind: "result", value: 2 });
+		again.abort();
+		await after.next();
+	});
+
+	test("a Device of an older version that never acks keeps its calls", async () => {
+		const hub = createWorkHub({ ackMs: 10 });
+		const taking = new AbortController();
+		const deliveries = hub.take("b", taking.signal)[Symbol.asyncIterator]();
+		const taken = deliveries.next();
+		const replies = hub.call("b", request())[Symbol.asyncIterator]();
+		const answered = replies.next();
+		const call = (await taken).value;
+		await Bun.sleep(40);
+		expect(hub.online("b", "")).toBe(true);
+		hub.reply("b", {
+			id: call.id,
+			replies: [{ kind: "result", value: "late" }],
+			done: true,
+		});
+		expect((await answered).value).toEqual({ kind: "result", value: "late" });
+		taking.abort();
+		await deliveries.next();
 	});
 
 	test("a call the Device serves that the Host does not know (it restarted) is cancelled there", async () => {
