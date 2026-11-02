@@ -7,6 +7,7 @@ import {
 import { usePathname } from "expo-router";
 import {
 	BellRing,
+	CalendarX,
 	CircleCheck,
 	CircleX,
 	Hand,
@@ -41,6 +42,7 @@ const LOOK: Record<PushData["kind"], { icon: LucideIcon; tone: Tone | null }> =
 		"run-finished": { icon: CircleCheck, tone: "finished" },
 		"run-failed": { icon: CircleX, tone: "failed" },
 		"device-wait": { icon: MonitorSmartphone, tone: "waiting" },
+		"schedule-missed": { icon: CalendarX, tone: "failed" },
 		digest: { icon: Sunrise, tone: null },
 	};
 

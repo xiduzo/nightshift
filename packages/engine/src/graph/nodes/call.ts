@@ -221,7 +221,12 @@ async function callOnce(
 		flowName: node.flow,
 		inputs,
 		scope: { parentStepId: stepId, itemId: null },
-		run: { branch: step.tctx.run.branch, base_branch: "", index: "" },
+		run: {
+			branch: step.tctx.run.branch,
+			base_branch: "",
+			index: "",
+			due_at: step.tctx.run.due_at,
+		},
 	};
 	const ended = await runBody({
 		graph,

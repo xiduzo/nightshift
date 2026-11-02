@@ -19,7 +19,7 @@ import type {
 	OutcomeColor,
 	WaitUntil,
 } from "@nightshift/flows";
-import { instant } from "@nightshift/time";
+import { instant, iso } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { RunResult, RunStatus } from "../run-status";
@@ -915,3 +915,12 @@ export type RunTrigger =
 	| { kind: "schedule"; scheduleId: string; at: number }
 	/** `at`: when the webhook arrived (epoch ms). */
 	| { kind: "webhook"; scheduleId: string; at: number };
+
+/**
+ * When a run was due, as ISO 8601 UTC (`{{run.due_at}}`): the cron time a
+ * schedule started it for, also when it started late, or the moment of
+ * Run now. "" for a run that no schedule started.
+ */
+export function runDueAt(trigger: RunTrigger | undefined): string {
+	return trigger?.kind === "schedule" ? iso(trigger.at) : "";
+}

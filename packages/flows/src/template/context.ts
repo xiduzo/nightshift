@@ -6,6 +6,10 @@ import type { JsonValue } from "../nodes";
  * Fields of the run: `{{run.branch}}`. Inside a Call with `each`, `branch`
  * is the element's branch, `base_branch` the branch it builds on, and
  * `index` the element's position (from 0). Outside, both are "".
+ * `due_at` is when the run was due, as ISO 8601 UTC
+ * (`2026-11-02T21:30:00.000Z`): the cron time a schedule started it for,
+ * also when it started late, or the moment of Run now. "" for a run that
+ * no schedule started.
  */
 export const runFields = [
 	"branch",
@@ -14,6 +18,7 @@ export const runFields = [
 	"worktree",
 	"base_ref",
 	"flow",
+	"due_at",
 ] as const;
 export type RunField = (typeof runFields)[number];
 

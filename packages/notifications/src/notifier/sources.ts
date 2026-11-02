@@ -1,6 +1,6 @@
 import { spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine, LandedFact } from "@nightshift/engine";
+import type { Engine, LandedFact, ScheduleMissed } from "@nightshift/engine";
 
 /**
  * What the notifier reads, as ports: the run events of this Replica (as
@@ -42,14 +42,21 @@ export type RunEventSource = {
 	openGates(spaceId: string): Promise<OpenGateRef[]>;
 	/** One run of the Space. Null: this Replica has no such run. */
 	run(spaceId: string, runId: string): Promise<RunRef | null>;
+	/**
+	 * Calls `listener` when a schedule of this Replica skips a cron time
+	 * that was missed by more than it allows. Returns the unsubscribe.
+	 * Absent: no schedule fires here.
+	 */
+	onScheduleMissed?(listener: (missed: ScheduleMissed) => void): () => void;
 };
 
-/** The engine's run events and open Gates. */
+/** The engine's run events, missed schedules and open Gates. */
 export function engineRunEvents(
-	engine: Pick<Engine, "onLandedFacts" | "space">,
+	engine: Pick<Engine, "onLandedFacts" | "onScheduleMissed" | "space">,
 ): RunEventSource {
 	return {
 		subscribe: (listener) => engine.onLandedFacts(listener),
+		onScheduleMissed: (listener) => engine.onScheduleMissed(listener),
 		async openGates(spaceId) {
 			const gates = await engine.space(spaceId).listGates();
 			return gates.map((g) => ({

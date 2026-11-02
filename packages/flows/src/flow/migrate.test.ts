@@ -560,6 +560,7 @@ describe("migrateFlow: list sources", () => {
 					index: "",
 					worktree: "",
 					base_ref: "",
+					due_at: "",
 				},
 				inputs: { item: { number: 10 } },
 				nodes: {},

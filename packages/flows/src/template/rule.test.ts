@@ -27,6 +27,7 @@ const context: TemplateContext = {
 		index: "0",
 		worktree: "/tmp/wt",
 		base_ref: "main",
+		due_at: "",
 		flow: "night",
 	},
 };

@@ -1,4 +1,4 @@
-import type { LandedFact } from "@nightshift/engine";
+import type { LandedFact, ScheduleMissed } from "@nightshift/engine";
 
 import type {
 	NotificationChannel,
@@ -56,6 +56,8 @@ export type FakeRunEvents = {
 	setRun(runId: string, run: RunRef): void;
 	/** Lands the facts of run events, as the engine's landed feed would. */
 	land(facts: readonly LandedFact[]): void;
+	/** A schedule of the Replica skips a missed cron time, as the engine would say it. */
+	miss(missed: ScheduleMissed): void;
 };
 
 /** Run events and open Gates that a test sets. */
@@ -63,6 +65,7 @@ export function fakeRunEvents(): FakeRunEvents {
 	const open = new Map<string, OpenGateRef[]>();
 	const runs = new Map<string, RunRef>();
 	const listeners = new Set<(facts: readonly LandedFact[]) => void>();
+	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
 	return {
 		source: {
 			subscribe(listener) {
@@ -71,11 +74,18 @@ export function fakeRunEvents(): FakeRunEvents {
 			},
 			openGates: async (spaceId) => [...(open.get(spaceId) ?? [])],
 			run: async (_spaceId, runId) => runs.get(runId) ?? null,
+			onScheduleMissed(listener) {
+				missedListeners.add(listener);
+				return () => missedListeners.delete(listener);
+			},
 		},
 		setOpen: (spaceId, gates) => open.set(spaceId, gates),
 		setRun: (runId, run) => runs.set(runId, run),
 		land(facts) {
 			for (const listener of [...listeners]) listener(facts);
+		},
+		miss(missed) {
+			for (const listener of [...missedListeners]) listener(missed);
 		},
 	};
 }

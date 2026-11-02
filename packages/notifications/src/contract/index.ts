@@ -13,6 +13,7 @@ export {
 	parseDeviceWaitKey,
 	parseGateKey,
 	runEndKey,
+	scheduleMissedKey,
 	waitingKey,
 } from "./keys";
 export {

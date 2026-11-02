@@ -120,8 +120,9 @@ export function expoMessage(
 			interruptionLevel: "active",
 		};
 	}
-	if (message.kind === "digest") {
-		// A summary, not a question: a tap opens the inbox, at default importance.
+	if (message.kind === "digest" || message.kind === "schedule-missed") {
+		// A summary or a missed schedule, not a question: a tap opens the
+		// inbox, at default importance.
 		return {
 			...once,
 			data,

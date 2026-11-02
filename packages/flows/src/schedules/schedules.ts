@@ -61,6 +61,18 @@ export const timeOfDaySchema = z
 	.string()
 	.regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM, for example 07:00.");
 
+/** How late a cron time may start when a schedule does not say: 15 minutes. */
+export const DEFAULT_LATE_MINUTES = 15;
+/** The longest a schedule may start late: 7 days. */
+export const MAX_LATE_MINUTES = 7 * 24 * 60;
+
+/** How late a cron time may still start, in minutes: 1 to 10080 (7 days). */
+export const lateMinutesSchema = z
+	.number()
+	.int("Use whole minutes, for example 1440 for one day.")
+	.min(1, "Use at least 1 minute.")
+	.max(MAX_LATE_MINUTES, "Use at most 10080 minutes (7 days).");
+
 /** A webhook's secret: one secret by name, as `${NAME}`. */
 export const webhookSecretSchema = z
 	.string()
@@ -129,6 +141,13 @@ export const scheduleSchema = z.object({
 	scorePullRequests: z.boolean().optional(),
 	/** The stop time: the first such time of day after the run starts. */
 	stopAt: timeOfDaySchema.optional(),
+	/**
+	 * With `cron`: how late, in minutes, a cron time may still start its
+	 * run, for example after the Host was off over it. Later than that it
+	 * is skipped, and the people of the Space hear of it. Only the latest
+	 * cron time starts. Unset: 15 minutes.
+	 */
+	lateMinutes: lateMinutesSchema.optional(),
 	/**
 	 * The clock of `cron` and `stopAt`: the time zone of the person who
 	 * saved the schedule. Night Shift writes it on a save, so the Host
@@ -307,6 +326,11 @@ export function timeAndDaysToCron({ time, days }: TimeAndDays): string | null {
 	return `${minutes} ${hours} * * ${dow}`;
 }
 
+/** How late, in minutes, a cron time of the schedule may still start its run. */
+export function lateMinutesOf(schedule: Pick<Schedule, "lateMinutes">): number {
+	return schedule.lateMinutes ?? DEFAULT_LATE_MINUTES;
+}
+
 /**
  * A short description of a cron line for people: "every day at 22:00",
  * "weekdays at 22:00", "Mon, Wed at 06:30", "every 15 minutes". Shapes it
@@ -391,6 +415,9 @@ export function validateSchedules(
 		}
 		if (signal !== undefined && webhook === undefined) {
 			error("Only a schedule that waits for a webhook can send a signal.");
+		}
+		if (schedule.lateMinutes !== undefined && cron === undefined) {
+			error("Only a schedule that runs at set times can start late.");
 		}
 		if (schedule.scorePullRequests === true && webhook === undefined) {
 			error(

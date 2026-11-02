@@ -72,6 +72,16 @@ import {
 /** The flow choice of a webhook that starts no flow: it only wakes waiting runs. */
 const NO_FLOW = "-";
 
+/** How late a run may still start, in minutes. "" is the default, 15 minutes. */
+const LATE_CHOICES: readonly { minutes: string; label: string }[] = [
+	{ minutes: "", label: "15 minutes" },
+	{ minutes: "60", label: "1 hour" },
+	{ minutes: "360", label: "6 hours" },
+	{ minutes: "1440", label: "1 day" },
+	{ minutes: "4320", label: "3 days" },
+	{ minutes: "10080", label: "7 days" },
+];
+
 /** The way a webhook's input value reads the webhook: `{{event.…}}`. */
 const isTemplate = (text: string) => text.includes("{{");
 
@@ -269,6 +279,9 @@ function ScheduleForm({
 		time: schedule?.stopAt ?? DEFAULT_STOP,
 	}));
 	const [baseRef, setBaseRef] = useState(schedule?.baseRef ?? "");
+	const [late, setLate] = useState(
+		schedule?.lateMinutes === undefined ? "" : String(schedule.lateMinutes),
+	);
 	const machines = useSpaceMachines();
 	const project = useQuery(projectQueries.list()).data?.find(
 		(p) => p.id === projectId,
@@ -362,6 +375,7 @@ function ScheduleForm({
 				flow: chosen,
 				inputs: filledInputs(inputs, values),
 				cron,
+				...(late === "" ? {} : { lateMinutes: Number(late) }),
 			});
 			return;
 		}
@@ -655,6 +669,33 @@ function ScheduleForm({
 						}
 					/>
 				</Field>
+
+				{trigger === "times" ? (
+					<Field>
+						<FieldLabel htmlFor={`${id}-late`}>Start late up to</FieldLabel>
+						<NativeSelect
+							id={`${id}-late`}
+							value={late}
+							className="w-full"
+							onChange={(event) => setLate(event.target.value)}
+						>
+							{LATE_CHOICES.map((choice) => (
+								<NativeSelectOption key={choice.minutes} value={choice.minutes}>
+									{choice.label}
+								</NativeSelectOption>
+							))}
+							{LATE_CHOICES.some((choice) => choice.minutes === late) ? null : (
+								<NativeSelectOption value={late}>
+									{late} minutes
+								</NativeSelectOption>
+							)}
+						</NativeSelect>
+						<FieldDescription>
+							When Night Shift is off at the start time, the run starts once it
+							is back within this time. Later, you get a notification instead.
+						</FieldDescription>
+					</Field>
+				) : null}
 
 				{machines ? (
 					<Field

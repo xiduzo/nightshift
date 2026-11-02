@@ -4,7 +4,11 @@ export { createPullRequestScores } from "./pull-request-scores";
 export { createPullRequestWatch, msUntilMorning } from "./pull-request-watch";
 export type { ScheduleFiles } from "./schedule-files";
 export { createScheduleFiles } from "./schedule-files";
-export type { ScheduleList, SchedulePause } from "./scheduler";
+export type {
+	ScheduleList,
+	ScheduleMissed,
+	SchedulePause,
+} from "./scheduler";
 export { createScheduler, DEFAULT_SCHEDULE_TICK_MS } from "./scheduler";
 export type { WebhookAnswer, WebhookRequest } from "./webhooks";
 export { createWebhooks } from "./webhooks";

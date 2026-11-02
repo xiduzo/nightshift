@@ -7,6 +7,7 @@ import type {
 	RunStatus,
 	Scope,
 } from "../log";
+import { runDueAt } from "../log";
 import {
 	deriveInputs,
 	deriveNodeOutputs,
@@ -71,6 +72,7 @@ export function reentryUpdate(
 	return {
 		inputs: deriveInputs(run),
 		stopAt: run.stopAt,
+		dueAt: runDueAt(run.started?.payload.trigger),
 		visits: loggedVisits(flow, run, reentered),
 		nodes: deriveNodeOutputs(run, ""),
 		vars: deriveVariables(run, ""),

@@ -85,6 +85,7 @@ import {
 	createWebhooks,
 	DEFAULT_SCHEDULE_TICK_MS,
 	msUntilMorning,
+	type ScheduleMissed,
 	type WebhookAnswer,
 	type WebhookRequest,
 } from "../schedules";
@@ -200,6 +201,13 @@ export interface Engine {
 		listener: (facts: readonly LandedFact[]) => void,
 		scope?: LandedScope,
 	): () => void;
+	/**
+	 * Calls `listener` when this Replica's scheduler skips a cron time
+	 * that was missed by more than its schedule allows (`lateMinutes`).
+	 * Not for a pause or an earlier run that still runs. The notifier tells
+	 * the Space of it. Returns the unsubscribe.
+	 */
+	onScheduleMissed(listener: (missed: ScheduleMissed) => void): () => void;
 	/**
 	 * Moves Projects from one Space to others, as one operation (a Space
 	 * move, `projects-move.ts`): no run becomes active in `move.from` and
@@ -649,6 +657,7 @@ export function createEngine(
 		return !(await hostedElsewhere(row.spaceId));
 	};
 
+	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
 	const scheduler = createScheduler({
 		db,
 		now,
@@ -662,6 +671,18 @@ export function createEngine(
 		firesHere,
 		runStatus: reads.runStatus,
 		usage: options.usage,
+		missed: (time) => {
+			void projects
+				.find(time.projectId)
+				.then(({ spaceId }) => {
+					for (const listener of [...missedListeners]) {
+						listener({ ...time, spaceId });
+					}
+				})
+				.catch((error) =>
+					console.error("[schedules] could not tell of a missed time", error),
+				);
+		},
 	});
 	const pullRequestWatch = createPullRequestWatch({
 		db,
@@ -902,6 +923,10 @@ export function createEngine(
 		},
 		onLandedFacts: (listener, scope) =>
 			landed.subscribe((events) => listener(landedFacts(events)), scope),
+		onScheduleMissed(listener) {
+			missedListeners.add(listener);
+			return () => missedListeners.delete(listener);
+		},
 		moveProjects,
 		async forgetSpace(spaceId) {
 			await ready;

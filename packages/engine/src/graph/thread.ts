@@ -396,8 +396,14 @@ export function endingOf(outcome: DriveOutcome): {
 
 /** One way into a thread. */
 export type ThreadEntry =
-	/** The flow's start node, with the run's inputs and stop time. */
-	| { kind: "start"; inputs: Record<string, JsonValue>; stopAt: number | null }
+	/** The flow's start node, with the run's inputs, stop time and when it was due. */
+	| {
+			kind: "start";
+			inputs: Record<string, JsonValue>;
+			stopAt: number | null;
+			/** `{{run.due_at}}`. Absent: "". */
+			dueAt?: string;
+	  }
 	/** The node the thread is pending at runs again. `update` writes state first. */
 	| { kind: "continue"; update?: RunStateUpdate }
 	/**
@@ -436,7 +442,11 @@ export function resumeEach(
 export function inputOf(entry: ThreadEntry): StreamInput {
 	switch (entry.kind) {
 		case "start":
-			return { inputs: entry.inputs, stopAt: entry.stopAt };
+			return {
+				inputs: entry.inputs,
+				stopAt: entry.stopAt,
+				dueAt: entry.dueAt ?? "",
+			};
 		case "continue":
 			return entry.update ? new Command({ update: entry.update }) : null;
 		case "resume":

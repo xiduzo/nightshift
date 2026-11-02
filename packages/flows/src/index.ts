@@ -348,6 +348,7 @@ export {
 	cronToTimeAndDays,
 	describeCron,
 	isTimeZone,
+	lateMinutesOf,
 	latestCronTime,
 	nextCronTimes,
 	nextTimeOfDay,

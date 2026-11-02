@@ -77,6 +77,9 @@ export const COMMAND: NodeKind<CommandNode> = {
 	logsCommandOutput: () => true,
 };
 
+/** The variable that tells a command when its run was due, as ISO 8601 UTC. */
+const DUE_AT_ENV = "NS_DUE_AT";
+
 /** What the step says when the command's output is not JSON. */
 const NOT_JSON_REASON = "The command's output is not valid JSON.";
 /** What the step says when the data the command wrote is not JSON. */
@@ -100,7 +103,9 @@ async function runShell(
 	const result = await runCommand(step.device, {
 		command,
 		cwd: step.worktree,
-		env,
+		// When the run was due (`{{run.due_at}}`): "" for a run no schedule
+		// started. A template value of the same name (`{{due.at}}`) wins.
+		env: { [DUE_AT_ENV]: step.tctx.run.due_at, ...env },
 		...(node.secrets && node.secrets.length > 0
 			? { secrets: node.secrets }
 			: {}),

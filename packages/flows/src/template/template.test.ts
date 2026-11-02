@@ -16,6 +16,7 @@ const run: TemplateContext["run"] = {
 	index: "",
 	worktree: "/tmp/wt",
 	base_ref: "main",
+	due_at: "2026-11-02T21:30:00.000Z",
 	flow: "retry",
 };
 
@@ -102,6 +103,12 @@ describe("lookupRef", () => {
 		);
 		expect(lookupRef(context, { name: "epic", path: [] })).toBe("1097");
 		expect(lookupRef(context, { name: "check", path: ["exit_code"] })).toBe(1);
+	});
+
+	test("reads when the run was due", () => {
+		expect(renderTemplate("due {{run.due_at}}", context)).toBe(
+			"due 2026-11-02T21:30:00.000Z",
+		);
 	});
 
 	test("walks into objects and arrays", () => {

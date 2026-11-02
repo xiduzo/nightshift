@@ -15,6 +15,7 @@ const run: TemplateContext["run"] = {
 	index: "",
 	worktree: "/tmp/wt",
 	base_ref: "main",
+	due_at: "",
 	flow: "retry",
 };
 

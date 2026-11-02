@@ -473,8 +473,9 @@ export function templateContext(
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
 ): TemplateContext {
+	// A body reads its caller's fields (`runBody`), `due_at` too: its own state has none.
 	const fields = (config.configurable?.run as
-		| { branch: string; base_branch: string; index: string }
+		| { branch: string; base_branch: string; index: string; due_at?: string }
 		| undefined) ?? { branch: ctx.run.branch, base_branch: "", index: "" };
 	return {
 		nodes: state.nodes,
@@ -485,6 +486,7 @@ export function templateContext(
 			worktree: ctx.run.worktreePath,
 			base_ref: ctx.run.baseRef,
 			flow: ctx.flowName,
+			due_at: fields.due_at ?? state.dueAt ?? "",
 		},
 	};
 }

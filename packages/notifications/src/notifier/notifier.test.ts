@@ -1198,3 +1198,96 @@ describe("a step that waits for a device", () => {
 		expect(web.withdrawn()).toEqual(["run-1:wait:step-1"]);
 	});
 });
+
+describe("a missed schedule", () => {
+	const missed = {
+		spaceId: SPACE,
+		projectId: "project-1",
+		scheduleId: "rebalance",
+		flow: "rebalance",
+		at: utc(2026, 9, 21, 10, 30),
+	};
+
+	test("every Member hears that it did not start, with the flow and its time", async () => {
+		await notifier.start();
+		const ada = await register("ada", "web");
+		const bob = await register("bob", "expo");
+
+		events.miss(missed);
+		await notifier.idle();
+
+		const key = `missed:project-1:rebalance:${missed.at}`;
+		expect(sentTo(web)).toEqual([`${ada.id}:${key}`]);
+		expect(sentTo(expo)).toEqual([`${bob.id}:${key}`]);
+		expect(web.sent()[0]).toMatchObject({
+			kind: "schedule-missed",
+			runId: null,
+			title: "A schedule did not start",
+			body: "rebalance was due at 10:30. Night Shift was off at that time.",
+		});
+
+		// Told once, also when it is said again.
+		events.miss(missed);
+		await notifier.idle();
+		expect(web.calls).toHaveLength(1);
+	});
+
+	test("a push only: an open page gets no item, and the push waits until it closes", async () => {
+		await notifier.start();
+		const ada = await register("ada", "web");
+		const screen = openScreen("ada");
+		events.miss(missed);
+		await notifier.idle();
+		expect(screen).toEqual([]);
+		expect(web.calls).toEqual([]);
+
+		await closeScreens();
+		clock += 2 * MINUTE;
+		await notifier.tick();
+		expect(sentTo(web)).toEqual([
+			`${ada.id}:missed:project-1:rebalance:${missed.at}`,
+		]);
+	});
+
+	test("a time a day or more ago says its day", async () => {
+		await notifier.start();
+		await register("ada", "web");
+		events.miss({ ...missed, at: utc(2026, 9, 19, 22, 30) });
+		await notifier.idle();
+		expect(web.sent()[0]?.body).toBe(
+			"rebalance was due on Mon 19 Oct at 22:30. Night Shift was off at that time.",
+		);
+	});
+
+	test("held over quiet hours, it goes out when they end", async () => {
+		await settings.save("ada", {
+			quietHours: { start: "22:00", end: "07:00" },
+		});
+		clock = utc(2026, 9, 21, 23, 0);
+		await notifier.start();
+		const ada = await register("ada", "web");
+		const at = utc(2026, 9, 21, 22, 30);
+		events.miss({ ...missed, at });
+		await notifier.idle();
+		expect(web.calls).toEqual([]);
+
+		clock = utc(2026, 9, 22, 7, 0);
+		await notifier.tick();
+		expect(sentTo(web)).toEqual([`${ada.id}:missed:project-1:rebalance:${at}`]);
+		expect(web.sent()[0]?.body).toBe(
+			"rebalance was due at 22:30. Night Shift was off at that time.",
+		);
+	});
+
+	test("a person who turned off failed runs does not hear of it", async () => {
+		const current = await settings.get("ada");
+		await settings.save("ada", {
+			events: { ...current.events, runFailed: false },
+		});
+		await notifier.start();
+		await register("ada", "web");
+		events.miss(missed);
+		await notifier.idle();
+		expect(web.calls).toEqual([]);
+	});
+});

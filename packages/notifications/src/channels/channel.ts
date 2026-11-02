@@ -100,6 +100,8 @@ export function titleOf(kind: NoticeKind): string {
 			return "A run failed";
 		case "device-wait":
 			return "A step waits for a device";
+		case "schedule-missed":
+			return "A schedule did not start";
 		case "digest":
 			return "Night Shift: last night";
 	}
@@ -112,6 +114,28 @@ export function gatesWaitingTitle(count: number): string {
 
 /** What one notification says: its sentence, and a second line. */
 export type NoticeWords = { title: string; body?: string };
+
+/**
+ * The words of a missed schedule: "A schedule did not start", and "<flow>
+ * was due at 22:30. Night Shift was off at that time." on the person's
+ * clock. A time a day or more ago says its day too.
+ */
+export function scheduleMissedWords(missed: {
+	flow: string;
+	at: number;
+	timeZone: string;
+	now: number;
+}): NoticeWords {
+	// `formatClock` adds the day to a time a day or more away: here, in the past.
+	const away = Math.max(0, missed.now - missed.at);
+	const due = formatClock(missed.at, missed.at - away, missed.timeZone);
+	// "22:30", or "Mon 2 Nov at 22:30".
+	const when = due.includes(" at ") ? `on ${due}` : `at ${due}`;
+	return {
+		title: titleOf("schedule-missed"),
+		body: `${missed.flow} was due ${when}. Night Shift was off at that time.`,
+	};
+}
 
 /**
  * The words of a device wait: "<flow> waits for <device>", and what

@@ -23,6 +23,7 @@ import {
 	type RunLog,
 	type RunRow,
 	type RunTrigger,
+	runDueAt,
 } from "../log";
 import type { ListedProject } from "../projects";
 import {
@@ -404,7 +405,12 @@ export function createRunStart(deps: RunStartDeps) {
 							});
 						}
 						started = { row, walkerId, device };
-						return { row, inputs, stopAt: prepared.stopAt };
+						return {
+							row,
+							inputs,
+							stopAt: prepared.stopAt,
+							dueAt: runDueAt(trigger),
+						};
 					},
 				),
 		});

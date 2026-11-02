@@ -148,6 +148,11 @@ export function noticeOf(message: NotificationMessage): DesktopNotice {
 				...base,
 				body: message.body ?? "Open the run to see what waits.",
 			};
+		case "schedule-missed":
+			return {
+				...base,
+				body: message.body ?? "Night Shift was off at its time.",
+			};
 		case "digest":
 			return {
 				...base,

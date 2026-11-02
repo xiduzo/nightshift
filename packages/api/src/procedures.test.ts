@@ -117,6 +117,7 @@ const engine: Context["engine"] = {
 	logMemberChange: async () => {},
 	logKnowledgeUse: async () => {},
 	onLandedFacts: () => () => {},
+	onScheduleMissed: () => () => {},
 	usageAllowed: async () => true,
 	leases: {
 		take: async () => ({ kind: "held" }),

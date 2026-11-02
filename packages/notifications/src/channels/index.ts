@@ -10,6 +10,7 @@ export {
 	type NotificationMessage,
 	type PushChannels,
 	type SendResult,
+	scheduleMissedWords,
 	titleOf,
 } from "./channel";
 export {

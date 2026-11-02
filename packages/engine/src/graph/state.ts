@@ -247,6 +247,15 @@ export const RunState = z.object({
 		default: () => null as number | null,
 	}),
 	/**
+	 * When the run was due (`{{run.due_at}}`, `runDueAt` of
+	 * `RunStarted.trigger`): ISO 8601 UTC, "" for a run no schedule
+	 * started, and in a checkpoint from before it. Only the root's is
+	 * read: a body gets its caller's through `configurable.dueAt`.
+	 */
+	dueAt: withLangGraph(z.string(), {
+		default: () => "",
+	}),
+	/**
 	 * True once a Call node followed its `stopped` edge: the stop time came,
 	 * and the nodes after the edge wrap the run up. From then on steps start
 	 * past the stop time, in this graph and in the flows it calls
@@ -306,8 +315,10 @@ export const RunState = z.object({
 });
 export type RunStateValues = Omit<
 	z.infer<typeof RunState>,
-	"pending" | "joins" | "cascades"
+	"pending" | "joins" | "cascades" | "dueAt"
 > & {
+	/** Optional: a state a test or an older checkpoint writes may have none. */
+	dueAt?: string;
 	pending: PendingValue;
 	joins: Record<string, JoinRound>;
 	/** Optional: a state a test or an older checkpoint writes may have none. */

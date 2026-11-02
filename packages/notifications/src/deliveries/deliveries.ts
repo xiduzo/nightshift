@@ -15,13 +15,16 @@ import { and, desc, eq, gte, inArray, isNull, lt, not, or } from "drizzle-orm";
  * What a notification tells. `device-wait`: a step waits for a Device that
  * is offline. `digest`: the runs that ended since the last digest, and the
  * Gates that wait, once a day. A digest spans Spaces and runs: its entry
- * has an empty `spaceId` and `runId`.
+ * has an empty `spaceId` and `runId`. `schedule-missed`: a schedule did
+ * not start its run, because its time was missed by more than it allows.
+ * It names no run: its entry has an empty `runId`.
  */
 export type NoticeKind =
 	| "gate-opened"
 	| "run-finished"
 	| "run-failed"
 	| "device-wait"
+	| "schedule-missed"
 	| "digest";
 
 /**

@@ -3,6 +3,7 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { iso } from "@nightshift/time";
 import { atLocal, utc } from "@nightshift/time/testing";
 import { asc, eq, inArray } from "drizzle-orm";
 import {
@@ -435,6 +436,129 @@ describe("the scheduler", () => {
 		expect(await scheduleFacts()).toEqual([]);
 		const [listed] = (await engine.listSchedules(project.id)).schedules;
 		expect(listed?.last).toBeNull();
+		expect(listed?.nextAt).toBe(at(17, 22));
+	});
+
+	test("a missed time starts once within its lateMinutes, with the time it was due", async () => {
+		// The step reads when its run was due, as a template and from its environment.
+		const flow = commandFlow(
+			`printf '{"due":"%s","env":"%s"}' "{{run.due_at}}" "$NS_DUE_AT" > "$NS_OUTPUT"`,
+		);
+		const first = startDaemon();
+		const project = await setup(
+			first.engine,
+			[nightly({ lateMinutes: 1440 })],
+			flow,
+		);
+		clock = at(16, 22);
+		const [fired] = await waitForFacts(1);
+		await waitForEnd(first.engine, firedRunId(fired));
+		first.die();
+
+		// The Host is off from 21:30 to 23:30 the next evening, over 22:00.
+		clock = at(17, 23, 30);
+		const second = startDaemon();
+		const facts = await waitForFacts(2);
+		expect(facts[1]).toMatchObject({
+			type: "ScheduleFired",
+			payload: { scheduleId: "nightly", at: at(17, 22), error: null },
+		});
+		const runId = firedRunId(facts[1]);
+		const run = await waitForEnd(second.engine, runId);
+		expect(run.status).toBe("finished");
+		expect(run.trigger).toEqual({
+			kind: "schedule",
+			scheduleId: "nightly",
+			at: at(17, 22),
+		});
+		const due = iso(at(17, 22));
+		const [ended] = (
+			await sandbox.db
+				.select()
+				.from(event)
+				.where(eq(event.runId, runId))
+				.orderBy(asc(event.seq))
+		)
+			.map(parseEventRow)
+			.filter((e) => e.type === "StepEnded");
+		expect(
+			(ended?.payload as EnginePayloads["StepEnded"] | undefined)?.outputs.data,
+		).toEqual({ due, env: due });
+		second.die();
+
+		// Started again: the time does not start a second run.
+		clock = at(17, 23, 45);
+		const third = startDaemon();
+		await third.engine.listProjects();
+		await settle();
+		expect(await scheduleFacts()).toHaveLength(2);
+		expect(await third.engine.listRuns()).toHaveLength(2);
+		const [listed] = (await third.engine.listSchedules(project.id)).schedules;
+		expect(listed?.nextAt).toBe(at(18, 22));
+	});
+
+	test("a missed time past its lateMinutes is skipped, and the Space hears of it", async () => {
+		const first = startDaemon();
+		const project = await setup(first.engine, [nightly({ lateMinutes: 60 })]);
+		clock = at(16, 22);
+		const [fired] = await waitForFacts(1);
+		await waitForEnd(first.engine, firedRunId(fired));
+		first.die();
+
+		clock = at(17, 23, 30);
+		const second = startDaemon();
+		const told: unknown[] = [];
+		second.root.onScheduleMissed((missed) => told.push(missed));
+		const facts = await waitForFacts(2);
+		expect(facts[1]).toMatchObject({
+			type: "ScheduleSkipped",
+			payload: {
+				at: at(17, 22),
+				reason: expect.stringContaining(
+					"Missed by 1 h 30 min. Night Shift was off, or the computer was asleep. This schedule starts at most 1 h late.",
+				),
+			},
+		});
+		await waitFor(async () => (told.length > 0 ? told : null), {
+			label: "the missed time to be told",
+		});
+		expect(told).toEqual([
+			{
+				spaceId: sandbox.spaceId,
+				projectId: project.id,
+				scheduleId: "nightly",
+				flow: "night",
+				at: at(17, 22),
+			},
+		]);
+		expect(await second.engine.listRuns()).toHaveLength(1);
+	});
+
+	test("a pause or an open run is skipped without telling of a miss", async () => {
+		const { engine, root } = startDaemon();
+		const told: unknown[] = [];
+		root.onScheduleMissed((missed) => told.push(missed));
+		await setup(engine, [
+			nightly({ lateMinutes: 1440, pausedUntil: at(17, 6) }),
+		]);
+		clock = at(16, 22, 1);
+		const [skipped] = await waitForFacts(1);
+		expect(skipped).toMatchObject({
+			type: "ScheduleSkipped",
+			payload: { reason: "You paused this schedule for tonight." },
+		});
+		await settle();
+		expect(told).toEqual([]);
+	});
+
+	test("lateMinutes does not start a time from before the schedule existed", async () => {
+		clock = at(16, 23);
+		const { engine } = startDaemon();
+		const project = await setup(engine, [nightly({ lateMinutes: 1440 })]);
+		await settle();
+		expect(await scheduleFacts()).toEqual([]);
+		expect(await engine.listRuns()).toEqual([]);
+		const [listed] = (await engine.listSchedules(project.id)).schedules;
 		expect(listed?.nextAt).toBe(at(17, 22));
 	});
 

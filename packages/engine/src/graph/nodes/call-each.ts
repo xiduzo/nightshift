@@ -395,6 +395,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				branch: element.branch ?? tctx.run.branch,
 				base_branch: element.baseBranch ?? "",
 				index: String(element.index - 1),
+				due_at: tctx.run.due_at,
 			},
 		};
 		graph ??= bodyGraph(ctx, node, called);

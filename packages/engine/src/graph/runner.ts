@@ -170,11 +170,13 @@ export type RunnerDeps = {
 	usage?: UsageNotes;
 };
 
-/** What a start's Turn prepares once its slot is held: the run row, its inputs and its stop time. */
+/** What a start's Turn prepares once its slot is held: the run row, its inputs, its stop time and when it was due. */
 export type StartPlan = {
 	row: RunRow;
 	inputs: Record<string, JsonValue>;
 	stopAt: number | null;
+	/** `{{run.due_at}}` (`runDueAt`). Absent: "". */
+	dueAt?: string;
 };
 
 /** What a Turn does to a run. */
@@ -838,8 +840,8 @@ export function createRunner(deps: RunnerDeps) {
 		intent: Extract<Intent, { kind: "start" }>,
 	): Promise<Taken> {
 		reserve(runId, intent, {});
-		const { row, inputs, stopAt } = await intent.prepare();
-		drive(row, inputOf({ kind: "start", inputs, stopAt }));
+		const { row, inputs, stopAt, dueAt } = await intent.prepare();
+		drive(row, inputOf({ kind: "start", inputs, stopAt, dueAt }));
 		return DRIVING;
 	}
 

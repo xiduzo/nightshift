@@ -33,6 +33,19 @@ export function digestKey(day: string): string {
 	return `${DIGEST}:${day}`;
 }
 
+/**
+ * One missed cron time of a schedule
+ * (`missed:<projectId>:<scheduleId>:<ms>`): a restart that finds it again
+ * never tells it twice.
+ */
+export function scheduleMissedKey(missed: {
+	projectId: string;
+	scheduleId: string;
+	at: number;
+}): string {
+	return `${MISSED}:${missed.projectId}:${missed.scheduleId}:${missed.at}`;
+}
+
 /** The notification at the end of quiet hours (`waiting:<ms>`). */
 export function waitingKey(at: number): string {
 	return `waiting:${at}`;
@@ -48,6 +61,7 @@ export type NotificationKey =
 
 const WAITING = "waiting";
 const DIGEST = "digest";
+const MISSED = "missed";
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function integer(part: string): number | null {

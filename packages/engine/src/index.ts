@@ -193,6 +193,7 @@ export {
 } from "./run";
 export type {
 	ScheduleList,
+	ScheduleMissed,
 	SchedulePause,
 	WebhookAnswer,
 } from "./schedules";

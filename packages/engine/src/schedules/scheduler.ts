@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import {
+	lateMinutesOf,
 	latestCronTime,
 	nextCronTimes,
 	nextTimeOfDay,
@@ -35,10 +36,14 @@ import type { WebhookDelivery } from "./webhooks";
  *   of `RunStarted` (which closes the gap when the daemon dies between the
  *   start and the `ScheduleFired`).
  * - Only the latest due cron time counts. It fires when it is at most
- *   `SCHEDULE_GRACE_MS` late, for example after a daemon restart. Later than
- *   that it is skipped (`ScheduleSkipped`) when the scheduler watched it come
- *   due (the computer slept) or when it fell while the daemon was down for a
- *   schedule that fired before. A time from before a schedule existed or was
+ *   `SCHEDULE_GRACE_MS` late, for example after a daemon restart. A time
+ *   that was missed fires up to the schedule's own `lateMinutes` late
+ *   (default 15): one the scheduler watched come due (the computer slept),
+ *   or one that fell while the daemon was down for a schedule that fired
+ *   or was skipped before. Its run's trigger keeps the cron time, so the
+ *   run knows when it was due (`{{run.due_at}}`). Later than that window
+ *   a missed time is skipped (`ScheduleSkipped`) and `missed` tells the
+ *   people of the Space. A time from before a schedule existed or was
  *   resumed is ignored without a log entry.
  * - A schedule does not start while an earlier run of it is still running,
  *   waiting or sleeping: that cron time is skipped.
@@ -82,8 +87,27 @@ export function pausedAt(schedule: Schedule, at: number): boolean {
 	return schedule.pausedUntil !== undefined && schedule.pausedUntil > at;
 }
 
-/** How late a cron time may still start. */
+/**
+ * How late any cron time may still start, also one from before the
+ * schedule was watched. A missed time may start as late as the schedule's
+ * `lateMinutes`, and no later than those minutes when they are fewer.
+ */
 export const SCHEDULE_GRACE_MS = 15 * 60_000;
+
+/** A cron time that was missed by more than its schedule allows: it did not start. */
+export type MissedScheduleTime = {
+	projectId: string;
+	scheduleId: string;
+	/** The flow it would have started. */
+	flow: string;
+	/** The cron time (epoch ms). */
+	at: number;
+	/** The schedule's clock, when it names one. */
+	timeZone?: string;
+};
+
+/** A missed cron time, with the Space of its project: what the notifier tells. */
+export type ScheduleMissed = MissedScheduleTime & { spaceId: string };
 export const DEFAULT_SCHEDULE_TICK_MS = 30_000;
 /** How many of a schedule's latest runs the overlap check looks at. */
 const OVERLAP_LOOKBACK = 5;
@@ -127,6 +151,12 @@ export type SchedulerDeps = {
 	 * every schedule fires here.
 	 */
 	firesHere?: (projectId: string, schedule: Schedule) => Promise<boolean>;
+	/**
+	 * A cron time was missed by more than its schedule allows, after its
+	 * `ScheduleSkipped`. Not called for a pause or for an earlier run that
+	 * still runs.
+	 */
+	missed?: (time: MissedScheduleTime) => void;
 };
 
 export type Scheduler = {
@@ -303,6 +333,32 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		record(projectId, scheduleId, { kind: "skipped", at, reason, runId });
 	}
 
+	/**
+	 * What the due time `due` of a schedule does at `at`, when no earlier
+	 * fact handled it: it starts, it was missed by more than the schedule
+	 * allows, or it is ignored (it fell before the schedule was watched).
+	 * Within the grace any time starts. Later, only a time that was missed:
+	 * one this scheduler watched come due, or one that fell while the
+	 * daemon was down for a schedule with history. It starts while it is
+	 * within the schedule's `lateMinutes`.
+	 */
+	function timingOf(
+		key: string,
+		schedule: Schedule,
+		due: number,
+		at: number,
+		current: History | undefined,
+	): "start" | "missed" | "ignore" {
+		const late = at - due;
+		const window = lateMinutesOf(schedule) * 60_000;
+		if (late <= Math.min(SCHEDULE_GRACE_MS, window)) return "start";
+		const watched = watchedSince.get(key) ?? at;
+		const missedWhileWatching = due >= watched;
+		const missedWhileDown = current !== undefined && due < startedAt;
+		if (!missedWhileWatching && !missedWhileDown) return "ignore";
+		return late <= window ? "start" : "missed";
+	}
+
 	async function consider(
 		projectId: string,
 		schedule: CronSchedule,
@@ -316,17 +372,28 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		// It came due while the scheduler was off.
 		if (onSince !== null && due < onSince) return;
 
-		const late = at - due;
-		if (late > SCHEDULE_GRACE_MS) {
-			const watched = watchedSince.get(key) ?? at;
-			const missedWhileWatching = due >= watched;
-			const missedWhileDown = current !== undefined && due < startedAt;
-			if (missedWhileWatching || missedWhileDown) {
-				await skip(
+		const timing = timingOf(key, schedule, due, at, current);
+		if (timing === "ignore") return;
+		if (timing === "missed") {
+			const late = at - due;
+			await skip(
+				projectId,
+				schedule.id,
+				due,
+				`Missed by ${lateness(late)}. Night Shift was off, or the computer was asleep. This schedule starts at most ${lateness(lateMinutesOf(schedule) * 60_000)} late.`,
+			);
+			try {
+				deps.missed?.({
 					projectId,
-					schedule.id,
-					due,
-					`Missed by ${lateness(late)}. Night Shift was off, or the computer was asleep. A schedule starts at most ${SCHEDULE_GRACE_MS / 60_000} min late.`,
+					scheduleId: schedule.id,
+					flow: schedule.flow,
+					at: due,
+					...(schedule.timeZone ? { timeZone: schedule.timeZone } : {}),
+				});
+			} catch (error) {
+				console.error(
+					`[schedules] ${schedule.id}: telling of a miss failed`,
+					error,
 				);
 			}
 			return;
@@ -560,7 +627,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			if (
 				due !== null &&
 				(!current || due > current.lastAt) &&
-				at - due <= SCHEDULE_GRACE_MS
+				timingOf(keyOf(projectId, schedule.id), schedule, due, at, current) ===
+					"start"
 			) {
 				return due;
 			}

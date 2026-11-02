@@ -1,4 +1,8 @@
-import { INBOX_KEEP_MS, type LandedFact } from "@nightshift/engine";
+import {
+	INBOX_KEEP_MS,
+	type LandedFact,
+	type ScheduleMissed,
+} from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import {
 	deviceWaitWords,
@@ -8,9 +12,16 @@ import {
 	type NoticeWords,
 	type NotificationMessage,
 	type PushChannels,
+	scheduleMissedWords,
 	titleOf,
 } from "../channels";
-import { digestKey, parseGateKey, runEndKey, waitingKey } from "../contract";
+import {
+	digestKey,
+	parseGateKey,
+	runEndKey,
+	scheduleMissedKey,
+	waitingKey,
+} from "../contract";
 import type { Claim, Delivery, DeliveryLog, NoticeKind } from "../deliveries";
 import {
 	type Digest,
@@ -184,6 +195,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			key,
 			kind,
 			...ids,
+			// A missed schedule names no run: its entry keeps an empty one.
+			runId: ids.runId === "" ? null : ids.runId,
 			title: words?.title ?? titleOf(kind),
 			...(words?.body ? { body: words.body } : {}),
 			alert,
@@ -225,6 +238,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		if (kind === "gate-opened") return settings.events.gateOpened;
 		if (kind === "run-finished") return settings.events.runFinished;
 		if (kind === "device-wait") return settings.events.deviceWait;
+		// A run that did not start, as a person sees it: like a run that failed.
+		if (kind === "schedule-missed") return settings.events.runFailed;
 		return settings.events.runFailed;
 	}
 
@@ -331,6 +346,30 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 						flow: run.title,
 						device: wait.deviceName,
 						stopAt: run.stopAt,
+						timeZone: settings.timeZone,
+						now: now(),
+					}),
+			},
+		);
+	}
+
+	/**
+	 * A schedule's cron time was missed by more than it allows: every
+	 * Member of the Space hears "A schedule did not start", with the flow
+	 * and the time on their own clock. A push only: no open page has an
+	 * item for it, so it goes when the person closes their pages.
+	 */
+	async function tellMissed(missed: ScheduleMissed): Promise<void> {
+		await tell(
+			"schedule-missed",
+			scheduleMissedKey(missed),
+			{ spaceId: missed.spaceId, runId: "", stepId: null },
+			{
+				inApp: false,
+				words: (settings) =>
+					scheduleMissedWords({
+						flow: missed.flow,
+						at: missed.at,
 						timeZone: settings.timeZone,
 						now: now(),
 					}),
@@ -531,6 +570,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			const seen =
 				row.kind !== "gate-opened" &&
 				row.kind !== "digest" &&
+				// No page shows a missed schedule: it goes out.
+				row.kind !== "schedule-missed" &&
 				deps.inApp.isActive(row.personId);
 			const sent = seen
 				? []
@@ -560,10 +601,18 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			if (inQuietHours(settings, at)) continue;
 			const gates = rows.filter((row) => row.kind === "gate-opened");
 			// A wait that is over was withdrawn: what is left still waits.
-			const stillWait = rows.filter((row) => row.kind === "device-wait");
+			// A missed schedule is still news when quiet hours end: it goes out too.
+			const stillWait = rows.filter(
+				(row) => row.kind === "device-wait" || row.kind === "schedule-missed",
+			);
 			// Runs that ended meanwhile go without a push.
 			for (const row of rows) {
-				if (row.kind === "gate-opened" || row.kind === "device-wait") continue;
+				if (
+					row.kind === "gate-opened" ||
+					row.kind === "device-wait" ||
+					row.kind === "schedule-missed"
+				)
+					continue;
 				await deps.deliveries.update(personId, row.key, {
 					status: "dropped",
 					heldFor: [],
@@ -760,10 +809,20 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		start() {
 			stopped = false;
 			const ready = enqueue("The open Gates were not read.", baseline);
-			unsubscribe = deps.events.subscribe((facts) => {
+			const offFacts = deps.events.subscribe((facts) => {
 				if (stopped) return;
 				void enqueue("A run event was not handled.", () => handle(facts));
 			});
+			const offMissed = deps.events.onScheduleMissed?.((missed) => {
+				if (stopped) return;
+				void enqueue("A missed schedule was not told.", () =>
+					tellMissed(missed),
+				);
+			});
+			unsubscribe = () => {
+				offFacts();
+				offMissed?.();
+			};
 			timer = setInterval(() => {
 				if (!stopped) void enqueue("Held pushes were not sent.", tick);
 			}, deps.tickMs ?? DEFAULT_TICK_MS);

@@ -164,6 +164,7 @@ export function webhookInputs(
 			index: "",
 			worktree: "",
 			base_ref: "",
+			due_at: "",
 			flow: "",
 		},
 	};

@@ -55,7 +55,13 @@ import type { Parked, RunStateValues } from "../state";
  *   open and rethrows.
  */
 
-export type BodyRun = { branch: string; base_branch: string; index: string };
+/** The caller's run fields a body reads differently, and `due_at`, which a body's own state lacks. */
+export type BodyRun = {
+	branch: string;
+	base_branch: string;
+	index: string;
+	due_at: string;
+};
 
 export type BodyEnd =
 	| {

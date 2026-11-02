@@ -42,7 +42,7 @@ export type {
 	StepOutputs,
 	WaitReason,
 } from "./events";
-export { groupByRun, parseEventRow, scopeKey } from "./events";
+export { groupByRun, parseEventRow, runDueAt, scopeKey } from "./events";
 export { followOwnStep, waker } from "./follow";
 export {
 	createRunHistory,

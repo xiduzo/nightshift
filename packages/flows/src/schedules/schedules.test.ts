@@ -5,6 +5,7 @@ import {
 	cronToTimeAndDays,
 	describeCron,
 	isTimeZone,
+	lateMinutesOf,
 	latestCronTime,
 	nextCronTimes,
 	nextTimeOfDay,
@@ -58,6 +59,22 @@ describe("scheduleSchema", () => {
 			"id",
 			"stopAt",
 		]);
+	});
+
+	test("lateMinutes is whole minutes, from 1 to 7 days", () => {
+		const late = (lateMinutes: unknown) =>
+			scheduleSchema.safeParse({ ...schedule(), lateMinutes });
+		expect(late(1440).data?.lateMinutes).toBe(1440);
+		expect(late(10080).success).toBe(true);
+		expect(late(0).error?.issues[0]?.message).toBe("Use at least 1 minute.");
+		expect(late(10081).error?.issues[0]?.message).toBe(
+			"Use at most 10080 minutes (7 days).",
+		);
+		expect(late(1.5).error?.issues[0]?.message).toBe(
+			"Use whole minutes, for example 1440 for one day.",
+		);
+		expect(lateMinutesOf(schedule())).toBe(15);
+		expect(lateMinutesOf(schedule({ lateMinutes: 1440 }))).toBe(1440);
 	});
 
 	test("the file has version 1", () => {
@@ -335,5 +352,23 @@ describe("validateSchedules", () => {
 		expect(parse("hunter2")).toBe(false);
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 		expect(parse("${}")).toBe(false);
+	});
+
+	test("only a schedule at set times starts late", () => {
+		const issues = validateSchedules(
+			[
+				schedule({ id: "late", inputs: { epic: "1" }, lateMinutes: 1440 }),
+				{
+					...schedule({ id: "hook-late", inputs: { epic: "1" } }),
+					cron: undefined,
+					webhook: { secret: HOOK_SECRET },
+					lateMinutes: 60,
+				},
+			],
+			flows,
+		);
+		expect(issues.map((i) => [i.scheduleId, i.message])).toEqual([
+			["hook-late", "Only a schedule that runs at set times can start late."],
+		]);
 	});
 });
