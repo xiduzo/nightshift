@@ -429,7 +429,7 @@ function checkKnowledgeFolders(node: AgentNode, check: NodeCheck): void {
 	const folders = Array.isArray(node.knowledge) ? node.knowledge : [];
 	if (folders.length === 0) {
 		check.error(
-			`Agent node "${node.id}" lists no knowledge folders. Use false to give the agent no knowledge.`,
+			`Agent node "${node.id}" lists no knowledge folders. Pick at least one, or choose Never to give the agent no knowledge.`,
 		);
 		return;
 	}

@@ -46,9 +46,9 @@ describe("an Agent node's knowledge folders", () => {
 		}
 	});
 
-	test("an empty list is not valid: false gives no knowledge", () => {
+	test("an empty list is not valid: Never gives no knowledge", () => {
 		expect(errors(flowWith([]))).toEqual([
-			'Agent node "reader" lists no knowledge folders. Use false to give the agent no knowledge.',
+			'Agent node "reader" lists no knowledge folders. Pick at least one, or choose Never to give the agent no knowledge.',
 		]);
 	});
 
