@@ -64,6 +64,29 @@ function failureWords(error: unknown, call: string): string {
 	return wordsFor(error);
 }
 
+/** A placed Device that did not answer a call within its deadline. */
+function noAnswer(name: string): string {
+	return `${name} did not answer in time. Check that it is online, then try again.`;
+}
+
+/**
+ * How long a call that answers once may take. A call lost on the way, or
+ * a Device that hangs, then ends with a refusal and frees what waits for
+ * it, such as a run's start. Calls a step runs (`decide`, `callTool`) have
+ * their own limits through the step's signal.
+ */
+export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
+	capabilities: 60_000,
+	flows: 60_000,
+	itemBranch: 2 * 60_000,
+	snapshotWorktree: 2 * 60_000,
+	worktreeChanges: 2 * 60_000,
+	// Git work on a large project can take minutes.
+	worktree: 3 * 60_000,
+	handOff: 3 * 60_000,
+	receiveHandOff: 3 * 60_000,
+};
+
 /** Another Device, reached through `relay`, working for one run (or its start). */
 export function remoteDevice(
 	relay: WorkRelay,
@@ -78,10 +101,24 @@ export function remoteDevice(
 		);
 
 	/** The one result of a call; throws its error as a refusal (`refusalOf`). */
-	async function once<T>(call: WorkCall, signal?: AbortSignal): Promise<T> {
-		for await (const reply of ask(call, signal)) {
+	async function once<T>(
+		call: WorkCall,
+		signal?: AbortSignal,
+		projectId?: string,
+	): Promise<T> {
+		const limit = CALL_DEADLINES_MS[call.kind];
+		const deadline =
+			limit === undefined ? undefined : AbortSignal.timeout(limit);
+		const ended =
+			signal && deadline
+				? AbortSignal.any([signal, deadline])
+				: (signal ?? deadline);
+		for await (const reply of ask(call, ended, projectId)) {
 			if (reply.kind === "result") return reply.value as T;
 			if (reply.kind === "error") throw refusalOf(reply);
+		}
+		if (deadline?.aborted && !signal?.aborted) {
+			throw new Refusal("unavailable", noAnswer(device.name));
 		}
 		throw new Refusal("unavailable", stopped(device.name));
 	}
@@ -180,13 +217,8 @@ export function remoteDevice(
 			const has = await once<Capabilities>({ kind: "capabilities", query });
 			return { ...has, elsewhere: device.name };
 		},
-		flows: async (projectId) => {
-			for await (const reply of ask({ kind: "flows" }, undefined, projectId)) {
-				if (reply.kind === "result") return reply.value as FlowSources;
-				if (reply.kind === "error") throw refusalOf(reply);
-			}
-			throw new Refusal("unavailable", stopped(device.name));
-		},
+		flows: (projectId) =>
+			once<FlowSources>({ kind: "flows" }, undefined, projectId),
 		session,
 		exec,
 		async callTool(input): Promise<ToolResult> {

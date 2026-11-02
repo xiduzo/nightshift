@@ -2,6 +2,7 @@ import {
 	type FlowDocuments,
 	HostUnreachableError,
 	OlderHostError,
+	START_DEADLINE_MS,
 	type WalkFile,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
@@ -224,7 +225,15 @@ export function createRelay(deps: {
 					);
 				}
 			}
-			return to.ask((client) => client.sync.startRun(start));
+			// Longer than the Host's own limit on a start, so its refusal comes first.
+			return to.ask(
+				(client, signal) => client.sync.startRun(start, { signal }),
+				{
+					ms: START_DEADLINE_MS + 30_000,
+					words:
+						"The computer that keeps this Space did not answer in time. Check the run list, then start the run again.",
+				},
+			);
 		},
 
 		leases: {

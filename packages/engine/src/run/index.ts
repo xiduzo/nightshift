@@ -15,4 +15,5 @@ export type {
 } from "./peers";
 export type { MoveRows } from "./projects-move";
 export { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";
+export { START_DEADLINE_MS } from "./run-start";
 export type { SpaceEngine } from "./space-engine";

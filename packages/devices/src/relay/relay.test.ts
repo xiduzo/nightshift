@@ -327,6 +327,37 @@ describe("the Space route", () => {
 		const lost = new TypeError("The network connection was lost.");
 		await expect(refused(lost)).rejects.toBe(lost);
 	});
+
+	test("a call the Host never answers gives up after its deadline, and its signal aborts", async () => {
+		let aborted = false;
+		await expect(
+			routes.onHost(
+				"space-team",
+				(_client, signal) =>
+					new Promise((_, reject) => {
+						signal.addEventListener("abort", () => {
+							aborted = true;
+							reject(new Error("aborted"));
+						});
+					}),
+				{ ms: 20, words: "Too slow." },
+			),
+		).rejects.toMatchObject({ kind: "unavailable", message: "Too slow." });
+		expect(aborted).toBe(true);
+	});
+
+	test("a call that settles in time keeps its signal: a stream it opened runs on", async () => {
+		let signal: AbortSignal | undefined;
+		await routes.onHost(
+			"space-team",
+			async (_client, given) => {
+				signal = given;
+			},
+			{ ms: 20 },
+		);
+		await Bun.sleep(40);
+		expect(signal?.aborted).toBe(false);
+	});
 });
 
 describe("whether the Host of a Space can be reached, for a run start", () => {

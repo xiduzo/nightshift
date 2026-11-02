@@ -187,6 +187,7 @@ export {
 	GateClosedError,
 	type PlanDevices,
 	planNodes,
+	START_DEADLINE_MS,
 	UNREACHABLE_DEVICE,
 } from "./run";
 export type {

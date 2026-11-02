@@ -218,6 +218,8 @@ export async function prepareRun(
 }
 
 export type RunStartDeps = {
+	/** How long a start may take before it gives up. Default `START_DEADLINE_MS`. */
+	startDeadlineMs?: number;
 	db: Database;
 	log: RunLog;
 	runner: Pick<Runner, "take">;
@@ -242,6 +244,39 @@ export type RunStartDeps = {
 export type RunStart = ReturnType<typeof createRunStart>;
 
 /** The writing half of run start, over `prepareRun`. */
+/**
+ * How long a start may take, from its plan to its row. Each call to a
+ * Device has its own, shorter limit (copying the project takes the
+ * longest); this one catches any other wait, so a start that hangs frees
+ * its place in the run cap and tells the person.
+ */
+export const START_DEADLINE_MS = 4 * 60_000;
+
+/** Why a start that took too long gave up. */
+export const START_TOO_LONG =
+	"The run did not start in time. Check that its device is online, then start the run again.";
+
+/**
+ * Runs `work` until it settles or `ms` passes: then it is refused, and
+ * `work` sees its signal aborted, so it writes nothing after that.
+ */
+async function beforeDeadline<T>(
+	ms: number,
+	work: (deadline: AbortSignal) => Promise<T>,
+): Promise<T> {
+	const deadline = AbortSignal.timeout(ms);
+	let onAbort = () => {};
+	const late = new Promise<never>((_, reject) => {
+		onAbort = () => reject(new Refusal("unavailable", START_TOO_LONG));
+		deadline.addEventListener("abort", onAbort, { once: true });
+	});
+	try {
+		return await Promise.race([work(deadline), late]);
+	} finally {
+		deadline.removeEventListener("abort", onAbort);
+	}
+}
+
 export function createRunStart(deps: RunStartDeps) {
 	const { db, log, runner } = deps;
 
@@ -260,98 +295,105 @@ export function createRunStart(deps: RunStartDeps) {
 		let started: { row: RunRow; walkerId: string; device: Device } | undefined;
 		await runner.take(runId, {
 			kind: "start",
-			prepare: async () => {
-				const projectRow = await deps.projectRow(input.projectId);
-				// Every run has a starter, and the plan names them: the Person
-				// who starts it, else this computer's owner (a schedule that
-				// names no Person fires here for them), as the Host of the
-				// Space knows them.
-				const planned = await deps.plan({
-					start: input,
-					project: projectRow,
-					runId,
-					scheduled: trigger.kind === "schedule",
-				});
-				const startedBy = planned.plan.personId;
-				const { device } = planned.run;
-				const prepared = await prepareRun(input, planned, deps);
-				const {
-					flow,
-					flowName,
-					flowRevision,
-					calledFlows,
-					calledFlowRevisions,
-					inputs,
-					title,
-				} = prepared;
-				const authorId = input.startedBy ?? startedBy;
-				const author = authorId ? await gitAuthorOf(db, authorId) : null;
-				// The worktree lives on the run's Device. An offline one makes it
-				// when it is back: until then the row keeps the base the person
-				// asked for, and no branch.
-				const worktree = planned.run.offline
-					? null
-					: await device.worktree({
-							id: runId,
-							projectId: projectRow.id,
-							...(input.baseRef !== undefined
-								? { baseRef: input.baseRef }
-								: {}),
-							...(author ? { author } : {}),
+			prepare: () =>
+				beforeDeadline(
+					deps.startDeadlineMs ?? START_DEADLINE_MS,
+					async (deadline) => {
+						const projectRow = await deps.projectRow(input.projectId);
+						// Every run has a starter, and the plan names them: the Person
+						// who starts it, else this computer's owner (a schedule that
+						// names no Person fires here for them), as the Host of the
+						// Space knows them.
+						const planned = await deps.plan({
+							start: input,
+							project: projectRow,
+							runId,
+							scheduled: trigger.kind === "schedule",
 						});
-				const walkerId = await log.walkerId();
-				// The row and the event that names it are one batch.
-				await log.append(
-					{
-						type: "RunStarted",
-						runId,
-						payload: {
-							projectId: projectRow.id,
+						const startedBy = planned.plan.personId;
+						const { device } = planned.run;
+						const prepared = await prepareRun(input, planned, deps);
+						const {
+							flow,
 							flowName,
-							...(flowRevision !== null ? { flowRevision } : {}),
-							title,
-							start: flow.start,
-							stopAt: prepared.stopAt,
+							flowRevision,
+							calledFlows,
+							calledFlowRevisions,
 							inputs,
-							trigger,
-							startedBy,
-						},
+							title,
+						} = prepared;
+						const authorId = input.startedBy ?? startedBy;
+						const author = authorId ? await gitAuthorOf(db, authorId) : null;
+						// The worktree lives on the run's Device. An offline one makes it
+						// when it is back: until then the row keeps the base the person
+						// asked for, and no branch.
+						const worktree = planned.run.offline
+							? null
+							: await device.worktree({
+									id: runId,
+									projectId: projectRow.id,
+									...(input.baseRef !== undefined
+										? { baseRef: input.baseRef }
+										: {}),
+									...(author ? { author } : {}),
+								});
+						// Too late: the person was told it did not start, so it does not.
+						if (deadline.aborted)
+							throw new Refusal("unavailable", START_TOO_LONG);
+						const walkerId = await log.walkerId();
+						// The row and the event that names it are one batch.
+						await log.append(
+							{
+								type: "RunStarted",
+								runId,
+								payload: {
+									projectId: projectRow.id,
+									flowName,
+									...(flowRevision !== null ? { flowRevision } : {}),
+									title,
+									start: flow.start,
+									stopAt: prepared.stopAt,
+									inputs,
+									trigger,
+									startedBy,
+								},
+							},
+							{
+								before: [
+									db.insert(run).values({
+										id: runId,
+										// The run is in its project's Space, also when the scheduler starts it.
+										spaceId: projectRow.spaceId,
+										projectId: projectRow.id,
+										flowName,
+										flow: JSON.stringify(flow),
+										bodyFlows: JSON.stringify(calledFlows),
+										flowRevision,
+										bodyFlowRevisions: JSON.stringify(calledFlowRevisions),
+										title,
+										worktreePath: worktree?.worktreePath ?? "",
+										branch: worktree?.branch ?? "",
+										baseRef: worktree?.baseRef ?? input.baseRef ?? "",
+										walkerId,
+										// The walk reads the plan, and decides nothing again.
+										...planColumns(planned.plan),
+									}),
+								],
+							},
+						);
+						const [row] = await db.select().from(run).where(eq(run.id, runId));
+						if (!row) throw new Error("Could not create the run.");
+						if (worktree) {
+							await log.append({
+								type: "WorktreeCreated",
+								runId,
+								payload: worktree,
+							});
+						}
+						started = { row, walkerId, device };
+						return { row, inputs, stopAt: prepared.stopAt };
 					},
-					{
-						before: [
-							db.insert(run).values({
-								id: runId,
-								// The run is in its project's Space, also when the scheduler starts it.
-								spaceId: projectRow.spaceId,
-								projectId: projectRow.id,
-								flowName,
-								flow: JSON.stringify(flow),
-								bodyFlows: JSON.stringify(calledFlows),
-								flowRevision,
-								bodyFlowRevisions: JSON.stringify(calledFlowRevisions),
-								title,
-								worktreePath: worktree?.worktreePath ?? "",
-								branch: worktree?.branch ?? "",
-								baseRef: worktree?.baseRef ?? input.baseRef ?? "",
-								walkerId,
-								// The walk reads the plan, and decides nothing again.
-								...planColumns(planned.plan),
-							}),
-						],
-					},
-				);
-				const [row] = await db.select().from(run).where(eq(run.id, runId));
-				if (!row) throw new Error("Could not create the run.");
-				if (worktree) {
-					await log.append({
-						type: "WorktreeCreated",
-						runId,
-						payload: worktree,
-					});
-				}
-				started = { row, walkerId, device };
-				return { row, inputs, stopAt: prepared.stopAt };
-			},
+				),
 		});
 		if (!started) throw new Error("Could not create the run.");
 		const { row, walkerId, device } = started;

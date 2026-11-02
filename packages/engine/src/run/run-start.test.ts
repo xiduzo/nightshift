@@ -16,9 +16,12 @@ import { modelValuesHaveDecider, VALUE } from "../graph/nodes/value";
 import { type TestDeviceDeps, testDevice } from "../testing/test-support";
 import {
 	connectionsExist,
+	createRunStart,
 	quickRunTitle,
 	REQUIREMENTS,
+	type RunStartDeps,
 	refusalOf,
+	START_TOO_LONG,
 } from "./run-start";
 
 /**
@@ -209,5 +212,38 @@ describe("quickRunTitle", () => {
 		);
 		expect(title).toHaveLength(80);
 		expect(title.endsWith("…")).toBe(true);
+	});
+});
+
+describe("a start that hangs", () => {
+	test("is refused after its deadline, and writes nothing after that", async () => {
+		let settled = false;
+		let release = () => {};
+		const deps = {
+			startDeadlineMs: 20,
+			// The runner frees the start's slot when its prepare settles.
+			runner: {
+				take: async (_runId: string, turn: { prepare(): Promise<unknown> }) => {
+					try {
+						await turn.prepare();
+					} finally {
+						settled = true;
+					}
+				},
+			},
+			projectRow: async () => ({ id: "p1", spaceId: "s1" }),
+			// The Device never answers: the plan waits until the test ends it.
+			plan: () =>
+				new Promise((_, reject) => {
+					release = () => reject(new Error("released"));
+				}),
+		} as unknown as RunStartDeps;
+		const start = createRunStart(deps).start(
+			{ projectId: "p1", flowName: "nightly" },
+			{ kind: "manual" },
+		);
+		await expect(start).rejects.toThrow(START_TOO_LONG);
+		expect(settled).toBe(true);
+		release();
 	});
 });

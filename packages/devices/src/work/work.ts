@@ -81,11 +81,15 @@ export function createWorkServer(deps: {
 	/** The calls, and the link they reply over. A call outlives a link that restarts, and this server. */
 	const served = deps.served ?? servedCalls();
 	const calls = served.running;
+	/** Acks a call again: the Host sends a call again when its ack got lost. */
+	const acks = new Map<string, () => void>();
 
 	/** The replies of one call, sent in order, a batch at a time. */
 	function outbox(id: string, abort: () => void) {
 		const pending: WorkReply[] = [];
 		let ended = false;
+		/** An empty batch is due: the ack that tells the Host the call arrived (`work-hub.ts`). */
+		let ackDue = false;
 		let closed = false;
 		let busy = false;
 		let failingSince: number | null = null;
@@ -95,7 +99,8 @@ export function createWorkServer(deps: {
 			if (busy || closed) return;
 			busy = true;
 			try {
-				while (pending.length > 0 || ended) {
+				while (pending.length > 0 || ended || ackDue) {
+					ackDue = false;
 					const replies = pending.splice(0, 500);
 					const done = ended && pending.length === 0;
 					const since = failingSince ?? now();
@@ -142,6 +147,10 @@ export function createWorkServer(deps: {
 			}
 		}
 		return {
+			ack() {
+				ackDue = true;
+				void pump();
+			},
 			push(reply: WorkReply) {
 				pending.push(reply);
 				void pump();
@@ -157,6 +166,10 @@ export function createWorkServer(deps: {
 		const controller = new AbortController();
 		calls.set(id, controller);
 		const out = outbox(id, () => controller.abort());
+		// Tells the Host at once that the call arrived. A Host that hears no
+		// ack takes this stream for dead and sends the call again.
+		out.ack();
+		acks.set(id, () => out.ack());
 		try {
 			const parsed = workRequestSchema.safeParse(raw);
 			if (!parsed.success) {
@@ -180,6 +193,7 @@ export function createWorkServer(deps: {
 			});
 		} finally {
 			calls.delete(id);
+			acks.delete(id);
 			out.end();
 		}
 	}
@@ -198,6 +212,9 @@ export function createWorkServer(deps: {
 						calls.get(delivery.id)?.abort();
 					} else if (!calls.has(delivery.id)) {
 						void serve(delivery.id, delivery.request);
+					} else {
+						// It runs here already: the Host missed the ack.
+						acks.get(delivery.id)?.();
 					}
 				}
 			});

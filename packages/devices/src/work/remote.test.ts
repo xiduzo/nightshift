@@ -8,7 +8,7 @@ import {
 	testDevice,
 } from "@nightshift/engine/testing";
 import type { WorkFor, WorkRelay } from "../contract";
-import { remoteDevice, serveWork } from "./remote";
+import { CALL_DEADLINES_MS, remoteDevice, serveWork } from "./remote";
 
 /**
  * The snapshots that tell what a step changed, as a Walker asks another
@@ -81,5 +81,36 @@ describe("the snapshots of a remote Device", () => {
 		await expect(
 			device.snapshotWorktree?.({ cwd: sandbox.repoPath }),
 		).rejects.toThrow("does not tell what a step changed");
+	});
+});
+
+describe("a call to a remote Device that never answers", () => {
+	test("ends with a refusal after its deadline, and the call is cancelled there", async () => {
+		const before = CALL_DEADLINES_MS.capabilities;
+		CALL_DEADLINES_MS.capabilities = 30;
+		let cancelled = false;
+		// The call went to a stream nobody reads: no reply ever comes.
+		const lost: WorkRelay = {
+			async *call(_id, _request, signal) {
+				await new Promise<void>((resolve) =>
+					signal?.addEventListener("abort", () => resolve(), { once: true }),
+				);
+				cancelled = signal?.aborted === true;
+			},
+			online: () => true,
+		};
+		try {
+			const device = remoteDevice(
+				lost,
+				{ id: "laptop", name: "laptop" },
+				FOR_RUN,
+			);
+			await expect(device.capabilities()).rejects.toThrow(
+				"laptop did not answer in time. Check that it is online, then try again.",
+			);
+			expect(cancelled).toBe(true);
+		} finally {
+			CALL_DEADLINES_MS.capabilities = before;
+		}
 	});
 });

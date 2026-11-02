@@ -49,6 +49,14 @@ export function listeners(options: {
 	];
 }
 
+/**
+ * How long, in seconds, one request may wait for its answer. Bun's own
+ * default is 10 s: it closed a run start that waited longer for a Device
+ * to copy its project. Longer than the longest start (`START_DEADLINE_MS`
+ * plus the caller's margin), so the calls' own deadlines answer first.
+ */
+const REQUEST_TIMEOUT_S = 5 * 60;
+
 /** Starts the daemon's listeners. `fetch` wraps the daemon's own (the web UI of the binary). */
 export function serveDaemon(
 	daemon: DaemonServe,
@@ -74,7 +82,10 @@ export function serveDaemon(
 			hostname: listener.hostname,
 			port: listener.port,
 			...(listener.tls && daemon.tls ? { tls: daemon.tls } : {}),
-			fetch,
+			fetch(request, server) {
+				server.timeout(request, REQUEST_TIMEOUT_S);
+				return fetch(request, server);
+			},
 			websocket: daemon.websocket,
 		}),
 	);
