@@ -77,7 +77,7 @@ export function createHostExchange(deps: {
 		admission: Pick<OfferAdmission, "serve">;
 		projects: Pick<
 			PeerProjects,
-			"recordClone" | "addFromRemote" | "matching" | "take"
+			"recordClone" | "setClones" | "addFromRemote" | "matching" | "take"
 		>;
 		hostSpaces: Pick<HostSpaces, "hostOf">;
 		/** Its Space archive: the knowledge content its Devices copy here, by hash (ADR 4). */
@@ -360,6 +360,20 @@ export function createHostExchange(deps: {
 				projectId: input.projectId,
 				deviceId: key.deviceId,
 				deviceName: input.deviceName,
+			});
+		},
+
+		async setClones(key, input) {
+			await admit(key);
+			const role = await roleIn(db, key.personId, input.spaceId);
+			if (!role || !roleAllows(role, { project: ["add"] })) {
+				forbidden(ROLE_REFUSAL.message);
+			}
+			// Only the key's own Device: never another Device's Clones.
+			return engine.projects.setClones(input.spaceId, {
+				deviceId: key.deviceId,
+				deviceName: input.deviceName,
+				projectIds: input.projectIds,
 			});
 		},
 

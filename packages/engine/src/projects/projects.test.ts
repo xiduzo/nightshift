@@ -458,6 +458,102 @@ describe("what the peers ask of the Projects", () => {
 		}
 	});
 
+	test("setClones makes a Device's Clones in the document exactly the ones it has, and again changes nothing", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app") },
+			sandbox.spaceId,
+		);
+		const tools = await projects.add(
+			{ repoPath: await repo("tools") },
+			sandbox.spaceId,
+		);
+		await projects.recordClone(sandbox.spaceId, {
+			projectId: app.id,
+			deviceId: "studio",
+			deviceName: "Studio",
+		});
+		const deviceIds = async (projectId: string) =>
+			(await projects.clones(sandbox.spaceId, projectId)).map(
+				(c) => c.deviceId,
+			);
+
+		// A lost addClone heals, a Clone the Device no longer has goes, and
+		// a Project the document lacks is left out.
+		expect(
+			await projects.setClones(sandbox.spaceId, {
+				deviceId: "studio",
+				deviceName: "Studio",
+				projectIds: [tools.id, "unknown"],
+			}),
+		).toEqual({ added: [tools.id], removed: [app.id] });
+		expect(await deviceIds(app.id)).toEqual([sandbox.deviceId]);
+		expect(await deviceIds(tools.id)).toEqual([sandbox.deviceId, "studio"]);
+
+		const document = await documents.open(sandbox.spaceId);
+		const changes: number[] = [];
+		const count = () => changes.push(1);
+		document.doc.on("update", count);
+		expect(
+			await projects.setClones(sandbox.spaceId, {
+				deviceId: "studio",
+				deviceName: "Studio",
+				projectIds: [tools.id],
+			}),
+		).toEqual({ added: [], removed: [] });
+		document.doc.off("update", count);
+		expect(changes).toEqual([]);
+		// Another Device's Clones stay as they are.
+		expect(await deviceIds(app.id)).toEqual([sandbox.deviceId]);
+	});
+
+	test("setClones is refused in a Space a Host keeps", async () => {
+		const team = await otherSpace(sandbox.db, "Team");
+		const replica = keptElsewhere(team);
+		try {
+			await expect(
+				projectsOf(replica).setClones(team, {
+					deviceId: "studio",
+					deviceName: "Studio",
+					projectIds: [],
+				}),
+			).rejects.toThrow(PROJECT_NOT_FOUND);
+		} finally {
+			await replica.flush();
+		}
+	});
+
+	test("clonedHere lists the Projects of a Space with a Clone on this computer, removed ones too", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app") },
+			sandbox.spaceId,
+		);
+		const tools = await projects.add(
+			{ repoPath: await repo("tools") },
+			sandbox.spaceId,
+		);
+		await projects.remove(tools.id);
+		const team = await otherSpace(sandbox.db, "Team");
+		await projects.add({ repoPath: await repo("other") }, team);
+		// Another Device's row (from a Space move) is not this computer's.
+		await sandbox.db.insert(device).values({
+			id: "studio",
+			name: "Studio",
+			platform: "linux",
+		});
+		await sandbox.db.insert(clone).values({
+			id: "row-studio",
+			spaceId: sandbox.spaceId,
+			projectId: app.id,
+			deviceId: "studio",
+			path: "/elsewhere/app",
+		});
+		expect((await projects.clonedHere(sandbox.spaceId)).sort()).toEqual(
+			[app.id, tools.id].sort(),
+		);
+	});
+
 	test("forgetDevice removes a Device's Clones and its name from the Spaces kept here", async () => {
 		const projects = projectsOf();
 		const app = await projects.add(

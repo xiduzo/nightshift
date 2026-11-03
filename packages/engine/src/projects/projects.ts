@@ -11,7 +11,9 @@ import type { RunLog } from "../log";
 import { type Git, systemGit } from "./git";
 import { normaliseRemote } from "./remote";
 import {
+	cloneKey,
 	deviceEntries,
+	deviceNameIn,
 	projectClones,
 	projectEntry,
 	recordClone,
@@ -688,6 +690,57 @@ export function createProjects(deps: ProjectsDeps) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			await document.change(() => recordClone(document, record));
+		},
+
+		/**
+		 * The Projects of the Space with a Clone on this computer, removed
+		 * ones too: what this Device tells the Host that keeps the Space it
+		 * has (`setClones`), so a Clone the Host missed heals.
+		 */
+		async clonedHere(spaceId: string): Promise<string[]> {
+			const rows = await withClone(eq(project.spaceId, spaceId));
+			return rows.map((row) => row.id);
+		},
+
+		/**
+		 * Makes a Device's Clones in the Space's document exactly the
+		 * Projects it says it has: on the Host that keeps the Space. A
+		 * Project the document lacks is left out. When they are in step, the
+		 * document does not change: the Device may say it again and again.
+		 * Refused as not found when this Replica does not keep the Space.
+		 */
+		async setClones(
+			spaceId: string,
+			input: {
+				deviceId: string;
+				deviceName: string;
+				projectIds: readonly string[];
+			},
+		): Promise<{ added: string[]; removed: string[] }> {
+			const document = await documents.open(spaceId);
+			if (document.hostedElsewhere) {
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
+			}
+			const has = new Set(
+				input.projectIds.filter((id) => document.projects.has(id)),
+			);
+			const known = new Set(deviceEntries(document, input.deviceId).projectIds);
+			const added = [...has].filter((id) => !known.has(id));
+			const removed = [...known].filter((id) => !has.has(id));
+			const named = deviceNameIn(document, input.deviceId);
+			const rename = has.size > 0 && named !== input.deviceName;
+			if (added.length === 0 && removed.length === 0 && !rename) {
+				return { added, removed };
+			}
+			await document.change(() => {
+				for (const projectId of removed) {
+					document.clones.delete(cloneKey(projectId, input.deviceId));
+				}
+				for (const projectId of has) {
+					recordClone(document, { ...input, projectId });
+				}
+			});
+			return { added, removed };
 		},
 
 		/**

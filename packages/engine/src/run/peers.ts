@@ -133,9 +133,9 @@ export type PeerFact = {
  * The Projects as the peers get them (`PeerContext.projects`): a project
  * a person has not removed (`find`), the Projects of a Space and those of
  * a Device's personal Space (`ofSpace`, `matching`), the Clones
- * (`clones`, `clonePath`), and on a Host, a Device's Clone, a Project
- * it asks for and the Projects it takes (`recordClone`, `addFromRemote`,
- * `take`).
+ * (`clones`, `clonePath`, and `clonedHere` that a Device tells its Host),
+ * and on a Host, a Device's Clones, a Project it asks for and the
+ * Projects it takes (`recordClone`, `setClones`, `addFromRemote`, `take`).
  */
 export type PeerProjects = Pick<
 	Projects,
@@ -145,6 +145,8 @@ export type PeerProjects = Pick<
 	| "clones"
 	| "clonePath"
 	| "recordClone"
+	| "setClones"
+	| "clonedHere"
 	| "forgetDevice"
 	| "addFromRemote"
 	| "take"

@@ -197,18 +197,22 @@ export function recordClone(
 
 /**
  * The Clones of a Device and its name in the document: the keys to remove
- * when the Device goes. Empty: the document never knew it.
+ * when the Device goes, and the Projects they are of. Empty: the document never knew it.
  */
 export function deviceEntries(
 	document: SpaceDocument,
 	deviceId: string,
-): { clones: string[]; named: boolean } {
+): { clones: string[]; projectIds: string[]; named: boolean } {
 	const clones: string[] = [];
+	const projectIds: string[] = [];
 	for (const [key, value] of document.clones.entries()) {
 		const parsed = spaceCloneSchema.safeParse(value);
-		if (parsed.success && parsed.data.deviceId === deviceId) clones.push(key);
+		if (parsed.success && parsed.data.deviceId === deviceId) {
+			clones.push(key);
+			projectIds.push(parsed.data.projectId);
+		}
 	}
-	return { clones, named: document.devices.has(deviceId) };
+	return { clones, projectIds, named: document.devices.has(deviceId) };
 }
 
 /** The Space documents of this Replica: views of its synced documents. */

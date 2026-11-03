@@ -46,6 +46,7 @@ import {
 	type LinkOptions,
 	type OpenDocumentChannel,
 	type SyncedDocument,
+	tellClones,
 } from "./links";
 import { createHomeMembership } from "./membership";
 import {
@@ -458,6 +459,17 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					replyDeadlineMs: () =>
 						deps.settings.current().offlineWorkMinutes * 60_000,
 				}).attach(link),
+				// This computer's Clones, each time the link comes online: a Clone
+				// the Host missed heals, one this computer no longer has goes.
+				link.stream(
+					"Telling the Host of this computer's projects",
+					tellClones({
+						spaces: () => engine.hostSpaces.ofHost(hostId),
+						projects: engine.projects,
+						deviceName: async () =>
+							(await engine.devices.get(self.id))?.name ?? self.name,
+					}),
+				),
 			];
 			return () => {
 				for (const stop of stops) stop();

@@ -98,6 +98,14 @@ export type HostExchange = {
 		input: { spaceId: string; projectId: string; deviceName: string },
 	): Promise<void>;
 	/**
+	 * Makes the Device's Clones in a Space of this Host exactly these
+	 * Projects (`PeerProjects.setClones`). Needs `project.add` there.
+	 */
+	setClones(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; projectIds: string[]; deviceName: string },
+	): Promise<{ added: string[]; removed: string[] }>;
+	/**
 	 * Publishes an Offer of the key's Device into a Space of this Host (or
 	 * its new caps). Needs `offer.make` there; logged in the key's
 	 * Person's name.

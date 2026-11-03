@@ -431,6 +431,33 @@ export const hostContract = {
 			)
 			.output(described(z.void())),
 		/**
+		 * The Device's Clones in a Space here are exactly these Projects: a
+		 * Clone the Host missed is added, one the Device no longer has goes.
+		 * The Device says it each time its link comes online; saying it again
+		 * changes nothing. An older Host has none: its `addClone` stays the
+		 * only way in.
+		 */
+		setClones: sync
+			.route({
+				summary:
+					"Sets the Clones a paired Device has of the projects of a Space here.",
+			})
+			.input(
+				z.object({
+					spaceId: z.string().min(1),
+					projectIds: z.array(z.string().min(1)).max(1000),
+					deviceName,
+				}),
+			)
+			.output(
+				described(
+					z.object({
+						added: z.array(z.string()),
+						removed: z.array(z.string()),
+					}),
+				),
+			),
+		/**
 		 * Takes the Projects of a home Device's own personal Space into the
 		 * key's Person's personal Space here (ADR 1): each by its remote, a
 		 * Project here with the same remote takes its place. Runs again

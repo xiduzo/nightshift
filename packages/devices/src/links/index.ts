@@ -1,6 +1,7 @@
-/** This computer's Links to the Hosts it paired with: the links it keeps, the Spaces of those Hosts, pairing from the Device's side, and the procedures it calls on a Host. */
+/** This computer's Links to the Hosts it paired with: the links it keeps, the Spaces of those Hosts, pairing from the Device's side, the procedures it calls on a Host, and the Clones it tells each Host of. */
 
 export { backoff, pause } from "./backoff";
+export { tellClones } from "./clones";
 export type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
 export { fromHost, isOlderHost } from "./from-host";
 export {
