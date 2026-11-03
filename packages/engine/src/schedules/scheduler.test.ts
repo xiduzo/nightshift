@@ -14,6 +14,7 @@ import type { RunLog } from "../log";
 import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
 import type { RunSummary } from "../read/views";
 import { createEngine, type Engine, type EngineInternals } from "../run/engine";
+import { UNREACHABLE_DEVICE } from "../run/run-plan";
 import type { SpaceEngine } from "../run/space-engine";
 import { START_HOLD_WORDS } from "../run/start-holds";
 import { seedFlows } from "../testing/seed-flows";
@@ -84,7 +85,7 @@ function startDaemon(
 
 function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 	return {
-		version: 7,
+		version: 8,
 		inputs: [{ name: "epic", type: "text" }],
 		outputs: [],
 		start: "work",
@@ -105,7 +106,7 @@ function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 /** Waits at a Gate until a person answers: a run that stays open. */
 function gateFlow(): Flow {
 	return {
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: "ask",
@@ -693,25 +694,31 @@ describe("the scheduler", () => {
 		);
 	});
 
-	test("the computer that keeps the Space fires every schedule; the Device a schedule names runs its run", async () => {
+	test("the computer that keeps the Space fires every schedule; the Device a schedule names by id runs its run", async () => {
 		const { engine } = startDaemon();
 		await setup(engine, [
-			nightly({ id: "elsewhere", device: "hetzner-1" }),
-			nightly({ id: "here", device: "test" }),
+			nightly({ id: "elsewhere", device: "hetzner-id" }),
+			nightly({ id: "here", device: sandbox.deviceId }),
+			nightly({ id: "old", device: { name: "LE2316" } }),
 		]);
 		clock = at(16, 22, 1);
-		await waitForFacts(2);
+		await waitForFacts(3);
 		await settle();
 		const facts = await scheduleFacts();
 		const of = (id: string) =>
 			facts.find((f) => f.payload.scheduleId === id)?.payload;
 		expect(of("here")).toMatchObject({ error: null });
 		expect(of("here")?.runId).toBeString();
-		// This computer alone has no Device of that name: the start is refused.
+		// This computer alone reaches no other Device: the start is refused.
 		expect(of("elsewhere")).toMatchObject({
 			runId: null,
+			error: UNREACHABLE_DEVICE,
+		});
+		// A name from before ids never starts on a guess.
+		expect(of("old")).toMatchObject({
+			runId: null,
 			error:
-				'There is no device named "hetzner-1" in this Space. Choose another device for this schedule.',
+				'This schedule names the device "LE2316", but Night Shift cannot tell which device that is. Choose the device again.',
 		});
 		await waitForEnd(engine, of("here")?.runId as string);
 	});

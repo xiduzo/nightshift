@@ -7,6 +7,7 @@ import {
 	nextTimeOfDay,
 	type Schedule,
 	type ScheduleIssue,
+	scheduleDevice,
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { and, asc, gt, inArray } from "drizzle-orm";
@@ -435,7 +436,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
 					...(stopAt !== undefined ? { stopAt } : {}),
 					// The Device it names runs it; this computer only fires it.
-					...(schedule.device ? { deviceName: schedule.device } : {}),
+					...scheduleDevice(schedule),
 					// Another Person's schedule: their run, through the Offers here.
 					...(schedule.person ? { startedBy: schedule.person } : {}),
 				},
@@ -587,7 +588,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					inputs: schedule.inputs,
 					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
 					...(stopAt !== undefined ? { stopAt } : {}),
-					...(schedule.device ? { deviceName: schedule.device } : {}),
+					...scheduleDevice(schedule),
 					...(startedBy ? { startedBy } : {}),
 				},
 				{ kind: "schedule", scheduleId: schedule.id, at },

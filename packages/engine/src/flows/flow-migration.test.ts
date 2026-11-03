@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Profile } from "@nightshift/flows";
 import { openDeviceDocument } from "../device-config/device-document";
 import { createProfileStore } from "../device-config/profiles";
@@ -72,4 +72,84 @@ test("two Devices of one name find nothing: Night Shift does not guess", async (
 	});
 	const migration = await migrations.forDevice(sandbox.deviceId);
 	expect(migration.deviceIdByName("twin")).toBeNull();
+});
+
+describe("a Device's name in a Space (ADR 14)", () => {
+	/** The Device rows of a Host: three Persons, two Macs named alike. */
+	const rows = [
+		{ id: "ada-mac", name: "MacBook", ownerId: "ada" },
+		{ id: "bob-mac", name: "MacBook", ownerId: "bob" },
+		{ id: "ada-desk", name: "LE2316", ownerId: "ada" },
+		{ id: "ada-dev", name: "LE2316", ownerId: "ada" },
+		{ id: "zed-box", name: "hetzner-1", ownerId: "zed" },
+		{ id: "zed-far", name: "far", ownerId: "zed" },
+	];
+	/** The Space document: its Devices with a Clone, and one Offer. */
+	const space = {
+		devices: new Map<string, unknown>([
+			["ada-mac", { name: "MacBook", updatedAt: 1 }],
+			["bob-mac", { name: "MacBook", updatedAt: 1 }],
+			["ada-desk", { name: "LE2316", updatedAt: 1 }],
+			["ada-dev", { name: "LE2316", updatedAt: 1 }],
+		]),
+		offers: new Map<string, unknown>([
+			["zed-box/p", { deviceId: "zed-box", deviceName: "hetzner-1" }],
+		]),
+	};
+	const migrationsFor = (selfOwner: string | null = "ada") =>
+		createFlowMigrations({
+			db: sandbox.db,
+			device: async () => ({ id: sandbox.deviceId, name: "Host" }),
+			directory: {
+				known: async () => rows,
+				selfOwnerId: async () => selfOwner,
+			},
+			spaces: { open: async () => space } as never,
+		});
+
+	test("the Person's own Device of that name wins over another Person's", async () => {
+		const migrations = migrationsFor();
+		const forAda = await migrations.forDevice(sandbox.deviceId, {
+			spaceId: "s",
+			personId: "ada",
+		});
+		const forBob = await migrations.forDevice(sandbox.deviceId, {
+			spaceId: "s",
+			personId: "bob",
+		});
+		expect(forAda.deviceIdByName("MacBook")).toBe("ada-mac");
+		expect(forBob.deviceIdByName("MacBook")).toBe("bob-mac");
+	});
+
+	test("two Devices of one name in the first rank that has it find nothing: Night Shift does not guess", async () => {
+		const migrations = migrationsFor();
+		const forAda = await migrations.forDevice(sandbox.deviceId, {
+			spaceId: "s",
+			personId: "ada",
+		});
+		// Ada's desktop app and her development daemon.
+		expect(forAda.deviceIdByName("LE2316")).toBeNull();
+		const forCarol = await migrations.forDevice(sandbox.deviceId, {
+			spaceId: "s",
+			personId: "carol",
+		});
+		expect(forCarol.deviceIdByName("MacBook")).toBeNull();
+	});
+
+	test("another Person's Device counts only when the Space has it", async () => {
+		const forAda = await migrationsFor().forDevice(sandbox.deviceId, {
+			spaceId: "s",
+			personId: "ada",
+		});
+		expect(forAda.deviceIdByName("hetzner-1")).toBe("zed-box");
+		expect(forAda.deviceIdByName("far")).toBeNull();
+		expect(forAda.deviceIdByName("Host")).toBe(sandbox.deviceId);
+	});
+
+	test("without a Person, this computer's owner's Devices come first", async () => {
+		const forOwner = await migrationsFor("bob").forDevice(sandbox.deviceId, {
+			spaceId: "s",
+		});
+		expect(forOwner.deviceIdByName("MacBook")).toBe("bob-mac");
+	});
 });

@@ -103,7 +103,7 @@ describe("a Subflow that names a computer", () => {
 		const started = await space().startRun({
 			projectId,
 			flow: {
-				version: 7,
+				version: 8,
 				inputs: [],
 				outputs: [],
 				start: "sync",
@@ -114,7 +114,7 @@ describe("a Subflow that names a computer", () => {
 						position: { x: 0, y: 0 },
 						flow: "kit:knowledge/folder",
 						inputs: { path: notes, folder: "notes" },
-						device: "B",
+						device: b.deviceId,
 					},
 				],
 				edges: [],

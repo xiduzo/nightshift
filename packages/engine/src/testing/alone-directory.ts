@@ -1,7 +1,7 @@
 import { hostname } from "node:os";
 import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import type { DeviceDirectory } from "../contract";
 
 /**
@@ -29,6 +29,11 @@ export function aloneDirectory(db: Database): DeviceDirectory {
 				.where(inArray(device.id, [...ids]));
 			return new Map(rows.map((d) => [d.id, d.name]));
 		},
+		known: () =>
+			db
+				.select({ id: device.id, name: device.name, ownerId: device.ownerId })
+				.from(device)
+				.where(isNull(device.revokedAt)),
 		hostedElsewhere: async () => false,
 	};
 }

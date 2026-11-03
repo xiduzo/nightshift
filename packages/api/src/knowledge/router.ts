@@ -41,7 +41,7 @@ function sourcesOf(
 	return knowledgeSources({
 		space: context.space,
 		files: context.knowledge,
-		deviceName: context.daemon.device.name,
+		device: context.daemon.device,
 	});
 }
 

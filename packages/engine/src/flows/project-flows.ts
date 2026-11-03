@@ -16,6 +16,7 @@ import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import {
 	dismissNotice,
+	type FlowDocument,
 	type FlowDocuments,
 	type FlowMergePlan,
 	type FlowNotice,
@@ -30,10 +31,13 @@ import {
 	type RevisionKind,
 	readSchedules,
 	removeFlow,
+	type ScheduleMigrations,
 	saveFlow,
 	saveSchedules,
+	schedulePersons,
 	upgradedSources,
 	upgradeFlows,
+	upgradeSchedules,
 } from "./flow-document";
 import type { FlowMigrations } from "./flow-migration";
 
@@ -70,8 +74,8 @@ export type SaveFlowOptions = {
 export type ProjectFlows = {
 	/**
 	 * Every flow of the project that this Night Shift reads, by name, with
-	 * its Flow revision. A flow of format 6 reads as the Device that saved
-	 * it named its profiles.
+	 * its Flow revision. A flow of an older format reads as the Device that
+	 * saved it named its profiles and Devices.
 	 */
 	flows(projectId: string): Promise<FlowSources>;
 	/** Saves a flow, a draft with errors too, as a new revision. Returns its issues. */
@@ -103,9 +107,10 @@ export type ProjectFlows = {
 	/** Removes a notice, on every Device of the Space. One that is gone already is no error. */
 	dismissNotice(projectId: string, noticeId: string): Promise<void>;
 	/**
-	 * Brings the flows of format 6 of every Project whose Space this
-	 * Replica keeps (`keeps`) to the current format, once (ADR 3): a
-	 * revision of kind `upgrade` by Night Shift on this Device.
+	 * Brings the flows and the schedules of an older format of every
+	 * Project whose Space this Replica keeps (`keeps`) to the current
+	 * format, once (ADR 3, ADR 14): a flow with a revision of kind
+	 * `upgrade` by Night Shift on this Device.
 	 */
 	upgrade(keeps: (spaceId: string) => Promise<boolean>): Promise<void>;
 	/**
@@ -145,9 +150,10 @@ export type ProjectFlowsDeps = {
 	/** The clock of a revision. Default `now`. */
 	now?: () => number;
 	/**
-	 * What brings a flow of format 6, and a revision of it, to the current
-	 * format. Without it, a node of format 6 keeps its profile's name and
-	 * the editor asks to pick the profile again, and nothing upgrades.
+	 * What brings a flow of an older format, a revision of it, and the
+	 * schedules, to the current format. Without it, a node keeps its
+	 * profile's name and the editor asks to pick the profile again, a
+	 * Device name is to choose again, and nothing upgrades.
 	 */
 	migrations?: FlowMigrations;
 };
@@ -161,11 +167,45 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 	};
 	const deviceId = async () =>
 		typeof deps.deviceId === "string" ? deps.deviceId : await deps.deviceId();
+	/** The Space of a Project, or undefined when it is gone. */
+	const spaceOf = async (projectId: string) =>
+		(await deps.project(projectId).catch(() => null))?.spaceId;
+
+	/**
+	 * What brings the document's schedules of an older format to the
+	 * current one: each by its Person's Devices, in the Project's Space.
+	 */
+	async function scheduleMigrations(
+		document: FlowDocument,
+		spaceId: string | undefined,
+	): Promise<ScheduleMigrations | undefined> {
+		const persons = schedulePersons(document);
+		if (!migrations || persons.length === 0 || spaceId === undefined) {
+			return undefined;
+		}
+		const self = await deviceId();
+		const byPerson = new Map<
+			string | null,
+			Awaited<ReturnType<FlowMigrations["forDevice"]>>
+		>();
+		for (const personId of persons) {
+			byPerson.set(
+				personId,
+				await migrations.forDevice(self, { spaceId, personId }),
+			);
+		}
+		return (personId) => byPerson.get(personId);
+	}
 
 	return {
 		async flows(projectId) {
 			const document = await documentOf(projectId);
-			return upgradedSources(document, migrations, await deviceId());
+			return upgradedSources(
+				document,
+				migrations,
+				await deviceId(),
+				await spaceOf(projectId),
+			);
 		},
 
 		async save(projectId, name, flow, options = {}) {
@@ -202,7 +242,8 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 			if (flowId === null) return [];
 			const revisions = flowRevisions(document, flowId);
 			if (!migrations) return revisions;
-			// A revision of format 6 reads as the Device that saved it named its profiles.
+			const spaceId = await spaceOf(projectId);
+			// A revision of an older format reads as the Device that saved it named its profiles and Devices.
 			return Promise.all(
 				revisions.map(async (revision) =>
 					olderFormat(revision.flow)
@@ -210,7 +251,12 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 								...revision,
 								flow: migrateFlow(
 									revision.flow,
-									await migrations.forDevice(revision.deviceId),
+									await migrations.forDevice(
+										revision.deviceId,
+										spaceId === undefined
+											? undefined
+											: { spaceId, personId: revision.personId },
+									),
 								) as FlowRevision["flow"],
 							}
 						: revision,
@@ -220,7 +266,10 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 
 		async schedules(projectId, options = {}) {
 			const document = await documentOf(projectId);
-			const { schedules, unreadable } = readSchedules(document);
+			const { schedules, unreadable } = readSchedules(
+				document,
+				await scheduleMigrations(document, await spaceOf(projectId)),
+			);
 			const issues: ScheduleIssue[] =
 				unreadable > 0
 					? [
@@ -265,7 +314,16 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 			for (const document of await deps.documents.openAll()) {
 				const row = await deps.project(document.projectId).catch(() => null);
 				if (!row || !(await keeps(row.spaceId))) continue;
-				await upgradeFlows(document, { migrations, deviceId: self, at: now() });
+				await upgradeFlows(document, {
+					migrations,
+					deviceId: self,
+					spaceId: row.spaceId,
+					at: now(),
+				});
+				await upgradeSchedules(
+					document,
+					await scheduleMigrations(document, row.spaceId),
+				);
 			}
 		},
 

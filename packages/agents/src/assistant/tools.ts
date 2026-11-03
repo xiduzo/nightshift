@@ -347,7 +347,7 @@ export function authoringTools(port: AuthoringPort): BridgedTool[] {
 		toolDefinition({
 			name: AUTHORING_TOOLS.listProfiles,
 			description:
-				'The profiles a node may name, each on its computer (a Device). Name one in a node as `"profile": { "device": <device>, "profile": <profile> }`, with both ids from this list; the step runs on that computer. An Agent Profile (`kind` agent) is for an Agent node. A Model Profile (`kind` model) is for a Decision or a Value decided by a model. The settings (harness, model, decider) show for this computer\'s profiles only.',
+				'The profiles a node may name, each on its computer (a Device). Name one in a node as `"profile": { "device": <device>, "profile": <profile> }`, with both ids from this list; the step runs on that computer. An Agent Profile (`kind` agent) is for an Agent node. A Model Profile (`kind` model) is for a Decision or a Value decided by a model. The settings (harness, model, decider) show for this computer\'s profiles only. A node without a profile names the computer its step runs on as `"device": <device>`, by the same id.',
 			inputSchema: noInput,
 		}).server(async () => {
 			const profiles = await port.profiles();

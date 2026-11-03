@@ -51,14 +51,14 @@ function sources() {
 	return knowledgeSources({
 		space,
 		files: built.knowledge,
-		// The test Device's name.
-		deviceName: "test",
+		// The test Device.
+		device: { id: sandbox.deviceId, name: "test" },
 	});
 }
 
 const callFlow = (kit: string, inputs: Record<string, string>): Flow =>
 	flowSchema.parse({
-		version: 7,
+		version: 8,
 		start: "sync",
 		nodes: [
 			{ id: "sync", type: "call", position: { x: 0, y: 0 }, flow: kit, inputs },
@@ -69,7 +69,7 @@ const callFlow = (kit: string, inputs: Record<string, string>): Flow =>
 /** A flow that calls a kit and does more: one the editor drew, not the page. */
 const drawnFlow = (kit: string, inputs: Record<string, string> = {}): Flow =>
 	flowSchema.parse({
-		version: 7,
+		version: 8,
 		start: "sync",
 		nodes: [
 			{ id: "sync", type: "call", position: { x: 0, y: 0 }, flow: kit, inputs },
@@ -151,13 +151,13 @@ describe("save", () => {
 		expect((await schedules())[0]?.device).toBeUndefined();
 		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
 			inputs: { path: "~/notes", folder: "folder" },
-			device: "test",
+			device: sandbox.deviceId,
 		});
 		// Edited on another computer, it stays on the one that has the folder.
 		await knowledgeSources({
 			space,
 			files: built.knowledge,
-			deviceName: "laptop",
+			device: { id: "laptop-id", name: "laptop" },
 		}).save(
 			projectId,
 			{
@@ -170,19 +170,26 @@ describe("save", () => {
 			owner,
 		);
 		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
-			device: "test",
+			device: sandbox.deviceId,
 		});
-		// The list names the computer, and whether it is this one.
-		const computer = async (deviceName: string) =>
+		// The list names the computer by its id, and whether it is this one.
+		// A person's Devices name it: the Subflow keeps its id.
+		const computer = async (device: { id: string; name: string }) =>
 			(
 				await knowledgeSources({
-					space,
+					space: root.space(sandbox.spaceId, { personId: "ada" }),
 					files: built.knowledge,
-					deviceName,
+					device,
 				}).list(projectId)
 			).syncs.find((sync) => sync.flow === "knowledge-folder")?.computer;
-		expect(await computer("test")).toEqual({ name: "test", here: true });
-		expect(await computer("laptop")).toEqual({ name: "test", here: false });
+		expect(await computer({ id: sandbox.deviceId, name: "test" })).toEqual({
+			name: "test",
+			here: true,
+		});
+		expect(await computer({ id: "laptop-id", name: "laptop" })).toEqual({
+			name: "test",
+			here: false,
+		});
 		// A source of another kind runs where the run runs.
 		await sources().save(
 			projectId,

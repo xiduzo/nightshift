@@ -51,11 +51,16 @@ export type SpaceFlowsDeps = {
 		ids: readonly string[],
 	) => Promise<ReadonlyMap<string, string>>;
 	/**
-	 * What brings an imported file of format 6 to the current format: its
-	 * nodes name the profiles of this Device, the one that imports it.
-	 * Without it, a node keeps its profile's name, to pick again.
+	 * What brings an imported file of an older format to the current
+	 * format: its nodes name the profiles of this Device, the one that
+	 * imports it, and the Devices of the Space by id, the Person's own
+	 * first. Without it, a node keeps its profile's name and its Device's
+	 * name, to pick again.
 	 */
-	migration?: () => Promise<FlowMigration>;
+	migration?: (scope: {
+		spaceId: string;
+		personId: string | null;
+	}) => Promise<FlowMigration>;
 };
 
 /** Who or what a revision names, with its name when known. */
@@ -340,7 +345,10 @@ export function createSpaceFlows(
 
 			async import(projectId, name, json) {
 				await inSpace(projectId);
-				const flow = importedFlow(json, await deps.migration?.());
+				const flow = importedFlow(
+					json,
+					await deps.migration?.({ spaceId, personId: personId ?? null }),
+				);
 				const free = suffixedName(name, namesOf(await flows.flows(projectId)));
 				const issues = await flows.save(projectId, free, flow, {
 					kind: "import",
@@ -352,7 +360,10 @@ export function createSpaceFlows(
 
 			async importStarters(projectId) {
 				await inSpace(projectId);
-				const migration = await deps.migration?.();
+				const migration = await deps.migration?.({
+					spaceId,
+					personId: personId ?? null,
+				});
 				const taken = namesOf(await flows.flows(projectId));
 				const result: StarterImport = { imported: [], skipped: [] };
 				for (const starter of starterList()) {

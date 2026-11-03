@@ -53,8 +53,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 						walker,
 						byId: async (id) =>
 							id === device.id || id === self ? walker : null,
-						byName: async (name) => (name === device.name ? walker : null),
-						profileDevice: async (id) =>
+						nodeDevice: async (id) =>
 							id === device.id || id === self ? walker : null,
 						profileFor: context.profiles.here,
 						lastKnown: context.profiles.lastKnown,

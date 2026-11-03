@@ -446,7 +446,7 @@ export function createEngine(
 		git,
 		...(hosts ? { relay: hosts } : {}),
 	});
-	/** What brings a flow of format 6 to the current one: its nodes name a Device's profile. */
+	/** What brings a flow or a schedule of an older format to the current one: its nodes name a Device's profile, and their Device, by id. */
 	const thisDevice = async () => ({
 		id: await runLog.walkerId(),
 		name: device.name,
@@ -455,6 +455,8 @@ export function createEngine(
 		db,
 		device: thisDevice,
 		profiles: options.profiles,
+		directory,
+		spaces: documents,
 	});
 	/** The flows and schedules of every project: its flow document (ADR 2). */
 	const projectFlows = createProjectFlows({
@@ -882,7 +884,8 @@ export function createEngine(
 			project: (projectId, spaceId) => projects.find(projectId, spaceId),
 			personNames: (ids) => namesOf(db, ids),
 			deviceNames: (ids) => directory.names(ids),
-			migration: async () => migrations.forDevice(await runLog.walkerId()),
+			migration: async (scope) =>
+				migrations.forDevice(await runLog.walkerId(), scope),
 		}),
 		importClone: (projectId) => cloneImports.project(projectId),
 		kept: {

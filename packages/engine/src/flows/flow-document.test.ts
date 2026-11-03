@@ -526,8 +526,8 @@ describe("flows of format 6 in the document (ADR 3)", () => {
 			{ device: "laptop", profile: "p-laptop" },
 			"builder",
 		]);
-		// LE2316 has no "builder": the node keeps the name and its device, to pick again.
-		expect(read.build?.nodes[1]).toMatchObject({ device: "LE2316" });
+		// LE2316 has no "builder": the node keeps the name, to pick again, and names LE2316 by id.
+		expect(read.build?.nodes[1]).toMatchObject({ device: "le-2316" });
 		const [revision] = await flows.revisions(of, "build");
 		expect(revision?.flow).toMatchObject({
 			version: FLOW_VERSION,
@@ -587,5 +587,126 @@ describe("flows of format 6 in the document (ADR 3)", () => {
 			{ device: "laptop", profile: "p-laptop" },
 			"builder",
 		]);
+	});
+});
+
+describe("schedules from before ids (ADR 14)", () => {
+	const clock = { at: 1_000 };
+	let host: Replica;
+
+	beforeEach(async () => {
+		clock.at = 1_000;
+		host = await replica(clock);
+	});
+
+	afterEach(async () => {
+		await host.dispose();
+	});
+
+	/** One Device named "MacBook" (id `mac-id`); "LE2316" is two Devices. */
+	const migrations: FlowMigrations = {
+		async forDevice(deviceId, scope) {
+			return {
+				deviceId,
+				deviceIdByName: (name) =>
+					name === "MacBook"
+						? "mac-id"
+						: // Only Ada has one Device named "studio".
+							name === "studio" && scope?.personId === "ada"
+							? "ada-studio"
+							: null,
+				profileIdByName: () => null,
+			};
+		},
+	};
+
+	/** Schedules as a Night Shift before ids saved them: no `schedulesVersion`. */
+	async function storeVersion1(document: FlowDocument) {
+		const schedules = document.current.doc.getMap("schedules");
+		const order = document.current.doc.getArray<string>("scheduleOrder");
+		await document.current.change(() => {
+			for (const [id, extra] of [
+				["mac", { device: "MacBook" }],
+				["twin", { device: "LE2316" }],
+				["ada", { device: "studio", person: "ada" }],
+				["bob", { device: "studio", person: "bob" }],
+				["anywhere", {}],
+			] as const) {
+				schedules.set(id, {
+					id,
+					flow: "build",
+					inputs: {},
+					cron: "0 22 * * *",
+					enabled: true,
+					...extra,
+				});
+				order.push([id]);
+			}
+		});
+	}
+
+	const devices = (list: { schedules: { id: string; device?: unknown }[] }) =>
+		Object.fromEntries(list.schedules.map((s) => [s.id, s.device]));
+
+	test("a read brings each name to one Device's id, by the schedule's Person; any other name is to choose again", async () => {
+		await storeVersion1(await host.document());
+		const flows = createProjectFlows({
+			documents: host.documents,
+			project: async () => ({ spaceId: host.sandbox.spaceId }),
+			deviceId: host.sandbox.deviceId,
+			migrations,
+		});
+		const read = await flows.schedules(of, { validate: false });
+		expect(devices(read)).toEqual({
+			mac: "mac-id",
+			twin: { name: "LE2316" },
+			ada: "ada-studio",
+			bob: { name: "studio" },
+			anywhere: undefined,
+		});
+	});
+
+	test("without a migration, a name is never taken as an id", async () => {
+		await storeVersion1(await host.document());
+		const read = await host.flows.schedules(of, { validate: false });
+		expect(devices(read)).toMatchObject({
+			mac: { name: "MacBook" },
+			twin: { name: "LE2316" },
+		});
+		expect(
+			(await host.flows.schedules(of)).issues.map((issue) => [
+				issue.scheduleId,
+				issue.message,
+			]),
+		).toContainEqual([
+			"mac",
+			'This schedule names the device "MacBook", but Night Shift cannot tell which device that is. Choose the device again.',
+		]);
+	});
+
+	test("upgrade writes the ids once: an id is never read as a name again", async () => {
+		await host.sandbox.db.insert(project).values({
+			id: of,
+			spaceId: host.sandbox.spaceId,
+			name: "Project",
+			createdAt: asDate(),
+		});
+		const document = await host.document();
+		await storeVersion1(document);
+		const flows = createProjectFlows({
+			documents: host.documents,
+			project: async () => ({ spaceId: host.sandbox.spaceId }),
+			deviceId: host.sandbox.deviceId,
+			migrations,
+		});
+		await flows.upgrade(async () => true);
+		expect(document.current.doc.getMap("meta").get("schedulesVersion")).toBe(2);
+		expect(document.current.doc.getMap("schedules").get("mac")).toMatchObject({
+			device: "mac-id",
+		});
+		// The ids stay ids, with or without a migration.
+		expect(
+			devices(await host.flows.schedules(of, { validate: false })),
+		).toMatchObject({ mac: "mac-id", twin: { name: "LE2316" } });
 	});
 });

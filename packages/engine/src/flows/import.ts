@@ -5,6 +5,7 @@ import {
 	flowNameSchema,
 	flowSchema,
 	migrateFlow,
+	migrateSchedule,
 	type Profile,
 	profileSchema,
 	type Schedule,
@@ -101,9 +102,14 @@ export type CloneImport =
 			deleted: boolean;
 	  };
 
+/**
+ * The schedules file of the folder: version 1, before ids. Its `device`
+ * names a Device by its name: the import brings it to the Device's id
+ * (`migrateSchedule`), or to `{ name }` to choose again.
+ */
 const schedulesFileSchema = z.object({
 	version: z.literal(1),
-	schedules: z.array(scheduleSchema).default([]),
+	schedules: z.array(z.unknown()).default([]),
 });
 
 /** Imports the Clone's folder, unless an import of this Clone is done. */
@@ -203,10 +209,16 @@ export async function importClone(
 			"json" in folder.schedules
 				? schedulesFileSchema.safeParse(folder.schedules.json)
 				: null;
-		if (parsed?.success) schedules = parsed.data.schedules;
-		else problems.push("The schedules are not valid.");
+		const each = parsed?.success
+			? parsed.data.schedules.map((json) =>
+					scheduleSchema.safeParse(migrateSchedule(json, migration)),
+				)
+			: null;
+		if (each?.every((one) => one.success)) {
+			schedules = each.flatMap((one) => (one.success ? [one.data] : []));
+		} else problems.push("The schedules are not valid.");
 	}
-	const current = readSchedules(document).schedules;
+	const current = readSchedules(document, () => migration).schedules;
 	const scheduleIds = new Set([
 		...current.map((schedule) => schedule.id),
 		...schedules.map((schedule) => schedule.id),

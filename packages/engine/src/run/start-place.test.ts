@@ -130,8 +130,8 @@ describe("the Run's Device when the start names none", () => {
 	test("the Device a schedule names, or this computer for a start for nobody, asks for no default", async () => {
 		const p = places({ list: [laptop] });
 		expect(
-			await p.place("space-own", start({ deviceName: "Desktop" }), "ada"),
-		).toEqual({ walker: "here" });
+			await p.place("space-own", start({ deviceId: "desktop" }), "ada"),
+		).toEqual({ walker: "here", deviceId: "desktop" });
 		expect(await p.place("space-own", start(), null)).toEqual({
 			walker: "here",
 		});

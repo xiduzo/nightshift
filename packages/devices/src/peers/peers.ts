@@ -221,7 +221,7 @@ export function createPeers(
 			schedulesWithOffers: createScheduleOffers({
 				db,
 				documents,
-				namesFor: placement.namesFor,
+				devicesFor: placement.devicesFor,
 				offersHere: admission.inForce,
 				...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
 			}),

@@ -40,6 +40,7 @@ export function createCloneImports(deps: {
 			.select({
 				id: clone.id,
 				projectId: clone.projectId,
+				spaceId: project.spaceId,
 				repoPath: clone.path,
 			})
 			.from(clone)
@@ -57,6 +58,7 @@ export function createCloneImports(deps: {
 	function importOne(row: {
 		id: string;
 		projectId: string;
+		spaceId: string;
 		repoPath: string;
 	}): Promise<void> {
 		const found = running.get(row.id);
@@ -73,6 +75,7 @@ export function createCloneImports(deps: {
 							migration: async () =>
 								(deps.migrations as FlowMigrations).forDevice(
 									(await deps.device()).id,
+									{ spaceId: row.spaceId },
 								),
 						}
 					: {}),

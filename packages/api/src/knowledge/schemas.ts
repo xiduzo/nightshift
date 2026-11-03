@@ -49,7 +49,7 @@ export const knowledgeSchema = z.object({
 				.object({
 					cron: z.string(),
 					enabled: z.boolean(),
-					/** The Device its runs run on, by name. */
+					/** The Device its runs run on, by its id. */
 					device: z.string().optional(),
 				})
 				.nullable(),

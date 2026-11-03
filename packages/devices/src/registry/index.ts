@@ -6,6 +6,7 @@ export {
 	type DeviceRegistry,
 	deviceNamesOf,
 	homePersonsOf,
+	knownDevices,
 	OFFLINE_AFTER_MS,
 	type PairedDevice,
 } from "./registry";

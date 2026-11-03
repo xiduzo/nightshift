@@ -46,11 +46,8 @@ export const flowListItemSchema = exact<FlowListItem>()(
 		inputs: flowSchema.shape.inputs,
 		/** The flows whose Subflow nodes run this one. */
 		callers: z.array(z.string()),
-		/** The Devices its nodes name, and its profiles' Devices by id. */
-		devices: z.object({
-			names: z.array(z.string()),
-			ids: z.array(z.string()),
-		}),
+		/** The Devices its nodes and its profiles name, by id. */
+		devices: z.object({ ids: z.array(z.string()) }),
 		/** Its nodes by type, the most first, without End nodes. */
 		nodeTypes: z.array(
 			z.object({

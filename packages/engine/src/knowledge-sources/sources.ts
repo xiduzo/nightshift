@@ -1,11 +1,14 @@
 import {
 	cronError,
+	deviceIdOf,
 	type FlowIssue,
 	type KnowledgeSource,
 	knowledgeKitsOf,
 	knowledgeSourceKind,
+	legacyDeviceName,
 	REVIEW_LEARNINGS_KIT,
 	type Schedule,
+	scheduleDevice,
 	scheduleSchema,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -133,13 +136,21 @@ export type KnowledgeSourcesDeps = {
 	/** The Space as the person who asks sees it. */
 	space: Pick<
 		SpaceEngine,
-		"flows" | "listSchedules" | "saveSchedules" | "listRuns" | "startRun"
+		| "flows"
+		| "listSchedules"
+		| "saveSchedules"
+		| "listRuns"
+		| "startRun"
+		| "listDevices"
 	>;
 	/** This Device's knowledge: the files, and the removal of a folder. */
 	files: Pick<ProjectKnowledge, "listing" | "removeFolder">;
-	/** This computer's name: a source that reads a folder here syncs here. */
-	deviceName: string;
+	/** This computer: a source that reads a folder here syncs here. */
+	device: { id: string; name: string };
 };
+
+/** What the Knowledge page calls a computer it cannot name. */
+const ANOTHER_COMPUTER = "another computer";
 
 /** The schedules of a project are this computer's owner's to change (`schedules.save`). */
 const OWNER_ONLY =
@@ -189,12 +200,16 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 		async list(projectId: string): Promise<KnowledgeOverview> {
 			const now = timeNow();
 			const flows = await space.flows.map(projectId);
-			const [{ files, proposed, shared, olderHost }, schedules, runs] =
+			const [{ files, proposed, shared, olderHost }, schedules, runs, devices] =
 				await Promise.all([
 					deps.files.listing(projectId),
 					savedSchedules(projectId),
 					space.listRuns({ projectId, limit: LAST_RUNS }),
+					// Names only: a list that does not load names none.
+					space.listDevices(projectId).catch(() => []),
 				]);
+			const names = new Map(devices.map((d) => [d.deviceId, d.name]));
+			names.set(deps.device.id, deps.device.name);
 			const used = Object.entries(flows)
 				.map(([flow, parsed]) => ({
 					flow,
@@ -223,19 +238,30 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 					const node = parsed?.nodes[0];
 					const device =
 						source && node?.type === "call" ? node.device : undefined;
+					const deviceId = deviceIdOf(device);
+					const scheduledOn = deviceIdOf(schedule?.device);
 					return [
 						{
 							flow,
 							kits: fills,
 							source,
-							computer: device
-								? { name: device, here: device === deps.deviceName }
-								: null,
+							computer:
+								device === undefined
+									? null
+									: {
+											name:
+												(deviceId === undefined
+													? legacyDeviceName(device)
+													: names.get(deviceId)) ?? ANOTHER_COMPUTER,
+											here: deviceId === deps.device.id,
+										},
 							schedule: schedule?.cron
 								? {
 										cron: schedule.cron,
 										enabled: schedule.enabled,
-										...(schedule.device ? { device: schedule.device } : {}),
+										...(scheduledOn !== undefined
+											? { device: scheduledOn }
+											: {}),
 									}
 								: null,
 							lastRun,
@@ -288,7 +314,7 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 				...(name !== undefined ? { name } : {}),
 				flows: await space.flows.map(projectId),
 				here: {
-					device: deps.deviceName,
+					device: deps.device.id,
 					...(scheduled !== undefined ? { scheduled } : {}),
 				},
 			});
@@ -360,7 +386,7 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 				projectId,
 				flowName: name,
 				startedBy,
-				...(schedule?.device ? { deviceName: schedule.device } : {}),
+				...(schedule ? scheduleDevice(schedule) : {}),
 			});
 		},
 	};

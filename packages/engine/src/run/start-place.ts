@@ -9,8 +9,7 @@ import type { PlacementPort } from "./peers";
  *   Device: the one the start names, else this computer, so the run's
  *   unplaced steps run where the person started it.
  * - `here`: this computer walks the run. `deviceId` is its Run's Device
- *   when that is another Device. Absent: this computer, or the Device a
- *   schedule names by name (`deviceName`), which the run's plan finds.
+ *   when that is another Device. Absent: this computer.
  */
 export type StartPlace =
 	| { walker: "host"; deviceId: string }
@@ -107,9 +106,7 @@ export function createStartPlaces(deps: {
 		if (start.deviceId !== undefined) {
 			return { walker: "here", deviceId: start.deviceId };
 		}
-		if (start.deviceName !== undefined || personId === null) {
-			return { walker: "here" };
-		}
+		if (personId === null) return { walker: "here" };
 		const chosen = (await placements(spaceId, personId, start.projectId)).find(
 			(p) => p.default,
 		);

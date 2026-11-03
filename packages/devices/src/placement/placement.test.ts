@@ -55,7 +55,7 @@ import { type DeviceOffer, NO_STARTER } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
-import { createPlacement, deviceNamed } from "./placement";
+import { createPlacement } from "./placement";
 
 /** No profile of this computer, and no Device document kept here. */
 const NO_PROFILES: Pick<PeerProfiles, "here" | "lastKnown"> = {
@@ -223,7 +223,7 @@ function peerEngine(
 
 const flow = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow =>
 	({
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "a",
@@ -648,7 +648,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			flow: flow(
 				[
 					commitOn("one", "one.txt"),
-					commitOn("two", "two.txt", "studio-b"),
+					commitOn("two", "two.txt", B),
 					{ ...command("three", "ls"), device: undefined },
 				] as Flow["nodes"],
 				[
@@ -699,7 +699,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 					command("scribble", "echo draft > draft.txt"),
 					{
 						...command("there", "ls"),
-						device: "studio-b",
+						device: B,
 					},
 				] as Flow["nodes"],
 				[{ id: "e1", from: "scribble", outcome: "pass", to: "there" }],
@@ -719,7 +719,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			flow: flow(
 				[
 					command("first", "sleep 0.3"),
-					{ ...command("ask", "echo from B"), device: "studio-b" },
+					{ ...command("ask", "echo from B"), device: B },
 				] as Flow["nodes"],
 				[{ id: "e1", from: "first", outcome: "pass", to: "ask" }],
 			),
@@ -760,7 +760,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 						position: { x: 0, y: 0 },
 						flow: "sync",
 						inputs: {},
-						device: "studio-b",
+						device: B,
 					},
 					command("after", "echo from A"),
 				] as Flow["nodes"],
@@ -812,7 +812,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			flow: flow(
 				[
 					command("first", "true"),
-					{ ...command("ask", "echo from B"), device: "studio-b" },
+					{ ...command("ask", "echo from B"), device: B },
 				] as Flow["nodes"],
 				[{ id: "e1", from: "first", outcome: "pass", to: "ask" }],
 			),
@@ -838,7 +838,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		const started = await space().startRun({
 			projectId,
 			flow: flow([
-				{ ...command("ask", "echo from B"), device: "studio-b" },
+				{ ...command("ask", "echo from B"), device: B },
 			] as Flow["nodes"]),
 			startedBy: personId,
 			stopAt,
@@ -917,7 +917,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 				startedBy: personId,
 			}),
 		).rejects.toThrow(
-			'The flow names the device "nowhere", but you have no device of that name, and none of that name offers profiles to this Space.',
+			'The flow runs "ask" on a device that is not in this Space, or that you cannot use. Choose another device.',
 		);
 	});
 
@@ -991,10 +991,7 @@ describe("a run's plan", () => {
 
 	/** gate → a command on studio-b. */
 	const gateThenB = flow(
-		[
-			gate,
-			{ ...command("there", "echo from B"), device: "studio-b" },
-		] as Flow["nodes"],
+		[gate, { ...command("there", "echo from B"), device: B }] as Flow["nodes"],
 		[{ id: "e1", from: "gate", outcome: "yes", to: "there" }],
 	);
 
@@ -1024,15 +1021,15 @@ describe("a run's plan", () => {
 		const row = await rowOf(started.id);
 		expect(placedRun(row).plan).toEqual({
 			device: { id: started.device.id, name: "test" },
-			named: { "studio-b": { id: B, name: "studio-b" } },
+			named: { [B]: { id: B, name: "studio-b" } },
 			devices: {
 				[started.device.id]: { id: started.device.id, name: "test" },
 				[B]: { id: B, name: "studio-b" },
 			},
 			personId,
 		});
-		// A Replica of a version before the plan reads the same Devices.
-		expect(JSON.parse(row.placements ?? "{}")).toEqual({ "studio-b": B });
+		// The nodes name their Devices by id (ADR 14): so does `placements`.
+		expect(JSON.parse(row.placements ?? "{}")).toEqual({ [B]: B });
 		await space().act(started.id, { kind: "stop" });
 	});
 
@@ -1243,11 +1240,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 				profiles: LAPTOP_PROFILES,
 			},
 		]);
-		// A node that names it waits for it, instead of a refusal.
-		const named = (await placement.namesFor(SPACE, ON_HOST, "p-shared"))(
-			"Laptop",
-		);
-		expect(named).toMatchObject({ deviceId: "laptop", online: false });
+
 		await spaceDocuments.flush();
 	});
 
@@ -1297,44 +1290,6 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 	});
 });
 
-describe("the name of a Device", () => {
-	const own = (name: string, deviceId = name) => ({
-		deviceId,
-		name,
-		thisDevice: false,
-		online: true,
-		hasClone: true,
-	});
-	const offered = (name: string, deviceId = name) => ({
-		...own(name, deviceId),
-		offers: ["coder"],
-	});
-
-	test("picks one of the Person's own over another Person's, and nothing when none has it", () => {
-		expect(
-			deviceNamed(
-				[offered("studio", "theirs"), own("studio", "mine")],
-				"studio",
-			)?.deviceId,
-		).toBe("mine");
-		expect(deviceNamed([offered("studio")], "studio")?.deviceId).toBe("studio");
-		// Of two other people's, this computer.
-		expect(
-			deviceNamed(
-				[
-					offered("studio", "theirs"),
-					{ ...offered("studio", "here"), thisDevice: true },
-				],
-				"studio",
-			)?.deviceId,
-		).toBe("here");
-		expect(deviceNamed([own("studio")], "laptop")).toBeNull();
-		expect(() =>
-			deviceNamed([own("studio", "one"), own("studio", "two")], "studio"),
-		).toThrow('Two of your devices are named "studio".');
-	});
-});
-
 describe("the walk, from the plan alone", () => {
 	/** A's placement module, with no registry and no names it learned. */
 	const placementOfA = () =>
@@ -1358,7 +1313,7 @@ describe("the walk, from the plan alone", () => {
 			projectId,
 			walkerId: a.deviceId,
 			deviceId: B,
-			placements: JSON.stringify({ "hetzner-1": "device-h" }),
+			placements: JSON.stringify({ "device-h": "device-h" }),
 			deviceNames: JSON.stringify({ [B]: "studio-b", "device-h": "hetzner-1" }),
 			startedBy: personId,
 			...fields,
@@ -1373,18 +1328,40 @@ describe("the walk, from the plan alone", () => {
 			placement.deviceFor(
 				{
 					...command("y", "true"),
-					device: "hetzner-1",
+					device: "device-h",
 				} as Flow["nodes"][number],
 				row({}),
 			).name,
 		).toBe("hetzner-1");
 	});
 
+	test("a run from before ids: its node names its Device by the name the plan keeps (ADR 14)", () => {
+		const placement = placementOfA();
+		const older = row({
+			placements: JSON.stringify({ "hetzner-1": "device-h" }),
+		});
+		// Its flow snapshot reads as format 8: the name is to choose again.
+		const at = placement.deviceFor(
+			{
+				...command("y", "true"),
+				device: { name: "hetzner-1" },
+			} as Flow["nodes"][number],
+			older,
+		);
+		expect([at.id, at.name]).toEqual(["device-h", "hetzner-1"]);
+	});
+
 	test("a run from before the plan kept names: by the node's name, and before Placement on its Walker", () => {
 		const placement = placementOfA();
-		const older = row({ deviceNames: null });
+		const older = row({
+			placements: JSON.stringify({ "hetzner-1": "device-h" }),
+			deviceNames: null,
+		});
 		const named = placement.deviceFor(
-			{ ...command("y", "true"), device: "hetzner-1" } as Flow["nodes"][number],
+			{
+				...command("y", "true"),
+				device: { name: "hetzner-1" },
+			} as Flow["nodes"][number],
 			older,
 		);
 		expect([named.id, named.name]).toEqual(["device-h", "hetzner-1"]);
@@ -1425,10 +1402,12 @@ describe("the walk, from the plan alone", () => {
 
 	test("a run planned before steps were placed by id still reads: its copy names the profile's Device by name too", () => {
 		const placement = placementOfA();
-		const older = row({});
+		const older = row({
+			placements: JSON.stringify({ "hetzner-1": "device-h" }),
+		});
 		const node = {
 			...agentOn("device-h"),
-			device: "hetzner-1",
+			device: { name: "hetzner-1" },
 		} as Flow["nodes"][number];
 		const at = placement.deviceFor(node, older);
 		expect([at.id, at.name]).toEqual(["device-h", "hetzner-1"]);
@@ -1510,7 +1489,7 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 			projectId,
 			{
 				night: flow([
-					{ ...command("there", "echo from B"), device: "studio-b" },
+					{ ...command("there", "echo from B"), device: B },
 				] as Flow["nodes"]),
 			},
 			[

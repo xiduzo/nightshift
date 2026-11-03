@@ -27,16 +27,11 @@ export type StartRunInput = {
 	startedBy?: string;
 	/**
 	 * The Device the run's steps run on, and its worktree's home (its
-	 * Placement): one of the starter's Devices with a Clone of the project
-	 * (`listPlacements`). Default: this computer.
+	 * Placement), by its id: one of the starter's Devices with a Clone of
+	 * the project (`listPlacements`), or the one a schedule names
+	 * (`Schedule.device`). Default: this computer.
 	 */
 	deviceId?: string;
-	/**
-	 * The run's Device by the name a schedule gives it (`Schedule.device`):
-	 * the Host fires the schedule, and the run runs there. Without
-	 * `deviceId` only. Default: this computer.
-	 */
-	deviceName?: string;
 } & (
 	| { flowName: string; flow?: never }
 	/** A flow that is not a file, for example a quick run. */

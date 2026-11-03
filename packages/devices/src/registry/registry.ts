@@ -115,6 +115,16 @@ export async function deviceNamesOf(
 	return new Map(rows.map((d) => [d.id, d.name]));
 }
 
+/** Every Device row whose access is not removed, with its owner (`DeviceDirectory.known`). */
+export async function knownDevices(
+	db: Database,
+): Promise<{ id: string; name: string; ownerId: string | null }[]> {
+	return db
+		.select({ id: device.id, name: device.name, ownerId: device.ownerId })
+		.from(device)
+		.where(isNull(device.revokedAt));
+}
+
 /**
  * The Persons whose home Host this computer is: each has a paired Device
  * with access that joined it as its home Host. Only a Host has such rows.

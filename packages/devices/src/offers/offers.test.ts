@@ -154,7 +154,7 @@ describe("another Person's run on the computer that walks it", () => {
 	const carol = "person-carol";
 
 	const flow = (prompt: string, extra: Record<string, unknown> = {}): Flow => ({
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -493,7 +493,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			repoPath: sandbox.repoPath,
 		});
 		await owner.flows.save(projectId, "night", {
-			version: 7,
+			version: 8,
 			inputs: [],
 			outputs: [],
 			start: "work",
@@ -511,7 +511,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			inputs: {},
 			cron: "0 22 * * *",
 			enabled: true,
-			device: here?.name as string,
+			device: here?.deviceId as string,
 		};
 		await expect(space.saveSchedules(projectId, [schedule])).rejects.toThrow(
 			`The schedule "nightly" fires on another person's device. ${here?.name} is not your device. It offers nothing to this Space.`,

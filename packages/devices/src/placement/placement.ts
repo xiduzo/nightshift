@@ -29,9 +29,11 @@ import {
 	type SpaceDocuments,
 } from "@nightshift/engine/projects";
 import {
+	deviceIdOf,
 	type FlowNode,
 	type FlowSources,
 	isProfileRef,
+	legacyDeviceName,
 	profileOf,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -142,32 +144,13 @@ const NO_STARTER_RELAY: WorkRelay = {
 	online: () => true,
 };
 
-/** The Device a node names, if its kind runs on one. */
-function nodeDevice(node: FlowNode): string | undefined {
-	return "device" in node ? node.device : undefined;
-}
-
 /**
- * The Device a name picks among the Devices a Person may use: a name of
- * one of their own wins over another Person's. Null when none has it.
- * Throws when two of them have it.
+ * What a node writes as its Device, as the plan keys it: the Device's id,
+ * or, for a run planned before ids, the name that plan kept (`named`).
  */
-export function deviceNamed(
-	devices: readonly OwnDevice[],
-	name: string,
-): OwnDevice | null {
-	const all = devices.filter((d) => d.name === name);
-	// One of their own wins, then this computer, then another Person's.
-	const own = all.filter((d) => d.offers === undefined);
-	const here = all.filter((d) => d.thisDevice);
-	const matches = own.length > 0 ? own : here.length > 0 ? here : all;
-	if (matches.length > 1) {
-		throw new Refusal(
-			"conflict",
-			`Two of your devices are named "${name}". Rename one on the Devices page.`,
-		);
-	}
-	return matches[0] ?? null;
+function nodeDevice(node: FlowNode): string | undefined {
+	if (!("device" in node)) return undefined;
+	return deviceIdOf(node.device) ?? legacyDeviceName(node.device) ?? undefined;
 }
 
 export function createPlacement(deps: PlacementDeps) {
@@ -182,15 +165,19 @@ export function createPlacement(deps: PlacementDeps) {
 	/**
 	 * The Device a step of `node` runs on, as the run's plan says: its
 	 * profile's Device by id, else the Device it names, else the run's.
+	 * A run planned before ids keeps the Devices its nodes named by name.
 	 */
 	function deviceFor(node: FlowNode, run: PlacedRun): Device {
 		const ref = profileOf(node);
 		if (isProfileRef(ref)) return deviceById(ref.device, run);
 		const { plan } = run;
-		const name = nodeDevice(node);
+		const key = nodeDevice(node);
 		const at =
-			(name !== undefined ? plan.named[name] : undefined) ?? plan.device;
-		return deviceById(at.id, run, at.name ?? name);
+			(key !== undefined
+				? (plan.named[key] ?? plan.devices[key])
+				: undefined) ?? plan.device;
+		const oldName = "device" in node ? legacyDeviceName(node.device) : null;
+		return deviceById(at.id, run, at.name ?? oldName ?? undefined);
 	}
 
 	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
@@ -421,16 +408,6 @@ export function createPlacement(deps: PlacementDeps) {
 		);
 	}
 
-	/** The Device a name picks for a Person, over one list of their Devices (`deviceNamed`). */
-	async function namesFor(
-		spaceId: string,
-		personId: string,
-		projectId: string,
-	): Promise<(name: string) => OwnDevice | null> {
-		const devices = await devicesFor(spaceId, personId, projectId);
-		return (name) => deviceNamed(devices, name);
-	}
-
 	/** The Devices a run of the project can run on: online, with a Clone. */
 	async function placements(
 		spaceId: string,
@@ -451,8 +428,8 @@ export function createPlacement(deps: PlacementDeps) {
 	/**
 	 * The Devices a run of the project may use, for the Person it runs
 	 * for: this computer (through its Offers, for another Person's run),
-	 * and the others by id or by name, each checked first: the Person's
-	 * own, or another Person's through its Offers, online.
+	 * and the others by id, each checked first: the Person's own, or
+	 * another Person's through its Offers, online.
 	 */
 	async function devicesOf(
 		project: ListedProject,
@@ -567,12 +544,7 @@ export function createPlacement(deps: PlacementDeps) {
 			async byId(id) {
 				return (await isHere(id)) ? walker : other(id);
 			},
-			async byName(name) {
-				const match = deviceNamed(await list(), name);
-				if (!match) return name === device.name ? walker : null;
-				return match.thisDevice ? walker : other(match.deviceId);
-			},
-			async profileDevice(id) {
+			async nodeDevice(id) {
 				if (await isHere(id)) return walker;
 				const match = (await list()).find((d) => d.deviceId === id);
 				if (!match) return null;
@@ -686,7 +658,6 @@ export function createPlacement(deps: PlacementDeps) {
 		deviceById: (id: string, run: PlacedRun) => deviceById(id, run),
 		moveTo,
 		devicesFor,
-		namesFor,
 		placements,
 	};
 }

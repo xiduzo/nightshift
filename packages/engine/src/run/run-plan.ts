@@ -1,10 +1,12 @@
 import {
 	cascadeProblem,
+	deviceIdOf,
 	type Flow,
 	type FlowNode,
 	type FlowSources,
 	hasCascade,
 	isProfileRef,
+	legacyDeviceName,
 	type ProfileRef,
 	type ProfileSettings,
 	profileOf,
@@ -26,11 +28,12 @@ import { checkAddresses } from "./start-addresses";
  * The Placement rule is written once here: a node's profile names its
  * Device (ADR 3), else the node's `device`, else the `device` of the
  * nearest Subflow around it (a Call node's, so a folder on one computer
- * syncs there whoever starts the run), else the run's Device. The walk
- * applies the Subflow's part (`bodyGraph`). Who the
- * Devices are (the Person's own or offered, online, by id or by name) is
- * the caller's: the devices' planner (`PlacementPort.plan`) passes its
- * lookups, and so does the engine's own fake of a computer alone.
+ * syncs there whoever starts the run), else the run's Device. Every
+ * Device by its id: a name only labels it (ADR 14). The walk applies the
+ * Subflow's part (`bodyGraph`). Who the Devices are (the Person's own or
+ * offered, online) is the caller's: the devices' planner
+ * (`PlacementPort.plan`) passes its lookups, and so does the engine's own
+ * fake of a computer alone.
  *
  * A profile is an Agent Profile for an Agent node, or a Model Profile for
  * a Decision or a Value decided by a model. A node with a cascade (ADR 6)
@@ -53,19 +56,13 @@ export type PlanDevices = {
 	 */
 	byId(id: string): Promise<PlacedDevice | null>;
 	/**
-	 * A Device by the name a node gives it: this computer, one of the
-	 * Person's other Devices, or another Person's through its Offers. Null
-	 * when there is none of that name. An offline one is `offline`: its
-	 * steps wait for it. Throws a refusal of its own (two of that name).
+	 * The Device a node runs on, by its id: the one its profile belongs to,
+	 * or the one it names (`device`). This computer, one of the Person's
+	 * other Devices, or another Person's through its Offers. Null when the
+	 * Person cannot use a Device of that id in the Space. An offline one is
+	 * `offline`: its steps wait for it. Throws a refusal of its own.
 	 */
-	byName(name: string): Promise<PlacedDevice | null>;
-	/**
-	 * The Device a node's profile belongs to, by its id: this computer, one
-	 * of the Person's other Devices, or another Person's through its Offers.
-	 * Null when the Person cannot use a Device of that id in the Space. An
-	 * offline one is `offline`. Throws a refusal of its own.
-	 */
-	profileDevice(id: string): Promise<PlacedDevice | null>;
+	nodeDevice(id: string): Promise<PlacedDevice | null>;
 	/** A profile of this computer by its id, or null. */
 	profileFor(id: string): ProfileSettings | null;
 	/**
@@ -79,7 +76,7 @@ export type PlanDevices = {
 		string,
 		{ name: string; settings: ProfileSettings }
 	> | null>;
-	/** The last name of a Device the Space no longer has, for the refusal. Default: none. */
+	/** The name of a Device by its id, for a refusal: one the Space no longer has too. Default: none. */
 	deviceName?(deviceId: string): Promise<string | null>;
 	/** The project's flows, from this Replica's flow document. */
 	flows(projectId: string): Promise<FlowSources>;
@@ -89,9 +86,14 @@ export type PlanDevices = {
 export const UNREACHABLE_DEVICE =
 	"That device cannot take runs from this computer. Pair it with this computer, or choose another device.";
 
-/** The Device a node names, if its kind runs on one. */
+/** The Device a node names by its id, if its kind runs on one. */
 function namedDevice(node: FlowNode): string | undefined {
-	return "device" in node ? node.device : undefined;
+	return "device" in node ? deviceIdOf(node.device) : undefined;
+}
+
+/** A name from before ids that a node names as its Device, or null. */
+function oldDeviceName(node: FlowNode): string | null {
+	return "device" in node ? legacyDeviceName(node.device) : null;
 }
 
 const planned = (at: PlacedDevice): PlannedDevice => ({
@@ -106,10 +108,10 @@ function idAsName(ref: ProfileRef): string | null {
 
 /**
  * Where each node runs, and its profile. Returns the flows with their
- * profiles resolved, the Devices the nodes name by their name (`named`),
- * and the Devices of the profiles by id (`byId`): a node with a profile
- * runs on its profile's Device, by the id its profile names, so two
- * Devices of one name never take each other's steps.
+ * profiles resolved, the Devices the nodes name (`named`), and the Devices
+ * of the profiles (`byId`), each by its id: a node with a profile runs on
+ * its profile's Device, so two Devices of one name never take each
+ * other's steps.
  */
 async function placeNodes(
 	flows: readonly Flow[],
@@ -124,22 +126,45 @@ async function placeNodes(
 	const nodes = flows.flatMap((f) => f.nodes.flatMap(runsAs));
 	const named = new Map<string, PlacedDevice>();
 	const byId = new Map<string, PlacedDevice>();
+	const unknown = new Map<string, string[]>();
 	for (const node of nodes) {
-		const name = namedDevice(node);
-		if (name === undefined || named.has(name)) continue;
 		if (isProfileRef(profileOf(node))) continue;
-		if (name === runDevice.name) {
-			named.set(name, runDevice);
-			continue;
-		}
-		const found = await devices.byName(name);
-		if (!found) {
+		const oldName = oldDeviceName(node);
+		if (oldName !== null) {
+			// The flow check refuses it first: a run never starts on a guess.
 			throw new Refusal(
 				"invalid",
-				`The flow names the device "${name}", but you have no device of that name, and none of that name offers profiles to this Space. Check the node's device.`,
+				`Node "${node.id}" names the device "${oldName}", but Night Shift cannot tell which device that is. Choose the device again.`,
 			);
 		}
-		named.set(name, found);
+		const id = namedDevice(node);
+		if (id === undefined || named.has(id)) continue;
+		const missing = unknown.get(id);
+		if (missing) {
+			if (!missing.includes(node.id)) missing.push(node.id);
+			continue;
+		}
+		const found =
+			id === runDevice.id
+				? runDevice
+				: id === devices.walker.id
+					? devices.walker
+					: await devices.nodeDevice(id);
+		if (found) named.set(id, found);
+		else unknown.set(id, [node.id]);
+	}
+	if (unknown.size > 0) {
+		const words: string[] = [];
+		for (const [id, nodeIds] of unknown) {
+			const name = (await devices.deviceName?.(id)) ?? null;
+			const which = nodeIds.map((nodeId) => `"${nodeId}"`).join(", ");
+			words.push(
+				name === null
+					? `The flow runs ${which} on a device that is not in this Space, or that you cannot use. Choose another device.`
+					: `The flow runs ${which} on ${name}, which is not in this Space, or that you cannot use. Choose another device.`,
+			);
+		}
+		throw new Refusal("invalid", words.join(" "));
 	}
 
 	// The Device of each profile, by its id: null when the Space has none.
@@ -153,7 +178,7 @@ async function placeNodes(
 				? runDevice
 				: ref.device === devices.walker.id
 					? devices.walker
-					: await devices.profileDevice(ref.device),
+					: await devices.nodeDevice(ref.device),
 		);
 	}
 	const wanted = new Map<PlacedDevice, Set<string>>();
@@ -341,15 +366,6 @@ export async function planNodes(
 		const found = await devices.byId(start.deviceId);
 		if (!found) throw new Refusal("invalid", UNREACHABLE_DEVICE);
 		run = found;
-	} else if (start.deviceName !== undefined) {
-		const found = await devices.byName(start.deviceName);
-		if (!found) {
-			throw new Refusal(
-				"invalid",
-				`There is no device named "${start.deviceName}" in this Space. Choose another device for this schedule.`,
-			);
-		}
-		run = found;
 	}
 	if (run !== walker && !run.hasClone) {
 		throw new Refusal(
@@ -383,11 +399,11 @@ export async function planNodes(
 		// A cascade's tiers each go to their own Device.
 		for (const node of body.nodes.flatMap(runsAs)) {
 			const ref = profileOf(node);
-			const name = namedDevice(node);
+			const id = namedDevice(node);
 			const at = isProfileRef(ref)
 				? (byId.get(ref.device) ?? run)
-				: name !== undefined
-					? (named.get(name) ?? run)
+				: id !== undefined
+					? (named.get(id) ?? run)
 					: around;
 			groups.set(at, (groups.get(at) ?? new Set()).add(node));
 			if (node.type !== "call") continue;
@@ -400,7 +416,7 @@ export async function planNodes(
 		plan: {
 			device: planned(run),
 			named: Object.fromEntries(
-				[...named].map(([name, at]) => [name, planned(at)]),
+				[...named].map(([id, at]) => [id, planned(at)]),
 			),
 			devices: Object.fromEntries(
 				[run, ...named.values(), ...byId.values()].map((at) => [

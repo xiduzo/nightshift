@@ -1,7 +1,12 @@
 import type { Database } from "@nightshift/db";
 import { type Actor, flowsForRun, type OwnDevice } from "@nightshift/engine";
 import type { SpaceDocuments } from "@nightshift/engine/projects";
-import type { FlowNode, FlowSources, Schedule } from "@nightshift/flows";
+import {
+	deviceIdOf,
+	type FlowNode,
+	type FlowSources,
+	type Schedule,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { personInSpace } from "../links";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
@@ -11,21 +16,21 @@ import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
  * runs there, through that Device's Offers: each such schedule gets the
  * saver as its `person`, and is refused unless the Offers in the Space
  * cover what its flow runs on that Device now. A schedule on one of the
- * saver's own Devices names no Person. The Device a schedule's name picks
- * is Placement's rule (`namesFor`): a name of the saver's own Device wins.
+ * saver's own Devices names no Person. A schedule names its Device by id
+ * (ADR 14), among those Placement lets the saver use (`devicesFor`).
  */
 export function createScheduleOffers(deps: {
 	db: Database;
 	documents: SpaceDocuments;
 	/**
-	 * The Device a name picks among those a Person may place a run of the
-	 * project on (`Placement.namesFor`): null when none has it.
+	 * The Devices a Person may place a run of the project on: their own,
+	 * then other Persons' that offer profiles (`Placement.devicesFor`).
 	 */
-	namesFor(
+	devicesFor(
 		spaceId: string,
 		personId: string,
 		projectId: string,
-	): Promise<(name: string) => OwnDevice | null>;
+	): Promise<OwnDevice[]>;
 	/** This computer's Offers into the Space that are in force. */
 	offersHere(spaceId: string): Promise<DeviceOffer[]>;
 	/** Whether the Person's role in the Space lets them use Offers. */
@@ -38,17 +43,20 @@ export function createScheduleOffers(deps: {
 		actor: Actor | undefined,
 		schedules: readonly Schedule[],
 	): Promise<Schedule[]> {
-		if (!actor || !schedules.some((s) => s.device !== undefined)) {
+		if (!actor || !schedules.some((s) => deviceIdOf(s.device) !== undefined)) {
 			return [...schedules];
 		}
 		const personId = await personInSpace(db, spaceId, actor.personId);
-		const named = await deps.namesFor(spaceId, personId, project.id);
+		const devices = await deps.devicesFor(spaceId, personId, project.id);
 		const document = await deps.documents.open(spaceId);
 		const out: Schedule[] = [];
 		for (const schedule of schedules) {
 			const { person: _old, ...rest } = schedule;
+			const id = deviceIdOf(schedule.device);
 			const theirs =
-				schedule.device === undefined ? null : named(schedule.device);
+				id === undefined
+					? null
+					: (devices.find((d) => d.deviceId === id) ?? null);
 			if (theirs?.offers === undefined) {
 				out.push(rest);
 				continue;
@@ -67,7 +75,10 @@ export function createScheduleOffers(deps: {
 					// The schedule's run starts on that Device: its nodes run there
 					// unless they name another.
 					.filter(
-						(n) => !("device" in n) || !n.device || n.device === theirs.name,
+						(n) =>
+							!("device" in n) ||
+							!n.device ||
+							deviceIdOf(n.device) === theirs.deviceId,
 					);
 			} catch {
 				// A flow that does not load is the schedule's own issue.

@@ -1,4 +1,5 @@
 import {
+	type DeviceRef,
 	type Flow,
 	flowNameSchema,
 	flowSchema,
@@ -88,16 +89,16 @@ function checkedInputs(source: KnowledgeSource): Record<string, string> {
 
 /**
  * The flow of a source: one Subflow node that calls its kit with its
- * values, on the computer `device` names when it has one.
+ * values, on the computer `device` names (by its id) when it has one.
  */
 function sourceFlow(
 	kit: KnowledgeSourceKit,
 	inputs: Record<string, string>,
-	device: string | undefined,
+	device: DeviceRef | undefined,
 ) {
 	const kind = knowledgeSourceKind(kit);
 	return flowSchema.parse({
-		version: 7,
+		version: 8,
 		description: `Knowledge: ${kind.label}. Edit it on the Knowledge page.`,
 		start: "sync",
 		nodes: [
@@ -188,18 +189,19 @@ function free(base: string, taken: ReadonlySet<string>): string {
  * computer on its Subflow (`device`), so its steps run there whoever
  * starts the run, the Host included: the computer it already names, else
  * `here.scheduled` (an older source ran on its schedule's computer),
- * else `here.device` (where the person adds it).
+ * else `here.device` (where the person adds it). Each by the computer's
+ * id. A name from before ids stays, for the person to choose again.
  */
 export function savedSource(input: {
 	source: KnowledgeSource;
 	name?: string;
 	flows: FlowMap;
-	here: { device: string; scheduled?: string };
+	here: { device: string; scheduled?: DeviceRef };
 }): { name: string; flow: Flow } {
 	const { source, name, flows } = input;
 	const inputs = checkedInputs(source);
 	let current: KnowledgeSource | null = null;
-	let placed: string | undefined;
+	let placed: DeviceRef | undefined;
 	if (name !== undefined) {
 		const flow = flows[name];
 		current = flow ? sourceOf(flow) : null;
@@ -253,7 +255,7 @@ export function savedSource(input: {
 export function withSourceSchedule(
 	schedules: readonly Schedule[],
 	name: string,
-	times: { cron: string; device?: string } | null,
+	times: { cron: string; device?: DeviceRef } | null,
 ): Schedule[] {
 	const index = schedules.findIndex((schedule) =>
 		isSourceSchedule(schedule, name),

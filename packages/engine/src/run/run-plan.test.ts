@@ -103,9 +103,7 @@ function devices(walkerProfiles: string[] = []): PlanDevices {
 		walker,
 		byId: async (id) =>
 			id === "this" ? walker : (others.find((d) => d.id === id) ?? null),
-		byName: async (name) =>
-			name === "this" ? walker : (others.find((d) => d.name === name) ?? null),
-		profileDevice: async (id) =>
+		nodeDevice: async (id) =>
 			id === "this" ? walker : (others.find((d) => d.id === id) ?? null),
 		profileFor: (id) => (walkerProfiles.includes(id) ? PROFILE : null),
 		flows: async () => ({}),
@@ -284,7 +282,7 @@ describe("the node walk of a run's plan", () => {
 		const theirs = twin("twin-b", ["reviewer"]);
 		const twins: PlanDevices = {
 			...devices(),
-			profileDevice: async (id) =>
+			nodeDevice: async (id) =>
 				[mine, theirs].find((device) => device.id === id) ?? null,
 		};
 		const planned = await planNodes(
@@ -360,8 +358,7 @@ describe("the node walk of a run's plan", () => {
 		const away = at("away", { offline: true });
 		const offline: PlanDevices = {
 			...devices(),
-			byName: async (name) => (name === "away" ? away : null),
-			profileDevice: async (id) => (id === "away" ? away : null),
+			nodeDevice: async (id) => (id === "away" ? away : null),
 			lastKnown: async (id) =>
 				id === "away"
 					? new Map([["own", { name: "builder", settings: PROFILE }]])
@@ -399,7 +396,41 @@ describe("the node walk of a run's plan", () => {
 		);
 	});
 
-	test("refuses a Device nobody can reach, a name nobody has, and a run's Device without the project", async () => {
+	test("two Devices of one name each run the steps of the nodes that name them: by id", async () => {
+		const twin = (id: string): PlacedDevice => ({ ...at(id), name: "twin" });
+		const [a, b] = [twin("twin-a"), twin("twin-b")];
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				flow: flow([command("one", "twin-a"), command("two", "twin-b")]),
+			},
+			{
+				...devices(),
+				nodeDevice: async (id) => [a, b].find((d) => d.id === id) ?? null,
+			},
+			"the-person",
+		);
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([
+			["twin-a", ["one"]],
+			["twin-b", ["two"]],
+		]);
+	});
+
+	test("a Device name from before ids refuses the run: Night Shift never guesses", async () => {
+		const old = {
+			...command("a"),
+			device: { name: "LE2316" },
+		} as FlowNode;
+		await expect(
+			planNodes({ projectId: "p", flow: flow([old]) }, devices(), "the-person"),
+		).rejects.toThrow(
+			'Node "a" names the device "LE2316", but Night Shift cannot tell which device that is. Choose the device again.',
+		);
+	});
+
+	test("refuses a Device nobody can reach, a node's Device the Space does not have, and a run's Device without the project", async () => {
 		await expect(
 			planNodes(
 				{ projectId: "p", deviceId: "gone", flow: flow([command("a")]) },
@@ -409,12 +440,24 @@ describe("the node walk of a run's plan", () => {
 		).rejects.toThrow(UNREACHABLE_DEVICE);
 		await expect(
 			planNodes(
-				{ projectId: "p", flow: flow([command("a", "nowhere")]) },
+				{
+					projectId: "p",
+					flow: flow([command("a", "nowhere"), command("b", "nowhere")]),
+				},
 				devices(),
 				"the-person",
 			),
 		).rejects.toThrow(
-			'The flow names the device "nowhere", but you have no device of that name',
+			'The flow runs "a", "b" on a device that is not in this Space, or that you cannot use. Choose another device.',
+		);
+		await expect(
+			planNodes(
+				{ projectId: "p", flow: flow([command("a", "sold")]) },
+				{ ...devices(), deviceName: async () => "LE2316" },
+				"the-person",
+			),
+		).rejects.toThrow(
+			'The flow runs "a" on LE2316, which is not in this Space, or that you cannot use. Choose another device.',
 		);
 		const bare = devices();
 		await expect(
@@ -493,8 +536,7 @@ describe("the addresses of a run's Model Profiles", () => {
 		return {
 			walker,
 			byId: async () => walker,
-			byName: async () => null,
-			profileDevice: async (id) => placed.find((d) => d.id === id) ?? null,
+			nodeDevice: async (id) => placed.find((d) => d.id === id) ?? null,
 			profileFor: () => null,
 			lastKnown: async () => new Map([["jev", { name: "jev", settings: jev }]]),
 			flows: async () => ({}),
