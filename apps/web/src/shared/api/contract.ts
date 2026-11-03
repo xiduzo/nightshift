@@ -34,6 +34,9 @@ export type CliCheck = ApiOutputs["connections"]["check"];
 export type CliTool = ApiOutputs["cliTools"]["list"][number];
 export type CheckTarget = ApiInputs["connections"]["check"]["target"];
 export type McpTestResult = ApiOutputs["connections"]["test"];
+/** A secret of a project (ADR 13): its name, who set it and when, and the flows that use it. */
+export type ProjectSecretRow =
+	ApiOutputs["projects"]["secrets"]["secrets"][number];
 
 /** An agent CLI or a kit's tool found on this computer, not set up yet. */
 export type FoundProgram = ApiOutputs["programs"]["found"][number];

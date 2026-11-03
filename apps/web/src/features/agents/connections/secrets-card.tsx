@@ -55,57 +55,54 @@ import {
 	RadioGroup,
 	RadioGroupItem,
 } from "@nightshift/ui/components/radio-group";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowRightLeftIcon,
 	CircleAlertIcon,
+	FolderInputIcon,
 	KeyRoundIcon,
-	LaptopIcon,
 	MoreHorizontalIcon,
 	PlusIcon,
 	Trash2Icon,
-	UserIcon,
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { projectQueries } from "@/features/projects";
 import type { SecretView } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatRelative, useNow } from "@/shared/format";
+import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import { LocalTime } from "@/shared/time";
-import { connectionMutations, connectionQueries } from "../queries";
+import {
+	connectionMutations,
+	connectionQueries,
+	projectSecretMutations,
+	projectSecretQueries,
+} from "../queries";
 import { OUTSIDE_HINT } from "./parts";
-
-const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
-
-/** Where a saved secret lives (ADR 13). */
-type SecretScope = SecretView["scope"];
+import {
+	Ago,
+	SCOPE,
+	SECRET_NAME,
+	type SecretScope,
+	UsedBy,
+} from "./secret-parts";
 
 /** One row of the list: a name in one scope. */
 type SecretRef = { name: string; scope: SecretScope };
-
-/** What each scope is called, and what it means for the person. */
-const SCOPE: Record<
-	SecretScope,
-	{ label: string; hint: string; icon: typeof UserIcon }
-> = {
-	personal: {
-		label: "Personal",
-		hint: "Your steps on all your computers can use it.",
-		icon: UserIcon,
-	},
-	computer: {
-		label: "This computer",
-		hint: "Only steps on this computer can use it.",
-		icon: LaptopIcon,
-	},
-};
 
 const rowId = (secret: SecretRef) => `${secret.scope}:${secret.name}`;
 
@@ -171,46 +168,6 @@ function usersOf(secret: SecretView): string[] {
 	];
 }
 
-/** How many users the Used by column names before "+N more". */
-const USERS_SHOWN = 2;
-
-/** The first users of a secret, and "+N more" with the rest on hover. */
-function UsedBy({ secret }: { secret: SecretView }) {
-	const users = usersOf(secret);
-	if (users.length === 0) return "—";
-	const shown = users.slice(0, USERS_SHOWN);
-	const rest = users.slice(USERS_SHOWN);
-	return (
-		<span className="flex flex-wrap items-baseline gap-x-1">
-			<span>
-				{shown.join(", ")}
-				{rest.length > 0 ? "," : null}
-			</span>
-			{rest.length > 0 ? (
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<span className="cursor-default whitespace-nowrap font-sans text-foreground underline decoration-dotted underline-offset-4" />
-						}
-					>
-						+{rest.length} more
-					</TooltipTrigger>
-					<TooltipContent className="flex max-w-80 flex-col gap-0.5 font-mono">
-						{rest.map((user) => (
-							<span key={user}>{user}</span>
-						))}
-					</TooltipContent>
-				</Tooltip>
-			) : null}
-		</span>
-	);
-}
-
-/** A moment as "3 minutes ago", with the UTC time on hover. */
-function Ago({ at, now }: { at: number; now: number }) {
-	return <LocalTime at={at}>{formatRelative(at, now)}</LocalTime>;
-}
-
 /** When a value was last saved: "—" when it is not saved here, or saved before the date was kept. */
 function LastSet({ secret, now }: { secret: SecretView; now: number }) {
 	if (secret.setAt !== null) return <Ago at={secret.setAt} now={now} />;
@@ -235,6 +192,7 @@ function secretColumns({
 	personal,
 	onSet,
 	onMove,
+	onMoveToProject,
 	onRemove,
 }: {
 	now: number;
@@ -242,6 +200,7 @@ function secretColumns({
 	personal: boolean;
 	onSet: (secret: SecretRef) => void;
 	onMove: (secret: SecretRef) => void;
+	onMoveToProject: (secret: SecretRef) => void;
 	onRemove: (secret: SecretRef) => void;
 }) {
 	return column.columns([
@@ -259,7 +218,7 @@ function secretColumns({
 		}),
 		column.accessor("usedBy", {
 			header: "Used by",
-			cell: ({ row }) => <UsedBy secret={row.original} />,
+			cell: ({ row }) => <UsedBy users={usersOf(row.original)} />,
 			meta: { cellClassName: "font-mono text-muted-foreground" },
 		}),
 		column.accessor("setAt", {
@@ -321,6 +280,12 @@ function secretColumns({
 									</DropdownMenuItem>
 								) : null}
 								{secret.saved ? (
+									<DropdownMenuItem onClick={() => onMoveToProject(ref)}>
+										<FolderInputIcon />
+										Move to a project…
+									</DropdownMenuItem>
+								) : null}
+								{secret.saved ? (
 									<>
 										<DropdownMenuSeparator />
 										<DropdownMenuItem
@@ -360,6 +325,7 @@ export function SecretsCard({
 	/** The secret being set; `{ name: "" }` adds a new one. */
 	const [setting, setSetting] = useState<SecretRef | null>(null);
 	const [removing, setRemoving] = useState<SecretRef | null>(null);
+	const [toProject, setToProject] = useState<SecretRef | null>(null);
 	const now = useNow(60_000);
 	const queryClient = useQueryClient();
 	const moveSecret = useMutation(
@@ -437,6 +403,7 @@ export function SecretsCard({
 										name: ref.name,
 										to: ref.scope === "computer" ? "personal" : "computer",
 									}),
+								onMoveToProject: setToProject,
 								onRemove: setRemoving,
 							})}
 							data={secrets}
@@ -458,6 +425,12 @@ export function SecretsCard({
 					secret={find(removing)}
 					onOpenChange={(open) => {
 						if (!open) setRemoving(null);
+					}}
+				/>
+				<MoveToProjectDialog
+					target={toProject}
+					onOpenChange={(open) => {
+						if (!open) setToProject(null);
 					}}
 				/>
 			</Card>
@@ -759,5 +732,134 @@ function RemoveSecretDialog({
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
+	);
+}
+
+/**
+ * Moves a saved secret into a project of the Space you work in (ADR 13):
+ * Night Shift saves it as the project's, then removes this copy. You never
+ * type it again.
+ */
+function MoveToProjectDialog({
+	target,
+	onOpenChange,
+}: {
+	target: SecretRef | null;
+	onOpenChange: (open: boolean) => void;
+}) {
+	return (
+		<Dialog open={target !== null} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-md">
+				{target !== null ? (
+					<MoveToProjectForm
+						target={target}
+						onDone={() => onOpenChange(false)}
+					/>
+				) : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function MoveToProjectForm({
+	target,
+	onDone,
+}: {
+	target: SecretRef;
+	onDone: () => void;
+}) {
+	const id = useId();
+	const queryClient = useQueryClient();
+	const projects = useQuery(projectQueries.list());
+	const choices = (projects.data ?? []).map((project) => ({
+		value: project.id,
+		label: project.name,
+	}));
+	const [projectId, setProjectId] = useState<string | null>(null);
+	const chosen = choices.find((choice) => choice.value === projectId);
+	const move = useMutation(
+		projectSecretMutations.moveIn({
+			onSuccess: () => {
+				toast.success(
+					`Moved ${target.name} to ${chosen?.label ?? "the project"}`,
+				);
+				void queryClient.invalidateQueries({
+					queryKey: connectionQueries.lists(),
+				});
+				void queryClient.invalidateQueries({
+					queryKey: projectSecretQueries.lists(),
+				});
+				onDone();
+			},
+		}),
+	);
+
+	return (
+		<form
+			className="contents"
+			onSubmit={(event) => {
+				event.preventDefault();
+				if (projectId) {
+					move.mutate({
+						projectId,
+						name: target.name,
+						from: target.scope,
+					});
+				}
+			}}
+		>
+			<DialogHeader>
+				<DialogTitle>
+					Move <span className="font-mono">{target.name}</span> to a project
+				</DialogTitle>
+				<DialogDescription>
+					Every step of the project's runs can use it, on any computer. Everyone
+					who can change the project's flows can use it.
+				</DialogDescription>
+			</DialogHeader>
+			<FieldGroup>
+				<Field data-invalid={move.error ? true : undefined}>
+					<FieldLabel htmlFor={`${id}-project`}>Project</FieldLabel>
+					<Select
+						items={choices}
+						value={projectId}
+						onValueChange={(value) => setProjectId(value)}
+						disabled={choices.length === 0}
+					>
+						<SelectTrigger id={`${id}-project`} className="w-full">
+							<SelectValue placeholder="Choose a project" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectGroup>
+								{choices.map((choice) => (
+									<SelectItem key={choice.value} value={choice.value}>
+										{choice.label}
+									</SelectItem>
+								))}
+							</SelectGroup>
+						</SelectContent>
+					</Select>
+					{choices.length === 0 && !projects.isLoading ? (
+						<FieldDescription>
+							This Space has no projects yet. Add one first.
+						</FieldDescription>
+					) : null}
+					{move.error ? <FieldError>{move.error.message}</FieldError> : null}
+				</Field>
+			</FieldGroup>
+			<DialogFooter>
+				<DialogClose render={<Button variant="outline" type="button" />}>
+					Cancel
+				</DialogClose>
+				<Button type="submit" disabled={!projectId || move.isPending}>
+					{move.isPending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<ArrowRightLeftIcon data-icon="inline-start" />
+					)}
+					{move.isPending ? "Moving…" : "Move"}
+				</Button>
+			</DialogFooter>
+		</form>
 	);
 }

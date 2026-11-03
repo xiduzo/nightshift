@@ -177,6 +177,7 @@ export function NodeInspector({
 				) : null}
 				{node.type === "command" ? (
 					<CommandFields
+						projectId={projectId}
 						flow={flow}
 						node={node}
 						onChange={(change) =>
@@ -294,6 +295,7 @@ export function NodeInspector({
 
 				{node.type === "service" ? (
 					<ServiceFields
+						projectId={projectId}
 						flow={flow}
 						node={node}
 						onChange={(change) =>

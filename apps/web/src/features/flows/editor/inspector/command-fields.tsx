@@ -27,7 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { useId } from "react";
-import { connectionQueries } from "@/features/agents";
+import { connectionQueries, projectSecretQueries } from "@/features/agents";
 import { CommandSuggest } from "../../assistant/field-helpers";
 import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note } from "../fields";
@@ -42,12 +42,14 @@ const COMMAND_OUTPUTS: { value: CommandNode["output"]; label: string }[] = [
 ];
 
 export function CommandFields({
+	projectId,
 	flow,
 	node,
 	onChange,
 	onRenameOutcome,
 	onRemoveOutcome,
 }: {
+	projectId: string;
 	flow: Flow;
 	node: CommandNode;
 	onChange: (change: (node: CommandNode) => CommandNode) => void;
@@ -58,6 +60,11 @@ export function CommandFields({
 	const commandTools = useCommandToolField(node);
 	// The secrets of this computer, to pick from.
 	const secrets = useQuery(connectionQueries.list()).data?.secrets;
+	// The project's secrets: each step of its runs has them (ADR 13).
+	const projectSecrets = useQuery({
+		...projectSecretQueries.list(projectId),
+		select: (list) => list.secrets.map((secret) => secret.name),
+	}).data;
 	const named = node.secrets ?? [];
 	const exits = commandExits(node);
 	const catchAll = exits.findIndex((exit) => exit.code === undefined);
@@ -177,6 +184,7 @@ export function CommandFields({
 					id={`${id}-secrets`}
 					names={named}
 					secrets={secrets}
+					projectSecrets={projectSecrets}
 					onChange={(names) =>
 						onChange(({ secrets: _, ...rest }) =>
 							names.length > 0 ? { ...rest, secrets: names } : rest,

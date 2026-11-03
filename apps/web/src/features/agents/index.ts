@@ -1,4 +1,4 @@
-/** Agents: harnesses, profiles, custom agents, connections, CLI tools and secrets. */
+/** Agents: harnesses, profiles, custom agents, connections, CLI tools and secrets, a project's secrets too. */
 
 export { EFFORTS, PERMISSION_MODES, permissionLabel } from "./agent-options";
 export { AgentsPage } from "./agents-page";
@@ -16,11 +16,13 @@ export {
 } from "./harnesses";
 export { ModelCombobox, useHarnessModels } from "./model-combobox";
 export { WithdrawOfferDialog } from "./offer-dialog";
+export { ProjectSecretsPage } from "./project-secrets-page";
 export {
 	cliToolQueries,
 	connectionQueries,
 	deciderQueries,
 	harnessQueries,
 	profileQueries,
+	projectSecretQueries,
 } from "./queries";
 export { SecretsPage } from "./secrets-page";

@@ -83,6 +83,24 @@ export const connectionMutations = {
 	moveSecret: orpc.connections.moveSecret.mutationOptions,
 };
 
+/** The secrets of a project (ADR 13): the Host of its Space keeps them. */
+export const projectSecretQueries = {
+	/** Every list of project secrets. Invalidate it after one is set, moved or removed. */
+	lists: () => orpc.projects.secrets.key(),
+	/** The secrets of one project: names, who set each and when. */
+	list: (projectId: string) =>
+		orpc.projects.secrets.queryOptions({ input: { projectId } }),
+};
+
+export const projectSecretMutations = {
+	set: orpc.projects.setSecret.mutationOptions,
+	remove: orpc.projects.removeSecret.mutationOptions,
+	/** To this computer or to Personal. */
+	moveOut: orpc.projects.moveSecretOut.mutationOptions,
+	/** From this computer or from Personal. */
+	moveIn: orpc.projects.moveSecretIn.mutationOptions,
+};
+
 export const cliToolQueries = {
 	/** Every list of CLI Tools. */
 	lists: () => orpc.cliTools.list.key(),

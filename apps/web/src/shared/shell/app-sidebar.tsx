@@ -364,6 +364,13 @@ function ProjectPages({ project }: { project: Project }) {
 				badge={null}
 			/>
 			<ProjectPageItem
+				to="/projects/$projectId/secrets"
+				projectId={project.id}
+				label="Secrets"
+				icon={KeyRoundIcon}
+				badge={null}
+			/>
+			<ProjectPageItem
 				to="/projects/$projectId/schedules"
 				projectId={project.id}
 				label="Schedules"
@@ -405,6 +412,7 @@ function ProjectPageItem({
 		| "/projects/$projectId/runs"
 		| "/projects/$projectId/knowledge"
 		| "/projects/$projectId/schedules"
+		| "/projects/$projectId/secrets"
 		| "/projects/$projectId/branches";
 	projectId: string;
 	label: string;

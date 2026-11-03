@@ -18,7 +18,7 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
-import { connectionQueries } from "@/features/agents";
+import { connectionQueries, projectSecretQueries } from "@/features/agents";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { SecretsField } from "../secrets-field";
 import { TemplateField } from "../template-field";
@@ -34,16 +34,23 @@ const READY_KINDS: { value: ReadyKind; label: string }[] = [
 ];
 
 export function ServiceFields({
+	projectId,
 	flow,
 	node,
 	onChange,
 }: {
+	projectId: string;
 	flow: Flow;
 	node: ServiceNode;
 	onChange: (change: (node: ServiceNode) => ServiceNode) => void;
 }) {
 	const id = useId();
 	const secrets = useQuery(connectionQueries.list()).data?.secrets;
+	// The project's secrets: each step of its runs has them (ADR 13).
+	const projectSecrets = useQuery({
+		...projectSecretQueries.list(projectId),
+		select: (list) => list.secrets.map((secret) => secret.name),
+	}).data;
 	const named = node.secrets ?? [];
 	// The Sections the node is in: the service can run until the run leaves one.
 	const sections = (flow.sections ?? []).filter((section) =>
@@ -234,6 +241,7 @@ export function ServiceFields({
 					id={`${id}-secrets`}
 					names={named}
 					secrets={secrets}
+					projectSecrets={projectSecrets}
 					onChange={(names) =>
 						onChange(({ secrets: _, ...rest }) =>
 							names.length > 0 ? { ...rest, secrets: names } : rest,

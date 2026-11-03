@@ -1,0 +1,532 @@
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@nightshift/ui/components/alert-dialog";
+import { Button } from "@nightshift/ui/components/button";
+import { Card, CardContent } from "@nightshift/ui/components/card";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@nightshift/ui/components/empty";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
+import { Input } from "@nightshift/ui/components/input";
+import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	CircleAlertIcon,
+	KeyRoundIcon,
+	LaptopIcon,
+	MoreHorizontalIcon,
+	PlusIcon,
+	Trash2Icon,
+	UserIcon,
+} from "lucide-react";
+import { useId, useState } from "react";
+import { toast } from "sonner";
+import { ProjectPage } from "@/features/projects";
+import type { Project, ProjectSecretRow } from "@/shared/api";
+import { DataTable, dataTableColumns } from "@/shared/data-table";
+import { useNow } from "@/shared/format";
+import { PageHeading, PageSection } from "@/shared/page";
+import { Ago, SCOPE, SECRET_NAME, UsedBy } from "./connections/secret-parts";
+import {
+	connectionQueries,
+	projectSecretMutations,
+	projectSecretQueries,
+} from "./queries";
+
+/** What a person who can change a project's flows can do with its secrets, so they read it before they save one. */
+const TRUST_LINE =
+	"Everyone who can change this project's flows can use it. The Host admin can read it.";
+
+const column = dataTableColumns<ProjectSecretRow>();
+
+function projectSecretColumns({
+	now,
+	canChange,
+	onSet,
+	onMove,
+	onRemove,
+}: {
+	now: number;
+	/** The person's role saves flows: the row menu shows. */
+	canChange: boolean;
+	onSet: (name: string) => void;
+	onMove: (name: string, to: "personal" | "computer") => void;
+	onRemove: (name: string) => void;
+}) {
+	return column.columns([
+		column.accessor("name", {
+			header: "Name",
+			meta: {
+				headClassName: "pl-4 md:pl-6",
+				cellClassName: "pl-4 font-mono md:pl-6",
+			},
+		}),
+		column.accessor("flows", {
+			header: "Used by",
+			cell: ({ row }) => <UsedBy users={row.original.flows} />,
+			meta: { cellClassName: "font-mono text-muted-foreground" },
+		}),
+		column.accessor("setAt", {
+			header: "Last set",
+			cell: ({ row: { original } }) => (
+				<span>
+					<Ago at={original.setAt} now={now} />
+					{original.setBy ? ` by ${original.setBy.name}` : null}
+				</span>
+			),
+			meta: {
+				headClassName: "hidden md:table-cell",
+				cellClassName:
+					"hidden whitespace-nowrap text-muted-foreground md:table-cell",
+			},
+		}),
+		...(canChange
+			? [
+					column.display({
+						id: "actions",
+						header: () => <span className="sr-only">Actions</span>,
+						cell: ({ row: { original: secret } }) => (
+							<div className="flex justify-end">
+								<DropdownMenu>
+									<DropdownMenuTrigger
+										render={
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												aria-label={`More for ${secret.name}`}
+											/>
+										}
+									>
+										<MoreHorizontalIcon />
+									</DropdownMenuTrigger>
+									<DropdownMenuContent align="end" className="w-52">
+										<DropdownMenuItem onClick={() => onSet(secret.name)}>
+											<KeyRoundIcon />
+											Change value
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											onClick={() => onMove(secret.name, "personal")}
+										>
+											<UserIcon />
+											Move to Personal
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											onClick={() => onMove(secret.name, "computer")}
+										>
+											<LaptopIcon />
+											Move to this computer
+										</DropdownMenuItem>
+										<DropdownMenuSeparator />
+										<DropdownMenuItem
+											variant="destructive"
+											onClick={() => onRemove(secret.name)}
+										>
+											<Trash2Icon />
+											Remove
+										</DropdownMenuItem>
+									</DropdownMenuContent>
+								</DropdownMenu>
+							</div>
+						),
+						meta: {
+							headClassName: "pr-4 text-right md:pr-6",
+							cellClassName: "pr-4 md:pr-6",
+						},
+					}),
+				]
+			: []),
+	]);
+}
+
+/**
+ * A project's Secrets page (ADR 13): the tokens and passwords that every
+ * step of the project's runs can use, on any computer. Members see the
+ * names, who set each and when. A Member whose role saves flows adds,
+ * changes, moves and removes them. Nobody sees a value again.
+ */
+export function ProjectSecretsPage({ projectId }: { projectId: string }) {
+	return (
+		<ProjectPage projectId={projectId} section="Secrets">
+			{(project) => (
+				<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+					<PageHeading
+						title="Secrets"
+						description={
+							<>
+								Tokens and passwords this project's flows use, written as{" "}
+								<span className="font-mono">${"{NAME}"}</span>. Each step of its
+								runs can use them, on any computer.
+							</>
+						}
+					/>
+					<ProjectSecrets project={project} />
+				</div>
+			)}
+		</ProjectPage>
+	);
+}
+
+function ProjectSecrets({ project }: { project: Project }) {
+	const list = useQuery(projectSecretQueries.list(project.id));
+	/** The secret whose value is set; "" adds a new one. */
+	const [setting, setSetting] = useState<string | null>(null);
+	const [removing, setRemoving] = useState<ProjectSecretRow | null>(null);
+	const now = useNow(60_000);
+	const queryClient = useQueryClient();
+	const refresh = () => {
+		void queryClient.invalidateQueries({
+			queryKey: projectSecretQueries.lists(),
+		});
+		void queryClient.invalidateQueries({ queryKey: connectionQueries.lists() });
+	};
+	const move = useMutation(
+		projectSecretMutations.moveOut({
+			onSuccess: (_, { name, to }) => {
+				toast.success(`Moved ${name} to ${SCOPE[to].label}`);
+				refresh();
+			},
+			onError: (error) => toast.error(`Not moved: ${error.message}`),
+		}),
+	);
+
+	if (list.error) {
+		return (
+			<Alert variant="destructive">
+				<CircleAlertIcon />
+				<AlertTitle>The secrets did not load</AlertTitle>
+				<AlertDescription>{list.error.message}</AlertDescription>
+				<AlertAction>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void list.refetch()}
+					>
+						Try again
+					</Button>
+				</AlertAction>
+			</Alert>
+		);
+	}
+	if (!list.data) return <Skeleton className="h-64 w-full rounded-xl" />;
+	const { secrets, available, canChange } = list.data;
+
+	return (
+		<PageSection
+			title="Project secrets"
+			description={
+				canChange
+					? "Night Shift keeps them safe and never shows them again."
+					: "Only Members who can change flows add or change them."
+			}
+			actions={
+				canChange && available ? (
+					<Button variant="outline" size="sm" onClick={() => setSetting("")}>
+						<PlusIcon data-icon="inline-start" />
+						Add secret
+					</Button>
+				) : null
+			}
+		>
+			{available ? null : (
+				<Alert>
+					<CircleAlertIcon />
+					<AlertTitle>The secrets of this project are not shown</AlertTitle>
+					<AlertDescription>
+						Night Shift could not reach the Host of this Space. Check that this
+						computer is online, then try again.
+					</AlertDescription>
+				</Alert>
+			)}
+			<Card className="py-0">
+				<CardContent className="px-0">
+					{secrets.length === 0 ? (
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<KeyRoundIcon />
+								</EmptyMedia>
+								<EmptyTitle>No project secrets yet</EmptyTitle>
+								<EmptyDescription>
+									{canChange
+										? "Add one, or move one here from the Secrets page. Then every step of this project can use it."
+										: "When a Member adds one, every step of this project can use it."}
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					) : (
+						<DataTable
+							aria-label="Project secrets"
+							columns={projectSecretColumns({
+								now,
+								canChange,
+								onSet: setSetting,
+								onMove: (name, to) =>
+									move.mutate({ projectId: project.id, name, to }),
+								onRemove: (name) =>
+									setRemoving(secrets.find((s) => s.name === name) ?? null),
+							})}
+							data={secrets}
+							getRowId={(secret) => secret.name}
+						/>
+					)}
+				</CardContent>
+			</Card>
+			<ProjectSecretDialog
+				project={project}
+				name={setting}
+				saved={secrets.some((s) => s.name === setting)}
+				onDone={refresh}
+				onOpenChange={(open) => {
+					if (!open) setSetting(null);
+				}}
+			/>
+			<RemoveProjectSecretDialog
+				project={project}
+				secret={removing}
+				onDone={refresh}
+				onOpenChange={(open) => {
+					if (!open) setRemoving(null);
+				}}
+			/>
+		</PageSection>
+	);
+}
+
+/** Saves a value of the project. `name` "" asks for the name too; null is closed. */
+function ProjectSecretDialog({
+	project,
+	name,
+	saved,
+	onDone,
+	onOpenChange,
+}: {
+	project: Project;
+	name: string | null;
+	/** It has a value now: the new one replaces it. */
+	saved: boolean;
+	onDone: () => void;
+	onOpenChange: (open: boolean) => void;
+}) {
+	return (
+		<Dialog open={name !== null} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-md">
+				{name !== null ? (
+					<ProjectSecretForm
+						project={project}
+						fixedName={name || null}
+						saved={saved}
+						onDone={() => {
+							onDone();
+							onOpenChange(false);
+						}}
+					/>
+				) : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function ProjectSecretForm({
+	project,
+	fixedName,
+	saved,
+	onDone,
+}: {
+	project: Project;
+	fixedName: string | null;
+	saved: boolean;
+	onDone: () => void;
+}) {
+	const id = useId();
+	const [name, setName] = useState(fixedName ?? "");
+	const [value, setValue] = useState("");
+	const set = useMutation(
+		projectSecretMutations.set({
+			onSuccess: () => {
+				toast.success(`Saved ${name}`);
+				onDone();
+			},
+		}),
+	);
+	const trimmedName = name.trim();
+	const nameInvalid = trimmedName !== "" && !SECRET_NAME.test(trimmedName);
+	const canSave = SECRET_NAME.test(trimmedName) && value !== "";
+
+	return (
+		<form
+			className="contents"
+			onSubmit={(event) => {
+				event.preventDefault();
+				if (!canSave) return;
+				set.mutate({ projectId: project.id, name: trimmedName, value });
+			}}
+		>
+			<DialogHeader>
+				<DialogTitle>
+					{fixedName ? (
+						<>
+							Set <span className="font-mono">{fixedName}</span>
+						</>
+					) : (
+						`Add a secret to ${project.name}`
+					)}
+				</DialogTitle>
+				<DialogDescription>{TRUST_LINE}</DialogDescription>
+			</DialogHeader>
+			<FieldGroup className="gap-5">
+				{fixedName ? null : (
+					<Field data-invalid={nameInvalid || undefined}>
+						<FieldLabel htmlFor={`${id}-name`}>Name</FieldLabel>
+						<Input
+							id={`${id}-name`}
+							value={name}
+							onChange={(event) => setName(event.target.value)}
+							placeholder="DATABASE_URL"
+							className="font-mono"
+							autoComplete="off"
+							spellCheck={false}
+							autoFocus
+							aria-invalid={nameInvalid || undefined}
+						/>
+						{nameInvalid ? (
+							<FieldError>
+								Start with a letter or _. Use letters, digits and _.
+							</FieldError>
+						) : null}
+					</Field>
+				)}
+				<Field>
+					<FieldLabel htmlFor={`${id}-value`}>Value</FieldLabel>
+					<Input
+						id={`${id}-value`}
+						type="password"
+						value={value}
+						onChange={(event) => setValue(event.target.value)}
+						className="font-mono"
+						autoComplete="off"
+						spellCheck={false}
+						autoFocus={Boolean(fixedName)}
+					/>
+					<FieldDescription>
+						{saved
+							? "A new value replaces the saved one."
+							: "Paste it once. Nobody sees it again."}
+					</FieldDescription>
+				</Field>
+				{set.error ? (
+					<Alert variant="destructive">
+						<CircleAlertIcon />
+						<AlertTitle>Not saved</AlertTitle>
+						<AlertDescription>{set.error.message}</AlertDescription>
+					</Alert>
+				) : null}
+			</FieldGroup>
+			<DialogFooter>
+				<DialogClose render={<Button variant="outline" type="button" />}>
+					Cancel
+				</DialogClose>
+				<Button type="submit" disabled={!canSave || set.isPending}>
+					{set.isPending ? <Spinner data-icon="inline-start" /> : null}
+					{set.isPending ? "Saving…" : "Save"}
+				</Button>
+			</DialogFooter>
+		</form>
+	);
+}
+
+function RemoveProjectSecretDialog({
+	project,
+	secret,
+	onDone,
+	onOpenChange,
+}: {
+	project: Project;
+	secret: ProjectSecretRow | null;
+	onDone: () => void;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const remove = useMutation(
+		projectSecretMutations.remove({
+			onSuccess: () => {
+				toast.success(`Removed ${secret?.name}`);
+				onDone();
+				onOpenChange(false);
+			},
+			onError: (error) => toast.error(`Not removed: ${error.message}`),
+		}),
+	);
+	const flows = secret?.flows ?? [];
+
+	return (
+		<AlertDialog open={secret !== null} onOpenChange={onOpenChange}>
+			<AlertDialogContent>
+				<AlertDialogHeader>
+					<AlertDialogTitle>
+						Remove <span className="font-mono">{secret?.name}</span> from{" "}
+						{project.name}?
+					</AlertDialogTitle>
+					<AlertDialogDescription>
+						{flows.length === 0
+							? "No flow of this project uses it."
+							: `Flows that use it (${flows.join(", ")}) stop before the command runs, unless the computer that runs them has a secret of that name.`}
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<AlertDialogFooter>
+					<AlertDialogCancel>Cancel</AlertDialogCancel>
+					<AlertDialogAction
+						variant="destructive"
+						disabled={remove.isPending}
+						onClick={() => {
+							if (secret) {
+								remove.mutate({ projectId: project.id, name: secret.name });
+							}
+						}}
+					>
+						{remove.isPending ? <Spinner data-icon="inline-start" /> : null}
+						{remove.isPending ? "Removing…" : "Remove"}
+					</AlertDialogAction>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
+	);
+}

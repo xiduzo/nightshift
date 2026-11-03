@@ -31,7 +31,7 @@ function hasSecretValue(secret: SecretView | undefined): boolean {
 
 /** What the editor says about a secret this computer has no value for. */
 function missingSecretMessage(name: string): string {
-	return `The secret ${name} is not saved. The step stops before the command runs. Save it on the Secrets page, or remove it here.`;
+	return `The secret ${name} is not saved. The step stops before the command runs. Save it on the Secrets page or for the project, or remove it here.`;
 }
 
 /**
@@ -43,12 +43,15 @@ export function SecretsField({
 	id,
 	names,
 	secrets,
+	projectSecrets = [],
 	onChange,
 }: {
 	id: string;
 	names: readonly string[];
 	/** The secrets of this computer; undefined while they load. */
 	secrets: readonly SecretView[] | undefined;
+	/** The names of the project's secrets (ADR 13): each step of its runs has them. */
+	projectSecrets?: readonly string[];
 	onChange: (names: string[]) => void;
 }) {
 	const anchor = useComboboxAnchor();
@@ -69,15 +72,19 @@ export function SecretsField({
 			byName.set(secret.name, secret);
 		}
 	}
-	// A name saved for this computer and as Personal is listed once.
+	// A name saved for the project, this computer and as Personal is listed once.
+	const inProject = new Set(projectSecrets);
 	const known = [
-		...new Set(
-			secrets
+		...new Set([
+			...projectSecrets,
+			...secrets
 				.filter((secret) => hasSecretValue(secret))
 				.map((secret) => secret.name),
-		),
-	];
-	const missing = names.filter((name) => !hasSecretValue(byName.get(name)));
+		]),
+	].sort();
+	const missing = names.filter(
+		(name) => !inProject.has(name) && !hasSecretValue(byName.get(name)),
+	);
 
 	if (known.length === 0 && names.length === 0) {
 		return (

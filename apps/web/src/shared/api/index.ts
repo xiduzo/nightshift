@@ -80,6 +80,7 @@ export type {
 	Outcome,
 	PermissionMode,
 	ProfileRow,
+	ProjectSecretRow,
 	SecretSource,
 	SecretView,
 	SettingsView,
