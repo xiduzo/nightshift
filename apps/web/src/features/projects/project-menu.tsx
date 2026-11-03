@@ -21,6 +21,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	ArrowRightLeftIcon,
+	FolderOpenIcon,
 	MonitorIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
@@ -29,14 +30,15 @@ import {
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import type { Project } from "@/shared/api";
+import { useChooseProjectFolder } from "./choose-project-folder";
 import { MoveProjectDialog, RenameProjectDialog } from "./project-actions";
 import { ProjectClonesDialog } from "./project-clones-dialog";
 import { projectFolder } from "./projects";
 import { projectMutations } from "./queries";
 
 /**
- * The ⋯ menu of a project: the computers that have it, rename it, move it
- * to another Space, or remove it. `children` are items above these, such
+ * The ⋯ menu of a project: the computers that have it, its folder here,
+ * rename it, move it to another Space, or remove it. `children` are items above these, such
  * as "Open project".
  */
 export function ProjectMenu({
@@ -50,6 +52,7 @@ export function ProjectMenu({
 }) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const folder = useChooseProjectFolder(project);
 	const [dialog, setDialog] = useState<
 		"computers" | "rename" | "move" | "remove" | null
 	>(null);
@@ -89,6 +92,12 @@ export function ProjectMenu({
 						<MonitorIcon aria-hidden="true" />
 						Computers…
 					</DropdownMenuItem>
+					{folder.available ? (
+						<DropdownMenuItem disabled={folder.busy} onClick={folder.choose}>
+							<FolderOpenIcon aria-hidden="true" />
+							{project.repoPath === null ? "Choose folder…" : "Change folder…"}
+						</DropdownMenuItem>
+					) : null}
 					<DropdownMenuItem onClick={() => setDialog("rename")}>
 						<PencilIcon aria-hidden="true" />
 						Rename…

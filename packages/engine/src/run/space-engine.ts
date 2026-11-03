@@ -34,6 +34,12 @@ export interface SpaceEngine {
 	 * still needs, and runs refuse to start until then.
 	 */
 	addProject(input: { repoPath: string; name?: string }): Promise<Project>;
+	/**
+	 * Makes a git repository on this computer the project's folder here:
+	 * its first one, or in place of the one it has. The folder must hold
+	 * the project's repository. Fails while a run of it runs here.
+	 */
+	useProjectFolder(projectId: string, repoPath: string): Promise<Project>;
 	/** Turns anonymous usage on or off for every computer in this Space. */
 	setUsage(enabled: boolean): Promise<void>;
 	/** Keeps the project's runs and events. Fails while one of its runs is running. */

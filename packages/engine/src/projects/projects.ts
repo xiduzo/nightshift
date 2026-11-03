@@ -221,6 +221,46 @@ export function createProjects(deps: ProjectsDeps) {
 	}
 
 	/**
+	 * Makes `path` the folder of the Project's Clone on this computer: a new
+	 * Clone, or the one here moved (`moved`). The Space knows of it first,
+	 * through its Host when a Host keeps it. The row and its event are one
+	 * batch.
+	 */
+	async function cloneHere(
+		projectId: string,
+		spaceId: string,
+		deviceId: string,
+		path: string,
+		moved: boolean,
+	): Promise<void> {
+		await recordCloneHere(projectId, spaceId, deviceId);
+		await log.append(
+			{ type: "CloneAdded", payload: { projectId, deviceId, path } },
+			{
+				before: [
+					moved
+						? db
+								.update(clone)
+								.set({ path })
+								.where(
+									and(
+										eq(clone.projectId, projectId),
+										eq(clone.deviceId, deviceId),
+									),
+								)
+						: db.insert(clone).values({
+								id: randomUUID(),
+								spaceId,
+								projectId,
+								deviceId,
+								path,
+							}),
+				],
+			},
+		);
+	}
+
+	/**
 	 * Asks the Host that keeps the Space to add the Project, and keeps its
 	 * row here at once: the Space document brings the same entry a moment
 	 * later, and its projection finds the row in step.
@@ -408,40 +448,10 @@ export function createProjects(deps: ProjectsDeps) {
 				) {
 					throw new Refusal(
 						"conflict",
-						`This computer already has this project, in ${elsewhere.repoPath}. Remove it first to use this folder instead.`,
+						`This computer already has this project, in ${elsewhere.repoPath}. Choose Change folder in its menu to use this folder instead.`,
 					);
 				}
-				// The Space knows of the Clone first: through its Host, when a Host keeps it.
-				await recordCloneHere(known.id, spaceId, deviceId);
-				// A Clone that moved, or a removed project's: this folder now.
-				// The row and its event are one batch.
-				await log.append(
-					{
-						type: "CloneAdded",
-						payload: { projectId: known.id, deviceId, path },
-					},
-					{
-						before: [
-							elsewhere
-								? db
-										.update(clone)
-										.set({ path })
-										.where(
-											and(
-												eq(clone.projectId, known.id),
-												eq(clone.deviceId, deviceId),
-											),
-										)
-								: db.insert(clone).values({
-										id: randomUUID(),
-										spaceId,
-										projectId: known.id,
-										deviceId,
-										path,
-									}),
-						],
-					},
-				);
+				await cloneHere(known.id, spaceId, deviceId, path, Boolean(elsewhere));
 				return restore({ ...known, repoPath: path });
 			}
 
@@ -472,6 +482,46 @@ export function createProjects(deps: ProjectsDeps) {
 				type: "ProjectAdded",
 				payload: { projectId: id, name, repoPath: path, remote },
 			});
+			return { ...row, repoPath: path };
+		},
+
+		/**
+		 * Makes the git repository at `path` the project's folder on this
+		 * computer: its first one, or in place of the one it has. The folder
+		 * must hold the project's repository (its `origin` names the
+		 * project's remote, in any case), and be no other project's folder.
+		 */
+		async useFolder(
+			projectId: string,
+			repoPath: string,
+			spaceId: string,
+		): Promise<ProjectRow> {
+			const row = await rowOf(projectId);
+			if (row.removedAt !== null || row.spaceId !== spaceId) {
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
+			}
+			const path = await resolveRepoTopLevel(repoPath);
+			const deviceId = await deps.deviceId();
+			const [taken] = await withClone(eq(clone.path, path));
+			if (taken?.id === projectId) return { ...row, repoPath: path };
+			if (taken) {
+				throw new Refusal(
+					"conflict",
+					`This folder is the project ${taken.name} already. Choose another folder.`,
+				);
+			}
+			const url = await originUrl(path);
+			const remote = url === null ? null : normaliseRemote(url);
+			if (remote?.toLowerCase() !== row.remote?.toLowerCase()) {
+				throw new Refusal(
+					"invalid",
+					row.remote === null
+						? "This folder has a remote repository, and this project has none. Choose the folder of this project."
+						: `This folder holds another repository. Choose a copy of ${row.remote}.`,
+				);
+			}
+			const [here] = await withClone(eq(project.id, projectId));
+			await cloneHere(projectId, spaceId, deviceId, path, Boolean(here));
 			return { ...row, repoPath: path };
 		},
 

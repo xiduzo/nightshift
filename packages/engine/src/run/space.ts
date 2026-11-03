@@ -161,6 +161,20 @@ export function createSpaces(deps: SpacesDeps) {
 				return added;
 			},
 
+			async useProjectFolder(projectId, repoPath) {
+				await ready;
+				const current = await projects.find(projectId, spaceId);
+				// A run here works in the folder it has: a new one waits for its end.
+				if (current.repoPath !== null) {
+					await noActiveRun(projectId, "change its folder");
+				}
+				const row = await projects.useFolder(projectId, repoPath, spaceId);
+				await deps.importClone(row.id);
+				const [used] = await withClones(spaceId, [row]);
+				if (!used) throw new Error("Could not use the folder.");
+				return used;
+			},
+
 			async setUsage(enabled) {
 				await ready;
 				const document = await deps.documents.open(spaceId);

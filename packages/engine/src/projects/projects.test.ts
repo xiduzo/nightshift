@@ -231,6 +231,68 @@ describe("projects by remote", () => {
 	});
 });
 
+describe("the folder of a project here", () => {
+	/** A project of the Space without a Clone here, as a Host's sync brings it. */
+	async function synced(remote: string | null = "github.com/acme/app") {
+		await sandbox.db.insert(project).values({
+			id: "p1",
+			spaceId: sandbox.spaceId,
+			name: "app",
+			remote,
+		});
+	}
+
+	test("a copy a person has becomes the folder of a project not here yet", async () => {
+		await synced();
+		const path = await repo("mine", "git@github.com:Acme/App.git");
+		const used = await projectsOf().useFolder("p1", path, sandbox.spaceId);
+		expect(used).toMatchObject({ id: "p1", repoPath: path });
+		expect(await clones()).toEqual([
+			{ projectId: "p1", deviceId: sandbox.deviceId, path },
+		]);
+	});
+
+	test("another folder takes the place of the one a project has", async () => {
+		const projects = projectsOf();
+		const first = await repo("one", "git@github.com:acme/app.git");
+		const added = await projects.add({ repoPath: first }, sandbox.spaceId);
+		const second = await repo("two", "https://github.com/acme/app");
+
+		await projects.useFolder(added.id, second, sandbox.spaceId);
+		expect((await projects.get(added.id)).repoPath).toBe(second);
+		expect(await clones()).toEqual([
+			{ projectId: added.id, deviceId: sandbox.deviceId, path: second },
+		]);
+	});
+
+	test("a folder of another repository is refused", async () => {
+		await synced();
+		const path = await repo("other", "git@github.com:acme/other.git");
+		await expect(
+			projectsOf().useFolder("p1", path, sandbox.spaceId),
+		).rejects.toThrow("Choose a copy of github.com/acme/app.");
+		expect(await clones()).toEqual([]);
+	});
+
+	test("a folder that is another project's is refused", async () => {
+		const projects = projectsOf();
+		const lib = await repo("lib");
+		await projects.add({ repoPath: lib }, sandbox.spaceId);
+		await synced(null);
+		await expect(
+			projects.useFolder("p1", lib, sandbox.spaceId),
+		).rejects.toThrow("This folder is the project lib already.");
+	});
+
+	test("a project of another Space is not found", async () => {
+		await synced();
+		const path = await repo("mine", "git@github.com:acme/app.git");
+		await expect(
+			projectsOf().useFolder("p1", path, "elsewhere"),
+		).rejects.toThrow(PROJECT_NOT_FOUND);
+	});
+});
+
 describe("what the peers ask of the Projects", () => {
 	/** The Space documents of a Replica whose Space `spaceId` a Host keeps. */
 	function keptElsewhere(spaceId: string): SpaceDocuments {

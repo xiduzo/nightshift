@@ -14,6 +14,7 @@ import { CloudDownloadIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { Project } from "@/shared/api";
+import { useChooseProjectFolder } from "./choose-project-folder";
 import { projectMutations, projectQueries } from "./queries";
 
 /** Whether Night Shift can copy the project from GitHub: its remote is there. */
@@ -46,8 +47,9 @@ export function useProjectCopy(project: Pick<Project, "id" | "repoPath">) {
 
 /**
  * A project that is not on this computer yet: how its copy from GitHub
- * goes, and a button to copy it now or try again. A Host copies each
- * project on its own. Nothing when the project is here.
+ * goes, a button to copy it now or try again, and one to choose a copy
+ * the person already has. A Host copies each project on its own. Nothing
+ * when the project is here.
  */
 export function CopyProjectHere({
 	project,
@@ -58,6 +60,7 @@ export function CopyProjectHere({
 }) {
 	const queryClient = useQueryClient();
 	const copy = useProjectCopy(project);
+	const folder = useChooseProjectFolder(project);
 	const start = useMutation(
 		projectMutations.copyHere({
 			onSuccess: () =>
@@ -87,19 +90,37 @@ export function CopyProjectHere({
 						: busy
 							? "A large project can take a few minutes."
 							: canCopy
-								? `Copy ${project.remote} here to use it on this computer.`
-								: "Add its folder on this computer to use it here."}
+								? folder.available
+									? `Copy ${project.remote} here, or choose a copy you already have.`
+									: `Copy ${project.remote} here to use it on this computer.`
+								: folder.available
+									? "Choose its folder on this computer to use it here."
+									: "Add its folder on this computer to use it here."}
 				</ItemDescription>
 			</ItemContent>
-			{canCopy && !busy ? (
+			{!busy && (canCopy || folder.available) ? (
 				<ItemActions>
-					<Button
-						size="sm"
-						variant="outline"
-						onClick={() => start.mutate({ projectId: project.id })}
-					>
-						{copy?.state === "failed" ? "Try again" : "Copy from GitHub"}
-					</Button>
+					{folder.available ? (
+						<Button
+							size="sm"
+							variant={canCopy ? "ghost" : "outline"}
+							disabled={folder.busy}
+							onClick={folder.choose}
+						>
+							{folder.busy ? <Spinner data-icon="inline-start" /> : null}
+							Choose folder…
+						</Button>
+					) : null}
+					{canCopy ? (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={folder.busy}
+							onClick={() => start.mutate({ projectId: project.id })}
+						>
+							{copy?.state === "failed" ? "Try again" : "Copy from GitHub"}
+						</Button>
+					) : null}
 				</ItemActions>
 			) : null}
 		</Item>

@@ -14,6 +14,7 @@ export const projectMutations = {
 	chooseFolder: orpc.projects.chooseFolder.mutationOptions,
 	cloneFromGitHub: orpc.projects.cloneFromGitHub.mutationOptions,
 	copyHere: orpc.projects.copyHere.mutationOptions,
+	useFolder: orpc.projects.useFolder.mutationOptions,
 	installGit: orpc.projects.installGit.mutationOptions,
 	setUpGit: orpc.projects.setUpGit.mutationOptions,
 	removeRunCopy: orpc.projects.removeRunCopy.mutationOptions,

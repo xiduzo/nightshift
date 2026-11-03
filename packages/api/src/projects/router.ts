@@ -187,9 +187,19 @@ export const projects = {
 				"Opens the folder picker on this computer and returns the chosen folder.",
 		})
 		.output(output(z.string().nullable()))
-		.handler(({ context }) =>
+		.input(
+			z
+				.object({
+					/** `use`: the folder of a project the Space has (`useFolder`). Default `add`. */
+					purpose: z.enum(["add", "use"]).optional(),
+				})
+				.optional(),
+		)
+		.handler(({ context, input }) =>
 			context.projectSetup.chooseFolder(
-				"Choose a project folder to add to Night Shift",
+				input?.purpose === "use"
+					? "Choose the folder of this project on this computer"
+					: "Choose a project folder to add to Night Shift",
 			),
 		),
 	/** How a project can be added on this computer: a folder picker, the GitHub CLI. */
@@ -273,6 +283,21 @@ export const projects = {
 				.copy(context.space, input.projectId)
 				.catch(() => null);
 		}),
+	/**
+	 * Makes a folder on this computer the project's folder here: a copy a
+	 * person already has, or a new place for the one it has. The owner's:
+	 * it is this computer's disk.
+	 */
+	useFolder: ownerProcedure
+		.route({
+			summary:
+				"Makes a git repository on this computer the folder of a project here.",
+		})
+		.output(output(projectSchema))
+		.input(z.object({ projectId: z.string(), repoPath: z.string().min(1) }))
+		.handler(({ context, input }) =>
+			context.space.useProjectFolder(input.projectId, input.repoPath),
+		),
 	remove: permitted({ project: ["remove"] })
 		.route({
 			summary: "Removes a project from the Space. Its runs and history stay.",
