@@ -24,14 +24,14 @@ import type { SecretView } from "@/shared/api";
 
 import { Note } from "./fields";
 
-/** Whether this computer has a value for the secret: saved, or set outside Night Shift. */
+/** Whether the secret has a value: saved as Personal or on this computer, or set outside Night Shift. */
 function hasSecretValue(secret: SecretView | undefined): boolean {
 	return secret !== undefined && (secret.saved || secret.inEnv);
 }
 
 /** What the editor says about a secret this computer has no value for. */
 function missingSecretMessage(name: string): string {
-	return `The secret ${name} is not saved on this computer. The step stops before the command runs. Save it on the Secrets page, or remove it here.`;
+	return `The secret ${name} is not saved. The step stops before the command runs. Save it on the Secrets page, or remove it here.`;
 }
 
 /**
@@ -62,10 +62,21 @@ export function SecretsField({
 		);
 	}
 
-	const byName = new Map(secrets.map((secret) => [secret.name, secret]));
-	const known = secrets
-		.filter((secret) => hasSecretValue(secret))
-		.map((secret) => secret.name);
+	// One row per scope: a name has a value when any of its rows has one.
+	const byName = new Map<string, SecretView>();
+	for (const secret of secrets) {
+		if (!hasSecretValue(byName.get(secret.name))) {
+			byName.set(secret.name, secret);
+		}
+	}
+	// A name saved for this computer and as Personal is listed once.
+	const known = [
+		...new Set(
+			secrets
+				.filter((secret) => hasSecretValue(secret))
+				.map((secret) => secret.name),
+		),
+	];
 	const missing = names.filter((name) => !hasSecretValue(byName.get(name)));
 
 	if (known.length === 0 && names.length === 0) {

@@ -41,12 +41,20 @@ import {
 } from "@nightshift/ui/components/empty";
 import {
 	Field,
+	FieldContent,
 	FieldDescription,
 	FieldError,
 	FieldGroup,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
+	FieldTitle,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	RadioGroup,
+	RadioGroupItem,
+} from "@nightshift/ui/components/radio-group";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
@@ -55,11 +63,14 @@ import {
 } from "@nightshift/ui/components/tooltip";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+	ArrowRightLeftIcon,
 	CircleAlertIcon,
 	KeyRoundIcon,
+	LaptopIcon,
 	MoreHorizontalIcon,
 	PlusIcon,
 	Trash2Icon,
+	UserIcon,
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -73,7 +84,32 @@ import { OUTSIDE_HINT } from "./parts";
 
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 
-/** Where a secret's value lives: the keychain, the environment, both, or nowhere. */
+/** Where a saved secret lives (ADR 13). */
+type SecretScope = SecretView["scope"];
+
+/** One row of the list: a name in one scope. */
+type SecretRef = { name: string; scope: SecretScope };
+
+/** What each scope is called, and what it means for the person. */
+const SCOPE: Record<
+	SecretScope,
+	{ label: string; hint: string; icon: typeof UserIcon }
+> = {
+	personal: {
+		label: "Personal",
+		hint: "Your steps on all your computers can use it.",
+		icon: UserIcon,
+	},
+	computer: {
+		label: "This computer",
+		hint: "Only steps on this computer can use it.",
+		icon: LaptopIcon,
+	},
+};
+
+const rowId = (secret: SecretRef) => `${secret.scope}:${secret.name}`;
+
+/** Where a secret's value lives: Personal, this computer, the environment, or nowhere. */
 function WhereBadges({ secret }: { secret: SecretView }) {
 	if (!secret.saved && !secret.inEnv) {
 		return (
@@ -92,15 +128,22 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 			</Tooltip>
 		);
 	}
+	const scope = SCOPE[secret.scope];
 	return (
 		<span className="flex flex-wrap gap-1.5">
 			{secret.saved ? (
-				<Badge
-					variant="outline"
-					className="border-status-finished/40 bg-status-finished/10 text-status-finished"
-				>
-					Saved
-				</Badge>
+				<Tooltip>
+					<TooltipTrigger render={<span className="inline-flex" />}>
+						<Badge
+							variant="outline"
+							className="border-status-finished/40 bg-status-finished/10 text-status-finished"
+						>
+							<scope.icon data-icon="inline-start" aria-hidden />
+							{scope.label}
+						</Badge>
+					</TooltipTrigger>
+					<TooltipContent className="max-w-64">{scope.hint}</TooltipContent>
+				</Tooltip>
 			) : null}
 			{secret.inEnv ? (
 				<Tooltip>
@@ -189,12 +232,17 @@ const column = dataTableColumns<SecretView>();
 
 function secretColumns({
 	now,
+	personal,
 	onSet,
+	onMove,
 	onRemove,
 }: {
 	now: number;
-	onSet: (name: string) => void;
-	onRemove: (name: string) => void;
+	/** The Personal secrets can be read now: a move to Personal can work. */
+	personal: boolean;
+	onSet: (secret: SecretRef) => void;
+	onMove: (secret: SecretRef) => void;
+	onRemove: (secret: SecretRef) => void;
 }) {
 	return column.columns([
 		column.accessor("name", {
@@ -240,41 +288,55 @@ function secretColumns({
 		column.display({
 			id: "actions",
 			header: () => <span className="sr-only">Actions</span>,
-			cell: ({ row: { original: secret } }) => (
-				<div className="flex justify-end">
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							render={
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									aria-label={`More for ${secret.name}`}
-								/>
-							}
-						>
-							<MoreHorizontalIcon />
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" className="w-52">
-							<DropdownMenuItem onClick={() => onSet(secret.name)}>
-								<KeyRoundIcon />
-								{secret.saved ? "Change value" : "Set value"}
-							</DropdownMenuItem>
-							{secret.saved ? (
-								<>
-									<DropdownMenuSeparator />
+			cell: ({ row: { original: secret } }) => {
+				const ref = { name: secret.name, scope: secret.scope };
+				return (
+					<div className="flex justify-end">
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`More for ${secret.name}`}
+									/>
+								}
+							>
+								<MoreHorizontalIcon />
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-52">
+								<DropdownMenuItem onClick={() => onSet(ref)}>
+									<KeyRoundIcon />
+									{secret.saved ? "Change value" : "Set value"}
+								</DropdownMenuItem>
+								{secret.saved ? (
 									<DropdownMenuItem
-										variant="destructive"
-										onClick={() => onRemove(secret.name)}
+										disabled={secret.scope === "computer" && !personal}
+										onClick={() => onMove(ref)}
 									>
-										<Trash2Icon />
-										Remove saved value
+										<ArrowRightLeftIcon />
+										{secret.scope === "computer"
+											? "Move to Personal"
+											: "Move to this computer"}
 									</DropdownMenuItem>
-								</>
-							) : null}
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</div>
-			),
+								) : null}
+								{secret.saved ? (
+									<>
+										<DropdownMenuSeparator />
+										<DropdownMenuItem
+											variant="destructive"
+											onClick={() => onRemove(ref)}
+										>
+											<Trash2Icon />
+											Remove saved value
+										</DropdownMenuItem>
+									</>
+								) : null}
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</div>
+				);
+			},
 			meta: {
 				headClassName: "pr-4 text-right md:pr-6",
 				cellClassName: "pr-4 md:pr-6",
@@ -283,30 +345,70 @@ function secretColumns({
 	]);
 }
 
-/** The `${NAME}` values connections and Command nodes read: saved in the keychain, or from the environment. */
-export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
-	/** The secret being set; "" adds a new one. */
-	const [setting, setSetting] = useState<string | null>(null);
-	const [removing, setRemoving] = useState<string | null>(null);
+/**
+ * The `${NAME}` values connections and Command nodes read: Personal ones,
+ * for the person's steps on all their computers, and this computer's own.
+ */
+export function SecretsCard({
+	secrets,
+	personal,
+}: {
+	secrets: SecretView[];
+	/** Whether the Personal secrets could be read now. */
+	personal: "available" | "unavailable";
+}) {
+	/** The secret being set; `{ name: "" }` adds a new one. */
+	const [setting, setSetting] = useState<SecretRef | null>(null);
+	const [removing, setRemoving] = useState<SecretRef | null>(null);
 	const now = useNow(60_000);
+	const queryClient = useQueryClient();
+	const moveSecret = useMutation(
+		connectionMutations.moveSecret({
+			onSuccess: (_, { name, to }) => {
+				toast.success(`Moved ${name} to ${SCOPE[to].label}`);
+				void queryClient.invalidateQueries({
+					queryKey: connectionQueries.lists(),
+				});
+			},
+			onError: (error) => toast.error(`Not moved: ${error.message}`),
+		}),
+	);
+	const find = (ref: SecretRef | null) =>
+		ref === null
+			? null
+			: (secrets.find((s) => rowId(s) === rowId(ref)) ?? null);
 
 	return (
 		<PageSection
-			title="On this computer"
+			title="Your secrets"
 			description={
 				<>
 					Tokens and passwords your tools and commands use, written as{" "}
 					<span className="font-mono">${"{NAME}"}</span>. Night Shift keeps them
-					safe on this computer and never shows them again.
+					safe and never shows them again.
 				</>
 			}
 			actions={
-				<Button variant="outline" size="sm" onClick={() => setSetting("")}>
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={() => setSetting({ name: "", scope: "computer" })}
+				>
 					<PlusIcon data-icon="inline-start" />
 					Add secret
 				</Button>
 			}
 		>
+			{personal === "unavailable" ? (
+				<Alert>
+					<CircleAlertIcon />
+					<AlertTitle>Your Personal secrets are not shown</AlertTitle>
+					<AlertDescription>
+						Night Shift could not read them now. Check that this computer is
+						online, then try again.
+					</AlertDescription>
+				</Alert>
+			) : null}
 			<Card className="py-0">
 				<CardContent className="px-0">
 					{secrets.length === 0 ? (
@@ -328,25 +430,32 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 							aria-label="Secrets"
 							columns={secretColumns({
 								now,
+								personal: personal === "available",
 								onSet: setSetting,
+								onMove: (ref) =>
+									moveSecret.mutate({
+										name: ref.name,
+										to: ref.scope === "computer" ? "personal" : "computer",
+									}),
 								onRemove: setRemoving,
 							})}
 							data={secrets}
-							getRowId={(secret) => secret.name}
+							getRowId={rowId}
 						/>
 					)}
 				</CardContent>
 
 				<SecretDialog
-					name={setting}
-					secret={secrets.find((s) => s.name === setting) ?? null}
+					target={setting}
+					secret={find(setting)}
+					personal={personal === "available"}
 					onOpenChange={(open) => {
 						if (!open) setSetting(null);
 					}}
 				/>
 				<RemoveSecretDialog
-					name={removing}
-					secret={secrets.find((s) => s.name === removing) ?? null}
+					target={removing}
+					secret={find(removing)}
 					onOpenChange={(open) => {
 						if (!open) setRemoving(null);
 					}}
@@ -357,25 +466,30 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 }
 
 /**
- * Saves a value in the macOS keychain. `name` "" asks for the name too; null
- * is closed.
+ * Saves a value, as Personal or for this computer. A `target` with no name
+ * asks for the name too; null is closed.
  */
 function SecretDialog({
-	name,
+	target,
 	secret,
+	personal,
 	onOpenChange,
 }: {
-	name: string | null;
+	target: SecretRef | null;
 	secret: SecretView | null;
+	/** Personal can be chosen now. */
+	personal: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
 	return (
-		<Dialog open={name !== null} onOpenChange={onOpenChange}>
+		<Dialog open={target !== null} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md">
-				{name !== null ? (
+				{target !== null ? (
 					<SecretForm
-						fixedName={name || null}
+						fixedName={target.name || null}
+						initialScope={target.scope}
 						secret={secret}
+						personal={personal}
 						onDone={() => onOpenChange(false)}
 					/>
 				) : null}
@@ -384,19 +498,73 @@ function SecretDialog({
 	);
 }
 
+/** Where a new value goes: Personal or this computer. */
+function ScopeChoice({
+	value,
+	personal,
+	onChange,
+}: {
+	value: SecretScope;
+	personal: boolean;
+	onChange: (scope: SecretScope) => void;
+}) {
+	const id = useId();
+	return (
+		<FieldSet>
+			<FieldLegend variant="label">Who can use it</FieldLegend>
+			<RadioGroup
+				value={value}
+				onValueChange={(next) => onChange(next as SecretScope)}
+			>
+				{(["personal", "computer"] as const).map((scope) => {
+					const { label, hint } = SCOPE[scope];
+					const disabled = scope === "personal" && !personal;
+					return (
+						<FieldLabel key={scope} htmlFor={`${id}-${scope}`}>
+							<Field
+								orientation="horizontal"
+								data-disabled={disabled || undefined}
+							>
+								<FieldContent>
+									<FieldTitle>{label}</FieldTitle>
+									<FieldDescription>
+										{disabled
+											? "Not available now. Check that this computer is online."
+											: hint}
+									</FieldDescription>
+								</FieldContent>
+								<RadioGroupItem
+									value={scope}
+									id={`${id}-${scope}`}
+									disabled={disabled}
+								/>
+							</Field>
+						</FieldLabel>
+					);
+				})}
+			</RadioGroup>
+		</FieldSet>
+	);
+}
+
 function SecretForm({
 	fixedName,
+	initialScope,
 	secret,
+	personal,
 	onDone,
 }: {
 	fixedName: string | null;
+	initialScope: SecretScope;
 	secret: SecretView | null;
+	personal: boolean;
 	onDone: () => void;
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
 	const [name, setName] = useState(fixedName ?? "");
 	const [value, setValue] = useState("");
+	const [scope, setScope] = useState<SecretScope>(initialScope);
 	const setSecret = useMutation(
 		connectionMutations.setSecret({
 			onSuccess: () => {
@@ -411,6 +579,8 @@ function SecretForm({
 	const trimmedName = name.trim();
 	const nameInvalid = trimmedName !== "" && !SECRET_NAME.test(trimmedName);
 	const canSave = SECRET_NAME.test(trimmedName) && value !== "";
+	// A saved value keeps its place. A new one, or one without a value, chooses.
+	const chooses = !secret?.saved;
 
 	return (
 		<form
@@ -418,7 +588,7 @@ function SecretForm({
 			onSubmit={(event) => {
 				event.preventDefault();
 				if (!canSave) return;
-				setSecret.mutate({ name: trimmedName, value });
+				setSecret.mutate({ name: trimmedName, value, scope });
 			}}
 		>
 			<DialogHeader>
@@ -432,7 +602,7 @@ function SecretForm({
 					)}
 				</DialogTitle>
 				<DialogDescription>
-					Night Shift keeps it safe on this computer and never shows it again.
+					Night Shift keeps it safe and never shows it again.
 					{secret?.inEnv
 						? " It replaces the value that is set outside Night Shift."
 						: null}
@@ -488,6 +658,9 @@ function SecretForm({
 							: "Paste it once. To change it later, set it again."}
 					</FieldDescription>
 				</Field>
+				{chooses ? (
+					<ScopeChoice value={scope} personal={personal} onChange={setScope} />
+				) : null}
 				{setSecret.error ? (
 					<Alert variant="destructive">
 						<CircleAlertIcon />
@@ -510,11 +683,11 @@ function SecretForm({
 }
 
 function RemoveSecretDialog({
-	name,
+	target,
 	secret,
 	onOpenChange,
 }: {
-	name: string | null;
+	target: SecretRef | null;
 	secret: SecretView | null;
 	onOpenChange: (open: boolean) => void;
 }) {
@@ -522,7 +695,7 @@ function RemoveSecretDialog({
 	const removeSecret = useMutation(
 		connectionMutations.removeSecret({
 			onSuccess: () => {
-				toast.success(`Removed ${name}`);
+				toast.success(`Removed ${target?.name}`);
 				void queryClient.invalidateQueries({
 					queryKey: connectionQueries.lists(),
 				});
@@ -551,11 +724,21 @@ function RemoveSecretDialog({
 						.join(" ");
 
 	return (
-		<AlertDialog open={name !== null} onOpenChange={onOpenChange}>
+		<AlertDialog open={target !== null} onOpenChange={onOpenChange}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>
-						Remove <span className="font-mono">{name}</span>?
+						{target?.scope === "personal" ? (
+							<>
+								Remove the Personal secret{" "}
+								<span className="font-mono">{target.name}</span>?
+							</>
+						) : (
+							<>
+								Remove <span className="font-mono">{target?.name}</span> from
+								this computer?
+							</>
+						)}
 					</AlertDialogTitle>
 					<AlertDialogDescription>{consequence}</AlertDialogDescription>
 				</AlertDialogHeader>
@@ -565,7 +748,7 @@ function RemoveSecretDialog({
 						variant="destructive"
 						disabled={removeSecret.isPending}
 						onClick={() => {
-							if (name) removeSecret.mutate({ name });
+							if (target) removeSecret.mutate(target);
 						}}
 					>
 						{removeSecret.isPending ? (

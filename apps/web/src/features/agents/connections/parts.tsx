@@ -132,6 +132,7 @@ export const OUTSIDE_HINT =
 	"Set where Night Shift starts, for example in Docker or in your shell. A value you save here replaces it.";
 
 const SOURCE_LABEL: Record<SecretSource, string> = {
+	personal: "Personal",
 	keychain: "Saved",
 	env: "Outside Night Shift",
 	missing: "Missing",
@@ -145,12 +146,13 @@ export function VariableBadge({
 	name: string;
 	source: SecretSource;
 }) {
+	const saved = source === "keychain" || source === "personal";
 	const badge = (
 		<Badge
 			variant={source === "env" ? "secondary" : "outline"}
 			className={cn(
 				"max-w-full",
-				source === "keychain" &&
+				saved &&
 					"border-status-finished/40 bg-status-finished/10 text-status-finished",
 				source === "missing" &&
 					"border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
@@ -161,7 +163,7 @@ export function VariableBadge({
 			<span className="font-normal opacity-80">· {SOURCE_LABEL[source]}</span>
 		</Badge>
 	);
-	if (source === "keychain") return badge;
+	if (saved) return badge;
 	return (
 		<Tooltip>
 			<TooltipTrigger render={<span className="inline-flex max-w-full" />}>

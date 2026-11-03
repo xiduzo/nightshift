@@ -14,8 +14,9 @@ import { OtherDevicesSecrets } from "./other-device";
 import { connectionQueries, otherDeviceQueries } from "./queries";
 
 /**
- * The Secrets page: the `${NAME}` values of this computer, which tools and
- * Command nodes read, and the names of the secrets on your other devices.
+ * The Secrets page: the `${NAME}` values tools and Command nodes read, the
+ * Personal ones and this computer's, and the names of the secrets on your
+ * other devices.
  */
 export function SecretsPage() {
 	const tools = useQuery(connectionQueries.list());
@@ -28,12 +29,15 @@ export function SecretsPage() {
 				<div className="mx-auto w-full max-w-4xl">
 					<PageHeading
 						title="Secrets"
-						description="Save the tokens and passwords your tools and Command nodes use. They stay on this computer."
+						description="Save the tokens and passwords your tools and Command nodes use. Make one Personal for all your computers, or keep it on this computer."
 					/>
 				</div>
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
 					{tools.data ? (
-						<SecretsCard secrets={tools.data.secrets} />
+						<SecretsCard
+							secrets={tools.data.secrets}
+							personal={tools.data.personal}
+						/>
 					) : tools.error ? (
 						<Alert variant="destructive">
 							<CircleAlertIcon />

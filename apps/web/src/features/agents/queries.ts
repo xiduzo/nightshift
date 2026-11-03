@@ -80,6 +80,7 @@ export const connectionMutations = {
 	test: orpc.connections.test.mutationOptions,
 	setSecret: orpc.connections.setSecret.mutationOptions,
 	removeSecret: orpc.connections.removeSecret.mutationOptions,
+	moveSecret: orpc.connections.moveSecret.mutationOptions,
 };
 
 export const cliToolQueries = {
