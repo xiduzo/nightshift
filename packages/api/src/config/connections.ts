@@ -37,7 +37,22 @@ export const connections = {
 		})
 		.output(output(connectionListSchema))
 		.handler(async ({ context }) =>
-			connectionsInUse(context, await context.space.flowUse()),
+			connectionsInUse(
+				context,
+				await context.space.flowUse(),
+				// A project's own secrets win for its flows. When they cannot be
+				// read now, the flows stay listed.
+				(projectId) =>
+					context.connections
+						.projectSecrets(
+							{ spaceId: context.spaceId, projectId },
+							context.session.user.id,
+						)
+						.then(
+							(names) => new Set(names.map((secret) => secret.name)),
+							() => new Set<string>(),
+						),
+			),
 		),
 	/** Runs `--version` and the login check of one CLI. Read-only. */
 	check: ownerProcedure

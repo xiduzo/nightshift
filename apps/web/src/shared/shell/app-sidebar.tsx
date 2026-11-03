@@ -145,6 +145,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 						</SidebarMenuItem>
 						<SidebarMenuItem>
 							<SidebarMenuButton
+								tooltip="Secrets"
+								isActive={Boolean(matchRoute({ to: "/space-secrets" }))}
+								render={<Link to="/space-secrets" />}
+							>
+								<KeyRoundIcon aria-hidden="true" />
+								<span>Secrets</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
 								tooltip="Account"
 								isActive={Boolean(matchRoute({ to: "/account" }))}
 								render={<Link to="/account" />}

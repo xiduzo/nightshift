@@ -105,6 +105,8 @@ What you configure once reads like the Settings page:
 - A pick opens its detail in place. The breadcrumb leads back ("Agents › builder"). No list beside the detail.
 - What this computer has but does not use yet sits at the end of the list it joins, as a dashed row with one action ("Add profile", "Add tool"). Not in a banner on top.
 - Secrets have their own page in the main menu: Command nodes use them too, not only agents.
+- Secrets have two pages. The computer's page (under the computer in the sidebar) lists the Personal secrets and this computer's. The Space's page (under Overview) lists each project's secrets and the secrets on your other devices.
+- The computer's page leaves out a missing name when each flow that uses it gets it from its project.
 - A project's Secrets are a page of the project in the sidebar, beside Knowledge and Schedules. They are setup, so they do not go on the project's page.
 - A secret on another of your devices has the same row menu as your own: Move to Personal, Move to a project…, Remove from <device>. That device does the work. When it is offline, the toast says so and when to try again. Its profiles stay read-only here.
 - A move into a project ends with a toast whose action opens that project's Secrets page.

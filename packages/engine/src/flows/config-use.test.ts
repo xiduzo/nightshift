@@ -128,6 +128,57 @@ describe("connectionsInUse", () => {
 			["ZAC_USER", [flow("tools")], ["gh-work"]],
 		]);
 	});
+
+	test("leaves out the flows whose project has the secret, and a name nothing else needs", async () => {
+		const use = noUse();
+		const other: FlowRef = { ...flow("rebalance"), projectId: "p2" };
+		// p1 keeps both names. Only p2's flow still reads LAB_DB_URL here.
+		use.secrets.set("ALPACA_KEY", [flow("trade")]);
+		use.secrets.set("LAB_DB_URL", [flow("mark"), other]);
+		const asked: string[] = [];
+		const listed = await connectionsInUse(
+			{
+				connections: { list: () => [], secrets: secretsOf },
+				cliTools: { list: () => [] },
+				profiles: { list: () => [] },
+			},
+			use,
+			async (projectId) => {
+				asked.push(projectId);
+				return new Set(projectId === "p1" ? ["ALPACA_KEY", "LAB_DB_URL"] : []);
+			},
+		);
+		expect(listed.secrets.map((s) => [s.name, s.flows])).toEqual([
+			["LAB_DB_URL", [other]],
+		]);
+		expect(asked.sort()).toEqual(["p1", "p2"]);
+	});
+
+	test("keeps a saved value when its project has the secret too", async () => {
+		const use = noUse();
+		use.secrets.set("LAB_DB_URL", [flow("mark")]);
+		const listed = await connectionsInUse(
+			{
+				connections: {
+					list: () => [],
+					secrets: async (named) => {
+						const list = await secretsOf(named);
+						return {
+							...list,
+							secrets: list.secrets.map((s) => ({ ...s, saved: true })),
+						};
+					},
+				},
+				cliTools: { list: () => [] },
+				profiles: { list: () => [] },
+			},
+			use,
+			async () => new Set(["LAB_DB_URL"]),
+		);
+		expect(listed.secrets.map((s) => [s.name, s.saved, s.flows])).toEqual([
+			["LAB_DB_URL", true, []],
+		]);
+	});
 });
 
 describe("cliToolsInUse", () => {

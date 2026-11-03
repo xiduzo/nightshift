@@ -10,17 +10,16 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { SecretsCard } from "./connections/secrets-card";
-import { OtherDevicesSecrets } from "./other-device";
-import { connectionQueries, otherDeviceQueries } from "./queries";
+import { connectionQueries } from "./queries";
 
 /**
- * The Secrets page: the `${NAME}` values tools and Command nodes read, the
- * Personal ones and this computer's, and the names of the secrets on your
- * other devices.
+ * The Secrets page of this computer: the `${NAME}` values tools and
+ * Command nodes read here, the Personal ones and this computer's. A name
+ * that a project's own secret covers for every flow that uses it is not
+ * listed. The Space's Secrets page has the projects and your other devices.
  */
 export function SecretsPage() {
 	const tools = useQuery(connectionQueries.list());
-	const otherDevices = useQuery(otherDeviceQueries.list());
 
 	return (
 		<>
@@ -56,7 +55,6 @@ export function SecretsPage() {
 					) : (
 						<Skeleton className="h-64 w-full rounded-xl" />
 					)}
-					<OtherDevicesSecrets devices={otherDevices.data ?? []} />
 				</div>
 			</div>
 		</>

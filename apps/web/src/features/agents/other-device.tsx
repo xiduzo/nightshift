@@ -131,7 +131,7 @@ export function OtherDeviceDetail({ device }: { device: OtherDevice }) {
 	);
 }
 
-/** The secret names of each of your other devices, under this computer's own secrets. */
+/** The secret names of each of your other devices, on the Secrets page of the Space. */
 export function OtherDevicesSecrets({ devices }: { devices: OtherDevice[] }) {
 	const now = useNow(60_000);
 	if (devices.length === 0) return null;

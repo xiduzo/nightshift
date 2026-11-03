@@ -46,6 +46,11 @@ export type SecretInUse = SecretView & { flows: FlowRef[]; tools: string[] };
  * (Personal), with what uses each. A secret only a Command node or a CLI
  * tool's login names is listed too: saved or not. `personal` says whether
  * the Personal secrets could be read now.
+ *
+ * `projectNames` gives the names of a project's own secrets (ADR 13). A
+ * project's secret wins for its flows, so those flows do not use this
+ * computer's value or the Person's: they leave the list. A name that is
+ * not saved here and that nothing else uses then leaves it too.
  */
 export async function connectionsInUse(
 	config: {
@@ -54,6 +59,9 @@ export async function connectionsInUse(
 		profiles: Pick<ProfileStore, "list">;
 	},
 	use: FlowUse,
+	projectNames: (
+		projectId: string,
+	) => Promise<ReadonlySet<string>> = async () => new Set(),
 ): Promise<{
 	connections: ConnectionInUse[];
 	secrets: SecretInUse[];
@@ -69,6 +77,28 @@ export async function connectionsInUse(
 		...use.secrets.keys(),
 		...toolsBySecret.keys(),
 	]);
+	const projectIds = new Set(
+		[...use.secrets.values()].flat().map((flow) => flow.projectId),
+	);
+	const kept = new Map(
+		await Promise.all(
+			[...projectIds].map(async (id) => [id, await projectNames(id)] as const),
+		),
+	);
+	const secrets: SecretInUse[] = [];
+	for (const secret of listed.secrets) {
+		const flows = (use.secrets.get(secret.name) ?? []).filter(
+			(flow) => !kept.get(flow.projectId)?.has(secret.name),
+		);
+		const tools = toolsBySecret.get(secret.name) ?? [];
+		const needed =
+			secret.saved ||
+			secret.inEnv ||
+			secret.usedBy.length > 0 ||
+			tools.length > 0 ||
+			flows.length > 0;
+		if (needed) secrets.push({ ...secret, flows, tools });
+	}
 	return {
 		// After the secrets: a connection's variables read the Personal names as listed now.
 		connections: config.connections.list().map((c) => ({
@@ -76,11 +106,7 @@ export async function connectionsInUse(
 			usedBy: use.connections.get(c.name) ?? [],
 			profiles: profilesNaming(config.profiles, (p) => p.connections, c.name),
 		})),
-		secrets: listed.secrets.map((secret) => ({
-			...secret,
-			flows: use.secrets.get(secret.name) ?? [],
-			tools: toolsBySecret.get(secret.name) ?? [],
-		})),
+		secrets,
 		personal: listed.personal,
 	};
 }
