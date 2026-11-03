@@ -26,6 +26,13 @@ import {
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
@@ -50,6 +57,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
 	KeyRoundIcon,
+	MoreHorizontalIcon,
 	PlusIcon,
 	Trash2Icon,
 } from "lucide-react";
@@ -79,7 +87,7 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 					</Badge>
 				</TooltipTrigger>
 				<TooltipContent className="max-w-64">
-					No value yet. Choose Set to save one.
+					No value yet. Choose Set value in the menu of this row.
 				</TooltipContent>
 			</Tooltip>
 		);
@@ -118,6 +126,41 @@ function usersOf(secret: SecretView): string[] {
 		...secret.tools,
 		...flowNamesOf(secret).map((name) => `${name} (flow)`),
 	];
+}
+
+/** How many users the Used by column names before "+N more". */
+const USERS_SHOWN = 2;
+
+/** The first users of a secret, and "+N more" with the rest on hover. */
+function UsedBy({ secret }: { secret: SecretView }) {
+	const users = usersOf(secret);
+	if (users.length === 0) return "—";
+	const shown = users.slice(0, USERS_SHOWN);
+	const rest = users.slice(USERS_SHOWN);
+	return (
+		<span className="flex flex-wrap items-baseline gap-x-1">
+			<span>
+				{shown.join(", ")}
+				{rest.length > 0 ? "," : null}
+			</span>
+			{rest.length > 0 ? (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<span className="cursor-default whitespace-nowrap font-sans text-foreground underline decoration-dotted underline-offset-4" />
+						}
+					>
+						+{rest.length} more
+					</TooltipTrigger>
+					<TooltipContent className="flex max-w-80 flex-col gap-0.5 font-mono">
+						{rest.map((user) => (
+							<span key={user}>{user}</span>
+						))}
+					</TooltipContent>
+				</Tooltip>
+			) : null}
+		</span>
+	);
 }
 
 /** A moment as "3 minutes ago", with the UTC time on hover. */
@@ -168,10 +211,7 @@ function secretColumns({
 		}),
 		column.accessor("usedBy", {
 			header: "Used by",
-			cell: ({ row }) => {
-				const users = usersOf(row.original);
-				return users.length > 0 ? users.join(", ") : "—";
-			},
+			cell: ({ row }) => <UsedBy secret={row.original} />,
 			meta: { cellClassName: "font-mono text-muted-foreground" },
 		}),
 		column.accessor("setAt", {
@@ -201,33 +241,38 @@ function secretColumns({
 			id: "actions",
 			header: () => <span className="sr-only">Actions</span>,
 			cell: ({ row: { original: secret } }) => (
-				<div className="flex justify-end gap-1">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => onSet(secret.name)}
-					>
-						<KeyRoundIcon data-icon="inline-start" />
-						Set
-					</Button>
-					{secret.saved ? (
-						<Tooltip>
-							<TooltipTrigger
-								render={
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label={`Remove ${secret.name}`}
-										className="text-muted-foreground hover:text-destructive"
+				<div className="flex justify-end">
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							render={
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label={`More for ${secret.name}`}
+								/>
+							}
+						>
+							<MoreHorizontalIcon />
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-52">
+							<DropdownMenuItem onClick={() => onSet(secret.name)}>
+								<KeyRoundIcon />
+								{secret.saved ? "Change value" : "Set value"}
+							</DropdownMenuItem>
+							{secret.saved ? (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										variant="destructive"
 										onClick={() => onRemove(secret.name)}
-									/>
-								}
-							>
-								<Trash2Icon />
-							</TooltipTrigger>
-							<TooltipContent>Remove the saved value</TooltipContent>
-						</Tooltip>
-					) : null}
+									>
+										<Trash2Icon />
+										Remove saved value
+									</DropdownMenuItem>
+								</>
+							) : null}
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 			),
 			meta: {
