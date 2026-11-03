@@ -208,10 +208,17 @@ flowchart LR
   keeps it itself when it has no Home Host. A step on one of the Person's
   own Devices asks the Home Host for the values it needs and keeps them in
   memory for that step only. A step of another Person's run under an Offer
-  gets none, and a Guest Host keeps none. `${NAME}` reads Personal, then
-  this computer, then the environment, where the MCP server starts. Secret
-  names are owner-private: every Device of the Person sees the secret
-  names of each of their Devices, nobody else does.
+  gets none, and a Guest Host keeps none. A Project secret belongs to the
+  Project: the Host that keeps its Space keeps it, encrypted at rest
+  (`project_secret`, bound to the Project and the name), or the Device
+  that keeps the Space itself. A Member whose role saves Flows sets it.
+  The Host gives the values only to the Device that has a step of a run of
+  that Project now (a call of the work hub, or the run's Walker), another
+  Person's Device under an Offer too. A step's `${NAME}` reads its run's
+  Project, then Personal, then this computer, then the environment, where
+  the MCP server starts. Secret names are owner-private: every Device of
+  the Person sees the secret names of each of their Devices, nobody else
+  does. A Project's names are its Members'.
 - **Every row carries a Space id** (the TECH constraint). The Host filters
   every sync, relay and stream by membership. The Replica holds many
   Spaces; every query is scoped to one.

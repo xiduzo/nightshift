@@ -105,6 +105,7 @@ What you configure once reads like the Settings page:
 - A pick opens its detail in place. The breadcrumb leads back ("Agents › builder"). No list beside the detail.
 - What this computer has but does not use yet sits at the end of the list it joins, as a dashed row with one action ("Add profile", "Add tool"). Not in a banner on top.
 - Secrets have their own page in the main menu: Command nodes use them too, not only agents.
+- A project's Secrets are a page of the project in the sidebar, beside Knowledge and Schedules. They are setup, so they do not go on the project's page.
 
 ### Devices
 
