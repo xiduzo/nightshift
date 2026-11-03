@@ -306,8 +306,16 @@ export type DecisionInput = {
 	 * decider's default.
 	 */
 	address?: ModelAddress;
+	/**
+	 * The run the step works for. The Device reads the secrets of the API
+	 * key and the address for it: that run's Project first (ADR 13).
+	 */
+	run?: DeciderRun;
 	signal: AbortSignal;
 };
+
+/** The run a decider's call works for: its Space, its Project and its id. */
+export type DeciderRun = { spaceId: string; projectId: string; runId: string };
 
 /** A decision, or why there is none. */
 export type DecisionResult =
@@ -345,6 +353,8 @@ export type ValueInput = {
 	model?: string;
 	/** Where the decider finds its server, as for a decision. */
 	address?: ModelAddress;
+	/** The run the step works for, as for a decision. */
+	run?: DeciderRun;
 	signal: AbortSignal;
 };
 

@@ -1113,6 +1113,15 @@ describe("Project secrets (ADR 13)", () => {
 		).toMatchObject({ ok: true, env: { KEY: "project" } });
 	});
 
+	test("a decider's API key of a step reads the Project's value; without a run, this computer's", async () => {
+		const { store } = await scopedStore({
+			keychain: { MODEL_KEY: "computer" },
+			projects: { app: { MODEL_KEY: "project" } },
+		});
+		expect(await store.secret("MODEL_KEY", { project: step })).toBe("project");
+		expect(await store.secret("MODEL_KEY")).toBe("computer");
+	});
+
 	test("under an Offer: the run's Project secrets, but no Personal one", async () => {
 		const { store, personal } = await scopedStore({
 			personal: { MINE: "personal" },

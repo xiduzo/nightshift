@@ -250,8 +250,11 @@ export type ConnectionStore = {
 	 * once per scope, Personal first.
 	 */
 	secrets(named?: Iterable<string>): Promise<SecretList>;
-	/** A secret's value, to use: Personal, then the keychain, then the daemon's environment. */
-	secret(name: string): Promise<string | undefined>;
+	/**
+	 * A secret's value, to use: the run's Project (with `use.project`),
+	 * Personal, then the keychain, then the daemon's environment.
+	 */
+	secret(name: string, use?: SecretUse): Promise<string | undefined>;
 	/** Where a secret's value comes from, as this computer knows the Personal names now. */
 	secretSource(name: string): SecretSource;
 	/** Saves a value in a scope. Default: this computer. */
@@ -834,8 +837,8 @@ export function createConnectionStore(options: {
 				personal: personal === null ? "unavailable" : "available",
 			};
 		},
-		async secret(name) {
-			const value = (await resolve([name])).vars[name];
+		async secret(name, use) {
+			const value = (await resolve([name], use)).vars[name];
 			if (value !== undefined) recordUse([name]);
 			return value;
 		},

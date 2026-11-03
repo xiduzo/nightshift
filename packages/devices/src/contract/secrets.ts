@@ -29,3 +29,15 @@ export const projectRefSchema = z.object({
 export const stepRunSchema = projectRefSchema.extend({
 	runId: z.string().min(1),
 });
+
+/**
+ * Where a secret saved on another of the Person's Devices goes (ADR 13,
+ * decision 7): to their Personal secrets, into a Project, or nowhere (that
+ * Device removes it). That Device reads its own value and moves it.
+ */
+export const secretMoveSchema = z.discriminatedUnion("to", [
+	z.object({ to: z.literal("personal") }),
+	projectRefSchema.extend({ to: z.literal("project") }),
+	z.object({ to: z.literal("removed") }),
+]);
+export type SecretMove = z.infer<typeof secretMoveSchema>;

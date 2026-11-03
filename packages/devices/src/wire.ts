@@ -69,9 +69,13 @@ import {
 	createPersonalSecretsHost,
 	createProjectSecretStore,
 	createProjectSecretsHost,
+	createSecretMovesHost,
 	devicePersonalSecrets,
 	deviceProjectSecrets,
+	deviceSecretMoves,
+	type OwnSecrets,
 	secretsCipher,
+	serveSecretCall,
 } from "./secrets";
 import {
 	createWorkHub,
@@ -203,6 +207,12 @@ export type DevicesDeps = {
 	 * (ADR 13): NIGHTSHIFT_SECRETS_KEY, else a file. At least 32 characters.
 	 */
 	secretsKey: string;
+	/**
+	 * This computer's own secrets (its connection store): what it moves
+	 * when its Home Host asks for its owner (ADR 13, decision 7). Without
+	 * them, it moves none.
+	 */
+	ownSecrets?: OwnSecrets;
 	/** The engine's scheduler: off, or on until the signal aborts. */
 	scheduler: PeerEngineOptions["scheduler"];
 	/** A secret's value by name: the secret a webhook schedule names. */
@@ -385,6 +395,13 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			engine.admission.withdrawn(spaceId, profile),
 	});
 
+	/** The secret calls of its Home Host: this computer moves its own value (ADR 13). */
+	const secretCalls = serveSecretCall({
+		hostLinks,
+		own: deps.ownSecrets,
+		ownerId,
+	});
+
 	/** This computer's links to the Hosts it paired with. */
 	const links = createDeviceLinks({
 		links: hostLinks,
@@ -427,10 +444,13 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					selfId: self.id,
 					applied,
 				}).attach(link),
-				// Every call passes the engine's Offer admission.
+				// Every call of a run passes the engine's Offer admission. A
+				// secret call is its owner's, from its Home Host only.
 				createWorkServer({
 					serve: (request, signal) =>
-						engine.admission.serve(request, { hostId }, signal),
+						request.call.kind === "secret"
+							? secretCalls(request, { hostId })
+							: engine.admission.serve(request, { hostId }, signal),
 					served,
 					// A session for a Walker that this computer cannot reach stops.
 					replyDeadlineMs: () =>
@@ -539,6 +559,21 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				(await engine.offers.list(spaceId)).some(
 					(offer) => offer.deviceId === deviceId,
 				),
+		}),
+		// As a Home Host: a paired Device asks to move a secret on another.
+		secretMoves: createSecretMovesHost({
+			registry: engine.devices,
+			work: handover.hub,
+			isHost: host.isHost,
+			self: { id: self.id, ownerId, own: deps.ownSecrets },
+		}),
+		// The owner's moves of a secret on another of their Devices.
+		moves: deviceSecretMoves({
+			registry: engine.devices,
+			work: handover.hub,
+			hostLinks,
+			links: () => links,
+			ownerId,
 		}),
 		hostSpaces: engine.hostSpaces,
 		keys: keyStore,

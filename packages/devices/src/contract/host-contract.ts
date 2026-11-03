@@ -36,6 +36,7 @@ import {
 	personalSecretNameSchema,
 	projectRefSchema,
 	projectSecretNameSchema,
+	secretMoveSchema,
 	stepRunSchema,
 } from "./secrets";
 import {
@@ -617,6 +618,26 @@ export const hostContract = {
 				summary: "Removes a Personal secret of a paired Device's Person.",
 			})
 			.input(z.object({ name: secretNameSchema }))
+			.output(described(z.void())),
+		/**
+		 * Asks another Device of the key's Person, paired here as its Home
+		 * Host, to move a secret saved there (ADR 13, decision 7). That
+		 * Device reads its own value and moves it: the value never passes
+		 * through the Device that asks. Refused while that Device is offline,
+		 * or when its version cannot do it.
+		 */
+		moveOnDevice: sync
+			.route({
+				summary:
+					"Asks another Device of the Person to move a secret saved there to Personal, into a project, or to remove it.",
+			})
+			.input(
+				z.object({
+					deviceId: z.string().min(1).max(64),
+					name: secretNameSchema,
+					move: secretMoveSchema,
+				}),
+			)
 			.output(described(z.void())),
 	},
 	/**

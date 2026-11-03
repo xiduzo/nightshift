@@ -485,9 +485,11 @@ export async function createDaemon(
 		id: device.id,
 		name: device.name,
 		...harnesses,
-		// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
+		// Decision nodes decided by a model: TanStack AI deciders, with API
+		// keys from the secrets: the run's Project first, when a step asks.
 		decider: tanstackDecider({
-			secret: (name) => connections.secret(name),
+			secret: (name, run) =>
+				connections.secret(name, run ? { project: run } : undefined),
 			// The same Ollama search by meaning uses, with its headers.
 			ollama: () => {
 				const at = ollama.endpoint();
@@ -572,6 +574,9 @@ export async function createDaemon(
 		keyStore,
 		// What seals the Personal secrets this computer keeps (ADR 13).
 		secretsKey: secretsKey({ ...process.env, ...env }, dataDir),
+		// What this computer moves of its own secrets when its Home Host
+		// asks for its owner: saved in the new scope, then removed here.
+		ownSecrets: connections,
 		// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 		// Otherwise the Settings switch is read on every tick.
 		scheduler:

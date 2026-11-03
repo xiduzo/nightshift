@@ -12,6 +12,7 @@ import type {
 	PairingRedeemed,
 	PairingStart,
 	PhoneView,
+	SecretMove,
 } from "../contract";
 import type {
 	HostRole,
@@ -20,7 +21,11 @@ import type {
 	LinkedHost,
 } from "../links";
 import type { PairedDevice } from "../registry";
-import type { PersonalSecretsHost, ProjectSecretsHost } from "../secrets";
+import type {
+	PersonalSecretsHost,
+	ProjectSecretsHost,
+	SecretMovesHost,
+} from "../secrets";
 
 /** This computer's Devices, as the API serves them: as a Host (pairing, presence) and its links to Hosts. */
 
@@ -118,8 +123,16 @@ export type Devices = {
 	personalSecrets: PersonalSecretsHost;
 	/** The Project secrets this computer keeps as the Host of their Spaces (ADR 13). */
 	projectSecrets: ProjectSecretsHost;
+	/** This computer as a Home Host: a paired Device asks it to move a secret on another (ADR 13). */
+	secretMoves: SecretMovesHost;
 	/** The owner's other Devices, from their documents: their profiles and secret names. */
 	others(ownerId: string): Promise<OtherDeviceView[]>;
+	/**
+	 * Asks one of the owner's other Devices to move a secret saved there:
+	 * to Personal, into a Project, or away (ADR 13, decision 7). That
+	 * Device moves its own value. Refuses while it is offline.
+	 */
+	moveSecretOn(deviceId: string, name: string, move: SecretMove): Promise<void>;
 	/** The Host this computer joined that keeps the Space, or null for a Space it keeps itself. */
 	hostOf(spaceId: string): Promise<string | null>;
 	/** The phones of this computer's owner on a Host it joined. */

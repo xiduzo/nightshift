@@ -512,6 +512,27 @@ describe("tanstackDecider: the address of a Model Profile", () => {
 		expect(sent[0]?.headers.get("x-proxy-key")).toBe("key proxy-key");
 	});
 
+	test("a step's call reads the key for its run: the run's Project secret first (ADR 13)", async () => {
+		const sent = stubAddress(() => ollamaChat('{"choice":"ship"}'));
+		const asked: unknown[] = [];
+		const run = { spaceId: "team", projectId: "api", runId: "run-1" };
+		const scoped = tanstackDecider({
+			secret: async (name, forRun) => {
+				asked.push([name, forRun]);
+				return forRun?.projectId === "api" ? "project-key" : "own-key";
+			},
+		});
+		await scoped.decide(
+			input({
+				decider: "ollama",
+				address: { baseUrl: "http://gpu-box:11434/", apiKey: "OPENJEV_KEY" },
+				run,
+			}),
+		);
+		expect(asked).toEqual([["OPENJEV_KEY", run]]);
+		expect(sent[0]?.headers.get("authorization")).toBe("Bearer project-key");
+	});
+
 	test("OpenAI at an address asks its /v1/decisions with the address's key, not the vendor's", async () => {
 		const sent = stubAddress(() =>
 			Response.json({

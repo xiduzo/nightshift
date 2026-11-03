@@ -8,7 +8,11 @@ import {
 	type ServedDocuments,
 } from "../host";
 import type { OpenDocumentChannel } from "../links";
-import type { PersonalSecretsHost, ProjectSecretsHost } from "../secrets";
+import type {
+	PersonalSecretsHost,
+	ProjectSecretsHost,
+	SecretMovesHost,
+} from "../secrets";
 import { memoryDocuments } from "./memory-documents";
 
 /**
@@ -72,6 +76,8 @@ export function inMemoryHost(deps: {
 	personalSecrets?: PersonalSecretsHost;
 	/** The Project secrets the Host keeps (ADR 13). Default: not served. */
 	projectSecrets?: ProjectSecretsHost;
+	/** The moves of a secret on another Device of the Person (ADR 13). Default: not served. */
+	secretMoves?: SecretMovesHost;
 }): MemoryHost {
 	let network = new AbortController();
 	const watchers = new Set<() => void>();
@@ -117,6 +123,7 @@ export function inMemoryHost(deps: {
 						remove: notServed,
 						take: notServed,
 					},
+					secretMoves: deps.secretMoves ?? { move: notServed },
 				},
 				phones: {
 					list: async () => [],

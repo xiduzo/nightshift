@@ -259,6 +259,9 @@ function withoutRun<T extends { run?: unknown }>(input: T): T {
 	return rest as T;
 }
 
+/** The words of a secret call that came as a call of a run. */
+const NOT_A_RUN_CALL = "This device moves its secrets only for its owner.";
+
 /** The words of a snapshot call on a Device that takes none. */
 const NO_SNAPSHOTS = "This device does not tell what a step changed.";
 
@@ -365,10 +368,22 @@ export async function* serveWork(
 			case "decide":
 				yield result(
 					"output" in call.input
-						? await device.decide({ ...call.input, signal })
-						: await device.decide({ ...call.input, signal }),
+						? await device.decide({
+								...withoutRun(call.input),
+								...run,
+								signal,
+							})
+						: await device.decide({
+								...withoutRun(call.input),
+								...run,
+								signal,
+							}),
 				);
 				return;
+			case "secret":
+				// Never a call of a run: the Device serves it apart, from its
+				// Home Host only (`serveSecretCall`).
+				throw new Refusal("forbidden", NOT_A_RUN_CALL);
 		}
 	} catch (error) {
 		if (!(error instanceof Refusal)) {

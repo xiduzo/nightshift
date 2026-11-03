@@ -117,6 +117,8 @@ describe("the Decision node", () => {
 			labels: [{ name: "ship", description: "Good enough" }, { name: "redo" }],
 			model: "jev-1.13.0",
 		});
+		// It names the run: the decider reads the key of the run's Project first (ADR 13).
+		expect(decider.calls[0]?.run?.runId).toBe(h.runId);
 
 		expect(await h.types()).toEqual([
 			"RunStarted",

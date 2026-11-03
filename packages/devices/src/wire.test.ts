@@ -517,7 +517,7 @@ describe("the devices runtime across a reload", () => {
 		await startB();
 		await streamsOn();
 		const run = "abcdef12-0000-0000-0000-000000000000";
-		const request: WorkRequest = {
+		const request = {
 			spaceId: a.spaceId,
 			projectId,
 			personId: paired.personId,
@@ -532,7 +532,7 @@ describe("the devices runtime across a reload", () => {
 					permissionMode: "acceptEdits",
 				},
 			},
-		};
+		} satisfies WorkRequest;
 		// A Walker's call to B, through A.
 		const replies: WorkReply[] = [];
 		let done = false;

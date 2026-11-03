@@ -428,6 +428,43 @@ describe("procedures", () => {
 		expect(asked).toEqual([ada.userId]);
 	});
 
+	test("only the owner asks another of their devices to move a secret saved there", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const asked: unknown[] = [];
+		const devices = {
+			moveSecretOn: async (...args: unknown[]) => {
+				asked.push(args);
+			},
+		};
+		const input = {
+			deviceId: "laptop",
+			name: "GH_TOKEN",
+			to: "personal" as const,
+		};
+		expect(
+			await errorOf(
+				call(appRouter.devices.moveSecret, input, {
+					context: await contextFor(ada.headers, { devices }),
+				}),
+			),
+		).toBe("FORBIDDEN");
+		expect(asked).toEqual([]);
+		const owner = await contextFor(ada.headers, {
+			devices,
+			ownerId: ada.userId,
+		});
+		await call(appRouter.devices.moveSecret, input, { context: owner });
+		await call(
+			appRouter.devices.moveSecret,
+			{ ...input, to: "removed" },
+			{ context: owner },
+		);
+		expect(asked).toEqual([
+			["laptop", "GH_TOKEN", { to: "personal" }],
+			["laptop", "GH_TOKEN", { to: "removed" }],
+		]);
+	});
+
 	test("a Person creates a Space, owns it, and works in it", async () => {
 		const ada = await sandbox.signUp("Ada");
 		let context = await contextFor(ada.headers);

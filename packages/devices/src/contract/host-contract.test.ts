@@ -50,6 +50,7 @@ describe("the Host's contract", () => {
 			"secrets.values",
 			"secrets.set",
 			"secrets.remove",
+			"secrets.moveOnDevice",
 			"projectSecrets.list",
 			"projectSecrets.values",
 			"projectSecrets.set",

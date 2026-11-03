@@ -16,7 +16,12 @@ import {
 } from "../links";
 import type { HomeMembership } from "../membership";
 import { type Reach, reachFor } from "../reach";
-import type { PersonalSecretsHost, ProjectSecretsHost } from "../secrets";
+import type {
+	PersonalSecretsHost,
+	ProjectSecretsHost,
+	SecretMoves,
+	SecretMovesHost,
+} from "../secrets";
 import type { Host } from "./host";
 import type { Devices, DevicesOverview, OtherDeviceView } from "./types";
 
@@ -50,6 +55,10 @@ export function createDevices(deps: {
 	personalSecrets: PersonalSecretsHost;
 	/** The Project secrets this computer keeps as the Host of their Spaces. */
 	projectSecrets: ProjectSecretsHost;
+	/** As a Home Host: the moves a paired Device asks for on another. */
+	secretMoves: SecretMovesHost;
+	/** The owner's moves of a secret on another of their Devices. */
+	moves: SecretMoves;
 	/** The clock, in milliseconds. Default: `now`. */
 	now?: () => number;
 }): Devices {
@@ -114,6 +123,9 @@ export function createDevices(deps: {
 		hello: (key) => host.hello(key),
 		personalSecrets: deps.personalSecrets,
 		projectSecrets: deps.projectSecrets,
+		secretMoves: deps.secretMoves,
+		moveSecretOn: (deviceId, name, move) =>
+			deps.moves.move(deviceId, name, move),
 		async others(ownerId) {
 			const view = (
 				copy: DeviceCopy,

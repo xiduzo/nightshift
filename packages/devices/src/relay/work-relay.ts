@@ -40,9 +40,16 @@ export function createWorkRelay(deps: {
 				yield { kind: "error", message: HOST_UNREACHABLE, offline: true };
 				return;
 			}
+			// A Walker sends calls of runs only. A secret call goes from the
+			// Home Host's own hub (`relayMove`), never through `devices.call`.
+			const { call } = request;
+			if (call.kind === "secret") {
+				yield { kind: "error", message: "A run does not move secrets." };
+				return;
+			}
 			try {
 				const replies = await to.client.devices.call(
-					{ deviceId, request },
+					{ deviceId, request: { ...request, call } },
 					signal ? { signal } : {},
 				);
 				for await (const reply of replies) yield reply;

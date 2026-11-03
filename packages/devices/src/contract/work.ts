@@ -13,9 +13,11 @@ import {
 	effortSchema,
 	modelAddressSchema,
 	permissionModeSchema,
+	secretNameSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 import { exact } from "./described";
+import { type SecretMove, secretMoveSchema } from "./secrets";
 
 /**
  * The wire of the work relay: a call of the Device port as plain data
@@ -59,7 +61,17 @@ export type WorkCall =
 	| {
 			kind: "decide";
 			input: Omit<DecisionInput, "signal"> | Omit<ValueInput, "signal">;
-	  };
+	  }
+	| SecretCall;
+
+/**
+ * Not a call of a run: the Person's Home Host asks one of their Devices
+ * to move a secret saved there (ADR 13, decision 7). Its request names no
+ * Space, no project and no run (all empty), and its Person is the one who
+ * asks, as the Home Host knows them. The Device serves it only from its
+ * Home Host, for its own Person (`serveSecretCall`).
+ */
+export type SecretCall = { kind: "secret"; name: string; move: SecretMove };
 
 export type WorkRequest = WorkFor & { call: WorkCall };
 
@@ -81,7 +93,8 @@ export const WORK_KINDS = [
 /**
  * A request as the placed Device reads it: the checked part strictly, the
  * call's input as the Device port types it (the local Device reads it as
- * it would a local call).
+ * it would a local call). A call of a run only: a Walker never sends a
+ * secret call (`secretRequestSchema`).
  */
 export const workRequestSchema = z.object({
 	spaceId: z.string().min(1),
@@ -90,6 +103,26 @@ export const workRequestSchema = z.object({
 	runId: z.string().min(1).nullable(),
 	call: z.looseObject({ kind: z.enum(WORK_KINDS) }),
 });
+
+/** A secret call as the Device reads it from its Home Host: no Space, no project, no run. */
+export const secretRequestSchema = z.object({
+	spaceId: z.literal(""),
+	projectId: z.literal(""),
+	personId: z.string().min(1),
+	runId: z.null(),
+	call: z.object({
+		kind: z.literal("secret"),
+		name: secretNameSchema,
+		move: secretMoveSchema,
+	}),
+});
+
+/**
+ * What a Device of an older version answers to a call it cannot read: a
+ * secret call, for one. The Host reads it as "update that Device".
+ */
+export const UNREADABLE_REQUEST =
+	"This device cannot read that request. Update Night Shift on both computers.";
 
 /** One answer of a placed Device to a call. */
 export type WorkReply =
@@ -246,6 +279,7 @@ const decideInputSchema = z.union([
 		),
 		model: z.string().optional(),
 		address: modelAddressSchema.optional(),
+		run: stepRunSchema.optional(),
 	}),
 	z.object({
 		decider: deciderNameSchema,
@@ -253,6 +287,7 @@ const decideInputSchema = z.union([
 		output: z.record(z.string(), z.unknown()),
 		model: z.string().optional(),
 		address: modelAddressSchema.optional(),
+		run: stepRunSchema.optional(),
 	}),
 ]);
 
@@ -316,6 +351,7 @@ const workCallSchema = z.discriminatedUnion("kind", [
 		}),
 	}),
 	z.object({ kind: z.literal("decide"), input: decideInputSchema }),
+	secretRequestSchema.shape.call,
 ]);
 
 /**

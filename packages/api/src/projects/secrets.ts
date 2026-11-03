@@ -176,4 +176,28 @@ export const projectSecrets = {
 				context.session.user.id,
 			),
 		),
+	/**
+	 * Moves a secret saved on another of the owner's devices into a project
+	 * of the session's Space (ADR 13, decision 7). That device reads its own
+	 * value, saves it in the project, then removes its copy: the value never
+	 * passes through this computer. Refused while that device is offline.
+	 */
+	moveSecretFromDevice: ownerSaving
+		.route({
+			summary:
+				"Moves a secret saved on another of your devices into a project of the Space. That device moves its own value.",
+		})
+		.output(output(z.void()))
+		.input(
+			projectInput.extend({
+				name: secretNameSchema,
+				deviceId: z.string().min(1).max(64),
+			}),
+		)
+		.handler(async ({ context, input }) =>
+			context.devices.moveSecretOn(input.deviceId, input.name, {
+				to: "project",
+				...(await inSpace(context, input.projectId)),
+			}),
+		),
 };

@@ -48,6 +48,7 @@ export type HostPeerContext = {
 		| "revoke"
 		| "personalSecrets"
 		| "projectSecrets"
+		| "secretMoves"
 	>;
 	phones: HostPhones;
 };
@@ -210,6 +211,9 @@ export const hostRouter = os.router({
 		),
 		remove: keyed.secrets.remove.handler(({ context, input }) =>
 			context.devices.personalSecrets.remove(context.key, input),
+		),
+		moveOnDevice: keyed.secrets.moveOnDevice.handler(({ context, input }) =>
+			context.devices.secretMoves.move(context.key, input),
 		),
 	},
 	projectSecrets: {

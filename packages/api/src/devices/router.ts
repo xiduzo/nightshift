@@ -1,4 +1,5 @@
 import { phoneSchema } from "@nightshift/devices";
+import { secretNameSchema } from "@nightshift/flows";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -53,6 +54,30 @@ export const devices = {
 		})
 		.output(output(z.array(otherDeviceViewSchema)))
 		.handler(({ context }) => context.devices.others(context.session.user.id)),
+	/**
+	 * Asks another of the owner's devices to move a secret saved there to
+	 * their Personal secrets, or to remove it (ADR 13, decision 7). That
+	 * device does it with its own value: the value never passes through
+	 * this computer. Refused while that device is offline.
+	 */
+	moveSecret: ownerProcedure
+		.route({
+			summary:
+				"Asks another of your devices to move a secret saved there to your Personal secrets, or to remove it.",
+		})
+		.output(output(z.void()))
+		.input(
+			z.object({
+				deviceId: z.string().min(1).max(64),
+				name: secretNameSchema,
+				to: z.enum(["personal", "removed"]),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.devices.moveSecretOn(input.deviceId, input.name, {
+				to: input.to,
+			}),
+		),
 	/**
 	 * The Devices of the session's Space, as every Member sees them: name,
 	 * online, Clones of its Projects, offered profiles. Nothing else.

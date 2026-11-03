@@ -1,5 +1,7 @@
 import { now as timeNow } from "@nightshift/time";
 import {
+	secretRequestSchema,
+	UNREADABLE_REQUEST,
 	type WorkReply,
 	type WorkRequest,
 	workRequestSchema,
@@ -171,13 +173,11 @@ export function createWorkServer(deps: {
 		out.ack();
 		acks.set(id, () => out.ack());
 		try {
-			const parsed = workRequestSchema.safeParse(raw);
+			// A call of a run, or a secret call of the Home Host.
+			const run = workRequestSchema.safeParse(raw);
+			const parsed = run.success ? run : secretRequestSchema.safeParse(raw);
 			if (!parsed.success) {
-				out.push({
-					kind: "error",
-					message:
-						"This device cannot read that request. Update Night Shift on both computers.",
-				});
+				out.push({ kind: "error", message: UNREADABLE_REQUEST });
 				return;
 			}
 			for await (const reply of deps.serve(

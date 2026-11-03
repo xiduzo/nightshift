@@ -61,7 +61,7 @@ export type WorkHub = WorkRelay & {
 	): boolean;
 	/**
 	 * Whether a step's call of the run goes to the Device now: a session,
-	 * a command or a tool call this hub sent there (or holds for it) and
+	 * a command, a tool call or a decider call this hub sent there (or holds for it) and
 	 * that has not ended. What the Host checks before it gives the
 	 * Device the run's Project secrets (ADR 13).
 	 */
@@ -71,11 +71,12 @@ export type WorkHub = WorkRelay & {
 	): boolean;
 };
 
-/** The calls of a step that read secrets on the Device. */
+/** The calls of a step that read secrets on the Device: a decider reads its API key. */
 const STEP_CALLS: ReadonlySet<string> = new Set([
 	"session",
 	"exec",
 	"callTool",
+	"decide",
 ]);
 
 /** One stream a Device takes its work over. */

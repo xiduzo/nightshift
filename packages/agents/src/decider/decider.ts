@@ -444,9 +444,25 @@ export function defaultDeciderModel(
 }
 
 export type TanstackDeciderOptions = DeciderContext & {
-	/** A secret's value: the keychain, then the environment. */
-	secret: (name: string) => Promise<string | undefined>;
+	/**
+	 * A secret's value: the run's Project (with `run`), Personal, the
+	 * keychain, then the environment.
+	 */
+	secret: (
+		name: string,
+		run?: DecisionInput["run"],
+	) => Promise<string | undefined>;
 };
+
+/** The secrets of one call: the run's, when the call names one. */
+function secretsOf(
+	options: TanstackDeciderOptions,
+	run: DecisionInput["run"],
+): (name: string) => Promise<string | undefined> {
+	return run
+		? (name) => options.secret(name, run)
+		: (name) => options.secret(name);
+}
 
 /**
  * What one decider call cost: the provider's own figure (OpenRouter sends
@@ -491,7 +507,7 @@ async function decideOnce(
 		spec,
 		input.address,
 		input.decider,
-		options.secret,
+		secretsOf(options, input.run),
 	);
 	if ("problem" in access) return failed("harness", access.problem);
 	const result = await decide({
@@ -547,7 +563,7 @@ async function valueOnce(
 		spec,
 		input.address,
 		input.decider,
-		options.secret,
+		secretsOf(options, input.run),
 	);
 	if ("problem" in access) return valueFailed("harness", access.problem);
 	const abortController = new AbortController();
