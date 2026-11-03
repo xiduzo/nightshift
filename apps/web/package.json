@@ -11,7 +11,8 @@
 		"dev": "vite dev",
 		"check-types": "tsc -b ../../packages/api && vite build && tsc --noEmit",
 		"test": "bun test",
-		"env:generate": "varlock codegen"
+		"env:generate": "varlock codegen",
+		"prototype:nav": "PROTO_PORT=3003 VITE_SERVER_URL=http://localhost:3003 vite dev"
 	},
 	"dependencies": {
 		"@nightshift/client": "workspace:*",

@@ -6,13 +6,17 @@ import { Toaster } from "@nightshift/ui/components/sonner";
 import { TooltipProvider } from "@nightshift/ui/components/tooltip";
 import { useRouterState } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { isOutsideApp, useAccessGuard } from "@/features/access";
 import { NotificationStream } from "@/features/notifications";
 import { UsageNotice } from "@/features/settings";
 import { SpaceTabs } from "@/features/spaces";
 
 import { AppSidebar } from "./app-sidebar";
+import { PrototypeNavSwitcher, useNavVariant } from "./prototype-nav";
+import { NavMenusSidebar } from "./prototype-nav-b-menus";
+import { NavDrillSidebar } from "./prototype-nav-c-drill";
+import { NavRailsSidebar, RAILS_WIDTH } from "./prototype-nav-d-rails";
 import { TabBadge } from "./use-tab-badge";
 
 /**
@@ -26,6 +30,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 	const href = useRouterState({ select: (s) => s.location.href });
 	const outsideApp = isOutsideApp(pathname);
 	const appMayShow = useAccessGuard(pathname, href);
+	// PROTOTYPE: the sidebar variant (`?nav=`), see prototype-nav.tsx.
+	const nav = useNavVariant();
 	return (
 		<ThemeProvider
 			attribute="class"
@@ -37,8 +43,23 @@ export function AppShell({ children }: { children: ReactNode }) {
 				{outsideApp ? (
 					children
 				) : appMayShow ? (
-					<SidebarProvider>
-						<AppSidebar />
+					<SidebarProvider
+						key={nav}
+						style={
+							nav === "D"
+								? ({ "--sidebar-width": RAILS_WIDTH } as CSSProperties)
+								: undefined
+						}
+					>
+						{nav === "B" ? (
+							<NavMenusSidebar />
+						) : nav === "C" ? (
+							<NavDrillSidebar />
+						) : nav === "D" ? (
+							<NavRailsSidebar />
+						) : (
+							<AppSidebar />
+						)}
 						<SidebarInset className="min-w-0">{children}</SidebarInset>
 					</SidebarProvider>
 				) : null}
@@ -50,6 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					<SpaceTabs />
 					<TabBadge />
 					<UsageNotice />
+					<PrototypeNavSwitcher />
 				</>
 			)}
 		</ThemeProvider>

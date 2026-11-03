@@ -245,7 +245,7 @@ function NavProjects({ projects }: { projects: Project[] | undefined }) {
 }
 
 /** One project: its name opens the dashboard, the chevron opens the folder. */
-function ProjectFolder({ project }: { project: Project }) {
+export function ProjectFolder({ project }: { project: Project }) {
 	const matchRoute = useMatchRoute();
 	const params = { projectId: project.id };
 	const inProject = Boolean(
@@ -311,7 +311,13 @@ function ProjectFolder({ project }: { project: Project }) {
 }
 
 /** The pages of an open project folder, each with its count. */
-function ProjectPages({ project }: { project: Project }) {
+export function ProjectPages({
+	project,
+	indent = true,
+}: {
+	project: Project;
+	indent?: boolean;
+}) {
 	const flows = useQuery({
 		...flowQueries.list(project.id),
 		staleTime: 30_000,
@@ -329,6 +335,7 @@ function ProjectPages({ project }: { project: Project }) {
 		/* Full-width rows, indented to the project name, so a count fits on the right. */
 		<SidebarMenu className="mt-1 group-data-[collapsible=icon]:hidden">
 			<ProjectPageItem
+				indent={indent}
 				to="/projects/$projectId/flows"
 				projectId={project.id}
 				label="Flows"
@@ -344,6 +351,7 @@ function ProjectPages({ project }: { project: Project }) {
 				}
 			/>
 			<ProjectPageItem
+				indent={indent}
 				to="/projects/$projectId/runs"
 				projectId={project.id}
 				label="Runs"
@@ -367,6 +375,7 @@ function ProjectPages({ project }: { project: Project }) {
 				}
 			/>
 			<ProjectPageItem
+				indent={indent}
 				to="/projects/$projectId/knowledge"
 				projectId={project.id}
 				label="Knowledge"
@@ -374,6 +383,7 @@ function ProjectPages({ project }: { project: Project }) {
 				badge={null}
 			/>
 			<ProjectPageItem
+				indent={indent}
 				to="/projects/$projectId/secrets"
 				projectId={project.id}
 				label="Secrets"
@@ -381,6 +391,7 @@ function ProjectPages({ project }: { project: Project }) {
 				badge={null}
 			/>
 			<ProjectPageItem
+				indent={indent}
 				to="/projects/$projectId/schedules"
 				projectId={project.id}
 				label="Schedules"
@@ -398,6 +409,7 @@ function ProjectPages({ project }: { project: Project }) {
 			{/* What runs left in the project's folder: only where it has one. */}
 			{project.repoPath !== null ? (
 				<ProjectPageItem
+					indent={indent}
 					to="/projects/$projectId/branches"
 					projectId={project.id}
 					label="Branches"
@@ -416,7 +428,9 @@ function ProjectPageItem({
 	icon: PageIcon,
 	tooltip,
 	badge,
+	indent = true,
 }: {
+	indent?: boolean;
 	to:
 		| "/projects/$projectId/flows"
 		| "/projects/$projectId/runs"
@@ -435,7 +449,7 @@ function ProjectPageItem({
 	return (
 		<SidebarMenuItem>
 			<SidebarMenuButton
-				className="pl-8"
+				className={indent ? "pl-8" : undefined}
 				tooltip={tooltip}
 				isActive={Boolean(matchRoute({ to, params, fuzzy: true }))}
 				render={<Link to={to} params={params} />}
@@ -448,7 +462,7 @@ function ProjectPageItem({
 	);
 }
 
-function DaemonStatus({
+export function DaemonStatus({
 	reachable,
 	loading,
 }: {
@@ -492,7 +506,7 @@ const THEMES = [
 	{ value: "system", label: "System", icon: MonitorIcon },
 ] as const;
 
-function ThemeMenu() {
+export function ThemeMenu() {
 	const { theme = "system", setTheme } = useTheme();
 	// The theme is known only in the browser: the trigger names none, so the
 	// server's HTML matches. The menu shows the choice.
