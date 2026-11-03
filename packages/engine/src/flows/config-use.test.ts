@@ -181,6 +181,54 @@ describe("connectionsInUse", () => {
 	});
 });
 
+describe("connectionsInUse with a CLI tool's login", () => {
+	const acli = tool("acli-work", {
+		login: {
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+			env: { TOKEN: "${ACLI_TOKEN}" },
+			folder: null,
+			signIn: null,
+		} as never,
+	});
+	const list = (use: FlowUse, keeps: Record<string, string[]>) =>
+		connectionsInUse(
+			{
+				connections: { list: () => [], secrets: secretsOf },
+				cliTools: { list: () => [acli] },
+				profiles: { list: () => [profile("worker", { clis: ["acli-work"] })] },
+			},
+			use,
+			async (projectId) => new Set(keeps[projectId] ?? []),
+		);
+
+	test("leaves out the tool when each flow that uses it is in a project that has the secret", async () => {
+		const use = noUse();
+		use.secrets.set("ACLI_TOKEN", [flow("demo")]);
+		use.clis.set("acli-work", [flow("test")]);
+		expect((await list(use, { p1: ["ACLI_TOKEN"] })).secrets).toEqual([]);
+	});
+
+	test("keeps the tool when a flow of another project uses it", async () => {
+		const use = noUse();
+		const other: FlowRef = { ...flow("sync"), projectId: "p2" };
+		use.secrets.set("ACLI_TOKEN", [flow("demo")]);
+		use.profiles.set(profileUseKey("d1", "worker"), [
+			{ ...other, nodeIds: ["a"] },
+		]);
+		const listed = await list(use, { p1: ["ACLI_TOKEN"] });
+		expect(listed.secrets.map((s) => [s.name, s.flows, s.tools])).toEqual([
+			["ACLI_TOKEN", [], ["acli-work"]],
+		]);
+	});
+
+	test("keeps the tool when no flow is known to use it", async () => {
+		const listed = await list(noUse(), { p1: ["ACLI_TOKEN"] });
+		expect(listed.secrets.map((s) => [s.name, s.tools])).toEqual([
+			["ACLI_TOKEN", ["acli-work"]],
+		]);
+	});
+});
+
 describe("cliToolsInUse", () => {
 	test("names the flows and Agent Profiles that use each tool, and when a login signed in", async () => {
 		const use = noUse();

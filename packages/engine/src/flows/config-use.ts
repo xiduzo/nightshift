@@ -49,8 +49,11 @@ export type SecretInUse = SecretView & { flows: FlowRef[]; tools: string[] };
  *
  * `projectNames` gives the names of a project's own secrets (ADR 13). A
  * project's secret wins for its flows, so those flows do not use this
- * computer's value or the Person's: they leave the list. A name that is
- * not saved here and that nothing else uses then leaves it too.
+ * computer's value or the Person's: they leave the list. A CLI tool's
+ * login reads the secret of the project its step runs in too, so a tool
+ * leaves a name's list when each flow known to use the tool or the name is
+ * in a project that has it. A tool no flow is known to use stays. A name
+ * that is not saved here and that nothing else uses then leaves it too.
  */
 export async function connectionsInUse(
 	config: {
@@ -77,8 +80,27 @@ export async function connectionsInUse(
 		...use.secrets.keys(),
 		...toolsBySecret.keys(),
 	]);
+	// The flows that use a CLI tool: by name in an Agent node, or through
+	// an Agent Profile that names it.
+	const toolFlows = new Map<string, FlowRef[]>();
+	for (const tool of config.cliTools.list()) {
+		const viaProfiles = config.profiles
+			.list()
+			.filter((p) => isAgentProfile(p) && p.clis.includes(tool.name))
+			.flatMap((p) =>
+				[...use.profiles]
+					.filter(([key]) => key.endsWith(`/${p.id}`))
+					.flatMap(([, flows]) => flows),
+			);
+		toolFlows.set(tool.name, [
+			...(use.clis.get(tool.name) ?? []),
+			...viaProfiles,
+		]);
+	}
 	const projectIds = new Set(
-		[...use.secrets.values()].flat().map((flow) => flow.projectId),
+		[...use.secrets.values(), ...toolFlows.values()]
+			.flat()
+			.map((flow) => flow.projectId),
 	);
 	const kept = new Map(
 		await Promise.all(
@@ -87,10 +109,18 @@ export async function connectionsInUse(
 	);
 	const secrets: SecretInUse[] = [];
 	for (const secret of listed.secrets) {
+		const covered = (flow: FlowRef) =>
+			kept.get(flow.projectId)?.has(secret.name) === true;
+		const tools = (toolsBySecret.get(secret.name) ?? []).filter((tool) => {
+			const users = [
+				...(toolFlows.get(tool) ?? []),
+				...(use.secrets.get(secret.name) ?? []),
+			];
+			return users.length === 0 || !users.every(covered);
+		});
 		const flows = (use.secrets.get(secret.name) ?? []).filter(
-			(flow) => !kept.get(flow.projectId)?.has(secret.name),
+			(flow) => !covered(flow),
 		);
-		const tools = toolsBySecret.get(secret.name) ?? [];
 		const needed =
 			secret.saved ||
 			secret.inEnv ||
