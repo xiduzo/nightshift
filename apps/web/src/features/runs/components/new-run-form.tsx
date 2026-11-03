@@ -29,20 +29,34 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@nightshift/ui/components/tabs";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { PlayIcon, TriangleAlertIcon } from "lucide-react";
+import {
+	MessageSquareTextIcon,
+	PlayIcon,
+	TriangleAlertIcon,
+	WorkflowIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 import { EFFORTS, ModelCombobox, PERMISSION_MODES } from "@/features/agents";
+import { PickFlowRunForm } from "@/features/flows";
 import type { Effort, PermissionMode } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { LargerTextarea } from "@/shared/larger-window";
 import { runMutations } from "../queries";
 
+type QuickRunMode = "flow" | "prompt";
+
 /**
- * A quick run: one Agent node with a prompt, no flow file, in a dialog. The
- * fields live here, outside the dialog's content, so a closed dialog keeps
- * what was typed.
+ * A quick run, in a dialog with two tabs: one of the project's flows, or
+ * one Agent node with a prompt and no flow file. The fields live here,
+ * outside the dialog's content, so a closed dialog keeps what was typed.
  */
 export function QuickRunDialog({
 	projectId,
@@ -65,6 +79,8 @@ export function QuickRunDialog({
 	const [effort, setEffort] = useState<Effort | "">("");
 	const [baseRef, setBaseRef] = useState("");
 	const [flowError, setFlowError] = useState<string | null>(null);
+	const [mode, setMode] = useState<QuickRunMode>("flow");
+	const [flowName, setFlowName] = useState<string | null>(null);
 
 	const startRun = useMutation(
 		runMutations.start({
@@ -105,163 +121,193 @@ export function QuickRunDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
-				<form
-					className="contents"
-					onSubmit={(event) => {
-						event.preventDefault();
-						submit();
-					}}
+				<DialogHeader>
+					<DialogTitle>Quick run</DialogTitle>
+					<DialogDescription>
+						Run a flow, or give one agent a prompt. The run works on a new
+						branch in its own copy of the project.
+					</DialogDescription>
+				</DialogHeader>
+
+				<Tabs
+					value={mode}
+					onValueChange={(value) => setMode(value as QuickRunMode)}
+					className="gap-6"
 				>
-					<DialogHeader>
-						<DialogTitle>Quick run</DialogTitle>
-						<DialogDescription>
-							One agent with a prompt, without a flow. It works on a new branch
-							in its own copy of the project.
-						</DialogDescription>
-					</DialogHeader>
+					<TabsList className="w-full">
+						<TabsTrigger value="flow">
+							<WorkflowIcon data-icon="inline-start" />
+							Flow
+						</TabsTrigger>
+						<TabsTrigger value="prompt">
+							<MessageSquareTextIcon data-icon="inline-start" />
+							Prompt
+						</TabsTrigger>
+					</TabsList>
+					<TabsContent value="flow" className="grid gap-6">
+						<PickFlowRunForm
+							projectId={projectId}
+							flowName={flowName}
+							onFlowNameChange={setFlowName}
+							onStarted={() => onOpenChange(false)}
+						/>
+					</TabsContent>
+					<TabsContent value="prompt" className="grid gap-6">
+						<form
+							className="contents"
+							onSubmit={(event) => {
+								event.preventDefault();
+								submit();
+							}}
+						>
+							<FieldGroup className="gap-5">
+								<Field>
+									<FieldLabel htmlFor={`${id}-prompt`}>Prompt</FieldLabel>
+									<LargerTextarea
+										title="Prompt"
+										id={`${id}-prompt`}
+										value={prompt}
+										onChange={(event) => setPrompt(event.target.value)}
+										onKeyDown={(event) => {
+											if (
+												event.key === "Enter" &&
+												(event.metaKey || event.ctrlKey)
+											) {
+												event.preventDefault();
+												submit();
+											}
+										}}
+										placeholder="What should the agent do?"
+										className="min-h-28 text-sm md:text-sm"
+										aria-describedby={`${id}-prompt-hint`}
+										required
+										autoFocus
+									/>
+									<FieldDescription id={`${id}-prompt-hint`}>
+										<KbdGroup>
+											<Kbd>⌘/Ctrl</Kbd>
+											<Kbd>Enter</Kbd>
+										</KbdGroup>{" "}
+										to start.
+									</FieldDescription>
+								</Field>
 
-					<FieldGroup className="gap-5">
-						<Field>
-							<FieldLabel htmlFor={`${id}-prompt`}>Prompt</FieldLabel>
-							<LargerTextarea
-								title="Prompt"
-								id={`${id}-prompt`}
-								value={prompt}
-								onChange={(event) => setPrompt(event.target.value)}
-								onKeyDown={(event) => {
-									if (
-										event.key === "Enter" &&
-										(event.metaKey || event.ctrlKey)
-									) {
-										event.preventDefault();
-										submit();
-									}
-								}}
-								placeholder="What should the agent do?"
-								className="min-h-28 text-sm md:text-sm"
-								aria-describedby={`${id}-prompt-hint`}
-								required
-								autoFocus
-							/>
-							<FieldDescription id={`${id}-prompt-hint`}>
-								<KbdGroup>
-									<Kbd>⌘/Ctrl</Kbd>
-									<Kbd>Enter</Kbd>
-								</KbdGroup>{" "}
-								to start.
-							</FieldDescription>
-						</Field>
+								<div className="grid gap-5 sm:grid-cols-2">
+									<Field>
+										<FieldLabel htmlFor={`${id}-model`}>Model</FieldLabel>
+										<ModelCombobox
+											id={`${id}-model`}
+											harness={QUICK_RUN_HARNESS}
+											value={model}
+											onChange={setModel}
+										/>
+									</Field>
+									<Field>
+										<FieldLabel htmlFor={`${id}-effort`}>
+											Effort{" "}
+											<span className="font-normal text-muted-foreground">
+												(optional)
+											</span>
+										</FieldLabel>
+										<NativeSelect
+											id={`${id}-effort`}
+											value={effort}
+											className="w-full"
+											onChange={(event) =>
+												setEffort(event.target.value as Effort | "")
+											}
+										>
+											<NativeSelectOption value="">
+												Model default
+											</NativeSelectOption>
+											{EFFORTS.map((value) => (
+												<NativeSelectOption key={value} value={value}>
+													{value}
+												</NativeSelectOption>
+											))}
+										</NativeSelect>
+									</Field>
+									<Field>
+										<FieldLabel htmlFor={`${id}-permission`}>
+											Permission mode
+										</FieldLabel>
+										<NativeSelect
+											id={`${id}-permission`}
+											value={permissionMode}
+											className="w-full"
+											onChange={(event) =>
+												setPermissionMode(event.target.value as PermissionMode)
+											}
+											aria-describedby={
+												permissionMode === "bypassPermissions"
+													? `${id}-permission-warning`
+													: undefined
+											}
+										>
+											{PERMISSION_MODES.map(({ value, label }) => (
+												<NativeSelectOption key={value} value={value}>
+													{label}
+												</NativeSelectOption>
+											))}
+										</NativeSelect>
+									</Field>
+									<Field>
+										<FieldLabel htmlFor={`${id}-base-ref`}>
+											Start from{" "}
+											<span className="font-normal text-muted-foreground">
+												(optional)
+											</span>
+										</FieldLabel>
+										<Input
+											id={`${id}-base-ref`}
+											value={baseRef}
+											onChange={(event) => setBaseRef(event.target.value)}
+											placeholder="The current branch"
+											className="font-mono"
+											autoComplete="off"
+											spellCheck={false}
+										/>
+									</Field>
+								</div>
 
-						<div className="grid gap-5 sm:grid-cols-2">
-							<Field>
-								<FieldLabel htmlFor={`${id}-model`}>Model</FieldLabel>
-								<ModelCombobox
-									id={`${id}-model`}
-									harness={QUICK_RUN_HARNESS}
-									value={model}
-									onChange={setModel}
-								/>
-							</Field>
-							<Field>
-								<FieldLabel htmlFor={`${id}-effort`}>
-									Effort{" "}
-									<span className="font-normal text-muted-foreground">
-										(optional)
-									</span>
-								</FieldLabel>
-								<NativeSelect
-									id={`${id}-effort`}
-									value={effort}
-									className="w-full"
-									onChange={(event) =>
-										setEffort(event.target.value as Effort | "")
-									}
+								{permissionMode === "bypassPermissions" ? (
+									<Alert
+										id={`${id}-permission-warning`}
+										className="border-status-interrupted/40 text-status-interrupted"
+									>
+										<TriangleAlertIcon aria-hidden="true" />
+										<AlertDescription className="text-status-interrupted">
+											The agent runs every tool, shell commands included,
+											without asking. Use it only on a repository you trust.
+										</AlertDescription>
+									</Alert>
+								) : null}
+
+								{flowError || startRun.error ? (
+									<FieldError>
+										{flowError ?? startRun.error?.message}
+									</FieldError>
+								) : null}
+							</FieldGroup>
+
+							<DialogFooter>
+								<DialogClose
+									render={<Button variant="outline" type="button" />}
 								>
-									<NativeSelectOption value="">
-										Model default
-									</NativeSelectOption>
-									{EFFORTS.map((value) => (
-										<NativeSelectOption key={value} value={value}>
-											{value}
-										</NativeSelectOption>
-									))}
-								</NativeSelect>
-							</Field>
-							<Field>
-								<FieldLabel htmlFor={`${id}-permission`}>
-									Permission mode
-								</FieldLabel>
-								<NativeSelect
-									id={`${id}-permission`}
-									value={permissionMode}
-									className="w-full"
-									onChange={(event) =>
-										setPermissionMode(event.target.value as PermissionMode)
-									}
-									aria-describedby={
-										permissionMode === "bypassPermissions"
-											? `${id}-permission-warning`
-											: undefined
-									}
-								>
-									{PERMISSION_MODES.map(({ value, label }) => (
-										<NativeSelectOption key={value} value={value}>
-											{label}
-										</NativeSelectOption>
-									))}
-								</NativeSelect>
-							</Field>
-							<Field>
-								<FieldLabel htmlFor={`${id}-base-ref`}>
-									Start from{" "}
-									<span className="font-normal text-muted-foreground">
-										(optional)
-									</span>
-								</FieldLabel>
-								<Input
-									id={`${id}-base-ref`}
-									value={baseRef}
-									onChange={(event) => setBaseRef(event.target.value)}
-									placeholder="The current branch"
-									className="font-mono"
-									autoComplete="off"
-									spellCheck={false}
-								/>
-							</Field>
-						</div>
-
-						{permissionMode === "bypassPermissions" ? (
-							<Alert
-								id={`${id}-permission-warning`}
-								className="border-status-interrupted/40 text-status-interrupted"
-							>
-								<TriangleAlertIcon aria-hidden="true" />
-								<AlertDescription className="text-status-interrupted">
-									The agent runs every tool, shell commands included, without
-									asking. Use it only on a repository you trust.
-								</AlertDescription>
-							</Alert>
-						) : null}
-
-						{flowError || startRun.error ? (
-							<FieldError>{flowError ?? startRun.error?.message}</FieldError>
-						) : null}
-					</FieldGroup>
-
-					<DialogFooter>
-						<DialogClose render={<Button variant="outline" type="button" />}>
-							Cancel
-						</DialogClose>
-						<Button type="submit" disabled={!canSubmit}>
-							{startRun.isPending ? (
-								<Spinner data-icon="inline-start" />
-							) : (
-								<PlayIcon data-icon="inline-start" />
-							)}
-							{startRun.isPending ? "Starting…" : "Start run"}
-						</Button>
-					</DialogFooter>
-				</form>
+									Cancel
+								</DialogClose>
+								<Button type="submit" disabled={!canSubmit}>
+									{startRun.isPending ? (
+										<Spinner data-icon="inline-start" />
+									) : (
+										<PlayIcon data-icon="inline-start" />
+									)}
+									{startRun.isPending ? "Starting…" : "Start run"}
+								</Button>
+							</DialogFooter>
+						</form>
+					</TabsContent>
+				</Tabs>
 			</DialogContent>
 		</Dialog>
 	);

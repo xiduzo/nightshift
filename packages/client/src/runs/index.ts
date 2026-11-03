@@ -29,6 +29,7 @@ export {
 	testCountsText,
 } from "./command-output/test-run";
 export { askWhyMutation, explainRun } from "./explain";
+export { type FlowUse, rankFlowsByUse } from "./flow-use";
 export {
 	agoLabel,
 	compactCount,

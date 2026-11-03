@@ -42,4 +42,7 @@ export { ProjectFlowsPage } from "./project-flows-page";
 export { flowQueries } from "./queries";
 export { BaseRefCombobox } from "./start/base-ref-combobox";
 export { FlowInputFields } from "./start/flow-input-fields";
-export { StartRunDialog } from "./start/start-run-dialog";
+export {
+	PickFlowRunForm,
+	StartRunDialog,
+} from "./start/start-run-dialog";
