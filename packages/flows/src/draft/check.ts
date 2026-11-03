@@ -2,6 +2,7 @@
 import { type Flow, type FlowNode, flowSchema } from "../flow";
 import {
 	type AgentNode,
+	deviceIdOf,
 	isProfileRef,
 	type ProfileRef,
 	sameProfileRef,
@@ -32,8 +33,8 @@ export type DraftMessages = {
 	missingConnection: (name: string) => string;
 	/** A profile the node names that its Device does not have, as far as this computer knows. */
 	missingProfile: (profile: ProfileRef) => string;
-	/** A Device the node names (`device`) that no Device of the list has as its name. */
-	missingDevice: (name: string, node: FlowNode) => string;
+	/** A Device the node names (`device`) by an id that no Device of the list has. */
+	missingDevice: (deviceId: string, node: FlowNode) => string;
 	/** A program a command calls by its own name, such as `acli`, that only `tools` sign in to. */
 	programWithoutLogin: (program: string, tools: readonly string[]) => string;
 	/**
@@ -67,7 +68,7 @@ export type DraftCheckOptions = {
 	/** The Devices whose profiles this computer cannot tell: a profile on one is not checked. */
 	untoldDevices?: readonly string[];
 	/**
-	 * The names of the Devices a run of the project may use: the person's
+	 * The ids of the Devices a run of the project may use: the person's
 	 * own and those that offer profiles to the Space. A node that names
 	 * another does not start. Leave it out while they load.
 	 */
@@ -159,11 +160,11 @@ export function checkDraft(
 
 	if (devices) {
 		for (const node of flow.nodes) {
-			const name = "device" in node ? node.device : undefined;
-			if (name === undefined || devices.includes(name)) continue;
+			const id = "device" in node ? deviceIdOf(node.device) : undefined;
+			if (id === undefined || devices.includes(id)) continue;
 			issues.push({
 				severity: "error",
-				message: messages.missingDevice(name, node),
+				message: messages.missingDevice(id, node),
 				nodeId: node.id,
 			});
 		}

@@ -55,11 +55,11 @@ Night Shift's tools cannot save a schedule or a profile:
 
 # Writing Night Shift flows
 
-A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 7. The model never changes the graph at run time.
+A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 8. The model never changes the graph at run time.
 
 ## The file
 
-`{ version: 7, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
+`{ version: 8, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
 
 - `inputs`: `{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }`. The start dialog shows a field per type: a number field, a switch, a list to pick from. `choice` needs `options` (a list of text) and gives the picked text. A default is text: `"45"`, `"true"`, one of the options, or JSON text. Use `boolean` for yes/no, `number` for counts and minutes, `choice` for a fixed list. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
@@ -99,7 +99,7 @@ Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
 ### call
 
-Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. A parameter sweep is one Command that loops, not one element per set. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message. With `device` (a computer's name), its steps run on that computer wherever the run runs.
+Shown as Subflow. Runs another flow of the project (`flow`, its name), or a kit (`kit:github/publish-draft-pr`, see Kits), with `inputs` bound to templates. With `each`, it runs the flow once per element of a list: `source` is `{ kind: "json", value }` or `{ kind: "command", command }` (prints a JSON array); the element goes to the input named by `as`. A parameter sweep is one Command that loops, not one element per set. Without `each` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow `pass` (`done`, `nothing-to-do`) or `fail` (`failed`); `ended` holds the End's status and `end_message` its message. With `device` (a computer's id, as `list_profiles` gives it), its steps run on that computer wherever the run runs.
 
 Outcomes: `pass`, `fail`, `stopped`; with `each`: `done`, `halted`, `stopped`. Outputs: `outcome`, `ended`, `end_message`, `visit`; with `each`: `outcome`, `done_count`, `failed_count`, `blocked_count`, `waiting_count`, `summary`, `results`, `visit`.
 
@@ -258,7 +258,7 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 
 ## Checklist
 
-- `version` is 7, `start` names a node, every edge connects known nodes on an outcome its source can end with.
+- `version` is 8, `start` names a node, every edge connects known nodes on an outcome its source can end with.
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with `max`.
 - A flow of more than about six nodes has Sections, one per phase, without warnings.
@@ -268,7 +268,7 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 
 ```json
 {
- "version": 7,
+ "version": 8,
  "description": "Builds a task, runs the tests, fixes failures, then asks.",
  "inputs": [
   {
@@ -424,7 +424,7 @@ This one calls the flow `build-task`, which takes an input `item`.
 
 ```json
 {
- "version": 7,
+ "version": 8,
  "description": "Plans a feature, then builds each task in its own branch.",
  "inputs": [
   {

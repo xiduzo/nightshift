@@ -1,5 +1,10 @@
 import type { Flow, FlowNode } from "../flow";
-import { isProfileRef, type ServiceNode, serviceSection } from "../nodes";
+import {
+	deviceIdOf,
+	isProfileRef,
+	type ServiceNode,
+	serviceSection,
+} from "../nodes";
 import { profileOf } from "../profiles";
 import { nodesWithin, sectionPath } from "../sections";
 import type { Report } from "./issues";
@@ -7,7 +12,7 @@ import type { Report } from "./issues";
 /**
  * One Device per service (ADR 9): every step in a Service node's scope
  * runs on the service's Device, so it reaches the service. A flow tells
- * only part of where a step runs: a Device by name, a profile's Device by
+ * only part of where a step runs: a Device by id, a profile's Device by
  * id, or the run's Device. This check errors where the flow alone shows
  * two different Devices. Run start checks the rest, with the Devices it
  * placed the steps on.
@@ -20,8 +25,12 @@ export function checkServicePlacement(flow: Flow, error: Report): void {
 			if (node.id === service.id || !runsOnDevice(node)) continue;
 			const there = placeOf(node);
 			if (!differs(own, there)) continue;
+			const where =
+				there.kind === "device" && own.kind === "device"
+					? `Node "${node.id}" and the service "${service.id}" name different devices.`
+					: `Node "${node.id}" runs on ${words(there)}, but the service "${service.id}" runs on ${words(own)}.`;
 			error(
-				`Node "${node.id}" runs on ${words(there)}, but the service "${service.id}" runs on ${words(own)}. Every step while the service runs must run on its device. Give them the same device.`,
+				`${where} Every step while the service runs must run on its device. Give them the same device.`,
 				{ nodeId: node.id },
 			);
 		}
@@ -30,16 +39,15 @@ export function checkServicePlacement(flow: Flow, error: Report): void {
 
 /** Where a node runs, as far as the flow says. */
 type Place =
-	| { kind: "name"; name: string }
+	| { kind: "device"; device: string }
 	| { kind: "profile"; device: string }
 	| { kind: "run" };
 
 function placeOf(node: FlowNode): Place {
 	const profile = profileOf(node);
 	if (isProfileRef(profile)) return { kind: "profile", device: profile.device };
-	if ("device" in node && node.device !== undefined) {
-		return { kind: "name", name: node.device };
-	}
+	const device = "device" in node ? deviceIdOf(node.device) : undefined;
+	if (device !== undefined) return { kind: "device", device };
 	return { kind: "run" };
 }
 
@@ -48,14 +56,16 @@ function differs(a: Place, b: Place): boolean {
 	if (a.kind === "profile" && b.kind === "profile")
 		return a.device !== b.device;
 	if (a.kind === "profile" || b.kind === "profile") return false;
-	if (a.kind === "name" && b.kind === "name") return a.name !== b.name;
+	if (a.kind === "device" && b.kind === "device") {
+		return a.device !== b.device;
+	}
 	return a.kind !== b.kind;
 }
 
 function words(place: Place): string {
 	switch (place.kind) {
-		case "name":
-			return `the device "${place.name}"`;
+		case "device":
+			return "the device it names";
 		case "profile":
 			return "the device of its profile";
 		case "run":

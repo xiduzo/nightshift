@@ -49,7 +49,7 @@ afterEach(async () => {
 });
 
 const echoFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [
 		{ name: "pr", type: "text" },
 		{ name: "body", type: "json" },
@@ -70,7 +70,7 @@ const echoFlow: Flow = {
 
 /** Waits for the signal `ci-done` with the run's own `pr` as the key. */
 const waitFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [{ name: "pr", type: "text" }],
 	outputs: [],
 	start: "ci",

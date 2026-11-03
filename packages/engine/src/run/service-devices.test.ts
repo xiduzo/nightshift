@@ -41,7 +41,7 @@ function plan(
 	sections: Flow["sections"] = undefined,
 ): PlannedRun {
 	const flow: Flow = {
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: "stack",

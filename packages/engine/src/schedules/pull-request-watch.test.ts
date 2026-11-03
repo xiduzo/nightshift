@@ -24,7 +24,7 @@ const PR = "https://github.com/acme/app/pull/12";
 const MERGE_SHA = "0123456789abcdef0123456789abcdef01234567";
 
 const openerFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [{ name: "pr", type: "text" }],
 	outputs: [],
 	start: "open",

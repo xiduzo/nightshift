@@ -6,7 +6,7 @@ import { type AgentNode, knowledgeFolderPath } from "./agent";
 
 function flowWith(knowledge: AgentNode["knowledge"]): Flow {
 	return {
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: "reader",

@@ -9,7 +9,7 @@ import {
 	tierNode,
 } from "../flow";
 import { isKitName } from "../kits";
-import { isPersonTier, reservedNames } from "../nodes";
+import { isPersonTier, legacyDeviceName, reservedNames } from "../nodes";
 import { checkBranches } from "./branches";
 import { checkCall, type ErrorsOf } from "./calls";
 import { findCycles } from "./cycles";
@@ -104,7 +104,14 @@ function validateIn(
 			node.by !== "model"
 		) {
 			error(
-				`Node "${node.id}" names the device "${node.device}", but ${node.type === "decision" ? (node.by === "person" ? "you decide it" : "a rule decides it") : "a rule makes it"}. Only a model runs on a device. Remove the device.`,
+				`Node "${node.id}" names a device, but ${node.type === "decision" ? (node.by === "person" ? "you decide it" : "a rule decides it") : "a rule makes it"}. Only a model runs on a device. Remove the device.`,
+				{ nodeId: node.id },
+			);
+		}
+		const oldName = "device" in node ? legacyDeviceName(node.device) : null;
+		if (oldName !== null) {
+			error(
+				`Node "${node.id}" names the device "${oldName}", but Night Shift cannot tell which device that is. Choose the device again.`,
 				{ nodeId: node.id },
 			);
 		}

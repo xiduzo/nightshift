@@ -149,7 +149,7 @@ function edge(
 }
 
 function flow(nodes: FlowNode[], edges: FlowEdge[], start = "worker"): Flow {
-	return { version: 7, inputs: [], outputs: [], start, nodes, edges };
+	return { version: 8, inputs: [], outputs: [], start, nodes, edges };
 }
 
 const errors = (issues: FlowIssue[]) =>
@@ -1133,7 +1133,7 @@ describe("parseFlow", () => {
 
 	test("turns schema errors into one issue per zod issue, with the path", () => {
 		const result = parseFlow({
-			version: 7,
+			version: 8,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
 			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
@@ -2113,7 +2113,7 @@ describe("validateFlow: Call", () => {
 describe("parseFlow with options", () => {
 	test("passes the options to validateFlow", () => {
 		const json = {
-			version: 7,
+			version: 8,
 			start: "each",
 			nodes: [
 				{
@@ -2150,7 +2150,7 @@ describe("parseFlow with options", () => {
 		});
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow).toMatchObject({
-			version: 7,
+			version: 8,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});
@@ -2608,7 +2608,7 @@ describe("validateFlow: devices", () => {
 			[],
 		);
 		expect(errors(validateFlow(gate)).map((e) => e.message)).toEqual([
-			'Node "worker" names the device "studio", but you decide it. Only a model runs on a device. Remove the device.',
+			'Node "worker" names a device, but you decide it. Only a model runs on a device. Remove the device.',
 		]);
 	});
 
@@ -3063,11 +3063,17 @@ describe("the Service node", () => {
 		expect(elsewhere(onBox)).toEqual([
 			[
 				"work",
-				'Node "work" runs on the device "box", but the service "stack" runs on the run\'s device. Every step while the service runs must run on its device. Give them the same device.',
+				'Node "work" runs on the device it names, but the service "stack" runs on the run\'s device. Every step while the service runs must run on its device. Give them the same device.',
 			],
 		]);
 		expect(elsewhere(onBox, { device: "box" })).toEqual([]);
 		expect(elsewhere(command("work"), { device: "box" })).toHaveLength(1);
+		expect(elsewhere(onBox, { device: "studio" })).toEqual([
+			[
+				"work",
+				'Node "work" and the service "stack" name different devices. Every step while the service runs must run on its device. Give them the same device.',
+			],
+		]);
 	});
 
 	test("given a step on another device outside its Section, then the flow has no issues", () => {

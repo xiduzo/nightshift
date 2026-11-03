@@ -148,7 +148,7 @@ function edge(
 
 function flowOf(nodes: Flow["nodes"], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

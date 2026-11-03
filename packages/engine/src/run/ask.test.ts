@@ -111,7 +111,7 @@ function flowOf(nodes: Flow["nodes"]): Flow {
 		to: node.id,
 	}));
 	return {
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: "designer",

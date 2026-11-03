@@ -34,7 +34,7 @@ let stop: () => Promise<void>;
 
 /** One command that counts its runs in a kept variable. */
 const countFlow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "count",

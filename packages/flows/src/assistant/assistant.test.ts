@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { chatRequestSchema, suggestionRequestSchema } from "./assistant";
 
 const flow = {
-	version: 7,
+	version: 8,
 	start: "plan",
 	nodes: [
 		{

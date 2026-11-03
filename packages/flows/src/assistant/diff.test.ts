@@ -3,7 +3,7 @@ import { type Flow, type FlowInput, flowSchema } from "../flow";
 import { diffFlows, flowDiffSummary } from "./diff";
 
 const base: FlowInput = {
-	version: 7,
+	version: 8,
 	description: "Builds and checks.",
 	inputs: [{ name: "task", type: "text" }],
 	outputs: [{ name: "summary", value: "{{build.summary}}" }],

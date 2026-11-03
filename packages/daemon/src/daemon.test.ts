@@ -97,7 +97,7 @@ async function rpc<T>(daemon: Daemon, path: string, input?: unknown) {
 
 /** One Command node: what the Host's run walks. */
 const echoFlow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "echo",

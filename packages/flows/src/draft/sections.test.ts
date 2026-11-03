@@ -12,7 +12,7 @@ const command = (id: string) => ({
 
 /** a → b → c → d. */
 const chain: Flow = flowSchema.parse({
-	version: 7,
+	version: 8,
 	start: "a",
 	nodes: ["a", "b", "c", "d"].map(command),
 	edges: [

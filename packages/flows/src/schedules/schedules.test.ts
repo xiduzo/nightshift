@@ -77,10 +77,10 @@ describe("scheduleSchema", () => {
 		expect(lateMinutesOf(schedule({ lateMinutes: 1440 }))).toBe(1440);
 	});
 
-	test("the file has version 1", () => {
-		expect(schedulesFileSchema.safeParse({ version: 2 }).success).toBe(false);
-		expect(schedulesFileSchema.parse({ version: 1 })).toEqual({
-			version: 1,
+	test("the file has version 2", () => {
+		expect(schedulesFileSchema.safeParse({ version: 1 }).success).toBe(false);
+		expect(schedulesFileSchema.parse({ version: 2 })).toEqual({
+			version: 2,
 			schedules: [],
 		});
 	});

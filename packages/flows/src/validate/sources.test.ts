@@ -67,7 +67,7 @@ describe("listFlowSources", () => {
 				errorCount: 1,
 				inputs: quick().inputs,
 				callers: [],
-				devices: { names: [], ids: [] },
+				devices: { ids: [] },
 				nodeTypes: [{ type: "agent", count: 1 }],
 				gateCount: 0,
 			},
@@ -79,7 +79,7 @@ describe("listFlowSources", () => {
 				errorCount: 1,
 				inputs: [],
 				callers: [],
-				devices: { names: [], ids: [] },
+				devices: { ids: [] },
 				nodeTypes: [],
 				gateCount: 0,
 			},
@@ -91,7 +91,7 @@ describe("listFlowSources", () => {
 				errorCount: 0,
 				inputs: quick().inputs,
 				callers: ["zeta"],
-				devices: { names: [], ids: [] },
+				devices: { ids: [] },
 				nodeTypes: [{ type: "agent", count: 1 }],
 				gateCount: 0,
 			},
@@ -103,7 +103,7 @@ describe("listFlowSources", () => {
 				errorCount: 0,
 				inputs: [],
 				callers: [],
-				devices: { names: [], ids: [] },
+				devices: { ids: [] },
 				nodeTypes: [{ type: "call", count: 1 }],
 				gateCount: 0,
 			},
@@ -255,32 +255,35 @@ describe("devicesOf", () => {
 		})),
 	});
 
-	test("names the Devices of the flow and of the flows it calls, once each, sorted", () => {
+	test("names the Devices of the flow and of the flows it calls by id, once each, sorted", () => {
 		expect(
-			devicesOf("zeta", { zeta: caller(), quick: placed("studio") }),
-		).toEqual({ names: ["studio"], ids: [] });
-		expect(devicesOf("quick", { quick: placed("hetzner-1") })).toEqual({
-			names: ["hetzner-1"],
-			ids: [],
+			devicesOf("zeta", { zeta: caller(), quick: placed("studio-id") }),
+		).toEqual({ ids: ["studio-id"] });
+		expect(devicesOf("quick", { quick: placed("hetzner-id") })).toEqual({
+			ids: ["hetzner-id"],
 		});
 	});
 
 	test("a node's profile names its Device by id, not the node's device", () => {
 		expect(devicesOf("quick", { quick: profiled() })).toEqual({
-			names: [],
 			ids: ["device-id"],
 		});
 	});
 
+	test("a name left from before ids names no Device", () => {
+		const old: Flow = {
+			...quick(),
+			nodes: quick().nodes.map((node) => ({
+				...node,
+				device: { name: "LE2316" },
+			})),
+		};
+		expect(devicesOf("quick", { quick: old })).toEqual({ ids: [] });
+	});
+
 	test("a flow that names no Device, or does not load, needs none", () => {
-		expect(devicesOf("quick", { quick: quick() })).toEqual({
-			names: [],
-			ids: [],
-		});
-		expect(devicesOf("broken", { broken: null })).toEqual({
-			names: [],
-			ids: [],
-		});
+		expect(devicesOf("quick", { quick: quick() })).toEqual({ ids: [] });
+		expect(devicesOf("broken", { broken: null })).toEqual({ ids: [] });
 	});
 });
 

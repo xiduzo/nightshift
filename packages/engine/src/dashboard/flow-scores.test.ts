@@ -45,7 +45,7 @@ afterEach(async () => {
 
 /** Replicates a paper: `held` is whether it held up after publication. */
 const replicateFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [{ name: "held", type: "text" }],
 	outputs: [],
 	start: "replicate",

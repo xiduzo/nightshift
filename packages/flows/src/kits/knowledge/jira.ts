@@ -12,7 +12,7 @@ const WORK_ITEM_MARKDOWN = String.raw`def adf: if type == "string" then . elif t
  * knowledge, with the Atlassian CLI (`acli`) and `jq`.
  */
 export const knowledgeJiraKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description:
 		"Copies Jira work items into the project's knowledge as markdown, one file each. Needs a CLI tool that runs the Atlassian CLI signed in, and jq.",
 	inputs: [

@@ -14,7 +14,7 @@ accepted="$NS_KNOWLEDGE/learnings/accepted"`;
  * waited stays for the next review.
  */
 export const knowledgeReviewLearningsKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description:
 		"Shows what agents proposed to learn about the project, and asks you to keep or delete it. Agents read what you keep.",
 	inputs: [],

@@ -12,7 +12,7 @@ const command = (id: string) => ({
 /** a → b → c → d, and a fails to e. */
 const flowWith = (sections: FlowSection[]): Flow =>
 	flowSchema.parse({
-		version: 7,
+		version: 8,
 		start: "a",
 		nodes: ["a", "b", "c", "d", "e"].map(command),
 		edges: [

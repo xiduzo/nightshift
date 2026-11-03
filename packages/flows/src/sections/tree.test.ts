@@ -20,7 +20,7 @@ const command = (id: string) => ({
  * a → b → c → d → e. Outer holds b and Inner; Inner holds c and d.
  */
 const nested: Flow = flowSchema.parse({
-	version: 7,
+	version: 8,
 	start: "a",
 	nodes: ["a", "b", "c", "d", "e"].map(command),
 	edges: [

@@ -78,7 +78,7 @@ function call(extra: Partial<CallNode> = {}): CallNode {
 
 function flow(nodes: FlowNode[], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 7,
+		version: 8,
 		inputs: [{ name: "issue", type: "text" }],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -91,7 +91,7 @@ const errors = (issues: FlowIssue[]) =>
 	issues.filter((issue) => issue.severity === "error").map((i) => i.message);
 
 const body = (...inputs: string[]): Flow => ({
-	version: 7,
+	version: 8,
 	inputs: inputs.map((name) => ({ name, type: "text" as const })),
 	outputs: [],
 	start: "work",

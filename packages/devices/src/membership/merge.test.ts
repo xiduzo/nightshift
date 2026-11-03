@@ -69,7 +69,7 @@ afterEach(async () => {
 
 /** One command step: a run that ends on its own. */
 const quickFlow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "hello",

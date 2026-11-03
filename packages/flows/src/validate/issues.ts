@@ -61,9 +61,7 @@ export type FlowListItem = FlowFile & {
  * flow does not name.
  */
 export type FlowDevices = {
-	/** The Devices nodes name (`device`), sorted. */
-	names: string[];
-	/** The Devices of the nodes' profiles, by the Device's id, sorted. */
+	/** The Devices of the nodes (`device`) and of their profiles, by the Device's id, sorted. */
 	ids: string[];
 };
 

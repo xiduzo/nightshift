@@ -63,7 +63,7 @@ const MAX_WAKES = 200;
  * need the checks of a commit.
  */
 export const watchPrKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description: `Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue. It reads the checks, the review and the merge queue every ${EVERY_MINUTES} minutes. To wake it as soon as GitHub reports a change, add a webhook schedule that sends the signal pr-changed with the pull request number as its key.`,
 	inputs: [
 		{

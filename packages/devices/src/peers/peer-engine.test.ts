@@ -40,7 +40,7 @@ afterEach(async () => {
 
 /** A command, then a Gate: the run waits with a step that has a transcript. */
 const gateFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "hello",

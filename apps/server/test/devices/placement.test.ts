@@ -77,7 +77,7 @@ function repo(name: string): string {
 async function saveFlow(name: string, nodes: unknown[], edges: unknown[] = []) {
 	await seedFlows(savesOn(a), projectId, {
 		[name]: {
-			version: 7,
+			version: 8,
 			inputs: [],
 			outputs: [],
 			start: (nodes[0] as { id: string }).id,

@@ -9,7 +9,7 @@ import {
 } from "./apply";
 
 const flow: Flow = flowSchema.parse({
-	version: 7,
+	version: 8,
 	start: "plan",
 	inputs: [{ name: "ticket", type: "text" }],
 	variables: [{ name: "tries", type: "number" }],

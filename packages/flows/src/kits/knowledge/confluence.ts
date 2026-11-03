@@ -17,7 +17,7 @@ const PAGE_MARKDOWN = String.raw`"# \(.title)\n\n" + ((.body.storage.value // ""
  * is a secret the command reads.
  */
 export const knowledgeConfluenceKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description: `Copies Confluence pages into the project's knowledge as markdown, one file each. Save an Atlassian API token as the secret ${TOKEN}. Needs jq.`,
 	inputs: [
 		{

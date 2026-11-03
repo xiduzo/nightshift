@@ -38,7 +38,7 @@ const designer: FlowNode = {
 
 function flow(nodes: FlowNode[]): Flow {
 	return {
-		version: 7,
+		version: 8,
 		inputs: [{ name: "issue", type: "text" }],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

@@ -15,7 +15,7 @@ import { terminalResources } from "./terminal-resources";
 import type { TerminalGate, TerminalRunSummary } from "./terminal-runs";
 
 const flow: Flow = flowSchema.parse({
-	version: 7,
+	version: 8,
 	inputs: [{ name: "issue", type: "text" }],
 	outputs: [],
 	start: "build",

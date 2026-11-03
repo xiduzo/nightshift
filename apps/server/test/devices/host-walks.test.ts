@@ -96,7 +96,7 @@ beforeAll(async () => {
 	// One command that counts the runs of the flow in a kept variable.
 	await seedFlows(savesOn(a), projectId, {
 		count: {
-			version: 7,
+			version: 8,
 			inputs: [],
 			outputs: [],
 			start: "count",

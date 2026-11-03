@@ -34,7 +34,7 @@ import { trackedState } from "./legacy-folder";
 /** A flow of one Command node that says `word`, and calls `calls` after it when given. */
 function flow(word: string, calls?: string): Flow {
 	return flowSchema.parse({
-		version: 7,
+		version: 8,
 		inputs: [],
 		outputs: [],
 		start: "say",

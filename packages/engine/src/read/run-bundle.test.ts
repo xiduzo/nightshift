@@ -55,7 +55,7 @@ const check: CommandNode = {
 	output: "text",
 };
 const flow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "work",

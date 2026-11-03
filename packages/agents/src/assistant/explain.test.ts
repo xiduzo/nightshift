@@ -10,7 +10,7 @@ const run: AuthoringRun = {
 	reason: "The step `test` failed.",
 	inputs: {},
 	flow: flowSchema.parse({
-		version: 7,
+		version: 8,
 		inputs: [],
 		start: "test",
 		nodes: [

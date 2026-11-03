@@ -7,7 +7,7 @@ import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
  * one takes the newest pages. A private wiki needs git signed in to GitHub.
  */
 export const knowledgeGithubWikiKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description:
 		"Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync. A private wiki needs git signed in to GitHub.",
 	inputs: [

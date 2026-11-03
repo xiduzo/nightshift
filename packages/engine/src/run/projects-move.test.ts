@@ -127,7 +127,7 @@ const gate: DecisionNode = {
 
 /** One Gate: the run waits with a step and events. */
 const flow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "ship",

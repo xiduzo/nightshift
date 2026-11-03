@@ -4,7 +4,7 @@ import type { FlowIssue } from "../validate";
 import { proposalIssues } from "./proposal";
 
 const valid: FlowInput = {
-	version: 7,
+	version: 8,
 	inputs: [{ name: "task", type: "text" }],
 	start: "build",
 	nodes: [
@@ -29,7 +29,7 @@ const valid: FlowInput = {
 };
 
 const draft: Flow = flowSchema.parse({
-	version: 7,
+	version: 8,
 	start: "only",
 	nodes: [
 		{
@@ -56,7 +56,7 @@ describe("proposalIssues", () => {
 		for (const proposal of [null, "flow", { ...valid, version: 4 }, {}]) {
 			const issues = proposalIssues(draft, proposal);
 			expect(issues).toHaveLength(1);
-			expect(issues[0]?.message).toContain('"version": 7');
+			expect(issues[0]?.message).toContain('"version": 8');
 		}
 	});
 
@@ -129,7 +129,7 @@ describe("proposalIssues", () => {
 
 	test("a Call node checks the flows of the project", () => {
 		const proposal: FlowInput = {
-			version: 7,
+			version: 8,
 			start: "sub",
 			nodes: [
 				{
@@ -148,7 +148,7 @@ describe("proposalIssues", () => {
 
 	test("a flow that calls itself, by its own name", () => {
 		const proposal: FlowInput = {
-			version: 7,
+			version: 8,
 			start: "again",
 			nodes: [
 				{ id: "again", type: "call", position: { x: 0, y: 0 }, flow: "me" },

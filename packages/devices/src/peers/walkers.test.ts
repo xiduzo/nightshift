@@ -38,7 +38,7 @@ const HOST = "the-host";
 
 /** A Gate: the run waits, so the open Gates name its Walker too. */
 const gateFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "ship",

@@ -138,7 +138,7 @@ describe("pickAgent", () => {
 });
 
 const flow: FlowInput = {
-	version: 7,
+	version: 8,
 	inputs: [{ name: "issue", type: "text" }],
 	start: "plan",
 	nodes: [

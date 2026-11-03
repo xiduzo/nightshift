@@ -6,7 +6,7 @@ import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
  * through the free reader at r.jina.ai, with `curl`. No account.
  */
 export const knowledgeWebKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description:
 		"Copies web pages into the project's knowledge as markdown. It needs no account. Each page gets a file named after its address.",
 	inputs: [

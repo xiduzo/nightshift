@@ -17,7 +17,7 @@ import {
 import { suggestionPrompt } from "./suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
-	version: 7,
+	version: 8,
 	start: "review",
 	inputs: [{ name: "pr", type: "text" }],
 	nodes: [

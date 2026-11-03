@@ -11,7 +11,7 @@ export const FOLDER_MAX_FILES = 5000;
  * Hidden files and folders stay out. It replaces what the folder had.
  */
 export const knowledgeFolderKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description:
 		"Copies a folder of this computer into the project's knowledge, such as notes outside the project. It replaces what the folder had.",
 	inputs: [

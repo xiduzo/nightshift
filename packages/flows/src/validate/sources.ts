@@ -6,7 +6,12 @@ import {
 	flowSchema,
 	migrateFlow,
 } from "../flow";
-import { calledFlowNames, flowNameSchema, isProfileRef } from "../nodes";
+import {
+	calledFlowNames,
+	deviceIdOf,
+	flowNameSchema,
+	isProfileRef,
+} from "../nodes";
 import { nodeProfiles } from "../profiles";
 import type { ScheduleFlowInfo } from "../schedules";
 import { parseFlow } from "./flow";
@@ -137,10 +142,9 @@ function nodesOf(
 /**
  * The Devices `name` and the flows it calls run on, as run start places
  * their nodes: a node's profile names its Device, else the node's
- * `device`. Each called flow counts once.
+ * `device`, each by the Device's id. Each called flow counts once.
  */
 export function devicesOf(name: string, flows: ProjectFlowMap): FlowDevices {
-	const names = new Set<string>();
 	const ids = new Set<string>();
 	const seen = new Set<string>();
 	const walk = (flowName: string) => {
@@ -149,14 +153,13 @@ export function devicesOf(name: string, flows: ProjectFlowMap): FlowDevices {
 		for (const node of flows[flowName]?.nodes ?? []) {
 			const profiles = nodeProfiles(node).filter(isProfileRef);
 			for (const profile of profiles) ids.add(profile.device);
-			if (profiles.length === 0 && "device" in node && node.device) {
-				names.add(node.device);
-			}
+			const device = "device" in node ? deviceIdOf(node.device) : undefined;
+			if (profiles.length === 0 && device !== undefined) ids.add(device);
 			if (node.type === "call") calledFlowNames(node).forEach(walk);
 		}
 	};
 	walk(name);
-	return { names: [...names].sort(), ids: [...ids].sort() };
+	return { ids: [...ids].sort() };
 }
 
 /**

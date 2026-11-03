@@ -46,6 +46,7 @@ export {
 	variableTypeSchema,
 } from "./flow";
 export {
+	deviceRefOfName,
 	type FlowMigration,
 	migrateFlow,
 	migrateToolSets,

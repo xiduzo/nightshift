@@ -93,7 +93,7 @@ function repo(name: string): string {
 async function saveFlow(name: string, agent: Record<string, unknown>) {
 	await seedFlows(savesOn(a), projectId, {
 		[name]: {
-			version: 7,
+			version: 8,
 			inputs: [],
 			outputs: [],
 			start: "work",

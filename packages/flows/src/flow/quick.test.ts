@@ -11,7 +11,7 @@ describe("singleAgentFlow", () => {
 			permissionMode: "acceptEdits",
 		});
 		expect(flow).toEqual({
-			version: 7,
+			version: 8,
 			inputs: [],
 			outputs: [],
 			start: "agent",

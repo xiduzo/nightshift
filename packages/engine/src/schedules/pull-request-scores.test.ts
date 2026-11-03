@@ -136,7 +136,7 @@ afterEach(async () => {
 
 /** Opens the pull request `{{pr}}`: `gh pr create` prints its address last. */
 const openerFlow: Flow = {
-	version: 7,
+	version: 8,
 	inputs: [{ name: "pr", type: "text" }],
 	outputs: [],
 	start: "open",

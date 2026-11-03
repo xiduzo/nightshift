@@ -211,7 +211,7 @@ const noPairing = new Proxy({} as Auth, {
 
 /** A command, then a Gate. */
 const gateFlow = {
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: "hello",

@@ -8,7 +8,7 @@ import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
  * such as `docs/private/`, become knowledge without a commit.
  */
 export const knowledgeFilesKit: FlowInput = {
-	version: 7,
+	version: 8,
 	description:
 		"Copies files of the project into its knowledge, also files that git ignores, such as private notes. It replaces what the folder had.",
 	inputs: [

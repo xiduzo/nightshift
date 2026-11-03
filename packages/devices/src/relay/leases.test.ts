@@ -46,7 +46,7 @@ const edge = (from: string, outcome: string, to: string): FlowEdge => ({
 	to,
 });
 const flowOf = (nodes: FlowNode[], edges: FlowEdge[]): Flow => ({
-	version: 7,
+	version: 8,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",
