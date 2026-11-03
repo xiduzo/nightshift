@@ -252,3 +252,30 @@ export const spaceSplit = sqliteTable("space_split", {
 	createdAt: createdAt(),
 	updatedAt: updatedAt(),
 });
+
+// Owner: `@nightshift/devices`, `secrets/` (ADR 13).
+
+/**
+ * A Personal Secret a Person keeps here: on their Home Host, or on a
+ * computer without one. The value is encrypted at rest with AES-GCM under
+ * this computer's secrets key (`NIGHTSHIFT_SECRETS_KEY`, else a file in
+ * the data folder), bound to its owner and name. Nobody reads a value
+ * back through the UI: it goes to the steps of its owner's own Devices.
+ */
+export const personalSecret = sqliteTable(
+	"personal_secret",
+	{
+		/** The Person whose secret it is, as this computer knows them. */
+		ownerId: text("owner_id").notNull(),
+		/** Its `${NAME}`. */
+		name: text("name").notNull(),
+		/** The value, encrypted, in base64. */
+		ciphertext: text("ciphertext").notNull(),
+		/** The AES-GCM nonce of `ciphertext`, in base64: a new one per write. */
+		iv: text("iv").notNull(),
+		setAt: integer("set_at", { mode: "timestamp_ms" }).notNull(),
+		/** The Device that set it last. */
+		setBy: text("set_by"),
+	},
+	(table) => [primaryKey({ columns: [table.ownerId, table.name] })],
+);

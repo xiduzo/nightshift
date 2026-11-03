@@ -12,10 +12,17 @@ export { openConfigStores } from "./config-stores";
 export type {
 	Connection,
 	ConnectionStore,
+	PersonalSecrets,
+	SecretScope,
 	SecretSource,
+	SecretUse,
 	SecretView,
 } from "./connections";
-export { connectionInputSchema, secretStore } from "./connections";
+export {
+	connectionInputSchema,
+	PERSONAL_UNREACHABLE,
+	secretStore,
+} from "./connections";
 export {
 	createDeviceCopies,
 	type DeviceCopies,

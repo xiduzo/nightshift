@@ -5,6 +5,7 @@ import {
 	type ConnectionInput,
 	type ConnectionStore,
 	createConnectionStore,
+	type PersonalSecrets,
 	referencedVariables,
 	type SecretBackend,
 } from "./connections";
@@ -64,6 +65,11 @@ async function savedNow() {
 		connections: [...document.connections.keys()].sort(),
 		secrets: secrets.map((s) => s.name),
 	};
+}
+
+/** The rows of the Secrets page. */
+async function listed(store: ConnectionStore, named?: Iterable<string>) {
+	return (await store.secrets(named)).secrets;
 }
 
 /** A clock a test moves by hand. */
@@ -259,35 +265,52 @@ describe("secrets", () => {
 		await store.setSecret("ORPHAN", "o");
 
 		const never = { setAt: null, usedAt: null };
-		expect(store.secrets()).toEqual([
-			{
-				name: "DOCS_TOKEN",
-				saved: true,
-				inEnv: false,
-				usedBy: ["docs", "wiki"],
-				setAt: 5000,
-				usedAt: null,
-			},
-			{
-				name: "ORPHAN",
-				saved: true,
-				inEnv: false,
-				usedBy: [],
-				setAt: 5000,
-				usedAt: null,
-			},
-			{ name: "TEAM", saved: false, inEnv: true, usedBy: ["docs"], ...never },
-			{
-				name: "TRACKER_TOKEN",
-				saved: false,
-				inEnv: false,
-				usedBy: ["tracker"],
-				...never,
-			},
-		]);
+		const scope = "computer";
+		expect(await store.secrets()).toEqual({
+			personal: "available",
+			secrets: [
+				{
+					name: "DOCS_TOKEN",
+					scope,
+					saved: true,
+					inEnv: false,
+					usedBy: ["docs", "wiki"],
+					setAt: 5000,
+					usedAt: null,
+				},
+				{
+					name: "ORPHAN",
+					scope,
+					saved: true,
+					inEnv: false,
+					usedBy: [],
+					setAt: 5000,
+					usedAt: null,
+				},
+				{
+					name: "TEAM",
+					scope,
+					saved: false,
+					inEnv: true,
+					usedBy: ["docs"],
+					...never,
+				},
+				{
+					name: "TRACKER_TOKEN",
+					scope,
+					saved: false,
+					inEnv: false,
+					usedBy: ["tracker"],
+					...never,
+				},
+			],
+		});
 		// A name only a Command node uses is listed too.
 		expect(
-			store.secrets(["ZAC_USER", "TEAM"]).map((s) => [s.name, s.usedBy]),
+			(await listed(store, ["ZAC_USER", "TEAM"])).map((s) => [
+				s.name,
+				s.usedBy,
+			]),
 		).toEqual([
 			["DOCS_TOKEN", ["docs", "wiki"]],
 			["ORPHAN", []],
@@ -325,7 +348,7 @@ describe("secrets", () => {
 	test("setSecret accepts a name with _ and digits", async () => {
 		const { store } = await makeStore();
 		await store.setSecret("_my_token_2", "v");
-		expect(store.secrets().map((s) => s.name)).toEqual(["_my_token_2"]);
+		expect((await listed(store)).map((s) => s.name)).toEqual(["_my_token_2"]);
 	});
 
 	test("setSecret refuses an empty value", async () => {
@@ -335,7 +358,7 @@ describe("secrets", () => {
 			"A secret needs a value.",
 		);
 		expect(secrets.values.size).toBe(0);
-		expect(store.secrets()).toEqual([]);
+		expect(await listed(store)).toEqual([]);
 	});
 
 	test("removeSecret deletes the value and the name; the environment takes over", async () => {
@@ -349,9 +372,10 @@ describe("secrets", () => {
 		expect(store.get("tracker")?.variables).toEqual([
 			{ name: "TRACKER_TOKEN", source: "env" },
 		]);
-		expect(store.secrets()).toEqual([
+		expect(await listed(store)).toEqual([
 			{
 				name: "TRACKER_TOKEN",
+				scope: "computer",
 				saved: false,
 				inEnv: true,
 				usedBy: ["tracker"],
@@ -392,25 +416,34 @@ describe("when a secret was set and used", () => {
 		});
 		return { store, document, clock, secrets };
 	}
-	function times(store: ConnectionStore, name: string) {
-		const found = store.secrets([name]).find((s) => s.name === name);
+	async function times(store: ConnectionStore, name: string) {
+		const found = (await listed(store, [name])).find((s) => s.name === name);
 		return found && { setAt: found.setAt, usedAt: found.usedAt };
 	}
 
 	test("setting a value records when; setting it again moves it; a restart keeps it", async () => {
 		const { store, document, clock, secrets } = await timedStore();
 		await store.setSecret("TOKEN", "one");
-		expect(times(store, "TOKEN")).toEqual({ setAt: 1_000_000, usedAt: null });
+		expect(await times(store, "TOKEN")).toEqual({
+			setAt: 1_000_000,
+			usedAt: null,
+		});
 		clock.advance(5000);
 		await store.setSecret("TOKEN", "two");
-		expect(times(store, "TOKEN")).toEqual({ setAt: 1_005_000, usedAt: null });
+		expect(await times(store, "TOKEN")).toEqual({
+			setAt: 1_005_000,
+			usedAt: null,
+		});
 		expect(document.facts.get("secrets")).toEqual([
 			{ name: "TOKEN", setAt: 1_005_000 },
 		]);
 
 		await document.flush();
 		const { store: again } = await makeStore({}, secrets);
-		expect(times(again, "TOKEN")).toEqual({ setAt: 1_005_000, usedAt: null });
+		expect(await times(again, "TOKEN")).toEqual({
+			setAt: 1_005_000,
+			usedAt: null,
+		});
 	});
 
 	test("removing a secret removes its times; the environment's use starts over", async () => {
@@ -420,8 +453,8 @@ describe("when a secret was set and used", () => {
 		clock.advance(1000);
 		await store.secretEnv(["TOKEN", "OTHER"]);
 		await store.removeSecret("TOKEN");
-		expect(times(store, "TOKEN")).toEqual({ setAt: null, usedAt: null });
-		expect(times(store, "OTHER")).toEqual({
+		expect(await times(store, "TOKEN")).toEqual({ setAt: null, usedAt: null });
+		expect(await times(store, "OTHER")).toEqual({
 			setAt: 1_000_000,
 			usedAt: 1_001_000,
 		});
@@ -442,7 +475,9 @@ describe("when a secret was set and used", () => {
 			secrets: memorySecrets({ OLD_TOKEN: "old" }).backend,
 			now: testClock().now,
 		});
-		expect(store.secrets().map((s) => [s.name, s.saved, s.setAt])).toEqual([
+		expect(
+			(await listed(store)).map((s) => [s.name, s.saved, s.setAt]),
+		).toEqual([
 			["NEWER", true, 7],
 			["OLD_TOKEN", true, null],
 		]);
@@ -467,24 +502,25 @@ describe("when a secret was set and used", () => {
 			await store.setSecret(name, "v");
 		}
 		await store.setSecret("UNUSED", "u");
-		const usedAt = (name: string) => times(store, name)?.usedAt ?? null;
+		const usedAt = async (name: string) =>
+			(await times(store, name))?.usedAt ?? null;
 
 		// Reading for the list, the source, or to mask a run is not a use.
 		store.list();
 		store.secretSource("TRACKER_TOKEN");
 		await store.secretValues();
-		expect(store.secrets().every((s) => s.usedAt === null)).toBe(true);
+		expect((await listed(store)).every((s) => s.usedAt === null)).toBe(true);
 
 		clock.advance(1000); // an Agent node's or a Tool node's MCP server
 		await store.mcpServersFor({ connections: ["tracker"] });
-		expect(usedAt("TRACKER_TOKEN")).toBe(1_001_000);
-		expect(usedAt("DOCS_TOKEN")).toBeNull();
+		expect(await usedAt("TRACKER_TOKEN")).toBe(1_001_000);
+		expect(await usedAt("DOCS_TOKEN")).toBeNull();
 
 		clock.advance(1000); // a connection test
 		await store.expandForTest({ name: "docs" });
-		expect(usedAt("DOCS_TOKEN")).toBe(1_002_000);
+		expect(await usedAt("DOCS_TOKEN")).toBe(1_002_000);
 		// A variable from the environment counts too.
-		expect(usedAt("TEAM")).toBe(1_002_000);
+		expect(await usedAt("TEAM")).toBe(1_002_000);
 
 		clock.advance(1000); // a custom agent's environment
 		// Its values are the session's to hide, from the environment too.
@@ -492,17 +528,17 @@ describe("when a secret was set and used", () => {
 			ok: true,
 			values: ["e"],
 		});
-		expect(usedAt("FROM_ENV")).toBe(1_003_000);
+		expect(await usedAt("FROM_ENV")).toBe(1_003_000);
 
 		clock.advance(1000); // a Command node's secrets
 		await store.secretEnv(["CMD"]);
-		expect(usedAt("CMD")).toBe(1_004_000);
+		expect(await usedAt("CMD")).toBe(1_004_000);
 
 		clock.advance(1000); // a decider's API key
 		await store.secret("API_KEY");
-		expect(usedAt("API_KEY")).toBe(1_005_000);
+		expect(await usedAt("API_KEY")).toBe(1_005_000);
 
-		expect(usedAt("UNUSED")).toBeNull();
+		expect(await usedAt("UNUSED")).toBeNull();
 	});
 
 	test("a use that fails for a missing value records nothing", async () => {
@@ -523,7 +559,7 @@ describe("when a secret was set and used", () => {
 			false,
 		);
 		expect(await store.secret("LACK")).toBeUndefined();
-		expect(store.secrets().map((s) => s.usedAt)).toEqual([null, null]);
+		expect((await listed(store)).map((s) => s.usedAt)).toEqual([null, null]);
 	});
 
 	test("a use writes the document at most once a minute per secret", async () => {
@@ -541,18 +577,18 @@ describe("when a secret was set and used", () => {
 		await store.secretEnv(["A"]);
 		await store.secret("B");
 		expect(writes).toBe(1);
-		expect(times(store, "A")?.usedAt).toBe(1_000_000);
+		expect((await times(store, "A"))?.usedAt).toBe(1_000_000);
 
 		clock.advance(30_000);
 		await store.secretEnv(["A", "B"]);
 		expect(writes).toBe(2);
-		expect(times(store, "A")?.usedAt).toBe(1_060_000);
-		expect(times(store, "B")?.usedAt).toBe(1_060_000);
+		expect((await times(store, "A"))?.usedAt).toBe(1_060_000);
+		expect((await times(store, "B"))?.usedAt).toBe(1_060_000);
 
 		// What the next start reads.
 		await document.flush();
 		const { store: again } = await makeStore();
-		expect(times(again, "B")?.usedAt).toBe(1_060_000);
+		expect((await times(again, "B"))?.usedAt).toBe(1_060_000);
 	});
 });
 
@@ -724,5 +760,222 @@ describe("secretValues", () => {
 		const { store } = await makeStore();
 		await store.save(tracker);
 		expect(await store.secretValues()).toEqual([]);
+	});
+});
+
+/**
+ * The Person's Personal secrets in memory, as the Home Host keeps them.
+ * `down` makes every call fail, as a Host that cannot be reached.
+ */
+function memoryPersonal(initial: Record<string, string> = {}) {
+	const values = new Map(Object.entries(initial));
+	const state = { down: false, calls: 0 };
+	const check = () => {
+		state.calls += 1;
+		if (state.down) throw new Error("The Host cannot be reached.");
+	};
+	const port: PersonalSecrets = {
+		async list() {
+			check();
+			return [...values.keys()].sort().map((name) => ({ name, setAt: 7 }));
+		},
+		async values(names) {
+			check();
+			return Object.fromEntries(
+				names.flatMap((name) => {
+					const value = values.get(name);
+					return value === undefined ? [] : [[name, value]];
+				}),
+			);
+		},
+		async set(name, value) {
+			check();
+			values.set(name, value);
+		},
+		async remove(name) {
+			check();
+			values.delete(name);
+		},
+	};
+	return { port, values, state };
+}
+
+describe("Personal secrets (ADR 13)", () => {
+	async function personalStore(options: {
+		env?: Record<string, string>;
+		keychain?: Record<string, string>;
+		personal?: Record<string, string>;
+	}) {
+		const keychain = memorySecrets();
+		const store = createConnectionStore({
+			document: await sandbox.openDocument(),
+			env: options.env ?? {},
+			secrets: keychain.backend,
+			personal: () => personal.port,
+		});
+		// Saved through the store, so the Device facts name them.
+		for (const [name, value] of Object.entries(options.keychain ?? {})) {
+			await store.setSecret(name, value);
+		}
+		const personal = memoryPersonal(options.personal);
+		return { store, keychain, personal };
+	}
+
+	test("a name reads Personal, then this computer, then the environment", async () => {
+		const { store } = await personalStore({
+			env: { A: "env-a", B: "env-b", C: "env-c" },
+			keychain: { A: "computer-a", B: "computer-b" },
+			personal: { A: "personal-a" },
+		});
+		expect(await store.secretEnv(["A", "B", "C"])).toEqual({
+			ok: true,
+			env: { A: "personal-a", B: "computer-b", C: "env-c" },
+		});
+		expect(await store.secret("A")).toBe("personal-a");
+		expect(store.secretSource("A")).toBe("personal");
+		expect(store.secretSource("B")).toBe("keychain");
+	});
+
+	test("a use under an Offer reads no Personal secret", async () => {
+		const { store, personal } = await personalStore({
+			keychain: { SHARED: "computer" },
+			personal: { SHARED: "personal", ONLY_MINE: "mine" },
+		});
+		await store.save({
+			name: "mine",
+			server: { command: "x", env: { T: ref("ONLY_MINE") } },
+		});
+		const calls = personal.state.calls;
+		expect(
+			await store.secretEnv(["SHARED", "ONLY_MINE"], { personal: false }),
+		).toEqual({ ok: false, missing: ["ONLY_MINE"] });
+		expect(await store.secretEnv(["SHARED"], { personal: false })).toEqual({
+			ok: true,
+			env: { SHARED: "computer" },
+		});
+		expect(
+			(
+				await store.mcpServersFor(
+					{ connections: ["mine"] },
+					{ personal: false },
+				)
+			).ok,
+		).toBe(false);
+		expect(await store.secretValues({ personal: false })).toEqual(["computer"]);
+		// It never asked for them.
+		expect(personal.state.calls).toBe(calls);
+	});
+
+	test("fails closed: a Personal name has no value while the Personal secrets cannot be read", async () => {
+		const { store, personal } = await personalStore({
+			env: { TOKEN: "env-token", OTHER: "env-other" },
+			personal: { TOKEN: "personal-token" },
+		});
+		// This computer learns which names are Personal at a use or a list.
+		await store.secrets();
+		personal.state.down = true;
+		const found = await store.secretEnv(["TOKEN", "OTHER"]);
+		expect(found).toEqual({ ok: false, missing: ["TOKEN"], unreachable: true });
+		// A name that is not Personal still reads the environment.
+		expect(await store.secretEnv(["OTHER"])).toEqual({
+			ok: true,
+			env: { OTHER: "env-other" },
+		});
+		expect(await store.secrets()).toMatchObject({ personal: "unavailable" });
+	});
+
+	test("before the devices start, a Personal name is missing and says why", async () => {
+		const store = createConnectionStore({
+			document: await sandbox.openDocument(),
+			env: {},
+			secrets: memorySecrets().backend,
+			personal: () => null,
+		});
+		expect(await store.secretEnv(["TOKEN"])).toEqual({
+			ok: false,
+			missing: ["TOKEN"],
+			unreachable: true,
+		});
+	});
+
+	test("the list has each scope: Personal first, a name in both scopes twice", async () => {
+		const { store } = await personalStore({
+			keychain: { BOTH: "c", HERE: "h" },
+			personal: { BOTH: "p", MINE: "m" },
+		});
+		const rows = (await store.secrets()).secrets.map((s) => [
+			s.name,
+			s.scope,
+			s.saved,
+			s.setAt === null ? null : "set",
+		]);
+		expect(rows).toEqual([
+			["BOTH", "personal", true, "set"],
+			["BOTH", "computer", true, "set"],
+			["HERE", "computer", true, "set"],
+			["MINE", "personal", true, "set"],
+		]);
+	});
+
+	test("set and remove a Personal secret: the value goes to the Person's store only", async () => {
+		const { store, keychain, personal } = await personalStore({});
+		let changes = 0;
+		store.onSecretsChange(() => {
+			changes += 1;
+		});
+		await store.setSecret("MINE", "m", "personal");
+		expect(personal.values.get("MINE")).toBe("m");
+		expect(keychain.values.has("MINE")).toBe(false);
+		expect((await savedNow()).secrets).toEqual([]);
+		await store.removeSecret("MINE", "personal");
+		expect(personal.values.has("MINE")).toBe(false);
+		expect(changes).toBe(2);
+	});
+
+	test("move to Personal: the value lands there, and this computer's copy goes", async () => {
+		const { store, keychain, personal } = await personalStore({
+			keychain: { GH_TOKEN: "ghp_secret" },
+		});
+		await store.moveSecret("GH_TOKEN", "personal");
+		expect(personal.values.get("GH_TOKEN")).toBe("ghp_secret");
+		expect(keychain.values.has("GH_TOKEN")).toBe(false);
+		expect((await savedNow()).secrets).toEqual([]);
+		expect(await store.secret("GH_TOKEN")).toBe("ghp_secret");
+	});
+
+	test("a move that cannot reach the Personal secrets keeps this computer's copy", async () => {
+		const { store, keychain, personal } = await personalStore({
+			keychain: { GH_TOKEN: "ghp_secret" },
+		});
+		personal.state.down = true;
+		await expect(store.moveSecret("GH_TOKEN", "personal")).rejects.toThrow();
+		expect(keychain.values.get("GH_TOKEN")).toBe("ghp_secret");
+		expect((await savedNow()).secrets).toEqual(["GH_TOKEN"]);
+	});
+
+	test("move to this computer, and a move of a value that is not there", async () => {
+		const { store, keychain, personal } = await personalStore({
+			personal: { API_KEY: "sk-1" },
+		});
+		await store.moveSecret("API_KEY", "computer");
+		expect(keychain.values.get("API_KEY")).toBe("sk-1");
+		expect(personal.values.has("API_KEY")).toBe(false);
+		await expect(store.moveSecret("API_KEY", "computer")).rejects.toThrow(
+			"API_KEY is not a Personal secret.",
+		);
+		await expect(store.moveSecret("NOPE", "personal")).rejects.toThrow(
+			"This computer has no saved value of NOPE.",
+		);
+	});
+
+	test("masking takes every Personal value too", async () => {
+		const { store } = await personalStore({
+			keychain: { HERE: "computer-value" },
+			personal: { MINE: "personal-value" },
+		});
+		expect((await store.secretValues()).sort()).toEqual([
+			"computer-value",
+			"personal-value",
+		]);
 	});
 });

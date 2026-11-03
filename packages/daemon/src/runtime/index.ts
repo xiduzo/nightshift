@@ -4,6 +4,7 @@ export {
 	prepareDaemonEnv,
 	secretFiles,
 	secretsDir,
+	secretsKey,
 	webPushSubject,
 } from "./daemon-env";
 export { processDatabase } from "./database";

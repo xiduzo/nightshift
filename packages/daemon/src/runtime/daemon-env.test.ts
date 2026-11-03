@@ -17,8 +17,10 @@ import {
 	type DaemonEnv,
 	daemonAuthSecret,
 	prepareDaemonEnv,
+	SECRETS_KEY_FILE,
 	secretFiles,
 	secretsDir,
+	secretsKey,
 	webPushSubject,
 } from "./daemon-env";
 
@@ -72,6 +74,39 @@ describe("the environment of a daemon without varlock", () => {
 		writeFileSync(given, "short");
 		expect(() =>
 			authSecret({ BETTER_AUTH_SECRET_FILE: given }, dataDir),
+		).toThrow("too short");
+	});
+});
+
+describe("the key that seals the Personal secrets a computer keeps (ADR 13)", () => {
+	test("made once in the data directory, readable by this user only", () => {
+		const dataDir = dir();
+		const first = secretsKey({}, dataDir);
+		expect(first.length).toBe(64);
+		expect(secretsKey({}, dataDir)).toBe(first);
+		const file = join(dataDir, SECRETS_KEY_FILE);
+		expect(readFileSync(file, "utf8")).toBe(first);
+		expect(statSync(file).mode & 0o777).toBe(0o600);
+	});
+
+	test("the environment, then a file, then the secrets folder, before the data directory", () => {
+		const dataDir = dir();
+		secretsKey({}, dataDir);
+		expect(secretsKey({ NIGHTSHIFT_SECRETS_KEY: SECRET }, dataDir)).toBe(
+			SECRET,
+		);
+		const given = join(dir(), "key");
+		writeFileSync(given, `${SECRET}\n`);
+		expect(secretsKey({ NIGHTSHIFT_SECRETS_KEY_FILE: given }, dataDir)).toBe(
+			SECRET,
+		);
+		const folder = dir();
+		writeFileSync(join(folder, "NIGHTSHIFT_SECRETS_KEY"), SECRET);
+		expect(secretsKey({ NIGHTSHIFT_SECRETS_DIR: folder }, dataDir)).toBe(
+			SECRET,
+		);
+		expect(() =>
+			secretsKey({ NIGHTSHIFT_SECRETS_KEY: "short" }, dataDir),
 		).toThrow("too short");
 	});
 });

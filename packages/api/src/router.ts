@@ -46,6 +46,7 @@ const peerRoutes = {
 	sync: hostPeer.sync,
 	archive: hostPeer.archive,
 	leases: hostPeer.leases,
+	secrets: hostPeer.secrets,
 };
 
 /** What the screens call, and the Devices procedures of a paired Device. */

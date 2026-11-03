@@ -40,7 +40,10 @@ export type HostPeerContext = {
 	/** This computer as the Host of run history. */
 	exchange: HostExchange;
 	/** This computer as a Host: pairing, and the answer to a link. */
-	devices: Pick<Devices, "startPairing" | "redeemPairing" | "hello" | "revoke">;
+	devices: Pick<
+		Devices,
+		"startPairing" | "redeemPairing" | "hello" | "revoke" | "personalSecrets"
+	>;
 	phones: HostPhones;
 };
 
@@ -188,6 +191,20 @@ export const hostRouter = os.router({
 				// The Walker's own events, which the wire describes loosely.
 				entries: input.entries as TranscriptEntry[],
 			}),
+		),
+	},
+	secrets: {
+		list: keyed.secrets.list.handler(({ context }) =>
+			context.devices.personalSecrets.list(context.key),
+		),
+		values: keyed.secrets.values.handler(({ context, input }) =>
+			context.devices.personalSecrets.values(context.key, input),
+		),
+		set: keyed.secrets.set.handler(({ context, input }) =>
+			context.devices.personalSecrets.set(context.key, input),
+		),
+		remove: keyed.secrets.remove.handler(({ context, input }) =>
+			context.devices.personalSecrets.remove(context.key, input),
 		),
 	},
 	devices: {

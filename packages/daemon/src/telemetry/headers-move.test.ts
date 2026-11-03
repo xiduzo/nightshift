@@ -82,7 +82,7 @@ describe("moveTelemetryHeaders", () => {
 			OTEL_HEADER_X_SCOPE_ORGID: "night",
 		});
 		// The secrets are on the Secrets page, and the export reads them.
-		expect(h.secrets.secrets().map((s) => s.name)).toEqual([
+		expect((await h.secrets.secrets()).secrets.map((s) => s.name)).toEqual([
 			"OTEL_HEADER_AUTHORIZATION",
 			"OTEL_HEADER_X_SCOPE_ORGID",
 		]);

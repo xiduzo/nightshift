@@ -2,6 +2,7 @@ import { type CliToolStore, createCliToolStore } from "./cli-tools";
 import {
 	type ConnectionStore,
 	createConnectionStore,
+	type PersonalSecrets,
 	type SecretBackend,
 } from "./connections";
 import type { DeviceDocument } from "./device-document";
@@ -24,13 +25,23 @@ export async function openConfigStores(options: {
 	document: DeviceDocument;
 	/** The fallback of every setting and every `${NAME}`: the environment. */
 	env: Readonly<Record<string, string | undefined>>;
-	/** Where the secrets saved on the Connections page go (`secretStore`). */
+	/** Where the secrets saved for this computer go (`secretStore`). */
 	secrets: SecretBackend;
+	/**
+	 * The Person's Personal secrets (ADR 13), read at each use. Null until
+	 * the devices start. Without it, this computer has no Personal scope.
+	 */
+	personal?: () => PersonalSecrets | null;
 }): Promise<ConfigStores> {
-	const { document, env, secrets } = options;
+	const { document, env, secrets, personal } = options;
 	const stores: ConfigStores = {
 		settings: createSettingsStore({ document, env }),
-		connections: createConnectionStore({ document, env, secrets }),
+		connections: createConnectionStore({
+			document,
+			env,
+			secrets,
+			...(personal ? { personal } : {}),
+		}),
 		cliTools: createCliToolStore({ document }),
 		profiles: createProfileStore({ document }),
 	};

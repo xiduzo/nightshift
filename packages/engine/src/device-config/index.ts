@@ -6,8 +6,11 @@ export type {
 	Connection,
 	ConnectionStore,
 	SecretEnv,
+	SecretList,
+	SecretUse,
 	SecretView,
 } from "./connections";
+export { unreachableNote } from "./connections";
 export {
 	type DeviceCopy,
 	lastKnownProfiles,

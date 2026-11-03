@@ -18,6 +18,8 @@ import {
 	type CliToolStore,
 	programOf,
 	type SecretEnv,
+	type SecretUse,
+	unreachableNote,
 } from "../device-config";
 import { redactText } from "./redact";
 
@@ -79,6 +81,8 @@ export type ToolLaunchers = {
 	 */
 	prepare(
 		names: readonly string[],
+		/** Which secret scopes the logins may read. Default: every scope. */
+		use?: SecretUse,
 	): Promise<({ ok: true } & PreparedTools) | { ok: false; message: string }>;
 	/**
 	 * Prepares every CLI tool with a login, for a command: `gh` in the
@@ -116,7 +120,7 @@ const expand = (value: string, secrets: Record<string, string>) =>
 export function createToolLaunchers(options: {
 	tools: Pick<CliToolStore, "get" | "list">;
 	/** Secrets by name: the saved ones, then the environment. */
-	secretEnv: (names: readonly string[]) => Promise<SecretEnv>;
+	secretEnv: (names: readonly string[], use?: SecretUse) => Promise<SecretEnv>;
 	/** Night Shift's data folder: the logins' own folders go in `tools/`. */
 	dataDir: string;
 	/** Where a program is on this computer, or null. Default: `Bun.which`. */
@@ -153,6 +157,7 @@ export function createToolLaunchers(options: {
 	async function resolveLogin(
 		tool: CliTool,
 		login: Login,
+		use?: SecretUse,
 	): Promise<
 		| {
 				ok: true;
@@ -162,7 +167,7 @@ export function createToolLaunchers(options: {
 		  }
 		| { ok: false; message: string }
 	> {
-		const found = await secretEnv(loginReferences(login));
+		const found = await secretEnv(loginReferences(login), use);
 		if (!found.ok) {
 			const [noun, isNot, it] =
 				found.missing.length === 1
@@ -170,7 +175,7 @@ export function createToolLaunchers(options: {
 					: ["secrets", "they are", "them"];
 			return {
 				ok: false,
-				message: `The CLI tool ${tool.name} needs the ${noun} ${found.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or change the tool's login.`,
+				message: `The CLI tool ${tool.name} needs the ${noun} ${found.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or change the tool's login.${unreachableNote(found)}`,
 			};
 		}
 		const out: Record<string, string> = Object.fromEntries(
@@ -354,6 +359,7 @@ export function createToolLaunchers(options: {
 	async function build(
 		names: readonly string[],
 		strict: boolean,
+		use?: SecretUse,
 	): Promise<({ ok: true } & PreparedTools) | { ok: false; message: string }> {
 		const launchers: {
 			tool: CliTool;
@@ -380,7 +386,7 @@ export function createToolLaunchers(options: {
 			}
 			let vars: Record<string, string> = {};
 			if (tool.login) {
-				const resolved = await resolveLogin(tool, tool.login);
+				const resolved = await resolveLogin(tool, tool.login, use);
 				if (!resolved.ok) {
 					if (!strict) continue;
 					return resolved;
@@ -467,7 +473,7 @@ export function createToolLaunchers(options: {
 
 	return {
 		guarded,
-		prepare: (names) => build(names, true),
+		prepare: (names, use) => build(names, true, use),
 		async forCommand() {
 			const names = tools
 				.list()

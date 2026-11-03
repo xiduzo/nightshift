@@ -28,6 +28,8 @@ import {
 	cliToolsInstruction,
 	type McpExpansion,
 	type SecretEnv,
+	type SecretUse,
+	unreachableNote,
 } from "../device-config";
 import type { ProjectKnowledge } from "../knowledge";
 import {
@@ -69,9 +71,13 @@ export type LocalDeviceDeps = {
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/**
 	 * The custom agents added on this computer (`acp:<slug>`), read at each
-	 * question. Undefined: none of that name.
+	 * question. Undefined: none of that name. `use`: which secret scopes
+	 * its environment may read.
 	 */
-	customHarness?: (name: CustomHarnessName) => AgentHarness | undefined;
+	customHarness?: (
+		name: CustomHarnessName,
+		use?: SecretUse,
+	) => AgentHarness | undefined;
 	/**
 	 * The harnesses added on the Agents page, read at each question. A
 	 * harness left out cannot run a session, even when `harnesses` has it.
@@ -85,13 +91,15 @@ export type LocalDeviceDeps = {
 	/**
 	 * An Agent node's MCP servers: its connections, with `${NAME}`
 	 * expanded. Default: none, and a node with connections is refused.
+	 * `use`: which secret scopes they may read (none Personal under an Offer).
 	 */
 	mcpServersFor?: (
 		node: Pick<AgentNode, "connections">,
+		use?: SecretUse,
 	) => Promise<McpExpansion>;
 	/**
-	 * A Command node's secrets, by name: the keychain, then the daemon's
-	 * environment. Default: `process.env`.
+	 * A Command node's secrets, by name: Personal, then the keychain, then
+	 * the daemon's environment. Default: `process.env`.
 	 */
 	secretEnv?: (names: readonly string[]) => Promise<SecretEnv>;
 	/** The connections defined on this computer. */
@@ -110,6 +118,11 @@ export type LocalDeviceDeps = {
 	 * it, a tool runs the program of its name with this computer's sign-in.
 	 */
 	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "forCommand" | "guarded">;
+	/*
+	 * Every secret this Device reads for a step goes through `mcpServersFor`,
+	 * `secretEnv`, `toolLaunchers`, `customHarness`, the decider and
+	 * `secretValues`: the scopes of ADR 13 are the store's, not this file's.
+	 */
 	/**
 	 * The folder of a project's Clone on this computer, or null when it has
 	 * none. Without it, this computer has no Clones: a run cannot start here.
@@ -163,12 +176,13 @@ export type LocalDeviceDeps = {
 		config?: Record<string, string>;
 	};
 	/**
-	 * The values of the saved secrets and of the ones the connections
-	 * reference, read as a session starts: its output has each as `•••`,
-	 * as an exported run has. Without it: only the values the session was
-	 * given (its CLI tools' logins, its MCP servers' and `sessionEnv`'s).
+	 * The values of the saved secrets (Personal ones too, when `use`
+	 * allows them) and of the ones the connections reference, read as a
+	 * session starts: its output has each as `•••`, as an exported run has.
+	 * Without it: only the values the session was given (its CLI tools'
+	 * logins, its MCP servers' and `sessionEnv`'s).
 	 */
-	secretValues?: () => Promise<readonly string[]>;
+	secretValues?: (use?: SecretUse) => Promise<readonly string[]>;
 };
 
 /** What an agent learns about the files a person added to the run's answers. */
@@ -191,13 +205,19 @@ function noDecider(
 	};
 }
 
-/** Why a command does not start: secrets it names that this computer does not have. */
-function missingSecretsMessage(missing: readonly string[]): string {
+/**
+ * Why a command does not start: secrets it names that this computer does
+ * not have, and why when the Personal secrets could not be read.
+ */
+function missingSecretsMessage(
+	missing: readonly string[],
+	found: { unreachable?: boolean } = {},
+): string {
 	const [noun, isNot, it] =
 		missing.length === 1
 			? ["secret", "it is", "it"]
 			: ["secrets", "they are", "them"];
-	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove ${it} from the node.`;
+	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove ${it} from the node.${unreachableNote(found)}`;
 }
 
 /** The session's `saveArtifact`: copies the file and tells the agent it is kept. */
@@ -241,7 +261,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	const findCli = deps.findCli ?? ((name: string) => Bun.which(name));
 	const mcpServersFor =
 		deps.mcpServersFor ??
-		(async (node: Pick<AgentNode, "connections">): Promise<McpExpansion> =>
+		(async (
+			node: Pick<AgentNode, "connections">,
+			_use?: SecretUse,
+		): Promise<McpExpansion> =>
 			(node.connections ?? []).length > 0
 				? {
 						ok: false,
@@ -262,8 +285,11 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		});
 
 	/** The harness of that name, when it is added and built. */
-	const harnessFor = (name: AgentHarnessName): AgentHarness | undefined => {
-		if (isCustomHarness(name)) return deps.customHarness?.(name);
+	const harnessFor = (
+		name: AgentHarnessName,
+		use?: SecretUse,
+	): AgentHarness | undefined => {
+		if (isCustomHarness(name)) return deps.customHarness?.(name, use);
 		return (deps.harnessNames?.().has(name) ?? true)
 			? harnesses[name]
 			: undefined;
@@ -303,13 +329,17 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			knowledge,
 			knowledgeOnly,
 			files,
+			underOffer,
 			...rest
 		} = input;
+		// Another Person's step under an Offer reads no Personal secret of
+		// this computer's owner (ADR 13, decision 5).
+		const use: SecretUse = underOffer ? { personal: false } : {};
 		// Some folders of the knowledge (a view), or the whole folder.
 		const knowledgeAsked = knowledgeOnly
 			? { projectId: knowledgeOnly.projectId, folders: knowledgeOnly.folders }
 			: knowledge;
-		const harness = harnessFor(name);
+		const harness = harnessFor(name, use);
 		if (!harness) {
 			yield {
 				type: "refused",
@@ -317,9 +347,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			};
 			return;
 		}
-		// `${NAME}` in env values and headers reads the keychain, then the
-		// environment. The values go to the harness only, never into the log.
-		const mcp = await mcpServersFor(connections ? { connections } : {});
+		// `${NAME}` in env values and headers reads Personal, then the
+		// keychain, then the environment. The values go to the harness only,
+		// never into the log.
+		const mcp = await mcpServersFor(connections ? { connections } : {}, use);
 		if (!mcp.ok) {
 			yield { type: "refused", message: mcp.message };
 			return;
@@ -331,7 +362,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		// The secrets the logins read go to the launchers only.
 		const tools =
 			withClis && deps.toolLaunchers
-				? await deps.toolLaunchers.prepare(clis)
+				? await deps.toolLaunchers.prepare(clis, use)
 				: null;
 		if (tools && !tools.ok) {
 			yield { type: "refused", message: tools.message };
@@ -410,7 +441,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					console.warn("The agent's secrets were not read:", error);
 					return [];
 				})) ?? []),
-				...((await deps.secretValues?.().catch((error) => {
+				...((await deps.secretValues?.(use).catch((error) => {
 					console.warn("The saved secrets were not read:", error);
 					return [];
 				})) ?? []),
@@ -456,7 +487,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				? await secretEnv(secrets)
 				: { ok: true as const, env: {} };
 		if (!found.ok) {
-			yield { type: "refused", message: missingSecretsMessage(found.missing) };
+			yield {
+				type: "refused",
+				message: missingSecretsMessage(found.missing, found),
+			};
 			return;
 		}
 		// The knowledge as the Space has it now, before the command reads it.

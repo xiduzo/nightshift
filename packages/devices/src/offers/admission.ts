@@ -469,6 +469,10 @@ function offeredSession(
 	const { offered, ...rest } = input;
 	return {
 		...rest,
+		// Another Person's step: its secrets read this computer's only, never
+		// its owner's Personal ones (ADR 13, decision 5). Set after the
+		// spread, so no Walker can take it off.
+		underOffer: true,
 		harness: profile.harness,
 		model: profile.model,
 		permissionMode: clampToCap(

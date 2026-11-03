@@ -143,6 +143,49 @@ describe("session", () => {
 		expect(harness.calls).toHaveLength(0);
 	});
 
+	test("a session under an Offer asks for no Personal secret; its owner's own session may", async () => {
+		const uses: [string, unknown][] = [];
+		const d = device({
+			harnesses: { "claude-code": fakeHarness() },
+			customHarness: (_name, use) => {
+				uses.push(["agent", use]);
+				return fakeHarness();
+			},
+			mcpServersFor: async (_node, use) => {
+				uses.push(["mcp", use]);
+				return { ok: true, servers: {} };
+			},
+			toolLaunchers: {
+				prepare: async (_names, use) => {
+					uses.push(["tools", use]);
+					return { ok: true, ...noTools };
+				},
+				forCommand: async () => noTools,
+				guarded: () => [],
+			},
+			secretValues: async (use) => {
+				uses.push(["mask", use]);
+				return [];
+			},
+		});
+		const run = (extra: Partial<SessionInput>) =>
+			collect(
+				d.session(
+					sessionInput({ harness: "acp:goose", clis: ["gh"], ...extra }),
+				),
+			);
+		await run({ underOffer: true });
+		expect(uses).toEqual([
+			["agent", { personal: false }],
+			["mcp", { personal: false }],
+			["tools", { personal: false }],
+			["mask", { personal: false }],
+		]);
+		uses.length = 0;
+		await run({});
+		expect(uses.every(([, use]) => JSON.stringify(use) === "{}")).toBe(true);
+	});
+
 	test("says ready, then starts the harness only when the next event is read", async () => {
 		const harness = fakeHarness();
 		const d = device({ harnesses: { "claude-code": harness } });
@@ -860,6 +903,30 @@ describe("exec", () => {
 			},
 		]);
 		expect(existsSync(marker)).toBe(false);
+	});
+
+	test("a Personal secret that cannot be read now refuses the command, and says why", async () => {
+		const events = await collect(
+			device({
+				secretEnv: async () => ({
+					ok: false,
+					missing: ["GH_TOKEN"],
+					unreachable: true,
+				}),
+			}).exec({
+				command: "true",
+				cwd: sandbox.repoPath,
+				secrets: ["GH_TOKEN"],
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(events).toEqual([
+			{
+				type: "refused",
+				message:
+					"The command needs the secret GH_TOKEN, but it is not saved. Save it on the Secrets page, or remove it from the node. Night Shift could not read your Personal secrets now. Check that this computer is online, then try again.",
+			},
+		]);
 	});
 });
 

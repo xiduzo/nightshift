@@ -21,6 +21,7 @@ import {
 	type Connection,
 	cliToolGitSchema,
 	type ProfileView,
+	type SecretScope,
 	type SecretSource,
 	type SecretView,
 	type SettingField,
@@ -92,13 +93,20 @@ const flowRefSchema = exact<FlowRef>()(
 );
 
 const secretSourceSchema = exact<SecretSource>()(
-	z.enum(["keychain", "env", "missing"]),
+	z.enum(["personal", "keychain", "env", "missing"]),
+);
+
+/** Where a saved secret lives (ADR 13): this computer only, or the Person's, on each of their computers. */
+export const secretScopeSchema = exact<SecretScope>()(
+	z.enum(["computer", "personal"]),
 );
 
 /** A `${NAME}` secret the connections or Command nodes use. Its value never comes back. */
 const secretViewSchema = exact<SecretView>()(
 	z.object({
 		name: z.string(),
+		/** Where its saved value lives. A name saved nowhere is "computer". */
+		scope: secretScopeSchema,
 		saved: z.boolean(),
 		inEnv: z.boolean(),
 		/** The connections that reference it. */
@@ -141,6 +149,8 @@ export const connectionListSchema = z.object({
 			tools: z.array(z.string()),
 		}),
 	),
+	/** Whether the Person's Personal secrets could be read now. When not, the list has this computer's only. */
+	personal: z.enum(["available", "unavailable"]),
 });
 
 /** A CLI on this computer: where it is, its version and its login. */

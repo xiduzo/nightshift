@@ -118,7 +118,7 @@ describe("the Device document", () => {
 		});
 		expect(s.profiles.get("builder")?.description).toBe("Builds.");
 		// A secret saved before keeps when it was set.
-		expect(s.connections.secrets()).toMatchObject([
+		expect((await s.connections.secrets()).secrets).toMatchObject([
 			{ name: "TRACKER_TOKEN", saved: true, setAt: SECRET_SET_AT },
 		]);
 	});

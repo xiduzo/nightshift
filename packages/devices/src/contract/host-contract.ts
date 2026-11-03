@@ -10,6 +10,7 @@ import {
 	labelSchema,
 	nameSchema,
 	permissionModeSchema,
+	secretNameSchema,
 } from "@nightshift/flows";
 import type { RefusalKind } from "@nightshift/refusal";
 import { type ContractRouterClient, oc } from "@orpc/contract";
@@ -30,6 +31,7 @@ import {
 import { offerCapsSchema, offerRefSchema } from "./offers";
 import { personalMergeInputSchema, personalMergeSchema } from "./personal";
 import { runRowsSchema, syncCursorsSchema } from "./rows";
+import { PERSONAL_SECRET_MAX, personalSecretNameSchema } from "./secrets";
 import {
 	commandBatchSchema,
 	feedStepSchema,
@@ -568,6 +570,47 @@ export const hostContract = {
 					ended: z.boolean(),
 				}),
 			)
+			.output(described(z.void())),
+	},
+	/**
+	 * The Personal secrets of the key's Person (ADR 13), which this Host
+	 * keeps as their Home Host. Only a Device of that Person, paired here as
+	 * its Home Host and with access, gets an answer: any other key is
+	 * FORBIDDEN, and a Guest Host keeps none. A value goes to a Device for a
+	 * use, and the Device keeps it in memory for that use only. An older
+	 * Host has none: the Device says to update it.
+	 */
+	secrets: {
+		list: sync
+			.route({
+				summary:
+					"Lists the names of the Personal secrets of a paired Device's Person, with when each was set.",
+			})
+			.output(described(z.array(personalSecretNameSchema))),
+		values: sync
+			.route({
+				summary:
+					"Gives a paired Device of the Person the values of these Personal secrets, for one use.",
+			})
+			.input(z.object({ names: z.array(secretNameSchema).max(200) }))
+			.output(described(z.record(z.string(), z.string()))),
+		set: sync
+			.route({
+				summary:
+					"Saves a Personal secret of a paired Device's Person, or replaces its value.",
+			})
+			.input(
+				z.object({
+					name: secretNameSchema,
+					value: z.string().min(1).max(PERSONAL_SECRET_MAX),
+				}),
+			)
+			.output(described(z.void())),
+		remove: sync
+			.route({
+				summary: "Removes a Personal secret of a paired Device's Person.",
+			})
+			.input(z.object({ name: secretNameSchema }))
 			.output(described(z.void())),
 	},
 	/**

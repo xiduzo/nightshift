@@ -23,6 +23,7 @@ import {
 	connectionSchema,
 	mcpTestResultSchema,
 	mcpToolsSchema,
+	secretScopeSchema,
 } from "./schemas";
 
 const checkTarget = z.enum(harnessNameSchema.options);
@@ -118,20 +119,58 @@ export const connections = {
 			}
 			return context.checks.mcp(config, values);
 		}),
-	/** Saves a secret in the system keychain. The value never comes back. */
+	/**
+	 * Saves a secret: in this computer's keychain, or as a Personal secret
+	 * (ADR 13) that the Person's steps on each of their computers can use.
+	 * The value never comes back.
+	 */
 	setSecret: ownerProcedure
-		.route({ summary: "Saves a secret in the keychain of this computer." })
+		.route({
+			summary:
+				"Saves a secret on this computer, or as a Personal secret of its owner.",
+		})
 		.output(output(z.void()))
-		.input(z.object({ name: secretNameSchema, value: z.string().min(1) }))
+		.input(
+			z.object({
+				name: secretNameSchema,
+				value: z.string().min(1),
+				/** Default: this computer. */
+				scope: secretScopeSchema.optional(),
+			}),
+		)
 		.handler(({ context, input }) =>
-			context.connections.setSecret(input.name, input.value),
+			context.connections.setSecret(input.name, input.value, input.scope),
 		),
 	removeSecret: ownerProcedure
-		.route({ summary: "Removes a secret from the keychain of this computer." })
+		.route({
+			summary:
+				"Removes a secret from this computer, or a Personal secret of its owner.",
+		})
 		.output(output(z.void()))
-		.input(z.object({ name: secretNameSchema }))
+		.input(
+			z.object({
+				name: secretNameSchema,
+				/** Default: this computer. */
+				scope: secretScopeSchema.optional(),
+			}),
+		)
 		.handler(({ context, input }) =>
-			context.connections.removeSecret(input.name),
+			context.connections.removeSecret(input.name, input.scope),
+		),
+	/**
+	 * Moves a saved secret to another scope (ADR 13, decision 7): this
+	 * computer reads the value where it is, saves it in `to`, then removes
+	 * its old copy. The person never types it again.
+	 */
+	moveSecret: ownerProcedure
+		.route({
+			summary:
+				"Moves a saved secret between this computer and its owner's Personal secrets.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ name: secretNameSchema, to: secretScopeSchema }))
+		.handler(({ context, input }) =>
+			context.connections.moveSecret(input.name, input.to),
 		),
 	/**
 	 * The tools of a saved connection, for a Tool node's inspector: each

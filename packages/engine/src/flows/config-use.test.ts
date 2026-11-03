@@ -4,6 +4,7 @@ import type {
 	CliTool,
 	Connection,
 	ProfileView,
+	SecretList,
 	SecretView,
 } from "../device-config";
 import { cliToolsInUse, connectionsInUse, profilesInUse } from "./config-use";
@@ -51,21 +52,28 @@ const profile = (
 			}) as never;
 
 /** The secret store's view: every name it is asked for, none saved. */
-const secretsOf = (named: Iterable<string> = []): SecretView[] =>
-	[...new Set(named)].sort().map((name) => ({
-		name,
-		saved: false,
-		inEnv: false,
-		usedBy: [],
-		setAt: null,
-		usedAt: null,
-	}));
+const secretsOf = async (
+	named: Iterable<string> = [],
+): Promise<SecretList> => ({
+	personal: "available",
+	secrets: [...new Set(named)].sort().map(
+		(name): SecretView => ({
+			name,
+			scope: "computer",
+			saved: false,
+			inEnv: false,
+			usedBy: [],
+			setAt: null,
+			usedAt: null,
+		}),
+	),
+});
 
 describe("connectionsInUse", () => {
-	test("names the flows and the Agent Profiles that use each connection", () => {
+	test("names the flows and the Agent Profiles that use each connection", async () => {
 		const use = noUse();
 		use.connections.set("github", [flow("night")]);
-		const listed = connectionsInUse(
+		const listed = await connectionsInUse(
 			{
 				connections: {
 					list: () => [connection("github"), connection("linear")],
@@ -91,10 +99,10 @@ describe("connectionsInUse", () => {
 		]);
 	});
 
-	test("lists a secret a Command node or a CLI tool's login names, with what reads it", () => {
+	test("lists a secret a Command node or a CLI tool's login names, with what reads it", async () => {
 		const use = noUse();
 		use.secrets.set("ZAC_USER", [flow("tools")]);
-		const listed = connectionsInUse(
+		const listed = await connectionsInUse(
 			{
 				connections: { list: () => [], secrets: secretsOf },
 				cliTools: {

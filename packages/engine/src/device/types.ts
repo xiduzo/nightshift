@@ -245,6 +245,13 @@ export type SessionInput = Omit<
 	 * the whole folder.
 	 */
 	knowledgeOnly?: { projectId: string; folders: string[] };
+	/**
+	 * The session runs another Person's step under an Offer of this
+	 * Device. Its secrets read this computer and the environment only,
+	 * never the owner's Personal secrets (ADR 13, decision 5). Only the
+	 * Offer admission on the Device that runs it sets it, after the wire.
+	 */
+	underOffer?: true;
 };
 
 /**

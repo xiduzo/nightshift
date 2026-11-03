@@ -198,6 +198,11 @@ const sessionFields = {
 	/** The step's turn limit, and what is left of the run's budget. */
 	maxTurns: z.number().int().positive().optional(),
 	maxBudgetUsd: z.number().positive().optional(),
+	/**
+	 * Another Person's step under an Offer: no Personal secret (ADR 13). The
+	 * Device that runs it sets it itself; a Walker's only narrows.
+	 */
+	underOffer: z.literal(true).optional(),
 };
 
 /** A session the Walker resolved: its harness, model, tools and connections. */

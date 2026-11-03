@@ -13,6 +13,7 @@ import {
 	type DeviceCopies,
 	type DeviceDocument,
 	type KeyStoreKind,
+	type PersonalSecrets,
 	type ProfileStore,
 	profileChoice,
 	type SettingsStore,
@@ -63,6 +64,12 @@ import { listenHostname, ownCertificate, type Reach, reachFor } from "./reach";
 import { type DevicePresence, OFFLINE_AFTER_MS } from "./registry";
 import { createRelay, createWorkRelay } from "./relay";
 import {
+	createPersonalSecretStore,
+	createPersonalSecretsHost,
+	devicePersonalSecrets,
+	secretsCipher,
+} from "./secrets";
+import {
 	createWorkHub,
 	createWorkServer,
 	type ServedCalls,
@@ -86,6 +93,11 @@ export type DevicesRuntime = {
 	serve: { hostname: string; tls?: { cert: string; key: string } };
 	/** Waits until this Replica's documents of a Space are in step with its Host's. */
 	inStep: HostRelay["inStep"];
+	/**
+	 * This computer's owner's Personal secrets (ADR 13), for the engine's
+	 * connection store: at the Home Host, else kept here.
+	 */
+	personalSecrets: PersonalSecrets;
 };
 
 /**
@@ -177,6 +189,11 @@ export type DevicesDeps = {
 	archive: SpaceArchive;
 	/** Where the Device keys go: the keychain, else a file (`prefer: "file"`). */
 	keyStore: { prefer?: KeyStoreKind };
+	/**
+	 * The key this computer seals the Personal secrets it keeps with
+	 * (ADR 13): NIGHTSHIFT_SECRETS_KEY, else a file. At least 32 characters.
+	 */
+	secretsKey: string;
 	/** The engine's scheduler: off, or on until the signal aborts. */
 	scheduler: PeerEngineOptions["scheduler"];
 	/** A secret's value by name: the secret a webhook schedule names. */
@@ -472,10 +489,28 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 
 	await links.start();
 
+	/** The Personal secrets this computer keeps: as a Home Host, and its owner's without one. */
+	const personalStore = createPersonalSecretStore({
+		db,
+		cipher: secretsCipher(deps.secretsKey),
+	});
+	const personalSecrets = devicePersonalSecrets({
+		hostLinks,
+		links: () => links,
+		store: personalStore,
+		ownerId,
+		selfId: self.id,
+	});
+
 	const devices = createDevices({
 		host,
 		links,
 		hostLinks,
+		personalSecrets: createPersonalSecretsHost({
+			registry: engine.devices,
+			store: personalStore,
+			isHost: host.isHost,
+		}),
 		hostSpaces: engine.hostSpaces,
 		keys: keyStore,
 		settings: deps.settings,
@@ -495,6 +530,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		offers,
 		reach,
 		inStep: relay.inStep,
+		personalSecrets,
 		serve: {
 			hostname: listenHostname(reach, deps.env.NIGHTSHIFT_LISTEN),
 			...(certificate

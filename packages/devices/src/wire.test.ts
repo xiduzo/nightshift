@@ -106,6 +106,7 @@ async function startB(
 		dataDir: b.dataDir,
 		archive: createSpaceArchive(b.dataDir),
 		keyStore: { prefer: "file" },
+		secretsKey: "a-test-secrets-key-of-at-least-32-characters",
 		scheduler: false,
 		disconnect: () => {},
 		kept,

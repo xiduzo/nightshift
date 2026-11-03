@@ -413,6 +413,8 @@ for (const [path, call] of Object.entries(paths)) {
 				clis: ["gh"],
 				cwd: worktree,
 				prompt: "Do the work.",
+				// Another Person's step: no Personal secret of this computer's owner (ADR 13).
+				underOffer: true,
 			});
 			expect("offered" in (first ?? {})).toBe(false);
 			// A node may ask for less than the cap; never more.

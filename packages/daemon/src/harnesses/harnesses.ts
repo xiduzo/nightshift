@@ -20,6 +20,7 @@ import type { localDevice } from "@nightshift/engine";
 import {
 	type ConnectionStore,
 	HARNESS_BIN,
+	PERSONAL_UNREACHABLE,
 	type SettingsStore,
 } from "@nightshift/engine/device-config";
 import { type AgentHarnessName, isCustomHarness } from "@nightshift/flows";
@@ -93,14 +94,15 @@ export function localHarnesses(deps: {
 		// applies to the next one. `${NAME}` in their env reads the secrets,
 		// then this computer's environment: once per session, and every value
 		// it reads comes back as `•••` in the session's output.
-		customHarness: (name) => {
+		// Under an Offer (`use.personal` false), no Personal secret.
+		customHarness: (name, use) => {
 			const agent = settings
 				.current()
 				.customAgents.find((a) => `acp:${a.slug}` === name);
 			if (!agent) return undefined;
 			let expanding: ReturnType<ConnectionStore["expandEnv"]> | null = null;
 			const expanded = () => {
-				expanding ??= connections.expandEnv(agent.env);
+				expanding ??= connections.expandEnv(agent.env, use);
 				return expanding;
 			};
 			const harness = customAcpHarness(agent, {
@@ -114,7 +116,7 @@ export function localHarnesses(deps: {
 					// Words for the person: the step shows them as they are.
 					throw new Refusal(
 						"conflict",
-						`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.`,
+						`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.${env.unreachable ? ` ${PERSONAL_UNREACHABLE}` : ""}`,
 					);
 				},
 			});

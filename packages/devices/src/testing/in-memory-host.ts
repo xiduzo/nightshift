@@ -8,6 +8,7 @@ import {
 	type ServedDocuments,
 } from "../host";
 import type { OpenDocumentChannel } from "../links";
+import type { PersonalSecretsHost } from "../secrets";
 import { memoryDocuments } from "./memory-documents";
 
 /**
@@ -67,6 +68,8 @@ export function inMemoryHost(deps: {
 	revoke?(personId: string, deviceId: string): Promise<void>;
 	/** What the Host serves over the document channel. Default: no documents. */
 	documents?: ServedDocuments;
+	/** The Personal secrets the Host keeps (ADR 13). Default: not served. */
+	personalSecrets?: PersonalSecretsHost;
 }): MemoryHost {
 	let network = new AbortController();
 	const watchers = new Set<() => void>();
@@ -99,6 +102,12 @@ export function inMemoryHost(deps: {
 					startPairing: notServed,
 					redeemPairing: notServed,
 					revoke: deps.revoke ?? notServed,
+					personalSecrets: deps.personalSecrets ?? {
+						list: notServed,
+						values: notServed,
+						set: notServed,
+						remove: notServed,
+					},
 				},
 				phones: {
 					list: async () => [],

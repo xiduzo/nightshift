@@ -129,6 +129,48 @@ export function daemonAuthSecret(
 	return secret;
 }
 
+/** Where the secrets key is kept when nothing else gives one, next to the database. */
+export const SECRETS_KEY_FILE = "secrets-key";
+
+/**
+ * The key this daemon seals the Personal secrets it keeps with (ADR 13),
+ * read like the auth secret: NIGHTSHIFT_SECRETS_KEY, else the file that
+ * NIGHTSHIFT_SECRETS_KEY_FILE names, else `NIGHTSHIFT_SECRETS_KEY` in the
+ * service manager's secrets folder, else one made once and kept in the
+ * data directory, readable by this user only. At least 32 characters.
+ * A new key cannot open what the old one sealed: keep it with the data.
+ */
+export function secretsKey(env: Env, dataDir: string): string {
+	const set = env.NIGHTSHIFT_SECRETS_KEY?.trim();
+	if (set) return checkedSecretsKey(set, "NIGHTSHIFT_SECRETS_KEY");
+	const given = [
+		env.NIGHTSHIFT_SECRETS_KEY_FILE,
+		secretsDir(env) &&
+			join(secretsDir(env) as string, "NIGHTSHIFT_SECRETS_KEY"),
+	];
+	for (const file of given) {
+		if (!file || !existsSync(file)) continue;
+		return checkedSecretsKey(readFileSync(file, "utf8").trim(), file);
+	}
+	const file = join(dataDir, SECRETS_KEY_FILE);
+	if (existsSync(file)) {
+		const saved = readFileSync(file, "utf8").trim();
+		if (saved.length >= 32) return saved;
+	}
+	const key = randomBytes(32).toString("hex");
+	writeFileSync(file, key, { mode: 0o600 });
+	return key;
+}
+
+function checkedSecretsKey(value: string, from: string): string {
+	if (value.length < 32) {
+		throw new Error(
+			`The secrets key in ${from} is too short. Use at least 32 characters.`,
+		);
+	}
+	return value;
+}
+
 /**
  * The folder of secret files a service manager gives this daemon:
  * NIGHTSHIFT_SECRETS_DIR (for example /run/secrets in Docker), else

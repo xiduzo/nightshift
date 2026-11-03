@@ -45,6 +45,7 @@ import {
 	HARNESS_BIN,
 	openConfigStores,
 	openDeviceDocument,
+	type PersonalSecrets,
 	secretStore,
 } from "@nightshift/engine/device-config";
 import {
@@ -100,6 +101,7 @@ import {
 	processDatabase,
 	secretFiles,
 	secretsDir,
+	secretsKey,
 	stopOlderDocuments,
 	stopOnSignals,
 } from "./runtime";
@@ -329,10 +331,17 @@ export async function createDaemon(
 	const keyStore =
 		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
+	/**
+	 * The Person's Personal secrets (ADR 13): at the Home Host, else kept
+	 * here. The devices below give them; a use before that reads a
+	 * Personal name as one that cannot be read now.
+	 */
+	let personalSecrets: PersonalSecrets | null = null;
 	const config = await openConfigStores({
 		document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
+		personal: () => personalSecrets,
 	});
 	const { settings, connections, cliTools, profiles } = config;
 	hostSettings = () => settings.current();
@@ -340,7 +349,7 @@ export async function createDaemon(
 	// login's own folder is in the data folder, so it outlives a restart.
 	const toolLaunchers = createToolLaunchers({
 		tools: cliTools,
-		secretEnv: (names) => connections.secretEnv(names),
+		secretEnv: (names, use) => connections.secretEnv(names, use),
 		dataDir,
 		env: { ...process.env, ...env },
 	});
@@ -481,8 +490,8 @@ export async function createDaemon(
 				return { host: at.address, headers: at.headers };
 			},
 		}),
-		mcpServersFor: (node) => connections.mcpServersFor(node),
-		// A Command node's secrets: the keychain, then the environment.
+		mcpServersFor: (node, use) => connections.mcpServersFor(node, use),
+		// A Command node's secrets: Personal, then the keychain, then the environment.
 		secretEnv: (names) => connections.secretEnv(names),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),
@@ -504,9 +513,10 @@ export async function createDaemon(
 		snapshots: true,
 		// A Claude Code session sends its own telemetry while the export is on.
 		sessionEnv: (session) => telemetry.sessionEnv(session),
-		// A session's output has every saved secret's value as •••, and those of Ollama's headers.
-		secretValues: async () => [
-			...(await connections.secretValues()),
+		// A session's output has every saved secret's value as •••, the
+		// Personal ones too, and those of Ollama's headers.
+		secretValues: async (use) => [
+			...(await connections.secretValues(use)),
 			...ollama.endpoint().secretValues,
 		],
 	});
@@ -555,6 +565,8 @@ export async function createDaemon(
 		dataDir,
 		archive,
 		keyStore,
+		// What seals the Personal secrets this computer keeps (ADR 13).
+		secretsKey: secretsKey({ ...process.env, ...env }, dataDir),
 		// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 		// Otherwise the Settings switch is read on every tick.
 		scheduler:
@@ -577,6 +589,7 @@ export async function createDaemon(
 		...(outside.documents ? { documentChannel: outside.documents } : {}),
 	});
 	const { engine } = devices;
+	personalSecrets = devices.personalSecrets;
 	knowledge.connect({
 		inStep: devices.inStep,
 		// The Spaces with no Host: this Replica keeps their knowledge content.
