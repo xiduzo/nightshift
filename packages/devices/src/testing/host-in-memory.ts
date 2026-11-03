@@ -148,6 +148,7 @@ export async function hostInMemory(
 		devicesPage: "https://a.invalid/devices",
 		fingerprint: null,
 		disconnect: () => {},
+		forgetClones: (deviceId) => host.projects.forgetDevice(deviceId),
 	});
 	const hostExchange = createHostExchange({
 		db: a.db,

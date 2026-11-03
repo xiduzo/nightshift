@@ -108,6 +108,17 @@ export const devices = {
 		.handler(({ context, input }) =>
 			context.devices.revoke(context.session.user.id, input.deviceId),
 		),
+	/** Removes a Device whose access is gone from this computer's list, for good. */
+	forget: protectedProcedure
+		.route({
+			summary:
+				"Removes one of the Person's Devices whose access is gone, with its copies of projects.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ deviceId: z.string().min(1) }))
+		.handler(({ context, input }) =>
+			context.devices.forget(context.session.user.id, input.deviceId),
+		),
 	/**
 	 * Your phones on the Host of the session's Space: this computer's own
 	 * when it keeps the Space, else the Host's, asked over this computer's

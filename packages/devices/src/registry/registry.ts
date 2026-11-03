@@ -1,6 +1,6 @@
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { device } from "@nightshift/db/schema";
+import { clone, device, ydoc } from "@nightshift/db/schema";
 import type { PeerContext } from "@nightshift/engine";
 import { deviceDocumentName } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
@@ -89,6 +89,12 @@ export type DeviceRegistry = {
 	sweep(offlineAfterMs: number): Promise<void>;
 	/** Access removed: `DeviceRevoked`, and `DeviceOffline` when it was online. */
 	revoke(id: string): Promise<void>;
+	/**
+	 * Removes a Device whose access is gone, for good: its row, its Clones
+	 * here and the Device document this Host kept for it. Refused while it
+	 * still has access. The runs it walked keep its name.
+	 */
+	forget(id: string): Promise<void>;
 	/**
 	 * The owner of a Device document this Host keeps for a paired Device:
 	 * one whose home Host it is, with access. Null for any other name.
@@ -314,6 +320,24 @@ export function createDeviceRegistry(deps: {
 				},
 			);
 			if (online.delete(id)) await logPresence("DeviceOffline", found);
+		},
+
+		async forget(id) {
+			await ready;
+			const found = await row(id);
+			if (!found) return;
+			if (!found.revokedAt) {
+				throw new Refusal(
+					"conflict",
+					"Remove the access of this device first.",
+				);
+			}
+			online.delete(id);
+			await db.batch([
+				db.delete(clone).where(eq(clone.deviceId, id)),
+				db.delete(ydoc).where(eq(ydoc.name, deviceDocumentName(id))),
+				db.delete(device).where(and(eq(device.id, id), eq(device.self, false))),
+			]);
 		},
 
 		async keptDocumentOwner(documentName) {

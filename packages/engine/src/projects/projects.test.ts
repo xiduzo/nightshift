@@ -396,6 +396,29 @@ describe("what the peers ask of the Projects", () => {
 		}
 	});
 
+	test("forgetDevice removes a Device's Clones and its name from the Spaces kept here", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app") },
+			sandbox.spaceId,
+		);
+		await projects.recordClone(sandbox.spaceId, {
+			projectId: app.id,
+			deviceId: "studio",
+			deviceName: "Studio",
+		});
+
+		await projects.forgetDevice("studio");
+		expect(
+			(await projects.clones(sandbox.spaceId, app.id)).map((c) => c.deviceId),
+		).toEqual([sandbox.deviceId]);
+		expect(
+			await sandbox.db.select().from(clone).where(eq(clone.deviceId, "studio")),
+		).toEqual([]);
+		// A Device the documents never knew: nothing changes.
+		await projects.forgetDevice("unknown");
+	});
+
 	test("take writes an entry only where none is, brings a removed Project back and records Clones, in one change", async () => {
 		const projects = projectsOf();
 		const app = await projects.add(

@@ -35,7 +35,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { permissionLabel, WithdrawOfferDialog } from "@/features/agents";
 import { RunStatusBadge } from "@/features/runs/components/run-status-badge";
-import type { OfferView, RunSummary } from "@/shared/api";
+import { type OfferView, orpc, type RunSummary } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
@@ -62,7 +62,7 @@ export function caps(offer: Pick<OfferView, "permissionCap" | "sessionCap">) {
  * One computer of the Space: what runs on it now, which of the Space's
  * projects it has, and what it offers to the Space. For this computer, also
  * its own Offers and the way to its settings. For one of yours paired here,
- * Remove access.
+ * Remove access, and once its access is gone, Remove computer.
  */
 export function ComputerDetail({
 	computer,
@@ -78,6 +78,7 @@ export function ComputerDetail({
 }) {
 	const now = useNow(30_000);
 	const [removing, setRemoving] = useState(false);
+	const [forgetting, setForgetting] = useState(false);
 	const Icon = computerIcon(computer.platform);
 	const revoked = computer.paired?.revokedAt != null;
 	const kicker = computer.thisDevice
@@ -105,13 +106,19 @@ export function ComputerDetail({
 				</span>
 			}
 			actions={
-				computer.paired && !revoked
+				computer.paired
 					? [
-							{
-								label: "Remove access",
-								destructive: true,
-								onSelect: () => setRemoving(true),
-							},
+							revoked
+								? {
+										label: "Remove computer",
+										destructive: true,
+										onSelect: () => setForgetting(true),
+									}
+								: {
+										label: "Remove access",
+										destructive: true,
+										onSelect: () => setRemoving(true),
+									},
 						]
 					: undefined
 			}
@@ -263,11 +270,18 @@ export function ComputerDetail({
 			) : null}
 
 			{computer.paired ? (
-				<RemoveAccessDialog
-					device={{ id: computer.paired.id, name: computer.name }}
-					open={removing}
-					onOpenChange={setRemoving}
-				/>
+				<>
+					<RemoveAccessDialog
+						device={{ id: computer.paired.id, name: computer.name }}
+						open={removing}
+						onOpenChange={setRemoving}
+					/>
+					<RemoveComputerDialog
+						device={{ id: computer.paired.id, name: computer.name }}
+						open={forgetting}
+						onOpenChange={setForgetting}
+					/>
+				</>
 			) : null}
 		</DetailShell>
 	);
@@ -414,6 +428,53 @@ function RemoveAccessDialog({
 					>
 						{revoke.isPending ? <Spinner data-icon="inline-start" /> : null}
 						Remove access
+					</AlertDialogAction>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
+	);
+}
+
+/** Removes a computer whose access is gone from the list, for good. */
+function RemoveComputerDialog({
+	device,
+	open,
+	onOpenChange,
+}: {
+	device: { id: string; name: string };
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const queryClient = useQueryClient();
+	const forget = useMutation(
+		deviceMutations.forget({
+			onSuccess: () => {
+				toast.success(`${device.name} is removed`);
+				onOpenChange(false);
+				void queryClient.invalidateQueries({ queryKey: orpc.devices.key() });
+			},
+			onError: (error) => toast.error(`Not removed: ${error.message}`),
+		}),
+	);
+	return (
+		<AlertDialog open={open} onOpenChange={onOpenChange}>
+			<AlertDialogContent>
+				<AlertDialogHeader>
+					<AlertDialogTitle>Remove {device.name}?</AlertDialogTitle>
+					<AlertDialogDescription>
+						It leaves this list, with its copies of your projects. Its runs
+						stay. To use it here again, pair it again.
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<AlertDialogFooter>
+					<AlertDialogCancel>Cancel</AlertDialogCancel>
+					<AlertDialogAction
+						variant="destructive"
+						disabled={forget.isPending}
+						onClick={() => forget.mutate({ deviceId: device.id })}
+					>
+						{forget.isPending ? <Spinner data-icon="inline-start" /> : null}
+						Remove computer
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

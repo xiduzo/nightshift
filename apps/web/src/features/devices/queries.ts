@@ -25,6 +25,7 @@ export const deviceMutations = {
 	approve: orpc.devices.approve.mutationOptions,
 	deny: orpc.devices.deny.mutationOptions,
 	revoke: orpc.devices.revoke.mutationOptions,
+	forget: orpc.devices.forget.mutationOptions,
 	removePhone: orpc.devices.removePhone.mutationOptions,
 };
 

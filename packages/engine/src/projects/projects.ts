@@ -11,6 +11,7 @@ import type { RunLog } from "../log";
 import { type Git, systemGit } from "./git";
 import { normaliseRemote } from "./remote";
 import {
+	deviceEntries,
 	projectClones,
 	projectEntry,
 	recordClone,
@@ -584,6 +585,23 @@ export function createProjects(deps: ProjectsDeps) {
 			remotes?: readonly string[];
 		}): Promise<MovingProject[]> {
 			return projectRowsOf(db, input);
+		},
+
+		/**
+		 * Removes a Device from the Space documents this Replica keeps: its
+		 * Clones and its name. On a Host, when its owner removes a Device for
+		 * good. A Space a Host keeps elsewhere is that Host's to change.
+		 */
+		async forgetDevice(deviceId: string): Promise<void> {
+			for (const document of await documents.openAll()) {
+				if (document.hostedElsewhere) continue;
+				const { clones, named } = deviceEntries(document, deviceId);
+				if (clones.length === 0 && !named) continue;
+				await document.change(() => {
+					for (const key of clones) document.clones.delete(key);
+					if (named) document.devices.delete(deviceId);
+				});
+			}
 		},
 
 		/** The Devices with a Clone of the Project, as its Space document says, oldest Clone first. */

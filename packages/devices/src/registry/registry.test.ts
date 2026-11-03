@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { device, event } from "@nightshift/db/schema";
+import { device, event, ydoc } from "@nightshift/db/schema";
 import {
 	createRunBus,
 	createRunHistory,
@@ -145,6 +145,31 @@ describe("the Devices of a Host", () => {
 		// Pairing again gives access back.
 		await registry.join({ ...macbook, ownerId });
 		expect((await registry.get("device-b"))?.revokedAt).toBeNull();
+	});
+
+	test("forgetting removes a revoked Device for good, its kept document too; never one with access", async () => {
+		await registry.join({ ...macbook, ownerId });
+		await sandbox.db
+			.insert(ydoc)
+			.values({ name: "device:device-b", state: Buffer.from([0]) });
+
+		await expect(registry.forget("device-b")).rejects.toThrow(
+			"Remove the access of this device first.",
+		);
+		expect(await registry.get("device-b")).not.toBeNull();
+
+		await registry.revoke("device-b");
+		await registry.forget("device-b");
+		expect(await registry.get("device-b")).toBeNull();
+		expect(await registry.list(ownerId)).toEqual([]);
+		expect(
+			await sandbox.db
+				.select()
+				.from(ydoc)
+				.where(eq(ydoc.name, "device:device-b")),
+		).toEqual([]);
+		// Again: nothing left to remove.
+		await registry.forget("device-b");
 	});
 
 	test("a guest Host keeps no Device document; nor does any Host for a name it does not know", async () => {

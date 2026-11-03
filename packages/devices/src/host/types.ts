@@ -109,6 +109,8 @@ export type Devices = {
 	deny(headers: Headers, userCode: string): Promise<void>;
 	/** Removes a Device's access: its key, its connections. The Person's own Devices only. */
 	revoke(personId: string, deviceId: string): Promise<void>;
+	/** Removes a Device whose access is gone from the list, for good. The Person's own Devices only. */
+	forget(personId: string, deviceId: string): Promise<void>;
 	/** A paired Device's link answered. */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** The owner's other Devices, from their documents: their profiles and secret names. */

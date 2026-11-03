@@ -332,6 +332,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		devicesPage,
 		fingerprint,
 		disconnect: deps.disconnect,
+		forgetClones: (deviceId) => engine.projects.forgetDevice(deviceId),
 		pending: handover.pending,
 	});
 

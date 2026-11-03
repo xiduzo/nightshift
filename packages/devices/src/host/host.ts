@@ -64,6 +64,8 @@ export function createHost(deps: {
 	fingerprint: string | null;
 	/** Ends the Device's open connections to the relay. */
 	disconnect(deviceId: string): void;
+	/** Removes a Device's Clones from the Space documents this Host keeps. */
+	forgetClones(deviceId: string): Promise<void>;
 	/** The pairings in progress of the Host before a reload. Default: none. */
 	pending?: PendingPairings;
 }) {
@@ -246,6 +248,25 @@ export function createHost(deps: {
 			await keys.revoke(deviceId);
 			await registry.revoke(deviceId);
 			deps.disconnect(deviceId);
+		},
+
+		/**
+		 * The Person's own Device, whose access is gone: it leaves the list
+		 * for good, with its Clones. To use it again, pair it again.
+		 */
+		async forget(personId: string, deviceId: string) {
+			const paired = await registry.get(deviceId);
+			if (!paired || paired.ownerId !== personId) {
+				throw new Refusal("forbidden", "This device is not one of yours here.");
+			}
+			if (paired.revokedAt === null) {
+				throw new Refusal(
+					"conflict",
+					"Remove the access of this device first.",
+				);
+			}
+			await deps.forgetClones(deviceId);
+			await registry.forget(deviceId);
 		},
 
 		/** A paired Device's link answered: it is online. */

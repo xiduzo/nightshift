@@ -195,6 +195,22 @@ export function recordClone(
 	}
 }
 
+/**
+ * The Clones of a Device and its name in the document: the keys to remove
+ * when the Device goes. Empty: the document never knew it.
+ */
+export function deviceEntries(
+	document: SpaceDocument,
+	deviceId: string,
+): { clones: string[]; named: boolean } {
+	const clones: string[] = [];
+	for (const [key, value] of document.clones.entries()) {
+		const parsed = spaceCloneSchema.safeParse(value);
+		if (parsed.success && parsed.data.deviceId === deviceId) clones.push(key);
+	}
+	return { clones, named: document.devices.has(deviceId) };
+}
+
 /** The Space documents of this Replica: views of its synced documents. */
 export type SpaceDocuments = {
 	/** The Space's document: imported and mirrored on its first open. */

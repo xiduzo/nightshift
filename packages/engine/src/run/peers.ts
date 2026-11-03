@@ -145,6 +145,7 @@ export type PeerProjects = Pick<
 	| "clones"
 	| "clonePath"
 	| "recordClone"
+	| "forgetDevice"
 	| "addFromRemote"
 	| "take"
 >;

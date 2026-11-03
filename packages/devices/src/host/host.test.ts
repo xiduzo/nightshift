@@ -50,6 +50,7 @@ beforeEach(async () => {
 		devicesPage: "https://studio.invalid/devices",
 		fingerprint: null,
 		disconnect: () => {},
+		forgetClones: async () => {},
 	});
 });
 afterEach(() => {

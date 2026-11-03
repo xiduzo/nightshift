@@ -105,6 +105,7 @@ export function createDevices(deps: {
 		approve: (headers, code) => host.approve(headers, code),
 		deny: (headers, code) => host.deny(headers, code),
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),
+		forget: (personId, deviceId) => host.forget(personId, deviceId),
 		hello: (key) => host.hello(key),
 		async others(ownerId) {
 			const view = (
