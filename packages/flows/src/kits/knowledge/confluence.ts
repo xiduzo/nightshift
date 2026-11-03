@@ -49,7 +49,7 @@ export const knowledgeConfluenceKit: FlowInput = {
 };
 
 function withSync(): Pick<FlowInput, "nodes" | "edges" | "outputs"> {
-	const ends = syncEnds("Pages synced");
+	const ends = syncEnds("Pages synced", "Could not sync the pages");
 	return {
 		...ends,
 		nodes: [

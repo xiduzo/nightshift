@@ -34,8 +34,11 @@ case "$folder" in
 esac
 dest="$NS_KNOWLEDGE/$folder"`;
 
+/** Sets `files`: how many files the kit's folder has. */
+export const FIND_FILES = String.raw`files=$(find "$dest" -type f -not -path '*/.git/*' | wc -l | tr -d ' ')`;
+
 /** The end of every sync command: how many files the kit's folder has, as its data. */
-export const COUNT_FILES = String.raw`files=$(find "$dest" -type f -not -path '*/.git/*' | wc -l | tr -d ' ')
+export const COUNT_FILES = String.raw`${FIND_FILES}
 printf '{"files": %s}' "$files" > "$NS_OUTPUT"`;
 
 /** The input every knowledge kit has: its folder in the knowledge folder. */
@@ -51,9 +54,15 @@ export function folderInput(
 	};
 }
 
-/** The ends every knowledge kit has: synced, or not. */
+/**
+ * The ends every knowledge kit has: synced, or not. `synced` starts the
+ * message of the first and `notSynced` is the message of the second.
+ * `syncedMore` is a template that follows the first message's file count.
+ */
 export function syncEnds(
-	what: string,
+	synced: string,
+	notSynced: string,
+	syncedMore = "",
 ): Pick<FlowInput, "nodes" | "edges" | "outputs"> {
 	return {
 		outputs: [
@@ -69,14 +78,14 @@ export function syncEnds(
 				type: "end",
 				position: { x: 300, y: -60 },
 				status: "done",
-				message: `${what}: {{sync.data.files}} files`,
+				message: `${synced}: {{sync.data.files}} files${syncedMore}`,
 			},
 			{
 				id: "not_synced",
 				type: "end",
 				position: { x: 300, y: 60 },
 				status: "failed",
-				message: `Could not sync ${what.toLowerCase()}`,
+				message: notSynced,
 			},
 		],
 		edges: [

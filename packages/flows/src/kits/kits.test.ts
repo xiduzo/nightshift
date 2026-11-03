@@ -87,6 +87,11 @@ exit "$code"
  */
 const CURL_STUB = `#!/bin/sh
 printf '%s\\n' "curl $*" >> "$STUB_LOG"
+case "$*" in
+	*timeout.example*) exit 22 ;;
+	*gone.example*) printf 'Title: Page Not Found\\n\\nWarning: Target URL returned error 404: Not Found\\n\\nMarkdown Content:\\nGone.\\n'; exit 0 ;;
+	*bot.example*) printf 'Title: Just a moment...\\n\\nWarning: This page maybe requiring CAPTCHA, please make sure you are authorized to access this page.\\n\\nMarkdown Content:\\nWait.\\n'; exit 0 ;;
+esac
 cat "$STUB_FIXTURES/curl.out"
 `;
 
@@ -907,14 +912,60 @@ describe("the knowledge kits", () => {
 			urls: "https://example.com/docs?page=1\nhttps://example.org",
 		});
 		expect(ran.outcome).toBe("synced");
-		expect(ran.data).toEqual({ files: 2 });
+		expect(ran.data).toEqual({ files: 2, skipped: "" });
 		expect(await read("web/example.com-docs-page-1.md")).toBe(
 			"Title: Docs\n\nThe docs.",
 		);
 		expect(await calls()).toEqual([
-			"curl -fsSL --max-time 120 https://r.jina.ai/https://example.com/docs?page=1",
-			"curl -fsSL --max-time 120 https://r.jina.ai/https://example.org",
+			"curl -fsL --max-time 120 https://r.jina.ai/https://example.com/docs?page=1",
+			"curl -fsL --max-time 120 https://r.jina.ai/https://example.org",
 		]);
+	});
+
+	test("web: a page that cannot be read does not stop the others", async () => {
+		await writeFile(join(fixtures, "curl.out"), "Title: Docs\n\nThe docs.");
+		const ran = await step(kit("kit:knowledge/web"), "sync", {
+			urls: "https://timeout.example\nhttps://gone.example\nhttps://bot.example\nhttps://example.org",
+		});
+		expect(ran.outcome).toBe("synced");
+		expect(ran.data).toEqual({
+			files: 1,
+			skipped:
+				". Could not read: https://timeout.example https://gone.example https://bot.example",
+		});
+		expect(ran.log).toContain(
+			"Could not read https://timeout.example: the page did not load.",
+		);
+		expect(ran.log).toContain(
+			"Could not read https://gone.example: the page is gone or blocks readers.",
+		);
+		expect(await read("web/example.org.md")).toBe("Title: Docs\n\nThe docs.");
+		expect(await readdir(join(knowledge, "web"))).toEqual(["example.org.md"]);
+	});
+
+	test("web: a page that cannot be read keeps its last copy", async () => {
+		await mkdir(join(knowledge, "web"), { recursive: true });
+		await writeFile(join(knowledge, "web/gone.example.md"), "The last copy.");
+		await writeFile(join(fixtures, "curl.out"), "Title: Docs");
+		const ran = await step(kit("kit:knowledge/web"), "sync", {
+			urls: "https://gone.example\nhttps://example.org",
+		});
+		expect(ran.outcome).toBe("synced");
+		expect(await read("web/gone.example.md")).toBe("The last copy.");
+	});
+
+	test("web: fails when it reads no page, and says which ones", async () => {
+		const flow = kit("kit:knowledge/web");
+		const ran = await step(flow, "sync", {
+			urls: "https://timeout.example\nhttps://bot.example",
+		});
+		expect(ran.outcome).toBe("fail");
+		expect(ran.log).toContain("Could not read https://timeout.example");
+		expect(ran.log).toContain("Could not read https://bot.example");
+		const end = flow.nodes.find((node) => node.id === "not_synced");
+		expect(end).toMatchObject({
+			message: "Could not read any page. {{sync.log_tail}}",
+		});
 	});
 
 	test("jira: each work item as markdown, its description as text", async () => {

@@ -39,7 +39,7 @@ export const knowledgeJiraKit: FlowInput = {
 };
 
 function withSync(): Pick<FlowInput, "nodes" | "edges" | "outputs"> {
-	const ends = syncEnds("Work items synced");
+	const ends = syncEnds("Work items synced", "Could not sync the work items");
 	return {
 		...ends,
 		nodes: [

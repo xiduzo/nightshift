@@ -27,7 +27,7 @@ export const knowledgeFilesKit: FlowInput = {
 };
 
 function withSync(): Pick<FlowInput, "nodes" | "edges" | "outputs"> {
-	const ends = syncEnds("Files copied");
+	const ends = syncEnds("Files copied", "Could not copy the files");
 	return {
 		outputs: ends.outputs,
 		nodes: [

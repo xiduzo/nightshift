@@ -37,7 +37,7 @@ export const knowledgeFolderKit: FlowInput = {
 };
 
 function withSync(): Pick<FlowInput, "nodes" | "edges" | "outputs"> {
-	const ends = syncEnds("Folder copied");
+	const ends = syncEnds("Folder copied", "Could not copy the folder");
 	return {
 		outputs: ends.outputs,
 		nodes: [

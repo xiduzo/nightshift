@@ -26,7 +26,7 @@ export const knowledgeGithubWikiKit: FlowInput = {
 };
 
 function withSync(): Pick<FlowInput, "nodes" | "edges" | "outputs"> {
-	const ends = syncEnds("Wiki synced");
+	const ends = syncEnds("Wiki synced", "Could not sync the wiki");
 	return {
 		...ends,
 		nodes: [
