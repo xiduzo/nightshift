@@ -99,6 +99,8 @@ export const projectSecretMutations = {
 	moveOut: orpc.projects.moveSecretOut.mutationOptions,
 	/** From this computer or from Personal. */
 	moveIn: orpc.projects.moveSecretIn.mutationOptions,
+	/** From another of your devices: that device moves its own value. */
+	moveFromDevice: orpc.projects.moveSecretFromDevice.mutationOptions,
 };
 
 export const cliToolQueries = {
@@ -131,8 +133,13 @@ export const programMutations = {
 };
 
 export const otherDeviceQueries = {
-	/** The owner's other Devices: their profiles and secret names, read-only here. */
+	/** The owner's other Devices: their profiles and secret names. */
 	list: () => orpc.devices.others.queryOptions(),
+};
+
+export const otherDeviceMutations = {
+	/** Another of your devices moves a secret saved there to Personal, or removes it. */
+	moveSecret: orpc.devices.moveSecret.mutationOptions,
 };
 
 export const deciderQueries = {

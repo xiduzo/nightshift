@@ -55,21 +55,13 @@ import {
 	RadioGroup,
 	RadioGroupItem,
 } from "@nightshift/ui/components/radio-group";
-import {
-	Select,
-	SelectContent,
-	SelectGroup,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowRightLeftIcon,
 	CircleAlertIcon,
@@ -81,17 +73,12 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { projectQueries } from "@/features/projects";
 import type { SecretView } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import {
-	connectionMutations,
-	connectionQueries,
-	projectSecretMutations,
-	projectSecretQueries,
-} from "../queries";
+import { connectionMutations, connectionQueries } from "../queries";
+import { MoveToProjectDialog } from "./move-to-project-dialog";
 import { OUTSIDE_HINT } from "./parts";
 import {
 	Ago,
@@ -428,7 +415,11 @@ export function SecretsCard({
 					}}
 				/>
 				<MoveToProjectDialog
-					target={toProject}
+					target={
+						toProject === null
+							? null
+							: { name: toProject.name, from: { scope: toProject.scope } }
+					}
 					onOpenChange={(open) => {
 						if (!open) setToProject(null);
 					}}
@@ -732,134 +723,5 @@ function RemoveSecretDialog({
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
-	);
-}
-
-/**
- * Moves a saved secret into a project of the Space you work in (ADR 13):
- * Night Shift saves it as the project's, then removes this copy. You never
- * type it again.
- */
-function MoveToProjectDialog({
-	target,
-	onOpenChange,
-}: {
-	target: SecretRef | null;
-	onOpenChange: (open: boolean) => void;
-}) {
-	return (
-		<Dialog open={target !== null} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-md">
-				{target !== null ? (
-					<MoveToProjectForm
-						target={target}
-						onDone={() => onOpenChange(false)}
-					/>
-				) : null}
-			</DialogContent>
-		</Dialog>
-	);
-}
-
-function MoveToProjectForm({
-	target,
-	onDone,
-}: {
-	target: SecretRef;
-	onDone: () => void;
-}) {
-	const id = useId();
-	const queryClient = useQueryClient();
-	const projects = useQuery(projectQueries.list());
-	const choices = (projects.data ?? []).map((project) => ({
-		value: project.id,
-		label: project.name,
-	}));
-	const [projectId, setProjectId] = useState<string | null>(null);
-	const chosen = choices.find((choice) => choice.value === projectId);
-	const move = useMutation(
-		projectSecretMutations.moveIn({
-			onSuccess: () => {
-				toast.success(
-					`Moved ${target.name} to ${chosen?.label ?? "the project"}`,
-				);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
-				void queryClient.invalidateQueries({
-					queryKey: projectSecretQueries.lists(),
-				});
-				onDone();
-			},
-		}),
-	);
-
-	return (
-		<form
-			className="contents"
-			onSubmit={(event) => {
-				event.preventDefault();
-				if (projectId) {
-					move.mutate({
-						projectId,
-						name: target.name,
-						from: target.scope,
-					});
-				}
-			}}
-		>
-			<DialogHeader>
-				<DialogTitle>
-					Move <span className="font-mono">{target.name}</span> to a project
-				</DialogTitle>
-				<DialogDescription>
-					Every step of the project's runs can use it, on any computer. Everyone
-					who can change the project's flows can use it.
-				</DialogDescription>
-			</DialogHeader>
-			<FieldGroup>
-				<Field data-invalid={move.error ? true : undefined}>
-					<FieldLabel htmlFor={`${id}-project`}>Project</FieldLabel>
-					<Select
-						items={choices}
-						value={projectId}
-						onValueChange={(value) => setProjectId(value)}
-						disabled={choices.length === 0}
-					>
-						<SelectTrigger id={`${id}-project`} className="w-full">
-							<SelectValue placeholder="Choose a project" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectGroup>
-								{choices.map((choice) => (
-									<SelectItem key={choice.value} value={choice.value}>
-										{choice.label}
-									</SelectItem>
-								))}
-							</SelectGroup>
-						</SelectContent>
-					</Select>
-					{choices.length === 0 && !projects.isLoading ? (
-						<FieldDescription>
-							This Space has no projects yet. Add one first.
-						</FieldDescription>
-					) : null}
-					{move.error ? <FieldError>{move.error.message}</FieldError> : null}
-				</Field>
-			</FieldGroup>
-			<DialogFooter>
-				<DialogClose render={<Button variant="outline" type="button" />}>
-					Cancel
-				</DialogClose>
-				<Button type="submit" disabled={!projectId || move.isPending}>
-					{move.isPending ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<ArrowRightLeftIcon data-icon="inline-start" />
-					)}
-					{move.isPending ? "Moving…" : "Move"}
-				</Button>
-			</DialogFooter>
-		</form>
 	);
 }

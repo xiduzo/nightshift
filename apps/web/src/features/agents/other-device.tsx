@@ -1,6 +1,24 @@
-/** The profiles and secret names of your other devices: read-only on this computer. */
+/** The profiles and secret names of your other devices. Each moves a secret saved there when you ask. */
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
 import {
 	Empty,
 	EmptyDescription,
@@ -10,22 +28,43 @@ import {
 } from "@nightshift/ui/components/empty";
 import {
 	Item,
+	ItemActions,
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
-import { BotIcon, KeyRoundIcon, LaptopIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+	ArrowRightLeftIcon,
+	BotIcon,
+	FolderInputIcon,
+	KeyRoundIcon,
+	LaptopIcon,
+	MoreHorizontalIcon,
+	Trash2Icon,
+} from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import type { OtherDevice } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
+import {
+	type MoveTarget,
+	MoveToProjectDialog,
+} from "./connections/move-to-project-dialog";
+import {
+	connectionQueries,
+	otherDeviceMutations,
+	otherDeviceQueries,
+} from "./queries";
 
-/** Where a person changes what another device has. */
-function openOn(device: Pick<OtherDevice, "name">): string {
-	return `To change its profiles and secrets, open Night Shift on ${device.name}.`;
+/** Where a person changes the profiles of another device: there. */
+function profilesOn(device: Pick<OtherDevice, "name">): string {
+	return `To change its profiles, open Night Shift on ${device.name}.`;
 }
 
 /** One of your other devices: its profiles and the names of its secrets. */
@@ -44,14 +83,14 @@ export function OtherDeviceDetail({ device }: { device: OtherDevice }) {
 							? "Online. "
 							: "Offline. "}
 					{device.checkedAt === null ? (
-						openOn(device)
+						profilesOn(device)
 					) : (
 						<>
 							Updated{" "}
 							<LocalTime at={device.checkedAt}>
 								{formatRelative(device.checkedAt, now)}
 							</LocalTime>
-							. {openOn(device)}
+							. {profilesOn(device)}
 						</>
 					)}
 				</>
@@ -84,7 +123,7 @@ export function OtherDeviceDetail({ device }: { device: OtherDevice }) {
 			</DetailSection>
 			<DetailSection
 				title="Secrets"
-				description={`Only their names. The values stay on ${device.name}.`}
+				description={`Saved on ${device.name}. To use one on all your computers, move it to Personal.`}
 			>
 				<SecretNames device={device} now={now} />
 			</DetailSection>
@@ -99,15 +138,12 @@ export function OtherDevicesSecrets({ devices }: { devices: OtherDevice[] }) {
 	return (
 		<PageSection
 			title="On your other devices"
-			description="The names of the secrets saved there. The values stay on each device."
+			description="The secrets saved on each device. To use one on all your computers, move it to Personal."
 		>
 			{devices.map((device) => (
 				<Card key={device.id} className="py-0">
 					<CardContent className="flex flex-col gap-3 p-4">
-						<div className="flex flex-col gap-1">
-							<h3 className="font-medium text-sm">{device.name}</h3>
-							<p className="text-muted-foreground text-xs">{openOn(device)}</p>
-						</div>
+						<h3 className="font-medium text-sm">{device.name}</h3>
 						<SecretNames device={device} now={now} />
 					</CardContent>
 				</Card>
@@ -116,7 +152,47 @@ export function OtherDevicesSecrets({ devices }: { devices: OtherDevice[] }) {
 	);
 }
 
+/**
+ * The secrets saved on one of your other devices, each with a menu: that
+ * device moves its own value to Personal or into a project, or removes it.
+ * The value never passes through this computer.
+ */
 function SecretNames({ device, now }: { device: OtherDevice; now: number }) {
+	const queryClient = useQueryClient();
+	const [toProject, setToProject] = useState<MoveTarget | null>(null);
+	const [removing, setRemoving] = useState<string | null>(null);
+	/** The device no longer lists it: its copy here follows a moment later. */
+	const forget = (name: string) =>
+		queryClient.setQueryData(otherDeviceQueries.list().queryKey, (devices) =>
+			devices?.map((d) =>
+				d.id === device.id
+					? { ...d, secrets: d.secrets.filter((s) => s.name !== name) }
+					: d,
+			),
+		);
+	const moveSecret = useMutation(
+		otherDeviceMutations.moveSecret({
+			onSuccess: (_, { name, to }) => {
+				toast.success(
+					to === "removed"
+						? `Removed ${name} from ${device.name}`
+						: `Moved ${name} to Personal`,
+				);
+				forget(name);
+				void queryClient.invalidateQueries({
+					queryKey: connectionQueries.lists(),
+				});
+				setRemoving(null);
+			},
+			onError: (error, { to }) =>
+				toast.error(
+					`${to === "removed" ? "Not removed" : "Not moved"}: ${error.message}`,
+				),
+		}),
+	);
+	const busy = (name: string) =>
+		moveSecret.isPending && moveSecret.variables?.name === name;
+
 	if (device.secrets.length === 0) {
 		return (
 			<NothingYet
@@ -127,23 +203,121 @@ function SecretNames({ device, now }: { device: OtherDevice; now: number }) {
 		);
 	}
 	return (
-		<ItemGroup className="gap-2" aria-label={`Secrets on ${device.name}`}>
-			{device.secrets.map((secret) => (
-				<Item key={secret.name} variant="outline" size="sm">
-					<ItemContent>
-						<ItemTitle className="font-mono">{secret.name}</ItemTitle>
-						{secret.setAt === null ? null : (
-							<ItemDescription>
-								Set{" "}
-								<LocalTime at={secret.setAt}>
-									{formatRelative(secret.setAt, now)}
-								</LocalTime>
-							</ItemDescription>
-						)}
-					</ItemContent>
-				</Item>
-			))}
-		</ItemGroup>
+		<>
+			<ItemGroup className="gap-2" aria-label={`Secrets on ${device.name}`}>
+				{device.secrets.map((secret) => (
+					<Item key={secret.name} variant="outline" size="sm">
+						<ItemContent>
+							<ItemTitle className="font-mono">{secret.name}</ItemTitle>
+							{secret.setAt === null ? null : (
+								<ItemDescription>
+									Set{" "}
+									<LocalTime at={secret.setAt}>
+										{formatRelative(secret.setAt, now)}
+									</LocalTime>
+								</ItemDescription>
+							)}
+						</ItemContent>
+						<ItemActions>
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<Button
+											variant="ghost"
+											size="icon-sm"
+											aria-label={`More for ${secret.name}`}
+											disabled={busy(secret.name)}
+										/>
+									}
+								>
+									{busy(secret.name) ? <Spinner /> : <MoreHorizontalIcon />}
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" className="w-56">
+									<DropdownMenuItem
+										onClick={() =>
+											moveSecret.mutate({
+												deviceId: device.id,
+												name: secret.name,
+												to: "personal",
+											})
+										}
+									>
+										<ArrowRightLeftIcon />
+										Move to Personal
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() =>
+											setToProject({
+												name: secret.name,
+												from: { deviceId: device.id, deviceName: device.name },
+											})
+										}
+									>
+										<FolderInputIcon />
+										Move to a project…
+									</DropdownMenuItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										variant="destructive"
+										onClick={() => setRemoving(secret.name)}
+									>
+										<Trash2Icon />
+										Remove from {device.name}
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</ItemActions>
+					</Item>
+				))}
+			</ItemGroup>
+			<MoveToProjectDialog
+				target={toProject}
+				onOpenChange={(open) => {
+					if (!open) setToProject(null);
+				}}
+				onMoved={(target) => forget(target.name)}
+			/>
+			<AlertDialog
+				open={removing !== null}
+				onOpenChange={(open) => {
+					if (!open) setRemoving(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							Remove <span className="font-mono">{removing}</span> from{" "}
+							{device.name}?
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							Steps on {device.name} that use it have no value until you set it
+							again.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={moveSecret.isPending}
+							onClick={() => {
+								if (removing) {
+									moveSecret.mutate({
+										deviceId: device.id,
+										name: removing,
+										to: "removed",
+									});
+								}
+							}}
+						>
+							{moveSecret.isPending ? (
+								<Spinner data-icon="inline-start" />
+							) : null}
+							{moveSecret.isPending ? "Removing…" : "Remove"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</>
 	);
 }
 
