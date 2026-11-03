@@ -45,6 +45,11 @@ describe("the Host's contract", () => {
 			"archive.knowledgeGet",
 			"archive.follow",
 			"archive.tail",
+			// ADR 13: an older Host has none, and the Device says to update it.
+			"secrets.list",
+			"secrets.values",
+			"secrets.set",
+			"secrets.remove",
 			"devices.work",
 			"devices.call",
 			"devices.reachable",
