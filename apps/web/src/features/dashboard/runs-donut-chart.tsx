@@ -8,6 +8,15 @@ import {
 	type RunStatusCounts,
 } from "./run-statuses";
 
+/** Without runs the donut is one gray ring. */
+const NO_RUNS = [
+	{
+		status: "none",
+		count: 1,
+		fill: "color-mix(in oklch, var(--muted-foreground) 40%, transparent)",
+	},
+];
+
 /** A donut of run statuses, after the shadcn `chart-pie-donut` block. Small enough for a sidebar badge. */
 export function RunsDonutChart({
 	runs,
@@ -16,6 +25,7 @@ export function RunsDonutChart({
 	runs: RunStatusCounts;
 	className?: string;
 }) {
+	const counts = countRunStatuses(runs);
 	return (
 		<ChartContainer
 			config={RUN_STATUS_CHART}
@@ -26,7 +36,7 @@ export function RunsDonutChart({
 			{/* Recharts keeps a 5px margin by default; at 16px that leaves a dot. */}
 			<PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
 				<Pie
-					data={countRunStatuses(runs)}
+					data={counts.length > 0 ? counts : NO_RUNS}
 					dataKey="count"
 					nameKey="status"
 					innerRadius="50%"

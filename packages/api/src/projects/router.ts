@@ -2,9 +2,11 @@ import { isAbsolute, join, relative } from "node:path";
 import type { ProjectRuns } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
+import { timeZoneSchema } from "../dashboard";
 import { output } from "../output";
 import {
 	ownerOnly,
@@ -42,10 +44,18 @@ export const projects = {
 				"Lists the projects of the Space, with the Devices that have a Clone of each and how their runs stand.",
 		})
 		.output(output(z.array(listedProjectSchema)))
-		.handler(async ({ context }) => {
+		.input(
+			z
+				.object({
+					/** The reader's time zone: the nights of a project's runs fall on its clock. */
+					timeZone: timeZoneSchema,
+				})
+				.default({ timeZone: "UTC" }),
+		)
+		.handler(async ({ context, input }) => {
 			const [projects, runs] = await Promise.all([
 				context.space.listProjects(),
-				context.space.projectRuns(),
+				context.space.projectRuns({ now: now(), timeZone: input.timeZone }),
 			]);
 			return projects.map((project) => ({
 				...project,

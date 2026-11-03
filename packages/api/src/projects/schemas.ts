@@ -44,6 +44,15 @@ const projectRunsSchema = exact<ProjectRuns>()(
 			.object({ id: z.string(), title: z.string(), createdAt: z.number() })
 			.nullable(),
 		nextWakeAt: z.number().nullable(),
+		nights: z
+			.array(
+				z.object({
+					nights: z.literal([7, 30, 90]),
+					total: z.number(),
+					statuses: z.partialRecord(runStatusSchema, z.number()),
+				}),
+			)
+			.optional(),
 	}),
 );
 

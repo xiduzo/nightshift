@@ -1,5 +1,5 @@
 import type { RunStatus } from "../log";
-import type { RunSummary } from "../read";
+import { NIGHT_RANGES, type NightRange, type RunSummary } from "../read";
 
 /**
  * The dashboard's numbers, computed from the runs on the server: the stat
@@ -9,8 +9,7 @@ import type { RunSummary } from "../read";
  */
 
 /** The night ranges the details offer: 7, 30 or 90 nights. */
-export const NIGHT_RANGES = [7, 30, 90] as const;
-export type NightRange = (typeof NIGHT_RANGES)[number];
+export { NIGHT_RANGES, type NightRange };
 
 /** The hour ranges of the activity details: a day, two, a week. */
 export const HOUR_RANGES = [24, 48, 168] as const;

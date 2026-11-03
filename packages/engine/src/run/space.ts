@@ -146,9 +146,9 @@ export function createSpaces(deps: SpacesDeps) {
 				return withClones(spaceId, await projects.listInSpace(spaceId));
 			},
 
-			async projectRuns() {
+			async projectRuns(read) {
 				await ready;
-				return reads.projectRuns(spaceId);
+				return reads.projectRuns(spaceId, read);
 			},
 
 			async addProject(input) {

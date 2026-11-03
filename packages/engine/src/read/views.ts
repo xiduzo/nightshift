@@ -242,11 +242,24 @@ export type RunSummary = {
 	metrics?: RunMetrics;
 };
 
+/** The night ranges the dashboard and the sidebar offer: 7, 30 or 90 nights. */
+export const NIGHT_RANGES = [7, 30, 90] as const;
+export type NightRange = (typeof NIGHT_RANGES)[number];
+
 /** How the runs of one project stand: what a project's row and the sidebar show. */
 export type ProjectRuns = {
 	total: number;
 	/** How many runs have each status. A status no run has is left out. */
 	statuses: Partial<Record<RunStatus, number>>;
+	/**
+	 * The same counts over the last 7, 30 and 90 nights, on the reader's
+	 * clock, as the dashboard counts them. Older Hosts send none.
+	 */
+	nights?: {
+		nights: NightRange;
+		total: number;
+		statuses: Partial<Record<RunStatus, number>>;
+	}[];
 	/** The newest run. Null without runs. */
 	last: { id: string; title: string; createdAt: number } | null;
 	/** When the first of its sleeping runs wakes. Null when none waits for a time. */

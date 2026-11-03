@@ -59,3 +59,4 @@ export type {
 	RunWalker,
 	StepDetail,
 } from "./views";
+export { NIGHT_RANGES, type NightRange } from "./views";

@@ -307,6 +307,14 @@ describe("the read model", () => {
 			last: { id: "r2", title: "Second" },
 			nextWakeAt: null,
 		});
+		// Both runs started tonight: every night range counts them.
+		expect(counts.get("p")?.nights).toEqual(
+			([7, 30, 90] as const).map((nights) => ({
+				nights,
+				total: 2,
+				statuses: { running: 1, finished: 1 },
+			})),
+		);
 		// A project without runs is not in it.
 		expect(counts.has("q")).toBe(false);
 	});

@@ -4,7 +4,7 @@ import type { Database } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { asDate, instant } from "@nightshift/time";
+import { asDate, instant, lastNights, nightOf, now } from "@nightshift/time";
 import { and, desc, eq, gte, isNull, lt, or } from "drizzle-orm";
 import { stepSources } from "../knowledge";
 import {
@@ -66,6 +66,7 @@ import type {
 	StepSummary,
 	SubflowRun,
 } from "./views";
+import { NIGHT_RANGES } from "./views";
 
 /**
  * The read model: what people see of a run, derived from the event log
@@ -686,7 +687,16 @@ export function createReadModel(deps: ReadModelDeps) {
 	 */
 	async function projectRuns(
 		spaceId: string,
+		read: { now: number; timeZone: string } = {
+			now: now(),
+			timeZone: "UTC",
+		},
 	): Promise<Map<string, ProjectRuns>> {
+		// The first night of each range, as the dashboard counts them.
+		const ranges = NIGHT_RANGES.map((nights) => ({
+			nights,
+			first: lastNights(nights, read.now, read.timeZone)[0] ?? read.now,
+		}));
 		const rows = await db
 			.select({
 				id: run.id,
@@ -715,6 +725,11 @@ export function createReadModel(deps: ReadModelDeps) {
 						createdAt: instant(row.createdAt),
 					},
 					nextWakeAt: null,
+					nights: ranges.map(({ nights }) => ({
+						nights,
+						total: 0,
+						statuses: {},
+					})),
 				};
 				counts.set(row.projectId, counted);
 			}
@@ -722,6 +737,13 @@ export function createReadModel(deps: ReadModelDeps) {
 			if (!fact) continue;
 			counted.total += 1;
 			counted.statuses[fact.status] = (counted.statuses[fact.status] ?? 0) + 1;
+			const night = nightOf(instant(row.createdAt), read.timeZone);
+			ranges.forEach(({ first }, index) => {
+				const range = counted.nights?.[index];
+				if (!range || night < first) return;
+				range.total += 1;
+				range.statuses[fact.status] = (range.statuses[fact.status] ?? 0) + 1;
+			});
 			if (
 				fact.wakeAt !== null &&
 				(counted.nextWakeAt === null || fact.wakeAt < counted.nextWakeAt)

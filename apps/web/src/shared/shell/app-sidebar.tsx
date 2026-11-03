@@ -57,15 +57,14 @@ import {
 	WorkflowIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { type ComponentProps, type ReactNode, useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { describeRunStatuses, RunsDonut } from "@/features/dashboard";
 import { ThisDeviceLabel } from "@/features/devices";
-import { flowQueries } from "@/features/flows";
 import { useOpenGates } from "@/features/gates";
 import { AddProjectDialog, projectQueries } from "@/features/projects";
-import { scheduleQueries } from "@/features/schedules";
 import { SpaceSwitcher } from "@/features/spaces";
 import type { Project } from "@/shared/api";
+import { useSidebarRange } from "./use-sidebar-range";
 
 /**
  * The app shell's sidebar, after the shadcn `sidebar-07` block with the
@@ -149,6 +148,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 /** The projects. The + on the group label is the one place to add a project. */
 function NavProjects({ projects }: { projects: Project[] | undefined }) {
 	const [adding, setAdding] = useState(false);
+	const range = useSidebarRange();
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Projects</SidebarGroupLabel>
@@ -158,7 +158,7 @@ function NavProjects({ projects }: { projects: Project[] | undefined }) {
 			</SidebarGroupAction>
 			<SidebarMenu>
 				{projects?.map((project) => (
-					<ProjectItem key={project.id} project={project} />
+					<ProjectItem key={project.id} project={project} range={range} />
 				))}
 			</SidebarMenu>
 			<AddProjectDialog open={adding} onOpenChange={setAdding} />
@@ -201,9 +201,10 @@ const PROJECT_PAGES: {
 
 /**
  * One project: its name opens the project's page and names the page of
- * the project you are on. The ⋯ menu opens its other pages.
+ * the project you are on. Its icon is a donut of its runs over the range
+ * of Home or the project's page. The ⋯ menu opens its other pages.
  */
-function ProjectItem({ project }: { project: Project }) {
+function ProjectItem({ project, range }: { project: Project; range: number }) {
 	const matchRoute = useMatchRoute();
 	const { isMobile } = useSidebar();
 	const params = { projectId: project.id };
@@ -217,19 +218,24 @@ function ProjectItem({ project }: { project: Project }) {
 
 	// Counted by Night Shift with the project list: no read per project.
 	const running = (project.runs?.statuses.running ?? 0) > 0;
+	const inRange = project.runs?.nights?.find((r) => r.nights === range);
+	const runs = inRange
+		? `Last ${range} nights: ${describeRunStatuses(inRange)}`
+		: null;
+	const label = [project.name, runs, running ? "A run is in progress" : null]
+		.filter(Boolean)
+		.join(". ");
 
 	return (
 		<SidebarMenuItem>
 			<SidebarMenuButton
-				tooltip={
-					running ? `${project.name}, a run is in progress` : project.name
-				}
+				tooltip={label}
 				isActive={inProject}
 				render={<Link to="/projects/$projectId" params={params} />}
 			>
-				{/* A pulsing dot on the folder while a run in this project is in progress. */}
+				{/* A pulsing dot on the icon while a run in this project is in progress. */}
 				<span className="relative flex shrink-0">
-					<Icon aria-hidden="true" />
+					{inRange ? <RunsDonut runs={inRange} /> : <Icon aria-hidden="true" />}
 					{running ? (
 						<span className="absolute -top-0.5 -right-0.5 flex size-2">
 							<span className="absolute inset-0 animate-ping rounded-full bg-status-running/60 motion-reduce:hidden" />
@@ -239,8 +245,8 @@ function ProjectItem({ project }: { project: Project }) {
 				</span>
 				<span className="truncate">
 					{project.name}
-					{running ? (
-						<span className="sr-only">, a run is in progress</span>
+					{label !== project.name ? (
+						<span className="sr-only">{label.slice(project.name.length)}</span>
 					) : null}
 				</span>
 				{current ? (
@@ -266,7 +272,6 @@ function ProjectItem({ project }: { project: Project }) {
 					side={isMobile ? "bottom" : "right"}
 					align={isMobile ? "end" : "start"}
 				>
-					{/* Its flows and schedules are read only while the menu is open. */}
 					<ProjectPages project={project} />
 				</DropdownMenuContent>
 			</DropdownMenu>
@@ -274,50 +279,8 @@ function ProjectItem({ project }: { project: Project }) {
 	);
 }
 
-/** The pages of a project in its menu, each with its count. */
+/** The pages of a project in its menu. */
 function ProjectPages({ project }: { project: Project }) {
-	const flows = useQuery({
-		...flowQueries.list(project.id),
-		staleTime: 30_000,
-		meta: { quietErrors: true },
-	});
-	const schedules = useQuery({
-		...scheduleQueries.list(project.id),
-		staleTime: 30_000,
-		meta: { quietErrors: true },
-	});
-	const schedulesOn = schedules.data?.schedules.filter((s) => s.enabled);
-	const runs = project.runs;
-
-	// What the menu shows beside a page, and what a screen reader says.
-	const count: Partial<
-		Record<ProjectPageRoute, { shown: ReactNode; spoken: string }>
-	> = {};
-	if (flows.data) {
-		const n = flows.data.length;
-		count["/projects/$projectId/flows"] = {
-			shown: n,
-			spoken: `${n} ${n === 1 ? "flow" : "flows"}`,
-		};
-	}
-	if (runs) {
-		count["/projects/$projectId/runs"] = {
-			shown: (
-				<>
-					{runs.total > 0 ? <RunsDonut runs={runs} /> : null}
-					{runs.total}
-				</>
-			),
-			spoken: describeRunStatuses(runs),
-		};
-	}
-	if (schedules.data && schedulesOn) {
-		count["/projects/$projectId/schedules"] = {
-			shown: schedulesOn.length,
-			spoken: `${schedulesOn.length} of ${schedules.data.schedules.length} schedules on`,
-		};
-	}
-
 	return PROJECT_PAGES.filter(
 		// What runs left in the project's folder: only where it has one.
 		(page) =>
@@ -329,17 +292,6 @@ function ProjectPages({ project }: { project: Project }) {
 		>
 			<PageIcon aria-hidden="true" />
 			{label}
-			{count[to] ? (
-				<>
-					<span
-						aria-hidden="true"
-						className="ml-auto flex items-center gap-1.5 text-muted-foreground text-xs tabular-nums"
-					>
-						{count[to].shown}
-					</span>
-					<span className="sr-only">, {count[to].spoken}</span>
-				</>
-			) : null}
 		</DropdownMenuItem>
 	));
 }

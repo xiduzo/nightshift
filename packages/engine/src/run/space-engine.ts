@@ -26,8 +26,15 @@ import type { RunActionRequest } from "./actions";
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {
 	listProjects(): Promise<Project[]>;
-	/** How the runs of each project stand, by project id. A project without runs is not in it. */
-	projectRuns(): Promise<Map<string, ProjectRuns>>;
+	/**
+	 * How the runs of each project stand, by project id. A project without
+	 * runs is not in it. Its nights fall on the clock of `read`: UTC now
+	 * without it.
+	 */
+	projectRuns(read?: {
+		now: number;
+		timeZone: string;
+	}): Promise<Map<string, ProjectRuns>>;
 	/**
 	 * Fails when the path is not the top level of a git repository. A
 	 * repository without commits is added; `checkProjectFolder` says what it

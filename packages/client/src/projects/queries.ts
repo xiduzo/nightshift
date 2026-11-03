@@ -1,12 +1,16 @@
 import type { ApiQueryUtils } from "../api";
+import { readerTimeZone } from "../dashboard";
 
 /** The query options of projects. */
 export function createProjectQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every projects query. Invalidate it after a project changes. */
 		all: () => orpc.projects.key(),
-		/** The projects of the active Space, each with the counts of its runs. */
-		list: () => orpc.projects.list.queryOptions(),
+		/** The projects of the active Space, each with the counts of its runs, per night range on the reader's clock. */
+		list: () =>
+			orpc.projects.list.queryOptions({
+				input: { timeZone: readerTimeZone() },
+			}),
 		/** Every list of projects. A run that changes changes its counts. */
 		lists: () => orpc.projects.list.key(),
 		/** Whether the folder at `path` can be a project: git, a repository, a commit. */
