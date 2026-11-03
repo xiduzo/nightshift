@@ -35,34 +35,21 @@ describe("offlineNeeds", () => {
 
 	test("names each computer the flow needs that is offline, once", () => {
 		expect(
-			offlineNeeds(
-				{
-					names: ["MacBook Pro", "Tower", "studio", "MacBook Pro"],
-					ids: ["mbp", "mini"],
-				},
-				known,
-			),
+			offlineNeeds({ ids: ["mbp", "pc", "host", "mbp", "mini"] }, known),
 		).toEqual(["MacBook Pro", "Mac mini"]);
 	});
 
 	test("a computer whose access was removed is offline", () => {
-		expect(offlineNeeds({ names: [], ids: ["old"] }, known)).toEqual([
-			"Old laptop",
-		]);
+		expect(offlineNeeds({ ids: ["old"] }, known)).toEqual(["Old laptop"]);
 	});
 
 	test("says nothing of a computer it does not know or cannot tell about", () => {
-		expect(
-			offlineNeeds({ names: ["Far away", "Nowhere"], ids: ["x"] }, known),
-		).toEqual([]);
+		expect(offlineNeeds({ ids: ["far", "nowhere"] }, known)).toEqual([]);
 	});
 
 	test("the Host is online, also before the other reads arrive", () => {
 		expect(
-			offlineNeeds(
-				{ names: ["studio"], ids: [] },
-				knownComputers(overview, undefined),
-			),
+			offlineNeeds({ ids: ["host"] }, knownComputers(overview, undefined)),
 		).toEqual([]);
 		expect(knownComputers(undefined, undefined)).toEqual([]);
 	});

@@ -101,11 +101,14 @@ export function WebhookDialog({
 	onOpenChange,
 	projectId,
 	schedule,
+	device,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	projectId: string;
 	schedule: ScheduleSummary | null;
+	/** The name of the computer the schedule runs on, when it names one. */
+	device?: string | undefined;
 }) {
 	const id = useId();
 	const secret = webhookSecretName(schedule?.webhook?.secret ?? "");
@@ -157,7 +160,7 @@ export function WebhookDialog({
 													<LastDelivery
 														delivery={delivery}
 														zone={schedule.timeZone}
-														device={schedule.device}
+														device={device}
 													/>
 												</ItemTitle>
 												{outcomeOf(delivery) ? (

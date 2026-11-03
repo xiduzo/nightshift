@@ -6,6 +6,7 @@ import {
 	type PlannedSchedule,
 	scheduleName,
 } from "@nightshift/client";
+import { deviceIdOf, legacyDeviceName } from "@nightshift/flows";
 
 import { formatTime } from "@/shared/format";
 import { shownPaused } from "./schedule-words";
@@ -33,8 +34,8 @@ const LIVE = new Set(["running", "waiting", "sleeping"]);
 
 /**
  * The schedules of the next 24 hours (`plan.soon`), with the computer
- * each runs on: its own `device`, else the Host, which fires every
- * schedule. A computer is offline only when the Host says so.
+ * each runs on: its own `device` (by its id), else the Host, which fires
+ * every schedule. A computer is offline only when the Host says so.
  */
 export function tonightEntries(
 	soon: readonly PlannedSchedule[],
@@ -46,10 +47,15 @@ export function tonightEntries(
 	return soon.map((entry) => {
 		const { schedule } = entry;
 		const key = scheduleKey(entry.projectId, schedule.id);
-		const computer = schedule.device ?? hostName;
+		const id = deviceIdOf(schedule.device);
+		const computer =
+			schedule.device === undefined
+				? hostName
+				: id === undefined
+					? legacyDeviceName(schedule.device)
+					: (known.find((one) => one.id === id)?.name ?? "another computer");
 		const offline =
-			computer !== null &&
-			offlineNeeds({ names: [computer], ids: [] }, known).length > 0;
+			id !== undefined && offlineNeeds({ ids: [id] }, known).length > 0;
 		const last = schedule.last;
 		const started =
 			last?.kind === "fired" &&

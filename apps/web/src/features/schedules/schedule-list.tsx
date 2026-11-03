@@ -40,6 +40,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
 	type Machine,
+	machineName,
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
@@ -109,7 +110,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					machines,
 					schedule.device,
 					schedule.flow === undefined
-						? { names: [], ids: [] }
+						? { ids: [] }
 						: flows.data?.find((flow) => flow.name === schedule.flow)?.devices,
 				)
 			: [];
@@ -285,6 +286,10 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 				}}
 				projectId={projectId}
 				schedule={schedules.find((s) => s.id === hookOf) ?? null}
+				device={machineName(
+					machines,
+					schedules.find((s) => s.id === hookOf)?.device,
+				)}
 			/>
 
 			<AlertDialog

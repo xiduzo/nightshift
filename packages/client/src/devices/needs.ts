@@ -2,9 +2,9 @@ import type { DevicesOverview, SpaceDevice } from "./types";
 
 /**
  * Which computers a flow needs that are offline now. A flow names its
- * computers by name (a node's device) and by id (a profile's device). The
- * Host answers what it knows of them: the Space's computers, the
- * Person's paired computers, and itself.
+ * computers by id (a node's device, a profile's device). The Host answers
+ * what it knows of them: the Space's computers, the Person's paired
+ * computers, and itself.
  */
 
 /** A computer as the Host knows it now. Null `online`: it cannot tell. */
@@ -45,18 +45,13 @@ export function knownComputers(
  * tell about, is left out: there is nothing sure to say.
  */
 export function offlineNeeds(
-	flow: { names: readonly string[]; ids: readonly string[] },
+	flow: { ids: readonly string[] },
 	known: readonly KnownComputer[],
 ): string[] {
 	const offline = new Set<string>();
-	const check = (computer: KnownComputer | undefined) => {
-		if (computer?.online === false) offline.add(computer.name);
-	};
-	for (const name of flow.names) {
-		check(known.find((computer) => computer.name === name));
-	}
 	for (const id of flow.ids) {
-		check(known.find((computer) => computer.id === id));
+		const computer = known.find((one) => one.id === id);
+		if (computer?.online === false) offline.add(computer.name);
 	}
 	return [...offline];
 }

@@ -2,7 +2,7 @@
 
 export { DevicesPage } from "./devices-page";
 export { MachineBadge, useSpaceMachines } from "./machine-badge";
-export { type Machine, neededMachines } from "./machines";
+export { type Machine, machineName, neededMachines } from "./machines";
 export { deviceQueries } from "./queries";
 export { ThisComputerSettings } from "./this-computer-settings";
 export { ThisDeviceLabel } from "./this-device-label";

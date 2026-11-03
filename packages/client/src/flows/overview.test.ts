@@ -16,7 +16,7 @@ const flow = (
 	errorCount: 0,
 	inputs: [],
 	callers: [],
-	devices: { names: [], ids: [] },
+	devices: { ids: [] },
 	nodeTypes: [],
 	gateCount: 0,
 	...extra,

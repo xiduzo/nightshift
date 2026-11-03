@@ -128,7 +128,7 @@ const TonightRow = memo(function TonightRow({
 			? undefined
 			: hoverTime(at, {
 					zone: schedule.timeZone,
-					device: schedule.device ?? entry.computer,
+					device: entry.computer,
 				});
 
 	let actions: ReactNode = null;

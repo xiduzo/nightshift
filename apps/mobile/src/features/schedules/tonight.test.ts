@@ -51,12 +51,9 @@ const known: KnownComputer[] = [
 const none = new Map<string, "pause" | "resume">();
 
 describe("tonightEntries", () => {
-	test("takes the schedule's own computer, else the Host", () => {
+	test("takes the schedule's own computer by its id, else the Host", () => {
 		const [own, host] = tonightEntries(
-			[
-				planned(schedule("a", { device: "MacBook Pro" })),
-				planned(schedule("b")),
-			],
+			[planned(schedule("a", { device: "m" })), planned(schedule("b"))],
 			known,
 			"Host",
 			NOW,
@@ -68,7 +65,7 @@ describe("tonightEntries", () => {
 
 	test("is not offline when the Host cannot tell, or knows no computer", () => {
 		const [unsure, nameless] = tonightEntries(
-			[planned(schedule("a", { device: "Unsure" })), planned(schedule("b"))],
+			[planned(schedule("a", { device: "x" })), planned(schedule("b"))],
 			known,
 			null,
 			NOW,
@@ -147,10 +144,10 @@ describe("offlineNotices", () => {
 	test("lists each schedule that starts on a computer that is offline", () => {
 		const entries = tonightEntries(
 			[
-				planned(schedule("lighthouse", { device: "MacBook Pro" })),
+				planned(schedule("lighthouse", { device: "m" })),
 				planned(
 					schedule("paused", {
-						device: "MacBook Pro",
+						device: "m",
 						pausedUntil: NOW + 20 * HOUR,
 					}),
 				),

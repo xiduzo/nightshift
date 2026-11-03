@@ -18,11 +18,11 @@ describe("a node's Device", () => {
 		expect(runsOnDevice(node({ type: "wait" }))).toBe(false);
 	});
 
-	test("setting it, and back to the run's device", () => {
-		const placed = withDevice(node({ type: "command" }), "hetzner-1");
-		expect(placed).toMatchObject({ device: "hetzner-1" });
+	test("setting it by its id, and back to the run's device", () => {
+		const placed = withDevice(node({ type: "command" }), "hetzner-id");
+		expect(placed).toMatchObject({ device: "hetzner-id" });
 		expect("device" in withDevice(placed, undefined)).toBe(false);
 		const gate = node({ type: "decision", by: "person" });
-		expect(withDevice(gate, "hetzner-1")).toBe(gate);
+		expect(withDevice(gate, "hetzner-id")).toBe(gate);
 	});
 });

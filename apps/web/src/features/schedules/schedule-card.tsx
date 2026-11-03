@@ -83,7 +83,7 @@ export function ScheduleCard({
 	onWebhook: () => void;
 }) {
 	const name = scheduleName(schedule);
-	const runsOn = schedule.device?.trim() || needs[0]?.name || null;
+	const runsOn = needs[0]?.name ?? null;
 	const errors = schedule.issues.filter((issue) => issue.severity === "error");
 	const StartIcon = schedule.webhook ? WebhookIcon : CalendarClockIcon;
 	return (

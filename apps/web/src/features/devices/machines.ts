@@ -1,9 +1,15 @@
+import {
+	type DeviceRef,
+	deviceIdOf,
+	legacyDeviceName,
+} from "@nightshift/flows";
 import type { SpaceComputer, SpaceView } from "./space-view";
 
 /**
  * The computers a schedule or a flow needs, as the Space knows them now:
  * the one that starts its schedules (the Host, else this computer), and
- * every computer by name or by id, each with whether it is online.
+ * every computer by its id, each with whether it is online. A schedule
+ * and a node name a computer by id; its name is only what the page shows.
  */
 
 /** A computer of the Space, as a run needs it. */
@@ -27,9 +33,7 @@ export type SpaceMachines = {
 	starterIsHost: boolean;
 	/** Every computer of the Space but a linked Host, this computer first. */
 	computers: Machine[];
-	/** A computer by the name a schedule or a node gives it. */
-	byName(name: string): Machine | null;
-	/** A computer by its id, as a profile names it. */
+	/** A computer by its id, as a schedule, a node or a profile names it. */
 	byId(id: string): Machine | null;
 };
 
@@ -94,16 +98,24 @@ export function spaceMachines(view: SpaceView): SpaceMachines {
 		starter,
 		starterIsHost,
 		computers,
-		byName: (name) => all.find((c) => c.name === name) ?? null,
 		byId: (id) => all.find((c) => c.id === id) ?? null,
 	};
 }
 
-/** The Devices a flow names (`FlowListItem.devices`). */
-export type FlowDeviceNames = {
-	names: readonly string[];
-	ids: readonly string[];
-};
+/** The Devices a flow names, by id (`FlowListItem.devices`). */
+export type FlowDeviceIds = { ids: readonly string[] };
+
+/** What the page calls a computer a schedule names: its name, a name from before ids, or "another computer". */
+export function machineName(
+	machines: SpaceMachines | null | undefined,
+	device: DeviceRef | undefined,
+): string | undefined {
+	if (device === undefined) return undefined;
+	const id = deviceIdOf(device);
+	return id === undefined
+		? (legacyDeviceName(device) ?? undefined)
+		: (machines?.byId(id)?.name ?? "another computer");
+}
 
 /** A computer the Space does not know now. */
 const unknown = (name: string): Machine => ({
@@ -116,32 +128,34 @@ const unknown = (name: string): Machine => ({
 });
 
 /**
- * The computers a run needs, by name, in order: the one it runs on (the
- * schedule's device, else the starter; none for `null`), then the ones the
- * flow names. A profile's computer by id that the Space does not know shows
- * as "A device".
+ * The computers a run needs, in order: the one it runs on (the schedule's
+ * device, else the starter; none for `null`), then the ones the flow
+ * names, each once, by id. A computer the Space does not know shows as
+ * "A device", and a name from before ids as that name, without a status.
  */
 export function neededMachines(
 	machines: SpaceMachines,
-	runsOn: string | undefined | null,
-	flow: FlowDeviceNames | undefined,
+	runsOn: DeviceRef | undefined | null,
+	flow: FlowDeviceIds | undefined,
 ): Machine[] {
 	const out = new Map<string, Machine>();
-	const add = (machine: Machine) => {
-		if (!out.has(machine.name)) out.set(machine.name, machine);
+	const add = (key: string, machine: Machine) => {
+		if (!out.has(key)) out.set(key, machine);
 	};
-	if (runsOn !== null) {
-		add(
-			runsOn === undefined
-				? machines.starter
-				: (machines.byName(runsOn) ?? unknown(runsOn)),
-		);
+	const byId = (id: string) => {
+		const known = machines.byId(id);
+		add(known?.id ?? id, known ?? unknown("A device"));
+	};
+	if (runsOn === undefined) {
+		add(machines.starter.id ?? "starter", machines.starter);
+	} else if (runsOn !== null) {
+		const id = deviceIdOf(runsOn);
+		if (id !== undefined) byId(id);
+		else {
+			const name = legacyDeviceName(runsOn) ?? "A device";
+			add(`name:${name}`, unknown(name));
+		}
 	}
-	for (const name of flow?.names ?? []) {
-		add(machines.byName(name) ?? unknown(name));
-	}
-	for (const id of flow?.ids ?? []) {
-		add(machines.byId(id) ?? unknown("A device"));
-	}
+	for (const id of flow?.ids ?? []) byId(id);
 	return [...out.values()];
 }

@@ -78,8 +78,7 @@ describe("spaceMachines", () => {
 			lastSeenAt: 7,
 			projectIds: [],
 		});
-		expect(machines.byName("hetzner-1")?.name).toBe("hetzner-1");
-		expect(machines.byName("LE2316")?.projectIds).toEqual(["keez"]);
+		expect(machines.byId("self")?.projectIds).toEqual(["keez"]);
 	});
 
 	test("a Host with a copy of a project is a computer of the Space too", () => {
@@ -96,7 +95,6 @@ describe("spaceMachines", () => {
 			projectIds: ["keez"],
 		});
 		// A flow that names the Host sees its link's status too.
-		expect(machines.byName("hetzner-1")?.online).toBe(true);
 		expect(machines.byId("host-1")?.online).toBe(true);
 	});
 
@@ -121,9 +119,8 @@ describe("neededMachines", () => {
 
 	test("the run's computer first, then each one the flow names, once", () => {
 		expect(
-			neededMachines(machines, "LE2316", {
-				names: ["studio", "LE2316"],
-				ids: ["studio"],
+			neededMachines(machines, "self", {
+				ids: ["studio", "self"],
 			}).map((m) => [m.name, m.online]),
 		).toEqual([
 			["LE2316", true],
@@ -134,21 +131,26 @@ describe("neededMachines", () => {
 	test("no device: the run runs on the Host; a name the Space does not know has no status", () => {
 		expect(
 			neededMachines(machines, undefined, {
-				names: ["gone"],
 				ids: ["nobody"],
 			}).map((m) => [m.name, m.online]),
 		).toEqual([
 			["hetzner-1", true],
-			["gone", null],
 			["A device", null],
 		]);
 	});
 
+	test("a schedule's name from before ids shows as that name, with no status", () => {
+		expect(
+			neededMachines(machines, { name: "LE2316" }, { ids: [] }).map((m) => [
+				m.name,
+				m.online,
+			]),
+		).toEqual([["LE2316", null]]);
+	});
+
 	test("null leaves the run's computer out: only what the flow names", () => {
 		expect(
-			neededMachines(machines, null, { names: ["hetzner-1"], ids: [] }).map(
-				(m) => m.name,
-			),
-		).toEqual(["hetzner-1"]);
+			neededMachines(machines, null, { ids: ["studio"] }).map((m) => m.name),
+		).toEqual(["studio"]);
 	});
 });

@@ -1,6 +1,7 @@
 import {
 	commandExits,
 	DATA_EXIT_CODE,
+	type DeviceRef,
 	type EndStatus,
 	type FlowIssue,
 	type FlowNode,
@@ -38,6 +39,7 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 import { CalledFlowName } from "./called-flow-name";
+import { useDeviceLabel } from "./device-names-context";
 import {
 	CALL_EACH_ICON,
 	DECIDED_BY_ICON,
@@ -469,13 +471,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 							prefix={runsEach(node) ? "Each runs" : "Runs"}
 						/>
 						{node.device !== undefined ? (
-							<span
-								className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground"
-								title={`Its steps run on ${node.device}`}
-							>
-								<MonitorIcon className="size-3 shrink-0" aria-hidden="true" />
-								<span className="truncate">On {node.device}</span>
-							</span>
+							<SubflowDevice device={node.device} />
 						) : null}
 					</div>
 				) : null}
@@ -629,3 +625,17 @@ export const nodeTypes: NodeTypes = {
 	lease: FlowNodeCard,
 	service: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;
+
+/** The computer a Subflow's steps run on, by its name. */
+function SubflowDevice({ device }: { device: DeviceRef }) {
+	const name = useDeviceLabel(device);
+	return (
+		<span
+			className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground"
+			title={`Its steps run on ${name}`}
+		>
+			<MonitorIcon className="size-3 shrink-0" aria-hidden="true" />
+			<span className="truncate">On {name}</span>
+		</span>
+	);
+}

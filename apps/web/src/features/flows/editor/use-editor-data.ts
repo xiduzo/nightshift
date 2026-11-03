@@ -50,12 +50,21 @@ export function useEditorData(projectId: string, name: string) {
 				untoldDevices: devices.data
 					.filter((device) => device.profiles === undefined)
 					.map((device) => device.deviceId),
-				deviceNames: devices.data.map((device) => device.name),
+				deviceIds: devices.data.map((device) => device.deviceId),
 			},
+		[devices.data],
+	);
+	// A node keeps a device's id: the canvas shows its name.
+	const deviceNames = useMemo(
+		() =>
+			new Map(
+				(devices.data ?? []).map((device) => [device.deviceId, device.name]),
+			),
 		[devices.data],
 	);
 	const cliTools = useCommandTools().refs;
 	return {
+		deviceNames,
 		projectFlows,
 		nodeDefaults,
 		policyDefaults,

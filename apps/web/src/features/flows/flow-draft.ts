@@ -54,14 +54,18 @@ export function missingProfileMessage(_profile: ProfileRef): string {
 }
 
 /**
- * What the editor says about a node that names a device you cannot use:
- * the run does not start. A Subflow names a computer.
+ * What the editor says about a node that names a device you cannot use,
+ * or one that left the Space: the run does not start. A Subflow names a
+ * computer.
  */
-export function missingDeviceMessage(
-	name: string,
-	node: Pick<FlowNode, "type">,
-): string {
-	return `You have no ${node.type === "call" ? "computer" : "device"} named ${name}. Pick another one so the run can start.`;
+export function missingDeviceMessage(node: Pick<FlowNode, "type">): string {
+	const what = node.type === "call" ? "computer" : "device";
+	return `This ${what} is no longer in this Space, or you cannot use it. Choose another ${what}.`;
+}
+
+/** What the editor says about a device name from before ids that Night Shift could not bring to one device. */
+export function oldDeviceMessage(name: string): string {
+	return `Night Shift cannot tell which device "${name}" is. Choose the device again.`;
 }
 
 /** What the editor says about a command that calls a program without the login of its CLI tool. */
@@ -259,7 +263,7 @@ const MESSAGES: DraftMessages = {
 	},
 	missingConnection: missingConnectionMessage,
 	missingProfile: missingProfileMessage,
-	missingDevice: missingDeviceMessage,
+	missingDevice: (_id, node) => missingDeviceMessage(node),
 	programWithoutLogin: programWithoutLoginMessage,
 	refusesCommands: refusesCommandsMessage,
 };
@@ -334,8 +338,8 @@ export function checkFlow(
 	profiles?: {
 		known: readonly KnownProfile[];
 		untoldDevices: readonly string[];
-		/** The names of the devices a run may use: a node that names another does not start. */
-		deviceNames: readonly string[];
+		/** The ids of the devices a run may use: a node that names another does not start. */
+		deviceIds: readonly string[];
 	},
 	cliTools?: readonly CliToolRef[],
 ): FlowCheck {
@@ -348,7 +352,7 @@ export function checkFlow(
 			? {
 					profiles: profiles.known,
 					untoldDevices: profiles.untoldDevices,
-					devices: profiles.deviceNames,
+					devices: profiles.deviceIds,
 				}
 			: {}),
 	});

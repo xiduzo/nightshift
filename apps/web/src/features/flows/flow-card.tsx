@@ -45,6 +45,7 @@ import {
 import type { ReactNode } from "react";
 import {
 	MachineBadge,
+	machineName,
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
@@ -151,7 +152,10 @@ function startText(start: FlowStart): string {
 }
 
 /** What the chip's tooltip says: the whole schedule, or who runs it. */
-function startHint(start: FlowStart): string {
+function startHint(
+	start: FlowStart,
+	machines: Parameters<typeof machineName>[0],
+): string {
 	if (start.kind === "subflow") {
 		return `A Subflow node in ${start.caller} runs this flow.`;
 	}
@@ -162,12 +166,13 @@ function startHint(start: FlowStart): string {
 		? "No next start."
 		: `Starts next on ${hoverTime(nextAt, {
 				zone: start.schedule.timeZone,
-				device: start.schedule.device,
+				device: machineName(machines, start.schedule.device),
 			})}.`;
 }
 
 /** Every way the flow starts besides you, one chip each. */
 function StartChips({ starts }: { starts: FlowStart[] }) {
+	const machines = useSpaceMachines();
 	if (starts.length === 0) {
 		return (
 			<Badge variant="outline" className="font-normal text-muted-foreground">
@@ -197,7 +202,7 @@ function StartChips({ starts }: { starts: FlowStart[] }) {
 					{startText(start)}
 					{paused ? <span className="sr-only"> (paused)</span> : null}
 				</TooltipTrigger>
-				<TooltipContent>{startHint(start)}</TooltipContent>
+				<TooltipContent>{startHint(start, machines)}</TooltipContent>
 			</Tooltip>
 		);
 	});

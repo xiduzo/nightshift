@@ -1,4 +1,9 @@
-import type { FlowNode } from "@nightshift/flows";
+import {
+	type DeviceRef,
+	deviceIdOf,
+	type FlowNode,
+	legacyDeviceName,
+} from "@nightshift/flows";
 import {
 	Select,
 	SelectContent,
@@ -8,14 +13,16 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 
-import { missingDeviceMessage } from "../flow-draft";
+import { missingDeviceMessage, oldDeviceMessage } from "../flow-draft";
 import { Field } from "./fields";
 
 /**
  * A device a node can name, as the Host lists it: one of yours, or
  * another person's with the profiles it offers to the Space (`offers`).
+ * A node keeps its id; the name is only what the list shows.
  */
 export type DeviceChoice = {
+	deviceId: string;
 	name: string;
 	thisDevice: boolean;
 	offers?: string[];
@@ -41,7 +48,7 @@ export function runsOnDevice(node: FlowNode): boolean {
 	}
 }
 
-/** The node with its step on `device`, or on the run's device when undefined. */
+/** The node with its step on the device of that id, or on the run's device when undefined. */
 export function withDevice(
 	node: FlowNode,
 	device: string | undefined,
@@ -61,15 +68,15 @@ export type DeviceFieldCopy = {
 	hint: string;
 	/** The choice for no device of its own. */
 	run: string;
-	/** The error for a name the list does not have. */
-	unknown: (name: string) => string;
+	/** The error for a device the list does not have. */
+	unknown: () => string;
 };
 
 const STEP_COPY: DeviceFieldCopy = {
 	label: "Device",
 	hint: "Pick one of your devices, or a device that someone offers for this profile.",
 	run: "The device the run starts on",
-	unknown: (name) => missingDeviceMessage(name, { type: "command" }),
+	unknown: () => missingDeviceMessage({ type: "command" }),
 };
 
 /** A Subflow's words: its steps run on the computer it names. */
@@ -77,15 +84,20 @@ export const SUBFLOW_DEVICE_COPY: DeviceFieldCopy = {
 	label: "Runs on",
 	hint: "The steps of this Subflow run on the computer you pick, wherever the run runs. Pick one with the folder or tools they need.",
 	run: "Where the run runs",
-	unknown: (name) => missingDeviceMessage(name, { type: "call" }),
+	unknown: () => missingDeviceMessage({ type: "call" }),
 };
 
+/** The choice that stands for a device name from before ids. */
+const OLD_NAME = "__old_name__";
+
 /**
- * Where a step runs: one of your devices by name, or the device the run
- * starts on. The list is what the Host says this node may name: yours,
- * and other people's that offer the node's profile to the Space. A name
- * that is not one of them stays, marked as an error, so a flow from a
- * colleague keeps its choice until you pick another.
+ * Where a step runs: one of your devices, or the device the run starts
+ * on. The node keeps the device's id, and the list shows its name. The
+ * list is what the Host says this node may name: yours, and other
+ * people's that offer the node's profile to the Space. A device that is
+ * not one of them stays, marked as an error, so a flow from a colleague
+ * keeps its choice until you pick another. So does a name from before
+ * ids that Night Shift could not bring to one device.
  */
 export function DeviceField({
 	id,
@@ -95,42 +107,58 @@ export function DeviceField({
 	onChange,
 }: {
 	id: string;
-	value: string | undefined;
+	value: DeviceRef | undefined;
 	/** The devices this node may name (`runs.devices` with `forNode`); undefined while they load. */
 	devices: readonly DeviceChoice[] | undefined;
 	copy?: DeviceFieldCopy;
 	onChange: (device: string | undefined) => void;
 }) {
-	const listed = devices ?? [];
-	const names = [...new Set(listed.map((d) => d.name))];
-	const unknown = value !== undefined && !names.includes(value);
-	const label = (name: string) => {
-		const known = listed.find((d) => d.name === name);
-		if (!known) return `${name} (not found)`;
-		if (known.offers !== undefined && !known.thisDevice) {
-			return `${name} (offers ${known.offers.join(", ")})`;
+	const listed = [
+		...new Map((devices ?? []).map((d) => [d.deviceId, d])).values(),
+	];
+	const chosen = deviceIdOf(value);
+	const oldName = legacyDeviceName(value);
+	const unknown =
+		chosen !== undefined && !listed.some((d) => d.deviceId === chosen);
+	const label = (device: DeviceChoice) => {
+		if (device.offers !== undefined && !device.thisDevice) {
+			return `${device.name} (offers ${device.offers.join(", ")})`;
 		}
-		return known.thisDevice ? `${name} (this computer)` : name;
+		return device.thisDevice ? `${device.name} (this computer)` : device.name;
 	};
 	const items = [
 		{ value: RUN_DEVICE, label: copy.run },
-		...(unknown ? [{ value, label: label(value) }] : []),
-		...names.map((name) => ({ value: name, label: label(name) })),
+		...(oldName !== null
+			? [{ value: OLD_NAME, label: `${oldName} (choose again)` }]
+			: []),
+		...(unknown && chosen !== undefined
+			? [{ value: chosen, label: "A device that is not in this Space" }]
+			: []),
+		...listed.map((device) => ({
+			value: device.deviceId,
+			label: label(device),
+		})),
 	];
+	const error =
+		oldName !== null
+			? oldDeviceMessage(oldName)
+			: unknown && devices !== undefined
+				? copy.unknown()
+				: null;
 	return (
 		<Field
 			id={id}
 			label={copy.label}
 			optional
 			hint={copy.hint}
-			// Only once the list is in: a name it lacks does not run.
-			error={unknown && devices !== undefined ? copy.unknown(value) : null}
+			// Only once the list is in: a device it lacks does not run.
+			error={error}
 		>
 			<Select
 				items={items}
-				value={value ?? RUN_DEVICE}
+				value={oldName !== null ? OLD_NAME : (chosen ?? RUN_DEVICE)}
 				onValueChange={(next) => {
-					if (next === null) return;
+					if (next === null || next === OLD_NAME) return;
 					onChange(next === RUN_DEVICE ? undefined : next);
 				}}
 			>
@@ -138,7 +166,7 @@ export function DeviceField({
 					id={id}
 					className="w-full"
 					aria-describedby={`${id}-hint`}
-					aria-invalid={(unknown && devices !== undefined) || undefined}
+					aria-invalid={error !== null || undefined}
 				>
 					<SelectValue />
 				</SelectTrigger>
