@@ -54,9 +54,9 @@ import { OVERVIEW_ROWS } from "./overview";
 
 /**
  * Home's three lanes, in the order you act on them: what runs now, what
- * waits for you, which flows failed. Each lane is as tall as its rows. A
- * row is one line and shows the rest on hover. Every row opens its place:
- * a run its page, a Gate its question in the inbox.
+ * waits for you, which flows failed. The lanes share the height of the
+ * tallest. A row is one line and shows the rest on hover. Every row opens
+ * its place: a run its page, a Gate its question in the inbox.
  */
 export function HomeLanes({
 	running,
@@ -82,7 +82,7 @@ export function HomeLanes({
 		projects?.find((project) => project.id === projectId)?.name;
 
 	return (
-		<div className="grid items-start gap-4 lg:grid-cols-3">
+		<div className="grid gap-4 lg:grid-cols-3">
 			<Lane
 				icon={<LoaderCircleIcon className="text-status-running" />}
 				title="Running now"
@@ -293,7 +293,7 @@ function LaneRow({
 }
 
 /**
- * One lane: as tall as its rows, one line when it has none, and how many
+ * One lane: as tall as its row of lanes, one line when it has none, and how many
  * rows it leaves out under them.
  */
 function Lane({
@@ -333,7 +333,7 @@ function Lane({
 					<CardAction>{action}</CardAction>
 				) : null}
 			</CardHeader>
-			<CardContent className="px-2">
+			<CardContent className="flex-1 px-2">
 				{isLoading ? (
 					<div className="flex flex-col gap-2 px-2">
 						<Skeleton className="h-7 w-full" />
