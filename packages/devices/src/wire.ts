@@ -15,6 +15,7 @@ import {
 	type KeyStoreKind,
 	type PersonalSecrets,
 	type ProfileStore,
+	type ProjectSecrets,
 	profileChoice,
 	type SettingsStore,
 } from "@nightshift/engine/device-config";
@@ -66,7 +67,10 @@ import { createRelay, createWorkRelay } from "./relay";
 import {
 	createPersonalSecretStore,
 	createPersonalSecretsHost,
+	createProjectSecretStore,
+	createProjectSecretsHost,
 	devicePersonalSecrets,
+	deviceProjectSecrets,
 	secretsCipher,
 } from "./secrets";
 import {
@@ -98,6 +102,11 @@ export type DevicesRuntime = {
 	 * connection store: at the Home Host, else kept here.
 	 */
 	personalSecrets: PersonalSecrets;
+	/**
+	 * The secrets of the Projects (ADR 13), for the engine's connection
+	 * store: at the Host that keeps their Space, else kept here.
+	 */
+	projectSecrets: ProjectSecrets;
 };
 
 /**
@@ -490,9 +499,16 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	await links.start();
 
 	/** The Personal secrets this computer keeps: as a Home Host, and its owner's without one. */
-	const personalStore = createPersonalSecretStore({
+	const cipher = secretsCipher(deps.secretsKey);
+	const personalStore = createPersonalSecretStore({ db, cipher });
+	/** The Project secrets this computer keeps: of the Spaces it keeps, as their Host or without one. */
+	const projectStore = createProjectSecretStore({ db, cipher });
+	const projectSecrets = deviceProjectSecrets({
 		db,
-		cipher: secretsCipher(deps.secretsKey),
+		hostSpaces: engine.hostSpaces,
+		links: () => links,
+		store: projectStore,
+		ownerId,
 	});
 	const personalSecrets = devicePersonalSecrets({
 		hostLinks,
@@ -510,6 +526,19 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			registry: engine.devices,
 			store: personalStore,
 			isHost: host.isHost,
+		}),
+		projectSecrets: createProjectSecretsHost({
+			db,
+			registry: engine.devices,
+			store: projectStore,
+			isHost: host.isHost,
+			hostOf: (spaceId) => engine.hostSpaces.hostOf(spaceId),
+			// The calls this Host sends to its placed Devices.
+			work: handover.hub,
+			offersInto: async (deviceId, spaceId) =>
+				(await engine.offers.list(spaceId)).some(
+					(offer) => offer.deviceId === deviceId,
+				),
 		}),
 		hostSpaces: engine.hostSpaces,
 		keys: keyStore,
@@ -531,6 +560,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		reach,
 		inStep: relay.inStep,
 		personalSecrets,
+		projectSecrets,
 		serve: {
 			hostname: listenHostname(reach, deps.env.NIGHTSHIFT_LISTEN),
 			...(certificate

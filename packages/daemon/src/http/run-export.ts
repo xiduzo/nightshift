@@ -4,22 +4,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { Database } from "@nightshift/db";
+import { run } from "@nightshift/db/schema";
 import { exportRun, type RunBundleSummary } from "@nightshift/engine";
 import type { ConnectionStore } from "@nightshift/engine/device-config";
+import { and, eq } from "drizzle-orm";
 
 /**
  * `GET /api/runs/:id/export`: the run of the Space `spaceId` as one SQLite
  * file, a run bundle (a run of another Space is not found). The
  * file goes to a new temp directory, streams out, and the directory is
  * removed when the stream closes, also when the client goes away. The
- * values of saved secrets and connection variables are taken out.
+ * values of saved secrets and connection variables are taken out, and
+ * the run's Project secrets that this computer keeps (ADR 13).
  */
 export async function runExportResponse(
 	deps: {
 		db: Database;
 		/** This computer's data folder, where the steps' transcripts are. */
 		dataDir: string;
-		connections: Pick<ConnectionStore, "secretValues">;
+		connections: Pick<ConnectionStore, "exportValues">;
 		/** Where the temp directory goes. The OS temp directory by default. */
 		tmpDir?: string;
 	},
@@ -31,13 +34,22 @@ export async function runExportResponse(
 	);
 	const remove = () => rm(dir, { recursive: true, force: true });
 	try {
+		const [found] = await deps.db
+			.select({ projectId: run.projectId })
+			.from(run)
+			.where(and(eq(run.id, runId), eq(run.spaceId, spaceId)));
 		const summary = await exportRun({
 			db: deps.db,
 			dataDir: deps.dataDir,
 			runId,
 			spaceId,
 			path: join(dir, "run.nightshift.sqlite"),
-			redact: await deps.connections.secretValues(),
+			redact: found
+				? await deps.connections.exportValues({
+						spaceId,
+						projectId: found.projectId,
+					})
+				: [],
 		});
 		if (!summary) {
 			await remove();

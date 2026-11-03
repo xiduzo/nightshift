@@ -9,7 +9,7 @@ import {
 	type VariableResult,
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import type { Device } from "../device";
+import { type Device, forRun } from "../device";
 import { type KnowledgeUseEvent, knowledgeUseEvent } from "../knowledge";
 import {
 	commandLogPath,
@@ -640,8 +640,13 @@ export async function beginStep(
 	const runId = ctx.run.id;
 	const scope = scopeOf(config);
 	// Asked once per step: the body works on this Device, and a new step
-	// records it.
-	const device = ctx.deviceFor(node, ctx.run);
+	// records it. Its calls name the run: it reads the run's Project
+	// secrets for them (ADR 13).
+	const device = forRun(ctx.deviceFor(node, ctx.run), {
+		spaceId: ctx.run.spaceId,
+		projectId: ctx.run.projectId,
+		runId,
+	});
 	const logged = runState ?? (await ctx.log.state(runId));
 	// The kind says which timers a step has: a Gate waits as long as it
 	// must, a Wait node keeps its own deadline across its sleeps, and only an

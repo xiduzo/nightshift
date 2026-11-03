@@ -1,4 +1,5 @@
 import type { ProjectRuns, RunCopies } from "@nightshift/engine";
+import type { ProjectSecretName } from "@nightshift/engine/device-config";
 import type {
 	Branches,
 	GitHubAccess,
@@ -186,3 +187,27 @@ export const gitInstallSchema = exact<GitInstall>()(
 		z.object({ kind: z.literal("manual"), url: z.string() }),
 	]),
 );
+
+/** A Project secret as Members see it (ADR 13): never its value. */
+const projectSecretSchema = exact<ProjectSecretName>()(
+	z.object({
+		name: z.string(),
+		setAt: z.number(),
+		/** The Person who set it last. Null: not known. */
+		setBy: z.object({ id: z.string(), name: z.string() }).nullable(),
+	}),
+);
+
+/** The secrets of a project, and what the person may do with them. */
+export const projectSecretListSchema = z.object({
+	secrets: z.array(
+		projectSecretSchema.extend({
+			/** The flows of the project that use it, by name. */
+			flows: z.array(z.string()),
+		}),
+	),
+	/** False: the Host of the Space could not be reached now, and the list is empty. */
+	available: z.boolean(),
+	/** The person's role saves Flows: they may set, move and remove these. */
+	canChange: z.boolean(),
+});

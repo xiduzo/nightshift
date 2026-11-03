@@ -184,6 +184,16 @@ describe("session", () => {
 		uses.length = 0;
 		await run({});
 		expect(uses.every(([, use]) => JSON.stringify(use) === "{}")).toBe(true);
+		// A step of a run reads its Project's secrets first, under an Offer too (ADR 13).
+		const step = { spaceId: "space-1", projectId: "app", runId: "run-1" };
+		uses.length = 0;
+		await run({ underOffer: true, run: step });
+		expect(uses.map(([, use]) => use)).toEqual([
+			{ personal: false, project: step },
+			{ personal: false, project: step },
+			{ personal: false, project: step },
+			{ personal: false, project: step },
+		]);
 	});
 
 	test("says ready, then starts the harness only when the next event is read", async () => {
@@ -928,6 +938,61 @@ describe("exec", () => {
 			},
 		]);
 	});
+
+	const run = { spaceId: "space-1", projectId: "app", runId: "run-1" };
+
+	test("a command of a run reads its Project's secrets: a Project secret counts as saved", async () => {
+		const uses: unknown[] = [];
+		const events = await collect(
+			device({
+				// Only the run's Project has DB_URL (ADR 13).
+				secretEnv: async (names, use) => {
+					uses.push(use);
+					return use?.project?.projectId === "app"
+						? { ok: true, env: { DB_URL: "postgres://x" } }
+						: { ok: false, missing: [...names] };
+				},
+			}).exec({
+				command: 'echo "url $DB_URL"',
+				cwd: sandbox.repoPath,
+				secrets: ["DB_URL"],
+				run,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(uses).toEqual([{ project: run }]);
+		expect(events).toContainEqual({
+			type: "output",
+			stream: "stdout",
+			text: "url •••\n",
+		});
+		expect(events.at(-1)).toMatchObject({ type: "exit", exitCode: 0 });
+	});
+
+	test("a Project's secrets that cannot be read now refuse the command, and say why", async () => {
+		const events = await collect(
+			device({
+				secretEnv: async () => ({
+					ok: false,
+					missing: ["DB_URL"],
+					projectUnreachable: true,
+				}),
+			}).exec({
+				command: "true",
+				cwd: sandbox.repoPath,
+				secrets: ["DB_URL"],
+				run,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(events).toEqual([
+			{
+				type: "refused",
+				message:
+					"The command needs the secret DB_URL, but it is not saved. Save it on the Secrets page, or remove it from the node. Night Shift could not read this project's secrets now. Check that this computer is online, then try again.",
+			},
+		]);
+	});
 });
 
 describe("callTool", () => {
@@ -938,6 +1003,24 @@ describe("callTool", () => {
 				: { ok: false, message: "No such connection." },
 	});
 	const signal = () => new AbortController().signal;
+
+	test("a tool call of a run expands its connection with the run's Project secrets", async () => {
+		const uses: unknown[] = [];
+		const run = { spaceId: "space-1", projectId: "app", runId: "run-1" };
+		await device({
+			mcpServersFor: async (_node, use) => {
+				uses.push(use);
+				return { ok: false, message: "No such connection." };
+			},
+		}).callTool({
+			connection: "jira",
+			tool: "say",
+			arguments: {},
+			run,
+			signal: signal(),
+		});
+		expect(uses).toEqual([{ project: run }]);
+	});
 
 	test("refuses a connection it cannot resolve, without calling anything", async () => {
 		expect(

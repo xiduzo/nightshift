@@ -67,11 +67,21 @@ const leftovers = async () =>
 		n.startsWith("nightshift-export-"),
 	);
 
+/** The projects whose secret values an export asked for. */
+let asked: { spaceId: string; projectId: string }[] = [];
 const deps = () => ({
 	db: sandbox.db,
 	dataDir: sandbox.dataDir,
-	connections: { secretValues: async () => ["hunter2-secret"] },
+	connections: {
+		exportValues: async (project: { spaceId: string; projectId: string }) => {
+			asked.push(project);
+			return ["hunter2-secret"];
+		},
+	},
 	tmpDir: sandbox.root,
+});
+beforeEach(() => {
+	asked = [];
 });
 
 describe("GET /api/runs/:id/export", () => {
@@ -79,6 +89,8 @@ describe("GET /api/runs/:id/export", () => {
 		await seedRun();
 		const response = await runExportResponse(deps(), RUN_ID, sandbox.spaceId);
 		expect(response.status).toBe(200);
+		// The values it takes out include the run's Project secrets (ADR 13).
+		expect(asked).toEqual([{ spaceId: sandbox.spaceId, projectId: "p1" }]);
 		expect(response.headers.get("Content-Disposition")).toBe(
 			'attachment; filename="nightly-fix-up-0123abcd.nightshift.sqlite"',
 		);

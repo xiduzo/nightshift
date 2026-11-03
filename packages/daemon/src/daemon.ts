@@ -46,6 +46,7 @@ import {
 	openConfigStores,
 	openDeviceDocument,
 	type PersonalSecrets,
+	type ProjectSecrets,
 	secretStore,
 } from "@nightshift/engine/device-config";
 import {
@@ -337,11 +338,14 @@ export async function createDaemon(
 	 * Personal name as one that cannot be read now.
 	 */
 	let personalSecrets: PersonalSecrets | null = null;
+	/** The secrets of the Projects (ADR 13): at the Host of their Space, else kept here. The devices give them too. */
+	let projectSecrets: ProjectSecrets | null = null;
 	const config = await openConfigStores({
 		document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
 		personal: () => personalSecrets,
+		projects: () => projectSecrets,
 	});
 	const { settings, connections, cliTools, profiles } = config;
 	hostSettings = () => settings.current();
@@ -491,8 +495,9 @@ export async function createDaemon(
 			},
 		}),
 		mcpServersFor: (node, use) => connections.mcpServersFor(node, use),
-		// A Command node's secrets: Personal, then the keychain, then the environment.
-		secretEnv: (names) => connections.secretEnv(names),
+		// A Command node's secrets: the run's Project, Personal, then the
+		// keychain, then the environment.
+		secretEnv: (names, use) => connections.secretEnv(names, use),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),
 		findCli: (name) => Bun.which(cliTools.program(name)),
@@ -590,6 +595,7 @@ export async function createDaemon(
 	});
 	const { engine } = devices;
 	personalSecrets = devices.personalSecrets;
+	projectSecrets = devices.projectSecrets;
 	knowledge.connect({
 		inStep: devices.inStep,
 		// The Spaces with no Host: this Replica keeps their knowledge content.

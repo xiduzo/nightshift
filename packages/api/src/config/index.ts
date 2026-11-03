@@ -9,5 +9,5 @@ export { programs } from "./found-programs";
 export { deciders, harnesses } from "./harnesses";
 export { ollama } from "./ollama";
 export { profiles } from "./profiles";
-export { deviceProfileSchema } from "./schemas";
+export { deviceProfileSchema, secretScopeSchema } from "./schemas";
 export { settings } from "./settings";

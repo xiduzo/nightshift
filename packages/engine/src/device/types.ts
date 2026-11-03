@@ -15,6 +15,7 @@ import type {
 	ModelAddress,
 	ProfileSettings,
 } from "@nightshift/flows";
+import type { StepRun } from "../device-config";
 import type { KnowledgeRequest, KnowledgeUseEvent } from "../knowledge";
 import type { WorktreeChanges } from "../log";
 
@@ -252,6 +253,13 @@ export type SessionInput = Omit<
 	 * Offer admission on the Device that runs it sets it, after the wire.
 	 */
 	underOffer?: true;
+	/**
+	 * The run the step works for. The Device reads that run's Project
+	 * secrets for it (ADR 13), and the Host that keeps them checks that the
+	 * step runs here. A Device that serves a call over the wire sets it
+	 * from the call's own run, after the wire.
+	 */
+	run?: StepRun;
 };
 
 /**
@@ -308,6 +316,13 @@ export type ExecInput = {
 	 * sends none.
 	 */
 	pid?: boolean;
+	/**
+	 * The run the step works for. The Device reads that run's Project
+	 * secrets for it (ADR 13), and the Host that keeps them checks that the
+	 * step runs here. A Device that serves a call over the wire sets it
+	 * from the call's own run, after the wire.
+	 */
+	run?: StepRun;
 	/** Aborting kills the whole process group (SIGTERM, then SIGKILL). */
 	signal: AbortSignal;
 };
@@ -339,6 +354,13 @@ export type ToolCallInput = {
 	tool: string;
 	/** The rendered arguments; the Device types them by the tool's input schema. */
 	arguments: Record<string, JsonValue>;
+	/**
+	 * The run the step works for. The Device reads that run's Project
+	 * secrets for it (ADR 13), and the Host that keeps them checks that the
+	 * step runs here. A Device that serves a call over the wire sets it
+	 * from the call's own run, after the wire.
+	 */
+	run?: StepRun;
 	signal: AbortSignal;
 };
 

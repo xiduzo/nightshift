@@ -25,6 +25,7 @@ import {
 	projectSourcesSchema,
 	runCopiesSchema,
 } from "./schemas";
+import { projectSecrets } from "./secrets";
 
 /** How the runs of a project without runs stand. */
 const NO_RUNS: ProjectRuns = {
@@ -337,6 +338,7 @@ export const projects = {
 			}
 			await context.space.moveProject(input.projectId, input.spaceId);
 		}),
+	...projectSecrets,
 };
 
 /** A clone under Night Shift's projects folder came from GitHub. Any other folder is a folder. */

@@ -20,7 +20,7 @@ import type {
 	LinkedHost,
 } from "../links";
 import type { PairedDevice } from "../registry";
-import type { PersonalSecretsHost } from "../secrets";
+import type { PersonalSecretsHost, ProjectSecretsHost } from "../secrets";
 
 /** This computer's Devices, as the API serves them: as a Host (pairing, presence) and its links to Hosts. */
 
@@ -116,6 +116,8 @@ export type Devices = {
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** The Personal secrets this computer keeps as the Home Host of a paired Device's Person (ADR 13). */
 	personalSecrets: PersonalSecretsHost;
+	/** The Project secrets this computer keeps as the Host of their Spaces (ADR 13). */
+	projectSecrets: ProjectSecretsHost;
 	/** The owner's other Devices, from their documents: their profiles and secret names. */
 	others(ownerId: string): Promise<OtherDeviceView[]>;
 	/** The Host this computer joined that keeps the Space, or null for a Space it keeps itself. */

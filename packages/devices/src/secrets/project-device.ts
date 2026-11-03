@@ -1,0 +1,143 @@
+import type { Database } from "@nightshift/db";
+import { run } from "@nightshift/db/schema";
+import type { ProjectSecrets } from "@nightshift/engine/device-config";
+import { Refusal } from "@nightshift/refusal";
+import { eq } from "drizzle-orm";
+import type { HostClient } from "../contract";
+import type { DeviceLinks, HostSpaces } from "../links";
+import { askHost, PERSONAL_DEADLINE_MS } from "./device";
+import { NOT_YOUR_STEP, projectAccess, withNames } from "./project-host";
+import type { ProjectSecretStore } from "./project-store";
+
+/** What a person reads when the Host of the Space does not know Project secrets yet. */
+export const OLDER_HOST_PROJECT_SECRETS =
+	"The Host of this Space runs an older version of Night Shift. Update Night Shift there to use project secrets.";
+
+/** The refusal of a change through this computer by someone who does not own it. */
+export const OWNER_ONLY =
+	"Only the owner of this computer can change this project's secrets here.";
+
+/**
+ * The secrets of the Projects as this computer reaches them (ADR 13), the
+ * engine's `ProjectSecrets` port. Per call, by the Project's Space:
+ *
+ * - A Space a Host keeps: the call goes to that Host over its link, with
+ *   this Device's key, in the name of this computer's owner. The Host
+ *   checks the Member, their role and the step. Nothing is kept here: a
+ *   value lives in memory for the use that asked.
+ * - A Space this computer keeps (as its Host, or without one): its own
+ *   store, after the same checks, from its own records.
+ *
+ * A Host that cannot be reached, or does not answer within the deadline,
+ * throws `HostUnreachableError`: a step then reads the secret as missing
+ * (fails closed).
+ */
+export function deviceProjectSecrets(deps: {
+	db: Database;
+	hostSpaces: Pick<HostSpaces, "hostOf">;
+	/** Lazy: the links are made after this. */
+	links(): Pick<DeviceLinks, "get">;
+	store: ProjectSecretStore;
+	/** The Person who owns this computer: the only one who acts through its key. */
+	ownerId: string;
+	deadlineMs?: number;
+}): ProjectSecrets {
+	const { db, store } = deps;
+	const options = {
+		deadlineMs: deps.deadlineMs ?? PERSONAL_DEADLINE_MS,
+		olderHost: OLDER_HOST_PROJECT_SECRETS,
+	};
+
+	/** The Host that keeps the Space and its link, or null when this computer keeps it. */
+	async function keeper(spaceId: string) {
+		const hostId = await deps.hostSpaces.hostOf(spaceId);
+		return hostId === null ? null : deps.links().get(hostId);
+	}
+
+	/**
+	 * A change, or a list, by `personId`: here after the checks, else at the
+	 * Host. Through the Host, only the owner of this computer acts: the
+	 * key is theirs.
+	 */
+	async function asPerson<T>(
+		at: { spaceId: string; projectId: string },
+		personId: string,
+		saves: boolean,
+		here: () => Promise<T>,
+		onHost: (client: HostClient) => Promise<T>,
+	): Promise<T> {
+		const hostId = await deps.hostSpaces.hostOf(at.spaceId);
+		if (hostId === null) {
+			await projectAccess(db, deps.hostSpaces, at, { personId, saves });
+			return here();
+		}
+		if (personId !== deps.ownerId) throw new Refusal("forbidden", OWNER_ONLY);
+		return askHost(deps.links().get(hostId), onHost, options);
+	}
+
+	return {
+		list: (at, personId) =>
+			asPerson(
+				at,
+				personId,
+				false,
+				async () => {
+					const kept = await store.list(at.projectId);
+					return withNames(db, kept);
+				},
+				(client) => client.projectSecrets.list(at),
+			),
+		async values(step, names) {
+			if (names?.length === 0) return {};
+			const link = await keeper(step.spaceId);
+			if (link === null) {
+				// This computer keeps the Space: its own run of the Project.
+				const [row] = await db
+					.select({ spaceId: run.spaceId, projectId: run.projectId })
+					.from(run)
+					.where(eq(run.id, step.runId));
+				if (row?.spaceId !== step.spaceId || row.projectId !== step.projectId) {
+					throw new Refusal("forbidden", NOT_YOUR_STEP);
+				}
+				return store.values(step.projectId, names);
+			}
+			return askHost(
+				link,
+				(client) =>
+					client.projectSecrets.values({
+						...step,
+						...(names ? { names: [...names] } : {}),
+					}),
+				options,
+			);
+		},
+		set: (at, name, value, personId) =>
+			asPerson(
+				at,
+				personId,
+				true,
+				() => store.set(at, name, value, personId),
+				(client) => client.projectSecrets.set({ ...at, name, value }),
+			),
+		remove: (at, name, personId) =>
+			asPerson(
+				at,
+				personId,
+				true,
+				() => store.remove(at.projectId, name),
+				(client) => client.projectSecrets.remove({ ...at, name }),
+			),
+		take: (at, name, personId) =>
+			asPerson(
+				at,
+				personId,
+				true,
+				async () => (await store.values(at.projectId, [name]))[name] ?? null,
+				(client) => client.projectSecrets.take({ ...at, name }),
+			),
+		async kept(at) {
+			if ((await deps.hostSpaces.hostOf(at.spaceId)) !== null) return [];
+			return Object.values(await store.values(at.projectId));
+		},
+	};
+}

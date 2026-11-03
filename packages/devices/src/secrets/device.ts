@@ -7,6 +7,7 @@ import {
 	fromHost,
 	type HostLinks,
 	isOlderHost,
+	type Link,
 } from "../links";
 import type { PersonalSecretStore } from "./store";
 
@@ -52,22 +53,10 @@ export function devicePersonalSecrets(deps: {
 	): Promise<T> {
 		const home = await deps.hostLinks.home();
 		if (!home) return here();
-		const link = deps.links().get(home.hostId);
-		if (!link) throw new HostUnreachableError();
-		let timer: Timer | undefined;
-		const late = new Promise<never>((_, reject) => {
-			timer = setTimeout(() => reject(new HostUnreachableError()), deadlineMs);
-			timer.unref?.();
+		return askHost(deps.links().get(home.hostId), onHost, {
+			deadlineMs,
+			olderHost: OLDER_HOST_SECRETS,
 		});
-		try {
-			return await Promise.race([link.call(onHost), late]);
-		} catch (error) {
-			if (isOlderHost(error))
-				throw new Refusal("unavailable", OLDER_HOST_SECRETS);
-			throw fromHost(error);
-		} finally {
-			clearTimeout(timer);
-		}
 	}
 
 	const { store, ownerId } = deps;
@@ -95,4 +84,34 @@ export function devicePersonalSecrets(deps: {
 				(client) => client.secrets.remove({ name }),
 			),
 	};
+}
+
+/**
+ * One call of a Host over its link, for a secret: within `deadlineMs`,
+ * else `HostUnreachableError`, as is a Host without a link here. The
+ * Host's refusals come back in this computer's words (`fromHost`), and
+ * a Host of a version without the call says `olderHost`.
+ */
+export async function askHost<T>(
+	link: Pick<Link, "call"> | undefined,
+	onHost: (client: HostClient) => Promise<T>,
+	options: { deadlineMs: number; olderHost: string },
+): Promise<T> {
+	if (!link) throw new HostUnreachableError();
+	let timer: Timer | undefined;
+	const late = new Promise<never>((_, reject) => {
+		timer = setTimeout(
+			() => reject(new HostUnreachableError()),
+			options.deadlineMs,
+		);
+		timer.unref?.();
+	});
+	try {
+		return await Promise.race([link.call(onHost), late]);
+	} catch (error) {
+		if (isOlderHost(error)) throw new Refusal("unavailable", options.olderHost);
+		throw fromHost(error);
+	} finally {
+		clearTimeout(timer);
+	}
 }

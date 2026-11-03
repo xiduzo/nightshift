@@ -279,3 +279,30 @@ export const personalSecret = sqliteTable(
 	},
 	(table) => [primaryKey({ columns: [table.ownerId, table.name] })],
 );
+
+/**
+ * A Project Secret (ADR 13): kept by the Host that keeps the Project's
+ * Space, or by a computer that keeps the Space itself. Sealed like a
+ * Personal one, bound to `project:<project id>` and its name, so a row
+ * never opens as another Project's or as a Personal secret. Members whose
+ * role saves Flows set it. Nobody reads a value back: it goes to the
+ * steps of the Project's runs, on the Device each step is placed on.
+ */
+export const projectSecret = sqliteTable(
+	"project_secret",
+	{
+		/** The Project's Space when it was set: a check, the Project's row decides. */
+		spaceId: spaceId(),
+		projectId: text("project_id").notNull(),
+		/** Its `${NAME}`. */
+		name: text("name").notNull(),
+		/** The value, encrypted, in base64. */
+		ciphertext: text("ciphertext").notNull(),
+		/** The AES-GCM nonce of `ciphertext`, in base64: a new one per write. */
+		iv: text("iv").notNull(),
+		setAt: integer("set_at", { mode: "timestamp_ms" }).notNull(),
+		/** The Person who set it last, as this computer knows them. */
+		setBy: text("set_by"),
+	},
+	(table) => [primaryKey({ columns: [table.projectId, table.name] })],
+);

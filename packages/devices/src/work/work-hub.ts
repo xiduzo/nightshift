@@ -59,7 +59,24 @@ export type WorkHub = WorkRelay & {
 		deviceId: string,
 		input: { id: string; replies: WorkReply[]; done: boolean },
 	): boolean;
+	/**
+	 * Whether a step's call of the run goes to the Device now: a session,
+	 * a command or a tool call this hub sent there (or holds for it) and
+	 * that has not ended. What the Host checks before it gives the
+	 * Device the run's Project secrets (ADR 13).
+	 */
+	placed(
+		deviceId: string,
+		run: { spaceId: string; projectId: string; runId: string },
+	): boolean;
 };
+
+/** The calls of a step that read secrets on the Device. */
+const STEP_CALLS: ReadonlySet<string> = new Set([
+	"session",
+	"exec",
+	"callTool",
+]);
 
 /** One stream a Device takes its work over. */
 type Stream = {
@@ -351,6 +368,22 @@ export function createWorkHub(
 				ended.removeEventListener("abort", notify);
 				leave(deviceId, stream);
 			}
+		},
+
+		placed(deviceId, run) {
+			for (const call of calls.values()) {
+				const { request } = call.request;
+				if (
+					call.deviceId === deviceId &&
+					request.runId === run.runId &&
+					request.projectId === run.projectId &&
+					request.spaceId === run.spaceId &&
+					STEP_CALLS.has(request.call.kind)
+				) {
+					return true;
+				}
+			}
+			return false;
 		},
 
 		reply(deviceId, { id, replies, done }) {

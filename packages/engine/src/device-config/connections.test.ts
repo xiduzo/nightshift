@@ -6,8 +6,10 @@ import {
 	type ConnectionStore,
 	createConnectionStore,
 	type PersonalSecrets,
+	type ProjectSecrets,
 	referencedVariables,
 	type SecretBackend,
+	type StepRun,
 } from "./connections";
 
 let sandbox: Sandbox;
@@ -977,5 +979,264 @@ describe("Personal secrets (ADR 13)", () => {
 			"computer-value",
 			"personal-value",
 		]);
+	});
+});
+
+/**
+ * The Project secrets in memory, as the Host that keeps the Space keeps
+ * them, by Project. `down` makes every call fail, as a Host that cannot
+ * be reached.
+ */
+function memoryProjects(initial: Record<string, Record<string, string>> = {}) {
+	const values = new Map(
+		Object.entries(initial).map(([id, v]) => [id, new Map(Object.entries(v))]),
+	);
+	const state = { down: false, calls: 0, asked: [] as StepRun[] };
+	const check = () => {
+		state.calls += 1;
+		if (state.down) throw new Error("The Host cannot be reached.");
+	};
+	const of = (projectId: string) => {
+		let found = values.get(projectId);
+		if (!found) {
+			found = new Map();
+			values.set(projectId, found);
+		}
+		return found;
+	};
+	const port: ProjectSecrets = {
+		async list({ projectId }) {
+			check();
+			return [...of(projectId).keys()].sort().map((name) => ({
+				name,
+				setAt: 9,
+				setBy: { id: "ann", name: "Ann" },
+			}));
+		},
+		async values(run, names) {
+			check();
+			state.asked.push(run);
+			const kept = of(run.projectId);
+			return Object.fromEntries(
+				(names ?? [...kept.keys()]).flatMap((name) => {
+					const value = kept.get(name);
+					return value === undefined ? [] : [[name, value]];
+				}),
+			);
+		},
+		async set({ projectId }, name, value) {
+			check();
+			of(projectId).set(name, value);
+		},
+		async remove({ projectId }, name) {
+			check();
+			of(projectId).delete(name);
+		},
+		async take({ projectId }, name) {
+			check();
+			return of(projectId).get(name) ?? null;
+		},
+		async kept({ projectId }) {
+			check();
+			return [...of(projectId).values()];
+		},
+	};
+	return { port, values, state };
+}
+
+describe("Project secrets (ADR 13)", () => {
+	const project = { spaceId: "space-1", projectId: "app" };
+	const step = { ...project, runId: "run-1" };
+
+	async function scopedStore(options: {
+		env?: Record<string, string>;
+		keychain?: Record<string, string>;
+		personal?: Record<string, string>;
+		projects?: Record<string, Record<string, string>>;
+	}) {
+		const keychain = memorySecrets();
+		const personal = memoryPersonal(options.personal);
+		const projects = memoryProjects(options.projects);
+		const store = createConnectionStore({
+			document: await sandbox.openDocument(),
+			env: options.env ?? {},
+			secrets: keychain.backend,
+			personal: () => personal.port,
+			projects: () => projects.port,
+		});
+		for (const [name, value] of Object.entries(options.keychain ?? {})) {
+			await store.setSecret(name, value);
+		}
+		return { store, keychain, personal, projects };
+	}
+
+	test("a step's name reads its Project, then Personal, then this computer, then the environment", async () => {
+		const { store, projects } = await scopedStore({
+			env: { A: "env-a", B: "env-b", C: "env-c", D: "env-d" },
+			keychain: { A: "computer-a", B: "computer-b", C: "computer-c" },
+			personal: { A: "personal-a", B: "personal-b" },
+			projects: { app: { A: "project-a" }, other: { B: "other-b" } },
+		});
+		expect(
+			await store.secretEnv(["A", "B", "C", "D"], { project: step }),
+		).toEqual({
+			ok: true,
+			env: { A: "project-a", B: "personal-b", C: "computer-c", D: "env-d" },
+		});
+		// It asked for the step's run, and nothing of another Project.
+		expect(projects.state.asked).toEqual([step]);
+		// A use that is not a step's reads no Project secret.
+		expect(await store.secretEnv(["A"])).toEqual({
+			ok: true,
+			env: { A: "personal-a" },
+		});
+	});
+
+	test("an MCP server and a custom agent of a step read the Project's value", async () => {
+		const { store } = await scopedStore({
+			keychain: { TOKEN: "computer" },
+			projects: { app: { TOKEN: "project" } },
+		});
+		await store.save({
+			name: "tracker",
+			server: { command: "x", env: { T: ref("TOKEN") } },
+		});
+		const servers = await store.mcpServersFor(
+			{ connections: ["tracker"] },
+			{ project: step },
+		);
+		expect(servers.ok && servers.servers.tracker).toMatchObject({
+			env: { T: "project" },
+		});
+		expect(
+			await store.expandEnv({ KEY: ref("TOKEN") }, { project: step }),
+		).toMatchObject({ ok: true, env: { KEY: "project" } });
+	});
+
+	test("under an Offer: the run's Project secrets, but no Personal one", async () => {
+		const { store, personal } = await scopedStore({
+			personal: { MINE: "personal" },
+			projects: { app: { SHARED: "project" } },
+		});
+		const calls = personal.state.calls;
+		expect(
+			await store.secretEnv(["SHARED", "MINE"], {
+				personal: false,
+				project: step,
+			}),
+		).toEqual({ ok: false, missing: ["MINE"] });
+		expect(
+			await store.secretEnv(["SHARED"], { personal: false, project: step }),
+		).toEqual({ ok: true, env: { SHARED: "project" } });
+		expect(personal.state.calls).toBe(calls);
+	});
+
+	test("fails closed: a Project name has no value while the Project's secrets cannot be read", async () => {
+		const { store, projects } = await scopedStore({
+			keychain: { TOKEN: "computer-token" },
+			env: { OTHER: "env-other" },
+			projects: { app: { TOKEN: "project-token" } },
+		});
+		// This computer learns which names are the Project's at a use or a list.
+		await store.secretEnv(["TOKEN"], { project: step });
+		projects.state.down = true;
+		expect(
+			await store.secretEnv(["TOKEN", "OTHER"], { project: step }),
+		).toEqual({ ok: false, missing: ["TOKEN"], projectUnreachable: true });
+		expect(await store.secretEnv(["OTHER"], { project: step })).toEqual({
+			ok: true,
+			env: { OTHER: "env-other" },
+		});
+	});
+
+	test("masking a step's output takes every value of its Project, and the export the kept ones", async () => {
+		const { store } = await scopedStore({
+			keychain: { HERE: "computer-value" },
+			projects: {
+				app: { HERE: "project-here", DB_URL: "postgres://x" },
+				other: { NOPE: "other-value" },
+			},
+		});
+		expect((await store.secretValues({ project: step })).sort()).toEqual([
+			"computer-value",
+			"postgres://x",
+			"project-here",
+		]);
+		expect((await store.exportValues(project)).sort()).toEqual([
+			"computer-value",
+			"postgres://x",
+			"project-here",
+		]);
+		expect(await store.secretValues()).toEqual(["computer-value"]);
+	});
+
+	test("list, set and remove a Project secret: the value goes to the Project only", async () => {
+		const { store, keychain, projects } = await scopedStore({});
+		await store.setProjectSecret(project, "DB_URL", "postgres://x", "ann");
+		expect(projects.values.get("app")?.get("DB_URL")).toBe("postgres://x");
+		expect(keychain.values.has("DB_URL")).toBe(false);
+		expect((await savedNow()).secrets).toEqual([]);
+		expect(await store.projectSecrets(project, "ann")).toEqual([
+			{ name: "DB_URL", setAt: 9, setBy: { id: "ann", name: "Ann" } },
+		]);
+		await store.removeProjectSecret(project, "DB_URL", "ann");
+		expect(projects.values.get("app")?.has("DB_URL")).toBe(false);
+		await expect(
+			store.setProjectSecret(project, "EMPTY", "", "ann"),
+		).rejects.toThrow("A secret needs a value.");
+	});
+
+	test("move into a Project: from this computer or from Personal, the old copy goes after", async () => {
+		const { store, keychain, personal, projects } = await scopedStore({
+			keychain: { GH_TOKEN: "ghp" },
+			personal: { API_KEY: "sk" },
+		});
+		await store.moveToProject("GH_TOKEN", "computer", project, "ann");
+		expect(projects.values.get("app")?.get("GH_TOKEN")).toBe("ghp");
+		expect(keychain.values.has("GH_TOKEN")).toBe(false);
+		expect((await savedNow()).secrets).toEqual([]);
+		await store.moveToProject("API_KEY", "personal", project, "ann");
+		expect(projects.values.get("app")?.get("API_KEY")).toBe("sk");
+		expect(personal.values.has("API_KEY")).toBe(false);
+		await expect(
+			store.moveToProject("NOPE", "computer", project, "ann"),
+		).rejects.toThrow("This computer has no saved value of NOPE.");
+	});
+
+	test("a move into a Project that fails keeps the copy it moves from", async () => {
+		const { store, keychain, projects } = await scopedStore({
+			keychain: { GH_TOKEN: "ghp" },
+		});
+		projects.state.down = true;
+		await expect(
+			store.moveToProject("GH_TOKEN", "computer", project, "ann"),
+		).rejects.toThrow();
+		expect(keychain.values.get("GH_TOKEN")).toBe("ghp");
+	});
+
+	test("move out of a Project: to this computer or to Personal, the Project's copy goes after", async () => {
+		const { store, keychain, personal, projects } = await scopedStore({
+			projects: { app: { DB_URL: "postgres://x", API_KEY: "sk" } },
+		});
+		await store.moveFromProject(project, "DB_URL", "computer", "ann");
+		expect(keychain.values.get("DB_URL")).toBe("postgres://x");
+		expect(projects.values.get("app")?.has("DB_URL")).toBe(false);
+		await store.moveFromProject(project, "API_KEY", "personal", "ann");
+		expect(personal.values.get("API_KEY")).toBe("sk");
+		expect(projects.values.get("app")?.has("API_KEY")).toBe(false);
+		await expect(
+			store.moveFromProject(project, "API_KEY", "computer", "ann"),
+		).rejects.toThrow("API_KEY is not a secret of this project.");
+	});
+
+	test("a move out of a Project whose save fails keeps the Project's copy", async () => {
+		const { store, personal, projects } = await scopedStore({
+			projects: { app: { DB_URL: "postgres://x" } },
+		});
+		personal.state.down = true;
+		await expect(
+			store.moveFromProject(project, "DB_URL", "personal", "ann"),
+		).rejects.toThrow();
+		expect(projects.values.get("app")?.get("DB_URL")).toBe("postgres://x");
 	});
 });

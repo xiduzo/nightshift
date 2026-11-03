@@ -29,6 +29,7 @@ import {
 	type McpExpansion,
 	type SecretEnv,
 	type SecretUse,
+	type StepRun,
 	unreachableNote,
 } from "../device-config";
 import type { ProjectKnowledge } from "../knowledge";
@@ -98,10 +99,11 @@ export type LocalDeviceDeps = {
 		use?: SecretUse,
 	) => Promise<McpExpansion>;
 	/**
-	 * A Command node's secrets, by name: Personal, then the keychain, then
-	 * the daemon's environment. Default: `process.env`.
+	 * A Command node's secrets, by name: the run's Project, Personal, then
+	 * the keychain, then the daemon's environment. Default: `process.env`.
+	 * `use`: which scopes they may read.
 	 */
-	secretEnv?: (names: readonly string[]) => Promise<SecretEnv>;
+	secretEnv?: (names: readonly string[], use?: SecretUse) => Promise<SecretEnv>;
 	/** The connections defined on this computer. */
 	connectionNames?: () => ReadonlySet<string>;
 	/** The CLI tools defined on this computer. */
@@ -206,12 +208,23 @@ function noDecider(
 }
 
 /**
+ * Which secret scopes a step's use reads (ADR 13): its run's Project
+ * first, and no Personal secret under an Offer.
+ */
+function secretUse(run: StepRun | undefined, underOffer?: true): SecretUse {
+	return {
+		...(underOffer ? { personal: false } : {}),
+		...(run ? { project: run } : {}),
+	};
+}
+
+/**
  * Why a command does not start: secrets it names that this computer does
  * not have, and why when the Personal secrets could not be read.
  */
 function missingSecretsMessage(
 	missing: readonly string[],
-	found: { unreachable?: boolean } = {},
+	found: Parameters<typeof unreachableNote>[0] = {},
 ): string {
 	const [noun, isNot, it] =
 		missing.length === 1
@@ -273,7 +286,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				: { ok: true, servers: {} });
 	const secretEnv =
 		deps.secretEnv ??
-		(async (names: readonly string[]): Promise<SecretEnv> => {
+		(async (names: readonly string[], _use?: SecretUse): Promise<SecretEnv> => {
 			const missing = names.filter((name) => process.env[name] === undefined);
 			if (missing.length > 0) return { ok: false, missing };
 			return {
@@ -330,11 +343,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			knowledgeOnly,
 			files,
 			underOffer,
+			run,
 			...rest
 		} = input;
 		// Another Person's step under an Offer reads no Personal secret of
-		// this computer's owner (ADR 13, decision 5).
-		const use: SecretUse = underOffer ? { personal: false } : {};
+		// this computer's owner (ADR 13, decision 5). A step of a run reads
+		// its Project's secrets first.
+		const use = secretUse(run, underOffer);
 		// Some folders of the knowledge (a view), or the whole folder.
 		const knowledgeAsked = knowledgeOnly
 			? { projectId: knowledgeOnly.projectId, folders: knowledgeOnly.folders }
@@ -476,7 +491,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	 * to the launcher only, and come back as `•••` too.
 	 */
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
-		const { secrets = [], knowledge, ...command } = input;
+		const { secrets = [], knowledge, run, ...command } = input;
 		// The secrets of the CLI tools' logins go to their launchers only. A
 		// command that names one in `secrets` gets it below.
 		const scrub = (deps.toolLaunchers?.guarded() ?? []).filter(
@@ -484,7 +499,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		);
 		const found =
 			secrets.length > 0
-				? await secretEnv(secrets)
+				? await secretEnv(secrets, secretUse(run))
 				: { ok: true as const, env: {} };
 		if (!found.ok) {
 			yield {
@@ -566,16 +581,20 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		session,
 		exec,
 		async callTool(input): Promise<ToolResult> {
-			const mcp = await mcpServersFor({ connections: [input.connection] });
+			const { run, ...call } = input;
+			const mcp = await mcpServersFor(
+				{ connections: [call.connection] },
+				secretUse(run),
+			);
 			if (!mcp.ok) return { kind: "refused", message: mcp.message };
-			const server = mcp.servers[input.connection];
+			const server = mcp.servers[call.connection];
 			if (!server) {
 				return {
 					kind: "refused",
-					message: `There is no connection named "${input.connection}". Add it under Agents → Tools, or pick another one.`,
+					message: `There is no connection named "${call.connection}". Add it under Agents → Tools, or pick another one.`,
 				};
 			}
-			return callServerTool(server, input);
+			return callServerTool(server, call);
 		},
 		decide,
 		flows: async (projectId) => deps.flows?.(projectId) ?? {},

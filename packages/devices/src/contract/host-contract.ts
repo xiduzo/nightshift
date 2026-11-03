@@ -31,7 +31,13 @@ import {
 import { offerCapsSchema, offerRefSchema } from "./offers";
 import { personalMergeInputSchema, personalMergeSchema } from "./personal";
 import { runRowsSchema, syncCursorsSchema } from "./rows";
-import { PERSONAL_SECRET_MAX, personalSecretNameSchema } from "./secrets";
+import {
+	PERSONAL_SECRET_MAX,
+	personalSecretNameSchema,
+	projectRefSchema,
+	projectSecretNameSchema,
+	stepRunSchema,
+} from "./secrets";
 import {
 	commandBatchSchema,
 	feedStepSchema,
@@ -612,6 +618,55 @@ export const hostContract = {
 			})
 			.input(z.object({ name: secretNameSchema }))
 			.output(described(z.void())),
+	},
+	/**
+	 * The secrets of the Projects of the Spaces this Host keeps (ADR 13).
+	 * A Member's Device lists their names. One whose Person's role saves
+	 * Flows sets, removes and moves them. Values go only to a Device with a
+	 * step of a run of the Project placed on it now (`values`), or to a
+	 * move (`take`). Any other key is FORBIDDEN. An older Host has none:
+	 * the Device says to update it.
+	 */
+	projectSecrets: {
+		list: sync
+			.route({
+				summary:
+					"Lists the names of a project's secrets, with when and by whom each was set.",
+			})
+			.input(projectRefSchema)
+			.output(described(z.array(projectSecretNameSchema))),
+		values: sync
+			.route({
+				summary:
+					"Gives a Device the values of its project's secrets for a step of the run placed on it now.",
+			})
+			.input(
+				stepRunSchema.extend({
+					/** Without: every value of the project, to take out of the step's output. */
+					names: z.array(secretNameSchema).max(200).optional(),
+				}),
+			)
+			.output(described(z.record(z.string(), z.string()))),
+		set: sync
+			.route({ summary: "Saves a project secret, or replaces its value." })
+			.input(
+				projectRefSchema.extend({
+					name: secretNameSchema,
+					value: z.string().min(1).max(PERSONAL_SECRET_MAX),
+				}),
+			)
+			.output(described(z.void())),
+		remove: sync
+			.route({ summary: "Removes a project secret." })
+			.input(projectRefSchema.extend({ name: secretNameSchema }))
+			.output(described(z.void())),
+		take: sync
+			.route({
+				summary:
+					"Gives a Device the value of a project secret to move it to another scope.",
+			})
+			.input(projectRefSchema.extend({ name: secretNameSchema }))
+			.output(described(z.string().nullable())),
 	},
 	/**
 	 * The work relay: a placed Device takes the calls of the runs the Host

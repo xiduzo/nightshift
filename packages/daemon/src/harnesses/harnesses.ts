@@ -20,8 +20,8 @@ import type { localDevice } from "@nightshift/engine";
 import {
 	type ConnectionStore,
 	HARNESS_BIN,
-	PERSONAL_UNREACHABLE,
 	type SettingsStore,
+	unreachableNote,
 } from "@nightshift/engine/device-config";
 import { type AgentHarnessName, isCustomHarness } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -116,7 +116,7 @@ export function localHarnesses(deps: {
 					// Words for the person: the step shows them as they are.
 					throw new Refusal(
 						"conflict",
-						`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.${env.unreachable ? ` ${PERSONAL_UNREACHABLE}` : ""}`,
+						`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.${unreachableNote(env)}`,
 					);
 				},
 			});

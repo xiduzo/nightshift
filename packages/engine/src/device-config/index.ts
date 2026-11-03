@@ -9,6 +9,7 @@ export type {
 	SecretList,
 	SecretUse,
 	SecretView,
+	StepRun,
 } from "./connections";
 export { unreachableNote } from "./connections";
 export {

@@ -13,15 +13,19 @@ export type {
 	Connection,
 	ConnectionStore,
 	PersonalSecrets,
+	ProjectRef,
+	ProjectSecretName,
+	ProjectSecrets,
 	SecretScope,
 	SecretSource,
 	SecretUse,
 	SecretView,
+	StepRun,
 } from "./connections";
 export {
 	connectionInputSchema,
-	PERSONAL_UNREACHABLE,
 	secretStore,
+	unreachableNote,
 } from "./connections";
 export {
 	createDeviceCopies,

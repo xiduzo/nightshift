@@ -42,7 +42,12 @@ export type HostPeerContext = {
 	/** This computer as a Host: pairing, and the answer to a link. */
 	devices: Pick<
 		Devices,
-		"startPairing" | "redeemPairing" | "hello" | "revoke" | "personalSecrets"
+		| "startPairing"
+		| "redeemPairing"
+		| "hello"
+		| "revoke"
+		| "personalSecrets"
+		| "projectSecrets"
 	>;
 	phones: HostPhones;
 };
@@ -205,6 +210,23 @@ export const hostRouter = os.router({
 		),
 		remove: keyed.secrets.remove.handler(({ context, input }) =>
 			context.devices.personalSecrets.remove(context.key, input),
+		),
+	},
+	projectSecrets: {
+		list: keyed.projectSecrets.list.handler(({ context, input }) =>
+			context.devices.projectSecrets.list(context.key, input),
+		),
+		values: keyed.projectSecrets.values.handler(({ context, input }) =>
+			context.devices.projectSecrets.values(context.key, input),
+		),
+		set: keyed.projectSecrets.set.handler(({ context, input }) =>
+			context.devices.projectSecrets.set(context.key, input),
+		),
+		remove: keyed.projectSecrets.remove.handler(({ context, input }) =>
+			context.devices.projectSecrets.remove(context.key, input),
+		),
+		take: keyed.projectSecrets.take.handler(({ context, input }) =>
+			context.devices.projectSecrets.take(context.key, input),
 		),
 	},
 	devices: {

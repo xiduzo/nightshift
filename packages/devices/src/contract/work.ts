@@ -167,6 +167,16 @@ const stepReportSchema = z.union([
 	}),
 ]);
 
+/**
+ * The run a step's call works for (ADR 13). The placed Device does not
+ * take it from here: it sets it from the request's own run (`serveWork`).
+ */
+const stepRunSchema = z.object({
+	spaceId: z.string(),
+	projectId: z.string(),
+	runId: z.string(),
+});
+
 /** What every session has: where it works, its prompt, the session it continues. */
 const sessionFields = {
 	cwd: z.string(),
@@ -203,6 +213,7 @@ const sessionFields = {
 	 * Device that runs it sets it itself; a Walker's only narrows.
 	 */
 	underOffer: z.literal(true).optional(),
+	run: stepRunSchema.optional(),
 };
 
 /** A session the Walker resolved: its harness, model, tools and connections. */
@@ -292,6 +303,7 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			knowledge: z.object({ projectId: z.string() }).optional(),
 			/** A service: a first `started` event with the process id. */
 			pid: z.boolean().optional(),
+			run: stepRunSchema.optional(),
 		}),
 	}),
 	z.object({
@@ -300,6 +312,7 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			connection: z.string(),
 			tool: z.string(),
 			arguments: z.record(z.string(), z.json()),
+			run: stepRunSchema.optional(),
 		}),
 	}),
 	z.object({ kind: z.literal("decide"), input: decideInputSchema }),

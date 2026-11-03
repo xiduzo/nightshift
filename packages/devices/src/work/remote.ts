@@ -252,6 +252,13 @@ export function remoteDevice(
 	};
 }
 
+/** A call's input without the run it names: `serveWork` sets the request's. */
+function withoutRun<T extends { run?: unknown }>(input: T): T {
+	const { run: _, ...rest } = input;
+	// Each member of a union of inputs, less one optional field.
+	return rest as T;
+}
+
 /** The words of a snapshot call on a Device that takes none. */
 const NO_SNAPSHOTS = "This device does not tell what a step changed.";
 
@@ -267,6 +274,19 @@ export async function* serveWork(
 	signal: AbortSignal,
 ): AsyncGenerator<WorkReply> {
 	const { call } = request;
+	// The run a step's call works for is the request's own, never one the
+	// call's input names: the Project secrets it reads are that run's
+	// (ADR 13), and the Host checked that run for this Device.
+	const run =
+		request.runId === null
+			? {}
+			: {
+					run: {
+						spaceId: request.spaceId,
+						projectId: request.projectId,
+						runId: request.runId,
+					},
+				};
 	const result = (value: unknown): WorkReply => ({ kind: "result", value });
 	try {
 		switch (call.kind) {
@@ -320,17 +340,27 @@ export async function* serveWork(
 				);
 				return;
 			case "session":
-				for await (const item of device.session({ ...call.input, signal })) {
+				for await (const item of device.session({
+					...withoutRun(call.input),
+					...run,
+					signal,
+				})) {
 					yield { kind: "item", item };
 				}
 				return;
 			case "exec":
-				for await (const item of device.exec({ ...call.input, signal })) {
+				for await (const item of device.exec({
+					...withoutRun(call.input),
+					...run,
+					signal,
+				})) {
 					yield { kind: "item", item };
 				}
 				return;
 			case "callTool":
-				yield result(await device.callTool({ ...call.input, signal }));
+				yield result(
+					await device.callTool({ ...withoutRun(call.input), ...run, signal }),
+				);
 				return;
 			case "decide":
 				yield result(

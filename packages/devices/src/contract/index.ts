@@ -39,7 +39,7 @@ export type {
 export { READS, READS_HEADER, reads } from "./reads";
 export type { HostRelay, InStep } from "./relay";
 export type { RunRows, SyncCursors } from "./rows";
-export type { PersonalSecretName } from "./secrets";
+export type { PersonalSecretName, ProjectSecretName } from "./secrets";
 export type {
 	CommandBatch,
 	FollowWant,
