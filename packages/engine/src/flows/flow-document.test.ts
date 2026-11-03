@@ -5,6 +5,8 @@ import {
 	type Flow,
 	flowSchema,
 	parsedFlows,
+	parseFlow,
+	scheduleSchema,
 	singleAgentFlow,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -533,6 +535,41 @@ describe("flows of format 6 in the document (ADR 3)", () => {
 			version: FLOW_VERSION,
 			nodes: [{ profile: { device: "laptop", profile: "p-laptop" } }, {}],
 		});
+	});
+
+	test("a schedule checks its flow as a read gives it, not as an older format stored it", async () => {
+		await storeFormat6(desktop, "laptop");
+		const flows = createProjectFlows({
+			documents: desktop.documents,
+			project: async () => ({ spaceId: desktop.sandbox.spaceId }),
+			deviceId: "desktop",
+			migrations,
+		});
+		const nightly = scheduleSchema.parse({
+			id: "nightly",
+			flow: "build",
+			cron: "0 2 * * *",
+		});
+		// The read has one error: node "b" names a profile to pick again. The
+		// stored format 6 has more: its Device is a name, which no read keeps.
+		const read = (await flows.flows(of)).build;
+		const errors =
+			read && "json" in read
+				? parseFlow(read.json, { name: "build" }).issues.filter(
+						(issue) => issue.severity === "error",
+					).length
+				: -1;
+		expect(errors).toBe(1);
+		const says = [
+			{
+				severity: "error" as const,
+				scheduleId: "nightly",
+				message:
+					'The flow "build" has an error. Fix the flow so this schedule can run.',
+			},
+		];
+		expect(await flows.saveSchedules(of, [nightly])).toEqual(says);
+		expect((await flows.schedules(of)).issues).toEqual(says);
 	});
 
 	test("upgradeFlows writes the current format once, with a revision of kind upgrade", async () => {

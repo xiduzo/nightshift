@@ -197,15 +197,21 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 		return (personId) => byPerson.get(personId);
 	}
 
+	/**
+	 * The flows as a read gives them: one of an older format in the current
+	 * format, so a schedule checks the flow that runs, not the stored one.
+	 */
+	const readSources = async (projectId: string, document: FlowDocument) =>
+		upgradedSources(
+			document,
+			migrations,
+			await deviceId(),
+			await spaceOf(projectId),
+		);
+
 	return {
 		async flows(projectId) {
-			const document = await documentOf(projectId);
-			return upgradedSources(
-				document,
-				migrations,
-				await deviceId(),
-				await spaceOf(projectId),
-			);
+			return readSources(projectId, await documentOf(projectId));
 		},
 
 		async save(projectId, name, flow, options = {}) {
@@ -284,7 +290,7 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 				issues.push(
 					...validateSchedules(
 						schedules,
-						scheduleFlowInfos(flowSources(document)),
+						scheduleFlowInfos(await readSources(projectId, document)),
 					),
 				);
 			}
@@ -296,7 +302,7 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 			await saveSchedules(document, schedules);
 			return validateSchedules(
 				schedules,
-				scheduleFlowInfos(flowSources(document)),
+				scheduleFlowInfos(await readSources(projectId, document)),
 			);
 		},
 
