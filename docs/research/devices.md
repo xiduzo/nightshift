@@ -201,11 +201,17 @@ flowchart LR
   never receives it. A Member of a shared Space sees of your Device only:
   its name, that it is online, that it has a Clone of the shared Project,
   and the names of the profiles you offered.
-- **Secret values never leave their Device.** Values are in that Device's
-  keychain or environment; `${NAME}` resolves where the MCP server starts.
-  Secret names are owner-private: every Device of the Person sees the
-  secret names of each of their Devices, nobody else does. A step that
-  needs a Secret runs on a Device that has it (ADR 1).
+- **A Secret has a scope (ADR 13).** A secret of "This computer" never
+  leaves its Device: its value is in that Device's keychain or
+  environment. A Personal secret belongs to the Person: their Home Host
+  keeps it, encrypted at rest (AES-GCM, `personal_secret`), or the Device
+  keeps it itself when it has no Home Host. A step on one of the Person's
+  own Devices asks the Home Host for the values it needs and keeps them in
+  memory for that step only. A step of another Person's run under an Offer
+  gets none, and a Guest Host keeps none. `${NAME}` reads Personal, then
+  this computer, then the environment, where the MCP server starts. Secret
+  names are owner-private: every Device of the Person sees the secret
+  names of each of their Devices, nobody else does.
 - **Every row carries a Space id** (the TECH constraint). The Host filters
   every sync, relay and stream by membership. The Replica holds many
   Spaces; every query is scoped to one.
@@ -1881,7 +1887,11 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      Connections page go to the keychain where it works, else
      `<data dir>/secrets/<NAME>` (0600), the same choice as Device keys
      (`packages/engine/src/device-config/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
-     Devices page says where: "Secrets and access to your Hosts".
+     Devices page says where: "Secrets and access to your Hosts". The key
+     that encrypts the Personal secrets a computer keeps (ADR 13) is read
+     the same way: `NIGHTSHIFT_SECRETS_KEY`, else the file
+     `NIGHTSHIFT_SECRETS_KEY_FILE`, else `NIGHTSHIFT_SECRETS_KEY` in the
+     secrets folder, else `<data dir>/secrets-key`, made once (0600).
    - **Listening.** `NIGHTSHIFT_LISTEN` narrows where a Host binds (default
      `0.0.0.0`): `127.0.0.1` when its way out runs on the same computer. A
      daemon that is not a Host binds `127.0.0.1` whatever it says. With its
