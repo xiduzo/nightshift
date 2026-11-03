@@ -10,6 +10,7 @@ export {
 	type PairedDevice,
 } from "./registry";
 export {
+	defaultSelfDeviceHost,
 	selfDevice,
 	selfOwnerId,
 	setSelfOwner,

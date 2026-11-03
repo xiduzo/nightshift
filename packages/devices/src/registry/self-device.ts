@@ -56,6 +56,11 @@ function addressName(addresses: string | undefined): string | null {
  * when set, else the host name. A container whose host name is its id
  * cannot see the name of its computer: its default is the name in its first
  * Host address, else "Host".
+ *
+ * A dev daemon (`dev`, NIGHTSHIFT_DEV) runs beside the desktop app on the
+ * same computer: its default is "<host name> (dev)", so the two Devices do
+ * not share a name. Only a new Device takes it: a dev Device named after
+ * the host name keeps its name.
  */
 export function defaultSelfDeviceHost(
 	opts: {
@@ -63,21 +68,26 @@ export function defaultSelfDeviceHost(
 		hostName?: string;
 		container?: boolean;
 		platform?: string;
+		dev?: boolean;
 	} = {},
 ): SelfDeviceHost {
 	const env = opts.env ?? process.env;
 	const raw = hostDeviceName(opts.hostName ?? hostname());
 	const container = opts.container ?? inContainer();
 	const unnamed = container && isContainerId(raw);
-	const name =
-		env.NIGHTSHIFT_DEVICE_NAME?.trim() ||
-		(unnamed ? addressName(env.NIGHTSHIFT_HOST_ADDRESSES) || "Host" : raw);
+	const chosen = env.NIGHTSHIFT_DEVICE_NAME?.trim();
+	const fallback = unnamed
+		? addressName(env.NIGHTSHIFT_HOST_ADDRESSES) || "Host"
+		: raw;
+	const name = chosen || (opts.dev ? `${fallback} (dev)` : fallback);
+	// A dev Device named after the host name is not stale: renaming it would be silent.
+	const rawIsStale = !opts.dev || Boolean(chosen);
 	return {
 		name,
 		platform: opts.platform ?? process.platform,
 		stale: (current) =>
 			current !== name &&
-			(current === raw ||
+			((rawIsStale && current === raw) ||
 				(container && (isContainerId(current) || current === "Host"))),
 	};
 }

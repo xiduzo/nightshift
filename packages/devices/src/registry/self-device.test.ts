@@ -107,6 +107,26 @@ describe("defaultSelfDeviceHost", () => {
 		expect(of("Adas-MacBook.local", false).name).toBe("Adas-MacBook");
 	});
 
+	test("a new dev Device is named apart from the desktop app's", () => {
+		const host = defaultSelfDeviceHost({
+			env: {},
+			hostName: "LE2316.local",
+			container: false,
+			platform: "darwin",
+			dev: true,
+		});
+		expect(host.name).toBe("LE2316 (dev)");
+		// A dev Device that already has the host name keeps it.
+		expect(host.stale?.("LE2316")).toBe(false);
+		const named = defaultSelfDeviceHost({
+			env: { NIGHTSHIFT_DEVICE_NAME: "Studio" },
+			hostName: "LE2316",
+			container: false,
+			dev: true,
+		});
+		expect(named.name).toBe("Studio");
+	});
+
 	test("a container id is a 12 or 64 hex host name", () => {
 		expect(isContainerId("cea79743b08a")).toBe(true);
 		expect(isContainerId("a".repeat(64))).toBe(true);

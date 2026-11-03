@@ -20,6 +20,7 @@ import {
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
+	defaultSelfDeviceHost,
 	deviceDirectory,
 	type HostClient,
 	type OpenDocumentChannel,
@@ -289,7 +290,7 @@ export async function createDaemon(
 	const hostPolicy = hostPolicyFromEnv(env);
 
 	/** This computer's Device: the Walker of its runs, the owner of its Clones. */
-	const device = await selfDevice(db);
+	const device = await selfDevice(db, defaultSelfDeviceHost({ dev }));
 
 	/**
 	 * This Device's document: its profiles, CLI tools, connections, settings

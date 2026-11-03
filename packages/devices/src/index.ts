@@ -53,6 +53,7 @@ export type { HostRole, JoinProgress, OpenDocumentChannel } from "./links";
 export type { Offers, OfferView, SpaceDeviceView } from "./offers";
 export { deviceDirectory, type PeerEngine } from "./peers";
 export {
+	defaultSelfDeviceHost,
 	type PairedDevice,
 	selfDevice,
 	selfOwnerId,
