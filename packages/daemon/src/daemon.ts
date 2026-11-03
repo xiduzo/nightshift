@@ -145,7 +145,7 @@ export type DaemonOutside = {
 /** Facts about this daemon that change only on a restart. */
 export type DaemonInfo = Context["daemon"] & {
 	databaseUrl: string;
-	/** The lease this daemon holds: the desktop watchdog tells another daemon's apart. */
+	/** The lease this daemon holds. */
 	leaseOwner: string;
 	/** Whom this daemon answers since it started: this computer, or the network. */
 	reach: "this-computer" | "network";
@@ -162,6 +162,11 @@ export type Daemon = DaemonServe & {
 	 * so the next daemon starts at once. Bounded at 2 s. Never throws.
 	 */
 	stop(): Promise<void>;
+	/**
+	 * Calls `listener` with the time of each lease heartbeat the database
+	 * took: the desktop watchdog's sign that this daemon's timers still run.
+	 */
+	onLeaseHeartbeat(listener: (at: number) => void): () => void;
 };
 
 /**
@@ -815,6 +820,7 @@ export async function createDaemon(
 		info,
 		ownerHasLogin: () => hasLogin(db, person.userId),
 		stop,
+		onLeaseHeartbeat: (listener) => lease.onHeartbeat(listener),
 	};
 }
 

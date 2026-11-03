@@ -2,8 +2,7 @@
 	"name": "@nightshift/daemon",
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts",
-		"./heartbeat": "./src/heartbeat.ts"
+		".": "./src/index.ts"
 	},
 	"scripts": {
 		"check-types": "tsc -b ../api && tsc --noEmit",

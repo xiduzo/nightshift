@@ -32,7 +32,7 @@ const libsqlNative = libsqlNativePackage();
  * The watchdog runs in a Worker, from its own file next to the bundle: Bun
  * starts a Worker from a file and does not bundle it with the main process.
  * So the worker is bundled here on its own, with what it imports
- * (`@nightshift/daemon/heartbeat`). The file keeps the name the app starts
+ * (only `@nightshift/time`). The file keeps the name the app starts
  * it by (`watchdog-worker.ts`). Bun runs the bundled JavaScript in it as it is.
  */
 async function bundleWatchdogWorker(): Promise<string> {

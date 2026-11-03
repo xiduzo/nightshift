@@ -12,7 +12,7 @@ import type { Telemetry } from "@nightshift/telemetry";
 
 import type { KeepAwake } from "../keep-awake";
 import type { KeptSync } from "../sync";
-import type { Lease } from "./lease";
+import type { HeldLease } from "./hold-lease";
 
 /**
  * What one daemon process keeps across `bun --hot` reloads. `bun --hot`
@@ -46,7 +46,7 @@ export type HotRegistry = KeptDevices &
 	KeptSync & {
 		/** The database clients of this process, by URL (`processDatabase`). */
 		nightshiftDatabases?: Map<string, Database>;
-		nightshiftLease?: Lease;
+		nightshiftLease?: HeldLease;
 		/** Every document this Replica syncs, by name. */
 		nightshiftDocuments?: SyncedDocuments;
 		/** A daemon of an older version kept these apart (`stopOlderDocuments`). */

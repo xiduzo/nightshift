@@ -72,17 +72,16 @@ export async function startDaemon(desktop: DesktopScreen): Promise<Daemon> {
 	});
 
 	// Only for the daemon this app runs: a shared one has its own watchers.
-	const url = daemon.info.databaseUrl;
-	const watchdog = url.startsWith("file:")
-		? startWatchdog({ database: url.slice(5), owner: daemon.info.leaseOwner })
-		: null;
+	const watchdog = startWatchdog();
+	const unwatch = daemon.onLeaseHeartbeat((at) => watchdog.heartbeat(at));
 
 	let stopped: Promise<void> | undefined;
 	return {
 		kind: "own",
 		stop: () => {
 			stopped ??= (async () => {
-				watchdog?.terminate();
+				unwatch();
+				watchdog.terminate();
 				await daemon.stop();
 			})();
 			return stopped;

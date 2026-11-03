@@ -1,8 +1,12 @@
 /**
- * The lease heartbeat as another process reads it (`@nightshift/daemon/heartbeat`):
- * the desktop watchdog in its Worker and `nightshift health`. This entry
- * imports nothing but Bun and Node, and does nothing when it loads. The
- * daemon writes the lease row (`runtime/lease.ts`).
+ * The lease heartbeat as another process reads it: `nightshift health`.
+ * The daemon writes the lease row (`runtime/lease.ts`).
+ *
+ * Only from another process. bun:sqlite is a second copy of SQLite beside
+ * the daemon's libsql: in one process the two do not see each other's
+ * locks, and closing this connection can reset the daemon's shared-memory
+ * file under it (a SIGBUS in the daemon). The desktop watchdog hears the
+ * heartbeat from the daemon instead (`Daemon.onLeaseHeartbeat`).
  */
 import { Database as Sqlite } from "bun:sqlite";
 import { existsSync } from "node:fs";

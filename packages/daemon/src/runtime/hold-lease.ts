@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import { now } from "@nightshift/time";
 
 import {
 	acquireLease,
@@ -14,11 +15,18 @@ import {
  * later (its machine slept past the stale window and another daemon
  * started) fences itself: it exits with code 3 and writes nothing more.
  *
- * Its heartbeat stops when the lease is released. `bun --hot` evaluates
+ * Its heartbeat stops when the lease is released. `onHeartbeat` hears each
+ * heartbeat the database took: the desktop watchdog listens there, so it
+ * never opens the database itself. `bun --hot` evaluates
  * the daemon again on each reload, in the same process: the daemon keeps
  * the lease the process holds (`nightshiftLease`).
  */
-export async function holdLease(db: Database): Promise<Lease> {
+export type HeldLease = Lease & {
+	/** Calls `listener` with the time of each heartbeat the database took. Returns how to stop. */
+	onHeartbeat(listener: (at: number) => void): () => void;
+};
+
+export async function holdLease(db: Database): Promise<HeldLease> {
 	let lease: Lease;
 	try {
 		lease = await acquireLease({
@@ -35,11 +43,19 @@ export async function holdLease(db: Database): Promise<Lease> {
 		console.error(error.message);
 		process.exit(1);
 	}
+	const listeners = new Set<(at: number) => void>();
 	const heartbeat = setInterval(() => {
-		lease.heartbeat().catch((error) => {
-			// A failed write is not a lost lease: the next heartbeat tries again.
-			console.error("The lease heartbeat failed:", error);
-		});
+		lease
+			.heartbeat()
+			.then((written) => {
+				if (!written) return;
+				const at = now();
+				for (const listener of listeners) listener(at);
+			})
+			.catch((error) => {
+				// A failed write is not a lost lease: the next heartbeat tries again.
+				console.error("The lease heartbeat failed:", error);
+			});
 	}, LEASE_HEARTBEAT_MS);
 	heartbeat.unref();
 	lease.signal.addEventListener("abort", () => clearInterval(heartbeat), {
@@ -48,5 +64,10 @@ export async function holdLease(db: Database): Promise<Lease> {
 	console.log(
 		`Holding the database lease: epoch ${lease.epoch}, pid ${lease.pid} on ${lease.host}.`,
 	);
-	return lease;
+	return Object.assign(lease, {
+		onHeartbeat(listener: (at: number) => void) {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+	});
 }

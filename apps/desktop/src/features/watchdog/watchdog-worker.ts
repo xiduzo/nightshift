@@ -2,49 +2,44 @@
  * The desktop app's watchdog, in a Worker: see `./watchdog.ts`. A Worker has
  * its own event loop and timers, so it keeps checking when the app's own
  * timers stopped. The app's build bundles this file on its own and puts it
- * next to the app's bundle (`electrobun.config.ts`). It imports only the
- * heartbeat read of `@nightshift/daemon`, an entry that loads nothing else.
+ * next to the app's bundle (`electrobun.config.ts`).
+ *
+ * It never opens the database. The daemon's libsql and a second SQLite in
+ * this Worker would share one process without seeing each other's locks:
+ * the Worker's connection could reset the daemon's shared-memory file under
+ * it, and the daemon crashed with a SIGBUS. The daemon tells it of each
+ * lease heartbeat instead.
  */
-import { readHeartbeatFile } from "@nightshift/daemon/heartbeat";
 import { now } from "@nightshift/time";
 
-export type WatchdogStart = {
-	/** The database file. */
-	database: string;
-	/** The lease this app's daemon holds. */
-	owner: string;
-	checkEveryMs: number;
-	staleAfterMs: number;
-};
+export type WatchdogMessage =
+	| { kind: "start"; checkEveryMs: number; staleAfterMs: number }
+	/** The daemon's lease heartbeat, which the database took at `at`. */
+	| { kind: "heartbeat"; at: number };
 
 declare const self: Worker;
 
-/**
- * How old this daemon's lease heartbeat is (the health check of `@nightshift/daemon` reads
- * the same row). Null when there is nothing to judge: the lease was given
- * up (the app is quitting), or another daemon holds it.
- */
-function heartbeatAge(start: WatchdogStart): number | null {
-	try {
-		const row = readHeartbeatFile(start.database);
-		return row?.owner === start.owner ? now() - row.heartbeatAt : null;
-	} catch (error) {
-		console.error("The watchdog could not read the database:", error);
-		return null;
-	}
-}
+let lastHeartbeatAt = now();
+let started = false;
 
-self.onmessage = (event: MessageEvent<WatchdogStart>) => {
-	const start = event.data;
+self.onmessage = (event: MessageEvent<WatchdogMessage>) => {
+	const message = event.data;
+	if (message.kind === "heartbeat") {
+		lastHeartbeatAt = Math.max(lastHeartbeatAt, message.at);
+		return;
+	}
+	if (started) return;
+	started = true;
+	lastHeartbeatAt = now();
 	let staleReads = 0;
 	setInterval(() => {
-		const age = heartbeatAge(start);
+		const age = now() - lastHeartbeatAt;
 		// Twice in a row: a computer that just woke from sleep catches up.
-		staleReads = age !== null && age > start.staleAfterMs ? staleReads + 1 : 0;
+		staleReads = age > message.staleAfterMs ? staleReads + 1 : 0;
 		if (staleReads < 2) return;
 		console.error(
-			`WATCHDOG: the daemon's last heartbeat is ${Math.round((age ?? 0) / 1_000)} s old. Its timers stopped, or it hangs. Killing the app: open it again to pick up the runs.`,
+			`WATCHDOG: the daemon's last heartbeat is ${Math.round(age / 1_000)} s old. Its timers stopped, or it hangs. Killing the app: open it again to pick up the runs.`,
 		);
 		process.kill(process.pid, "SIGKILL");
-	}, start.checkEveryMs);
+	}, message.checkEveryMs);
 };
