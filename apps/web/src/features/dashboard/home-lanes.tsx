@@ -1,9 +1,11 @@
+import { shortReason } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Card,
 	CardAction,
 	CardContent,
+	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@nightshift/ui/components/card";
@@ -11,19 +13,20 @@ import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
 } from "@nightshift/ui/components/empty";
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from "@nightshift/ui/components/hover-card";
 import {
 	Item,
 	ItemActions,
 	ItemContent,
-	ItemDescription,
 	ItemGroup,
 	ItemMedia,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
-import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Link } from "@tanstack/react-router";
 import {
@@ -36,8 +39,9 @@ import {
 	LoaderCircleIcon,
 	MoonIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type {
+	FailingFlow,
 	NightRange,
 	NightsRange,
 	OpenGate,
@@ -46,12 +50,13 @@ import type {
 } from "@/shared/api";
 import { formatRelative, formatTime, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import { MoreRows } from "./details";
+import { OVERVIEW_ROWS } from "./overview";
 
 /**
  * Home's three lanes, in the order you act on them: what runs now, what
- * waits for you, what failed. Every row opens its place: a run its page,
- * a Gate its question in the inbox.
+ * waits for you, which flows failed. Each lane is as tall as its rows. A
+ * row is one line and shows the rest on hover. Every row opens its place:
+ * a run its page, a Gate its question in the inbox.
  */
 export function HomeLanes({
 	running,
@@ -66,7 +71,7 @@ export function HomeLanes({
 	running: RunSummary[];
 	gates: OpenGate[];
 	/** Undefined while the numbers load. */
-	failed: NightsRange["runs"]["failed"] | undefined;
+	failed: NightsRange["runs"] | undefined;
 	projects: Project[] | undefined;
 	range: NightRange;
 	isLoading: boolean;
@@ -77,63 +82,41 @@ export function HomeLanes({
 		projects?.find((project) => project.id === projectId)?.name;
 
 	return (
-		<div className="grid gap-4 lg:grid-cols-3">
+		<div className="grid items-start gap-4 lg:grid-cols-3">
 			<Lane
 				icon={<LoaderCircleIcon className="text-status-running" />}
 				title="Running now"
 				count={running.length}
 				isLoading={isLoading}
-				empty={{
-					icon: <MoonIcon />,
-					title: "Nothing runs now",
-					description:
-						"Start a flow from a project, or let its schedule start it tonight.",
-				}}
+				empty="Nothing runs now. A schedule starts its flow at its time."
 			>
-				{running.map((run) => {
-					const project = projectName(run.projectId);
-					return (
-						<Item
-							key={run.id}
-							variant="outline"
-							size="sm"
-							render={<Link to="/runs/$runId" params={{ runId: run.id }} />}
-						>
-							<ItemMedia variant="icon">
-								{run.status === "sleeping" ? (
-									<MoonIcon className="text-status-sleeping" />
-								) : (
-									<LoaderCircleIcon className="animate-spin text-status-running" />
-								)}
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>
-									{project ? `${project} · ${run.title}` : run.title}
-								</ItemTitle>
-								<ItemDescription>
-									{run.status === "sleeping" && run.wakeAt ? (
-										<>
-											Continues at{" "}
-											<LocalTime at={run.wakeAt}>
-												{formatTime(run.wakeAt)}
-											</LocalTime>
-										</>
-									) : (
-										<>
-											Started{" "}
-											<LocalTime at={run.createdAt}>
-												{formatRelative(run.createdAt, now)}
-											</LocalTime>
-										</>
-									)}
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon className="size-4 text-muted-foreground" />
-							</ItemActions>
-						</Item>
-					);
-				})}
+				{running.map((run) => (
+					<LaneRow
+						key={run.id}
+						link={<Link to="/runs/$runId" params={{ runId: run.id }} />}
+						icon={
+							run.status === "sleeping" ? (
+								<MoonIcon className="text-status-sleeping" />
+							) : (
+								<LoaderCircleIcon className="animate-spin text-status-running" />
+							)
+						}
+						title={
+							<Title group={projectName(run.projectId)} name={run.title} />
+						}
+						meta={
+							run.status === "sleeping" && run.wakeAt ? (
+								<LocalTime at={run.wakeAt}>
+									Continues at {formatTime(run.wakeAt)}
+								</LocalTime>
+							) : (
+								<LocalTime at={run.createdAt}>
+									{formatRelative(run.createdAt, now)}
+								</LocalTime>
+							)
+						}
+					/>
+				))}
 			</Lane>
 
 			<Lane
@@ -152,93 +135,166 @@ export function HomeLanes({
 						<ArrowRightIcon data-icon="inline-end" />
 					</Button>
 				}
-				empty={{
-					icon: <HourglassIcon />,
-					title: "Nothing waits for you",
-					description: "A run asks you here when it needs your decision.",
-				}}
+				empty="Nothing waits for you."
+				hidden={gates.length - OVERVIEW_ROWS}
+				where="in the inbox"
 			>
-				{gates.map((gate) => (
-					<Item
+				{gates.slice(0, OVERVIEW_ROWS).map((gate) => (
+					<LaneRow
 						key={`${gate.runId}-${gate.stepId}`}
-						variant="outline"
-						size="sm"
-						render={<Link to="/inbox" search={{ gate: gate.stepId }} />}
-					>
-						<ItemContent>
-							<ItemTitle className="line-clamp-2">{gate.question}</ItemTitle>
-							<ItemDescription>
-								{gate.projectName} · {gate.flowName ?? gate.runTitle} · waits
-								since{" "}
-								<LocalTime at={gate.openedAt}>
-									{formatRelative(gate.openedAt, now)}
-								</LocalTime>
-							</ItemDescription>
-						</ItemContent>
-						<ItemActions>
-							<ChevronRightIcon className="size-4 text-muted-foreground" />
-						</ItemActions>
-					</Item>
+						link={<Link to="/inbox" search={{ gate: gate.stepId }} />}
+						title={<span className="truncate">{gate.question}</span>}
+						meta={
+							<LocalTime at={gate.openedAt}>
+								{formatRelative(gate.openedAt, now)}
+							</LocalTime>
+						}
+						detail={
+							<>
+								<p className="font-medium">{gate.question}</p>
+								<p className="text-muted-foreground">
+									{gate.projectName} · {gate.flowName ?? gate.runTitle}
+								</p>
+							</>
+						}
+					/>
 				))}
 			</Lane>
 
 			<Lane
 				icon={<CircleXIcon className="text-status-failed" />}
 				title="Failed"
-				count={failed?.count ?? 0}
+				count={failed?.stillFailing ?? 0}
 				isLoading={!failed}
 				action={
-					failed && failed.count > 0 ? (
-						<Button variant="ghost" size="sm" onClick={onFailedDetails}>
-							Details
-							<ArrowUpRightIcon data-icon="inline-end" />
-						</Button>
-					) : undefined
+					<Button variant="ghost" size="sm" onClick={onFailedDetails}>
+						Details
+						<ArrowUpRightIcon data-icon="inline-end" />
+					</Button>
 				}
-				empty={{
-					icon: <CircleCheckIcon />,
-					title: "No run failed",
-					description: `No run failed in the last ${range} nights.`,
-				}}
-				footer={
-					failed ? (
-						<MoreRows
-							hidden={failed.count - failed.rows.length}
-							where="in Details"
-						/>
-					) : null
-				}
+				empty={`No run failed in the last ${range} nights.`}
+				hidden={failed ? failed.failing.count - failed.failing.rows.length : 0}
+				where="in Details"
 			>
-				{(failed?.rows ?? []).map((run) => (
-					<Item
-						key={run.id}
-						variant="outline"
-						size="sm"
-						render={<Link to="/runs/$runId" params={{ runId: run.id }} />}
-					>
-						<ItemContent>
-							<ItemTitle>
-								{run.group} · {run.title}
-							</ItemTitle>
-							<ItemDescription className="line-clamp-2">
-								{run.reason ?? "No reason given"}
-							</ItemDescription>
-						</ItemContent>
-						<ItemActions className="self-start text-muted-foreground text-xs">
-							<LocalTime at={run.createdAt}>
-								{formatRelative(run.createdAt, now)}
-							</LocalTime>
-						</ItemActions>
-					</Item>
+				{(failed?.failing.rows ?? []).map((flow) => (
+					<FailedRow key={flow.key} flow={flow} now={now} />
 				))}
 			</Lane>
 		</div>
 	);
 }
 
+/** A flow with failed runs. A flow that a later run finished shows dimmed. */
+function FailedRow({ flow, now }: { flow: FailingFlow; now: number }) {
+	const { step, short } = shortReason(flow.reason);
+	const times =
+		flow.failed === 1 ? "Failed once" : `Failed ${flow.failed} times`;
+	return (
+		<LaneRow
+			link={<Link to="/runs/$runId" params={{ runId: flow.runId }} />}
+			muted={flow.fixedAt !== null}
+			title={<Title group={flow.group} name={flow.title} />}
+			meta={
+				flow.fixedAt !== null ? (
+					<CircleCheckIcon
+						className="size-3.5 text-status-finished"
+						aria-label="A later run finished"
+					/>
+				) : flow.failed > 1 ? (
+					`${flow.failed}×`
+				) : (
+					<LocalTime at={flow.lastAt}>
+						{formatRelative(flow.lastAt, now)}
+					</LocalTime>
+				)
+			}
+			detail={
+				<>
+					<p className="font-medium">{step ? `${times}, at ${step}` : times}</p>
+					<p className="text-muted-foreground">{short ?? "No reason given."}</p>
+					<p className="text-muted-foreground text-xs">
+						Last failed{" "}
+						<LocalTime at={flow.lastAt}>
+							{formatRelative(flow.lastAt, now)}
+						</LocalTime>
+					</p>
+					{flow.fixedAt !== null ? (
+						<Badge variant="outline" className="text-status-finished">
+							<CircleCheckIcon data-icon="inline-start" />A later run finished{" "}
+							{formatRelative(flow.fixedAt, now)}
+						</Badge>
+					) : null}
+				</>
+			}
+		/>
+	);
+}
+
+/** "project · flow": the flow truncates first. */
+function Title({ group, name }: { group: string | undefined; name: string }) {
+	return (
+		<span className="flex min-w-0 gap-1">
+			{group ? (
+				<span className="shrink-0 text-muted-foreground">{group} ·</span>
+			) : null}
+			<span className="truncate">{name}</span>
+		</span>
+	);
+}
+
+/** One line of a lane. With `detail`, the rest shows on hover. */
+function LaneRow({
+	link,
+	icon,
+	title,
+	meta,
+	detail,
+	muted,
+}: {
+	link: ReactElement;
+	icon?: ReactNode;
+	title: ReactNode;
+	meta: ReactNode;
+	detail?: ReactNode;
+	muted?: boolean;
+}) {
+	const body = (
+		<>
+			{icon ? <ItemMedia variant="icon">{icon}</ItemMedia> : null}
+			<ItemContent className="min-w-0">
+				<ItemTitle className="w-full font-normal">{title}</ItemTitle>
+			</ItemContent>
+			<ItemActions className="text-muted-foreground text-xs tabular-nums">
+				{meta}
+				<ChevronRightIcon className="size-3.5" />
+			</ItemActions>
+		</>
+	);
+	const className = muted ? "opacity-60" : undefined;
+	if (!detail) {
+		return (
+			<Item size="xs" className={className} render={link}>
+				{body}
+			</Item>
+		);
+	}
+	return (
+		<HoverCard>
+			<HoverCardTrigger
+				render={<Item size="xs" className={className} render={link} />}
+			>
+				{body}
+			</HoverCardTrigger>
+			<HoverCardContent className="flex w-96 flex-col gap-1.5 text-sm">
+				{detail}
+			</HoverCardContent>
+		</HoverCard>
+	);
+}
+
 /**
- * One lane: a fixed height, so the three line up, with its rows scrolling
- * inside, or an empty state in the middle.
+ * One lane: as tall as its rows, one line when it has none, and how many
+ * rows it leaves out under them.
  */
 function Lane({
 	icon,
@@ -247,7 +303,8 @@ function Lane({
 	isLoading,
 	action,
 	empty,
-	footer,
+	hidden = 0,
+	where,
 	children,
 }: {
 	icon: ReactNode;
@@ -255,12 +312,13 @@ function Lane({
 	count: number;
 	isLoading: boolean;
 	action?: ReactNode;
-	empty: { icon: ReactNode; title: string; description: string };
-	footer?: ReactNode;
+	empty: string;
+	hidden?: number;
+	where?: string;
 	children: ReactNode[];
 }) {
 	return (
-		<Card size="sm" className="h-80 min-w-0 lg:h-[30rem]">
+		<Card size="sm" className="min-w-0">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 [&>svg]:size-4">
 					{icon}
@@ -271,31 +329,31 @@ function Lane({
 						</Badge>
 					)}
 				</CardTitle>
-				{action ? <CardAction>{action}</CardAction> : null}
+				{action && children.length > 0 ? (
+					<CardAction>{action}</CardAction>
+				) : null}
 			</CardHeader>
-			<CardContent className="flex min-h-0 flex-1 flex-col gap-2 px-0">
+			<CardContent className="px-2">
 				{isLoading ? (
-					<div className="flex flex-col gap-2 px-3">
-						<Skeleton className="h-14 w-full" />
-						<Skeleton className="h-14 w-full" />
+					<div className="flex flex-col gap-2 px-2">
+						<Skeleton className="h-7 w-full" />
+						<Skeleton className="h-7 w-full" />
 					</div>
 				) : children.length === 0 ? (
-					<Empty className="h-full">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">{empty.icon}</EmptyMedia>
-							<EmptyTitle>{empty.title}</EmptyTitle>
-							<EmptyDescription>{empty.description}</EmptyDescription>
+					<Empty className="items-start p-2 md:p-2">
+						<EmptyHeader className="items-start text-left">
+							<EmptyDescription>{empty}</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
 				) : (
-					<>
-						<ScrollArea className="min-h-0 flex-1 px-3">
-							<ItemGroup className="gap-2 pb-1">{children}</ItemGroup>
-						</ScrollArea>
-						{footer ? <div className="px-3">{footer}</div> : null}
-					</>
+					<ItemGroup>{children}</ItemGroup>
 				)}
 			</CardContent>
+			{hidden > 0 && !isLoading ? (
+				<CardFooter className="text-muted-foreground text-xs">
+					{hidden} more {where}.
+				</CardFooter>
+			) : null}
 		</Card>
 	);
 }

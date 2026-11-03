@@ -71,7 +71,7 @@ An overview shows **at most 5 rows** in a list or table: the Failed lane on Home
 - One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
 - The full list is one link away: a section action ("Flows", "All runs") or the dialog footer. Under a cut list in a dialog, `MoreRows` says how many rows it leaves out.
-- Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit. Neither do Home's Running now and Waiting for you lanes: what needs you now shows in full. A project's runs page shows 15 runs to a page.
+- Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit. Neither does Home's Running now lane: what runs now shows in full. A project's runs page shows 15 runs to a page.
 
 ### A project's page
 
@@ -88,12 +88,15 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 
 ### Home
 
-Home answers "what needs me" over every project. The heading says how many Gates wait and how many runs failed in the range. Keep its shape:
+Home answers "what needs me" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
 
 - The same range as a project's page, on top: 7, 30 or 90 nights, in the URL (`?range=30`).
 - The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per night, with the nights before dashed. Each says how it moved against them. A number opens its details dialog.
-- Three lanes of equal height, in the order you act on them: Running now, Waiting for you, Failed. Each lane has a count, scrolls inside, and shows an empty state when it has nothing.
-- Every row opens its place: a run its run page, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
+- Three lanes in the order you act on them: Running now, Waiting for you, Failed. Each lane is as tall as its rows and has a count. A lane with nothing shows one line that says so.
+- A row is one line: what it is and one fact (when, or how often). The rest shows in a hover card. Long text truncates. It never wraps the row.
+- Waiting for you and Failed show at most 5 rows (see Overview lists). The rest is one link away: the inbox, or **Details**.
+- Failed shows one row per flow, not per run. The flows that still fail come first. A flow that a later run finished shows dimmed, with a check. The lane counts only the flows that still fail. The hover card says how often it failed, at which step, and the first sentence of why.
+- Every row opens its place: a run its run page, a failed flow its newest failed run, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
 - Under the lanes, the projects, each with the status of its last runs. A project opens its page at the same range.
 
 ### Setup pages (Agents, Secrets, Settings)

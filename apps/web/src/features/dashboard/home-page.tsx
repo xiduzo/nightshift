@@ -39,7 +39,7 @@ export function HomePage({
 		(run) => run.status === "running" || run.status === "sleeping",
 	);
 	const waiting = gates.data?.length ?? 0;
-	const failed = nights?.runs.failed.count ?? 0;
+	const failing = nights?.runs.stillFailing ?? 0;
 
 	return (
 		<>
@@ -50,7 +50,7 @@ export function HomePage({
 					description={
 						!nights
 							? "What runs now, what waits for you and what failed in all your projects."
-							: needsYou(waiting, failed, range)
+							: needsYou(waiting, failing)
 					}
 				/>
 				<RangeBar value={range} onValueChange={onRangeChange} />
@@ -61,7 +61,7 @@ export function HomePage({
 				<HomeLanes
 					running={running}
 					gates={gates.data ?? []}
-					failed={nights?.runs.failed}
+					failed={nights?.runs}
 					projects={projects.data}
 					range={range}
 					isLoading={openRuns.isLoading || gates.isLoading}
@@ -83,15 +83,18 @@ export function HomePage({
 	);
 }
 
-/** The line under the heading: what needs you, over the range of the page. */
-function needsYou(waiting: number, failed: number, range: NightRange) {
+/**
+ * The line under the heading: what needs you now.
+ * `failing` counts the flows whose failure no later run made good.
+ */
+function needsYou(waiting: number, failing: number) {
 	const gates =
 		waiting === 0
 			? "Nothing waits for you."
 			: `${waiting} ${waiting === 1 ? "Gate waits" : "Gates wait"} for you.`;
-	const runs =
-		failed === 0
-			? `No run failed in the last ${range} nights.`
-			: `${failed} ${failed === 1 ? "run" : "runs"} failed in the last ${range} nights.`;
-	return `${gates} ${runs}`;
+	const flows =
+		failing === 0
+			? "No flow fails now."
+			: `${failing} ${failing === 1 ? "flow still fails" : "flows still fail"}.`;
+	return `${gates} ${flows}`;
 }

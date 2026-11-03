@@ -9,9 +9,11 @@ export {
 	consoleValues,
 	nightsOf,
 } from "./console";
+export { shortReason } from "./failing";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export type {
 	DashboardSummary,
+	FailingFlow,
 	FlowHealthRow,
 	FlowRange,
 	FlowRun,

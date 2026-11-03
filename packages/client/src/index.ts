@@ -33,6 +33,7 @@ export {
 	consoleValues,
 	createDashboardQueries,
 	type DashboardSummary,
+	type FailingFlow,
 	type FlowHealthRow,
 	type FlowRange,
 	type FlowRun,
@@ -42,6 +43,7 @@ export {
 	nightsOf,
 	readerTimeZone,
 	type Spread,
+	shortReason,
 } from "./dashboard";
 export {
 	createDeviceQueries,

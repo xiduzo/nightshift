@@ -877,4 +877,52 @@ describe("one flow in detail", () => {
 		expect(range?.latest).toHaveLength(5);
 		expect(range?.latest[0]?.warnings).toBeNumber();
 	});
+
+	test("list the failing flows once each, the ones that still fail first", () => {
+		const range = nightsOf(
+			summarize([
+				aRun({
+					flowName: "night",
+					status: "failed",
+					createdAt: NOW - 4 * HOUR,
+				}),
+				aRun({
+					id: "night-newest",
+					flowName: "night",
+					status: "failed",
+					reason: "The agent stopped.",
+					createdAt: NOW - 3 * HOUR,
+				}),
+				aRun({ flowName: "fix", status: "failed", createdAt: NOW - HOUR }),
+				aRun({
+					flowName: "fix",
+					status: "finished",
+					createdAt: NOW - HOUR / 2,
+				}),
+				aRun({ flowName: "fix", status: "finished", createdAt: NOW }),
+				aRun({
+					flowName: "night",
+					projectId: "p2",
+					status: "failed",
+					createdAt: NOW - 5 * HOUR,
+				}),
+			]),
+			7,
+		).runs;
+		expect(range.stillFailing).toBe(2);
+		expect(range.failing.count).toBe(3);
+		expect(range.failing.rows.map((flow) => flow.key)).toEqual([
+			"p1/night",
+			"p2/night",
+			"p1/fix",
+		]);
+		expect(range.failing.rows[0]).toMatchObject({
+			title: "night",
+			runId: "night-newest",
+			reason: "The agent stopped.",
+			failed: 2,
+			fixedAt: null,
+		});
+		expect(range.failing.rows[2]?.fixedAt).toBe(NOW - HOUR / 2);
+	});
 });

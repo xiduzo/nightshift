@@ -187,6 +187,29 @@ export type FailedRun = DashboardRun & {
 	};
 };
 
+/**
+ * The failures of one flow in a range: one row per flow, not per run, so
+ * a flow that fails each night shows once.
+ */
+export type FailingFlow = {
+	/** The project and the flow: `<projectId>/<flow>`. */
+	key: string;
+	/** Its flow, or its project over all projects. */
+	group: string;
+	/** The flow name, or the prompt of a quick run. */
+	title: string;
+	/** The newest failed run. */
+	runId: string;
+	/** When the newest failed run started. */
+	lastAt: number;
+	/** Why the newest failed run failed. */
+	reason: string | null;
+	/** Its failed runs in the range. */
+	failed: number;
+	/** When a later run of the flow finished. Null while it still fails. */
+	fixedAt: number | null;
+};
+
 /** How the runs of one flow or project went in a range. */
 export type RunsGroup = {
 	label: string;
@@ -210,6 +233,10 @@ export type RunsRange = {
 	groups: TopRows<RunsGroup>;
 	/** The failed runs, newest first. */
 	failed: TopRows<FailedRun>;
+	/** The flows with failed runs: the ones that still fail first, then the newest. */
+	failing: TopRows<FailingFlow>;
+	/** Of them, the flows no later run finished. */
+	stillFailing: number;
 };
 
 /** How an asked Gate stands. */

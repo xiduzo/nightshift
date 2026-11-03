@@ -168,6 +168,19 @@ const nightsRangeSchema = z.object({
 				}),
 			}),
 		),
+		failing: topRows(
+			z.object({
+				key: z.string(),
+				group: z.string(),
+				title: z.string(),
+				runId: z.string(),
+				lastAt: z.number(),
+				reason: z.string().nullable(),
+				failed: z.number(),
+				fixedAt: z.number().nullable(),
+			}),
+		),
+		stillFailing: z.number(),
 	}),
 	gates: z.object({
 		asked: z.number(),

@@ -11,6 +11,7 @@ import {
 import {
 	type AskedGate,
 	type FailedRun,
+	type FailingFlow,
 	type GateState,
 	type GatesGroup,
 	type GatesRange,
@@ -233,6 +234,51 @@ function runsOf(nights: readonly number[], inRange: PlacedRun[]): RunsRange {
 		),
 		groups: topRows(groups),
 		failed: topRows(failed),
+		...failingOf(inRange),
+	};
+}
+
+/** The flows with failed runs in the range, one row per flow. */
+function failingOf(
+	inRange: PlacedRun[],
+): Pick<RunsRange, "failing" | "stillFailing"> {
+	const keyOf = (run: RunSummary) =>
+		`${run.projectId}/${run.flowName ?? run.title}`;
+	const flows = new Map<string, FailingFlow>();
+	for (const { run, group } of inRange) {
+		if (run.status !== "failed") continue;
+		const key = keyOf(run);
+		const flow = flows.get(key);
+		if (flow && flow.lastAt >= run.createdAt) {
+			flow.failed += 1;
+			continue;
+		}
+		flows.set(key, {
+			key,
+			group,
+			title: run.flowName ?? run.title,
+			runId: run.id,
+			lastAt: run.createdAt,
+			reason: run.reason,
+			failed: (flow?.failed ?? 0) + 1,
+			fixedAt: null,
+		});
+	}
+	for (const { run } of inRange) {
+		const flow = flows.get(keyOf(run));
+		if (!flow || run.status !== "finished" || run.createdAt <= flow.lastAt) {
+			continue;
+		}
+		flow.fixedAt = Math.min(flow.fixedAt ?? run.createdAt, run.createdAt);
+	}
+	const failing = [...flows.values()].sort(
+		(a, b) =>
+			Number(a.fixedAt !== null) - Number(b.fixedAt !== null) ||
+			b.lastAt - a.lastAt,
+	);
+	return {
+		failing: topRows(failing),
+		stillFailing: failing.filter((flow) => flow.fixedAt === null).length,
 	};
 }
 
