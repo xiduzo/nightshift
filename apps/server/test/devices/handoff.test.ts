@@ -37,6 +37,9 @@ let a: Daemon;
 let b: Daemon;
 let aName: string;
 let bName: string;
+// A node names its Device by id (ADR 14).
+let aDevice: string;
+let bDevice: string;
 let projectId: string;
 let folderOnA: string;
 let folderOnB: string;
@@ -154,6 +157,8 @@ beforeAll(async () => {
 	);
 	aName = (await a.client.devices.list()).thisComputer?.name as string;
 	bName = (await b.client.devices.list()).thisComputer?.name as string;
+	aDevice = (await a.client.devices.list()).thisComputer?.id as string;
+	bDevice = (await b.client.devices.list()).thisComputer?.id as string;
 
 	folderOnA = repo("on-a");
 	projectId = (await a.client.projects.add({ repoPath: folderOnA })).id;
@@ -187,7 +192,7 @@ describe("nodes on two Devices", () => {
 		expect(aName).not.toBe(bName);
 		await flowIn(a, "relay", [
 			commits("one", "one.txt"),
-			commits("two", "two.txt", bName),
+			commits("two", "two.txt", bDevice),
 			shell("three", "ls"),
 		]);
 		const started = await a.client.runs.start({
@@ -220,7 +225,7 @@ describe("nodes on two Devices", () => {
 	test("a dirty worktree fails the step that needs the work on the other Device", async () => {
 		await flowIn(a, "dirty", [
 			shell("scribble", "echo draft > draft.txt"),
-			shell("there", "ls", bName),
+			shell("there", "ls", bDevice),
 		]);
 		const started = await a.client.runs.start({
 			projectId,
@@ -239,7 +244,7 @@ describe("nodes on two Devices", () => {
 	test("B starts a run with a node on A: A walks it, and the work moves both ways", async () => {
 		await flowIn(b, "visit", [
 			commits("here", "here.txt"),
-			commits("there", "there.txt", aName),
+			commits("there", "there.txt", aDevice),
 			shell("back", "ls"),
 		]);
 		// The Host walks it: the flow B saved reaches A first.
@@ -271,7 +276,7 @@ describe("nodes on two Devices", () => {
 	test("a node whose Device is offline sleeps, and continues when it is back", async () => {
 		await flowIn(a, "later", [
 			shell("first", "sleep 2"),
-			shell("there", "echo from B", bName),
+			shell("there", "echo from B", bDevice),
 		]);
 		const started = await a.client.runs.start({
 			projectId,
