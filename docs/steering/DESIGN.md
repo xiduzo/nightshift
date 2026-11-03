@@ -106,6 +106,8 @@ What you configure once reads like the Settings page:
 - What this computer has but does not use yet sits at the end of the list it joins, as a dashed row with one action ("Add profile", "Add tool"). Not in a banner on top.
 - Secrets have their own page in the main menu: Command nodes use them too, not only agents.
 - A project's Secrets are a page of the project in the sidebar, beside Knowledge and Schedules. They are setup, so they do not go on the project's page.
+- A secret on another of your devices has the same row menu as your own: Move to Personal, Move to a project…, Remove from <device>. That device does the work. When it is offline, the toast says so and when to try again. Its profiles stay read-only here.
+- A move into a project ends with a toast whose action opens that project's Secrets page.
 
 ### Devices
 

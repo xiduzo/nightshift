@@ -1,6 +1,6 @@
 # 13. A Secret has a scope
 
-Status: accepted, 2026-11-03. Personal built, 2026-11-03. Project built, 2026-11-03.
+Status: accepted, 2026-11-03. Personal built, 2026-11-03. Project built, 2026-11-03. Moves between devices built, 2026-11-03.
 
 ## Context
 

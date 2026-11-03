@@ -219,6 +219,22 @@ flowchart LR
   the MCP server starts. Secret names are owner-private: every Device of
   the Person sees the secret names of each of their Devices, nobody else
   does. A Project's names are its Members'.
+- **A secret on another Device moves only while that Device is online
+  (ADR 13, decision 7).** The browser asks this computer, which asks its
+  Home Host over its link (`secrets.moveOnDevice`). The Home Host checks
+  that the key's Device and the target are both the key's Person's, with
+  access, and both call it home. It sends the target a secret call over
+  that Device's own work stream (a `WorkCall` of kind `secret`, with no
+  Space, project or run). The target serves it only from its Home Host,
+  for its own Person: it reads its keychain, saves the value in the new
+  scope with its own Host calls (`personalSecrets.set`,
+  `projectSecrets.set`, where its owner's role is checked), and removes
+  its copy only after that save. Its Device document then lists the names
+  without it. On the Home Host itself, the call goes from its own hub. An
+  offline Device is refused at once ("LE2316 is offline. Move it when
+  LE2316 is online."). An older one cannot read the call ("Update Night
+  Shift on LE2316 to move its secrets from here."). A Walker's
+  `devices.call` never carries a secret call.
 - **Every row carries a Space id** (the TECH constraint). The Host filters
   every sync, relay and stream by membership. The Replica holds many
   Spaces; every query is scoped to one.
@@ -520,8 +536,9 @@ the profile's Device is offline, the step waits for it. A Project has no
 profiles of its own (ADR 3). In a personal Space, every profile of the
 Person's Devices is usable without an Offer (ADR 1). Across Persons, a
 profile is visible only as an Offer. The Agents page shows the profiles
-and secret names of the Person's other Devices read-only: they change
-on their own Device.
+and secret names of the Person's other Devices. Profiles change on their
+own Device. A secret saved there moves to Personal or into a Project, or
+goes, from any of the Person's Devices while that Device is online.
 
 ### Placement
 
@@ -1375,11 +1392,14 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      also has the Device's Clone paths and settings: its owner's, like
      the rest of the document.
    - **Seen on the Agents page** (`devices.others`, the owner only): "Your
-     other devices" lists each with its profiles and secret names,
-     read-only, and says to open Night Shift on that device to change
-     them. Secrets lists the secret names of each other device under this
-     computer's own. On a Host the list comes from the documents it keeps
-     (with online), on a Device from its copies.
+     other devices" lists each with its profiles and secret names, and
+     says to open Night Shift on that device to change its profiles.
+     Secrets lists the secret names of each other device under this
+     computer's own, each with a menu: Move to Personal, Move to a
+     project…, Remove from that device (`devices.moveSecret`,
+     `projects.moveSecretFromDevice`, ADR 13). On a Host the list comes
+     from the documents it keeps (with online), on a Device from its
+     copies.
 
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
