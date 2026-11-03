@@ -31,7 +31,7 @@ const LAST_RUNS = 8;
 
 type LastRun = FlowHealthRow["lastRuns"][number] & { flow: string };
 
-/** Each project and how its last runs ended. A project opens its page. */
+/** Each project and how its last runs ended. A project opens its page, a run icon its run. */
 export function HomeProjects({
 	projects,
 	range,
@@ -61,16 +61,21 @@ export function HomeProjects({
 								key={project.id}
 								variant="outline"
 								size="sm"
-								render={
-									<Link
-										to="/projects/$projectId"
-										params={{ projectId: project.id }}
-										search={{ range }}
-									/>
-								}
+								className="relative hover:bg-muted/40 has-[a[data-stretched]:focus-visible]:ring-2 has-[a[data-stretched]:focus-visible]:ring-ring/50"
 							>
 								<ItemContent>
-									<ItemTitle>{project.name}</ItemTitle>
+									<ItemTitle>
+										{/* The link covers the card, so the card is one target. */}
+										<Link
+											to="/projects/$projectId"
+											params={{ projectId: project.id }}
+											search={{ range }}
+											data-stretched=""
+											className="outline-none after:absolute after:inset-0"
+										>
+											{project.name}
+										</Link>
+									</ItemTitle>
 									<LastRuns
 										runs={lastRunsOf(
 											summary ? nightsOf(summary, range) : undefined,
@@ -125,7 +130,13 @@ function LastRuns({
 		<div className="flex flex-col items-start gap-1">
 			<div className="flex items-center gap-0.5">
 				{runs.map((run) => (
-					<span key={run.runId} className="p-0.5">
+					<Link
+						key={run.runId}
+						to="/runs/$runId"
+						params={{ runId: run.runId }}
+						// Above the card's link: the card opens the project, an icon its run.
+						className="relative z-10 rounded-sm p-0.5 hover:bg-muted"
+					>
 						<RunStatusIcon
 							status={run.status}
 							context={{
@@ -133,7 +144,7 @@ function LastRuns({
 								after: hoverTime(run.startedAt),
 							}}
 						/>
-					</span>
+					</Link>
 				))}
 			</div>
 			<LocalTime at={last.startedAt} className="text-muted-foreground text-xs">
