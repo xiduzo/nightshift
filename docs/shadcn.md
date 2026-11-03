@@ -112,7 +112,7 @@ CLI when you need them.
 | ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow and schedule cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
 | ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
-| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (sidebar), a sparkline in every stat card on Home, the metrics chart of a project's page, and the history chart in each details dialog. Recharts keeps a 5px margin by default. Set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars. Give it a hidden `YAxis` with a domain of at least 1. |
+| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (a project's menu in the sidebar), a sparkline in every stat card on Home, the metrics chart of a project's page, and the history chart in each details dialog. Recharts keeps a 5px margin by default. Set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars. Give it a hidden `YAxis` with a domain of at least 1. |
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
@@ -189,8 +189,8 @@ files into the app. Then adapt the copy. Browse them at
 | `sidebar-03` | A sidebar with submenus. |
 | `sidebar-04` | A floating sidebar with submenus. |
 | `sidebar-05` | A sidebar with collapsible submenus. |
-| `sidebar-06` | A sidebar with submenus as dropdowns. |
-| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell comes from it. Its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). |
+| `sidebar-06` | A sidebar with submenus as dropdowns. Each project's ⋯ menu opens its pages this way. |
+| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell comes from it. Its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). Its user menu is the Settings menu: the Space, this computer, your account and the theme. |
 | `sidebar-08` | An inset sidebar with secondary navigation. |
 | `sidebar-09` | Collapsible nested sidebars (a mail-client layout). |
 | `sidebar-10` | A sidebar in a popover. |
@@ -214,7 +214,7 @@ files into the app. Then adapt the copy. Browse them at
 
 | You need | Use |
 | --- | --- |
-| The page frame, navigation, mobile menu | Sidebar (from `sidebar-07`) with `SidebarInset` and a header holding `SidebarTrigger` and a Breadcrumb |
+| The page frame, navigation, mobile menu | Sidebar (from `sidebar-07`, project menus from `sidebar-06`) with `SidebarInset` and a header holding `SidebarTrigger` and a Breadcrumb |
 | A page title with actions | A header row: `h1` + muted description + Buttons. No component needed. |
 | A number with a caption | Card (`CardHeader` + `CardDescription` + `CardTitle`), as in `dashboard-01`'s section cards |
 | A list of things you click into | Item in an `ItemGroup`, or Table when there are columns to compare |

@@ -1,14 +1,16 @@
 import { Badge } from "@nightshift/ui/components/badge";
 import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@nightshift/ui/components/collapsible";
-import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import {
@@ -25,6 +27,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarRail,
+	useSidebar,
 } from "@nightshift/ui/components/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useMatchRoute } from "@tanstack/react-router";
@@ -32,7 +35,7 @@ import {
 	BookOpenIcon,
 	BotIcon,
 	CalendarClockIcon,
-	ChevronRightIcon,
+	ChevronsUpDownIcon,
 	CircleUserRoundIcon,
 	FolderIcon,
 	FolderOpenIcon,
@@ -45,6 +48,7 @@ import {
 	MonitorIcon,
 	MonitorSmartphoneIcon,
 	MoonIcon,
+	MoreHorizontalIcon,
 	PlusIcon,
 	Settings2Icon,
 	SunIcon,
@@ -53,12 +57,7 @@ import {
 	WorkflowIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import {
-	type ComponentProps,
-	type ReactNode,
-	useEffect,
-	useState,
-} from "react";
+import { type ComponentProps, type ReactNode, useState } from "react";
 import { describeRunStatuses, RunsDonut } from "@/features/dashboard";
 import { ThisDeviceLabel } from "@/features/devices";
 import { flowQueries } from "@/features/flows";
@@ -68,7 +67,13 @@ import { scheduleQueries } from "@/features/schedules";
 import { SpaceSwitcher } from "@/features/spaces";
 import type { Project } from "@/shared/api";
 
-/** The app shell's sidebar, after the shadcn `sidebar-07` block. */
+/**
+ * The app shell's sidebar, after the shadcn `sidebar-07` block with the
+ * project menus of `sidebar-06`. It keeps what you open every day: Home,
+ * the Inbox and the projects. A project's pages open from its ⋯ menu. The
+ * Space, this computer, your account and the theme sit in one Settings
+ * menu in the footer.
+ */
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 	const matchRoute = useMatchRoute();
 	const gates = useOpenGates();
@@ -82,7 +87,6 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
-					<SidebarGroupLabel>Overview</SidebarGroupLabel>
 					<SidebarMenu>
 						<SidebarMenuItem>
 							<SidebarMenuButton
@@ -123,96 +127,17 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 								</SidebarMenuBadge>
 							) : null}
 						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Members"
-								isActive={Boolean(matchRoute({ to: "/members" }))}
-								render={<Link to="/members" />}
-							>
-								<UsersIcon aria-hidden="true" />
-								<span>Members</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Devices"
-								isActive={Boolean(matchRoute({ to: "/devices" }))}
-								render={<Link to="/devices" />}
-							>
-								<MonitorSmartphoneIcon aria-hidden="true" />
-								<span>Devices</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Secrets"
-								isActive={Boolean(matchRoute({ to: "/space-secrets" }))}
-								render={<Link to="/space-secrets" />}
-							>
-								<KeyRoundIcon aria-hidden="true" />
-								<span>Secrets</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Account"
-								isActive={Boolean(matchRoute({ to: "/account" }))}
-								render={<Link to="/account" />}
-							>
-								<CircleUserRoundIcon aria-hidden="true" />
-								<span>Account</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
 					</SidebarMenu>
 				</SidebarGroup>
 				<NavProjects projects={projects.data} />
-				{/* Saved on this computer only: its agents, secrets and settings. */}
-				<SidebarGroup className="mt-auto">
-					<ThisDeviceLabel />
-					<SidebarMenu>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Agents"
-								isActive={Boolean(matchRoute({ to: "/agents" }))}
-								render={<Link to="/agents" />}
-							>
-								<BotIcon aria-hidden="true" />
-								<span>Agents</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Secrets"
-								isActive={Boolean(matchRoute({ to: "/secrets" }))}
-								render={<Link to="/secrets" />}
-							>
-								<KeyRoundIcon aria-hidden="true" />
-								<span>Secrets</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Settings"
-								isActive={Boolean(matchRoute({ to: "/settings" }))}
-								render={<Link to="/settings" />}
-							>
-								<Settings2Icon aria-hidden="true" />
-								<span>Settings</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-					</SidebarMenu>
-				</SidebarGroup>
 			</SidebarContent>
 			<SidebarFooter>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<DaemonStatus
+						<SettingsMenu
 							reachable={!projects.isError}
 							loading={projects.isLoading}
 						/>
-					</SidebarMenuItem>
-					<SidebarMenuItem>
-						<ThemeMenu />
 					</SidebarMenuItem>
 				</SidebarMenu>
 			</SidebarFooter>
@@ -221,10 +146,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 	);
 }
 
-/**
- * The projects, each a folder with its flows, runs and schedules. The + on
- * the group label is the one place to add a project.
- */
+/** The projects. The + on the group label is the one place to add a project. */
 function NavProjects({ projects }: { projects: Project[] | undefined }) {
 	const [adding, setAdding] = useState(false);
 	return (
@@ -236,7 +158,7 @@ function NavProjects({ projects }: { projects: Project[] | undefined }) {
 			</SidebarGroupAction>
 			<SidebarMenu>
 				{projects?.map((project) => (
-					<ProjectFolder key={project.id} project={project} />
+					<ProjectItem key={project.id} project={project} />
 				))}
 			</SidebarMenu>
 			<AddProjectDialog open={adding} onOpenChange={setAdding} />
@@ -244,35 +166,65 @@ function NavProjects({ projects }: { projects: Project[] | undefined }) {
 	);
 }
 
-/** One project: its name opens the dashboard, the chevron opens the folder. */
-function ProjectFolder({ project }: { project: Project }) {
+type ProjectPageRoute =
+	| "/projects/$projectId/flows"
+	| "/projects/$projectId/runs"
+	| "/projects/$projectId/schedules"
+	| "/projects/$projectId/knowledge"
+	| "/projects/$projectId/secrets"
+	| "/projects/$projectId/branches";
+
+const PROJECT_PAGES: {
+	to: ProjectPageRoute;
+	label: string;
+	icon: LucideIcon;
+}[] = [
+	{ to: "/projects/$projectId/flows", label: "Flows", icon: WorkflowIcon },
+	{ to: "/projects/$projectId/runs", label: "Runs", icon: HistoryIcon },
+	{
+		to: "/projects/$projectId/schedules",
+		label: "Schedules",
+		icon: CalendarClockIcon,
+	},
+	{
+		to: "/projects/$projectId/knowledge",
+		label: "Knowledge",
+		icon: BookOpenIcon,
+	},
+	{ to: "/projects/$projectId/secrets", label: "Secrets", icon: KeyRoundIcon },
+	{
+		to: "/projects/$projectId/branches",
+		label: "Branches",
+		icon: GitBranchIcon,
+	},
+];
+
+/**
+ * One project: its name opens the project's page and names the page of
+ * the project you are on. The ⋯ menu opens its other pages.
+ */
+function ProjectItem({ project }: { project: Project }) {
 	const matchRoute = useMatchRoute();
+	const { isMobile } = useSidebar();
 	const params = { projectId: project.id };
 	const inProject = Boolean(
 		matchRoute({ to: "/projects/$projectId", params, fuzzy: true }),
 	);
-	const [open, setOpen] = useState(inProject);
-	// Entering a project opens its folder; leaving it does not close it.
-	useEffect(() => {
-		if (inProject) setOpen(true);
-	}, [inProject]);
-	const Icon = open ? FolderOpenIcon : FolderIcon;
+	const current = PROJECT_PAGES.find((page) =>
+		matchRoute({ to: page.to, params, fuzzy: true }),
+	);
+	const Icon = inProject ? FolderOpenIcon : FolderIcon;
 
 	// Counted by Night Shift with the project list: no read per project.
-	const runs = project.runs;
-	const running = (runs?.statuses.running ?? 0) > 0;
+	const running = (project.runs?.statuses.running ?? 0) > 0;
 
 	return (
-		<Collapsible
-			open={open}
-			onOpenChange={setOpen}
-			render={<SidebarMenuItem />}
-		>
+		<SidebarMenuItem>
 			<SidebarMenuButton
 				tooltip={
 					running ? `${project.name}, a run is in progress` : project.name
 				}
-				isActive={Boolean(matchRoute({ to: "/projects/$projectId", params }))}
+				isActive={inProject}
 				render={<Link to="/projects/$projectId" params={params} />}
 			>
 				{/* A pulsing dot on the folder while a run in this project is in progress. */}
@@ -285,32 +237,44 @@ function ProjectFolder({ project }: { project: Project }) {
 						</span>
 					) : null}
 				</span>
-				<span>
+				<span className="truncate">
 					{project.name}
 					{running ? (
 						<span className="sr-only">, a run is in progress</span>
 					) : null}
 				</span>
+				{current ? (
+					<span className="ml-auto pr-5 text-muted-foreground text-xs">
+						{current.label}
+					</span>
+				) : null}
 			</SidebarMenuButton>
-			<CollapsibleTrigger
-				render={
-					<SidebarMenuAction className="transition-transform data-panel-open:rotate-90" />
-				}
-			>
-				<ChevronRightIcon aria-hidden="true" />
-				<span className="sr-only">
-					{open ? "Close" : "Open"} {project.name}
-				</span>
-			</CollapsibleTrigger>
-			<CollapsibleContent>
-				{/* Its flows and schedules are read only while the folder is open. */}
-				<ProjectPages project={project} />
-			</CollapsibleContent>
-		</Collapsible>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<SidebarMenuAction
+							showOnHover
+							className="data-popup-open:opacity-100"
+						/>
+					}
+				>
+					<MoreHorizontalIcon aria-hidden="true" />
+					<span className="sr-only">Pages of {project.name}</span>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent
+					className="min-w-48"
+					side={isMobile ? "bottom" : "right"}
+					align={isMobile ? "end" : "start"}
+				>
+					{/* Its flows and schedules are read only while the menu is open. */}
+					<ProjectPages project={project} />
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</SidebarMenuItem>
 	);
 }
 
-/** The pages of an open project folder, each with its count. */
+/** The pages of a project in its menu, each with its count. */
 function ProjectPages({ project }: { project: Project }) {
 	const flows = useQuery({
 		...flowQueries.list(project.id),
@@ -325,164 +289,176 @@ function ProjectPages({ project }: { project: Project }) {
 	const schedulesOn = schedules.data?.schedules.filter((s) => s.enabled);
 	const runs = project.runs;
 
-	return (
-		/* Full-width rows, indented to the project name, so a count fits on the right. */
-		<SidebarMenu className="mt-1 group-data-[collapsible=icon]:hidden">
-			<ProjectPageItem
-				to="/projects/$projectId/flows"
-				projectId={project.id}
-				label="Flows"
-				icon={WorkflowIcon}
-				badge={
-					flows.data ? (
-						<SidebarMenuBadge
-							aria-label={`${flows.data.length} ${flows.data.length === 1 ? "flow" : "flows"}`}
-						>
-							{flows.data.length}
-						</SidebarMenuBadge>
-					) : null
-				}
-			/>
-			<ProjectPageItem
-				to="/projects/$projectId/runs"
-				projectId={project.id}
-				label="Runs"
-				icon={HistoryIcon}
-				// The menu button hides its tooltip while the sidebar is open; this one is the breakdown.
-				tooltip={
-					runs && runs.total > 0
-						? { children: describeRunStatuses(runs), hidden: false }
-						: undefined
-				}
-				badge={
-					runs ? (
-						<SidebarMenuBadge
-							className="gap-1.5"
-							aria-label={describeRunStatuses(runs)}
-						>
-							{runs.total > 0 ? <RunsDonut runs={runs} /> : null}
-							{runs.total}
-						</SidebarMenuBadge>
-					) : null
-				}
-			/>
-			<ProjectPageItem
-				to="/projects/$projectId/knowledge"
-				projectId={project.id}
-				label="Knowledge"
-				icon={BookOpenIcon}
-				badge={null}
-			/>
-			<ProjectPageItem
-				to="/projects/$projectId/secrets"
-				projectId={project.id}
-				label="Secrets"
-				icon={KeyRoundIcon}
-				badge={null}
-			/>
-			<ProjectPageItem
-				to="/projects/$projectId/schedules"
-				projectId={project.id}
-				label="Schedules"
-				icon={CalendarClockIcon}
-				badge={
-					schedules.data && schedulesOn ? (
-						<SidebarMenuBadge
-							aria-label={`${schedulesOn.length} of ${schedules.data.schedules.length} schedules on`}
-						>
-							{schedulesOn.length}
-						</SidebarMenuBadge>
-					) : null
-				}
-			/>
-			{/* What runs left in the project's folder: only where it has one. */}
-			{project.repoPath !== null ? (
-				<ProjectPageItem
-					to="/projects/$projectId/branches"
-					projectId={project.id}
-					label="Branches"
-					icon={GitBranchIcon}
-					badge={null}
-				/>
+	// What the menu shows beside a page, and what a screen reader says.
+	const count: Partial<
+		Record<ProjectPageRoute, { shown: ReactNode; spoken: string }>
+	> = {};
+	if (flows.data) {
+		const n = flows.data.length;
+		count["/projects/$projectId/flows"] = {
+			shown: n,
+			spoken: `${n} ${n === 1 ? "flow" : "flows"}`,
+		};
+	}
+	if (runs) {
+		count["/projects/$projectId/runs"] = {
+			shown: (
+				<>
+					{runs.total > 0 ? <RunsDonut runs={runs} /> : null}
+					{runs.total}
+				</>
+			),
+			spoken: describeRunStatuses(runs),
+		};
+	}
+	if (schedules.data && schedulesOn) {
+		count["/projects/$projectId/schedules"] = {
+			shown: schedulesOn.length,
+			spoken: `${schedulesOn.length} of ${schedules.data.schedules.length} schedules on`,
+		};
+	}
+
+	return PROJECT_PAGES.filter(
+		// What runs left in the project's folder: only where it has one.
+		(page) =>
+			page.to !== "/projects/$projectId/branches" || project.repoPath !== null,
+	).map(({ to, label, icon: PageIcon }) => (
+		<DropdownMenuItem
+			key={to}
+			render={<Link to={to} params={{ projectId: project.id }} />}
+		>
+			<PageIcon aria-hidden="true" />
+			{label}
+			{count[to] ? (
+				<>
+					<span
+						aria-hidden="true"
+						className="ml-auto flex items-center gap-1.5 text-muted-foreground text-xs tabular-nums"
+					>
+						{count[to].shown}
+					</span>
+					<span className="sr-only">, {count[to].spoken}</span>
+				</>
 			) : null}
-		</SidebarMenu>
-	);
+		</DropdownMenuItem>
+	));
 }
 
-function ProjectPageItem({
-	to,
-	projectId,
-	label,
-	icon: PageIcon,
-	tooltip,
-	badge,
-}: {
-	to:
-		| "/projects/$projectId/flows"
-		| "/projects/$projectId/runs"
-		| "/projects/$projectId/knowledge"
-		| "/projects/$projectId/schedules"
-		| "/projects/$projectId/secrets"
-		| "/projects/$projectId/branches";
-	projectId: string;
-	label: string;
-	icon: LucideIcon;
-	tooltip?: ComponentProps<typeof SidebarMenuButton>["tooltip"];
-	badge: ReactNode;
-}) {
-	const matchRoute = useMatchRoute();
-	const params = { projectId };
-	return (
-		<SidebarMenuItem>
-			<SidebarMenuButton
-				className="pl-8"
-				tooltip={tooltip}
-				isActive={Boolean(matchRoute({ to, params, fuzzy: true }))}
-				render={<Link to={to} params={params} />}
-			>
-				<PageIcon aria-hidden="true" />
-				<span>{label}</span>
-			</SidebarMenuButton>
-			{badge}
-		</SidebarMenuItem>
-	);
-}
-
-function DaemonStatus({
+/**
+ * One menu for what you set up once: the Space, this computer, your
+ * account and the theme. Its button also says whether Night Shift runs.
+ */
+function SettingsMenu({
 	reachable,
 	loading,
 }: {
 	reachable: boolean;
 	loading: boolean;
 }) {
-	const label = loading
+	const { isMobile } = useSidebar();
+	const matchRoute = useMatchRoute();
+	const status = loading
 		? "Connecting to Night Shift…"
 		: reachable
 			? "Night Shift is running"
 			: "Cannot reach Night Shift";
+	const onSettingsPage = SETTINGS_PAGES.some((page) =>
+		matchRoute({ to: page }),
+	);
+
 	return (
-		<SidebarMenuButton
-			tooltip={label}
-			className="pointer-events-none text-muted-foreground"
-			aria-live="polite"
-			render={<div />}
-		>
-			<span className="relative flex size-4 items-center justify-center">
-				{reachable && !loading ? (
-					<span className="absolute size-2 animate-ping rounded-full bg-status-finished/60 motion-reduce:hidden" />
-				) : null}
-				<span
-					className={
-						loading
-							? "size-2 rounded-full bg-muted-foreground"
-							: reachable
-								? "size-2 rounded-full bg-status-finished"
-								: "size-2 rounded-full bg-status-failed"
-					}
-				/>
-			</span>
-			<span className="text-xs">{label}</span>
-		</SidebarMenuButton>
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<SidebarMenuButton
+						size="lg"
+						tooltip={`Settings. ${status}`}
+						isActive={onSettingsPage}
+						className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+					/>
+				}
+			>
+				<span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border">
+					<Settings2Icon aria-hidden="true" />
+					<span
+						aria-hidden="true"
+						className={`absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-sidebar ${
+							loading
+								? "bg-muted-foreground"
+								: reachable
+									? "bg-status-finished"
+									: "bg-status-failed"
+						}`}
+					/>
+				</span>
+				<div className="grid flex-1 text-left text-sm leading-tight">
+					<span className="truncate font-medium">Settings</span>
+					<span
+						className="truncate text-muted-foreground text-xs"
+						aria-live="polite"
+					>
+						{status}
+					</span>
+				</div>
+				<ChevronsUpDownIcon className="ml-auto" aria-hidden="true" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				className="min-w-56"
+				side={isMobile ? "bottom" : "right"}
+				align="end"
+			>
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Space</DropdownMenuLabel>
+					<MenuLink to="/members" label="Members" icon={UsersIcon} />
+					<MenuLink
+						to="/devices"
+						label="Devices"
+						icon={MonitorSmartphoneIcon}
+					/>
+					<MenuLink to="/space-secrets" label="Secrets" icon={KeyRoundIcon} />
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				{/* Saved on this computer only: its agents, secrets and settings. */}
+				<DropdownMenuGroup>
+					<ThisDeviceLabel />
+					<MenuLink to="/agents" label="Agents" icon={BotIcon} />
+					<MenuLink to="/secrets" label="Secrets" icon={KeyRoundIcon} />
+					<MenuLink to="/settings" label="Settings" icon={Settings2Icon} />
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuGroup>
+					<MenuLink to="/account" label="Account" icon={CircleUserRoundIcon} />
+					<ThemeSubmenu />
+				</DropdownMenuGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+const SETTINGS_PAGES = [
+	"/members",
+	"/devices",
+	"/space-secrets",
+	"/agents",
+	"/secrets",
+	"/settings",
+	"/account",
+] as const;
+
+function MenuLink({
+	to,
+	label,
+	icon: ItemIcon,
+}: {
+	to: (typeof SETTINGS_PAGES)[number];
+	label: string;
+	icon: LucideIcon;
+}) {
+	return (
+		<DropdownMenuItem render={<Link to={to} />}>
+			<ItemIcon aria-hidden="true" />
+			{label}
+		</DropdownMenuItem>
 	);
 }
 
@@ -492,17 +468,15 @@ const THEMES = [
 	{ value: "system", label: "System", icon: MonitorIcon },
 ] as const;
 
-function ThemeMenu() {
+function ThemeSubmenu() {
 	const { theme = "system", setTheme } = useTheme();
-	// The theme is known only in the browser: the trigger names none, so the
-	// server's HTML matches. The menu shows the choice.
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger render={<SidebarMenuButton tooltip="Theme" />}>
+		<DropdownMenuSub>
+			<DropdownMenuSubTrigger>
 				<SunMoonIcon aria-hidden="true" />
-				<span>Theme</span>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent side="top" align="start" className="min-w-40">
+				Theme
+			</DropdownMenuSubTrigger>
+			<DropdownMenuSubContent className="min-w-36">
 				<DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
 					{THEMES.map(({ value, label, icon: ItemIcon }) => (
 						<DropdownMenuRadioItem key={value} value={value}>
@@ -511,7 +485,7 @@ function ThemeMenu() {
 						</DropdownMenuRadioItem>
 					))}
 				</DropdownMenuRadioGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+			</DropdownMenuSubContent>
+		</DropdownMenuSub>
 	);
 }
