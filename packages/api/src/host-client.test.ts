@@ -38,7 +38,8 @@ describe("the peer protocol", () => {
 		// `archive.knowledgeGet`, 29 before the `leases` group (ADR 7), and
 		// 32 before `sync.addProject`, 33 before the `secrets` group, 37
 		// before the `projectSecrets` group and 42 before
-		// `secrets.moveOnDevice` (ADR 13), which an older Host lacks.
-		expect(served).toBe(43);
+		// `secrets.moveOnDevice` (ADR 13) and 43 before `sync.setClones`, which
+		// an older Host lacks.
+		expect(served).toBe(44);
 	});
 });
