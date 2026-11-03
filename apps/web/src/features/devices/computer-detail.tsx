@@ -19,6 +19,7 @@ import {
 	ItemGroup,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
+import { SheetFooter } from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -105,22 +106,20 @@ export function ComputerDetail({
 						.join(" ")}
 				</span>
 			}
-			actions={
-				computer.paired
-					? [
-							revoked
-								? {
-										label: "Remove computer",
-										destructive: true,
-										onSelect: () => setForgetting(true),
-									}
-								: {
-										label: "Remove access",
-										destructive: true,
-										onSelect: () => setRemoving(true),
-									},
-						]
-					: undefined
+			footer={
+				computer.paired ? (
+					<SheetFooter className="flex-row justify-end border-t bg-popover">
+						<Button
+							variant="destructive"
+							size="sm"
+							onClick={() =>
+								revoked ? setForgetting(true) : setRemoving(true)
+							}
+						>
+							{revoked ? "Remove computer" : "Remove access"}
+						</Button>
+					</SheetFooter>
+				) : undefined
 			}
 		>
 			<DetailSection

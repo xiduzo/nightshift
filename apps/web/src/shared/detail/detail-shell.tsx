@@ -25,6 +25,7 @@ export function DetailShell({
 	subtitle,
 	actions,
 	save,
+	footer,
 	children,
 }: {
 	icon: ReactNode;
@@ -43,6 +44,8 @@ export function DetailShell({
 		onSave: () => void;
 		onDiscard: () => void;
 	};
+	/** A bar at the bottom that stays in view, such as a sheet's actions. */
+	footer?: ReactNode;
 	children: ReactNode;
 }) {
 	const showBar = save && (save.dirty || save.isNew);
@@ -117,6 +120,7 @@ export function DetailShell({
 					</div>
 				</div>
 			) : null}
+			{footer ? <div className="sticky bottom-0">{footer}</div> : null}
 		</div>
 	);
 }

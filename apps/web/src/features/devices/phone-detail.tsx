@@ -9,6 +9,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@nightshift/ui/components/alert-dialog";
+import { Button } from "@nightshift/ui/components/button";
+import { SheetFooter } from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SmartphoneIcon } from "lucide-react";
@@ -53,13 +55,17 @@ export function PhoneDetail({
 					) : null}
 				</>
 			}
-			actions={[
-				{
-					label: "Sign out",
-					destructive: true,
-					onSelect: () => setSigningOut(true),
-				},
-			]}
+			footer={
+				<SheetFooter className="flex-row justify-end border-t bg-popover">
+					<Button
+						variant="destructive"
+						size="sm"
+						onClick={() => setSigningOut(true)}
+					>
+						Sign out
+					</Button>
+				</SheetFooter>
+			}
 		>
 			<DetailSection title="What it does">
 				<p className="text-sm">
