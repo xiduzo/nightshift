@@ -278,6 +278,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const hostLinks = createHostLinks(db);
 	const keyStore = await deviceKeyStore({
 		dataDir: deps.dataDir,
+		deviceId: self.id,
 		...deps.keyStore,
 	});
 
@@ -406,6 +407,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const links = createDeviceLinks({
 		links: hostLinks,
 		keys: keyStore,
+		deviceId: self.id,
 		// The Spaces the Host lists: kept here as the Host's, their documents
 		// synced read-only, before run rows that name their projects arrive.
 		// The flow and knowledge documents of their Projects sync both ways.

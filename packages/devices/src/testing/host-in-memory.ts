@@ -224,6 +224,7 @@ export async function hostInMemory(
 			});
 			const stored = await deviceKeyStore({
 				dataDir: replica.dataDir,
+				deviceId: key.deviceId,
 				prefer: "file",
 			});
 			await stored.set(hostId, token(key));

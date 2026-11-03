@@ -245,6 +245,7 @@ describe("the links of a joining Device", () => {
 	test("a key kept in a file is readable by its owner only", async () => {
 		const store = await deviceKeyStore({
 			dataDir: sandbox.dataDir,
+			deviceId: sandbox.deviceId,
 			prefer: "file",
 		});
 		expect(store.kind).toBe("file");

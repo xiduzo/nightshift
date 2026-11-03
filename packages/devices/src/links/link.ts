@@ -97,6 +97,13 @@ export type HttpsLinkOptions = {
 	link: HostLink;
 	key: string;
 	/**
+	 * This computer's Device. A Host that knows the key as another Device's
+	 * (another Night Shift on this computer paired with the same keychain)
+	 * gets no calls: the link stops as revoked, and keeps the key, which is
+	 * the other install's. Without it, any Device's key is used.
+	 */
+	deviceId?: string;
+	/**
 	 * The documents to sync with this Host: called with every answer of
 	 * the Host. A document it gives syncs from then on, and one it no
 	 * longer gives stops: the link attaches and detaches by the
@@ -330,6 +337,15 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		while (!stop.signal.aborted) {
 			try {
 				const { address, value } = await firstAnswering(addresses, answer);
+				if (options.deviceId && value.deviceId !== options.deviceId) {
+					// Every call with this key would act as the other Device.
+					current = null;
+					setState("revoked", null);
+					const said = `The key for ${link.name} belongs to another Night Shift on this computer. Pair this computer with ${link.name} again.`;
+					console.error(said);
+					endWaits(said);
+					return;
+				}
 				learn(value, address);
 				setState("online", address);
 				waits.reset();

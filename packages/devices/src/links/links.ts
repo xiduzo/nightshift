@@ -40,6 +40,8 @@ export type LinkOptions = Pick<
 export function createDeviceLinks(deps: {
 	links: HostLinks;
 	keys: DeviceKeyStore;
+	/** This computer's Device: a key the Host knows as another Device's is not used (`HttpsLinkOptions.deviceId`). */
+	deviceId?: string;
 	/**
 	 * The documents to sync with a Host, asked with each of its answers:
 	 * the link syncs these, and stops a document it no longer gets.
@@ -86,6 +88,7 @@ export function createDeviceLinks(deps: {
 		}
 		const started = httpsLink({
 			...deps.linkOptions,
+			...(deps.deviceId ? { deviceId: deps.deviceId } : {}),
 			...(deps.hostClient ? { clientFor: deps.hostClient } : {}),
 			...(deps.documentChannel
 				? { documentChannel: deps.documentChannel }

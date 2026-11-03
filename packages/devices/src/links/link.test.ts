@@ -182,6 +182,35 @@ describe("httpsLink", () => {
 		await link.close();
 	});
 
+	test("a key the Host knows as another Device's is not used: no calls, no streams, and the key stays", async () => {
+		const host = fakeHost({
+			"https://studio.local": () => Promise.resolve(hello([])),
+		});
+		let revoked = 0;
+		let streamed = 0;
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_other_install",
+			deviceId: "device-dev",
+			clientFor: host.clientFor,
+			heartbeatMs: 5,
+			onRevoked: () => revoked++,
+		});
+		link.stream("clones", async () => {
+			streamed++;
+		});
+		await until(() => link.state().status === "revoked");
+		const calls = host.calls.length;
+		await Bun.sleep(30);
+		expect(host.calls.length).toBe(calls);
+		expect(link.client()).toBeNull();
+		expect(streamed).toBe(0);
+		// The key is the other install's: the link does not delete it.
+		expect(revoked).toBe(0);
+		await expect(link.ready()).rejects.toThrow();
+		await link.close();
+	});
+
 	test("a stream runs while the link is online, stops when it drops, and starts again when it is back", async () => {
 		let up = true;
 		const host = fakeHost({

@@ -190,14 +190,53 @@ const KEYCHAIN_SERVICE = "nightshift-device-keys";
  * The system keychain (`Bun.secrets`) where it works, else a file per Host
  * in the data directory, readable by this user only (a headless computer
  * has no keychain). `prefer: "file"` skips the keychain.
+ *
+ * The keychain is one per user, and two Night Shifts on one computer (the
+ * desktop app and a dev daemon) share it: there each key is this Device's
+ * (`deviceKeysOf`). The files are in the data directory, which is the
+ * install's own.
  */
-export function deviceKeyStore(options: {
+export async function deviceKeyStore(options: {
 	dataDir: string;
+	/** This computer's Device: the owner of the keys in the keychain. */
+	deviceId: string;
 	prefer?: KeyStoreKind;
 }): Promise<DeviceKeyStore> {
-	return valueStore({
+	const store = await valueStore({
 		service: KEYCHAIN_SERVICE,
 		dir: join(options.dataDir, "device-keys"),
 		prefer: options.prefer,
 	});
+	return store.kind === "keychain"
+		? deviceKeysOf(store, options.deviceId)
+		: store;
+}
+
+/**
+ * The keys of one Device in a store that other installs share: each under
+ * `<deviceId>/<hostId>`. A key from before, under the Host's id alone, is
+ * read while the Device has none of its own. It may be another install's:
+ * the link refuses a key the Host knows as another Device's
+ * (`expectDeviceId`). A new key never goes there.
+ */
+export function deviceKeysOf(
+	store: DeviceKeyStore,
+	deviceId: string,
+): DeviceKeyStore {
+	const own = (hostId: string) => `${deviceId}/${hostId}`;
+	return {
+		kind: store.kind,
+		async get(hostId) {
+			return (await store.get(own(hostId))) ?? store.get(hostId);
+		},
+		set: (hostId, key) => store.set(own(hostId), key),
+		async delete(hostId) {
+			// A key from before goes only when it was the one in use.
+			if ((await store.get(own(hostId))) === null) {
+				await store.delete(hostId);
+				return;
+			}
+			await store.delete(own(hostId));
+		},
+	};
 }
