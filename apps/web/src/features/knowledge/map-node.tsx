@@ -12,11 +12,11 @@ import {
 	LightbulbIcon,
 	MessageCircleQuestionIcon,
 } from "lucide-react";
-import type { KnowledgeGraph } from "@/shared/api";
+import type { KnowledgeMap } from "@/shared/api";
 
-export type GraphNode = KnowledgeGraph["nodes"][number];
-export type GraphEdge = KnowledgeGraph["edges"][number];
-export type GraphKind = GraphNode["kind"];
+export type KnowledgeNode = KnowledgeMap["nodes"][number];
+export type KnowledgeEdge = KnowledgeMap["edges"][number];
+export type NodeKind = KnowledgeNode["kind"];
 
 export const KIND_ICON = {
 	file: FileTextIcon,
@@ -25,7 +25,7 @@ export const KIND_ICON = {
 	learning: LightbulbIcon,
 } as const;
 
-export const KIND_NAME: Record<GraphKind, { one: string; many: string }> = {
+export const KIND_NAME: Record<NodeKind, { one: string; many: string }> = {
 	file: { one: "File", many: "Files" },
 	topic: { one: "Topic", many: "Topics" },
 	question: { one: "Question", many: "Questions" },
@@ -33,7 +33,7 @@ export const KIND_NAME: Record<GraphKind, { one: string; many: string }> = {
 };
 
 export type MapNodeData = {
-	node: GraphNode;
+	node: KnowledgeNode;
 	/** `dim`: outside what the person looks at. `lit`: a search found it. */
 	state: "normal" | "lit" | "dim" | "selected";
 };
@@ -80,8 +80,14 @@ function MapNodeView({ data }: NodeProps<MapNode>) {
 
 export const mapNodeTypes = { map: MapNodeView };
 
+/** The dashes of an edge: a question's and a closeness are no fact in the files. */
+const EDGE_DASHES: Partial<Record<KnowledgeEdge["kind"], string>> = {
+	found: "4 3",
+	close: "1 4",
+};
+
 /** How one edge looks: a question's edge is dashed, a link between files heavier. */
-export function mapEdge(edge: GraphEdge, dim: boolean): Edge {
+export function mapEdge(edge: KnowledgeEdge, dim: boolean): Edge {
 	return {
 		id: edge.id,
 		source: edge.source,
@@ -89,7 +95,7 @@ export function mapEdge(edge: GraphEdge, dim: boolean): Edge {
 		type: "straight",
 		style: {
 			stroke: edge.kind === "found" ? "var(--ring)" : "var(--muted-foreground)",
-			strokeDasharray: edge.kind === "found" ? "4 3" : undefined,
+			strokeDasharray: EDGE_DASHES[edge.kind],
 			strokeWidth: edge.kind === "links" ? 2 : 1,
 			opacity: dim ? 0.05 : 0.35,
 		},

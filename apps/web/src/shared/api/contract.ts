@@ -56,6 +56,6 @@ export type KnowledgeFile = Knowledge["files"][number];
 /** The question set against each way to search. */
 export type KnowledgeEvaluation = ApiOutputs["knowledge"]["evaluate"];
 /** A project's knowledge as a graph. */
-export type KnowledgeGraph = ApiOutputs["knowledge"]["graph"];
+export type KnowledgeMap = ApiOutputs["knowledge"]["graph"];
 /** How agents used each file of a project's knowledge. */
 export type KnowledgeUse = ApiOutputs["knowledge"]["use"];

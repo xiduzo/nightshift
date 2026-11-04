@@ -6,6 +6,14 @@ import {
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
@@ -29,7 +37,7 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	Background,
@@ -38,27 +46,33 @@ import {
 	ReactFlowProvider,
 	useReactFlow,
 } from "@xyflow/react";
-import { CircleAlertIcon, SearchIcon, TriangleAlertIcon } from "lucide-react";
+import {
+	CircleAlertIcon,
+	EyeOffIcon,
+	SearchIcon,
+	TriangleAlertIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { loadElk } from "@/features/flows";
-import type { KnowledgeGraph } from "@/shared/api";
+import { type KnowledgeMap, orpc } from "@/shared/api";
 import { PanelHeader } from "@/shared/panel";
 import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import {
-	type GraphKind,
-	type GraphNode,
 	KIND_ICON,
 	KIND_NAME,
+	type KnowledgeNode,
 	type MapNode,
 	type MapNodeData,
 	mapEdge,
 	mapNodeTypes,
+	type NodeKind,
 } from "./map-node";
-import { knowledgeQueries } from "./queries";
+import { knowledgeMutations, knowledgeQueries } from "./queries";
 import { learningTaskId } from "./review-queue";
 import { useKnowledgeHits } from "./use-knowledge-hits";
 
-const KINDS: GraphKind[] = ["file", "topic", "question", "learning"];
+const KINDS: NodeKind[] = ["file", "topic", "question", "learning"];
 
 /** About how wide a node is, before it is measured, in px. */
 function nodeWidth(label: string): number {
@@ -67,8 +81,8 @@ function nodeWidth(label: string): number {
 
 /** Where each node goes: a stress layout keeps connected nodes close. */
 async function layoutOf(
-	nodes: GraphNode[],
-	edges: KnowledgeGraph["edges"],
+	nodes: KnowledgeNode[],
+	edges: KnowledgeMap["edges"],
 ): Promise<Map<string, { x: number; y: number }>> {
 	const layout = await loadElk();
 	const laid = await layout({
@@ -98,7 +112,9 @@ async function layoutOf(
 }
 
 /** The nodes in a circle, for when the layout does not load. */
-function circleOf(nodes: GraphNode[]): Map<string, { x: number; y: number }> {
+function circleOf(
+	nodes: KnowledgeNode[],
+): Map<string, { x: number; y: number }> {
 	const radius = Math.max(200, nodes.length * 30);
 	return new Map(
 		nodes.map((node, index) => {
@@ -122,13 +138,13 @@ export function KnowledgeMapPage({ node }: { node: string | undefined }) {
 			title="Map"
 			description="How your files, topics, questions and learnings connect."
 		>
-			<KnowledgeMap focus={node ?? null} />
+			<MapLoader focus={node ?? null} />
 		</KnowledgeSection>
 	);
 }
 
-function KnowledgeMap({ focus }: { focus: string | null }) {
-	const { projectId, review, openFile } = useKnowledge();
+function MapLoader({ focus }: { focus: string | null }) {
+	const { projectId, knowledge, review, openFile } = useKnowledge();
 	const navigate = useNavigate();
 	const onOpenFile = openFile;
 	const onReview = (learningId: string) => {
@@ -138,18 +154,18 @@ function KnowledgeMap({ focus }: { focus: string | null }) {
 			params: { projectId },
 		});
 	};
-	const graph = useQuery(knowledgeQueries.graph(projectId));
-	if (graph.error) {
+	const map = useQuery(knowledgeQueries.map(projectId));
+	if (map.error) {
 		return (
 			<Alert variant="destructive">
 				<CircleAlertIcon />
 				<AlertTitle>The map did not load</AlertTitle>
-				<AlertDescription>{graph.error.message}</AlertDescription>
+				<AlertDescription>{map.error.message}</AlertDescription>
 			</Alert>
 		);
 	}
-	if (!graph.data) return <Skeleton className="h-96 w-full" />;
-	if (graph.data.nodes.length === 0) {
+	if (!map.data) return <Skeleton className="h-96 w-full" />;
+	if (map.data.nodes.length === 0) {
 		return (
 			<Empty className="border">
 				<EmptyHeader>
@@ -165,8 +181,9 @@ function KnowledgeMap({ focus }: { focus: string | null }) {
 		<ReactFlowProvider>
 			<MapView
 				projectId={projectId}
-				graph={graph.data}
+				map={map.data}
 				focus={focus}
+				mayChange={knowledge.can.startRuns}
 				onOpenFile={onOpenFile}
 				onReview={onReview}
 			/>
@@ -174,16 +191,47 @@ function KnowledgeMap({ focus }: { focus: string | null }) {
 	);
 }
 
+/** Marks a word as not a topic, with a way back, or puts one back. */
+function useNotTopic(projectId: string) {
+	const queryClient = useQueryClient();
+	const { mutate, isPending } = useMutation(
+		knowledgeMutations.markNotTopic({
+			onSuccess: (_words, { word, notTopic }) => {
+				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
+				if (!notTopic) {
+					toast.success(`${word} is a topic again`);
+					return;
+				}
+				toast.success(`${word} is no longer a topic`, {
+					action: {
+						label: "Undo",
+						onClick: () => mutate({ projectId, word, notTopic: false }),
+					},
+				});
+			},
+			onError: (error) =>
+				toast.error(`The topics did not change: ${error.message}`),
+		}),
+	);
+	return {
+		isPending,
+		mark: (word: string, notTopic: boolean) =>
+			mutate({ projectId, word, notTopic }),
+	};
+}
+
 function MapView({
 	projectId,
-	graph,
+	map,
 	focus,
+	mayChange,
 	onOpenFile,
 	onReview,
 }: {
 	projectId: string;
-	graph: KnowledgeGraph;
+	map: KnowledgeMap;
 	focus: string | null;
+	mayChange: boolean;
 	onOpenFile: (path: string) => void;
 	onReview: (learningId: string) => void;
 }) {
@@ -194,20 +242,21 @@ function MapView({
 		{ x: number; y: number }
 	> | null>(null);
 	const { text, setText, query, hits } = useKnowledgeHits(projectId);
+	const notTopic = useNotTopic(projectId);
 	const flow = useReactFlow();
 
 	useEffect(() => setPicked(focus), [focus]);
 
 	const visible = useMemo(() => {
-		const nodes = graph.nodes.filter((node) => kinds.includes(node.kind));
+		const nodes = map.nodes.filter((node) => kinds.includes(node.kind));
 		const ids = new Set(nodes.map((node) => node.id));
 		return {
 			nodes,
-			edges: graph.edges.filter(
+			edges: map.edges.filter(
 				(edge) => ids.has(edge.source) && ids.has(edge.target),
 			),
 		};
-	}, [graph, kinds]);
+	}, [map, kinds]);
 
 	useEffect(() => {
 		let current = true;
@@ -292,16 +341,16 @@ function MapView({
 				: lit !== null,
 		),
 	);
-	const chosen = graph.nodes.find((node) => node.id === selected);
+	const chosen = map.nodes.find((node) => node.id === selected);
 
 	return (
 		<div className="flex flex-col gap-4">
-			{graph.filesLeftOut > 0 ? (
+			{map.filesLeftOut > 0 ? (
 				<Alert>
 					<TriangleAlertIcon />
 					<AlertTitle>This map leaves out some topics</AlertTitle>
 					<AlertDescription>
-						Night Shift skipped {graph.filesLeftOut} files, because you have so
+						Night Shift skipped {map.filesLeftOut} files, because you have so
 						many. Sync only what your agents need.
 					</AlertDescription>
 				</Alert>
@@ -339,12 +388,41 @@ function MapView({
 								<Icon />
 								{KIND_NAME[kind].many}
 								<span className="text-muted-foreground tabular-nums">
-									{graph.nodes.filter((node) => node.kind === kind).length}
+									{map.nodes.filter((node) => node.kind === kind).length}
 								</span>
 							</ToggleGroupItem>
 						);
 					})}
 				</ToggleGroup>
+				{mayChange && map.notTopics.length > 0 ? (
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							render={<Button variant="outline" size="sm" />}
+						>
+							<EyeOffIcon />
+							Not topics
+							<span className="text-muted-foreground tabular-nums">
+								{map.notTopics.length}
+							</span>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start">
+							<DropdownMenuGroup>
+								<DropdownMenuLabel>
+									Choose one to show it again
+								</DropdownMenuLabel>
+								{map.notTopics.map((word) => (
+									<DropdownMenuItem
+										key={word}
+										disabled={notTopic.isPending}
+										onClick={() => notTopic.mark(word, false)}
+									>
+										{word}
+									</DropdownMenuItem>
+								))}
+							</DropdownMenuGroup>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				) : null}
 			</div>
 			<div className="flex h-[calc(100svh-15.5rem)] min-h-96 flex-col gap-4 lg:flex-row">
 				<div className="relative min-h-64 min-w-0 flex-1 overflow-hidden rounded-xl border">
@@ -369,10 +447,15 @@ function MapView({
 					{chosen ? (
 						<NodeDetail
 							node={chosen}
-							graph={graph}
+							map={map}
 							onSelect={setPicked}
 							onOpenFile={onOpenFile}
 							onReview={onReview}
+							onNotTopic={
+								mayChange && chosen.kind === "topic"
+									? () => notTopic.mark(chosen.label, true)
+									: undefined
+							}
 						/>
 					) : (
 						<Empty>
@@ -393,26 +476,29 @@ function MapView({
 /** One node: what it is, what to do with it, and what connects to it. */
 function NodeDetail({
 	node,
-	graph,
+	map,
 	onSelect,
 	onOpenFile,
 	onReview,
+	onNotTopic,
 }: {
-	node: GraphNode;
-	graph: KnowledgeGraph;
+	node: KnowledgeNode;
+	map: KnowledgeMap;
 	onSelect: (id: string) => void;
 	onOpenFile: (path: string) => void;
 	onReview: (learningId: string) => void;
+	/** Unset: the person may not change the topics, or this is no topic. */
+	onNotTopic: (() => void) | undefined;
 }) {
 	const Icon = KIND_ICON[node.kind];
-	const near = graph.edges.flatMap((edge) =>
+	const near = map.edges.flatMap((edge) =>
 		edge.source === node.id
 			? [edge.target]
 			: edge.target === node.id
 				? [edge.source]
 				: [],
 	);
-	const byId = new Map(graph.nodes.map((other) => [other.id, other]));
+	const byId = new Map(map.nodes.map((other) => [other.id, other]));
 	const { path } = node;
 	return (
 		<>
@@ -438,6 +524,10 @@ function NodeDetail({
 							onClick={() => onReview(node.id.replace(/^learning:/, ""))}
 						>
 							Review it
+						</Button>
+					) : onNotTopic ? (
+						<Button variant="outline" size="sm" onClick={onNotTopic}>
+							Not a topic
 						</Button>
 					) : undefined
 				}

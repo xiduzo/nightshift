@@ -364,11 +364,11 @@ function QuestionsCard() {
 
 function MapCard() {
 	const { projectId } = useKnowledge();
-	const graph = useQuery({
-		...knowledgeQueries.graph(projectId),
+	const map = useQuery({
+		...knowledgeQueries.map(projectId),
 		meta: { quietErrors: true },
 	});
-	const topics = (graph.data?.nodes ?? [])
+	const topics = (map.data?.nodes ?? [])
 		.filter((node) => node.kind === "topic")
 		.sort((a, b) => b.degree - a.degree)
 		.slice(0, TOPICS_SHOWN);
@@ -384,7 +384,7 @@ function MapCard() {
 				<OpenPage to="/projects/$projectId/knowledge/map" label="Open map" />
 			</CardHeader>
 			<CardContent className="flex flex-wrap gap-1">
-				{graph.isLoading ? <Skeleton className="h-16 w-full" /> : null}
+				{map.isLoading ? <Skeleton className="h-16 w-full" /> : null}
 				{topics.map((topic) => (
 					<Badge
 						key={topic.id}

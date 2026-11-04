@@ -26,8 +26,8 @@ export const knowledgeQueries = {
 	/** How often agents found and read each file, and which no run used lately. */
 	use: (projectId: string) =>
 		orpc.knowledge.use.queryOptions({ input: { projectId } }),
-	/** The knowledge as a graph: its files, their topics and what connects to them. */
-	graph: (projectId: string) =>
+	/** The Map: the files, their topics and what connects to them. */
+	map: (projectId: string) =>
 		orpc.knowledge.graph.queryOptions({ input: { projectId } }),
 	/** The learnings that wait for a person, newest first. */
 	learnings: (projectId: string) => learningQueries.learnings(projectId),
@@ -51,6 +51,8 @@ export const knowledgeMutations = {
 	syncSource: orpc.knowledge.syncSource.mutationOptions,
 	/** Marks the files that answer a question, or with none takes it out of the set. */
 	markQuestion: orpc.knowledge.markQuestion.mutationOptions,
+	/** Marks a word as not a topic on the Map, or puts it back. */
+	markNotTopic: orpc.knowledge.markNotTopic.mutationOptions,
 	/** Turns search by meaning on or off for the project. */
 	setMeaning: orpc.knowledge.setMeaning.mutationOptions,
 };
