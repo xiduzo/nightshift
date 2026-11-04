@@ -128,16 +128,71 @@ index lists only the accepted ones.
 
 ### The Map
 
-The Map page of Knowledge shows the knowledge as a graph: the files,
-the topics they share, the links between them, the questions that found them
-and the learnings that name their topics. `packages/engine/src/knowledge/graph.ts`
-builds it.
+The Map page of Knowledge shows the files, the topics they share, the links
+between them, the files close in meaning, the questions that found them and the
+learnings that name their topics. `packages/engine/src/knowledge/map.ts` draws
+it, and `topics.ts` finds the topics.
 
-- `TopicGraphTransformer` finds the topics by counting words. It takes
-  LangChain `Document`s and gives a `GraphDocument` for each file.
-- The graph reads at most 200 files, 60 KB of each. It reads them again only
-  when a file changes. A file it cannot read stays on the map without topics.
-- The graph is for people. Agents do not get it, and search does not use it.
+The Map draws what this computer's search index already holds. It reads the
+sections and the stored vectors through the search store. To draw it, Night
+Shift does not ask the Host, nor a model, so the page opens when the Host is
+down. A test measures this. A file that the Space lists and this computer does
+not have yet stands alone on the Map, until a reconcile brings it. The Map is
+for people. Agents do not get it, and search does not use it.
+
+No model makes the Map. A Map that a model makes would be a flow that writes a
+file ([the research](research/knowledge-graph-extraction.md)). The engine has no
+seam for one.
+
+**Topics.** Night Shift counts words, in every language the same way. These rules
+lift it above a plain count. Each rule improved the top topics on this
+repository's docs or on a Dutch text, or it is not here:
+
+- A plural folds into its singular, when the text has both: "Devices" and
+  "Device" are one topic. The rule is in English and Dutch ("modellen", "model").
+- Two words that stand together more than a fifth of the time, in two files or
+  more, are one topic: "pull request", "MCP server", "wettelijke termijn". A word
+  that mostly stands in its phrases gives way to them: no "wettelijke" next to
+  "wettelijke termijn". A phrase scores double, or single words fill every place.
+- Short words of English and Dutch stop a phrase and are no topics. Everyday
+  verbs and words of web pages are no topic alone, but fine in a phrase.
+
+**Not a topic.** A person marks a topic on the Map, and the next word takes its
+place. The list is `evals/not-topics.json`. It syncs with the knowledge, as the
+question set does, so it follows the Space and not the Device. It holds for the
+word in either number. Marking a phrase does not hide its words. If two people
+mark a word at the same moment, the later list wins.
+
+**Files close in meaning.** Two files connect when the middle of their section
+vectors is at the model's line (`closeAt` in `embedding-model.ts`) or above it,
+and each is among the other's three closest. Two files that link do not get this
+edge too. The middle of the sections says more than the best pair of sections,
+which favours long files.
+
+| Measured on `docs/`, 55 files, 1 415 sections, `qwen3-embedding:0.6b`, 2026-11-04 | Top 40 pairs that share a subject by name |
+| --- | --- |
+| Best pair of sections | 8 |
+| Middle of the sections | 19 |
+
+The line for this model is 0.6. On `docs/`, 382 of the 1 485 pairs of files are
+over it, and the mutual rule keeps 38. 25 stay after the pairs that link. The
+share that has a subject in common by name is
+flat from 0.6 to 0.85, between 42% and 50%, so the mutual rule does the choosing
+and the line is a guard. Files of unrelated subjects stay far below it: 0.14 to
+0.36 between a Dutch text and English docs, and between English docs of different
+subjects. Four short Dutch files on one subject sit at 0.41 to 0.60, so they get
+no edge: the line is measured on longer files, and no Dutch corpus was at hand. A
+model that nobody measured has no line, and its Map has no such edges. With no
+model, with search by meaning off for the project, or before the first vectors,
+the Map stands without them.
+
+**What it costs.** The Map has no cache: each draw counts again, on the daemon's
+one thread. It reads at most 6 MB of text, 60 KB of each file, and at most 4 000
+vectors: the first section of each file, then the second. It compares the first
+400 files by path. On a computer with a load of 50 to 65, the limits took 600 to
+1 150 ms for the text, 160 to 390 ms to read the vectors, and 110 to 240 ms to
+compare. A project the size of `docs/` draws in 150 to 400 ms on that computer.
+Past the text limit, the page says how many files it left out.
 
 ## What an agent gets
 
@@ -542,7 +597,8 @@ From these events:
 - **Questions agents asked.** The Knowledge page lists recent questions,
   each with what it found. Mark the file that answers a question. Marked
   questions are the project's question set: `evals/questions.json` in the
-  knowledge. It syncs like the learnings. `evals/` is Night Shift's own: no
+  knowledge. It syncs like the learnings. `evals/` is Night Shift's own, and it
+  also holds the words that are not topics on the Map: no
   index, search, read or file list shows it.
 - **Test search.** With one marked question or more, the page tests the
   set against search by words, by meaning, and both. It shows how many it
