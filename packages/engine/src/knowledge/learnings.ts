@@ -12,6 +12,7 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { SpaceArchive } from "../archive";
+import type { CloseNote, CloseNotes, NoteToCompare } from "./close-notes";
 import type { KnowledgeFolders } from "./folder";
 import type { KnowledgeDocuments } from "./knowledge-document";
 import type { KnowledgeReconciled, KnowledgeStepHold } from "./reconcile";
@@ -35,6 +36,8 @@ import type { SpaceHostStatus } from "./space-host-status";
  * (`learning-file.ts`, `layout.ts`), because the agents' reports, the web
  * app and the shell of `kit:knowledge/review-learnings` need them too. That
  * kit is the second form of `settle`: `learnings-kit.test.ts` runs both.
+ * Which notes are close to others is `close-notes.ts`: this module only
+ * gives it the notes and puts the answer on what waits.
  */
 
 /** One step's proposed learnings that wait for a person, as the review lists them. */
@@ -49,6 +52,12 @@ export type WaitingLearning = {
 	notes: string[];
 	/** Epoch ms: when the step last added to it. */
 	proposedAt: number;
+	/**
+	 * The notes close to each note, one list per note of `notes`, in their
+	 * order. A person compares them. Absent: none is close, none could be
+	 * compared yet, or Night Shift does not compare them here.
+	 */
+	nearTo?: CloseNote[][];
 };
 
 /** A learning that waits, with the project it is for. */
@@ -72,6 +81,8 @@ export type LearningsDeps = {
 	/** Holds the folder as a step does: `settle` changes it, and the reconcile at `done` publishes that. */
 	startStep(projectId: string): Promise<KnowledgeStepHold>;
 	notifications: LearningsNotifications;
+	/** Which notes are close to others. Absent: the list has no `nearTo`. */
+	closeNotes?: Pick<CloseNotes, "among">;
 };
 
 export type Learnings = {
@@ -99,8 +110,10 @@ export type Learnings = {
 	 * What waits for a person, newest first, with its notes, as the Space's
 	 * document has it. No reconcile first: a step publishes what it proposed
 	 * when it ends. A file whose content is neither here nor at the Host now
-	 * has no notes. `onlyHere`: the Host is not asked, and what is not here
-	 * has no notes.
+	 * has no notes. `onlyHere`: the Host is not asked, what is not here has
+	 * no notes, and no note is compared. Without `onlyHere`, each carries the
+	 * notes close to it (`nearTo`), from vectors made in the background: the
+	 * read never waits for a model.
 	 */
 	waiting(
 		projectId: string,
@@ -131,6 +144,9 @@ export type Learnings = {
 	reconciled(change: KnowledgeReconciled): Promise<void>;
 };
 
+/** Kept files each read compares with, at most: the newest. */
+const MAX_KEPT_FILES = 500;
+
 /** Which files wait, with which content: when this changes, what waits changed. */
 function waitingKey(
 	entries: Iterable<readonly [string, { sha256: string }]>,
@@ -143,7 +159,8 @@ function waitingKey(
 }
 
 export function createLearnings(deps: LearningsDeps): Learnings {
-	const { folders, documents, archive, status, notifications } = deps;
+	const { folders, documents, archive, status, notifications, closeNotes } =
+		deps;
 	/** What waited at the last reconcile of each project in this process. */
 	const known = new Map<string, string>();
 
@@ -184,6 +201,67 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 		return learnings;
 	}
 
+	/** The notes kept in the project, as this computer has them: the Host is not asked. */
+	async function keptNotes(projectId: string): Promise<NoteToCompare[]> {
+		const spaceId = await status.spaceOf(projectId);
+		if (spaceId === null) return [];
+		const prefix = `${ACCEPTED_LEARNINGS_DIR}/`;
+		const kept = [...(await documents.open(projectId)).entries()]
+			.filter(([path]) => path.startsWith(prefix) && path.endsWith(".md"))
+			.sort(([, a], [, b]) => b.changedAt - a.changedAt)
+			.slice(0, MAX_KEPT_FILES);
+		const notes = await Promise.all(
+			kept.map(async ([path, entry]) => {
+				const content = await archive.here
+					.read({ kind: "content", spaceId, sha256: entry.sha256 })
+					.catch(() => null);
+				if (!content) return [];
+				return parseLearnings(new TextDecoder().decode(content)).map(
+					(text): NoteToCompare => ({
+						id: path.slice(prefix.length),
+						text,
+						kept: true,
+					}),
+				);
+			}),
+		);
+		return notes.flat();
+	}
+
+	/** What waited, with the notes close to each note. */
+	async function withCloseNotes(
+		projectId: string,
+		learnings: WaitingLearning[],
+	): Promise<WaitingLearning[]> {
+		const waiting = learnings.flatMap(({ id, notes }) =>
+			notes.map((text): NoteToCompare => ({ id, text, kept: false })),
+		);
+		if (!closeNotes || waiting.length === 0) return learnings;
+		const close = await closeNotes.among(projectId, {
+			notes: async () => [...waiting, ...(await keptNotes(projectId))],
+			onPrepared: () => void tellScreens(projectId),
+		});
+		if (!close) return learnings;
+		let at = 0;
+		return learnings.map((learning) => {
+			const nearTo = learning.notes.map(() => close[at++] ?? []);
+			return nearTo.some((near) => near.length > 0)
+				? { ...learning, nearTo }
+				: learning;
+		});
+	}
+
+	/** Lets the open screens of the project's Space read what waits again. */
+	async function tellScreens(projectId: string): Promise<void> {
+		const spaceId = await status.spaceOf(projectId);
+		if (spaceId === null) return;
+		await notifications
+			.learningsChanged(spaceId, projectId)
+			.catch((error: unknown) => {
+				console.warn("The screens were not told of the learnings:", error);
+			});
+	}
+
 	async function propose(
 		projectId: string,
 		step: LearningStep,
@@ -214,12 +292,14 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 			}
 		},
 		async waiting(projectId, options) {
-			const learnings = await listed(projectId, options);
-			return learnings
+			const learnings = (await listed(projectId, options))
 				.map((learning) => ({ ...learning, notes: learning.notes ?? [] }))
 				.sort(
 					(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
 				);
+			return options?.onlyHere
+				? learnings
+				: withCloseNotes(projectId, learnings);
 		},
 		async count(projectId) {
 			const learnings = await listed(projectId, { onlyHere: true });

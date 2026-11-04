@@ -348,6 +348,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		status,
 		startStep: (projectId) => sync.startStep(projectId),
 		notifications: deps.notifications,
+		closeNotes: search.closeNotes,
 	});
 	const sync = createKnowledgeSync({
 		folders,

@@ -8,6 +8,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	testKnowledge,
+	waitFor,
 	withDevice,
 } from "@nightshift/engine/testing";
 import { call, ORPCError } from "@orpc/server";
@@ -480,6 +481,83 @@ describe("knowledge.evaluate and knowledge.setMeaning", () => {
 });
 
 describe("knowledge.learnings, keepLearning and deleteLearning", () => {
+	test("carry the notes close to each note, on the list and on the Review page", async () => {
+		let heard = 0;
+		const close = testKnowledge(sandbox, {
+			pageWaitMs: 5_000,
+			archive: built.archive,
+			synced: built.synced,
+			folderLocks: built.folderLocks,
+			notifications: {
+				learningsChanged: async () => {
+					heard++;
+				},
+			},
+			// Every note is the same to this model.
+			meaning: {
+				model: "fake",
+				embeddings: {
+					embedDocuments: async (texts) => texts.map(() => [1, 0]),
+					embedQuery: async () => [1, 0],
+				},
+				query: (text) => text,
+				ready: async () => "ready",
+				closeNotesAt: 0.9,
+			},
+		});
+		try {
+			const asked = {
+				...context("viewer", "viewer"),
+				knowledge: close.knowledge,
+			};
+			await putFile("learnings/proposed/run-1.s1.md", "- Use bun.\n");
+			await putFile("learnings/proposed/run-2.s1.md", "- bun it is.\n");
+			await call(appRouter.knowledge.get, { projectId }, { context: asked });
+			heard = 0;
+
+			await call(appRouter.knowledge.learnings, undefined, { context: asked });
+			await waitFor(() => heard > 0, { label: "the vectors" });
+
+			const waiting = await call(appRouter.knowledge.learnings, undefined, {
+				context: asked,
+			});
+			const expected = {
+				"run-1.s1.md": [
+					[
+						{
+							id: "run-2.s1.md",
+							note: "bun it is.",
+							kept: false,
+							similarity: 1,
+						},
+					],
+				],
+				"run-2.s1.md": [
+					[{ id: "run-1.s1.md", note: "Use bun.", kept: false, similarity: 1 }],
+				],
+			};
+			expect(Object.fromEntries(waiting.map((w) => [w.id, w.nearTo]))).toEqual(
+				expected,
+			);
+			const tasks = await call(
+				appRouter.knowledge.review,
+				{ projectId },
+				{ context: asked },
+			);
+			expect(
+				Object.fromEntries(
+					tasks.flatMap((task) =>
+						task.kind === "learning"
+							? [[task.learning.id, task.learning.nearTo]]
+							: [],
+					),
+				),
+			).toEqual(expected);
+		} finally {
+			close.close();
+		}
+	});
+
 	test("any Member lists what waits; keeping or deleting asks a role that may start runs and tells the open screens", async () => {
 		await putFile(
 			"learnings/proposed/run-1.s1.md",

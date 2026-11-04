@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
+import { createCloseNotes } from "./close-notes";
 import { isDocument, loadDocument } from "./documents";
 import {
 	createKnowledgeFolders,
@@ -347,7 +348,10 @@ export function createKnowledgeSearch(
 			: Promise.resolve(true);
 	const folders = createKnowledgeFolders(dataDir);
 	const store = createSearchStore(dataDir, {
-		onVectorsGone: () => preparation.vectorsGone(),
+		onVectorsGone: () => {
+			preparation.vectorsGone();
+			closeNotes.vectorsGone();
+		},
 	});
 	/** Closed for good: a later search still answers, and nothing prepares. */
 	let closed = false;
@@ -357,6 +361,12 @@ export function createKnowledgeSearch(
 		meaningOn,
 		...(options.clock ? { clock: options.clock } : {}),
 		...(options.onPreparation ? { onEvent: options.onPreparation } : {}),
+	});
+	const closeNotes = createCloseNotes({
+		store,
+		model: () => (closed ? null : current()),
+		meaningOn,
+		...(options.clock ? { clock: options.clock } : {}),
 	});
 	/** One refresh per project at a time: a second search waits for it. */
 	const refreshing = new Map<string, Promise<KnowledgeRefresh>>();
@@ -629,6 +639,7 @@ export function createKnowledgeSearch(
 				);
 			});
 		},
+		closeNotes,
 		/**
 		 * What the index holds for the Map, after a refresh: the files, the text
 		 * of their sections, and the vectors that are ready. It walks this

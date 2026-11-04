@@ -415,6 +415,12 @@ describe("the floor of a model", () => {
 		expect(
 			ollamaMeaning({ ...at, model: "some-other-model" }).closeAt,
 		).toBeUndefined();
+		expect(
+			ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).closeNotesAt,
+		).toBe(0.78);
+		expect(
+			ollamaMeaning({ ...at, model: "some-other-model" }).closeNotesAt,
+		).toBeUndefined();
 		expect(ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).floor).toBe(
 			0.5,
 		);

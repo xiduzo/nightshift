@@ -21,12 +21,20 @@ import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";
  * sections and gets the vector store and record manager of a project.
  */
 
-/** Bump to build every index again. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. 5: a section's stable id, on its row and in its vector's metadata, and its heading path, which the model reads. */
+/** Bump to build every index again: a new table needs no bump, since each open creates it. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. 5: a section's stable id, on its row and in its vector's metadata, and its heading path, which the model reads. */
 const SCHEMA_VERSION = 5;
 /** Every table of the index, for an index built again. */
-const TABLES = ["files", "texts", "sections", "meta", "records", "vectors"];
+const TABLES = [
+	"files",
+	"texts",
+	"sections",
+	"meta",
+	"records",
+	"vectors",
+	"note_vectors",
+];
 /** The tables of the vectors, for another model. */
-const VECTOR_TABLES = ["records", "vectors"];
+const VECTOR_TABLES = ["records", "vectors", "note_vectors"];
 /** Words around a match in an excerpt. */
 const SNIPPET_TOKENS = 16;
 
@@ -65,6 +73,10 @@ export function createSearchTables(db: Database): void {
 	// The vector store's table: one row per distinct section of a project.
 	db.run(
 		"CREATE TABLE IF NOT EXISTS vectors (project_id TEXT NOT NULL, id TEXT NOT NULL, text TEXT NOT NULL, metadata TEXT NOT NULL, vec BLOB NOT NULL, PRIMARY KEY (project_id, id))",
+	);
+	// One row per distinct text of a note: `close-notes.ts`. No section has these.
+	db.run(
+		"CREATE TABLE IF NOT EXISTS note_vectors (project_id TEXT NOT NULL, hash TEXT NOT NULL, vec BLOB NOT NULL, PRIMARY KEY (project_id, hash))",
 	);
 	db.run(
 		"CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
@@ -188,6 +200,15 @@ export function createSearchStore(
 		return db;
 	}
 
+	/** The model of the vectors the open index holds. */
+	function modelOfVectors(sqlite: Database): string | undefined {
+		return sqlite
+			.query<{ value: string }, []>(
+				"SELECT value FROM meta WHERE key = 'model'",
+			)
+			.get()?.value;
+	}
+
 	/**
 	 * The model is part of the index: the vectors of another model go, and
 	 * every project prepares again. Runs when the index opens and when the
@@ -195,11 +216,7 @@ export function createSearchStore(
 	 */
 	function align(sqlite: Database, model: string, force = false): void {
 		if (vectorModel === model && !force) return;
-		const kept = sqlite
-			.query<{ value: string }, []>(
-				"SELECT value FROM meta WHERE key = 'model'",
-			)
-			.get()?.value;
+		const kept = modelOfVectors(sqlite);
 		vectorModel = model;
 		if (kept === model && !force) return;
 		for (const table of VECTOR_TABLES) sqlite.run(`DELETE FROM ${table}`);
@@ -500,12 +517,7 @@ export function createSearchStore(
 			limit: number,
 		): { path: string; vector: Float32Array }[] {
 			const sqlite = opened();
-			const kept = sqlite
-				.query<{ value: string }, []>(
-					"SELECT value FROM meta WHERE key = 'model'",
-				)
-				.get()?.value;
-			if (kept !== model) return [];
+			if (modelOfVectors(sqlite) !== model) return [];
 			return sqlite
 				.query<{ path: string; vec: Uint8Array }, [string, number]>(
 					`WITH held AS (
@@ -527,6 +539,71 @@ export function createSearchStore(
 					path,
 					vector: new Float32Array(vec.slice().buffer),
 				}));
+		},
+
+		/** The vectors of the project's notes, by the hash of their text. It reads no model. Another model's vectors: none. */
+		noteVectors(projectId: string, model: string): Map<string, Float32Array> {
+			const sqlite = opened();
+			if (modelOfVectors(sqlite) !== model) return new Map();
+			return new Map(
+				sqlite
+					.query<{ hash: string; vec: Uint8Array }, [string]>(
+						"SELECT hash, vec FROM note_vectors WHERE project_id = ?",
+					)
+					.all(projectId)
+					.map(({ hash, vec }) => [hash, new Float32Array(vec.slice().buffer)]),
+			);
+		},
+		/** Which notes of the project have a vector of this model. */
+		noteHashes(projectId: string, model: string): Set<string> {
+			const sqlite = opened();
+			if (modelOfVectors(sqlite) !== model) return new Set();
+			return new Set(
+				sqlite
+					.query<{ hash: string }, [string]>(
+						"SELECT hash FROM note_vectors WHERE project_id = ?",
+					)
+					.all(projectId)
+					.map(({ hash }) => hash),
+			);
+		},
+		/** Stores vectors of the project's notes. The vectors of another model go first. */
+		writeNoteVectors(
+			projectId: string,
+			model: string,
+			rows: readonly { hash: string; vector: readonly number[] }[],
+		): void {
+			const sqlite = opened();
+			align(sqlite, model);
+			const put = sqlite.prepare(
+				"INSERT OR REPLACE INTO note_vectors (project_id, hash, vec) VALUES (?, ?, ?)",
+			);
+			sqlite.transaction(() => {
+				for (const { hash, vector } of rows) {
+					put.run(
+						projectId,
+						hash,
+						new Uint8Array(new Float32Array(vector).buffer),
+					);
+				}
+			})();
+		},
+		/** Drops the vectors of the project's notes that are not these. */
+		keepNoteVectors(projectId: string, hashes: readonly string[]): void {
+			const sqlite = opened();
+			const keep = new Set(hashes);
+			const gone = sqlite
+				.query<{ hash: string }, [string]>(
+					"SELECT hash FROM note_vectors WHERE project_id = ?",
+				)
+				.all(projectId)
+				.filter(({ hash }) => !keep.has(hash));
+			const drop = sqlite.prepare(
+				"DELETE FROM note_vectors WHERE project_id = ? AND hash = ?",
+			);
+			sqlite.transaction(() => {
+				for (const { hash } of gone) drop.run(projectId, hash);
+			})();
 		},
 
 		/** The project's vector store for this model. The vectors of another model go first. */

@@ -42,6 +42,8 @@ export type KnowledgeMeaning = {
 	floor?: number;
 	/** The least similarity (cosine) of two files the Map shows as close. Absent: the Map shows none (`embedding-model.ts`). */
 	closeAt?: number;
+	/** The least similarity (cosine) of two notes of learnings shown as close. Absent: none show (`embedding-model.ts`). */
+	closeNotesAt?: number;
 };
 
 /**
@@ -156,12 +158,14 @@ export function ollamaMeaning(options: {
 	const measured = measuredModel(model);
 	const floor = measured?.floor;
 	const closeAt = measured?.closeAt;
+	const closeNotesAt = measured?.closeNotesAt;
 	return {
 		model,
 		embeddings,
 		query: (text) => queryFor(model, text),
 		...(floor !== undefined ? { floor } : {}),
 		...(closeAt !== undefined ? { closeAt } : {}),
+		...(closeNotesAt !== undefined ? { closeNotesAt } : {}),
 		where,
 		downloaded: () => downloading?.() ?? null,
 		async ready() {

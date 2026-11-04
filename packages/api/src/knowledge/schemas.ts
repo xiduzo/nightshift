@@ -111,6 +111,23 @@ const waitingLearningSchema = exact<WaitingLearning>()(
 		notes: z.array(z.string()),
 		/** Epoch ms: when the step last added to it. */
 		proposedAt: z.number(),
+		/** The notes close to each note, one list per note, in their order. Absent: none, or a Host of an older version. */
+		nearTo: z
+			.array(
+				z.array(
+					z.object({
+						/** The name of the file the other note is in. */
+						id: z.string(),
+						/** Its text, to compare. */
+						note: z.string(),
+						/** A person kept it. Otherwise it waits too. */
+						kept: z.boolean(),
+						/** How close, as a cosine. It does not say whether they agree. */
+						similarity: z.number(),
+					}),
+				),
+			)
+			.optional(),
 	}),
 );
 
