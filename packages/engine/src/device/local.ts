@@ -8,9 +8,11 @@ import type {
 	DecisionInput,
 	DecisionResult,
 	HarnessName,
+	SessionContribution,
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
+import { foldContributions } from "@nightshift/agents/types";
 import {
 	type AgentHarnessName,
 	type AgentNode,
@@ -339,8 +341,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			connections,
 			clis,
 			artifacts,
-			knowledge,
-			knowledgeOnly,
+			knowledge: _knowledge,
+			knowledgeOnly: _knowledgeOnly,
 			files,
 			underOffer,
 			run,
@@ -350,10 +352,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		// this computer's owner (ADR 13, decision 5). A step of a run reads
 		// its Project's secrets first.
 		const use = secretUse(run, underOffer);
-		// Some folders of the knowledge (a view), or the whole folder.
-		const knowledgeAsked = knowledgeOnly
-			? { projectId: knowledgeOnly.projectId, folders: knowledgeOnly.folders }
-			: knowledge;
 		const harness = harnessFor(name, use);
 		if (!harness) {
 			yield {
@@ -393,15 +391,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					: "";
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
 			// The knowledge as the Space has it now, before the agent reads it.
-			known =
-				knowledgeAsked && deps.knowledge
-					? await deps.knowledge.forSession(knowledgeAsked, {
-							...(artifacts
-								? { runId: artifacts.runId, stepId: artifacts.stepId }
-								: {}),
-							...(rest.stepReport ? { stepReport: rest.stepReport } : {}),
-						})
-					: null;
+			known = deps.knowledge
+				? await deps.knowledge.forSession(
+						input,
+						artifacts
+							? { runId: artifacts.runId, stepId: artifacts.stepId }
+							: {},
+					)
+				: null;
 			const added = artifacts
 				? deps.sessionEnv?.({ harness: name, ...artifacts })
 				: undefined;
@@ -410,20 +407,25 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				artifacts && deps.artifacts && files && files.length > 0
 					? await deps.artifacts.answerFolder(artifacts.runId, files)
 					: null;
-			const prompt = [
-				input.prompt,
-				...(answers ? [answerFilesInstruction(answers.paths)] : []),
-				...(guide ? [guide] : []),
-			].join("\n\n");
-			const env = {
-				...added?.env,
-				...known?.env,
-				...tools?.env,
-			};
+			// What each part adds to the session, in this order.
+			const contributions: SessionContribution[] = [
+				...(added ? [{ env: added.env }] : []),
+				...(known ? [known.contribution] : []),
+				...(answers
+					? [
+							{
+								addDirs: [answers.dir],
+								afterPrompt: answerFilesInstruction(answers.paths),
+							},
+						]
+					: []),
+				...(guide ? [{ afterPrompt: guide }] : []),
+				...(tools?.env ? [{ env: tools.env }] : []),
+			];
 			yield { type: "ready", harness: name };
 			const run = harness.run({
 				...rest,
-				prompt,
+				...foldContributions(rest, contributions),
 				...(clis && clis.length > 0 ? { clis } : {}),
 				...(Object.keys(mcp.servers).length > 0
 					? { mcpServers: mcp.servers }
@@ -434,14 +436,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 						}
 					: {}),
 				...(tools?.toolsPath ? { toolsPath: tools.toolsPath } : {}),
-				...(Object.keys(env).length > 0 ? { env } : {}),
 				...(added?.config && Object.keys(added.config).length > 0
 					? { harnessConfig: added.config }
-					: {}),
-				// The folder, the line, the tools and the learnings.
-				...known?.input,
-				...(answers
-					? { addDirs: [...(known?.input.addDirs ?? []), answers.dir] }
 					: {}),
 				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
 			});
@@ -511,7 +507,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		// The sync flows write in its folder.
 		const known =
 			knowledge && deps.knowledge
-				? await deps.knowledge.forCommand(knowledge)
+				? await deps.knowledge.forCommand(knowledge.projectId)
 				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		try {

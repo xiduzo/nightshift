@@ -657,7 +657,7 @@ describe("the project's knowledge", () => {
 	test("a step holds the project's folder from its start to its end, also when it fails to start", async () => {
 		const seen: string[] = [];
 		const knowledge = {
-			forCommand: async ({ projectId }: { projectId: string }) => {
+			forCommand: async (projectId: string) => {
 				seen.push(`start ${projectId}`);
 				return {
 					env: { NS_KNOWLEDGE: "/k" },

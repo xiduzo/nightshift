@@ -1,4 +1,4 @@
-import type { KnowledgePort } from "../tools";
+import type { KnowledgePort } from "../knowledge";
 import type { ToolServerResource, ToolServerResources } from "./mcp";
 import { chooseProject, type TerminalProject } from "./terminal-project";
 

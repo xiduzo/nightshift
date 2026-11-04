@@ -153,6 +153,22 @@ export type AgentSessionInput = {
 	signal: AbortSignal;
 };
 
+/**
+ * What one part of Night Shift adds to a session: its knowledge, the files of
+ * the run's answers, what the agent learns about its CLI tools.
+ * `foldContributions` makes them one `AgentSessionInput`, so no field of it
+ * belongs to one part.
+ */
+export type SessionContribution = Pick<
+	AgentSessionInput,
+	"env" | "addDirs" | "instructions" | "tools" | "toolsInstruction"
+> & {
+	/** Added after the prompt, whatever tools the session gets. */
+	afterPrompt?: string;
+	/** Added to the session's step report. A session without a report stays without one. */
+	report?: Pick<StepReportSpec, "learnings">;
+};
+
 /** Where a cost came from: the harness said it, or Night Shift priced the tokens. */
 export type CostSource = "reported" | "estimated";
 

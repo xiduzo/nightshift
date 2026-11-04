@@ -54,6 +54,7 @@ export {
 	opencodeHarness,
 	runPiAcp,
 } from "./harnesses";
+export { KNOWLEDGE_TERMINAL_INSTRUCTION } from "./knowledge";
 export type {
 	AgentErrorKind,
 	AgentEvent,

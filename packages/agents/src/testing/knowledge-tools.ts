@@ -1,4 +1,4 @@
-import { KNOWLEDGE_TOOLS_INSTRUCTION, knowledgeTools } from "../tools";
+import { knowledgeBrief, knowledgeTools } from "../knowledge";
 
 /**
  * The knowledge tools of an Agent step over a fake index: one file,
@@ -6,7 +6,9 @@ import { KNOWLEDGE_TOOLS_INSTRUCTION, knowledgeTools } from "../tools";
  * harness must hand them to its agent, or leave them out with their word.
  */
 export function fakeKnowledgeTools() {
-	return {
+	const { tools, toolsInstruction } = knowledgeBrief({
+		folder: "/data/knowledge/p1",
+		learnings: false,
 		tools: knowledgeTools(
 			{
 				searchKnowledge: async () => [
@@ -24,6 +26,6 @@ export function fakeKnowledgeTools() {
 			},
 			{ project: { id: "p1" } },
 		),
-		toolsInstruction: KNOWLEDGE_TOOLS_INSTRUCTION,
-	};
+	});
+	return { tools, toolsInstruction };
 }

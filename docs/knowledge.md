@@ -134,6 +134,10 @@ set `knowledge` on the Agent node: `true` gives it always, `false` never,
 and a list of folders gives only those ([Only some folders](#only-some-folders)).
 In the editor, this is the Knowledge section on the Setup tab.
 
+One module holds all of this text: `packages/agents/src/knowledge/brief.ts`.
+The snapshot next to its test shows what each harness gets, in each mode. A
+test checks the quotes in this file against that module.
+
 The agent gets one line next to its prompt, not the files:
 
 > Project knowledge is in `<folder>`. Read INDEX.md there first, then grep
@@ -289,8 +293,12 @@ example `wiki`) and reports how many files it has. `files`, `folder` and
 
 An agent that reads the knowledge may add `learnings` to its step report.
 That is a list of short notes about the project that help the next agent.
-Its report instructions say so in one sentence. The field is optional, so
-an agent with nothing to say reports as before.
+Its report instructions say so in one sentence:
+
+> If you learned something about this project that would help the next
+> agent, add it to `learnings`: a list of short notes. Leave it out otherwise.
+
+The field is optional, so an agent with nothing to say reports as before.
 
 The computer that ran the step keeps them in
 `learnings/proposed/<run id>.<step id>.md`. Each step has its own file, so

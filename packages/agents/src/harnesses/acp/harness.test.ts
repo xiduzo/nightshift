@@ -163,17 +163,6 @@ describe("acpHarness", () => {
 		]);
 	});
 
-	test("knowledge: the line comes before the prompt", async () => {
-		await run({
-			addDirs: ["/data/knowledge/p1"],
-			instructions: "Project knowledge is in /data/knowledge/p1.",
-		});
-		const prompt = entry(await logged(), "prompt")?.text;
-		expect(prompt).toStartWith(
-			"Project knowledge is in /data/knowledge/p1.\n\nRun the tests",
-		);
-	});
-
 	test("the knowledge tools reach the agent over the bridge, with their word", async () => {
 		const events = await run(fakeKnowledgeTools(), {
 			FAKE_ACP_CALLS: JSON.stringify([

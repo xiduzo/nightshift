@@ -132,15 +132,15 @@ export type Knowledge = {
 	 */
 	connect(hosts: KnowledgeHosts): void;
 	/** A Command step starts: the folder, made for it, in `NS_KNOWLEDGE`. */
-	forCommand(request: KnowledgeRequest): Promise<CommandKnowledge>;
+	forCommand(projectId: string): Promise<CommandKnowledge>;
 	/**
 	 * An Agent session starts: the folder in `NS_KNOWLEDGE`, and when it
 	 * has files or the node asks for it, the folder to read with a fresh
-	 * index, the line, the tools and, for a step of a run (`runId`), the
+	 * index, and the session brief with, for a step of a run (`runId`), the
 	 * learnings. The index catches up with the folder from now on, not at
-	 * the first search.
+	 * the first search. It gets nothing when the request asks for nothing.
 	 *
-	 * With `folders`: a view of those folders instead (`view.ts`), even
+	 * With `knowledgeOnly`: a view of those folders instead (`view.ts`), even
 	 * when it is empty. `NS_KNOWLEDGE`, the line and the folder to read
 	 * are the view's, the tools find nothing else, and the session never
 	 * gets the folder's path. Its learnings still go to the folder's

@@ -109,29 +109,6 @@ describe("claudeCodeHarness thinking, subagent text and OTLP headers", () => {
 });
 
 describe("claudeCodeHarness with knowledge", () => {
-	test("the folder goes to --add-dir and the line to --append-system-prompt", async () => {
-		const claudeLog = join(dir, "claude.jsonl");
-		const claude = await fakeBin(dir, "claude", "fake-claude", {
-			FAKE_CLAUDE_LOG: claudeLog,
-		});
-		for await (const _ of claudeCodeHarness({ claudeExecutable: claude }).run(
-			input({
-				addDirs: ["/data/knowledge/p 1"],
-				instructions: "Project knowledge is in /data/knowledge/p 1.",
-			}),
-		)) {
-			// Drain the session.
-		}
-		const run = JSON.parse((await readFile(claudeLog, "utf8")).trim());
-		const argv: string[] = run.argv;
-		expect(argv[argv.indexOf("--add-dir") + 1]).toBe("/data/knowledge/p 1");
-		expect(argv[argv.indexOf("--append-system-prompt") + 1]).toBe(
-			"Project knowledge is in /data/knowledge/p 1.",
-		);
-		// The prompt stays the step's own.
-		expect(run.prompt).not.toContain("Project knowledge");
-	});
-
 	test("the knowledge tools: bridged, allowed without a prompt, and named after the prompt", async () => {
 		const claudeLog = join(dir, "claude.jsonl");
 		const claude = await fakeBin(dir, "claude", "fake-claude", {

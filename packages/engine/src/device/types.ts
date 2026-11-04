@@ -201,66 +201,51 @@ export type SessionInput = Omit<
 	| "scrubEnv"
 	// The Device adds the export's own (`sessionEnv`) itself.
 	| "harnessConfig"
-	// The Device adds Night Shift's own (the knowledge tools) itself.
+	// The Device folds these from what adds to the session (`SessionContribution`).
 	| "tools"
 	| "toolsInstruction"
-	// The assistant's, not a run step's: it runs on this computer only.
-	| "readOnly"
-	// The Device adds the knowledge folder itself (`knowledge`).
 	| "addDirs"
 	| "instructions"
-> & {
-	harness: AgentHarnessName;
-	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
-	prompt: string;
-	/**
-	 * CLI tools by name. The Device runs each with its own login, through
-	 * a launcher it makes for the session (`tool-launchers.ts`).
-	 */
-	clis?: string[];
-	/** Connections by name: the Device expands them with its own secrets. */
-	connections?: string[];
-	/**
-	 * The step the session runs for: the agent keeps artifacts of it with
-	 * `save_artifact`. The Device that runs the session keeps them.
-	 */
-	artifacts?: { runId: string; stepId: string };
-	/**
-	 * The files people added to the answers of the run's Gates. The Device
-	 * writes them where the session may read them, and tells the agent
-	 * where. Needs `artifacts`.
-	 */
-	files?: AnswerFile[];
-	/**
-	 * The project whose knowledge folder the session gets on the Device
-	 * that runs it: in `NS_KNOWLEDGE`, and to read with a line that says
-	 * where, when it has files or `always` (`knowledge/step-knowledge.ts`).
-	 * Absent: the node turned it off (`knowledge: false`).
-	 */
-	knowledge?: Omit<KnowledgeRequest, "folders">;
-	/**
-	 * The node lists folders of the knowledge (`knowledge: [...]`): the
-	 * session gets a copy of those only, in `NS_KNOWLEDGE` and to read, and
-	 * its search and reads find nothing else. A field of its own, not part of
-	 * `knowledge`: a Device that does not know it gives no knowledge, never
-	 * the whole folder.
-	 */
-	knowledgeOnly?: { projectId: string; folders: string[] };
-	/**
-	 * The session runs another Person's step under an Offer of this
-	 * Device. Its secrets read this computer and the environment only,
-	 * never the owner's Personal secrets (ADR 13, decision 5). Only the
-	 * Offer admission on the Device that runs it sets it, after the wire.
-	 */
-	underOffer?: true;
-	/**
-	 * The run the step works for. The Device reads that run's Project
-	 * secrets for it (ADR 13), and the Host that keeps them checks that the
-	 * step runs here. A Device that serves a call over the wire sets it
-	 * from the call's own run, after the wire.
-	 */
-	run?: StepRun;
-};
+	// The assistant's, not a run step's: it runs on this computer only.
+	| "readOnly"
+> &
+	KnowledgeRequest & {
+		harness: AgentHarnessName;
+		/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
+		prompt: string;
+		/**
+		 * CLI tools by name. The Device runs each with its own login, through
+		 * a launcher it makes for the session (`tool-launchers.ts`).
+		 */
+		clis?: string[];
+		/** Connections by name: the Device expands them with its own secrets. */
+		connections?: string[];
+		/**
+		 * The step the session runs for: the agent keeps artifacts of it with
+		 * `save_artifact`. The Device that runs the session keeps them.
+		 */
+		artifacts?: { runId: string; stepId: string };
+		/**
+		 * The files people added to the answers of the run's Gates. The Device
+		 * writes them where the session may read them, and tells the agent
+		 * where. Needs `artifacts`.
+		 */
+		files?: AnswerFile[];
+		/**
+		 * The session runs another Person's step under an Offer of this
+		 * Device. Its secrets read this computer and the environment only,
+		 * never the owner's Personal secrets (ADR 13, decision 5). Only the
+		 * Offer admission on the Device that runs it sets it, after the wire.
+		 */
+		underOffer?: true;
+		/**
+		 * The run the step works for. The Device reads that run's Project
+		 * secrets for it (ADR 13), and the Host that keeps them checks that the
+		 * step runs here. A Device that serves a call over the wire sets it
+		 * from the call's own run, after the wire.
+		 */
+		run?: StepRun;
+	};
 
 /**
  * A session of an Agent Profile the Device offers to the run's Space (an

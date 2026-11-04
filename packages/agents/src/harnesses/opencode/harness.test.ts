@@ -438,27 +438,6 @@ describe("opencodeHarness", () => {
 		expect(line?.config.permission["docs_*"]).toBe("allow");
 	});
 
-	test("knowledge: the folder is allowed, the line comes before the prompt", async () => {
-		const { log, harness } = await fakeOpencode();
-		await collect(
-			harness.run(
-				input({
-					addDirs: ["/data/knowledge/p1"],
-					instructions: "Project knowledge is in /data/knowledge/p1.",
-				}),
-			),
-		);
-		const [line] = await readLog(log);
-		expect(line?.config.permission.external_directory).toEqual({
-			"*": "deny",
-			"/data/knowledge/p1": "allow",
-			"/data/knowledge/p1/*": "allow",
-		});
-		expect(line?.prompt).toStartWith(
-			"Project knowledge is in /data/knowledge/p1.\n\n",
-		);
-	});
-
 	test("resume continues a known session with the follow-up only", async () => {
 		const { log, harness } = await fakeOpencode({
 			FAKE_OPENCODE_SESSIONS: "ses_old",

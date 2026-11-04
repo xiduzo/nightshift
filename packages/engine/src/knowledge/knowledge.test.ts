@@ -92,7 +92,7 @@ describe("the size of the knowledge documents", () => {
 			usage: { note: (moment) => moments.push(moment) },
 		});
 		await a.put("wiki/Home.md", "# Home\n");
-		await (await a.knowledge.forCommand({ projectId: "p1" })).done();
+		await (await a.knowledge.forCommand("p1")).done();
 
 		await waitFor(() => moments.length > 0);
 		expect(moments[0]).toEqual({
@@ -114,7 +114,7 @@ describe("a step's knowledge", () => {
 	// keeps one `KnowledgeFolderLocks` across the reload.
 	test("a Knowledge made beside a running step leaves its folder alone", async () => {
 		const a = await device(memoryHost());
-		const step = await a.knowledge.forCommand({ projectId: "p1" });
+		const step = await a.knowledge.forCommand("p1");
 		await a.put("wiki/Page.md", "# Pa");
 
 		const reloaded = testKnowledge(a.sandbox, {
@@ -137,7 +137,7 @@ describe("a step's knowledge", () => {
 			timers: { firstReconcileMs: 1, retryMs: 1 },
 		});
 		await a.put("wiki/Home.md", "# Home\n");
-		const sync = await a.knowledge.forCommand({ projectId: "p1" });
+		const sync = await a.knowledge.forCommand("p1");
 		expect(sync.env).toEqual({ NS_KNOWLEDGE: a.dir });
 		// The reconcile before the step published what was there.
 		expect(await a.paths()).toEqual(["wiki/Home.md"]);
@@ -153,7 +153,9 @@ describe("a step's knowledge", () => {
 
 		// An agent of another run shares the folder: the first to end does
 		// not reconcile, the last one does.
-		const agent = await a.knowledge.forSession({ projectId: "p1" });
+		const agent = await a.knowledge.forSession({
+			knowledge: { projectId: "p1" },
+		});
 		await sync.done();
 		expect(await a.paths()).toEqual(["wiki/Home.md"]);
 		await a.put("wiki/Page.md", "# Page\n");
@@ -176,13 +178,13 @@ describe("a step's knowledge", () => {
 			encodeStateAsUpdate((await a.persisted("p1")).doc),
 		);
 		const session = await b.knowledge.forSession(
-			{ projectId: "p1", always: true },
-			{ runId: "run-2", stepReport: true },
+			{ knowledge: { projectId: "p1", always: true } },
+			{ runId: "run-2" },
 		);
 		await session.done();
-		expect(session.input.addDirs).toEqual([b.dir]);
-		expect(session.input.stepReport).toEqual({ learnings: true });
-		const read = session.input.tools?.find(
+		expect(session.contribution.addDirs).toEqual([b.dir]);
+		expect(session.contribution.report).toEqual({ learnings: true });
+		const read = session.contribution.tools?.find(
 			(tool) => tool.name === "read_knowledge",
 		);
 		const call = async (path: string) =>
@@ -208,11 +210,11 @@ describe("a step's knowledge", () => {
 		const a = await device(memoryHost());
 		await a.put("wiki/deploy.md", "# Deploy\n\nWe deploy at night.\n");
 		const session = await a.knowledge.forSession(
-			{ projectId: "p1" },
+			{ knowledge: { projectId: "p1" } },
 			{ runId: "run-1" },
 		);
 		const tool = (name: string) =>
-			session.input.tools?.find((t) => t.name === name);
+			session.contribution.tools?.find((t) => t.name === name);
 		async function* harness(): AsyncGenerator<AgentEvent> {
 			await tool("search_knowledge")?.execute?.({ query: "deploy" });
 			await tool("read_knowledge")?.execute?.({ path: "wiki/deploy.md" });
@@ -288,7 +290,7 @@ describe("a Host of an older version", () => {
 		expect(calls).toBe(1);
 
 		await a.put("wiki/Next.md", "# Next\n");
-		const step = await a.knowledge.forCommand({ projectId: "p1" });
+		const step = await a.knowledge.forCommand("p1");
 		await step.done();
 		expect(calls).toBe(1);
 		expect(await a.paths()).toContain("wiki/Next.md");
@@ -334,19 +336,24 @@ describe("a node that lists folders of the knowledge", () => {
 	test("gets a copy of those folders only, with its own index, in NS_KNOWLEDGE and to read", async () => {
 		const a = await lab();
 		const session = await a.knowledge.forSession(
-			{ projectId: "p1", folders: ["books", "research/papers"] },
-			{ runId: "run-1", stepId: "s1", stepReport: true },
+			{
+				knowledgeOnly: {
+					projectId: "p1",
+					folders: ["books", "research/papers"],
+				},
+			},
+			{ runId: "run-1", stepId: "s1" },
 		);
-		const view = session.env.NS_KNOWLEDGE as string;
+		const view = session.contribution.env?.NS_KNOWLEDGE as string;
 		expect(view).toBeString();
 		// Outside the knowledge folders, where no reconcile looks.
 		expect(view.startsWith(join(a.sandbox.dataDir, "knowledge"))).toBe(false);
-		expect(session.input.addDirs).toEqual([view]);
-		expect(session.input.instructions).toContain(view);
-		expect(session.input.instructions).not.toContain(a.dir);
-		expect(JSON.stringify(session.input)).not.toContain(a.dir);
+		expect(session.contribution.addDirs).toEqual([view]);
+		expect(session.contribution.instructions).toContain(view);
+		expect(session.contribution.instructions).not.toContain(a.dir);
+		expect(JSON.stringify(session.contribution)).not.toContain(a.dir);
 		// The learnings stay on: proposals go to the real folder.
-		expect(session.input.stepReport).toEqual({ learnings: true });
+		expect(session.contribution.report).toEqual({ learnings: true });
 		expect(await filesUnder(view)).toEqual([
 			"INDEX.md",
 			"books/graham.md",
@@ -364,11 +371,16 @@ describe("a node that lists folders of the knowledge", () => {
 	test("searches and reads nothing outside them", async () => {
 		const a = await lab();
 		const session = await a.knowledge.forSession(
-			{ projectId: "p1", folders: ["books", "research/papers"] },
+			{
+				knowledgeOnly: {
+					projectId: "p1",
+					folders: ["books", "research/papers"],
+				},
+			},
 			{ runId: "run-1", stepId: "s1" },
 		);
 		const tool = (name: string) =>
-			session.input.tools?.find((t) => t.name === name);
+			session.contribution.tools?.find((t) => t.name === name);
 		const search = async (query: string) =>
 			String(await tool("search_knowledge")?.execute?.({ query }));
 		const read = async (path: string) =>
@@ -398,10 +410,10 @@ describe("a node that lists folders of the knowledge", () => {
 	test("gets the kept learnings only when it lists them, and its proposals still go to the knowledge", async () => {
 		const a = await lab();
 		const session = await a.knowledge.forSession(
-			{ projectId: "p1", folders: ["learnings/accepted"] },
-			{ runId: "run-1", stepId: "s1", stepReport: true },
+			{ knowledgeOnly: { projectId: "p1", folders: ["learnings/accepted"] } },
+			{ runId: "run-1", stepId: "s1" },
 		);
-		const view = session.env.NS_KNOWLEDGE as string;
+		const view = session.contribution.env?.NS_KNOWLEDGE as string;
 		expect(await filesUnder(view)).toEqual([
 			"INDEX.md",
 			"learnings/accepted/costs.md",
@@ -419,10 +431,12 @@ describe("a node that lists folders of the knowledge", () => {
 		const a = await lab();
 		const before = await a.paths();
 		const session = await a.knowledge.forSession(
-			{ projectId: "p1", folders: ["books", "nothing/here"] },
+			{
+				knowledgeOnly: { projectId: "p1", folders: ["books", "nothing/here"] },
+			},
 			{ runId: "run-1", stepId: "s1" },
 		);
-		const view = session.env.NS_KNOWLEDGE as string;
+		const view = session.contribution.env?.NS_KNOWLEDGE as string;
 		// The agent writes in its copy.
 		await writeFile(join(view, "books/graham.md"), "# Changed\n");
 		await writeFile(join(view, "books/new.md"), "# New\n");
@@ -438,10 +452,10 @@ describe("a node that lists folders of the knowledge", () => {
 	test("an empty view is still a view: never the whole folder", async () => {
 		const a = await lab();
 		const session = await a.knowledge.forSession(
-			{ projectId: "p1", folders: ["nothing/here"] },
+			{ knowledgeOnly: { projectId: "p1", folders: ["nothing/here"] } },
 			{ runId: "run-1" },
 		);
-		const view = session.env.NS_KNOWLEDGE as string;
+		const view = session.contribution.env?.NS_KNOWLEDGE as string;
 		expect(view).not.toBe(a.dir);
 		expect(await filesUnder(view)).toEqual(["INDEX.md"]);
 		expect(await readFile(join(view, "INDEX.md"), "utf8")).toContain(
@@ -452,9 +466,11 @@ describe("a node that lists folders of the knowledge", () => {
 
 	test("without a list, the agent gets the whole folder as before", async () => {
 		const a = await lab();
-		const session = await a.knowledge.forSession({ projectId: "p1" });
-		expect(session.env).toEqual({ NS_KNOWLEDGE: a.dir });
-		expect(session.input.addDirs).toEqual([a.dir]);
+		const session = await a.knowledge.forSession({
+			knowledge: { projectId: "p1" },
+		});
+		expect(session.contribution.env).toEqual({ NS_KNOWLEDGE: a.dir });
+		expect(session.contribution.addDirs).toEqual([a.dir]);
 		await session.done();
 	});
 });
@@ -490,10 +506,15 @@ describe("the learnings of a run", () => {
 		const step = (stepId: string) => ({
 			runId: "run-1",
 			stepId,
-			stepReport: true as const,
 		});
-		const onA = await a.knowledge.forSession({ projectId: "p1" }, step("s1"));
-		const onB = await b.knowledge.forSession({ projectId: "p1" }, step("s2"));
+		const onA = await a.knowledge.forSession(
+			{ knowledge: { projectId: "p1" } },
+			step("s1"),
+		);
+		const onB = await b.knowledge.forSession(
+			{ knowledge: { projectId: "p1" } },
+			step("s2"),
+		);
 		for await (const _ of onA.events(reporting(["Use bun."]))) {
 		}
 		for await (const _ of onB.events(
@@ -522,14 +543,13 @@ describe("the learnings of a run", () => {
 		const step = (stepId: string) => ({
 			runId: "run-1",
 			stepId,
-			stepReport: true as const,
 		});
 		for (const [stepId, notes] of [
 			["s1", ["Use bun.", "Tests  run\n with bun test."]],
 			["s2", ["The API is in packages/api."]],
 		] as const) {
 			const session = await a.knowledge.forSession(
-				{ projectId: "p1", always: true },
+				{ knowledge: { projectId: "p1", always: true } },
 				step(stepId),
 			);
 			for await (const _ of session.events(reporting([...notes]))) {

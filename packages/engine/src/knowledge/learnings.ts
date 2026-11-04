@@ -1,6 +1,6 @@
 import { appendFile, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
+import type { AgentEvent } from "@nightshift/agents/types";
 import {
 	PROPOSED_LEARNINGS_DIR,
 	proposedLearningFileName,
@@ -83,19 +83,6 @@ export async function proposeLearnings(
 		file,
 		`${head}${lines.map((line) => `- ${line}`).join("\n")}\n`,
 	);
-}
-
-/**
- * The step report of an agent that reads the knowledge: it may add
- * `learnings`. A session without a report stays without one.
- */
-export function withLearnings(
-	stepReport: AgentSessionInput["stepReport"],
-): AgentSessionInput["stepReport"] {
-	if (!stepReport) return stepReport;
-	return stepReport === true
-		? { learnings: true }
-		: { ...stepReport, learnings: true };
 }
 
 /**

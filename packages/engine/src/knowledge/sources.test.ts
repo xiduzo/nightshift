@@ -399,7 +399,7 @@ describe("remove", () => {
 			sources().remove(projectId, one.name, { files: true }, member),
 		).rejects.toThrow("Only the owner of this computer");
 		// A run writes the knowledge now.
-		const step = await built.knowledge.forCommand({ projectId });
+		const step = await built.knowledge.forCommand(projectId);
 		await expect(
 			sources().remove(projectId, one.name, { files: true }, owner),
 		).rejects.toThrow("A run is changing this knowledge now");

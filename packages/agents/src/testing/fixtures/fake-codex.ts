@@ -2,8 +2,9 @@
  * A fake `codex` for tests: `codex exec --experimental-json … [resume <id>]`
  * with the prompt on stdin. Never talks to OpenAI.
  *
- * It appends `{ argv, prompt, config }` as one JSON line to `$FAKE_CODEX_LOG`
- * (`config`: the `--config key=value` pairs), then prints JSONL thread
+ * It appends `{ argv, prompt, config, tools }` as one JSON line to
+ * `$FAKE_CODEX_LOG` (`config`: the `--config key=value` pairs; `tools`: the
+ * bridge's `tools/list`, when the session has a bridge), then prints JSONL thread
  * events: `thread.started` (fresh threads only: id `fake-thread`), then for
  * each entry of the JSON array `$FAKE_CODEX_CALLS` an `mcp_tool_call` item on
  * the `tanstack` server around a real MCP `tools/call` to the bridge from
@@ -34,9 +35,6 @@ for (let i = 0; i < argv.length; i++) {
 const resumeAt = argv.indexOf("resume");
 const resumed = resumeAt >= 0 ? argv[resumeAt + 1] : undefined;
 
-const log = process.env.FAKE_CODEX_LOG;
-if (log) appendFileSync(log, `${JSON.stringify({ argv, prompt, config })}\n`);
-
 const print = (event: unknown) =>
 	process.stdout.write(`${JSON.stringify(event)}\n`);
 
@@ -51,7 +49,8 @@ function bridge(): { url: string; headers: Record<string, string> } {
 	return { url, headers };
 }
 
-async function callTool(call: Call): Promise<{ text: string; ok: boolean }> {
+/** One JSON-RPC call to the bridge, its answer as JSON or as an SSE stream. */
+async function rpc(method: string, params: unknown) {
 	const { url, headers } = bridge();
 	const response = await fetch(url, {
 		method: "POST",
@@ -63,8 +62,8 @@ async function callTool(call: Call): Promise<{ text: string; ok: boolean }> {
 		body: JSON.stringify({
 			jsonrpc: "2.0",
 			id: 1,
-			method: "tools/call",
-			params: { name: call.name, arguments: call.arguments },
+			method,
+			params,
 		}),
 	});
 	const body = await response.text();
@@ -79,7 +78,22 @@ async function callTool(call: Call): Promise<{ text: string; ok: boolean }> {
 				.map((line) => line.slice(5).trim())
 				.at(-1)
 		: body;
-	const message = JSON.parse(data ?? "{}");
+	return JSON.parse(data ?? "{}");
+}
+
+const tools = config["mcp_servers.tanstack.url"]
+	? ((await rpc("tools/list", {})).result?.tools ?? [])
+	: undefined;
+const log = process.env.FAKE_CODEX_LOG;
+if (log) {
+	appendFileSync(log, `${JSON.stringify({ argv, prompt, config, tools })}\n`);
+}
+
+async function callTool(call: Call): Promise<{ text: string; ok: boolean }> {
+	const message = await rpc("tools/call", {
+		name: call.name,
+		arguments: call.arguments,
+	});
 	if (message.error) return { text: message.error.message, ok: false };
 	const text = (message.result?.content ?? [])
 		.map((part: { text?: string }) => part.text ?? "")

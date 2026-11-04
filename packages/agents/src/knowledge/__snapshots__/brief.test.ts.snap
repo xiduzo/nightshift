@@ -1,0 +1,331 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`what an agent is told about the knowledge Claude Code, auto mode 1`] = `
+{
+  "folder": {
+    "--add-dir": "/data/knowledge/p1",
+  },
+  "prompt": 
+"Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "system": "Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.",
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge Claude Code, plan mode 1`] = `
+{
+  "folder": {
+    "--add-dir": "/data/knowledge/p1",
+  },
+  "prompt": 
+"Run the tests
+
+When you are done, end your final message with exactly one line in this format:
+NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "One or two sentences about the result."}
+Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something.
+If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise. Put it on that same line: "learnings": ["…"]."
+,
+  "system": "Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.",
+  "tools": [],
+}
+`;
+
+exports[`what an agent is told about the knowledge Codex, auto mode 1`] = `
+{
+  "folder": {
+    "--add-dir": null,
+  },
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge Codex, plan mode 1`] = `
+{
+  "folder": {
+    "--add-dir": null,
+  },
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge OpenCode, auto mode 1`] = `
+{
+  "folder": {
+    "*": "deny",
+    "/data/knowledge/p1": "allow",
+    "/data/knowledge/p1/*": "allow",
+  },
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge OpenCode, plan mode 1`] = `
+{
+  "folder": {
+    "*": "deny",
+    "/data/knowledge/p1": "allow",
+    "/data/knowledge/p1/*": "allow",
+  },
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge Grok Build, auto mode 1`] = `
+{
+  "folder": "reads any folder",
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, end your final message with exactly one line in this format:
+NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "One or two sentences about the result."}
+Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something.
+If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise. Put it on that same line: "learnings": ["…"]."
+,
+  "tools": [],
+}
+`;
+
+exports[`what an agent is told about the knowledge Grok Build, plan mode 1`] = `
+{
+  "folder": "reads any folder",
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, end your final message with exactly one line in this format:
+NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "One or two sentences about the result."}
+Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something.
+If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise. Put it on that same line: "learnings": ["…"]."
+,
+  "tools": [],
+}
+`;
+
+exports[`what an agent is told about the knowledge an ACP agent (Copilot), auto mode 1`] = `
+{
+  "folder": "reads any folder",
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge an ACP agent (Copilot), plan mode 1`] = `
+{
+  "folder": "reads any folder",
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, call the \`report_step\` tool exactly once, as your last action. Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something. Put a one or two sentence summary of the result in \`summary\`. If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise.
+
+To find something in the project knowledge, call \`search_knowledge\` with a few keywords or a question. It finds sections of files by their words, and by their meaning when this computer can. PDF and Word files too. Then read a file it gives with \`read_knowledge\`: give the hit's section, page or line to read from there."
+,
+  "tools": [
+    "report_step",
+    "search_knowledge",
+    "read_knowledge",
+  ],
+}
+`;
+
+exports[`what an agent is told about the knowledge pi, auto mode 1`] = `
+{
+  "folder": "reads any folder",
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, end your final message with exactly one line in this format:
+NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "One or two sentences about the result."}
+Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something.
+If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise. Put it on that same line: "learnings": ["…"]."
+,
+  "tools": [],
+}
+`;
+
+exports[`what an agent is told about the knowledge pi, plan mode 1`] = `
+{
+  "folder": "reads any folder",
+  "prompt": 
+"Project knowledge is in /data/knowledge/p1. Read INDEX.md there first, then grep the folder for what you need. Do not change the folder.
+
+Run the tests
+
+When you are done, end your final message with exactly one line in this format:
+NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "One or two sentences about the result."}
+Use outcome "pass" when the task is done, "fail" when it is not, and "needs-input" when you need a person to decide or provide something.
+If you learned something about this project that would help the next agent, add it to \`learnings\`: a list of short notes. Leave it out otherwise. Put it on that same line: "learnings": ["…"]."
+,
+  "tools": [],
+}
+`;
+
+exports[`what an agent is told about the knowledge the tools and the report field, as a harness offers them 1`] = `
+{
+  "env": {
+    "NS_KNOWLEDGE": "/data/knowledge/p1",
+  },
+  "indexIntro": "Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. PDF and Word files too. Under the line of a large markdown file: its headings. Read a file, or grep the folder, for more.",
+  "report": {
+    "additionalProperties": false,
+    "properties": {
+      "learnings": {
+        "description": "Optional. Short notes about this project that would help the next agent. Leave it out when you have none.",
+        "items": {
+          "type": "string",
+        },
+        "maxItems": 10,
+        "type": "array",
+      },
+      "outcome": {
+        "description": ""pass": the task is done. "fail": it is not. "needs-input": a person must decide or provide something.",
+        "enum": [
+          "pass",
+          "fail",
+          "needs-input",
+        ],
+        "type": "string",
+      },
+      "summary": {
+        "description": "One or two sentences about the result.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "outcome",
+      "summary",
+    ],
+    "type": "object",
+  },
+  "terminal": "search_knowledge finds files in the project's knowledge by keyword, and by meaning when this computer can: the wiki, pages and notes besides the code. read_knowledge reads one of them, and each file is a resource too. The tools work in the project of the folder you work in, or the one you name in \`project\` (list_projects).",
+  "tools": [
+    {
+      "description": "Search the project's knowledge: the files besides the code that agents read, such as a wiki, web pages, work items, PDF and Word files. It finds by keyword, and also by meaning when this computer can, so a question in other words finds an answer too. Returns the best files first, each with its path, title, the section (its heading and line, and page for a PDF) and an excerpt with the words found in bold. Every word must match, else some of them. Keep a phrase together in quotes. End a word with * to match its start. Read a file with read_knowledge: give it the hit's section, page or line to read from there.",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "description": "At most this many files. Default 10, at most 50.",
+            "type": "number",
+          },
+          "query": {
+            "description": "The words to look for. Example: deploy "release notes" config*",
+            "type": "string",
+          },
+        },
+        "required": [
+          "query",
+        ],
+        "type": "object",
+      },
+      "name": "search_knowledge",
+    },
+    {
+      "description": "Read one file of the project's knowledge by its path, as search_knowledge gives it. Returns its text, at most 100 KB: from the start, or from the section, page or line of a search hit when you give them. For a PDF or Word file, the text in it.",
+      "inputSchema": {
+        "properties": {
+          "line": {
+            "description": "Start at this line, from search_knowledge: of the file, or of the page you give.",
+            "type": "number",
+          },
+          "page": {
+            "description": "Start at this page of a PDF, from search_knowledge.",
+            "type": "number",
+          },
+          "path": {
+            "description": "The file's path in the knowledge, from search_knowledge. Example: wiki/Home.md",
+            "type": "string",
+          },
+          "section": {
+            "description": "Start at this section: its heading, as search_knowledge gives it. Example: Rolling updates",
+            "type": "string",
+          },
+        },
+        "required": [
+          "path",
+        ],
+        "type": "object",
+      },
+      "name": "read_knowledge",
+    },
+  ],
+}
+`;

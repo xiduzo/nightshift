@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
+import { KNOWLEDGE_INDEX_INTRO } from "@nightshift/agents/tools";
 import {
 	isHiddenFromReaders,
 	KNOWLEDGE_INDEX_FILE,
@@ -111,13 +112,6 @@ const MAX_FILES = 20_000;
 const HEAD_BYTES = 4096;
 /** The files whose text the index reads, besides PDF and Word files. Any other file shows its name only. */
 export const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
-/**
- * The first line of the index's text: an index without it is written again.
- * Change it when the format of the lines changes, so each computer writes its
- * index again.
- */
-const INDEX_INTRO =
-	"Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. PDF and Word files too. Under the line of a large markdown file: its headings. Read a file, or grep the folder, for more.";
 /**
  * The markdown files whose headings the index shows: the largest ones, where
  * structure helps most. An agent reads the index first, so it stays small:
@@ -250,7 +244,7 @@ export async function indexFolder(dir: string): Promise<KnowledgeFile[]> {
 	const stale =
 		written === null ||
 		newest > written.mtimeMs ||
-		!text.includes(INDEX_INTRO) ||
+		!text.includes(KNOWLEDGE_INDEX_INTRO) ||
 		!samePaths(indexedPaths(text), files);
 	if (stale) await writeWhole(indexPath, await indexText(dir, files));
 	return files;
@@ -341,7 +335,7 @@ async function indexText(
 	return [
 		"# Knowledge index",
 		"",
-		INDEX_INTRO,
+		KNOWLEDGE_INDEX_INTRO,
 		"",
 		...(lines.length > 0 ? lines : ["No files yet."]),
 		"",

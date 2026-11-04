@@ -24,6 +24,7 @@
  * result says it was refused (`isRefusedReport`).
  */
 import { toolDefinition } from "@tanstack/ai";
+import { LEARNINGS_FIELD_DESCRIPTION, LEARNINGS_RULE } from "../knowledge";
 import type {
 	AgentSessionInput,
 	StepReportOutcome,
@@ -64,10 +65,6 @@ const DEFAULT_OUTCOME_DESCRIPTION =
 
 const SUMMARY_RULE =
 	"Put a one or two sentence summary of the result in `summary`.";
-
-/** One sentence, only for an agent that may propose learnings. */
-const LEARNINGS_RULE =
-	"If you learned something about this project that would help the next agent, add it to `learnings`: a list of short notes. Leave it out otherwise.";
 
 /** The most notes one report proposes, and the longest note. */
 const MAX_LEARNINGS = 10;
@@ -400,8 +397,7 @@ export function reportInputSchema(rules: ReportRules): Record<string, unknown> {
 						type: "array",
 						items: { type: "string" },
 						maxItems: MAX_LEARNINGS,
-						description:
-							"Optional. Short notes about this project that would help the next agent. Leave it out when you have none.",
+						description: LEARNINGS_FIELD_DESCRIPTION,
 					},
 				}
 			: {}),

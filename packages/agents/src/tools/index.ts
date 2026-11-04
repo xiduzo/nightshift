@@ -3,21 +3,24 @@
  * client, and the Connections page's test) and CLI tools (programs on this
  * computer, with their help), and Night Shift's own knowledge tools.
  */
+
+export {
+	KNOWLEDGE_INDEX_INTRO,
+	type KnowledgePort,
+	type KnowledgeReadFrom,
+	type KnowledgeUse,
+	type KnowledgeUseHit,
+	knowledgeBrief,
+	knowledgeEnv,
+	knowledgeTools,
+	useHit,
+} from "../knowledge";
 export {
 	type CliToolCheck,
 	checkCli,
 	cliHelp,
 	pathPrograms,
 } from "./cli-tools";
-export {
-	KNOWLEDGE_TOOLS_INSTRUCTION,
-	type KnowledgePort,
-	type KnowledgeReadFrom,
-	type KnowledgeUse,
-	type KnowledgeUseHit,
-	knowledgeTools,
-	useHit,
-} from "./knowledge";
 export {
 	callMcpTool,
 	MCP_TIMEOUT_MS,
