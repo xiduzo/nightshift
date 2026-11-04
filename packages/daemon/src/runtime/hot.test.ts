@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hotSlots } from "./hot";
+import { hotSlots, stopOlderKnowledge } from "./hot";
 
 /**
  * `bun --hot` makes the daemon again on each reload, in the same process:
@@ -41,6 +41,47 @@ async function start(registry: Registry, id: number, log: string[] = []) {
 	registry.handover ??= { released: 0 };
 	return { slots, document, worker };
 }
+
+describe("the knowledge a daemon of an older version kept", () => {
+	test("stops: its search closes and its timers end", async () => {
+		const log: string[] = [];
+		const timer = (name: string) =>
+			setTimeout(() => log.push(name), 1) as unknown as Timer;
+		const registry = {
+			nightshiftKnowledgeSearch: { close: () => log.push("search closed") },
+			nightshiftKnowledgeTimers: {
+				first: timer("first"),
+				retry: timer("retry"),
+				firstCollect: timer("firstCollect"),
+				collect: timer("collect"),
+			},
+		};
+
+		stopOlderKnowledge(registry);
+		await Bun.sleep(5);
+
+		expect(log).toEqual(["search closed"]);
+		expect(registry.nightshiftKnowledgeSearch).toBeUndefined();
+		expect(registry.nightshiftKnowledgeTimers).toBeUndefined();
+	});
+
+	test("a search that does not close does not stop the daemon, and nothing kept is nothing to do", () => {
+		const errors = console.error;
+		console.error = () => {};
+		try {
+			stopOlderKnowledge({
+				nightshiftKnowledgeSearch: {
+					close() {
+						throw new Error("stuck");
+					},
+				},
+			});
+		} finally {
+			console.error = errors;
+		}
+		stopOlderKnowledge({});
+	});
+});
 
 describe("the slots of a daemon across reloads", () => {
 	test("a reload keeps a kept slot, and stops the one before of a replaced slot first", async () => {

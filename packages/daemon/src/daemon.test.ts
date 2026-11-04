@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { daemonLease, project as projectTable } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
+import type { Knowledge } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
@@ -164,6 +165,7 @@ describe("the daemon, wired in one process", () => {
 		expect(hot.nightshiftDevices).toBeUndefined();
 		expect(hot.nightshiftScheduler).toBeUndefined();
 		expect(hot.nightshiftSync).toBeUndefined();
+		expect(hot.nightshiftKnowledge).toBeUndefined();
 		const db = processDatabase(first.info.databaseUrl);
 		const [row] = await db.select().from(daemonLease);
 		expect(row?.owner).toBeNull();
@@ -172,6 +174,23 @@ describe("the daemon, wired in one process", () => {
 		expect(next.info.lease.epoch).toBeGreaterThan(firstLease);
 		expect(hot.nightshiftDocuments).not.toBe(documents);
 		expect((await call(next, "/health"))?.status).toBe(200);
+	});
+
+	test("a reload makes its own knowledge, and the one before closes", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const env = envIn(dir);
+		const first = await start(env);
+		const before = hot.nightshiftKnowledge as Knowledge;
+		const closed = spyOn(before, "close");
+
+		// As `bun --hot` does: a new daemon in this process, and nothing stopped.
+		const reloaded = await start(env);
+		started.splice(started.indexOf(first), 1);
+
+		expect(closed).toHaveBeenCalledTimes(1);
+		expect(hot.nightshiftKnowledge).toBeDefined();
+		expect(hot.nightshiftKnowledge).not.toBe(before);
+		expect(await rpc<unknown[]>(reloaded, "knowledge/learnings")).toEqual([]);
 	});
 
 	test("pairs with a Host in memory: the Host walks a run it starts, and its stop is clean", async () => {

@@ -222,7 +222,7 @@ Night Shift then:
   (`knowledge-web-pages`, then `knowledge-web-pages-2`). A source is that
   flow ([ADR 4](adr/0004-knowledge-belongs-to-the-space.md), decision 6):
   no other store holds it. The engine module `knowledgeSources`
-  (`packages/engine/src/knowledge-sources`) owns every rule of a source:
+  (`packages/engine/src/knowledge/sources.ts`) owns every rule of a source:
   the API only checks who asks.
 - gives each source its own folder in the knowledge: the kit's folder, or
   `web-2` when another flow fills `web`. A sync replaces its folder, so two
@@ -569,6 +569,25 @@ floor still holds: with this path, the lowest right file in a top 5 is at
 The Knowledge page warns above 2 000 files. Nothing loads the folder into
 a prompt, but an agent finds less in that much text. Sync only what your
 agents need.
+
+## The module
+
+`createKnowledge` in `packages/engine/src/knowledge` is the one door to all
+of the above. It builds the document view, the search and the reconcile
+inside, and returns one interface (`Knowledge`). A step's Device, the API
+and the daemon use only that interface. The API checks who asks and carries
+the answer.
+
+The daemon makes one `Knowledge` per start. `connect` is its one late
+binding, because the devices runtime is made after it. The timers run from
+`connect` on: every folder after 15 seconds, the retries each minute, and
+the collection of old content each day. `close` ends them.
+
+A `bun --hot` reload replaces the whole `Knowledge`, and only what is on disk
+stays. `close` stops the timers and the preparation of vectors, and closes
+the index file. The next search opens the file again. Sections that did not
+change are not embedded again. A session that outlives the reload still
+searches, on its own connection to the index, and prepares nothing.
 
 ## Known gaps (phase 1)
 
