@@ -1,20 +1,19 @@
 import { readFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
+import { BaseDocumentLoader } from "@langchain/core/document_loaders/base";
 import { Document } from "@langchain/core/documents";
 
 /**
  * The text of a PDF or Word file in the knowledge, so search finds its
  * words, `read_knowledge` reads it, and `INDEX.md` gives its title.
  *
- * LangChain's document loaders read them: `PDFLoader` a PDF, `DocxLoader`
- * a Word file (it calls `mammoth`). Each gives LangChain `Document`s, so a
- * text splitter or vector store takes them as they are. The loaders load
- * on the first document, not when Night Shift starts.
- *
- * `PDFLoader` by default imports the old PDF.js of `pdf-parse` through a
- * path in a variable. `bun build --compile` cannot see that import, so the
- * `nightshift` binary would not find it, and that PDF.js is old. So we give
- * the loader the current PDF.js of `unpdf` (no native parts) instead.
+ * `PdfLoader` and `DocxLoader` read them. They are LangChain document loaders,
+ * so a text splitter or vector store takes their `Document`s as they are. They
+ * live here because the loaders of `@langchain/community` are at their end: that
+ * package is sunset, its repository is archived, and it brings a vendor SDK with
+ * it. Both call a maintained library with no native parts, `unpdf` and `mammoth`,
+ * which `bun build --compile` can carry in the `nightshift` binary. The libraries
+ * load on the first document, not when Night Shift starts.
  *
  * A file over 10 MB is not read: it stays on the Device that has it (ADR 4)
  * and its text could hold a lot of memory. It shows by its name only. So
@@ -36,9 +35,9 @@ export const isDocument = (path: string) =>
 
 /**
  * What a document's `Document`s carry. `source` is the path that was
- * loaded. A PDF gives one `Document` per page with text, with `loc` and
- * `pdf` as `PDFLoader` sets them. `title` is the title the PDF itself
- * gives, when it gives one. A Word file gives one `Document`.
+ * loaded. A PDF gives one `Document` per page with text, with its page
+ * number in `loc`. `title` is the title the PDF itself gives, when it gives
+ * one. A Word file gives one `Document`.
  */
 export type DocumentMetadata = {
 	source: string;
@@ -83,43 +82,93 @@ function pdfTitle(info: unknown): string | undefined {
 		: clean;
 }
 
-async function loadPdf(blob: Blob): Promise<Document[]> {
-	const [{ PDFLoader }, { getResolvedPDFJS }] = await Promise.all([
-		import("@langchain/community/document_loaders/fs/pdf"),
-		import("unpdf"),
-	]);
-	const { getDocument, version } = await getResolvedPDFJS();
-	// The loader does not free the document it opens. We keep its task and
-	// free it (and its worker) when the loader is done.
-	const tasks: { destroy(): Promise<void> }[] = [];
-	const pdfjs = async () => ({
-		isV2: false as const,
-		version,
-		getDocument: (params: Parameters<typeof getDocument>[0]) => {
+/**
+ * A page's text: a new line where the next piece of text sits at another
+ * height, nothing between pieces at the same height.
+ */
+function pageText(items: readonly object[]): string {
+	let lastY: unknown;
+	let text = "";
+	for (const item of items) {
+		if (!("str" in item) || !("transform" in item)) continue;
+		const y = (item.transform as unknown[])[5];
+		text += lastY === y || !lastY ? item.str : `\n${item.str}`;
+		lastY = y;
+	}
+	return text;
+}
+
+/** A PDF as one `Document` per page with text, by the PDF.js of `unpdf`. */
+class PdfLoader extends BaseDocumentLoader {
+	constructor(
+		private readonly content: Uint8Array,
+		private readonly source: string,
+	) {
+		super();
+	}
+
+	async load(): Promise<Document<DocumentMetadata>[]> {
+		const { getResolvedPDFJS } = await import("unpdf");
+		const { getDocument } = await getResolvedPDFJS();
+		const task = getDocument({
+			data: this.content,
+			useWorkerFetch: false,
+			useSystemFonts: true,
 			// Errors only: a broken file is not news in the log.
-			const task = getDocument({
-				...(params as object),
-				verbosity: 0,
-			});
-			tasks.push(task);
-			return task;
-		},
-	});
-	try {
-		const pages = await new PDFLoader(blob, { pdfjs }).load();
-		const title = pdfTitle(pages[0]?.metadata.pdf?.info);
-		if (title) for (const page of pages) page.metadata.title = title;
-		return pages;
-	} finally {
-		await Promise.all(tasks.map((task) => task.destroy().catch(() => {})));
+			verbosity: 0,
+		});
+		try {
+			const pdf = await task.promise;
+			const info = (await pdf.getMetadata().catch(() => null))?.info;
+			const title = pdfTitle(info);
+			const pages: Document<DocumentMetadata>[] = [];
+			for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+				const page = await pdf.getPage(pageNumber);
+				const { items } = await page.getTextContent();
+				if (items.length === 0) continue;
+				pages.push(
+					new Document<DocumentMetadata>({
+						pageContent: pageText(items),
+						metadata: {
+							source: this.source,
+							...(title ? { title } : {}),
+							pdf: { info, totalPages: pdf.numPages },
+							loc: { pageNumber },
+						},
+					}),
+				);
+			}
+			return pages;
+		} finally {
+			// Frees the document and its worker, also when it did not open.
+			await task.destroy().catch(() => {});
+		}
 	}
 }
 
-async function loadDocx(blob: Blob): Promise<Document[]> {
-	const { DocxLoader } = await import(
-		"@langchain/community/document_loaders/fs/docx"
-	);
-	return new DocxLoader(blob).load();
+/** A Word file as one `Document`, by `mammoth`. Nothing when it holds no text. */
+class DocxLoader extends BaseDocumentLoader {
+	constructor(
+		private readonly content: Uint8Array,
+		private readonly source: string,
+	) {
+		super();
+	}
+
+	async load(): Promise<Document<DocumentMetadata>[]> {
+		const { extractRawText } = await import("mammoth");
+		const { value } = await extractRawText({
+			buffer: Buffer.from(this.content),
+		});
+		return value
+			? [
+					new Document<DocumentMetadata>({
+						pageContent: value,
+						metadata: { source: this.source },
+					}),
+				]
+			: [];
+	}
 }
 
 /** How many files' documents stay parsed. */
@@ -147,17 +196,16 @@ async function parse(
 	content: Uint8Array,
 	source: string,
 ): Promise<Document<DocumentMetadata>[]> {
-	// A copy on its own buffer: what a Blob takes.
-	const blob = new Blob([content.slice()]);
-	const docs = kind === ".pdf" ? await loadPdf(blob) : await loadDocx(blob);
-	return docs.flatMap((doc) => {
+	const loader =
+		kind === ".pdf"
+			? // A copy on its own buffer: PDF.js may take the one it gets away.
+				new PdfLoader(content.slice(), source)
+			: new DocxLoader(content, source);
+	return (await loader.load()).flatMap((doc) => {
 		const pageContent = tidy(doc.pageContent);
 		if (pageContent === "") return [];
 		doc.pageContent = pageContent;
-		// The loaders say "blob": say which file it was.
-		doc.metadata.source = source;
-		delete doc.metadata.blobType;
-		return [doc as Document<DocumentMetadata>];
+		return [doc];
 	});
 }
 

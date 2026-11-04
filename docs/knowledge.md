@@ -102,8 +102,7 @@ and the learnings that name their topics. `packages/engine/src/knowledge/graph.t
 builds it.
 
 - `TopicGraphTransformer` finds the topics by counting words. It takes
-  LangChain `Document`s and gives `GraphDocument`s, as `LLMGraphTransformer`
-  does. A model can take its place.
+  LangChain `Document`s and gives a `GraphDocument` for each file.
 - The graph reads at most 200 files, 60 KB of each. It reads them again only
   when a file changes. A file it cannot read stays on the map without topics.
 - The graph is for people. Agents do not get it, and search does not use it.
@@ -346,10 +345,10 @@ the file yet, Night Shift gets its content from the Space by its hash.
 Both give the text of a PDF or Word file. Neither gives the learnings
 that wait for a person.
 
-LangChain's document loaders read the text: `PDFLoader` for a PDF and
-`DocxLoader` (on `mammoth`) for a Word file. Night Shift gives `PDFLoader`
-the PDF.js of `unpdf`, so both work in the `nightshift` binary too. A PDF
-of scanned pages has no text to find. `INDEX.md` lists a PDF or Word file
+Two small LangChain document loaders in `documents.ts` read the text:
+`PdfLoader` on `unpdf` for a PDF and `DocxLoader` on `mammoth` for a Word
+file. Neither library has native parts, so both work in the `nightshift`
+binary too. A PDF of scanned pages has no text to find. `INDEX.md` lists a PDF or Word file
 with the title the PDF gives, else the first line of its text, and its
 first sentence.
 
