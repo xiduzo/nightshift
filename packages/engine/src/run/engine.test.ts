@@ -2424,12 +2424,10 @@ describe("deadlines without timers", () => {
 		});
 		const hung = sessions[0] as (typeof sessions)[number];
 
-		// Within its budget, and its grace: the sweep leaves it alone.
-		await Bun.sleep(40);
-		expect(await statusOf(engine, run.id)).toBe("running");
-
-		// One minute (100 ms) of budget, one minute of grace.
-		await waitFor(() => hung.input.signal.aborted, { label: "the sweep" });
+		// One minute (100 ms) of budget, one minute of grace. The sweep aborts the
+		// session first and writes the end after it, so wait for the end itself.
+		await waitForStatus(engine, run.id, "failed");
+		expect(hung.input.signal.aborted).toBe(true);
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("failed");
 		expect(detail.reason).toBe(
@@ -2439,6 +2437,12 @@ describe("deadlines without timers", () => {
 			["worker", "error", "The step ran past its time budget of 1 min."],
 		]);
 		expect(detail.steps[0]?.sessions[0]?.outcome).toBe("failed");
+		// Within its budget and its grace the sweep left it alone, however long
+		// this computer took to get here.
+		const step = detail.steps[0];
+		expect(
+			(step?.endedAt ?? 0) - (step?.startedAt ?? 0),
+		).toBeGreaterThanOrEqual(200);
 
 		// The hung harness wakes later: its drive writes nothing more.
 		const ended = await loggedTypes();
