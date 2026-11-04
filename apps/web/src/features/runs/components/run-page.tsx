@@ -56,11 +56,11 @@ import { runQueries } from "../queries";
 import { StepTranscript } from "../transcript/step-transcript";
 import { emptyTranscript } from "../transcript/transcript";
 import { AskWhyButton } from "./ask-why-button";
-import { RunDetails } from "./details/run-details";
+import { RunActions } from "./run-actions";
 import { RunArtifacts } from "./run-artifacts";
 import { FocusBreadcrumb, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
-import { RunActions, RunTitle } from "./run-header";
+import { RunTitle } from "./run-header";
 import { RunLeases } from "./run-leases";
 import { RunServices } from "./run-services";
 import { RunStatusPanel } from "./run-status-panel";
@@ -531,11 +531,11 @@ export function RunPage({
 	return (
 		<>
 			<SiteHeader crumbs={crumbs}>
-				<RunActions run={runData} status={status} steps={steps} />
-				<RunDetails
+				<RunActions
+					key={runData.id}
 					run={runData}
-					steps={steps}
 					status={status}
+					steps={steps}
 					onShowStep={setPickedStepId}
 				/>
 			</SiteHeader>
