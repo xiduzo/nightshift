@@ -288,6 +288,26 @@ describe("a failed preparation", () => {
 	});
 });
 
+describe("an index that closes and opens again during a preparation", () => {
+	test("did not fail, and the next look prepares the rest", async () => {
+		write("p1", "a.md", ["A car."]);
+		const held = embeddings.hold();
+		preparation.request("p1");
+		await held.arrived;
+		store.close();
+		await store.open();
+		held.release();
+
+		expect(await watch.settled("p1")).toBe("idle");
+		expect(watch.events.map((event) => event.to)).not.toContain("failed");
+		expect(warned).not.toHaveBeenCalled();
+
+		preparation.request("p1");
+		expect(await watch.settled("p1")).toBe("ready");
+		expect(vectorsOf("p1").count()).toBe(1);
+	});
+});
+
 describe("a model change during a preparation", () => {
 	test("throws the mixed vectors away, and the new model builds them", async () => {
 		write("p1", "a.md", ["A car.", "A kitten."]);

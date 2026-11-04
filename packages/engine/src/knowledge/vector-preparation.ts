@@ -160,6 +160,7 @@ export function createVectorPreparation(options: {
 			return;
 		}
 		const project = projectOf(projectId);
+		const opening = store.opening();
 		try {
 			// Before `behind` is cleared: a new model makes every project behind.
 			const vectors = store.vectorsFor(projectId, model);
@@ -192,8 +193,9 @@ export function createVectorPreparation(options: {
 				store.resetVectors(nowModel);
 			}
 		} catch (error) {
-			// Closed while it ran: that is not a failure.
-			if (!store.isOpen()) {
+			// Closed while it ran, and maybe opened again since: its handles are
+			// gone, and that is not a failure. The next look prepares again.
+			if (!store.isOpen() || store.opening() !== opening) {
 				move(projectId, "idle");
 				return;
 			}

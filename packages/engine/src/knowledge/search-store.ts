@@ -155,6 +155,8 @@ export function createSearchStore(
 	let db: Database | null = null;
 	/** The model the open index's vectors belong to. */
 	let vectorModel: string | null = null;
+	/** Counts each time the open index file was let go: what holds a handle of an older one holds a closed one. */
+	let opening = 0;
 	/** The vector store of each project, on the open index file. It keeps the project's vectors in memory. */
 	const vectorStores = new Map<
 		string,
@@ -178,6 +180,7 @@ export function createSearchStore(
 
 	/** Forgets what belongs to the open index file. */
 	function forget(): void {
+		opening += 1;
 		vectorStores.clear();
 		vectorModel = null;
 		options.onVectorsGone?.();
@@ -255,6 +258,8 @@ export function createSearchStore(
 			}
 		},
 		isOpen: () => db !== null,
+		/** Which opening of the index this is: another number means the file closed in between. */
+		opening: () => opening,
 		/** Closes the index file. A later `open` opens it again. */
 		close(): void {
 			db?.close();
