@@ -1,13 +1,11 @@
 import type { KnowledgeUse, KnowledgeUseHit } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema";
-import { asDate, now as timeNow } from "@nightshift/time";
-import { and, desc, gte, inArray, sql } from "drizzle-orm";
+import { now as timeNow } from "@nightshift/time";
 import {
 	type EventInput,
 	type KnowledgeUseFact,
 	type KnowledgeVia,
-	parseEventRow,
+	knowledgeUseEvents,
 } from "../log";
 import { questionKey } from "./questions";
 
@@ -60,30 +58,6 @@ export type AskedQuestion = {
 /** How many searches the questions read, newest first. */
 const ASKED_WINDOW = 2_000;
 
-/** The project's knowledge events, newest first, at most `limit`. */
-function projectEvents(
-	db: Database,
-	projectId: string,
-	types: readonly ("KnowledgeSearched" | "KnowledgeRead")[],
-	options: { limit: number; since?: number },
-) {
-	return db
-		.select()
-		.from(event)
-		.where(
-			and(
-				inArray(event.type, [...types]),
-				sql`json_extract(${event.payload}, '$.projectId') = ${projectId}`,
-				options.since === undefined
-					? undefined
-					: gte(event.at, asDate(options.since)),
-			),
-		)
-		.orderBy(desc(event.seq))
-		.limit(options.limit)
-		.then((rows) => rows.map(parseEventRow));
-}
-
 /**
  * The questions agents asked a project's knowledge, newest first, at most
  * `limit`: each question once (`questionKey`), with what its last asking
@@ -95,7 +69,7 @@ export async function askedQuestions(
 	options: { limit?: number } = {},
 ): Promise<AskedQuestion[]> {
 	const limit = options.limit ?? 50;
-	const rows = await projectEvents(db, projectId, ["KnowledgeSearched"], {
+	const rows = await knowledgeUseEvents(db, projectId, ["KnowledgeSearched"], {
 		limit: ASKED_WINDOW,
 	});
 	const asked = new Map<string, AskedQuestion>();
@@ -261,7 +235,7 @@ export async function knowledgeFileUse(
 	now: number = timeNow(),
 ): Promise<KnowledgeUseReport> {
 	const since = now - USE_WINDOW_DAYS * DAY;
-	const rows = await projectEvents(
+	const rows = await knowledgeUseEvents(
 		db,
 		projectId,
 		["KnowledgeSearched", "KnowledgeRead"],

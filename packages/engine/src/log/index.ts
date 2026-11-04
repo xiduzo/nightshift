@@ -57,6 +57,7 @@ export {
 	leavingHolds,
 	type ServiceHold,
 } from "./holds";
+export { knowledgeUseEvents } from "./knowledge-uses";
 export {
 	createLandedFeed,
 	type LandedRunEvent,
