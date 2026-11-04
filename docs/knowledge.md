@@ -220,8 +220,8 @@ where you added it on its Subflow node (`device`, **Runs on** in the
 editor). The Subflow's steps run there, whoever starts the run: the Host
 that fires its schedule, **Sync now**, or the Flows page. That computer's
 reconcile after the step publishes the files to the Space. An older folder
-source without `device` still runs where its schedule names, and moves
-over on its next save.
+source without `device` runs on the Host until you save it again from the
+computer that has the folder.
 
 Saving a flow needs a role that may save flows. Who may write to the
 knowledge stays as above: the computer that runs the sync publishes it.
