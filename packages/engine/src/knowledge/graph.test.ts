@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { GraphDocument } from "@langchain/community/graphs/document";
 import { Document } from "@langchain/core/documents";
 import { knowledgeGraphOf, TopicGraphTransformer } from "./graph";
 
@@ -35,12 +34,15 @@ const ids = (graph: Awaited<ReturnType<typeof graphOf>>, kind: string) =>
 	graph.nodes.filter((node) => node.kind === kind).map((node) => node.id);
 
 describe("TopicGraphTransformer", () => {
-	test("gives LangChain's GraphDocument, with its source", async () => {
-		const [first] = await new TopicGraphTransformer().convertToGraphDocuments(
+	test("gives one GraphDocument per file, with the file first", async () => {
+		const documents = await new TopicGraphTransformer().convertToGraphDocuments(
 			library,
 		);
-		expect(first).toBeInstanceOf(GraphDocument);
-		expect(first?.source.metadata.path).toBe("a.md");
+		expect(documents.map((document) => document.nodes[0])).toEqual([
+			{ id: "a.md", type: "File" },
+			{ id: "b.md", type: "File" },
+			{ id: "c.md", type: "File" },
+		]);
 	});
 
 	test("a word that files share is a topic, a word of one file is not", async () => {
@@ -66,8 +68,8 @@ describe("TopicGraphTransformer", () => {
 		const labels = documents
 			.flatMap((document) => document.nodes)
 			.filter((node) => node.type === "Topic")
-			.map((node) => String(node.properties.label));
-		expect(labels.some((label) => label.includes("\n"))).toBe(false);
+			.map((node) => node.label);
+		expect(labels.some((label) => label?.includes("\n"))).toBe(false);
 	});
 
 	test("the first word of a line is not a name, and The never is", async () => {
@@ -80,7 +82,7 @@ describe("TopicGraphTransformer", () => {
 		const labels = documents
 			.flatMap((document) => document.nodes)
 			.filter((node) => node.type === "Topic")
-			.map((node) => String(node.properties.label));
+			.map((node) => node.label);
 		expect(labels).not.toContain("The");
 		expect(labels).not.toContain("Numbers");
 	});

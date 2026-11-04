@@ -1,8 +1,3 @@
-import {
-	GraphDocument,
-	Node,
-	Relationship,
-} from "@langchain/community/graphs/document";
 import type { Document } from "@langchain/core/documents";
 import type { WaitingLearning } from "./learnings";
 import type { AskedQuestion } from "./use";
@@ -12,11 +7,28 @@ import type { AskedQuestion } from "./use";
  * topics they share, the links between them, the questions that found them
  * and the learnings that name their topics.
  *
- * `TopicGraphTransformer` finds the topics by counting words. It has the shape
- * of LangChain's `LLMGraphTransformer` (documents in, `GraphDocument`s out), so
- * that a model can take its place when one proves worth its cost. The rest of
- * this file reads `GraphDocument`s only.
+ * `TopicGraphTransformer` finds the topics by counting words and gives a
+ * `GraphDocument` per file. The rest of this file reads `GraphDocument`s only.
  */
+
+/** A file or a topic, in the `GraphDocument` of one file. */
+type GraphNode = {
+	/** A file's path or a topic's key. */
+	id: string;
+	type: "File" | "Topic";
+	/** A topic as the text writes it. */
+	label?: string;
+};
+
+/** What one file connects to: the topics it names and the files it links to. */
+export type GraphDocument = {
+	nodes: GraphNode[];
+	relationships: {
+		source: GraphNode;
+		target: GraphNode;
+		type: "MENTIONS" | "LINKS_TO";
+	}[];
+};
 
 export type KnowledgeGraphNode = {
 	/** `file:<path>`, `topic:<key>`, `question:<query>` or `learning:<id>`. */
@@ -180,36 +192,36 @@ export class TopicGraphTransformer {
 		const paths = documents.map(pathOf);
 		return documents.map((document, index) => {
 			const path = pathOf(document);
-			const file = new Node({ id: path, type: "File" });
+			const file: GraphNode = { id: path, type: "File" };
 			const best = [...(terms[index] ?? new Map<string, Term>())]
 				.filter(([key]) => topics.has(key))
 				.sort((a, b) => b[1].count - a[1].count)
 				.slice(0, TOPICS_PER_FILE)
 				.map(
-					([key]) =>
-						new Node({
-							id: key,
-							type: "Topic",
-							properties: { label: shownAs.get(key) ?? key },
-						}),
+					([key]): GraphNode => ({
+						id: key,
+						type: "Topic",
+						label: shownAs.get(key) ?? key,
+					}),
 				);
 			const linked = linksOf(document.pageContent, paths, path).map(
-				(target) => new Node({ id: target, type: "File" }),
+				(target): GraphNode => ({ id: target, type: "File" }),
 			);
-			return new GraphDocument({
+			return {
 				nodes: [file, ...best, ...linked],
 				relationships: [
-					...best.map(
-						(target) =>
-							new Relationship({ source: file, target, type: "MENTIONS" }),
-					),
-					...linked.map(
-						(target) =>
-							new Relationship({ source: file, target, type: "LINKS_TO" }),
-					),
+					...best.map((target) => ({
+						source: file,
+						target,
+						type: "MENTIONS" as const,
+					})),
+					...linked.map((target) => ({
+						source: file,
+						target,
+						type: "LINKS_TO" as const,
+					})),
 				],
-				source: document,
-			});
+			};
 		});
 	}
 }
@@ -266,12 +278,12 @@ export function knowledgeGraphOf(input: {
 	for (const document of input.documents) {
 		for (const node of document.nodes) {
 			if (node.type !== "Topic") continue;
-			const label = String(node.properties.label ?? node.id);
+			const label = node.label ?? node.id;
 			topics.set(`topic:${node.id}`, label);
 			addNode(`topic:${node.id}`, "topic", label);
 		}
 	}
-	const idOf = (node: Node) =>
+	const idOf = (node: GraphNode) =>
 		node.type === "Topic" ? `topic:${node.id}` : `file:${node.id}`;
 	for (const document of input.documents) {
 		for (const relation of document.relationships) {

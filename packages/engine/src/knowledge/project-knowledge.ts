@@ -1,6 +1,5 @@
 import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { GraphDocument } from "@langchain/community/graphs/document";
 import { Document } from "@langchain/core/documents";
 import {
 	KNOWLEDGE_TOOLS_INSTRUCTION,
@@ -22,7 +21,7 @@ import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
 import { createKnowledgeFolders, isReadable } from "./folder";
-import { TopicGraphTransformer } from "./graph";
+import { type GraphDocument, TopicGraphTransformer } from "./graph";
 import {
 	type KnowledgeDocuments,
 	knowledgeEntries,
