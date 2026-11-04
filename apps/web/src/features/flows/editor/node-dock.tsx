@@ -41,11 +41,11 @@ export function isPaletteItem(value: string): value is PaletteItem {
  * its width, so the bigger icons reach out over the canvas.
  */
 const DOCK_ITEM = cn(
-	"size-10 shrink-0 cursor-grab rounded-full bg-background p-0 active:cursor-grabbing dark:bg-background",
+	"size-8 shrink-0 cursor-grab rounded-full bg-background p-0 active:cursor-grabbing dark:bg-background",
 	"transition-[width,height] duration-200 ease-out motion-reduce:transition-none",
-	"hover:size-15",
-	"[&:has(+_*:hover)]:size-[50px] [*:hover+&]:size-[50px]",
-	"[&:has(+*+*:hover)]:size-11 [*:hover+*+&]:size-11",
+	"hover:size-12",
+	"[&:has(+_*:hover)]:size-10 [*:hover+&]:size-10",
+	"[&:has(+*+*:hover)]:size-9 [*:hover+*+&]:size-9",
 );
 
 /**
@@ -68,7 +68,7 @@ export function NodeDock({
 			aria-label="Add a node"
 			aria-orientation="vertical"
 			className={cn(
-				"flex w-[58px] flex-col items-start gap-2 rounded-2xl border bg-background/80 p-2 shadow-sm backdrop-blur-md",
+				"flex w-11 flex-col items-start gap-1.5 rounded-xl border bg-background/80 p-1.5 shadow-sm backdrop-blur-md",
 				className,
 			)}
 		>
@@ -93,7 +93,7 @@ export function NodeDock({
 								/>
 							}
 						>
-							<Icon className="size-[45%]" aria-hidden="true" />
+							<Icon className="size-[50%]" aria-hidden="true" />
 						</TooltipTrigger>
 						<TooltipContent side="right" className="max-w-60">
 							<span className="flex flex-col gap-0.5">
