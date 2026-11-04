@@ -147,13 +147,18 @@ function singularsOf(word: string): string[] {
 	return out;
 }
 
-/** Whether a person marked this key, in whichever number they saw it. */
-function isMarked(key: string, marked: ReadonlySet<string>): boolean {
-	return (
-		marked.has(key) ||
-		singularsOf(key).some((form) => marked.has(form)) ||
-		[...marked].some((word) => singularsOf(word).includes(key))
-	);
+/**
+ * Whether a person marked a key, in whichever number they saw it. Ready once,
+ * for it runs for every word of every file. None marked: no rule runs at all.
+ */
+function markedBy(marked: ReadonlySet<string>): (key: string) => boolean {
+	if (marked.size === 0) return () => false;
+	const forms = new Set(marked);
+	for (const word of marked) {
+		for (const form of singularsOf(word)) forms.add(form);
+	}
+	return (key) =>
+		forms.has(key) || singularsOf(key).some((form) => marked.has(form));
 }
 
 const hasCapital = (text: string) => text !== text.toLowerCase();
@@ -191,6 +196,7 @@ export function findTopics(
 	files: readonly TextOfFile[],
 	notTopics: ReadonlySet<string> = new Set(),
 ): FoundTopics {
+	const isMarked = markedBy(notTopics);
 	/** Every word of all texts, by lower case, with how often it stands there. */
 	const vocabulary = new Map<string, number>();
 	/** How many times each word and phrase stands, by lower case. */
@@ -286,7 +292,7 @@ export function findTopics(
 
 	/** Two words of several files that stand together far more than the rarer one stands alone. */
 	const isPhrase = (key: string): boolean => {
-		if ((seenIn.get(key) ?? 0) < 2 || isMarked(key, notTopics)) return false;
+		if ((seenIn.get(key) ?? 0) < 2 || isMarked(key)) return false;
 		const [a = "", b = ""] = key.split(" ");
 		const rarer = Math.min(total.get(a) ?? 1, total.get(b) ?? 1);
 		return (phraseTotal.get(key) ?? 0) / rarer >= PHRASE_SHARE;
@@ -301,7 +307,7 @@ export function findTopics(
 	}
 	const isWord = (key: string): boolean =>
 		!NOT_ALONE.has(key) &&
-		!isMarked(key, notTopics) &&
+		!isMarked(key) &&
 		(inPhrases.get(key) ?? 0) / (total.get(key) ?? 1) < COVERED_SHARE;
 
 	const most = Math.max(2, Math.ceil(files.length * MOST_OF_THE_FILES));
