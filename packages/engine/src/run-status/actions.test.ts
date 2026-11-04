@@ -52,12 +52,17 @@ describe("the actions a run allows", () => {
 		);
 	});
 
-	test("on another computer: a stop, an answer, a signal and a move travel to the Walker, nothing else", () => {
+	test("on another computer: a stop, an answer, a signal, a move and a resume travel to the Walker, nothing else", () => {
 		expect(allowed("running", false)).toEqual(["stop"]);
 		expect(allowed("waiting", false)).toEqual(["stop", "answer", "move"]);
-		expect(allowed("sleeping", false)).toEqual(["stop", "signal", "move"]);
-		expect(allowed("failed", false)).toEqual(["move"]);
-		expect(allowed("finished", false)).toEqual([]);
+		expect(allowed("sleeping", false)).toEqual([
+			"stop",
+			"signal",
+			"move",
+			"resume",
+		]);
+		expect(allowed("failed", false)).toEqual(["move", "resume"]);
+		expect(allowed("finished", false)).toEqual(["resume"]);
 	});
 });
 
@@ -76,12 +81,16 @@ describe("why a run does not allow an action", () => {
 	});
 
 	test("a run another Device walks has one refusal for what only its Walker takes", () => {
-		for (const action of ["resume", "restart", "rerun"] as const) {
+		for (const action of ["restart", "rerun"] as const) {
 			expect(whyNot(action, "stopped", false)).toBe(WALKED_ELSEWHERE);
 		}
 		// What travels to the Walker is refused for its status only.
 		expect(whyNot("answer", "running", false)).toBe(
 			"This run does not wait at a Gate.",
+		);
+		expect(whyNot("resume", "failed", false)).toBeNull();
+		expect(whyNot("resume", "running", false)).toBe(
+			"This run is still running. Stop it or wait for it to end.",
 		);
 	});
 

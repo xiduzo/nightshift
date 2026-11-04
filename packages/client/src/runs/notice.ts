@@ -22,11 +22,6 @@ export type StoppedNotice = {
 	resumable: boolean;
 };
 
-/** The name of the computer that runs a run, as people read it (as the web devices say it). */
-function walkerName(walker: RunSummary["walker"]): string {
-	return walker.name ?? "another device";
-}
-
 function firstLine(text: string | null | undefined): string | undefined {
 	return text
 		?.split("\n")
@@ -36,8 +31,7 @@ function firstLine(text: string | null | undefined): string | undefined {
 
 /**
  * Why a run ended and what you can do now: "The run stopped. Resume it to
- * continue." A run another computer walks says only that computer can
- * resume it. Null while the run is on its way, and for a run that finished
+ * continue." Null while the run is on its way, and for a run that finished
  * without a message from an End node.
  */
 export function stoppedNotice(
@@ -48,15 +42,9 @@ export function stoppedNotice(
 	},
 	status: RunStatus,
 ): StoppedNotice | null {
-	// A run of another device: only it resumes.
-	const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
 	const { resume } = runActions(status, run.walker.thisDevice, run.result);
-	const resumeHere = elsewhere
-		? `Only ${elsewhere} can resume it.`
-		: "Resume it to continue.";
-	const continueHere = elsewhere
-		? resumeHere
-		: "Resume it to continue where it stopped.";
+	const resumeHere = "Resume it to continue.";
+	const continueHere = "Resume it to continue where it stopped.";
 	switch (status) {
 		case "finished":
 			// Only an End node with a message leaves you something to read.

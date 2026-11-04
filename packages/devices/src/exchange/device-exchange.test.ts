@@ -22,7 +22,7 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
 import { onReplyMismatch, type ReplyMismatch } from "../contract/described";
 import type { Link } from "../links";
@@ -468,6 +468,142 @@ describe("the Device's exchange with its Host", () => {
 		await untilStatus(paired.device, run.id, "finished");
 		await untilStatus(paired.host, run.id, "finished");
 		expect(await paired.host.exchange.commands.pendingOf([run.id])).toEqual([]);
+	});
+
+	test("a resume on A travels to B as a Command: the run continues where B walks it", async () => {
+		const run = await walkOnB(gateFlow);
+		online();
+		await untilStatus(paired.host, run.id, "waiting");
+		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		await onA.act(run.id, { kind: "stop" });
+		await untilStatus(paired.host, run.id, "stopped");
+
+		await onA.act(run.id, { kind: "resume" });
+
+		await untilStatus(paired.device, run.id, "waiting");
+		await untilStatus(paired.host, run.id, "waiting");
+		await waitFor(
+			async () =>
+				(await paired.host.exchange.commands.pendingOf([run.id])).length === 0,
+			{ label: "the resume done" },
+		);
+	});
+
+	test("a resume's follow-up prompt reaches the agent step B reopens", async () => {
+		const run = await walkOnB(agentFlow);
+		online();
+		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const step = await waitFor(
+			async () =>
+				(await paired.device.space(a.spaceId).getRun(run.id)).steps[0]?.id,
+			{ label: "the step on B" },
+		);
+		const onDisk = join(b.dataDir, "transcripts", run.id, `${step}.ndjson`);
+		await waitFor(
+			async () =>
+				(
+					await Bun.file(onDisk)
+						.text()
+						.catch(() => "")
+				).includes("first part"),
+			{ label: "the first part on B" },
+		);
+		await untilStatus(paired.host, run.id, "running");
+		await onA.act(run.id, { kind: "stop" });
+		await untilStatus(paired.host, run.id, "stopped");
+
+		await onA.act(run.id, { kind: "resume", prompt: "Go on." });
+
+		await untilStatus(paired.device, run.id, "finished");
+		const [resumed] = await b.db
+			.select()
+			.from(event)
+			.where(and(eq(event.runId, run.id), eq(event.type, "RunResumed")));
+		expect(JSON.parse(resumed?.payload as string)).toMatchObject({
+			prompt: "Go on.",
+			by: "person",
+		});
+	});
+
+	test("a second resume waits for the first: one is on its way to B while B is away", async () => {
+		const run = await walkOnB(gateFlow);
+		const period = online();
+		await untilStatus(paired.host, run.id, "waiting");
+		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		await onA.act(run.id, { kind: "stop" });
+		await untilStatus(paired.host, run.id, "stopped");
+		await period.stop();
+
+		await onA.act(run.id, { kind: "resume" });
+		await expect(onA.act(run.id, { kind: "resume" })).rejects.toThrow(
+			"already on its way",
+		);
+		expect(
+			(await paired.host.exchange.commands.pendingOf([run.id])).length,
+		).toBe(1);
+
+		online();
+		await untilStatus(paired.device, run.id, "waiting");
+	});
+
+	test("a resume on B travels to A, the Host that walks the run", async () => {
+		await paired.projectOnDevice(projectId);
+		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const run = await onA.startRun({ projectId, flow: gateFlow });
+		await untilStatus(paired.host, run.id, "waiting");
+		await onA.act(run.id, { kind: "stop" });
+		await untilStatus(paired.host, run.id, "stopped");
+		online();
+		await untilStatus(paired.device, run.id, "stopped");
+
+		await paired.device
+			.space(a.spaceId, { personId: paired.personId })
+			.act(run.id, { kind: "resume" });
+
+		await untilStatus(paired.host, run.id, "waiting");
+		await untilStatus(paired.device, run.id, "waiting");
+	});
+
+	test("any Member of the Space resumes a run someone else started; a viewer does not", async () => {
+		const run = await walkOnB(gateFlow);
+		online();
+		await untilStatus(paired.host, run.id, "waiting");
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.act(run.id, { kind: "stop" });
+		await untilStatus(paired.host, run.id, "stopped");
+		const document = await paired.documents.open(a.spaceId);
+		document.doc.transact(() => {
+			document.members.set("viewer", { name: "Viewer", role: "viewer" });
+			document.members.set("colleague", { name: "Colleague", role: "member" });
+		});
+		const { commands } = paired.host.exchange;
+		const resume = (personId: string) =>
+			commands.enqueue({
+				kind: "run.resume",
+				payload: {},
+				spaceId: a.spaceId,
+				runId: run.id,
+				walkerId: b.deviceId,
+				personId,
+			});
+
+		const viewer = await resume("viewer");
+		await waitFor(async () => (await commandOnA(viewer.id)).done, {
+			label: "the viewer's Command done",
+		});
+		expect(await commandOnA(viewer.id)).toEqual({
+			done: true,
+			error: "The person who asked may not do this in this Space.",
+		});
+		expect(await statusOn(paired.device, run.id)).toBe("stopped");
+
+		const colleague = await resume("colleague");
+		await waitFor(async () => (await commandOnA(colleague.id)).done, {
+			label: "the colleague's Command done",
+		});
+		expect(await commandOnA(colleague.id)).toEqual({ done: true, error: null });
+		await untilStatus(paired.device, run.id, "waiting");
 	});
 
 	test("a Command applied just before the link dropped is not applied again when it is back", async () => {

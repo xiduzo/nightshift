@@ -178,6 +178,11 @@ const runCommandInput = z.discriminatedUnion("kind", [
 	}),
 	z.object({
 		runId: z.string().min(1),
+		kind: z.literal("run.resume"),
+		payload: z.object({ prompt: z.string().min(1).optional() }),
+	}),
+	z.object({
+		runId: z.string().min(1),
 		kind: z.literal("lease.release"),
 		payload: z.object({ name: z.string().min(1).max(500) }),
 	}),

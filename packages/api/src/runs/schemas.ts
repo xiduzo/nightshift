@@ -326,6 +326,7 @@ export const runDetailSchema = exact<RunDetail>()(
 					"signal.send",
 					"run.stop",
 					"run.move",
+					"run.resume",
 					"lease.release",
 					"run.useful",
 				]),

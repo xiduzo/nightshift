@@ -1483,9 +1483,12 @@ describe("restart a step", () => {
 			.update(run)
 			.set({ walkerId: "another-device" })
 			.where(eq(run.id, walked.id));
-		// One rule, one refusal: only the Walker resumes, restarts or reruns.
+		// A resume travels to the Walker: without a way there, it is refused.
+		await expect(engine.act(walked.id, { kind: "resume" })).rejects.toThrow(
+			"cannot reach",
+		);
+		// One rule, one refusal: only the Walker restarts or reruns.
 		for (const act of [
-			() => engine.act(walked.id, { kind: "resume" }),
 			() => engine.act(walked.id, { kind: "restart" }),
 			() => engine.act(walked.id, { kind: "rerun", nodeId: "worker" }),
 		]) {
