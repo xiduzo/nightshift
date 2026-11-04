@@ -95,6 +95,11 @@ const KNOWLEDGE_KITS = `${KIT_PREFIX}knowledge/`;
 /** The kit that asks a person about the learnings agents proposed. */
 export const REVIEW_LEARNINGS_KIT = `${KNOWLEDGE_KITS}review-learnings`;
 
+/** Whether a Call's flow names a `kit:knowledge/*` kit, known or not. */
+export function isKnowledgeKit(name: string): boolean {
+	return name.startsWith(KNOWLEDGE_KITS);
+}
+
 /**
  * The knowledge kits a flow calls, by name, sorted: a flow with one fills
  * the project's knowledge (or reviews its learnings,
@@ -105,7 +110,7 @@ export function knowledgeKitsOf(flow: Flow): string[] {
 	for (const node of flow.nodes) {
 		if (node.type !== "call") continue;
 		for (const name of calledFlowNames(node)) {
-			if (name.startsWith(KNOWLEDGE_KITS)) names.add(name);
+			if (isKnowledgeKit(name)) names.add(name);
 		}
 	}
 	return [...names].sort();

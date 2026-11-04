@@ -1,4 +1,5 @@
 import type { FlowInput } from "../../flow";
+import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
 import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
 
 /** The most files one sync of a folder copies: more is rarely knowledge. */
@@ -61,7 +62,7 @@ if [ ! -d "$src" ]; then
 	exit 3
 fi
 patterns="{{patterns}}"
-part="$dest.part"
+part="$dest${KNOWLEDGE_STAGING_SUFFIX}"
 list=$(mktemp)
 trap 'rm -rf "$part" "$list"' EXIT
 rm -rf "$part"

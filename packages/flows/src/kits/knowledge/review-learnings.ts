@@ -1,10 +1,11 @@
 import type { FlowInput } from "../../flow";
+import { ACCEPTED_LEARNINGS_DIR, PROPOSED_LEARNINGS_DIR } from "./layout";
 
 /** The start of each command: the proposals and the accepted learnings. */
 const LEARNINGS = String.raw`set -e
 if [ -z "$NS_KNOWLEDGE" ]; then echo "Run this kit in a flow: the step gets the project's knowledge folder there." >&2; exit 2; fi
-proposed="$NS_KNOWLEDGE/learnings/proposed"
-accepted="$NS_KNOWLEDGE/learnings/accepted"`;
+proposed="$NS_KNOWLEDGE/${PROPOSED_LEARNINGS_DIR}"
+accepted="$NS_KNOWLEDGE/${ACCEPTED_LEARNINGS_DIR}"`;
 
 /**
  * `kit:knowledge/review-learnings`: a Gate with what agents proposed to

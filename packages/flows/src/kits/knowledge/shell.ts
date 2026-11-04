@@ -3,23 +3,7 @@
  * a kit copied into a project reads on its own.
  */
 import type { FlowInput } from "../../flow";
-
-/**
- * Night Shift's own folders in the knowledge: no source fills them.
- * `learnings/` holds what agents propose and what a person kept, `evals/`
- * the question set. The kits and the Knowledge page's sources refuse them.
- */
-const KNOWLEDGE_OWN_FOLDERS: readonly string[] = ["learnings", "evals"];
-
-/** Whether a folder of the knowledge is one of Night Shift's own, or in one. */
-export function isKnowledgeOwnFolder(folder: string): boolean {
-	return KNOWLEDGE_OWN_FOLDERS.some(
-		(name) => folder === name || folder.startsWith(`${name}/`),
-	);
-}
-
-/** That a folder is Night Shift's own, as the kits and the sources say it. */
-export const KNOWLEDGE_OWN_FOLDERS_WORDS = `${KNOWLEDGE_OWN_FOLDERS.join(" and ")} are Night Shift's own.`;
+import { KNOWLEDGE_OWN_FOLDERS, KNOWLEDGE_OWN_FOLDERS_WORDS } from "./layout";
 
 /**
  * The start of every sync command: it stops on the first error, finds

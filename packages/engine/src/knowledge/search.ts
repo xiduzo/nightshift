@@ -4,6 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { index } from "@langchain/core/indexing";
+import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { sha256OfFile } from "../archive";
 import { isDocument, loadDocument } from "./documents";
@@ -127,8 +128,6 @@ export type KnowledgeMeaningStatus = {
 	percent: number | null;
 };
 
-/** The index file, hidden so no project id can name it. */
-export const SEARCH_FILE = ".search.sqlite";
 /** Bump to build every index again. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. */
 const SCHEMA_VERSION = 4;
 /** What the index reads of a file: past this, the end of a very large file is not found. */
@@ -368,7 +367,7 @@ export function createKnowledgeSearch(
 			: Promise.resolve(true);
 	const folders = createKnowledgeFolders(dataDir);
 	const root = join(dataDir, "knowledge");
-	const file = join(root, SEARCH_FILE);
+	const file = join(root, KNOWLEDGE_SEARCH_FILE);
 	let db: Database | null = null;
 	let closed = false;
 	/** One refresh per project at a time: a second search waits for it. */

@@ -1,4 +1,5 @@
 import type { FlowInput } from "../../flow";
+import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
 import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
 
 /**
@@ -56,9 +57,9 @@ mkdir -p "$dest"
 # Split the list, but never read a pattern in it.
 set -f
 for key in $(printf '%s' "$keys" | tr ',' ' '); do
-	"$tool" jira workitem view "$key" --json > "$dest/$key.json.part"
-	jq -r '${WORK_ITEM_MARKDOWN}' "$dest/$key.json.part" > "$dest/$key.md"
-	rm -f "$dest/$key.json.part"
+	"$tool" jira workitem view "$key" --json > "$dest/$key.json${KNOWLEDGE_STAGING_SUFFIX}"
+	jq -r '${WORK_ITEM_MARKDOWN}' "$dest/$key.json${KNOWLEDGE_STAGING_SUFFIX}" > "$dest/$key.md"
+	rm -f "$dest/$key.json${KNOWLEDGE_STAGING_SUFFIX}"
 done
 ${COUNT_FILES}`,
 				exits: [

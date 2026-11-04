@@ -2,6 +2,7 @@
 
 export {
 	isKitName,
+	isKnowledgeKit,
 	type Kit,
 	kitCopyName,
 	kitFlow,
@@ -10,9 +11,23 @@ export {
 	REVIEW_LEARNINGS_KIT,
 } from "./kits";
 export {
+	ACCEPTED_LEARNINGS_DIR,
+	isHiddenFromReaders,
 	isKnowledgeOwnFolder,
+	isProposedLearning,
+	isProposedLearningFile,
+	isQuestionSetPath,
+	KNOWLEDGE_INDEX_FILE,
 	KNOWLEDGE_OWN_FOLDERS_WORDS,
-} from "./knowledge/shell";
+	KNOWLEDGE_RECONCILE_FILE,
+	KNOWLEDGE_SEARCH_FILE,
+	KNOWLEDGE_STAGING_SUFFIX,
+	knowledgeFoldersOf,
+	PROPOSED_LEARNINGS_DIR,
+	proposedLearningFileName,
+	proposedLearningOf,
+	QUESTION_SET_FILE,
+} from "./knowledge/layout";
 export {
 	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_SOURCE_KINDS,

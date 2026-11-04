@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { EVALS_DIR } from "./folder";
 
 /**
  * The project's question set: questions agents asked the knowledge, each
@@ -8,12 +7,9 @@ import { EVALS_DIR } from "./folder";
  *
  * It is a file of the knowledge, `evals/questions.json`, so it syncs with
  * the Space like the learnings do (ADR 4), and every computer evaluates the
- * same set. `evals/` is Night Shift's own (`isEvalsPath`): no index, search
+ * same set. `evals/` is Night Shift's own (`isQuestionSetPath`): no index, search
  * or read shows it.
  */
-
-/** The question set's file in the knowledge. */
-export const QUESTIONS_FILE = `${EVALS_DIR}/questions.json`;
 
 /** One question of the set: what an agent asked, and the files that answer it. */
 export type KnowledgeQuestion = {

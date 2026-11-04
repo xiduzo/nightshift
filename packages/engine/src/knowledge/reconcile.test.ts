@@ -494,6 +494,23 @@ describe("reconcile", () => {
 		// The sandbox's Space is the personal one of its Person.
 		expect(listing.shared).toBe(false);
 	});
+
+	// The web editor takes the folders an Agent node may pick from this list,
+	// with no filter of its own (`knowledgeFoldersOf`).
+	test("leaves out the proposed learnings and the question set, and keeps the accepted learnings", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.put("learnings/accepted/run-0.s1.md", "- Kept.\n");
+		await a.put("learnings/proposed/run-1.s1.md", "- Waits.\n");
+		await a.put("evals/questions.json", "[]\n");
+
+		const { files } = await a.sync.listing("p1");
+		expect(files.map((f) => f.path)).toEqual([
+			"learnings/accepted/run-0.s1.md",
+			"wiki/Home.md",
+		]);
+	});
 });
 
 describe("read", () => {

@@ -1,3 +1,4 @@
+import { knowledgeFoldersOf } from "@nightshift/flows";
 import {
 	Combobox,
 	ComboboxChip,
@@ -16,7 +17,6 @@ import { Fragment } from "react";
 
 import { knowledgeFolderQueries } from "../queries";
 import { Field, Note } from "./fields";
-import { foldersOf } from "./knowledge-folders";
 
 /**
  * The folders of the project's knowledge an Agent node may read: a
@@ -49,7 +49,7 @@ export function KnowledgeFoldersField({
 		);
 	}
 
-	const known = foldersOf(
+	const known = knowledgeFoldersOf(
 		(knowledge.data?.files ?? []).map((file) => file.path),
 	);
 	const missing = folders.filter((folder) => !known.includes(folder));

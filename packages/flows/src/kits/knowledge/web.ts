@@ -1,4 +1,5 @@
 import type { FlowInput } from "../../flow";
+import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
 import { FIND_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
 
 /**
@@ -51,7 +52,7 @@ kept=0
 missed=""
 for url in $urls; do
 	name=$(printf '%s' "$url" | sed -e 's#^[A-Za-z]*://##' -e 's#[/?=&:]#-#g' -e 's#[^A-Za-z0-9._-]##g' -e 's#-*$##')
-	part="$dest/$name.md.part"
+	part="$dest/$name.md${KNOWLEDGE_STAGING_SUFFIX}"
 	if ! curl -fsL --max-time 120 "https://r.jina.ai/$url" > "$part"; then
 		echo "Could not read $url: the page did not load." >&2
 	elif sed -n '1,/^Markdown Content:/p' "$part" | grep -q -E '^Warning: (Target URL returned error|This page maybe requiring CAPTCHA)'; then

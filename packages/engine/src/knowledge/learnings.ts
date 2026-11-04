@@ -1,6 +1,10 @@
 import { appendFile, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
+import {
+	PROPOSED_LEARNINGS_DIR,
+	proposedLearningFileName,
+} from "@nightshift/flows";
 
 /**
  * Learnings: what agents propose to learn about a project, in its
@@ -14,28 +18,6 @@ import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
  * two Devices, and the reconcile keeps one change of a path, the later
  * one. Files of their own keep both.
  */
-
-/** Night Shift's own folder in the knowledge: no source fills it. */
-export const LEARNINGS_DIR = "learnings";
-/** The proposals that wait for a person. */
-export const PROPOSED_DIR = `${LEARNINGS_DIR}/proposed`;
-
-/** Whether a path of the knowledge is a proposal, or their folder. */
-export function isProposal(path: string): boolean {
-	return path === PROPOSED_DIR || path.startsWith(`${PROPOSED_DIR}/`);
-}
-
-/** Whether a folder of the knowledge is Night Shift's own, or in it. */
-export function isLearningsFolder(folder: string): boolean {
-	return folder === LEARNINGS_DIR || folder.startsWith(`${LEARNINGS_DIR}/`);
-}
-
-/** Whether a path is one step's proposals: `learnings/proposed/<runId>.<stepId>.md` (`<runId>.md` before). */
-export function isProposalFile(path: string): boolean {
-	return (
-		isProposal(path) && path.endsWith(".md") && path.split("/").length === 3
-	);
-}
 
 /** How many notes a proposal holds: one per `- ` line. */
 export function notesIn(content: Uint8Array | string): number {
@@ -54,28 +36,6 @@ export function notesOf(content: Uint8Array | string): string[] {
 		.filter((line) => line.startsWith("- "))
 		.map((line) => line.slice(2).trim())
 		.filter((note) => note !== "");
-}
-
-/** The learnings a person kept: agents read them. */
-export const ACCEPTED_DIR = `${LEARNINGS_DIR}/accepted`;
-
-/** Ids that become a part of a file name. */
-const ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
-
-/**
- * One step's proposal, by the name of its file in `learnings/proposed/`
- * (`<runId>.<stepId>.md`, or `<runId>.md` before steps had files of their
- * own): its run and step. Null for a name that is not a proposal's.
- */
-export function proposalOf(
-	name: string,
-): { runId: string; stepId: string | null } | null {
-	if (!name.endsWith(".md")) return null;
-	const parts = name.slice(0, -3).split(".");
-	const [runId, stepId, ...rest] = parts;
-	if (runId === undefined || rest.length > 0 || !ID.test(runId)) return null;
-	if (stepId === undefined) return { runId, stepId: null };
-	return ID.test(stepId) ? { runId, stepId } : null;
 }
 
 /** One step's proposals that wait for a person, as the review lists them. */
@@ -106,20 +66,15 @@ export async function proposeLearnings(
 	step: LearningStep,
 	notes: readonly string[],
 ): Promise<void> {
-	const { runId, stepId } = step;
-	for (const id of [runId, ...(stepId === undefined ? [] : [stepId])]) {
-		if (!ID.test(id)) throw new Error(`"${id}" is not an id.`);
-	}
+	const name = proposedLearningFileName(step);
+	const { runId } = step;
 	const lines = notes
 		.map((note) => note.replace(/\s+/g, " ").trim())
 		.filter((note) => note !== "");
 	if (lines.length === 0) return;
-	const dir = join(root, ...PROPOSED_DIR.split("/"));
+	const dir = join(root, ...PROPOSED_LEARNINGS_DIR.split("/"));
 	await mkdir(dir, { recursive: true });
-	const file = join(
-		dir,
-		stepId === undefined ? `${runId}.md` : `${runId}.${stepId}.md`,
-	);
+	const file = join(dir, name);
 	const isNew = (await stat(file).catch(() => null)) === null;
 	const head = isNew
 		? `# Learnings of run ${runId.slice(0, 8)}\n\nWhat the agents of run ${runId} proposed to learn about this project.\n\n`

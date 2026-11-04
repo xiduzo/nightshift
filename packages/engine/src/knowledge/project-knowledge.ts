@@ -9,12 +9,19 @@ import {
 	knowledgeTools,
 } from "@nightshift/agents/tools";
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
-import { knowledgeFolderPath } from "@nightshift/flows";
+import {
+	ACCEPTED_LEARNINGS_DIR,
+	KNOWLEDGE_INDEX_FILE,
+	knowledgeFolderPath,
+	PROPOSED_LEARNINGS_DIR,
+	proposedLearningOf,
+	QUESTION_SET_FILE,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
-import { createKnowledgeFolders, INDEX_FILE, isReadable } from "./folder";
+import { createKnowledgeFolders, isReadable } from "./folder";
 import { TopicGraphTransformer } from "./graph";
 import {
 	type KnowledgeDocuments,
@@ -22,19 +29,12 @@ import {
 	meaningIsOn,
 	setMeaning,
 } from "./knowledge-document";
-import {
-	ACCEPTED_DIR,
-	keepLearnings,
-	PROPOSED_DIR,
-	proposalOf,
-	withLearnings,
-} from "./learnings";
+import { keepLearnings, withLearnings } from "./learnings";
 import {
 	formatQuestions,
 	type KnowledgeQuestion,
 	markQuestion,
 	parseQuestions,
-	QUESTIONS_FILE,
 } from "./questions";
 import { createKnowledgeSync, type KnowledgeSyncDeps } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
@@ -153,7 +153,7 @@ export type ProjectKnowledgeDeps = Pick<
 
 /** The line an agent gets next to its prompt. */
 function knowledgeLine(path: string): string {
-	return `Project knowledge is in ${path}. Read ${INDEX_FILE} there first, then grep the folder for what you need. Do not change the folder.`;
+	return `Project knowledge is in ${path}. Read ${KNOWLEDGE_INDEX_FILE} there first, then grep the folder for what you need. Do not change the folder.`;
 }
 
 /** The session's events, each with the uses of the knowledge that came before it in front. */
@@ -196,7 +196,10 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 
 	/** The question set's file in this computer's folder, or null. */
 	function readQuestions(projectId: string): Promise<string | null> {
-		const file = join(folders.folder(projectId), ...QUESTIONS_FILE.split("/"));
+		const file = join(
+			folders.folder(projectId),
+			...QUESTION_SET_FILE.split("/"),
+		);
 		return readFile(file, "utf8").catch(() => null);
 	}
 
@@ -450,7 +453,7 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 				);
 				const file = join(
 					await folders.ensure(projectId),
-					...QUESTIONS_FILE.split("/"),
+					...QUESTION_SET_FILE.split("/"),
 				);
 				await writeWhole(file, formatQuestions(next));
 				return next;
@@ -475,17 +478,17 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 				"not-found",
 				"This learning no longer waits. Someone kept or deleted it.",
 			);
-			if (!proposalOf(id)) throw gone;
+			if (!proposedLearningOf(id)) throw gone;
 			const hold = await sync.startStep(projectId);
 			try {
 				const root = folders.folder(projectId);
-				const proposed = join(root, ...PROPOSED_DIR.split("/"), id);
+				const proposed = join(root, ...PROPOSED_LEARNINGS_DIR.split("/"), id);
 				const content = await readFile(proposed).catch(() => null);
 				if (content === null) {
 					// Listed in the Space, but its content did not reach this folder.
 					const listed = knowledgeEntries(
 						await deps.documents.open(projectId),
-					).has(`${PROPOSED_DIR}/${id}`);
+					).has(`${PROPOSED_LEARNINGS_DIR}/${id}`);
 					if (!listed) throw gone;
 					throw new Refusal(
 						"unavailable",
@@ -493,7 +496,7 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 					);
 				}
 				if (decision === "keep") {
-					const accepted = join(root, ...ACCEPTED_DIR.split("/"));
+					const accepted = join(root, ...ACCEPTED_LEARNINGS_DIR.split("/"));
 					await mkdir(accepted, { recursive: true });
 					await appendFile(join(accepted, id), content);
 				}

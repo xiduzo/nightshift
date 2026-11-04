@@ -771,6 +771,33 @@ describe("kit:jira", () => {
 describe("the knowledge kits", () => {
 	const read = (path: string) => readFile(join(knowledge, path), "utf8");
 
+	// The kits generate this shell from the layout, and a project's copy of a
+	// kit holds it as written: a change here leaves those copies behind.
+	test("their shell keeps the names that copies in projects already hold", () => {
+		const shell = (name: string, id = "sync") => {
+			const node = kit(name).nodes.find((one) => one.id === id);
+			return node?.type === "command" ? node.command : "";
+		};
+		for (const name of ["files", "folder", "web", "jira", "confluence"]) {
+			expect(shell(`kit:knowledge/${name}`)).toContain(
+				`*/../*|learnings|learnings/*|evals|evals/*) echo "Choose a folder inside the knowledge folder, for example docs. learnings and evals are Night Shift's own."`,
+			);
+		}
+		for (const name of ["files", "folder"]) {
+			expect(shell(`kit:knowledge/${name}`)).toContain('part="$dest.part"');
+		}
+		expect(shell("kit:knowledge/web")).toContain('part="$dest/$name.md.part"');
+		expect(shell("kit:knowledge/jira")).toContain('"$dest/$key.json.part"');
+		expect(shell("kit:knowledge/confluence")).toContain(
+			'"$dest/$id.json.part"',
+		);
+		for (const id of ["list", "keep", "delete"]) {
+			const review = shell("kit:knowledge/review-learnings", id);
+			expect(review).toContain('proposed="$NS_KNOWLEDGE/learnings/proposed"');
+			expect(review).toContain('accepted="$NS_KNOWLEDGE/learnings/accepted"');
+		}
+	});
+
 	test("every one refuses a folder outside the knowledge, or Night Shift's own", async () => {
 		for (const folder of [
 			"../out",

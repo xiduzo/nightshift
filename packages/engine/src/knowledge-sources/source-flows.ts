@@ -3,6 +3,7 @@ import {
 	type Flow,
 	flowNameSchema,
 	flowSchema,
+	isKnowledgeKit,
 	isKnowledgeOwnFolder,
 	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_OWN_FOLDERS_WORDS,
@@ -25,9 +26,6 @@ import { Refusal } from "@nightshift/refusal";
 
 /** The project's flows by name, null for one that is not valid. */
 export type FlowMap = Readonly<Record<string, Flow | null>>;
-
-/** What the knowledge kits' names start with. */
-const KNOWLEDGE_KITS = "kit:knowledge/";
 
 /**
  * Whether a source's schedule is this one: the source's own cron schedule.
@@ -142,9 +140,7 @@ export function sourceOf(flow: Flow): KnowledgeSource | null {
 export function foldersOf(flow: Flow): string[] {
 	const folders = new Set<string>();
 	for (const node of flow.nodes) {
-		if (node.type !== "call" || !node.flow.startsWith(KNOWLEDGE_KITS)) {
-			continue;
-		}
+		if (node.type !== "call" || !isKnowledgeKit(node.flow)) continue;
 		const bound = node.inputs[KNOWLEDGE_FOLDER_INPUT];
 		const folder =
 			bound !== undefined

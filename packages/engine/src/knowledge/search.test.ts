@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
 import { tinyDocx, tinyPdf } from "../testing/documents";
 import { createKnowledgeFolders } from "./folder";
 import {
@@ -9,7 +10,6 @@ import {
 	type KnowledgeHit,
 	type KnowledgeSearch,
 	matchQuery,
-	SEARCH_FILE,
 } from "./search";
 
 let dataDir: string;
@@ -196,7 +196,7 @@ describe("knowledge search", () => {
 		await put("a.md", "alpha");
 		search.close();
 		await writeFile(
-			join(dataDir, "knowledge", SEARCH_FILE),
+			join(dataDir, "knowledge", KNOWLEDGE_SEARCH_FILE),
 			"not a database at all, ".repeat(400),
 		);
 		search = createKnowledgeSearch(dataDir);

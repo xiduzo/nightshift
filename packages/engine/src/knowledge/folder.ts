@@ -9,6 +9,11 @@ import {
 } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
+import {
+	isHiddenFromReaders,
+	KNOWLEDGE_INDEX_FILE,
+	KNOWLEDGE_STAGING_SUFFIX,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";
 import { writeWhole } from "../archive";
@@ -20,7 +25,6 @@ import {
 	loadDocumentContent,
 	textOf,
 } from "./documents";
-import { isProposal } from "./learnings";
 
 /**
  * The knowledge folder of a project: markdown (and any other files) that
@@ -98,13 +102,6 @@ export type KnowledgeReadFrom = {
 	page?: number;
 };
 
-/** The file Night Shift writes at the top of the folder. */
-export const INDEX_FILE = "INDEX.md";
-/**
- * What the sync kits name a file or folder while they write it, before a
- * rename makes it whole (`$dest.part`, `page.md.part`): never knowledge.
- */
-const STAGING_SUFFIX = ".part";
 /** The longest path the knowledge takes. */
 const MAX_PATH = 1024;
 /** The most files the index lists: a folder past it is far too large to read. */
@@ -127,26 +124,16 @@ const INDEX_INTRO =
 export function isKnowledgePath(path: string): boolean {
 	if (path === "" || path.length > MAX_PATH) return false;
 	// Not even in another case: on macOS, `index.md` is the index.
-	if (path.toLowerCase() === INDEX_FILE.toLowerCase()) return false;
+	if (path.toLowerCase() === KNOWLEDGE_INDEX_FILE.toLowerCase()) return false;
 	if (/[\\\0]/.test(path)) return false;
 	return path
 		.split("/")
 		.every(
 			(part) =>
-				part !== "" && !part.startsWith(".") && !part.endsWith(STAGING_SUFFIX),
+				part !== "" &&
+				!part.startsWith(".") &&
+				!part.endsWith(KNOWLEDGE_STAGING_SUFFIX),
 		);
-}
-
-/**
- * Night Shift's own folder for the project's question set
- * (`questions.ts`): it syncs with the knowledge, like the learnings, but no
- * agent reads it and no source fills it.
- */
-export const EVALS_DIR = "evals";
-
-/** Whether a path of the knowledge is in the question set's folder, or is it. */
-export function isEvalsPath(path: string): boolean {
-	return path === EVALS_DIR || path.startsWith(`${EVALS_DIR}/`);
 }
 
 /**
@@ -155,7 +142,7 @@ export function isEvalsPath(path: string): boolean {
  * `read_knowledge` take these only.
  */
 export function isReadable(path: string): boolean {
-	return isKnowledgePath(path) && !isProposal(path) && !isEvalsPath(path);
+	return isKnowledgePath(path) && !isHiddenFromReaders(path);
 }
 
 /** A file's title when its text gives none: its name without the extension. */
@@ -234,7 +221,7 @@ export function createKnowledgeFolders(dataDir: string) {
  */
 export async function indexFolder(dir: string): Promise<KnowledgeFile[]> {
 	const { files, newest } = await walkFolder(dir, readable);
-	const indexPath = join(dir, INDEX_FILE);
+	const indexPath = join(dir, KNOWLEDGE_INDEX_FILE);
 	const written = await stat(indexPath).catch(() => null);
 	const text =
 		written === null ? "" : await readFile(indexPath, "utf8").catch(() => "");

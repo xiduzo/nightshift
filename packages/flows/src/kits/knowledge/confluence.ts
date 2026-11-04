@@ -1,4 +1,5 @@
 import type { FlowInput } from "../../flow";
+import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
 import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
 
 /** The secret the kit reads: an Atlassian API token. */
@@ -68,9 +69,9 @@ mkdir -p "$dest"
 # Split the list, but never read a pattern in it.
 set -f
 for id in $(printf '%s' "$pages" | tr ',' ' '); do
-	curl -fsS --max-time 120 -u "$email:$${TOKEN}" -H "Accept: application/json" "https://$site/wiki/api/v2/pages/$id?body-format=storage" > "$dest/$id.json.part"
-	jq -r '${PAGE_MARKDOWN}' "$dest/$id.json.part" > "$dest/$id.md"
-	rm -f "$dest/$id.json.part"
+	curl -fsS --max-time 120 -u "$email:$${TOKEN}" -H "Accept: application/json" "https://$site/wiki/api/v2/pages/$id?body-format=storage" > "$dest/$id.json${KNOWLEDGE_STAGING_SUFFIX}"
+	jq -r '${PAGE_MARKDOWN}' "$dest/$id.json${KNOWLEDGE_STAGING_SUFFIX}" > "$dest/$id.md"
+	rm -f "$dest/$id.json${KNOWLEDGE_STAGING_SUFFIX}"
 done
 ${COUNT_FILES}`,
 				exits: [

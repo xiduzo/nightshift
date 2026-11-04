@@ -1,4 +1,5 @@
 import type { FlowInput } from "../../flow";
+import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
 import { COUNT_FILES, folderInput, KNOWLEDGE_DEST, syncEnds } from "./shell";
 
 /**
@@ -42,7 +43,7 @@ common=$(git rev-parse --git-common-dir)
 case "$common" in /*) ;; *) common="$PWD/$common" ;; esac
 project=$(cd "$common/.." && pwd)
 from="{{from}}"
-part="$dest.part"
+part="$dest${KNOWLEDGE_STAGING_SUFFIX}"
 rm -rf "$part"
 mkdir -p "$part"
 cd "$project"

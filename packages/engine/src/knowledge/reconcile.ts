@@ -10,6 +10,16 @@ import {
 import { dirname, join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { organization, project } from "@nightshift/db/schema";
+import {
+	isKnowledgeOwnFolder,
+	isProposedLearning,
+	isProposedLearningFile,
+	isQuestionSetPath,
+	KNOWLEDGE_OWN_FOLDERS_WORDS,
+	KNOWLEDGE_RECONCILE_FILE,
+	PROPOSED_LEARNINGS_DIR,
+	proposedLearningOf,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
@@ -23,7 +33,6 @@ import { OLDER_HOST, OlderHostError } from "../contract";
 import type { PersistedDocument } from "../documents";
 import { LOCAL_ONLY_BYTES } from "./documents";
 import {
-	isEvalsPath,
 	isKnowledgePath,
 	isReadable,
 	type KnowledgeFile,
@@ -39,16 +48,7 @@ import {
 	knowledgeEntries,
 	knowledgeFiles,
 } from "./knowledge-document";
-import {
-	isLearningsFolder,
-	isProposal,
-	isProposalFile,
-	notesIn,
-	notesOf,
-	PROPOSED_DIR,
-	proposalOf,
-	type WaitingLearning,
-} from "./learnings";
+import { notesIn, notesOf, type WaitingLearning } from "./learnings";
 
 /**
  * Knowledge in the Space (ADR 4): each Device's folder is a working copy
@@ -134,8 +134,6 @@ export type KnowledgeSyncDeps = {
 	pageWaitMs?: number;
 };
 
-/** The state of the last reconcile, in the folder. Hidden: no walk lists it. */
-const STATE_FILE = ".reconciled.json";
 /** How long a reconcile waits for the document to be in step with the Host: before it, and after a change. */
 const IN_STEP_BEFORE_MS = 3_000;
 const IN_STEP_AFTER_MS = 10_000;
@@ -600,8 +598,8 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				a.localeCompare(b),
 			)) {
 				// The question set is Night Shift's own: the page shows it elsewhere.
-				if (isEvalsPath(path)) continue;
-				if (!isProposal(path)) {
+				if (isQuestionSetPath(path)) continue;
+				if (!isProposedLearning(path)) {
 					files.push({
 						path,
 						size: entry.size,
@@ -610,7 +608,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					});
 					continue;
 				}
-				if (!isProposalFile(path)) continue;
+				if (!isProposedLearningFile(path)) continue;
 				const content = spaceId
 					? await archive
 							.read({ kind: "content", spaceId, sha256: entry.sha256 })
@@ -638,9 +636,9 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			const entries = knowledgeEntries(await deps.documents.open(projectId));
 			const waiting: WaitingLearning[] = [];
 			for (const [path, entry] of entries) {
-				if (!isProposalFile(path)) continue;
-				const id = path.slice(PROPOSED_DIR.length + 1);
-				const step = proposalOf(id);
+				if (!isProposedLearningFile(path)) continue;
+				const id = path.slice(PROPOSED_LEARNINGS_DIR.length + 1);
+				const step = proposedLearningOf(id);
 				if (!step) continue;
 				const content = await archive
 					.read({ kind: "content", spaceId, sha256: entry.sha256 })
@@ -716,14 +714,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		async removeFolder(projectId: string, folder: string): Promise<number> {
 			const name = folder.replace(/\/+$/, "");
 			const prefix = `${name}/`;
-			if (
-				!isKnowledgePath(`${prefix}x`) ||
-				isLearningsFolder(name) ||
-				isEvalsPath(name)
-			) {
+			if (!isKnowledgePath(`${prefix}x`) || isKnowledgeOwnFolder(name)) {
 				throw new Refusal(
 					"invalid",
-					"Choose a folder inside the knowledge. learnings and evals are Night Shift's own.",
+					`Choose a folder inside the knowledge. ${KNOWLEDGE_OWN_FOLDERS_WORDS}`,
 				);
 			}
 			if (busy(projectId)) {
@@ -832,7 +826,10 @@ function hasHistory(document: PersistedDocument): boolean {
 }
 
 async function readState(root: string): Promise<State | null> {
-	const text = await readFile(join(root, STATE_FILE), "utf8").catch(() => null);
+	const text = await readFile(
+		join(root, KNOWLEDGE_RECONCILE_FILE),
+		"utf8",
+	).catch(() => null);
 	if (text === null) return null;
 	try {
 		const parsed = JSON.parse(text) as Partial<State>;
@@ -847,7 +844,7 @@ async function readState(root: string): Promise<State | null> {
 }
 
 async function writeState(root: string, state: State): Promise<void> {
-	await writeWhole(join(root, STATE_FILE), JSON.stringify(state));
+	await writeWhole(join(root, KNOWLEDGE_RECONCILE_FILE), JSON.stringify(state));
 }
 
 /**
