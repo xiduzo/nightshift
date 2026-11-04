@@ -175,6 +175,7 @@ export {
 	formatLearnings,
 	isHiddenFromReaders,
 	isKitName,
+	isKnowledgeId,
 	isKnowledgeKit,
 	isKnowledgeOwnFolder,
 	isProposedLearning,

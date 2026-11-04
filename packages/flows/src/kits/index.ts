@@ -13,6 +13,7 @@ export {
 export {
 	ACCEPTED_LEARNINGS_DIR,
 	isHiddenFromReaders,
+	isKnowledgeId,
 	isKnowledgeOwnFolder,
 	isProposedLearning,
 	isQuestionSetPath,

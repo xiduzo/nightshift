@@ -87,8 +87,12 @@ export function isHiddenFromReaders(path: string): boolean {
 const ID_START =
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-/** Ids that become a part of a file name. */
 const ID = new RegExp(`^[${ID_START}][${ID_START}_-]*$`);
+
+/** Whether an id can be one file or folder name: nothing that could leave the folder. */
+export function isKnowledgeId(id: string): boolean {
+	return ID.test(id);
+}
 
 /**
  * The name of a step's file in `learnings/proposed/`: `<runId>.<stepId>.md`,
@@ -100,7 +104,7 @@ export function proposedLearningFileName(step: {
 }): string {
 	const { runId, stepId } = step;
 	for (const id of [runId, ...(stepId === undefined ? [] : [stepId])]) {
-		if (!ID.test(id)) throw new Error(`"${id}" is not an id.`);
+		if (!isKnowledgeId(id)) throw new Error(`"${id}" is not an id.`);
 	}
 	return stepId === undefined ? `${runId}.md` : `${runId}.${stepId}.md`;
 }
@@ -116,9 +120,10 @@ export function proposedLearningOf(
 	if (!name.endsWith(".md")) return null;
 	const parts = name.slice(0, -3).split(".");
 	const [runId, stepId, ...rest] = parts;
-	if (runId === undefined || rest.length > 0 || !ID.test(runId)) return null;
+	if (runId === undefined || rest.length > 0 || !isKnowledgeId(runId))
+		return null;
 	if (stepId === undefined) return { runId, stepId: null };
-	return ID.test(stepId) ? { runId, stepId } : null;
+	return isKnowledgeId(stepId) ? { runId, stepId } : null;
 }
 
 /**

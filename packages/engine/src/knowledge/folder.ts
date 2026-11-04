@@ -10,7 +10,7 @@ import {
 import { extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
 import { KNOWLEDGE_INDEX_INTRO } from "@nightshift/agents/tools";
-import { KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
+import { isKnowledgeId, KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";
 import { writeWhole } from "../archive";
@@ -125,12 +125,9 @@ function fallbackTitle(path: string): string {
 	return name.slice(0, name.length - extname(name).length) || name;
 }
 
-/** Whether an id is one file or folder name: nothing that could leave the folder. */
-const isId = (id: string) => /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
-
 /** An id as one file or folder name: nothing that could leave the folder. */
 function folderName(id: string): string {
-	if (!isId(id)) {
+	if (!isKnowledgeId(id)) {
 		throw new Error(`"${id}" is not an id.`);
 	}
 	return id;
@@ -159,7 +156,7 @@ export function createKnowledgeFolders(dataDir: string) {
 				() => [],
 			);
 			return names
-				.filter((entry) => entry.isDirectory() && isId(entry.name))
+				.filter((entry) => entry.isDirectory() && isKnowledgeId(entry.name))
 				.map((entry) => entry.name)
 				.sort();
 		},
