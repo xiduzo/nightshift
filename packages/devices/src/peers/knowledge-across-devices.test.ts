@@ -15,7 +15,8 @@ import {
 	testKnowledge,
 	waitFor,
 } from "@nightshift/engine/testing";
-import { kitFlow } from "@nightshift/flows";
+import { REVIEW_LEARNINGS_KIT } from "@nightshift/flows";
+import { kitCommand } from "@nightshift/flows/testing";
 import { eq } from "drizzle-orm";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 
@@ -89,10 +90,14 @@ function knowledgeOn(
 		reconcile: () => knowledge.listing(projectId),
 		dir,
 		/** A command step on this Device, with the project's knowledge. */
-		async exec(command: string): Promise<ExecEvent[]> {
+		async exec(
+			command: string,
+			env: Record<string, string> = {},
+		): Promise<ExecEvent[]> {
 			const events: ExecEvent[] = [];
 			for await (const event of device.exec({
 				command,
+				env,
 				cwd: sandbox.repoPath,
 				knowledge: { projectId },
 				signal: new AbortController().signal,
@@ -169,13 +174,11 @@ describe("knowledge in the Space, across paired Devices", () => {
 		// The Knowledge page on A counts them.
 		expect((await onA.reconcile()).proposed).toBe(2);
 
-		// The review runs on C: the kit's own Keep command, unchanged.
-		const kit = kitFlow("kit:knowledge/review-learnings");
-		const keep = kit?.nodes.find((node) => node.id === "keep");
-		if (keep?.type !== "command") throw new Error("The kit has no Keep.");
-		const ran = await onC.exec(
-			keep.command.replace("{{list.data.files}}", "run-1.md"),
-		);
+		// The review runs on C: the kit's own Keep, rendered as a step renders it.
+		const { command, env } = kitCommand(REVIEW_LEARNINGS_KIT, "keep", {
+			list: { data: { files: " run-1.md" } },
+		});
+		const ran = await onC.exec(command, env);
 		expect(ran.at(-1)).toMatchObject({ type: "exit", exitCode: 0 });
 		expect(await onC.has("learnings/proposed/run-1.md")).toBe(false);
 
