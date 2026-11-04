@@ -418,14 +418,22 @@ way to run Ollama.
 
 The Knowledge page says whether search by meaning is on, which Ollama it
 uses ("on this computer" or the host name), how far a download or the
-first preparation is, and when Ollama does not answer.
+first preparation is, when Ollama does not answer, and when a preparation
+stopped.
 
 After each change to the folder, Night Shift embeds the new and changed
 sections in the background (`@langchain/ollama`, `num_ctx` 2048, so the
 model takes about 1 GB of memory). A search never waits for it. It uses
 the vectors there are and finds the rest by words. On an M4 Max the first
 preparation of 1 100 sections takes about one minute. Later ones embed
-only the sections that changed.
+only the sections that changed. A section that moves in its file keeps its
+vector: the section's id comes from its path, the file's title and its text.
+
+A project prepares only when someone looks at it: a search, or the Knowledge
+page. One project prepares at a time. A preparation that fails keeps what it
+embedded. The next look at least one minute later tries again, and embeds
+only the rest. Each project has one state in `vector-preparation.ts`: `idle`,
+`queued`, `preparing`, `failed` or `ready`.
 
 On a CPU it is much slower. In the Night Shift image under Docker Desktop
 on an M4 Max (16 vCPUs), Ollama embeds about 0.25 sections per second with
@@ -457,7 +465,9 @@ or time of change differ, and splits again only those whose content hash
 changed. It drops the removed ones. Thus the index stays correct, whoever
 changes the folder. For 2 000 files the first search takes about half a
 second, and a later one about 50 ms. It reads the first 1 MB of a file.
-A new embedding model builds the vectors again.
+A new embedding model builds the vectors again. So does a new version of the
+index (`SCHEMA_VERSION` in `search-store.ts`, the one module that knows its
+tables).
 
 An agent that gets the folder can still read `INDEX.md` and grep the
 folder. In `nightshift mcp` the tools take a `project` too. In a step they

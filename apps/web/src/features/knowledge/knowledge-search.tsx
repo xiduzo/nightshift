@@ -34,7 +34,7 @@ import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { knowledgeQueries } from "./queries";
 import { useKnowledgeHits } from "./use-knowledge-hits";
 
-/** How often the page asks again while search by meaning gets ready, in ms. */
+/** How often the page asks again while search by meaning gets ready or stopped, in ms. A look is also what tries a stopped one again. */
 const PREPARING_POLL = 5000;
 
 /**
@@ -160,7 +160,9 @@ function MeaningLine({ projectId }: { projectId: string }) {
 		...knowledgeQueries.meaning(projectId),
 		refetchInterval: (query) => {
 			const state = query.state.data?.state;
-			return state === "preparing" || state === "downloading"
+			return state === "preparing" ||
+				state === "downloading" ||
+				state === "failed"
 				? PREPARING_POLL
 				: false;
 		},
@@ -169,17 +171,19 @@ function MeaningLine({ projectId }: { projectId: string }) {
 	if (!status || status.state === "off") return null;
 	const where = status.where ? `at ${status.where}` : "on this computer";
 	const pull = <code className="font-mono">ollama pull {status.model}</code>;
+	const done =
+		status.total > 0 ? Math.floor((status.done / status.total) * 100) : 0;
 	return (
 		<p className="text-muted-foreground text-sm">
 			{status.state === "on" ? (
 				"Search finds files by their words and by their meaning."
 			) : status.state === "preparing" ? (
+				<>Search by meaning gets ready: {done}% done.</>
+			) : status.state === "failed" ? (
 				<>
-					Search by meaning gets ready:{" "}
-					{status.total > 0
-						? Math.floor((status.done / status.total) * 100)
-						: 0}
-					% done.
+					Search by meaning stopped at {done}%. Night Shift tries again each
+					minute, and search finds words until then. If this stays, restart
+					Ollama {where}.
 				</>
 			) : status.state === "turned-off" ? (
 				"Search finds words only. Search by meaning is off for this project."
