@@ -70,6 +70,21 @@ describe("TopicGraphTransformer", () => {
 		expect(labels.some((label) => label.includes("\n"))).toBe(false);
 	});
 
+	test("the first word of a line is not a name, and The never is", async () => {
+		const documents = await new TopicGraphTransformer().convertToGraphDocuments(
+			[
+				doc("a.md", "The first line\nNumbers in a line and see The end"),
+				doc("b.md", "The second line\nNumbers in a line and see The end"),
+			],
+		);
+		const labels = documents
+			.flatMap((document) => document.nodes)
+			.filter((node) => node.type === "Topic")
+			.map((node) => String(node.properties.label));
+		expect(labels).not.toContain("The");
+		expect(labels).not.toContain("Numbers");
+	});
+
 	test("no words in common: no topics", async () => {
 		const documents = await new TopicGraphTransformer().convertToGraphDocuments(
 			[doc("a.md", "apples pears"), doc("b.md", "engines wheels")],

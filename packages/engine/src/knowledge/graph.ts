@@ -71,6 +71,7 @@ const STOP_WORDS = new Set(
 	months monthly daily weekly annual annually sample samples source sources window publication published
 	address january february march april june july august september october november december
 	jan feb mar apr jun jul aug sep sept oct nov dec return returns index strategy strategies
+	the and for but not are was has its our you this that with from
 	deze voor naar maar niet door worden wordt zijn heeft hebben meer veel ook onze wij jouw`
 		.split(/\s+/)
 		.filter(Boolean),
@@ -104,9 +105,9 @@ function termsOf(text: string): Map<string, Term> {
 		else terms.set(key, { count: weight, shown });
 	};
 	const plain = plainText(text);
-	// Names: "Dual Momentum", "CAGR". Not the first word of a sentence.
+	// Names: "Dual Momentum", "CAGR". Not the first word of a sentence or a line.
 	for (const match of plain.matchAll(
-		/(?<![.!?:]\s)(?<=\s)([A-Z][a-zA-Z0-9]+(?:[ \t]+[A-Z][a-zA-Z0-9]+){0,2})\b/g,
+		/(?<![.!?:]\s)(?<=[ \t])([A-Z][a-zA-Z0-9]+(?:[ \t]+[A-Z][a-zA-Z0-9]+){0,2})\b/g,
 	)) {
 		const shown = match[1] ?? "";
 		if (shown.length < 3) continue;
