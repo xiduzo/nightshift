@@ -29,7 +29,7 @@ export type KnowledgeListing = {
 	olderHost: boolean;
 };
 
-export type KnowledgeReaderDeps = {
+type KnowledgeReaderDeps = {
 	folders: Pick<KnowledgeFolders, "read">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	/** The content by hash: here, and at the Space's Host. */

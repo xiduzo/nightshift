@@ -11,7 +11,7 @@ import { z } from "zod";
  */
 
 /** One word a person marked. */
-export type NotTopic = {
+type NotTopic = {
 	/** As the person saw it on the Map. */
 	word: string;
 	/** Epoch ms: when they marked it. */

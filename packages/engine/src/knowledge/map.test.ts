@@ -7,7 +7,7 @@ import type { ArchiveHost } from "../archive";
 import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { testKnowledge } from "../testing/knowledge";
-import { closeFiles, type FileVector, MAX_CLOSE_FILES } from "./map";
+import { knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
 
 /** The Map, through the door's `map`: what a person sees, whatever draws it. */
@@ -546,7 +546,28 @@ describe("files close in meaning", () => {
 	});
 });
 
-describe("closeFiles", () => {
+describe("files close in meaning", () => {
+	/** The pairs the Map connects, drawn from these vectors alone. */
+	const closeFiles = (
+		vectors: { path: string; vector: Float32Array }[],
+		closeAt: number,
+	) =>
+		knowledgeMapOf({
+			files: vectors.map(({ path }) => path),
+			read: [],
+			filesLeftOut: 0,
+			vectors,
+			closeAt,
+			asked: [],
+			learnings: [],
+			notTopics: [],
+		})
+			.edges.filter((edge) => edge.kind === "close")
+			.map((edge) => [
+				edge.source.replace("file:", ""),
+				edge.target.replace("file:", ""),
+			]);
+
 	/** A unit vector along one dimension, a little to the side by `lean`. */
 	const along = (dimension: number, lean = 0, size = 8) => {
 		const vector = new Float32Array(size);
@@ -556,9 +577,10 @@ describe("closeFiles", () => {
 	};
 
 	test("a file that is close to everything connects only to its closest ones", () => {
-		const others = ["a", "b", "c", "d", "e"].map(
-			(path, at): FileVector => ({ path, vector: along(0, at * 0.01) }),
-		);
+		const others = ["a", "b", "c", "d", "e"].map((path, at) => ({
+			path,
+			vector: along(0, at * 0.01),
+		}));
 		const pairs = closeFiles(others, 0.5);
 		const edgesOf = (path: string) =>
 			pairs.filter((pair) => pair.includes(path)).length;
@@ -597,29 +619,27 @@ describe("closeFiles", () => {
 	});
 
 	test("compares the first files only, so a big project does not stall the page", () => {
-		const count = MAX_CLOSE_FILES + 100;
+		const compared = 400;
+		const count = compared + 100;
 		const name = (at: number) => `file-${String(at).padStart(5, "0")}`;
 		// In pairs: each file is close to its neighbour and to nothing else.
-		const vectors = Array.from(
-			{ length: count },
-			(_, at): FileVector => ({
-				path: name(at),
-				vector: (() => {
-					const vector = new Float32Array(1024);
-					const pair = Math.floor(at / 2);
-					vector[pair % 1024] = 1;
-					vector[(pair * 7 + 1) % 1024] = 0.5;
-					return vector;
-				})(),
-			}),
-		);
+		const vectors = Array.from({ length: count }, (_, at) => ({
+			path: name(at),
+			vector: (() => {
+				const vector = new Float32Array(1024);
+				const pair = Math.floor(at / 2);
+				vector[pair % 1024] = 1;
+				vector[(pair * 7 + 1) % 1024] = 0.5;
+				return vector;
+			})(),
+		}));
 		const started = performance.now();
 		const pairs = closeFiles(vectors, 0.99);
 		const took = performance.now() - started;
 		const paths = new Set(pairs.flat());
 		expect(paths.has(name(0))).toBe(true);
-		expect(paths.has(name(MAX_CLOSE_FILES - 2))).toBe(true);
-		expect(paths.has(name(MAX_CLOSE_FILES))).toBe(false);
+		expect(paths.has(name(compared - 2))).toBe(true);
+		expect(paths.has(name(compared))).toBe(false);
 		expect(paths.has(name(count - 1))).toBe(false);
 		// Far above what it takes on a quiet computer: this holds on a busy one.
 		expect(took).toBeLessThan(10_000);

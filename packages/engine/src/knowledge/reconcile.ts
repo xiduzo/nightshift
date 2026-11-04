@@ -59,7 +59,7 @@ import type { SpaceHostStatus } from "./space-host-status";
  * document has the path too. `INDEX.md` and hidden files never sync.
  */
 
-export type KnowledgeSyncDeps = {
+type KnowledgeSyncDeps = {
 	folders: Pick<KnowledgeFolders, "folder" | "known" | "scan">;
 	documents: Pick<KnowledgeDocuments, "open" | "remove">;
 	/** The content by hash: here, and at the Space's Host. */
@@ -95,7 +95,7 @@ type Kept = KnowledgeEntry & { mtimeMs: number };
 type State = { files: Record<string, Kept>; unpushed: string[] };
 
 /** A Project of a Space move: its Space and id before, and after (`ProjectsMoved` of the run). */
-export type MovedProject = {
+type MovedProject = {
 	from: { spaceId: string; projectId: string };
 	to: { spaceId: string; projectId: string };
 };

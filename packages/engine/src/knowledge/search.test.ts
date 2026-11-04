@@ -9,7 +9,6 @@ import {
 	createKnowledgeSearch,
 	type KnowledgeHit,
 	type KnowledgeSearch,
-	matchQuery,
 } from "./search";
 
 let dataDir: string;
@@ -228,14 +227,32 @@ describe("knowledge search", () => {
 	});
 });
 
-describe("matchQuery", () => {
-	test("quotes every word, keeps phrases and makes the last word a prefix", () => {
-		expect(matchQuery("deploy app", "all")).toBe('"deploy" "app"*');
-		expect(matchQuery('"night shift" run*', "any")).toBe(
-			'"night shift" OR "run"*',
-		);
-		expect(matchQuery('say "hello there"', "all")).toBe('"say" "hello there"');
-		expect(matchQuery("* () :", "all")).toBeNull();
+describe("what a person types", () => {
+	test("every word must match, and the last word is a prefix", async () => {
+		await put("a.md", "We deploy the application at night.");
+		await put("b.md", "We deploy the database at night.");
+		expect(paths(await search.search("p1", "deploy app"))).toEqual(["a.md"]);
+	});
+
+	test("a quoted phrase keeps its words together, and its last word whole", async () => {
+		await put("a.md", "The night shift ran.");
+		await put("b.md", "A shift in the night ran.");
+		await put("c.md", "The night shifter ran.");
+		expect(paths(await search.search("p1", '"night shift"'))).toEqual(["a.md"]);
+	});
+
+	test("with no section that has all the words, sections with some of them", async () => {
+		await put("a.md", "The night shift ran.");
+		await put("b.md", "Runners rest here.");
+		await put("c.md", "Nothing of it.");
+		expect(
+			paths(await search.search("p1", '"night shift" run*')).sort(),
+		).toEqual(["a.md", "b.md"]);
+	});
+
+	test("nothing to look for finds nothing", async () => {
+		await put("a.md", "Some text.");
+		expect(await search.search("p1", "* () :")).toEqual([]);
 	});
 });
 

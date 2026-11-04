@@ -67,7 +67,7 @@ import {
 } from "./use";
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
-export type KnowledgeHosts = {
+type KnowledgeHosts = {
 	/** Waits until this Replica's documents of a Space are in step with its Host's. */
 	inStep(
 		spaceId: string,
@@ -82,13 +82,13 @@ export type KnowledgeHosts = {
 };
 
 /** A question agents asked, and the files a person marked as its answer. */
-export type AskedQuestionWithAnswers = AskedQuestion & {
+type AskedQuestionWithAnswers = AskedQuestion & {
 	/** Null: it is not in the question set. */
 	answers: string[] | null;
 };
 
 /** The questions agents asked a project's knowledge, and its question set. */
-export type KnowledgeQuestions = {
+type KnowledgeQuestions = {
 	asked: AskedQuestionWithAnswers[];
 	set: KnowledgeQuestion[];
 };

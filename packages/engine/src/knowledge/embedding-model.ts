@@ -8,11 +8,9 @@
  * `docs/research/knowledge-vectors.md` §3.4. A model nobody has measured gets
  * no record: `docs/knowledge.md` lists the ones to watch.
  */
-export type EmbeddingModel = {
+type EmbeddingModel = {
 	/** The name as Ollama knows it. */
 	name: string;
-	/** The length of a vector, in the measurement. */
-	dims: number;
 	/**
 	 * What goes in front of a query. Null: nothing. Documents get nothing
 	 * either way. This is a fact of the model, so other sizes of it get it too.
@@ -34,7 +32,6 @@ export type EmbeddingModel = {
 
 const QWEN3: EmbeddingModel = {
 	name: "qwen3-embedding:0.6b",
-	dims: 1024,
 	instruct:
 		"Instruct: Given a question, retrieve passages of project documentation that answer it\nQuery:",
 	floor: 0.5,

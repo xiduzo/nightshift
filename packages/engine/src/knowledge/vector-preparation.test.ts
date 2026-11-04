@@ -8,7 +8,10 @@ import { watchVectorPreparation } from "../testing/vector-preparation";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
 import { createSearchStore, type SearchStore } from "./search-store";
 import { sectionId } from "./sections";
-import { createVectorPreparation, RETRY_MS } from "./vector-preparation";
+import { createVectorPreparation } from "./vector-preparation";
+
+/** After a failed preparation, how long until the next try. */
+const RETRY_MS = 60_000;
 
 /** Embeddings a test holds and fails at will, to stand in a transition. */
 class HeldEmbeddings extends SynonymEmbeddings {

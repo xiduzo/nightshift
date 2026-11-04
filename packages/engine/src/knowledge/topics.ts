@@ -22,7 +22,7 @@
 export type TextOfFile = { path: string; text: string };
 
 /** What the topics of some files are. */
-export type FoundTopics = {
+type FoundTopics = {
 	/** Each topic by its key, as the text writes it. */
 	topics: Map<string, string>;
 	/** The topics of a file, by path, the most named first. */

@@ -100,7 +100,7 @@ function folderClause(folders: readonly string[]): {
 }
 
 /** A file as the index has it. */
-export type IndexedFile = {
+type IndexedFile = {
 	id: number;
 	path: string;
 	size: number;

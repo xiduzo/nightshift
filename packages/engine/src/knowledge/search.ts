@@ -61,10 +61,10 @@ import { inFolders } from "./view";
  */
 
 /** A part of a hit's excerpt: `match` parts are the words the query found. */
-export type KnowledgeSnippetPart = { text: string; match: boolean };
+type KnowledgeSnippetPart = { text: string; match: boolean };
 
 /** How a search found a file: by the words of the query, or by its meaning. */
-export type KnowledgeFound = "words" | "meaning";
+type KnowledgeFound = "words" | "meaning";
 
 /** A file a search found, at its best section. */
 export type KnowledgeHit = {
@@ -92,7 +92,7 @@ export type KnowledgeHit = {
 export type KnowledgeSearchMode = "words" | "meaning" | "both";
 
 /** What a refresh did. */
-export type KnowledgeRefresh = {
+type KnowledgeRefresh = {
 	/** Text files the folder has now. */
 	files: number;
 	/** Files read and indexed again: new or changed. */
@@ -227,7 +227,7 @@ function within<T>(promise: Promise<T>, ms: number): Promise<T> {
  * last word (search as you type). `all`: every word must match. `any`: one
  * is enough.
  */
-export function matchQuery(input: string, mode: "all" | "any"): string | null {
+function matchQuery(input: string, mode: "all" | "any"): string | null {
 	const terms: { text: string; phrase: boolean; prefix: boolean }[] = [];
 	for (const found of input.matchAll(/"([^"]*)"|(\S+)/g)) {
 		const phrase = found[1] !== undefined;
@@ -298,14 +298,14 @@ type MeaningHit = {
 };
 
 /** What the Map reads of the index, at most. */
-export type MapLimits = {
+type MapLimits = {
 	maxBytes: number;
 	maxBytesPerFile: number;
 	maxVectors: number;
 };
 
 /** What the index holds for the Map. */
-export type IndexForMap = {
+type IndexForMap = {
 	/** Every file it has. */
 	files: string[];
 	read: { path: string; sections: string[] }[];

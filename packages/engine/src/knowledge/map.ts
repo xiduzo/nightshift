@@ -26,7 +26,7 @@ export function questionNode(query: string): string {
 	return `question:${query}`;
 }
 
-export type KnowledgeMapNode = {
+type KnowledgeMapNode = {
 	/** `file:<path>`, `topic:<key>`, `question:<query>` or `learning:<id>`. */
 	id: string;
 	kind: "file" | "topic" | "question" | "learning";
@@ -37,7 +37,7 @@ export type KnowledgeMapNode = {
 	degree: number;
 };
 
-export type KnowledgeMapEdge = {
+type KnowledgeMapEdge = {
 	id: string;
 	source: string;
 	target: string;
@@ -59,10 +59,10 @@ export type KnowledgeMap = {
 };
 
 /** A section's vector, with its file. */
-export type FileVector = { path: string; vector: Float32Array };
+type FileVector = { path: string; vector: Float32Array };
 
 /** A file's sections as the index holds them, in order. */
-export type SectionsOfFile = { path: string; sections: string[] };
+type SectionsOfFile = { path: string; sections: string[] };
 
 /** A learning's words on the Map, at most. */
 const LABEL_LENGTH = 60;
@@ -78,14 +78,14 @@ const CLOSEST_FILES = 3;
  * daemon's one thread, so the cost grows with the square of this. The first
  * files by path get edges, and the others stand without them.
  */
-export const MAX_CLOSE_FILES = 400;
+const MAX_CLOSE_FILES = 400;
 
 /**
  * The text of a file from its sections. The splitter repeats the end of a
  * section at the start of the next. Together again they count each word once,
  * and a code fence that a cut split closes again.
  */
-export function textOfSections({ path, sections }: SectionsOfFile): TextOfFile {
+function textOfSections({ path, sections }: SectionsOfFile): TextOfFile {
 	let text = "";
 	for (const section of sections) {
 		text += text === "" ? section : `\n${withoutOverlap(text, section)}`;
@@ -176,7 +176,7 @@ function middlesOf(vectors: readonly FileVector[]): Map<string, Float32Array> {
  * long files: on this repository's docs, 8 of its top 40 pairs shared a
  * subject by name, against 19 for the middle.
  */
-export function closeFiles(
+function closeFiles(
 	vectors: readonly FileVector[],
 	closeAt: number,
 ): [string, string][] {

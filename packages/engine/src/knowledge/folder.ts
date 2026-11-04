@@ -638,7 +638,7 @@ function tooLarge(path: string): Refusal {
  * or an agent reads, or a link leads it out of the folder. Refuses a file
  * that is not text and a document whose text it cannot read.
  */
-export async function readFolderFile(
+async function readFolderFile(
 	dir: string,
 	path: string,
 	maxBytes: number,

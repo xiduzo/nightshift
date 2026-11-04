@@ -5,7 +5,11 @@ import { project } from "@nightshift/db/schema";
 import { asDate, now } from "@nightshift/time";
 import { createSpaceArchive, type SpaceArchive, sha256Of } from "../archive";
 import { createSandbox, type Sandbox } from "../testing";
-import { CONTENT_GRACE_MS, collectContent } from "./collect";
+import { collectContent } from "./collect";
+
+/** How long content stays after a computer last copied it. */
+const CONTENT_GRACE_MS = 7 * 24 * 60 * 60_000;
+
 import {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,

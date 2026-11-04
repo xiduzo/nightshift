@@ -25,7 +25,7 @@ import {
 } from "./brief";
 
 /** A file a search found, at its best section. `match` parts of the excerpt are the words found. */
-export type KnowledgeToolHit = {
+type KnowledgeToolHit = {
 	path: string;
 	title: string;
 	/** The heading of the section. Null or absent: none. */
@@ -71,7 +71,7 @@ export type KnowledgeReadFrom = {
 };
 
 /** One file of the knowledge, its text cut at the size asked for. */
-export type KnowledgeToolFile = {
+type KnowledgeToolFile = {
 	path: string;
 	title: string;
 	text: string;
@@ -100,7 +100,7 @@ export type KnowledgePort = {
 };
 
 /** The project a call works in. Without a name, messages say "the project's knowledge". */
-export type KnowledgeProject = { id: string; name?: string };
+type KnowledgeProject = { id: string; name?: string };
 
 /**
  * Where the tools work:
@@ -108,7 +108,7 @@ export type KnowledgeProject = { id: string; name?: string };
  * - `projectOf`: the tools take a `project`, and this finds the project
  *   of a call (an id, a name, or the folder the agent works in).
  */
-export type KnowledgeScope =
+type KnowledgeScope =
 	| { project: KnowledgeProject }
 	| { projectOf: (args: unknown) => Promise<KnowledgeProject> };
 

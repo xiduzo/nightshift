@@ -55,7 +55,7 @@ const entrySchema = z.object({
  * One Project's knowledge document, as the knowledge reads and writes it.
  * Only this module knows it is Yjs.
  */
-export type KnowledgeDocument = {
+type KnowledgeDocument = {
 	/** The document's name in the Space: what a Replica keeps in step with its Host. */
 	readonly name: string;
 	/** Every valid entry, by path. */

@@ -21,7 +21,7 @@ export type SettleFailure = {
 };
 
 /** A keep or a delete. */
-export type SettleDecision = "keep" | "delete";
+type SettleDecision = "keep" | "delete";
 
 /** The learning a keep or a delete is for, while it is on its way or once it worked. */
 function settledKey(

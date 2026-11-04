@@ -194,7 +194,7 @@ export function stepSources(
 }
 
 /** How agents used one file of the knowledge. */
-export type KnowledgeFileUse = {
+type KnowledgeFileUse = {
 	path: string;
 	/** Searches that returned it in their top 5. */
 	found: number;
@@ -228,7 +228,7 @@ const USE_EVENTS = 20_000;
 /** A search counts as finding a file in its top this many. */
 const FOUND_IN_TOP = 5;
 /** A file no run used for this long is marked: a source may sync it for nothing. */
-export const UNUSED_DAYS = 30;
+const UNUSED_DAYS = 30;
 
 /**
  * Which of the listed files are not used: no run used the file lately, and

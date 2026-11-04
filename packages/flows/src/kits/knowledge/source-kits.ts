@@ -433,7 +433,7 @@ export const knowledgeSourceKitSchema = z.enum(
 );
 
 /** One kind of source, as the page shows it and a new flow is named. */
-export type KnowledgeSourceKind = SourceKind<KnowledgeSourceKit>;
+type KnowledgeSourceKind = SourceKind<KnowledgeSourceKit>;
 
 /** Every kind of source, in the order the page offers them. */
 export const KNOWLEDGE_SOURCE_KINDS: readonly KnowledgeSourceKind[] =

@@ -107,7 +107,7 @@ export type KnowledgeSync = {
  * well), `stale` (its last sync ended more than `STALE_AFTER_MS` ago), or
  * null: it syncs now, synced lately, or never synced.
  */
-export type SyncHealth = "failed" | "stale" | null;
+type SyncHealth = "failed" | "stale" | null;
 
 /** A source that has not synced for this long is stale. */
 const STALE_AFTER_MS = 7 * 24 * 60 * 60_000;
@@ -144,7 +144,7 @@ export type SourceProblem = {
 };
 
 /** What the person's role allows on the sources of this project, as the API checked it. */
-export type SourcePermissions = {
+type SourcePermissions = {
 	/** Add a source, or edit one. */
 	save: boolean;
 	/** Remove a source. */
@@ -156,7 +156,7 @@ export type SourcePermissions = {
 };
 
 /** What the person may do with one source, as the changes below allow it. */
-export type SourceActions = {
+type SourceActions = {
 	sync: boolean;
 	edit: boolean;
 	remove: boolean;
@@ -182,7 +182,7 @@ function sourceActions(
 }
 
 /** A project's knowledge in its Space, and the flows that fill it. */
-export type KnowledgeOverview = {
+type KnowledgeOverview = {
 	/** Every file but the index and the proposals, by path. */
 	files: KnowledgeFile[];
 	/** So many files that an agent reads it badly. */

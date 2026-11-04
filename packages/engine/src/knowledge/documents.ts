@@ -28,7 +28,7 @@ import { Document } from "@langchain/core/documents";
 export const LOCAL_ONLY_BYTES = 10 * 1024 * 1024;
 
 /** The documents whose text Night Shift takes out. */
-export const DOCUMENT_FILES = new Set([".pdf", ".docx"]);
+const DOCUMENT_FILES = new Set([".pdf", ".docx"]);
 
 export const isDocument = (path: string) =>
 	DOCUMENT_FILES.has(extname(path).toLowerCase());
@@ -262,12 +262,3 @@ export function loadDocumentContent(
 /** The text of a document's `Document`s: an empty line between pages. */
 export const textOf = (docs: Document[]) =>
 	tidy(docs.map((doc) => doc.pageContent).join("\n\n"));
-
-/**
- * The text of the PDF or Word file at `abs`. Null when it is not one, is
- * larger than 10 MB, or does not open.
- */
-export async function documentText(abs: string): Promise<string | null> {
-	const docs = await loadDocument(abs);
-	return docs === null ? null : textOf(docs);
-}

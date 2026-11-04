@@ -39,7 +39,7 @@ export const EVALUATION = {
 } as const;
 
 /** How one way to search did on the question set. */
-export type KnowledgeModeResult = {
+type KnowledgeModeResult = {
 	/** Questions with a right file in the top `k`. */
 	found: number;
 	/** `found` of all questions, 0 to 1. */
@@ -53,7 +53,7 @@ export type KnowledgeModeResult = {
 };
 
 /** One question of the set, and where each way to search ranked its first right file (null: not in the top `depth`). */
-export type KnowledgeEvaluationRow = {
+type KnowledgeEvaluationRow = {
 	query: string;
 	answers: string[];
 	ranks: Record<KnowledgeSearchMode, number | null>;
@@ -67,7 +67,7 @@ export type KnowledgeEvaluationRow = {
  * not work for the project on this computer now (`meaning.state` says
  * why), so only words are measured.
  */
-export type KnowledgeEvaluationAdvice =
+type KnowledgeEvaluationAdvice =
 	| "too-few"
 	| "keep"
 	| "turn-off"

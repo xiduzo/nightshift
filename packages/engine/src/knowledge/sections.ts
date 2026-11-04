@@ -100,7 +100,7 @@ export const isMarkdown = (path: string) =>
 	MARKDOWN.has(extname(path).toLowerCase());
 
 /** A heading of a markdown text. */
-export type MarkdownHeading = {
+type MarkdownHeading = {
 	/** 1 for `#`, up to 6. */
 	level: number;
 	/** Without its `#` marks. */

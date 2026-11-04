@@ -53,7 +53,7 @@ export type VectorPreparationEvent = {
 };
 
 /** After a failed preparation, how long until the next try. */
-export const RETRY_MS = 60_000;
+const RETRY_MS = 60_000;
 /** Sections embedded in one call to the model. */
 const EMBED_BATCH = 32;
 

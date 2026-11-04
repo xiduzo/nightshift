@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tinyDocx, tinyPdf } from "../testing/documents";
-import { documentText, loadDocument, loadDocumentContent } from "./documents";
+import { loadDocument, loadDocumentContent, textOf } from "./documents";
 
 let dir: string;
 
@@ -46,7 +46,7 @@ describe("loadDocument", () => {
 			"Onboarding guide\n\nEvery new teammate meets the wombat.",
 		]);
 		expect(docs?.[0]?.metadata).toEqual({ source: abs });
-		expect(await documentText(abs)).toBe(
+		expect(textOf(docs ?? [])).toBe(
 			"Onboarding guide\n\nEvery new teammate meets the wombat.",
 		);
 	});
@@ -58,7 +58,9 @@ describe("loadDocument", () => {
 		if (first?.[0]) first[0].pageContent = "changed by a reader";
 		expect((await loadDocument(abs))?.[0]?.pageContent).toBe("First\n\nOne.");
 		await writeFile(abs, tinyDocx("Second version", ["Two."]));
-		expect(await documentText(abs)).toBe("Second version\n\nTwo.");
+		expect(textOf((await loadDocument(abs)) ?? [])).toBe(
+			"Second version\n\nTwo.",
+		);
 	});
 
 	test("a file's content by hash reads as the file does", async () => {

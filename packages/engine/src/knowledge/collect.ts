@@ -19,17 +19,17 @@ import type { KnowledgeDocuments } from "./knowledge-document";
  */
 
 /** How long unlisted content stays after it was last kept. */
-export const CONTENT_GRACE_MS = 7 * 24 * 60 * 60_000;
+const CONTENT_GRACE_MS = 7 * 24 * 60 * 60_000;
 
 /** What one collection did. */
-export type CollectResult = {
+type CollectResult = {
 	/** Content files it removed. */
 	removed: number;
 	/** Unlisted content it kept for now: within the grace period. */
 	waiting: number;
 };
 
-export type CollectDeps = {
+type CollectDeps = {
 	db: Database;
 	documents: Pick<KnowledgeDocuments, "open">;
 	archive: Pick<SpaceArchive, "here">;
