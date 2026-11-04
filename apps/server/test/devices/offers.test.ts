@@ -178,7 +178,13 @@ beforeAll(async () => {
 	);
 	chmodSync(claude, 0o755);
 	[a, b] = await Promise.all([
-		startDaemon(root, "a", { NIGHTSHIFT_HOST: "on" }),
+		// The Host walks the runs. Its run cap (2 by default) is not what these tests
+		// prove, and a run that just ended can hold its place for a moment under
+		// load: two starts at once would then get "The run cap is reached".
+		startDaemon(root, "a", {
+			NIGHTSHIFT_HOST: "on",
+			NIGHTSHIFT_MAX_CONCURRENT_RUNS: "8",
+		}),
 		startDaemon(root, "b", { NIGHTSHIFT_CLAUDE_BIN: claude }),
 	]);
 	bId = await pair(a, b);
