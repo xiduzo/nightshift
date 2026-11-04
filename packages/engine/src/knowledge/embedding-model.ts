@@ -20,6 +20,8 @@ export type EmbeddingModel = {
 	instruct: string | null;
 	/** The least similarity (cosine) of a hit found by meaning alone. */
 	floor: number;
+	/** The least similarity (cosine) of two files that the Map shows as close. */
+	closeAt: number;
 	/** The corpus and the day of the measurement of `floor`, and where it is written. */
 	measuredOn: string;
 };
@@ -30,8 +32,9 @@ const QWEN3: EmbeddingModel = {
 	instruct:
 		"Instruct: Given a question, retrieve passages of project documentation that answer it\nQuery:",
 	floor: 0.5,
+	closeAt: 0.6,
 	measuredOn:
-		"This repository's docs/, 42 files, 1 153 sections, 2026-10-31: docs/research/knowledge-vectors.md §3.4. Checked with the heading path, 55 files, 1 413 sections, 2026-11-04: docs/knowledge.md",
+		"This repository's docs/, 42 files, 1 153 sections, 2026-10-31: docs/research/knowledge-vectors.md §3.4. Checked with the heading path, 55 files, 1 413 sections, 2026-11-04: docs/knowledge.md. The line for close files on the same docs, 2026-11-04: docs/knowledge.md, The Map",
 };
 
 /** The model of search by meaning when the owner of the computer picks none. */

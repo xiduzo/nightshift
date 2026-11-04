@@ -40,6 +40,8 @@ export type KnowledgeMeaning = {
 	downloaded?(): number | null;
 	/** The least similarity (cosine) of a hit found by meaning alone. Absent: no floor (`embedding-model.ts`). */
 	floor?: number;
+	/** The least similarity (cosine) of two files the Map shows as close. Absent: the Map shows none (`embedding-model.ts`). */
+	closeAt?: number;
 };
 
 /**
@@ -151,12 +153,15 @@ export function ollamaMeaning(options: {
 			return "no-ollama";
 		}
 	}
-	const floor = measuredModel(model)?.floor;
+	const measured = measuredModel(model);
+	const floor = measured?.floor;
+	const closeAt = measured?.closeAt;
 	return {
 		model,
 		embeddings,
 		query: (text) => queryFor(model, text),
 		...(floor !== undefined ? { floor } : {}),
+		...(closeAt !== undefined ? { closeAt } : {}),
 		where,
 		downloaded: () => downloading?.() ?? null,
 		async ready() {

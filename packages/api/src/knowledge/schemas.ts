@@ -2,8 +2,8 @@ import type {
 	AskedQuestion,
 	KnowledgeEvaluation,
 	KnowledgeFile,
-	KnowledgeGraph,
 	KnowledgeHit,
+	KnowledgeMap,
 	KnowledgeMeaningStatus,
 	KnowledgeQuestion,
 	KnowledgeText,
@@ -280,8 +280,8 @@ export const knowledgeUseSchema = exact<KnowledgeUseReport>()(
 	}),
 );
 
-/** The knowledge as a graph: its files, their topics, and what connects to them. */
-export const knowledgeGraphSchema = exact<KnowledgeGraph>()(
+/** The Map: the files, their topics, and what connects to them. */
+export const knowledgeMapSchema = exact<KnowledgeMap>()(
 	z.object({
 		nodes: z.array(
 			z.object({
@@ -297,9 +297,10 @@ export const knowledgeGraphSchema = exact<KnowledgeGraph>()(
 				id: z.string(),
 				source: z.string(),
 				target: z.string(),
-				kind: z.enum(["mentions", "links", "found", "touches"]),
+				kind: z.enum(["mentions", "links", "found", "touches", "close"]),
 			}),
 		),
 		filesLeftOut: z.number(),
+		notTopics: z.array(z.string()),
 	}),
 );

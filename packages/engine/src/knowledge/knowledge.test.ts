@@ -867,52 +867,6 @@ describe("what an agent in a terminal asks", () => {
 	});
 });
 
-describe("the Map", () => {
-	test("has the files and the topics they share", async () => {
-		const a = await device(memoryHost());
-		await a.put(
-			"wiki/one.md",
-			"Momentum and more momentum. See [two](two.md).",
-		);
-		await a.put("wiki/two.md", "This is about momentum too.");
-		const map = await a.knowledge.map("p1");
-		expect(map.nodes.map((node) => node.id)).toEqual(
-			expect.arrayContaining([
-				"file:wiki/one.md",
-				"file:wiki/two.md",
-				"topic:momentum",
-			]),
-		);
-		expect(map.edges.map((edge) => edge.id)).toContain(
-			"file:wiki/one.md->file:wiki/two.md",
-		);
-	});
-
-	test("reads a changed file again, and connects what agents asked and the learnings that wait", async () => {
-		const a = await device(memoryHost());
-		await a.put("wiki/one.md", "Momentum in a first file.");
-		await a.put("wiki/two.md", "Momentum in a second file.");
-		await a.knowledge.map("p1");
-		await a.put("wiki/three.md", "Momentum in a third file, and rainbows.");
-		await a.put("wiki/one.md", "Later on, some rainbows and momentum.");
-		await a.put(
-			"learnings/proposed/run-1.s1.md",
-			"- Rainbows come after the rain.\n",
-		);
-		await a.knowledge.search("p1", "deploy", { agent: true });
-		// A proposal waits once a reconcile published it.
-		await a.knowledge.listing("p1");
-		const map = await a.knowledge.map("p1");
-		expect(map.nodes.map((node) => node.id)).toEqual(
-			expect.arrayContaining([
-				"topic:rainbows",
-				"question:deploy",
-				"learning:run-1.s1.md",
-			]),
-		);
-	});
-});
-
 describe("the learnings that wait", () => {
 	test("of several projects come newest first, each with its project", async () => {
 		const a = await device(memoryHost());

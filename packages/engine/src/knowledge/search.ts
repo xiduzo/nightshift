@@ -296,6 +296,24 @@ type MeaningHit = {
 	snippet: KnowledgeSnippetPart[];
 };
 
+/** What the Map reads of the index, at most. */
+export type MapLimits = {
+	maxBytes: number;
+	maxBytesPerFile: number;
+	maxVectors: number;
+};
+
+/** What the index holds for the Map. */
+export type IndexForMap = {
+	/** Every file it has. */
+	files: string[];
+	read: { path: string; sections: string[] }[];
+	filesLeftOut: number;
+	vectors: { path: string; vector: Float32Array }[];
+	/** The line for files close in meaning. Null: no model, or none measured. */
+	closeAt: number | null;
+};
+
 /** Search over the projects' knowledge folders on this computer. */
 export type KnowledgeSearch = ReturnType<typeof createKnowledgeSearch>;
 
@@ -609,6 +627,30 @@ export function createKnowledgeSearch(
 							];
 						})
 				);
+			});
+		},
+		/**
+		 * What the index holds for the Map, after a refresh: the files, the text
+		 * of their sections, and the vectors that are ready. It walks this
+		 * computer's folder. It asks neither the Host nor the model, so the
+		 * vectors of a model that does not answer now still count. Search by
+		 * meaning off for the project, or a model nobody measured: no vectors.
+		 */
+		async forMap(projectId: string, limits: MapLimits): Promise<IndexForMap> {
+			const meaning = current();
+			const closeAt = meaning?.closeAt ?? null;
+			const on = closeAt !== null && (await meaningOn(projectId));
+			return store.healing(async () => {
+				await refresh(projectId);
+				return {
+					files: [...store.files(projectId).keys()],
+					...store.sectionTexts(projectId, limits),
+					vectors:
+						meaning && on
+							? store.storedVectors(projectId, meaning.model, limits.maxVectors)
+							: [],
+					closeAt,
+				};
 			});
 		},
 		/**

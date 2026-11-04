@@ -17,9 +17,9 @@ export {
 	type KnowledgeFolderLocks,
 } from "./folder-locks";
 export type { KnowledgeFile } from "./folder-snapshot";
-export type { KnowledgeGraph } from "./graph";
 export { createKnowledge, type Knowledge } from "./knowledge";
 export type { WaitingLearning } from "./learnings";
+export type { KnowledgeMap } from "./map";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
 export type { KnowledgeQuestion } from "./questions";
 export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";

@@ -98,6 +98,92 @@ describe("the index file", () => {
 	});
 });
 
+describe("what the Map reads", () => {
+	test("the sections by file, as far as the limits go, and how many files that left out", async () => {
+		await store.open();
+		write("a.md", ["One.", "Two.", "Three."]);
+		write("b.md", ["Four."]);
+		write("c.md", ["Five."]);
+		write("d.md", [""]);
+		expect(
+			store.sectionTexts("p1", { maxBytes: 1_000, maxBytesPerFile: 1_000 }),
+		).toEqual({
+			read: [
+				{ path: "a.md", sections: ["One.", "Two.", "Three."] },
+				{ path: "b.md", sections: ["Four."] },
+				{ path: "c.md", sections: ["Five."] },
+			],
+			filesLeftOut: 0,
+		});
+		expect(
+			store.sectionTexts("p1", { maxBytes: 1_000, maxBytesPerFile: 4 }).read[0],
+		).toEqual({ path: "a.md", sections: ["One."] });
+		expect(
+			store.sectionTexts("p1", { maxBytes: 16, maxBytesPerFile: 1_000 }),
+		).toEqual({
+			read: [
+				{ path: "a.md", sections: ["One.", "Two.", "Three."] },
+				{ path: "b.md", sections: ["Four."] },
+			],
+			filesLeftOut: 1,
+		});
+		expect(
+			store.sectionTexts("p2", { maxBytes: 1_000, maxBytesPerFile: 1_000 }),
+		).toEqual({ read: [], filesLeftOut: 0 });
+	});
+
+	/** Stores a vector for each section of the file, as the preparation does. */
+	async function embed(path: string, title = "Title") {
+		const texts = store.sectionsToEmbed("p1").filter((s) => s.path === path);
+		await store.vectorsFor("p1", model("fake-model")).addVectors(
+			texts.map((_, at) => [at + 1, 0]),
+			texts.map(
+				(section) =>
+					new Document({
+						pageContent: section.text,
+						metadata: { path, title, section_id: section.section_id },
+					}),
+			),
+		);
+	}
+
+	test("the first section of each file first, so a cut leaves no file out", async () => {
+		await store.open();
+		write("a.md", ["A one.", "A two.", "A three."]);
+		write("b.md", ["B one.", "B two."]);
+		await embed("a.md");
+		await embed("b.md");
+		const read = (limit: number) =>
+			store
+				.storedVectors("p1", "fake-model", limit)
+				.map(({ path, vector }) => [path, vector[0]]);
+		expect(read(2)).toEqual([
+			["a.md", 1],
+			["b.md", 1],
+		]);
+		expect(read(3)).toEqual([
+			["a.md", 1],
+			["b.md", 1],
+			["a.md", 2],
+		]);
+		expect(read(99)).toHaveLength(5);
+	});
+
+	test("no vector of a section that went, of a file that went, or of another model", async () => {
+		await store.open();
+		write("a.md", ["A one."]);
+		write("b.md", ["B one."]);
+		await embed("a.md");
+		await embed("b.md");
+		write("a.md", ["Another text."]);
+		store.removeFiles([store.files("p1").get("b.md") as never]);
+		expect(store.storedVectors("p1", "fake-model", 9)).toEqual([]);
+		expect(store.storedVectors("p1", "other-model", 9)).toEqual([]);
+		// Only reading: the vectors of the model stay until it asks.
+		expect(store.vectorsFor("p1", model("fake-model")).count()).toBe(2);
+	});
+});
+
 describe("a section's row", () => {
 	test("has an id from its path and text, whatever its place in the file", async () => {
 		await store.open();

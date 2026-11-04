@@ -16,8 +16,8 @@ import {
 	type KnowledgeView,
 	knowledgeEvaluationSchema,
 	knowledgeFileSchema,
-	knowledgeGraphSchema,
 	knowledgeHitSchema,
+	knowledgeMapSchema,
 	knowledgeMeaningSchema,
 	knowledgeQuestionsSchema,
 	knowledgeSchema,
@@ -384,19 +384,47 @@ export const knowledge = {
 			});
 		}),
 	/**
-	 * The project's knowledge as a graph: its files, the topics they share,
+	 * The Map of the project's knowledge: its files, the topics they share,
 	 * the questions that found them and the learnings that name their topics.
+	 * The procedure keeps the older name: it is on the wire.
 	 */
 	graph: protectedProcedure
 		.route({
 			summary:
-				"Gives a project's knowledge as a graph: its files, their topics, the questions that found them and the learnings that wait.",
+				"Gives the Map of a project's knowledge: its files, their topics, the files close in meaning, the questions that found them and the learnings that wait.",
 		})
-		.output(output(knowledgeGraphSchema))
+		.output(output(knowledgeMapSchema))
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
 			return context.knowledge.map(input.projectId);
+		}),
+	/**
+	 * Marks a word as not a topic on the Map, or puts it back. The list syncs
+	 * with the knowledge, so every computer of the Space draws the same Map.
+	 * It changes the knowledge, so it asks a role that may start runs (ADR 4).
+	 * Returns the list.
+	 */
+	markNotTopic: permitted(MAY.changeKnowledge)
+		.route({
+			summary:
+				"Marks a word as not a topic on a project's Map, or puts it back.",
+		})
+		.output(output(knowledgeMapSchema.shape.notTopics))
+		.input(
+			z.object({
+				projectId: z.string(),
+				word: z.string().trim().min(1).max(200),
+				notTopic: z.boolean(),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return context.knowledge.markNotTopic(input.projectId, {
+				word: input.word,
+				notTopic: input.notTopic,
+				by: context.session.user.id,
+			});
 		}),
 	/**
 	 * Marks the files that answer a question an agent asked: the question

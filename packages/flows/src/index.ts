@@ -200,6 +200,7 @@ export {
 	knowledgeSourceKind,
 	knowledgeSourceKitSchema,
 	knowledgeSourceSchema,
+	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
 	proposedLearningFileName,
 	proposedLearningOf,

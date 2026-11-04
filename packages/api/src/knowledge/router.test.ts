@@ -342,7 +342,7 @@ describe("knowledge.search and knowledge.read", () => {
 
 describe("knowledge.graph", () => {
 	test("any Member gets the Map of a project of the Space, and only of those", async () => {
-		await putFile("wiki/one.md", "Momentum and more momentum.");
+		await putFile("wiki/one.md", "The momentum and more momentum.");
 		await putFile("wiki/two.md", "This is about momentum too.");
 		const graph = await call(
 			appRouter.knowledge.graph,
@@ -356,6 +356,41 @@ describe("knowledge.graph", () => {
 			call(
 				appRouter.knowledge.graph,
 				{ projectId: "p9" },
+				{ context: context("member") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+	});
+});
+
+describe("knowledge.markNotTopic", () => {
+	test("takes a word off the Map for a role that may start runs, and only that role", async () => {
+		await putFile("wiki/one.md", "The momentum here.");
+		await putFile("wiki/two.md", "More momentum there.");
+		await expect(
+			call(
+				appRouter.knowledge.markNotTopic,
+				{ projectId, word: "momentum", notTopic: true },
+				{ context: context("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+		expect(
+			await call(
+				appRouter.knowledge.markNotTopic,
+				{ projectId, word: " momentum ", notTopic: true },
+				{ context: context("member") },
+			),
+		).toEqual(["momentum"]);
+		const map = await call(
+			appRouter.knowledge.graph,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(map.notTopics).toEqual(["momentum"]);
+		expect(map.nodes.map((node) => node.id)).not.toContain("topic:momentum");
+		await expect(
+			call(
+				appRouter.knowledge.markNotTopic,
+				{ projectId: "p9", word: "momentum", notTopic: true },
 				{ context: context("member") },
 			),
 		).rejects.toBeInstanceOf(ORPCError);

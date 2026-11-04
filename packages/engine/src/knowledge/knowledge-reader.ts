@@ -39,7 +39,7 @@ export type KnowledgeReaderDeps = {
 	folders: Pick<KnowledgeFolders, "read">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	/** The content by hash: here, and at the Space's Host. */
-	archive: Pick<SpaceArchive, "read">;
+	archive: Pick<SpaceArchive, "here" | "read">;
 	status: SpaceHostStatus;
 	/** This Device: a file larger than 10 MB can be read only on the Device that has it. */
 	deviceId: string;
@@ -109,9 +109,13 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 		 * The proposals that wait for a person, newest first, with their
 		 * notes, as the Space's document has them. No reconcile first: a
 		 * step publishes its proposals when it ends. A proposal whose content
-		 * is neither here nor at the Host now has no notes.
+		 * is neither here nor at the Host now has no notes. `onlyHere`: the Host
+		 * is not asked, and what is not here has no notes.
 		 */
-		async waitingLearnings(projectId: string): Promise<WaitingLearning[]> {
+		async waitingLearnings(
+			projectId: string,
+			options: { onlyHere?: boolean } = {},
+		): Promise<WaitingLearning[]> {
 			const spaceId = await status.spaceOf(projectId);
 			if (spaceId === null) return [];
 			const entries = (await documents.open(projectId)).entries();
@@ -121,12 +125,14 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 				const id = path.slice(PROPOSED_LEARNINGS_DIR.length + 1);
 				const step = proposedLearningOf(id);
 				if (!step) continue;
-				const content = await archive
-					.read({ kind: "content", spaceId, sha256: entry.sha256 })
-					.catch((error: unknown) => {
-						status.heard(spaceId, error);
-						return null;
-					});
+				const ref = { kind: "content" as const, spaceId, sha256: entry.sha256 };
+				const content = await (options.onlyHere
+					? archive.here.read(ref)
+					: archive.read(ref)
+				).catch((error: unknown) => {
+					status.heard(spaceId, error);
+					return null;
+				});
 				waiting.push({
 					id,
 					...step,

@@ -31,6 +31,8 @@ export const PROPOSED_LEARNINGS_DIR = `${LEARNINGS_DIR}/proposed`;
 export const ACCEPTED_LEARNINGS_DIR = `${LEARNINGS_DIR}/accepted`;
 /** The project's question set. */
 export const QUESTION_SET_FILE = `${EVALS_DIR}/questions.json`;
+/** The words people marked as not a topic on the Map. */
+export const NOT_TOPICS_FILE = `${EVALS_DIR}/not-topics.json`;
 /** The file Night Shift writes at the top of the folder. */
 export const KNOWLEDGE_INDEX_FILE = "INDEX.md";
 /** The search index, in the folder that holds the projects. Hidden, so no project id can name it. */
@@ -76,7 +78,7 @@ export function isProposedLearningFile(path: string): boolean {
 	);
 }
 
-/** Whether a path is in the question set's folder, or is it. */
+/** Whether a path is in the folder of the question set and the words that are not topics, or is it. */
 export function isQuestionSetPath(path: string): boolean {
 	return isAt(path, EVALS_DIR);
 }

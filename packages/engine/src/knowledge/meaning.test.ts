@@ -409,6 +409,12 @@ describe("the floor of a model", () => {
 
 	test("qwen3-embedding has its floor, a model without one has none", () => {
 		const at = { address: "http://127.0.0.1:1" };
+		expect(
+			ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).closeAt,
+		).toBe(0.6);
+		expect(
+			ollamaMeaning({ ...at, model: "some-other-model" }).closeAt,
+		).toBeUndefined();
 		expect(ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).floor).toBe(
 			0.5,
 		);

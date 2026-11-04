@@ -23,6 +23,7 @@ export {
 	KNOWLEDGE_SEARCH_FILE,
 	KNOWLEDGE_STAGING_SUFFIX,
 	knowledgeFoldersOf,
+	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
 	proposedLearningFileName,
 	proposedLearningOf,

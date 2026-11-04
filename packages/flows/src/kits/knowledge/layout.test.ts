@@ -12,6 +12,7 @@ import {
 	KNOWLEDGE_SEARCH_FILE,
 	KNOWLEDGE_STAGING_SUFFIX,
 	knowledgeFoldersOf,
+	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
 	proposedLearningFileName,
 	proposedLearningOf,
@@ -24,6 +25,7 @@ describe("the layout of the knowledge folder", () => {
 		expect({
 			PROPOSED_LEARNINGS_DIR,
 			ACCEPTED_LEARNINGS_DIR,
+			NOT_TOPICS_FILE,
 			QUESTION_SET_FILE,
 			KNOWLEDGE_INDEX_FILE,
 			KNOWLEDGE_SEARCH_FILE,
@@ -34,6 +36,7 @@ describe("the layout of the knowledge folder", () => {
 			PROPOSED_LEARNINGS_DIR: "learnings/proposed",
 			ACCEPTED_LEARNINGS_DIR: "learnings/accepted",
 			QUESTION_SET_FILE: "evals/questions.json",
+			NOT_TOPICS_FILE: "evals/not-topics.json",
 			KNOWLEDGE_INDEX_FILE: "INDEX.md",
 			KNOWLEDGE_SEARCH_FILE: ".search.sqlite",
 			KNOWLEDGE_RECONCILE_FILE: ".reconciled.json",

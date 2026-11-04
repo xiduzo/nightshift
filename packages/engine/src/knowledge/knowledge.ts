@@ -1,10 +1,10 @@
 import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { Document } from "@langchain/core/documents";
 import { type KnowledgeUse, useHit } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
 import {
 	ACCEPTED_LEARNINGS_DIR,
+	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
 	proposedLearningOf,
 	QUESTION_SET_FILE,
@@ -24,19 +24,15 @@ import {
 } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
 import { isReadable } from "./folder-snapshot";
-import {
-	type GraphDocument,
-	type KnowledgeGraph,
-	knowledgeGraphOf,
-	TopicGraphTransformer,
-} from "./graph";
 import { createKnowledgeDocuments } from "./knowledge-document";
 import {
 	createKnowledgeReader,
 	type KnowledgeListing,
 } from "./knowledge-reader";
 import type { WaitingLearning } from "./learnings";
+import { type KnowledgeMap, knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
+import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
 import {
 	formatQuestions,
 	type KnowledgeQuestion,
@@ -216,12 +212,22 @@ export type Knowledge = {
 		mark: { query: string; answers: readonly string[]; by: string | null },
 	): Promise<KnowledgeQuestion[]>;
 	/**
-	 * The Map: the files, the topics they share, the questions that found
-	 * them and the learnings that name their topics. It reads the files
-	 * again only when one changed. A file it cannot read stays on the map,
-	 * alone.
+	 * The Map: the files, the topics they share, the files close in meaning,
+	 * the questions that found them and the learnings that name their
+	 * topics. It draws what this computer's search index holds: drawing never
+	 * asks the Host, nor any model. A file the index does not have stays on
+	 * the Map, alone.
 	 */
-	map(projectId: string): Promise<KnowledgeGraph>;
+	map(projectId: string): Promise<KnowledgeMap>;
+	/**
+	 * Marks a word as not a topic, so no Map of the Space shows it, or puts
+	 * it back. The list goes to the Space as a step's changes do. Returns the
+	 * list.
+	 */
+	markNotTopic(
+		projectId: string,
+		mark: { word: string; notTopic: boolean; by: string | null },
+	): Promise<string[]>;
 	/** How often agents found and read each file, and when a run last used it. */
 	use(projectId: string): Promise<KnowledgeUseReport>;
 	/** The question set against each way to search on this computer. */
@@ -300,16 +306,15 @@ export type KnowledgeDeps = {
 	timers?: Partial<typeof TIMERS>;
 };
 
-/** The files the Map reads, at most: it reads them one by one. */
-const GRAPH_MAX_FILES = 200;
-/** How much of each file the Map reads. */
-const GRAPH_MAX_BYTES = 60_000;
-
-/** What the Map of a project's knowledge is made from, besides the questions and the learnings. */
-type KnowledgeGraphInput = {
-	files: string[];
-	documents: GraphDocument[];
-	filesLeftOut: number;
+/**
+ * What the Map reads of the index, at most, at each draw: it runs on the
+ * daemon's one thread, with no cache. See `docs/knowledge.md`, "The Map", for
+ * what this costs at the limits.
+ */
+const MAP_LIMITS = {
+	maxBytes: 6_000_000,
+	maxBytesPerFile: 60_000,
+	maxVectors: 4_000,
 };
 
 export function createKnowledge(deps: KnowledgeDeps): Knowledge {
@@ -433,46 +438,16 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		}
 	}
 
-	/** The latest graph input of each project, with the files it is for. */
-	const graphs = new Map<string, { key: string; input: KnowledgeGraphInput }>();
+	/** The file of the words that are not topics, in this computer's folder. */
+	function notTopicsFile(projectId: string): string {
+		return join(folders.folder(projectId), ...NOT_TOPICS_FILE.split("/"));
+	}
 
-	/**
-	 * What the Map is made from: every file, and what the transformer found
-	 * in the files it could read. It reads them only when a file changed.
-	 */
-	async function graphInput(projectId: string): Promise<KnowledgeGraphInput> {
-		const { files } = await reader.listing(projectId);
-		const key = files
-			.map((file) => `${file.path}:${file.size}:${file.changedAt}`)
-			.join("\n");
-		const known = graphs.get(projectId);
-		if (known?.key === key) return known.input;
-		const readable = files.filter(
-			(file) => isReadable(file.path) && !file.local,
+	/** The words people marked, as far as this computer's folder has them. */
+	async function notTopicsHere(projectId: string) {
+		return parseNotTopics(
+			await readFile(notTopicsFile(projectId), "utf8").catch(() => null),
 		);
-		const read: Document[] = [];
-		for (const file of readable.slice(0, GRAPH_MAX_FILES)) {
-			const text = await reader
-				.read(projectId, file.path, GRAPH_MAX_BYTES)
-				.catch(() => null);
-			if (text) {
-				read.push(
-					new Document({
-						pageContent: text.text,
-						metadata: { path: file.path },
-					}),
-				);
-			}
-		}
-		const input: KnowledgeGraphInput = {
-			files: files.map((file) => file.path),
-			documents: await new TopicGraphTransformer().convertToGraphDocuments(
-				read,
-			),
-			filesLeftOut: Math.max(0, readable.length - GRAPH_MAX_FILES),
-		};
-		graphs.set(projectId, { key, input });
-		return input;
 	}
 
 	return {
@@ -598,12 +573,38 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			}
 		},
 		async map(projectId) {
-			const [read, asked, learnings] = await Promise.all([
-				graphInput(projectId),
+			const [listed, index, asked, learnings, notTopics] = await Promise.all([
+				documents.open(projectId).then((document) => document.entries()),
+				search.forMap(projectId, MAP_LIMITS),
 				askedQuestions(db, projectId),
-				reader.waitingLearnings(projectId),
+				reader.waitingLearnings(projectId, { onlyHere: true }),
+				notTopicsHere(projectId),
 			]);
-			return knowledgeGraphOf({ ...read, asked, learnings });
+			return knowledgeMapOf({
+				// What the Space lists, and what this folder has but did not publish yet.
+				files: [...[...listed.keys()].filter(isReadable), ...index.files],
+				read: index.read,
+				filesLeftOut: index.filesLeftOut,
+				vectors: index.vectors,
+				closeAt: index.closeAt,
+				asked,
+				learnings,
+				notTopics: notTopics.map(({ word }) => word),
+			});
+		},
+		async markNotTopic(projectId, mark) {
+			const hold = await sync.startStep(projectId);
+			try {
+				const next = markNotTopic(await notTopicsHere(projectId), {
+					...mark,
+					at: now(),
+				});
+				await folders.ensure(projectId);
+				await writeWhole(notTopicsFile(projectId), formatNotTopics(next));
+				return next.map(({ word }) => word);
+			} finally {
+				await hold.done();
+			}
 		},
 		use: (projectId) => knowledgeFileUse(db, projectId),
 		async evaluate(projectId) {
