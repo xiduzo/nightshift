@@ -195,6 +195,9 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		const next = new Map<string, Kept>();
 		const sets: [string, KnowledgeEntry][] = [];
 		const deletes: string[] = [];
+		/** What `settle` decides to do in the folder: done after every path is settled. */
+		const removals: string[] = [];
+		const takes: [string, KnowledgeEntry][] = [];
 
 		/** Publishes the folder's file: content to the archive, then its entry. */
 		async function publish(
@@ -280,9 +283,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			if (!localChanged) {
 				// Only the document changed it.
 				if (!entry) {
-					if (file && (await inFolder(root, path))) {
-						await removeFile(root, path);
-					}
+					if (file && (await inFolder(root, path))) removals.push(path);
 					return;
 				}
 				if (was && file && entry.changedAt < was.changedAt) {
@@ -293,9 +294,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					next.set(path, { ...was, mtimeMs: file.changedAt });
 					return;
 				}
-				const taken = await take(path, entry);
-				if (taken) next.set(path, taken);
-				else keep();
+				takes.push([path, entry]);
 				return;
 			}
 			// Both changed it.
@@ -315,11 +314,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				else keep();
 				return;
 			}
-			if (entry) {
-				const taken = await take(path, entry);
-				if (taken) next.set(path, taken);
-				else keep();
-			}
+			if (entry) takes.push([path, entry]);
 		}
 
 		const paths = [
@@ -332,6 +327,18 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			.filter(isKnowledgePath)
 			.sort();
 		await inTurns(paths, AT_ONCE, settle);
+		// Removals before writes, never side by side. A removal also removes
+		// the folders it leaves empty, and a write at the same time may need
+		// one of them: a moved file would wait for the next reconcile.
+		await inTurns(removals, AT_ONCE, (path) => removeFile(root, path));
+		await inTurns(takes, AT_ONCE, async ([path, entry]) => {
+			const taken = await take(path, entry);
+			if (taken) next.set(path, taken);
+			else {
+				const was = saved.get(path);
+				if (was) next.set(path, was);
+			}
+		});
 
 		await document.apply({ delete: deletes, set: sets });
 		await writeState(root, {

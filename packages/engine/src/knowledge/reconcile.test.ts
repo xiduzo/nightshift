@@ -173,6 +173,63 @@ describe("reconcile", () => {
 		expect(await b.has("wiki")).toBe(false);
 	});
 
+	test("a file that moves leaves its old folder empty: the one reconcile writes it all the same", async () => {
+		// As a kept learning moves from `learnings/proposed` to
+		// `learnings/accepted`. One folder does not always lose this race,
+		// so the test moves many.
+		const FOLDERS = 100;
+		const { host } = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		const moves = Array.from({ length: FOLDERS }, (_, n) => {
+			const folder = `f${n}`;
+			return n % 2 === 0
+				? { from: `${folder}/old/x.md`, to: `${folder}/new/x.md`, n }
+				: { from: `${folder}/old.md`, to: `${folder}/new.md`, n };
+		});
+		for (const { from, n } of moves) await a.put(from, `# ${n}\n`);
+		await a.sync.reconcile("p1");
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+
+		for (const { from, to, n } of moves) {
+			await rm(join(b.dir, from));
+			await b.put(to, `# ${n}\n`);
+		}
+		await b.sync.reconcile("p1");
+		await syncDocuments(a, b);
+
+		await a.sync.reconcile("p1");
+		const lost: string[] = [];
+		for (const { from, to } of moves) {
+			if (!(await a.has(to))) lost.push(to);
+			expect(await a.has(from)).toBe(false);
+		}
+		expect(lost).toEqual([]);
+	});
+
+	test("a file that becomes a folder, and a folder that becomes a file, arrive in one reconcile", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		await a.put("to-folder", "a file\n");
+		await a.put("to-file/page.md", "a page\n");
+		await a.sync.reconcile("p1");
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+
+		await rm(join(b.dir, "to-folder"));
+		await rm(join(b.dir, "to-file"), { recursive: true });
+		await b.put("to-folder/page.md", "a page\n");
+		await b.put("to-file", "a file\n");
+		await b.sync.reconcile("p1");
+		await syncDocuments(a, b);
+
+		await a.sync.reconcile("p1");
+		expect(await a.read("to-folder/page.md")).toBe("a page\n");
+		expect(await a.read("to-file")).toBe("a file\n");
+	});
+
 	test("when both Devices changed one path, the later change wins on both", async () => {
 		const { host } = memoryHost();
 		const a = await device(host);
