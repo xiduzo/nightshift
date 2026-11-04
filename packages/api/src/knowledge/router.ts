@@ -79,13 +79,9 @@ const learningInput = z.object({
 	id: z.string().min(1).max(300),
 });
 
-/**
- * Keeps or deletes one step's proposals, then tells the open screens of
- * the Space, so their lists of learnings read again.
- */
+/** Keeps or deletes one step's proposals of a project the person sees. */
 async function settle(
-	context: Pick<Context, "knowledge" | "notifications"> & {
-		spaceId: string;
+	context: Pick<Context, "knowledge"> & {
 		space: { listProjects(): Promise<{ id: string }[]> };
 	},
 	input: z.infer<typeof learningInput>,
@@ -93,11 +89,6 @@ async function settle(
 ): Promise<void> {
 	await knownProject(context.space, input.projectId);
 	await context.knowledge.settleLearning(input.projectId, input.id, decision);
-	await context.notifications
-		.learningsChanged(context.spaceId, input.projectId)
-		.catch((error: unknown) => {
-			console.warn("The screens were not told of a kept learning:", error);
-		});
 }
 
 /**

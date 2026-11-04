@@ -71,8 +71,9 @@ export type InAppItem =
 			at: number;
 	  }
 	/**
-	 * A person kept or deleted learnings that waited in a project. Quiet,
-	 * as `run-changed`: a screen reads its learnings again.
+	 * The learnings that wait in a project changed: a step proposed some, or
+	 * a person kept or deleted some. Quiet, as `run-changed`: a screen reads
+	 * its learnings again.
 	 */
 	| {
 			kind: "learnings-changed";

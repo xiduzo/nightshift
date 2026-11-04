@@ -2,9 +2,9 @@ import type { ApiQueryUtils } from "../api";
 
 /**
  * The query options of the learnings that wait. No list polls: the live
- * cache reads them again when a person keeps or deletes some
- * (`learnings-changed`), and when a run changes, since a step that ends
- * may have proposed new ones.
+ * cache reads them again when this computer's reconcile finds that they
+ * changed (`learnings-changed`), and when a run changes, since a step that
+ * ends on another computer may have proposed new ones.
  */
 export function createKnowledgeQueries(orpc: ApiQueryUtils) {
 	return {

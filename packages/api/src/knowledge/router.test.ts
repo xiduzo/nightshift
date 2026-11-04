@@ -12,9 +12,8 @@ import {
 } from "@nightshift/engine/testing";
 import { call, ORPCError } from "@orpc/server";
 
-import type { Context } from "../context";
 import { appRouter } from "../router";
-import { accessAs, stub, testContext } from "../testing/context";
+import { accessAs, testContext } from "../testing/context";
 
 /**
  * The Knowledge page's procedures over a real Space on this computer: who
@@ -27,10 +26,20 @@ let sandbox: Sandbox;
 let engine: Engine;
 let built: ReturnType<typeof testKnowledge>;
 let projectId: string;
+/** What the door told the open screens: the Space and the project. */
+let told: [string, string][];
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	built = testKnowledge(sandbox, { pageWaitMs: 5_000 });
+	told = [];
+	built = testKnowledge(sandbox, {
+		pageWaitMs: 5_000,
+		notifications: {
+			learningsChanged: async (spaceId, project) => {
+				told.push([spaceId, project]);
+			},
+		},
+	});
 	engine = createEngine(
 		withDevice({
 			db: sandbox.db,
@@ -485,15 +494,10 @@ describe("knowledge.learnings, keepLearning and deleteLearning", () => {
 			{ projectId },
 			{ context: context("viewer", "viewer") },
 		);
-		const told: [string, string][] = [];
-		const asked = (personId: string, role: Role) => ({
-			...context(personId, role),
-			notifications: stub<Context["notifications"]>("notifications", {
-				learningsChanged: async (spaceId, project) => {
-					told.push([spaceId, project]);
-				},
-			}),
-		});
+		const asked = (personId: string, role: Role) => context(personId, role);
+		// The read above published what waits: the screens heard that.
+		expect(told).toEqual([[sandbox.spaceId, projectId]]);
+		told.length = 0;
 
 		const waiting = await call(appRouter.knowledge.learnings, undefined, {
 			context: asked("viewer", "viewer"),

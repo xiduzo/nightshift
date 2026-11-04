@@ -156,8 +156,10 @@ export type Notifications = {
 	 */
 	schedulesChanged(spaceId: string, projectId: string): Promise<void>;
 	/**
-	 * Tells the open screens of the Space's Members that the learnings of
-	 * a project changed: a person kept or deleted some. Quiet: no push.
+	 * Tells the open screens of the Space's Members that the learnings that
+	 * wait in a project changed: a step proposed some, or a person kept or
+	 * deleted some, on any Device of the Space. Quiet: no push. A push says
+	 * what waits, and the Gate that reviews them already does.
 	 */
 	learningsChanged(spaceId: string, projectId: string): Promise<void>;
 	/**

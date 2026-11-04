@@ -164,3 +164,42 @@ describe("settle", () => {
 		expect(await b.has("learnings/proposed/run-1.md")).toBe(false);
 	});
 });
+
+describe("who hears", () => {
+	test("content that cannot be fetched yet is told once, not at each reconcile", async () => {
+		const { host, state } = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		await b.sync.reconcile("p1");
+		await a.put("learnings/proposed/run-1.md", "- One.\n");
+		await a.sync.reconcile("p1");
+		await syncDocuments(a, b);
+
+		state.down = true;
+		await b.sync.reconcile("p1");
+		await b.sync.reconcile("p1");
+		const heard: [string, string] = [b.sandbox.spaceId, "p1"];
+		expect(b.told).toEqual([heard]);
+		state.down = false;
+		await b.sync.reconcile("p1");
+		expect(b.told).toEqual([heard]);
+		expect(await b.read("learnings/proposed/run-1.md")).toBe("- One.\n");
+	});
+
+	test("after a start, what the folder held at the last reconcile says what changed", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		const proposal = "learnings/proposed/run-1.md";
+		const change = (held: string[], listed: string[]) => ({
+			projectId: "p2",
+			spaceId: a.sandbox.spaceId,
+			held: Object.fromEntries(held.map((path) => [path, { sha256: "x" }])),
+			listed: new Map(listed.map((path) => [path, { sha256: "x" }])),
+		});
+		// The module is new for p2, as it is for every project after a start.
+		await a.learnings.reconciled(change([proposal], [proposal]));
+		expect(a.told).toEqual([]);
+		await a.learnings.reconciled(change([proposal], []));
+		expect(a.told).toEqual([[a.sandbox.spaceId, "p2"]]);
+	});
+});

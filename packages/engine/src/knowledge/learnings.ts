@@ -14,7 +14,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { SpaceArchive } from "../archive";
 import type { KnowledgeFolders } from "./folder";
 import type { KnowledgeDocuments } from "./knowledge-document";
-import type { KnowledgeStepHold } from "./reconcile";
+import type { KnowledgeReconciled, KnowledgeStepHold } from "./reconcile";
 import type { SpaceHostStatus } from "./space-host-status";
 
 /**
@@ -30,7 +30,8 @@ import type { SpaceHostStatus } from "./space-host-status";
  * one. Files of their own keep both.
  *
  * This module owns the protocol over the folder, the document and the
- * archive: what proposes, waits, counts and settles. The file's text and the path rule are in `flows`
+ * archive: what proposes, waits, counts and settles, and who hears that
+ * what waits changed. The file's text and the path rule are in `flows`
  * (`learning-file.ts`, `layout.ts`), because the agents' reports, the web
  * app and the shell of `kit:knowledge/review-learnings` need them too. That
  * kit is the second form of `settle`: `learnings-kit.test.ts` runs both.
@@ -53,6 +54,12 @@ export type WaitingLearning = {
 /** A step of a run, as its proposed learnings are named. */
 export type LearningStep = { runId: string; stepId?: string };
 
+/** Who tells the open screens of a Space's Members: `notifications` of the daemon, a layer above. */
+export type LearningsNotifications = {
+	/** What waits in a project changed. Quiet: a screen reads it again, and no push goes out. */
+	learningsChanged(spaceId: string, projectId: string): Promise<void>;
+};
+
 export type LearningsDeps = {
 	folders: Pick<KnowledgeFolders, "folder">;
 	documents: Pick<KnowledgeDocuments, "open">;
@@ -61,6 +68,7 @@ export type LearningsDeps = {
 	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
 	/** Holds the folder as a step does: `settle` changes it, and the reconcile at `done` publishes that. */
 	startStep(projectId: string): Promise<KnowledgeStepHold>;
+	notifications: LearningsNotifications;
 };
 
 export type Learnings = {
@@ -108,10 +116,30 @@ export type Learnings = {
 		id: string,
 		decision: "keep" | "delete",
 	): Promise<void>;
+	/**
+	 * A reconcile ended. Every way what waits can change comes through here:
+	 * a person who settles, a step's proposals, a review by the kit, and each
+	 * of them on another Device. So one reconcile tells the screens once, and
+	 * only when what waits is not what it was.
+	 */
+	reconciled(change: KnowledgeReconciled): Promise<void>;
 };
 
+/** Which files wait, with which content: when this changes, what waits changed. */
+function waitingKey(
+	entries: Iterable<readonly [string, { sha256: string }]>,
+): string {
+	const keys: string[] = [];
+	for (const [path, entry] of entries) {
+		if (proposedLearningAt(path)) keys.push(`${path}:${entry.sha256}`);
+	}
+	return keys.sort().join("\n");
+}
+
 export function createLearnings(deps: LearningsDeps): Learnings {
-	const { folders, documents, archive, status } = deps;
+	const { folders, documents, archive, status, notifications } = deps;
+	/** What waited at the last reconcile of each project in this process. */
+	const known = new Map<string, string>();
 
 	/** The proposed learnings the document lists. Notes are null when the content cannot be read now. */
 	async function listed(
@@ -219,6 +247,17 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 			} finally {
 				await hold.done();
 			}
+		},
+		async reconciled({ projectId, spaceId, held, listed: entries }) {
+			const before = known.get(projectId) ?? waitingKey(Object.entries(held));
+			const after = waitingKey(entries);
+			known.set(projectId, after);
+			if (before === after) return;
+			await notifications
+				.learningsChanged(spaceId, projectId)
+				.catch((error: unknown) => {
+					console.warn("The screens were not told of the learnings:", error);
+				});
 		},
 	};
 }

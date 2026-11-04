@@ -11,6 +11,8 @@ import { dirname, join } from "node:path";
 import { Embeddings } from "@langchain/core/embeddings";
 import type { AgentEvent } from "@nightshift/agents/types";
 import { event, project } from "@nightshift/db/schema";
+import { REVIEW_LEARNINGS_KIT } from "@nightshift/flows";
+import { kitCommand } from "@nightshift/flows/testing";
 import { eq } from "drizzle-orm";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import type { ArchiveHost } from "../archive";
@@ -59,7 +61,7 @@ async function device(
 	host: ArchiveHost,
 	options: Pick<
 		Parameters<typeof testKnowledge>[1] & {},
-		"meaning" | "timers" | "usage"
+		"meaning" | "notifications" | "timers" | "usage"
 	> = {},
 ) {
 	const sandbox = await createSandbox();
@@ -891,6 +893,169 @@ describe("the learnings that wait", () => {
 			["p1", "run-1.s1.md", ["One."]],
 		]);
 		expect(await a.knowledge.learnings([])).toEqual([]);
+	});
+});
+
+describe("what waits changes, and the open screens hear", () => {
+	/** A Device whose screens hear each change: `told`, by Space and project. */
+	async function listening(host: ArchiveHost) {
+		const told: [string, string][] = [];
+		const built = await device(host, {
+			notifications: {
+				learningsChanged: async (spaceId, projectId) => {
+					told.push([spaceId, projectId]);
+				},
+			},
+		});
+		const heard: [string, string] = [built.sandbox.spaceId, "p1"];
+		return { ...built, told, heard };
+	}
+
+	/** An Agent step of run-1 that proposes these notes, and ends. */
+	async function stepProposes(
+		on: Awaited<ReturnType<typeof device>>,
+		stepId: string,
+		notes: string[],
+	) {
+		const session = await on.knowledge.forSession(
+			{ knowledge: { projectId: "p1", always: true } },
+			{ runId: "run-1", stepId },
+		);
+		for await (const _ of session.events(reporting(notes))) {
+		}
+		return session;
+	}
+
+	/** The review kit's own command in a Command step, as a Device runs it. */
+	async function kitStep(
+		on: Awaited<ReturnType<typeof device>>,
+		nodeId: string,
+		files: string,
+	) {
+		const step = await on.knowledge.forCommand("p1");
+		const { command, env } = kitCommand(REVIEW_LEARNINGS_KIT, nodeId, {
+			list: { data: { files } },
+		});
+		const proc = Bun.spawn(["/bin/sh", "-c", command], {
+			env: { PATH: process.env.PATH ?? "", ...env, ...step.env },
+		});
+		expect(await proc.exited).toBe(0);
+		return step;
+	}
+
+	test("a proposal at the end of a step: once, when the step ends", async () => {
+		const a = await listening(memoryHost());
+		const session = await stepProposes(a, "s1", ["Use bun."]);
+		expect(a.told).toEqual([]);
+		await session.done();
+		expect(a.told).toEqual([a.heard]);
+		expect((await a.knowledge.listing("p1")).proposed).toBe(1);
+		expect(a.told).toEqual([a.heard]);
+	});
+
+	test("a person who keeps or deletes: once each", async () => {
+		const a = await listening(memoryHost());
+		await (await stepProposes(a, "s1", ["Keep me."])).done();
+		await (await stepProposes(a, "s2", ["Delete me."])).done();
+		a.told.length = 0;
+
+		await a.knowledge.settleLearning("p1", "run-1.s1.md", "keep");
+		expect(a.told).toEqual([a.heard]);
+		await a.knowledge.settleLearning("p1", "run-1.s2.md", "delete");
+		expect(a.told).toEqual([a.heard, a.heard]);
+		expect((await a.knowledge.listing("p1")).proposed).toBe(0);
+	});
+
+	test("a refusal: nothing changed, nobody hears", async () => {
+		const a = await listening(memoryHost());
+		await (await stepProposes(a, "s1", ["Use bun."])).done();
+		a.told.length = 0;
+		await expect(
+			a.knowledge.settleLearning("p1", "../x.md", "keep"),
+		).rejects.toThrow("This learning no longer waits.");
+		await expect(
+			a.knowledge.settleLearning("p1", "gone.md", "keep"),
+		).rejects.toThrow("This learning no longer waits.");
+		expect(a.told).toEqual([]);
+	});
+
+	test("a review by the kit: its Keep and its Delete, once each", async () => {
+		const a = await listening(memoryHost());
+		await (await stepProposes(a, "s1", ["Keep me."])).done();
+		await (await stepProposes(a, "s2", ["Delete me."])).done();
+		a.told.length = 0;
+
+		const keep = await kitStep(a, "keep", " run-1.s1.md");
+		expect(a.told).toEqual([]);
+		await keep.done();
+		expect(a.told).toEqual([a.heard]);
+		const remove = await kitStep(a, "delete", " run-1.s2.md");
+		await remove.done();
+		expect(a.told).toEqual([a.heard, a.heard]);
+		expect(await a.paths()).toContain("learnings/accepted/run-1.s1.md");
+		expect((await a.knowledge.listing("p1")).proposed).toBe(0);
+	});
+
+	test("a change of another Device: once, at the reconcile that brings it", async () => {
+		const host = memoryHost();
+		const a = await listening(host);
+		const b = await listening(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.knowledge.listing("p1");
+		await exchange(a, b);
+		await b.knowledge.listing("p1");
+		expect(b.told).toEqual([]);
+
+		await (await stepProposes(a, "s1", ["Use bun."])).done();
+		await exchange(a, b);
+		await b.knowledge.listing("p1");
+		expect(b.told).toEqual([b.heard]);
+		await b.knowledge.listing("p1");
+		expect(b.told).toEqual([b.heard]);
+
+		await a.knowledge.settleLearning("p1", "run-1.s1.md", "delete");
+		await exchange(a, b);
+		await b.knowledge.listing("p1");
+		expect(b.told).toEqual([b.heard, b.heard]);
+	});
+
+	test("a file an agent reads: nobody hears", async () => {
+		const a = await listening(memoryHost());
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.knowledge.listing("p1");
+		await a.put("learnings/accepted/old.md", "- Kept.\n");
+		await a.put("learnings/proposed/my notes.md", "- No proposal's name.\n");
+		await a.knowledge.listing("p1");
+		expect(a.told).toEqual([]);
+	});
+
+	test("a reconcile of many files: once", async () => {
+		const a = await listening(memoryHost());
+		for (let i = 0; i < 30; i++) {
+			await a.put(`learnings/proposed/run-${i}.s1.md`, `- Note ${i}.\n`);
+		}
+		await a.knowledge.listing("p1");
+		expect(a.told).toEqual([a.heard]);
+		expect((await a.knowledge.listing("p1")).proposed).toBe(30);
+		expect(a.told).toEqual([a.heard]);
+	});
+
+	test("screens that cannot be told do not stop the reconcile", async () => {
+		const warn = spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			const a = await device(memoryHost(), {
+				notifications: {
+					learningsChanged: async () => {
+						throw new Error("No screens.");
+					},
+				},
+			});
+			await a.put("learnings/proposed/run-1.s1.md", "- Use bun.\n");
+			expect((await a.knowledge.listing("p1")).proposed).toBe(1);
+			expect(warn).toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 });
 

@@ -22,7 +22,11 @@ import {
 	createKnowledgeReader,
 	type KnowledgeListing,
 } from "./knowledge-reader";
-import { createLearnings, type WaitingLearning } from "./learnings";
+import {
+	createLearnings,
+	type LearningsNotifications,
+	type WaitingLearning,
+} from "./learnings";
 import { type KnowledgeMap, knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
 import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
@@ -178,8 +182,9 @@ export type Knowledge = {
 	 * (`kit:knowledge/review-learnings`) does: keep adds them to
 	 * `learnings/accepted/`, where agents read them, and both take them
 	 * out of `learnings/proposed/`. It holds the folder as a step does,
-	 * so the change goes to the Space when it ends. Refuses a proposal
-	 * that no longer waits, and one whose content cannot be fetched now.
+	 * so the change goes to the Space when it ends, and the open screens
+	 * hear of it. Refuses a proposal that no longer waits, and one whose
+	 * content cannot be fetched now.
 	 */
 	settleLearning(
 		projectId: string,
@@ -295,6 +300,8 @@ export type KnowledgeDeps = {
 	pageWaitMs?: number;
 	/** Where the size of each knowledge document goes, once a day. */
 	usage?: UsageNotes;
+	/** Who tells the open screens that the learnings that wait changed, on any path. */
+	notifications: LearningsNotifications;
 	/** Other times for `TIMERS`. */
 	timers?: Partial<typeof TIMERS>;
 };
@@ -331,6 +338,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		archive,
 		status,
 		startStep: (projectId) => sync.startStep(projectId),
+		notifications: deps.notifications,
 	});
 	const sync = createKnowledgeSync({
 		folders,
@@ -341,6 +349,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		deviceId: device.id,
 		inStep: async (spaceId, names, options) =>
 			hosts?.inStep(spaceId, names, options),
+		reconciled: learnings.reconciled,
 	});
 	const reader = createKnowledgeReader({
 		folders,

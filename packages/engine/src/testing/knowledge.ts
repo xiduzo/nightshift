@@ -28,6 +28,8 @@ export function testKnowledge(
 		KnowledgeDeps,
 		"meaning" | "pageWaitMs" | "timers" | "usage"
 	> & {
+		/** Default: nobody hears that the learnings that wait changed. */
+		notifications?: KnowledgeDeps["notifications"];
 		archive?: SpaceArchive;
 		/** Default: its own. Give one to make a second Knowledge as a reload does. */
 		folderLocks?: KnowledgeFolderLocks;
@@ -39,6 +41,7 @@ export function testKnowledge(
 		archive = createSpaceArchive(sandbox.dataDir),
 		synced = createSyncedDocuments({ db: sandbox.db }),
 		folderLocks = createKnowledgeFolderLocks(),
+		notifications = { learningsChanged: async () => {} },
 		...rest
 	} = options;
 	const knowledge = createKnowledge({
@@ -48,6 +51,7 @@ export function testKnowledge(
 		archive,
 		folderLocks,
 		device: { id: sandbox.deviceId, name: "test" },
+		notifications,
 		...rest,
 	});
 	return {

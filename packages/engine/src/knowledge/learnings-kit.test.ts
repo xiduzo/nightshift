@@ -122,6 +122,7 @@ function learningsOver(
 		} as never,
 		status: { spaceOf: async () => "space", heard: () => {} },
 		startStep: async () => ({ done: async () => {} }),
+		notifications: { learningsChanged: async () => {} },
 	});
 }
 

@@ -464,6 +464,9 @@ export async function createDaemon(
 	 * back from the file: unchanged sections are not embedded again.
 	 */
 	stopOlderKnowledge(hot);
+	/** Tells the open screens; set once the notifications below exist. */
+	let learningsChanged: (spaceId: string, projectId: string) => Promise<void> =
+		async () => {};
 	const folderLocks = await slots.keep(
 		"nightshiftKnowledgeFolderLocks",
 		createKnowledgeFolderLocks,
@@ -480,6 +483,10 @@ export async function createDaemon(
 				device,
 				usage: telemetry,
 				meaning: () => ollama.meaning(),
+				notifications: {
+					learningsChanged: (spaceId, projectId) =>
+						learningsChanged(spaceId, projectId),
+				},
 			}),
 		(before) => before.close(),
 	);
@@ -651,6 +658,7 @@ export async function createDaemon(
 			console.error("Could not tell the open screens of new projects:", error);
 		});
 	};
+	learningsChanged = notifications.learningsChanged;
 	usageSnapshot = () =>
 		usageFacts({
 			db,

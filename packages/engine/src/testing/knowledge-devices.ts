@@ -64,12 +64,19 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 	if (host) archive.connect(host);
 	const status = createSpaceHostStatus(sandbox.db);
 	const locks = createKnowledgeFolderLocks();
+	/** Each time the open screens heard that what waits changed: the Space and the project. */
+	const told: [string, string][] = [];
 	const learnings = createLearnings({
 		folders,
 		documents,
 		archive,
 		status,
 		startStep: (projectId) => sync.startStep(projectId),
+		notifications: {
+			learningsChanged: async (spaceId, projectId) => {
+				told.push([spaceId, projectId]);
+			},
+		},
 	});
 	/** One more instance over this Device's folder and documents. */
 	const newSync = (
@@ -82,6 +89,7 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 			status,
 			locks: options.locks ?? locks,
 			deviceId: sandbox.deviceId,
+			reconciled: learnings.reconciled,
 			...(options.inStep ? { inStep: options.inStep } : {}),
 		});
 	const sync = newSync();
@@ -107,6 +115,7 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 		sync,
 		reader,
 		learnings,
+		told,
 		dir,
 		document,
 		entries: async () => (await document()).entries(),

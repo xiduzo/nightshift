@@ -80,6 +80,8 @@ export type KnowledgeSyncDeps = {
 		names: readonly string[],
 		options: { timeoutMs: number },
 	): Promise<unknown>;
+	/** A reconcile brought the folder and the document in step. It must not fail. */
+	reconciled?(change: KnowledgeReconciled): Promise<void>;
 };
 
 /** How long a reconcile waits for the document to be in step with the Host: before it, and after a change. */
@@ -96,6 +98,16 @@ type State = { files: Record<string, Kept>; unpushed: string[] };
 export type MovedProject = {
 	from: { spaceId: string; projectId: string };
 	to: { spaceId: string; projectId: string };
+};
+
+/** What a reconcile leaves behind, for what depends on the document. */
+export type KnowledgeReconciled = {
+	projectId: string;
+	spaceId: string;
+	/** What the folder held at the reconcile before this one, by path. */
+	held: Readonly<Record<string, { sha256: string }>>;
+	/** What the document lists now. */
+	listed: ReadonlyMap<string, { sha256: string }>;
 };
 
 /** A step's hold on a project's folder: `done` when the step ends. */
@@ -328,6 +340,12 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		});
 		if (unpushed.size > 0) pending.add(projectId);
 		else pending.delete(projectId);
+		await deps.reconciled?.({
+			projectId,
+			spaceId,
+			held: state?.files ?? {},
+			listed: document.entries(),
+		});
 		if ((sets.length > 0 || deletes.length > 0) && !status.isOlder(spaceId)) {
 			// This Device's changes reach the Host before the step ends: the
 			// next step on another Device reads them.

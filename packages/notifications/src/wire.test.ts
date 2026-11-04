@@ -138,6 +138,35 @@ test("a new Gate goes to the Person's browser, and its answer sends no push that
 	]);
 });
 
+test("the learnings that wait reach open screens only: nothing goes to a phone or a browser", async () => {
+	const ada = await sandbox.signUp("Ada");
+	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+	await notifications.targets.register(ada.userId, browser);
+	await notifications.start();
+	const got: { kind: string }[] = [];
+	const controller = new AbortController();
+	void (async () => {
+		for await (const item of notifications.watch(
+			ada.userId,
+			controller.signal,
+		)) {
+			got.push(item);
+		}
+	})();
+	await Bun.sleep(0);
+
+	await notifications.learningsChanged(spaceId, "p1");
+	await waitFor(() => got.length === 1);
+	controller.abort();
+
+	expect(got[0]).toMatchObject({
+		kind: "learnings-changed",
+		spaceId,
+		projectId: "p1",
+	});
+	expect(sender.requests).toEqual([]);
+});
+
 test("a browser the push service lost is forgotten", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
