@@ -457,6 +457,26 @@ describe("learnings", () => {
 		expect(schema.required).toEqual(["outcome", "summary"]);
 	});
 
+	test("one report carries at most 10 notes of 500 characters", () => {
+		const parsed = parseStepReport(
+			{
+				outcome: "pass",
+				summary: "Done.",
+				learnings: [
+					"",
+					"x".repeat(501),
+					"y".repeat(500),
+					...Array.from({ length: 12 }, (_, i) => `Note ${i}.`),
+				],
+			},
+			rules,
+		);
+		expect(parsed?.learnings).toHaveLength(10);
+		expect(parsed?.learnings?.[0]).toBe(`${"x".repeat(499)}…`);
+		expect(parsed?.learnings?.[1]).toBe("y".repeat(500));
+		expect(parsed?.learnings?.[9]).toBe("Note 7.");
+	});
+
 	test("a report keeps its notes, one line each, and drops what is not a note", () => {
 		expect(
 			parseStepReport(

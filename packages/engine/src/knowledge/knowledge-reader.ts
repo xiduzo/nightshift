@@ -1,10 +1,4 @@
-import {
-	isProposedLearning,
-	isProposedLearningFile,
-	isQuestionSetPath,
-	PROPOSED_LEARNINGS_DIR,
-	proposedLearningOf,
-} from "@nightshift/flows";
+import { isProposedLearning, isQuestionSetPath } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { SpaceArchive } from "../archive";
 import { OLDER_HOST } from "../contract";
@@ -17,7 +11,7 @@ import {
 } from "./folder";
 import type { KnowledgeFile } from "./folder-snapshot";
 import type { KnowledgeDocuments } from "./knowledge-document";
-import { notesIn, notesOf, type WaitingLearning } from "./learnings";
+import type { Learnings } from "./learnings";
 import type { SpaceHostStatus } from "./space-host-status";
 
 /** What the Knowledge page lists: the document's files, and the learnings that wait. */
@@ -39,7 +33,9 @@ export type KnowledgeReaderDeps = {
 	folders: Pick<KnowledgeFolders, "read">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	/** The content by hash: here, and at the Space's Host. */
-	archive: Pick<SpaceArchive, "here" | "read">;
+	archive: Pick<SpaceArchive, "read">;
+	/** How many notes wait: the page shows the number. */
+	learnings: Pick<Learnings, "count">;
 	status: SpaceHostStatus;
 	/** This Device: a file larger than 10 MB can be read only on the Device that has it. */
 	deviceId: string;
@@ -57,12 +53,12 @@ export type KnowledgeReaderDeps = {
 export type KnowledgeReader = ReturnType<typeof createKnowledgeReader>;
 
 export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
-	const { folders, documents, archive, status, deviceId } = deps;
+	const { folders, documents, archive, learnings, status, deviceId } = deps;
 	return {
 		/**
 		 * The Knowledge page's list: a reconcile first, for a while, so the
 		 * document has this Device's own changes. Then the document's files
-		 * and how many notes its proposals hold. The reconcile goes on when
+		 * and how many notes wait. The reconcile goes on when
 		 * the wait ends. While a step writes the folder, the page lists the
 		 * document as it is.
 		 */
@@ -74,75 +70,25 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 			const spaceId = await status.spaceOf(projectId);
 			const entries = (await documents.open(projectId)).entries();
 			const files: KnowledgeFile[] = [];
-			let proposed = 0;
 			for (const [path, entry] of [...entries].sort(([a], [b]) =>
 				a.localeCompare(b),
 			)) {
-				// The question set is Night Shift's own: the page shows it elsewhere.
-				if (isQuestionSetPath(path)) continue;
-				if (!isProposedLearning(path)) {
-					files.push({
-						path,
-						size: entry.size,
-						changedAt: entry.changedAt,
-						...(entry.local ? { local: true as const } : {}),
-					});
-					continue;
-				}
-				if (!isProposedLearningFile(path)) continue;
-				const content = spaceId
-					? await archive
-							.read({ kind: "content", spaceId, sha256: entry.sha256 })
-							.catch(() => null)
-					: null;
-				// A proposal whose content is not here holds one note at least.
-				proposed += content ? notesIn(content) : 1;
+				// The question set is Night Shift's own: the page shows it
+				// elsewhere. The proposed learnings wait: the page counts them.
+				if (isQuestionSetPath(path) || isProposedLearning(path)) continue;
+				files.push({
+					path,
+					size: entry.size,
+					changedAt: entry.changedAt,
+					...(entry.local ? { local: true as const } : {}),
+				});
 			}
 			return {
 				files,
-				proposed,
+				proposed: await learnings.count(projectId),
 				shared: spaceId ? await status.isShared(spaceId) : false,
 				olderHost: spaceId ? status.isOlder(spaceId) : false,
 			};
-		},
-		/**
-		 * The proposals that wait for a person, newest first, with their
-		 * notes, as the Space's document has them. No reconcile first: a
-		 * step publishes its proposals when it ends. A proposal whose content
-		 * is neither here nor at the Host now has no notes. `onlyHere`: the Host
-		 * is not asked, and what is not here has no notes.
-		 */
-		async waitingLearnings(
-			projectId: string,
-			options: { onlyHere?: boolean } = {},
-		): Promise<WaitingLearning[]> {
-			const spaceId = await status.spaceOf(projectId);
-			if (spaceId === null) return [];
-			const entries = (await documents.open(projectId)).entries();
-			const waiting: WaitingLearning[] = [];
-			for (const [path, entry] of entries) {
-				if (!isProposedLearningFile(path)) continue;
-				const id = path.slice(PROPOSED_LEARNINGS_DIR.length + 1);
-				const step = proposedLearningOf(id);
-				if (!step) continue;
-				const ref = { kind: "content" as const, spaceId, sha256: entry.sha256 };
-				const content = await (options.onlyHere
-					? archive.here.read(ref)
-					: archive.read(ref)
-				).catch((error: unknown) => {
-					status.heard(spaceId, error);
-					return null;
-				});
-				waiting.push({
-					id,
-					...step,
-					notes: content ? notesOf(content) : [],
-					proposedAt: entry.changedAt,
-				});
-			}
-			return waiting.sort(
-				(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
-			);
 		},
 		/**
 		 * One file of the project's knowledge, by its path, at most

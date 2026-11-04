@@ -1,3 +1,4 @@
+import { learningNotes } from "@nightshift/flows";
 import type { TranscriptItem } from "../transcript/transcript-items";
 
 /**
@@ -16,10 +17,6 @@ export const LEARNINGS_NEXT =
  */
 export function stepLearnings(items: readonly TranscriptItem[]): string[] {
 	return items.flatMap((item) =>
-		item.kind === "report"
-			? (item.learnings ?? [])
-					.map((note) => note.replace(/\s+/g, " ").trim())
-					.filter((note) => note !== "")
-			: [],
+		item.kind === "report" ? learningNotes(item.learnings ?? []) : [],
 	);
 }

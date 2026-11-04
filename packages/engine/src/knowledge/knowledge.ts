@@ -1,15 +1,8 @@
-import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type KnowledgeUse, useHit } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
-import {
-	ACCEPTED_LEARNINGS_DIR,
-	NOT_TOPICS_FILE,
-	PROPOSED_LEARNINGS_DIR,
-	proposedLearningOf,
-	QUESTION_SET_FILE,
-} from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
+import { NOT_TOPICS_FILE, QUESTION_SET_FILE } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { type SpaceArchive, writeWhole } from "../archive";
 import type { SyncedDocuments } from "../documents";
@@ -29,7 +22,7 @@ import {
 	createKnowledgeReader,
 	type KnowledgeListing,
 } from "./knowledge-reader";
-import type { WaitingLearning } from "./learnings";
+import { createLearnings, type WaitingLearning } from "./learnings";
 import { type KnowledgeMap, knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
 import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
@@ -332,6 +325,13 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	/** The devices runtime, made after this: until then content stays here. */
 	let hosts: KnowledgeHosts | null = null;
 	const status = createSpaceHostStatus(db);
+	const learnings = createLearnings({
+		folders,
+		documents,
+		archive,
+		status,
+		startStep: (projectId) => sync.startStep(projectId),
+	});
 	const sync = createKnowledgeSync({
 		folders,
 		documents,
@@ -346,12 +346,19 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		folders,
 		documents,
 		archive,
+		learnings,
 		status,
 		deviceId: device.id,
 		reconcileUnlessHeld: sync.reconcileUnlessHeld,
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
 	});
-	const steps = createStepKnowledge({ folders, sync, reader, search });
+	const steps = createStepKnowledge({
+		folders,
+		sync,
+		reader,
+		search,
+		learnings,
+	});
 	/** Facts of a project with no run: an agent's use through the MCP server. No landing feed reads them. */
 	const log = createRunLog(db, { walkerId: device.id });
 
@@ -490,7 +497,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		async learnings(projectIds) {
 			const lists = await Promise.all(
 				projectIds.map(async (projectId) =>
-					(await reader.waitingLearnings(projectId)).map((learning) => ({
+					(await learnings.waiting(projectId)).map((learning) => ({
 						...learning,
 						projectId,
 					})),
@@ -502,38 +509,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 					(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
 				);
 		},
-		async settleLearning(projectId, id, decision) {
-			const gone = new Refusal(
-				"not-found",
-				"This learning no longer waits. Someone kept or deleted it.",
-			);
-			if (!proposedLearningOf(id)) throw gone;
-			const hold = await sync.startStep(projectId);
-			try {
-				const root = folders.folder(projectId);
-				const proposed = join(root, ...PROPOSED_LEARNINGS_DIR.split("/"), id);
-				const content = await readFile(proposed).catch(() => null);
-				if (content === null) {
-					// Listed in the Space, but its content did not reach this folder.
-					const listed = (await documents.open(projectId))
-						.entries()
-						.has(`${PROPOSED_LEARNINGS_DIR}/${id}`);
-					if (!listed) throw gone;
-					throw new Refusal(
-						"unavailable",
-						"Night Shift cannot get this learning now. Try again when the computer that keeps this Space is online.",
-					);
-				}
-				if (decision === "keep") {
-					const accepted = join(root, ...ACCEPTED_LEARNINGS_DIR.split("/"));
-					await mkdir(accepted, { recursive: true });
-					await appendFile(join(accepted, id), content);
-				}
-				await rm(proposed, { force: true });
-			} finally {
-				await hold.done();
-			}
-		},
+		settleLearning: learnings.settle,
 		async questions(projectId, options = {}) {
 			const [asked, set] = await Promise.all([
 				askedQuestions(db, projectId, options),
@@ -573,11 +549,11 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			}
 		},
 		async map(projectId) {
-			const [listed, index, asked, learnings, notTopics] = await Promise.all([
+			const [listed, index, asked, waiting, notTopics] = await Promise.all([
 				documents.open(projectId).then((document) => document.entries()),
 				search.forMap(projectId, MAP_LIMITS),
 				askedQuestions(db, projectId),
-				reader.waitingLearnings(projectId, { onlyHere: true }),
+				learnings.waiting(projectId, { onlyHere: true }),
 				notTopicsHere(projectId),
 			]);
 			return knowledgeMapOf({
@@ -588,7 +564,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 				vectors: index.vectors,
 				closeAt: index.closeAt,
 				asked,
-				learnings,
+				learnings: waiting,
 				notTopics: notTopics.map(({ word }) => word),
 			});
 		},

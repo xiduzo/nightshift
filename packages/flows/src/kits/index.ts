@@ -15,7 +15,6 @@ export {
 	isHiddenFromReaders,
 	isKnowledgeOwnFolder,
 	isProposedLearning,
-	isProposedLearningFile,
 	isQuestionSetPath,
 	KNOWLEDGE_INDEX_FILE,
 	KNOWLEDGE_OWN_FOLDERS_WORDS,
@@ -25,10 +24,16 @@ export {
 	knowledgeFoldersOf,
 	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
+	proposedLearningAt,
 	proposedLearningFileName,
 	proposedLearningOf,
 	QUESTION_SET_FILE,
 } from "./knowledge/layout";
+export {
+	formatLearnings,
+	learningNotes,
+	parseLearnings,
+} from "./knowledge/learning-file";
 export {
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSourceKit,

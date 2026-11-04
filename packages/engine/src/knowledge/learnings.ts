@@ -1,44 +1,42 @@
-import { appendFile, mkdir, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@nightshift/agents/types";
 import {
+	ACCEPTED_LEARNINGS_DIR,
+	formatLearnings,
 	PROPOSED_LEARNINGS_DIR,
+	parseLearnings,
+	proposedLearningAt,
 	proposedLearningFileName,
+	proposedLearningOf,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
+import type { SpaceArchive } from "../archive";
+import type { KnowledgeFolders } from "./folder";
+import type { KnowledgeDocuments } from "./knowledge-document";
+import type { KnowledgeStepHold } from "./reconcile";
+import type { SpaceHostStatus } from "./space-host-status";
 
 /**
  * Learnings: what agents propose to learn about a project, in its
  * knowledge. `learnings/` is Night Shift's own folder there. Each step's
- * proposals wait in `learnings/proposed/<runId>.<stepId>.md`, one note per
- * `- ` line, until a person keeps them (`kit:knowledge/review-learnings` moves
- * them into `learnings/accepted/`, where agents read them) or deletes
- * them. The index, search and `read_knowledge` leave the proposals out.
+ * proposed learnings wait in `learnings/proposed/<runId>.<stepId>.md`, one
+ * note per `- ` line, until a person keeps them (into `learnings/accepted/`,
+ * where agents read them) or deletes them. The index, search and
+ * `read_knowledge` leave them out.
  *
  * One file per step, not per run: two steps of one run can run at once on
  * two Devices, and the reconcile keeps one change of a path, the later
  * one. Files of their own keep both.
+ *
+ * This module owns the protocol over the folder, the document and the
+ * archive: what proposes, waits, counts and settles. The file's text and the path rule are in `flows`
+ * (`learning-file.ts`, `layout.ts`), because the agents' reports, the web
+ * app and the shell of `kit:knowledge/review-learnings` need them too. That
+ * kit is the second form of `settle`: `learnings-kit.test.ts` runs both.
  */
 
-/** How many notes a proposal holds: one per `- ` line. */
-export function notesIn(content: Uint8Array | string): number {
-	return linesOf(content).filter((line) => line.startsWith("- ")).length;
-}
-
-function linesOf(content: Uint8Array | string): string[] {
-	const text =
-		typeof content === "string" ? content : new TextDecoder().decode(content);
-	return text.split("\n");
-}
-
-/** The notes of a proposal, in order: the text of each `- ` line. */
-export function notesOf(content: Uint8Array | string): string[] {
-	return linesOf(content)
-		.filter((line) => line.startsWith("- "))
-		.map((line) => line.slice(2).trim())
-		.filter((note) => note !== "");
-}
-
-/** One step's proposals that wait for a person, as the review lists them. */
+/** One step's proposed learnings that wait for a person, as the review lists them. */
 export type WaitingLearning = {
 	/** The name of its file in `learnings/proposed/`: what keeps or deletes it. */
 	id: string;
@@ -52,55 +50,175 @@ export type WaitingLearning = {
 	proposedAt: number;
 };
 
-/** A step of a run, as its proposals are named. */
+/** A step of a run, as its proposed learnings are named. */
 export type LearningStep = { runId: string; stepId?: string };
 
-/**
- * Adds what an agent of a run's step proposes to learn to
- * `learnings/proposed/<runId>.<stepId>.md` in the knowledge folder `root`
- * (`<runId>.md` without a step), one note per line, for a person to keep
- * or delete.
- */
-export async function proposeLearnings(
-	root: string,
-	step: LearningStep,
-	notes: readonly string[],
-): Promise<void> {
-	const name = proposedLearningFileName(step);
-	const { runId } = step;
-	const lines = notes
-		.map((note) => note.replace(/\s+/g, " ").trim())
-		.filter((note) => note !== "");
-	if (lines.length === 0) return;
-	const dir = join(root, ...PROPOSED_LEARNINGS_DIR.split("/"));
-	await mkdir(dir, { recursive: true });
-	const file = join(dir, name);
-	const isNew = (await stat(file).catch(() => null)) === null;
-	const head = isNew
-		? `# Learnings of run ${runId.slice(0, 8)}\n\nWhat the agents of run ${runId} proposed to learn about this project.\n\n`
-		: "";
-	await appendFile(
-		file,
-		`${head}${lines.map((line) => `- ${line}`).join("\n")}\n`,
-	);
-}
+export type LearningsDeps = {
+	folders: Pick<KnowledgeFolders, "folder">;
+	documents: Pick<KnowledgeDocuments, "open">;
+	/** The content by hash: here, and at the Space's Host. */
+	archive: Pick<SpaceArchive, "here" | "read">;
+	status: Pick<SpaceHostStatus, "spaceOf" | "heard">;
+	/** Holds the folder as a step does: `settle` changes it, and the reconcile at `done` publishes that. */
+	startStep(projectId: string): Promise<KnowledgeStepHold>;
+};
 
-/**
- * The session's events as they are, with the learnings of its reports
- * kept as proposals of the run's step, for a person to review. A note that cannot
- * be kept is left out: the step goes on.
- */
-export async function* keepLearnings(
-	events: AsyncIterable<AgentEvent>,
-	root: string,
-	step: LearningStep,
-): AsyncGenerator<AgentEvent> {
-	for await (const event of events) {
-		if (event.type === "report" && event.learnings?.length) {
-			await proposeLearnings(root, step, event.learnings).catch((error) =>
-				console.warn("The learnings of a step were not kept:", error),
-			);
+export type Learnings = {
+	/**
+	 * Adds what an agent of a run's step proposes to learn to its file in
+	 * the project's folder. The step holds the folder: the reconcile when
+	 * the step ends puts it in the Space.
+	 */
+	propose(
+		projectId: string,
+		step: LearningStep,
+		notes: readonly string[],
+	): Promise<void>;
+	/**
+	 * The session's events as they are, with the learnings of its reports
+	 * proposed for the run's step. A note that cannot be kept is left out:
+	 * the step goes on.
+	 */
+	keepReported(
+		events: AsyncIterable<AgentEvent>,
+		projectId: string,
+		step: LearningStep,
+	): AsyncGenerator<AgentEvent>;
+	/**
+	 * What waits for a person, newest first, with its notes, as the Space's
+	 * document has it. No reconcile first: a step publishes what it proposed
+	 * when it ends. A file whose content is neither here nor at the Host now
+	 * has no notes. `onlyHere`: the Host is not asked, and what is not here
+	 * has no notes.
+	 */
+	waiting(
+		projectId: string,
+		options?: { onlyHere?: boolean },
+	): Promise<WaitingLearning[]>;
+	/** How many notes wait. A file whose content is not here holds one at least. */
+	count(projectId: string): Promise<number>;
+	/**
+	 * Keeps or deletes one step's proposed learnings: keep adds the file to
+	 * `learnings/accepted/`, and both take it out of `learnings/proposed/`.
+	 * Refuses a name that is no proposed learning, one that no longer waits,
+	 * and one whose content cannot be fetched now.
+	 */
+	settle(
+		projectId: string,
+		id: string,
+		decision: "keep" | "delete",
+	): Promise<void>;
+};
+
+export function createLearnings(deps: LearningsDeps): Learnings {
+	const { folders, documents, archive, status } = deps;
+
+	/** The proposed learnings the document lists. Notes are null when the content cannot be read now. */
+	async function listed(
+		projectId: string,
+		options: { onlyHere?: boolean } = {},
+	) {
+		const spaceId = await status.spaceOf(projectId);
+		if (spaceId === null) return [];
+		const entries = (await documents.open(projectId)).entries();
+		const learnings = [];
+		for (const [path, entry] of entries) {
+			const learning = proposedLearningAt(path);
+			if (!learning) continue;
+			const ref = { kind: "content" as const, spaceId, sha256: entry.sha256 };
+			const content = await (options.onlyHere
+				? archive.here.read(ref)
+				: archive.read(ref)
+			).catch((error: unknown) => {
+				status.heard(spaceId, error);
+				return null;
+			});
+			learnings.push({
+				...learning,
+				notes: content
+					? parseLearnings(new TextDecoder().decode(content))
+					: null,
+				proposedAt: entry.changedAt,
+			});
 		}
-		yield event;
+		return learnings;
 	}
+
+	async function propose(
+		projectId: string,
+		step: LearningStep,
+		notes: readonly string[],
+	): Promise<void> {
+		const dir = join(
+			folders.folder(projectId),
+			...PROPOSED_LEARNINGS_DIR.split("/"),
+		);
+		const file = join(dir, proposedLearningFileName(step));
+		const isNew = (await stat(file).catch(() => null)) === null;
+		const text = formatLearnings(notes, { runId: step.runId, isNew });
+		if (text === "") return;
+		await mkdir(dir, { recursive: true });
+		await appendFile(file, text);
+	}
+
+	return {
+		propose,
+		async *keepReported(events, projectId, step) {
+			for await (const event of events) {
+				if (event.type === "report" && event.learnings?.length) {
+					await propose(projectId, step, event.learnings).catch((error) =>
+						console.warn("The learnings of a step were not kept:", error),
+					);
+				}
+				yield event;
+			}
+		},
+		async waiting(projectId, options) {
+			const learnings = await listed(projectId, options);
+			return learnings
+				.map((learning) => ({ ...learning, notes: learning.notes ?? [] }))
+				.sort(
+					(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
+				);
+		},
+		async count(projectId) {
+			const learnings = await listed(projectId);
+			return learnings.reduce(
+				(sum, learning) => sum + (learning.notes?.length ?? 1),
+				0,
+			);
+		},
+		async settle(projectId, id, decision) {
+			const gone = new Refusal(
+				"not-found",
+				"This learning no longer waits. Someone kept or deleted it.",
+			);
+			if (!proposedLearningOf(id)) throw gone;
+			const hold = await deps.startStep(projectId);
+			try {
+				const root = folders.folder(projectId);
+				const proposed = join(root, ...PROPOSED_LEARNINGS_DIR.split("/"), id);
+				const content = await readFile(proposed).catch(() => null);
+				if (content === null) {
+					// Listed in the Space, but its content did not reach this folder.
+					const isListed = (await documents.open(projectId))
+						.entries()
+						.has(`${PROPOSED_LEARNINGS_DIR}/${id}`);
+					if (!isListed) throw gone;
+					throw new Refusal(
+						"unavailable",
+						"Night Shift cannot get this learning now. Try again when the computer that keeps this Space is online.",
+					);
+				}
+				if (decision === "keep") {
+					const accepted = join(root, ...ACCEPTED_LEARNINGS_DIR.split("/"));
+					await mkdir(accepted, { recursive: true });
+					await appendFile(join(accepted, id), content);
+				}
+				await rm(proposed, { force: true });
+			} finally {
+				await hold.done();
+			}
+		},
+	};
 }

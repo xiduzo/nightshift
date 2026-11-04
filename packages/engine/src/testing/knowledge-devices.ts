@@ -8,6 +8,7 @@ import { createKnowledgeFolders } from "../knowledge/folder";
 import { createKnowledgeFolderLocks } from "../knowledge/folder-locks";
 import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
 import { createKnowledgeReader } from "../knowledge/knowledge-reader";
+import { createLearnings } from "../knowledge/learnings";
 import { createKnowledgeSync } from "../knowledge/reconcile";
 import { createSpaceHostStatus } from "../knowledge/space-host-status";
 import { createSandbox, type Sandbox } from "./test-support";
@@ -63,6 +64,13 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 	if (host) archive.connect(host);
 	const status = createSpaceHostStatus(sandbox.db);
 	const locks = createKnowledgeFolderLocks();
+	const learnings = createLearnings({
+		folders,
+		documents,
+		archive,
+		status,
+		startStep: (projectId) => sync.startStep(projectId),
+	});
 	/** One more instance over this Device's folder and documents. */
 	const newSync = (
 		options: { locks?: typeof locks; inStep?(): Promise<unknown> } = {},
@@ -81,6 +89,7 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 		folders,
 		documents,
 		archive,
+		learnings,
 		status,
 		deviceId: sandbox.deviceId,
 		reconcileUnlessHeld: sync.reconcileUnlessHeld,
@@ -97,6 +106,7 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 		newSync,
 		sync,
 		reader,
+		learnings,
 		dir,
 		document,
 		entries: async () => (await document()).entries(),

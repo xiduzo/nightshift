@@ -23,6 +23,7 @@
  * A valid tool report counts even when its delivery fails, unless the
  * result says it was refused (`isRefusedReport`).
  */
+import { learningNotes } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import { LEARNINGS_FIELD_DESCRIPTION, LEARNINGS_RULE } from "../knowledge";
 import type {
@@ -305,17 +306,15 @@ export function parseStepReport(
 }
 
 /**
- * The notes of `learnings`: its strings, each on one line and trimmed,
- * the empty ones left out, at most `MAX_LEARNINGS` of
- * `MAX_LEARNING_LENGTH` characters. Anything else is none: a report never
- * fails over its learnings.
+ * The notes of `learnings`, as they are kept (`learningNotes`), and what one
+ * report may carry: at most `MAX_LEARNINGS` of `MAX_LEARNING_LENGTH`
+ * characters. Anything else is none: a report never fails over its learnings.
  */
 function learningsOf(value: unknown): string[] {
 	if (!Array.isArray(value)) return [];
-	return value
-		.filter((note): note is string => typeof note === "string")
-		.map((note) => note.replace(/\s+/g, " ").trim())
-		.filter((note) => note !== "")
+	return learningNotes(
+		value.filter((note): note is string => typeof note === "string"),
+	)
 		.slice(0, MAX_LEARNINGS)
 		.map((note) =>
 			note.length > MAX_LEARNING_LENGTH

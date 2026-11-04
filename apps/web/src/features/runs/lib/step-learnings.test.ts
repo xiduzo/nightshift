@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { formatLearnings, parseLearnings } from "@nightshift/flows";
 import type { TranscriptItem } from "../transcript/transcript-items";
 import { stepLearnings } from "./step-learnings";
 
@@ -21,6 +22,21 @@ describe("the learnings of a step", () => {
 				report(["The API lives in packages/api."]),
 			]),
 		).toEqual(["Tests run with bun test.", "The API lives in packages/api."]);
+	});
+
+	test("shows each note as it is kept", () => {
+		const notes = [
+			"Tests run with  bun test.\n",
+			" ",
+			"\t- Starts with a dash.\r\nOn two lines. ",
+			"# Looks like a title",
+			"\u00a0Odd\u2028spaces\u00a0",
+		];
+		const kept = parseLearnings(
+			formatLearnings(notes, { runId: "run-1", isNew: true }),
+		);
+		expect(kept).toHaveLength(4);
+		expect(stepLearnings([report(notes)])).toEqual(kept);
 	});
 
 	test("none without a report that proposes one", () => {

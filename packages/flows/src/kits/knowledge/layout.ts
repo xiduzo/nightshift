@@ -69,15 +69,6 @@ export function isProposedLearning(path: string): boolean {
 	return isAt(path, PROPOSED_LEARNINGS_DIR);
 }
 
-/** Whether a path is one step's proposed learnings: `learnings/proposed/<runId>.<stepId>.md` (`<runId>.md` before). */
-export function isProposedLearningFile(path: string): boolean {
-	return (
-		isProposedLearning(path) &&
-		path.endsWith(".md") &&
-		path.split("/").length === 3
-	);
-}
-
 /** Whether a path is in the folder of the question set and the words that are not topics, or is it. */
 export function isQuestionSetPath(path: string): boolean {
 	return isAt(path, EVALS_DIR);
@@ -88,8 +79,16 @@ export function isHiddenFromReaders(path: string): boolean {
 	return isProposedLearning(path) || isQuestionSetPath(path);
 }
 
+/**
+ * What the ids in a proposed learning's name start with. Spelled out, not a
+ * range, because the kit's shell uses it too, and what a range holds there
+ * depends on the locale.
+ */
+const ID_START =
+	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
 /** Ids that become a part of a file name. */
-const ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const ID = new RegExp(`^[${ID_START}][${ID_START}_-]*$`);
 
 /**
  * The name of a step's file in `learnings/proposed/`: `<runId>.<stepId>.md`,
@@ -120,6 +119,35 @@ export function proposedLearningOf(
 	if (runId === undefined || rest.length > 0 || !ID.test(runId)) return null;
 	if (stepId === undefined) return { runId, stepId: null };
 	return ID.test(stepId) ? { runId, stepId } : null;
+}
+
+/**
+ * `proposedLearningOf` in the shell of the review kit: `is_proposed_learning
+ * "$name"` says whether a name is one. The kit's Keep and Delete run where no
+ * TypeScript does, so the rule has this second form, next to the first.
+ * `learnings-kit.test.ts` of the engine and `layout.test.ts` run both.
+ */
+export const IS_PROPOSED_LEARNING_SHELL = `is_proposed_learning() {
+	case "$1" in
+		*[!${ID_START}_.-]*|[!${ID_START}]*|*.[!${ID_START}]*|*.*.*.md) return 1 ;;
+		*.md) return 0 ;;
+	esac
+	return 1
+}`;
+
+/**
+ * The proposed learning at a path of the folder: the name of its file, which
+ * keeps or deletes it, and its run and step. Null for any other path, also
+ * for a file in that folder with another name.
+ */
+export function proposedLearningAt(
+	path: string,
+): { id: string; runId: string; stepId: string | null } | null {
+	const start = `${PROPOSED_LEARNINGS_DIR}/`;
+	if (!path.startsWith(start)) return null;
+	const id = path.slice(start.length);
+	const step = proposedLearningOf(id);
+	return step && { id, ...step };
 }
 
 /**

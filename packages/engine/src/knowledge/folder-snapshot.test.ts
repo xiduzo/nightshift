@@ -199,6 +199,11 @@ describe("a step's start", () => {
 				},
 			},
 			reader: { read: async () => null },
+			learnings: {
+				async *keepReported(events) {
+					yield* events;
+				},
+			},
 			search: {
 				search: async () => [],
 				refresh: async (_projectId, snapshot) => {

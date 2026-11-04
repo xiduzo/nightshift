@@ -10,7 +10,7 @@ import { knowledgeFolderPath } from "@nightshift/flows";
 import { indexFolder, type KnowledgeFolders } from "./folder";
 import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeReader } from "./knowledge-reader";
-import { keepLearnings } from "./learnings";
+import type { Learnings } from "./learnings";
 import type { KnowledgeSync } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
 import { createKnowledgeView, inFolders, type KnowledgeView } from "./view";
@@ -108,8 +108,9 @@ export function createStepKnowledge(deps: {
 	sync: Pick<KnowledgeSync, "startStep">;
 	reader: Pick<KnowledgeReader, "read">;
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
+	learnings: Pick<Learnings, "keepReported">;
 }) {
-	const { folders, sync, reader, search } = deps;
+	const { folders, sync, reader, search, learnings } = deps;
 
 	/** The step holds the folder: a reconcile first, and `done` for the one after. */
 	async function begin(projectId: string) {
@@ -157,11 +158,10 @@ export function createStepKnowledge(deps: {
 	/**
 	 * What a session gets of the knowledge: `shown` in `NS_KNOWLEDGE`, to
 	 * read and in the line; the tools, in `only` when given; and for a step
-	 * of a run, the learnings, kept in the folder `path`.
+	 * of a run, the learnings, kept in the project's folder.
 	 */
 	function given(
 		projectId: string,
-		path: string,
 		shown: string,
 		step: SessionStep,
 		done: () => Promise<void>,
@@ -184,7 +184,7 @@ export function createStepKnowledge(deps: {
 				withUses(
 					runId === undefined
 						? events
-						: keepLearnings(events, path, {
+						: learnings.keepReported(events, projectId, {
 								runId,
 								...(stepId !== undefined ? { stepId } : {}),
 							}),
@@ -233,7 +233,7 @@ export function createStepKnowledge(deps: {
 						await hold.done();
 					}
 				};
-				return given(projectId, path, view.path, step, done, only);
+				return given(projectId, view.path, step, done, only);
 			}
 			const plain: SessionKnowledge = {
 				...nothing,
@@ -251,7 +251,7 @@ export function createStepKnowledge(deps: {
 				return plain;
 			}
 			refreshSearch(projectId, snapshot);
-			return given(projectId, path, path, step, hold.done);
+			return given(projectId, path, step, hold.done);
 		},
 	};
 }

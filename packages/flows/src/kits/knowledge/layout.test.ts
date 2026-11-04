@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
 	ACCEPTED_LEARNINGS_DIR,
+	IS_PROPOSED_LEARNING_SHELL,
 	isHiddenFromReaders,
 	isKnowledgeOwnFolder,
 	isProposedLearning,
-	isProposedLearningFile,
 	isQuestionSetPath,
 	KNOWLEDGE_INDEX_FILE,
 	KNOWLEDGE_OWN_FOLDERS_WORDS,
@@ -14,6 +14,7 @@ import {
 	knowledgeFoldersOf,
 	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
+	proposedLearningAt,
 	proposedLearningFileName,
 	proposedLearningOf,
 	QUESTION_SET_FILE,
@@ -67,12 +68,26 @@ describe("the layout of the knowledge folder", () => {
 
 	test("tells a proposed learning's file from its folder, and from the question set", () => {
 		expect(isProposedLearning(PROPOSED_LEARNINGS_DIR)).toBe(true);
-		expect(isProposedLearningFile(PROPOSED_LEARNINGS_DIR)).toBe(false);
-		expect(isProposedLearningFile("learnings/proposed/run-1.s1.md")).toBe(true);
-		expect(isProposedLearningFile("learnings/proposed/deep/run-1.md")).toBe(
-			false,
-		);
-		expect(isProposedLearningFile("learnings/proposed/run-1.txt")).toBe(false);
+		expect(proposedLearningAt(PROPOSED_LEARNINGS_DIR)).toBeNull();
+		expect(proposedLearningAt("learnings/proposed/run-1.s1.md")).toEqual({
+			id: "run-1.s1.md",
+			runId: "run-1",
+			stepId: "s1",
+		});
+		expect(proposedLearningAt("learnings/proposed/run-1.md")).toEqual({
+			id: "run-1.md",
+			runId: "run-1",
+			stepId: null,
+		});
+		for (const path of [
+			"learnings/proposed/deep/run-1.md",
+			"learnings/proposed/run-1.txt",
+			"learnings/proposed/my notes.md",
+			"learnings/accepted/run-1.md",
+			"run-1.md",
+		]) {
+			expect(proposedLearningAt(path)).toBeNull();
+		}
 		expect(isQuestionSetPath(QUESTION_SET_FILE)).toBe(true);
 		expect(isQuestionSetPath("learnings/proposed/run-1.md")).toBe(false);
 	});
@@ -99,6 +114,73 @@ describe("the layout of the knowledge folder", () => {
 		for (const name of ["run-1", "../x.md", ".md", "a.b.c.md", "a.b/c.md"]) {
 			expect(proposedLearningOf(name)).toBeNull();
 		}
+	});
+
+	test("the shell's rule for a proposed learning's name is the same as this one", async () => {
+		const parts = [
+			"a",
+			"Z9",
+			"run-1",
+			"s_1",
+			"-",
+			"_",
+			".",
+			"..",
+			" ",
+			"/",
+			"é",
+			"*",
+			"$",
+			"'",
+			"\n",
+			"md",
+			".md",
+			".MD",
+		];
+		const names = new Set<string>(["", ".", ".md", "..md", "a.b.c.md"]);
+		for (const first of parts) {
+			for (const second of parts) {
+				names.add(`${first}${second}`);
+				names.add(`${first}${second}.md`);
+				for (const third of parts) {
+					names.add(`${first}.${second}.${third}`);
+					names.add(`${first}${second}${third}.md`);
+				}
+			}
+		}
+		const all = [...names];
+		/** The shell's answer for each name, in order. */
+		const answers = async (some: string[]): Promise<string[]> => {
+			const proc = Bun.spawn(
+				[
+					"/bin/sh",
+					"-c",
+					`${IS_PROPOSED_LEARNING_SHELL}
+for name in "$@"; do
+	if is_proposed_learning "$name"; then echo yes; else echo no; fi
+done`,
+					"sh",
+					...some,
+				],
+				{ stdout: "pipe" },
+			);
+			const out = await new Response(proc.stdout).text();
+			expect(await proc.exited).toBe(0);
+			return out.trim().split("\n");
+		};
+		// In parts: a shell function call copies all the arguments of its caller.
+		const lines: string[] = [];
+		for (let at = 0; at < all.length; at += 500) {
+			lines.push(...(await answers(all.slice(at, at + 500))));
+		}
+		expect(lines).toHaveLength(all.length);
+		const differ = all.filter(
+			(name, i) => (lines[i] === "yes") !== (proposedLearningOf(name) !== null),
+		);
+		expect(differ).toEqual([]);
+		// The test proves something only when both answers occur.
+		expect(lines).toContain("yes");
+		expect(lines).toContain("no");
 	});
 
 	test("gives every folder that holds a file, at any depth, sorted", () => {
