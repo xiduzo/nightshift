@@ -29,9 +29,11 @@ import {
 } from "@nightshift/ui/components/empty";
 import {
 	Item,
+	ItemActions,
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
+	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Kbd } from "@nightshift/ui/components/kbd";
 import { Progress } from "@nightshift/ui/components/progress";
@@ -41,6 +43,7 @@ import {
 	CheckCircle2Icon,
 	CheckIcon,
 	CircleAlertIcon,
+	CopyIcon,
 	FileX2Icon,
 	LightbulbIcon,
 	NetworkIcon,
@@ -51,6 +54,11 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { formatRelative } from "@/shared/format";
+import {
+	closeNotesShown,
+	closeNotesTitle,
+	type ShownCloseNote,
+} from "./close-notes-words";
 import { fileNameOf } from "./folder-tree";
 import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import { SyncNowButton } from "./sources";
@@ -201,6 +209,40 @@ function ReviewQueue() {
 	);
 }
 
+/** The notes close to one note, so a person can compare them. */
+function CloseNotes({
+	notes,
+	onShow,
+}: {
+	notes: readonly ShownCloseNote[];
+	onShow: (taskId: string) => void;
+}) {
+	if (notes.length === 0) return null;
+	return (
+		<ItemGroup className="mt-2 gap-1">
+			{notes.map(({ key, label, note, taskId }) => (
+				<Item key={key} size="xs" variant="muted" role="listitem">
+					<ItemContent>
+						<ItemTitle className="text-muted-foreground text-xs">
+							{label}
+						</ItemTitle>
+						<ItemDescription className="line-clamp-none text-foreground">
+							{note}
+						</ItemDescription>
+					</ItemContent>
+					{taskId ? (
+						<ItemActions>
+							<Button size="xs" variant="ghost" onClick={() => onShow(taskId)}>
+								Show note
+							</Button>
+						</ItemActions>
+					) : null}
+				</Item>
+			))}
+		</ItemGroup>
+	);
+}
+
 function TaskCard({
 	projectId,
 	task,
@@ -239,6 +281,8 @@ function TaskCard({
 	switch (task.kind) {
 		case "learning": {
 			const { learning } = task;
+			const close = closeNotesShown(learning, review.queue);
+			const notesWithClose = close.filter((near) => near.length > 0).length;
 			return (
 				<Card>
 					<CardHeader>
@@ -265,10 +309,26 @@ function TaskCard({
 							<ul className="flex list-disc flex-col gap-3 pl-5 text-lg leading-snug">
 								{learning.notes.map((note, index) => (
 									// The notes keep their order, and the same note may come twice.
-									<li key={index}>{note}</li>
+									<li key={index}>
+										{note}
+										<CloseNotes
+											notes={close[index] ?? []}
+											onShow={review.bringForward}
+										/>
+									</li>
 								))}
 							</ul>
 						)}
+						{notesWithClose > 0 ? (
+							<Alert className="mt-4">
+								<CopyIcon />
+								<AlertTitle>{closeNotesTitle(notesWithClose)}</AlertTitle>
+								<AlertDescription>
+									They may repeat each other or disagree. Compare them, then
+									keep or delete.
+								</AlertDescription>
+							</Alert>
+						) : null}
 					</CardContent>
 					<CardFooter className="flex-wrap gap-2">
 						{mayDecide ? (
