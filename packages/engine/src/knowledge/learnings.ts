@@ -51,6 +51,9 @@ export type WaitingLearning = {
 	proposedAt: number;
 };
 
+/** A learning that waits, with the project it is for. */
+export type ProjectLearning = WaitingLearning & { projectId: string };
+
 /** A step of a run, as its proposed learnings are named. */
 export type LearningStep = { runId: string; stepId?: string };
 
@@ -103,7 +106,10 @@ export type Learnings = {
 		projectId: string,
 		options?: { onlyHere?: boolean },
 	): Promise<WaitingLearning[]>;
-	/** How many notes wait. A file whose content is not here holds one at least. */
+	/**
+	 * How many notes wait. A file whose content is not here holds one at
+	 * least, and no Host is asked: the Knowledge page draws from this.
+	 */
 	count(projectId: string): Promise<number>;
 	/**
 	 * Keeps or deletes one step's proposed learnings: keep adds the file to
@@ -141,7 +147,11 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 	/** What waited at the last reconcile of each project in this process. */
 	const known = new Map<string, string>();
 
-	/** The proposed learnings the document lists. Notes are null when the content cannot be read now. */
+	/**
+	 * The proposed learnings the document lists. Notes are null when the
+	 * content cannot be read now. A Host that fails once is not asked again in
+	 * this read, so many files do not each wait for it.
+	 */
 	async function listed(
 		projectId: string,
 		options: { onlyHere?: boolean } = {},
@@ -150,15 +160,17 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 		if (spaceId === null) return [];
 		const entries = (await documents.open(projectId)).entries();
 		const learnings = [];
+		let onlyHere = options.onlyHere ?? false;
 		for (const [path, entry] of entries) {
 			const learning = proposedLearningAt(path);
 			if (!learning) continue;
 			const ref = { kind: "content" as const, spaceId, sha256: entry.sha256 };
-			const content = await (options.onlyHere
+			const content = await (onlyHere
 				? archive.here.read(ref)
 				: archive.read(ref)
 			).catch((error: unknown) => {
 				status.heard(spaceId, error);
+				onlyHere = true;
 				return null;
 			});
 			learnings.push({
@@ -210,7 +222,7 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 				);
 		},
 		async count(projectId) {
-			const learnings = await listed(projectId);
+			const learnings = await listed(projectId, { onlyHere: true });
 			return learnings.reduce(
 				(sum, learning) => sum + (learning.notes?.length ?? 1),
 				0,

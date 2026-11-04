@@ -48,7 +48,10 @@ export async function removeKnowledgeDevices(): Promise<void> {
 }
 
 /** A Device with project p1 and its knowledge, reaching `host`. */
-export async function knowledgeDevice(host: ArchiveHost | null) {
+export async function knowledgeDevice(
+	host: ArchiveHost | null,
+	options: { pageWaitMs?: number } = {},
+) {
 	const sandbox = await createSandbox();
 	sandboxes.push(sandbox);
 	await sandbox.db
@@ -101,7 +104,7 @@ export async function knowledgeDevice(host: ArchiveHost | null) {
 		status,
 		deviceId: sandbox.deviceId,
 		reconcileUnlessHeld: sync.reconcileUnlessHeld,
-		pageWaitMs: 5_000,
+		pageWaitMs: options.pageWaitMs ?? 5_000,
 	});
 	const dir = folders.folder("p1");
 	const document = () => documents.open("p1");

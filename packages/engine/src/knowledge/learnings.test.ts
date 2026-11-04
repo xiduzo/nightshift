@@ -95,6 +95,71 @@ describe("waiting and count", () => {
 		expect(await a.learnings.count("p1")).toBe(1);
 	});
 
+	test("the count asks no Host: a Host that never answers cannot hold the page", async () => {
+		const { host, kept } = memoryHost();
+		const a = await device(host);
+		await a.put("learnings/proposed/run-1.md", "- One.\n- Two.\n");
+		await a.sync.reconcile("p1");
+		let asked = 0;
+		const { promise: answer, resolve } = Promise.withResolvers<null>();
+		const stalled = await device({
+			archivePut: host.archivePut,
+			archiveGet: () => {
+				asked++;
+				return answer;
+			},
+		});
+		await syncDocuments(a, stalled);
+		expect(kept.size).toBe(1);
+
+		expect(await stalled.learnings.count("p1")).toBe(1);
+		expect(asked).toBe(0);
+		resolve(null);
+	});
+
+	test("the page's list comes in time while a Host never answers", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		await a.put("learnings/proposed/run-1.md", "- One.\n");
+		await a.sync.reconcile("p1");
+		const { promise: answer, resolve } = Promise.withResolvers<null>();
+		const stalled = await device(
+			{ archivePut: host.archivePut, archiveGet: () => answer },
+			{ pageWaitMs: 20 },
+		);
+		await syncDocuments(a, stalled);
+
+		const listing = await stalled.reader.listing("p1");
+		expect(listing.proposed).toBe(1);
+		resolve(null);
+	});
+
+	test("what waits asks a Host that fails only once in one read", async () => {
+		const { host, state } = memoryHost();
+		const a = await device(host);
+		await a.put("learnings/proposed/run-1.md", "- One.\n");
+		await a.put("learnings/proposed/run-2.md", "- Two.\n");
+		await a.put("learnings/proposed/run-3.md", "- Three.\n");
+		await a.sync.reconcile("p1");
+		let asked = 0;
+		const b = await device({
+			archivePut: host.archivePut,
+			archiveGet: (ref) => {
+				asked++;
+				return host.archiveGet(ref);
+			},
+		});
+		await syncDocuments(a, b);
+
+		state.down = true;
+		const waiting = await b.learnings.waiting("p1");
+		expect(waiting.map(({ notes }) => notes)).toEqual([[], [], []]);
+		expect(asked).toBe(1);
+		state.down = false;
+		const back = await b.learnings.waiting("p1");
+		expect(back.map(({ notes }) => notes.length)).toEqual([1, 1, 1]);
+	});
+
 	test("a file whose content is not here has no notes yet, and counts as one", async () => {
 		const { host, state } = memoryHost();
 		const a = await device(host);
