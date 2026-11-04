@@ -395,6 +395,70 @@ it ends, the Review page, a review by the kit, and each of these on another
 computer. One reconcile tells them once, however many files it brings. No
 push goes out for this. The Gate of the review sends its own push.
 
+### Close notes
+
+The Review page shows when a note that waits is close in meaning to another
+note: one that also waits, or one you kept. It shows the text of the other
+note, so you can compare the two. You still keep or delete each step's notes.
+Nothing merges, and nothing goes away by itself.
+
+A cosine cannot tell a note that repeats another from a note that disagrees
+with it, because both are about one thing. So the page says that the notes are
+close. It does not say which of the two it is.
+
+`packages/engine/src/knowledge/close-notes.ts` owns this. The list of what waits
+gains `nearTo`: one list per note, in the order of `notes`, with the three
+closest at most. Each has the file `id`, the text in `note`, whether it is `kept`,
+and the `similarity`. The field is additive. An older phone ignores it, and an
+older Host does not send it. The phone does not show it: comparing notes is work
+for a computer.
+
+**A page never waits for a model.** The read asks the search index for vectors
+that it already has. It does not ask whether the model is ready. A note with no
+vector yet is not compared. Its vector comes in the background, one project at a
+time, through the same paced embeddings as the sections. When vectors came, the
+open screens read again. After a failed embed, the next try waits a minute.
+
+Vectors of notes are in the search index, in their own table, by the hash of the
+text. So a note embeds once: not at each draw, not after a restart, and not again
+when you keep it. The vectors of notes that went are dropped at the next
+preparation. Another model drops them all, as it does the vectors of sections.
+Each draw compares again only when a note or a vector changed.
+
+Search by meaning off for the project, no model, or a model with no measured
+line: the list has no `nearTo`, and nothing embeds. When the model stops
+answering, the vectors that are there still count, as they do on the Map. A
+computer compares with the kept notes it has here, the 500 newest files at most.
+It does not ask the Host for them.
+
+**The line.** Two notes are close at the model's `closeNotesAt` in
+`embedding-model.ts` or above it. The line for `qwen3-embedding:0.6b` is 0.78.
+
+| 191 notes, `qwen3-embedding:0.6b`, 2026-11-05 | Pairs | Least | Middle | Most | At 0.78 or above |
+| --- | --- | --- | --- | --- | --- |
+| Same thing in other words | 42 | 0.783 | 0.886 | 0.956 | 42 |
+| Nearly the same words | 8 | 0.963 | 0.990 | 0.998 | 8 |
+| One subject, the facts disagree | 24 | 0.670 | 0.875 | 0.962 | 19 |
+| One subject or area, other facts | 50 | 0.395 | 0.624 | 0.767 | 0 |
+| Other subjects | 17 911 | 0.092 | 0.325 | 0.762 | 0 |
+
+Read this table with care:
+
+- One author wrote these notes and their labels. They have the shape of real
+  notes, but they come from no real project. No real notes were measured.
+- The gap is thin: 0.767 to 0.783. A related pair can pass the line in real use.
+  That costs one extra comparison for a person, and nothing is lost.
+- 5 of 24 pairs that disagree stay under the line, for example "needs approval
+  from two people" and "anyone can deploy with no approval". Absence of a close
+  note does not mean that a note agrees with the others.
+- Close does not rank what repeats first. "Cut on Tuesdays" is 0.953 from "cut on
+  Fridays", and 0.796 from "every Tuesday a new branch gets created".
+
+To measure again or try another model, run `close-notes.live.test.ts` with
+`OLLAMA_LIVE_MODEL` set. The notes are in `testing/fixtures/close-notes.ts`.
+
+### The Review page
+
 The Review page shows what the engine decides waits (`knowledge.review`,
 `knowledge/review.ts`): a source that needs a look, a step's learnings, a
 question that found nothing, and the files no run used. The engine sets the
@@ -803,6 +867,9 @@ reads it.
   adds the whole file. A Command can write other text there. The Gate shows it.
 - A screen connected to a computer hears of another computer's change at the
   next reconcile there, or when a run changes.
+- Close notes do not say whether two notes repeat or disagree. A model could
+  say which (`docs/research/knowledge-graph-extraction.md`). The engine has no
+  model for this.
 - A project that joins another one when a computer joins its home Host
   keeps its knowledge folder under its old id.
 - The evaluation runs from the page only. `kit:knowledge/evaluate`, so a

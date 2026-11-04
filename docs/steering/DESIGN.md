@@ -107,6 +107,7 @@ A project's Knowledge opens on an overview. Five child pages hold the details: R
 - **The overview** has the search on top, then a card for what waits for you and a card per child page. A search replaces the cards until you clear it. Each card shows the facts that matter and at most 5 rows (see Overview lists). A row opens its child page.
 - **Review** shows one task at a time, in one column, `max-w-3xl`: a source that fails, a step's learnings, a question that found nothing, files no run used. Keys: K keeps, D deletes, S puts off. A row in "Next" brings that task forward.
 - Keep and Delete leave the queue at once and go out after 5 seconds. The toast has Undo. Leaving Knowledge sends them. The queue stays while you move between the child pages.
+- A note close to another note shows that note's text under it, with "Close to a kept note", "Close to a note that also waits" or "Close to a note here". The words say "close" and nothing more: only a person can tell whether two notes repeat or disagree. The phone does not show them.
 - "Not important" and "Keep syncing them" are remembered in this browser. A learning is never dismissed: a person keeps or deletes it.
 - **Files** has the search on top, then every file by folder: folders on the left, the files of the chosen folder on the right. Each side scrolls on its own. A search replaces the folders until you clear it.
 - **Sources** lists where the files come from. **Questions** lists what agents searched for, with the test of search on top when questions are marked.
