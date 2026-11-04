@@ -30,14 +30,12 @@ describe("what a run that ended says", () => {
 		});
 	});
 
-	test("a run another computer runs says only that computer can resume it", () => {
+	test("a run another computer runs resumes from here too", () => {
 		const notice = stoppedNotice(run({ walker: laptop }), "failed");
-		expect(notice?.body).toBe(
-			"The run failed. Only Sander's laptop can resume it.",
-		);
-		expect(notice?.resumable).toBe(false);
+		expect(notice?.body).toBe("The run failed. Resume it to continue.");
+		expect(notice?.resumable).toBe(true);
 		expect(stoppedNotice(run({ walker: unnamed }), "stopped")?.gist).toBe(
-			"Only another device can resume it.",
+			"Resume it to continue.",
 		);
 	});
 

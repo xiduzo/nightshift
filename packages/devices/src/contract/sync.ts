@@ -107,6 +107,11 @@ const runCommandSchema = exact<RunCommand>()(
 			...commandFields,
 		}),
 		z.object({
+			kind: z.literal("run.resume"),
+			payload: z.object({ prompt: z.string().optional() }),
+			...commandFields,
+		}),
+		z.object({
 			kind: z.literal("lease.release"),
 			payload: z.object({ name: z.string() }),
 			...commandFields,

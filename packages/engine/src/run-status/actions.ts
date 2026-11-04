@@ -49,6 +49,7 @@ const RELAYED: ReadonlySet<RunAction> = new Set([
 	"answer",
 	"signal",
 	"move",
+	"resume",
 ]);
 
 /**

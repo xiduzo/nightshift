@@ -770,7 +770,7 @@ describe("a run walked elsewhere", () => {
 	test("it is never resumed or recovered here, and without a relay it is read-only", async () => {
 		const { engineB, run, stepId } = await waitingOnB();
 		expect(
-			engineB.space(a.spaceId).act(run.id, { kind: "resume" }),
+			engineB.space(a.spaceId).act(run.id, { kind: "rerun", nodeId: "ship" }),
 		).rejects.toThrow("Another device");
 		expect(
 			engineB

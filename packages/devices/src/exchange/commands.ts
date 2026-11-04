@@ -14,7 +14,7 @@ import type { RunCommand } from "../contract";
 /**
  * Commands: a person's action on a run that another Device walks. The
  * Walker is the only writer of its run's events, so an answer to a Gate, a
- * signal or a stop travels to it as a command, and the Walker applies it
+ * signal, a stop or a resume travels to it as a command, and the Walker applies it
  * like a local action. The Host keeps a command (`run_command`) until the
  * Walker reports it applied, or why not; a command to a Walker that is
  * offline waits, and shows as pending. The Walker's log says which
@@ -27,6 +27,7 @@ export const COMMAND_PERMISSION = {
 	"signal.send": { signal: ["send"] },
 	"run.stop": { run: ["stop"] },
 	"run.move": { run: ["move"] },
+	"run.resume": { run: ["resume"] },
 	// Letting go of a lease cuts into the run, as a stop does.
 	"lease.release": { run: ["stop"] },
 	"run.useful": { run: ["stop"] },
@@ -182,6 +183,8 @@ export async function applyRunCommand(
 			return space.act(runId, { kind: "stop", ...command.payload });
 		case "run.move":
 			return space.act(runId, { kind: "move", ...command.payload });
+		case "run.resume":
+			return space.act(runId, { kind: "resume", ...command.payload });
 		case "lease.release":
 			return space.act(runId, { kind: "release-lease", ...command.payload });
 		case "run.useful":

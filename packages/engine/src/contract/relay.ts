@@ -118,6 +118,8 @@ export type RunCommandInput =
 	  }
 	/** Another Device walks the run from here on. */
 	| { kind: "run.move"; payload: { to: string } }
+	/** The run continues at its last step, with an optional follow-up prompt. */
+	| { kind: "run.resume"; payload: { prompt?: string } }
 	/** A person lets go of a lease the run holds (ADR 7). */
 	| { kind: "lease.release"; payload: { name: string } }
 	/** Whether the person found the run's pull request useful. */

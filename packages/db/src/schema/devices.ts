@@ -159,6 +159,7 @@ export const runCommand = sqliteTable(
 				"signal.send",
 				"run.stop",
 				"run.move",
+				"run.resume",
 				"lease.release",
 				"run.useful",
 			],

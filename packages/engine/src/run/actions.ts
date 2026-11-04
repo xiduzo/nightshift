@@ -52,7 +52,7 @@ import type { StartHolds } from "./start-holds";
  *
  * On a run another Device walks, this computer writes nothing: the Walker
  * is the only writer of its run's events. A stop, an answer, a Signal and
- * a move travel to it. Only the Walker resumes, restarts or reruns.
+ * a move and a resume travel to it. Only the Walker restarts or reruns.
  */
 
 /** One action a person asks of a run (`SpaceEngine.act`). */
@@ -286,9 +286,9 @@ export function createRunActions(deps: RunActionsDeps) {
 	}
 
 	/**
-	 * An action on a run another Device walks: a stop, an answer, a Signal
-	 * or a move travels to the Walker as a Command, once the run's log here
-	 * allows it. Only the Walker takes the rest.
+	 * An action on a run another Device walks: a stop, an answer, a Signal,
+	 * a move or a resume travels to the Walker as a Command, once the run's
+	 * log here allows it. Only the Walker takes the rest.
 	 */
 	async function onWalker(
 		row: RunRow,
@@ -345,6 +345,21 @@ export function createRunActions(deps: RunActionsDeps) {
 					kind: "run.move",
 					payload: { to: request.to },
 				});
+			case "resume": {
+				refuseUnless("resume", status, false, result);
+				const pending =
+					(await deps.archive.pendingCommands([row.id])).get(row.id) ?? [];
+				if (pending.some((c) => c.kind === "run.resume")) {
+					throw new RunRefusal(
+						"not-now",
+						"A resume of this run is already on its way to the device that runs it.",
+					);
+				}
+				return relay.send(row, actor, {
+					kind: "run.resume",
+					payload: request.prompt ? { prompt: request.prompt } : {},
+				});
+			}
 			case "release-lease":
 				refuseRelease(runState, request.name);
 				return relay.send(row, actor, {
