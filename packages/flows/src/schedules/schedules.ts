@@ -1,21 +1,10 @@
-import { Refusal } from "@nightshift/refusal";
 import { isTimeZone } from "@nightshift/time";
 import { latestCronTime, nextCronTimes } from "@nightshift/time/cron";
 import { Cron } from "croner";
 import { z } from "zod";
 
-import {
-	deviceRefOfName,
-	type FlowInputDef,
-	type FlowMigration,
-} from "../flow";
-import {
-	deviceIdOf,
-	deviceRefSchema,
-	flowNameSchema,
-	labelSchema,
-	legacyDeviceName,
-} from "../nodes";
+import type { FlowInputDef } from "../flow";
+import { flowNameSchema, labelSchema } from "../nodes";
 import { ruleProblem, templateRefs } from "../template";
 
 export { isTimeZone, latestCronTime, nextCronTimes };
@@ -56,11 +45,13 @@ export { isTimeZone, latestCronTime, nextCronTimes };
  * exists and runs, the cron line parses, the inputs fit the flow, a
  * schedule has a cron line or a webhook). Browser-safe.
  *
- * Version 1 → 2 (`migrateSchedule`): `device` names the Device by its id
- * instead of its name (ADR 14).
+ * Version 1 → 2: `device` names the Device by its id instead of its name
+ * (ADR 14). Version 2 → 3: a schedule has no `device`. Its runs always run
+ * on the Replica that keeps the Space (ADR 15). The schema drops an old
+ * `device`, so a save from an older list cannot bring it back.
  */
 
-export const SCHEDULES_VERSION = 2;
+export const SCHEDULES_VERSION = 3;
 
 /** A schedule id: a slug, unique in the file. */
 export const scheduleIdSchema = z
@@ -180,19 +171,10 @@ export const scheduleSchema = z.object({
 	 */
 	pausedUntil: z.number().int().positive().optional(),
 	/**
-	 * The Device its runs run on, by its id. The Space's Host fires every
-	 * schedule (or the one Device of a Space without a Host), so a schedule
-	 * every Clone has never fires twice, and starts the run there. Unset:
-	 * the run runs on the Device that fires it. `{ name }`: a name from
-	 * before ids that Night Shift could not bring to one Device. The
-	 * schedule does not start until a person chooses the device again.
-	 */
-	device: deviceRefSchema.optional(),
-	/**
-	 * The Person whose runs it starts, when its `device` is another
+	 * The Person whose runs it starts, when the Host of the Space is another
 	 * Person's: Night Shift writes it when you save the schedule, and the
-	 * runs use that Device through its Offers only. Unset: the runs are
-	 * the firing Device's owner's.
+	 * runs use the Host through its Offers only. Unset: the runs are the
+	 * Host's owner's.
 	 */
 	person: z.string().trim().min(1).max(128).optional(),
 });
@@ -201,46 +183,6 @@ export const schedulesFileSchema = z.object({
 	version: z.literal(SCHEDULES_VERSION),
 	schedules: z.array(scheduleSchema).default([]),
 });
-
-/**
- * The Device a schedule's runs run on, as a run start takes it: its id,
- * or nothing for the Device that fires it. Refuses a name from before ids
- * that Night Shift could not bring to one Device: the run never starts
- * on a guess.
- */
-export function scheduleDevice(schedule: Pick<Schedule, "device">): {
-	deviceId?: string;
-} {
-	const oldName = legacyDeviceName(schedule.device);
-	if (oldName !== null) {
-		throw new Refusal(
-			"invalid",
-			`This schedule names the device "${oldName}", but Night Shift cannot tell which device that is. Choose the device again.`,
-		);
-	}
-	const deviceId = deviceIdOf(schedule.device);
-	return deviceId === undefined ? {} : { deviceId };
-}
-
-/**
- * A schedule of version 1 as version 2 has it, as raw JSON before
- * `scheduleSchema` checks it: its `device` goes from a Device's name to the
- * Device's id (`migration.deviceIdByName`). A name it cannot bring to one
- * id, or any name without a migration, becomes `{ name }`: the schedule
- * does not start until a person chooses the device again. Returns the
- * input unchanged when it names no Device by name.
- */
-export function migrateSchedule(
-	json: unknown,
-	migration?: Pick<FlowMigration, "deviceIdByName">,
-): unknown {
-	if (json === null || typeof json !== "object" || Array.isArray(json)) {
-		return json;
-	}
-	const device = (json as { device?: unknown }).device;
-	if (typeof device !== "string") return json;
-	return { ...json, device: deviceRefOfName(device, migration) };
-}
 
 export type Schedule = z.infer<typeof scheduleSchema>;
 /** What a schedule holds before defaults apply. */
@@ -484,12 +426,6 @@ export function validateSchedules(
 		if (whenProblem) error(`The webhook's rule is not valid: ${whenProblem}`);
 		const keyProblem = signal?.key ? ruleProblem(signal.key) : null;
 		if (keyProblem) error(`The signal's key is not valid: ${keyProblem}`);
-		const oldName = legacyDeviceName(schedule.device);
-		if (oldName !== null) {
-			error(
-				`This schedule names the device "${oldName}", but Night Shift cannot tell which device that is. Choose the device again.`,
-			);
-		}
 
 		if (schedule.flow === undefined) {
 			// A webhook that only wakes Waits, or only scores, starts no flow.

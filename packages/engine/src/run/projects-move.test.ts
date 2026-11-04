@@ -288,13 +288,7 @@ describe("a Space move", () => {
 		const app = await mine.addProject({ repoPath: sandbox.repoPath });
 		const schedules: Schedule[] = [
 			{ id: "nightly", cron: "0 22 * * *", inputs: {}, enabled: true },
-			{
-				id: "studio",
-				cron: "0 6 * * *",
-				inputs: {},
-				enabled: true,
-				device: "studio",
-			},
+			{ id: "studio", cron: "0 6 * * *", inputs: {}, enabled: false },
 		];
 		await mine.saveSchedules(app.id, schedules);
 		let counted = -1;
@@ -303,11 +297,9 @@ describe("a Space move", () => {
 			from: sandbox.spaceId,
 			plan: async () => ({
 				projects: { [app.id]: { spaceId: home, projectId: app.id } },
-				// The merge: a schedule that names no Device keeps firing its runs here.
+				// A split: a schedule that is on is paused here.
 				schedule: (schedule) =>
-					schedule.device === undefined
-						? { ...schedule, device: "this-computer" }
-						: schedule,
+					schedule.enabled ? { ...schedule, enabled: false } : schedule,
 			}),
 			statements: (done) => {
 				counted = done.schedules;
@@ -317,9 +309,9 @@ describe("a Space move", () => {
 
 		expect(counted).toBe(1);
 		const listed = await engine.space(home).listSchedules(app.id);
-		expect(listed.schedules.map((s) => [s.id, s.device])).toEqual([
-			["nightly", "this-computer"],
-			["studio", "studio"],
+		expect(listed.schedules.map((s) => [s.id, s.enabled])).toEqual([
+			["nightly", false],
+			["studio", false],
 		]);
 	});
 

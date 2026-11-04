@@ -12,12 +12,11 @@ import { personInSpace } from "../links";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
 
 /**
- * A schedule that fires on another Person's Device starts the saver's
- * runs there, through that Device's Offers: each such schedule gets the
- * saver as its `person`, and is refused unless the Offers in the Space
- * cover what its flow runs on that Device now. A schedule on one of the
- * saver's own Devices names no Person. A schedule names its Device by id
- * (ADR 14), among those Placement lets the saver use (`devicesFor`).
+ * A schedule's runs run on the Replica that keeps the Space (ADR 15). When
+ * that Replica is another Person's, a schedule starts the saver's runs there,
+ * through its Offers: it gets the saver as its `person`, and is refused
+ * unless the Offers in the Space cover what its flow runs there now. The
+ * saver's own Host names no Person.
  */
 export function createScheduleOffers(deps: {
 	db: Database;
@@ -31,6 +30,8 @@ export function createScheduleOffers(deps: {
 		personId: string,
 		projectId: string,
 	): Promise<OwnDevice[]>;
+	/** The id of the Replica that keeps the Space: its Host, or this computer. */
+	keeper(spaceId: string): Promise<string>;
 	/** This computer's Offers into the Space that are in force. */
 	offersHere(spaceId: string): Promise<DeviceOffer[]>;
 	/** Whether the Person's role in the Space lets them use Offers. */
@@ -43,21 +44,23 @@ export function createScheduleOffers(deps: {
 		actor: Actor | undefined,
 		schedules: readonly Schedule[],
 	): Promise<Schedule[]> {
-		if (!actor || !schedules.some((s) => deviceIdOf(s.device) !== undefined)) {
-			return [...schedules];
-		}
+		if (!actor || schedules.length === 0) return [...schedules];
 		const personId = await personInSpace(db, spaceId, actor.personId);
 		const devices = await deps.devicesFor(spaceId, personId, project.id);
 		const document = await deps.documents.open(spaceId);
+		const keeperId = await deps.keeper(spaceId);
+		const theirs = devices.find((d) => d.deviceId === keeperId) ?? null;
+		if (theirs === null) {
+			// Another Person's Host that offers this Person nothing.
+			throw new Refusal(
+				"conflict",
+				"Schedules run on the Host of this Space. Its owner offers you nothing there yet.",
+			);
+		}
 		const out: Schedule[] = [];
 		for (const schedule of schedules) {
 			const { person: _old, ...rest } = schedule;
-			const id = deviceIdOf(schedule.device);
-			const theirs =
-				id === undefined
-					? null
-					: (devices.find((d) => d.deviceId === id) ?? null);
-			if (theirs?.offers === undefined) {
+			if (theirs.offers === undefined) {
 				out.push(rest);
 				continue;
 			}
@@ -72,8 +75,8 @@ export function createScheduleOffers(deps: {
 				});
 				nodes = [loaded.flow, ...Object.values(loaded.calledFlows)]
 					.flatMap((f) => f.nodes)
-					// The schedule's run starts on that Device: its nodes run there
-					// unless they name another.
+					// The schedule's run starts on the Host: its nodes run there
+					// unless they name another Device.
 					.filter(
 						(n) =>
 							!("device" in n) ||
@@ -93,7 +96,7 @@ export function createScheduleOffers(deps: {
 			if (refusal !== null) {
 				throw new Refusal(
 					"conflict",
-					`The schedule "${schedule.id}" fires on another person's device. ${refusal}`,
+					`The schedule "${schedule.id}" runs on another person's computer. ${refusal}`,
 				);
 			}
 			out.push({ ...rest, person: personId });

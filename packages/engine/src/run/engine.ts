@@ -1,6 +1,7 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { KnowledgeUse } from "@nightshift/agents/tools";
 import { isCustomHarness, type Schedule } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
@@ -63,6 +64,7 @@ import {
 	createWorktrees,
 	forgetSpaceRows,
 	memberName,
+	NOT_ON_THIS_COMPUTER,
 	spaceUsageOn,
 	systemGit,
 } from "../projects";
@@ -653,10 +655,8 @@ export function createEngine(
 
 	// The Replica that keeps the Space fires every schedule of it (its Host,
 	// or the one Device of a Space without one), so one that is always on
-	// starts them, with a Clone of the project or not. The Device a schedule
-	// names runs the run (`deviceName`), else the default Device of a
-	// person's start (`start-place.ts`). A webhook schedule's webhooks go
-	// to the same Replica.
+	// starts them, and its runs run there (ADR 15). A webhook schedule's
+	// webhooks go to the same Replica.
 	const firesHere = async (projectId: string, _schedule: Schedule) => {
 		const row = await projects.find(projectId);
 		return !(await hostedElsewhere(row.spaceId));
@@ -758,14 +758,32 @@ export function createEngine(
 	}
 
 	/**
-	 * A schedule's or a webhook's start: for the schedule's Person, else
-	 * this computer's owner, with the same default as a person's start.
+	 * A schedule's or a webhook's start, also Run now: for the schedule's
+	 * Person, else this computer's owner. It always runs on the Replica that
+	 * keeps the Space: its Host, or this computer in a Space without one
+	 * (ADR 15). A Host without a copy of the project refuses it. It does not
+	 * move to another Device.
 	 */
-	function startForSchedule(
+	async function startForSchedule(
 		input: StartRunInput,
 		trigger: RunTrigger,
 	): Promise<RunSummary> {
-		return startRunWith(input, trigger, input.startedBy ?? ownerId);
+		const { spaceId } = await projects.find(input.projectId);
+		const deviceId =
+			(await directory.hostOf(spaceId)) ?? (await runLog.walkerId());
+		return startRunWith(
+			{ ...input, deviceId },
+			trigger,
+			input.startedBy ?? ownerId,
+		).catch((error: unknown) => {
+			if (error instanceof Refusal && error.message === NOT_ON_THIS_COMPUTER) {
+				throw new Refusal(
+					error.kind,
+					"The computer that runs schedules does not have this project. Add it there.",
+				);
+			}
+			throw error;
+		});
 	}
 
 	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */

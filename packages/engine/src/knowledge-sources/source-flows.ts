@@ -188,15 +188,13 @@ function free(base: string, taken: ReadonlySet<string>): string {
  * A source that reads a folder of one computer (`local`) names that
  * computer on its Subflow (`device`), so its steps run there whoever
  * starts the run, the Host included: the computer it already names, else
- * `here.scheduled` (an older source ran on its schedule's computer),
- * else `here.device` (where the person adds it). Each by the computer's
- * id. A name from before ids stays, for the person to choose again.
+ * `here.device` (where the person adds it). Each by the computer's id. A name from before ids stays, for the person to choose again.
  */
 export function savedSource(input: {
 	source: KnowledgeSource;
 	name?: string;
 	flows: FlowMap;
-	here: { device: string; scheduled?: DeviceRef };
+	here: { device: string };
 }): { name: string; flow: Flow } {
 	const { source, name, flows } = input;
 	const inputs = checkedInputs(source);
@@ -242,7 +240,7 @@ export function savedSource(input: {
 		free(knowledgeSourceKind(source.kit).flowName, new Set(Object.keys(flows)));
 	flowNameSchema.parse(saved);
 	const device = knowledgeSourceKind(source.kit).local
-		? (placed ?? input.here.scheduled ?? input.here.device)
+		? (placed ?? input.here.device)
 		: undefined;
 	return { name: saved, flow: sourceFlow(source.kit, inputs, device) };
 }
@@ -255,7 +253,7 @@ export function savedSource(input: {
 export function withSourceSchedule(
 	schedules: readonly Schedule[],
 	name: string,
-	times: { cron: string; device?: DeviceRef } | null,
+	times: { cron: string } | null,
 ): Schedule[] {
 	const index = schedules.findIndex((schedule) =>
 		isSourceSchedule(schedule, name),
@@ -263,9 +261,8 @@ export function withSourceSchedule(
 	if (times === null) {
 		return schedules.filter((_, at) => at !== index);
 	}
-	const { device, ...cron } = times;
 	const existing = index === -1 ? undefined : schedules[index];
-	const { device: _old, ...kept } = existing ?? {
+	const kept = existing ?? {
 		id: free(name, new Set(schedules.map((schedule) => schedule.id))),
 		flow: name,
 		inputs: {},
@@ -273,9 +270,8 @@ export function withSourceSchedule(
 	};
 	const schedule: Schedule = {
 		...kept,
-		...cron,
+		...times,
 		enabled: true,
-		...(device !== undefined ? { device } : {}),
 	};
 	return index === -1
 		? [...schedules, schedule]

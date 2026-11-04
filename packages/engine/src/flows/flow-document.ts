@@ -10,7 +10,6 @@ import {
 	flowNameSchema,
 	flowSchema,
 	migrateFlow,
-	migrateSchedule,
 	SCHEDULES_VERSION,
 	type Schedule,
 	scheduleSchema,
@@ -653,72 +652,36 @@ export function olderSchedules(document: FlowDocument): boolean {
 }
 
 /**
- * The Persons the schedules of an older format name (`person`, null for
- * none), each once: a Device name in a schedule means that Person's
- * Devices first. Empty when the schedules are current.
- */
-export function schedulePersons(document: FlowDocument): (string | null)[] {
-	const maps = mapsOf(document);
-	if (schedulesVersionOf(maps) >= SCHEDULES_VERSION) return [];
-	const persons = new Set<string | null>();
-	for (const value of maps.schedules.values()) {
-		const person = isRecord(value) ? value.person : undefined;
-		persons.add(typeof person === "string" ? person : null);
-	}
-	return [...persons];
-}
-
-/** What brings one schedule of an older format to the current one, by its Person. */
-export type ScheduleMigrations = (
-	personId: string | null,
-) => Pick<FlowMigration, "deviceIdByName"> | undefined;
-
-/**
  * The schedules of the document that this Night Shift reads, in their
- * order, and whether it holds others. Schedules of an older format read
- * as the current one (`migrateSchedule`): a Device name becomes the
- * Device's id through `migrations`, and without one, or for a name it
- * cannot bring to one Device, it is to choose again.
+ * order, and whether it holds others. The schema drops a `device` of an
+ * older format (ADR 15).
  */
-export function readSchedules(
-	document: FlowDocument,
-	migrations?: ScheduleMigrations,
-): {
+export function readSchedules(document: FlowDocument): {
 	schedules: Schedule[];
 	unreadable: number;
 } {
 	const maps = mapsOf(document);
-	const older = schedulesVersionOf(maps) < SCHEDULES_VERSION;
 	const schedules: Schedule[] = [];
 	let unreadable = 0;
 	for (const key of orderedKeys(maps.schedules, maps.scheduleOrder)) {
-		const raw = maps.schedules.get(key);
-		const parsed = scheduleSchema.safeParse(
-			older ? migrateSchedule(raw, migrations?.(personOf(raw))) : raw,
-		);
+		const parsed = scheduleSchema.safeParse(maps.schedules.get(key));
 		if (parsed.success) schedules.push(parsed.data);
 		else unreadable++;
 	}
 	return { schedules, unreadable };
 }
 
-function personOf(raw: unknown): string | null {
-	const person = isRecord(raw) ? raw.person : undefined;
-	return typeof person === "string" ? person : null;
-}
-
 /**
  * Brings the schedules of the document to the current format, once
- * (ADR 14: a schedule names its Device by id): reads them as
- * `readSchedules` does and saves them. A schedule this Night Shift does
- * not read stays as it is. Returns whether it changed the document.
+ * (ADR 15: a schedule names no Device): reads them as `readSchedules`
+ * does and saves them. A schedule this Night Shift does not read stays as
+ * it is. Returns whether it changed the document.
  */
 export async function upgradeSchedules(
 	document: FlowDocument,
-	migrations?: ScheduleMigrations,
 ): Promise<boolean> {
 	if (!olderSchedules(document)) return false;
-	await saveSchedules(document, readSchedules(document, migrations).schedules);
+	await saveSchedules(document, readSchedules(document).schedules);
 	return true;
 }
 
@@ -966,7 +929,7 @@ export function planFlowMerge(
 	}
 	const ids = new Set(into.schedules.keys());
 	for (const key of orderedKeys(from.schedules, from.scheduleOrder)) {
-		const schedule = scheduleOf(from, into, key, plan.flows, persons);
+		const schedule = scheduleOf(from, key, plan.flows, persons);
 		const there = into.schedules.get(key);
 		if (there === undefined) {
 			ids.add(key);
@@ -1039,7 +1002,7 @@ export async function mergeFlowDocuments(
 		}
 		for (const key of orderedKeys(from.schedules, from.scheduleOrder)) {
 			const id = plan.schedules[key] ?? key;
-			const schedule = scheduleOf(from, into, key, plan.flows, persons);
+			const schedule = scheduleOf(from, key, plan.flows, persons);
 			if (into.schedules.has(id)) continue;
 			into.schedules.set(
 				id,
@@ -1069,23 +1032,19 @@ function sameFlow(a: FlowSource | undefined, b: FlowSource | undefined) {
 
 /**
  * A schedule of the source as the destination takes it: its flow by its
- * new name, its Person by their id there. A schedule of an older format
- * than the destination's names its Device to choose again: a merge has no
- * migration, and never takes a name for an id.
+ * new name, its Person by their id there. A `device` of an older format
+ * stays behind (ADR 15).
  */
 function scheduleOf(
 	source: FlowMaps,
-	destination: FlowMaps,
 	key: string,
 	flows: Readonly<Record<string, string>>,
 	persons: Readonly<Record<string, string>>,
 ): unknown {
 	const raw = copyOf(source.schedules.get(key));
-	const schedule =
-		schedulesVersionOf(source) < schedulesVersionOf(destination)
-			? migrateSchedule(raw)
-			: raw;
-	if (!isRecord(schedule)) return schedule;
+	if (!isRecord(raw)) return raw;
+	// A schedule of an older format names a Device. No schedule does now.
+	const { device: _device, ...schedule } = raw;
 	const flow = schedule.flow;
 	const renamed =
 		typeof flow === "string" && Object.hasOwn(flows, flow)

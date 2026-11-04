@@ -28,4 +28,6 @@ export type DeviceDirectory = {
 	known(): Promise<KnownDevice[]>;
 	/** Whether a Host keeps the Space, not this Replica. */
 	hostedElsewhere(spaceId: string): Promise<boolean>;
+	/** The id of the Host that keeps the Space, or null when this Replica keeps it. */
+	hostOf(spaceId: string): Promise<string | null>;
 };

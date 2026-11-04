@@ -23,5 +23,6 @@ export function deviceDirectory(db: Database): DeviceDirectory {
 		known: () => knownDevices(db),
 		hostedElsewhere: async (spaceId) =>
 			(await hostSpaces.hostOf(spaceId)) !== null,
+		hostOf: (spaceId) => hostSpaces.hostOf(spaceId),
 	};
 }

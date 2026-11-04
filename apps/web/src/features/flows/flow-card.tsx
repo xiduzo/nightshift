@@ -45,7 +45,6 @@ import {
 import type { ReactNode } from "react";
 import {
 	MachineBadge,
-	machineName,
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
@@ -154,7 +153,7 @@ function startText(start: FlowStart): string {
 /** What the chip's tooltip says: the whole schedule, or who runs it. */
 function startHint(
 	start: FlowStart,
-	machines: Parameters<typeof machineName>[0],
+	machines: ReturnType<typeof useSpaceMachines>,
 ): string {
 	if (start.kind === "subflow") {
 		return `A Subflow node in ${start.caller} runs this flow.`;
@@ -166,7 +165,7 @@ function startHint(
 		? "No next start."
 		: `Starts next on ${hoverTime(nextAt, {
 				zone: start.schedule.timeZone,
-				device: machineName(machines, start.schedule.device),
+				device: machines?.starter.name,
 			})}.`;
 }
 
@@ -213,7 +212,7 @@ function Steps({ overview }: { overview: FlowOverview }) {
 	const { flow } = overview;
 	const machines = useSpaceMachines();
 	// The run's own computer is the one you start it on: only what the flow names.
-	const needs = machines ? neededMachines(machines, null, flow.devices) : [];
+	const needs = machines ? neededMachines(machines, false, flow.devices) : [];
 	if (flow.nodeTypes.length === 0) return null;
 	return (
 		<Part label="Steps">

@@ -1521,7 +1521,7 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		for (const request of requests) expect(request.personId).toBe(personId);
 	}, 30_000);
 
-	test("a schedule that names no Device runs where a person's start would: on B, when A has no Clone", async () => {
+	test("a schedule never moves to another Device: on A without a Clone it does not start", async () => {
 		// A Device saved the schedule; A's own folder of the project went since.
 		await a.db.insert(clone).values({
 			id: "clone-a",
@@ -1547,14 +1547,17 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		await a.db.delete(clone).where(eq(clone.id, "clone-a"));
 		await Bun.sleep(TICK_MS * 4);
 		clock = at(16, 22, 0, 20);
-		const scheduled = await waitFor(
-			async () => (await engine.space(a.spaceId).listRuns())[0],
-			{ label: "the scheduled run", timeoutMs: 10_000 },
+		const last = await waitFor(
+			async () =>
+				(await engine.space(a.spaceId).listSchedules(projectId)).schedules[0]
+					?.last ?? undefined,
+			{ label: "the schedule's start", timeoutMs: 10_000 },
 		);
-		expect(scheduled.trigger.kind).toBe("schedule");
-		expect(scheduled.device).toMatchObject({ id: B, thisDevice: false });
-		const run = await until(scheduled.id, "finished");
-		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe("from B");
+		expect(last).toMatchObject({
+			kind: "failed",
+			error: expect.stringContaining("does not have this project"),
+		});
+		expect(await engine.space(a.spaceId).listRuns()).toEqual([]);
 	}, 30_000);
 });
 

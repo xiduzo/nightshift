@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { event, organization, project, user } from "@nightshift/db/schema";
+import {
+	event,
+	hostSpace,
+	organization,
+	project,
+	user,
+} from "@nightshift/db/schema";
 import type { MoveRows, WalkRef } from "@nightshift/engine";
 import {
 	createRunLog,
@@ -198,6 +204,56 @@ describe("a Device's engine among its peers", () => {
 		);
 		expect(await engine.members.role(a.spaceId, "a-stranger")).toBeNull();
 		expect(await engine.members.name(a.spaceId, "a-stranger")).toBeNull();
+	});
+});
+
+describe("a schedule in a Space a Host keeps", () => {
+	test("Run now on a Device starts the run on the Host, never on the Device", async () => {
+		const starts: { deviceId?: string }[] = [];
+		const relay: HostRelay = {
+			command: async () => {},
+			addProject: async () => ({ projectId: "p" }),
+			addClone: async () => {},
+			reachable: async () => true,
+			archiveGet: async () => null,
+			archivePut: async () => true,
+			inStep: async () => "in step" as const,
+			startRun: async (input) => {
+				starts.push(input);
+				throw new Error("The Host takes it from here.");
+			},
+			offer: async () => {},
+			withdrawOffer: async () => {},
+			devices: async () => [],
+		};
+		const engine = engineOf(b, { relay });
+		const space = engine.space(b.spaceId);
+		const { id: projectId } = await space.addProject({
+			repoPath: b.repoPath,
+		});
+		await space.flows.save(projectId, "night", gateFlow);
+		await space.saveSchedules(projectId, [
+			{
+				id: "nightly",
+				flow: "night",
+				inputs: {},
+				cron: "0 22 * * *",
+				enabled: true,
+			},
+		]);
+		await b.db.insert(hostSpace).values({
+			spaceId: b.spaceId,
+			hostId: "host-1",
+			name: "Studio",
+			role: "owner",
+			personal: false,
+		});
+
+		await expect(space.runScheduleNow(projectId, "nightly")).rejects.toThrow(
+			"The Host takes it from here.",
+		);
+
+		expect(starts.map((start) => start.deviceId)).toEqual(["host-1"]);
 	});
 });
 

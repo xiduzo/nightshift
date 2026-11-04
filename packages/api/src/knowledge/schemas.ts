@@ -50,7 +50,6 @@ export const knowledgeSchema = z.object({
 					cron: z.string(),
 					enabled: z.boolean(),
 					/** The Device its runs run on, by its id. */
-					device: z.string().optional(),
 				})
 				.nullable(),
 			/** Its latest run among the project's recent ones: when it ended, else started. */

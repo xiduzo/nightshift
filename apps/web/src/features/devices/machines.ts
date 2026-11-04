@@ -1,8 +1,3 @@
-import {
-	type DeviceRef,
-	deviceIdOf,
-	legacyDeviceName,
-} from "@nightshift/flows";
 import type { SpaceComputer, SpaceView } from "./space-view";
 
 /**
@@ -24,6 +19,8 @@ export type Machine = {
 	thisDevice: boolean;
 	/** The projects it has a copy of. Null when this computer cannot tell. */
 	projectIds: string[] | null;
+	/** A flow names it, and it is no longer in this Space. */
+	gone?: true;
 };
 
 export type SpaceMachines = {
@@ -105,57 +102,36 @@ export function spaceMachines(view: SpaceView): SpaceMachines {
 /** The Devices a flow names, by id (`FlowListItem.devices`). */
 export type FlowDeviceIds = { ids: readonly string[] };
 
-/** What the page calls a computer a schedule names: its name, a name from before ids, or "another computer". */
-export function machineName(
-	machines: SpaceMachines | null | undefined,
-	device: DeviceRef | undefined,
-): string | undefined {
-	if (device === undefined) return undefined;
-	const id = deviceIdOf(device);
-	return id === undefined
-		? (legacyDeviceName(device) ?? undefined)
-		: (machines?.byId(id)?.name ?? "another computer");
-}
-
 /** A computer the Space does not know now. */
-const unknown = (name: string): Machine => ({
+const gone: Machine = {
 	id: null,
-	name,
+	name: "Unknown device",
 	online: null,
 	lastSeenAt: null,
 	thisDevice: false,
 	projectIds: null,
-});
+	gone: true,
+};
 
 /**
- * The computers a run needs, in order: the one it runs on (the schedule's
- * device, else the starter; none for `null`), then the ones the flow
- * names, each once, by id. A computer the Space does not know shows as
- * "A device", and a name from before ids as that name, without a status.
+ * The computers a run needs, in order: the one that keeps the Space when
+ * the run starts on its own (a schedule's run always runs there, ADR 15),
+ * then the ones the flow names, each once, by id. A computer the Space
+ * does not know shows as "Unknown device", and says what to do about it.
  */
 export function neededMachines(
 	machines: SpaceMachines,
-	runsOn: DeviceRef | undefined | null,
+	startsOnKeeper: boolean,
 	flow: FlowDeviceIds | undefined,
 ): Machine[] {
 	const out = new Map<string, Machine>();
 	const add = (key: string, machine: Machine) => {
 		if (!out.has(key)) out.set(key, machine);
 	};
-	const byId = (id: string) => {
+	if (startsOnKeeper) add(machines.starter.id ?? "starter", machines.starter);
+	for (const id of flow?.ids ?? []) {
 		const known = machines.byId(id);
-		add(known?.id ?? id, known ?? unknown("A device"));
-	};
-	if (runsOn === undefined) {
-		add(machines.starter.id ?? "starter", machines.starter);
-	} else if (runsOn !== null) {
-		const id = deviceIdOf(runsOn);
-		if (id !== undefined) byId(id);
-		else {
-			const name = legacyDeviceName(runsOn) ?? "A device";
-			add(`name:${name}`, unknown(name));
-		}
+		add(known?.id ?? id, known ?? gone);
 	}
-	for (const id of flow?.ids ?? []) byId(id);
 	return [...out.values()];
 }

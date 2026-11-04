@@ -117,40 +117,17 @@ describe("neededMachines", () => {
 		],
 	);
 
-	test("the run's computer first, then each one the flow names, once", () => {
-		expect(
-			neededMachines(machines, "self", {
-				ids: ["studio", "self"],
-			}).map((m) => [m.name, m.online]),
-		).toEqual([
-			["LE2316", true],
-			["studio", false],
+	test("a schedule runs on the Host; a device the Space does not know says so", () => {
+		const needed = neededMachines(machines, true, { ids: ["nobody"] });
+		expect(needed.map((m) => [m.name, m.online, m.gone])).toEqual([
+			["hetzner-1", true, undefined],
+			["Unknown device", null, true],
 		]);
 	});
 
-	test("no device: the run runs on the Host; a name the Space does not know has no status", () => {
+	test("a flow on its own needs only the computers it names", () => {
 		expect(
-			neededMachines(machines, undefined, {
-				ids: ["nobody"],
-			}).map((m) => [m.name, m.online]),
-		).toEqual([
-			["hetzner-1", true],
-			["A device", null],
-		]);
-	});
-
-	test("a schedule's name from before ids shows as that name, with no status", () => {
-		expect(
-			neededMachines(machines, { name: "LE2316" }, { ids: [] }).map((m) => [
-				m.name,
-				m.online,
-			]),
-		).toEqual([["LE2316", null]]);
-	});
-
-	test("null leaves the run's computer out: only what the flow names", () => {
-		expect(
-			neededMachines(machines, null, { ids: ["studio"] }).map((m) => m.name),
+			neededMachines(machines, false, { ids: ["studio"] }).map((m) => m.name),
 		).toEqual(["studio"]);
 	});
 });

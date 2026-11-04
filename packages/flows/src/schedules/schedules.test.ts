@@ -77,12 +77,19 @@ describe("scheduleSchema", () => {
 		expect(lateMinutesOf(schedule({ lateMinutes: 1440 }))).toBe(1440);
 	});
 
-	test("the file has version 2", () => {
-		expect(schedulesFileSchema.safeParse({ version: 1 }).success).toBe(false);
-		expect(schedulesFileSchema.parse({ version: 2 })).toEqual({
-			version: 2,
+	test("the file has version 3", () => {
+		expect(schedulesFileSchema.safeParse({ version: 2 }).success).toBe(false);
+		expect(schedulesFileSchema.parse({ version: 3 })).toEqual({
+			version: 3,
 			schedules: [],
 		});
+	});
+
+	test("a schedule drops a device, so an older save cannot bring one back", () => {
+		const parsed = scheduleSchema.parse(
+			schedule({ device: "LE2316" } as Partial<Schedule>),
+		);
+		expect(parsed).not.toHaveProperty("device");
 	});
 });
 

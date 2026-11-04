@@ -5530,29 +5530,6 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
               "minLength": 1,
               "type": "string",
             },
-            "device": {
-              "anyOf": [
-                {
-                  "maxLength": 128,
-                  "minLength": 1,
-                  "type": "string",
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "maxLength": 64,
-                      "minLength": 1,
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "name",
-                  ],
-                  "type": "object",
-                },
-              ],
-            },
             "enabled": {
               "default": true,
               "type": "boolean",
@@ -5643,7 +5620,7 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
         "type": "array",
       },
       "version": {
-        "const": 2,
+        "const": 3,
         "type": "number",
       },
     },
@@ -5710,29 +5687,6 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
             "cron": {
               "minLength": 1,
               "type": "string",
-            },
-            "device": {
-              "anyOf": [
-                {
-                  "maxLength": 128,
-                  "minLength": 1,
-                  "type": "string",
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "maxLength": 64,
-                      "minLength": 1,
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "name",
-                  ],
-                  "type": "object",
-                },
-              ],
             },
             "enabled": {
               "default": true,
@@ -5828,7 +5782,7 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
         "type": "array",
       },
       "version": {
-        "const": 2,
+        "const": 3,
         "type": "number",
       },
     },
@@ -6545,10 +6499,10 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "profileSchema": "c85890b1cbf0dbf0c6e8c78e3841b86358311f25b9a9f9635e18f42412a9e128",
   "profileSettingsSchema": "bcb870acdfc1cf67f41fdb26110ffb5ca1caa25fc9eedbb4e011efe094e59fd3",
   "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "scheduleSchema": "96b38d432493119f9d2c2d9a53b71ccc7e58105a86351d2ff1747131abd3aa0c",
+  "scheduleSchema": "848da5f6cd24123e8881067d605c303e5521fbbd8bba02d7004eae61fae5ef40",
   "scheduleSignalSchema": "72340129c840cb54c596990620242a4a89780d13706772bdabc77b1f8ebf3dad",
   "scheduleWebhookSchema": "70545dcc8c286be6daaed5f150a58473f47db13bd006063aae6d7a1b7795a442",
-  "schedulesFileSchema": "e2bdc02a881f2dc967990f5f543f67e3116ec98f1c48341569ab0e972ef44da0",
+  "schedulesFileSchema": "f58ac5aa2b81a0731875baea9315534a14a17ef8bdd9043dc9d697e228881811",
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "serviceNodeSchema": "9211b5d36df35c8c8817938f33ae12184604bda7dffef8c0bcf4854b09a349d6",

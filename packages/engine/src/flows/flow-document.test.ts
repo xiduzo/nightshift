@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project } from "@nightshift/db/schema";
+import type { Schedule } from "@nightshift/flows";
 import {
 	FLOW_VERSION,
 	type Flow,
@@ -657,7 +658,7 @@ describe("schedules from before ids (ADR 14)", () => {
 		},
 	};
 
-	/** Schedules as a Night Shift before ids saved them: no `schedulesVersion`. */
+	/** Schedules as an older Night Shift saved them: no `schedulesVersion`, a `device`. */
 	async function storeVersion1(document: FlowDocument) {
 		const schedules = document.current.doc.getMap("schedules");
 		const order = document.current.doc.getArray<string>("scheduleOrder");
@@ -682,46 +683,19 @@ describe("schedules from before ids (ADR 14)", () => {
 		});
 	}
 
-	const devices = (list: { schedules: { id: string; device?: unknown }[] }) =>
-		Object.fromEntries(list.schedules.map((s) => [s.id, s.device]));
+	const devices = (list: { schedules: object[] }) =>
+		list.schedules.filter((schedule) => "device" in schedule);
 
-	test("a read brings each name to one Device's id, by the schedule's Person; any other name is to choose again", async () => {
-		await storeVersion1(await host.document());
-		const flows = createProjectFlows({
-			documents: host.documents,
-			project: async () => ({ spaceId: host.sandbox.spaceId }),
-			deviceId: host.sandbox.deviceId,
-			migrations,
-		});
-		const read = await flows.schedules(of, { validate: false });
-		expect(devices(read)).toEqual({
-			mac: "mac-id",
-			twin: { name: "LE2316" },
-			ada: "ada-studio",
-			bob: { name: "studio" },
-			anywhere: undefined,
-		});
-	});
-
-	test("without a migration, a name is never taken as an id", async () => {
+	test("a read drops the device of an older schedule, and keeps its Person", async () => {
 		await storeVersion1(await host.document());
 		const read = await host.flows.schedules(of, { validate: false });
-		expect(devices(read)).toMatchObject({
-			mac: { name: "MacBook" },
-			twin: { name: "LE2316" },
-		});
-		expect(
-			(await host.flows.schedules(of)).issues.map((issue) => [
-				issue.scheduleId,
-				issue.message,
-			]),
-		).toContainEqual([
-			"mac",
-			'This schedule names the device "MacBook", but Night Shift cannot tell which device that is. Choose the device again.',
-		]);
+		expect(devices(read)).toEqual([]);
+		expect(read.schedules.find((s) => s.id === "ada")?.person).toBe("ada");
+		const { issues } = await host.flows.schedules(of);
+		expect(issues.filter((i) => i.message.includes("device"))).toEqual([]);
 	});
 
-	test("upgrade writes the ids once: an id is never read as a name again", async () => {
+	test("upgrade drops the devices once", async () => {
 		await host.sandbox.db.insert(project).values({
 			id: of,
 			spaceId: host.sandbox.spaceId,
@@ -737,13 +711,27 @@ describe("schedules from before ids (ADR 14)", () => {
 			migrations,
 		});
 		await flows.upgrade(async () => true);
-		expect(document.current.doc.getMap("meta").get("schedulesVersion")).toBe(2);
-		expect(document.current.doc.getMap("schedules").get("mac")).toMatchObject({
-			device: "mac-id",
-		});
-		// The ids stay ids, with or without a migration.
+		expect(document.current.doc.getMap("meta").get("schedulesVersion")).toBe(3);
+		expect(
+			document.current.doc.getMap("schedules").get("mac"),
+		).not.toHaveProperty("device");
+	});
+
+	test("a save of an older list, with names, stores no device", async () => {
+		const document = await host.document();
+		await host.flows.saveSchedules(of, [
+			{
+				id: "stale",
+				flow: "build",
+				inputs: {},
+				cron: "0 22 * * *",
+				enabled: true,
+				device: "LE2316",
+			} as Schedule,
+		]);
 		expect(
 			devices(await host.flows.schedules(of, { validate: false })),
-		).toMatchObject({ mac: "mac-id", twin: { name: "LE2316" } });
+		).toEqual([]);
+		expect(document.current.doc.getMap("schedules").size).toBe(1);
 	});
 });

@@ -28,8 +28,8 @@ export type StartRunInput = {
 	/**
 	 * The Device the run's steps run on, and its worktree's home (its
 	 * Placement), by its id: one of the starter's Devices with a Clone of
-	 * the project (`listPlacements`), or the one a schedule names
-	 * (`Schedule.device`). Default: this computer.
+	 * the project (`listPlacements`), or the Replica that keeps the
+	 * Space for a schedule's run (ADR 15). Default: this computer.
 	 */
 	deviceId?: string;
 } & (

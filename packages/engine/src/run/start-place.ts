@@ -49,8 +49,8 @@ function defaultOf(list: readonly Placement[]): Placement | null {
  *   reaches it (decision 9). Else this computer: the Replica that keeps
  *   the Space, or a Device that cannot reach its Host, which walks the
  *   run itself and the exchange sends it to the Host later (decision 10).
- * - The Run's Device: the Device the start names (by id, or a schedule's
- *   by name). Else the default among the Devices the Person may run the
+ * - The Run's Device: the Device the start names, by id (a schedule's
+ *   start names the Replica that keeps the Space, ADR 15). Else the default among the Devices the Person may run the
  *   project on (`defaultOf`). A start for nobody runs on this computer.
  *
  * The Devices a person chooses from (`placements`) mark the same

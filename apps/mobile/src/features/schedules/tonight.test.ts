@@ -50,29 +50,42 @@ const known: KnownComputer[] = [
 
 const none = new Map<string, "pause" | "resume">();
 
+/** The computers each flow names: lighthouse has a step on the MacBook. */
+const flowDevices = (_project: string, flow: string) =>
+	flow === "lighthouse" || flow === "paused"
+		? ["m"]
+		: flow === "unsure"
+			? ["x"]
+			: [];
+
 describe("tonightEntries", () => {
-	test("takes the schedule's own computer by its id, else the Host", () => {
-		const [own, host] = tonightEntries(
-			[planned(schedule("a", { device: "m" })), planned(schedule("b"))],
+	test("every schedule runs on the Host; a computer its flow names can be offline", () => {
+		const [lighthouse, host] = tonightEntries(
+			[planned(schedule("lighthouse")), planned(schedule("b"))],
 			known,
+			flowDevices,
 			"Host",
 			NOW,
 			none,
 		);
-		expect(own).toMatchObject({ computer: "MacBook Pro", offline: true });
-		expect(host).toMatchObject({ computer: "Host", offline: false });
+		expect(lighthouse).toMatchObject({
+			computer: "Host",
+			offline: "MacBook Pro",
+		});
+		expect(host).toMatchObject({ computer: "Host", offline: null });
 	});
 
 	test("is not offline when the Host cannot tell, or knows no computer", () => {
 		const [unsure, nameless] = tonightEntries(
-			[planned(schedule("a", { device: "x" })), planned(schedule("b"))],
+			[planned(schedule("unsure")), planned(schedule("b"))],
 			known,
+			flowDevices,
 			null,
 			NOW,
 			none,
 		);
-		expect(unsure?.offline).toBe(false);
-		expect(nameless).toMatchObject({ computer: null, offline: false });
+		expect(unsure?.offline).toBeNull();
+		expect(nameless).toMatchObject({ computer: null, offline: null });
 	});
 
 	test("shows a pause on its way, and a run on its way", () => {
@@ -101,6 +114,7 @@ describe("tonightEntries", () => {
 				),
 			],
 			known,
+			flowDevices,
 			"Host",
 			NOW,
 			new Map([[scheduleKey("p", "a"), "pause" as const]]),
@@ -119,6 +133,7 @@ describe("tonightHint", () => {
 				planned(schedule("b", { pausedUntil: NOW + 20 * HOUR })),
 			],
 			known,
+			flowDevices,
 			"Host",
 			NOW,
 			none,
@@ -141,19 +156,15 @@ describe("startWhen", () => {
 });
 
 describe("offlineNotices", () => {
-	test("lists each schedule that starts on a computer that is offline", () => {
+	test("lists each schedule whose flow names a computer that is offline", () => {
 		const entries = tonightEntries(
 			[
-				planned(schedule("lighthouse", { device: "m" })),
-				planned(
-					schedule("paused", {
-						device: "m",
-						pausedUntil: NOW + 20 * HOUR,
-					}),
-				),
+				planned(schedule("lighthouse")),
+				planned(schedule("paused", { pausedUntil: NOW + 20 * HOUR })),
 				planned(schedule("on-host")),
 			],
 			known,
+			flowDevices,
 			"Host",
 			NOW,
 			none,

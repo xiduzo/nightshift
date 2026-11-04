@@ -14,7 +14,6 @@ import type { RunLog } from "../log";
 import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
 import type { RunSummary } from "../read/views";
 import { createEngine, type Engine, type EngineInternals } from "../run/engine";
-import { UNREACHABLE_DEVICE } from "../run/run-plan";
 import type { SpaceEngine } from "../run/space-engine";
 import { START_HOLD_WORDS } from "../run/start-holds";
 import { seedFlows } from "../testing/seed-flows";
@@ -694,33 +693,23 @@ describe("the scheduler", () => {
 		);
 	});
 
-	test("the computer that keeps the Space fires every schedule; the Device a schedule names by id runs its run", async () => {
+	test("the computer that keeps the Space fires every schedule and runs its run there", async () => {
 		const { engine } = startDaemon();
 		await setup(engine, [
-			nightly({ id: "elsewhere", device: "hetzner-id" }),
-			nightly({ id: "here", device: sandbox.deviceId }),
-			nightly({ id: "old", device: { name: "LE2316" } }),
+			nightly({ id: "here" }),
+			// A list saved before schedules lost their device: it counts for nothing.
+			nightly({ id: "old", device: "LE2316" } as Partial<Schedule>),
 		]);
 		clock = at(16, 22, 1);
-		await waitForFacts(3);
+		await waitForFacts(2);
 		await settle();
 		const facts = await scheduleFacts();
 		const of = (id: string) =>
 			facts.find((f) => f.payload.scheduleId === id)?.payload;
 		expect(of("here")).toMatchObject({ error: null });
-		expect(of("here")?.runId).toBeString();
-		// This computer alone reaches no other Device: the start is refused.
-		expect(of("elsewhere")).toMatchObject({
-			runId: null,
-			error: UNREACHABLE_DEVICE,
-		});
-		// A name from before ids never starts on a guess.
-		expect(of("old")).toMatchObject({
-			runId: null,
-			error:
-				'This schedule names the device "LE2316", but Night Shift cannot tell which device that is. Choose the device again.',
-		});
+		expect(of("old")).toMatchObject({ error: null });
 		await waitForEnd(engine, of("here")?.runId as string);
+		await waitForEnd(engine, of("old")?.runId as string);
 	});
 
 	test("picks up an edit of the schedules on the next tick, without a restart", async () => {

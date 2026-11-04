@@ -56,7 +56,7 @@ export function FlowHealthTable({
 		const out = new Map<string, Machine[]>();
 		if (!machines) return out;
 		for (const flow of flows.data ?? []) {
-			out.set(flow.name, neededMachines(machines, null, flow.devices));
+			out.set(flow.name, neededMachines(machines, false, flow.devices));
 		}
 		return out;
 	}, [flows.data, machines]);

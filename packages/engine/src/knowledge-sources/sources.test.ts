@@ -81,13 +81,12 @@ const drawnFlow = (kit: string, inputs: Record<string, string> = {}): Flow =>
 const flows = () => space.flows.map(projectId);
 const schedules = async (): Promise<Schedule[]> =>
 	(await space.listSchedules(projectId)).schedules.map(
-		({ id, flow, inputs, cron, enabled, device, webhook }) => ({
+		({ id, flow, inputs, cron, enabled, webhook }) => ({
 			id,
 			flow,
 			inputs,
 			enabled,
 			...(cron !== undefined ? { cron } : {}),
-			...(device !== undefined ? { device } : {}),
 			...(webhook !== undefined ? { webhook } : {}),
 		}),
 	);
@@ -148,7 +147,6 @@ describe("save", () => {
 			},
 			owner,
 		);
-		expect((await schedules())[0]?.device).toBeUndefined();
 		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
 			inputs: { path: "~/notes", folder: "folder" },
 			device: sandbox.deviceId,
@@ -199,38 +197,6 @@ describe("save", () => {
 		expect(
 			(await flows())["knowledge-web-pages"]?.nodes[0] as object,
 		).not.toHaveProperty("device");
-	});
-
-	test("an older folder source, pinned by its schedule, moves over to its Subflow on its next edit", async () => {
-		await space.flows.save(
-			projectId,
-			"knowledge-folder",
-			callFlow("kit:knowledge/folder", { path: "~/notes", folder: "folder" }),
-		);
-		await space.saveSchedules(projectId, [
-			{
-				id: "knowledge-folder",
-				flow: "knowledge-folder",
-				inputs: {},
-				cron: "0 6 * * *",
-				enabled: true,
-				device: "studio",
-			},
-		]);
-		await sources().save(
-			projectId,
-			{
-				name: "knowledge-folder",
-				source: { kit: "kit:knowledge/folder", inputs: { path: "~/notes" } },
-				keepUpToDate: { cron: "0 7 * * *" },
-			},
-			owner,
-		);
-		expect((await flows())["knowledge-folder"]?.nodes[0]).toMatchObject({
-			device: "studio",
-		});
-		expect((await schedules())[0]).toMatchObject({ cron: "0 7 * * *" });
-		expect((await schedules())[0]?.device).toBeUndefined();
 	});
 
 	test("an edit keeps the source's folder without asking for it, and its schedule's other settings", async () => {

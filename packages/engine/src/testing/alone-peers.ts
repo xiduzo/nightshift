@@ -79,9 +79,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 		},
 		offers: {
 			async schedulesWithOffers(_project, _spaceId, actor, schedules) {
-				if (!actor || !schedules.some((s) => s.device !== undefined)) {
-					return [...schedules];
-				}
+				if (!actor) return [...schedules];
 				return schedules.map(({ person: _old, ...rest }) => rest);
 			},
 		},

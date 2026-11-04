@@ -338,7 +338,7 @@ describe("leaving the home Host keeps a copy", () => {
 			state: "done",
 			projects: 1,
 			runs: 1,
-			unpinned: 0,
+			unpinned: 1,
 		});
 		const own = result?.spaceId as string;
 		expect(own).not.toBe(a.spaceId);
@@ -405,9 +405,9 @@ describe("leaving the home Host keeps a copy", () => {
 		).toHaveLength(1);
 	});
 
-	test("a schedule that names another device is paused on B after the split and names no device; turned on, it has a next start; one that names B stays", async () => {
+	test("a schedule that is on is paused on B after the split, without its Person; turned on, it has a next start", async () => {
 		const { projectId } = await mergedIntoA();
-		// What A saved: a schedule on C, for the Person.
+		// What A saved: a schedule for the Person.
 		const flows = createProjectFlows({
 			documents: paired.flows,
 			project: async () => ({ spaceId: "" }),
@@ -422,7 +422,6 @@ describe("leaving the home Host keeps a copy", () => {
 				inputs: {},
 				cron: "0 6 * * *",
 				enabled: true,
-				device: "C",
 				person: paired.personId,
 			},
 		]);
@@ -430,22 +429,21 @@ describe("leaving the home Host keeps a copy", () => {
 
 		const result = await splitter().revoked(home);
 
-		expect(result).toMatchObject({ state: "done", unpinned: 1 });
+		expect(result).toMatchObject({ state: "done", unpinned: 2 });
 		const own = result?.spaceId as string;
 		const { schedules } = await paired.device
 			.space(own)
 			.listSchedules(projectId);
 		const byId = new Map(schedules.map((s) => [s.id, s]));
-		expect(byId.get("nightly")).toMatchObject({ device: "B", enabled: true });
-		// A still fires it on C: B does not run it a second time.
+		expect(byId.get("nightly")).toMatchObject({ enabled: false });
+		// A still fires it: B does not run it a second time.
 		expect(byId.get("on-c")).toMatchObject({
 			enabled: false,
 			nextAt: null,
 			cron: "0 6 * * *",
 		});
-		expect(byId.get("on-c")?.device).toBeUndefined();
 		expect(byId.get("on-c")?.person).toBeUndefined();
-		expect((await b.db.select().from(spaceSplit))[0]?.unpinned).toBe(1);
+		expect((await b.db.select().from(spaceSplit))[0]?.unpinned).toBe(2);
 
 		const paused = await flows.schedules(projectId, { validate: false });
 		await flows.saveSchedules(

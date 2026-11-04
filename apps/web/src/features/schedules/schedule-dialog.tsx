@@ -8,10 +8,8 @@ import {
 import {
 	cronError,
 	cronToTimeAndDays,
-	deviceIdOf,
 	type FlowInputDef,
 	type JsonValue,
-	legacyDeviceName,
 	type Schedule,
 	timeAndDaysToCron,
 	webhookSecretName,
@@ -155,11 +153,6 @@ function freeId(flow: string, taken: readonly string[]): string {
 	}
 }
 
-/** The choice of the computer that starts the schedules: the schedule names no device. */
-const STARTER = "";
-/** The choice that stands for a device name from before ids: the schedule keeps it until you choose. */
-const OLD_NAME = "__old_name__";
-
 /** Whether a computer has a copy of the project. True when this computer cannot tell. */
 function hasProject(machine: Machine | null, projectId: string): boolean {
 	return machine?.projectIds?.includes(projectId) ?? true;
@@ -290,39 +283,7 @@ function ScheduleForm({
 	const project = useQuery(projectQueries.list()).data?.find(
 		(p) => p.id === projectId,
 	);
-	// Null until the person picks one: a new schedule runs on the computer
-	// that starts it when that one has the project, else on this computer.
-	// A schedule keeps the device's id; the list shows its name.
-	const oldName = legacyDeviceName(schedule?.device);
-	const [device, setDevice] = useState<string | null>(
-		schedule
-			? oldName !== null
-				? OLD_NAME
-				: (deviceIdOf(schedule.device) ?? STARTER)
-			: null,
-	);
-	const self = machines?.computers.find((c) => c.thisDevice) ?? null;
-	const runsOn =
-		device ??
-		(machines &&
-		!hasProject(machines.starter, projectId) &&
-		self?.id &&
-		self.id !== machines.starter.id
-			? self.id
-			: STARTER);
-	const runsOnMachine = machines
-		? runsOn === STARTER
-			? machines.starter
-			: runsOn === OLD_NAME
-				? null
-				: machines.byId(runsOn)
-		: null;
-	const deviceChoices = machines
-		? machines.computers.filter(
-				(c): c is Machine & { id: string } =>
-					c.id !== null && c.id !== machines.starter.id,
-			)
-		: [];
+	const runsOnMachine = machines?.starter ?? null;
 
 	const chosenItem = startsFlow
 		? list.data?.find((item) => item.name === chosen)
@@ -380,13 +341,6 @@ function ScheduleForm({
 			id: scheduleId,
 			...(stop.on ? { stopAt: stop.time } : {}),
 			...(ref === "" ? {} : { baseRef: ref }),
-			...(runsOn === STARTER
-				? {}
-				: runsOn === OLD_NAME
-					? schedule?.device
-						? { device: schedule.device }
-						: {}
-					: { device: runsOn }),
 			enabled: schedule?.enabled ?? true,
 		};
 		if (trigger === "times") {
@@ -720,71 +674,27 @@ function ScheduleForm({
 
 				{machines ? (
 					<Field
-						data-invalid={
-							runsOn === OLD_NAME ||
-							!hasProject(runsOnMachine, projectId) ||
-							undefined
-						}
+						data-invalid={!hasProject(runsOnMachine, projectId) || undefined}
 					>
-						<FieldLabel htmlFor={`${id}-device`}>Runs on</FieldLabel>
-						<NativeSelect
-							id={`${id}-device`}
-							value={runsOn}
-							className="w-full"
-							onChange={(event) => setDevice(event.target.value)}
-						>
-							<NativeSelectOption value={STARTER}>
-								{machines.starter.name}
-								{machines.starterIsHost ? " (the Host)" : " (this computer)"}
-							</NativeSelectOption>
-							{deviceChoices.map((machine) => (
-								<NativeSelectOption key={machine.id} value={machine.id}>
-									{machine.name}
-									{machine.thisDevice ? " (this computer)" : ""}
-									{machine.online === false ? ", offline now" : ""}
-								</NativeSelectOption>
-							))}
-							{runsOn === OLD_NAME && oldName !== null ? (
-								<NativeSelectOption value={OLD_NAME}>
-									{oldName} (choose again)
-								</NativeSelectOption>
-							) : runsOn !== STARTER && runsOnMachine === null ? (
-								<NativeSelectOption value={runsOn}>
-									A computer that is not in this Space
-								</NativeSelectOption>
-							) : null}
-						</NativeSelect>
-						{runsOn === OLD_NAME && oldName !== null ? (
-							<FieldError>
-								Night Shift cannot tell which computer "{oldName}" is. Choose
-								the computer again.
-							</FieldError>
-						) : runsOn !== STARTER && runsOnMachine === null ? (
-							<FieldError>
-								This computer is no longer in this Space. Choose another
-								computer.
-							</FieldError>
-						) : !hasProject(runsOnMachine, projectId) &&
-							runsOnMachine?.thisDevice &&
-							project ? (
+						{!hasProject(runsOnMachine, projectId) &&
+						runsOnMachine?.thisDevice &&
+						project ? (
 							<CopyProjectHere project={project} />
 						) : !hasProject(runsOnMachine, projectId) ? (
 							<FieldError>
-								{runsOnMachine?.name} does not have this project. Add its folder
-								there, or choose another computer.
+								{runsOnMachine?.name} does not have this project. The schedule
+								cannot start until it does.
 							</FieldError>
 						) : runsOnMachine?.online === false ? (
 							<FieldError>
-								{runsOnMachine.name} is offline now. The run cannot start there
-								until it is back.
+								{runsOnMachine.name} is offline now. The run cannot start until
+								it is back.
 							</FieldError>
 						) : (
 							<FieldDescription>
-								{!machines.starterIsHost
-									? "Night Shift starts the run here at its time."
-									: runsOn === STARTER
-										? `${machines.starter.name}, the Host, starts the run at its time and runs it.`
-										: `${machines.starter.name}, the Host, starts the run at its time. The steps run on ${runsOnMachine?.name ?? "the computer you chose"}.`}
+								{machines.starterIsHost
+									? `Runs on ${machines.starter.name}, the Host, at its time.`
+									: "Night Shift starts the run here at its time."}
 							</FieldDescription>
 						)}
 					</Field>

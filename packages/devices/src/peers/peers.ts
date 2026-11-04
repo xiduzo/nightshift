@@ -222,6 +222,8 @@ export function createPeers(
 				db,
 				documents,
 				devicesFor: placement.devicesFor,
+				keeper: async (spaceId) =>
+					(await hostOf(spaceId)) ?? (await context.walkerId()),
 				offersHere: admission.inForce,
 				...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
 			}),

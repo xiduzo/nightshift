@@ -6,7 +6,6 @@ import {
 	type PlannedSchedule,
 	scheduleName,
 } from "@nightshift/client";
-import { deviceIdOf, legacyDeviceName } from "@nightshift/flows";
 
 import { formatTime } from "@/shared/format";
 import { shownPaused } from "./schedule-words";
@@ -21,8 +20,8 @@ export type TonightEntry = PlannedSchedule & {
 	key: string;
 	/** The computer its runs run on. Null when the phone cannot tell. */
 	computer: string | null;
-	/** That computer is offline now. */
-	offline: boolean;
+	/** The computer its flow names that is offline now. Null: none is. */
+	offline: string | null;
 	/** Paused tonight, also while a pause is on its way. */
 	paused: boolean;
 	/** The run its last start began, while that run is still on its way. */
@@ -34,12 +33,14 @@ const LIVE = new Set(["running", "waiting", "sleeping"]);
 
 /**
  * The schedules of the next 24 hours (`plan.soon`), with the computer
- * each runs on: its own `device` (by its id), else the Host, which fires
- * every schedule. A computer is offline only when the Host says so.
+ * each runs on: the Host, which fires every schedule and runs it (ADR 15).
+ * `flowDevices` gives the computers its flow names: a step can still run on
+ * another computer. A computer is offline only when the Host says so.
  */
 export function tonightEntries(
 	soon: readonly PlannedSchedule[],
 	known: readonly KnownComputer[],
+	flowDevices: (projectId: string, flow: string) => readonly string[],
 	hostName: string | null,
 	now: number,
 	pending: ReadonlyMap<string, "pause" | "resume">,
@@ -47,15 +48,12 @@ export function tonightEntries(
 	return soon.map((entry) => {
 		const { schedule } = entry;
 		const key = scheduleKey(entry.projectId, schedule.id);
-		const id = deviceIdOf(schedule.device);
-		const computer =
-			schedule.device === undefined
-				? hostName
-				: id === undefined
-					? legacyDeviceName(schedule.device)
-					: (known.find((one) => one.id === id)?.name ?? "another computer");
-		const offline =
-			id !== undefined && offlineNeeds({ ids: [id] }, known).length > 0;
+		const computer = hostName;
+		const ids =
+			schedule.flow === undefined
+				? []
+				: flowDevices(entry.projectId, schedule.flow);
+		const offline = offlineNeeds({ ids }, known)[0] ?? null;
 		const last = schedule.last;
 		const started =
 			last?.kind === "fired" &&
@@ -119,7 +117,8 @@ export function offlineNotices(
 ): OfflineNotice[] {
 	return entries.flatMap((entry) => {
 		const at = entry.schedule.nextAt;
-		if (!entry.offline || entry.paused || entry.started || at === null) {
+		const { offline } = entry;
+		if (offline === null || entry.paused || entry.started || at === null) {
 			return [];
 		}
 		const name = scheduleName(entry.schedule);
@@ -127,9 +126,9 @@ export function offlineNotices(
 		return [
 			{
 				key: entry.key,
-				title: `${entry.computer} is offline`,
+				title: `${offline} is offline`,
 				caption: `${name} needs it ${when}.`,
-				sentence: `${name} needs ${entry.computer} ${when}.`,
+				sentence: `${name} needs ${offline} ${when}.`,
 				entry,
 			},
 		];

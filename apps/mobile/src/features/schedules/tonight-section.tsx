@@ -91,11 +91,11 @@ function statusOf(entry: TonightEntry): Look | undefined {
 			label: `Started at ${formatTime(entry.started.at)}`,
 		};
 	}
-	if (entry.offline) {
+	if (entry.offline !== null) {
 		return {
 			tone: "interrupted",
 			icon: "circle-alert",
-			label: `${entry.computer} is offline`,
+			label: `${entry.offline} is offline`,
 		};
 	}
 	return undefined;
@@ -182,7 +182,7 @@ const TonightRow = memo(function TonightRow({
 					<RunNowButton
 						name={name}
 						busy={nudges.starting}
-						disabled={entry.offline}
+						disabled={entry.offline !== null}
 						onConfirm={nudges.runNow}
 					/>
 				) : null}
@@ -193,8 +193,14 @@ const TonightRow = memo(function TonightRow({
 	return (
 		<View>
 			<ListRow
-				icon={entry.offline && !entry.paused ? TriangleAlert : CalendarClock}
-				tone={entry.offline && !entry.paused ? "interrupted" : undefined}
+				icon={
+					entry.offline !== null && !entry.paused
+						? TriangleAlert
+						: CalendarClock
+				}
+				tone={
+					entry.offline !== null && !entry.paused ? "interrupted" : undefined
+				}
 				title={name}
 				status={statusOf(entry)}
 				caption={[entry.projectName, ...(where ? [where] : [])]}

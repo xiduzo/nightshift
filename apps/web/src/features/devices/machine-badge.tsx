@@ -38,6 +38,9 @@ export function useSpaceMachines(): SpaceMachines | null {
 
 /** How a computer is now, in one sentence. */
 function statusLine(machine: Machine, now: number): string {
+	if (machine.gone) {
+		return "This device is no longer in this Space. Choose another device.";
+	}
 	if (machine.thisDevice) return "This computer. Online now.";
 	if (machine.online) return "Online now.";
 	if (machine.online === null)

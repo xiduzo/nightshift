@@ -31,10 +31,8 @@ import {
 	type RevisionKind,
 	readSchedules,
 	removeFlow,
-	type ScheduleMigrations,
 	saveFlow,
 	saveSchedules,
-	schedulePersons,
 	upgradedSources,
 	upgradeFlows,
 	upgradeSchedules,
@@ -172,32 +170,6 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 		(await deps.project(projectId).catch(() => null))?.spaceId;
 
 	/**
-	 * What brings the document's schedules of an older format to the
-	 * current one: each by its Person's Devices, in the Project's Space.
-	 */
-	async function scheduleMigrations(
-		document: FlowDocument,
-		spaceId: string | undefined,
-	): Promise<ScheduleMigrations | undefined> {
-		const persons = schedulePersons(document);
-		if (!migrations || persons.length === 0 || spaceId === undefined) {
-			return undefined;
-		}
-		const self = await deviceId();
-		const byPerson = new Map<
-			string | null,
-			Awaited<ReturnType<FlowMigrations["forDevice"]>>
-		>();
-		for (const personId of persons) {
-			byPerson.set(
-				personId,
-				await migrations.forDevice(self, { spaceId, personId }),
-			);
-		}
-		return (personId) => byPerson.get(personId);
-	}
-
-	/**
 	 * The flows as a read gives them: one of an older format in the current
 	 * format, so a schedule checks the flow that runs, not the stored one.
 	 */
@@ -272,10 +244,7 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 
 		async schedules(projectId, options = {}) {
 			const document = await documentOf(projectId);
-			const { schedules, unreadable } = readSchedules(
-				document,
-				await scheduleMigrations(document, await spaceOf(projectId)),
-			);
+			const { schedules, unreadable } = readSchedules(document);
 			const issues: ScheduleIssue[] =
 				unreadable > 0
 					? [
@@ -326,10 +295,7 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 					spaceId: row.spaceId,
 					at: now(),
 				});
-				await upgradeSchedules(
-					document,
-					await scheduleMigrations(document, row.spaceId),
-				);
+				await upgradeSchedules(document);
 			}
 		},
 

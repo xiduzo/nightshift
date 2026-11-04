@@ -56,9 +56,8 @@ import type { MembershipRecord, MergeRow, MergeTarget } from "./record";
  * 4. `moved`: one Space move (`Engine.moveProjects`), with this
  *    computer's events numbered after its latest. No run becomes active
  *    in Personal from the last check for runs that are not done through
- *    its batch. The schedules that name no device are pinned to this
- *    computer first, so their runs keep running where they ran: the Host
- *    fires them from now on, and starts their runs here. The batch moves
+ *    its batch. The Host fires the schedules and runs their runs from then
+ *    on. The batch moves
  *    every row of the Projects and their runs, makes the Host's Space
  *    this computer's personal Space named "Personal"
  *    (`adoptPersonalSpaceBatch`), and sets this state.
@@ -294,13 +293,13 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		);
 	}
 
-	/** How many schedules of the project name no device. A removed project has none that fire. */
-	async function unpinned(projectId: string, removed: boolean) {
+	/** How many schedules of the project move to the Host. A removed project has none that fire. */
+	async function schedulesOf(projectId: string, removed: boolean) {
 		if (removed) return 0;
 		const { schedules } = await engine.flows.schedules(projectId, {
 			validate: false,
 		});
-		return schedules.filter((schedule) => schedule.device === undefined).length;
+		return schedules.length;
 	}
 
 	async function preview(
@@ -347,7 +346,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 					from: fromName,
 					to: toName,
 				})),
-				schedules: await unpinned(p.id, p.removedAt !== null),
+				schedules: await schedulesOf(p.id, p.removedAt !== null),
 			});
 		}
 		return { host, projects: views, runs };
@@ -400,12 +399,6 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 						projects: targets,
 						personMap,
 						renumber: true,
-						// The Host fires the schedules from now on; their runs keep
-						// running where they ran: on this computer.
-						schedule: (schedule) =>
-							schedule.device === undefined
-								? { ...schedule, device: self.name }
-								: schedule,
 					};
 				},
 				statements: async () => [

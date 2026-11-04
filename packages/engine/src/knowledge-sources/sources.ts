@@ -8,7 +8,6 @@ import {
 	legacyDeviceName,
 	REVIEW_LEARNINGS_KIT,
 	type Schedule,
-	scheduleDevice,
 	scheduleSchema,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -239,7 +238,6 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 					const device =
 						source && node?.type === "call" ? node.device : undefined;
 					const deviceId = deviceIdOf(device);
-					const scheduledOn = deviceIdOf(schedule?.device);
 					return [
 						{
 							flow,
@@ -259,9 +257,6 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 								? {
 										cron: schedule.cron,
 										enabled: schedule.enabled,
-										...(scheduledOn !== undefined
-											? { device: scheduledOn }
-											: {}),
 									}
 								: null,
 							lastRun,
@@ -304,27 +299,20 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 				throw new Refusal("invalid", `This schedule is not valid: ${problem}`);
 			}
 			const { name } = input;
-			const schedules = await savedSchedules(projectId);
-			const scheduled =
-				name === undefined
-					? undefined
-					: schedules.find((item) => isSourceSchedule(item, name))?.device;
 			const saved = savedSource({
 				source: input.source,
 				...(name !== undefined ? { name } : {}),
 				flows: await space.flows.map(projectId),
-				here: {
-					device: deps.device.id,
-					...(scheduled !== undefined ? { scheduled } : {}),
-				},
+				here: { device: deps.device.id },
 			});
 			const issues = await space.flows.save(projectId, saved.name, saved.flow);
 			if (changesSchedule) {
-				// Its Subflow names the computer: the schedule runs anywhere.
+				// Its Subflow names the computer: the schedule runs on the Host,
+				// and hands that step to the computer.
 				await space.saveSchedules(
 					projectId,
 					withSourceSchedule(
-						schedules,
+						await savedSchedules(projectId),
 						saved.name,
 						cron === undefined ? null : { cron },
 					),
@@ -379,14 +367,10 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 			startedBy: string,
 		): Promise<RunSummary> {
 			await sourceNamed(projectId, name);
-			const schedule = (await savedSchedules(projectId)).find((item) =>
-				isSourceSchedule(item, name),
-			);
 			return space.startRun({
 				projectId,
 				flowName: name,
 				startedBy,
-				...(schedule ? scheduleDevice(schedule) : {}),
 			});
 		},
 	};

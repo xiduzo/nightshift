@@ -433,7 +433,7 @@ describe("another Person's run on the computer that walks it", () => {
 	});
 });
 
-describe("a schedule that fires on another Person's Device", () => {
+describe("a schedule that runs on another Person's computer", () => {
 	const TICK_MS = 5;
 	const carol = "person-carol";
 	/** Local time, October 2026. */
@@ -502,7 +502,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			],
 			edges: [],
 		});
-		// Carol saves a schedule that fires on this computer, which she does not own.
+		// Carol saves a schedule. It runs on this computer, which she does not own.
 		const space = engine.space(sandbox.spaceId, { personId: carol });
 		const [here] = await space.listDevices(projectId);
 		const schedule = {
@@ -511,10 +511,9 @@ describe("a schedule that fires on another Person's Device", () => {
 			inputs: {},
 			cron: "0 22 * * *",
 			enabled: true,
-			device: here?.deviceId as string,
 		};
 		await expect(space.saveSchedules(projectId, [schedule])).rejects.toThrow(
-			`The schedule "nightly" fires on another person's device. ${here?.name} is not your device. It offers nothing to this Space.`,
+			`The schedule "nightly" runs on another person's computer. ${here?.name} is not your device. It offers nothing to this Space.`,
 		);
 
 		own = [

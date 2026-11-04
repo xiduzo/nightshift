@@ -27,12 +27,10 @@ import type { MembershipRecord, SplitRow } from "./record";
  *
  * The Projects keep their ids, so their flow documents stay as they are
  * here, with their history; they no longer sync with the Host. A schedule
- * of theirs that names another Device is paused here: the Host still
- * fires it on that Device, and a run here too would be a second run of
- * it. It names no Device after the split, so when the person turns it on
- * it fires here, the one Replica of the new Space. The result counts
- * them (`unpinned`). A schedule that names this computer stays as it
- * is. The rows
+ * of theirs that is on is paused here: the Host still fires it, and a run
+ * here too would be a second run of it. When the person turns it on it
+ * fires here, the one Replica of the new Space. The result counts them
+ * (`unpinned`). The rows
  * that come along name the Person by their id here again. The Host's
  * Space stays on this computer with the rest of its rows, named
  * "Personal on <Host>", but the Person is no longer a Member of it here:
@@ -158,17 +156,11 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 						),
 						personMap: { [row.hostPersonId]: row.personId },
 						ownRunsOnly: true,
-						// The Host fires a schedule that names another Device there
-						// still. Turned on, it fires here. Its Person goes with its
-						// Device: it names who the runs there ran for.
+						// The Host still fires it. Turned on, it fires here. Its Person
+						// goes: it names who the runs on the Host ran for.
 						schedule: (schedule) => {
-							if (
-								schedule.device === undefined ||
-								schedule.device === self.name
-							) {
-								return schedule;
-							}
-							const { device: _device, person: _person, ...rest } = schedule;
+							if (!schedule.enabled) return schedule;
+							const { person: _person, ...rest } = schedule;
 							return { ...rest, enabled: false };
 						},
 					};

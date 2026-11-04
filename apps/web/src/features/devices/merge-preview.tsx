@@ -60,8 +60,9 @@ export function MergePreviewList({ preview }: { preview: MergePreview }) {
 							))}
 							{project.schedules > 0 ? (
 								<span className="block">
-									{plural(project.schedules, "schedule")} still{" "}
-									{project.schedules === 1 ? "runs" : "run"} on this computer.
+									{plural(project.schedules, "schedule")}{" "}
+									{project.schedules === 1 ? "runs" : "run"} on the Host from
+									then on.
 								</span>
 							) : null}
 						</ItemDescription>

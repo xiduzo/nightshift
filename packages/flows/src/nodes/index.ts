@@ -61,7 +61,6 @@ export {
 	deciderMeasuresProbability,
 	deciderNameSchema,
 	deviceIdOf,
-	deviceRefSchema,
 	flowNameSchema,
 	isProfileRef,
 	type JsonValue,

@@ -35,6 +35,7 @@ export function aloneDirectory(db: Database): DeviceDirectory {
 				.from(device)
 				.where(isNull(device.revokedAt)),
 		hostedElsewhere: async () => false,
+		hostOf: async () => null,
 	};
 }
 
