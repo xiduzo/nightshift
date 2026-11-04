@@ -645,7 +645,7 @@ async function readFolderFile(
 	const bytes = Math.max(1, maxBytes);
 	if (isDocument(clean)) {
 		if (info.size > LOCAL_ONLY_BYTES) throw tooLarge(clean);
-		return documentResult(clean, await loadDocument(abs), bytes, from);
+		return documentResult(clean, await loadDocument(abs, "read"), bytes, from);
 	}
 	if (from) {
 		const whole = await readStart(abs, LOCAL_ONLY_BYTES);

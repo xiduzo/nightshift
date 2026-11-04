@@ -15,6 +15,64 @@ afterEach(async () => {
 	await rm(dir, { recursive: true, force: true });
 });
 
+describe("whose parse goes first", () => {
+	/** A PDF long enough to take longer than a one-line one. */
+	const long = () =>
+		tinyPdf(
+			Array.from({ length: 2_000 }, (_, at) => `Line ${at} of the batch.`),
+		);
+
+	test("a read waits for the parse that runs, not for the batch behind it", async () => {
+		const names = ["a.pdf", "b.pdf", "c.pdf", "d.pdf"];
+		for (const name of names) await writeFile(join(dir, name), long());
+		await writeFile(join(dir, "asked.pdf"), tinyPdf(["The page reads this."]));
+
+		const done: string[] = [];
+		const noted = (name: string, parse: Promise<unknown>) =>
+			parse.then(() => done.push(name));
+		const batch = names.map((name) =>
+			noted(name, loadDocument(join(dir, name))),
+		);
+		const read = noted(
+			"asked.pdf",
+			loadDocument(join(dir, "asked.pdf"), "read"),
+		);
+		await Promise.all([...batch, read]);
+
+		// `a.pdf` was parsing: it ends first, though the read is much shorter. Two
+		// parses at once would end the read first, and memory has no bound.
+		expect(done).toEqual(["a.pdf", "asked.pdf", "b.pdf", "c.pdf", "d.pdf"]);
+	});
+
+	test("a read of a file this Device has by its hash goes first too", async () => {
+		const names = ["a.pdf", "b.pdf", "c.pdf"];
+		for (const name of names) await writeFile(join(dir, name), long());
+		const done: string[] = [];
+		const noted = (name: string, parse: Promise<unknown>) =>
+			parse.then(() => done.push(name));
+		const batch = names.map((name) =>
+			noted(name, loadDocument(join(dir, name))),
+		);
+		const read = noted(
+			"asked.pdf",
+			loadDocumentContent("asked.pdf", tinyPdf(["By its hash."])),
+		);
+		await Promise.all([...batch, read]);
+		expect(done).toEqual(["a.pdf", "asked.pdf", "b.pdf", "c.pdf"]);
+	});
+
+	test("a parse that fails lets the next one run", async () => {
+		await writeFile(join(dir, "broken.pdf"), "not a pdf");
+		await writeFile(join(dir, "good.pdf"), tinyPdf(["Still here."]));
+		const [broken, good] = await Promise.all([
+			loadDocument(join(dir, "broken.pdf")),
+			loadDocument(join(dir, "good.pdf"), "read"),
+		]);
+		expect(broken).toBeNull();
+		expect(good?.[0]?.pageContent).toBe("Still here.");
+	});
+});
+
 describe("loadDocument", () => {
 	test("a PDF gives a LangChain Document per page, with its file and title", async () => {
 		const abs = join(dir, "release.pdf");

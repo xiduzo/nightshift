@@ -46,13 +46,39 @@ export type DocumentMetadata = {
 	pdf?: { totalPages: number; info?: unknown };
 };
 
-/** One document at a time: a folder of PDFs never parses dozens at once. */
-let queue: Promise<unknown> = Promise.resolve();
+/**
+ * Who waits for a parse. `read`: someone asked for this one file now, a person
+ * on a page or an agent in a step. `background`: the search index and `INDEX.md`,
+ * which can bring a whole folder of PDFs.
+ */
+export type ParseTurn = "read" | "background";
 
-function oneAtATime<T>(work: () => Promise<T>): Promise<T> {
-	const next = queue.then(work, work);
-	queue = next.catch(() => {});
-	return next;
+const waiting: Record<ParseTurn, (() => void)[]> = { read: [], background: [] };
+let parsing = false;
+
+function nextParse(): void {
+	const next = waiting.read.shift() ?? waiting.background.shift();
+	parsing = next !== undefined;
+	next?.();
+}
+
+/**
+ * One document at a time, for memory: a folder of PDFs never parses dozens at
+ * once. A read goes before all that wait in the background, so it waits for the
+ * one parse that runs, not for a batch.
+ */
+function oneAtATime<T>(turn: ParseTurn, work: () => Promise<T>): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const start = () => {
+			work().then(resolve, reject).finally(nextParse);
+		};
+		if (parsing) {
+			waiting[turn].push(start);
+		} else {
+			parsing = true;
+			start();
+		}
+	});
 }
 
 /** Line ends as `\n`, at most one empty line, no space at the ends. */
@@ -216,10 +242,11 @@ async function parse(
  */
 export function loadDocument(
 	abs: string,
+	turn: ParseTurn = "background",
 ): Promise<Document<DocumentMetadata>[] | null> {
 	const kind = extname(abs).toLowerCase();
 	if (!DOCUMENT_FILES.has(kind)) return Promise.resolve(null);
-	return oneAtATime(async () => {
+	return oneAtATime(turn, async () => {
 		try {
 			const info = await stat(abs);
 			if (!info.isFile() || info.size > LOCAL_ONLY_BYTES) return null;
@@ -245,8 +272,9 @@ export function loadDocument(
 }
 
 /**
- * The `Document`s of a PDF or Word file's content, for a file this Device
- * has by its hash only: `path` says its kind. Null as `loadDocument` gives it.
+ * The `Document`s of a PDF or Word file's content, for a read of a file this
+ * Device has by its hash only: `path` says its kind. Null as `loadDocument`
+ * gives it.
  */
 export function loadDocumentContent(
 	path: string,
@@ -256,7 +284,7 @@ export function loadDocumentContent(
 	if (!DOCUMENT_FILES.has(kind) || content.length > LOCAL_ONLY_BYTES) {
 		return Promise.resolve(null);
 	}
-	return oneAtATime(() => parse(kind, content, path).catch(() => null));
+	return oneAtATime("read", () => parse(kind, content, path).catch(() => null));
 }
 
 /** The text of a document's `Document`s: an empty line between pages. */
