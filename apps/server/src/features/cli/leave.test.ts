@@ -59,7 +59,7 @@ describe("nightshift leave", () => {
 				waiting: null,
 			}),
 		).toContain(
-			"2 schedules named another device. They are paused here. Turn them on to run them on this computer.",
+			"2 schedules ran on the Host. They are paused here. Turn them on to run them on this computer.",
 		);
 	});
 
