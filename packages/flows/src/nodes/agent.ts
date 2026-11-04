@@ -383,7 +383,7 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 	}
 	checkNodeProfile(node, "Agent", check);
 	check.template(node.prompt, "prompt");
-	if (node.check !== undefined) check.template(node.check, "check");
+	if (node.check !== undefined) check.commandTemplate(node.check, "check");
 	if (node.outcomes !== undefined) {
 		checkOptions(
 			node.id,

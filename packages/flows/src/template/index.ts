@@ -23,6 +23,7 @@ export {
 	ruleVariableNames,
 	signalOutcome,
 } from "./rule";
+export { templatesInLiteralShellText } from "./shell-quotes";
 export {
 	renderCommand,
 	renderReadable,

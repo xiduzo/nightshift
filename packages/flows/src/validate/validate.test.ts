@@ -636,6 +636,37 @@ describe("validateFlow: parallel branches", () => {
 	});
 });
 
+describe("a value in a shell command", () => {
+	const withCheck = (text: string) =>
+		validateFlow(
+			flow(
+				[agent("worker"), command("quoted", { command: text })],
+				[edge("a", "worker", "pass", "quoted")],
+			),
+		).filter((issue) => issue.nodeId === "quoted");
+
+	test("warns once when single quotes stop the shell from filling it in", () => {
+		const found = withCheck("echo '{{worker.summary}}' '{{worker.summary}}'");
+		expect(found).toContainEqual(
+			expect.objectContaining({
+				severity: "warning",
+				message: expect.stringContaining('"{{worker.summary}}"'),
+			}),
+		);
+		expect(
+			found.filter((issue) => issue.message.includes("single quotes")),
+		).toHaveLength(1);
+	});
+
+	test("says nothing about double quotes", () => {
+		expect(
+			withCheck('echo "{{worker.summary}}"').filter((issue) =>
+				issue.message.includes("single quotes"),
+			),
+		).toEqual([]);
+	});
+});
+
 /** worker → decide → gate → ship, with retry loops back to the worker. */
 function decideAndGate(): Flow {
 	return flow(

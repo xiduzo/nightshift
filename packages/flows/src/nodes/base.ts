@@ -390,6 +390,8 @@ export type NodeCheck = {
 	warning: (message: string) => void;
 	/** Checks the references of a template. `where` names its field: "prompt". */
 	template: (text: string, where: string) => void;
+	/** The same for a shell command, which also warns of a value the shell cannot fill in. */
+	commandTemplate: (text: string, where: string) => void;
 	/**
 	 * Checks that a rule (a JSONata expression) is valid and reads known
 	 * names. `subject` starts each message: `The expression of "pick"`.

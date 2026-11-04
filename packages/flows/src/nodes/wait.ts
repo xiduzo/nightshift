@@ -165,7 +165,7 @@ export function checkWaitNode(node: WaitNode, check: NodeCheck): void {
 	if (signal?.key !== undefined) check.template(signal.key, "key");
 	const polled = waitCommandOf(until);
 	if (polled) {
-		check.template(polled.command, "command");
+		check.commandTemplate(polled.command, "command");
 		if (
 			node.timeoutMinutes !== undefined &&
 			node.timeoutMinutes <= polled.everyMinutes

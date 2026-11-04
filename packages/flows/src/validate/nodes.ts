@@ -13,6 +13,7 @@ import {
 	type NodeCheck,
 } from "../nodes";
 import { nodesWithin, sectionPath } from "../sections";
+import { templatesInLiteralShellText } from "../template";
 import type { Report } from "./issues";
 import {
 	checkDataRule,
@@ -44,6 +45,16 @@ export function checkNode(
 		warning: (message) => warning(message, at),
 		template: (text, where) =>
 			checkTemplate(text, `The ${where} of "${node.id}"`, at, own, error),
+		commandTemplate: (text, where) => {
+			const subject = `The ${where} of "${node.id}"`;
+			checkTemplate(text, subject, at, own, error);
+			for (const raw of new Set(templatesInLiteralShellText(text))) {
+				warning(
+					`${subject} has ${raw} in single quotes or a quoted heredoc. The command gets the name of the value, not the value. Use double quotes: "${raw}".`,
+					at,
+				);
+			}
+		},
 		rule: (expr, subject) => checkRule(expr, subject, at, scope, error),
 		eventRule: (expr, subject) => checkEventRule(expr, subject, at, error),
 		dataRule: (expr, subject) => checkDataRule(expr, subject, at, error),

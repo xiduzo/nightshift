@@ -98,17 +98,17 @@ export function serviceSection(node: ServiceNode): string | null {
  * wait is `ready.timeoutMinutes`: the node has no timeout of its own.
  */
 export function checkServiceNode(node: ServiceNode, check: NodeCheck): void {
-	check.template(node.start, "start command");
+	check.commandTemplate(node.start, "start command");
 	if ((node.ready.command === undefined) === (node.ready.url === undefined)) {
 		check.error(
 			`Service node "${node.id}" needs one ready check: a command or a URL.`,
 		);
 	}
 	if (node.ready.command !== undefined) {
-		check.template(node.ready.command, "ready command");
+		check.commandTemplate(node.ready.command, "ready command");
 	}
 	if (node.ready.url !== undefined) check.template(node.ready.url, "ready URL");
-	if (node.stop !== undefined) check.template(node.stop, "stop command");
+	if (node.stop !== undefined) check.commandTemplate(node.stop, "stop command");
 	const secrets = new Set<string>();
 	for (const name of node.secrets ?? []) {
 		if (secrets.has(name)) {

@@ -234,7 +234,7 @@ export const commandOutputFields = [
  * and its own exits follow the outcome and exit rules.
  */
 export function checkCommandNode(node: CommandNode, check: NodeCheck): void {
-	check.template(node.command, "command");
+	check.commandTemplate(node.command, "command");
 	const secrets = new Set<string>();
 	for (const name of node.secrets ?? []) {
 		if (secrets.has(name)) {

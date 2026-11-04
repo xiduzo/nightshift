@@ -191,7 +191,7 @@ export function checkCallNode(node: CallNode, check: NodeCheck): void {
 				check.template(each.source.value, "source value");
 				break;
 			case "command":
-				check.template(each.source.command, "source command");
+				check.commandTemplate(each.source.command, "source command");
 				break;
 		}
 		checkHaltOn(node.id, each, check);
