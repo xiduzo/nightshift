@@ -214,7 +214,10 @@ export type KnowledgeUseReport = {
 	unusedDays: number;
 	/** Whether any run used the knowledge since `now - unusedDays`: else no file is marked. */
 	runsUsedIt: boolean;
+	/** Only the files agents used. A file no agent ever touched is in `unused`, not here. */
 	files: KnowledgeFileUse[];
+	/** The paths of the listed files that are not used (`unusedFiles`), in the order listed. */
+	unused: string[];
 };
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -228,14 +231,35 @@ const FOUND_IN_TOP = 5;
 export const UNUSED_DAYS = 30;
 
 /**
+ * Which of the listed files are not used: no run used the file lately, and
+ * it has been here long enough to tell. A file that came in yesterday says
+ * nothing yet. While no run uses the knowledge at all, no file is marked.
+ */
+export function unusedFiles(
+	use: Pick<KnowledgeUseReport, "unusedDays" | "runsUsedIt" | "files">,
+	listed: readonly { path: string; changedAt: number }[],
+	now: number,
+): string[] {
+	if (!use.runsUsedIt) return [];
+	const before = now - use.unusedDays * DAY;
+	const lastRunAt = new Map(use.files.map((f) => [f.path, f.lastRunAt]));
+	return listed
+		.filter(
+			(file) =>
+				file.changedAt < before && (lastRunAt.get(file.path) ?? 0) < before,
+		)
+		.map((file) => file.path);
+}
+
+/**
  * How often agents found and read each file of a project's knowledge in
- * the last 90 days, in runs and through the MCP server, and when a run
- * last used it. The Knowledge page marks the files no run used in 30
- * days, once runs use the knowledge at all.
+ * the last 90 days, in runs and through the MCP server, when a run last
+ * used it, and which of the `listed` files are not used (`unusedFiles`).
  */
 export async function knowledgeFileUse(
 	db: Database,
 	projectId: string,
+	listed: readonly { path: string; changedAt: number }[],
 	now: number = timeNow(),
 ): Promise<KnowledgeUseReport> {
 	const since = now - USE_WINDOW_DAYS * DAY;
@@ -269,10 +293,11 @@ export async function knowledgeFileUse(
 			use(row.payload.path, row.at, inRun).read++;
 		}
 	}
-	return {
+	const used = {
 		since,
 		unusedDays: UNUSED_DAYS,
 		runsUsedIt,
 		files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path)),
 	};
+	return { ...used, unused: unusedFiles(used, listed, now) };
 }

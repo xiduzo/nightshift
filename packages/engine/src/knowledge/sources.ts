@@ -79,6 +79,9 @@ export type SourcesSpace<Run extends SourceRun = SourceRun> = {
 /** How many of the project's latest runs `list` reads for each source's last sync. */
 const LAST_RUNS = 200;
 
+/** How long a list waits for the names of other computers, which only the Host may know. */
+const NAMES_WAIT_MS = 2_000;
+
 /** One flow that fills the knowledge, as the Knowledge page lists it. */
 export type KnowledgeSync = {
 	flow: string;
@@ -140,13 +143,51 @@ export type SourceProblem = {
 	lastRun: NonNullable<KnowledgeSync["lastRun"]>;
 };
 
+/** What the person's role allows on the sources of this project, as the API checked it. */
+export type SourcePermissions = {
+	/** Add a source, or edit one. */
+	save: boolean;
+	/** Remove a source. */
+	remove: boolean;
+	/** Start runs: sync a source, remove its files. */
+	startRuns: boolean;
+	/** Change when a source syncs on its own: this computer's owner only. */
+	schedules: boolean;
+};
+
+/** What the person may do with one source, as the changes below allow it. */
+export type SourceActions = {
+	sync: boolean;
+	edit: boolean;
+	remove: boolean;
+	removeFiles: boolean;
+};
+
+/**
+ * Sync now starts a run, Edit saves its flow, Remove removes its flow and,
+ * for a source with a schedule, the schedule, which is this computer's
+ * owner's (`OWNER_ONLY`). A flow someone drew has no source: it only syncs.
+ */
+function sourceActions(
+	sync: Pick<KnowledgeSync, "source" | "schedule">,
+	can: SourcePermissions,
+): SourceActions {
+	const made = sync.source !== null;
+	return {
+		sync: can.startRuns,
+		edit: made && can.save,
+		remove: made && can.remove && (sync.schedule === null || can.schedules),
+		removeFiles: can.startRuns,
+	};
+}
+
 /** A project's knowledge in its Space, and the flows that fill it. */
 export type KnowledgeOverview = {
 	/** Every file but the index and the proposals, by path. */
 	files: KnowledgeFile[];
 	/** So many files that an agent reads it badly. */
 	tooLarge: boolean;
-	syncs: KnowledgeSync[];
+	syncs: (KnowledgeSync & { may: SourceActions })[];
 	/** How many learnings agents proposed that wait for a person. */
 	proposed: number;
 	/** The flows of the project that review the learnings, by name. */
@@ -223,88 +264,131 @@ export function knowledgeSources<Run extends SourceRun>(
 		return { flows, flow, source };
 	}
 
+	/** The computer a source's Subflow names, if it names one. */
+	function deviceOf(parsed: Flow | null) {
+		const source = parsed ? sourceOf(parsed) : null;
+		const node = parsed?.nodes[0];
+		return source && node?.type === "call" ? node.device : undefined;
+	}
+
+	/**
+	 * The names of the computers these flows name. Only the Host may know the
+	 * others, so it is asked only when a source names one, and a list that does
+	 * not load in time names none: the page must not wait on it.
+	 */
+	async function computerNames(projectId: string, flows: FlowMap) {
+		const names = new Map([[deps.device.id, deps.device.name]]);
+		const asks = Object.values(flows).some((flow) => {
+			const id = deviceIdOf(flow ? deviceOf(flow) : undefined);
+			return id !== undefined && id !== deps.device.id;
+		});
+		if (!asks) return names;
+		const devices = await Promise.race([
+			space.listDevices(projectId).catch(() => []),
+			Bun.sleep(NAMES_WAIT_MS).then(() => []),
+		]);
+		for (const { deviceId, name } of devices) names.set(deviceId, name);
+		// This computer's own name, also where the Host knows another.
+		names.set(deps.device.id, deps.device.name);
+		return names;
+	}
+
+	/** The project's flows that fill or review the knowledge, by name, and what each source's list says. */
+	async function fillingFlows(projectId: string) {
+		const now = timeNow();
+		const flows = await space.flows.map(projectId);
+		const [schedules, runs, names] = await Promise.all([
+			savedSchedules(projectId),
+			space.listRuns({ projectId, limit: LAST_RUNS }),
+			computerNames(projectId, flows),
+		]);
+		const used = Object.entries(flows)
+			.map(([flow, parsed]) => ({
+				flow,
+				parsed,
+				kits: parsed ? knowledgeKitsOf(parsed) : [],
+			}))
+			.sort((a, b) => a.flow.localeCompare(b.flow));
+		const syncs = used.flatMap(({ flow, parsed, kits }): KnowledgeSync[] => {
+			const fills = kits.filter((kit) => kit !== REVIEW_LEARNINGS_KIT);
+			if (fills.length === 0) return [];
+			const schedule = schedules.find((item) => isSourceSchedule(item, flow));
+			const last = runs.find((run) => run.flowName === flow);
+			const lastRun = last
+				? {
+						id: last.id,
+						status: last.status,
+						at: last.endedAt ?? last.createdAt,
+					}
+				: null;
+			const device = deviceOf(parsed);
+			const deviceId = deviceIdOf(device);
+			return [
+				{
+					flow,
+					kits: fills,
+					source: parsed ? sourceOf(parsed) : null,
+					computer:
+						device === undefined
+							? null
+							: {
+									name:
+										(deviceId === undefined
+											? legacyDeviceName(device)
+											: names.get(deviceId)) ?? ANOTHER_COMPUTER,
+									here: deviceId === deps.device.id,
+								},
+					schedule: schedule?.cron
+						? {
+								cron: schedule.cron,
+								enabled: schedule.enabled,
+							}
+						: null,
+					lastRun,
+					health: syncHealth(lastRun, now),
+				},
+			];
+		});
+		return {
+			syncs,
+			reviews: used
+				.filter(({ kits }) => kits.includes(REVIEW_LEARNINGS_KIT))
+				.map(({ flow }) => flow),
+		};
+	}
+
 	return {
 		/**
 		 * The files of the project's knowledge (after a reconcile of this
 		 * Device's folder), the flows that fill it with their schedules and
-		 * last runs, and the learnings that wait. A project the Space does
-		 * not have refuses.
+		 * last runs, what `can` allows on each, and the learnings that wait. A
+		 * project the Space does not have refuses.
 		 */
-		async list(projectId: string): Promise<KnowledgeOverview> {
-			const now = timeNow();
-			const flows = await space.flows.map(projectId);
-			const [{ files, proposed, shared, olderHost }, schedules, runs, devices] =
+		async list(
+			projectId: string,
+			can: SourcePermissions,
+		): Promise<KnowledgeOverview> {
+			const [{ files, proposed, shared, olderHost }, { syncs, reviews }] =
 				await Promise.all([
 					deps.files.listing(projectId),
-					savedSchedules(projectId),
-					space.listRuns({ projectId, limit: LAST_RUNS }),
-					// Names only: a list that does not load names none.
-					space.listDevices(projectId).catch(() => []),
+					fillingFlows(projectId),
 				]);
-			const names = new Map(devices.map((d) => [d.deviceId, d.name]));
-			names.set(deps.device.id, deps.device.name);
-			const used = Object.entries(flows)
-				.map(([flow, parsed]) => ({
-					flow,
-					parsed,
-					kits: parsed ? knowledgeKitsOf(parsed) : [],
-				}))
-				.sort((a, b) => a.flow.localeCompare(b.flow));
 			return {
 				files,
 				tooLarge: files.length > KNOWLEDGE_FILES_WARNING,
-				syncs: used.flatMap(({ flow, parsed, kits }) => {
-					const fills = kits.filter((kit) => kit !== REVIEW_LEARNINGS_KIT);
-					if (fills.length === 0) return [];
-					const schedule = schedules.find((item) =>
-						isSourceSchedule(item, flow),
-					);
-					const last = runs.find((run) => run.flowName === flow);
-					const lastRun = last
-						? {
-								id: last.id,
-								status: last.status,
-								at: last.endedAt ?? last.createdAt,
-							}
-						: null;
-					const source = parsed ? sourceOf(parsed) : null;
-					const node = parsed?.nodes[0];
-					const device =
-						source && node?.type === "call" ? node.device : undefined;
-					const deviceId = deviceIdOf(device);
-					return [
-						{
-							flow,
-							kits: fills,
-							source,
-							computer:
-								device === undefined
-									? null
-									: {
-											name:
-												(deviceId === undefined
-													? legacyDeviceName(device)
-													: names.get(deviceId)) ?? ANOTHER_COMPUTER,
-											here: deviceId === deps.device.id,
-										},
-							schedule: schedule?.cron
-								? {
-										cron: schedule.cron,
-										enabled: schedule.enabled,
-									}
-								: null,
-							lastRun,
-							health: syncHealth(lastRun, now),
-						},
-					];
-				}),
+				syncs: syncs.map((sync) => ({
+					...sync,
+					may: sourceActions(sync, can),
+				})),
 				proposed,
-				reviews: used
-					.filter(({ kits }) => kits.includes(REVIEW_LEARNINGS_KIT))
-					.map(({ flow }) => flow),
+				reviews,
 				shared,
 				olderHost,
 			};
+		},
+		/** The flows that fill the knowledge, with no reconcile: what `list` says of each. */
+		async syncs(projectId: string): Promise<KnowledgeSync[]> {
+			return (await fillingFlows(projectId)).syncs;
 		},
 		/**
 		 * Adds a source, or changes one the page added (`name`): its flow,

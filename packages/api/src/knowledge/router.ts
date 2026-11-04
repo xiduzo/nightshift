@@ -23,7 +23,8 @@ import {
 	knowledgeSchema,
 	knowledgeTextSchema,
 	knowledgeUseSchema,
-	projectLearningSchema,
+	listedLearningSchema,
+	reviewTaskSchema,
 } from "./schemas";
 
 /** What the person may change: this computer's schedules are its owner's. */
@@ -110,21 +111,32 @@ export const knowledge = {
 		.output(output(knowledgeSchema))
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }): Promise<KnowledgeView> => {
-			const [view, save, remove, changeKnowledge] = await Promise.all([
-				context.knowledge.sources(context.space).list(input.projectId),
+			const [save, remove, startRuns] = await Promise.all([
 				context.access.can(MAY.save),
 				context.access.can(MAY.remove),
 				context.access.can(MAY.changeKnowledge),
 			]);
-			return {
-				...view,
-				can: {
-					save,
-					remove,
-					startRuns: changeKnowledge,
-					schedules: rightsOf(context).schedules,
-				},
-			};
+			const can = { save, remove, startRuns, ...rightsOf(context) };
+			const view = await context.knowledge
+				.sources(context.space)
+				.list(input.projectId, can);
+			return { ...view, can };
+		}),
+	/**
+	 * What waits for a person on the Knowledge page, in the order a person
+	 * meets it: sources that need a look, learnings, questions that found
+	 * nothing and files no run used.
+	 */
+	review: protectedProcedure
+		.route({
+			summary:
+				"Lists what waits for a person on a project's Knowledge page, in the order to meet it.",
+		})
+		.output(output(z.array(reviewTaskSchema)))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return context.knowledge.review(input.projectId, context.space);
 		}),
 	/**
 	 * The files of the project's knowledge, as its Space lists them, and
@@ -151,16 +163,22 @@ export const knowledge = {
 			summary:
 				"Lists the learnings agents proposed that wait for a person, of one project or of every project of the Space, newest first.",
 		})
-		.output(output(z.array(projectLearningSchema)))
+		.output(output(z.array(listedLearningSchema)))
 		.input(z.object({ projectId: z.string().optional() }).optional())
 		.handler(async ({ context, input }) => {
 			const projectId = input?.projectId;
 			if (projectId !== undefined) {
 				await knownProject(context.space, projectId);
-				return context.knowledge.learnings([projectId]);
 			}
-			const projects = await context.space.listProjects();
-			return context.knowledge.learnings(projects.map(({ id }) => id));
+			const projectIds =
+				projectId !== undefined
+					? [projectId]
+					: (await context.space.listProjects()).map(({ id }) => id);
+			const [learnings, mayDecide] = await Promise.all([
+				context.knowledge.learnings(projectIds),
+				context.access.can(MAY.changeKnowledge),
+			]);
+			return learnings.map((learning) => ({ ...learning, mayDecide }));
 		}),
 	/**
 	 * Keeps one step's proposals: agents read them in later runs. As the
@@ -479,13 +497,13 @@ export const knowledge = {
 		}),
 	/**
 	 * How often agents found and read each file of the project's knowledge
-	 * in the last 90 days, and when a run last used it: the page marks the
-	 * files no run used in 30 days.
+	 * in the last 90 days, when a run last used it, and which files no run
+	 * used in 30 days.
 	 */
 	use: protectedProcedure
 		.route({
 			summary:
-				"Says how often agents found and read each file of a project's knowledge, and when a run last used it.",
+				"Says how often agents found and read each file of a project's knowledge, when a run last used it, and which files no run used lately.",
 		})
 		.output(output(knowledgeUseSchema))
 		.input(z.object({ projectId: z.string() }))

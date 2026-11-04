@@ -127,6 +127,7 @@ describe("knowledge.get", () => {
 				schedule: { cron: "0 6 * * *", enabled: true },
 				lastRun: null,
 				health: null,
+				may: { sync: false, edit: false, remove: false, removeFiles: false },
 			},
 		]);
 		expect(got.can).toEqual({
@@ -517,6 +518,24 @@ describe("knowledge.learnings, keepLearning and deleteLearning", () => {
 			]),
 		);
 		expect(waiting).toHaveLength(2);
+		// What the screen offers follows what the server allows below.
+		expect(waiting.map((w) => w.mayDecide)).toEqual([false, false]);
+		const forMember = await call(appRouter.knowledge.learnings, undefined, {
+			context: asked("member", "member"),
+		});
+		expect(forMember.map((w) => w.mayDecide)).toEqual([true, true]);
+		const tasks = await call(
+			appRouter.knowledge.review,
+			{ projectId },
+			{ context: asked("viewer", "viewer") },
+		);
+		expect(tasks.map((t) => [t.kind, t.id, t.node])).toEqual(
+			expect.arrayContaining([
+				["learning", "learning:run-1.s1.md", "learning:run-1.s1.md"],
+				["learning", "learning:run-2.md", "learning:run-2.md"],
+			]),
+		);
+		expect(tasks).toHaveLength(2);
 		await expect(
 			call(
 				appRouter.knowledge.learnings,
@@ -566,6 +585,13 @@ describe("knowledge.learnings, keepLearning and deleteLearning", () => {
 			{ context: context("viewer", "viewer") },
 		);
 		expect(got.proposed).toBe(0);
+		expect(
+			await call(
+				appRouter.knowledge.review,
+				{ projectId },
+				{ context: asked("viewer", "viewer") },
+			),
+		).toEqual([]);
 		expect(got.files.map((f) => f.path)).toContain(
 			"learnings/accepted/run-1.s1.md",
 		);

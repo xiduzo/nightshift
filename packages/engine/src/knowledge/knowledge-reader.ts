@@ -54,13 +54,37 @@ export type KnowledgeReader = ReturnType<typeof createKnowledgeReader>;
 
 export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 	const { folders, documents, archive, learnings, status, deviceId } = deps;
+
+	/** The files the document lists now, by path: no reconcile, no Host. */
+	async function files(projectId: string): Promise<KnowledgeFile[]> {
+		const entries = (await documents.open(projectId)).entries();
+		const listed: KnowledgeFile[] = [];
+		for (const [path, entry] of [...entries].sort(([a], [b]) =>
+			a.localeCompare(b),
+		)) {
+			// The question set is Night Shift's own: the page shows it
+			// elsewhere. The proposed learnings wait: the page counts them.
+			if (isQuestionSetPath(path) || isProposedLearning(path)) continue;
+			listed.push({
+				path,
+				size: entry.size,
+				changedAt: entry.changedAt,
+				...(entry.local ? { local: true as const } : {}),
+			});
+		}
+		return listed;
+	}
+
 	return {
+		files,
 		/**
 		 * The Knowledge page's list: a reconcile first, for a while, so the
 		 * document has this Device's own changes. Then the document's files
 		 * and how many notes wait. The reconcile goes on when
 		 * the wait ends. While a step writes the folder, the page lists the
-		 * document as it is.
+		 * document as it is. The wait is all a Host can cost this read: the
+		 * count of the notes asks no Host (`Learnings.count`), so a Host that
+		 * does not answer never holds the page longer than `pageWaitMs`.
 		 */
 		async listing(projectId: string): Promise<KnowledgeListing> {
 			await Promise.race([
@@ -68,23 +92,8 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 				Bun.sleep(deps.pageWaitMs ?? 2_000),
 			]);
 			const spaceId = await status.spaceOf(projectId);
-			const entries = (await documents.open(projectId)).entries();
-			const files: KnowledgeFile[] = [];
-			for (const [path, entry] of [...entries].sort(([a], [b]) =>
-				a.localeCompare(b),
-			)) {
-				// The question set is Night Shift's own: the page shows it
-				// elsewhere. The proposed learnings wait: the page counts them.
-				if (isQuestionSetPath(path) || isProposedLearning(path)) continue;
-				files.push({
-					path,
-					size: entry.size,
-					changedAt: entry.changedAt,
-					...(entry.local ? { local: true as const } : {}),
-				});
-			}
 			return {
-				files,
+				files: await files(projectId),
 				proposed: await learnings.count(projectId),
 				shared: spaceId ? await status.isShared(spaceId) : false,
 				olderHost: spaceId ? status.isOlder(spaceId) : false,

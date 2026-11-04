@@ -25,7 +25,7 @@ import {
 import {
 	createLearnings,
 	type LearningsNotifications,
-	type WaitingLearning,
+	type ProjectLearning,
 } from "./learnings";
 import { type KnowledgeMap, knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
@@ -38,6 +38,7 @@ import {
 	questionKey,
 } from "./questions";
 import { createKnowledgeSync } from "./reconcile";
+import { type ReviewTask, reviewTasks } from "./review";
 import {
 	createKnowledgeSearch,
 	type KnowledgeHit,
@@ -79,9 +80,6 @@ export type KnowledgeHosts = {
 	 */
 	keeps?(spaceId: string): Promise<boolean>;
 };
-
-/** A learning that waits, with the project it is for. */
-export type ProjectLearning = WaitingLearning & { projectId: string };
 
 /** A question agents asked, and the files a person marked as its answer. */
 export type AskedQuestionWithAnswers = AskedQuestion & {
@@ -178,6 +176,17 @@ export type Knowledge = {
 	 */
 	learnings(projectIds: readonly string[]): Promise<ProjectLearning[]>;
 	/**
+	 * What waits for a person on the Knowledge page, in the order a person
+	 * meets it: sources that need a look, learnings, questions that found
+	 * nothing and files no run used. In `space` as the person who asks sees it.
+	 * It holds no folder. Only a learning whose content is not here yet asks
+	 * the Host.
+	 */
+	review<Run extends SourceRun>(
+		projectId: string,
+		space: SourcesSpace<Run>,
+	): Promise<ReviewTask[]>;
+	/**
 	 * Keeps or deletes one step's proposals, as the review of learnings
 	 * (`kit:knowledge/review-learnings`) does: keep adds them to
 	 * `learnings/accepted/`, where agents read them, and both take them
@@ -226,7 +235,7 @@ export type Knowledge = {
 		projectId: string,
 		mark: { word: string; notTopic: boolean; by: string | null },
 	): Promise<string[]>;
-	/** How often agents found and read each file, and when a run last used it. */
+	/** How often agents found and read each file, when a run last used it, and which files no run used lately. */
 	use(projectId: string): Promise<KnowledgeUseReport>;
 	/** The question set against each way to search on this computer. */
 	evaluate(projectId: string): Promise<KnowledgeEvaluation>;
@@ -466,6 +475,38 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		);
 	}
 
+	/** What `sources` and `review` read: the sources in `space`, over this Device's files. */
+	function sourcesIn<Run extends SourceRun>(space: SourcesSpace<Run>) {
+		return knowledgeSources({
+			space,
+			files: { listing: reader.listing, removeFolder: sync.removeFolder },
+			device,
+		});
+	}
+
+	/** The learnings that wait in these projects, newest first, each with its project. */
+	async function projectLearnings(
+		projectIds: readonly string[],
+	): Promise<ProjectLearning[]> {
+		const lists = await Promise.all(
+			projectIds.map(async (projectId) =>
+				(await learnings.waiting(projectId)).map((learning) => ({
+					...learning,
+					projectId,
+				})),
+			),
+		);
+		return lists
+			.flat()
+			.sort((a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id));
+	}
+
+	/** How agents used the project's knowledge, and which of the files the document lists no run used lately. */
+	async function use(projectId: string) {
+		const files = await reader.files(projectId);
+		return { files, use: await knowledgeFileUse(db, projectId, files) };
+	}
+
 	return {
 		connect(runtime) {
 			hosts = runtime;
@@ -503,20 +544,21 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			}
 			return file;
 		},
-		async learnings(projectIds) {
-			const lists = await Promise.all(
-				projectIds.map(async (projectId) =>
-					(await learnings.waiting(projectId)).map((learning) => ({
-						...learning,
-						projectId,
-					})),
-				),
-			);
-			return lists
-				.flat()
-				.sort(
-					(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
-				);
+		learnings: projectLearnings,
+		async review(projectId, space) {
+			const [syncs, waiting, asked, used] = await Promise.all([
+				sourcesIn(space).syncs(projectId),
+				projectLearnings([projectId]),
+				askedQuestions(db, projectId),
+				use(projectId),
+			]);
+			const unused = new Set(used.use.unused);
+			return reviewTasks({
+				syncs,
+				learnings: waiting,
+				asked,
+				unused: used.files.filter((file) => unused.has(file.path)),
+			});
 		},
 		settleLearning: learnings.settle,
 		async questions(projectId, options = {}) {
@@ -591,7 +633,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 				await hold.done();
 			}
 		},
-		use: (projectId) => knowledgeFileUse(db, projectId),
+		use: async (projectId) => (await use(projectId)).use,
 		async evaluate(projectId) {
 			return evaluateKnowledge(search, projectId, await questionSet(projectId));
 		},
@@ -600,12 +642,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			await (await documents.open(projectId)).setMeaning(on);
 			return search.meaning(projectId);
 		},
-		sources: (space) =>
-			knowledgeSources({
-				space,
-				files: { listing: reader.listing, removeFolder: sync.removeFolder },
-				device,
-			}),
+		sources: sourcesIn,
 		async moved(move) {
 			for (const [projectId, to] of Object.entries(move.projects)) {
 				await sync.move({ from: { spaceId: move.from, projectId }, to });

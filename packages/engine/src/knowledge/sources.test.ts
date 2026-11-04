@@ -26,6 +26,8 @@ let built: ReturnType<typeof testKnowledge>;
 
 const owner = { schedules: true };
 const member = { schedules: false };
+/** A role that may do everything with a source. */
+const all = { save: true, remove: true, startRuns: true, schedules: true };
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
@@ -183,7 +185,7 @@ describe("save", () => {
 				await sourcesOn(
 					device,
 					root.space(sandbox.spaceId, { personId: "ada" }),
-				).list(projectId)
+				).list(projectId, all)
 			).syncs.find((sync) => sync.flow === "knowledge-folder")?.computer;
 		expect(await computer({ id: sandbox.deviceId, name: "test" })).toEqual({
 			name: "test",
@@ -317,7 +319,7 @@ describe("list", () => {
 			callFlow("kit:knowledge/review-learnings", {}),
 		);
 		await putFile("web/a.md", "# A\n");
-		const listed = await sources().list(projectId);
+		const listed = await sources().list(projectId, all);
 		expect(listed.files.map((file) => file.path)).toEqual(["web/a.md"]);
 		expect(listed.tooLarge).toBe(false);
 		expect(listed.syncs).toEqual([
@@ -332,10 +334,143 @@ describe("list", () => {
 				schedule: { cron: "0 6 * * *", enabled: true },
 				lastRun: null,
 				health: null,
+				may: { sync: true, edit: true, remove: true, removeFiles: true },
 			},
 		]);
 		expect(listed.reviews).toEqual(["review"]);
 		expect(listed.proposed).toBe(0);
+	});
+
+	describe("what you may do with a source", () => {
+		const none = {
+			save: false,
+			remove: false,
+			startRuns: false,
+			schedules: false,
+		};
+		/** The source's flow, with a schedule or not, then what `can` allows on it. */
+		async function mayOn(
+			can: typeof all,
+			options: { drawn?: boolean; scheduled?: boolean } = {},
+		) {
+			const flow = options.drawn
+				? drawnFlow("kit:knowledge/web", { urls: "a", folder: "web" })
+				: callFlow("kit:knowledge/web", { urls: "a", folder: "web" });
+			await space.flows.save(projectId, "web", flow);
+			await space.saveSchedules(
+				projectId,
+				options.scheduled
+					? [
+							{
+								id: "web",
+								flow: "web",
+								inputs: {},
+								enabled: true,
+								cron: "0 6 * * *",
+							},
+						]
+					: [],
+			);
+			const { syncs } = await sources().list(projectId, can);
+			return syncs.find((sync) => sync.flow === "web")?.may;
+		}
+
+		test("a viewer gets none of the actions", async () => {
+			expect(await mayOn(none, { scheduled: true })).toEqual({
+				sync: false,
+				edit: false,
+				remove: false,
+				removeFiles: false,
+			});
+		});
+
+		test("a Member edits and syncs, and removes a source without a schedule", async () => {
+			const member = { ...all, schedules: false };
+			expect(await mayOn(member)).toEqual({
+				sync: true,
+				edit: true,
+				remove: true,
+				removeFiles: true,
+			});
+			expect((await mayOn(member, { scheduled: true }))?.remove).toBe(false);
+			expect((await mayOn(all, { scheduled: true }))?.remove).toBe(true);
+		});
+
+		test("a flow someone drew only syncs here", async () => {
+			expect(await mayOn(all, { drawn: true })).toEqual({
+				sync: true,
+				edit: false,
+				remove: false,
+				removeFiles: true,
+			});
+		});
+	});
+
+	describe("the name of another computer", () => {
+		/** The Space, with a list of Devices that may never come. */
+		function viewWith(listDevices: SpaceEngine["listDevices"]): SpaceEngine {
+			return new Proxy(space, {
+				get: (target, name, receiver) =>
+					name === "listDevices"
+						? listDevices
+						: Reflect.get(target, name, receiver),
+			});
+		}
+		test("no source names another computer: the Host is not asked", async () => {
+			let asked = 0;
+			await space.flows.save(
+				projectId,
+				"web",
+				callFlow("kit:knowledge/web", { urls: "a", folder: "web" }),
+			);
+			const list = await sourcesOn(
+				{ id: sandbox.deviceId, name: "test" },
+				viewWith(async () => {
+					asked++;
+					return [];
+				}),
+			).list(projectId, all);
+			expect(list.syncs.map((sync) => sync.computer)).toEqual([null]);
+			expect(asked).toBe(0);
+		});
+
+		test("a Host that does not answer in time names none, and the page does not wait for it", async () => {
+			await sources().save(
+				projectId,
+				{
+					source: {
+						kit: "kit:knowledge/folder",
+						inputs: { path: "~/notes", folder: "notes" },
+					},
+				},
+				owner,
+			);
+			const never = new Promise<never>(() => {});
+			const list = await sourcesOn(
+				{ id: "laptop-id", name: "laptop" },
+				viewWith(() => never),
+			).list(projectId, all);
+			expect(list.syncs.map((sync) => sync.computer)).toEqual([
+				{ name: "another computer", here: false },
+			]);
+		});
+	});
+});
+
+describe("what waits on the Knowledge page", () => {
+	test("the door reads the learnings and the questions agents found nothing for, in order", async () => {
+		await putFile("learnings/proposed/run-1.s1.md", "- Use bun.\n");
+		await sources().list(projectId, all);
+		await built.knowledge.search(projectId, "gold", { agent: true });
+
+		const tasks = await built.knowledge.review(projectId, space);
+		expect(tasks.map((task) => [task.kind, task.id, task.node])).toEqual([
+			["learning", "learning:run-1.s1.md", "learning:run-1.s1.md"],
+			["question", "question:gold", "question:gold"],
+		]);
+		expect(tasks[0]).toMatchObject({
+			learning: { projectId, notes: ["Use bun."] },
+		});
 	});
 });
 
@@ -351,13 +486,13 @@ describe("remove", () => {
 		);
 		await putFile("web/a.md", "# A\n");
 		await putFile("web/b.md", "# B\n");
-		await sources().list(projectId);
+		await sources().list(projectId, all);
 		expect(
 			await sources().remove(projectId, one.name, { files: true }, owner),
 		).toEqual({ removedFiles: 2 });
 		expect(await flows()).toEqual({});
 		expect(await schedules()).toEqual([]);
-		expect((await sources().list(projectId)).files).toEqual([]);
+		expect((await sources().list(projectId, all)).files).toEqual([]);
 
 		// A drawn flow fills the folder too: its files stay.
 		const two = await sources().save(
@@ -376,11 +511,11 @@ describe("remove", () => {
 			drawnFlow("kit:knowledge/files", { folder: "web" }),
 		);
 		await putFile("web/c.md", "# C\n");
-		await sources().list(projectId);
+		await sources().list(projectId, all);
 		expect(
 			await sources().remove(projectId, two.name, { files: true }, owner),
 		).toEqual({ removedFiles: 0 });
-		expect((await sources().list(projectId)).files).toHaveLength(1);
+		expect((await sources().list(projectId, all)).files).toHaveLength(1);
 	});
 
 	test("checks first and removes the files first: a refusal leaves the source as it was", async () => {
@@ -393,7 +528,7 @@ describe("remove", () => {
 			owner,
 		);
 		await putFile("web/a.md", "# A\n");
-		await sources().list(projectId);
+		await sources().list(projectId, all);
 		// Someone who may not change this computer's schedules.
 		await expect(
 			sources().remove(projectId, one.name, { files: true }, member),
@@ -406,7 +541,7 @@ describe("remove", () => {
 		await step.done();
 		expect(Object.keys(await flows())).toEqual([one.name]);
 		expect(await schedules()).toHaveLength(1);
-		expect((await sources().list(projectId)).files).toHaveLength(1);
+		expect((await sources().list(projectId, all)).files).toHaveLength(1);
 		await expect(
 			sources().remove(projectId, "nope", { files: false }, owner),
 		).rejects.toThrow("This project has no such source.");
@@ -436,9 +571,9 @@ describe("sync", () => {
 		);
 		const detail = await space.getRun(run.id);
 		expect(detail.status).toBe("finished");
-		expect((await sources().list(projectId)).files.map((f) => f.path)).toEqual([
-			"folder/a.md",
-		]);
+		expect(
+			(await sources().list(projectId, all)).files.map((f) => f.path),
+		).toEqual(["folder/a.md"]);
 	});
 });
 

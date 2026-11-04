@@ -30,35 +30,50 @@ export const knowledgeFileSchema = exact<KnowledgeFile>()(
 	}),
 );
 
+/** A flow of the project that calls a `kit:knowledge/*` kit to fill the knowledge. */
+const knowledgeSyncSchema = z.object({
+	flow: z.string(),
+	kits: z.array(z.string()),
+	/** The source, when the flow is one the Knowledge page made and can edit. */
+	source: knowledgeSourceSchema.nullable(),
+	/** The computer a source's Subflow names: a folder source syncs there. `here`: this one. */
+	computer: z.object({ name: z.string(), here: z.boolean() }).nullable(),
+	/** Its schedule at set times, if it has one. */
+	schedule: z
+		.object({
+			cron: z.string(),
+			enabled: z.boolean(),
+			/** The Device its runs run on, by its id. */
+		})
+		.nullable(),
+	/** Its latest run among the project's recent ones: when it ended, else started. */
+	lastRun: z
+		.object({ id: z.string(), status: runStatusSchema, at: z.number() })
+		.nullable(),
+	/** Its last sync failed, or it has not synced in a week. Null: nothing to do. */
+	health: z.enum(["failed", "stale"]).nullable(),
+});
+
 /** A project's knowledge in its Space, and the flows that fill it. */
 export const knowledgeSchema = z.object({
 	/** Every file but the index, by path. */
 	files: z.array(knowledgeFileSchema),
 	/** So many files that an agent reads it badly. */
 	tooLarge: z.boolean(),
-	/** The flows of the project that call a `kit:knowledge/*` kit to fill it, by name. */
+	/** The flows that fill the knowledge, by name. */
 	syncs: z.array(
-		z.object({
-			flow: z.string(),
-			kits: z.array(z.string()),
-			/** The source, when the flow is one the Knowledge page made and can edit. */
-			source: knowledgeSourceSchema.nullable(),
-			/** The computer a source's Subflow names: a folder source syncs there. `here`: this one. */
-			computer: z.object({ name: z.string(), here: z.boolean() }).nullable(),
-			/** Its schedule at set times, if it has one. */
-			schedule: z
-				.object({
-					cron: z.string(),
-					enabled: z.boolean(),
-					/** The Device its runs run on, by its id. */
-				})
-				.nullable(),
-			/** Its latest run among the project's recent ones: when it ended, else started. */
-			lastRun: z
-				.object({ id: z.string(), status: runStatusSchema, at: z.number() })
-				.nullable(),
-			/** Its last sync failed, or it has not synced in a week. Null: nothing to do. */
-			health: z.enum(["failed", "stale"]).nullable(),
+		knowledgeSyncSchema.extend({
+			/** What the person may do with this source: the server refuses the rest. */
+			may: z.object({
+				/** Start a sync now. */
+				sync: z.boolean(),
+				/** Edit it. Only a source the page made. */
+				edit: z.boolean(),
+				/** Remove it, with its schedule. Only a source the page made. */
+				remove: z.boolean(),
+				/** Remove its files too. */
+				removeFiles: z.boolean(),
+			}),
 		}),
 	),
 	/** How many learnings agents proposed that wait for a person. */
@@ -100,8 +115,17 @@ const waitingLearningSchema = exact<WaitingLearning>()(
 );
 
 /** A proposal that waits, with the project it is for. */
-export const projectLearningSchema = waitingLearningSchema.extend({
+const projectLearningSchema = waitingLearningSchema.extend({
 	projectId: z.string(),
+});
+
+/** A proposal in the list of what waits, with what the person may do with it. */
+export const listedLearningSchema = projectLearningSchema.extend({
+	/**
+	 * Whether the person's role lets them keep or delete it: the server refuses
+	 * it otherwise. Unset from a Host of an older version, which does not say.
+	 */
+	mayDecide: z.boolean().optional(),
 });
 
 /** A file a knowledge search found. */
@@ -194,8 +218,8 @@ const knowledgeQuestionSchema = exact<KnowledgeQuestion>()(
 	}),
 );
 
-/** A question agents asked, what its last asking found, and its answers when it is in the set. */
-const askedQuestionSchema = exact<AskedQuestion>()(
+/** A question agents asked, and what its last asking found. */
+const askedSchema = exact<AskedQuestion>()(
 	z.object({
 		query: z.string(),
 		times: z.number(),
@@ -204,7 +228,10 @@ const askedQuestionSchema = exact<AskedQuestion>()(
 		stepId: z.string().nullable(),
 		hits: z.array(useHitSchema),
 	}),
-).extend({
+);
+
+/** A question agents asked, what its last asking found, and its answers when it is in the set. */
+const askedQuestionSchema = askedSchema.extend({
 	/** The files a person marked as its answer. Null: not in the question set. */
 	answers: z.array(z.string()).nullable(),
 });
@@ -277,8 +304,42 @@ export const knowledgeUseSchema = exact<KnowledgeUseReport>()(
 				lastRunAt: z.number().nullable(),
 			}),
 		),
+		/** The paths of the files no run used lately. A file no agent ever touched is here and not in `files`. */
+		unused: z.array(z.string()),
 	}),
 );
+
+/**
+ * What waits for a person on the Knowledge page, in the order a person meets
+ * it. `id` stays the same while a task asks the same thing. `node`: the node of
+ * the Map it is about, if it has one.
+ */
+export const reviewTaskSchema = z.discriminatedUnion("kind", [
+	z.object({
+		kind: z.literal("source"),
+		id: z.string(),
+		node: z.null(),
+		sync: knowledgeSyncSchema,
+	}),
+	z.object({
+		kind: z.literal("learning"),
+		id: z.string(),
+		node: z.string(),
+		learning: projectLearningSchema,
+	}),
+	z.object({
+		kind: z.literal("question"),
+		id: z.string(),
+		node: z.string(),
+		question: askedSchema,
+	}),
+	z.object({
+		kind: z.literal("unused"),
+		id: z.string(),
+		node: z.null(),
+		files: z.array(knowledgeFileSchema),
+	}),
+]);
 
 /** The Map: the files, their topics, and what connects to them. */
 export const knowledgeMapSchema = exact<KnowledgeMap>()(

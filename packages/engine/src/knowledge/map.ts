@@ -16,6 +16,16 @@ import type { AskedQuestion } from "./use";
  * name: `knowledge.graph` stays, because a client out there may call it.
  */
 
+/** The node of a learning that waits. */
+export function learningNode(id: string): string {
+	return `learning:${id}`;
+}
+
+/** The node of a question agents asked. */
+export function questionNode(query: string): string {
+	return `question:${query}`;
+}
+
 export type KnowledgeMapNode = {
 	/** `file:<path>`, `topic:<key>`, `question:<query>` or `learning:<id>`. */
 	id: string;
@@ -283,7 +293,7 @@ export function knowledgeMapOf(input: {
 		}
 	}
 	for (const question of input.asked) {
-		const id = `question:${question.query}`;
+		const id = questionNode(question.query);
 		addNode(id, "question", question.query);
 		for (const hit of question.hits) connect(id, `file:${hit.path}`, "found");
 	}
@@ -291,7 +301,7 @@ export function knowledgeMapOf(input: {
 		const text = learning.notes.join(" ");
 		const touched = found.namedIn(text);
 		if (touched.length === 0) continue;
-		const id = `learning:${learning.id}`;
+		const id = learningNode(learning.id);
 		addNode(
 			id,
 			"learning",

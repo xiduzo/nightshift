@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { KnowledgeUse } from "@nightshift/agents/tools";
-import { project } from "@nightshift/db/schema";
+import { project, run } from "@nightshift/db/schema";
 import { now as timeNow } from "@nightshift/time";
 import { createRunLog, type KnowledgeUseFact, type RunLog } from "../log";
 import { createSandbox, type Sandbox } from "../testing";
@@ -9,6 +9,7 @@ import {
 	knowledgeFileUse,
 	knowledgeUseEvent,
 	stepSources,
+	unusedFiles,
 } from "./use";
 
 /** How agents used a project's knowledge, read back from the event log. */
@@ -27,7 +28,7 @@ async function setup() {
 			.values({ id, spaceId: sandbox.spaceId, name: id });
 	}
 	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
-	return { db: sandbox.db, log };
+	return { db: sandbox.db, log, sandbox };
 }
 
 /** A use through the nightshift MCP server: a fact of the project, with no run. */
@@ -145,10 +146,11 @@ describe("knowledgeFileUse", () => {
 			found: false,
 		});
 		const now = timeNow() + 1000;
-		const report = await knowledgeFileUse(db, "p1", now);
+		const report = await knowledgeFileUse(db, "p1", [], now);
 		expect(report.unusedDays).toBe(30);
 		// Only the MCP server used it: no run did.
 		expect(report.runsUsedIt).toBe(false);
+		expect(report.unused).toEqual([]);
 		expect(
 			report.files.map((f) => [f.path, f.found, f.read, f.lastRunAt]),
 		).toEqual([
@@ -160,7 +162,82 @@ describe("knowledgeFileUse", () => {
 		]);
 		// Past the window, nothing counts.
 		expect(
-			(await knowledgeFileUse(db, "p1", now + 91 * 86_400_000)).files,
+			(await knowledgeFileUse(db, "p1", [], now + 91 * 86_400_000)).files,
+		).toEqual([]);
+	});
+
+	test("a run's use lately: the old files no run used are not used, a file no agent touched too", async () => {
+		const { db, log, sandbox } = await setup();
+		await db.insert(run).values({
+			id: "r1",
+			spaceId: sandbox.spaceId,
+			projectId: "p1",
+			flowName: null,
+			flow: "{}",
+			bodyFlows: "{}",
+			title: "test",
+			worktreePath: sandbox.repoPath,
+			branch: "nightshift/test",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+		});
+		await log.append({
+			...knowledgeUseEvent(
+				"p1",
+				{ kind: "search", query: "deploy", hits: [hit("used.md")] },
+				"step",
+			),
+			runId: "r1",
+		});
+		const report = await knowledgeFileUse(db, "p1", [
+			{ path: "used.md", changedAt: 1 },
+			{ path: "never.md", changedAt: 1 },
+			{ path: "new.md", changedAt: timeNow() },
+		]);
+		expect(report.runsUsedIt).toBe(true);
+		expect(report.unused).toEqual(["never.md"]);
+		// The report lists only what agents used: `unused` is what tells of the rest.
+		expect(report.files.map((f) => f.path)).toEqual(["used.md"]);
+	});
+});
+
+describe("unusedFiles", () => {
+	const DAY = 24 * 60 * 60 * 1000;
+	const NOW = 100 * DAY;
+	const report = (lastRunAt: number | null, runsUsedIt = true) => ({
+		unusedDays: 30,
+		runsUsedIt,
+		files: [{ path: "a.md", found: 1, read: 1, lastAt: 1, lastRunAt }],
+	});
+
+	test("an old file no run used lately is not used", () => {
+		expect(
+			unusedFiles(
+				report(10 * DAY),
+				[
+					{ path: "a.md", changedAt: 1 },
+					{ path: "b.md", changedAt: 1 },
+				],
+				NOW,
+			),
+		).toEqual(["a.md", "b.md"]);
+	});
+
+	test("a file a run used lately is used", () => {
+		expect(
+			unusedFiles(report(90 * DAY), [{ path: "a.md", changedAt: 1 }], NOW),
+		).toEqual([]);
+	});
+
+	test("a file that came in lately says nothing yet", () => {
+		expect(
+			unusedFiles(report(null), [{ path: "a.md", changedAt: 99 * DAY }], NOW),
+		).toEqual([]);
+	});
+
+	test("no run used the knowledge at all: mark nothing", () => {
+		expect(
+			unusedFiles(report(null, false), [{ path: "a.md", changedAt: 1 }], NOW),
 		).toEqual([]);
 	});
 });
