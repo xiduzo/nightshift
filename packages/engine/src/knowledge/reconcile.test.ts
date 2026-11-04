@@ -1,29 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import {
-	mkdir,
-	readFile,
-	rm,
-	stat,
-	symlink,
-	utimes,
-	writeFile,
-} from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { project } from "@nightshift/db/schema";
-import { Refusal } from "@nightshift/refusal";
+import { mkdir, rm, stat, symlink } from "node:fs/promises";
+import { join } from "node:path";
 import { now } from "@nightshift/time";
-import * as Y from "yjs";
-import { type ArchiveHost, createSpaceArchive, sha256Of } from "../archive";
-import { createSandbox, type Sandbox } from "../testing";
-import { tinyDocx, tinyPdf } from "../testing/documents";
-import { createKnowledgeFolders } from "./folder";
+import { sha256Of } from "../archive";
 import {
-	createKnowledgeDocuments,
-	knowledgeEntries,
-	knowledgeFiles,
-} from "./knowledge-document";
-import { proposeLearnings } from "./learnings";
-import { createKnowledgeSync } from "./reconcile";
+	knowledgeDevice as device,
+	memoryHost,
+	removeKnowledgeDevices,
+	syncKnowledgeDocuments as syncDocuments,
+} from "../testing/knowledge-devices";
+import { createKnowledgeFolderLocks } from "./folder-locks";
 
 /**
  * The reconcile of a knowledge folder with its document (ADR 4), on two
@@ -31,90 +17,7 @@ import { createKnowledgeSync } from "./reconcile";
  * as a Link does.
  */
 
-const sandboxes: Sandbox[] = [];
-afterEach(async () => {
-	await Promise.all(sandboxes.splice(0).map((s) => s.cleanup()));
-});
-
-/** A Host's archive in memory: content by hash. `down` is the network gone. */
-function memoryHost() {
-	const kept = new Map<string, Uint8Array>();
-	const state = { down: false };
-	const host: ArchiveHost = {
-		async archivePut({ ref, content }) {
-			if (state.down) throw new TypeError("The network connection was lost.");
-			if (ref.kind !== "content" || typeof content === "string") return false;
-			kept.set(ref.sha256, content.slice());
-			return true;
-		},
-		async archiveGet(ref) {
-			if (state.down) throw new TypeError("The network connection was lost.");
-			if (ref.kind !== "content") return null;
-			return kept.get(ref.sha256)?.slice() ?? null;
-		},
-	};
-	return { kept, state, host };
-}
-
-/** A Device's archive, connected to `host` when there is one. */
-function archiveOf(dataDir: string, host: ArchiveHost | null) {
-	const archive = createSpaceArchive(dataDir);
-	if (host) archive.connect(host);
-	return archive;
-}
-
-/** A Device with project p1 and its knowledge, reaching `host`. */
-async function device(host: ArchiveHost | null) {
-	const sandbox = await createSandbox();
-	sandboxes.push(sandbox);
-	await sandbox.db
-		.insert(project)
-		.values({ id: "p1", spaceId: sandbox.spaceId, name: "p1" });
-	const folders = createKnowledgeFolders(sandbox.dataDir);
-	const documents = createKnowledgeDocuments({ db: sandbox.db });
-	const sync = createKnowledgeSync({
-		db: sandbox.db,
-		folders,
-		documents,
-		archive: archiveOf(sandbox.dataDir, host),
-		deviceId: sandbox.deviceId,
-		pageWaitMs: 5_000,
-	});
-	const dir = folders.folder("p1");
-	const document = () => documents.open("p1");
-	return {
-		sandbox,
-		folders,
-		sync,
-		dir,
-		document,
-		entries: async () => knowledgeEntries(await document()),
-		put: async (path: string, text: string | Uint8Array, at?: number) => {
-			const file = join(dir, path);
-			await mkdir(dirname(file), { recursive: true });
-			await writeFile(file, text);
-			if (at !== undefined) await utimes(file, at / 1000, at / 1000);
-		},
-		read: (path: string) => readFile(join(dir, path), "utf8"),
-		has: (path: string) =>
-			stat(join(dir, path)).then(
-				() => true,
-				() => false,
-			),
-	};
-}
-type TestDevice = Awaited<ReturnType<typeof device>>;
-
-/** The documents of the Devices in step, as their Links leave them. */
-async function syncDocuments(...devices: TestDevice[]) {
-	const docs = await Promise.all(
-		devices.map(async (d) => (await d.document()).doc),
-	);
-	for (const from of docs) {
-		const update = Y.encodeStateAsUpdate(from);
-		for (const to of docs) if (to !== from) Y.applyUpdate(to, update);
-	}
-}
+afterEach(removeKnowledgeDevices);
 
 const NOW = now();
 
@@ -204,9 +107,8 @@ describe("reconcile", () => {
 		const a = await device(host);
 		await a.put("wiki/Home.md", "# Home\n");
 
-		const result = await a.sync.reconcile("p1");
+		await a.sync.reconcile("p1");
 
-		expect(result).toMatchObject({ published: 1, written: 0, unpushed: 0 });
 		const entry = (await a.entries()).get("wiki/Home.md");
 		const sha256 = sha256Of(new TextEncoder().encode("# Home\n"));
 		expect(entry).toMatchObject({
@@ -217,7 +119,8 @@ describe("reconcile", () => {
 		expect(entry?.local).toBeUndefined();
 		expect(new TextDecoder().decode(kept.get(sha256))).toBe("# Home\n");
 		// Nothing changed since: nothing to publish.
-		expect(await a.sync.reconcile("p1")).toMatchObject({ published: 0 });
+		await a.sync.reconcile("p1");
+		expect((await a.entries()).get("wiki/Home.md")).toEqual(entry);
 	});
 
 	test("writes an entry another Device changed into the folder, and its next change", async () => {
@@ -228,22 +131,22 @@ describe("reconcile", () => {
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
 
-		expect(await b.sync.reconcile("p1")).toMatchObject({
-			written: 1,
-			published: 0,
-		});
+		await b.sync.reconcile("p1");
 		expect(await b.read("wiki/Home.md")).toBe("# Home\n");
+		expect((await b.entries()).get("wiki/Home.md")?.deviceId).toBe(
+			a.sandbox.deviceId,
+		);
 
 		await a.put("wiki/Home.md", "# Home, again\n", NOW + 60_000);
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ written: 1 });
+		await b.sync.reconcile("p1");
 		expect(await b.read("wiki/Home.md")).toBe("# Home, again\n");
 		// B wrote it, and did not change it: it publishes nothing.
-		expect(await b.sync.reconcile("p1")).toMatchObject({
-			published: 0,
-			written: 0,
-		});
+		const entry = (await b.entries()).get("wiki/Home.md");
+		await b.sync.reconcile("p1");
+		expect((await b.entries()).get("wiki/Home.md")).toEqual(entry);
+		expect(entry?.deviceId).toBe(a.sandbox.deviceId);
 	});
 
 	test("a removal travels: the entry goes, then the file and its empty folder on the other Device", async () => {
@@ -256,11 +159,11 @@ describe("reconcile", () => {
 		await b.sync.reconcile("p1");
 
 		await rm(join(a.dir, "wiki/Home.md"));
-		expect(await a.sync.reconcile("p1")).toMatchObject({ unpublished: 1 });
+		await a.sync.reconcile("p1");
 		expect((await a.entries()).has("wiki/Home.md")).toBe(false);
 		await syncDocuments(a, b);
 
-		expect(await b.sync.reconcile("p1")).toMatchObject({ removed: 1 });
+		await b.sync.reconcile("p1");
 		expect(await b.has("wiki/Home.md")).toBe(false);
 		expect(await b.has("wiki")).toBe(false);
 	});
@@ -279,9 +182,12 @@ describe("reconcile", () => {
 		await b.put("notes.md", "from B, later\n", NOW + 20_000);
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ published: 1 });
+		await b.sync.reconcile("p1");
+		expect((await b.entries()).get("notes.md")?.deviceId).toBe(
+			b.sandbox.deviceId,
+		);
 		await syncDocuments(a, b);
-		expect(await a.sync.reconcile("p1")).toMatchObject({ written: 1 });
+		await a.sync.reconcile("p1");
 		expect(await a.read("notes.md")).toBe("from B, later\n");
 		expect(await b.read("notes.md")).toBe("from B, later\n");
 
@@ -290,7 +196,7 @@ describe("reconcile", () => {
 		await a.put("notes.md", "from A, late\n", NOW + 40_000);
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ written: 1 });
+		await b.sync.reconcile("p1");
 		expect(await b.read("notes.md")).toBe("from A, late\n");
 	});
 
@@ -304,20 +210,16 @@ describe("reconcile", () => {
 		await a.sync.reconcile("p1");
 		await b.sync.reconcile("p1");
 		const earlier = (await a.entries()).get("notes.md");
+		if (!earlier) throw new Error("A did not publish its change.");
 		await syncDocuments(a, b);
 		// Yjs keeps one of two changes made at once: here, A's earlier one.
-		const document = await a.document();
-		await document.change(() => {
-			knowledgeFiles(document).set("notes.md", earlier);
-		});
+		await (await a.document()).apply({ set: [["notes.md", earlier]] });
 		await syncDocuments(a, b);
 
-		expect(await b.sync.reconcile("p1")).toMatchObject({
-			published: 1,
-			written: 0,
-		});
+		await b.sync.reconcile("p1");
+		expect(await b.read("notes.md")).toBe("from B, later\n");
 		await syncDocuments(a, b);
-		expect(await a.sync.reconcile("p1")).toMatchObject({ written: 1 });
+		await a.sync.reconcile("p1");
 
 		expect(await a.read("notes.md")).toBe("from B, later\n");
 		expect(await b.read("notes.md")).toBe("from B, later\n");
@@ -363,9 +265,9 @@ describe("reconcile", () => {
 		expect(kept.size).toBe(0);
 
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ waiting: 1 });
+		await b.sync.reconcile("p1");
 		expect(await b.has("big.txt")).toBe(false);
-		const listing = await b.sync.listing("p1");
+		const listing = await b.reader.listing("p1");
 		expect(listing.files).toEqual([
 			{
 				path: "big.txt",
@@ -374,7 +276,7 @@ describe("reconcile", () => {
 				local: true,
 			},
 		]);
-		await expect(b.sync.read("p1", "big.txt", 1024)).rejects.toThrow(
+		await expect(b.reader.read("p1", "big.txt", 1024)).rejects.toThrow(
 			"stays on the computer that synced it",
 		);
 	});
@@ -389,13 +291,14 @@ describe("reconcile", () => {
 		await b.put("wiki/Home.md", "B's older home\n", NOW + 10_000);
 		await b.put("wiki/Only-B.md", "only on B\n", NOW);
 
-		expect(await a.sync.reconcile("p1")).toMatchObject({ published: 2 });
+		await a.sync.reconcile("p1");
+		expect([...(await a.entries()).keys()].sort()).toEqual([
+			"wiki/Home.md",
+			"wiki/Only-A.md",
+		]);
 		expect(await a.has(".reconciled.json")).toBe(true);
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({
-			published: 1,
-			written: 2,
-		});
+		await b.sync.reconcile("p1");
 		await syncDocuments(a, b);
 		await a.sync.reconcile("p1");
 
@@ -407,9 +310,10 @@ describe("reconcile", () => {
 	});
 
 	test("offline: content waits to be copied, a fetch that fails keeps the old file, and both go on later", async () => {
-		const { state, host } = memoryHost();
+		const { kept, state, host } = memoryHost();
 		const a = await device(host);
 		const b = await device(host);
+		const v2 = sha256Of(new TextEncoder().encode("v2\n"));
 		await a.put("notes.md", "v1\n", NOW);
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
@@ -417,23 +321,21 @@ describe("reconcile", () => {
 
 		state.down = true;
 		await a.put("notes.md", "v2\n", NOW + 10_000);
-		expect(await a.sync.reconcile("p1")).toMatchObject({
-			published: 1,
-			unpushed: 1,
-		});
+		await a.sync.reconcile("p1");
+		expect((await a.entries()).get("notes.md")?.sha256).toBe(v2);
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ waiting: 1 });
+		await b.sync.reconcile("p1");
 		expect(await b.read("notes.md")).toBe("v1\n");
 
 		state.down = false;
 		// The Host does not have v2 yet: B still waits.
-		expect(await b.sync.reconcile("p1")).toMatchObject({ waiting: 1 });
+		await b.sync.reconcile("p1");
+		expect(await b.read("notes.md")).toBe("v1\n");
+		expect(kept.has(v2)).toBe(false);
 		// A copies what waited at its next reconcile.
-		expect(await a.sync.reconcile("p1")).toMatchObject({ unpushed: 0 });
-		expect(await b.sync.reconcile("p1")).toMatchObject({
-			written: 1,
-			waiting: 0,
-		});
+		await a.sync.reconcile("p1");
+		expect(kept.has(v2)).toBe(true);
+		await b.sync.reconcile("p1");
 		expect(await b.read("notes.md")).toBe("v2\n");
 	});
 
@@ -449,16 +351,15 @@ describe("reconcile", () => {
 		expect([...(await a.entries()).keys()]).toEqual(["wiki/Home.md"]);
 
 		// Another Device's entries that are not paths of the folder.
-		const document = await a.document();
 		const home = (await a.entries()).get("wiki/Home.md");
-		await document.change(() => {
-			const files = knowledgeFiles(document);
-			for (const path of ["../outside.md", ".hidden", "index.md", "a//b"]) {
-				files.set(path, home);
-			}
+		if (!home) throw new Error("A did not publish its file.");
+		await (await a.document()).apply({
+			set: ["../outside.md", ".hidden", "index.md", "a//b"].map(
+				(path) => [path, home] as const,
+			),
 		});
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ written: 1 });
+		await b.sync.reconcile("p1");
 		expect(await b.has("wiki/Home.md")).toBe(true);
 		expect(await b.has(".hidden")).toBe(false);
 		expect(await b.has("index.md")).toBe(false);
@@ -476,7 +377,7 @@ describe("reconcile", () => {
 		await a.put("linked/Page.md", "# Page\n");
 		await a.sync.reconcile("p1");
 		await syncDocuments(a, b);
-		expect(await b.sync.reconcile("p1")).toMatchObject({ waiting: 1 });
+		await b.sync.reconcile("p1");
 		expect(
 			await stat(join(outside, "Page.md")).then(
 				() => true,
@@ -504,165 +405,80 @@ describe("reconcile", () => {
 		await a.put("notes.md", "kept\n");
 		await a.sync.reconcile("p1");
 		// A new Replica, the same folder: its document never had an update.
-		const fresh = createKnowledgeSync({
-			db: a.sandbox.db,
-			folders: a.folders,
-			documents: { open: async () => blankDocument(), remove: async () => {} },
-			archive: archiveOf(a.sandbox.dataDir, host),
-			deviceId: a.sandbox.deviceId,
-		});
-		expect(await fresh.reconcile("p1")).toMatchObject({
-			published: 1,
-			removed: 0,
-		});
+		await a.documents.remove("p1");
+		expect((await a.document()).isNew()).toBe(true);
+
+		await a.sync.reconcile("p1");
+
+		expect([...(await a.entries()).keys()]).toEqual(["notes.md"]);
 		expect(await a.read("notes.md")).toBe("kept\n");
 	});
-
-	test("lists the document's files and counts the proposed notes", async () => {
-		const { host } = memoryHost();
-		const a = await device(host);
-		const b = await device(host);
-		await a.put("wiki/Home.md", "# Home\n");
-		await a.put("logo.png", new Uint8Array([137, 80, 78, 71, 0, 1, 2]));
-		await proposeLearnings(a.dir, { runId: "run-1" }, [
-			"Use bun.",
-			"Tests are slow.",
-		]);
-		await a.sync.reconcile("p1");
-		await syncDocuments(a, b);
-
-		const listing = await b.sync.listing("p1");
-		expect(listing.files.map((f) => f.path)).toEqual([
-			"logo.png",
-			"wiki/Home.md",
-		]);
-		expect(listing.proposed).toBe(2);
-		// The sandbox's Space is the personal one of its Person.
-		expect(listing.shared).toBe(false);
-	});
-
-	// The web editor takes the folders an Agent node may pick from this list,
-	// with no filter of its own (`knowledgeFoldersOf`).
-	test("leaves out the proposed learnings and the question set, and keeps the accepted learnings", async () => {
-		const { host } = memoryHost();
-		const a = await device(host);
-		await a.put("wiki/Home.md", "# Home\n");
-		await a.put("learnings/accepted/run-0.s1.md", "- Kept.\n");
-		await a.put("learnings/proposed/run-1.s1.md", "- Waits.\n");
-		await a.put("evals/questions.json", "[]\n");
-
-		const { files } = await a.sync.listing("p1");
-		expect(files.map((f) => f.path)).toEqual([
-			"learnings/accepted/run-0.s1.md",
-			"wiki/Home.md",
-		]);
-	});
 });
 
-describe("read", () => {
-	/** A's folder has the files, B has them by hash only: both must read alike. */
-	async function twoDevices() {
-		const { host } = memoryHost();
-		const a = await device(host);
-		const b = await device(host);
-		const both = async () => {
-			await a.sync.reconcile("p1");
-			await syncDocuments(a, b);
-		};
-		return { a, b, both };
+describe("a folder's locks", () => {
+	/** A wait that ends when `open` is called. */
+	function gate() {
+		let open = () => {};
+		const opened = new Promise<void>((resolve) => {
+			open = resolve;
+		});
+		return { open, opened };
 	}
 
-	test("a file reads the same from this Device's folder and by its hash", async () => {
-		const { a, b, both } = await twoDevices();
-		await a.put("wiki/a.md", "# Alpha\n\nSome text here.\n");
-		await a.put(
-			"docs/guide.docx",
-			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
-		);
-		await a.put(
-			"docs/release.pdf",
-			tinyPdf(["Release checklist", "We ship on Fridays."]),
-		);
-		await both();
-		expect(await b.has("wiki/a.md")).toBe(false);
-		for (const path of ["wiki/a.md", "docs/guide.docx", "docs/release.pdf"]) {
-			const here = await a.sync.read("p1", path, 1024);
-			expect(await b.sync.read("p1", path, 1024)).toEqual(here);
-			expect(await b.sync.read("p1", path, 7)).toEqual(
-				await a.sync.read("p1", path, 7),
-			);
-		}
-		expect(await a.sync.read("p1", "./wiki/a.md", 1024)).toEqual({
-			path: "wiki/a.md",
-			title: "Alpha",
-			text: "# Alpha\n\nSome text here.\n",
-			size: 25,
-			truncated: false,
-		});
-		expect(await b.sync.read("p1", "wiki/a.md", 7)).toMatchObject({
-			text: "# Alpha",
-			truncated: true,
-		});
-		expect(await b.sync.read("p1", "docs/guide.docx", 1024)).toMatchObject({
-			title: "Onboarding guide",
-			text: "Onboarding guide\n\nEvery new teammate meets the wombat.",
-		});
-		expect(await b.sync.read("p1", "docs/release.pdf", 1024)).toMatchObject({
-			title: "Release checklist",
-		});
+	// `bun --hot` makes a second instance beside a step of the first: the
+	// daemon keeps one `KnowledgeFolderLocks` across the reload.
+	test("a second instance does not reconcile a folder a step of the first writes", async () => {
+		const a = await device(null);
+		const after = a.newSync();
+		const hold = await a.sync.startStep("p1");
+		await a.put("wiki/half.md", "half of what the step writes\n");
+
+		await after.reconcileUnlessHeld("p1");
+		expect(await a.entries()).toEqual(new Map());
+
+		await hold.done();
+		expect([...(await a.entries()).keys()]).toEqual(["wiki/half.md"]);
 	});
 
-	test("never a proposal, a hidden file, a link or a path out of the folder: here or by hash", async () => {
-		const { a, b, both } = await twoDevices();
-		await writeFile(join(a.sandbox.root, "outside.md"), "secret");
-		await a.put(".hidden.md", "hidden");
-		await proposeLearnings(a.dir, { runId: "run-1" }, ["Use bun."]);
-		await mkdir(a.dir, { recursive: true });
-		await symlink(join(a.sandbox.root, "outside.md"), join(a.dir, "link.md"));
-		await both();
-		expect((await b.entries()).has("learnings/proposed/run-1.md")).toBe(true);
-		for (const reader of [a, b]) {
-			for (const path of [
-				"../outside.md",
-				"/etc/hosts",
-				"wiki/../../outside.md",
-				".hidden.md",
-				"learnings/proposed/run-1.md",
-				"link.md",
-				"missing.md",
-				"",
-				"wiki",
-			]) {
-				expect(await reader.sync.read("p1", path, 1024)).toBeNull();
-			}
-		}
+	test("reconciles of two instances take turns on one folder", async () => {
+		const a = await device(null);
+		const inFirst = gate();
+		const leaveFirst = gate();
+		let secondStarted = false;
+		const first = a.newSync({
+			inStep: async () => {
+				inFirst.open();
+				await leaveFirst.opened;
+			},
+		});
+		const second = a.newSync({
+			inStep: async () => {
+				secondStarted = true;
+			},
+		});
+		await a.put("notes.md", "a file, so each reconcile changes something\n");
+
+		const running = first.reconcile("p1");
+		await inFirst.opened;
+		const waiting = second.reconcile("p1");
+		await Bun.sleep(50);
+		expect(secondStarted).toBe(false);
+
+		leaveFirst.open();
+		await Promise.all([running, waiting]);
+		expect(secondStarted).toBe(true);
 	});
 
-	test("refuses a file that is not text, and a document it cannot read: here and by hash", async () => {
-		const { a, b, both } = await twoDevices();
-		await a.put("logo.png", new Uint8Array([137, 80, 78, 71, 0, 1, 2]));
-		await a.put("broken.pdf", "not a pdf");
-		await both();
-		for (const reader of [a, b]) {
-			const binary = reader.sync.read("p1", "logo.png", 1024);
-			await expect(binary).rejects.toBeInstanceOf(Refusal);
-			await expect(binary).rejects.toThrow('"logo.png" is not a text file.');
-			const broken = reader.sync.read("p1", "broken.pdf", 1024);
-			await expect(broken).rejects.toBeInstanceOf(Refusal);
-			await expect(broken).rejects.toThrow("cannot read the text");
-		}
+	test("without one set of locks, a second instance scans in the middle of a step", async () => {
+		const a = await device(null);
+		const apart = a.newSync({ locks: createKnowledgeFolderLocks() });
+		const hold = await a.sync.startStep("p1");
+		await a.put("wiki/half.md", "half of what the step writes\n");
+
+		await apart.reconcileUnlessHeld("p1");
+
+		// This is what a reload did with a map in the module: it published half.
+		expect([...(await a.entries()).keys()]).toEqual(["wiki/half.md"]);
+		await hold.done();
 	});
 });
-
-/** A knowledge document of a new Replica: it never had an update. */
-function blankDocument() {
-	const doc = new Y.Doc();
-	return {
-		name: "knowledge:p1",
-		doc,
-		revision: () => 0,
-		change: async (fn: () => void) => doc.transact(fn),
-		flush: async () => {},
-		close: async () => {},
-	};
-}

@@ -22,18 +22,18 @@ import {
 	type KnowledgeReadFrom,
 	type KnowledgeText,
 } from "./folder";
+import type { KnowledgeFolderLocks } from "./folder-locks";
 import {
 	type GraphDocument,
 	type KnowledgeGraph,
 	knowledgeGraphOf,
 	TopicGraphTransformer,
 } from "./graph";
+import { createKnowledgeDocuments } from "./knowledge-document";
 import {
-	createKnowledgeDocuments,
-	knowledgeEntries,
-	meaningIsOn,
-	setMeaning,
-} from "./knowledge-document";
+	createKnowledgeReader,
+	type KnowledgeListing,
+} from "./knowledge-reader";
 import type { WaitingLearning } from "./learnings";
 import type { KnowledgeMeaning } from "./meaning";
 import {
@@ -43,7 +43,7 @@ import {
 	parseQuestions,
 	questionKey,
 } from "./questions";
-import { createKnowledgeSync, type KnowledgeListing } from "./reconcile";
+import { createKnowledgeSync } from "./reconcile";
 import {
 	createKnowledgeSearch,
 	type KnowledgeHit,
@@ -55,6 +55,7 @@ import {
 	type SourceRun,
 	type SourcesSpace,
 } from "./sources";
+import { createSpaceHostStatus } from "./space-host-status";
 import {
 	type CommandKnowledge,
 	createStepKnowledge,
@@ -278,6 +279,8 @@ export type KnowledgeDeps = {
 	documents: SyncedDocuments;
 	/** The content by hash: here, and at the Spaces' Hosts once the devices runtime connects it. */
 	archive: SpaceArchive;
+	/** The turns and the holds of each folder. One set per process: they must outlive this Knowledge across a reload. */
+	folderLocks: KnowledgeFolderLocks;
 	/** This computer: it signs what it writes, and a source that reads a folder here syncs here. */
 	device: { id: string; name: string };
 	/**
@@ -313,21 +316,31 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	const search = createKnowledgeSearch(deps.dataDir, {
 		...(deps.meaning ? { meaning: deps.meaning } : {}),
 		meaningOn: async (projectId) =>
-			meaningIsOn(await documents.open(projectId)),
+			(await documents.open(projectId)).meaningOn(),
 	});
 	/** The devices runtime, made after this: until then content stays here. */
 	let hosts: KnowledgeHosts | null = null;
+	const status = createSpaceHostStatus(db);
 	const sync = createKnowledgeSync({
-		db,
 		folders,
 		documents,
 		archive,
+		status,
+		locks: deps.folderLocks,
 		deviceId: device.id,
 		inStep: async (spaceId, names, options) =>
 			hosts?.inStep(spaceId, names, options),
+	});
+	const reader = createKnowledgeReader({
+		folders,
+		documents,
+		archive,
+		status,
+		deviceId: device.id,
+		reconcileUnlessHeld: sync.reconcileUnlessHeld,
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
 	});
-	const steps = createStepKnowledge({ folders, sync, search });
+	const steps = createStepKnowledge({ folders, sync, reader, search });
 	/** Facts of a project with no run: an agent's use through the MCP server. No landing feed reads them. */
 	const log = createRunLog(db, { walkerId: device.id });
 
@@ -397,7 +410,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	 * in the files it could read. It reads them only when a file changed.
 	 */
 	async function graphInput(projectId: string): Promise<KnowledgeGraphInput> {
-		const { files } = await sync.listing(projectId);
+		const { files } = await reader.listing(projectId);
 		const key = files
 			.map((file) => `${file.path}:${file.size}:${file.changedAt}`)
 			.join("\n");
@@ -408,7 +421,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		);
 		const read: Document[] = [];
 		for (const file of readable.slice(0, GRAPH_MAX_FILES)) {
-			const text = await sync
+			const text = await reader
 				.read(projectId, file.path, GRAPH_MAX_BYTES)
 				.catch(() => null);
 			if (text) {
@@ -439,7 +452,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		},
 		forCommand: steps.forCommand,
 		forSession: steps.forSession,
-		listing: sync.listing,
+		listing: reader.listing,
 		async search(projectId, query, options = {}) {
 			const { limit, agent } = options;
 			const hits = await search.search(
@@ -457,7 +470,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			return hits;
 		},
 		async read(projectId, path, { maxBytes, from, agent }) {
-			const file = await sync.read(projectId, path, maxBytes, from);
+			const file = await reader.read(projectId, path, maxBytes, from);
 			if (agent) {
 				await logged(projectId, {
 					kind: "read",
@@ -471,7 +484,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		async learnings(projectIds) {
 			const lists = await Promise.all(
 				projectIds.map(async (projectId) =>
-					(await sync.waitingLearnings(projectId)).map((learning) => ({
+					(await reader.waitingLearnings(projectId)).map((learning) => ({
 						...learning,
 						projectId,
 					})),
@@ -496,9 +509,9 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 				const content = await readFile(proposed).catch(() => null);
 				if (content === null) {
 					// Listed in the Space, but its content did not reach this folder.
-					const listed = knowledgeEntries(await documents.open(projectId)).has(
-						`${PROPOSED_LEARNINGS_DIR}/${id}`,
-					);
+					const listed = (await documents.open(projectId))
+						.entries()
+						.has(`${PROPOSED_LEARNINGS_DIR}/${id}`);
 					if (!listed) throw gone;
 					throw new Refusal(
 						"unavailable",
@@ -557,7 +570,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			const [read, asked, learnings] = await Promise.all([
 				graphInput(projectId),
 				askedQuestions(db, projectId),
-				sync.waitingLearnings(projectId),
+				reader.waitingLearnings(projectId),
 			]);
 			return knowledgeGraphOf({ ...read, asked, learnings });
 		},
@@ -567,13 +580,13 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		},
 		meaning: search.meaning,
 		async setMeaning(projectId, on) {
-			await setMeaning(await documents.open(projectId), on);
+			await (await documents.open(projectId)).setMeaning(on);
 			return search.meaning(projectId);
 		},
 		sources: (space) =>
 			knowledgeSources({
 				space,
-				files: { listing: sync.listing, removeFolder: sync.removeFolder },
+				files: { listing: reader.listing, removeFolder: sync.removeFolder },
 				device,
 			}),
 		async moved(move) {

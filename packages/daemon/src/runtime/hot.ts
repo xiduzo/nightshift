@@ -3,6 +3,7 @@ import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
 import type {
 	Knowledge,
+	KnowledgeFolderLocks,
 	OllamaService,
 	SyncedDocuments,
 } from "@nightshift/engine";
@@ -21,7 +22,8 @@ import type { HeldLease } from "./hold-lease";
  * a slot here, and the daemon names its lifecycle once (`hotSlots`):
  *
  * - kept: the database client (one per database, so a reload leaks none),
- *   the lease, the synced documents (one writer each), the
+ *   the lease, the synced documents (one writer each), the locks of the
+ *   knowledge folders (a step that outlives a reload still holds its folder), the
  *   in-app channel (an open notification stream outlives a reload), the
  *   clones from GitHub, and the relay (`keepSync`: its connections stay,
  *   and it is bound to the newest daemon's closures). Bun reloads a
@@ -65,6 +67,8 @@ export type HotRegistry = KeptDevices &
 		nightshiftGitHubClones?: GitHubClones;
 		/** The projects' knowledge on this computer. */
 		nightshiftKnowledge?: Knowledge;
+		/** Who may change each knowledge folder now. One set per process, as a folder has one writer. */
+		nightshiftKnowledgeFolderLocks?: KnowledgeFolderLocks;
 		/** A daemon of an older version kept these apart (`stopOlderKnowledge`). */
 		nightshiftKnowledgeSearch?: { close?(): void };
 		nightshiftKnowledgeTimers?: {

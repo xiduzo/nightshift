@@ -49,53 +49,90 @@ const entrySchema = z.object({
 	local: z.literal(true).optional(),
 });
 
-/** The document's `files`: path → entry. */
-export function knowledgeFiles(document: PersistedDocument) {
-	return document.doc.getMap<unknown>("files");
-}
+/**
+ * One Project's knowledge document, as the knowledge reads and writes it.
+ * Only this module knows it is Yjs.
+ */
+export type KnowledgeDocument = {
+	/** The document's name in the Space: what a Replica keeps in step with its Host. */
+	readonly name: string;
+	/** Every valid entry, by path. */
+	entries(): Map<string, KnowledgeEntry>;
+	/**
+	 * Whether the document never had an update: a new Replica's copy. Its
+	 * files were not removed, it only does not list them yet.
+	 */
+	isNew(): boolean;
+	/**
+	 * Changes entries in one change, removals first. Resolves when this
+	 * Replica has it. Nothing to change writes nothing.
+	 */
+	apply(change: {
+		set?: readonly (readonly [string, KnowledgeEntry])[];
+		delete?: readonly string[];
+	}): Promise<void>;
+	/**
+	 * Every hash the document names, with an entry `entries` leaves out (a
+	 * path that is no knowledge, a value of another version): what any
+	 * Replica may still fetch.
+	 */
+	allHashes(): Set<string>;
+	/** Whether search by meaning is on for the Project: on unless a person turned it off. */
+	meaningOn(): boolean;
+	/** Turns search by meaning on or off for the Project, for every Device of its Space. */
+	setMeaning(on: boolean): Promise<void>;
+};
 
-/** Every valid entry of the document, by path. */
-export function knowledgeEntries(
-	document: PersistedDocument,
-): Map<string, KnowledgeEntry> {
-	const entries = new Map<string, KnowledgeEntry>();
-	for (const [path, value] of knowledgeFiles(document).entries()) {
-		if (!isKnowledgePath(path)) continue;
-		const parsed = entrySchema.safeParse(value);
-		if (!parsed.success) continue;
-		const { local, ...entry } = parsed.data;
-		entries.set(path, local ? { ...entry, local } : entry);
-	}
-	return entries;
-}
-
-/** The document's `settings`: name → value. */
-function knowledgeSettings(document: PersistedDocument) {
-	return document.doc.getMap<unknown>("settings");
-}
-
-/** Whether search by meaning is on for the project: on unless a person turned it off. */
-export function meaningIsOn(document: PersistedDocument): boolean {
-	return knowledgeSettings(document).get("meaning") !== false;
-}
-
-/** Turns search by meaning on or off for the project, for every Device of its Space. */
-export async function setMeaning(
-	document: PersistedDocument,
-	on: boolean,
-): Promise<void> {
-	if (meaningIsOn(document) === on) return;
-	const settings = knowledgeSettings(document);
-	await document.change(() => {
-		if (on) settings.delete("meaning");
-		else settings.set("meaning", false);
-	});
+function knowledgeDocument(document: PersistedDocument): KnowledgeDocument {
+	const files = document.doc.getMap<unknown>("files");
+	const settings = document.doc.getMap<unknown>("settings");
+	const meaningOn = () => settings.get("meaning") !== false;
+	return {
+		name: document.name,
+		entries() {
+			const entries = new Map<string, KnowledgeEntry>();
+			for (const [path, value] of files.entries()) {
+				if (!isKnowledgePath(path)) continue;
+				const parsed = entrySchema.safeParse(value);
+				if (!parsed.success) continue;
+				const { local, ...entry } = parsed.data;
+				entries.set(path, local ? { ...entry, local } : entry);
+			}
+			return entries;
+		},
+		isNew: () => document.doc.store.clients.size === 0,
+		async apply(change) {
+			const removed = change.delete ?? [];
+			const set = change.set ?? [];
+			if (removed.length === 0 && set.length === 0) return;
+			await document.change(() => {
+				for (const path of removed) files.delete(path);
+				for (const [path, entry] of set) files.set(path, entry);
+			});
+		},
+		allHashes() {
+			const hashes = new Set<string>();
+			for (const value of files.values()) {
+				const sha256 = (value as { sha256?: unknown } | null)?.sha256;
+				if (typeof sha256 === "string") hashes.add(sha256);
+			}
+			return hashes;
+		},
+		meaningOn,
+		async setMeaning(on) {
+			if (meaningOn() === on) return;
+			await document.change(() => {
+				if (on) settings.delete("meaning");
+				else settings.set("meaning", false);
+			});
+		},
+	};
 }
 
 /** The knowledge documents of this Replica's Projects: views of its synced documents. */
 export type KnowledgeDocuments = {
 	/** The Project's knowledge document. */
-	open(projectId: string): Promise<PersistedDocument>;
+	open(projectId: string): Promise<KnowledgeDocument>;
 	/** Closes the Project's knowledge document and deletes it from this Replica: its Project moved to another id. */
 	remove(projectId: string): Promise<void>;
 };
@@ -108,7 +145,10 @@ export function createKnowledgeDocuments(options: {
 	const documents =
 		options.documents ?? createSyncedDocuments({ db: options.db });
 	return {
-		open: (projectId) => documents.open(documentName("knowledge", projectId)),
+		open: async (projectId) =>
+			knowledgeDocument(
+				await documents.open(documentName("knowledge", projectId)),
+			),
 		remove: (projectId) =>
 			documents.remove(documentName("knowledge", projectId)),
 	};

@@ -7,6 +7,7 @@ import {
 import type { AgentEvent, AgentSessionInput } from "@nightshift/agents/types";
 import { KNOWLEDGE_INDEX_FILE, knowledgeFolderPath } from "@nightshift/flows";
 import type { KnowledgeFolders } from "./folder";
+import type { KnowledgeReader } from "./knowledge-reader";
 import { keepLearnings, withLearnings } from "./learnings";
 import type { KnowledgeSync } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
@@ -102,10 +103,11 @@ async function* withUses(
 
 export function createStepKnowledge(deps: {
 	folders: Pick<KnowledgeFolders, "folder" | "ensure" | "files" | "index">;
-	sync: Pick<KnowledgeSync, "startStep" | "read">;
+	sync: Pick<KnowledgeSync, "startStep">;
+	reader: Pick<KnowledgeReader, "read">;
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
 }) {
-	const { folders, sync, search } = deps;
+	const { folders, sync, reader, search } = deps;
 
 	/** The step holds the folder: a reconcile first, and `done` for the one after. */
 	async function begin(projectId: string) {
@@ -130,11 +132,11 @@ export function createStepKnowledge(deps: {
 					...(folders ? { folders } : {}),
 				}),
 			readKnowledge: async (id, path, maxBytes, from) => {
-				if (!folders) return sync.read(id, path, maxBytes, from);
+				if (!folders) return reader.read(id, path, maxBytes, from);
 				// A file outside the folders is not there for this agent.
 				const clean = knowledgeFolderPath(path);
 				if (clean === null || !inFolders(clean, folders)) return null;
-				return sync.read(id, clean, maxBytes, from);
+				return reader.read(id, clean, maxBytes, from);
 			},
 		};
 		return {

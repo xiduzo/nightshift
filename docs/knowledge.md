@@ -583,8 +583,9 @@ binding, because the devices runtime is made after it. The timers run from
 `connect` on: every folder after 15 seconds, the retries each minute, and
 the collection of old content each day. `close` ends them.
 
-A `bun --hot` reload replaces the whole `Knowledge`, and only what is on disk
-stays. `close` stops the timers and the preparation of vectors, and closes
+A `bun --hot` reload replaces the whole `Knowledge`. What is on disk stays,
+and so do the locks of the folders: a step that started before the reload
+still holds its folder, and the new `Knowledge` leaves that folder alone. `close` stops the timers and the preparation of vectors, and closes
 the index file. The next search opens the file again. Sections that did not
 change are not embedded again. A session that outlives the reload still
 searches, on its own connection to the index, and prepares nothing.

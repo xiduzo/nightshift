@@ -18,7 +18,6 @@ import { OLDER_HOST, OlderHostError } from "../contract";
 import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import { otherSpace } from "../testing/test-support";
-import { knowledgeEntries } from "./knowledge-document";
 import type { KnowledgeMeaning } from "./meaning";
 
 /**
@@ -80,13 +79,33 @@ async function device(
 			await mkdir(dirname(join(dir, path)), { recursive: true });
 			await writeFile(join(dir, path), text);
 		},
-		paths: async () => [
-			...knowledgeEntries(await built.documents.open("p1")).keys(),
-		],
+		paths: async () => [...(await built.documents.open("p1")).entries().keys()],
 	};
 }
 
 describe("a step's knowledge", () => {
+	// `bun --hot` makes a new Knowledge beside a step that goes on: the daemon
+	// keeps one `KnowledgeFolderLocks` across the reload.
+	test("a Knowledge made beside a running step leaves its folder alone", async () => {
+		const a = await device(memoryHost());
+		const step = await a.knowledge.forCommand({ projectId: "p1" });
+		await a.put("wiki/Page.md", "# Pa");
+
+		const reloaded = testKnowledge(a.sandbox, {
+			pageWaitMs: 5_000,
+			folderLocks: a.folderLocks,
+			archive: a.archive,
+			synced: a.synced,
+		});
+		closes.push(reloaded.close);
+		const listing = await reloaded.knowledge.listing("p1");
+		expect(listing.files).toEqual([]);
+		expect(await a.paths()).toEqual([]);
+
+		await step.done();
+		expect(await a.paths()).toEqual(["wiki/Page.md"]);
+	});
+
 	test("while a sync writes the folder, the page and the timers leave it alone: its end publishes", async () => {
 		const a = await device(memoryHost(), {
 			timers: { firstReconcileMs: 1, retryMs: 1 },
@@ -127,8 +146,8 @@ describe("a step's knowledge", () => {
 		await a.knowledge.listing("p1");
 		// B's document has A's entries, as a Link brings them; its folder does not.
 		applyUpdate(
-			(await b.documents.open("p1")).doc,
-			encodeStateAsUpdate((await a.documents.open("p1")).doc),
+			(await b.persisted("p1")).doc,
+			encodeStateAsUpdate((await a.persisted("p1")).doc),
 		);
 		const session = await b.knowledge.forSession(
 			{ projectId: "p1", always: true },
@@ -251,8 +270,8 @@ describe("a Host of an older version", () => {
 		// A file another Device listed cannot come from that Host: it says why.
 		const b = await device(older);
 		applyUpdate(
-			(await b.documents.open("p1")).doc,
-			encodeStateAsUpdate((await a.documents.open("p1")).doc),
+			(await b.persisted("p1")).doc,
+			encodeStateAsUpdate((await a.persisted("p1")).doc),
 		);
 		await expect(
 			b.knowledge.read("p1", "wiki/Home.md", { maxBytes: 1024 }),
@@ -425,8 +444,8 @@ async function exchange(
 	b: Awaited<ReturnType<typeof device>>,
 ) {
 	const [docA, docB] = [
-		(await a.documents.open("p1")).doc,
-		(await b.documents.open("p1")).doc,
+		(await a.persisted("p1")).doc,
+		(await b.persisted("p1")).doc,
 	];
 	applyUpdate(docB, encodeStateAsUpdate(docA));
 	applyUpdate(docA, encodeStateAsUpdate(docB));
@@ -572,11 +591,11 @@ describe("a project that moves to another Space", () => {
 			"notes.md",
 			"wiki/Home.md",
 		]);
-		expect(
-			[...knowledgeEntries(await a.documents.open("p9")).keys()].sort(),
-		).toEqual(["notes.md", "wiki/Home.md"]);
+		expect([...(await a.documents.open("p9")).entries().keys()].sort()).toEqual(
+			["notes.md", "wiki/Home.md"],
+		);
 		// The old document is gone: an empty one opens in its place.
-		expect(knowledgeEntries(await a.documents.open("p1")).size).toBe(0);
+		expect((await a.documents.open("p1")).entries().size).toBe(0);
 		// The content went to the Team's Host.
 		expect(host.spaces.has(team)).toBe(true);
 		expect(
@@ -667,8 +686,8 @@ describe("the question set", () => {
 
 		// B gets the set as a Link brings the document.
 		applyUpdate(
-			(await b.documents.open("p1")).doc,
-			encodeStateAsUpdate((await a.documents.open("p1")).doc),
+			(await b.persisted("p1")).doc,
+			encodeStateAsUpdate((await a.persisted("p1")).doc),
 		);
 		expect((await b.knowledge.questions("p1")).set.map((q) => q.query)).toEqual(
 			["How do we  deploy?"],
@@ -910,8 +929,8 @@ describe("search by meaning", () => {
 			"turned-off",
 		);
 		applyUpdate(
-			(await b.documents.open("p1")).doc,
-			encodeStateAsUpdate((await a.documents.open("p1")).doc),
+			(await b.persisted("p1")).doc,
+			encodeStateAsUpdate((await a.persisted("p1")).doc),
 		);
 		expect((await b.knowledge.meaning("p1")).state).toBe("turned-off");
 		expect((await a.knowledge.setMeaning("p1", true)).state).not.toBe(
@@ -975,6 +994,6 @@ describe("connect and close", () => {
 		await mkdir(folder, { recursive: true });
 		await writeFile(join(folder, "a.md"), "# A\n");
 		await Bun.sleep(20);
-		expect(knowledgeEntries(await built.documents.open("p1")).size).toBe(0);
+		expect((await built.documents.open("p1")).entries().size).toBe(0);
 	});
 });

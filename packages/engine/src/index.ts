@@ -98,9 +98,11 @@ export {
 export {
 	type AskedQuestion,
 	createKnowledge,
+	createKnowledgeFolderLocks,
 	type Knowledge,
 	type KnowledgeEvaluation,
 	type KnowledgeFile,
+	type KnowledgeFolderLocks,
 	type KnowledgeGraph,
 	type KnowledgeHit,
 	type KnowledgeMeaningStatus,

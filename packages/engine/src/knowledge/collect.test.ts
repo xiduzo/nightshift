@@ -9,7 +9,6 @@ import { CONTENT_GRACE_MS, collectContent } from "./collect";
 import {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,
-	knowledgeFiles,
 } from "./knowledge-document";
 
 /**
@@ -58,13 +57,8 @@ async function kept(spaceId: string, text: string, ageMs: number) {
 
 async function list(projectId: string, path: string, sha256: string) {
 	const document = await documents.open(projectId);
-	await document.change(() => {
-		knowledgeFiles(document).set(path, {
-			sha256,
-			size: 1,
-			changedAt: 1,
-			deviceId: "d1",
-		});
+	await document.apply({
+		set: [[path, { sha256, size: 1, changedAt: 1, deviceId: "d1" }]],
 	});
 }
 

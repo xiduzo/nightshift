@@ -34,6 +34,7 @@ import {
 	createArtifactStore,
 	createFlowDocuments,
 	createKnowledge,
+	createKnowledgeFolderLocks,
 	createOllama,
 	createSpaceArchive,
 	createSyncedDocuments,
@@ -463,6 +464,10 @@ export async function createDaemon(
 	 * back from the file: unchanged sections are not embedded again.
 	 */
 	stopOlderKnowledge(hot);
+	const folderLocks = await slots.keep(
+		"nightshiftKnowledgeFolderLocks",
+		createKnowledgeFolderLocks,
+	);
 	const knowledge = await slots.replace(
 		"nightshiftKnowledge",
 		() =>
@@ -471,6 +476,7 @@ export async function createDaemon(
 				dataDir,
 				documents,
 				archive,
+				folderLocks,
 				device,
 				meaning: () => ollama.meaning(),
 			}),

@@ -3,7 +3,7 @@ import { project } from "@nightshift/db/schema";
 import { now as timeNow } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { SpaceArchive } from "../archive";
-import { type KnowledgeDocuments, knowledgeFiles } from "./knowledge-document";
+import type { KnowledgeDocuments } from "./knowledge-document";
 
 /**
  * The collection of knowledge content that no document lists any more
@@ -86,11 +86,8 @@ async function listedIn(
 		.where(eq(project.spaceId, spaceId));
 	const listed = new Set<string>();
 	for (const { id } of rows) {
-		for (const value of knowledgeFiles(
-			await deps.documents.open(id),
-		).values()) {
-			const sha256 = (value as { sha256?: unknown } | null)?.sha256;
-			if (typeof sha256 === "string") listed.add(sha256);
+		for (const sha256 of (await deps.documents.open(id)).allHashes()) {
+			listed.add(sha256);
 		}
 	}
 	return listed;

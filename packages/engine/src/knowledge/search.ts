@@ -59,7 +59,7 @@ import { inFolders } from "./view";
  * of PDF and Word files (`documents.ts`): the files a person or an agent
  * reads (`isReadable`), so not `INDEX.md`, hidden files or the learnings
  * that wait for a person. A document over 10 MB is found by its path only.
- * Reading one file is `KnowledgeSync.read`.
+ * Reading one file is `KnowledgeReader.read`.
  */
 
 /** A part of a hit's excerpt: `match` parts are the words the query found. */

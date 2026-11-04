@@ -182,6 +182,8 @@ describe("the daemon, wired in one process", () => {
 		const first = await start(env);
 		const before = hot.nightshiftKnowledge as Knowledge;
 		const closed = spyOn(before, "close");
+		const locks = hot.nightshiftKnowledgeFolderLocks;
+		expect(locks).toBeDefined();
 
 		// As `bun --hot` does: a new daemon in this process, and nothing stopped.
 		const reloaded = await start(env);
@@ -190,6 +192,8 @@ describe("the daemon, wired in one process", () => {
 		expect(closed).toHaveBeenCalledTimes(1);
 		expect(hot.nightshiftKnowledge).toBeDefined();
 		expect(hot.nightshiftKnowledge).not.toBe(before);
+		// A step of the one before still holds its folder.
+		expect(hot.nightshiftKnowledgeFolderLocks).toBe(locks);
 		expect(await rpc<unknown[]>(reloaded, "knowledge/learnings")).toEqual([]);
 	});
 

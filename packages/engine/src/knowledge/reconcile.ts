@@ -8,47 +8,23 @@ import {
 	stat,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Database } from "@nightshift/db";
-import { organization, project } from "@nightshift/db/schema";
 import {
 	isKnowledgeOwnFolder,
-	isProposedLearning,
-	isProposedLearningFile,
-	isQuestionSetPath,
 	KNOWLEDGE_OWN_FOLDERS_WORDS,
 	KNOWLEDGE_RECONCILE_FILE,
-	PROPOSED_LEARNINGS_DIR,
-	proposedLearningOf,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { now } from "@nightshift/time";
-import { eq } from "drizzle-orm";
 import {
 	type SpaceArchive,
 	sha256Of,
 	sha256OfFile,
 	writeWhole,
 } from "../archive";
-import { OLDER_HOST, OlderHostError } from "../contract";
-import type { PersistedDocument } from "../documents";
 import { LOCAL_ONLY_BYTES } from "./documents";
-import {
-	isKnowledgePath,
-	isReadable,
-	type KnowledgeFile,
-	type KnowledgeFolders,
-	type KnowledgeReadFrom,
-	type KnowledgeText,
-	knowledgeText,
-	walkFolder,
-} from "./folder";
-import {
-	type KnowledgeDocuments,
-	type KnowledgeEntry,
-	knowledgeEntries,
-	knowledgeFiles,
-} from "./knowledge-document";
-import { notesIn, notesOf, type WaitingLearning } from "./learnings";
+import { isKnowledgePath, type KnowledgeFolders, walkFolder } from "./folder";
+import type { KnowledgeFolderLocks } from "./folder-locks";
+import type { KnowledgeDocuments, KnowledgeEntry } from "./knowledge-document";
+import type { SpaceHostStatus } from "./space-host-status";
 
 /**
  * Knowledge in the Space (ADR 4): each Device's folder is a working copy
@@ -81,43 +57,15 @@ import { notesIn, notesOf, type WaitingLearning } from "./learnings";
  * document has the path too. `INDEX.md` and hidden files never sync.
  */
 
-/** What one reconcile did. */
-export type ReconcileResult = {
-	/** Entries this Device wrote into the document. */
-	published: number;
-	/** Entries it removed from the document. */
-	unpublished: number;
-	/** Files it wrote into the folder from the document. */
-	written: number;
-	/** Files it removed from the folder. */
-	removed: number;
-	/** Entries whose content it could not fetch now: their files wait. */
-	waiting: number;
-	/** Content the Host does not have yet. */
-	unpushed: number;
-};
-
-/** What the Knowledge page lists: the document's files, and the learnings that wait. */
-export type KnowledgeListing = {
-	/** The files, the proposals left out, by path. */
-	files: KnowledgeFile[];
-	/** How many notes the proposals hold. */
-	proposed: number;
-	/** The Project's Space is not a personal one: each of its Members reads the knowledge. */
-	shared: boolean;
-	/**
-	 * The Host that keeps the Space runs an older version of Night Shift:
-	 * it cannot take this knowledge yet. This Device works on its own copy.
-	 */
-	olderHost: boolean;
-};
-
 export type KnowledgeSyncDeps = {
-	db: Database;
-	folders: Pick<KnowledgeFolders, "folder" | "known" | "read">;
+	folders: Pick<KnowledgeFolders, "folder" | "known">;
 	documents: Pick<KnowledgeDocuments, "open" | "remove">;
 	/** The content by hash: here, and at the Space's Host. */
 	archive: Pick<SpaceArchive, "here" | "read" | "put">;
+	/** Which Space a Project has, and whether its Host takes this knowledge now. */
+	status: SpaceHostStatus;
+	/** The turns and the holds of each folder in this process. */
+	locks: KnowledgeFolderLocks;
 	/** This Device: it signs the entries it writes. */
 	deviceId: string;
 	/**
@@ -130,18 +78,11 @@ export type KnowledgeSyncDeps = {
 		names: readonly string[],
 		options: { timeoutMs: number },
 	): Promise<unknown>;
-	/** How long a page read waits for its reconcile. Default 2 s. */
-	pageWaitMs?: number;
 };
 
 /** How long a reconcile waits for the document to be in step with the Host: before it, and after a change. */
 const IN_STEP_BEFORE_MS = 3_000;
 const IN_STEP_AFTER_MS = 10_000;
-/**
- * How long a Device works on its own copy after the Host of a Space said
- * it runs an older version: then it asks again. As the run exchange does.
- */
-const OLDER_HOST_WAIT_MS = 60 * 60_000;
 /** How many files a reconcile reads, writes or fetches at once. */
 const AT_ONCE = 8;
 
@@ -149,32 +90,11 @@ const AT_ONCE = 8;
 type Kept = KnowledgeEntry & { mtimeMs: number };
 type State = { files: Record<string, Kept>; unpushed: string[] };
 
-/** The reconciles of each folder in this process, one at a time. */
-const reconciling = new Map<string, Promise<unknown>>();
-/**
- * How many steps write each folder now, in this process. While one does,
- * only the steps reconcile it: a scan in the middle of a sync would
- * publish half of what it writes.
- */
-const writing = new Map<string, number>();
-
 /** A Project of a Space move: its Space and id before, and after (`ProjectsMoved` of the run). */
 export type MovedProject = {
 	from: { spaceId: string; projectId: string };
 	to: { spaceId: string; projectId: string };
 };
-
-/** Runs `change` after every reconcile or move of the folder before it, in this process. */
-function inTurn<T>(root: string, change: () => Promise<T>): Promise<T> {
-	const before = reconciling.get(root) ?? Promise.resolve();
-	const run = before.catch(() => {}).then(change);
-	reconciling.set(root, run);
-	const forget = () => {
-		if (reconciling.get(root) === run) reconciling.delete(root);
-	};
-	run.then(forget, forget);
-	return run;
-}
 
 /** A step's hold on a project's folder: `done` when the step ends. */
 export type KnowledgeStepHold = { done(): Promise<void> };
@@ -183,56 +103,18 @@ export type KnowledgeStepHold = { done(): Promise<void> };
 export type KnowledgeSync = ReturnType<typeof createKnowledgeSync>;
 
 export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
-	const { db, folders, archive, deviceId } = deps;
+	const { folders, archive, status, locks, deviceId } = deps;
 	/** The projects whose content waits for the Host. */
 	const pending = new Set<string>();
-	/**
-	 * The Spaces whose Host runs an older version of Night Shift, until
-	 * when this Device asks it again. Its first knowledge call tells: then
-	 * no reconcile waits for its documents or calls it until that time.
-	 */
-	const olderHosts = new Map<string, number>();
-	const isOlder = (spaceId: string) => (olderHosts.get(spaceId) ?? 0) > now();
-	/** What a failed knowledge call to the Host says about it. */
-	function heard(spaceId: string, error: unknown): void {
-		if (error instanceof OlderHostError) {
-			olderHosts.set(spaceId, now() + OLDER_HOST_WAIT_MS);
-		}
-	}
 
-	async function spaceOf(projectId: string): Promise<string | null> {
-		const [row] = await db
-			.select({ spaceId: project.spaceId })
-			.from(project)
-			.where(eq(project.id, projectId));
-		return row?.spaceId ?? null;
-	}
-
-	/** Whether a Space has Members besides one Person: it is not a personal Space. */
-	async function isShared(spaceId: string): Promise<boolean> {
-		const [row] = await db
-			.select({ personal: organization.personal })
-			.from(organization)
-			.where(eq(organization.id, spaceId));
-		return row ? !row.personal : false;
-	}
-
-	async function reconcileOnce(projectId: string): Promise<ReconcileResult> {
-		const result: ReconcileResult = {
-			published: 0,
-			unpublished: 0,
-			written: 0,
-			removed: 0,
-			waiting: 0,
-			unpushed: 0,
-		};
-		const space = await spaceOf(projectId);
-		if (space === null) return result;
+	async function reconcileOnce(projectId: string): Promise<void> {
+		const space = await status.spaceOf(projectId);
+		if (space === null) return;
 		const spaceId: string = space;
 		const root = folders.folder(projectId);
 		const document = await deps.documents.open(projectId);
 		// A Host of an older version takes no knowledge: no wait, no call.
-		const older = isOlder(spaceId);
+		const older = status.isOlder(spaceId);
 		// The Host's changes first, a short while: the step must not wait long.
 		if (!older) {
 			await deps
@@ -245,7 +127,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		// A document that never had an update (a new Replica) is not one
 		// whose entries were removed: the folder's files are published again.
 		const saved = new Map(
-			state && hasHistory(document) ? Object.entries(state.files) : [],
+			state && !document.isNew() ? Object.entries(state.files) : [],
 		);
 		const unpushed = new Set(state?.unpushed ?? []);
 		/** The Host failed once: the rest waits for the next reconcile. */
@@ -262,10 +144,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				try {
 					await archive.put({ ref: ref(sha256), content });
 					unpushed.delete(sha256);
-					olderHosts.delete(spaceId);
+					status.answered(spaceId);
 					return;
 				} catch (error) {
-					heard(spaceId, error);
+					status.heard(spaceId, error);
 					offline = true;
 				}
 			}
@@ -287,14 +169,14 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			try {
 				return await archive.read(ref(sha256));
 			} catch (error) {
-				heard(spaceId, error);
+				status.heard(spaceId, error);
 				offline = true;
 				return null;
 			}
 		}
 
 		const files = await scan(root);
-		const entries = knowledgeEntries(document);
+		const entries = document.entries();
 		const next = new Map<string, Kept>();
 		const sets: [string, KnowledgeEntry][] = [];
 		const deletes: string[] = [];
@@ -323,7 +205,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				entry = { sha256, size: content.length, changedAt, deviceId };
 			}
 			sets.push([path, entry]);
-			result.published++;
 			return { ...entry, mtimeMs: file.mtimeMs };
 		}
 
@@ -339,7 +220,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				.then(() => stat(abs))
 				.catch(() => null);
 			if (!written) return null;
-			result.written++;
 			return { ...entry, size: written.size, mtimeMs: written.mtimeMs };
 		}
 
@@ -382,7 +262,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					else keep();
 				} else if (entry) {
 					deletes.push(path);
-					result.unpublished++;
 				}
 				return;
 			}
@@ -392,7 +271,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					if (file && (await inFolder(root, path))) {
 						await removeFile(root, path);
 					}
-					result.removed++;
 					return;
 				}
 				if (was && file && entry.changedAt < was.changedAt) {
@@ -400,16 +278,12 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					// earlier change: the later one, this folder's, goes back.
 					const { mtimeMs: _time, ...earlier } = was;
 					sets.push([path, earlier]);
-					result.published++;
 					next.set(path, { ...was, mtimeMs: file.mtimeMs });
 					return;
 				}
 				const taken = await take(path, entry);
 				if (taken) next.set(path, taken);
-				else {
-					result.waiting++;
-					keep();
-				}
+				else keep();
 				return;
 			}
 			// Both changed it.
@@ -434,10 +308,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			if (entry) {
 				const taken = await take(path, entry);
 				if (taken) next.set(path, taken);
-				else {
-					result.waiting++;
-					keep();
-				}
+				else keep();
 			}
 		}
 
@@ -448,33 +319,27 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			.sort();
 		await inTurns(paths, AT_ONCE, settle);
 
-		if (sets.length > 0 || deletes.length > 0) {
-			const map = knowledgeFiles(document);
-			await document.change(() => {
-				for (const path of deletes) map.delete(path);
-				for (const [path, entry] of sets) map.set(path, entry);
-			});
-		}
-		result.unpushed = unpushed.size;
+		await document.apply({ delete: deletes, set: sets });
 		await writeState(root, {
 			files: Object.fromEntries(next),
 			unpushed: [...unpushed],
 		});
 		if (unpushed.size > 0) pending.add(projectId);
 		else pending.delete(projectId);
-		if ((sets.length > 0 || deletes.length > 0) && !isOlder(spaceId)) {
+		if ((sets.length > 0 || deletes.length > 0) && !status.isOlder(spaceId)) {
 			// This Device's changes reach the Host before the step ends: the
 			// next step on another Device reads them.
 			await deps
 				.inStep?.(spaceId, [document.name], { timeoutMs: IN_STEP_AFTER_MS })
 				.catch(() => {});
 		}
-		return result;
 	}
 
 	/** One reconcile of a folder at a time, in this process. */
-	function reconcile(projectId: string): Promise<ReconcileResult> {
-		return inTurn(folders.folder(projectId), () => reconcileOnce(projectId));
+	function reconcile(projectId: string): Promise<void> {
+		return locks.inTurn(folders.folder(projectId), () =>
+			reconcileOnce(projectId),
+		);
 	}
 
 	/**
@@ -494,7 +359,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		const state = await readState(fromRoot);
 		const document = await deps.documents.open(from.projectId);
 		const unpushed = new Set(state?.unpushed ?? []);
-		for (const entry of knowledgeEntries(document).values()) {
+		for (const entry of document.entries().values()) {
 			if (!entry.local) unpushed.add(entry.sha256);
 		}
 		if (from.spaceId !== to.spaceId) {
@@ -537,7 +402,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 
 	/** Whether a step writes the project's folder now. */
 	function busy(projectId: string): boolean {
-		return (writing.get(folders.folder(projectId)) ?? 0) > 0;
+		return locks.held(folders.folder(projectId));
 	}
 
 	/** A reconcile whose failure leaves the folder as it is: the step goes on. */
@@ -558,151 +423,21 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		 */
 		async startStep(projectId: string): Promise<KnowledgeStepHold> {
 			const root = folders.folder(projectId);
-			const held = writing.get(root) ?? 0;
-			writing.set(root, held + 1);
 			// A step that shares the folder waits for the first one's reconcile.
-			if (held === 0) await reconcileQuietly(projectId);
-			else await reconciling.get(root)?.catch(() => {});
+			if (locks.hold(root)) await reconcileQuietly(projectId);
+			else await locks.turnsEnded(root);
 			let released = false;
 			return {
 				async done() {
 					if (released) return;
 					released = true;
-					const left = (writing.get(root) ?? 1) - 1;
-					if (left > 0) {
-						writing.set(root, left);
-						return;
-					}
-					writing.delete(root);
-					await reconcileQuietly(projectId);
+					if (locks.release(root)) await reconcileQuietly(projectId);
 				},
 			};
 		},
-		/**
-		 * The Knowledge page's list: a reconcile first, for a while, so the
-		 * document has this Device's own changes. Then the document's files
-		 * and how many notes its proposals hold. The reconcile goes on when
-		 * the wait ends. While a step writes the folder, the page lists the
-		 * document as it is.
-		 */
-		async listing(projectId: string): Promise<KnowledgeListing> {
-			const reconciled = busy(projectId)
-				? Promise.resolve()
-				: reconcileQuietly(projectId);
-			await Promise.race([reconciled, Bun.sleep(deps.pageWaitMs ?? 2_000)]);
-			const spaceId = await spaceOf(projectId);
-			const entries = knowledgeEntries(await deps.documents.open(projectId));
-			const files: KnowledgeFile[] = [];
-			let proposed = 0;
-			for (const [path, entry] of [...entries].sort(([a], [b]) =>
-				a.localeCompare(b),
-			)) {
-				// The question set is Night Shift's own: the page shows it elsewhere.
-				if (isQuestionSetPath(path)) continue;
-				if (!isProposedLearning(path)) {
-					files.push({
-						path,
-						size: entry.size,
-						changedAt: entry.changedAt,
-						...(entry.local ? { local: true as const } : {}),
-					});
-					continue;
-				}
-				if (!isProposedLearningFile(path)) continue;
-				const content = spaceId
-					? await archive
-							.read({ kind: "content", spaceId, sha256: entry.sha256 })
-							.catch(() => null)
-					: null;
-				// A proposal whose content is not here holds one note at least.
-				proposed += content ? notesIn(content) : 1;
-			}
-			return {
-				files,
-				proposed,
-				shared: spaceId ? await isShared(spaceId) : false,
-				olderHost: spaceId ? isOlder(spaceId) : false,
-			};
-		},
-		/**
-		 * The proposals that wait for a person, newest first, with their
-		 * notes, as the Space's document has them. No reconcile first: a
-		 * step publishes its proposals when it ends. A proposal whose content
-		 * is neither here nor at the Host now has no notes.
-		 */
-		async waitingLearnings(projectId: string): Promise<WaitingLearning[]> {
-			const spaceId = await spaceOf(projectId);
-			if (spaceId === null) return [];
-			const entries = knowledgeEntries(await deps.documents.open(projectId));
-			const waiting: WaitingLearning[] = [];
-			for (const [path, entry] of entries) {
-				if (!isProposedLearningFile(path)) continue;
-				const id = path.slice(PROPOSED_LEARNINGS_DIR.length + 1);
-				const step = proposedLearningOf(id);
-				if (!step) continue;
-				const content = await archive
-					.read({ kind: "content", spaceId, sha256: entry.sha256 })
-					.catch((error: unknown) => {
-						heard(spaceId, error);
-						return null;
-					});
-				waiting.push({
-					id,
-					...step,
-					notes: content ? notesOf(content) : [],
-					proposedAt: entry.changedAt,
-				});
-			}
-			return waiting.sort(
-				(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
-			);
-		},
-		/**
-		 * One file of the project's knowledge, by its path, at most
-		 * `maxBytes` of its text: this Device's copy, else its content by
-		 * its hash in the document, from the archive here or at the Host. A PDF or
-		 * Word file gives its text either way. Null when neither has the
-		 * file, and for a proposal. Refuses (never a plain error) a file
-		 * that is not text, one that stays on another Device, and one whose
-		 * content cannot be fetched now.
-		 */
-		async read(
-			projectId: string,
-			path: string,
-			maxBytes: number,
-			from?: KnowledgeReadFrom,
-		): Promise<KnowledgeText | null> {
-			// This computer's folder first: it may not have the file yet.
-			const here = await folders.read(projectId, path, maxBytes, from);
-			if (here) return here;
-			const clean = path.trim().replace(/^\.\/+/, "");
-			const spaceId = await spaceOf(projectId);
-			const entry = isReadable(clean)
-				? knowledgeEntries(await deps.documents.open(projectId)).get(clean)
-				: undefined;
-			if (spaceId === null || !entry) return null;
-			if (entry.local && entry.deviceId !== deviceId) {
-				throw new Refusal(
-					"unavailable",
-					"This file is larger than 10 MB. It stays on the computer that synced it.",
-				);
-			}
-			const content = await archive
-				.read({ kind: "content", spaceId, sha256: entry.sha256 })
-				.catch((error: unknown) => {
-					heard(spaceId, error);
-					return null;
-				});
-			if (!content && isOlder(spaceId)) {
-				throw new Refusal("unavailable", OLDER_HOST);
-			}
-			if (!content) {
-				throw new Refusal(
-					"unavailable",
-					"Night Shift cannot get this file now. Try again when the computer that keeps this Space is online.",
-				);
-			}
-			return knowledgeText(clean, content, maxBytes, from);
+		/** A reconcile that leaves the folder as it is when it fails. None while a step writes the folder. */
+		reconcileUnlessHeld(projectId: string): Promise<unknown> {
+			return busy(projectId) ? Promise.resolve() : reconcileQuietly(projectId);
 		},
 		/**
 		 * Removes a folder of the project's knowledge, for every Device of
@@ -728,15 +463,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			}
 			await reconcile(projectId);
 			const document = await deps.documents.open(projectId);
-			const paths = [...knowledgeEntries(document).keys()].filter((path) =>
+			const paths = [...document.entries().keys()].filter((path) =>
 				path.startsWith(prefix),
 			);
-			if (paths.length > 0) {
-				const map = knowledgeFiles(document);
-				await document.change(() => {
-					for (const path of paths) map.delete(path);
-				});
-			}
+			await document.apply({ delete: paths });
 			await reconcile(projectId);
 			return paths.length;
 		},
@@ -748,10 +478,10 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		move(project: MovedProject): Promise<void> {
 			const fromRoot = folders.folder(project.from.projectId);
 			const toRoot = folders.folder(project.to.projectId);
-			return inTurn(fromRoot, () =>
+			return locks.inTurn(fromRoot, () =>
 				fromRoot === toRoot
 					? moveOnce(project)
-					: inTurn(toRoot, () => moveOnce(project)),
+					: locks.inTurn(toRoot, () => moveOnce(project)),
 			);
 		},
 		/**
@@ -818,11 +548,6 @@ async function moveFolder(from: string, to: string): Promise<void> {
 		await rename(join(from, ...file.path.split("/")), target);
 	}
 	await rm(from, { recursive: true, force: true });
-}
-
-/** Whether a document ever had an update: an empty one may only be new. */
-function hasHistory(document: PersistedDocument): boolean {
-	return document.doc.store.clients.size > 0;
 }
 
 async function readState(root: string): Promise<State | null> {
