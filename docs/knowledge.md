@@ -395,6 +395,19 @@ it ends, the Review page, a review by the kit, and each of these on another
 computer. One reconcile tells them once, however many files it brings. No
 push goes out for this. The Gate of the review sends its own push.
 
+The Review page shows what the engine decides waits (`knowledge.review`,
+`knowledge/review.ts`): a source that needs a look, a step's learnings, a
+question that found nothing, and the files no run used. The engine sets the
+order and the id of each task. The screen only remembers what a person put off
+or dismissed in this browser. The phone shows only the learnings, of every
+project: it is for acting at night, and the rest needs a computer.
+
+Both apps send Keep and Delete through `useSettleLearnings` of
+`@nightshift/client`, which also says what to read again. They differ on purpose
+at one point. The web app gives 5 seconds to undo. The phone sends at the tap,
+so Delete asks first. On both, Keep waits for notes you can read, and a role
+that may not decide does not get the buttons.
+
 The Learnings module (`packages/engine/src/knowledge/learnings.ts`) owns this
 protocol. The text of a file and the rule for its name are in
 `packages/flows/src/kits/knowledge/` (`learning-file.ts`, `layout.ts`), because
@@ -761,6 +774,25 @@ still holds its folder, and the new `Knowledge` leaves that folder alone. `close
 the index file. The next search opens the file again. Sections that did not
 change are not embedded again. A session that outlives the reload still
 searches, on its own connection to the index, and prepares nothing.
+
+## What the page waits for
+
+The frame of the Knowledge page draws when `knowledge.get` answers. A Host that
+does not answer can cost that read at most 2 seconds each for two things:
+
+1. The reconcile before the list (`pageWaitMs`). It stays, because it puts your
+   own changes to the folder in the list. It goes on after the wait.
+2. The names of other computers. Night Shift asks the Host only when a source
+   names another computer. Too late or not at all: the source says "another
+   computer" until the next read.
+
+The count of the notes that wait never asks the Host. A proposed learning whose
+content is not here counts as one note. `knowledge.review` and
+`knowledge.learnings` ask the Host for such content, because they show the
+notes. They stop asking in that read once the Host fails. Their card has its
+own loader, so the frame does not wait for them. The Questions card holds the
+folder for its reconcile (`knowledge.questions`), and the Review page no longer
+reads it.
 
 ## Known gaps (phase 1)
 

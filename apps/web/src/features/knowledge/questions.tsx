@@ -33,7 +33,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { orpc } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { SearchEvaluation } from "./evaluation";
@@ -217,7 +216,9 @@ function Answer({
 	const mark = useMutation(
 		knowledgeMutations.markQuestion({
 			onSuccess: (_set, input) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
+				void queryClient.invalidateQueries({
+					queryKey: knowledgeQueries.all(),
+				});
 				toast.success(
 					input.answers.length > 0 ? "Question marked" : "Mark removed",
 				);

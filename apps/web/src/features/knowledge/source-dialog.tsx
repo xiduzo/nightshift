@@ -49,7 +49,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { FlowInputFields } from "@/features/flows";
 import { orpc } from "@/shared/api";
-import { knowledgeMutations } from "./queries";
+import { knowledgeMutations, knowledgeQueries } from "./queries";
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 const DEFAULT_TIME = "06:00";
@@ -184,7 +184,7 @@ function SourceForm({
 
 	const refresh = () =>
 		Promise.all([
-			queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() }),
+			queryClient.invalidateQueries({ queryKey: knowledgeQueries.all() }),
 			queryClient.invalidateQueries({ queryKey: orpc.flows.key() }),
 			queryClient.invalidateQueries({ queryKey: orpc.schedules.key() }),
 		]);

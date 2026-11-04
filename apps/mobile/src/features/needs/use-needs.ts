@@ -1,7 +1,8 @@
+import type { WaitingLearning } from "@nightshift/client";
 import { useMemo } from "react";
 
 import { useInbox } from "@/features/inbox";
-import { type Learning, useLearningsToCheck } from "@/features/learnings";
+import { useLearningsToCheck } from "@/features/learnings";
 import { useStoppedRuns } from "@/features/runs";
 import { type NeedsItem, needsItems } from "./queue";
 
@@ -15,7 +16,7 @@ export function useNeedsYou(subscribed = true) {
 	const gates = useInbox(subscribed);
 	const stopped = useStoppedRuns(subscribed);
 	const learnings = useLearningsToCheck(subscribed);
-	const items: NeedsItem<Learning>[] = useMemo(
+	const items: NeedsItem<WaitingLearning>[] = useMemo(
 		() =>
 			needsItems({
 				gates: gates.data,

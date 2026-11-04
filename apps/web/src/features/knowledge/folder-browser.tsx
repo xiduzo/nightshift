@@ -31,8 +31,7 @@ import {
 import { useMemo, useState } from "react";
 import type { KnowledgeFile } from "@/shared/api";
 import { DataTable } from "@/shared/data-table";
-import { fileColumns } from "./file-columns";
-import { fileUse } from "./file-use";
+import { fileColumns, fileUse } from "./file-columns";
 import {
 	type FolderNode,
 	folderTrail,

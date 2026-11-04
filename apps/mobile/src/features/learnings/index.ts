@@ -3,4 +3,3 @@
 export { LearningRow } from "./learning-row";
 export { useWaitingLearnings } from "./learnings-row";
 export { useLearningsToCheck } from "./to-check";
-export type { Learning } from "./waiting";

@@ -1,4 +1,10 @@
 import {
+	ASK_A_MEMBER,
+	canKeep,
+	type ReviewTask,
+	taskLine,
+} from "@nightshift/client";
+import {
 	Alert,
 	AlertDescription,
 	AlertTitle,
@@ -47,7 +53,6 @@ import { type ReactNode, useEffect } from "react";
 import { formatRelative } from "@/shared/format";
 import { fileNameOf } from "./folder-tree";
 import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
-import { type ReviewTask, taskLine, taskNode } from "./review-queue";
 import { SyncNowButton } from "./sources";
 import type { Review } from "./use-review";
 
@@ -93,8 +98,10 @@ function ReviewQueue() {
 			if (target?.closest("input, textarea, select, [role='dialog']")) return;
 			if (event.key === "s") review.putOff(current.id);
 			if (current.kind !== "learning" || !mayDecide) return;
-			if (event.key === "k") review.settle(current.learning, "keep");
-			if (event.key === "d") review.settle(current.learning, "delete");
+			if (event.key === "k" && canKeep(current.learning)) {
+				review.settle(current, "keep");
+			}
+			if (event.key === "d") review.settle(current, "delete");
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
@@ -222,7 +229,7 @@ function TaskCard({
 			<Kbd>S</Kbd>
 		</Button>
 	);
-	const node = taskNode(task);
+	const { node } = task;
 	const onMap = node ? (
 		<Button variant="ghost" onClick={() => onShowOnMap(node)}>
 			<NetworkIcon data-icon="inline-start" />
@@ -256,8 +263,9 @@ function TaskCard({
 							</p>
 						) : (
 							<ul className="flex list-disc flex-col gap-3 pl-5 text-lg leading-snug">
-								{learning.notes.map((note) => (
-									<li key={note}>{note}</li>
+								{learning.notes.map((note, index) => (
+									// The notes keep their order, and the same note may come twice.
+									<li key={index}>{note}</li>
 								))}
 							</ul>
 						)}
@@ -265,14 +273,17 @@ function TaskCard({
 					<CardFooter className="flex-wrap gap-2">
 						{mayDecide ? (
 							<>
-								<Button onClick={() => review.settle(learning, "keep")}>
+								<Button
+									disabled={!canKeep(learning)}
+									onClick={() => review.settle(task, "keep")}
+								>
 									<CheckIcon data-icon="inline-start" />
 									Keep
 									<Kbd>K</Kbd>
 								</Button>
 								<Button
 									variant="outline"
-									onClick={() => review.settle(learning, "delete")}
+									onClick={() => review.settle(task, "delete")}
 								>
 									<Trash2Icon data-icon="inline-start" />
 									Delete
@@ -280,9 +291,7 @@ function TaskCard({
 								</Button>
 							</>
 						) : (
-							<p className="text-muted-foreground text-sm">
-								Ask a Member of this Space to review it.
-							</p>
+							<p className="text-muted-foreground text-sm">{ASK_A_MEMBER}</p>
 						)}
 						{onMap}
 						{later}

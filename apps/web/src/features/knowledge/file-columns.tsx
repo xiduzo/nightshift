@@ -6,15 +6,22 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { FileTextIcon } from "lucide-react";
-import type { KnowledgeFile } from "@/shared/api";
+import type { KnowledgeFile, KnowledgeUse } from "@/shared/api";
 import { dataTableColumns } from "@/shared/data-table";
 import { formatRelative, formatSize, hoverTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import type { FileUse } from "./file-use";
-import { isUnused } from "./file-use";
 import { fileNameOf, folderOf } from "./folder-tree";
 
 const column = dataTableColumns<KnowledgeFile>();
+
+/** How agents used each file, by path, for the rows of a list. */
+export function fileUse(report: KnowledgeUse | undefined) {
+	return {
+		byPath: new Map((report?.files ?? []).map((file) => [file.path, file])),
+		unused: new Set(report?.unused ?? []),
+		unusedDays: report?.unusedDays ?? 30,
+	};
+}
 
 /**
  * The columns of a list of files. A file's name opens it. A file in a folder
@@ -22,7 +29,7 @@ const column = dataTableColumns<KnowledgeFile>();
  */
 export function fileColumns(
 	open: (path: string) => void,
-	use: FileUse,
+	use: ReturnType<typeof fileUse>,
 	folder: string,
 ) {
 	return column.columns([
@@ -88,7 +95,7 @@ export function fileColumns(
 								Found {used.found}, read {used.read}
 							</span>
 						) : null}
-						{isUnused(use, row.original) ? (
+						{use.unused.has(row.original.path) ? (
 							<Tooltip>
 								<TooltipTrigger render={<Badge variant="outline" />}>
 									Not used

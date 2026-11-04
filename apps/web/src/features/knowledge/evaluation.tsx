@@ -35,7 +35,7 @@ import {
 	SparklesIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { type KnowledgeEvaluation, orpc } from "@/shared/api";
+import type { KnowledgeEvaluation } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
@@ -187,7 +187,9 @@ function Advice({
 	const setMeaning = useMutation(
 		knowledgeMutations.setMeaning({
 			onSuccess: (_status, input) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
+				void queryClient.invalidateQueries({
+					queryKey: knowledgeQueries.all(),
+				});
 				toast.success(
 					input.on
 						? "Search by meaning is on for this project"

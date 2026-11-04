@@ -55,7 +55,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { loadElk } from "@/features/flows";
-import { type KnowledgeMap, orpc } from "@/shared/api";
+import type { KnowledgeMap } from "@/shared/api";
 import { PanelHeader } from "@/shared/panel";
 import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import {
@@ -69,7 +69,6 @@ import {
 	type NodeKind,
 } from "./map-node";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
-import { learningTaskId } from "./review-queue";
 import { useKnowledgeHits } from "./use-knowledge-hits";
 
 const KINDS: NodeKind[] = ["file", "topic", "question", "learning"];
@@ -147,8 +146,8 @@ function MapLoader({ focus }: { focus: string | null }) {
 	const { projectId, knowledge, review, openFile } = useKnowledge();
 	const navigate = useNavigate();
 	const onOpenFile = openFile;
-	const onReview = (learningId: string) => {
-		review.bringForward(learningTaskId(learningId));
+	const onReview = (node: string) => {
+		review.bringForwardNode(node);
 		void navigate({
 			to: "/projects/$projectId/knowledge/review",
 			params: { projectId },
@@ -197,7 +196,9 @@ function useNotTopic(projectId: string) {
 	const { mutate, isPending } = useMutation(
 		knowledgeMutations.markNotTopic({
 			onSuccess: (_words, { word, notTopic }) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
+				void queryClient.invalidateQueries({
+					queryKey: knowledgeQueries.all(),
+				});
 				if (!notTopic) {
 					toast.success(`${word} is a topic again`);
 					return;
@@ -233,7 +234,7 @@ function MapView({
 	focus: string | null;
 	mayChange: boolean;
 	onOpenFile: (path: string) => void;
-	onReview: (learningId: string) => void;
+	onReview: (node: string) => void;
 }) {
 	const [kinds, setKinds] = useState<string[]>(KINDS);
 	const [picked, setPicked] = useState<string | null>(focus);
@@ -486,7 +487,7 @@ function NodeDetail({
 	map: KnowledgeMap;
 	onSelect: (id: string) => void;
 	onOpenFile: (path: string) => void;
-	onReview: (learningId: string) => void;
+	onReview: (node: string) => void;
 	/** Unset: the person may not change the topics, or this is no topic. */
 	onNotTopic: (() => void) | undefined;
 }) {
@@ -521,7 +522,7 @@ function NodeDetail({
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => onReview(node.id.replace(/^learning:/, ""))}
+							onClick={() => onReview(node.id)}
 						>
 							Review it
 						</Button>

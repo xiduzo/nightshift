@@ -144,7 +144,7 @@ function KnowledgeProvider({
 	knowledge: Knowledge;
 	children: ReactNode;
 }) {
-	const review = useReview(projectId, knowledge);
+	const review = useReview(projectId);
 	const [open, setOpen] = useState<string | null>(null);
 	// Null: closed. "new": a new source. Else the source to edit.
 	const [dialog, setDialog] = useState<EditedSource | "new" | null>(null);

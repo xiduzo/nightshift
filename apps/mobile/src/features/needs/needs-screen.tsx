@@ -2,6 +2,7 @@ import {
 	createProjectQueries,
 	hoverTime,
 	type RunSummary,
+	type WaitingLearning,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -22,7 +23,7 @@ import { View } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { DigestSection, GateRow, useLastDigest } from "@/features/inbox";
-import { type Learning, LearningRow } from "@/features/learnings";
+import { LearningRow } from "@/features/learnings";
 import { PushCard } from "@/features/push";
 import { leaveRun, unleaveRun } from "@/features/runs";
 import { EmptyState } from "@/shared/empty";
@@ -63,7 +64,7 @@ const SECTION_HEAD: Record<NeedsSection, { title: string; hint: string }> = {
 	},
 };
 
-type Row = NeedsRow<Learning>;
+type Row = NeedsRow<WaitingLearning>;
 
 /**
  * The Needs you tab: everything that waits for you, in three sections.

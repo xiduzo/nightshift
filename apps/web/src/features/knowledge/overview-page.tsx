@@ -1,3 +1,4 @@
+import { taskLine } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -40,7 +41,6 @@ import {
 import { useMemo } from "react";
 import { OVERVIEW_ROWS } from "@/features/dashboard";
 import { formatRelative } from "@/shared/format";
-import { fileUse, isUnused } from "./file-use";
 import { folderTree } from "./folder-tree";
 import {
 	AddSourceButton,
@@ -50,7 +50,6 @@ import {
 import type { KNOWLEDGE_PAGES } from "./knowledge-nav";
 import { KnowledgeSearch } from "./knowledge-search";
 import { knowledgeQueries } from "./queries";
-import { taskLine } from "./review-queue";
 import { lastSyncText } from "./source-words";
 import { sourceLabel } from "./sources";
 
@@ -202,8 +201,7 @@ function FilesCard() {
 			),
 		[knowledge.files],
 	);
-	const used = fileUse(use.data);
-	const unused = knowledge.files.filter((file) => isUnused(used, file)).length;
+	const unused = use.data?.unused.length ?? 0;
 	return (
 		<Card>
 			<CardHeader>

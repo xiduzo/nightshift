@@ -296,7 +296,11 @@ export function createLiveCache({
 				if (!lists) invalidate(dashboard.all());
 			}
 			if (readSchedules) invalidate(schedules.lists());
-			if (lists || learnings) invalidate(knowledge.learningsKey());
+			if (lists || learnings) {
+				invalidate(knowledge.learningsKey());
+				// What waits on the Knowledge page: its learnings, and a source's last sync.
+				invalidate(knowledge.reviewKey());
+			}
 			if (learnings) invalidate(knowledge.getKey());
 		}, READ_MS);
 	}

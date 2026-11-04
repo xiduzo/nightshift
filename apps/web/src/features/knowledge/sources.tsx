@@ -62,13 +62,12 @@ import {
 	KnowledgeSection,
 	useKnowledge,
 } from "./knowledge-layout";
-import { knowledgeMutations } from "./queries";
+import { knowledgeMutations, knowledgeQueries } from "./queries";
 import type { EditedSource } from "./source-dialog";
 import {
 	computerText,
 	lastSyncText,
 	scheduleText,
-	sourceActions,
 	sourceSummary,
 	sourceTitle,
 } from "./source-words";
@@ -158,7 +157,6 @@ function Sources({
 						key={sync.flow}
 						projectId={projectId}
 						sync={sync}
-						may={sourceActions(sync, can)}
 						onEdit={onEdit}
 						onRemove={() => setRemoving(sync)}
 					/>
@@ -215,13 +213,11 @@ function FailedSyncs({ syncs }: { syncs: Knowledge["syncs"] }) {
 function SourceItem({
 	projectId,
 	sync,
-	may,
 	onEdit,
 	onRemove,
 }: {
 	projectId: string;
 	sync: Sync;
-	may: ReturnType<typeof sourceActions>;
 	onEdit: (source: EditedSource) => void;
 	onRemove: () => void;
 }) {
@@ -279,7 +275,9 @@ function SourceItem({
 				</ItemDescription>
 			</ItemContent>
 			<ItemActions>
-				{may.sync ? <SyncNowButton projectId={projectId} sync={sync} /> : null}
+				{sync.may.sync ? (
+					<SyncNowButton projectId={projectId} sync={sync} />
+				) : null}
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
@@ -293,7 +291,7 @@ function SourceItem({
 						<EllipsisIcon aria-hidden="true" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
-						{source && may.edit ? (
+						{source && sync.may.edit ? (
 							<DropdownMenuItem
 								onClick={() =>
 									onEdit({
@@ -319,7 +317,7 @@ function SourceItem({
 							<WorkflowIcon aria-hidden="true" />
 							Open flow
 						</DropdownMenuItem>
-						{source && may.remove ? (
+						{source && sync.may.remove ? (
 							<>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem variant="destructive" onClick={onRemove}>
@@ -346,7 +344,7 @@ export function SyncNowButton({
 	sync,
 }: {
 	projectId: string;
-	sync: Sync;
+	sync: Omit<Sync, "may">;
 }) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -359,7 +357,9 @@ export function SyncNowButton({
 	const start = useMutation(
 		knowledgeMutations.syncSource({
 			onSuccess: (run) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
+				void queryClient.invalidateQueries({
+					queryKey: knowledgeQueries.all(),
+				});
 				toast.success("Night Shift syncs it now", {
 					action: {
 						label: "View run",
@@ -431,7 +431,7 @@ function RemoveSourceDialog({
 		knowledgeMutations.removeSource({
 			onSuccess: ({ removedFiles }) => {
 				void Promise.all([
-					queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() }),
+					queryClient.invalidateQueries({ queryKey: knowledgeQueries.all() }),
 					queryClient.invalidateQueries({ queryKey: orpc.flows.key() }),
 					queryClient.invalidateQueries({ queryKey: orpc.schedules.key() }),
 				]);

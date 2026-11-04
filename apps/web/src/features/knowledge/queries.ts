@@ -1,48 +1,11 @@
-/** The query options of a project's knowledge, and its mutations. */
+/** The query options of a project's knowledge (`@nightshift/client`, on this app's client), and its mutations. */
 
 import { createKnowledgeQueries } from "@nightshift/client";
 import { orpc } from "@/shared/api";
 
-const learningQueries = createKnowledgeQueries(orpc);
-
-export const knowledgeQueries = {
-	/** The files on this computer and the flows that fill them. */
-	get: (projectId: string) =>
-		orpc.knowledge.get.queryOptions({ input: { projectId } }),
-	/** The files that best match the words, best first. */
-	search: (projectId: string, query: string) =>
-		orpc.knowledge.search.queryOptions({
-			input: { projectId, query, limit: 20 },
-		}),
-	/** Whether search finds by meaning on this computer. */
-	meaning: (projectId: string) =>
-		orpc.knowledge.meaning.queryOptions({ input: { projectId } }),
-	/** What agents asked the knowledge, and the project's question set. */
-	questions: (projectId: string) =>
-		orpc.knowledge.questions.queryOptions({ input: { projectId } }),
-	/** The question set against each way to search, run on this computer. */
-	evaluate: (projectId: string) =>
-		orpc.knowledge.evaluate.queryOptions({ input: { projectId } }),
-	/** How often agents found and read each file, and which no run used lately. */
-	use: (projectId: string) =>
-		orpc.knowledge.use.queryOptions({ input: { projectId } }),
-	/** The Map: the files, their topics and what connects to them. */
-	map: (projectId: string) =>
-		orpc.knowledge.graph.queryOptions({ input: { projectId } }),
-	/** The learnings that wait for a person, newest first. */
-	learnings: (projectId: string) => learningQueries.learnings(projectId),
-	learningsKey: learningQueries.learningsKey,
-	getKey: learningQueries.getKey,
-	/** One file, by its path in the knowledge. */
-	read: (projectId: string, path: string) =>
-		orpc.knowledge.read.queryOptions({ input: { projectId, path } }),
-};
+export const knowledgeQueries = createKnowledgeQueries(orpc);
 
 export const knowledgeMutations = {
-	/** Keeps one step's learnings: agents read them in later runs. */
-	keepLearning: learningQueries.keep,
-	/** Deletes one step's learnings. */
-	deleteLearning: learningQueries.delete,
 	/** Adds a source, or changes one: its flow and its schedule. */
 	saveSource: orpc.knowledge.saveSource.mutationOptions,
 	/** Removes a source, and its files if asked. */

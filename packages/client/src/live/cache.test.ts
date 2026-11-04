@@ -97,6 +97,7 @@ const KEYS = {
 	projects: createProjectQueries(orpc).list().queryKey,
 	branches: createProjectQueries(orpc).branches("p1").queryKey,
 	learnings: createKnowledgeQueries(orpc).learnings().queryKey,
+	review: createKnowledgeQueries(orpc).review("p1").queryKey,
 	knowledge: orpc.knowledge.get.queryOptions({ input: { projectId: "p1" } })
 		.queryKey,
 } as const;
@@ -105,6 +106,7 @@ type Name = keyof typeof KEYS;
 /** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules, the projects' counts, the learnings that wait. */
 const RUN_1: Name[] = [
 	"learnings",
+	"review",
 	"everyRun",
 	"ofProject",
 	"run1",
@@ -357,6 +359,7 @@ describe("the live cache follows the Host", () => {
 			orpc.schedules.list.key(),
 			orpc.projects.list.key(),
 			orpc.knowledge.learnings.key(),
+			orpc.knowledge.review.key(),
 		]);
 	});
 
@@ -370,7 +373,7 @@ describe("the live cache follows the Host", () => {
 			at: 4,
 		});
 		timers.due(300);
-		expect(stale()).toEqual(sorted(["learnings", "knowledge"]));
+		expect(stale()).toEqual(sorted(["learnings", "review", "knowledge"]));
 	});
 
 	test("a Host that changes the projects reads the projects, the dashboard and the schedules", async () => {

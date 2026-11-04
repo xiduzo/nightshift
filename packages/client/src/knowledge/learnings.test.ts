@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-	type Learning,
+	canKeep,
 	learningKey,
+	mayDecide,
 	stillWaiting,
-	waitingText,
-} from "./waiting";
+	type WaitingLearning,
+} from "./learnings";
 
-function learning(projectId: string, id: string): Learning {
+function learning(projectId: string, id: string): WaitingLearning {
 	return {
 		id,
 		projectId,
@@ -34,9 +35,18 @@ describe("the learnings that still wait", () => {
 	});
 });
 
-describe("the count of the learnings that wait", () => {
-	test("says one or more", () => {
-		expect(waitingText(1)).toBe("1 learning waits for you");
-		expect(waitingText(3)).toBe("3 learnings wait for you");
+describe("what you may do with a learning", () => {
+	test("keep waits for notes you can read", () => {
+		expect(canKeep(learning("p1", "a"))).toBe(true);
+		expect(canKeep({ notes: [] })).toBe(false);
+	});
+
+	test("a role that may not decide gets no choice", () => {
+		expect(mayDecide({ mayDecide: false })).toBe(false);
+		expect(mayDecide({ mayDecide: true })).toBe(true);
+	});
+
+	test("a Host of an older version does not say: the server decides at the tap", () => {
+		expect(mayDecide({})).toBe(true);
 	});
 });

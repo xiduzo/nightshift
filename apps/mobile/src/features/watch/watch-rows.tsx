@@ -6,6 +6,7 @@ import {
 	type RunSummary,
 	usageLabel,
 	useRunPrefetch,
+	type WaitingLearning,
 	waitedText,
 } from "@nightshift/client";
 import { router } from "expo-router";
@@ -13,7 +14,6 @@ import { Lightbulb } from "lucide-react-native";
 
 import { useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
-import type { Learning } from "@/features/learnings";
 import { formatTime } from "@/shared/format";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
@@ -90,7 +90,7 @@ function LearningItemRow({
 	learning,
 	projectName,
 }: {
-	learning: Learning;
+	learning: WaitingLearning;
 	projectName: string | undefined;
 }) {
 	return (
@@ -108,7 +108,7 @@ function LearningItemRow({
 export type WatchItem =
 	| { kind: "gate"; key: string; gate: OpenGate }
 	| { kind: "run"; key: string; run: RunSummary }
-	| { kind: "learning"; key: string; learning: Learning };
+	| { kind: "learning"; key: string; learning: WaitingLearning };
 
 /** A compact row of Needs you: a Gate, a run that stopped, or a learning. */
 export function NeedsItemRow({

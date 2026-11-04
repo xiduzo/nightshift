@@ -1,4 +1,11 @@
-import { agoLabel, useRunPrefetch } from "@nightshift/client";
+import {
+	ASK_A_MEMBER,
+	agoLabel,
+	canKeep,
+	mayDecide,
+	useRunPrefetch,
+	type WaitingLearning,
+} from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -27,12 +34,12 @@ import { View } from "react-native";
 
 import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
-import type { Learning } from "./waiting";
 
 /**
  * One step's learnings that wait: its notes, when the agent proposed
- * them, the run they came from, and Keep or Delete. Delete asks first.
- * Keep waits for notes you can read.
+ * them, the run they came from, and Keep or Delete. Delete asks first,
+ * since a tap here goes out at once. Keep waits for notes you can read. A role
+ * that may not decide reads who can.
  */
 export const LearningRow = memo(function LearningRow({
 	learning,
@@ -40,11 +47,11 @@ export const LearningRow = memo(function LearningRow({
 	onKeep,
 	onDelete,
 }: {
-	learning: Learning;
+	learning: WaitingLearning;
 	/** Its project, on the list of every project. Null on a project's own list. */
 	projectName: string | null;
-	onKeep: (learning: Learning) => void;
-	onDelete: (learning: Learning) => void;
+	onKeep: (learning: WaitingLearning) => void;
+	onDelete: (learning: WaitingLearning) => void;
 }) {
 	const now = useClock(60_000);
 	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
@@ -87,19 +94,23 @@ export const LearningRow = memo(function LearningRow({
 					<Icon as={ChevronRight} className="text-muted-foreground" />
 				</Button>
 			</Link>
-			<View className="flex-row flex-wrap gap-2">
-				<Button
-					size="lg"
-					className="h-auto min-h-11 py-2"
-					disabled={!readable}
-					onPress={() => onKeep(learning)}
-					accessibilityHint="Agents read it in later runs"
-				>
-					<Icon as={Check} />
-					<Text>Keep</Text>
-				</Button>
-				<DeleteButton onConfirm={() => onDelete(learning)} />
-			</View>
+			{mayDecide(learning) ? (
+				<View className="flex-row flex-wrap gap-2">
+					<Button
+						size="lg"
+						className="h-auto min-h-11 py-2"
+						disabled={!canKeep(learning)}
+						onPress={() => onKeep(learning)}
+						accessibilityHint="Agents read it in later runs"
+					>
+						<Icon as={Check} />
+						<Text>Keep</Text>
+					</Button>
+					<DeleteButton onConfirm={() => onDelete(learning)} />
+				</View>
+			) : (
+				<Text className="text-muted-foreground text-sm">{ASK_A_MEMBER}</Text>
+			)}
 		</View>
 	);
 });

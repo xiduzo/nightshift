@@ -116,7 +116,20 @@ export {
 	runProgress,
 	sameProgress,
 } from "./glance";
-export { createKnowledgeQueries } from "./knowledge";
+export {
+	ASK_A_MEMBER,
+	arrangeTasks,
+	canKeep,
+	createKnowledgeQueries,
+	learningKey,
+	mayDecide,
+	type ReviewTask,
+	type SettleFailure,
+	stillWaiting,
+	taskLine,
+	useSettleLearnings,
+	type WaitingLearning,
+} from "./knowledge";
 export {
 	type EntryFold,
 	type HostApi,

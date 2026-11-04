@@ -1,14 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import type { Knowledge } from "@/shared/api";
-import { fileUse, isUnused } from "./file-use";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
 import {
 	arrangeTasks,
-	reviewTasks,
-	type WaitingLearning,
-} from "./review-queue";
+	learningKey,
+	type ReviewTask,
+	useSettleLearnings,
+} from "@nightshift/client";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { orpc } from "@/shared/api";
+import { knowledgeQueries } from "./queries";
 
 /** How long a person can take back a Keep or a Delete, in ms. */
 const UNDO_MS = 5000;
@@ -51,59 +51,38 @@ export type Review = ReturnType<typeof useReview>;
  * and go out after a few seconds, so a person can take them back. Leaving
  * Knowledge sends them.
  */
-export function useReview(projectId: string, knowledge: Knowledge) {
-	const queryClient = useQueryClient();
-	const learnings = useQuery(knowledgeQueries.learnings(projectId));
-	const questions = useQuery(knowledgeQueries.questions(projectId));
-	const use = useQuery(knowledgeQueries.use(projectId));
+export function useReview(projectId: string) {
+	const review = useQuery(knowledgeQueries.review(projectId));
 	const { dismissed, dismiss } = useDismissed(projectId);
-	const [settling, setSettling] = useState<ReadonlySet<string>>(new Set());
+	// The learnings a person just kept or deleted: they wait out the time to take it back here.
+	const [held, setHeld] = useState<ReadonlySet<string>>(new Set());
 	const [later, setLater] = useState<string[]>([]);
 	const [forward, setForward] = useState<string | null>(null);
+	const release = (key: string) =>
+		setHeld((now) => new Set([...now].filter((other) => other !== key)));
+	const { settled, settle: send } = useSettleLearnings(orpc, {
+		onFailed: ({ title, message, learning }) => {
+			release(learningKey(learning));
+			toast.error(`${title}: ${message}`);
+		},
+	});
 
-	const tasks = useMemo(() => {
-		const used = fileUse(use.data);
-		return reviewTasks({
-			syncs: knowledge.syncs,
-			learnings: learnings.data ?? [],
-			asked: questions.data?.asked ?? [],
-			unused: knowledge.files.filter((file) => isUnused(used, file)),
-		});
-	}, [knowledge, learnings.data, questions.data, use.data]);
-
+	const tasks = useMemo(() => review.data ?? [], [review.data]);
 	const queue = useMemo(
 		() =>
-			arrangeTasks(tasks, {
-				gone: new Set([...dismissed, ...settling]),
-				later,
-				forward,
-			}),
-		[tasks, dismissed, settling, later, forward],
-	);
-
-	const unsettle = (id: string) =>
-		setSettling((now) => new Set([...now].filter((other) => other !== id)));
-	const readAgain = () =>
-		Promise.all(
-			[knowledgeQueries.learningsKey(), knowledgeQueries.getKey()].map(
-				(queryKey) => queryClient.invalidateQueries({ queryKey }),
+			arrangeTasks(
+				tasks.filter(
+					(task) =>
+						task.kind !== "learning" ||
+						!(
+							held.has(learningKey(task.learning)) ||
+							settled.has(learningKey(task.learning))
+						),
+				),
+				{ gone: dismissed, later, forward },
 			),
-		);
-	const failed = (what: string, id: string, error: Error) => {
-		unsettle(`learning:${id}`);
-		toast.error(`${what}: ${error.message}`);
-	};
-	const keep = useMutation({
-		...knowledgeMutations.keepLearning(),
-		onError: (error, { id }) => failed("The learning was not kept", id, error),
-		onSettled: readAgain,
-	});
-	const remove = useMutation({
-		...knowledgeMutations.deleteLearning(),
-		onError: (error, { id }) =>
-			failed("The learning was not deleted", id, error),
-		onSettled: readAgain,
-	});
+		[tasks, dismissed, held, settled, later, forward],
+	);
 
 	// What waits to go out, so that leaving the page can send it.
 	const waiting = useRef(new Map<string, () => void>());
@@ -114,18 +93,19 @@ export function useReview(projectId: string, knowledge: Knowledge) {
 		};
 	}, []);
 
-	const settle = (learning: WaitingLearning, decision: "keep" | "delete") => {
-		const id = `learning:${learning.id}`;
-		const input = { projectId, id: learning.id };
-		const send = () => {
+	const settle = (
+		task: Extract<ReviewTask, { kind: "learning" }>,
+		decision: "keep" | "delete",
+	) => {
+		const key = learningKey(task.learning);
+		const goOut = () => {
 			clearTimeout(timer);
-			waiting.current.delete(id);
-			if (decision === "keep") keep.mutate(input);
-			else remove.mutate(input);
+			waiting.current.delete(key);
+			send(task.learning, decision);
 		};
-		const timer = setTimeout(send, UNDO_MS);
-		waiting.current.set(id, send);
-		setSettling((now) => new Set([...now, id]));
+		const timer = setTimeout(goOut, UNDO_MS);
+		waiting.current.set(key, goOut);
+		setHeld((now) => new Set([...now, key]));
 		setForward(null);
 		toast(
 			decision === "keep"
@@ -137,9 +117,9 @@ export function useReview(projectId: string, knowledge: Knowledge) {
 					label: "Undo",
 					onClick: () => {
 						clearTimeout(timer);
-						waiting.current.delete(id);
-						unsettle(id);
-						setForward(id);
+						waiting.current.delete(key);
+						release(key);
+						setForward(task.id);
 					},
 				},
 			},
@@ -150,8 +130,8 @@ export function useReview(projectId: string, knowledge: Knowledge) {
 		/** Everything to do, for the progress. */
 		total: tasks.length,
 		queue,
-		loading: learnings.isLoading,
-		error: learnings.error,
+		loading: review.isLoading,
+		error: review.error,
 		settle,
 		dismiss,
 		/** The task comes up again after the others. */
@@ -160,5 +140,8 @@ export function useReview(projectId: string, knowledge: Knowledge) {
 			setLater((now) => [...now.filter((other) => other !== id), id]);
 		},
 		bringForward: setForward,
+		/** The task about this node of the Map comes up first. */
+		bringForwardNode: (node: string) =>
+			setForward(tasks.find((task) => task.node === node)?.id ?? null),
 	};
 }
