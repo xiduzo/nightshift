@@ -136,7 +136,7 @@ export async function knowledgeDevice(
 			),
 	};
 }
-export type KnowledgeDevice = Awaited<ReturnType<typeof knowledgeDevice>>;
+type KnowledgeDevice = Awaited<ReturnType<typeof knowledgeDevice>>;
 
 /** The documents of the Devices in step, as their Links leave them. */
 export async function syncKnowledgeDocuments(...devices: KnowledgeDevice[]) {

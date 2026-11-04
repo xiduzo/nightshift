@@ -64,7 +64,7 @@ export type WaitingLearning = {
 export type ProjectLearning = WaitingLearning & { projectId: string };
 
 /** A step of a run, as its proposed learnings are named. */
-export type LearningStep = { runId: string; stepId?: string };
+type LearningStep = { runId: string; stepId?: string };
 
 /** Who tells the open screens of a Space's Members: `notifications` of the daemon, a layer above. */
 export type LearningsNotifications = {
@@ -72,7 +72,7 @@ export type LearningsNotifications = {
 	learningsChanged(spaceId: string, projectId: string): Promise<void>;
 };
 
-export type LearningsDeps = {
+type LearningsDeps = {
 	folders: Pick<KnowledgeFolders, "folder">;
 	documents: Pick<KnowledgeDocuments, "open">;
 	/** The content by hash: here, and at the Space's Host. */

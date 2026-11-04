@@ -51,7 +51,7 @@ export type DocumentMetadata = {
  * on a page or an agent in a step. `background`: the search index and `INDEX.md`,
  * which can bring a whole folder of PDFs.
  */
-export type ParseTurn = "read" | "background";
+type ParseTurn = "read" | "background";
 
 const waiting: Record<ParseTurn, (() => void)[]> = { read: [], background: [] };
 let parsing = false;
