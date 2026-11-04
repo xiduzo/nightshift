@@ -96,7 +96,7 @@ index lists only the accepted ones.
 
 ### The Map
 
-The Map tab of the Knowledge page shows the knowledge as a graph: the files,
+The Map page of Knowledge shows the knowledge as a graph: the files,
 the topics they share, the links between them, the questions that found them
 and the learnings that name their topics. `packages/engine/src/knowledge/graph.ts`
 builds it.
@@ -285,8 +285,8 @@ A proposal that arrives while the Gate waits stays for the next review.
 The review runs on any computer of the Space. Its reconcile first fetches
 the proposals, and then puts what it kept or deleted back in the Space.
 
-You can also keep or delete proposals on the Review tab of the Knowledge
-page, one step at a time. Each decision acts on all notes of that step. The
+You can also keep or delete proposals on the Review page of Knowledge,
+one step at a time. Each decision acts on all notes of that step. The
 page sends it after 5 seconds, so you can undo it.
 
 ### Proposals from a Command
@@ -480,8 +480,9 @@ From these events:
   knowledge. It syncs like the learnings. `evals/` is Night Shift's own: no
   index, search, read or file list shows it.
 - **Test search.** With one marked question or more, the page tests the
-  set against search by words, by meaning, and both. It shows recall at 5
-  and the rank of each question's first right file. From 20 marked
+  set against search by words, by meaning, and both. It shows how many it
+  found in the first 5 results, and the position of each question's first
+  right file. From 20 marked
   questions, it offers to turn search by meaning off for the project when
   both do not beat words by 10 points. The thresholds are `EVALUATION` in
   `packages/engine/src/knowledge/evaluate.ts`. The setting is the

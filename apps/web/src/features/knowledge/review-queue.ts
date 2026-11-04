@@ -94,12 +94,12 @@ export function taskNode(task: ReviewTask): string | null {
 export function taskLine(task: ReviewTask): string {
 	switch (task.kind) {
 		case "source":
-			return `${task.sync.flow} needs a look`;
+			return `Check ${task.sync.flow}`;
 		case "learning":
 			return task.learning.notes[0] ?? "A learning";
 		case "question":
 			return `Agents found nothing for "${task.question.query}"`;
 		case "unused":
-			return `${task.files.length} ${task.files.length === 1 ? "file" : "files"} no run used`;
+			return `${task.files.length} ${task.files.length === 1 ? "file" : "files"} that no run used`;
 	}
 }

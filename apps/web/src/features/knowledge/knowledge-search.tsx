@@ -64,8 +64,8 @@ export function KnowledgeSearch({
 					type="text"
 					value={text}
 					onChange={(event) => setText(event.target.value)}
-					placeholder="Search the knowledge, for example: deploy"
-					aria-label="Search the knowledge"
+					placeholder="Search your files, for example: deploy"
+					aria-label="Search your files"
 				/>
 				{text !== "" ? (
 					<InputGroupAddon align="inline-end">
@@ -172,10 +172,7 @@ function MeaningLine({ projectId }: { projectId: string }) {
 	return (
 		<p className="text-muted-foreground text-sm">
 			{status.state === "on" ? (
-				<>
-					Search finds files by their words and by their meaning, with Ollama{" "}
-					{where}.
-				</>
+				"Search finds files by their words and by their meaning."
 			) : status.state === "preparing" ? (
 				<>
 					Search by meaning gets ready:{" "}

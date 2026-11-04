@@ -25,6 +25,12 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyTitle,
+} from "@nightshift/ui/components/empty";
 import { Field, FieldLabel } from "@nightshift/ui/components/field";
 import {
 	Item,
@@ -51,7 +57,11 @@ import { toast } from "sonner";
 import { flowQueries, StartRunDialog } from "@/features/flows";
 import { type Knowledge, orpc } from "@/shared/api";
 import { formatRelative, hoverTime } from "@/shared/format";
-import { PageSection } from "@/shared/page";
+import {
+	AddSourceButton,
+	KnowledgeSection,
+	useKnowledge,
+} from "./knowledge-layout";
 import { knowledgeMutations } from "./queries";
 import type { EditedSource } from "./source-dialog";
 import {
@@ -71,8 +81,40 @@ function kitLabel(kit: string): string {
 }
 
 /** A source's name for a person: its kind, or the name of the flow someone drew. */
-function sourceLabel(sync: Sync): string {
+export function sourceLabel(sync: Sync): string {
 	return sync.source ? sourceTitle(sync.source, sync.computer) : sync.flow;
+}
+
+/** Where the files come from, one source per row. */
+export function KnowledgeSourcesPage() {
+	const { projectId, knowledge, editSource } = useKnowledge();
+	return (
+		<KnowledgeSection
+			title="Sources"
+			description="Where your files come from. Each sync replaces the files this source added before."
+			actions={<AddSourceButton />}
+		>
+			{knowledge.syncs.length > 0 ? (
+				<Sources
+					projectId={projectId}
+					syncs={knowledge.syncs}
+					shared={knowledge.shared}
+					can={knowledge.can}
+					onEdit={editSource}
+				/>
+			) : (
+				<Empty className="border">
+					<EmptyHeader>
+						<EmptyTitle>No sources yet</EmptyTitle>
+						<EmptyDescription>
+							Add a source, such as a folder or web pages, to keep your files up
+							to date.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			)}
+		</KnowledgeSection>
+	);
 }
 
 /**
@@ -81,7 +123,7 @@ function sourceLabel(sync: Sync): string {
  * sync flow someone drew opens in the editor. Each action shows only to a
  * person who may use it.
  */
-export function Sources({
+function Sources({
 	projectId,
 	syncs,
 	shared,
@@ -96,19 +138,16 @@ export function Sources({
 }) {
 	const [removing, setRemoving] = useState<Sync | null>(null);
 	return (
-		<PageSection
-			title="Sources"
-			description="Where the knowledge comes from. Each sync replaces what that source added before."
-		>
+		<div className="flex min-w-0 flex-col gap-4">
 			{shared ? (
 				<Alert>
 					<UsersIcon />
 					<AlertTitle>
-						Every Member of this Space can read this knowledge
+						Every Member of this Space can read these files
 					</AlertTitle>
 					<AlertDescription>
-						Before you sync work items or pages here, make sure that each Member
-						may see them.
+						Before you sync work items or pages, make sure that each Member may
+						see them.
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -131,7 +170,7 @@ export function Sources({
 				removesFiles={can.startRuns}
 				onClose={() => setRemoving(null)}
 			/>
-		</PageSection>
+		</div>
 	);
 }
 
@@ -403,7 +442,8 @@ function RemoveSourceDialog({
 						: "Source removed",
 				);
 			},
-			onError: (error) => toast.error(`Could not remove: ${error.message}`),
+			onError: (error) =>
+				toast.error(`The source was not removed: ${error.message}`),
 		}),
 	);
 	return (

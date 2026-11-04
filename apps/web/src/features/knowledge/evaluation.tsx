@@ -80,8 +80,8 @@ export function SearchEvaluation({
 				<CardTitle>How well search finds answers</CardTitle>
 				<CardDescription>
 					Test your {marked} marked {marked === 1 ? "question" : "questions"}{" "}
-					against each way to search. A question counts when a right file is in
-					the top 5.
+					against each way to search. A question passes when a right file is in
+					the first 5 results.
 				</CardDescription>
 				<CardAction>
 					<Button
@@ -118,8 +118,9 @@ export function SearchEvaluation({
 						<TableHeader>
 							<TableRow>
 								<TableHead>Search by</TableHead>
-								<TableHead className="text-right">Found in the top 5</TableHead>
-								<TableHead className="text-right">Recall at 5</TableHead>
+								<TableHead className="text-right">
+									Found in the first 5
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -129,10 +130,9 @@ export function SearchEvaluation({
 									<TableRow key={mode}>
 										<TableCell>{label}</TableCell>
 										<TableCell className="text-right tabular-nums">
-											{r ? `${r.found} of ${result.questions}` : "Not tested"}
-										</TableCell>
-										<TableCell className="text-right tabular-nums">
-											{r ? percent(r.recall) : ""}
+											{r
+												? `${r.found} of ${result.questions} (${percent(r.recall)})`
+												: "Not tested"}
 										</TableCell>
 									</TableRow>
 								);
@@ -174,7 +174,8 @@ function Advice({
 						: "Search by meaning is off for this project",
 				);
 			},
-			onError: (error) => toast.error(`Could not save: ${error.message}`),
+			onError: (error) =>
+				toast.error(`The change was not saved: ${error.message}`),
 		}),
 	);
 	const { words, both } = evaluation.modes;
@@ -194,8 +195,8 @@ function Advice({
 				</AlertTitle>
 				<AlertDescription>
 					{off
-						? "Only words were tested. Turn it on to compare. It gets ready again first."
-						: "Only words were tested. Test again when search by meaning is ready."}
+						? "Night Shift tested words only. Turn it on to compare. It gets ready first."
+						: "Night Shift tested words only. Test again when search by meaning is ready."}
 				</AlertDescription>
 				{off && mayChange ? (
 					<AlertAction>
@@ -218,8 +219,8 @@ function Advice({
 				<SparklesIcon />
 				<AlertTitle>Mark more questions for a result you can trust</AlertTitle>
 				<AlertDescription>
-					{numbers} Night Shift decides from {evaluation.minQuestions} marked
-					questions or more.
+					{numbers} You need {evaluation.minQuestions} marked questions for a
+					clear result.
 				</AlertDescription>
 			</Alert>
 		);
@@ -238,8 +239,8 @@ function Advice({
 			<SparklesIcon />
 			<AlertTitle>Words alone find as much</AlertTitle>
 			<AlertDescription>
-				{numbers} That is less than {evaluation.minGainPoints} points better.
-				Turn off search by meaning to save the work of this computer.
+				{numbers} The gain is less than {evaluation.minGainPoints} points. Turn
+				off search by meaning to save work on this computer.
 			</AlertDescription>
 			{mayChange ? (
 				<AlertAction>
@@ -267,7 +268,7 @@ function Ranks({ evaluation }: { evaluation: Evaluation }) {
 				render={<Button variant="ghost" size="sm" className="self-start" />}
 			>
 				<ChevronDownIcon data-icon="inline-start" />
-				Rank of the first right file, per question
+				Position of the first right file, per question
 			</CollapsibleTrigger>
 			<CollapsibleContent>
 				<Table>

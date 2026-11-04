@@ -75,7 +75,7 @@ export function fileColumns(
 		}),
 		column.display({
 			id: "used",
-			header: "Used",
+			header: "Used by agents",
 			cell: ({ row }) => {
 				const used = use.byPath.get(row.original.path);
 				return (

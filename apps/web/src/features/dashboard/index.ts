@@ -1,6 +1,7 @@
 /** The overview of the nights: Home's numbers and lanes, and a project's page of metrics, chart and lists. */
 
 export { HomePage } from "./home-page";
+export { OVERVIEW_ROWS } from "./overview";
 export { preloadHomePage, preloadProjectDashboardPage } from "./preload";
 export { ProjectDashboardPage } from "./project-dashboard-page";
 export { PAGE_RANGES } from "./range-bar";

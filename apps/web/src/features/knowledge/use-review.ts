@@ -46,9 +46,10 @@ function useDismissed(projectId: string) {
 export type Review = ReturnType<typeof useReview>;
 
 /**
- * The queue of the Review tab, kept while the tabs change: what waits, in
- * order. Keep and Delete leave the queue at once, and go out after a few
- * seconds, so a person can take them back. Leaving the page sends them.
+ * The queue of the Review page, kept while a person moves between the pages
+ * of Knowledge: what waits, in order. Keep and Delete leave the queue at once,
+ * and go out after a few seconds, so a person can take them back. Leaving
+ * Knowledge sends them.
  */
 export function useReview(projectId: string, knowledge: Knowledge) {
 	const queryClient = useQueryClient();
@@ -129,7 +130,7 @@ export function useReview(projectId: string, knowledge: Knowledge) {
 		toast(
 			decision === "keep"
 				? "Kept. Agents read it in later runs."
-				: "Deleted. Agents never read it.",
+				: "Deleted. Agents do not read it.",
 			{
 				duration: UNDO_MS,
 				action: {

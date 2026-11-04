@@ -25,12 +25,15 @@ import { projectQueries } from "./queries";
 export function ProjectPage({
 	projectId,
 	section,
+	trail,
 	actions,
 	children,
 }: {
 	projectId: string;
 	/** The page inside the project, such as "Flows". None for the dashboard. */
 	section?: string;
+	/** The steps after the project, for a page deeper than one section. */
+	trail?: Crumb[];
 	/** Header actions, given the project. */
 	actions?: (project: Project) => ReactNode;
 	children: (project: Project) => ReactNode;
@@ -44,7 +47,7 @@ export function ProjectPage({
 			label: projectLabel,
 			link: { to: "/projects/$projectId", params: { projectId } },
 		},
-		...(section ? [{ label: section }] : []),
+		...(trail ?? (section ? [{ label: section }] : [])),
 	];
 
 	if (projects.isLoading) {

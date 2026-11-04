@@ -15,11 +15,13 @@ import {
 } from "@nightshift/ui/components/collapsible";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
 	FolderIcon,
@@ -42,7 +44,7 @@ import { knowledgeQueries } from "./queries";
 /**
  * Every file of the knowledge: the folders on the left, the files of the
  * chosen folder on the right, with how agents used them. Each side scrolls on
- * its own, so what comes below stays near.
+ * its own.
  */
 export function FolderBrowser({
 	projectId,
@@ -74,9 +76,23 @@ export function FolderBrowser({
 				<EmptyHeader>
 					<EmptyTitle>No files yet</EmptyTitle>
 					<EmptyDescription>
-						Choose Sync now on a source below to add its files.
+						Add a source, or choose Sync now on a source you have.
 					</EmptyDescription>
 				</EmptyHeader>
+				<EmptyContent>
+					<Button
+						variant="outline"
+						nativeButton={false}
+						render={
+							<Link
+								to="/projects/$projectId/knowledge/sources"
+								params={{ projectId }}
+							/>
+						}
+					>
+						Open sources
+					</Button>
+				</EmptyContent>
 			</Empty>
 		);
 	}

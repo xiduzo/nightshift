@@ -3,8 +3,8 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
+import { Card } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyDescription,
@@ -16,6 +16,13 @@ import {
 	InputGroupAddon,
 	InputGroupInput,
 } from "@nightshift/ui/components/input-group";
+import {
+	Item,
+	ItemContent,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
@@ -23,6 +30,7 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
 	Background,
 	type Edge,
@@ -34,6 +42,8 @@ import { CircleAlertIcon, SearchIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { loadElk } from "@/features/flows";
 import type { KnowledgeGraph } from "@/shared/api";
+import { PanelHeader } from "@/shared/panel";
+import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import {
 	type GraphKind,
 	type GraphNode,
@@ -45,6 +55,7 @@ import {
 	mapNodeTypes,
 } from "./map-node";
 import { knowledgeQueries } from "./queries";
+import { learningTaskId } from "./review-queue";
 import { useKnowledgeHits } from "./use-knowledge-hits";
 
 const KINDS: GraphKind[] = ["file", "topic", "question", "learning"];
@@ -105,18 +116,28 @@ function circleOf(nodes: GraphNode[]): Map<string, { x: number; y: number }> {
  * found them and the learnings that name their topics. Search shows what an
  * agent would find. A node shows what it connects to.
  */
-export function MapTab({
-	projectId,
-	focus,
-	onOpenFile,
-	onReview,
-}: {
-	projectId: string;
-	/** The node to start from. */
-	focus: string | null;
-	onOpenFile: (path: string) => void;
-	onReview: (learningId: string) => void;
-}) {
+export function KnowledgeMapPage({ node }: { node: string | undefined }) {
+	return (
+		<KnowledgeSection
+			title="Map"
+			description="How your files, topics, questions and learnings connect."
+		>
+			<KnowledgeMap focus={node ?? null} />
+		</KnowledgeSection>
+	);
+}
+
+function KnowledgeMap({ focus }: { focus: string | null }) {
+	const { projectId, review, openFile } = useKnowledge();
+	const navigate = useNavigate();
+	const onOpenFile = openFile;
+	const onReview = (learningId: string) => {
+		review.bringForward(learningTaskId(learningId));
+		void navigate({
+			to: "/projects/$projectId/knowledge/review",
+			params: { projectId },
+		});
+	};
 	const graph = useQuery(knowledgeQueries.graph(projectId));
 	if (graph.error) {
 		return (
@@ -280,9 +301,8 @@ function MapView({
 					<TriangleAlertIcon />
 					<AlertTitle>This map leaves out some topics</AlertTitle>
 					<AlertDescription>
-						Night Shift did not read {graph.filesLeftOut} of the files for
-						topics, because the knowledge is so large. Sync only what your
-						agents need.
+						Night Shift skipped {graph.filesLeftOut} files, because you have so
+						many. Sync only what your agents need.
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -298,8 +318,8 @@ function MapView({
 							setPicked(null);
 							setText(event.target.value);
 						}}
-						placeholder="Show what an agent would find"
-						aria-label="Show what an agent would find"
+						placeholder="Search to see what an agent finds"
+						aria-label="Search to see what an agent finds"
 					/>
 				</InputGroup>
 				<ToggleGroup
@@ -326,7 +346,7 @@ function MapView({
 					})}
 				</ToggleGroup>
 			</div>
-			<div className="flex h-[calc(100svh-17rem)] min-h-96 flex-col gap-4 lg:flex-row">
+			<div className="flex h-[calc(100svh-15.5rem)] min-h-96 flex-col gap-4 lg:flex-row">
 				<div className="relative min-h-64 min-w-0 flex-1 overflow-hidden rounded-xl border">
 					<ReactFlow<MapNode, Edge>
 						nodes={nodes}
@@ -345,29 +365,26 @@ function MapView({
 						<Background gap={24} size={1} />
 					</ReactFlow>
 				</div>
-				<aside className="flex h-56 shrink-0 flex-col overflow-hidden rounded-xl border lg:h-auto lg:w-80">
-					<ScrollArea className="min-h-0 flex-1">
-						<div className="flex flex-col gap-4 p-4">
-							{chosen ? (
-								<NodeDetail
-									node={chosen}
-									graph={graph}
-									onSelect={setPicked}
-									onOpenFile={onOpenFile}
-									onReview={onReview}
-								/>
-							) : (
-								<div className="flex flex-col gap-1">
-									<h3 className="font-medium text-sm">Choose a node</h3>
-									<p className="text-muted-foreground text-sm">
-										See what it connects to. Search to see what an agent would
-										find.
-									</p>
-								</div>
-							)}
-						</div>
-					</ScrollArea>
-				</aside>
+				<Card className="h-56 shrink-0 gap-0 overflow-hidden py-0 lg:h-auto lg:w-80">
+					{chosen ? (
+						<NodeDetail
+							node={chosen}
+							graph={graph}
+							onSelect={setPicked}
+							onOpenFile={onOpenFile}
+							onReview={onReview}
+						/>
+					) : (
+						<Empty>
+							<EmptyHeader>
+								<EmptyTitle>Choose an item</EmptyTitle>
+								<EmptyDescription>
+									This panel shows what connects to it.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					)}
+				</Card>
 			</div>
 		</div>
 	);
@@ -399,71 +416,86 @@ function NodeDetail({
 	const { path } = node;
 	return (
 		<>
-			<div className="flex flex-col gap-1">
-				<Badge variant="secondary" className="w-fit">
-					<Icon />
-					{KIND_NAME[node.kind].one}
-				</Badge>
-				<h3 className="break-words font-medium text-sm">{node.label}</h3>
-				{path ? (
-					<>
-						<p className="break-all font-mono text-muted-foreground text-xs">
-							{path}
-						</p>
+			<PanelHeader
+				icon={Icon}
+				kicker={KIND_NAME[node.kind].one}
+				title={node.label}
+				mono={false}
+				className="shrink-0 border-b"
+				actions={
+					path ? (
 						<Button
 							variant="outline"
 							size="sm"
-							className="mt-2 w-fit"
 							onClick={() => onOpenFile(path)}
 						>
 							Open file
 						</Button>
-					</>
-				) : null}
-				{node.kind === "learning" ? (
-					<Button
-						variant="outline"
-						size="sm"
-						className="mt-2 w-fit"
-						onClick={() => onReview(node.id.replace(/^learning:/, ""))}
-					>
-						Review it
-					</Button>
-				) : null}
-			</div>
-			{near.length === 0 ? (
-				<p className="text-muted-foreground text-sm">
-					Nothing connects to this yet.
-				</p>
-			) : null}
-			{KINDS.map((kind) => {
-				const items = near.flatMap((id) => {
-					const other = byId.get(id);
-					return other?.kind === kind ? [other] : [];
-				});
-				if (items.length === 0) return null;
-				const KindIcon = KIND_ICON[kind];
-				return (
-					<div key={kind} className="flex flex-col gap-0.5">
-						<h4 className="font-medium text-muted-foreground text-xs">
-							{KIND_NAME[kind].many}{" "}
-							<span className="tabular-nums">{items.length}</span>
-						</h4>
-						{items.map((item) => (
-							<Button
-								key={item.id}
-								variant="ghost"
-								size="sm"
-								className="w-full justify-start"
-								onClick={() => onSelect(item.id)}
-							>
-								<KindIcon data-icon="inline-start" />
-								<span className="truncate">{item.label}</span>
-							</Button>
-						))}
-					</div>
-				);
-			})}
+					) : node.kind === "learning" ? (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => onReview(node.id.replace(/^learning:/, ""))}
+						>
+							Review it
+						</Button>
+					) : undefined
+				}
+			/>
+			<ScrollArea className="min-h-0 flex-1">
+				<div className="flex flex-col gap-4 p-4">
+					{path ? (
+						<p className="break-all font-mono text-muted-foreground text-xs">
+							{path}
+						</p>
+					) : null}
+					{near.length === 0 ? (
+						<p className="text-muted-foreground text-sm">
+							Nothing connects to this yet.
+						</p>
+					) : null}
+					{KINDS.map((kind) => {
+						const items = near.flatMap((id) => {
+							const other = byId.get(id);
+							return other?.kind === kind ? [other] : [];
+						});
+						if (items.length === 0) return null;
+						const KindIcon = KIND_ICON[kind];
+						return (
+							<div key={kind} className="flex flex-col gap-1">
+								<h4 className="font-medium text-muted-foreground text-xs">
+									{KIND_NAME[kind].many}{" "}
+									<span className="tabular-nums">{items.length}</span>
+								</h4>
+								<ItemGroup className="gap-0.5">
+									{items.map((item) => (
+										<Item
+											key={item.id}
+											size="xs"
+											render={
+												<button
+													type="button"
+													className="text-left"
+													onClick={() => onSelect(item.id)}
+												/>
+											}
+										>
+											<ItemMedia variant="icon">
+												<KindIcon aria-hidden="true" />
+											</ItemMedia>
+											<ItemContent className="min-w-0">
+												<ItemTitle className="w-full font-normal">
+													<span className="truncate">{item.label}</span>
+												</ItemTitle>
+											</ItemContent>
+										</Item>
+									))}
+								</ItemGroup>
+							</div>
+						);
+					})}
+				</div>
+			</ScrollArea>
 		</>
 	);
 }

@@ -57,7 +57,7 @@ export function KnowledgeFileSheet({
 						<CircleAlertIcon />
 						<AlertTitle>This file is gone</AlertTitle>
 						<AlertDescription>
-							A sync changed the knowledge. Look for the file again.
+							A sync changed your files. Look for this file again.
 						</AlertDescription>
 					</Alert>
 				) : (

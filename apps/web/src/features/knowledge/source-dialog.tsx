@@ -53,10 +53,11 @@ import { knowledgeMutations } from "./queries";
 /** What each kind of source is, in one line, for the choice. */
 const KIND_HINTS: Record<KnowledgeSourceKind["kit"], string> = {
 	"kit:knowledge/folder": "Notes or documents outside this project.",
-	"kit:knowledge/files": "Files of this project, also ones that git ignores.",
+	"kit:knowledge/files": "Files of this project, also the ones git ignores.",
 	"kit:knowledge/web": "Any public page, as text. No account needed.",
 	"kit:knowledge/github-wiki": "The wiki of a repository, also a private one.",
-	"kit:knowledge/jira": "Work items, through your signed-in Jira CLI tool.",
+	"kit:knowledge/jira":
+		"Work items, through your Jira CLI tool. You must be signed in.",
 	"kit:knowledge/confluence":
 		"Pages by id, with an API token you save as a secret.",
 };
@@ -264,8 +265,8 @@ function SourceForm({
 				<DialogTitle>{edited ? "Edit source" : "Add source"}</DialogTitle>
 				<DialogDescription>
 					{edited
-						? "Change what Night Shift copies into the knowledge."
-						: "Choose what your agents should read. Night Shift copies it into the knowledge."}
+						? "Change what Night Shift copies for your agents."
+						: "Choose what your agents read. Night Shift keeps a copy for them."}
 				</DialogDescription>
 			</DialogHeader>
 
@@ -323,7 +324,7 @@ function SourceForm({
 				{shared ? (
 					<Alert>
 						<UsersIcon />
-						<AlertTitle>Every Member of this Space can read it</AlertTitle>
+						<AlertTitle>Every Member of this Space can read this</AlertTitle>
 						<AlertDescription>
 							Make sure that each Member may see what you add here.
 						</AlertDescription>

@@ -35,13 +35,35 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { orpc } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
-import { PageSection } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
 import { SearchEvaluation } from "./evaluation";
+import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
 
 /** The files a search found that the table shows, best first. */
 const SHOWN_HITS = 3;
+
+/** What agents searched for, and the mark that tests search. */
+export function KnowledgeQuestionsPage() {
+	const { projectId, knowledge } = useKnowledge();
+	const mayChange = knowledge.can.startRuns;
+	return (
+		<KnowledgeSection
+			title="Questions"
+			description={
+				mayChange
+					? "What agents searched for, and what they found. Mark the file that answers, so Night Shift can test search."
+					: "What agents searched for, and what they found."
+			}
+		>
+			<AskedQuestions
+				projectId={projectId}
+				mayChange={mayChange}
+				files={knowledge.files.map((file) => file.path)}
+			/>
+		</KnowledgeSection>
+	);
+}
 
 /**
  * "Questions agents asked": what agents searched for in the knowledge,
@@ -49,7 +71,7 @@ const SHOWN_HITS = 3;
  * the question joins the project's question set, which the evaluation
  * runs.
  */
-export function AskedQuestions({
+function AskedQuestions({
 	projectId,
 	files,
 	mayChange,
@@ -73,16 +95,7 @@ export function AskedQuestions({
 	const asked = questions.data?.asked ?? [];
 	const marked = questions.data?.set.length ?? 0;
 	return (
-		<PageSection
-			title="Questions agents asked"
-			description={
-				!mayChange
-					? "What agents searched for, and what they found."
-					: marked > 0
-						? `Mark the file that answers a question. ${marked} marked ${marked === 1 ? "question is" : "questions are"} in your question set.`
-						: "Mark the file that answers a question. Marked questions test how well search finds answers."
-			}
-		>
+		<div className="flex min-w-0 flex-col gap-4">
 			{marked > 0 ? (
 				<SearchEvaluation
 					projectId={projectId}
@@ -102,8 +115,7 @@ export function AskedQuestions({
 							<EmptyHeader>
 								<EmptyTitle>No questions yet</EmptyTitle>
 								<EmptyDescription>
-									When an agent searches this knowledge, its question shows
-									here.
+									When an agent searches your files, its question shows here.
 								</EmptyDescription>
 							</EmptyHeader>
 						</Empty>
@@ -151,7 +163,7 @@ export function AskedQuestions({
 					)}
 				</CardContent>
 			</Card>
-		</PageSection>
+		</div>
 	);
 }
 
@@ -207,12 +219,11 @@ function Answer({
 			onSuccess: (_set, input) => {
 				void queryClient.invalidateQueries({ queryKey: orpc.knowledge.key() });
 				toast.success(
-					input.answers.length > 0
-						? "Added to your question set"
-						: "Taken out of your question set",
+					input.answers.length > 0 ? "Question marked" : "Mark removed",
 				);
 			},
-			onError: (error) => toast.error(`Could not save: ${error.message}`),
+			onError: (error) =>
+				toast.error(`The mark was not saved: ${error.message}`),
 		}),
 	);
 	if (answers && answers.length > 0) {
@@ -224,13 +235,13 @@ function Answer({
 							{path}
 						</span>
 					))}
-					<Badge variant="secondary">In question set</Badge>
+					<Badge variant="secondary">Marked</Badge>
 				</div>
 				{mayChange ? (
 					<Button
 						variant="ghost"
 						size="icon-sm"
-						aria-label="Take this question out of the question set"
+						aria-label="Remove the mark from this question"
 						disabled={mark.isPending}
 						onClick={() => mark.mutate({ projectId, query, answers: [] })}
 					>

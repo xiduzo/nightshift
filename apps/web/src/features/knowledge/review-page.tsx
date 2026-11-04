@@ -30,7 +30,7 @@ import {
 import { Kbd } from "@nightshift/ui/components/kbd";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	CheckCircle2Icon,
 	CheckIcon,
@@ -44,9 +44,9 @@ import {
 	TriangleAlertIcon,
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
-import type { Knowledge } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { fileNameOf } from "./folder-tree";
+import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import { type ReviewTask, taskLine, taskNode } from "./review-queue";
 import { SyncNowButton } from "./sources";
 import type { Review } from "./use-review";
@@ -59,35 +59,34 @@ const NEXT_SHOWN = 5;
  * questions that found nothing, files no run used. K keeps, D deletes and
  * S puts off.
  */
-export function ReviewTab({
-	projectId,
-	review,
-	can,
-	fileCount,
-	active,
-	onOpenFile,
-	onAddSource,
-	onShowOnMap,
-	onShowFiles,
-}: {
-	projectId: string;
-	review: Review;
-	can: Knowledge["can"];
-	fileCount: number;
-	/** This tab is the one in view: only then do the keys work. */
-	active: boolean;
-	onOpenFile: (path: string) => void;
-	/** Unset: the person may not add a source. */
-	onAddSource: (() => void) | undefined;
-	onShowOnMap: (node: string) => void;
-	onShowFiles: () => void;
-}) {
+export function KnowledgeReviewPage() {
+	return (
+		<KnowledgeSection
+			title="Review"
+			description="What waits for you. Keep what agents learned, and fix what they could not find."
+		>
+			<ReviewQueue />
+		</KnowledgeSection>
+	);
+}
+
+function ReviewQueue() {
+	const { projectId, knowledge, review, openFile, addSource } = useKnowledge();
+	const navigate = useNavigate();
+	const can = knowledge.can;
+	const fileCount = knowledge.files.length;
+	const onShowOnMap = (node: string) =>
+		void navigate({
+			to: "/projects/$projectId/knowledge/map",
+			params: { projectId },
+			search: { node },
+		});
 	const { queue, total } = review;
 	const current = queue[0];
 	const mayDecide = can.startRuns;
 
 	useEffect(() => {
-		if (!active || !current) return;
+		if (!current) return;
 		const onKey = (event: KeyboardEvent) => {
 			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			const target = event.target as HTMLElement | null;
@@ -99,7 +98,7 @@ export function ReviewTab({
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [active, current, mayDecide, review]);
+	}, [current, mayDecide, review]);
 
 	if (review.error) {
 		return (
@@ -118,16 +117,25 @@ export function ReviewTab({
 					<EmptyMedia variant="icon">
 						<CheckCircle2Icon aria-hidden="true" />
 					</EmptyMedia>
-					<EmptyTitle>Nothing waits for you</EmptyTitle>
+					<EmptyTitle>Nothing to review</EmptyTitle>
 					<EmptyDescription>
-						When an agent learns something, it comes up here for you to keep or
-						delete.
+						When an agent learns something, it shows here. You keep it or delete
+						it.
 					</EmptyDescription>
 				</EmptyHeader>
 				{fileCount > 0 ? (
 					<EmptyContent>
-						<Button variant="outline" onClick={onShowFiles}>
-							See what agents know
+						<Button
+							variant="outline"
+							nativeButton={false}
+							render={
+								<Link
+									to="/projects/$projectId/knowledge/files"
+									params={{ projectId }}
+								/>
+							}
+						>
+							Open files
 						</Button>
 					</EmptyContent>
 				) : null}
@@ -143,7 +151,7 @@ export function ReviewTab({
 					className="h-1.5 flex-1"
 				/>
 				<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
-					{queue.length} to go
+					{queue.length} left
 				</span>
 			</div>
 			<TaskCard
@@ -151,8 +159,8 @@ export function ReviewTab({
 				task={current}
 				review={review}
 				mayDecide={mayDecide}
-				onOpenFile={onOpenFile}
-				onAddSource={onAddSource}
+				onOpenFile={openFile}
+				onAddSource={addSource}
 				onShowOnMap={onShowOnMap}
 			/>
 			{queue.length > 1 ? (
@@ -235,7 +243,7 @@ function TaskCard({
 								params={{ runId: learning.runId }}
 								className="underline underline-offset-2"
 							>
-								See the run
+								Open run
 							</Link>
 							· {formatRelative(learning.proposedAt)}
 						</CardDescription>
@@ -297,7 +305,8 @@ function TaskCard({
 					<CardHeader>
 						<CardDescription className="flex flex-wrap items-center gap-x-2">
 							<SearchXIcon aria-hidden="true" className="size-4" />
-							Agents found nothing · {formatRelative(task.question.lastAt)}
+							Agents searched for this and found nothing ·{" "}
+							{formatRelative(task.question.lastAt)}
 						</CardDescription>
 						<CardTitle className="text-lg">{task.question.query}</CardTitle>
 					</CardHeader>
@@ -318,7 +327,7 @@ function TaskCard({
 					<CardHeader>
 						<CardDescription className="flex flex-wrap items-center gap-x-2">
 							<FileX2Icon aria-hidden="true" className="size-4" />
-							No run used these lately
+							No run used these files lately
 						</CardDescription>
 						<CardTitle className="text-lg">
 							{task.files.length} {task.files.length === 1 ? "file" : "files"}{" "}
@@ -388,7 +397,7 @@ function SourceTask({
 								params={{ runId: sync.lastRun.id }}
 								className="underline underline-offset-2"
 							>
-								See the run
+								Open run
 							</Link>
 						</>
 					) : null}
