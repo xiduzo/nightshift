@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SynonymEmbeddings } from "../testing/embeddings";
+import { watchVectorPreparation } from "../testing/vector-preparation";
 import { adviceOf, EVALUATION, evaluateKnowledge } from "./evaluate";
 import { createKnowledgeFolders } from "./folder";
 import type { KnowledgeMeaning } from "./meaning";
@@ -18,6 +19,7 @@ let dataDir: string;
 let embeddings: SynonymEmbeddings;
 let on: boolean;
 let search: KnowledgeSearch;
+let watch: ReturnType<typeof watchVectorPreparation>;
 
 beforeEach(async () => {
 	dataDir = await mkdtemp(join(tmpdir(), "nightshift-evaluate-"));
@@ -33,9 +35,11 @@ beforeEach(async () => {
 		query: (text) => text,
 		ready: async () => "ready",
 	};
+	watch = watchVectorPreparation();
 	search = createKnowledgeSearch(dataDir, {
 		meaning,
 		meaningOn: async () => on,
+		onPreparation: watch.onEvent,
 	});
 });
 afterEach(async () => {
@@ -44,9 +48,9 @@ afterEach(async () => {
 });
 
 async function prepared() {
-	for (let i = 0; i < 200; i++) {
+	for (let i = 0; i < 20; i++) {
 		if ((await search.meaning("p1")).state === "on") return;
-		await Bun.sleep(10);
+		await watch.settled("p1");
 	}
 	throw new Error("The vectors did not come.");
 }
@@ -97,7 +101,7 @@ describe("evaluateKnowledge", () => {
 			both: null,
 		});
 		// Its vectors are not prepared either.
-		await Bun.sleep(50);
+		expect(await watch.settled("p1")).toBe("idle");
 		expect(embeddings.embedded).toBe(0);
 		// On again: it gets ready, and finds by meaning.
 		on = true;

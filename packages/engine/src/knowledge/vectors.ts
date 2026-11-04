@@ -23,37 +23,9 @@ import { now as timeNow } from "@nightshift/time";
  *
  * The vectors are float32 BLOBs, searched by an exact scan in JS: no
  * extension and no native addon. It stays fast for a project's knowledge
- * (about 50 ms over 20 000 sections of 1 024 dimensions).
+ * (about 50 ms over 20 000 sections of 1 024 dimensions). Their tables are
+ * the search store's (`search-store.ts`).
  */
-
-/** The record manager's table: which section ids `index()` stored, and when. */
-function recordsSchema(db: Database): void {
-	db.run(
-		"CREATE TABLE IF NOT EXISTS records (namespace TEXT NOT NULL, key TEXT NOT NULL, updated_at REAL NOT NULL, group_id TEXT, PRIMARY KEY (namespace, key))",
-	);
-	db.run(
-		"CREATE INDEX IF NOT EXISTS records_time ON records (namespace, updated_at)",
-	);
-	db.run(
-		"CREATE INDEX IF NOT EXISTS records_group ON records (namespace, group_id)",
-	);
-}
-
-/** The vector store's table: one row per section of a project, by its id. */
-function vectorsSchema(db: Database): void {
-	db.run(
-		"CREATE TABLE IF NOT EXISTS vectors (project_id TEXT NOT NULL, id TEXT NOT NULL, text TEXT NOT NULL, metadata TEXT NOT NULL, vec BLOB NOT NULL, PRIMARY KEY (project_id, id))",
-	);
-}
-
-/** Creates the tables of both classes in `db`, when they are not there. */
-export function createVectorTables(db: Database): void {
-	recordsSchema(db);
-	vectorsSchema(db);
-}
-
-/** The tables of both classes, for an index built again. */
-export const VECTOR_TABLES = ["records", "vectors"] as const;
 
 /**
  * A LangChain record manager on bun:sqlite, one namespace per project.
@@ -73,9 +45,8 @@ export class BunSqliteRecordManager implements RecordManagerInterface {
 		private readonly namespace: string,
 	) {}
 
-	async createSchema(): Promise<void> {
-		recordsSchema(this.db);
-	}
+	/** Nothing to do: the search store creates every table (`search-store.ts`). */
+	async createSchema(): Promise<void> {}
 
 	async getTime(): Promise<number> {
 		if (this.last === null) {
@@ -185,7 +156,6 @@ export class BunSqliteVectorStore extends VectorStore {
 		private readonly projectId: string,
 	) {
 		super(embeddings, {});
-		vectorsSchema(db);
 	}
 
 	_vectorstoreType(): string {

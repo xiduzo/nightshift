@@ -1,11 +1,5 @@
-import { Database } from "bun:sqlite";
-import { rmSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { Document } from "@langchain/core/documents";
-import { index } from "@langchain/core/indexing";
-import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
-import { now } from "@nightshift/time";
 import { sha256OfFile } from "../archive";
 import { isDocument, loadDocument } from "./documents";
 import {
@@ -19,13 +13,18 @@ import {
 	TEXT_FILES,
 } from "./folder";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
-import { type SectionMetadata, splitSections } from "./sections";
 import {
-	BunSqliteRecordManager,
-	BunSqliteVectorStore,
-	createVectorTables,
-	VECTOR_TABLES,
-} from "./vectors";
+	createSearchStore,
+	type IndexedFile,
+	type IndexedFileWrite,
+	MATCH_CLOSE,
+	MATCH_OPEN,
+} from "./search-store";
+import { splitSections } from "./sections";
+import {
+	createVectorPreparation,
+	type VectorPreparationEvent,
+} from "./vector-preparation";
 import { inFolders } from "./view";
 
 /**
@@ -49,8 +48,9 @@ import { inFolders } from "./view";
  * Each file is cut into sections (`sections.ts`), so a hit points at a
  * part of a file. Words: an FTS5 table of the sections, ranked by BM25.
  * Meaning (`meaning.ts`): a vector per section, kept current in the
- * background by LangChain's `index()` after each change, never during a
- * search. A search fuses both lists by file with reciprocal rank fusion.
+ * background (`vector-preparation.ts`), never during a search. The tables
+ * are the store's (`search-store.ts`): this module is the refresh and the
+ * query. A search fuses both lists by file with reciprocal rank fusion.
  * A file found by meaning alone must pass the model's floor
  * (`KnowledgeMeaning.floor`): a query no file matches finds nothing.
  * Without Ollama, or before the first vectors, it finds by words only.
@@ -109,7 +109,8 @@ export type KnowledgeRefresh = {
  * project. `no-ollama`: Ollama does not answer. `no-model`: Ollama does
  * not have the model. `downloading`: the model is on its way, `percent` of
  * it. `preparing`: the first vectors are on their way, `done` of `total`
- * sections. `on`: every section has its vector.
+ * sections. `failed`: the last preparation stopped at `done` of `total`, and
+ * it tries again. `on`: every section has its vector.
  */
 export type KnowledgeMeaningStatus = {
 	state:
@@ -117,6 +118,7 @@ export type KnowledgeMeaningStatus = {
 		| "turned-off"
 		| Exclude<KnowledgeMeaningReady, "ready">
 		| "preparing"
+		| "failed"
 		| "on";
 	/** The embedding model. Null when it is off. */
 	model: string | null;
@@ -128,8 +130,6 @@ export type KnowledgeMeaningStatus = {
 	percent: number | null;
 };
 
-/** Bump to build every index again. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. */
-const SCHEMA_VERSION = 4;
 /** What the index reads of a file: past this, the end of a very large file is not found. */
 const MAX_BODY_BYTES = 1024 * 1024;
 /** Files read at once while indexing. */
@@ -143,27 +143,14 @@ const FUSE_DEPTH = 20;
 const SECTION_CANDIDATES = 200;
 /** Reciprocal rank fusion's constant: a file at rank r of a list adds 1 / (60 + r). */
 const RRF_C = 60;
-/** Words around a match in an excerpt. */
-const SNIPPET_TOKENS = 16;
 /** Characters of a section's start, as the excerpt of a hit found by meaning only. */
 const SNIPPET_CHARS = 180;
-/** Sections embedded in one call to the model. */
-const EMBED_BATCH = 32;
 /** How long a search waits for the query's vector before it finds by words only. A Host's CPU takes 3 s for one, and up to 8 s more while a preparation runs. */
 const QUERY_TIMEOUT_MS = 15_000;
-/** After a failed preparation, how long until the next try. */
-const RETRY_MS = 60_000;
-
-/** Marks a match in `snippet()` output: never in a text file. */
-const OPEN = "\u0002";
-const CLOSE = "\u0003";
 
 const isText = (path: string) => TEXT_FILES.has(extname(path).toLowerCase());
 /** The files the index reads: text files and documents. */
 const isIndexed = (path: string) => isText(path) || isDocument(path);
-
-/** What the model embeds of a section: the file's title, then the section. */
-const embedText = (title: string, text: string) => `${title}\n\n${text}`;
 
 /**
  * Reciprocal rank fusion: each list adds 1 / (c + rank) to each key it
@@ -237,22 +224,6 @@ function within<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
- * The SQL that keeps a file's path (`f.path`) in `folders`, as
- * `inFolders` does: the folder itself, or a path that starts with it and
- * a `/`, in the same case. No folders: no file.
- */
-function folderClause(folders: readonly string[]): {
-	sql: string;
-	params: string[];
-} {
-	if (folders.length === 0) return { sql: "0", params: [] };
-	return {
-		sql: folders.map(() => "f.path = ? OR instr(f.path, ?) = 1").join(" OR "),
-		params: folders.flatMap((folder) => [folder, `${folder}/`]),
-	};
-}
-
-/**
  * The FTS5 query for what a person or an agent typed, or null when it has
  * no word. Every word is quoted, so no input is FTS5 syntax: `"a phrase"`
  * stays a phrase, a word ending in `*` matches as a prefix, and so does the
@@ -289,13 +260,13 @@ function snippetParts(raw: string): KnowledgeSnippetPart[] {
 	};
 	let rest = raw;
 	while (rest !== "") {
-		const start = rest.indexOf(OPEN);
+		const start = rest.indexOf(MATCH_OPEN);
 		if (start < 0) {
 			push(rest, false);
 			break;
 		}
 		push(rest.slice(0, start), false);
-		const end = rest.indexOf(CLOSE, start);
+		const end = rest.indexOf(MATCH_CLOSE, start);
 		const stop = end < 0 ? rest.length : end;
 		push(rest.slice(start + 1, stop), true);
 		rest = end < 0 ? "" : rest.slice(end + 1);
@@ -306,14 +277,6 @@ function snippetParts(raw: string): KnowledgeSnippetPart[] {
 	if (final && !final.match) final.text = final.text.trimEnd();
 	return parts.filter((part) => part.text !== "");
 }
-
-type Row = {
-	id: number;
-	path: string;
-	size: number;
-	changed_at: number;
-	sha256: string;
-};
 
 /** A file the words found, at its best section. */
 type WordsHit = {
@@ -347,13 +310,16 @@ export type KnowledgeSearch = ReturnType<typeof createKnowledgeSearch>;
  * when it gives null, search finds by words only. `meaningOn`: whether a
  * person left search by meaning on for a project (the project's setting,
  * `knowledge-document.ts`). Off: the project is searched by words only,
- * and its vectors are not prepared. Default: on.
+ * and its vectors are not prepared. Default: on. `clock` and `onPreparation`:
+ * the vector preparation's clock, and what hears each change of its state.
  */
 export function createKnowledgeSearch(
 	dataDir: string,
 	options: {
 		meaning?: KnowledgeMeaning | (() => KnowledgeMeaning | null);
 		meaningOn?: (projectId: string) => Promise<boolean>;
+		clock?: () => number;
+		onPreparation?: (event: VectorPreparationEvent) => void;
 	} = {},
 ) {
 	const given = options.meaning;
@@ -366,303 +332,29 @@ export function createKnowledgeSearch(
 			? options.meaningOn(projectId).catch(() => true)
 			: Promise.resolve(true);
 	const folders = createKnowledgeFolders(dataDir);
-	const root = join(dataDir, "knowledge");
-	const file = join(root, KNOWLEDGE_SEARCH_FILE);
-	let db: Database | null = null;
-	let closed = false;
+	const store = createSearchStore(dataDir, {
+		onVectorsGone: () => preparation.vectorsGone(),
+	});
+	const preparation = createVectorPreparation({
+		store,
+		model: current,
+		meaningOn,
+		...(options.clock ? { clock: options.clock } : {}),
+		...(options.onPreparation ? { onEvent: options.onPreparation } : {}),
+	});
 	/** One refresh per project at a time: a second search waits for it. */
 	const refreshing = new Map<string, Promise<KnowledgeRefresh>>();
-
-	/** The vector store of each project, on the open index file, with the model it embeds with. */
-	const stores = new Map<
-		string,
-		{ meaning: KnowledgeMeaning; store: BunSqliteVectorStore }
-	>();
-	/** The model the open index's vectors belong to. */
-	let indexModel: string | null = null;
-	/** Projects whose sections all have their vectors, since this index opened. */
-	const synced = new Set<string>();
-	/** A count per project that goes up when its sections change. */
-	const generation = new Map<string, number>();
-	/** Projects waiting for, or in, a preparation of their vectors. */
-	const queued = new Set<string>();
-	/** When a preparation of a project last failed. */
-	const failedAt = new Map<string, number>();
-	/** Projects whose setting turned search by meaning off, as last read. */
-	const turnedOff = new Set<string>();
-	/** Reads the project's setting again: off, its vectors are not prepared. */
-	async function readSetting(projectId: string): Promise<boolean> {
-		const on = await meaningOn(projectId);
-		if (on) turnedOff.delete(projectId);
-		else turnedOff.add(projectId);
-		return on;
-	}
-	/** Preparations run one project at a time, in the background. */
-	let preparing: Promise<void> = Promise.resolve();
-	/** What the last check of the model said, to log a change once. */
-	let lastReady: KnowledgeMeaningReady | null = null;
+	/** Whether the last query's vector did not come, to log it once. */
 	let queryFailed = false;
-
-	function create(): Database {
-		const sqlite = new Database(file, { create: true });
-		sqlite.run("PRAGMA journal_mode = WAL");
-		sqlite.run("PRAGMA synchronous = NORMAL");
-		const { user_version } = sqlite
-			.query<{ user_version: number }, []>("PRAGMA user_version")
-			.get() ?? { user_version: 0 };
-		if (user_version !== SCHEMA_VERSION) {
-			for (const table of [
-				"files",
-				"texts",
-				"sections",
-				"meta",
-				...VECTOR_TABLES,
-			]) {
-				sqlite.run(`DROP TABLE IF EXISTS ${table}`);
-			}
-		}
-		sqlite.run(
-			"CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, project_id TEXT NOT NULL, path TEXT NOT NULL, size INTEGER NOT NULL, changed_at REAL NOT NULL, sha256 TEXT NOT NULL, title TEXT NOT NULL, UNIQUE (project_id, path))",
-		);
-		sqlite.run(
-			"CREATE TABLE IF NOT EXISTS sections (id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL, ord INTEGER NOT NULL, heading TEXT, line INTEGER NOT NULL, page INTEGER, text TEXT NOT NULL)",
-		);
-		sqlite.run(
-			"CREATE INDEX IF NOT EXISTS sections_file ON sections (file_id, ord)",
-		);
-		// Stemmed (deploying finds deploy), accents folded, and fast prefixes.
-		sqlite.run(
-			"CREATE VIRTUAL TABLE IF NOT EXISTS texts USING fts5(path, title, heading, body, tokenize = 'porter unicode61 remove_diacritics 2', prefix = '2 3')",
-		);
-		createVectorTables(sqlite);
-		sqlite.run(
-			"CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-		);
-		sqlite.run(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-		return sqlite;
-	}
-
-	/**
-	 * The model is part of the index: the vectors of another model go, and
-	 * every project prepares again. Runs when the index opens and when the
-	 * model changes while Night Shift runs.
-	 */
-	function align(sqlite: Database, model: string, force = false): void {
-		if (indexModel === model && !force) return;
-		const kept = sqlite
-			.query<{ value: string }, []>(
-				"SELECT value FROM meta WHERE key = 'model'",
-			)
-			.get()?.value;
-		if (kept !== model || force) {
-			for (const table of VECTOR_TABLES) sqlite.run(`DELETE FROM ${table}`);
-			sqlite
-				.query(
-					"INSERT INTO meta (key, value) VALUES ('model', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-				)
-				.run(model);
-			stores.clear();
-			synced.clear();
-			failedAt.clear();
-			for (const projectId of generation.keys()) stale(projectId);
-		}
-		indexModel = model;
-	}
-
-	/** Forgets what belongs to the open index file. */
-	function forget(): void {
-		stores.clear();
-		synced.clear();
-		indexModel = null;
-	}
-
-	/** Throws the index away: it is derived, the next call builds it again. */
-	function discard(): void {
-		try {
-			db?.close();
-		} catch {}
-		db = null;
-		forget();
-		for (const suffix of ["", "-wal", "-shm"]) {
-			rmSync(`${file}${suffix}`, { force: true });
-		}
-	}
-
-	/** `work`, and once more on a new index when the file is broken. */
-	async function healing<T>(work: () => Promise<T>): Promise<T> {
-		try {
-			return await work();
-		} catch (error) {
-			if (
-				!/malformed|not a database|SQLITE_CORRUPT|SQLITE_NOTADB/i.test(
-					String(error),
-				)
-			) {
-				throw error;
-			}
-			discard();
-			return work();
-		}
-	}
-
-	/** The index, opened once. A file that does not open is derived data: it goes, and a new one is built. */
-	async function database(): Promise<Database> {
-		if (db) return db;
-		await mkdir(root, { recursive: true });
-		forget();
-		try {
-			db = create();
-		} catch {
-			discard();
-			db = create();
-		}
-		closed = false;
-		return db;
-	}
-
-	/** The project's vector store on `sqlite`, for the model now. */
-	function storeOf(
-		sqlite: Database,
-		projectId: string,
-		model: KnowledgeMeaning,
-	): BunSqliteVectorStore {
-		align(sqlite, model.model);
-		const kept = stores.get(projectId);
-		if (kept?.meaning === model) return kept.store;
-		const store = new BunSqliteVectorStore(model.embeddings, sqlite, projectId);
-		stores.set(projectId, { meaning: model, store });
-		return store;
-	}
-
-	/** Whether the model can embed now. A change is logged once. */
-	async function readyNow(model: KnowledgeMeaning) {
-		const ready = await model.ready();
-		if (ready !== lastReady && (lastReady !== null || ready !== "ready")) {
-			console.info(
-				ready === "ready"
-					? `Knowledge search finds by meaning again, with ${model.model}.`
-					: ready === "downloading"
-						? `Knowledge search finds by words only while ${model.model} downloads.`
-						: ready === "no-model"
-							? `Knowledge search finds by words only: Ollama does not have ${model.model}. Run: ollama pull ${model.model}`
-							: `Knowledge search finds by words only: Ollama does not answer${model.where ? ` at ${model.where}` : " on this computer"}.`,
-			);
-		}
-		lastReady = ready;
-		return ready;
-	}
-
-	/** The project's sections changed: its vectors are behind. */
-	function stale(projectId: string): void {
-		synced.delete(projectId);
-		generation.set(projectId, (generation.get(projectId) ?? 0) + 1);
-	}
-
-	/**
-	 * Brings the project's vectors in step with its sections, in the
-	 * background, one project at a time. A search never waits for it: it
-	 * uses the vectors there are.
-	 */
-	function prepare(projectId: string): void {
-		const meaning = current();
-		if (!meaning || closed) return;
-		if (synced.has(projectId) || queued.has(projectId)) return;
-		if (turnedOff.has(projectId)) return;
-		const failed = failedAt.get(projectId);
-		if (failed !== undefined && now() - failed < RETRY_MS) return;
-		queued.add(projectId);
-		preparing = preparing.then(async () => {
-			let again = false;
-			try {
-				again = await embed(projectId, meaning);
-				failedAt.delete(projectId);
-			} catch (error) {
-				failedAt.set(projectId, now());
-				if (!closed) {
-					console.warn(
-						"Knowledge search could not prepare its search by meaning:",
-						error,
-					);
-				}
-			} finally {
-				queued.delete(projectId);
-			}
-			if (again) prepare(projectId);
-		});
-	}
-
-	/**
-	 * Embeds the sections that have no vector yet and drops the vectors of
-	 * sections that went, through `index()`. Every section goes in, with
-	 * `cleanup: "full"`: a removed file is not seen, and only `full`
-	 * removes what was not seen. An unchanged section costs a hash and a
-	 * look-up, no embedding. True when the sections changed meanwhile.
-	 */
-	async function embed(
-		projectId: string,
-		model: KnowledgeMeaning,
-	): Promise<boolean> {
-		// Closed meanwhile: a preparation does not open the index again.
-		if ((await readyNow(model)) !== "ready" || closed) return false;
-		const at = generation.get(projectId) ?? 0;
-		const sqlite = await database();
-		// Before the generation is read again: a new model makes every project stale.
-		const store = storeOf(sqlite, projectId, model);
-		if ((generation.get(projectId) ?? 0) !== at) return true;
-		const docs = sqlite
-			.query<{ path: string; title: string; text: string }, [string]>(
-				`SELECT f.path AS path, f.title AS title, s.text AS text
-				FROM sections s JOIN files f ON f.id = s.file_id
-				WHERE f.project_id = ? AND s.text != ''
-				ORDER BY f.path, s.ord`,
-			)
-			.all(projectId)
-			.map(
-				(row) =>
-					new Document({
-						pageContent: embedText(row.title, row.text),
-						// Only the path: a line or heading that moves does not embed a section again.
-						metadata: { path: row.path },
-					}),
-			);
-		await index({
-			docsSource: docs,
-			recordManager: new BunSqliteRecordManager(
-				sqlite,
-				`knowledge:${projectId}`,
-			),
-			vectorStore: store,
-			options: {
-				cleanup: "full",
-				sourceIdKey: "path",
-				batchSize: EMBED_BATCH,
-			},
-		});
-		if (indexModel !== model.model) {
-			// The model changed while this one embedded: its vectors may be mixed in.
-			if (indexModel !== null) align(sqlite, indexModel, true);
-			return true;
-		}
-		if ((generation.get(projectId) ?? 0) !== at) return true;
-		synced.add(projectId);
-		return false;
-	}
 
 	async function update(projectId: string): Promise<KnowledgeRefresh> {
 		const dir = folders.folder(projectId);
 		const files = (await folders.files(projectId)).filter((f) =>
 			isIndexed(f.path),
 		);
-		const sqlite = await database();
-		const known = new Map(
-			sqlite
-				.query<Row, [string]>(
-					"SELECT id, path, size, changed_at, sha256 FROM files WHERE project_id = ?",
-				)
-				.all(projectId)
-				.map((row) => [row.path, row]),
-		);
-		const changed: { file: KnowledgeFile; row: Row | undefined }[] = [];
+		await store.open();
+		const known = store.files(projectId);
+		const changed: { file: KnowledgeFile; row: IndexedFile | undefined }[] = [];
 		for (const f of files) {
 			const row = known.get(f.path);
 			known.delete(f.path);
@@ -672,130 +364,44 @@ export function createKnowledgeSearch(
 		}
 		const gone = [...known.values()];
 
-		const dropFile = sqlite.prepare("DELETE FROM files WHERE id = ?");
-		const dropTexts = sqlite.prepare(
-			"DELETE FROM texts WHERE rowid IN (SELECT id FROM sections WHERE file_id = ?)",
-		);
-		const dropSections = sqlite.prepare(
-			"DELETE FROM sections WHERE file_id = ?",
-		);
-		const addFile = sqlite.prepare<
-			{ id: number },
-			[string, string, number, number, string, string]
-		>(
-			"INSERT INTO files (project_id, path, size, changed_at, sha256, title) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-		);
-		const setFile = sqlite.prepare(
-			"UPDATE files SET size = ?, changed_at = ?, sha256 = ?, title = ? WHERE id = ?",
-		);
-		const touchFile = sqlite.prepare(
-			"UPDATE files SET size = ?, changed_at = ? WHERE id = ?",
-		);
-		const addSection = sqlite.prepare<
-			{ id: number },
-			[number, number, string | null, number, number | null, string]
-		>(
-			"INSERT INTO sections (file_id, ord, heading, line, page, text) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-		);
-		const addText = sqlite.prepare(
-			"INSERT INTO texts (rowid, path, title, heading, body) VALUES (?, ?, ?, ?, ?)",
-		);
-		const drop = (id: number) => {
-			dropTexts.run(id);
-			dropSections.run(id);
-		};
-
 		let moved = false;
 		if (gone.length > 0) {
 			moved = true;
-			sqlite.transaction(() => {
-				for (const row of gone) {
-					drop(row.id);
-					dropFile.run(row.id);
-				}
-			})();
+			store.removeFiles(gone);
 		}
 
 		for (let at = 0; at < changed.length; at += BATCH) {
 			const batch = await Promise.all(
-				changed.slice(at, at + BATCH).map(async ({ file: f, row }) => {
-					const abs = join(dir, ...f.path.split("/"));
-					// A file that went since the walk is dropped by the next refresh.
-					const sha256 = await sha256OfFile(abs).catch(() => "");
-					if (row && sha256 !== "" && row.sha256 === sha256) {
-						return { file: f, row, same: true as const };
-					}
-					const fallback = fallbackTitle(f.path);
-					let title = f.path.split("/").at(-1) ?? f.path;
-					let content: string | Document[] = "";
-					if (isDocument(f.path)) {
-						const docs = await loadDocument(abs);
-						if (docs !== null) {
-							title = describeDocument(docs, fallback).title;
-							content = firstPages(docs, MAX_BODY_BYTES);
+				changed
+					.slice(at, at + BATCH)
+					.map(async ({ file: f, row }): Promise<IndexedFileWrite> => {
+						const abs = join(dir, ...f.path.split("/"));
+						// A file that went since the walk is dropped by the next refresh.
+						const sha256 = await sha256OfFile(abs).catch(() => "");
+						if (row && sha256 !== "" && row.sha256 === sha256) {
+							return { file: f, row, same: true };
 						}
-					} else {
-						const read = await readStart(abs, MAX_BODY_BYTES);
-						content = read?.text ?? "";
-						title = describeText(content.slice(0, 4096), fallback).title;
-					}
-					const sections = await splitSections(f.path, content);
-					return {
-						file: f,
-						row,
-						same: false as const,
-						sha256,
-						title,
-						sections,
-					};
-				}),
+						const fallback = fallbackTitle(f.path);
+						let title = f.path.split("/").at(-1) ?? f.path;
+						let content: string | Document[] = "";
+						if (isDocument(f.path)) {
+							const docs = await loadDocument(abs);
+							if (docs !== null) {
+								title = describeDocument(docs, fallback).title;
+								content = firstPages(docs, MAX_BODY_BYTES);
+							}
+						} else {
+							const read = await readStart(abs, MAX_BODY_BYTES);
+							content = read?.text ?? "";
+							title = describeText(content.slice(0, 4096), fallback).title;
+						}
+						const sections = await splitSections(f.path, content);
+						return { file: f, row, same: false, sha256, title, sections };
+					}),
 			);
-			sqlite.transaction(() => {
-				for (const item of batch) {
-					const { file: f, row } = item;
-					if (item.same) {
-						touchFile.run(f.size, f.changedAt, row?.id ?? 0);
-						continue;
-					}
-					moved = true;
-					let id = row?.id;
-					if (id === undefined) {
-						id = (
-							addFile.get(
-								projectId,
-								f.path,
-								f.size,
-								f.changedAt,
-								item.sha256,
-								item.title,
-							) as { id: number }
-						).id;
-					} else {
-						setFile.run(f.size, f.changedAt, item.sha256, item.title, id);
-						drop(id);
-					}
-					for (const [ord, section] of item.sections.entries()) {
-						const { heading, line, page } = section.metadata as SectionMetadata;
-						const added = addSection.get(
-							id,
-							ord,
-							heading,
-							line,
-							page,
-							section.pageContent,
-						) as { id: number };
-						addText.run(
-							added.id,
-							f.path,
-							item.title,
-							heading ?? "",
-							section.pageContent,
-						);
-					}
-				}
-			})();
+			if (store.writeFiles(projectId, batch)) moved = true;
 		}
-		if (moved) stale(projectId);
+		if (moved) preparation.sectionsChanged(projectId);
 		return {
 			files: files.length,
 			indexed: changed.length,
@@ -810,9 +416,9 @@ export function createKnowledgeSearch(
 	function refresh(projectId: string): Promise<KnowledgeRefresh> {
 		const running = refreshing.get(projectId);
 		if (running) return running;
-		const next = Promise.all([update(projectId), readSetting(projectId)])
-			.then(([result, on]) => {
-				if (on) prepare(projectId);
+		const next = update(projectId)
+			.then((result) => {
+				preparation.request(projectId);
 				return result;
 			})
 			.finally(() => refreshing.delete(projectId));
@@ -825,34 +431,17 @@ export function createKnowledgeSearch(
 	 * `limit`. With `folders`: in those folders only (`inFolders`).
 	 */
 	function byWords(
-		sqlite: Database,
 		projectId: string,
 		match: string,
 		limit: number,
 		folders?: readonly string[],
 	): WordsHit[] {
-		// In the query, so other files take no place among the candidates.
-		const within = folders ? folderClause(folders) : null;
-		// Columns: path, title, heading, body. A word in the title counts most, then the path, then a heading.
-		const rows = sqlite
-			.query<
-				{
-					path: string;
-					title: string;
-					heading: string | null;
-					line: number;
-					page: number | null;
-					snippet: string;
-				},
-				(string | number)[]
-			>(
-				`SELECT f.path AS path, f.title AS title, s.heading AS heading, s.line AS line, s.page AS page,
-					snippet(texts, -1, '${OPEN}', '${CLOSE}', '…', ${SNIPPET_TOKENS}) AS snippet
-				FROM texts t JOIN sections s ON s.id = t.rowid JOIN files f ON f.id = s.file_id
-				WHERE texts MATCH ? AND f.project_id = ?${within ? ` AND (${within.sql})` : ""}
-				ORDER BY bm25(texts, 3.0, 5.0, 2.0, 1.0) LIMIT ?`,
-			)
-			.all(match, projectId, ...(within?.params ?? []), SECTION_CANDIDATES);
+		const rows = store.sectionsWithWords(
+			projectId,
+			match,
+			SECTION_CANDIDATES,
+			folders,
+		);
 		const out: WordsHit[] = [];
 		const seen = new Set<string>();
 		for (const row of rows) {
@@ -877,16 +466,17 @@ export function createKnowledgeSearch(
 	 * project has no vectors yet, or the query's vector does not come.
 	 */
 	async function byMeaning(
-		sqlite: Database,
 		projectId: string,
 		text: string,
 		limit: number,
 		folders?: readonly string[],
 	): Promise<MeaningHit[]> {
 		const meaning = current();
-		if (!meaning || (await readyNow(meaning)) !== "ready") return [];
-		const store = storeOf(sqlite, projectId, meaning);
-		if (store.count() === 0) return [];
+		if (!meaning || (await preparation.readiness(meaning)) !== "ready") {
+			return [];
+		}
+		const vectors = store.vectorsFor(projectId, meaning);
+		if (vectors.count() === 0) return [];
 		let vector: number[];
 		try {
 			vector = await within(
@@ -904,7 +494,7 @@ export function createKnowledgeSearch(
 			queryFailed = true;
 			return [];
 		}
-		const found = await store.similaritySearchVectorWithScore(
+		const found = await vectors.similaritySearchVectorWithScore(
 			vector,
 			SECTION_CANDIDATES,
 			// Before the candidates are counted, so other files take no place.
@@ -912,36 +502,17 @@ export function createKnowledgeSearch(
 				? (doc) => inFolders(String(doc.metadata.path ?? ""), folders)
 				: undefined,
 		);
-		const files = new Map(
-			sqlite
-				.query<{ id: number; path: string; title: string }, [string]>(
-					"SELECT id, path, title FROM files WHERE project_id = ?",
-				)
-				.all(projectId)
-				.map((row) => [row.path, row]),
-		);
-		const sectionsOf = sqlite.prepare<
-			{
-				heading: string | null;
-				line: number;
-				page: number | null;
-				text: string;
-			},
-			[number]
-		>(
-			"SELECT heading, line, page, text FROM sections WHERE file_id = ? ORDER BY ord",
-		);
 		const out: MeaningHit[] = [];
 		const seen = new Set<string>();
 		for (const [doc, similarity] of found) {
 			const path = String(doc.metadata.path ?? "");
-			const f = files.get(path);
+			if (seen.has(path)) continue;
+			const f = store.fileAt(projectId, path);
 			// A vector of a file that went waits for the next preparation to go.
-			if (!f || seen.has(path)) continue;
+			if (!f) continue;
 			seen.add(path);
-			const section = sectionsOf
-				.all(f.id)
-				.find((s) => embedText(f.title, s.text) === doc.pageContent);
+			// None: the file changed since this vector, which the next preparation drops.
+			const section = store.section(f.id, String(doc.metadata.section_id));
 			out.push({
 				similarity,
 				path,
@@ -986,23 +557,22 @@ export function createKnowledgeSearch(
 			const all = matchQuery(text, "all");
 			if (all === null) return [];
 			const depth = Math.max(limit, FUSE_DEPTH);
-			const on = mode !== "words" && (await readSetting(projectId));
-			return healing(async () => {
+			const on = mode !== "words" && (await meaningOn(projectId));
+			return store.healing(async () => {
 				await refresh(projectId);
-				const sqlite = await database();
 				let words: WordsHit[] = [];
 				const { folders } = options;
 				if (mode !== "meaning") {
-					words = byWords(sqlite, projectId, all, depth, folders);
+					words = byWords(projectId, all, depth, folders);
 					if (words.length === 0) {
 						const any = matchQuery(text, "any");
 						if (any !== null && any !== all) {
-							words = byWords(sqlite, projectId, any, depth, folders);
+							words = byWords(projectId, any, depth, folders);
 						}
 					}
 				}
 				const meant = on
-					? await byMeaning(sqlite, projectId, text.trim(), depth, folders)
+					? await byMeaning(projectId, text.trim(), depth, folders)
 					: [];
 				const byPath = {
 					words: new Map(words.map((hit) => [hit.path, hit])),
@@ -1064,7 +634,7 @@ export function createKnowledgeSearch(
 				};
 			}
 			const where = meaning.where ?? null;
-			if (!(await readSetting(projectId))) {
+			if (!(await meaningOn(projectId))) {
 				return {
 					state: "turned-off",
 					model: meaning.model,
@@ -1074,7 +644,7 @@ export function createKnowledgeSearch(
 					percent: null,
 				};
 			}
-			const ready = await readyNow(meaning);
+			const ready = await preparation.readiness(meaning);
 			if (ready !== "ready") {
 				return {
 					state: ready,
@@ -1086,17 +656,12 @@ export function createKnowledgeSearch(
 						ready === "downloading" ? (meaning.downloaded?.() ?? 0) : null,
 				};
 			}
-			return healing(async () => {
+			return store.healing(async () => {
 				await refresh(projectId);
-				const sqlite = await database();
-				const total =
-					sqlite
-						.query<{ n: number }, [string]>(
-							"SELECT count(*) AS n FROM sections s JOIN files f ON f.id = s.file_id WHERE f.project_id = ? AND s.text != ''",
-						)
-						.get(projectId)?.n ?? 0;
-				const store = storeOf(sqlite, projectId, meaning);
-				if (synced.has(projectId)) {
+				const total = store.sectionCount(projectId);
+				// Before the state is read: another model makes every project behind.
+				const vectors = store.vectorsFor(projectId, meaning);
+				if (preparation.stateOf(projectId) === "ready") {
 					return {
 						state: "on",
 						model: meaning.model,
@@ -1106,12 +671,14 @@ export function createKnowledgeSearch(
 						percent: null,
 					};
 				}
-				prepare(projectId);
-				const done = Math.min(store.count(), total);
+				preparation.request(projectId);
 				return {
-					state: "preparing",
+					state:
+						preparation.stateOf(projectId) === "failed"
+							? "failed"
+							: "preparing",
 					model: meaning.model,
-					done,
+					done: Math.min(vectors.count(), total),
 					total,
 					where,
 					percent: null,
@@ -1120,10 +687,7 @@ export function createKnowledgeSearch(
 		},
 		/** Closes the index file. A later call opens it again. */
 		close(): void {
-			closed = true;
-			db?.close();
-			db = null;
-			forget();
+			store.close();
 		},
 	};
 }

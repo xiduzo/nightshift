@@ -3,16 +3,13 @@ import { describe, expect, test } from "bun:test";
 import { Document } from "@langchain/core/documents";
 import { index } from "@langchain/core/indexing";
 import { SynonymEmbeddings } from "../testing/embeddings";
+import { createSearchTables } from "./search-store";
 import { splitSections } from "./sections";
-import {
-	BunSqliteRecordManager,
-	BunSqliteVectorStore,
-	createVectorTables,
-} from "./vectors";
+import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";
 
 const open = () => {
 	const db = new Database(":memory:");
-	createVectorTables(db);
+	createSearchTables(db);
 	return db;
 };
 

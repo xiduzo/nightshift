@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SynonymEmbeddings } from "../testing/embeddings";
+import { watchVectorPreparation } from "../testing/vector-preparation";
 import { createKnowledgeFolders } from "./folder";
 import {
 	type KnowledgeMeaning,
@@ -23,6 +24,25 @@ let embeddings: SynonymEmbeddings;
 let ready: KnowledgeMeaningReady;
 let search: KnowledgeSearch;
 
+/** What each search's preparation did, to wait on it. */
+const watches = new WeakMap<
+	KnowledgeSearch,
+	ReturnType<typeof watchVectorPreparation>
+>();
+
+/** A search this file can wait on. */
+function open(
+	options: Parameters<typeof createKnowledgeSearch>[1] = {},
+): KnowledgeSearch {
+	const watch = watchVectorPreparation();
+	const opened = createKnowledgeSearch(dataDir, {
+		onPreparation: watch.onEvent,
+		...options,
+	});
+	watches.set(opened, watch);
+	return opened;
+}
+
 const fake = (model = "fake-model"): KnowledgeMeaning => ({
 	model,
 	embeddings,
@@ -35,7 +55,7 @@ beforeEach(async () => {
 	dir = await createKnowledgeFolders(dataDir).ensure("p1");
 	embeddings = new SynonymEmbeddings();
 	ready = "ready";
-	search = createKnowledgeSearch(dataDir, { meaning: fake() });
+	search = open({ meaning: fake() });
 });
 afterEach(async () => {
 	search.close();
@@ -50,10 +70,10 @@ const paths = (hits: KnowledgeHit[]) => hits.map((hit) => hit.path);
 
 /** Waits until the project's vectors are all there. */
 async function prepared(of: KnowledgeSearch = search, projectId = "p1") {
-	for (let i = 0; i < 200; i++) {
+	for (let i = 0; i < 20; i++) {
 		const status = await of.meaning(projectId);
 		if (status.state === "on") return status;
-		await Bun.sleep(10);
+		await watches.get(of)?.settled(projectId);
 	}
 	throw new Error("The vectors did not come.");
 }
@@ -195,7 +215,7 @@ describe("search by meaning", () => {
 	});
 
 	test("without a model it is off, and finds by words", async () => {
-		const plain = createKnowledgeSearch(dataDir);
+		const plain = open();
 		try {
 			await put("pets.md", FILES["pets.md"]);
 			expect(await plain.meaning("p1")).toEqual({
@@ -219,7 +239,7 @@ describe("search by meaning", () => {
 		await prepared();
 		search.close();
 		embeddings.embedded = 0;
-		search = createKnowledgeSearch(dataDir, { meaning: fake("other-model") });
+		search = open({ meaning: fake("other-model") });
 		await prepared();
 		expect(embeddings.embedded).toBe(4);
 	});
@@ -227,7 +247,7 @@ describe("search by meaning", () => {
 	test("a model picked while it runs builds the vectors again, and off turns it off", async () => {
 		let now: KnowledgeMeaning | null = fake();
 		search.close();
-		search = createKnowledgeSearch(dataDir, { meaning: () => now });
+		search = open({ meaning: () => now });
 		for (const [path, text] of Object.entries(FILES)) await put(path, text);
 		await prepared();
 		expect(embeddings.embedded).toBe(4);
@@ -249,7 +269,7 @@ describe("search by meaning", () => {
 	test("while the model downloads, it says how far, and where Ollama is", async () => {
 		ready = "downloading";
 		search.close();
-		search = createKnowledgeSearch(dataDir, {
+		search = open({
 			meaning: {
 				...fake(),
 				where: "studio.local",
@@ -269,16 +289,113 @@ describe("search by meaning", () => {
 	});
 });
 
+/** Sections long enough that the splitter never merges two of them. */
+const long = (heading: string, word: string) =>
+	`## ${heading}\n\n${`${word} `.repeat(Math.ceil(1000 / (word.length + 1))).trim()}\n`;
+
+describe("a section's vector", () => {
+	test("stays when its section moves: only new text is embedded", async () => {
+		await put(
+			"guide.md",
+			`${long("Start", "note")}\n${long("Cars", "automobile")}\n${long("Cats", "kitten")}`,
+		);
+		await prepared();
+		expect(embeddings.embedded).toBe(3);
+
+		embeddings.embedded = 0;
+		await put(
+			"guide.md",
+			`${long("Start", "note")}\n${long("Money", "price")}\n${long("Cars", "automobile")}\n${long("Cats", "kitten")}`,
+		);
+		await prepared();
+		expect(embeddings.embedded).toBe(1);
+		// The hit goes to the section where it stands now.
+		const [hit] = await search.search("p1", "vehicle");
+		expect(hit).toMatchObject({ path: "guide.md", section: "Cars" });
+		expect(hit?.line).toBeGreaterThan(5);
+	});
+
+	test("two sections with the same text share a vector, and a hit goes to the first", async () => {
+		const same = long("Pets", "kitten");
+		await put("twice.md", `${long("Cars", "automobile")}\n${same}\n${same}`);
+		const status = await prepared();
+		expect(status.total).toBe(3);
+		expect(embeddings.embedded).toBe(2);
+		const [hit] = await search.search("p1", "feline");
+		expect(hit).toMatchObject({ path: "twice.md", section: "Pets", line: 5 });
+	});
+
+	test("of a file that changed still finds the file, at its start, until the next preparation", async () => {
+		await put("pets.md", FILES["pets.md"]);
+		await prepared();
+		// Hold the next preparation back: the sections change, the vectors do not.
+		let release!: () => void;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const real = embeddings.embedDocuments.bind(embeddings);
+		embeddings.embedDocuments = async (texts) => {
+			await held;
+			return real(texts);
+		};
+		await put("pets.md", "# Pets\n\nSomething else sleeps here: a cat.\n");
+		const hits = await search.search("p1", "feline");
+		release();
+		expect(hits[0]).toMatchObject({
+			path: "pets.md",
+			section: null,
+			line: 1,
+		});
+		expect(hits[0]?.snippet[0]?.text).toContain("The kitten sleeps");
+		await prepared();
+	});
+});
+
+describe("a preparation that fails", () => {
+	test("says failed, keeps the words working, and comes back on the clock", async () => {
+		let clock = 1_000;
+		search.close();
+		search = open({ meaning: fake(), clock: () => clock });
+		const warned = spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			await put("pets.md", FILES["pets.md"]);
+			const real = embeddings.embedDocuments.bind(embeddings);
+			embeddings.embedDocuments = async () => {
+				throw new Error("Ollama stopped.");
+			};
+			await search.meaning("p1");
+			await watches.get(search)?.settled("p1");
+			expect(await search.meaning("p1")).toEqual({
+				state: "failed",
+				model: "fake-model",
+				done: 0,
+				total: 1,
+				where: null,
+				percent: null,
+			});
+			expect(paths(await search.search("p1", "kitten"))).toEqual(["pets.md"]);
+
+			// Within the wait it stays failed, whoever asks.
+			embeddings.embedDocuments = real;
+			clock += 59_999;
+			expect((await search.meaning("p1")).state).toBe("failed");
+
+			clock += 1;
+			expect((await prepared()).state).toBe("on");
+		} finally {
+			warned.mockRestore();
+		}
+	});
+});
+
 describe("the floor of a model", () => {
 	test("a file found by meaning alone must be close enough: a query nothing matches finds nothing", async () => {
 		search.close();
-		search = createKnowledgeSearch(dataDir, {
-			meaning: { ...fake(), floor: 0.5 },
-		});
+		search = open({ meaning: { ...fake(), floor: 0.5 } });
 		for (const [path, text] of Object.entries(FILES)) await put(path, text);
 		await prepared();
 		// Without a floor, every file is a little like any query.
-		const loose = createKnowledgeSearch(dataDir, { meaning: fake() });
+		const loose = open({ meaning: fake() });
 		await prepared(loose);
 		expect(paths(await loose.search("p1", "money"))).toHaveLength(3);
 		loose.close();

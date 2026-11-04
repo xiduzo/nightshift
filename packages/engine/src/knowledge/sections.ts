@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
@@ -29,6 +30,26 @@ export type SectionMetadata = {
 	/** The page of a PDF the section is on, from 1. Null: the file has no pages. */
 	page: number | null;
 };
+
+/** What the embedding model reads of a section: the file's title, then the section. */
+export const embedText = (title: string, text: string) => `${title}\n\n${text}`;
+
+/**
+ * The id of a section: a hash of its path and of what the model reads, and
+ * nothing about where it stands. `index()` hashes a vector's metadata into its
+ * record, so an id that changes when a section moves (a row id, a position)
+ * would embed every section of a file at each edit, at real Ollama time. With
+ * this one a section gets a new vector exactly when its path or its embedded
+ * text changes. Two sections with the same text in one file share an id and a
+ * vector, and a hit goes to the first.
+ */
+export function sectionId(path: string, title: string, text: string): string {
+	return createHash("sha256")
+		.update(path)
+		.update("\0")
+		.update(embedText(title, text))
+		.digest("hex");
+}
 
 const CHUNK_SIZE = 1200;
 const CHUNK_OVERLAP = 150;

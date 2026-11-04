@@ -133,7 +133,8 @@ export const knowledgeMeaningSchema = exact<KnowledgeMeaningStatus>()(
 		 * off for the project. `no-ollama`: Ollama does not answer.
 		 * `no-model`: Ollama does not have the model. `downloading`: the
 		 * model is on its way. `preparing`: the first vectors are on their
-		 * way. `on`: search finds by meaning.
+		 * way. `failed`: the last preparation stopped, and it tries again.
+		 * `on`: search finds by meaning.
 		 */
 		state: z.enum([
 			"off",
@@ -142,6 +143,7 @@ export const knowledgeMeaningSchema = exact<KnowledgeMeaningStatus>()(
 			"no-model",
 			"downloading",
 			"preparing",
+			"failed",
 			"on",
 		]),
 		/** The embedding model. Null when it is off. */
