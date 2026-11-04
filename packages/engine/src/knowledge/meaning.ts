@@ -4,6 +4,7 @@ import {
 } from "@langchain/core/embeddings";
 import { OllamaEmbeddings } from "@langchain/ollama";
 import { now as timeNow } from "@nightshift/time";
+import { measuredModel, queryFor } from "./embedding-model";
 
 /**
  * Search by meaning: an embedding model that turns a section of the
@@ -37,18 +38,8 @@ export type KnowledgeMeaning = {
 	where?: string | null;
 	/** While it is `downloading`: how far the download is, in percent. */
 	downloaded?(): number | null;
-	/** The least similarity (cosine) of a hit found by meaning alone. Absent: no floor. */
+	/** The least similarity (cosine) of a hit found by meaning alone. Absent: no floor (`embedding-model.ts`). */
 	floor?: number;
-};
-
-/**
- * The floor of each model: a file found by meaning alone, and less
- * similar to the query than this, is no hit. Each model has its own
- * scale. How it was chosen: `docs/research/knowledge-vectors.md` §3.4.
- * A model with no floor here (one picked in Settings) gets none.
- */
-const MEANING_FLOORS: Readonly<Record<string, number>> = {
-	"qwen3-embedding:0.6b": 0.5,
 };
 
 /**
@@ -61,14 +52,6 @@ const NUM_CTX = 2048;
 const PROBE_TIMEOUT_MS = 2_000;
 /** How long the answer of a check holds before the next one. */
 const PROBE_TTL_MS = 15_000;
-/** Qwen3 embeddings want an instruction in front of a query, and nothing in front of a document. */
-const QUERY_INSTRUCTION =
-	"Instruct: Given a question, retrieve passages of project documentation that answer it\nQuery:";
-
-/** A query as the model wants it: an instruction in front for Qwen3, the text as it is for others. */
-const queryFor = (model: string) => (text: string) =>
-	model.startsWith("qwen3-embedding") ? `${QUERY_INSTRUCTION}${text}` : text;
-
 /** How long one request of a preparation may hold Ollama, about. */
 const PACE_MS = 1_500;
 /** Sections in one request, at most: `index()` hands over its batch of 32. */
@@ -168,11 +151,11 @@ export function ollamaMeaning(options: {
 			return "no-ollama";
 		}
 	}
-	const floor = MEANING_FLOORS[model];
+	const floor = measuredModel(model)?.floor;
 	return {
 		model,
 		embeddings,
-		query: queryFor(model),
+		query: (text) => queryFor(model, text),
 		...(floor !== undefined ? { floor } : {}),
 		where,
 		downloaded: () => downloading?.() ?? null,

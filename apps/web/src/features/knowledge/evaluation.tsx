@@ -47,7 +47,13 @@ const MODES = [
 	{ mode: "both", label: "Words and meaning" },
 ] as const;
 
-type Result = { found: number; recall: number; mrr: number } | null;
+/** `allFound` is new on the wire: a Night Shift that is not updated yet has none. */
+type Result = {
+	found: number;
+	recall: number;
+	mrr: number;
+	allFound?: number;
+} | null;
 
 const percent = (recall: number) => `${Math.round(recall * 100)}%`;
 
@@ -74,6 +80,8 @@ export function SearchEvaluation({
 		staleTime: Number.POSITIVE_INFINITY,
 	});
 	const result = evaluation.data;
+	// One right file is all there is to find in most sets: then the column says the same.
+	const severalAnswers = result?.rows.some((row) => row.answers.length > 1);
 	return (
 		<Card>
 			<CardHeader>
@@ -121,6 +129,11 @@ export function SearchEvaluation({
 								<TableHead className="text-right">
 									Found in the first 5
 								</TableHead>
+								{severalAnswers ? (
+									<TableHead className="text-right">
+										All right files in the first 5
+									</TableHead>
+								) : null}
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -134,6 +147,13 @@ export function SearchEvaluation({
 												? `${r.found} of ${result.questions} (${percent(r.recall)})`
 												: "Not tested"}
 										</TableCell>
+										{severalAnswers ? (
+											<TableCell className="text-right tabular-nums">
+												{r?.allFound !== undefined
+													? `${r.allFound} of ${result.questions}`
+													: "Not tested"}
+											</TableCell>
+										) : null}
 									</TableRow>
 								);
 							})}

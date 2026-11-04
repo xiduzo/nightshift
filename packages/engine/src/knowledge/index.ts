@@ -6,6 +6,7 @@
  */
 
 export { LOCAL_ONLY_BYTES } from "./documents";
+export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
 export {
 	evaluateKnowledge,
 	type KnowledgeEvaluation,

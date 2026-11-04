@@ -223,6 +223,10 @@ const modeResultSchema = z
 		recall: z.number(),
 		/** The mean of 1 / rank of the first right file. */
 		mrr: z.number(),
+		/** Questions with all their right files in the top `k`. */
+		allFound: z.number(),
+		/** The mean nDCG at 10, 0 to 1. */
+		ndcg: z.number(),
 	})
 	.nullable();
 

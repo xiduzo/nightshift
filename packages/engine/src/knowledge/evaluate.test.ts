@@ -8,7 +8,11 @@ import { adviceOf, EVALUATION, evaluateKnowledge } from "./evaluate";
 import { createKnowledgeFolders } from "./folder";
 import type { KnowledgeMeaning } from "./meaning";
 import type { KnowledgeQuestion } from "./questions";
-import { createKnowledgeSearch, type KnowledgeSearch } from "./search";
+import {
+	createKnowledgeSearch,
+	type KnowledgeHit,
+	type KnowledgeSearch,
+} from "./search";
 
 /**
  * The evaluation over a real index with fake embeddings that know a few
@@ -82,8 +86,20 @@ describe("evaluateKnowledge", () => {
 			["vehicle", { words: null, meaning: 1, both: 1 }],
 			["release night", { words: 1, meaning: 1, both: 1 }],
 		]);
-		expect(result.modes.words).toEqual({ found: 1, recall: 0.5, mrr: 0.5 });
-		expect(result.modes.meaning).toEqual({ found: 2, recall: 1, mrr: 1 });
+		expect(result.modes.words).toEqual({
+			found: 1,
+			recall: 0.5,
+			mrr: 0.5,
+			allFound: 1,
+			ndcg: 0.5,
+		});
+		expect(result.modes.meaning).toEqual({
+			found: 2,
+			recall: 1,
+			mrr: 1,
+			allFound: 2,
+			ndcg: 1,
+		});
 		expect(result.modes.both?.found).toBe(2);
 	});
 
@@ -96,7 +112,7 @@ describe("evaluateKnowledge", () => {
 		]);
 		expect(result.advice).toBe("unavailable");
 		expect(result.modes).toEqual({
-			words: { found: 1, recall: 1, mrr: 1 },
+			words: { found: 1, recall: 1, mrr: 1, allFound: 1, ndcg: 1 },
 			meaning: null,
 			both: null,
 		});
@@ -110,8 +126,72 @@ describe("evaluateKnowledge", () => {
 	});
 });
 
+describe("a question with several right files", () => {
+	/** A search that ranks these paths, whatever the query or the way to search. */
+	const ranking = (ranked: Record<string, string[]>) => ({
+		meaning: search.meaning,
+		search: async (_projectId: string, query: string) =>
+			(ranked[query] ?? []).map((path) => ({ path }) as KnowledgeHit),
+	});
+	const asked = (query: string, ...answers: string[]): KnowledgeQuestion => ({
+		...question(query, ""),
+		answers,
+	});
+	const fill = (n: number) =>
+		Array.from({ length: n }, (_, i) => `other-${i}.md`);
+
+	test("recall counts one right file, all-found counts them all, nDCG counts each by its rank", async () => {
+		const result = await evaluateKnowledge(
+			ranking({
+				one: ["a.md", "other.md", "b.md"],
+				two: ["a.md", ...fill(6), "b.md"],
+			}),
+			"p1",
+			[asked("one", "a.md", "b.md"), asked("two", "a.md", "b.md")],
+		);
+		const words = result.modes.words;
+		expect(words?.found).toBe(2);
+		expect(words?.recall).toBe(1);
+		// The second question has its other right file at rank 8.
+		expect(words?.allFound).toBe(1);
+		const gain = (rank: number) => 1 / Math.log2(rank + 1);
+		const ideal = gain(1) + gain(2);
+		expect(words?.ndcg).toBeCloseTo(
+			((gain(1) + gain(3)) / ideal + (gain(1) + gain(8)) / ideal) / 2,
+			6,
+		);
+		expect(result.rows[1]?.ranks.words).toBe(1);
+	});
+
+	test("nDCG stops at 10, and the first right rank looks deeper", async () => {
+		const result = await evaluateKnowledge(
+			ranking({ deep: [...fill(10), "a.md"] }),
+			"p1",
+			[asked("deep", "a.md")],
+		);
+		expect(result.rows[0]?.ranks.words).toBe(11);
+		expect(result.modes.words?.ndcg).toBe(0);
+		expect(result.modes.words?.mrr).toBeCloseTo(1 / 11, 6);
+	});
+
+	test("the advice reads recall only", async () => {
+		const good = { found: 1, recall: 0.9, mrr: 1, allFound: 1, ndcg: 1 };
+		const poor = { found: 1, recall: 0.5, mrr: 0, allFound: 0, ndcg: 0 };
+		expect(adviceOf(EVALUATION.minQuestions, poor, good)).toBe("keep");
+		expect(adviceOf(EVALUATION.minQuestions, good, { ...good, ndcg: 0 })).toBe(
+			"turn-off",
+		);
+	});
+});
+
 describe("adviceOf", () => {
-	const at = (recall: number) => ({ found: 0, recall, mrr: 0 });
+	const at = (recall: number) => ({
+		found: 0,
+		recall,
+		mrr: 0,
+		allFound: 0,
+		ndcg: 0,
+	});
 	test("keeps search by meaning from 10 points better on 20 questions, offers to turn it off below", () => {
 		const enough = EVALUATION.minQuestions;
 		expect(adviceOf(enough, at(0.7), at(0.8))).toBe("keep");

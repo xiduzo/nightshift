@@ -412,6 +412,13 @@ describe("the floor of a model", () => {
 		expect(ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).floor).toBe(
 			0.5,
 		);
+		// Another size of the model reads its instruction, but its scale was not measured.
+		const other = ollamaMeaning({ ...at, model: "qwen3-embedding:4b" });
+		expect(other.floor).toBeUndefined();
+		expect(other.query("Why?")).toEndWith("Query:Why?");
+		expect(
+			ollamaMeaning({ ...at, model: "some-other-model" }).query("Why?"),
+		).toBe("Why?");
 		expect(
 			ollamaMeaning({ ...at, model: "some-other-model" }).floor,
 		).toBeUndefined();

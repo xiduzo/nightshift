@@ -10,8 +10,10 @@ import type {
  * The evaluation of a project's knowledge search: its question set
  * (`questions.ts`) against each way to search, by words, by meaning, and
  * both fused. For each way: how many questions found a right file in the
- * top 5 (recall at 5), and the rank of the first right file of each
- * question. A plain loop over `KnowledgeSearch.search`: the same search
+ * top 5 (recall at 5), the rank of the first right file of each question,
+ * and for a question with several right files, how many of them it found and
+ * how high (all in the top 5, nDCG at 10). Recall at 5 stays the headline: the
+ * advice reads only that. A plain loop over `KnowledgeSearch.search`: the same search
  * the agents get.
  */
 
@@ -28,6 +30,8 @@ export const EVALUATION = {
 	k: 5,
 	/** How deep a search looks for the rank of the first right file. */
 	depth: 20,
+	/** How deep nDCG looks. */
+	ndcgK: 10,
 	/** Below this many marked questions, the numbers decide nothing. */
 	minQuestions: 20,
 	/** Search by meaning earns its keep when both fused beat words alone by this many points. */
@@ -42,6 +46,10 @@ export type KnowledgeModeResult = {
 	recall: number;
 	/** The mean of 1 / rank of the first right file, 0 for one not in the top `depth`. */
 	mrr: number;
+	/** Questions with all their right files in the top `k`. */
+	allFound: number;
+	/** The mean nDCG at `ndcgK`, 0 to 1: every right file counts, and a higher rank counts more. */
+	ndcg: number;
 };
 
 /** One question of the set, and where each way to search ranked its first right file (null: not in the top `depth`). */
@@ -95,6 +103,11 @@ export async function evaluateKnowledge(
 		(mode) => mode === "words" || meaning.state === "on",
 	);
 	const rows: KnowledgeEvaluationRow[] = [];
+	const answerRanks: Record<KnowledgeSearchMode, number[][]> = {
+		words: [],
+		meaning: [],
+		both: [],
+	};
 	for (const question of questions) {
 		const right = new Set(question.answers);
 		const ranks: Record<KnowledgeSearchMode, number | null> = {
@@ -107,8 +120,12 @@ export async function evaluateKnowledge(
 				limit: EVALUATION.depth,
 				mode,
 			});
-			const at = hits.findIndex((hit) => right.has(hit.path));
-			ranks[mode] = at === -1 ? null : at + 1;
+			const paths = hits.map((hit) => hit.path);
+			const found = [...right]
+				.map((answer) => paths.indexOf(answer) + 1)
+				.filter((rank) => rank > 0);
+			ranks[mode] = found.length > 0 ? Math.min(...found) : null;
+			answerRanks[mode].push(found);
 		}
 		rows.push({ query: question.query, answers: question.answers, ranks });
 	}
@@ -123,7 +140,24 @@ export async function evaluateKnowledge(
 				(sum, row) => sum + 1 / (row.ranks[mode] ?? Number.POSITIVE_INFINITY),
 				0,
 			) / Math.max(rows.length, 1);
-		return { found, recall: rows.length === 0 ? 0 : found / rows.length, mrr };
+		const allFound = rows.filter(
+			(row, i) =>
+				(answerRanks[mode][i] ?? []).filter((rank) => rank <= EVALUATION.k)
+					.length === new Set(row.answers).size,
+		).length;
+		const ndcg =
+			rows.reduce(
+				(sum, row, i) =>
+					sum + ndcgOf(answerRanks[mode][i] ?? [], new Set(row.answers).size),
+				0,
+			) / Math.max(rows.length, 1);
+		return {
+			found,
+			recall: rows.length === 0 ? 0 : found / rows.length,
+			mrr,
+			allFound,
+			ndcg,
+		};
 	};
 	const modes = {
 		words: result("words"),
@@ -141,6 +175,19 @@ export async function evaluateKnowledge(
 		rows,
 		advice: adviceOf(rows.length, modes.words, modes.both),
 	};
+}
+
+/** nDCG at `ndcgK` of one question: a right file is worth 1, its rank discounts it. */
+function ndcgOf(ranks: readonly number[], answers: number): number {
+	const gain = (rank: number) => 1 / Math.log2(rank + 1);
+	const dcg = ranks
+		.filter((rank) => rank <= EVALUATION.ndcgK)
+		.reduce((sum, rank) => sum + gain(rank), 0);
+	let ideal = 0;
+	for (let rank = 1; rank <= Math.min(answers, EVALUATION.ndcgK); rank++) {
+		ideal += gain(rank);
+	}
+	return ideal === 0 ? 0 : dcg / ideal;
 }
 
 /** What the numbers say about search by meaning: see `KnowledgeEvaluationAdvice`. */

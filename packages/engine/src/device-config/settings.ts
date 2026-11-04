@@ -13,6 +13,7 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
+import { DEFAULT_EMBEDDING_MODEL } from "../knowledge";
 import { type DeviceDocument, mapView } from "./device-document";
 
 /**
@@ -470,7 +471,7 @@ const DEFS = {
 			.min(1, "Name a model, for example qwen3-embedding:0.6b.")
 			.max(200)
 			.regex(/^[\w.:/-]+$/, "Use a model name such as qwen3-embedding:0.6b."),
-		default: "qwen3-embedding:0.6b",
+		default: DEFAULT_EMBEDDING_MODEL,
 		env: "NIGHTSHIFT_EMBEDDING_MODEL",
 		fromEnv: text,
 	} satisfies Def<string>,

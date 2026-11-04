@@ -11,8 +11,11 @@ import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
  * LangChain's `RecursiveCharacterTextSplitter` cuts the text. Markdown is
  * cut at its headings first (`## `, then `### ` and lower), then at code
  * fences, paragraphs and lines. Other text is cut at paragraphs and lines.
- * LangChain.js has no `MarkdownHeaderTextSplitter`, so the heading of a
- * section is the last heading line at or above the line where it starts.
+ * LangChain.js has no `MarkdownHeaderTextSplitter`, so the headings of a
+ * section are the ones open at the line where it starts: the last heading
+ * at or above that line, and the headings above it, one per level. A
+ * section's place in its file is what the embedding model reads besides its
+ * text: "Limits" alone says little, its heading path says whose.
  *
  * 1 200 characters with 150 of overlap: the vectors spike
  * (`docs/research/knowledge-vectors.md` §2.1) found fewer, larger sections
@@ -25,14 +28,37 @@ export type SectionMetadata = {
 	path: string;
 	/** The heading the section is under, without its `#` marks. Null: none above it. */
 	heading: string | null;
+	/** Its headings from the top of the file to `heading`, joined by ` › `. Empty: none above it. */
+	headingPath: string;
 	/** The line where the section starts, from 1: of the file, or of its page. */
 	line: number;
 	/** The page of a PDF the section is on, from 1. Null: the file has no pages. */
 	page: number | null;
 };
 
-/** What the embedding model reads of a section: the file's title, then the section. */
-export const embedText = (title: string, text: string) => `${title}\n\n${text}`;
+const PATH_SEPARATOR = " › ";
+
+/**
+ * What the embedding model reads of a section: the file's title, the headings
+ * above it, then the section. A heading the text already says does not come
+ * twice: a file's first heading is often its title, and a section often starts
+ * with its own heading. Measured on this repository's docs, repeating it found
+ * the same files, at lower ranks (`docs/knowledge.md`, "Measure the search").
+ */
+export function embedText(
+	title: string,
+	headingPath: string,
+	text: string,
+): string {
+	const headings = headingPath === "" ? [] : headingPath.split(PATH_SEPARATOR);
+	if (headings.at(-1) === firstLineHeading(text)) headings.pop();
+	if (headings[0] === title) headings.shift();
+	return `${[title, ...headings].join(PATH_SEPARATOR)}\n\n${text}`;
+}
+
+/** The heading a text starts with, if it does. */
+const firstLineHeading = (text: string) =>
+	markdownHeadings(text.slice(0, text.indexOf("\n") + 1 || undefined))[0]?.text;
 
 /**
  * The id of a section: a hash of its path and of what the model reads, and
@@ -43,11 +69,16 @@ export const embedText = (title: string, text: string) => `${title}\n\n${text}`;
  * text changes. Two sections with the same text in one file share an id and a
  * vector, and a hit goes to the first.
  */
-export function sectionId(path: string, title: string, text: string): string {
+export function sectionId(
+	path: string,
+	title: string,
+	headingPath: string,
+	text: string,
+): string {
 	return createHash("sha256")
 		.update(path)
 		.update("\0")
-		.update(embedText(title, text))
+		.update(embedText(title, headingPath, text))
 		.digest("hex");
 }
 
@@ -64,12 +95,35 @@ const textSplitter = new RecursiveCharacterTextSplitter({
 	chunkOverlap: CHUNK_OVERLAP,
 });
 
-/** For each line of a markdown text, from 0: the heading it is under. Not in code fences. */
-function headingsByLine(text: string): (string | null)[] {
-	const out: (string | null)[] = [];
-	let current: string | null = null;
+/** Whether a path is a markdown file: the only files with headings. */
+export const isMarkdown = (path: string) =>
+	MARKDOWN.has(extname(path).toLowerCase());
+
+/** A heading of a markdown text. */
+export type MarkdownHeading = {
+	/** 1 for `#`, up to 6. */
+	level: number;
+	/** Without its `#` marks. */
+	text: string;
+	/** Its line, from 1. */
+	line: number;
+};
+
+/**
+ * The headings of a markdown text, in order: `#` lines, not in the front
+ * matter and not in code fences. The one parser of headings, for a section's
+ * place and for the file's lines in `INDEX.md`.
+ */
+export function markdownHeadings(text: string): MarkdownHeading[] {
+	const out: MarkdownHeading[] = [];
+	const lines = text.split("\n");
+	const frontMatterEnd =
+		lines[0]?.trimEnd() === "---"
+			? lines.findIndex((line, i) => i > 0 && line.trimEnd() === "---")
+			: -1;
 	let fence: string | null = null;
-	for (const raw of text.split("\n")) {
+	for (const [i, raw] of lines.entries()) {
+		if (i <= frontMatterEnd) continue;
 		const line = raw.trimEnd();
 		const opens = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
 		if (fence) {
@@ -77,12 +131,33 @@ function headingsByLine(text: string): (string | null)[] {
 		} else if (opens?.[1]) {
 			fence = opens[1].slice(0, 3);
 		} else {
-			const heading = /^\s{0,3}#{1,6}\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
-			if (heading?.[1]) current = heading[1].trim();
+			const heading = /^\s{0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
+			if (heading?.[1] && heading[2]) {
+				out.push({
+					level: heading[1].length,
+					text: heading[2].trim(),
+					line: i + 1,
+				});
+			}
 		}
-		out.push(current);
 	}
 	return out;
+}
+
+/** For each line of a markdown text, from 0: the headings open there, the top one first. */
+function headingsByLine(text: string): string[][] {
+	const at = new Map(markdownHeadings(text).map((h) => [h.line, h]));
+	const open: MarkdownHeading[] = [];
+	let current: string[] = [];
+	return text.split("\n").map((_, i) => {
+		const heading = at.get(i + 1);
+		if (heading) {
+			while ((open.at(-1)?.level ?? 0) >= heading.level) open.pop();
+			open.push(heading);
+			current = open.map((h) => h.text);
+		}
+		return current;
+	});
 }
 
 /**
@@ -95,7 +170,7 @@ export async function splitSections(
 	path: string,
 	content: string | Document[],
 ): Promise<Document<SectionMetadata>[]> {
-	const markdown = MARKDOWN.has(extname(path).toLowerCase());
+	const markdown = isMarkdown(path);
 	const pages = (
 		typeof content === "string"
 			? [new Document({ pageContent: content })]
@@ -114,7 +189,7 @@ export async function splitSections(
 		return [
 			new Document({
 				pageContent: "",
-				metadata: { path, heading: null, line: 1, page: null },
+				metadata: { path, heading: null, headingPath: "", line: 1, page: null },
 			}),
 		];
 	}
@@ -127,10 +202,17 @@ export async function splitSections(
 				| { lines?: { from?: number } }
 				| undefined;
 			const line = Math.max(1, loc?.lines?.from ?? 1);
+			const open = headings[line - 1] ?? [];
 			out.push(
 				new Document({
 					pageContent: piece.pageContent,
-					metadata: { path, heading: headings[line - 1] ?? null, line, page },
+					metadata: {
+						path,
+						heading: open.at(-1) ?? null,
+						headingPath: open.join(PATH_SEPARATOR),
+						line,
+						page,
+					},
 				}),
 			);
 		}

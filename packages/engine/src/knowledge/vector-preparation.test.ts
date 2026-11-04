@@ -79,7 +79,13 @@ function write(projectId: string, path: string, texts: string[], id = 1) {
 				(text, line) =>
 					new Document({
 						pageContent: text,
-						metadata: { path, heading: null, line: line + 1, page: null },
+						metadata: {
+							path,
+							heading: null,
+							headingPath: "",
+							line: line + 1,
+							page: null,
+						},
 					}),
 			),
 		},
@@ -361,7 +367,7 @@ describe("a vector's metadata", () => {
 		);
 		expect(hit?.[0].metadata).toEqual({
 			path: "a.md",
-			section_id: sectionId("a.md", "a.md", "A car."),
+			section_id: sectionId("a.md", "a.md", "", "A car."),
 		});
 	});
 });

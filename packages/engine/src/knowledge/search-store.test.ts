@@ -45,7 +45,13 @@ function write(path: string, texts: string[]) {
 				(text, line) =>
 					new Document({
 						pageContent: text,
-						metadata: { path, heading: null, line: line + 1, page: null },
+						metadata: {
+							path,
+							heading: null,
+							headingPath: "",
+							line: line + 1,
+							page: null,
+						},
 					}),
 			),
 		},
@@ -102,17 +108,20 @@ describe("a section's row", () => {
 		expect(after.map((s) => s.section_id).slice(1)).toEqual(
 			before.map((s) => s.section_id),
 		);
-		expect(before[0]?.section_id).toBe(sectionId("a.md", "Title", "A car."));
+		expect(before[0]?.section_id).toBe(
+			sectionId("a.md", "Title", "", "A car."),
+		);
 
 		const file = store.fileAt("p1", "a.md");
 		const moved = store.section(file?.id ?? 0, before[0]?.section_id ?? "");
 		expect(moved).toMatchObject({ line: 2, text: "A car." });
 	});
 
-	test("changes id with the file's path and the file's title", () => {
-		const id = sectionId("a.md", "Title", "A car.");
-		expect(sectionId("b.md", "Title", "A car.")).not.toBe(id);
-		expect(sectionId("a.md", "Other", "A car.")).not.toBe(id);
+	test("changes id with the file's path, its title and the heading path", () => {
+		const id = sectionId("a.md", "Title", "", "A car.");
+		expect(sectionId("b.md", "Title", "", "A car.")).not.toBe(id);
+		expect(sectionId("a.md", "Other", "", "A car.")).not.toBe(id);
+		expect(sectionId("a.md", "Title", "Garage", "A car.")).not.toBe(id);
 	});
 
 	test("without text gets no vector", async () => {

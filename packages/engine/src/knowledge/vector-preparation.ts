@@ -169,7 +169,11 @@ export function createVectorPreparation(options: {
 				docsSource: store.sectionsToEmbed(projectId).map(
 					(section) =>
 						new Document({
-							pageContent: embedText(section.title, section.text),
+							pageContent: embedText(
+								section.title,
+								section.heading_path,
+								section.text,
+							),
 							// `index()` hashes this: only what does not move when a section moves.
 							metadata: { path: section.path, section_id: section.section_id },
 						}),

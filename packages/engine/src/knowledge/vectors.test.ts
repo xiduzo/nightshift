@@ -4,7 +4,7 @@ import { Document } from "@langchain/core/documents";
 import { index } from "@langchain/core/indexing";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { createSearchTables } from "./search-store";
-import { splitSections } from "./sections";
+import { embedText, splitSections } from "./sections";
 import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";
 
 const open = () => {
@@ -203,9 +203,58 @@ describe("sections", () => {
 		expect(sections[0]?.metadata).toEqual({
 			path: "wiki/guide.md",
 			heading: "Guide",
+			headingPath: "Guide",
 			line: 1,
 			page: null,
 		});
+	});
+
+	test("carry the headings open where they start, one per level", async () => {
+		const text = [
+			"---",
+			"# not a heading",
+			"---",
+			"# Vectors",
+			"",
+			"Intro.",
+			"",
+			`## 4 The plan\n\n${"word ".repeat(300).trim()}`,
+			"",
+			`### 4.3 The threshold\n\n${"word ".repeat(300).trim()}\n\nTen points.`,
+			"",
+			`## 5 Risks\n\n${"word ".repeat(300).trim()}\n\nNone.`,
+		].join("\n");
+		const sections = await splitSections("v.md", text);
+		const under = (words: string) =>
+			sections.find((s) => s.pageContent.includes(words))?.metadata;
+		// It starts at the front matter, above the first heading, and that is no heading.
+		expect(under("Intro.")?.headingPath).toBe("");
+		expect(under("Ten points.")?.headingPath).toBe(
+			"Vectors › 4 The plan › 4.3 The threshold",
+		);
+		expect(under("Ten points.")?.heading).toBe("4.3 The threshold");
+		// A heading closes the deeper ones and its own level.
+		expect(under("None.")?.headingPath).toBe("Vectors › 5 Risks");
+	});
+
+	test("give the model the title and the headings above, each once", () => {
+		expect(embedText("Vectors", "", "Text.")).toBe("Vectors\n\nText.");
+		expect(embedText("Vectors", "Plan › Limit", "Text.")).toBe(
+			"Vectors › Plan › Limit\n\nText.",
+		);
+		// The first heading is the title.
+		expect(embedText("Vectors", "Vectors › Plan", "Text.")).toBe(
+			"Vectors › Plan\n\nText.",
+		);
+		expect(embedText("Vectors", "Vectors", "Text.")).toBe("Vectors\n\nText.");
+		// The section starts with its own heading.
+		expect(
+			embedText("Vectors", "Vectors › Plan › Limit", "### Limit\nTen."),
+		).toBe("Vectors › Plan\n\n### Limit\nTen.");
+		// Only a whole heading repeats.
+		expect(embedText("Vec", "Vectors › Plan", "Text.")).toBe(
+			"Vec › Vectors › Plan\n\nText.",
+		);
 	});
 
 	test("keep a document's pages, and give an empty file one empty section", async () => {
@@ -228,7 +277,13 @@ describe("sections", () => {
 		expect(await splitSections("empty.txt", "  \n")).toEqual([
 			expect.objectContaining({
 				pageContent: "",
-				metadata: { path: "empty.txt", heading: null, line: 1, page: null },
+				metadata: {
+					path: "empty.txt",
+					heading: null,
+					headingPath: "",
+					line: 1,
+					page: null,
+				},
 			}),
 		]);
 	});

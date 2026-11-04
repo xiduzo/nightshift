@@ -357,6 +357,12 @@ its headings first (`@langchain/textsplitters`). A PDF is cut page by
 page. A hit is a file at its best section, so the result says where to
 look.
 
+A section knows its heading path: the headings above it, one per level.
+The embedding model reads the file's title, that path and the section:
+`Knowledge vectors › 4 The evaluation plan`, then the text of 4.3. A heading
+that the text already starts with does not come twice. So a section called
+"Limits" says whose limits.
+
 ### By words
 
 Every word must match in one section. When no section has them all, the
@@ -392,7 +398,12 @@ computer only:
   progress. A new model builds the vectors again. The environment
   variable is `NIGHTSHIFT_EMBEDDING_MODEL`. Only `qwen3-embedding:0.6b`
   was measured on these docs and has a floor (below). The other models of
-  the list work, with no floor.
+  the list work, with no floor. `embedding-model.ts` in
+  `packages/engine/src/knowledge` has one record per measured model: its
+  name, vector length, query instruction, floor and measurement. A trial
+  is one record and one floor run. Two models are watched, with no record
+  until a measurement exists: `harrier-oss-v1-0.6b` and
+  `embeddinggemma-2:270m` for a Host with only a CPU.
 - **Ollama address.** Empty: the Ollama on this computer. With another
   address, your knowledge text goes to that computer to be embedded. The
   environment variable is `OLLAMA_HOST`, as Ollama's own CLI reads it.
@@ -448,7 +459,7 @@ The search fuses the two lists by reciprocal rank (each list adds
 1 / (60 + rank) to a file). A file only the meaning found must pass the
 model's floor: a cosine similarity of 0.50 for `qwen3-embedding:0.6b`. So a
 query that nothing answers finds nothing, not the 20 nearest files. A model
-without a floor in `meaning.ts` has none. How the floor was chosen:
+without a record in `embedding-model.ts` has none. How the floor was chosen:
 [knowledge-vectors.md](research/knowledge-vectors.md) §3.4. Without
 Ollama, search finds by words only, and nothing else changes. On this repository's `docs/` (26 questions),
 search by words found 18 to 20 answers in the top 5, search by words and
@@ -496,9 +507,12 @@ From these events:
 - **Test search.** With one marked question or more, the page tests the
   set against search by words, by meaning, and both. It shows how many it
   found in the first 5 results, and the position of each question's first
-  right file. From 20 marked
+  right file. When a question has several right files, the page also shows
+  how many questions have all of them in the first 5. From 20 marked
   questions, it offers to turn search by meaning off for the project when
-  both do not beat words by 10 points. The thresholds are `EVALUATION` in
+  both do not beat words by 10 points. The API also returns nDCG at 10 for
+  each way to search, for a person who compares two models. Only the first
+  number decides. The thresholds are `EVALUATION` in
   `packages/engine/src/knowledge/evaluate.ts`. The setting is the
   project's, in the knowledge document, so every computer of the Space
   follows it. Off, search finds by words only and prepares no vectors.
@@ -510,6 +524,25 @@ On this repository's `docs/` with the 26 questions of the vectors spike
 (2026-10-31, with the floor): words found 20 in the top 5, meaning 23,
 both 22. That is 7.7 points, so the page would offer to turn meaning off.
 With the agents' keyword forms: words 18, meaning 18, both 20.
+
+The heading path was measured the same way on 2026-11-04: this repository's
+`docs/`, 55 files, 1 413 sections, 30 new questions by file and 16 by
+section, `qwen3-embedding:0.6b` on the M4 Max. Few questions, so one or two
+of a difference can be chance.
+
+| What the model reads | Both, by file: top 5, MRR | Meaning, by file: top 5, MRR | Right section in top 3 of 16 | Queries with no answer above 0.50 |
+| --- | --- | --- | --- | --- |
+| Title, text | 22 of 30, 0.577 | 25 of 30, 0.555 | 6 | 1 of 6 |
+| Title, every heading, text | 22 of 30, 0.546 | 23 of 30, 0.512 | 7 | 0 of 6 |
+| Title, headings the text does not say, text (this one) | 22 of 30, 0.572 | 23 of 30, 0.542 | 8 | 0 of 6 |
+
+So the path does not find more files. It finds the right section more often,
+which is where a hit sends the agent. By meaning alone it loses two questions.
+On a made-up runbook with the same three headings under 8 services (24
+questions, built to need the path), the right section came first for 0 of 24
+without the path and for 19 of 24 with it, and in the top 3 for all 24. The
+floor still holds: with this path, the lowest right file in a top 5 is at
+0.528, and the highest query with no answer just stays under 0.50.
 
 ## Size
 

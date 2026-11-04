@@ -21,7 +21,7 @@ import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";
  * sections and gets the vector store and record manager of a project.
  */
 
-/** Bump to build every index again. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. 5: a section's stable id, on its row and in its vector's metadata. */
+/** Bump to build every index again. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. 5: a section's stable id, on its row and in its vector's metadata, and its heading path, which the model reads. */
 const SCHEMA_VERSION = 5;
 /** Every table of the index, for an index built again. */
 const TABLES = ["files", "texts", "sections", "meta", "records", "vectors"];
@@ -42,7 +42,7 @@ export function createSearchTables(db: Database): void {
 	// `id` is the row, and the row of its words in `texts`: a new one at each
 	// write of the file. `section_id` is what a vector knows: see `sectionId`.
 	db.run(
-		"CREATE TABLE IF NOT EXISTS sections (id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL, ord INTEGER NOT NULL, section_id TEXT NOT NULL, heading TEXT, line INTEGER NOT NULL, page INTEGER, text TEXT NOT NULL)",
+		"CREATE TABLE IF NOT EXISTS sections (id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL, ord INTEGER NOT NULL, section_id TEXT NOT NULL, heading TEXT, heading_path TEXT NOT NULL, line INTEGER NOT NULL, page INTEGER, text TEXT NOT NULL)",
 	);
 	db.run("CREATE INDEX IF NOT EXISTS sections_file ON sections (file_id, ord)");
 	db.run(
@@ -122,6 +122,7 @@ type WordSection = {
 type SectionToEmbed = {
 	path: string;
 	title: string;
+	heading_path: string;
 	text: string;
 	section_id: string;
 };
@@ -301,9 +302,18 @@ export function createSearchStore(
 			);
 			const addSection = sqlite.prepare<
 				{ id: number },
-				[number, number, string, string | null, number, number | null, string]
+				[
+					number,
+					number,
+					string,
+					string | null,
+					string,
+					number,
+					number | null,
+					string,
+				]
 			>(
-				"INSERT INTO sections (file_id, ord, section_id, heading, line, page, text) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+				"INSERT INTO sections (file_id, ord, section_id, heading, heading_path, line, page, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
 			);
 			const addText = sqlite.prepare(
 				"INSERT INTO texts (rowid, path, title, heading, body) VALUES (?, ?, ?, ?, ?)",
@@ -334,12 +344,13 @@ export function createSearchStore(
 						dropSections(id);
 					}
 					for (const [ord, section] of item.sections.entries()) {
-						const { heading, line, page } = section.metadata;
+						const { heading, headingPath, line, page } = section.metadata;
 						const added = addSection.get(
 							id,
 							ord,
-							sectionId(f.path, item.title, section.pageContent),
+							sectionId(f.path, item.title, headingPath, section.pageContent),
 							heading,
+							headingPath,
 							line,
 							page,
 							section.pageContent,
@@ -408,7 +419,7 @@ export function createSearchStore(
 		sectionsToEmbed(projectId: string): SectionToEmbed[] {
 			return opened()
 				.query<SectionToEmbed, [string]>(
-					`SELECT f.path AS path, f.title AS title, s.text AS text, s.section_id AS section_id
+					`SELECT f.path AS path, f.title AS title, s.heading_path AS heading_path, s.text AS text, s.section_id AS section_id
 					FROM sections s JOIN files f ON f.id = s.file_id
 					WHERE f.project_id = ? AND s.text != ''
 					ORDER BY f.path, s.ord`,
