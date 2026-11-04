@@ -94,6 +94,20 @@ does not need to write it. Each computer writes its own, and it never syncs.
 `learnings/proposed/` until you accept it into `learnings/accepted/`. The
 index lists only the accepted ones.
 
+### The Map
+
+The Map tab of the Knowledge page shows the knowledge as a graph: the files,
+the topics they share, the links between them, the questions that found them
+and the learnings that name their topics. `packages/engine/src/knowledge/graph.ts`
+builds it.
+
+- `TopicGraphTransformer` finds the topics by counting words. It takes
+  LangChain `Document`s and gives `GraphDocument`s, as `LLMGraphTransformer`
+  does. A model can take its place.
+- The graph reads at most 200 files, 60 KB of each. It reads them again only
+  when a file changes. A file it cannot read stays on the map without topics.
+- The graph is for people. Agents do not get it, and search does not use it.
+
 ## What an agent gets
 
 An Agent step gets the folder when the folder has files. To change that,
@@ -268,9 +282,12 @@ It opens a Gate with the proposals:
 - **Delete** removes them.
 
 A proposal that arrives while the Gate waits stays for the next review.
-The Knowledge page shows how many wait, with a button that runs the review.
 The review runs on any computer of the Space. Its reconcile first fetches
 the proposals, and then puts what it kept or deleted back in the Space.
+
+You can also keep or delete proposals on the Review tab of the Knowledge
+page, one step at a time. Each decision acts on all notes of that step. The
+page sends it after 5 seconds, so you can undo it.
 
 ### Proposals from a Command
 

@@ -27,14 +27,12 @@ import {
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon, SearchIcon, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { knowledgeQueries } from "./queries";
-
-/** How long the words rest before the search runs, in ms. */
-const TYPING_PAUSE = 250;
+import { useKnowledgeHits } from "./use-knowledge-hits";
 
 /** How often the page asks again while search by meaning gets ready, in ms. */
 const PREPARING_POLL = 5000;
@@ -45,21 +43,16 @@ const PREPARING_POLL = 5000;
  * the part found and the words found. A file opens in a sheet beside the
  * list. One quiet line says whether search finds by meaning.
  */
-export function KnowledgeSearch({ projectId }: { projectId: string }) {
-	const [text, setText] = useState("");
-	const [query, setQuery] = useState("");
+export function KnowledgeSearch({
+	projectId,
+	idle,
+}: {
+	projectId: string;
+	/** Shows while nothing is searched. */
+	idle?: ReactNode;
+}) {
+	const { text, setText, query, hits, clear } = useKnowledgeHits(projectId);
 	const [open, setOpen] = useState<string | null>(null);
-
-	useEffect(() => {
-		const timer = setTimeout(() => setQuery(text.trim()), TYPING_PAUSE);
-		return () => clearTimeout(timer);
-	}, [text]);
-
-	const hits = useQuery({
-		...knowledgeQueries.search(projectId, query),
-		enabled: query !== "",
-		placeholderData: keepPreviousData,
-	});
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -80,10 +73,7 @@ export function KnowledgeSearch({ projectId }: { projectId: string }) {
 						<InputGroupButton
 							size="icon-xs"
 							aria-label="Clear the search"
-							onClick={() => {
-								setText("");
-								setQuery("");
-							}}
+							onClick={clear}
 						>
 							<XIcon aria-hidden="true" />
 						</InputGroupButton>
@@ -91,7 +81,9 @@ export function KnowledgeSearch({ projectId }: { projectId: string }) {
 				) : null}
 			</InputGroup>
 			<MeaningLine projectId={projectId} />
-			{query === "" ? null : hits.error ? (
+			{query === "" ? (
+				idle
+			) : hits.error ? (
 				<Alert variant="destructive">
 					<CircleAlertIcon />
 					<AlertTitle>The search did not work</AlertTitle>

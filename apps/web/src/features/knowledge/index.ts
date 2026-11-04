@@ -1,3 +1,3 @@
-/** Knowledge: a project's Knowledge page, the files its agents read on this computer and the flows that fill them. */
+/** Knowledge: a project's Knowledge page: what waits for a person, the files agents read, and how they connect. */
 
-export { ProjectKnowledgePage } from "./knowledge-page";
+export { type KnowledgeTab, ProjectKnowledgePage } from "./knowledge-page";

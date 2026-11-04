@@ -301,7 +301,14 @@ function SourceItem({
  * runs it where its schedule runs it. A drawn flow asks for its inputs
  * first.
  */
-function SyncNowButton({ projectId, sync }: { projectId: string; sync: Sync }) {
+/** Sync now, which asks first when the source's flow needs inputs. */
+export function SyncNowButton({
+	projectId,
+	sync,
+}: {
+	projectId: string;
+	sync: Sync;
+}) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [asking, setAsking] = useState(false);

@@ -71,6 +71,7 @@ export type {
 	Knowledge,
 	KnowledgeEvaluation,
 	KnowledgeFile,
+	KnowledgeGraph,
 	KnowledgeUse,
 	McpServer,
 	McpTestResult,

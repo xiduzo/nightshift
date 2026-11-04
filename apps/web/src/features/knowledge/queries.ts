@@ -1,6 +1,9 @@
 /** The query options of a project's knowledge, and its mutations. */
 
+import { createKnowledgeQueries } from "@nightshift/client";
 import { orpc } from "@/shared/api";
+
+const learningQueries = createKnowledgeQueries(orpc);
 
 export const knowledgeQueries = {
 	/** The files on this computer and the flows that fill them. */
@@ -23,12 +26,23 @@ export const knowledgeQueries = {
 	/** How often agents found and read each file, and which no run used lately. */
 	use: (projectId: string) =>
 		orpc.knowledge.use.queryOptions({ input: { projectId } }),
+	/** The knowledge as a graph: its files, their topics and what connects to them. */
+	graph: (projectId: string) =>
+		orpc.knowledge.graph.queryOptions({ input: { projectId } }),
+	/** The learnings that wait for a person, newest first. */
+	learnings: (projectId: string) => learningQueries.learnings(projectId),
+	learningsKey: learningQueries.learningsKey,
+	getKey: learningQueries.getKey,
 	/** One file, by its path in the knowledge. */
 	read: (projectId: string, path: string) =>
 		orpc.knowledge.read.queryOptions({ input: { projectId, path } }),
 };
 
 export const knowledgeMutations = {
+	/** Keeps one step's learnings: agents read them in later runs. */
+	keepLearning: learningQueries.keep,
+	/** Deletes one step's learnings. */
+	deleteLearning: learningQueries.delete,
 	/** Adds a source, or changes one: its flow and its schedule. */
 	saveSource: orpc.knowledge.saveSource.mutationOptions,
 	/** Removes a source, and its files if asked. */

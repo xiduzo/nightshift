@@ -1,13 +1,11 @@
-import { hasEnded, now } from "@nightshift/client";
+import { hasEnded } from "@nightshift/client";
 import {
 	Alert,
-	AlertAction,
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -18,45 +16,70 @@ import {
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@nightshift/ui/components/tooltip";
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@nightshift/ui/components/tabs";
 import { useQuery } from "@tanstack/react-query";
 import {
 	BookOpenIcon,
 	CircleAlertIcon,
-	LightbulbIcon,
+	LibraryIcon,
+	ListChecksIcon,
+	NetworkIcon,
 	PlusIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { StartRunDialog } from "@/features/flows";
+import { useState } from "react";
 import { ProjectPage } from "@/features/projects";
-import type { KnowledgeFile, KnowledgeUse } from "@/shared/api";
-import { DataTable, dataTableColumns } from "@/shared/data-table";
-import { formatRelative, formatSize, hoverTime } from "@/shared/format";
-import { PageHeading, PageSection } from "@/shared/page";
-import { LocalTime } from "@/shared/time";
+import type { Knowledge } from "@/shared/api";
+import { PageHeading } from "@/shared/page";
+import { FilesTab } from "./files-tab";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
-import { KnowledgeSearch } from "./knowledge-search";
+import { MapTab } from "./map-tab";
 import { knowledgeQueries } from "./queries";
-import { AskedQuestions } from "./questions";
+import { learningTaskId } from "./review-queue";
+import { ReviewTab } from "./review-tab";
 import { type EditedSource, SourceDialog } from "./source-dialog";
-import { Sources } from "./sources";
+import { useReview } from "./use-review";
 
 /** How often the page reads the knowledge again while a source syncs. */
 const SYNCING_POLL_MS = 3_000;
 
+/** The views of the Knowledge page. */
+export type KnowledgeTab = "review" | "knows" | "map";
+
+/** Where on the page a person is, as its address holds it. */
+export type KnowledgeLocation = { tab: KnowledgeTab; node?: string };
+
 /**
- * A project's Knowledge page: the files its agents read, when each changed
- * and its size, and the sources that fill them: add one, edit or remove
- * it, or sync it now.
+ * A project's Knowledge page, in three tabs: Review, what waits for a person.
+ * What agents know, the files by folder, the sources and the questions. Map,
+ * how it connects.
  */
-export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
+export function ProjectKnowledgePage({
+	projectId,
+	tab,
+	node,
+	onView,
+}: {
+	projectId: string;
+	tab?: KnowledgeTab | undefined;
+	/** On the Map: the node to start from. */
+	node?: string | undefined;
+	onView: (view: KnowledgeLocation) => void;
+}) {
 	return (
 		<ProjectPage projectId={projectId} section="Knowledge">
-			{(project) => <KnowledgeSection projectId={project.id} />}
+			{(project) => (
+				<KnowledgeSection
+					projectId={project.id}
+					tab={tab}
+					node={node}
+					onView={onView}
+				/>
+			)}
 		</ProjectPage>
 	);
 }
@@ -65,7 +88,17 @@ export function ProjectKnowledgePage({ projectId }: { projectId: string }) {
  * The page's heading with Add source, the view, and the source dialog. A
  * person who may not save flows does not get Add source.
  */
-function KnowledgeSection({ projectId }: { projectId: string }) {
+function KnowledgeSection({
+	projectId,
+	tab,
+	node,
+	onView,
+}: {
+	projectId: string;
+	tab: KnowledgeTab | undefined;
+	node: string | undefined;
+	onView: (view: KnowledgeLocation) => void;
+}) {
 	const knowledge = useQuery(knowledgeQueries.get(projectId));
 	const can = knowledge.data?.can;
 	// Null: closed. "new": a new source. Else the source to edit.
@@ -95,6 +128,9 @@ function KnowledgeSection({ projectId }: { projectId: string }) {
 			/>
 			<KnowledgeView
 				projectId={projectId}
+				tab={tab}
+				node={node}
+				onView={onView}
 				onAdd={can?.save ? () => open("new") : undefined}
 				onEdit={open}
 			/>
@@ -115,10 +151,16 @@ function KnowledgeSection({ projectId }: { projectId: string }) {
 
 function KnowledgeView({
 	projectId,
+	tab,
+	node,
+	onView,
 	onAdd,
 	onEdit,
 }: {
 	projectId: string;
+	tab: KnowledgeTab | undefined;
+	node: string | undefined;
+	onView: (view: KnowledgeLocation) => void;
 	/** Unset: the person may not add a source. */
 	onAdd: (() => void) | undefined;
 	onEdit: (source: EditedSource) => void;
@@ -133,12 +175,6 @@ function KnowledgeView({
 				? SYNCING_POLL_MS
 				: false,
 	});
-	const [open, setOpen] = useState<string | null>(null);
-	const use = useQuery(knowledgeQueries.use(projectId));
-	const columns = useMemo(
-		() => fileColumns(setOpen, fileUse(use.data)),
-		[use.data],
-	);
 
 	if (knowledge.error) {
 		return (
@@ -152,19 +188,59 @@ function KnowledgeView({
 	if (knowledge.isLoading || !knowledge.data) {
 		return (
 			<div className="flex flex-col gap-2">
-				<Skeleton className="h-16 w-full" />
-				<Skeleton className="h-40 w-full" />
+				<Skeleton className="h-9 w-72" />
+				<Skeleton className="h-56 w-full" />
 			</div>
 		);
 	}
-	const { files, syncs, tooLarge, proposed, reviews, shared, can, olderHost } =
-		knowledge.data;
+	const { files, syncs, proposed } = knowledge.data;
 	if (files.length === 0 && syncs.length === 0 && proposed === 0) {
 		return <NoKnowledge onAdd={onAdd} />;
 	}
 	return (
+		<KnowledgeTabs
+			projectId={projectId}
+			knowledge={knowledge.data}
+			tab={tab}
+			node={node}
+			onView={onView}
+			onAdd={onAdd}
+			onEdit={onEdit}
+		/>
+	);
+}
+
+/**
+ * The three views of the knowledge. It starts on Review when something waits
+ * for a person, and on What agents know when nothing does.
+ */
+function KnowledgeTabs({
+	projectId,
+	knowledge,
+	tab,
+	node,
+	onView,
+	onAdd,
+	onEdit,
+}: {
+	projectId: string;
+	knowledge: Knowledge;
+	tab: KnowledgeTab | undefined;
+	node: string | undefined;
+	onView: (view: KnowledgeLocation) => void;
+	onAdd: (() => void) | undefined;
+	onEdit: (source: EditedSource) => void;
+}) {
+	const review = useReview(projectId, knowledge);
+	const [open, setOpen] = useState<string | null>(null);
+	const startsOnReview =
+		knowledge.proposed > 0 ||
+		knowledge.syncs.some((sync) => sync.health !== null);
+	const shown = tab ?? (startsOnReview ? "review" : "knows");
+	const waiting = review.queue.length;
+	return (
 		<>
-			{olderHost ? (
+			{knowledge.olderHost ? (
 				<Alert>
 					<TriangleAlertIcon />
 					<AlertTitle>This knowledge stays on this computer for now</AlertTitle>
@@ -175,82 +251,64 @@ function KnowledgeView({
 					</AlertDescription>
 				</Alert>
 			) : null}
-			{proposed > 0 ? (
-				<Learnings
-					projectId={projectId}
-					proposed={proposed}
-					reviews={reviews}
-					mayReview={can.startRuns}
-				/>
-			) : null}
-			{syncs.length > 0 ? (
-				<Sources
-					projectId={projectId}
-					syncs={syncs}
-					shared={shared}
-					can={can}
-					onEdit={onEdit}
-				/>
-			) : (
-				<Alert>
-					<BookOpenIcon />
-					<AlertTitle>Nothing adds files to this knowledge</AlertTitle>
-					<AlertDescription>
-						Add a source, such as a folder or web pages, to keep it up to date.
-					</AlertDescription>
-					{onAdd ? (
-						<AlertAction>
-							<Button size="sm" variant="outline" onClick={onAdd}>
-								Add source
-							</Button>
-						</AlertAction>
-					) : null}
-				</Alert>
-			)}
-			{files.length > 0 ? <KnowledgeSearch projectId={projectId} /> : null}
-			{files.length > 0 ? (
-				<AskedQuestions
-					projectId={projectId}
-					mayChange={can.startRuns}
-					files={files.map((file) => file.path)}
-				/>
-			) : null}
-			<PageSection
-				title="Files"
-				description={`${files.length} ${files.length === 1 ? "file" : "files"}.`}
+			<Tabs
+				value={shown}
+				onValueChange={(next) => onView({ tab: next as KnowledgeTab })}
+				className="gap-4"
 			>
-				{tooLarge ? (
-					<Alert>
-						<TriangleAlertIcon />
-						<AlertTitle>This knowledge is very large</AlertTitle>
-						<AlertDescription>
-							It has more than 2 000 files. Agents find less in this much text.
-							Sync only what they need.
-						</AlertDescription>
-					</Alert>
-				) : null}
-				<Card className="py-0">
-					<CardContent className="px-0">
-						{files.length === 0 ? (
-							<Empty>
-								<EmptyHeader>
-									<EmptyTitle>No files yet</EmptyTitle>
-									<EmptyDescription>
-										Choose Sync now on a source above to add its files.
-									</EmptyDescription>
-								</EmptyHeader>
-							</Empty>
-						) : (
-							<DataTable
-								columns={columns}
-								data={files}
-								getRowId={(file) => file.path}
-								pageSize={50}
-							/>
-						)}
-					</CardContent>
-				</Card>
-			</PageSection>
+				<TabsList>
+					<TabsTrigger value="review">
+						<ListChecksIcon aria-hidden="true" />
+						Review
+						{waiting > 0 ? (
+							<Badge variant="secondary" className="tabular-nums">
+								{waiting}
+							</Badge>
+						) : null}
+					</TabsTrigger>
+					<TabsTrigger value="knows">
+						<LibraryIcon aria-hidden="true" />
+						What agents know
+					</TabsTrigger>
+					<TabsTrigger value="map">
+						<NetworkIcon aria-hidden="true" />
+						Map
+					</TabsTrigger>
+				</TabsList>
+				<TabsContent value="review">
+					<ReviewTab
+						projectId={projectId}
+						review={review}
+						can={knowledge.can}
+						fileCount={knowledge.files.length}
+						active={shown === "review"}
+						onOpenFile={setOpen}
+						onAddSource={onAdd}
+						onShowOnMap={(next) => onView({ tab: "map", node: next })}
+						onShowFiles={() => onView({ tab: "knows" })}
+					/>
+				</TabsContent>
+				<TabsContent value="knows">
+					<FilesTab
+						projectId={projectId}
+						knowledge={knowledge}
+						onOpenFile={setOpen}
+						onAdd={onAdd}
+						onEdit={onEdit}
+					/>
+				</TabsContent>
+				<TabsContent value="map">
+					<MapTab
+						projectId={projectId}
+						focus={node ?? null}
+						onOpenFile={setOpen}
+						onReview={(learningId) => {
+							review.bringForward(learningTaskId(learningId));
+							onView({ tab: "review" });
+						}}
+					/>
+				</TabsContent>
+			</Tabs>
 			<KnowledgeFileSheet
 				projectId={projectId}
 				path={open}
@@ -284,158 +342,4 @@ function NoKnowledge({ onAdd }: { onAdd: (() => void) | undefined }) {
 			) : null}
 		</Empty>
 	);
-}
-
-/**
- * The learnings agents proposed, which wait for a person, and the flow
- * that asks about them.
- */
-function Learnings({
-	projectId,
-	proposed,
-	reviews,
-	mayReview,
-}: {
-	projectId: string;
-	proposed: number;
-	reviews: string[];
-	/** The person may start the review: a role that may start runs. */
-	mayReview: boolean;
-}) {
-	const [open, setOpen] = useState(false);
-	const review = reviews[0];
-	const notes = `${proposed} ${proposed === 1 ? "learning waits" : "learnings wait"} for you`;
-	return (
-		<Alert>
-			<LightbulbIcon />
-			<AlertTitle>{notes}</AlertTitle>
-			<AlertDescription>
-				{!mayReview
-					? "Agents learned something about this project. Ask a Member of this Space to review it."
-					: review
-						? "Agents learned something about this project. Keep what is right. Agents read it in later runs."
-						: "Agents learned something about this project. Add the review-learnings starter flow to keep or delete it."}
-			</AlertDescription>
-			{review && mayReview ? (
-				<AlertAction>
-					<Button size="sm" onClick={() => setOpen(true)}>
-						Review learnings
-					</Button>
-					<StartRunDialog
-						open={open}
-						onOpenChange={setOpen}
-						projectId={projectId}
-						flowName={review}
-					/>
-				</AlertAction>
-			) : null}
-		</Alert>
-	);
-}
-
-const column = dataTableColumns<KnowledgeFile>();
-
-/** How agents used each file, by path, and whether to mark the ones no run used. */
-function fileUse(report: KnowledgeUse | undefined) {
-	return {
-		byPath: new Map((report?.files ?? []).map((file) => [file.path, file])),
-		/** Files no run used since then are marked. Null: mark none. */
-		unusedBefore:
-			report?.runsUsedIt === true
-				? now() - report.unusedDays * 24 * 60 * 60 * 1000
-				: null,
-		unusedDays: report?.unusedDays ?? 30,
-	};
-}
-
-/** The columns of the file list. A file's path opens it. */
-function fileColumns(
-	open: (path: string) => void,
-	use: ReturnType<typeof fileUse>,
-) {
-	return column.columns([
-		column.accessor("path", {
-			header: "File",
-			cell: ({ row }) => (
-				<div className="flex flex-wrap items-center gap-2">
-					<Button
-						variant="link"
-						className="h-auto whitespace-normal break-all p-0 text-left font-mono text-xs"
-						onClick={() => open(row.original.path)}
-					>
-						{row.original.path}
-					</Button>
-					{row.original.local ? (
-						<Tooltip>
-							<TooltipTrigger render={<Badge variant="secondary" />}>
-								On one computer
-							</TooltipTrigger>
-							<TooltipContent>
-								Larger than 10 MB. It stays on the computer that synced it.
-							</TooltipContent>
-						</Tooltip>
-					) : null}
-				</div>
-			),
-			meta: {
-				headClassName: "pl-6",
-				cellClassName: "w-full max-w-0 py-3 pl-6",
-			},
-		}),
-		column.display({
-			id: "used",
-			header: "Used",
-			cell: ({ row }) => {
-				const used = use.byPath.get(row.original.path);
-				const unused =
-					use.unusedBefore !== null &&
-					(used?.lastRunAt ?? 0) < use.unusedBefore;
-				return (
-					<div className="flex flex-wrap items-center gap-2">
-						{used ? (
-							<span
-								className="whitespace-nowrap text-muted-foreground text-sm tabular-nums"
-								title={`Last used ${hoverTime(used.lastAt)}`}
-							>
-								Found {used.found}, read {used.read}
-							</span>
-						) : null}
-						{unused ? (
-							<Tooltip>
-								<TooltipTrigger render={<Badge variant="outline" />}>
-									Not used
-								</TooltipTrigger>
-								<TooltipContent>
-									No run used this file in {use.unusedDays} days. Stop syncing
-									it if your agents do not need it.
-								</TooltipContent>
-							</Tooltip>
-						) : null}
-					</div>
-				);
-			},
-			meta: { cellClassName: "py-3" },
-		}),
-		column.accessor("changedAt", {
-			header: "Changed",
-			cell: ({ row }) => (
-				<LocalTime
-					at={row.original.changedAt}
-					className="whitespace-nowrap text-muted-foreground text-sm"
-				>
-					{formatRelative(row.original.changedAt)}
-				</LocalTime>
-			),
-			meta: { cellClassName: "py-3" },
-		}),
-		column.accessor("size", {
-			header: "Size",
-			cell: ({ row }) => (
-				<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
-					{formatSize(row.original.size)}
-				</span>
-			),
-			meta: { headClassName: "pr-6", cellClassName: "py-3 pr-6 text-right" },
-		}),
-	]);
 }

@@ -117,7 +117,7 @@ CLI when you need them.
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
 | ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. |
-| ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K). |
+| ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, the keys of the Knowledge page's Review tab). |
 
 ### More
 
