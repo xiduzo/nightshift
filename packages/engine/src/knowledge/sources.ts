@@ -183,7 +183,7 @@ function sourceActions(
 
 /** A project's knowledge in its Space, and the flows that fill it. */
 type KnowledgeOverview = {
-	/** Every file but the index and the proposals, by path. */
+	/** Every file but the index and the proposed learnings, by path. */
 	files: KnowledgeFile[];
 	/** So many files that an agent reads it badly. */
 	tooLarge: boolean;

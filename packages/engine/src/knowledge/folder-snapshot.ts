@@ -103,7 +103,7 @@ export function isKnowledgePath(path: string): boolean {
 
 /**
  * Whether a person or an agent reads a path: one of the knowledge, but no
- * proposal and nothing of the question set. The index, search and
+ * proposed learning and nothing of the question set. The index, search and
  * `read_knowledge` take these only.
  */
 export function isReadable(path: string): boolean {

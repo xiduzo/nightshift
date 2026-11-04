@@ -88,8 +88,10 @@ old document and its search index go.
 
 Every Member of the Space can read the knowledge, on any computer and on
 the Host. A computer publishes its changes when its Member has a role that
-may start runs. A browser changes knowledge only through flows: the syncs
-and the review of learnings. In a shared Space, the Knowledge page says
+may start runs. A browser never writes the folder. A person changes knowledge
+through flows (the syncs, the review of learnings), through Keep and Delete on
+the Review page, and by marking a question or a word that is not a topic. These
+need the same role. In a shared Space, the Knowledge page says
 that every Member can read what you sync there. Before you sync a client's
 Jira or Confluence into a shared Space, make sure that each Member may see
 it.
@@ -186,13 +188,20 @@ model that nobody measured has no line, and its Map has no such edges. With no
 model, with search by meaning off for the project, or before the first vectors,
 the Map stands without them.
 
-**What it costs.** The Map has no cache: each draw counts again, on the daemon's
-one thread. It reads at most 6 MB of text, 60 KB of each file, and at most 4 000
-vectors: the first section of each file, then the second. It compares the first
-400 files by path. On a computer with a load of 50 to 65, the limits took 600 to
-1 150 ms for the text, 160 to 390 ms to read the vectors, and 110 to 240 ms to
-compare. A project the size of `docs/` draws in 150 to 400 ms on that computer.
-Past the text limit, the page says how many files it left out.
+**What it costs.** A draw counts on the daemon's one thread. It reads at most
+6 MB of text, 60 KB of each file, and at most 4 000 vectors: the first section of
+each file, then the second. It compares the first 400 files by path. On a computer
+with a load of 50 to 65, the limits took 600 to 1 150 ms for the text, 160 to
+390 ms to read the vectors, and 110 to 240 ms to compare. A project the size of
+`docs/` draws in 150 to 400 ms on that computer. Past the text limit, the page says
+how many files it left out.
+
+So Night Shift keeps the last Map of each project, for the last 8 projects, as
+long as what it drew from stays the same: the hash of each file, the vectors there
+are, the files the Space lists, what agents asked, the learnings that wait and what
+is not a topic. Each draw reads these again, which costs little, and any change
+draws again at once. No part of Night Shift has to say that the Map is old. With
+1 000 files and a load of 4, a draw took 650 ms and the next one 7 to 22 ms.
 
 ## What an agent gets
 
@@ -265,8 +274,8 @@ The rules:
 - A folder that does not exist yet is valid and gives nothing. The editor
   marks it.
 - `learnings/accepted` is a folder like the others: list it to give the
-  learnings you kept. The step still gets the learnings field, and its
-  proposals still go to `learnings/proposed/` of the knowledge.
+  learnings you kept. The step still gets the learnings field, and what it
+  proposes still goes to `learnings/proposed/` of the knowledge.
 - The view is a wall for what the agent reads through Night Shift. A
   harness that reads any file on the computer can still find the knowledge
   folder if it looks for it. Keep data that no agent may see out of the
@@ -374,18 +383,19 @@ step puts them in the Space. They wait for you there. The index does not list th
 no agent reads them.
 
 The `review-learnings` starter flow calls `kit:knowledge/review-learnings`.
-It opens a Gate with the proposals, without the header Night Shift writes
-at the top of each file:
+It opens a Gate with the proposed learnings, without the header Night Shift
+writes at the top of each file:
 
 - **Keep** moves them to `learnings/accepted/`. There the index lists them
   and agents read them.
 - **Delete** removes them.
 
-A proposal that arrives while the Gate waits stays for the next review.
-The review runs on any computer of the Space. Its reconcile first fetches
-the proposals, and then puts what it kept or deleted back in the Space.
+A proposed learning that arrives while the Gate waits stays for the next
+review. The review runs on any computer of the Space. Its reconcile first
+fetches the proposed learnings, and then puts what it kept or deleted back in
+the Space.
 
-You can also keep or delete proposals on the Review page of Knowledge,
+You can also keep or delete proposed learnings on the Review page of Knowledge,
 one step at a time. Each decision acts on all notes of that step. The
 page sends it after 5 seconds, so you can undo it.
 
@@ -480,7 +490,7 @@ that it needs no Night Shift command on the `PATH` of a step. Its Keep and Delet
 are the second form of `settle`. `learnings-kit.test.ts` runs both forms
 over the same folders and asks for the same result.
 
-### Proposals from a Command
+### Proposed learnings from a Command
 
 A Command can propose learnings too. It writes a file to
 `$NS_KNOWLEDGE/learnings/proposed/`. The rules:
@@ -543,6 +553,10 @@ binary too. A PDF of scanned pages has no text to find. `INDEX.md` lists a PDF o
 with the title the PDF gives, else the first line of its text, and its
 first sentence.
 
+Night Shift parses one such file at a time, because a folder of PDFs must not
+hold dozens in memory. A read of one file goes before all that the search index
+and `INDEX.md` queued, so it waits only for the parse that runs.
+
 Night Shift cuts each file into sections of about 1 200 characters, at
 its headings first (`@langchain/textsplitters`). A PDF is cut page by
 page. A hit is a file at its best section, so the result says where to
@@ -591,7 +605,7 @@ computer only:
   was measured on these docs and has a floor (below). The other models of
   the list work, with no floor. `embedding-model.ts` in
   `packages/engine/src/knowledge` has one record per measured model: its
-  name, vector length, query instruction, floor and measurement. A trial
+  name, query instruction, floor, line for close files and measurement. A trial
   is one record and one floor run. Two models are watched, with no record
   until a measurement exists: `harrier-oss-v1-0.6b` and
   `embeddinggemma-2:270m` for a Host with only a CPU.
@@ -628,7 +642,8 @@ model takes about 1 GB of memory). A search never waits for it. It uses
 the vectors there are and finds the rest by words. On an M4 Max the first
 preparation of 1 100 sections takes about one minute. Later ones embed
 only the sections that changed. A section that moves in its file keeps its
-vector: the section's id comes from its path, the file's title and its text.
+vector: the section's id comes from its path, the file's title, its heading path
+and its text.
 
 A project prepares only when someone looks at it: a search, or the Knowledge
 page. One project prepares at a time. A preparation that fails keeps what it
@@ -860,8 +875,9 @@ reads it.
 
 ## Known gaps (phase 1)
 
-- Content that no entry names any more stays in the archive. Retention is
-  undecided, as it is for run history.
+- Only the computer that keeps a Space removes content that no entry names. The
+  copy in another computer's archive stays. Retention is undecided, as it is for
+  run history.
 - A run does not record which version of the knowledge it read.
 - The Review page shows only the `- ` lines of a proposed learning, and Keep
   adds the whole file. A Command can write other text there. The Gate shows it.
@@ -870,12 +886,11 @@ reads it.
 - Close notes do not say whether two notes repeat or disagree. A model could
   say which (`docs/research/knowledge-graph-extraction.md`). The engine has no
   model for this.
-- A project that joins another one when a computer joins its home Host
-  keeps its knowledge folder under its old id.
 - The evaluation runs from the page only. `kit:knowledge/evaluate`, so a
   schedule can repeat it, waits for a way for a Command step to call Night
   Shift.
-- A source can still write into `evals/`: the kits refuse only
-  `learnings/`.
 - Search by meaning needs Ollama on each computer, or an address of an
   Ollama elsewhere. Each computer embeds its own copy of the knowledge.
+- `knowledgeGet` and `knowledgePut` remain on the Device's protocol beside the
+  archive's own procedures. They go at the next version of the contract, when
+  content becomes a kind of archive reference.

@@ -53,7 +53,7 @@ import { isMarkdown, markdownHeadings } from "./sections";
  * syncs, but no index, search or read shows it.
  *
  * `learnings/` is Night Shift's own (`learnings.ts`): the index lists the
- * learnings a person kept, never the proposals that wait.
+ * learnings a person kept, never the proposed learnings that wait.
  *
  * Which files count and what changed is `folder-snapshot.ts`. How one file
  * is read and what it is called is decided here once: `INDEX.md`, the search

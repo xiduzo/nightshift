@@ -3,7 +3,7 @@
 > The rules for where code lives. Read this before you add a file, a folder or a package.
 > When a rule changes, change it here and record the change in the ADR table of `TECH.md`.
 
-Last updated: 2026-11-02
+Last updated: 2026-11-05
 
 Night Shift is a **layered vertical codebase**.
 
@@ -113,7 +113,7 @@ The entries today:
 
 | Package | Entries |
 | --- | --- |
-| `agents` | `.`, `./harness-facts`, `./pricing`, `./tools` (the MCP client the Tool node calls), `./types` (the port barrel: the harness contract's types and its shell quoting), `./testing` (fakes, `fixturePath(name)`, `defaultDeciderModel` for a test's own decider). The engine uses the four light entries, because the root brings every harness and decider (their TanStack packages load on first use). `./harness-facts` is browser-safe. |
+| `agents` | `.`, `./harness-facts`, `./pricing`, `./tools` (the MCP client the Tool node calls, and Night Shift's knowledge tools with the Session brief), `./types` (the port barrel: the harness contract's types and its shell quoting), `./testing` (fakes, `fixturePath(name)`, `defaultDeciderModel` for a test's own decider). The engine uses the four light entries, because the root brings every harness and decider (their TanStack packages load on first use). `./harness-facts` is browser-safe. |
 | `api` | `.` (`appRouter` and its types, and `runAccess`: the access ladder of a run for a Person, with the refusals the procedures give, for the daemon's run file routes), `./client` (types only, for `client`, which passes them on to `apps/web` and `apps/mobile`), `./context` (`Context`: the request's `access` from auth, and the daemon's `Services`), `./testing` (`testContext`, `accessAs`) |
 | `auth` | `.`, `./testing` (`createAuthSandbox`, the second factor of a Person, and the Host policies a test sets or expects: `OPEN_HOST`, `TWO_FACTOR_REQUIRED`) |
 | `client` | `.` (`createApiClient`, `createQueryUtils`, the `create<Vertical>Queries` factories, `useFollowHost`, `useLiveRun`, `useAnswerGate`, the seam `ShownNotifications` (with `Notice`, `ListedNotification`), `EntryFold`, `HostApi`, `mergeSteps`, `answerGate` and `gateRefusalText`, which actions a run allows (`runActions` and `whyNot`, passed on from `@nightshift/engine/run-status`), the notify rules, the push contract (`PUSH_CATEGORY`, `PUSH_ANDROID_CHANNEL`, `PUSH_ACTION`, `PushData`, `pushDataOf`, `withdrawKeyOf`, `PushRoute`, `routeOf`, `webPathOf`), the shared formatters (`formatCost`, `formatKnownCost`, `costLabel`, `usageLabel`, `whenLabel`, `agoLabel`, `platformName`, `PHONE_DELAYS`, `phoneDelayLabel`, `deadlineText`, `deadlineWhen`, `useNow`, the clock `formatTime`, `formatDateTime`, `formatDayTime`, `formatRelative`, `formatLongDay`, `hoverTime`, `iso`, `now`), the shared words (`runStatusLabel`, `stepOutcomeLabel`), the shared rules (`canStart`), the view types), `./testing` (`gateKey`, `staleGates`: the push contract's Gate key and closed-Gate rule, for the test of the web app's service worker, which cannot import them) |

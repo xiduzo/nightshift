@@ -172,7 +172,7 @@ export type Knowledge = {
 	): Promise<KnowledgeText | null>;
 	/**
 	 * The learnings agents proposed that wait for a person in these
-	 * projects, newest first. Each is one step's proposals.
+	 * projects, newest first. Each is one step's proposed learnings.
 	 */
 	learnings(projectIds: readonly string[]): Promise<ProjectLearning[]>;
 	/**
@@ -187,12 +187,12 @@ export type Knowledge = {
 		space: SourcesSpace<Run>,
 	): Promise<ReviewTask[]>;
 	/**
-	 * Keeps or deletes one step's proposals, as the review of learnings
+	 * Keeps or deletes one step's proposed learnings, as the review of learnings
 	 * (`kit:knowledge/review-learnings`) does: keep adds them to
 	 * `learnings/accepted/`, where agents read them, and both take them
 	 * out of `learnings/proposed/`. It holds the folder as a step does,
 	 * so the change goes to the Space when it ends, and the open screens
-	 * hear of it. Refuses a proposal that no longer waits, and one whose
+	 * hear of it. Refuses a proposed learning that no longer waits, and one whose
 	 * content cannot be fetched now.
 	 */
 	settleLearning(

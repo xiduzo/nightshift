@@ -16,9 +16,9 @@ import type { SpaceHostStatus } from "./space-host-status";
 
 /** What the Knowledge page lists: the document's files, and the learnings that wait. */
 export type KnowledgeListing = {
-	/** The files, the proposals left out, by path. */
+	/** The files, the proposed learnings left out, by path. */
 	files: KnowledgeFile[];
-	/** How many notes the proposals hold. */
+	/** How many notes the proposed learnings hold. */
 	proposed: number;
 	/** The Project's Space is not a personal one: each of its Members reads the knowledge. */
 	shared: boolean;
@@ -104,7 +104,7 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 		 * `maxBytes` of its text: this Device's copy, else its content by
 		 * its hash in the document, from the archive here or at the Host. A PDF or
 		 * Word file gives its text either way. Null when neither has the
-		 * file, and for a proposal. Refuses (never a plain error) a file
+		 * file, and for a proposed learning. Refuses (never a plain error) a file
 		 * that is not text, one that stays on another Device, and one whose
 		 * content cannot be fetched now.
 		 */

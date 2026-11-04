@@ -70,7 +70,7 @@ export type SessionKnowledge = Pick<CommandKnowledge, "done"> & {
 	/** What the session gets: `NS_KNOWLEDGE`, and the brief when the agent reads the folder. */
 	contribution: SessionContribution;
 	/**
-	 * The session's events as they are, its learnings kept as proposals of
+	 * The session's events as they are, its learnings kept as proposed learnings of
 	 * the run, and each use of the knowledge tools before the next event.
 	 */
 	events(
@@ -81,7 +81,7 @@ export type SessionKnowledge = Pick<CommandKnowledge, "done"> & {
 /** The step an Agent session runs for. */
 export type SessionStep = {
 	runId?: string;
-	/** The step of the run: its proposals have a file of their own. */
+	/** The step of the run: its proposed learnings have a file of their own. */
 	stepId?: string;
 };
 

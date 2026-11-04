@@ -74,13 +74,13 @@ async function knownProject(
 	}
 }
 
-/** One step's proposals that wait, in a project of the Space. */
+/** One step's proposed learnings that wait, in a project of the Space. */
 const learningInput = z.object({
 	projectId: z.string(),
 	id: z.string().min(1).max(300),
 });
 
-/** Keeps or deletes one step's proposals of a project the person sees. */
+/** Keeps or deletes one step's proposed learnings of a project the person sees. */
 async function settle(
 	context: Pick<Context, "knowledge"> & {
 		space: { listProjects(): Promise<{ id: string }[]> };
@@ -156,7 +156,7 @@ export const knowledge = {
 	/**
 	 * The learnings agents proposed that wait for a person, newest first:
 	 * of one project, or of every project of the Space. Each is one step's
-	 * proposals, with its notes and the run that proposed them.
+	 * proposed learnings, with its notes and the run that proposed them.
 	 */
 	learnings: protectedProcedure
 		.route({
@@ -181,7 +181,7 @@ export const knowledge = {
 			return learnings.map((learning) => ({ ...learning, mayDecide }));
 		}),
 	/**
-	 * Keeps one step's proposals: agents read them in later runs. As the
+	 * Keeps one step's proposed learnings: agents read them in later runs. As the
 	 * review of learnings does, it changes the knowledge, so it asks a
 	 * role that may start runs (ADR 4).
 	 */
@@ -193,7 +193,7 @@ export const knowledge = {
 		.output(output(z.void()))
 		.input(learningInput)
 		.handler(({ context, input }) => settle(context, input, "keep")),
-	/** Deletes one step's proposals. A role that may start runs, as for keep. */
+	/** Deletes one step's proposed learnings. A role that may start runs, as for keep. */
 	deleteLearning: permitted(MAY.changeKnowledge)
 		.route({
 			summary: "Deletes the learnings of one step: agents never read them.",

@@ -98,14 +98,14 @@ export const knowledgeSchema = z.object({
 });
 export type KnowledgePage = z.infer<typeof knowledgeSchema>;
 
-/** One step's proposals that wait for a person: keep them or delete them. */
+/** One step's proposed learnings that wait for a person: keep them or delete them. */
 const waitingLearningSchema = exact<WaitingLearning>()(
 	z.object({
 		/** What keeps or deletes it. */
 		id: z.string(),
 		/** The run whose step proposed it. */
 		runId: z.string(),
-		/** That step. Null for a run from before steps had proposals of their own. */
+		/** That step. Null for a run from before steps had proposed learnings of their own. */
 		stepId: z.string().nullable(),
 		/** What the agent proposed to learn, one note each. Empty: the text cannot be read now. */
 		notes: z.array(z.string()),
@@ -131,12 +131,12 @@ const waitingLearningSchema = exact<WaitingLearning>()(
 	}),
 );
 
-/** A proposal that waits, with the project it is for. */
+/** A proposed learning that waits, with the project it is for. */
 const projectLearningSchema = waitingLearningSchema.extend({
 	projectId: z.string(),
 });
 
-/** A proposal in the list of what waits, with what the person may do with it. */
+/** A proposed learning in the list of what waits, with what the person may do with it. */
 export const listedLearningSchema = projectLearningSchema.extend({
 	/**
 	 * Whether the person's role lets them keep or delete it: the server refuses
