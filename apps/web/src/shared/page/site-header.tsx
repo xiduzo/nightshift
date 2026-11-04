@@ -43,10 +43,14 @@ export function SiteHeader({
 						return (
 							<Fragment key={index}>
 								{index > 0 ? (
-									<BreadcrumbSeparator className="hidden md:block" />
+									<BreadcrumbSeparator className="hidden shrink-0 md:block" />
 								) : null}
 								<BreadcrumbItem
-									className={last ? "min-w-0" : "hidden md:inline-flex"}
+									className={
+										last
+											? "min-w-0"
+											: "hidden shrink-0 whitespace-nowrap md:inline-flex"
+									}
 								>
 									{last || !crumb.link ? (
 										<BreadcrumbPage className="truncate">

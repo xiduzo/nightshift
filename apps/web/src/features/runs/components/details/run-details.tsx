@@ -1,14 +1,11 @@
-import { Button } from "@nightshift/ui/components/button";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import {
 	Sheet,
 	SheetContent,
 	SheetTitle,
-	SheetTrigger,
 } from "@nightshift/ui/components/sheet";
 import { Link } from "@tanstack/react-router";
-import { InfoIcon, MonitorIcon, WorkflowIcon } from "lucide-react";
-import { useState } from "react";
+import { MonitorIcon, WorkflowIcon } from "lucide-react";
 import { walkerName } from "@/features/devices";
 import { InspectorSection, RunRevision } from "@/features/flows";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
@@ -28,35 +25,32 @@ const SHA = /^[0-9a-f]{40}$/i;
 const ENDED: RunStatus[] = ["finished", "failed", "stopped", "interrupted"];
 
 /**
- * A button in the page header that opens every fact of the run in a Sheet,
- * in folding sections like the node settings of the flow editor.
+ * Every fact of the run in a Sheet, in folding sections like the node
+ * settings of the flow editor.
  */
 export function RunDetails({
 	run,
 	steps,
 	status,
+	open,
+	onOpenChange,
 	onShowStep,
 }: {
 	run: RunDetail;
 	/** The run's steps as they stand, live. */
 	steps: StepSummary[];
 	status: RunStatus;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
 	onShowStep: (stepId: string) => void;
 }) {
-	const [open, setOpen] = useState(false);
 	const showStep = (stepId: string) => {
-		setOpen(false);
+		onOpenChange(false);
 		onShowStep(stepId);
 	};
 
 	return (
-		<Sheet open={open} onOpenChange={setOpen}>
-			<SheetTrigger
-				render={<Button variant="outline" size="sm" aria-label="Details" />}
-			>
-				<InfoIcon data-icon="inline-start" />
-				<span className="hidden sm:inline">Details</span>
-			</SheetTrigger>
+		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent className="gap-0 data-[side=right]:sm:max-w-md">
 				<PanelHeader
 					icon={WorkflowIcon}
