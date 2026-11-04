@@ -15,6 +15,7 @@ export {
 	type KnowledgeFile,
 	type KnowledgeText,
 } from "./folder";
+export { type KnowledgeGraph, knowledgeGraphOf } from "./graph";
 export {
 	createKnowledgeDocuments,
 	type KnowledgeDocuments,

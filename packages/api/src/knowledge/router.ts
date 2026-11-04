@@ -4,6 +4,7 @@ import {
 	askedQuestions,
 	evaluateKnowledge,
 	knowledgeFileUse,
+	knowledgeGraphOf,
 	knowledgeSources,
 	questionKey,
 } from "@nightshift/engine";
@@ -23,6 +24,7 @@ import { runSummarySchema } from "../runs";
 import {
 	type KnowledgeView,
 	knowledgeEvaluationSchema,
+	knowledgeGraphSchema,
 	knowledgeHitSchema,
 	knowledgeMeaningSchema,
 	knowledgeQuestionsSchema,
@@ -440,6 +442,26 @@ export const knowledge = {
 				})),
 				set,
 			};
+		}),
+	/**
+	 * The project's knowledge as a graph: its files, the topics they share,
+	 * the questions that found them and the learnings that name their topics.
+	 */
+	graph: protectedProcedure
+		.route({
+			summary:
+				"Gives a project's knowledge as a graph: its files, their topics, the questions that found them and the learnings that wait.",
+		})
+		.output(output(knowledgeGraphSchema))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			const [read, asked, learnings] = await Promise.all([
+				context.knowledge.graphInput(input.projectId),
+				askedQuestions(context.db, input.projectId),
+				context.knowledge.waitingLearnings(input.projectId),
+			]);
+			return knowledgeGraphOf({ ...read, asked, learnings });
 		}),
 	/**
 	 * Marks the files that answer a question an agent asked: the question

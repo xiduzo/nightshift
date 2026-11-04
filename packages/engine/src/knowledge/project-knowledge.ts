@@ -1,5 +1,7 @@
 import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import type { GraphDocument } from "@langchain/community/graphs/document";
+import { Document } from "@langchain/core/documents";
 import {
 	KNOWLEDGE_TOOLS_INSTRUCTION,
 	type KnowledgePort,
@@ -13,6 +15,7 @@ import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import { type CollectResult, collectContent } from "./collect";
 import { createKnowledgeFolders, INDEX_FILE, isReadable } from "./folder";
+import { TopicGraphTransformer } from "./graph";
 import {
 	type KnowledgeDocuments,
 	knowledgeEntries,
@@ -58,6 +61,18 @@ import { createKnowledgeView, inFolders, type KnowledgeView } from "./view";
  * its harness takes Night Shift's own tools), and may propose learnings:
  * when the folder has files or its node asks for it.
  */
+
+/** The files a graph reads, at most: it reads them one by one. */
+const GRAPH_MAX_FILES = 200;
+/** How much of each file a graph reads. */
+const GRAPH_MAX_BYTES = 60_000;
+
+/** What the Map of a project's knowledge is made from. */
+export type KnowledgeGraphInput = {
+	files: string[];
+	documents: GraphDocument[];
+	filesLeftOut: number;
+};
 
 /** The environment variable with the folder's path. */
 export const KNOWLEDGE_ENV = "NS_KNOWLEDGE";
@@ -186,6 +201,9 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 	}
 
 	/** The step holds the folder: a reconcile first, and `done` for the one after. */
+	/** The latest graph input of each project, with the files it is for. */
+	const graphs = new Map<string, { key: string; input: KnowledgeGraphInput }>();
+
 	async function begin(projectId: string) {
 		const hold = await sync.startStep(projectId);
 		const path = folders.folder(projectId);
@@ -483,6 +501,45 @@ export function createProjectKnowledge(deps: ProjectKnowledgeDeps) {
 			} finally {
 				await hold.done();
 			}
+		},
+		/**
+		 * What the Map of the knowledge is made from: every file, and what the
+		 * transformer found in the files it could read. It reads them only
+		 * when a file changed. A file it cannot read stays on the map, alone.
+		 */
+		async graphInput(projectId: string): Promise<KnowledgeGraphInput> {
+			const { files } = await sync.listing(projectId);
+			const key = files
+				.map((file) => `${file.path}:${file.size}:${file.changedAt}`)
+				.join("\n");
+			const known = graphs.get(projectId);
+			if (known?.key === key) return known.input;
+			const readable = files.filter(
+				(file) => isReadable(file.path) && !file.local,
+			);
+			const documents: Document[] = [];
+			for (const file of readable.slice(0, GRAPH_MAX_FILES)) {
+				const text = await sync
+					.read(projectId, file.path, GRAPH_MAX_BYTES)
+					.catch(() => null);
+				if (text) {
+					documents.push(
+						new Document({
+							pageContent: text.text,
+							metadata: { path: file.path },
+						}),
+					);
+				}
+			}
+			const input: KnowledgeGraphInput = {
+				files: files.map((file) => file.path),
+				documents: await new TopicGraphTransformer().convertToGraphDocuments(
+					documents,
+				),
+				filesLeftOut: Math.max(0, readable.length - GRAPH_MAX_FILES),
+			};
+			graphs.set(projectId, { key, input });
+			return input;
 		},
 		/** Whether search by meaning is on for the project, in every Device of its Space. */
 		async meaningOn(projectId: string): Promise<boolean> {

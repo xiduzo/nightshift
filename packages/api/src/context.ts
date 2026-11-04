@@ -97,6 +97,7 @@ export type Services = {
 	knowledge: Pick<
 		ProjectKnowledge,
 		| "listing"
+		| "graphInput"
 		| "waitingLearnings"
 		| "settleLearning"
 		| "read"

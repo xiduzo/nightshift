@@ -360,6 +360,60 @@ describe("knowledge.search and knowledge.read", () => {
 	});
 });
 
+describe("knowledge.graph", () => {
+	test("any Member gets the files and the topics they share, and only of its projects", async () => {
+		await putFile(
+			"wiki/one.md",
+			"Momentum and more momentum. See [two](two.md).",
+		);
+		await putFile("wiki/two.md", "This is about momentum too.");
+		const graph = await call(
+			appRouter.knowledge.graph,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(graph.nodes.map((node) => node.id)).toEqual(
+			expect.arrayContaining([
+				"file:wiki/one.md",
+				"file:wiki/two.md",
+				"topic:momentum",
+			]),
+		);
+		expect(graph.edges.map((edge) => edge.id)).toContain(
+			"file:wiki/one.md->file:wiki/two.md",
+		);
+		await expect(
+			call(
+				appRouter.knowledge.graph,
+				{ projectId: "p9" },
+				{ context: context("member") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+	});
+
+	test("reads a changed file again, and connects what agents asked", async () => {
+		await putFile("wiki/one.md", "Momentum in a first file.");
+		await putFile("wiki/two.md", "Momentum in a second file.");
+		const ctx = context("member");
+		await call(appRouter.knowledge.graph, { projectId }, { context: ctx });
+		await putFile("wiki/three.md", "Momentum in a third file, and rainbows.");
+		await putFile("wiki/one.md", "Later on, some rainbows and momentum.");
+		await call(
+			appRouter.knowledge.search,
+			{ projectId, query: "deploy", agent: true },
+			{ context: ctx },
+		);
+		const graph = await call(
+			appRouter.knowledge.graph,
+			{ projectId },
+			{ context: ctx },
+		);
+		expect(graph.nodes.map((node) => node.id)).toEqual(
+			expect.arrayContaining(["topic:rainbows", "question:deploy"]),
+		);
+	});
+});
+
 describe("knowledge.questions and knowledge.markQuestion", () => {
 	test("lists what agents asked with its answers once marked; marking asks a role that may start runs", async () => {
 		await putFile("wiki/deploy.md", "# Deploy\n");

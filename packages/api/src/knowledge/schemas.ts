@@ -2,6 +2,7 @@ import type {
 	AskedQuestion,
 	KnowledgeEvaluation,
 	KnowledgeFile,
+	KnowledgeGraph,
 	KnowledgeHit,
 	KnowledgeMeaningStatus,
 	KnowledgeQuestion,
@@ -270,5 +271,29 @@ export const knowledgeUseSchema = exact<KnowledgeUseReport>()(
 				lastRunAt: z.number().nullable(),
 			}),
 		),
+	}),
+);
+
+/** The knowledge as a graph: its files, their topics, and what connects to them. */
+export const knowledgeGraphSchema = exact<KnowledgeGraph>()(
+	z.object({
+		nodes: z.array(
+			z.object({
+				id: z.string(),
+				kind: z.enum(["file", "topic", "question", "learning"]),
+				label: z.string(),
+				path: z.string().nullable(),
+				degree: z.number(),
+			}),
+		),
+		edges: z.array(
+			z.object({
+				id: z.string(),
+				source: z.string(),
+				target: z.string(),
+				kind: z.enum(["mentions", "links", "found", "touches"]),
+			}),
+		),
+		filesLeftOut: z.number(),
 	}),
 );
