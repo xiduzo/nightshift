@@ -374,7 +374,8 @@ step puts them in the Space. They wait for you there. The index does not list th
 no agent reads them.
 
 The `review-learnings` starter flow calls `kit:knowledge/review-learnings`.
-It opens a Gate with the proposals:
+It opens a Gate with the proposals, without the header Night Shift writes
+at the top of each file:
 
 - **Keep** moves them to `learnings/accepted/`. There the index lists them
   and agents read them.
@@ -388,21 +389,39 @@ You can also keep or delete proposals on the Review page of Knowledge,
 one step at a time. Each decision acts on all notes of that step. The
 page sends it after 5 seconds, so you can undo it.
 
+The open screens of the Members read the proposed learnings again each time a
+reconcile finds that what waits changed. That covers what a step proposes when
+it ends, the Review page, a review by the kit, and each of these on another
+computer. One reconcile tells them once, however many files it brings. No
+push goes out for this. The Gate of the review sends its own push.
+
+The Learnings module (`packages/engine/src/knowledge/learnings.ts`) owns this
+protocol. The text of a file and the rule for its name are in
+`packages/flows/src/kits/knowledge/` (`learning-file.ts`, `layout.ts`), because
+agent reports, the web app and the kit need them too. The kit stays shell, so
+that it needs no Night Shift command on the `PATH` of a step. Its Keep and Delete
+are the second form of `settle`. `learnings-kit.test.ts` runs both forms
+over the same folders and asks for the same result.
+
 ### Proposals from a Command
 
 A Command can propose learnings too. It writes a file to
 `$NS_KNOWLEDGE/learnings/proposed/`. The rules:
 
-- The review Gate shows every `*.md` file directly in that folder, with
-  its full text. It does not look in subfolders.
-- Write one note per `- ` line. The Knowledge page counts the notes by
-  these lines.
+- The review Gate shows every proposed learning directly in that folder. It
+  shows all of the text, because Keep adds all of it to what agents read. It leaves
+  out only blank lines and the header Night Shift writes. It does not look in
+  subfolders.
+- Write one note per `- ` line. The Knowledge page shows and counts the notes
+  by these lines. It does not show other text. Use the Gate to read it.
 - Night Shift names its own files `<run id>.<step id>.md`. A Command gets
   no run id or step id, so it gives the file a name of its own, for
   example `<flow>.<date>.md`.
 - Use only letters, digits, `-` and `_` in each part of the name, and at
-  most two parts before `.md`. The Knowledge page lists only names of that
-  form. Keep and Delete skip a name with a space.
+  most two parts before `.md`. Start each part with a letter or a digit. Only
+  a name of that form is a proposed learning, for the Gate, for Keep and Delete, and for
+  the Knowledge page and its count. A file with any other name stays in the
+  folder, and nothing shows it.
 
 For example:
 
@@ -748,8 +767,10 @@ searches, on its own connection to the index, and prepares nothing.
 - Content that no entry names any more stays in the archive. Retention is
   undecided, as it is for run history.
 - A run does not record which version of the knowledge it read.
-- Two steps of one run that run at the same time on two computers and
-  propose learnings write one file: the later change wins.
+- The Review page shows only the `- ` lines of a proposed learning, and Keep
+  adds the whole file. A Command can write other text there. The Gate shows it.
+- A screen connected to a computer hears of another computer's change at the
+  next reconcile there, or when a run changes.
 - A project that joins another one when a computer joins its home Host
   keeps its knowledge folder under its old id.
 - The evaluation runs from the page only. `kit:knowledge/evaluate`, so a
