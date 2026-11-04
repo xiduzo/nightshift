@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { daemonLease, project as projectTable } from "@nightshift/db/schema";
@@ -195,6 +195,41 @@ describe("the daemon, wired in one process", () => {
 		// A step of the one before still holds its folder.
 		expect(hot.nightshiftKnowledgeFolderLocks).toBe(locks);
 		expect(await rpc<unknown[]>(reloaded, "knowledge/learnings")).toEqual([]);
+	});
+
+	test("tells a screen that listens when the learnings that wait change", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const daemon = await start(envIn(dir));
+		const { active } = await rpc<{ active: string }>(daemon, "spaces/list");
+		await processDatabase(daemon.info.databaseUrl)
+			.insert(projectTable)
+			.values({ id: "p1", spaceId: active, name: "p1" });
+		const stop = new AbortController();
+		const watch = await call(daemon, "/rpc/notifications/watch", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({}),
+			signal: stop.signal,
+		});
+		const stream = watch?.body?.getReader();
+		if (!stream) throw new Error("The stream did not open.");
+
+		// A step on this computer proposed something: the page's read publishes it.
+		const proposed = join(dir, "knowledge", "p1", "learnings", "proposed");
+		await mkdir(proposed, { recursive: true });
+		await writeFile(join(proposed, "run-1.s1.md"), "- Use bun.\n");
+		await rpc(daemon, "knowledge/get", { projectId: "p1" });
+
+		let heard = "";
+		while (!heard.includes("learnings-changed")) {
+			const { done, value } = await stream.read();
+			if (done) break;
+			heard += new TextDecoder().decode(value);
+		}
+		stop.abort();
+		await stream.cancel().catch(() => {});
+		expect(heard).toContain("learnings-changed");
+		expect(heard).toContain('"projectId":"p1"');
 	});
 
 	test("pairs with a Host in memory: the Host walks a run it starts, and its stop is clean", async () => {
