@@ -21,7 +21,7 @@ import { isKnowledgePath } from "./folder-snapshot";
  * `files`: path → `{ sha256, size, changedAt, deviceId, local? }`, one
  * plain value per path. Entries merge per path: when two Devices change
  * one path, Yjs keeps one of them, and the next reconcile makes the later
- * change win (`createKnowledgeSync`). `local`: the file is larger than
+ * change win (`createKnowledgeReconciler`). `local`: the file is larger than
  * 10 MB and stays on the Device that has it.
  *
  * `settings`: the project's knowledge settings, one plain value per name,

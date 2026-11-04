@@ -190,7 +190,7 @@ describe("a step's start", () => {
 					return folders.scan(projectId);
 				},
 			},
-			sync: {
+			reconciler: {
 				startStep: async () => {
 					order.push("reconcile");
 					// The reconcile brings a file of another Device in.

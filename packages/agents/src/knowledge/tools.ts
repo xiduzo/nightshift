@@ -63,7 +63,12 @@ export type KnowledgeUse =
 			from?: KnowledgeReadFrom;
 	  };
 
-/** Where a read starts: a search hit's section, line or page. */
+/**
+ * Where a read starts: a section's heading, a line, a page, as a search hit
+ * names them. A line counts in its page when a page is given. A section starts
+ * at its heading, else at the first line with its words. Nothing given, or
+ * nothing found: the start of the file.
+ */
 export type KnowledgeReadFrom = {
 	section?: string;
 	line?: number;

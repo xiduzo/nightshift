@@ -11,7 +11,7 @@ import { indexFolder, type KnowledgeFolders } from "./folder";
 import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeReader } from "./knowledge-reader";
 import type { Learnings } from "./learnings";
-import type { KnowledgeSync } from "./reconcile";
+import type { KnowledgeReconciler } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
 import { createKnowledgeView, inFolders, type KnowledgeView } from "./view";
 
@@ -105,16 +105,16 @@ const nothing = {
 
 export function createStepKnowledge(deps: {
 	folders: Pick<KnowledgeFolders, "folder" | "ensure" | "scan">;
-	sync: Pick<KnowledgeSync, "startStep">;
+	reconciler: Pick<KnowledgeReconciler, "startStep">;
 	reader: Pick<KnowledgeReader, "read">;
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
 	learnings: Pick<Learnings, "keepReported">;
 }) {
-	const { folders, sync, reader, search, learnings } = deps;
+	const { folders, reconciler, reader, search, learnings } = deps;
 
 	/** The step holds the folder: a reconcile first, and `done` for the one after. */
 	async function begin(projectId: string) {
-		const hold = await sync.startStep(projectId);
+		const hold = await reconciler.startStep(projectId);
 		const path = folders.folder(projectId);
 		return { hold, path };
 	}

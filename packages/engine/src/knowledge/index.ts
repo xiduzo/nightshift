@@ -27,8 +27,8 @@ export { knowledgeSourceProblems, type SourceProblem } from "./sources";
 export type { KnowledgeRequest, KnowledgeUseEvent } from "./step-knowledge";
 export {
 	type AskedQuestion,
-	type KnowledgeSource,
 	type KnowledgeUseReport,
 	knowledgeUseEvent,
+	type StepSource,
 	stepSources,
 } from "./use";

@@ -9,7 +9,10 @@ import {
 } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { Document } from "@langchain/core/documents";
-import { KNOWLEDGE_INDEX_INTRO } from "@nightshift/agents/tools";
+import {
+	KNOWLEDGE_INDEX_INTRO,
+	type KnowledgeReadFrom,
+} from "@nightshift/agents/tools";
 import { isKnowledgeId, KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";
@@ -34,7 +37,7 @@ import { isMarkdown, markdownHeadings } from "./sections";
  * The knowledge folder of a project: markdown (and any other files) that
  * an agent may read, kept outside the repository and outside every
  * worktree: `<dataDir>/knowledge/<projectId>/`. Each Device has a working
- * copy of the Project's knowledge there, which `createKnowledgeSync` keeps
+ * copy of the Project's knowledge there, which `createKnowledgeReconciler` keeps
  * in step with the Space (ADR 4).
  *
  * Sync flows fill it with Commands (the `knowledge/*` kits), through the
@@ -80,18 +83,6 @@ export type KnowledgeText = {
 	 * start of the file.
 	 */
 	from?: { line: number; page: number | null };
-};
-
-/**
- * Where a read starts: a section's heading, a line, a page, as a search
- * hit names them (`KnowledgeHit`). A line counts in its page when a page
- * is given. A section starts at its heading, else at the first line with
- * its words. Nothing given, or nothing found: the start of the file.
- */
-export type KnowledgeReadFrom = {
-	section?: string;
-	line?: number;
-	page?: number;
 };
 
 /** What the index reads of a file for its title and first sentence. */

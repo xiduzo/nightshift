@@ -96,7 +96,7 @@ export const knowledgeSchema = z.object({
 	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
 	olderHost: z.boolean(),
 });
-export type KnowledgeView = z.infer<typeof knowledgeSchema>;
+export type KnowledgePage = z.infer<typeof knowledgeSchema>;
 
 /** One step's proposals that wait for a person: keep them or delete them. */
 const waitingLearningSchema = exact<WaitingLearning>()(

@@ -59,7 +59,7 @@ import type { SpaceHostStatus } from "./space-host-status";
  * document has the path too. `INDEX.md` and hidden files never sync.
  */
 
-type KnowledgeSyncDeps = {
+type KnowledgeReconcilerDeps = {
 	folders: Pick<KnowledgeFolders, "folder" | "known" | "scan">;
 	documents: Pick<KnowledgeDocuments, "open" | "remove">;
 	/** The content by hash: here, and at the Space's Host. */
@@ -114,9 +114,9 @@ export type KnowledgeReconciled = {
 export type KnowledgeStepHold = { done(): Promise<void> };
 
 /** A project's knowledge, as each Device keeps it in step with the Space. */
-export type KnowledgeSync = ReturnType<typeof createKnowledgeSync>;
+export type KnowledgeReconciler = ReturnType<typeof createKnowledgeReconciler>;
 
-export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
+export function createKnowledgeReconciler(deps: KnowledgeReconcilerDeps) {
 	const { folders, archive, status, locks, deviceId } = deps;
 	/** The projects whose content waits for the Host. */
 	const pending = new Set<string>();

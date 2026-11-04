@@ -25,7 +25,7 @@ describe("listing", () => {
 			"Use bun.",
 			"Tests are slow.",
 		]);
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		await syncDocuments(a, b);
 
 		const listing = await b.reader.listing("p1");
@@ -63,7 +63,7 @@ describe("read", () => {
 		const a = await device(host);
 		const b = await device(host);
 		const both = async () => {
-			await a.sync.reconcile("p1");
+			await a.reconciler.reconcile("p1");
 			await syncDocuments(a, b);
 		};
 		return { a, b, both };

@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type KnowledgeUse, useHit } from "@nightshift/agents/tools";
+import {
+	type KnowledgeReadFrom,
+	type KnowledgeUse,
+	useHit,
+} from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
 import { NOT_TOPICS_FILE, QUESTION_SET_FILE } from "@nightshift/flows";
 import { now } from "@nightshift/time";
@@ -10,11 +14,7 @@ import { createRunLog } from "../log";
 import type { UsageNotes } from "../usage";
 import { collectContent } from "./collect";
 import { evaluateKnowledge, type KnowledgeEvaluation } from "./evaluate";
-import {
-	createKnowledgeFolders,
-	type KnowledgeReadFrom,
-	type KnowledgeText,
-} from "./folder";
+import { createKnowledgeFolders, type KnowledgeText } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
 import { isReadable } from "./folder-snapshot";
 import { createKnowledgeDocuments } from "./knowledge-document";
@@ -37,7 +37,7 @@ import {
 	parseQuestions,
 	questionKey,
 } from "./questions";
-import { createKnowledgeSync } from "./reconcile";
+import { createKnowledgeReconciler } from "./reconcile";
 import { type ReviewTask, reviewTasks } from "./review";
 import {
 	createKnowledgeSearch,
@@ -346,11 +346,11 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		documents,
 		archive,
 		status,
-		startStep: (projectId) => sync.startStep(projectId),
+		startStep: (projectId) => reconciler.startStep(projectId),
 		notifications: deps.notifications,
 		closeNotes: search.closeNotes,
 	});
-	const sync = createKnowledgeSync({
+	const reconciler = createKnowledgeReconciler({
 		folders,
 		documents,
 		archive,
@@ -368,12 +368,12 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		learnings,
 		status,
 		deviceId: device.id,
-		reconcileUnlessHeld: sync.reconcileUnlessHeld,
+		reconcileUnlessHeld: reconciler.reconcileUnlessHeld,
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
 	});
 	const steps = createStepKnowledge({
 		folders,
-		sync,
+		reconciler,
 		reader,
 		search,
 		learnings,
@@ -395,12 +395,12 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	function startTimers(): () => void {
 		const times = { ...TIMERS, ...deps.timers };
 		const first = setTimeout(() => {
-			sync.reconcileAll().catch((error) => {
+			reconciler.reconcileAll().catch((error) => {
 				console.warn("The knowledge was not brought in step:", error);
 			});
 		}, times.firstReconcileMs);
 		const retry = setInterval(() => {
-			sync.retryPending().catch(() => {});
+			reconciler.retryPending().catch(() => {});
 		}, times.retryMs);
 		const collectNow = () => {
 			const keeps = hosts?.keeps?.bind(hosts);
@@ -456,7 +456,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 
 	/** The question set, as the Space has it: the folder is brought in step first, as for a step. */
 	async function questionSet(projectId: string): Promise<KnowledgeQuestion[]> {
-		const hold = await sync.startStep(projectId);
+		const hold = await reconciler.startStep(projectId);
 		try {
 			return parseQuestions(await readQuestions(projectId));
 		} finally {
@@ -480,7 +480,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	function sourcesIn<Run extends SourceRun>(space: SourcesSpace<Run>) {
 		return knowledgeSources({
 			space,
-			files: { listing: reader.listing, removeFolder: sync.removeFolder },
+			files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
 			device,
 		});
 	}
@@ -579,7 +579,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			};
 		},
 		async markQuestion(projectId, mark) {
-			const hold = await sync.startStep(projectId);
+			const hold = await reconciler.startStep(projectId);
 			try {
 				const next = markQuestion(
 					parseQuestions(await readQuestions(projectId)),
@@ -621,7 +621,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			});
 		},
 		async markNotTopic(projectId, mark) {
-			const hold = await sync.startStep(projectId);
+			const hold = await reconciler.startStep(projectId);
 			try {
 				const next = markNotTopic(await notTopicsHere(projectId), {
 					...mark,
@@ -646,14 +646,14 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		sources: sourcesIn,
 		async moved(move) {
 			for (const [projectId, to] of Object.entries(move.projects)) {
-				await sync.move({ from: { spaceId: move.from, projectId }, to });
+				await reconciler.move({ from: { spaceId: move.from, projectId }, to });
 				if (to.projectId === projectId) continue;
 				// The old id's folder is gone: its rows leave the index.
 				await search.refresh(projectId).catch(() => {});
 				search.refresh(to.projectId).catch(() => {});
 			}
 			for (const to of Object.values(move.projects)) {
-				sync.reconcile(to.projectId).catch(() => {});
+				reconciler.reconcile(to.projectId).catch(() => {});
 			}
 		},
 		close() {

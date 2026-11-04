@@ -1,3 +1,4 @@
+import type { KnowledgeReadFrom } from "@nightshift/agents/tools";
 import { isProposedLearning, isQuestionSetPath } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { SpaceArchive } from "../archive";
@@ -5,7 +6,6 @@ import { OLDER_HOST } from "../contract";
 import {
 	cleanPath,
 	type KnowledgeFolders,
-	type KnowledgeReadFrom,
 	type KnowledgeText,
 	knowledgeText,
 } from "./folder";

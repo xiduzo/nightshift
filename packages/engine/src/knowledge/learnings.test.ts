@@ -73,7 +73,7 @@ describe("waiting and count", () => {
 		await a.put("learnings/proposed/a.b.c.md", "- Three parts.\n");
 		await a.put("learnings/proposed/deep/run-2.md", "- Deep.\n");
 		await a.put("learnings/proposed/run-3.txt", "- Not markdown.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 
 		const waiting = await a.learnings.waiting("p1");
 		expect(waiting.map(({ id, notes }) => [id, notes])).toEqual([
@@ -90,7 +90,7 @@ describe("waiting and count", () => {
 			"learnings/proposed/run-1.md",
 			"# Learnings of run run-1\n\n- \n- One.\n-  \nProse.\n",
 		);
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual(["One."]);
 		expect(await a.learnings.count("p1")).toBe(1);
 	});
@@ -99,7 +99,7 @@ describe("waiting and count", () => {
 		const { host, kept } = memoryHost();
 		const a = await device(host);
 		await a.put("learnings/proposed/run-1.md", "- One.\n- Two.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		let asked = 0;
 		const { promise: answer, resolve } = Promise.withResolvers<null>();
 		const stalled = await device({
@@ -121,7 +121,7 @@ describe("waiting and count", () => {
 		const { host } = memoryHost();
 		const a = await device(host);
 		await a.put("learnings/proposed/run-1.md", "- One.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		const { promise: answer, resolve } = Promise.withResolvers<null>();
 		const stalled = await device(
 			{ archivePut: host.archivePut, archiveGet: () => answer },
@@ -140,7 +140,7 @@ describe("waiting and count", () => {
 		await a.put("learnings/proposed/run-1.md", "- One.\n");
 		await a.put("learnings/proposed/run-2.md", "- Two.\n");
 		await a.put("learnings/proposed/run-3.md", "- Three.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		let asked = 0;
 		const b = await device({
 			archivePut: host.archivePut,
@@ -165,7 +165,7 @@ describe("waiting and count", () => {
 		const a = await device(host);
 		const b = await device(host);
 		await a.put("learnings/proposed/run-1.md", "- One.\n- Two.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		await syncDocuments(a, b);
 
 		state.down = true;
@@ -184,7 +184,7 @@ describe("waiting and count", () => {
 		const a = await device(host);
 		const b = await device(host);
 		await a.put("learnings/proposed/run-1.md", "- One.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		await syncDocuments(a, b);
 
 		const onlyHere = await b.learnings.waiting("p1", { onlyHere: true });
@@ -202,7 +202,7 @@ describe("waiting and count", () => {
 		const a = await device(host);
 		await a.put("learnings/proposed/run-1.md", "- Old.\n", 1_000_000);
 		await a.put("learnings/proposed/run-2.md", "- New.\n", 2_000_000);
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		expect((await a.learnings.waiting("p1")).map(({ id }) => id)).toEqual([
 			"run-2.md",
 			"run-1.md",
@@ -216,7 +216,7 @@ describe("settle", () => {
 		const a = await device(host);
 		const b = await device(host);
 		await a.put("learnings/proposed/run-1.md", "- One.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		await syncDocuments(a, b);
 
 		state.down = true;
@@ -235,18 +235,18 @@ describe("who hears", () => {
 		const { host, state } = memoryHost();
 		const a = await device(host);
 		const b = await device(host);
-		await b.sync.reconcile("p1");
+		await b.reconciler.reconcile("p1");
 		await a.put("learnings/proposed/run-1.md", "- One.\n");
-		await a.sync.reconcile("p1");
+		await a.reconciler.reconcile("p1");
 		await syncDocuments(a, b);
 
 		state.down = true;
-		await b.sync.reconcile("p1");
-		await b.sync.reconcile("p1");
+		await b.reconciler.reconcile("p1");
+		await b.reconciler.reconcile("p1");
 		const heard: [string, string] = [b.sandbox.spaceId, "p1"];
 		expect(b.told).toEqual([heard]);
 		state.down = false;
-		await b.sync.reconcile("p1");
+		await b.reconciler.reconcile("p1");
 		expect(b.told).toEqual([heard]);
 		expect(await b.read("learnings/proposed/run-1.md")).toBe("- One.\n");
 	});

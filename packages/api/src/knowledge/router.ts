@@ -13,7 +13,7 @@ import { output } from "../output";
 import { permitted, protectedProcedure, refusalError } from "../procedures";
 import { runSummarySchema } from "../runs";
 import {
-	type KnowledgeView,
+	type KnowledgePage,
 	knowledgeEvaluationSchema,
 	knowledgeFileSchema,
 	knowledgeHitSchema,
@@ -110,7 +110,7 @@ export const knowledge = {
 		})
 		.output(output(knowledgeSchema))
 		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }): Promise<KnowledgeView> => {
+		.handler(async ({ context, input }): Promise<KnowledgePage> => {
 			const [save, remove, startRuns] = await Promise.all([
 				context.access.can(MAY.save),
 				context.access.can(MAY.remove),

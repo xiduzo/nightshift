@@ -9,7 +9,7 @@ import { createKnowledgeFolderLocks } from "../knowledge/folder-locks";
 import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
 import { createKnowledgeReader } from "../knowledge/knowledge-reader";
 import { createLearnings } from "../knowledge/learnings";
-import { createKnowledgeSync } from "../knowledge/reconcile";
+import { createKnowledgeReconciler } from "../knowledge/reconcile";
 import { createSpaceHostStatus } from "../knowledge/space-host-status";
 import { createSandbox, type Sandbox } from "./test-support";
 
@@ -74,7 +74,7 @@ export async function knowledgeDevice(
 		documents,
 		archive,
 		status,
-		startStep: (projectId) => sync.startStep(projectId),
+		startStep: (projectId) => reconciler.startStep(projectId),
 		notifications: {
 			learningsChanged: async (spaceId, projectId) => {
 				told.push([spaceId, projectId]);
@@ -82,10 +82,10 @@ export async function knowledgeDevice(
 		},
 	});
 	/** One more instance over this Device's folder and documents. */
-	const newSync = (
+	const newReconciler = (
 		options: { locks?: typeof locks; inStep?(): Promise<unknown> } = {},
 	) =>
-		createKnowledgeSync({
+		createKnowledgeReconciler({
 			folders,
 			documents,
 			archive,
@@ -95,7 +95,7 @@ export async function knowledgeDevice(
 			reconciled: learnings.reconciled,
 			...(options.inStep ? { inStep: options.inStep } : {}),
 		});
-	const sync = newSync();
+	const reconciler = newReconciler();
 	const reader = createKnowledgeReader({
 		folders,
 		documents,
@@ -103,7 +103,7 @@ export async function knowledgeDevice(
 		learnings,
 		status,
 		deviceId: sandbox.deviceId,
-		reconcileUnlessHeld: sync.reconcileUnlessHeld,
+		reconcileUnlessHeld: reconciler.reconcileUnlessHeld,
 		pageWaitMs: options.pageWaitMs ?? 5_000,
 	});
 	const dir = folders.folder("p1");
@@ -114,8 +114,8 @@ export async function knowledgeDevice(
 		documents,
 		synced,
 		locks,
-		newSync,
-		sync,
+		newReconciler,
+		reconciler,
 		reader,
 		learnings,
 		told,

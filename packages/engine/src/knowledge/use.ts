@@ -125,7 +125,7 @@ export async function askedQuestions(
  * of it put at the top. At the section it read from, else the section the
  * search found.
  */
-export type KnowledgeSource = {
+export type StepSource = {
 	path: string;
 	section: string | null;
 	page: number | null;
@@ -145,13 +145,11 @@ const MAX_SOURCES = 10;
  * them, then the top hits of its searches that it did not read. No effort
  * of the agent: it cites nothing itself.
  */
-export function stepSources(
-	uses: readonly KnowledgeUseFact[],
-): KnowledgeSource[] {
+export function stepSources(uses: readonly KnowledgeUseFact[]): StepSource[] {
 	/** Where each path was last found, for a read that names no spot. */
 	const foundAt = new Map<string, KnowledgeUseHit>();
-	const read = new Map<string, KnowledgeSource>();
-	const found = new Map<string, KnowledgeSource>();
+	const read = new Map<string, StepSource>();
+	const found = new Map<string, StepSource>();
 	for (const use of uses) {
 		if (use.type === "KnowledgeSearched") {
 			for (const [i, hit] of use.payload.hits.entries()) {
