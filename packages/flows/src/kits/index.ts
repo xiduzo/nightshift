@@ -29,15 +29,16 @@ export {
 	QUESTION_SET_FILE,
 } from "./knowledge/layout";
 export {
-	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_SOURCE_KINDS,
-	type KnowledgeSource,
-	type KnowledgeSourceKind,
 	type KnowledgeSourceKit,
+	knowledgeSourceKind,
+	knowledgeSourceKitSchema,
+} from "./knowledge/source-kits";
+export {
+	type KnowledgeSource,
 	knowledgeKitInputs,
 	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
-	knowledgeSourceKind,
-	knowledgeSourceKitSchema,
 	knowledgeSourceSchema,
 } from "./knowledge/sources";
+export { KNOWLEDGE_FOLDER_INPUT } from "./knowledge/sync-kit";

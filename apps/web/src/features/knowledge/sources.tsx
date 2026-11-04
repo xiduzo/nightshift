@@ -1,4 +1,4 @@
-import { KNOWLEDGE_SOURCE_KINDS } from "@nightshift/flows";
+import { knowledgeSourceKind } from "@nightshift/flows";
 import {
 	Alert,
 	AlertAction,
@@ -77,7 +77,7 @@ type Sync = Knowledge["syncs"][number];
 
 /** A kit's name for a person, for a sync flow someone drew on the canvas. */
 function kitLabel(kit: string): string {
-	return KNOWLEDGE_SOURCE_KINDS.find((kind) => kind.kit === kit)?.label ?? kit;
+	return knowledgeSourceKind(kit)?.label ?? kit;
 }
 
 /** A source's name for a person: its kind, or the name of the flow someone drew. */

@@ -188,7 +188,6 @@ export {
 	KNOWLEDGE_SOURCE_KINDS,
 	KNOWLEDGE_STAGING_SUFFIX,
 	type KnowledgeSource,
-	type KnowledgeSourceKind,
 	type KnowledgeSourceKit,
 	kitCopyName,
 	kitFlow,

@@ -3,9 +3,10 @@ import {
 	cronToTimeAndDays,
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSource,
-	type KnowledgeSourceKind,
+	type KnowledgeSourceKit,
 	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
+	knowledgeSourceKind,
 	timeAndDaysToCron,
 } from "@nightshift/flows";
 import {
@@ -49,18 +50,6 @@ import { toast } from "sonner";
 import { FlowInputFields } from "@/features/flows";
 import { orpc } from "@/shared/api";
 import { knowledgeMutations } from "./queries";
-
-/** What each kind of source is, in one line, for the choice. */
-const KIND_HINTS: Record<KnowledgeSourceKind["kit"], string> = {
-	"kit:knowledge/folder": "Notes or documents outside this project.",
-	"kit:knowledge/files": "Files of this project, also the ones git ignores.",
-	"kit:knowledge/web": "Any public page, as text. No account needed.",
-	"kit:knowledge/github-wiki": "The wiki of a repository, also a private one.",
-	"kit:knowledge/jira":
-		"Work items, through your Jira CLI tool. You must be signed in.",
-	"kit:knowledge/confluence":
-		"Pages by id, with an API token you save as a secret.",
-};
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 const DEFAULT_TIME = "06:00";
@@ -168,7 +157,7 @@ function SourceForm({
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
-	const [kit, setKit] = useState<KnowledgeSourceKind["kit"]>(
+	const [kit, setKit] = useState<KnowledgeSourceKit>(
 		edited?.source.kit ?? "kit:knowledge/folder",
 	);
 	const [values, setValues] = useState<InputTexts>(() => ({
@@ -178,7 +167,7 @@ function SourceForm({
 		initialTimes(edited?.schedule ?? null),
 	);
 	const [syncNow, setSyncNow] = useState(startRuns);
-	const kind = KNOWLEDGE_SOURCE_KINDS.find((k) => k.kit === kit);
+	const kind = knowledgeSourceKind(kit);
 	// A folder source of another computer stays there: say which one.
 	const elsewhere =
 		edited?.computer && !edited.computer.here ? edited.computer.name : null;
@@ -276,7 +265,7 @@ function SourceForm({
 					<RadioGroup
 						value={kit}
 						onValueChange={(value) => {
-							setKit(value as KnowledgeSourceKind["kit"]);
+							setKit(value as KnowledgeSourceKit);
 							setValues({});
 						}}
 						disabled={edited !== null}
@@ -291,9 +280,7 @@ function SourceForm({
 												? `Folder on ${elsewhere}`
 												: option.label}
 										</FieldTitle>
-										<FieldDescription>
-											{KIND_HINTS[option.kit]}
-										</FieldDescription>
+										<FieldDescription>{option.blurb}</FieldDescription>
 									</FieldContent>
 									<RadioGroupItem
 										value={option.kit}
@@ -310,10 +297,10 @@ function SourceForm({
 					inputs={inputs}
 					values={values}
 					onChange={setValues}
-					lines={kind?.lines ?? []}
+					lines={kind.lines}
 				/>
 				{braces ? <FieldError className="-mt-3">{braces}</FieldError> : null}
-				{kind?.local ? (
+				{kind.local ? (
 					<FieldDescription className="-mt-3">
 						{elsewhere
 							? `Only ${elsewhere} has this folder. Night Shift syncs it there.`

@@ -190,18 +190,18 @@ async function step(
 	});
 	const output = join(root, `${nodeId}.json`);
 	await writeFile(output, "");
-	const proc = Bun.spawn(["sh", "-c", command], {
+	const proc = Bun.spawn(["/bin/sh", "-c", command], {
 		cwd: where.cwd ?? repo,
 		env: {
 			...process.env,
 			...GIT_ENV,
-			...where.env,
 			...env,
 			NS_OUTPUT: output,
 			NS_KNOWLEDGE: knowledge,
 			PATH: `${bin}:${process.env.PATH}`,
 			STUB_LOG: log,
 			STUB_FIXTURES: fixtures,
+			...where.env,
 		},
 		stdout: "pipe",
 		stderr: "pipe",
@@ -1030,6 +1030,33 @@ describe("the knowledge kits", () => {
 			"acli-dimpact jira workitem view PROJ-1 --json",
 			"acli-dimpact jira workitem view PROJ-2 --json",
 		]);
+	});
+
+	test("jira and confluence: a computer without jq stops, and the log says what to install", async () => {
+		const noPrograms = { env: { PATH: join(root, "no-programs") } };
+		const jira = await step(
+			kit("kit:knowledge/jira"),
+			"sync",
+			{ keys: "PROJ-1" },
+			{},
+			noPrograms,
+		);
+		expect(jira.outcome).toBe("fail");
+		expect(jira.log).toContain(
+			"Install jq: this kit turns the work items into markdown with it.",
+		);
+		const confluence = await step(
+			kit("kit:knowledge/confluence"),
+			"sync",
+			{ site: "team.example.net", email: "me@example.net", pages: "123" },
+			{},
+			noPrograms,
+		);
+		expect(confluence.outcome).toBe("fail");
+		expect(confluence.log).toContain(
+			"Install jq: this kit turns the pages into markdown with it.",
+		);
+		expect(await calls()).toEqual([]);
 	});
 
 	test("confluence: each page as markdown, with the token as a secret", async () => {

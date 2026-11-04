@@ -7,13 +7,8 @@ import { waitForChecksKit } from "./github/wait-for-checks";
 import { watchPrKit } from "./github/watch-pr";
 import { jiraAssignKit } from "./jira/assign";
 import { jiraMoveKit } from "./jira/move";
-import { knowledgeConfluenceKit } from "./knowledge/confluence";
-import { knowledgeFilesKit } from "./knowledge/files";
-import { knowledgeFolderKit } from "./knowledge/folder";
-import { knowledgeGithubWikiKit } from "./knowledge/github-wiki";
-import { knowledgeJiraKit } from "./knowledge/jira";
 import { knowledgeReviewLearningsKit } from "./knowledge/review-learnings";
-import { knowledgeWebKit } from "./knowledge/web";
+import { KNOWLEDGE_SYNC_KITS } from "./knowledge/source-kits";
 
 /**
  * Kits: flows that ship with Night Shift, read only. A Call node runs one
@@ -37,13 +32,10 @@ const SOURCES: Readonly<Record<string, FlowInput>> = {
 	"kit:github/watch-pr": watchPrKit,
 	"kit:jira/assign": jiraAssignKit,
 	"kit:jira/move": jiraMoveKit,
-	"kit:knowledge/confluence": knowledgeConfluenceKit,
-	"kit:knowledge/files": knowledgeFilesKit,
-	"kit:knowledge/folder": knowledgeFolderKit,
-	"kit:knowledge/github-wiki": knowledgeGithubWikiKit,
-	"kit:knowledge/jira": knowledgeJiraKit,
 	"kit:knowledge/review-learnings": knowledgeReviewLearningsKit,
-	"kit:knowledge/web": knowledgeWebKit,
+	...Object.fromEntries(
+		KNOWLEDGE_SYNC_KITS.map(({ kit, flow }) => [kit, flow]),
+	),
 };
 
 /** One kit: its name and its flow. */

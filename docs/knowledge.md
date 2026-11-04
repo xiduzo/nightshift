@@ -253,6 +253,11 @@ Kits do the common syncs. Call one from a Subflow node:
 
 `kit:knowledge/review-learnings` is not a sync. See Learnings below.
 
+Each sync kit is one declaration in
+`packages/flows/src/kits/knowledge/source-kits.ts`. The list of kits, the
+Knowledge page and the readiness check all read that list. To add a source,
+add one declaration there.
+
 When you add a project, the readiness check names curl or jq when this
 computer does not have them, with the command that installs them. Runs
 start without them: only the sources that need them fail.
