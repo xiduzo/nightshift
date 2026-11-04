@@ -97,33 +97,21 @@ export {
 } from "./flows";
 export {
 	type AskedQuestion,
-	askedQuestions,
-	createKnowledgeDocuments,
-	createKnowledgeSearch,
-	createProjectKnowledge,
-	evaluateKnowledge,
-	type KnowledgeDocuments,
+	createKnowledge,
+	type Knowledge,
 	type KnowledgeEvaluation,
 	type KnowledgeFile,
 	type KnowledgeGraph,
 	type KnowledgeHit,
 	type KnowledgeMeaningStatus,
 	type KnowledgeQuestion,
-	type KnowledgeSearch,
 	type KnowledgeText,
 	type KnowledgeUseReport,
-	knowledgeFileUse,
-	knowledgeGraphOf,
+	knowledgeSourceProblems,
 	LOCAL_ONLY_BYTES,
-	type ProjectKnowledge,
-	questionKey,
+	type SourceProblem,
 	type WaitingLearning,
 } from "./knowledge";
-export {
-	knowledgeSourceProblems,
-	knowledgeSources,
-	type SourceProblem,
-} from "./knowledge-sources";
 export type {
 	CopyStamp,
 	LoggedEvent,

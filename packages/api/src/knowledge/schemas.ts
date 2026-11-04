@@ -17,7 +17,7 @@ import { exact } from "../output";
 import { runStatusSchema } from "../runs";
 
 /** One file of a project's knowledge folder. */
-const knowledgeFileSchema = exact<KnowledgeFile>()(
+export const knowledgeFileSchema = exact<KnowledgeFile>()(
 	z.object({
 		/** Relative to the folder, with `/` between its parts. */
 		path: z.string(),

@@ -3,46 +3,27 @@
  * The Space has them (ADR 4): a document lists them by hash, the content
  * travels by hash through the Space's Host, and each Device's folder is a
  * working copy that a reconcile keeps in step before and after each step.
+ *
+ * `createKnowledge` is the one door. The rest here is what the door's
+ * interface writes, and what the run's log and the Host contract share.
  */
 
 export { LOCAL_ONLY_BYTES } from "./documents";
 export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
-export {
-	evaluateKnowledge,
-	type KnowledgeEvaluation,
-} from "./evaluate";
-export {
-	KNOWLEDGE_FILES_WARNING,
-	type KnowledgeFile,
-	type KnowledgeText,
-} from "./folder";
-export { type KnowledgeGraph, knowledgeGraphOf } from "./graph";
-export {
-	createKnowledgeDocuments,
-	type KnowledgeDocuments,
-} from "./knowledge-document";
+export type { KnowledgeEvaluation } from "./evaluate";
+export type { KnowledgeFile, KnowledgeText } from "./folder";
+export type { KnowledgeGraph } from "./graph";
+export { createKnowledge, type Knowledge } from "./knowledge";
 export type { WaitingLearning } from "./learnings";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
-export {
-	createProjectKnowledge,
-	type KnowledgeRequest,
-	type KnowledgeUseEvent,
-	type ProjectKnowledge,
-} from "./project-knowledge";
-export { type KnowledgeQuestion, questionKey } from "./questions";
-export {
-	createKnowledgeSearch,
-	type KnowledgeHit,
-	type KnowledgeMeaningStatus,
-	type KnowledgeSearch,
-} from "./search";
+export type { KnowledgeQuestion } from "./questions";
+export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
+export { knowledgeSourceProblems, type SourceProblem } from "./sources";
+export type { KnowledgeRequest, KnowledgeUseEvent } from "./step-knowledge";
 export {
 	type AskedQuestion,
-	askedQuestions,
 	type KnowledgeSource,
 	type KnowledgeUseReport,
-	knowledgeFileUse,
 	knowledgeUseEvent,
-	logKnowledgeUse,
 	stepSources,
 } from "./use";

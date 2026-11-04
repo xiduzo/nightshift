@@ -33,10 +33,8 @@ import {
 import {
 	createArtifactStore,
 	createFlowDocuments,
-	createKnowledgeDocuments,
-	createKnowledgeSearch,
+	createKnowledge,
 	createOllama,
-	createProjectKnowledge,
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
@@ -105,6 +103,7 @@ import {
 	secretsDir,
 	secretsKey,
 	stopOlderDocuments,
+	stopOlderKnowledge,
 	stopOnSignals,
 } from "./runtime";
 import { keepSync } from "./sync";
@@ -256,8 +255,6 @@ export async function createDaemon(
 	});
 	/** The flow documents: each Project's flows and schedules, and their revisions. */
 	const flows = createFlowDocuments({ db, documents });
-	/** The knowledge documents: the files of each Project's knowledge, by hash. */
-	const knowledgeDocuments = createKnowledgeDocuments({ db, documents });
 
 	const trustedOrigins = trustedOriginsOf(env, port);
 	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
@@ -444,22 +441,6 @@ export async function createDaemon(
 		(before) => before.stop(),
 	);
 	/**
-	 * Search over the projects' knowledge folders: this computer's own
-	 * index, built from the folders and never synced. By words, and by
-	 * meaning when the Ollama above has the embedding model, unless a
-	 * person turned it off for the project. One open index file across
-	 * reloads: it asks the newest Ollama each time.
-	 */
-	const knowledgeSearch = await slots.keep(
-		"nightshiftKnowledgeSearch",
-		() =>
-			createKnowledgeSearch(dataDir, {
-				meaning: () => hot.nightshiftOllama?.meaning() ?? null,
-				meaningOn: (projectId) => knowledge.meaningOn(projectId),
-			}),
-		(kept) => kept.close(),
-	);
-	/**
 	 * This computer's Space archive (`<dataDir>/archive`): the walk files of
 	 * runs walked elsewhere and the knowledge content by hash, here and at
 	 * the Spaces' Hosts once the devices runtime below connects it. One
@@ -471,16 +452,30 @@ export async function createDaemon(
 	 * each folder a working copy of its Project's knowledge in the Space
 	 * (ADR 4), in step before and after each step that gets it, and when
 	 * the Knowledge page reads it. The content travels by hash through the
-	 * archive.
+	 * archive. Search finds by words, and by meaning when the Ollama above
+	 * has the embedding model, unless a person turned it off for the
+	 * project.
+	 *
+	 * Replaced on a reload, whole: this daemon's closures and the code of
+	 * this reload, with nothing kept but what is on disk. The one before
+	 * closes first, so one Knowledge prepares vectors. The next search
+	 * opens the index file again, and what the one before knew of it comes
+	 * back from the file: unchanged sections are not embedded again.
 	 */
-	const knowledge = createProjectKnowledge({
-		db,
-		dataDir,
-		archive,
-		documents: knowledgeDocuments,
-		deviceId: device.id,
-		search: knowledgeSearch,
-	});
+	stopOlderKnowledge(hot);
+	const knowledge = await slots.replace(
+		"nightshiftKnowledge",
+		() =>
+			createKnowledge({
+				db,
+				dataDir,
+				documents,
+				archive,
+				device,
+				meaning: () => ollama.meaning(),
+			}),
+		(before) => before.close(),
+	);
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
 		id: device.id,
@@ -716,43 +711,6 @@ export async function createDaemon(
 	);
 	projectCopies.start();
 
-	/**
-	 * Every knowledge folder here, once the Links had a moment to come up:
-	 * the import on upgrade (ADR 4, decision 10), and what changed while
-	 * the daemon was down. Then, each minute, the folders whose content
-	 * still waits for its Host. Once a day, from an hour after the start,
-	 * the content of the Spaces this computer keeps that no document lists
-	 * any more goes (`ProjectKnowledge.collect`).
-	 */
-	await slots.replace(
-		"nightshiftKnowledgeTimers",
-		() => {
-			const first = setTimeout(() => {
-				knowledge.reconcileAll().catch((error) => {
-					console.warn("The knowledge was not brought in step:", error);
-				});
-			}, 15_000);
-			const retry = setInterval(() => {
-				knowledge.retryPending().catch(() => {});
-			}, 60_000);
-			const collectNow = () => {
-				knowledge.collect().catch((error) => {
-					console.warn("The old knowledge content was not removed:", error);
-				});
-			};
-			const firstCollect = setTimeout(collectNow, 60 * 60_000);
-			const collect = setInterval(collectNow, 24 * 60 * 60_000);
-			for (const timer of [first, retry, firstCollect, collect]) timer.unref();
-			return { first, retry, firstCollect, collect };
-		},
-		({ first, retry, firstCollect, collect }) => {
-			clearTimeout(first);
-			clearInterval(retry);
-			clearTimeout(firstCollect);
-			clearInterval(collect);
-		},
-	);
-
 	const info: DaemonInfo = {
 		dataDir,
 		device: { ...device, ownerId: person.userId },
@@ -815,7 +773,6 @@ export async function createDaemon(
 		},
 		usage: telemetry,
 		knowledge,
-		knowledgeSearch,
 		ollama,
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),

@@ -259,8 +259,8 @@ export function apiPort(
 			g(() =>
 				client.knowledge.search({ projectId, query, limit, agent: true }),
 			),
-		knowledgeFiles: async (projectId) =>
-			(await g(() => client.knowledge.get({ projectId }))).files,
+		knowledgeFiles: (projectId) =>
+			g(() => client.knowledge.files({ projectId })),
 		readKnowledge: (projectId, path, maxBytes, from) =>
 			g(() =>
 				client.knowledge.read({

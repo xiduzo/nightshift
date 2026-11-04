@@ -335,9 +335,11 @@ export function createKnowledgeSearch(
 	const store = createSearchStore(dataDir, {
 		onVectorsGone: () => preparation.vectorsGone(),
 	});
+	/** Closed for good: a later search still answers, and nothing prepares. */
+	let closed = false;
 	const preparation = createVectorPreparation({
 		store,
-		model: current,
+		model: () => (closed ? null : current()),
 		meaningOn,
 		...(options.clock ? { clock: options.clock } : {}),
 		...(options.onPreparation ? { onEvent: options.onPreparation } : {}),
@@ -685,8 +687,13 @@ export function createKnowledgeSearch(
 				};
 			});
 		},
-		/** Closes the index file. A later call opens it again. */
+		/**
+		 * Closes the index file and ends the preparations for good. A later
+		 * search opens the file again, for a session that outlives this
+		 * index, and prepares nothing.
+		 */
 		close(): void {
+			closed = true;
 			store.close();
 		},
 	};

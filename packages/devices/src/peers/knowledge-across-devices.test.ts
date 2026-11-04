@@ -13,6 +13,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	testKnowledge,
+	waitFor,
 } from "@nightshift/engine/testing";
 import { kitFlow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
@@ -70,6 +71,8 @@ function knowledgeOn(
 		pageWaitMs: 10_000,
 		archive,
 		synced,
+		// The retry each minute, at once.
+		timers: { retryMs: 10 },
 	});
 	closes.push(close);
 	knowledge.connect({ inStep: async () => {} });
@@ -203,9 +206,10 @@ describe("knowledge in the Space, across paired Devices", () => {
 
 		// The retry each minute copies what waited.
 		paired.memory.up();
-		await onB.knowledge.retryPending();
-		await onA.reconcile();
-		expect(await onA.read("notes.md")).toBe("written offline\n");
+		await waitFor(async () => {
+			await onA.reconcile();
+			return (await onA.read("notes.md")) === "written offline\n";
+		});
 	});
 
 	test("the Host keeps content only with its hash, from a Device of a Member who may start runs, and gives it to Members", async () => {

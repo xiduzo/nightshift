@@ -1,13 +1,4 @@
-import { useHit } from "@nightshift/agents/tools";
 import { type Permissions, ROLE_REFUSAL } from "@nightshift/auth";
-import {
-	askedQuestions,
-	evaluateKnowledge,
-	knowledgeFileUse,
-	knowledgeGraphOf,
-	knowledgeSources,
-	questionKey,
-} from "@nightshift/engine";
 import {
 	flowNameSchema,
 	isTimeZone,
@@ -24,6 +15,7 @@ import { runSummarySchema } from "../runs";
 import {
 	type KnowledgeView,
 	knowledgeEvaluationSchema,
+	knowledgeFileSchema,
 	knowledgeGraphSchema,
 	knowledgeHitSchema,
 	knowledgeMeaningSchema,
@@ -33,19 +25,6 @@ import {
 	knowledgeUseSchema,
 	projectLearningSchema,
 } from "./schemas";
-
-/** The knowledge sources of the Space the person works in, from this computer. */
-function sourcesOf(
-	context: Pick<Context, "knowledge" | "daemon"> & {
-		space: Parameters<typeof knowledgeSources>[0]["space"];
-	},
-) {
-	return knowledgeSources({
-		space: context.space,
-		files: context.knowledge,
-		device: context.daemon.device,
-	});
-}
 
 /** What the person may change: this computer's schedules are its owner's. */
 function rightsOf(context: Pick<Context, "access" | "daemon">) {
@@ -77,16 +56,6 @@ const timeZoneSchema = z.string().refine(isTimeZone, {
  * is logged, for the Knowledge page. The page's own searches are not.
  */
 const agentSchema = z.boolean().optional();
-
-/** Logs an agent's use; a failed write does not fail the answer. */
-function logUse(
-	context: Pick<Context, "engine">,
-	...args: Parameters<Context["engine"]["logKnowledgeUse"]>
-): Promise<void> {
-	return context.engine.logKnowledgeUse(...args).catch((error) => {
-		console.warn("A use of the knowledge was not logged:", error);
-	});
-}
 
 /** The most of one file `knowledge.read` returns. */
 const READ_MAX_BYTES = 1024 * 1024;
@@ -151,7 +120,7 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }): Promise<KnowledgeView> => {
 			const [view, save, remove, changeKnowledge] = await Promise.all([
-				sourcesOf(context).list(input.projectId),
+				context.knowledge.sources(context.space).list(input.projectId),
 				context.access.can(MAY.save),
 				context.access.can(MAY.remove),
 				context.access.can(MAY.changeKnowledge),
@@ -165,6 +134,21 @@ export const knowledge = {
 					schedules: rightsOf(context).schedules,
 				},
 			};
+		}),
+	/**
+	 * The files of the project's knowledge, as its Space lists them, and
+	 * nothing about the flows that fill it: what an agent in a terminal
+	 * lists as its MCP resources.
+	 */
+	files: protectedProcedure
+		.route({
+			summary: "Lists the files of a project's knowledge in its Space.",
+		})
+		.output(output(z.array(knowledgeFileSchema)))
+		.input(z.object({ projectId: z.string() }))
+		.handler(async ({ context, input }) => {
+			await knownProject(context.space, input.projectId);
+			return (await context.knowledge.listing(input.projectId)).files;
 		}),
 	/**
 	 * The learnings agents proposed that wait for a person, newest first:
@@ -182,24 +166,10 @@ export const knowledge = {
 			const projectId = input?.projectId;
 			if (projectId !== undefined) {
 				await knownProject(context.space, projectId);
+				return context.knowledge.learnings([projectId]);
 			}
-			const ids =
-				projectId !== undefined
-					? [projectId]
-					: (await context.space.listProjects()).map((project) => project.id);
-			const lists = await Promise.all(
-				ids.map(async (id) =>
-					(await context.knowledge.waitingLearnings(id)).map((learning) => ({
-						...learning,
-						projectId: id,
-					})),
-				),
-			);
-			return lists
-				.flat()
-				.sort(
-					(a, b) => b.proposedAt - a.proposedAt || a.id.localeCompare(b.id),
-				);
+			const projects = await context.space.listProjects();
+			return context.knowledge.learnings(projects.map(({ id }) => id));
 		}),
 	/**
 	 * Keeps one step's proposals: agents read them in later runs. As the
@@ -255,7 +225,9 @@ export const knowledge = {
 		)
 		.handler(({ context, input }) => {
 			const { projectId, ...source } = input;
-			return sourcesOf(context).save(projectId, source, rightsOf(context));
+			return context.knowledge
+				.sources(context.space)
+				.save(projectId, source, rightsOf(context));
 		}),
 	/**
 	 * Removes a source the page added: its flow and its schedules, and with
@@ -285,12 +257,14 @@ export const knowledge = {
 			) {
 				throw refusalError(ROLE_REFUSAL);
 			}
-			return sourcesOf(context).remove(
-				input.projectId,
-				input.name,
-				{ files: input.removeFiles },
-				rightsOf(context),
-			);
+			return context.knowledge
+				.sources(context.space)
+				.remove(
+					input.projectId,
+					input.name,
+					{ files: input.removeFiles },
+					rightsOf(context),
+				);
 		}),
 	/**
 	 * Syncs a source the page added now: a run of its flow. A folder
@@ -304,11 +278,9 @@ export const knowledge = {
 		.output(output(runSummarySchema))
 		.input(z.object({ projectId: z.string(), name: flowNameSchema }))
 		.handler(({ context, input }) =>
-			sourcesOf(context).sync(
-				input.projectId,
-				input.name,
-				context.session.user.id,
-			),
+			context.knowledge
+				.sources(context.space)
+				.sync(input.projectId, input.name, context.session.user.id),
 		),
 	/**
 	 * The files of a project's knowledge on this computer that best match
@@ -334,19 +306,10 @@ export const knowledge = {
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			const hits = await context.knowledgeSearch.search(
-				input.projectId,
-				input.query,
-				{ ...(input.limit !== undefined ? { limit: input.limit } : {}) },
-			);
-			if (input.agent) {
-				await logUse(context, input.projectId, {
-					kind: "search",
-					query: input.query.trim(),
-					hits: hits.map(useHit),
-				});
-			}
-			return hits;
+			return context.knowledge.search(input.projectId, input.query, {
+				...(input.limit !== undefined ? { limit: input.limit } : {}),
+				...(input.agent ? { agent: true } : {}),
+			});
 		}),
 	/**
 	 * Whether search by meaning works for the project on this computer:
@@ -361,7 +324,7 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			return context.knowledgeSearch.meaning(input.projectId);
+			return context.knowledge.meaning(input.projectId);
 		}),
 	/**
 	 * One file of a project's knowledge, by its path: this computer's copy,
@@ -391,21 +354,11 @@ export const knowledge = {
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			const file = await context.knowledge.read(
-				input.projectId,
-				input.path,
-				input.maxBytes ?? READ_MAX_BYTES,
-				input.from,
-			);
-			if (input.agent) {
-				await logUse(context, input.projectId, {
-					kind: "read",
-					path: file?.path ?? input.path.trim(),
-					found: file !== null,
-					...(input.from ? { from: input.from } : {}),
-				});
-			}
-			return file;
+			return context.knowledge.read(input.projectId, input.path, {
+				maxBytes: input.maxBytes ?? READ_MAX_BYTES,
+				...(input.from ? { from: input.from } : {}),
+				...(input.agent ? { agent: true } : {}),
+			});
 		}),
 	/**
 	 * The questions agents asked the project's knowledge, newest first, with
@@ -426,22 +379,9 @@ export const knowledge = {
 		)
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			const [asked, set] = await Promise.all([
-				askedQuestions(context.db, input.projectId, {
-					...(input.limit !== undefined ? { limit: input.limit } : {}),
-				}),
-				context.knowledge.questions(input.projectId),
-			]);
-			const answers = new Map(
-				set.map((q) => [questionKey(q.query), q.answers]),
-			);
-			return {
-				asked: asked.map((question) => ({
-					...question,
-					answers: answers.get(questionKey(question.query)) ?? null,
-				})),
-				set,
-			};
+			return context.knowledge.questions(input.projectId, {
+				...(input.limit !== undefined ? { limit: input.limit } : {}),
+			});
 		}),
 	/**
 	 * The project's knowledge as a graph: its files, the topics they share,
@@ -456,12 +396,7 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			const [read, asked, learnings] = await Promise.all([
-				context.knowledge.graphInput(input.projectId),
-				askedQuestions(context.db, input.projectId),
-				context.knowledge.waitingLearnings(input.projectId),
-			]);
-			return knowledgeGraphOf({ ...read, asked, learnings });
+			return context.knowledge.map(input.projectId);
 		}),
 	/**
 	 * Marks the files that answer a question an agent asked: the question
@@ -505,12 +440,7 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			const questions = await context.knowledge.questions(input.projectId);
-			return evaluateKnowledge(
-				context.knowledgeSearch,
-				input.projectId,
-				questions,
-			);
+			return context.knowledge.evaluate(input.projectId);
 		}),
 	/**
 	 * Turns search by meaning on or off for the project, on every computer
@@ -526,8 +456,7 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string(), on: z.boolean() }))
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			await context.knowledge.setMeaning(input.projectId, input.on);
-			return context.knowledgeSearch.meaning(input.projectId);
+			return context.knowledge.setMeaning(input.projectId, input.on);
 		}),
 	/**
 	 * How often agents found and read each file of the project's knowledge
@@ -543,6 +472,6 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }) => {
 			await knownProject(context.space, input.projectId);
-			return knowledgeFileUse(context.db, input.projectId);
+			return context.knowledge.use(input.projectId);
 		}),
 };

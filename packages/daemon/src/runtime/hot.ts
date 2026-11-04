@@ -2,7 +2,7 @@ import type { PriceUpdates } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type { KeptDevices } from "@nightshift/devices";
 import type {
-	KnowledgeSearch,
+	Knowledge,
 	OllamaService,
 	SyncedDocuments,
 } from "@nightshift/engine";
@@ -29,7 +29,8 @@ import type { HeldLease } from "./hold-lease";
  * - replaced, the one before stopped first: the notifier, the keep-awake,
  *   the export to monitoring, the Ollama (and the `ollama serve` it
  *   started), the project copies, the scheduler, the price list, the facts
- *   timer and the knowledge timers;
+ *   timer and the knowledge (its timers and its open index file: only what
+ *   is on disk stays, so no closure or code of an earlier reload does);
  * - handed over: the devices (`startDevices` fills `nightshiftDevices`
  *   itself: its engine lets go of its runs, and the work hub, the applied
  *   commands, the calls served for a Host, the Devices online and the
@@ -62,24 +63,22 @@ export type HotRegistry = KeptDevices &
 		nightshiftScheduler?: AbortController;
 		/** The clones from GitHub that run, and how the last ones ended. */
 		nightshiftGitHubClones?: GitHubClones;
-		nightshiftKnowledgeSearch?: KnowledgeSearch;
-		/** The Ollama Night Shift uses: the `ollama serve` it started stops with it. */
-		nightshiftOllama?: OllamaService;
-		nightshiftProjectCopies?: ProjectCopies;
-		/** The daily update of the price list. */
-		nightshiftPrices?: PriceUpdates;
-		nightshiftFacts?: Timer;
-		/**
-		 * The first reconcile of every knowledge folder, the retry of what
-		 * waits for a Host, and the collection of old content. A daemon of
-		 * an older version kept no collection timers.
-		 */
+		/** The projects' knowledge on this computer. */
+		nightshiftKnowledge?: Knowledge;
+		/** A daemon of an older version kept these apart (`stopOlderKnowledge`). */
+		nightshiftKnowledgeSearch?: { close?(): void };
 		nightshiftKnowledgeTimers?: {
 			first: Timer;
 			retry: Timer;
 			firstCollect?: Timer;
 			collect?: Timer;
 		};
+		/** The Ollama Night Shift uses: the `ollama serve` it started stops with it. */
+		nightshiftOllama?: OllamaService;
+		nightshiftProjectCopies?: ProjectCopies;
+		/** The daily update of the price list. */
+		nightshiftPrices?: PriceUpdates;
+		nightshiftFacts?: Timer;
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;
 	};
@@ -109,6 +108,35 @@ export async function stopOlderDocuments(registry: HotRegistry) {
 		await older?.close?.().catch((error) => {
 			console.error(`${name} did not stop cleanly:`, error);
 		});
+	}
+}
+
+/**
+ * A daemon of an older version kept the knowledge search in a slot, over
+ * the closures of its first start, and the knowledge timers in another.
+ * The first daemon with one `Knowledge` stops both: its own does what they
+ * did, and two would prepare vectors and reconcile folders side by side.
+ */
+export function stopOlderKnowledge(
+	registry: Pick<
+		HotRegistry,
+		"nightshiftKnowledgeSearch" | "nightshiftKnowledgeTimers"
+	>,
+): void {
+	const search = registry.nightshiftKnowledgeSearch;
+	registry.nightshiftKnowledgeSearch = undefined;
+	try {
+		search?.close?.();
+	} catch (error) {
+		console.error("nightshiftKnowledgeSearch did not stop cleanly:", error);
+	}
+	const timers = registry.nightshiftKnowledgeTimers;
+	registry.nightshiftKnowledgeTimers = undefined;
+	if (timers) {
+		clearTimeout(timers.first);
+		clearInterval(timers.retry);
+		if (timers.firstCollect) clearTimeout(timers.firstCollect);
+		if (timers.collect) clearInterval(timers.collect);
 	}
 }
 

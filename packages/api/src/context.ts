@@ -11,9 +11,8 @@ import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	Engine,
-	KnowledgeSearch,
+	Knowledge,
 	OllamaService,
-	ProjectKnowledge,
 	ToolLaunchers,
 	UsageMoment,
 } from "@nightshift/engine";
@@ -88,26 +87,8 @@ export type Services = {
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
-	/**
-	 * The projects' knowledge in their Spaces (ADR 4): the files the
-	 * knowledge document lists, and one file's content by its hash for a
-	 * computer whose folder lacks it, and the removal of a source's folder,
-	 * and the learnings that wait for a person.
-	 */
-	knowledge: Pick<
-		ProjectKnowledge,
-		| "listing"
-		| "graphInput"
-		| "waitingLearnings"
-		| "settleLearning"
-		| "read"
-		| "removeFolder"
-		| "questions"
-		| "markQuestion"
-		| "setMeaning"
-	>;
-	/** Search over the projects' knowledge on this computer, by words and by meaning. */
-	knowledgeSearch: Pick<KnowledgeSearch, "search" | "meaning">;
+	/** The projects' knowledge in their Spaces (ADR 4), on this computer. */
+	knowledge: Knowledge;
 	/** The Ollama search by meaning and Decision nodes use: where it is, its models, a download. */
 	ollama: Pick<OllamaService, "endpoint" | "status" | "models" | "pull">;
 	/** Helps the person build a flow in the editor, on one of this computer's profiles. */

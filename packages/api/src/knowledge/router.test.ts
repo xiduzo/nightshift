@@ -17,10 +17,10 @@ import { appRouter } from "../router";
 import { accessAs, stub, testContext } from "../testing/context";
 
 /**
- * The Knowledge page's procedures over a real Space on this computer: the
- * files and the sources, for any Member of the Space (ADR 4), with their
- * checks of who asks, and search and one file. What a source does to the
- * flows and schedules is the engine's (`knowledgeSources`).
+ * The Knowledge page's procedures over a real Space on this computer: who
+ * may ask what (ADR 4), and that each procedure carries its input to the
+ * one door and its answer back. What the door does is the engine's
+ * (`knowledge.test.ts`, `sources.test.ts`).
  */
 
 let sandbox: Sandbox;
@@ -56,34 +56,8 @@ function context(personId: string, role: Role = "member") {
 		daemon: {
 			device: { id: sandbox.deviceId, name: "test", ownerId: "owner" },
 		},
-		db: sandbox.db,
 		engine,
 		knowledge: built.knowledge,
-		knowledgeSearch: {
-			search: async (_projectId, query) =>
-				query === "deploy"
-					? [
-							{
-								path: "wiki/deploy.md",
-								title: "Deploy",
-								section: "Rolling updates",
-								line: 12,
-								page: null,
-								snippet: [{ text: "deploy", match: true }],
-								score: 0.0328,
-								found: ["words", "meaning"],
-							},
-						]
-					: [],
-			meaning: async () => ({
-				state: "preparing",
-				model: "qwen3-embedding:0.6b",
-				done: 3,
-				total: 10,
-				where: null,
-				percent: null,
-			}),
-		},
 	});
 }
 
@@ -251,8 +225,24 @@ describe("knowledge.saveSource, removeSource and syncSource", () => {
 	});
 });
 
+describe("knowledge.files", () => {
+	test("any Member gets the files of a project of the Space, and only those", async () => {
+		await putFile("wiki/deploy.md", "# Deploy\n");
+		const ctx = context("viewer", "viewer");
+		expect(
+			(
+				await call(appRouter.knowledge.files, { projectId }, { context: ctx })
+			).map((file) => [file.path, file.size]),
+		).toEqual([["wiki/deploy.md", 9]]);
+		await expect(
+			call(appRouter.knowledge.files, { projectId: "p9" }, { context: ctx }),
+		).rejects.toBeInstanceOf(ORPCError);
+	});
+});
+
 describe("knowledge.search and knowledge.read", () => {
 	test("search gives the hits of a project of the Space, and refuses another", async () => {
+		await putFile("wiki/deploy.md", "# Deploy\n\nRolling updates.\n");
 		const hits = await call(
 			appRouter.knowledge.search,
 			{ projectId, query: "deploy", limit: 5 },
@@ -260,9 +250,9 @@ describe("knowledge.search and knowledge.read", () => {
 		);
 		expect(hits.map((h) => h.path)).toEqual(["wiki/deploy.md"]);
 		expect(hits[0]).toMatchObject({
-			section: "Rolling updates",
-			line: 12,
-			found: ["words", "meaning"],
+			section: "Deploy",
+			line: 1,
+			found: ["words"],
 		});
 		await expect(
 			call(
@@ -278,10 +268,10 @@ describe("knowledge.search and knowledge.read", () => {
 		expect(
 			await call(appRouter.knowledge.meaning, { projectId }, { context: ctx }),
 		).toEqual({
-			state: "preparing",
-			model: "qwen3-embedding:0.6b",
-			done: 3,
-			total: 10,
+			state: "off",
+			model: null,
+			done: 0,
+			total: 0,
 			where: null,
 			percent: null,
 		});
@@ -315,14 +305,24 @@ describe("knowledge.search and knowledge.read", () => {
 		).rejects.toBeInstanceOf(ORPCError);
 	});
 
-	test("an agent's search and read through the MCP server are logged for the project, the page's are not", async () => {
+	test("an agent's search and read say so; the page's do not", async () => {
 		await putFile("wiki/deploy.md", "# Deploy\n");
 		const ctx = context("viewer", "viewer");
+		const uses = async () =>
+			(await sandbox.db.select().from(event)).filter((row) =>
+				row.type.startsWith("Knowledge"),
+			);
 		await call(
 			appRouter.knowledge.search,
 			{ projectId, query: "deploy" },
 			{ context: ctx },
 		);
+		await call(
+			appRouter.knowledge.read,
+			{ projectId, path: "wiki/deploy.md" },
+			{ context: ctx },
+		);
+		expect(await uses()).toEqual([]);
 		await call(
 			appRouter.knowledge.search,
 			{ projectId, query: "deploy", agent: true },
@@ -330,42 +330,19 @@ describe("knowledge.search and knowledge.read", () => {
 		);
 		await call(
 			appRouter.knowledge.read,
-			{ projectId, path: "nope.md", agent: true },
+			{ projectId, path: "wiki/deploy.md", agent: true },
 			{ context: ctx },
 		);
-		const rows = (await sandbox.db.select().from(event))
-			.filter((row) => row.type.startsWith("Knowledge"))
-			.sort((a, b) => a.seq - b.seq);
-		expect(rows.map((row) => [row.type, row.runId])).toEqual([
-			["KnowledgeSearched", null],
-			["KnowledgeRead", null],
-		]);
-		expect(rows.map((row) => JSON.parse(row.payload))).toEqual([
-			{
-				projectId,
-				query: "deploy",
-				hits: [
-					{
-						path: "wiki/deploy.md",
-						section: "Rolling updates",
-						line: 12,
-						page: null,
-						found: ["words", "meaning"],
-					},
-				],
-				via: "mcp",
-			},
-			{ projectId, path: "nope.md", found: false, via: "mcp" },
+		expect((await uses()).map((row) => row.type).sort()).toEqual([
+			"KnowledgeRead",
+			"KnowledgeSearched",
 		]);
 	});
 });
 
 describe("knowledge.graph", () => {
-	test("any Member gets the files and the topics they share, and only of its projects", async () => {
-		await putFile(
-			"wiki/one.md",
-			"Momentum and more momentum. See [two](two.md).",
-		);
+	test("any Member gets the Map of a project of the Space, and only of those", async () => {
+		await putFile("wiki/one.md", "Momentum and more momentum.");
 		await putFile("wiki/two.md", "This is about momentum too.");
 		const graph = await call(
 			appRouter.knowledge.graph,
@@ -373,14 +350,7 @@ describe("knowledge.graph", () => {
 			{ context: context("viewer", "viewer") },
 		);
 		expect(graph.nodes.map((node) => node.id)).toEqual(
-			expect.arrayContaining([
-				"file:wiki/one.md",
-				"file:wiki/two.md",
-				"topic:momentum",
-			]),
-		);
-		expect(graph.edges.map((edge) => edge.id)).toContain(
-			"file:wiki/one.md->file:wiki/two.md",
+			expect.arrayContaining(["file:wiki/one.md", "topic:momentum"]),
 		);
 		await expect(
 			call(
@@ -390,47 +360,23 @@ describe("knowledge.graph", () => {
 			),
 		).rejects.toBeInstanceOf(ORPCError);
 	});
+});
 
-	test("reads a changed file again, and connects what agents asked", async () => {
-		await putFile("wiki/one.md", "Momentum in a first file.");
-		await putFile("wiki/two.md", "Momentum in a second file.");
-		const ctx = context("member");
-		await call(appRouter.knowledge.graph, { projectId }, { context: ctx });
-		await putFile("wiki/three.md", "Momentum in a third file, and rainbows.");
-		await putFile("wiki/one.md", "Later on, some rainbows and momentum.");
-		await call(
-			appRouter.knowledge.search,
-			{ projectId, query: "deploy", agent: true },
-			{ context: ctx },
-		);
-		const graph = await call(
-			appRouter.knowledge.graph,
-			{ projectId },
-			{ context: ctx },
-		);
-		expect(graph.nodes.map((node) => node.id)).toEqual(
-			expect.arrayContaining(["topic:rainbows", "question:deploy"]),
-		);
+describe("knowledge.use", () => {
+	test("any Member gets how agents used the files, and only of a project of the Space", async () => {
+		const ctx = context("viewer", "viewer");
+		expect(
+			await call(appRouter.knowledge.use, { projectId }, { context: ctx }),
+		).toMatchObject({ runsUsedIt: false, files: [] });
+		await expect(
+			call(appRouter.knowledge.use, { projectId: "p9" }, { context: ctx }),
+		).rejects.toBeInstanceOf(ORPCError);
 	});
 });
 
 describe("knowledge.questions and knowledge.markQuestion", () => {
-	test("lists what agents asked with its answers once marked; marking asks a role that may start runs", async () => {
+	test("any Member lists the questions; marking one asks a role that may start runs", async () => {
 		await putFile("wiki/deploy.md", "# Deploy\n");
-		await call(
-			appRouter.knowledge.search,
-			{ projectId, query: "deploy", agent: true },
-			{ context: context("viewer", "viewer") },
-		);
-		const asked = await call(
-			appRouter.knowledge.questions,
-			{ projectId },
-			{ context: context("viewer", "viewer") },
-		);
-		expect(asked.set).toEqual([]);
-		expect(asked.asked).toMatchObject([
-			{ query: "deploy", times: 1, runId: null, answers: null },
-		]);
 		await expect(
 			call(
 				appRouter.knowledge.markQuestion,
@@ -446,34 +392,31 @@ describe("knowledge.questions and knowledge.markQuestion", () => {
 		expect(set).toMatchObject([
 			{ query: "deploy", answers: ["wiki/deploy.md"], by: "member" },
 		]);
-		const after = await call(
-			appRouter.knowledge.questions,
-			{ projectId },
-			{ context: context("viewer", "viewer") },
-		);
-		expect(after.asked[0]?.answers).toEqual(["wiki/deploy.md"]);
-		expect(after.set).toHaveLength(1);
+		expect(
+			await call(
+				appRouter.knowledge.questions,
+				{ projectId, limit: 5 },
+				{ context: context("viewer", "viewer") },
+			),
+		).toMatchObject({ asked: [], set: [{ query: "deploy" }] });
 	});
 });
 
 describe("knowledge.evaluate and knowledge.setMeaning", () => {
-	test("the question set runs by words while search by meaning is not ready; turning it off asks a role that may start runs", async () => {
+	test("any Member evaluates; turning search by meaning off asks a role that may start runs", async () => {
 		await putFile("wiki/deploy.md", "# Deploy\n");
 		await built.knowledge.markQuestion(projectId, {
 			query: "deploy",
 			answers: ["wiki/deploy.md"],
 			by: "member",
 		});
-		const result = await call(
-			appRouter.knowledge.evaluate,
-			{ projectId },
-			{ context: context("viewer", "viewer") },
-		);
-		expect(result).toMatchObject({
-			questions: 1,
-			advice: "unavailable",
-			modes: { words: { found: 1, recall: 1 }, meaning: null, both: null },
-		});
+		expect(
+			await call(
+				appRouter.knowledge.evaluate,
+				{ projectId },
+				{ context: context("viewer", "viewer") },
+			),
+		).toMatchObject({ questions: 1, advice: "unavailable" });
 		await expect(
 			call(
 				appRouter.knowledge.setMeaning,
@@ -481,12 +424,13 @@ describe("knowledge.evaluate and knowledge.setMeaning", () => {
 				{ context: context("viewer", "viewer") },
 			),
 		).rejects.toBeInstanceOf(ORPCError);
-		await call(
-			appRouter.knowledge.setMeaning,
-			{ projectId, on: false },
-			{ context: context("member") },
-		);
-		expect(await built.knowledge.meaningOn(projectId)).toBe(false);
+		expect(
+			await call(
+				appRouter.knowledge.setMeaning,
+				{ projectId, on: false },
+				{ context: context("member") },
+			),
+		).toMatchObject({ state: "off" });
 	});
 });
 

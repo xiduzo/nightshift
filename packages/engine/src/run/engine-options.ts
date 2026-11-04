@@ -107,7 +107,7 @@ export type EngineOptions = {
 	/**
 	 * What follows the Projects of a Space move outside the rows, after
 	 * its batch: the daemon moves each Project's knowledge
-	 * (`ProjectKnowledge.moved`).
+	 * (`Knowledge.moved`).
 	 */
 	projectsMoved?: (move: ProjectsMoved) => Promise<void>;
 };

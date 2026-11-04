@@ -23,6 +23,7 @@ export {
 	hot,
 	hotSlots,
 	stopOlderDocuments,
+	stopOlderKnowledge,
 } from "./hot";
 export { DEFAULT_PORT, DESKTOP_PORT, daemonPort } from "./port";
 export { guardProcess, onProcessCrashed } from "./process-guard";

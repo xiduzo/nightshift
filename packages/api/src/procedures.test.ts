@@ -115,7 +115,6 @@ const engine: Context["engine"] = {
 		}),
 	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
 	logMemberChange: async () => {},
-	logKnowledgeUse: async () => {},
 	onLandedFacts: () => () => {},
 	onScheduleMissed: () => () => {},
 	usageAllowed: async () => true,

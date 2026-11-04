@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { KnowledgeUse } from "@nightshift/agents/tools";
 import { project } from "@nightshift/db/schema";
 import { now as timeNow } from "@nightshift/time";
-import { createRunLog, type KnowledgeUseFact } from "../log";
+import { createRunLog, type KnowledgeUseFact, type RunLog } from "../log";
 import { createSandbox, type Sandbox } from "../testing";
 import {
 	askedQuestions,
 	knowledgeFileUse,
-	logKnowledgeUse,
+	knowledgeUseEvent,
 	stepSources,
 } from "./use";
 
@@ -28,6 +29,10 @@ async function setup() {
 	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	return { db: sandbox.db, log };
 }
+
+/** A use through the nightshift MCP server: a fact of the project, with no run. */
+const logKnowledgeUse = (log: RunLog, projectId: string, use: KnowledgeUse) =>
+	log.append(knowledgeUseEvent(projectId, use, "mcp"));
 
 const hit = (path: string) => ({
 	path,

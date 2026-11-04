@@ -8,7 +8,6 @@ import {
 	type KnowledgeUseFact,
 	type KnowledgeVia,
 	parseEventRow,
-	type RunLog,
 } from "../log";
 import { questionKey } from "./questions";
 
@@ -16,7 +15,8 @@ import { questionKey } from "./questions";
  * How agents use a project's knowledge, from the event log: each search
  * (`KnowledgeSearched`) and each read (`KnowledgeRead`) of an agent. An
  * Agent step logs its own on its step (`StepHandle.usedKnowledge`); the
- * nightshift MCP server's calls are logged with no run (`logKnowledgeUse`).
+ * nightshift MCP server's calls are logged with no run (`Knowledge.search`,
+ * `Knowledge.read`).
  */
 
 /** The event of one use of the knowledge, without its run, step or session. */
@@ -40,15 +40,6 @@ export function knowledgeUseEvent(
 					...(use.from ? { from: use.from } : {}),
 				},
 			};
-}
-
-/** Logs a use of the knowledge through the nightshift MCP server: a fact of the project, with no run. */
-export async function logKnowledgeUse(
-	log: Pick<RunLog, "append">,
-	projectId: string,
-	use: KnowledgeUse,
-): Promise<void> {
-	await log.append(knowledgeUseEvent(projectId, use, "mcp"));
 }
 
 /** A question agents asked the knowledge, and what the last asking found. */

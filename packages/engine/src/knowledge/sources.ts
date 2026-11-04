@@ -1,6 +1,7 @@
 import {
 	cronError,
 	deviceIdOf,
+	type Flow,
 	type FlowIssue,
 	type KnowledgeSource,
 	knowledgeKitsOf,
@@ -12,14 +13,11 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
+import type { RunStatus } from "../log";
+import { KNOWLEDGE_FILES_WARNING, type KnowledgeFile } from "./folder";
+import type { KnowledgeListing } from "./reconcile";
 import {
-	KNOWLEDGE_FILES_WARNING,
-	type KnowledgeFile,
-	type ProjectKnowledge,
-} from "../knowledge";
-import type { RunSummary } from "../read";
-import type { SpaceEngine } from "../run";
-import {
+	type FlowMap,
 	foldersOf,
 	foldersOthersFill,
 	isSourceSchedule,
@@ -39,7 +37,43 @@ import {
  * Space's knowledge document too, but this Device changes them through
  * its own copy: the module takes this Device's knowledge as a dependency
  * (`files`), so removing a source's files removes them for every Device.
+ *
+ * The Space comes in as a port (`SourcesSpace`), not as `SpaceEngine`: the
+ * engine that walks runs reads this knowledge, so the knowledge cannot
+ * name it. `Knowledge.sources` is how a caller reaches this module.
  */
+
+/** A run as a source reads it: what its last sync says. */
+export type SourceRun = {
+	id: string;
+	status: RunStatus;
+	/** The flow it started from. Null for a quick run. */
+	flowName: string | null;
+	createdAt: number;
+	endedAt: number | null;
+};
+
+/** The Space as the person who asks sees it, as far as a source needs it. */
+export type SourcesSpace<Run extends SourceRun = SourceRun> = {
+	flows: {
+		map(projectId: string): Promise<FlowMap>;
+		save(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
+		remove(projectId: string, name: string): Promise<void>;
+	};
+	listSchedules(projectId: string): Promise<{ schedules: readonly unknown[] }>;
+	saveSchedules(
+		projectId: string,
+		schedules: readonly Schedule[],
+		timeZone?: string,
+	): Promise<unknown>;
+	listRuns(input: { projectId: string; limit: number }): Promise<Run[]>;
+	startRun(input: {
+		projectId: string;
+		flowName: string;
+		startedBy: string;
+	}): Promise<Run>;
+	listDevices(projectId: string): Promise<{ deviceId: string; name: string }[]>;
+};
 
 /** How many of the project's latest runs `list` reads for each source's last sync. */
 const LAST_RUNS = 200;
@@ -59,7 +93,7 @@ export type KnowledgeSync = {
 	/** Its own schedule at set times, if it has one. */
 	schedule: { cron: string; enabled: boolean; device?: string } | null;
 	/** Its latest run among the project's recent ones: when it ended, else started. */
-	lastRun: { id: string; status: RunSummary["status"]; at: number } | null;
+	lastRun: { id: string; status: RunStatus; at: number } | null;
 	/** What needs a person: its last sync failed, or it has not synced in a week (`syncHealth`). */
 	health: SyncHealth;
 };
@@ -131,19 +165,14 @@ export type SourceRights = {
 	schedules: boolean;
 };
 
-export type KnowledgeSourcesDeps = {
+type KnowledgeSourcesDeps<Run extends SourceRun> = {
 	/** The Space as the person who asks sees it. */
-	space: Pick<
-		SpaceEngine,
-		| "flows"
-		| "listSchedules"
-		| "saveSchedules"
-		| "listRuns"
-		| "startRun"
-		| "listDevices"
-	>;
+	space: SourcesSpace<Run>;
 	/** This Device's knowledge: the files, and the removal of a folder. */
-	files: Pick<ProjectKnowledge, "listing" | "removeFolder">;
+	files: {
+		listing(projectId: string): Promise<KnowledgeListing>;
+		removeFolder(projectId: string, folder: string): Promise<number>;
+	};
 	/** This computer: a source that reads a folder here syncs here. */
 	device: { id: string; name: string };
 };
@@ -156,9 +185,13 @@ const OWNER_ONLY =
 	"Only the owner of this computer can change its schedules. Save it without Keep it up to date, or ask the owner.";
 
 /** A project's knowledge sources, as one person in one Space sees them. */
-export type KnowledgeSources = ReturnType<typeof knowledgeSources>;
+export type KnowledgeSources<Run extends SourceRun = SourceRun> = ReturnType<
+	typeof knowledgeSources<Run>
+>;
 
-export function knowledgeSources(deps: KnowledgeSourcesDeps) {
+export function knowledgeSources<Run extends SourceRun>(
+	deps: KnowledgeSourcesDeps<Run>,
+) {
 	const { space } = deps;
 
 	/**
@@ -365,7 +398,7 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
 			projectId: string,
 			name: string,
 			startedBy: string,
-		): Promise<RunSummary> {
+		): Promise<Run> {
 			await sourceNamed(projectId, name);
 			return space.startRun({
 				projectId,
@@ -382,7 +415,9 @@ export function knowledgeSources(deps: KnowledgeSourcesDeps) {
  * project the Space cannot read is left out.
  */
 export async function knowledgeSourceProblems(
-	space: Pick<SpaceEngine, "listProjects" | "flows" | "listRuns">,
+	space: Pick<SourcesSpace, "flows" | "listRuns"> & {
+		listProjects(): Promise<{ id: string; name: string }[]>;
+	},
 	now: number = timeNow(),
 ): Promise<SourceProblem[]> {
 	const problems: SourceProblem[] = [];

@@ -144,11 +144,57 @@ describe("removeFolder", () => {
 
 	test("refuses a folder outside the knowledge, and Night Shift's own", async () => {
 		const a = await device(null);
-		for (const folder of ["", "../x", "learnings", ".hidden"]) {
+		for (const folder of ["", "../x", "learnings", "evals", ".hidden"]) {
 			await expect(a.sync.removeFolder("p1", folder)).rejects.toThrow(
 				"Choose a folder inside the knowledge",
 			);
 		}
+	});
+});
+
+describe("a step that holds the folder", () => {
+	test("the reconcile of every folder, the retry of what waits and a removal leave it alone until it ends", async () => {
+		const { state, host } = memoryHost();
+		const a = await device(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.sync.reconcile("p1");
+		// Its content waits for the Host: the retry would publish it.
+		state.down = true;
+		await a.put("wiki/Offline.md", "# Offline\n");
+		await a.sync.reconcile("p1");
+		state.down = false;
+
+		const step = await a.sync.startStep("p1");
+		await a.put("wiki/Page.md", "# Pa");
+		await a.sync.reconcileAll();
+		await a.sync.retryPending();
+		expect([...(await a.entries()).keys()]).not.toContain("wiki/Page.md");
+		await expect(a.sync.removeFolder("p1", "wiki")).rejects.toThrow(
+			"A run is changing this knowledge now. Try again when it ends.",
+		);
+
+		await a.put("wiki/Page.md", "# Page\n");
+		await step.done();
+		expect([...(await a.entries()).keys()]).toContain("wiki/Page.md");
+		expect(await a.sync.removeFolder("p1", "wiki")).toBe(3);
+	});
+
+	test("the retry reconciles only a folder whose content waits for the Host", async () => {
+		const { kept, state, host } = memoryHost();
+		const a = await device(host);
+		await a.put("wiki/Home.md", "# Home\n");
+		await a.sync.reconcile("p1");
+		const before = kept.size;
+
+		await a.put("wiki/Later.md", "# Later\n");
+		await a.sync.retryPending();
+		expect(kept.size).toBe(before);
+
+		state.down = true;
+		await a.sync.reconcile("p1");
+		state.down = false;
+		await a.sync.retryPending();
+		expect(kept.size).toBe(before + 1);
 	});
 });
 

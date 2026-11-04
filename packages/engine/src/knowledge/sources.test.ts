@@ -48,11 +48,21 @@ afterEach(async () => {
 });
 
 function sources() {
+	return built.knowledge.sources(space);
+}
+
+/** The sources in `view` as another computer sees them. */
+function sourcesOn(
+	device: { id: string; name: string },
+	view: SpaceEngine = space,
+) {
 	return knowledgeSources({
-		space,
-		files: built.knowledge,
-		// The test Device.
-		device: { id: sandbox.deviceId, name: "test" },
+		space: view,
+		files: {
+			listing: built.knowledge.listing,
+			removeFolder: async () => 0,
+		},
+		device,
 	});
 }
 
@@ -152,11 +162,7 @@ describe("save", () => {
 			device: sandbox.deviceId,
 		});
 		// Edited on another computer, it stays on the one that has the folder.
-		await knowledgeSources({
-			space,
-			files: built.knowledge,
-			device: { id: "laptop-id", name: "laptop" },
-		}).save(
+		await sourcesOn({ id: "laptop-id", name: "laptop" }).save(
 			projectId,
 			{
 				name: "knowledge-folder",
@@ -174,11 +180,10 @@ describe("save", () => {
 		// A person's Devices name it: the Subflow keeps its id.
 		const computer = async (device: { id: string; name: string }) =>
 			(
-				await knowledgeSources({
-					space: root.space(sandbox.spaceId, { personId: "ada" }),
-					files: built.knowledge,
+				await sourcesOn(
 					device,
-				}).list(projectId)
+					root.space(sandbox.spaceId, { personId: "ada" }),
+				).list(projectId)
 			).syncs.find((sync) => sync.flow === "knowledge-folder")?.computer;
 		expect(await computer({ id: sandbox.deviceId, name: "test" })).toEqual({
 			name: "test",
