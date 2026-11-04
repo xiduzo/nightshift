@@ -176,8 +176,8 @@ which favours long files.
 
 The line for this model is 0.6. On `docs/`, 382 of the 1 485 pairs of files are
 over it, and the mutual rule keeps 38. 25 stay after the pairs that link. The
-share that has a subject in common by name is
-flat from 0.6 to 0.85, between 42% and 50%, so the mutual rule does the choosing
+share with a subject in common by name is flat from 0.6 to 0.85, between 42% and
+50%, so the mutual rule does the choosing
 and the line is a guard. Files of unrelated subjects stay far below it: 0.14 to
 0.36 between a Dutch text and English docs, and between English docs of different
 subjects. Four short Dutch files on one subject sit at 0.41 to 0.60, so they get

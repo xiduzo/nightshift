@@ -110,7 +110,7 @@ A project's Knowledge opens on an overview. Five child pages hold the details: R
 - "Not important" and "Keep syncing them" are remembered in this browser. A learning is never dismissed: a person keeps or deletes it.
 - **Files** has the search on top, then every file by folder: folders on the left, the files of the chosen folder on the right. Each side scrolls on its own. A search replaces the folders until you clear it.
 - **Sources** lists where the files come from. **Questions** lists what agents searched for, with the test of search on top when questions are marked.
-- **Map** shows files, topics, questions and learnings as a graph. Search shows what an agent would find. An item shows what it connects to in the panel beside the map. "Show on map" on a task opens the Map at that item (`?node=`). "Review it" on a learning goes back to Review with that learning first.
+- **Map** shows files, topics, questions and learnings as a graph. Search shows what an agent would find. An item shows what it connects to in the panel beside the map. "Not a topic" on a topic takes it off the Map for the whole Space, and a menu shows it again. "Show on map" on a task opens the Map at that item (`?node=`). "Review it" on a learning goes back to Review with that learning first.
 - **Words.** The page that lists files is "Files". Not "What agents know": a label names what you see. The Map shows "items", because a Node is part of a flow. A person marks questions, so the page says "marked questions", not "question set".
 
 ### Setup pages (Agents, Secrets, Settings)
