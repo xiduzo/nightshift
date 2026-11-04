@@ -25,6 +25,7 @@ import {
 	loadDocumentContent,
 	textOf,
 } from "./documents";
+import { isMarkdown, markdownHeadings } from "./sections";
 
 /**
  * The knowledge folder of a project: markdown (and any other files) that
@@ -110,9 +111,30 @@ const MAX_FILES = 20_000;
 const HEAD_BYTES = 4096;
 /** The files whose text the index reads, besides PDF and Word files. Any other file shows its name only. */
 export const TEXT_FILES = new Set([".md", ".markdown", ".mdx", ".txt", ".rst"]);
-/** The first line of the index's text: an index without it is written again. */
+/**
+ * The first line of the index's text: an index without it is written again.
+ * Change it when the format of the lines changes, so each computer writes its
+ * index again.
+ */
 const INDEX_INTRO =
-	"Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. PDF and Word files too. Read a file, or grep the folder, for more.";
+	"Night Shift writes this file. One line per file: its path, title, first sentence and the day it last changed. PDF and Word files too. Under the line of a large markdown file: its headings. Read a file, or grep the folder, for more.";
+/**
+ * The markdown files whose headings the index shows: the largest ones, where
+ * structure helps most. An agent reads the index first, so it stays small:
+ * with the next limits, headings add about 30 000 characters at most. And each
+ * write reads at most this many files, at `OUTLINE_BYTES` each. No PDF or Word
+ * file is read for this, so a step's start does not wait for one.
+ */
+const MAX_OUTLINED_FILES = 100;
+/** The headings one file shows, at most. */
+const MAX_OUTLINE_HEADINGS = 12;
+/** The length of the headings of one file together, at most. */
+const MAX_OUTLINE_CHARS = 300;
+/** The length of one heading, at most. */
+const MAX_OUTLINE_HEADING = 80;
+/** What the index reads of a file for its headings. */
+const OUTLINE_BYTES = 256 * 1024;
+const OUTLINE_SEPARATOR = " · ";
 
 /**
  * Whether a path is one of the knowledge, in the folder and in the
@@ -297,14 +319,23 @@ async function indexText(
 	dir: string,
 	files: readonly KnowledgeFile[],
 ): Promise<string> {
+	const outlined = new Set(
+		files
+			.filter((file) => isMarkdown(file.path))
+			.sort((a, b) => b.size - a.size)
+			.slice(0, MAX_OUTLINED_FILES)
+			.map((file) => file.path),
+	);
 	const lines = await Promise.all(
 		files.map(async (file) => {
-			const { title, sentence } = await describe(
-				join(dir, ...file.path.split("/")),
-				file,
-			);
+			const abs = join(dir, ...file.path.split("/"));
+			const { title, sentence } = await describe(abs, file);
 			const day = iso(file.changedAt).slice(0, 10);
-			return `- \`${file.path}\`: ${title}${sentence ? `. ${sentence}` : ""} (changed ${day})`;
+			const line = `- \`${file.path}\`: ${title}${sentence ? `. ${sentence}` : ""} (changed ${day})`;
+			const outline = outlined.has(file.path)
+				? await readOutline(abs, title)
+				: "";
+			return outline ? `${line}\n  ${outline}` : line;
 		}),
 	);
 	return [
@@ -315,6 +346,57 @@ async function indexText(
 		...(lines.length > 0 ? lines : ["No files yet."]),
 		"",
 	].join("\n");
+}
+
+/** The headings of a markdown file on one line (`outlineOf`). Empty: it has none, or it went. */
+async function readOutline(abs: string, title: string): Promise<string> {
+	const head = await readStart(abs, OUTLINE_BYTES);
+	if (!head) return "";
+	const whole = head.size <= OUTLINE_BYTES;
+	// A cut can fall in a line: a heading cut in two is left out.
+	const text = whole
+		? head.text
+		: head.text.slice(0, head.text.lastIndexOf("\n"));
+	return outlineOf(text.replace(/\r\n?/g, "\n"), title, whole);
+}
+
+/**
+ * The headings of a markdown text on one line, for the index: the top level
+ * under the title, then each deeper level while all of it fits. Past the
+ * limits it says how many more there are. `whole`: this is the whole file, so
+ * the count is right. If not, it says only that more may follow.
+ */
+function outlineOf(text: string, title: string, whole: boolean): string {
+	const all = markdownHeadings(text).map((heading) => ({
+		...heading,
+		text: oneLine(heading.text),
+	}));
+	const headings = all[0]?.text === title ? all.slice(1) : all;
+	const levels = [...new Set(headings.map((h) => h.level))].sort(
+		(a, b) => a - b,
+	);
+	let shown: typeof headings = [];
+	for (const level of levels) {
+		const upTo = headings.filter((h) => h.level <= level);
+		if (shown.length > 0 && upTo.length > MAX_OUTLINE_HEADINGS) break;
+		shown = upTo;
+	}
+	const kept: string[] = [];
+	let chars = 0;
+	for (const { text: heading } of shown.slice(0, MAX_OUTLINE_HEADINGS)) {
+		const short =
+			heading.length > MAX_OUTLINE_HEADING
+				? `${heading.slice(0, MAX_OUTLINE_HEADING - 1)}…`
+				: heading;
+		chars += short.length + OUTLINE_SEPARATOR.length;
+		if (chars > MAX_OUTLINE_CHARS) break;
+		kept.push(short);
+	}
+	if (kept.length === 0) return "";
+	const hidden = shown.length - kept.length;
+	if (hidden > 0) kept.push(whole ? `… ${hidden} more` : "… more");
+	else if (!whole) kept.push("…");
+	return kept.join(OUTLINE_SEPARATOR);
 }
 
 type Description = { title: string; sentence: string };

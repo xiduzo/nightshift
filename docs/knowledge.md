@@ -85,10 +85,30 @@ it.
 ### The index
 
 Night Shift writes `INDEX.md` at the top of the folder: one line per file,
-with its path, title, first sentence and the day it changed. Night Shift
-writes it again when an agent gets the folder and when the Knowledge page
-reads it, if a file is newer than the index or a file came or went. A sync
-does not need to write it. Each computer writes its own, and it never syncs.
+with its path, title, first sentence and the day it changed. Under the line
+of a markdown file comes a second line with its headings, so an agent that
+can only grep still sees how a file is built:
+
+```
+- `research/knowledge-vectors.md`: Knowledge vectors. Status: written spike (changed 2026-10-30)
+  1 Decision · 2 The pieces · 3 The numbers · 4 The evaluation plan · 5 Risks
+```
+
+An agent reads this file first, so its size has limits:
+
+- Only the 100 largest markdown files show headings.
+- One file shows at most 12 headings and 300 characters. Then it says how
+  many more it has: `… 188 more`.
+- It shows the top level under the title, then each deeper level while all
+  of that level fits.
+- Night Shift reads at most the first 256 KB of a file for its headings.
+- PDF and Word files show no headings, so they cost a step's start nothing
+  extra.
+
+Night Shift writes it again when an agent gets the folder and when the
+Knowledge page reads it, if a file is newer than the index or a file came or
+went. A sync does not need to write it. Each computer writes its own, and it
+never syncs.
 
 `learnings/` belongs to Night Shift. What agents propose to learn waits in
 `learnings/proposed/` until you accept it into `learnings/accepted/`. The

@@ -113,6 +113,123 @@ describe("the knowledge folder", () => {
 	});
 });
 
+describe("the headings in the index", () => {
+	const indexOf = async (files: Record<string, string>) => {
+		const folders = createKnowledgeFolders(dataDir);
+		const dir = await folders.ensure("p1");
+		for (const [path, text] of Object.entries(files)) {
+			await put(dir, path, text);
+		}
+		await folders.index("p1");
+		return (await readFile(join(dir, "INDEX.md"), "utf8")).split("\n");
+	};
+	/** The line under the line of a file: its headings. Undefined: it has none. */
+	const under = (lines: string[], path: string) => {
+		const next = lines[lines.findIndex((l) => l.includes(`\`${path}\``)) + 1];
+		return next?.startsWith("  ") ? next.trim() : undefined;
+	};
+
+	test("come under the line of the file, without the title, not from code or front matter", async () => {
+		const lines = await indexOf({
+			"guide.md": [
+				"---",
+				"# a comment",
+				"title: Guide",
+				"---",
+				"# Guide",
+				"",
+				"The first sentence.",
+				"",
+				"## Install",
+				"",
+				"```sh",
+				"# not a heading",
+				"```",
+				"",
+				"### From source",
+				"",
+				"## `Run` it",
+			].join("\n"),
+			"plain.md": "# Plain\n\nOnly a title.\n",
+			"notes.txt": "# Not markdown\n\n## Not a heading here\n",
+		});
+		expect(under(lines, "guide.md")).toBe("Install · From source · 'Run' it");
+		expect(under(lines, "plain.md")).toBeUndefined();
+		expect(under(lines, "notes.txt")).toBeUndefined();
+	});
+
+	test("show deeper levels only when the whole level fits", async () => {
+		const many = (mark: string, n: number) =>
+			Array.from({ length: n }, (_, i) => `${mark} ${mark.length}.${i}`);
+		const lines = await indexOf({
+			"fits.md": ["# Title", ...many("##", 3), ...many("###", 4)].join("\n\n"),
+			"deep.md": ["# Title", ...many("##", 3), ...many("###", 20)].join("\n\n"),
+		});
+		expect(under(lines, "fits.md")?.split(" · ")).toHaveLength(7);
+		expect(under(lines, "deep.md")).toBe("2.0 · 2.1 · 2.2");
+	});
+
+	test("stop at their limits: 200 headings, and very long ones", async () => {
+		const lines = await indexOf({
+			"many.md": [
+				"# Title",
+				...Array.from({ length: 200 }, (_, i) => `## Part ${i}`),
+			].join("\n\n"),
+			"long.md": [
+				"# Title",
+				...Array.from({ length: 10 }, (_, i) => `## ${i} ${"x".repeat(500)}`),
+			].join("\n\n"),
+		});
+		const many = under(lines, "many.md") ?? "";
+		expect(many.split(" · ")).toHaveLength(13);
+		expect(many).toEndWith("Part 11 · … 188 more");
+		const long = under(lines, "long.md") ?? "";
+		expect(long).toEndWith("… 7 more");
+		expect(long.length).toBeLessThanOrEqual(320);
+	});
+
+	test("show for the largest files only, so a folder of thousands stays short", async () => {
+		const files: Record<string, string> = {};
+		for (let i = 0; i < 150; i++) {
+			// The larger the number, the larger the file.
+			const name = String(i).padStart(3, "0");
+			files[`f${name}.md`] =
+				`# F${name}\n\n## Part\n\n${"word ".repeat(10 + i)}\n`;
+		}
+		const lines = await indexOf(files);
+		const outlines = lines.filter((line) => line.startsWith("  "));
+		expect(outlines).toHaveLength(100);
+		expect(under(lines, "f149.md")).toBe("Part");
+		expect(under(lines, "f050.md")).toBe("Part");
+		expect(under(lines, "f049.md")).toBeUndefined();
+		// Still one listed path per file: the headings are not read as files.
+		const stale = lines.filter((line) => line.startsWith("- `"));
+		expect(stale).toHaveLength(150);
+	});
+
+	test("say that more may follow when a file is too long to read to its end", async () => {
+		const part = `${"word ".repeat(200)}\n\n`;
+		const lines = await indexOf({
+			"huge.md": `# Huge\n\n## Start\n\n${part.repeat(300)}## Far away\n`,
+		});
+		expect(under(lines, "huge.md")).toBe("Start · …");
+	});
+
+	test("do not make the index stale", async () => {
+		const folders = createKnowledgeFolders(dataDir);
+		const dir = await folders.ensure("p1");
+		await put(dir, "a.md", "# A\n\n## One\n\n## Two\n");
+		await folders.index("p1");
+		const index = join(dir, "INDEX.md");
+		const first = await readFile(index, "utf8");
+		await writeFile(index, `${first}<!-- kept -->\n`);
+		const past = asDate(now() - 60_000);
+		await utimes(join(dir, "a.md"), past, past);
+		await folders.index("p1");
+		expect(await readFile(index, "utf8")).toContain("<!-- kept -->");
+	});
+});
+
 describe("PDF and Word files in the index", () => {
 	test("show the title and first sentence of their text", async () => {
 		const folders = createKnowledgeFolders(dataDir);
@@ -130,6 +247,8 @@ describe("PDF and Word files in the index", () => {
 		expect(index).toContain(
 			"- `guide.docx`: Onboarding guide. Every new teammate meets the wombat",
 		);
+		// No headings: nothing more to parse at a step's start.
+		expect(index.split("\n").filter((l) => l.startsWith("  "))).toEqual([]);
 		expect(index).toContain(
 			"- `release.pdf`: Release checklist. We ship on Fridays (",
 		);
