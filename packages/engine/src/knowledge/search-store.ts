@@ -511,6 +511,33 @@ export function createSearchStore(
 			return { read, filesLeftOut: Math.max(0, all - read.length) };
 		},
 		/**
+		 * What changes when `sectionTexts` or `storedVectors` would read something
+		 * else: each file by its content, and which vectors there are. A section's
+		 * vector never changes while its file stays, so the vectors' count and
+		 * newest row are enough. It reads no section and no vector.
+		 */
+		mapStamp(projectId: string): string {
+			const sqlite = opened();
+			return JSON.stringify([
+				sqlite
+					.query<{ path: string; sha256: string }, [string]>(
+						"SELECT path, sha256 FROM files WHERE project_id = ? ORDER BY path",
+					)
+					.all(projectId)
+					.map(({ path, sha256 }) => [path, sha256]),
+				sqlite
+					.query<{ n: number; newest: number | null }, [string]>(
+						"SELECT count(*) AS n, max(rowid) AS newest FROM vectors WHERE project_id = ?",
+					)
+					.get(projectId),
+				sqlite
+					.query<{ value: string }, []>(
+						"SELECT value FROM meta WHERE key = 'model'",
+					)
+					.get()?.value ?? null,
+			]);
+		},
+		/**
 		 * The vectors of this model that still belong to a section of a file, at
 		 * most `limit`: the first section of each file, then the second of each,
 		 * so a cut leaves no file out. By path, from the store's own table: it

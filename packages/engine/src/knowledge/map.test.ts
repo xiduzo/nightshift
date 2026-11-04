@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -546,7 +547,120 @@ describe("files close in meaning", () => {
 	});
 });
 
-describe("files close in meaning", () => {
+describe("a second draw", () => {
+	/** Counts the two scans the Map's index read does: of the sections' text and of the vectors. */
+	function watchScans() {
+		const scans = (sql: unknown) =>
+			/s\.text AS text|WITH held AS/.test(String(sql));
+		const prepare = spyOn(Database.prototype, "prepare");
+		const query = spyOn(Database.prototype, "query");
+		return {
+			count: () =>
+				[...prepare.mock.calls, ...query.mock.calls].filter(([sql]) =>
+					scans(sql),
+				).length,
+			stop() {
+				prepare.mockRestore();
+				query.mockRestore();
+			},
+		};
+	}
+
+	test("with nothing changed does no scan, and gives the Map it drew", async () => {
+		const { meaning } = fakeMeaning(0.9);
+		const a = await device(memoryHost(), { meaning });
+		await closeLibrary(a);
+		await vectorsReady(a);
+		const first = await a.map();
+		const scans = watchScans();
+		try {
+			expect(await a.map()).toBe(first);
+			expect(scans.count()).toBe(0);
+		} finally {
+			scans.stop();
+		}
+	});
+
+	test("after a change in the folder scans again, and shows it", async () => {
+		const a = await device();
+		await a.put("wiki/one.md", "The momentum and rainbows.");
+		await a.put("wiki/two.md", "The momentum and rainbows.");
+		await a.map();
+		await a.put("wiki/three.md", "More.");
+		const scans = watchScans();
+		try {
+			const map = await a.map();
+			expect(scans.count()).toBeGreaterThan(0);
+			expect(idsOf(map, "file")).toContain("file:wiki/three.md");
+		} finally {
+			scans.stop();
+		}
+	});
+
+	test("after new vectors draws them", async () => {
+		const { meaning } = fakeMeaning(0.9);
+		const a = await device(memoryHost(), { meaning });
+		await closeLibrary(a);
+		// Drawn before the first vectors, so no edge of meaning yet.
+		const before = await a.map();
+		await waitFor(async () => (await a.knowledge.meaning("p1")).state === "on");
+		const after = await a.map();
+		expect(after).not.toBe(before);
+		expect(closeEdges(after)).toHaveLength(1);
+	});
+
+	test("shows a person's Not a topic at once, and its way back", async () => {
+		const a = await device();
+		await a.put("wiki/one.md", "The momentum and rainbows.");
+		await a.put("wiki/two.md", "The momentum and rainbows.");
+		expect(idsOf(await a.map(), "topic")).toContain("topic:rainbows");
+		await a.map();
+		await a.knowledge.markNotTopic("p1", {
+			word: "rainbows",
+			notTopic: true,
+			by: "ann",
+		});
+		const marked = await a.map();
+		expect(marked.notTopics).toEqual(["rainbows"]);
+		expect(idsOf(marked, "topic")).not.toContain("topic:rainbows");
+		await a.knowledge.markNotTopic("p1", {
+			word: "rainbows",
+			notTopic: false,
+			by: "ann",
+		});
+		expect(idsOf(await a.map(), "topic")).toContain("topic:rainbows");
+	});
+
+	test("draws again when a learning waits, and when agents ask something new", async () => {
+		const a = await device();
+		await a.put("wiki/one.md", "The momentum and rainbows.");
+		await a.put("wiki/two.md", "The momentum and rainbows.");
+		const first = await a.map();
+		await a.put(
+			"learnings/proposed/run-1.s1.md",
+			"- The momentum matters here.\n",
+		);
+		// A proposal waits once a reconcile published it.
+		await a.knowledge.listing("p1");
+		const second = await a.map();
+		expect(second).not.toBe(first);
+		expect(idsOf(second, "learning")).toEqual(["learning:run-1.s1.md"]);
+		await a.knowledge.search("p1", "momentum", { agent: true });
+		expect(idsOf(await a.map(), "question")).toEqual(["question:momentum"]);
+	});
+
+	test("two draws at once share one drawing", async () => {
+		const a = await device();
+		await a.put("wiki/one.md", "The momentum and rainbows.");
+		await a.put("wiki/two.md", "The momentum and rainbows.");
+		await a.map();
+		await a.put("wiki/three.md", "More.");
+		const [one, two] = await Promise.all([a.map(), a.map()]);
+		expect(one).toBe(two);
+	});
+});
+
+describe("which files connect", () => {
 	/** The pairs the Map connects, drawn from these vectors alone. */
 	const closeFiles = (
 		vectors: { path: string; vector: Float32Array }[],

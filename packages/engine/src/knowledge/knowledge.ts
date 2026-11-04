@@ -27,7 +27,7 @@ import {
 	type LearningsNotifications,
 	type ProjectLearning,
 } from "./learnings";
-import { type KnowledgeMap, knowledgeMapOf } from "./map";
+import { createMapMemo, type KnowledgeMap, knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
 import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
 import {
@@ -316,9 +316,9 @@ export type KnowledgeDeps = {
 };
 
 /**
- * What the Map reads of the index, at most, at each draw: it runs on the
- * daemon's one thread, with no cache. See `docs/knowledge.md`, "The Map", for
- * what this costs at the limits.
+ * What the Map reads of the index, at most, at each draw it must do: it runs on
+ * the daemon's one thread. See `docs/knowledge.md`, "The Map", for what this
+ * costs at the limits.
  */
 const MAP_LIMITS = {
 	maxBytes: 6_000_000,
@@ -378,6 +378,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		search,
 		learnings,
 	});
+	const mapMemo = createMapMemo();
 	/** Facts of a project with no run: an agent's use through the MCP server. No landing feed reads them. */
 	const log = createRunLog(db, { walkerId: device.id });
 
@@ -601,24 +602,39 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			}
 		},
 		async map(projectId) {
-			const [listed, index, asked, waiting, notTopics] = await Promise.all([
+			const [listed, stamp, asked, waiting, marked] = await Promise.all([
 				documents.open(projectId).then((document) => document.entries()),
-				search.forMap(projectId, MAP_LIMITS),
+				search.mapStamp(projectId),
 				askedQuestions(db, projectId),
 				learnings.waiting(projectId, { onlyHere: true }),
 				notTopicsHere(projectId),
 			]);
-			return knowledgeMapOf({
-				// What the Space lists, and what this folder has but did not publish yet.
-				files: [...[...listed.keys()].filter(isReadable), ...index.files],
-				read: index.read,
-				filesLeftOut: index.filesLeftOut,
-				vectors: index.vectors,
-				closeAt: index.closeAt,
-				asked,
-				learnings: waiting,
-				notTopics: notTopics.map(({ word }) => word),
-			});
+			const spaceFiles = [...listed.keys()].filter(isReadable);
+			const notTopics = marked.map(({ word }) => word);
+			return mapMemo(
+				projectId,
+				[
+					stamp,
+					spaceFiles,
+					asked.map(({ query, hits }) => [query, hits.map((hit) => hit.path)]),
+					waiting.map(({ id, notes }) => [id, notes]),
+					notTopics,
+				],
+				async () => {
+					const index = await search.forMap(projectId, MAP_LIMITS);
+					return knowledgeMapOf({
+						// What the Space lists, and what this folder has but did not publish yet.
+						files: [...spaceFiles, ...index.files],
+						read: index.read,
+						filesLeftOut: index.filesLeftOut,
+						vectors: index.vectors,
+						closeAt: index.closeAt,
+						asked,
+						learnings: waiting,
+						notTopics,
+					});
+				},
+			);
 		},
 		async markNotTopic(projectId, mark) {
 			const hold = await reconciler.startStep(projectId);

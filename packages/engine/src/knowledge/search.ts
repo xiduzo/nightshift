@@ -641,6 +641,24 @@ export function createKnowledgeSearch(
 		},
 		closeNotes,
 		/**
+		 * After a refresh, a text that changes when `forMap` would give something
+		 * else. It walks this computer's folder, and it reads no section and no
+		 * vector, so it costs little against what `forMap` reads.
+		 */
+		async mapStamp(projectId: string): Promise<string> {
+			const meaning = current();
+			const closeAt = meaning?.closeAt ?? null;
+			const on = closeAt !== null && (await meaningOn(projectId));
+			return store.healing(async () => {
+				await refresh(projectId);
+				return JSON.stringify([
+					closeAt,
+					on ? meaning?.model : null,
+					store.mapStamp(projectId),
+				]);
+			});
+		},
+		/**
 		 * What the index holds for the Map, after a refresh: the files, the text
 		 * of their sections, and the vectors that are ready. It walks this
 		 * computer's folder. It asks neither the Host nor the model, so the

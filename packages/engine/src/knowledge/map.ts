@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { WaitingLearning } from "./learnings";
 import { findTopics, type TextOfFile } from "./topics";
 import type { AskedQuestion } from "./use";
@@ -14,6 +15,10 @@ import type { AskedQuestion } from "./use";
  *
  * The product says Map, and so does this code. Only the wire keeps the older
  * name: `knowledge.graph` stays, because a client out there may call it.
+ *
+ * Drawing runs on the daemon's one thread, and at the size limits it takes more
+ * than a second. So `createMapMemo` keeps each project's last Map for as long as
+ * what it was drawn from stays the same.
  */
 
 /** The node of a learning that waits. */
@@ -314,5 +319,38 @@ export function knowledgeMapOf(input: {
 		edges: [...edges.values()],
 		filesLeftOut: input.filesLeftOut,
 		notTopics: [...input.notTopics],
+	};
+}
+
+/** How many projects' Maps stay drawn: a person looks at few, and each costs little memory. */
+const KEPT_MAPS = 8;
+
+/**
+ * Each project's last Map, by what it was drawn from. The caller reads the cheap
+ * parts each time and names them as `from`: everything the drawing depends on,
+ * so a change, a person's "Not a topic" too, shows at the next draw. Two draws at
+ * once of the same Map share one drawing. A drawing that fails is not kept.
+ */
+export function createMapMemo() {
+	const kept = new Map<string, { key: string; map: Promise<KnowledgeMap> }>();
+	return (
+		projectId: string,
+		from: unknown,
+		draw: () => Promise<KnowledgeMap>,
+	): Promise<KnowledgeMap> => {
+		const key = createHash("sha256").update(JSON.stringify(from)).digest("hex");
+		const known = kept.get(projectId);
+		const entry = known?.key === key ? known : { key, map: draw() };
+		// The latest at the end: the oldest goes first.
+		kept.delete(projectId);
+		kept.set(projectId, entry);
+		for (const old of kept.keys()) {
+			if (kept.size <= KEPT_MAPS) break;
+			kept.delete(old);
+		}
+		entry.map.catch(() => {
+			if (kept.get(projectId) === entry) kept.delete(projectId);
+		});
+		return entry.map;
 	};
 }
