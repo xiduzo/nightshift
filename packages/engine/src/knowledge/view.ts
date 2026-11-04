@@ -1,7 +1,8 @@
 import { copyFile, mkdir, mkdtemp, rm, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { indexFolder, type KnowledgeFile } from "./folder";
+import { indexFolder } from "./folder";
+import { type KnowledgeFile, scanFolder } from "./folder-snapshot";
 
 /**
  * A view of a project's knowledge: what an Agent step gets when its node
@@ -34,8 +35,6 @@ export function inFolders(path: string, folders: readonly string[]): boolean {
 export type KnowledgeView = {
 	/** The copy's folder. */
 	path: string;
-	/** The files in it, as its index lists them. */
-	files: KnowledgeFile[];
 	/** Removes the copy. Twice is fine. */
 	remove(): Promise<void>;
 };
@@ -70,7 +69,8 @@ export async function createKnowledgeView(
 			const at = file.changedAt / 1000;
 			await utimes(to, at, at);
 		}
-		return { path, files: await indexFolder(path), remove };
+		await indexFolder(await scanFolder(path));
+		return { path, remove };
 	} catch (error) {
 		await remove();
 		throw error;

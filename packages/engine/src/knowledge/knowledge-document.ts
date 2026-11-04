@@ -8,7 +8,7 @@ import {
 	type PersistedDocument,
 	type SyncedDocuments,
 } from "../documents";
-import { isKnowledgePath } from "./folder";
+import { isKnowledgePath } from "./folder-snapshot";
 
 /**
  * The knowledge document (ADR 4): the files of a Project's knowledge, in

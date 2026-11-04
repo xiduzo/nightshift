@@ -14,7 +14,8 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type { RunStatus } from "../log";
-import { KNOWLEDGE_FILES_WARNING, type KnowledgeFile } from "./folder";
+import { KNOWLEDGE_FILES_WARNING } from "./folder";
+import type { KnowledgeFile } from "./folder-snapshot";
 import type { KnowledgeListing } from "./knowledge-reader";
 import {
 	type FlowMap,

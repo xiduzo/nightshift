@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Document } from "@langchain/core/documents";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
-import type { KnowledgeFile } from "./folder";
+import type { KnowledgeFile } from "./folder-snapshot";
 import type { KnowledgeMeaning } from "./meaning";
 import { type SectionMetadata, sectionId } from "./sections";
 import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";
@@ -92,7 +92,7 @@ export type IndexedFile = {
 	id: number;
 	path: string;
 	size: number;
-	changed_at: number;
+	mtimeMs: number;
 	sha256: string;
 };
 
@@ -266,7 +266,7 @@ export function createSearchStore(
 			return new Map(
 				opened()
 					.query<IndexedFile, [string]>(
-						"SELECT id, path, size, changed_at, sha256 FROM files WHERE project_id = ?",
+						"SELECT id, path, size, changed_at AS mtimeMs, sha256 FROM files WHERE project_id = ?",
 					)
 					.all(projectId)
 					.map((row) => [row.path, row]),

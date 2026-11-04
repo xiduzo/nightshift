@@ -19,11 +19,11 @@ import { collectContent } from "./collect";
 import { evaluateKnowledge, type KnowledgeEvaluation } from "./evaluate";
 import {
 	createKnowledgeFolders,
-	isReadable,
 	type KnowledgeReadFrom,
 	type KnowledgeText,
 } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
+import { isReadable } from "./folder-snapshot";
 import {
 	type GraphDocument,
 	type KnowledgeGraph,

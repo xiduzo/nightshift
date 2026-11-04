@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, rm, stat, symlink } from "node:fs/promises";
 import { join } from "node:path";
+import {
+	KNOWLEDGE_RECONCILE_FILE,
+	KNOWLEDGE_SEARCH_FILE,
+} from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { sha256Of } from "../archive";
 import {
@@ -10,6 +14,7 @@ import {
 	syncKnowledgeDocuments as syncDocuments,
 } from "../testing/knowledge-devices";
 import { createKnowledgeFolderLocks } from "./folder-locks";
+import { createKnowledgeSearch } from "./search";
 
 /**
  * The reconcile of a knowledge folder with its document (ADR 4), on two
@@ -412,6 +417,141 @@ describe("reconcile", () => {
 
 		expect([...(await a.entries()).keys()]).toEqual(["notes.md"]);
 		expect(await a.read("notes.md")).toBe("kept\n");
+	});
+});
+
+describe("what the reconcile takes as changed", () => {
+	const sha256 = async (d: Awaited<ReturnType<typeof device>>, path: string) =>
+		(await d.entries()).get(path)?.sha256;
+
+	test("another size at the same time goes out, and another time with other content", async () => {
+		const a = await device(null);
+		await a.put("a.md", "aaaa", NOW);
+		await a.sync.reconcile("p1");
+		const first = await sha256(a, "a.md");
+
+		await a.put("a.md", "aaaaa", NOW);
+		await a.sync.reconcile("p1");
+		const second = await sha256(a, "a.md");
+		expect(second).not.toBe(first);
+
+		await a.put("a.md", "bbbbb", NOW + 1_000);
+		await a.sync.reconcile("p1");
+		expect(await sha256(a, "a.md")).not.toBe(second);
+	});
+
+	test("another time with the same content changes no entry", async () => {
+		const a = await device(null);
+		await a.put("a.md", "same", NOW);
+		await a.sync.reconcile("p1");
+		const entry = (await a.entries()).get("a.md");
+		await a.put("a.md", "same", NOW + 1_000);
+		await a.sync.reconcile("p1");
+		expect((await a.entries()).get("a.md")).toEqual(entry);
+	});
+
+	test("an edit that keeps both size and time is not seen, as long as both stay", async () => {
+		const a = await device(null);
+		await a.put("a.md", "aaaa", NOW);
+		await a.sync.reconcile("p1");
+		const first = await sha256(a, "a.md");
+		await a.put("a.md", "bbbb", NOW);
+		await a.sync.reconcile("p1");
+		expect(await sha256(a, "a.md")).toBe(first);
+		// The next change of its time shows it.
+		await a.put("a.md", "bbbb", NOW + 1_000);
+		await a.sync.reconcile("p1");
+		expect(await sha256(a, "a.md")).not.toBe(first);
+	});
+});
+
+/**
+ * The state of the reconcile and the `files` table of the search index stay
+ * two records (`folder-snapshot.ts`): each moves only when its own work is
+ * done, and neither stands in for the other.
+ */
+describe("the two records of a folder", () => {
+	test("a lost state loses no file: a newer edit and a file of the folder alone go out", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		await a.put("kept.md", "kept\n", NOW);
+		await a.put("edited.md", "before\n", NOW);
+		await a.sync.reconcile("p1");
+
+		await rm(join(a.dir, KNOWLEDGE_RECONCILE_FILE));
+		await a.put("edited.md", "after, by a person\n", NOW + 20_000);
+		await a.put("new.md", "new\n", NOW);
+		await a.sync.reconcile("p1");
+
+		expect(await a.read("kept.md")).toBe("kept\n");
+		expect(await a.read("edited.md")).toBe("after, by a person\n");
+		expect(await a.read("new.md")).toBe("new\n");
+		expect([...(await a.entries()).keys()].sort()).toEqual([
+			"edited.md",
+			"kept.md",
+			"new.md",
+		]);
+		const b = await device(host);
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+		expect(await b.read("edited.md")).toBe("after, by a person\n");
+	});
+
+	test("an index built again brings back no file another Device removed", async () => {
+		const { host } = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		await a.put("gone.md", "gone\n");
+		await a.sync.reconcile("p1");
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+		await rm(join(a.dir, "gone.md"));
+		await a.sync.reconcile("p1");
+		await syncDocuments(a, b);
+		await b.sync.reconcile("p1");
+		expect(await b.has("gone.md")).toBe(false);
+
+		const search = createKnowledgeSearch(b.sandbox.dataDir);
+		await search.refresh("p1");
+		search.close();
+		await rm(join(b.sandbox.dataDir, "knowledge", KNOWLEDGE_SEARCH_FILE));
+		await b.sync.reconcile("p1");
+		await syncDocuments(a, b);
+		await a.sync.reconcile("p1");
+
+		expect((await b.entries()).has("gone.md")).toBe(false);
+		expect(await a.has("gone.md")).toBe(false);
+	});
+
+	test("a crash after a reconcile, before the index read the files: the next search reads them", async () => {
+		const a = await device(null);
+		await a.put("first.md", "word one\n");
+		const before = createKnowledgeSearch(a.sandbox.dataDir);
+		await before.refresh("p1");
+		before.close();
+
+		await a.put("late.md", "word late\n");
+		await a.sync.reconcile("p1");
+
+		const after = createKnowledgeSearch(a.sandbox.dataDir);
+		const hits = await after.search("p1", "late");
+		after.close();
+		expect(hits.map((hit) => hit.path)).toEqual(["late.md"]);
+	});
+
+	test("a crash after the index read a file, before a reconcile: the file still goes out", async () => {
+		const a = await device(null);
+		await a.put("a.md", "before\n", NOW);
+		await a.sync.reconcile("p1");
+		const first = (await a.entries()).get("a.md")?.sha256;
+
+		await a.put("a.md", "after\n", NOW + 1_000);
+		const search = createKnowledgeSearch(a.sandbox.dataDir);
+		await search.refresh("p1");
+		search.close();
+		await a.sync.reconcile("p1");
+
+		expect((await a.entries()).get("a.md")?.sha256).not.toBe(first);
 	});
 });
 

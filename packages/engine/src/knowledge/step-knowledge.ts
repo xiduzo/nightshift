@@ -7,7 +7,8 @@ import {
 } from "@nightshift/agents/tools";
 import type { AgentEvent, SessionContribution } from "@nightshift/agents/types";
 import { knowledgeFolderPath } from "@nightshift/flows";
-import type { KnowledgeFolders } from "./folder";
+import { indexFolder, type KnowledgeFolders } from "./folder";
+import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeReader } from "./knowledge-reader";
 import { keepLearnings } from "./learnings";
 import type { KnowledgeSync } from "./reconcile";
@@ -103,7 +104,7 @@ const nothing = {
 } satisfies Omit<SessionKnowledge, "done">;
 
 export function createStepKnowledge(deps: {
-	folders: Pick<KnowledgeFolders, "folder" | "ensure" | "files" | "index">;
+	folders: Pick<KnowledgeFolders, "folder" | "ensure" | "scan">;
 	sync: Pick<KnowledgeSync, "startStep">;
 	reader: Pick<KnowledgeReader, "read">;
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
@@ -144,8 +145,8 @@ export function createStepKnowledge(deps: {
 	}
 
 	/** The index catches up with the folder from now on, not at the first search. */
-	function refreshSearch(projectId: string): void {
-		search.refresh(projectId).catch((error) => {
+	function refreshSearch(projectId: string, snapshot: FolderSnapshot): void {
+		search.refresh(projectId, snapshot).catch((error) => {
 			console.warn(
 				"The knowledge search index was not brought up to date:",
 				error,
@@ -215,17 +216,16 @@ export function createStepKnowledge(deps: {
 			if (knowledgeOnly) {
 				const only = knowledgeOnly.folders;
 				let view: KnowledgeView;
+				let snapshot: FolderSnapshot;
 				try {
-					view = await createKnowledgeView(
-						path,
-						await folders.files(projectId),
-						only,
-					);
+					// After the reconcile, which writes the folder.
+					snapshot = await folders.scan(projectId);
+					view = await createKnowledgeView(path, snapshot.readable, only);
 				} catch (error) {
 					console.warn("The knowledge was left out:", error);
 					return { ...nothing, done: hold.done };
 				}
-				refreshSearch(projectId);
+				refreshSearch(projectId, snapshot);
 				const done = async () => {
 					try {
 						await view.remove();
@@ -240,15 +240,17 @@ export function createStepKnowledge(deps: {
 				contribution: { env: knowledgeEnv(path) },
 				done: hold.done,
 			};
+			let snapshot: FolderSnapshot;
 			try {
-				const files = await folders.files(projectId);
-				if (files.length === 0 && !knowledge?.always) return plain;
-				await folders.index(projectId);
+				// After the reconcile, which writes the folder.
+				snapshot = await folders.scan(projectId);
+				if (snapshot.readable.length === 0 && !knowledge?.always) return plain;
+				await indexFolder(snapshot);
 			} catch (error) {
 				console.warn("The knowledge folder was left out:", error);
 				return plain;
 			}
-			refreshSearch(projectId);
+			refreshSearch(projectId, snapshot);
 			return given(projectId, path, path, step, hold.done);
 		},
 	};

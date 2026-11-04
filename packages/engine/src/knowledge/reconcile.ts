@@ -14,15 +14,15 @@ import {
 	KNOWLEDGE_RECONCILE_FILE,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import {
-	type SpaceArchive,
-	sha256Of,
-	sha256OfFile,
-	writeWhole,
-} from "../archive";
+import { type SpaceArchive, sha256Of, writeWhole } from "../archive";
 import { LOCAL_ONLY_BYTES } from "./documents";
-import { isKnowledgePath, type KnowledgeFolders, walkFolder } from "./folder";
+import type { KnowledgeFolders } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
+import {
+	isKnowledgePath,
+	type KnowledgeFile,
+	scanFolder,
+} from "./folder-snapshot";
 import type { KnowledgeDocuments, KnowledgeEntry } from "./knowledge-document";
 import type { SpaceHostStatus } from "./space-host-status";
 
@@ -35,7 +35,9 @@ import type { SpaceHostStatus } from "./space-host-status";
  * - the folder: the file as it is now;
  * - the state of the last reconcile (`.reconciled.json`, hidden in the
  *   folder, so the index and the agents skip it): the entry the folder
- *   held then, with the file's size and modification time;
+ *   held then, with the file's size and modification time. It is the base
+ *   of the merge, and the search index never stands in for it
+ *   (`folder-snapshot.ts`);
  * - the document: the entry as the Space has it now.
  *
  * A file the folder changed (its size or time differ, and so does its
@@ -58,7 +60,7 @@ import type { SpaceHostStatus } from "./space-host-status";
  */
 
 export type KnowledgeSyncDeps = {
-	folders: Pick<KnowledgeFolders, "folder" | "known">;
+	folders: Pick<KnowledgeFolders, "folder" | "known" | "scan">;
 	documents: Pick<KnowledgeDocuments, "open" | "remove">;
 	/** The content by hash: here, and at the Space's Host. */
 	archive: Pick<SpaceArchive, "here" | "read" | "put">;
@@ -175,7 +177,8 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			}
 		}
 
-		const files = await scan(root);
+		const snapshot = await folders.scan(projectId);
+		const local = snapshot.changedSince(saved);
 		const entries = document.entries();
 		const next = new Map<string, Kept>();
 		const sets: [string, KnowledgeEntry][] = [];
@@ -184,15 +187,14 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		/** Publishes the folder's file: content to the archive, then its entry. */
 		async function publish(
 			path: string,
-			file: FileStat,
-			known: string | null,
+			file: KnowledgeFile,
 			after: number,
 		): Promise<Kept | null> {
 			const abs = join(root, ...path.split("/"));
-			const changedAt = Math.max(file.mtimeMs, after + 1);
+			const changedAt = Math.max(file.changedAt, after + 1);
 			let entry: KnowledgeEntry;
 			if (file.size > LOCAL_ONLY_BYTES) {
-				const sha256 = known ?? (await sha256OfFile(abs).catch(() => null));
+				const sha256 = await snapshot.sha256(path);
 				if (sha256 === null) return null;
 				entry = { sha256, size: file.size, changedAt, deviceId, local: true };
 			} else {
@@ -205,7 +207,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 				entry = { sha256, size: content.length, changedAt, deviceId };
 			}
 			sets.push([path, entry]);
-			return { ...entry, mtimeMs: file.mtimeMs };
+			return { ...entry, mtimeMs: file.changedAt };
 		}
 
 		/** Writes the entry's content into the folder. Null when it cannot now. */
@@ -224,7 +226,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		}
 
 		async function settle(path: string): Promise<void> {
-			const file = files.get(path) ?? null;
+			const file = snapshot.file(path) ?? null;
 			const was = saved.get(path) ?? null;
 			const entry = entries.get(path) ?? null;
 			const keep = () => {
@@ -232,15 +234,12 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			};
 
 			// Did the folder change it since the last reconcile?
-			let sha256: string | null = null;
 			let localChanged = file !== null || was !== null;
 			if (file && was) {
-				if (file.size === was.size && file.mtimeMs === was.mtimeMs) {
+				if (!local.changed.has(path)) {
 					localChanged = false;
 				} else {
-					sha256 = await sha256OfFile(join(root, ...path.split("/"))).catch(
-						() => null,
-					);
+					const sha256 = await snapshot.sha256(path);
 					if (sha256 === null) return keep();
 					localChanged = sha256 !== was.sha256;
 				}
@@ -252,12 +251,13 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			const after = Math.max(was?.changedAt ?? 0, entry?.changedAt ?? 0);
 
 			if (!localChanged && !remoteChanged) {
-				if (file && entry) next.set(path, { ...entry, mtimeMs: file.mtimeMs });
+				if (file && entry)
+					next.set(path, { ...entry, mtimeMs: file.changedAt });
 				return;
 			}
 			if (localChanged && !remoteChanged) {
 				if (file) {
-					const kept = await publish(path, file, sha256, after);
+					const kept = await publish(path, file, after);
 					if (kept) next.set(path, kept);
 					else keep();
 				} else if (entry) {
@@ -278,7 +278,7 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 					// earlier change: the later one, this folder's, goes back.
 					const { mtimeMs: _time, ...earlier } = was;
 					sets.push([path, earlier]);
-					next.set(path, { ...was, mtimeMs: file.mtimeMs });
+					next.set(path, { ...was, mtimeMs: file.changedAt });
 					return;
 				}
 				const taken = await take(path, entry);
@@ -288,19 +288,17 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 			}
 			// Both changed it.
 			if (file && entry) {
-				sha256 ??= await sha256OfFile(join(root, ...path.split("/"))).catch(
-					() => null,
-				);
+				const sha256 = await snapshot.sha256(path);
 				if (sha256 === null) return keep();
 				if (sha256 === entry.sha256) {
-					next.set(path, { ...entry, mtimeMs: file.mtimeMs });
+					next.set(path, { ...entry, mtimeMs: file.changedAt });
 					return;
 				}
 			}
 			const localWins =
-				file !== null && (entry === null || file.mtimeMs > entry.changedAt);
+				file !== null && (entry === null || file.changedAt > entry.changedAt);
 			if (file && localWins) {
-				const kept = await publish(path, file, sha256, after);
+				const kept = await publish(path, file, after);
 				if (kept) next.set(path, kept);
 				else keep();
 				return;
@@ -313,7 +311,11 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 		}
 
 		const paths = [
-			...new Set([...files.keys(), ...saved.keys(), ...entries.keys()]),
+			...new Set([
+				...snapshot.files.map((file) => file.path),
+				...saved.keys(),
+				...entries.keys(),
+			]),
 		]
 			.filter(isKnowledgePath)
 			.sort();
@@ -513,20 +515,6 @@ export function createKnowledgeSync(deps: KnowledgeSyncDeps) {
 	};
 }
 
-/** A file of the folder, as the reconcile compares it. */
-type FileStat = { size: number; mtimeMs: number };
-
-/** Every file of the folder that syncs (`isKnowledgePath`), by path. */
-async function scan(root: string): Promise<Map<string, FileStat>> {
-	const { files } = await walkFolder(root);
-	return new Map(
-		files.map((file) => [
-			file.path,
-			{ size: file.size, mtimeMs: file.changedAt },
-		]),
-	);
-}
-
 /**
  * Moves a knowledge folder to another place. When that place has a
  * folder already, each file goes into it, unless the file there is
@@ -538,7 +526,7 @@ async function moveFolder(from: string, to: string): Promise<void> {
 		await rename(from, to);
 		return;
 	}
-	const { files } = await walkFolder(from);
+	const { files } = await scanFolder(from);
 	for (const file of files) {
 		const target = join(to, ...file.path.split("/"));
 		if (!(await inFolder(to, file.path))) continue;

@@ -141,6 +141,30 @@ describe("knowledge search", () => {
 		expect(paths(await search.search("p1", "bbbb"))).toEqual(["a.md"]);
 	});
 
+	test("a change of another size at the same time is read again", async () => {
+		await put("a.md", "aaaa", 1_000_000);
+		await search.refresh("p1");
+		await put("a.md", "bbbbbb", 1_000_000);
+		expect(paths(await search.search("p1", "bbbbbb"))).toEqual(["a.md"]);
+	});
+
+	test("an edit that keeps both size and time is not read, as long as both stay", async () => {
+		await put("a.md", "aaaa", 1_000_000);
+		await search.refresh("p1");
+		await put("a.md", "bbbb", 1_000_000);
+		expect(await search.refresh("p1")).toMatchObject({ indexed: 0 });
+		expect(await search.search("p1", "bbbb")).toEqual([]);
+	});
+
+	test("takes the look at the folder it is given, and takes a new one without it", async () => {
+		const folders = createKnowledgeFolders(dataDir);
+		await put("a.md", "aaaa");
+		const look = await folders.scan("p1");
+		await put("b.md", "bbbb");
+		expect(await search.refresh("p1", look)).toMatchObject({ files: 1 });
+		expect(await search.refresh("p1")).toMatchObject({ files: 2 });
+	});
+
 	test("keeps projects apart", async () => {
 		const other = await createKnowledgeFolders(dataDir).ensure("p2");
 		await put("a.md", "shared word");

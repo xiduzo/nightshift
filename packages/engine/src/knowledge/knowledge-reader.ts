@@ -9,13 +9,13 @@ import { Refusal } from "@nightshift/refusal";
 import type { SpaceArchive } from "../archive";
 import { OLDER_HOST } from "../contract";
 import {
-	isReadable,
-	type KnowledgeFile,
+	cleanPath,
 	type KnowledgeFolders,
 	type KnowledgeReadFrom,
 	type KnowledgeText,
 	knowledgeText,
 } from "./folder";
+import type { KnowledgeFile } from "./folder-snapshot";
 import type { KnowledgeDocuments } from "./knowledge-document";
 import { notesIn, notesOf, type WaitingLearning } from "./learnings";
 import type { SpaceHostStatus } from "./space-host-status";
@@ -156,11 +156,10 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 			// This computer's folder first: it may not have the file yet.
 			const here = await folders.read(projectId, path, maxBytes, from);
 			if (here) return here;
-			const clean = path.trim().replace(/^\.\/+/, "");
+			const clean = cleanPath(path);
+			if (clean === null) return null;
 			const spaceId = await status.spaceOf(projectId);
-			const entry = isReadable(clean)
-				? (await documents.open(projectId)).entries().get(clean)
-				: undefined;
+			const entry = (await documents.open(projectId)).entries().get(clean);
 			if (spaceId === null || !entry) return null;
 			if (entry.local && entry.deviceId !== deviceId) {
 				throw new Refusal(

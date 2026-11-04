@@ -1,21 +1,17 @@
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
-import { sha256OfFile } from "../archive";
 import { isDocument, loadDocument } from "./documents";
 import {
 	createKnowledgeFolders,
 	cutText,
-	describeDocument,
-	describeText,
-	fallbackTitle,
-	type KnowledgeFile,
+	describeFile,
+	isText,
 	readStart,
-	TEXT_FILES,
 } from "./folder";
+import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
 import {
 	createSearchStore,
-	type IndexedFile,
 	type IndexedFileWrite,
 	MATCH_CLOSE,
 	MATCH_OPEN,
@@ -38,9 +34,10 @@ import { inFolders } from "./view";
  * never waits on the Replica's writers. Delete the file and the next
  * search builds it again.
  *
- * It has no hooks. Before each search it walks the folder and reads again
- * only the files whose size or time of change differ, and drops the ones
- * that went. A file whose content hash (the sha256 the `knowledge:<id>`
+ * It has no hooks. Before each search it takes a look at the folder
+ * (`folder-snapshot.ts`) and reads again only the files whose size or time
+ * of change differ from its own `files` table, and drops the ones that went.
+ * A file whose content hash (the sha256 the `knowledge:<id>`
  * document holds) did not change is not split again. So it stays right
  * whoever changes the folder: a sync kit, a person, or the Space's
  * knowledge as it arrives.
@@ -55,7 +52,7 @@ import { inFolders } from "./view";
  * (`KnowledgeMeaning.floor`): a query no file matches finds nothing.
  * Without Ollama, or before the first vectors, it finds by words only.
  *
- * It indexes the text files (`TEXT_FILES`) the index lists, and the text
+ * It indexes the text files (`isText`) the index lists, and the text
  * of PDF and Word files (`documents.ts`): the files a person or an agent
  * reads (`isReadable`), so not `INDEX.md`, hidden files or the learnings
  * that wait for a person. A document over 10 MB is found by its path only.
@@ -148,7 +145,6 @@ const SNIPPET_CHARS = 180;
 /** How long a search waits for the query's vector before it finds by words only. A Host's CPU takes 3 s for one, and up to 8 s more while a preparation runs. */
 const QUERY_TIMEOUT_MS = 15_000;
 
-const isText = (path: string) => TEXT_FILES.has(extname(path).toLowerCase());
 /** The files the index reads: text files and documents. */
 const isIndexed = (path: string) => isText(path) || isDocument(path);
 
@@ -349,22 +345,17 @@ export function createKnowledgeSearch(
 	/** Whether the last query's vector did not come, to log it once. */
 	let queryFailed = false;
 
-	async function update(projectId: string): Promise<KnowledgeRefresh> {
-		const dir = folders.folder(projectId);
-		const files = (await folders.files(projectId)).filter((f) =>
-			isIndexed(f.path),
-		);
+	async function update(
+		projectId: string,
+		given?: FolderSnapshot,
+	): Promise<KnowledgeRefresh> {
+		const snapshot = given ?? (await folders.scan(projectId));
+		const { dir } = snapshot;
+		const files = snapshot.readable.filter((f) => isIndexed(f.path));
 		await store.open();
 		const known = store.files(projectId);
-		const changed: { file: KnowledgeFile; row: IndexedFile | undefined }[] = [];
-		for (const f of files) {
-			const row = known.get(f.path);
-			known.delete(f.path);
-			if (!row || row.size !== f.size || row.changed_at !== f.changedAt) {
-				changed.push({ file: f, row });
-			}
-		}
-		const gone = [...known.values()];
+		const { changed, gone } = snapshot.changedSince(known, files);
+		const changes = [...changed.values()];
 
 		let moved = false;
 		if (gone.length > 0) {
@@ -372,30 +363,28 @@ export function createKnowledgeSearch(
 			store.removeFiles(gone);
 		}
 
-		for (let at = 0; at < changed.length; at += BATCH) {
+		for (let at = 0; at < changes.length; at += BATCH) {
 			const batch = await Promise.all(
-				changed
+				changes
 					.slice(at, at + BATCH)
-					.map(async ({ file: f, row }): Promise<IndexedFileWrite> => {
+					.map(async (f): Promise<IndexedFileWrite> => {
+						const row = known.get(f.path);
 						const abs = join(dir, ...f.path.split("/"));
-						// A file that went since the walk is dropped by the next refresh.
-						const sha256 = await sha256OfFile(abs).catch(() => "");
+						// A file that went since the scan is dropped by the next refresh.
+						const sha256 = (await snapshot.sha256(f.path)) ?? "";
 						if (row && sha256 !== "" && row.sha256 === sha256) {
 							return { file: f, row, same: true };
 						}
-						const fallback = fallbackTitle(f.path);
-						let title = f.path.split("/").at(-1) ?? f.path;
-						let content: string | Document[] = "";
+						let title: string;
+						let content: string | Document[];
 						if (isDocument(f.path)) {
 							const docs = await loadDocument(abs);
-							if (docs !== null) {
-								title = describeDocument(docs, fallback).title;
-								content = firstPages(docs, MAX_BODY_BYTES);
-							}
+							title = describeFile(f.path, { docs }).title;
+							content = docs ? firstPages(docs, MAX_BODY_BYTES) : "";
 						} else {
 							const read = await readStart(abs, MAX_BODY_BYTES);
 							content = read?.text ?? "";
-							title = describeText(content.slice(0, 4096), fallback).title;
+							title = describeFile(f.path, { text: content }).title;
 						}
 						const sections = await splitSections(f.path, content);
 						return { file: f, row, same: false, sha256, title, sections };
@@ -406,7 +395,7 @@ export function createKnowledgeSearch(
 		if (moved) preparation.sectionsChanged(projectId);
 		return {
 			files: files.length,
-			indexed: changed.length,
+			indexed: changes.length,
 			removed: gone.length,
 		};
 	}
@@ -414,11 +403,15 @@ export function createKnowledgeSearch(
 	/**
 	 * The project's index brought up to date with its folder, then its
 	 * vectors in the background, unless search by meaning is off for it.
+	 * `snapshot`: the look at the folder the caller took just now.
 	 */
-	function refresh(projectId: string): Promise<KnowledgeRefresh> {
+	function refresh(
+		projectId: string,
+		snapshot?: FolderSnapshot,
+	): Promise<KnowledgeRefresh> {
 		const running = refreshing.get(projectId);
 		if (running) return running;
-		const next = update(projectId)
+		const next = update(projectId, snapshot)
 			.then((result) => {
 				preparation.request(projectId);
 				return result;

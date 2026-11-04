@@ -42,10 +42,22 @@ reconciles before and the last reconciles after.
   a removal, so nothing is lost.
 
 A hidden file in the folder, `.reconciled.json`, holds what the folder had
-at the last reconcile. `INDEX.md`, hidden files and the files a sync kit
-still writes (names that end in `.part`) never sync. A file
-larger than 10 MB stays on the computer that has it. The others list it,
-but do not fetch it.
+at the last reconcile. It is the base of the merge. `INDEX.md`, hidden files
+and the files a sync kit still writes (names that end in `.part`) never sync.
+A file larger than 10 MB stays on the computer that has it. The others list
+it, but do not fetch it.
+
+A file changed when its size or its time of change differ. Then Night Shift
+compares its hash. An edit that keeps both size and time is not seen until
+one of them changes. The reconcile, `INDEX.md` and the search index share
+this rule (`folder-snapshot.ts`). A step's start scans the folder twice: the
+reconcile scans it, and after the reconcile one more scan serves `INDEX.md`
+and the search index.
+
+The search index has its own record of the files it read, and neither record
+replaces the other. If you delete the index, no file comes back and no file
+goes. If you delete `.reconciled.json`, the next reconcile is an import. It
+loses no file, but a file that another computer removed can come back.
 
 A computer that cannot reach its Host works on its own copy. Content it
 cannot copy waits. Night Shift tries again each minute and at the next
@@ -502,7 +514,7 @@ it. Before each search, Night Shift reads again only the files whose size
 or time of change differ, and splits again only those whose content hash
 changed. It drops the removed ones. Thus the index stays correct, whoever
 changes the folder. For 2 000 files the first search takes about half a
-second, and a later one about 50 ms. It reads the first 1 MB of a file.
+second, and a later one about 20 ms. It reads the first 1 MB of a file.
 A new embedding model builds the vectors again. So does a new version of the
 index (`SCHEMA_VERSION` in `search-store.ts`, the one module that knows its
 tables).

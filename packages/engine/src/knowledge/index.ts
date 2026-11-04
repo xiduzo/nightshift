@@ -11,11 +11,12 @@
 export { LOCAL_ONLY_BYTES } from "./documents";
 export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
 export type { KnowledgeEvaluation } from "./evaluate";
-export type { KnowledgeFile, KnowledgeText } from "./folder";
+export type { KnowledgeText } from "./folder";
 export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
 } from "./folder-locks";
+export type { KnowledgeFile } from "./folder-snapshot";
 export type { KnowledgeGraph } from "./graph";
 export { createKnowledge, type Knowledge } from "./knowledge";
 export type { WaitingLearning } from "./learnings";

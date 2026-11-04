@@ -9,12 +9,14 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Document } from "@langchain/core/documents";
 import { asDate, iso, now } from "@nightshift/time";
 import { tinyDocx, tinyPdf } from "../testing/documents";
+import type { DocumentMetadata } from "./documents";
 import {
 	createKnowledgeFolders,
-	describeDocumentText,
-	describeText,
+	describeFile,
+	indexFolder,
 	textFrom,
 } from "./folder";
 
@@ -30,6 +32,10 @@ const put = async (dir: string, path: string, text: string) => {
 	await mkdir(join(dir, path, ".."), { recursive: true });
 	await writeFile(join(dir, path), text);
 };
+
+/** Writes the index of p1 when it is stale, from a new look at its folder. */
+const writeIndex = async () =>
+	indexFolder(await createKnowledgeFolders(dataDir).scan("p1"));
 
 describe("the knowledge folder", () => {
 	test("is per project, under the data folder, and refuses an id that leaves it", () => {
@@ -47,13 +53,13 @@ describe("the knowledge folder", () => {
 		await put(dir, "INDEX.md", "old");
 		await put(dir, "learnings/proposed/r1.md", "- a note");
 		await put(dir, "learnings/accepted/r0.md", "- kept");
-		const files = await folders.files("p1");
+		const { readable: files } = await folders.scan("p1");
 		expect(files.map((f) => f.path)).toEqual([
 			"learnings/accepted/r0.md",
 			"wiki/Home.md",
 		]);
 		expect(files[1]?.size).toBe(7);
-		expect(await folders.files("none")).toEqual([]);
+		expect((await folders.scan("none")).readable).toEqual([]);
 	});
 
 	test("writes the index with one line per file, and again only when it is stale", async () => {
@@ -67,7 +73,7 @@ describe("the knowledge folder", () => {
 		await put(dir, "notes.txt", "Plain words here.\n");
 		await put(dir, "diagram.png", "png");
 		const day = iso(now()).slice(0, 10);
-		await folders.index("p1");
+		await writeIndex();
 		const index = join(dir, "INDEX.md");
 		const first = await readFile(index, "utf8");
 		expect(first).toContain(
@@ -85,12 +91,12 @@ describe("the knowledge folder", () => {
 		await utimes(join(dir, "wiki"), past, past);
 		await utimes(join(dir, "notes.txt"), past, past);
 		await utimes(join(dir, "diagram.png"), past, past);
-		await folders.index("p1");
+		await writeIndex();
 		expect(await readFile(index, "utf8")).toContain("<!-- kept -->");
 
 		// A file that went: written again.
 		await rm(join(dir, "diagram.png"));
-		await folders.index("p1");
+		await writeIndex();
 		const second = await readFile(index, "utf8");
 		expect(second).not.toContain("<!-- kept -->");
 		expect(second).not.toContain("diagram.png");
@@ -100,13 +106,13 @@ describe("the knowledge folder", () => {
 		const old = asDate(now() - 30_000);
 		await utimes(index, old, old);
 		await put(dir, "notes.txt", "New words.\n");
-		await folders.index("p1");
+		await writeIndex();
 		expect(await readFile(index, "utf8")).toContain("New words");
 	});
 
 	test("an empty folder says so", async () => {
 		const folders = createKnowledgeFolders(dataDir);
-		await folders.index("p1");
+		await writeIndex();
 		expect(
 			await readFile(join(folders.folder("p1"), "INDEX.md"), "utf8"),
 		).toContain("No files yet.");
@@ -120,7 +126,7 @@ describe("the headings in the index", () => {
 		for (const [path, text] of Object.entries(files)) {
 			await put(dir, path, text);
 		}
-		await folders.index("p1");
+		await writeIndex();
 		return (await readFile(join(dir, "INDEX.md"), "utf8")).split("\n");
 	};
 	/** The line under the line of a file: its headings. Undefined: it has none. */
@@ -219,13 +225,13 @@ describe("the headings in the index", () => {
 		const folders = createKnowledgeFolders(dataDir);
 		const dir = await folders.ensure("p1");
 		await put(dir, "a.md", "# A\n\n## One\n\n## Two\n");
-		await folders.index("p1");
+		await writeIndex();
 		const index = join(dir, "INDEX.md");
 		const first = await readFile(index, "utf8");
 		await writeFile(index, `${first}<!-- kept -->\n`);
 		const past = asDate(now() - 60_000);
 		await utimes(join(dir, "a.md"), past, past);
-		await folders.index("p1");
+		await writeIndex();
 		expect(await readFile(index, "utf8")).toContain("<!-- kept -->");
 	});
 });
@@ -242,7 +248,7 @@ describe("PDF and Word files in the index", () => {
 			join(dir, "guide.docx"),
 			tinyDocx("Onboarding guide", ["Every new teammate meets the wombat."]),
 		);
-		await folders.index("p1");
+		await writeIndex();
 		const index = await readFile(join(dir, "INDEX.md"), "utf8");
 		expect(index).toContain(
 			"- `guide.docx`: Onboarding guide. Every new teammate meets the wombat",
@@ -258,12 +264,12 @@ describe("PDF and Word files in the index", () => {
 		const folders = createKnowledgeFolders(dataDir);
 		const dir = await folders.ensure("p1");
 		await put(dir, "a.md", "# A\n");
-		await folders.index("p1");
+		await writeIndex();
 		await writeFile(
 			join(dir, "INDEX.md"),
 			"# Knowledge index\n\n- `a.md`: A\n",
 		);
-		await folders.index("p1");
+		await writeIndex();
 		expect(await readFile(join(dir, "INDEX.md"), "utf8")).toContain(
 			"PDF and Word files too",
 		);
@@ -282,7 +288,7 @@ describe("PDF and Word files in the index", () => {
 				title: "Microsoft Word - notes.docx",
 			}),
 		);
-		await folders.index("p1");
+		await writeIndex();
 		const index = await readFile(join(dir, "INDEX.md"), "utf8");
 		expect(index).toContain("- `plan.pdf`: Team plan. We go on Monday (");
 		expect(index).toContain(
@@ -291,30 +297,50 @@ describe("PDF and Word files in the index", () => {
 	});
 
 	test("the first short line without a stop is the title, else the file name", () => {
-		expect(describeDocumentText("Plan\nWe go. Later more.", "f")).toEqual({
+		const ofText = (text: string) =>
+			describeFile("dir/f.pdf", {
+				docs: [
+					new Document<DocumentMetadata>({
+						pageContent: text,
+						metadata: { source: "f" },
+					}),
+				],
+			});
+		expect(ofText("Plan\nWe go. Later more.")).toEqual({
 			title: "Plan",
 			sentence: "We go",
 		});
-		expect(describeDocumentText("This is a sentence.\nMore.", "f")).toEqual({
+		expect(ofText("This is a sentence.\nMore.")).toEqual({
 			title: "f",
 			sentence: "This is a sentence",
 		});
-		expect(describeDocumentText("", "f")).toEqual({ title: "f", sentence: "" });
+		expect(ofText("")).toEqual({ title: "f", sentence: "" });
+	});
+
+	test("one that does not open shows its name", () => {
+		expect(describeFile("dir/f.pdf", { docs: null })).toEqual({
+			title: "f.pdf",
+			sentence: "",
+		});
 	});
 });
 
-describe("describeText", () => {
-	test("the first heading and the first sentence, past code and quotes", () => {
+describe("the title of a file", () => {
+	const ofText = (text: string) => describeFile("dir/file.md", { text });
+
+	test("is the first heading, with the first sentence, past code and quotes", () => {
 		expect(
-			describeText(
-				"Intro line first. More.\n\n```\ncode\n```\n> quote\n## Title\n",
-				"file",
-			),
+			ofText("Intro line first. More.\n\n```\ncode\n```\n> quote\n## Title\n"),
 		).toEqual({ title: "Title", sentence: "Intro line first" });
-		expect(describeText("", "file")).toEqual({ title: "file", sentence: "" });
-		expect(describeText("- a list item. Then.", "f").sentence).toBe(
-			"a list item",
-		);
+		expect(ofText("")).toEqual({ title: "file", sentence: "" });
+		expect(ofText("- a list item. Then.").sentence).toBe("a list item");
+	});
+
+	test("of a file that is not text is its name, whatever its bytes say", () => {
+		expect(describeFile("dir/a.png", { text: "# Not a title" })).toEqual({
+			title: "a.png",
+			sentence: "",
+		});
 	});
 });
 
