@@ -22,6 +22,7 @@ A released build of Night Shift sends these events to the Night Shift team. A ru
 | `nightshift.pull_request.opened` | `nightshift.run.id`. |
 | `nightshift.pull_request.outcome` | `nightshift.pull_request.outcome` (`merged`, `closed`, `reverted`, `_OTHER`). `nightshift.pull_request.hours`. |
 | `nightshift.install.active` | `os.type`. `host.arch`. `service.version`. `nightshift.install.spaces` and `nightshift.install.members` (`0`, `1`, `2-4`, `5+`). `nightshift.install.agents` (int). `nightshift.host.paired` and `nightshift.phone.signed_in` (booleans). |
+| `nightshift.knowledge.document_measured` | `nightshift.project.id` (a hash). `nightshift.knowledge.document.kilobytes` (int). |
 | `nightshift.process.crashed` | `error.type`. |
 
 ## End reasons

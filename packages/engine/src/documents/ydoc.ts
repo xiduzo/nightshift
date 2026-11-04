@@ -26,6 +26,8 @@ export type PersistedDocument = {
 export type DocumentRows = {
 	fetch(name: string): Promise<Uint8Array | null>;
 	store(name: string, state: Uint8Array): Promise<void>;
+	/** The size of each kept state whose name has this prefix, in bytes. SQLite reads no state for it. */
+	sizes(prefix: string): Promise<{ name: string; bytes: number }[]>;
 };
 
 export function documentRows(db: Database): DocumentRows {
@@ -49,6 +51,12 @@ export function documentRows(db: Database): DocumentRows {
 						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
 					},
 				});
+		},
+		sizes(prefix) {
+			return db
+				.select({ name: ydoc.name, bytes: sql<number>`length(${ydoc.state})` })
+				.from(ydoc)
+				.where(sql`substr(${ydoc.name}, 1, ${prefix.length}) = ${prefix}`);
 		},
 	};
 }

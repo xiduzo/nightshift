@@ -196,3 +196,12 @@ events:
     attributes:
       - ref: error.type
         requirement_level: required
+
+  - name: nightshift.knowledge.document_measured
+    brief: Night Shift measured the size of one knowledge document, once a day.
+    stability: development
+    attributes:
+      - ref: nightshift.project.id
+        requirement_level: required
+      - ref: nightshift.knowledge.document.kilobytes
+        requirement_level: required

@@ -2,7 +2,9 @@ import type { Database } from "@nightshift/db";
 import { z } from "zod";
 import {
 	createSyncedDocuments,
+	documentId,
 	documentName,
+	documentRows,
 	type PersistedDocument,
 	type SyncedDocuments,
 } from "../documents";
@@ -135,6 +137,12 @@ export type KnowledgeDocuments = {
 	open(projectId: string): Promise<KnowledgeDocument>;
 	/** Closes the Project's knowledge document and deletes it from this Replica: its Project moved to another id. */
 	remove(projectId: string): Promise<void>;
+	/**
+	 * The size of each knowledge document this Replica keeps, in bytes. Yjs
+	 * keeps a deleted entry for ever (`docs/knowledge.md`, "How the knowledge
+	 * document grows"), so this is its growth. It loads no document.
+	 */
+	sizes(): Promise<{ projectId: string; bytes: number }[]>;
 };
 
 export function createKnowledgeDocuments(options: {
@@ -151,5 +159,14 @@ export function createKnowledgeDocuments(options: {
 			),
 		remove: (projectId) =>
 			documents.remove(documentName("knowledge", projectId)),
+		async sizes() {
+			const rows = await documentRows(options.db).sizes(
+				documentName("knowledge", ""),
+			);
+			return rows.flatMap(({ name, bytes }) => {
+				const projectId = documentId("knowledge", name);
+				return projectId === null ? [] : [{ projectId, bytes }];
+			});
+		},
 	};
 }

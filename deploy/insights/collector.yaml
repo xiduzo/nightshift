@@ -55,6 +55,7 @@ processors:
       - nightshift.install.host
       - nightshift.install.members
       - nightshift.install.spaces
+      - nightshift.knowledge.document.kilobytes
       - nightshift.model.family
       - nightshift.node.kind
       - nightshift.phone.signed_in
@@ -64,6 +65,7 @@ processors:
       - nightshift.project.check.identity
       - nightshift.project.check.tools
       - nightshift.project.has_remote
+      - nightshift.project.id
       - nightshift.project.source
       - nightshift.project.starters
       - nightshift.pull_request.hours

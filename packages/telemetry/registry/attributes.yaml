@@ -2,7 +2,7 @@ file_format: definition/2
 attributes:
   - key: nightshift.project.id
     type: string
-    brief: The project a run belongs to.
+    brief: The project a run belongs to. A usage event sends a hash, not the id.
     stability: development
   - key: nightshift.flow.id
     type: string
@@ -402,4 +402,8 @@ attributes:
         - { id: two_to_four, value: "2-4", brief: Two to four other members., stability: development }
         - { id: five_plus, value: "5+", brief: Five or more other members., stability: development }
     brief: How many members the Spaces have, as a bucket.
+    stability: development
+  - key: nightshift.knowledge.document.kilobytes
+    type: int
+    brief: The size of one knowledge document on this computer, in whole kilobytes.
     stability: development

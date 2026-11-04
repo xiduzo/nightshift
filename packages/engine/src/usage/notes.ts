@@ -46,6 +46,7 @@ export type UsageMoment =
 			spaces: number;
 			members: number;
 	  }
+	| { kind: "knowledge-document-measured"; projectId: string; bytes: number }
 	| { kind: "process-crashed" };
 
 /** Where a moment is noted. Absent means this computer records none. */

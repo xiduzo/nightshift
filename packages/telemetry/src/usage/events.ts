@@ -315,6 +315,11 @@ export function momentEvent(
 				"service.version": platform.version,
 			});
 		}
+		case "knowledge-document-measured":
+			return draft(USAGE_EVENT.knowledgeDocumentMeasured, {
+				"project.id": hashId(key, moment.projectId),
+				"document.kilobytes": Math.ceil(whole(moment.bytes) / 1000),
+			});
 		case "process-crashed":
 			return draft(USAGE_EVENT.processCrashed, { "error.type": "_OTHER" });
 		default:

@@ -478,6 +478,7 @@ export async function createDaemon(
 				archive,
 				folderLocks,
 				device,
+				usage: telemetry,
 				meaning: () => ollama.meaning(),
 			}),
 		(before) => before.close(),

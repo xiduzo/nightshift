@@ -169,6 +169,9 @@ export const REGISTRY = {
 			type: "string",
 			members: ["0", "1", "2-4", "5+"],
 		},
+		"nightshift.knowledge.document.kilobytes": {
+			type: "int",
+		},
 		"nightshift.knowledge.reads": {
 			type: "int",
 		},
@@ -920,6 +923,7 @@ export const USAGE_EVENT = {
 	pullRequestOutcome: "nightshift.pull_request.outcome",
 	pullRequestUseful: "nightshift.pull_request.useful",
 	installActive: "nightshift.install.active",
+	knowledgeDocumentMeasured: "nightshift.knowledge.document_measured",
 	processCrashed: "nightshift.process.crashed",
 } as const;
 
@@ -1039,6 +1043,13 @@ export const usageEventSchema = {
 			name: z.literal("nightshift.install.started"),
 			"nightshift.install.entry": z.enum(["desktop", "server", "_OTHER"]),
 			"nightshift.install.host": z.boolean(),
+		})
+		.strict(),
+	"nightshift.knowledge.document_measured": z
+		.object({
+			name: z.literal("nightshift.knowledge.document_measured"),
+			"nightshift.knowledge.document.kilobytes": z.number().int(),
+			"nightshift.project.id": z.string(),
 		})
 		.strict(),
 	"nightshift.process.crashed": z

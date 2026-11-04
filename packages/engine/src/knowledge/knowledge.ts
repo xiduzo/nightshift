@@ -14,6 +14,7 @@ import { now } from "@nightshift/time";
 import { type SpaceArchive, writeWhole } from "../archive";
 import type { SyncedDocuments } from "../documents";
 import { createRunLog } from "../log";
+import type { UsageNotes } from "../usage";
 import { collectContent } from "./collect";
 import { evaluateKnowledge, type KnowledgeEvaluation } from "./evaluate";
 import {
@@ -269,6 +270,9 @@ const TIMERS = {
 	/** The content of the Spaces this Device keeps that no document lists any more. */
 	firstCollectMs: 60 * 60_000,
 	collectMs: 24 * 60 * 60_000,
+	/** The size of each knowledge document, for the anonymous usage. */
+	firstMeasureMs: 60 * 60_000,
+	measureMs: 24 * 60 * 60_000,
 };
 
 export type KnowledgeDeps = {
@@ -290,6 +294,8 @@ export type KnowledgeDeps = {
 	meaning?: KnowledgeMeaning | (() => KnowledgeMeaning | null);
 	/** How long a page read waits for its reconcile. Default 2 s. */
 	pageWaitMs?: number;
+	/** Where the size of each knowledge document goes, once a day. */
+	usage?: UsageNotes;
 	/** Other times for `TIMERS`. */
 	timers?: Partial<typeof TIMERS>;
 };
@@ -374,12 +380,37 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		};
 		const firstCollect = setTimeout(collectNow, times.firstCollectMs);
 		const collect = setInterval(collectNow, times.collectMs);
-		for (const timer of [first, retry, firstCollect, collect]) timer.unref();
+		const measureNow = () => {
+			documents
+				.sizes()
+				.then((sizes) => {
+					for (const size of sizes) {
+						deps.usage?.note({ kind: "knowledge-document-measured", ...size });
+					}
+				})
+				.catch((error) => {
+					console.warn("The knowledge documents were not measured:", error);
+				});
+		};
+		const firstMeasure = setTimeout(measureNow, times.firstMeasureMs);
+		const measure = setInterval(measureNow, times.measureMs);
+		for (const timer of [
+			first,
+			retry,
+			firstCollect,
+			collect,
+			firstMeasure,
+			measure,
+		]) {
+			timer.unref();
+		}
 		return () => {
 			clearTimeout(first);
 			clearInterval(retry);
 			clearTimeout(firstCollect);
 			clearInterval(collect);
+			clearTimeout(firstMeasure);
+			clearInterval(measure);
 		};
 	}
 

@@ -87,6 +87,28 @@ describe("the knowledge document", () => {
 		);
 	});
 
+	test("tells the size of each knowledge document it keeps, and of no other document", async () => {
+		const { synced, documents } = open();
+		expect(await documents.sizes()).toEqual([]);
+		const document = await documents.open("p1");
+		await document.apply({ set: [["a.md", entry("a")]] });
+		const flows = await synced.open(documentName("flows", "p1"));
+		await flows.change(() => flows.doc.getMap("x").set("y", 1));
+		await synced.flush();
+
+		const [size, ...others] = await documents.sizes();
+		expect(others).toEqual([]);
+		expect(size?.projectId).toBe("p1");
+		const growing = size?.bytes ?? 0;
+		expect(growing).toBeGreaterThan(0);
+
+		// A replaced entry leaves a deleted one behind: the size grows.
+		await document.apply({ set: [["a.md", entry("b")]] });
+		await synced.flush();
+		const [after] = await documents.sizes();
+		expect(after?.bytes).toBeGreaterThan(growing);
+	});
+
 	test("search by meaning is on until a person turns it off", async () => {
 		const document = await open().documents.open("p1");
 		expect(document.meaningOn()).toBe(true);

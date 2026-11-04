@@ -9,6 +9,7 @@ import { USAGE_EVENT } from "@nightshift/semconv";
 import { parseInstant } from "@nightshift/time";
 
 import { hashId } from "./anonymize";
+import { attr } from "./fields";
 import type { WaitingEvent } from "./outbox";
 import {
 	keepEvent,
@@ -215,6 +216,32 @@ test("an HMAC is stable for one key and changes after the id is reset", async ()
 		expect(JSON.stringify(after[0])).toBe(before.slice(1, -1));
 		expect(JSON.stringify(after[1])).not.toBe(JSON.stringify(after[0]));
 		expect(JSON.stringify(after)).not.toContain(SECRET_RUN);
+		await usage.stop();
+	} finally {
+		await close();
+	}
+});
+
+test("a knowledge document's size leaves as a hash and whole kilobytes", async () => {
+	const { db, close } = await openDb();
+	try {
+		const usage = createUsage({
+			db,
+			settings: switches(true, true),
+			policy: async () => true,
+		});
+		usage.note({
+			kind: "knowledge-document-measured",
+			projectId: SECRET_RUN,
+			bytes: 7_679_009,
+		});
+		await usage.settled();
+		const [event] = (await usage.outbox()).waiting as Record<string, unknown>[];
+		expect(event?.name).toBe(USAGE_EVENT.knowledgeDocumentMeasured);
+		const name = USAGE_EVENT.knowledgeDocumentMeasured;
+		expect(event?.[attr(name, "project.id")]).toHaveLength(16);
+		expect(event?.[attr(name, "document.kilobytes")]).toBe(7_680);
+		expect(JSON.stringify(event)).not.toContain(SECRET_RUN);
 		await usage.stop();
 	} finally {
 		await close();

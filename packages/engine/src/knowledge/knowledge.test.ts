@@ -18,6 +18,7 @@ import { OLDER_HOST, OlderHostError } from "../contract";
 import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import { otherSpace } from "../testing/test-support";
+import type { UsageMoment } from "../usage";
 import type { KnowledgeMeaning } from "./meaning";
 
 /**
@@ -58,7 +59,7 @@ async function device(
 	host: ArchiveHost,
 	options: Pick<
 		Parameters<typeof testKnowledge>[1] & {},
-		"meaning" | "timers"
+		"meaning" | "timers" | "usage"
 	> = {},
 ) {
 	const sandbox = await createSandbox();
@@ -82,6 +83,31 @@ async function device(
 		paths: async () => [...(await built.documents.open("p1")).entries().keys()],
 	};
 }
+
+describe("the size of the knowledge documents", () => {
+	test("goes to the usage notes on a timer, by project, until `close`", async () => {
+		const moments: UsageMoment[] = [];
+		const a = await device(memoryHost(), {
+			timers: { firstReconcileMs: 60_000, firstMeasureMs: 1, measureMs: 5 },
+			usage: { note: (moment) => moments.push(moment) },
+		});
+		await a.put("wiki/Home.md", "# Home\n");
+		await (await a.knowledge.forCommand({ projectId: "p1" })).done();
+
+		await waitFor(() => moments.length > 0);
+		expect(moments[0]).toEqual({
+			kind: "knowledge-document-measured",
+			projectId: "p1",
+			bytes: expect.any(Number),
+		});
+
+		a.knowledge.close();
+		await Bun.sleep(20);
+		const seen = moments.length;
+		await Bun.sleep(20);
+		expect(moments).toHaveLength(seen);
+	});
+});
 
 describe("a step's knowledge", () => {
 	// `bun --hot` makes a new Knowledge beside a step that goes on: the daemon

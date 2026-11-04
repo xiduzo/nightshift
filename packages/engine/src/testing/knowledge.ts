@@ -24,7 +24,10 @@ import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
  */
 export function testKnowledge(
 	sandbox: { db: Database; dataDir: string; deviceId: string },
-	options: Pick<KnowledgeDeps, "meaning" | "pageWaitMs" | "timers"> & {
+	options: Pick<
+		KnowledgeDeps,
+		"meaning" | "pageWaitMs" | "timers" | "usage"
+	> & {
 		archive?: SpaceArchive;
 		/** Default: its own. Give one to make a second Knowledge as a reload does. */
 		folderLocks?: KnowledgeFolderLocks;

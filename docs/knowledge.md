@@ -570,6 +570,82 @@ The Knowledge page warns above 2 000 files. Nothing loads the folder into
 a prompt, but an agent finds less in that much text. Sync only what your
 agents need.
 
+### How the knowledge document grows
+
+The knowledge document never forgets. Each change of a path adds a new
+entry and leaves a deleted one behind (ADR 4, a Yjs map). Reconcile writes
+only a real change, so the growth follows how many files change, not how
+often a computer syncs.
+
+A normal wiki changes tens of pages a night. That is harmless for years. A
+source that replaces its whole folder each night is the case to watch.
+Night Shift measured these numbers on one real Yjs map, in Bun 1.3.10
+on an Apple Silicon laptop, with 2 000 paths replaced each night.
+
+| After | Deleted entries | Kept state | Load | Memory the load adds |
+| ---------- | --------------- | ---------- | ------ | ------------------- |
+| 1 night | 0 | 0.42 MB | 12 ms | 19 MB |
+| 30 nights | 58 000 | 0.98 MB | 42 ms | 66 MB |
+| 90 nights | 178 000 | 2.0 MB | 90 ms | 124 MB |
+| 180 nights | 358 000 | 3.98 MB | 148 ms | 216 MB |
+| 365 nights | 728 000 | 7.68 MB | 0.3 to 0.5 s | 410 MB |
+
+The last column is the growth of the resident memory of the process. After
+a year, the JavaScript heap of the loaded document is about 185 MB.
+
+- One deleted entry takes about 10 bytes in the kept state. One live entry
+  takes about 210 bytes.
+- After a year, each change encodes the full state in 65 to 100 ms and writes
+  it to SQLite in 28 ms. Memory hurts first. The disk does not.
+- A computer that restarts each night is a new Yjs client each night. That
+  does not make the document larger: 6.87 MB after a year.
+- A copy of only the live entries takes 0.42 MB and loads in 4 ms.
+
+Measure again when Yjs or Bun changes much.
+
+**The measure.** Once a day each computer sends the size of each knowledge
+document it keeps, as the anonymous usage event
+`nightshift.knowledge.document_measured`: a hash of the project id and the
+size in whole kilobytes. It sends no name and no path. The size comes from
+SQLite without reading the state, so a heavy document is not loaded for it.
+The usage switches stop this event like any other.
+
+**When to compact.** Compact a document when both of these are true:
+
+- Its size is above 5 MB. At the churn above, that is after about 7 months,
+  when the load adds about 270 MB of memory.
+- Its live entries take less than half of that size. Multiply the number of
+  files on the Knowledge page by 210 bytes.
+
+A document that is large because it lists many files gains nothing.
+
+**How to compact.** Compaction is a procedure. No code does it yet (ADR 4
+stays, and there is no second CRDT).
+
+1. Release a version of Night Shift that reads a generation for each
+   project from the Space document. No generation means the name
+   `knowledge:<project id>`. Generation 2 means `knowledge:<project id>:2`.
+   The access rules and `documentKind` must accept the new name.
+2. Deploy the version to the Host. Update every computer of the Space. A
+   computer on an older version keeps writing to the old document, and the
+   Space loses those changes.
+3. Stop the schedules of the project. Wait until no run of the project is
+   open.
+4. Open the Knowledge page on each computer, so that each reconciles.
+5. On the Host, create `knowledge:<project id>:2`. Copy each entry of `files`
+   and each value of `settings` with the same values. Do not copy the
+   history.
+6. Set the generation of the project to 2 in the Space document. Each
+   computer opens the new document at its next reconcile.
+7. Start the schedules again.
+8. When every computer has reconciled, remove the old document on each
+   Replica.
+
+The content stays in the archive, because the hashes do not change. A
+computer that reconciles before its new document synced publishes its folder
+again. The later change wins, so it loses nothing. Until step 8, the
+collection of old content must read both documents.
+
 ## The module
 
 `createKnowledge` in `packages/engine/src/knowledge` is the one door to all
@@ -580,8 +656,9 @@ the answer.
 
 The daemon makes one `Knowledge` per start. `connect` is its one late
 binding, because the devices runtime is made after it. The timers run from
-`connect` on: every folder after 15 seconds, the retries each minute, and
-the collection of old content each day. `close` ends them.
+`connect` on: every folder after 15 seconds, the retries each minute, the
+collection of old content each day, and the size of each knowledge document
+each day. `close` ends them.
 
 A `bun --hot` reload replaces the whole `Knowledge`. What is on disk stays,
 and so do the locks of the folders: a step that started before the reload
