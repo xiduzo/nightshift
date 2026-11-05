@@ -216,17 +216,6 @@ export function ProfileSelect<P extends Profile>({
 	);
 }
 
-/** A node's backups once its profile is `next`: never the profile itself. */
-export function backupsWithProfile(
-	fallbacks: readonly ProfileRef[] | undefined,
-	next: ProfileRef,
-): ProfileRef[] | undefined {
-	const kept = (fallbacks ?? []).filter(
-		(backup) => keyOf(backup) !== keyOf(next),
-	);
-	return kept.length > 0 ? kept : undefined;
-}
-
 /**
  * The profiles that take a node's step when its own profile's computer
  * cannot, first one first (ADR 19). Each row is a profile on one computer.

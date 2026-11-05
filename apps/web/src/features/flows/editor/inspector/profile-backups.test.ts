@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { backupsWithProfile } from "./profile-select";
+import { backupsWithProfile } from "./profile-backups";
 
 describe("the backups of a node when its profile changes", () => {
 	const host = { device: "host", profile: "builder" };

@@ -32,7 +32,6 @@ import { Field, InspectorSection } from "../fields";
 import { OverrideBadge } from "./agent-fields";
 import { deciderModelHint, withoutField } from "./model-defaults";
 import {
-	backupsWithProfile,
 	ProfileBackupsField,
 	type ProfileChoice,
 	ProfileSelect,

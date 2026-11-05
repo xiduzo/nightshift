@@ -47,7 +47,6 @@ import { AgentOutcomeSection } from "./agent-outcomes";
 import { CascadeSection } from "./cascade-fields";
 import { withoutField } from "./model-defaults";
 import {
-	backupsWithProfile,
 	ProfileBackupsField,
 	type ProfileChoice,
 	ProfileSelect,
