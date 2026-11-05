@@ -66,10 +66,11 @@ const RUN_ID_AWK = "[A-Za-z0-9_-]+";
  * header cannot hide any: its lines match only with one word for the run.
  *
  * Backslashes and quotes are escaped, tabs are spaces, lines are joined with
- * `\n`: JSON without jq.
+ * `\n`: JSON without jq. A backslash doubles through "&&" because what a
+ * written "\\\\" gives in a replacement differs between awk programs.
  */
 export const LEARNINGS_GATE_TEXT_AWK = String.raw`BEGIN { ORS = "" }
 /^[ \t\r]*$/ { next }
 /^${TITLE_START}${RUN_ID_AWK}\r?$/ { next }
 /^${INTRO_START}${RUN_ID_AWK}${INTRO_END}\.\r?$/ { next }
-{ gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, " "); gsub(/\r/, ""); print $0 "\\n" }`;
+{ gsub(/\\/, "&&"); gsub(/"/, "\\\""); gsub(/\t/, " "); gsub(/\r/, ""); print $0 "\\n" }`;

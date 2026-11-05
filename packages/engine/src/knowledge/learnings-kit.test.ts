@@ -370,6 +370,18 @@ describe("what the Gate lists", () => {
 		).toBe(waiting.length);
 	});
 
+	test("keeps backslashes and quotes of a note, as valid JSON", async () => {
+		const note = String.raw`- C:\temp\new says "stop" at \\host`;
+		const knowledge = await folderOf({
+			"learnings/proposed/run-1.s1.md": `${note}\n`,
+		});
+		const { command, env } = rendered("list", "");
+		const { output } = await inShell(knowledge, command, env);
+
+		const gate = JSON.parse(output) as { text: string };
+		expect(gate.text).toBe(`${note}\n`);
+	});
+
 	test("has nothing for a folder of other files: no Gate opens", async () => {
 		const knowledge = await folderOf({
 			"learnings/proposed/my notes.md": "- Spaces.\n",
